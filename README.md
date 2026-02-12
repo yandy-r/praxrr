@@ -29,7 +29,7 @@
 
 ## Features
 
-**Core**
+### Core
 
 - **Link** - Connect to configuration databases like the
   [Dictionarry database](https://github.com/Dictionarry-Hub/db) or any Profilarr
@@ -38,7 +38,7 @@
 - **Sync** - Push configurations to your instances. Profilarr compiles
   everything to the right format automatically
 
-**For Users**
+### For Users
 
 - **Ready-to-Use Configurations** - Stop spending hours piecing together
   settings from forum posts. Get complete, tested quality profiles, custom
@@ -50,7 +50,7 @@
   the first RSS item that qualifies. Profilarr triggers intelligent searches
   based on filters and selectors
 
-**For Developers**
+### For Developers
 
 - **Unified Architecture** - One configuration language that compiles to
   Radarr/Sonarr-specific formats on sync. No more maintaining separate configs
@@ -62,7 +62,7 @@
 - **Testing** - Validate regex patterns, custom format conditions, and quality
   profile behavior before syncing
 
-**Authentication**
+### Authentication
 
 - `AUTH=on` (default) - Username/password login required
 - `AUTH=local` - Skip auth for local network requests
@@ -94,7 +94,7 @@ services:
     image: ghcr.io/dictionarry-hub/profilarr:latest
     container_name: profilarr
     ports:
-      - "6868:6868"
+      - '6868:6868'
     volumes:
       - ./config:/config
     environment:
@@ -112,7 +112,7 @@ services:
     image: ghcr.io/dictionarry-hub/profilarr-parser:latest
     container_name: profilarr-parser
     expose:
-      - "5000"
+      - '5000'
 ```
 
 > [!NOTE]
@@ -122,7 +122,7 @@ services:
 
 ### Development
 
-**Prerequisites**
+#### Prerequisites
 
 - [Git](https://git-scm.com/) (for PCD operations)
 - [Deno](https://deno.com/) 2.x
