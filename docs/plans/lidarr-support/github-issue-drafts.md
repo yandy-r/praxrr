@@ -2,11 +2,21 @@
 
 ## Issue Creation Status
 
-Attempted to create issues in `yandy-r/profilarr`, but GitHub API returned:
+Issues are now enabled and the Lidarr tracking set has been created.
 
-- `410 Issues has been disabled in this repository`
+Active tracking issues:
 
-Once issues are enabled, the drafts below can be posted as-is.
+- Parent umbrella: [#6](https://github.com/yandy-r/profilarr/issues/6)
+- Child issues:
+  - [#1](https://github.com/yandy-r/profilarr/issues/1)
+  - [#2](https://github.com/yandy-r/profilarr/issues/2)
+  - [#3](https://github.com/yandy-r/profilarr/issues/3)
+  - [#4](https://github.com/yandy-r/profilarr/issues/4)
+  - [#5](https://github.com/yandy-r/profilarr/issues/5)
+
+Planning workflow requirement:
+
+- When running `shared-context` and `parallel-plan`, map generated work items to issue IDs `#1`-`#5` and track rollup status in `#6`.
 
 ## Recommended Issue Set
 

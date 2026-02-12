@@ -270,6 +270,18 @@ This feature adds first-class Lidarr support to Profilarr so music automation ca
 - Keep API key handling write-only in forms and avoid exposing keys in logs/responses.
 - Reuse existing request validation and centralized error envelopes.
 
+## Issue Tracking
+
+- Parent tracker: [#6](https://github.com/yandy-r/profilarr/issues/6)
+- Child issues:
+  - [#1](https://github.com/yandy-r/profilarr/issues/1) onboarding + type contracts
+  - [#2](https://github.com/yandy-r/profilarr/issues/2) sync + media-management compatibility
+  - [#3](https://github.com/yandy-r/profilarr/issues/3) library + releases support
+  - [#4](https://github.com/yandy-r/profilarr/issues/4) UI controls + capability states
+  - [#5](https://github.com/yandy-r/profilarr/issues/5) rename/upgrades scope + parity matrix
+- Planning requirement for downstream workflows:
+  - `shared-context` and `parallel-plan` outputs must map proposed tasks to one of `#1`-`#5` and reference `#6` as the umbrella tracker.
+
 ## Task Breakdown Preview
 
 ### Phase 1: Type and Onboarding Parity
