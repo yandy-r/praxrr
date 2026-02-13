@@ -16,8 +16,10 @@
 	import {
 		ARR_APP_OPTIONS,
 		isArrAppType,
+		supportsArrSyncSurface,
 		supportsArrWorkflow,
 		type ArrAppType,
+		type ArrSyncSurface,
 		type ArrWorkflowSurface
 	} from '$shared/arr/capabilities.ts';
 
@@ -91,12 +93,24 @@
 		'rename',
 		'upgrades'
 	];
+	const downstreamSyncSurfaces: ArrSyncSurface[] = [
+		'quality_profiles',
+		'custom_formats',
+		'delay_profiles',
+		'media_management'
+	];
 	const workflowLabels: Record<ArrWorkflowSurface, string> = {
 		instances: 'Settings',
 		library: 'Library',
 		releases: 'Releases',
 		rename: 'Rename',
 		upgrades: 'Upgrades'
+	};
+	const syncLabels: Record<ArrSyncSurface, string> = {
+		quality_profiles: 'Quality Profiles',
+		custom_formats: 'Custom Formats',
+		delay_profiles: 'Delay Profiles',
+		media_management: 'Media Management'
 	};
 	const appPorts: Record<ArrAppType, number> = {
 		radarr: 7878,
@@ -206,19 +220,35 @@
 				.filter((workflow) => !supportsArrWorkflow(selectedAppType, workflow))
 				.map((workflow) => workflowLabels[workflow])
 		: [];
+	$: unsupportedSyncLabels = selectedAppType
+		? downstreamSyncSurfaces
+				.filter((surface) => !supportsArrSyncSurface(selectedAppType, surface))
+				.map((surface) => syncLabels[surface])
+		: [];
 	$: supportedWorkflowLabels = selectedAppType
 		? downstreamWorkflowSurfaces
 				.filter((workflow) => supportsArrWorkflow(selectedAppType, workflow))
 				.map((workflow) => workflowLabels[workflow])
 		: [];
+	$: supportedSyncLabels = selectedAppType
+		? downstreamSyncSurfaces
+				.filter((surface) => supportsArrSyncSurface(selectedAppType, surface))
+				.map((surface) => syncLabels[surface])
+		: [];
 	$: selectedAppLabel = selectedAppType
 		? typeOptions.find((option) => option.value === selectedAppType)?.label ?? 'This app'
 		: '';
 	$: unsupportedWorkflowSummary = joinLabels(unsupportedWorkflowLabels);
+	$: unsupportedSyncSummary = joinLabels(unsupportedSyncLabels);
 	$: supportedWorkflowSummary = joinLabels(supportedWorkflowLabels);
+	$: supportedSyncSummary = joinLabels(supportedSyncLabels);
 	$: unsupportedWorkflowMessage =
 		selectedAppType && unsupportedWorkflowLabels.length > 0
 			? `${selectedAppLabel} does not support ${unsupportedWorkflowSummary} in Profilarr yet.${supportedWorkflowLabels.length > 0 ? ` You can still use ${supportedWorkflowSummary}.` : ''}`
+			: '';
+	$: unsupportedSyncMessage =
+		selectedAppType && unsupportedSyncLabels.length > 0
+			? `${selectedAppLabel} does not support ${unsupportedSyncSummary} sync in Profilarr yet.${supportedSyncLabels.length > 0 ? ` You can still configure ${supportedSyncSummary}.` : ''}`
 			: '';
 	$: urlPlaceholder = selectedAppType ? `http://localhost:${appPorts[selectedAppType]}` : 'http://localhost:7878';
 	$: urlDescription = selectedAppType
@@ -226,7 +256,7 @@
 		: defaultUrlHint;
 	$: title = mode === 'create' ? 'Add Instance' : 'Settings';
 	$: description = mode === 'create'
-		? 'Configure a new Arr app instance. Workflow availability depends on app capabilities.'
+		? 'Configure a new Arr app instance. Workflow and sync availability depend on app capabilities.'
 		: `Configure connection and sync settings for ${instance?.name || 'this instance'}.`;
 </script>
 
@@ -287,6 +317,11 @@
 			{#if unsupportedWorkflowMessage}
 				<p class="text-xs text-amber-600 dark:text-amber-400" role="status">
 					{unsupportedWorkflowMessage}
+				</p>
+			{/if}
+			{#if unsupportedSyncMessage}
+				<p class="text-xs text-amber-600 dark:text-amber-400" role="status">
+					{unsupportedSyncMessage}
 				</p>
 			{/if}
 		</div>
