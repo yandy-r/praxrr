@@ -48,7 +48,7 @@ jobs:
       - name: Determine channel
         id: channel
         run: |
-          if [[ "${{ github.ref }}" == "refs/heads/v2" ]]; then
+          if [[ "${{ github.ref }}" == "refs/heads/v2-lidarr" ]]; then
             echo "value=develop" >> $GITHUB_OUTPUT
           elif [[ "${{ github.ref }}" == refs/tags/v*-beta* ]]; then
             echo "value=beta" >> $GITHUB_OUTPUT
@@ -65,15 +65,19 @@ jobs:
           images: ${{ env.IMAGE_BASE }}/${{ matrix.image }}
           labels: |
             org.opencontainers.image.licenses=AGPL-3.0
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
           tags: |
             # Branch push -> v2-lidarr
             type=raw,value=v2-lidarr,enable=${{ github.ref == 'refs/heads/v2-lidarr' }}
+            # Lidarr tag -> v2-lidarr + exact tag
+            type=raw,value=v2-lidarr,enable=${{ startsWith(github.ref, 'refs/tags/v2-lidarr.') }}
+            type=ref,event=tag,enable=${{ startsWith(github.ref, 'refs/tags/v2-lidarr.') }}
             # Beta tag -> beta + version
             type=raw,value=beta,enable=${{ startsWith(github.ref, 'refs/tags/v') && contains(github.ref, '-beta') }}
             type=semver,pattern={{version}},enable=${{ startsWith(github.ref, 'refs/tags/v') && contains(github.ref, '-beta') }}
             # Stable tag -> latest + version
-            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') && !contains(github.ref, '-beta') }}
-            type=semver,pattern={{version}},enable=${{ startsWith(github.ref, 'refs/tags/v') && !contains(github.ref, '-beta') }}
+            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') && !contains(github.ref, '-beta') && !startsWith(github.ref, 'refs/tags/v2-lidarr.') }}
+            type=semver,pattern={{version}},enable=${{ startsWith(github.ref, 'refs/tags/v') && !contains(github.ref, '-beta') && !startsWith(github.ref, 'refs/tags/v2-lidarr.') }}
 
       - name: Build and push
         id: push
