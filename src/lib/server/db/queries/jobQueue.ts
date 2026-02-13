@@ -163,6 +163,18 @@ export const jobQueueQueries = {
 		return rows.map(rowToRecord);
 	},
 
+	listQueuedByJobTypeAndInstanceId(jobType: JobType, instanceId: number): JobQueueRecord[] {
+		const rows = db.query<JobQueueRow>(
+			`SELECT * FROM job_queue
+			 WHERE job_type = ? AND status = 'queued'
+			 AND (json_extract(payload, '$.instanceId') = ? OR json_extract(payload, '$.instanceId') = ?)`,
+			jobType,
+			instanceId,
+			String(instanceId)
+		);
+		return rows.map(rowToRecord);
+	},
+
 	getNextQueued(): JobQueueRecord | undefined {
 		const row = db.queryFirst<JobQueueRow>(
 			`SELECT * FROM job_queue WHERE status = 'queued' ORDER BY run_at ASC LIMIT 1`

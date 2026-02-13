@@ -6,6 +6,7 @@ import { renameRunsQueries } from '$db/queries/renameRuns.ts';
 import { logger } from '$logger/logger.ts';
 import { scheduleRenameForInstance } from '$lib/server/jobs/init.ts';
 import { enqueueJob } from '$lib/server/jobs/queueService.ts';
+import { cancelQueuedRenameJobs } from '$lib/server/jobs/renameHelpers.ts';
 import { jobQueueQueries } from '$db/queries/jobQueue.ts';
 import { buildJobDisplayName } from '$lib/server/jobs/display.ts';
 import { isArrAppType, supportsArrWorkflow, ARR_APPS } from '$shared/arr/capabilities.ts';
@@ -21,18 +22,6 @@ function getRenameUnsupportedError(instanceType: string): string | null {
 	}
 
 	return null;
-}
-
-function cancelQueuedRenameJobs(instanceId: number): void {
-	jobQueueQueries.cancelByDedupeKey(`arr.rename:${instanceId}`);
-
-	const queuedRenameJobs = jobQueueQueries
-		.listByJobTypes(['arr.rename'])
-		.filter((job) => job.status === 'queued' && Number(job.payload.instanceId) === instanceId);
-
-	for (const job of queuedRenameJobs) {
-		jobQueueQueries.setStatus(job.id, 'cancelled');
-	}
 }
 
 export const load: ServerLoad = ({ params }) => {
