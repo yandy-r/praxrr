@@ -6,6 +6,7 @@ import { renameRunsQueries } from '$db/queries/renameRuns.ts';
 import { logger } from '$logger/logger.ts';
 import { scheduleRenameForInstance } from '$lib/server/jobs/init.ts';
 import { enqueueJob } from '$lib/server/jobs/queueService.ts';
+import { cancelQueuedRenameJobs } from '$lib/server/jobs/renameHelpers.ts';
 import { jobQueueQueries } from '$db/queries/jobQueue.ts';
 import { buildJobDisplayName } from '$lib/server/jobs/display.ts';
 import { isArrAppType, supportsArrWorkflow, ARR_APPS } from '$shared/arr/capabilities.ts';
@@ -61,7 +62,7 @@ export const actions: Actions = {
 
 		const unsupportedError = getRenameUnsupportedError(instance.type);
 		if (unsupportedError) {
-			jobQueueQueries.cancelByDedupeKey(`arr.rename:${id}`);
+			cancelQueuedRenameJobs(id);
 			return fail(400, { error: unsupportedError });
 		}
 
@@ -124,7 +125,7 @@ export const actions: Actions = {
 
 		const unsupportedError = getRenameUnsupportedError(instance.type);
 		if (unsupportedError) {
-			jobQueueQueries.cancelByDedupeKey(`arr.rename:${id}`);
+			cancelQueuedRenameJobs(id);
 			return fail(400, { error: unsupportedError });
 		}
 
@@ -192,7 +193,7 @@ export const actions: Actions = {
 
 		const unsupportedError = getRenameUnsupportedError(instance.type);
 		if (unsupportedError) {
-			jobQueueQueries.cancelByDedupeKey(`arr.rename:${id}`);
+			cancelQueuedRenameJobs(id);
 			return fail(400, { error: unsupportedError });
 		}
 

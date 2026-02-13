@@ -2,6 +2,7 @@ import { jobQueueRegistry } from '../queueRegistry.ts';
 import type { JobHandler } from '../queueTypes.ts';
 import { arrRenameSettingsQueries } from '$db/queries/arrRenameSettings.ts';
 import { arrInstancesQueries } from '$db/queries/arrInstances.ts';
+import { cancelQueuedRenameJobs } from '../renameHelpers.ts';
 import { processRenameConfig } from '$lib/server/rename/processor.ts';
 import { calculateNextRunFromMinutes } from '../scheduleUtils.ts';
 import { logger } from '$logger/logger.ts';
@@ -13,23 +14,33 @@ const renameRunHandler: JobHandler = async (job) => {
 		return { status: 'failure', error: 'Invalid instance ID' };
 	}
 
-	const settings = arrRenameSettingsQueries.getByInstanceId(instanceId);
-	if (!settings || !settings.enabled) {
-		return { status: 'cancelled', output: 'Rename config disabled' };
-	}
-
 	const instance = arrInstancesQueries.getById(instanceId);
 	if (!instance) {
 		return { status: 'failure', error: 'Arr instance not found' };
 	}
 
 	if (!isArrAppType(instance.type)) {
+		try {
+			cancelQueuedRenameJobs(instanceId);
+		} catch {
+			// Best-effort cleanup for unsupported types; continue with explicit unsupported output.
+		}
 		return { status: 'skipped', output: `Rename is not supported for unknown instance type: ${instance.type}` };
 	}
 
 	if (!supportsArrWorkflow(instance.type, 'rename')) {
+		try {
+			cancelQueuedRenameJobs(instanceId);
+		} catch {
+			// Best-effort cleanup for unsupported types; continue with explicit unsupported output.
+		}
 		const label = ARR_APPS[instance.type].label;
 		return { status: 'skipped', output: `Rename is not supported for ${label} instances` };
+	}
+
+	const settings = arrRenameSettingsQueries.getByInstanceId(instanceId);
+	if (!settings || !settings.enabled) {
+		return { status: 'cancelled', output: 'Rename config disabled' };
 	}
 
 	try {
