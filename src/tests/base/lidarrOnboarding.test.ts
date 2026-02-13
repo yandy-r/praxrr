@@ -4,7 +4,13 @@ import { BaseTest, type TestContext } from './BaseTest.ts';
 import { actions } from '../../routes/arr/new/+page.server.ts';
 import { POST as testConnectionPost } from '../../routes/arr/test/+server.ts';
 import { arrInstancesQueries } from '../../lib/server/db/queries/arrInstances.ts';
-import type { CreateArrInstanceInput } from '../../lib/server/db/queries/arrInstances.ts';
+interface CapturedCreate {
+  type: string;
+  name: string;
+  apiKey: string;
+  tags?: string[];
+  enabled?: boolean;
+}
 import { generalSettingsQueries } from '../../lib/server/db/queries/generalSettings.ts';
 import { LidarrClient } from '../../lib/server/utils/arr/clients/lidarr.ts';
 
@@ -71,7 +77,7 @@ class LidarrOnboardingTest extends BaseTest {
     });
 
     this.test('arr/new accepts lidarr and redirects after create', async () => {
-      let created: CreateArrInstanceInput | null = null;
+      let created: CapturedCreate | null = null;
       let delayProfileChecks = 0;
 
       const nameExistsMock: typeof arrInstancesQueries.nameExists = () => false;
@@ -111,11 +117,12 @@ class LidarrOnboardingTest extends BaseTest {
         assertEquals(error.location, '/arr/77/settings');
       }
 
-      assertEquals(created?.type, 'lidarr');
-      assertEquals(created?.name, 'Lidarr Main');
-      assertEquals(created?.apiKey, 'lidarr-api-key');
-      assertEquals(created?.tags, ['music']);
-      assertEquals(created?.enabled, true);
+      const c = created as unknown as CapturedCreate;
+      assertEquals(c.type, 'lidarr');
+      assertEquals(c.name, 'Lidarr Main');
+      assertEquals(c.apiKey, 'lidarr-api-key');
+      assertEquals(c.tags, ['music']);
+      assertEquals(c.enabled, true);
       assertEquals(delayProfileChecks, 0);
     });
 
@@ -146,7 +153,7 @@ class LidarrOnboardingTest extends BaseTest {
         return true;
       };
       const originalClose = LidarrClient.prototype.close;
-      const closeMock: typeof LidarrClient.prototype.close = function () {
+      const closeMock: typeof LidarrClient.prototype.close = function (this: LidarrClient) {
         closeCalls++;
         originalClose.call(this);
       };
