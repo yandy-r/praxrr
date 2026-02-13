@@ -3,7 +3,7 @@ name: Publish API Spec
 on:
   push:
     branches:
-      - v2
+      - v2-lidarr
     paths:
       - 'docs/api/v1/**'
       - 'packages/profilarr-api/deno.json'
