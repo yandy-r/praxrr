@@ -52,7 +52,7 @@ Files to Modify
 
 Update `ArrType` and any Arr route schemas that currently assume only Radarr/Sonarr so `lidarr` is contract-valid everywhere onboarding/library/releases rely on schema enums. Keep contract semantics backward-compatible for existing types and avoid introducing speculative Lidarr-only payload fields that are not yet consumed by server routes. Explicitly note any unchanged surfaces that remain capability-gated for later phases.
 
-#### Task 1.2: Encode PCD entity strategy for Lidarr media-management (Issue #3) Depends on [none]
+#### Task 1.2: Encode PCD entity strategy for Lidarr media-management (Issue #2) Depends on [none]
 
 **READ THESE BEFORE TASK**
 
@@ -92,7 +92,7 @@ Files to Modify
 
 Regenerate API typings so schema updates become compile-time truth for server/UI code by running `deno task bundle:api && deno task generate:api-types`. Ensure output includes `lidarr` in relevant unions, confirm the diff is generated-only (no manual edits), and treat this as a hard gate before shared/runtime union edits.
 
-#### Task 1.4: Align shared/runtime Arr unions and sync type constraints (Issue #1, #3) Depends on [1.3]
+#### Task 1.4: Align shared/runtime Arr unions and sync type constraints (Issue #1, #2) Depends on [1.3]
 
 **READ THESE BEFORE TASK**
 
@@ -176,7 +176,7 @@ Replace hardcoded Radarr/Sonarr assumptions in the instance form with capability
 
 ### Phase 2: Core Lidarr API and Sync Delivery
 
-#### Task 2.1: Implement Lidarr client methods required by routes and sync (Issue #2) Depends on [none]
+#### Task 2.1: Implement Lidarr client methods required by routes and sync (Issue #2, #3) Depends on [none]
 
 **READ THESE BEFORE TASK**
 
@@ -197,7 +197,7 @@ Files to Modify
 
 Implement explicit Lidarr v1 methods required by downstream tasks: `getArtists()`, `getAlbums(artistIds?: number[])`, `getLibrary(profilarrProfileNames?: Set<string>)`, `getReleases(albumId: number)`, and any type-safe helpers needed for profile joins in `types.ts`. Reuse base-client request/error patterns, keep method naming consistent with existing Arr clients, and define return contracts so library/releases/sync routes avoid ad-hoc shape transformations.
 
-#### Task 2.2: Add Lidarr branch to Arr library API route (Issue #2) Depends on [1.5, 2.1]
+#### Task 2.2: Add Lidarr branch to Arr library API route (Issue #3) Depends on [1.5, 2.1]
 
 **READ THESE BEFORE TASK**
 
@@ -217,7 +217,7 @@ Files to Modify
 
 Wire `lidarr` into library aggregation with the same response contract, cache behavior, and error envelopes used by existing Arr branches. Ensure profile attribution semantics remain consistent and unsupported fallback branches are not triggered for valid Lidarr instances.
 
-#### Task 2.3: Add Lidarr branch to Arr releases API route (Issue #2) Depends on [1.5, 2.1]
+#### Task 2.3: Add Lidarr branch to Arr releases API route (Issue #3) Depends on [1.5, 2.1]
 
 **READ THESE BEFORE TASK**
 
@@ -237,7 +237,7 @@ Files to Modify
 
 Add `lidarr` release-search support while preserving existing query validation, grouped release response behavior, and standardized 4xx/5xx error payloads. Keep per-type logic isolated so Radarr/Sonarr execution paths stay unchanged.
 
-#### Task 2.4: Extend sync orchestration mappings for Lidarr (Issue #3) Depends on [1.4, 2.1]
+#### Task 2.4: Extend sync orchestration mappings for Lidarr (Issue #2) Depends on [1.4, 2.1]
 
 **READ THESE BEFORE TASK**
 
@@ -258,7 +258,7 @@ Files to Modify
 
 Ensure section-based sync orchestration can schedule and execute Lidarr-compatible sections without creating a separate job pipeline. Use explicit capability checks where sections are intentionally unsupported and preserve existing section status/job-history behavior.
 
-#### Task 2.5: Implement media-management sync behavior for reused entity strategy (Issue #3) Depends on [1.2, 2.4]
+#### Task 2.5: Implement media-management sync behavior for reused entity strategy (Issue #2) Depends on [1.2, 2.4]
 
 **READ THESE BEFORE TASK**
 
@@ -385,7 +385,7 @@ Files to Modify
 
 Refactor binary Radarr/Sonarr condition targeting into scalable app selection driven by shared metadata so Lidarr can be expressed without bespoke UI forks. Update shared type validation alongside the UI component so condition payload typing remains exhaustive for `lidarr`. Maintain accessibility expectations for keyboard operation and non-color-only distinctions.
 
-#### Task 3.4: Add server regression tests for Lidarr onboarding and APIs (Issue #1, #2) Depends on [1.7, 2.2, 2.3]
+#### Task 3.4: Add server regression tests for Lidarr onboarding and APIs (Issue #1, #3) Depends on [1.7, 2.2, 2.3]
 
 **READ THESE BEFORE TASK**
 
@@ -406,7 +406,7 @@ Files to Modify
 
 Add focused server tests covering onboarding allowlists and library/releases parity behavior for Lidarr, including error-envelope assertions and regressions for existing Arr types. Keep fixtures minimal and deterministic so failures pinpoint contract drift quickly.
 
-#### Task 3.5: Add sync/operations regression tests for mixed Arr deployments (Issue #3, #5) Depends on [2.5, 3.1, 3.2]
+#### Task 3.5: Add sync/operations regression tests for mixed Arr deployments (Issue #2, #5) Depends on [2.5, 3.1, 3.2]
 
 **READ THESE BEFORE TASK**
 
