@@ -3,13 +3,13 @@ name: Docker
 on:
   push:
     branches:
-      - v2
+      - v2-lidarr
     tags:
       - 'v*'
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_BASE: ghcr.io/dictionarry-hub
+  IMAGE_BASE: ghcr.io/yandy-r
 
 jobs:
   build:
@@ -66,8 +66,8 @@ jobs:
           labels: |
             org.opencontainers.image.licenses=AGPL-3.0
           tags: |
-            # Branch push -> develop
-            type=raw,value=develop,enable=${{ github.ref == 'refs/heads/v2' }}
+            # Branch push -> v2-lidarr
+            type=raw,value=v2-lidarr,enable=${{ github.ref == 'refs/heads/v2-lidarr' }}
             # Beta tag -> beta + version
             type=raw,value=beta,enable=${{ startsWith(github.ref, 'refs/tags/v') && contains(github.ref, '-beta') }}
             type=semver,pattern={{version}},enable=${{ startsWith(github.ref, 'refs/tags/v') && contains(github.ref, '-beta') }}
