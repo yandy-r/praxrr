@@ -13,6 +13,7 @@ Active tracking issues:
   - [#3](https://github.com/yandy-r/profilarr/issues/3)
   - [#4](https://github.com/yandy-r/profilarr/issues/4)
   - [#5](https://github.com/yandy-r/profilarr/issues/5)
+  - [#8](https://github.com/yandy-r/profilarr/issues/8) (follow-up: Lidarr quality/custom-format sync parity)
 
 Status sync (2026-02-13):
 
@@ -215,6 +216,56 @@ Research/spec: `docs/plans/lidarr-support/feature-spec.md`
 - `deno task check`
 - `deno task test`
 - relevant `deno task test:e2e` subset(s).
+```
+
+---
+
+## Proposed Follow-Up Child Issue (under #6)
+
+## 6) feat(lidarr): add quality profile and custom-format sync parity
+
+### Body
+
+```markdown
+## Summary
+
+Implement full Lidarr parity for `qualityProfiles` sync, including custom-format score mapping, so syncing a Profilarr database applies expected quality/custom-format behavior in Lidarr (not only delay/media-management).
+
+## Context
+
+Current scope intentionally capability-gates Lidarr quality/custom-format sync:
+
+- `src/lib/server/sync/mappings.ts` limits Lidarr to `delayProfiles` + `mediaManagement`.
+- `qualityProfiles` for Lidarr is skipped with an explicit unsupported reason.
+
+This issue converts that gate into supported behavior.
+
+## Scope
+
+- Enable Lidarr `qualityProfiles` section in sync capability mappings.
+- Implement Lidarr-specific mapping strategy for:
+  - quality definitions
+  - custom-format/source/resolution mapping parity where applicable
+  - deterministic handling for fields Lidarr still cannot represent
+- Update sync handlers to execute Lidarr quality-profile sync path instead of skipping.
+- Add/extend regression tests for mixed Arr deployments:
+  - Lidarr quality profile sync success path
+  - Radarr/Sonarr non-regression
+  - explicit handling for any still-unsupported edge fields
+- Update docs/notes in this plan set to reflect the new parity level.
+
+## Acceptance Criteria
+
+- Running Arr sync for a Lidarr instance with `qualityProfiles` selected no longer returns a capability-gated skip by default.
+- Lidarr receives expected quality profile + custom-format score updates from Profilarr-managed data.
+- Sync outputs/logs remain deterministic and explicit for any residual unsupported fields.
+- Existing Radarr/Sonarr sync behavior remains unchanged.
+
+## Validation
+
+- `deno task check`
+- targeted sync tests (including mixed Arr matrix)
+- manual queue/job smoke test against a real Lidarr instance/container proving quality-profile/custom-format sync updates are applied.
 ```
 
 ---
