@@ -17,6 +17,7 @@ AGENTS.md
 # Application
 /temp
 /config
+.deno-cache/
 
 # OS
 .DS_Store
