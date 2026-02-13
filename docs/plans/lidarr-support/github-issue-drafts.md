@@ -17,8 +17,10 @@ Active tracking issues:
 
 Status sync (2026-02-13):
 
-- `#1` has been re-verified against implementation scope and acceptance criteria in this branch.
-- `#1` is ready for issue-state closeout once merged to the target branch.
+- `#1`-`#5` have been verified against implementation scope and acceptance criteria in this branch.
+- `#1`-`#5` are ready for issue-state closeout once merged to the target branch.
+- `#6` umbrella rollup is complete; see "Rollup Completion Update" section below.
+- `#8` (follow-up) remains open for future Lidarr quality/custom-format sync parity work.
 
 Planning workflow requirement:
 
@@ -272,31 +274,53 @@ This issue converts that gate into supported behavior.
 
 ## Rollup Completion Update (Task 3.7)
 
+Completed: 2026-02-13
+
 ### Final Task-to-Issue Mapping (from `parallel-plan.md`)
 
-- `#1` foundation/onboarding/type contracts: `1.1`, `1.3`, `1.4`, `1.5`, `3.4`
-- `#2` sync/media-management compatibility: `1.2`, `1.4`, `2.1`, `2.4`, `2.5`, `3.5`
-- `#3` library/releases delivery: `2.1`, `2.2`, `2.3`, `3.4`
-- `#4` UI generalization/capability UX: `1.6`, `1.7`, `2.6`, `2.7`, `3.3`, `3.6`
-- `#5` rename/upgrades scope + parity matrix: `3.1`, `3.2`, `3.5`
-- `#6` umbrella rollup: `3.7` (status aggregation and closeout notes for `#1`-`#5`)
+| Issue | Scope | Tasks |
+|-------|-------|-------|
+| `#1` | Foundation/onboarding/type contracts | `1.1`, `1.3`, `1.4`, `1.5`, `3.4` |
+| `#2` | Sync/media-management compatibility | `1.2`, `1.4`, `2.1`, `2.4`, `2.5`, `3.5` |
+| `#3` | Library/releases delivery | `2.1`, `2.2`, `2.3`, `3.4` |
+| `#4` | UI generalization/capability UX | `1.6`, `1.7`, `2.6`, `2.7`, `3.3`, `3.6` |
+| `#5` | Rename/upgrades scope + parity matrix | `3.1`, `3.2`, `3.5` |
+| `#6` | Umbrella rollup | `3.7` (status aggregation and closeout notes for `#1`-`#5`) |
 
 ### Completion Notes
 
-- `#1` completed in scope: onboarding allowlists and contract chain updates
-  (`arr.yaml` -> `pcd.yaml` -> generated `src/lib/api/v1.d.ts`) plus onboarding regression
-  coverage in `src/tests/base/lidarrOnboarding.test.ts`.
-- `#2` completed in scope: sync mappings and media-management behavior implemented with
-  the v1 entity-reuse strategy and mixed-arr sync regression coverage in
+- `#1` completed: OpenAPI schemas updated (`arr.yaml`, `pcd.yaml`), API types regenerated
+  (`src/lib/api/v1.d.ts`), shared unions aligned (`src/lib/shared/pcd/types.ts`), and Lidarr
+  enabled in onboarding allowlists (`+page.server.ts`, `+server.ts`). Server regression
+  coverage added in `src/tests/base/lidarrOnboarding.test.ts`.
+- `#2` completed: PCD entity strategy encoded as v1 reuse of existing media-management shapes.
+  Sync orchestration extended in `src/lib/server/sync/mappings.ts` and
+  `src/lib/server/jobs/handlers/arrSync.ts`. Media-management syncer updated to handle Lidarr
+  with explicit capability gating for unsupported fields. Quality profile sync for Lidarr
+  intentionally deferred to follow-up `#8`. Regression coverage in
   `src/tests/jobs/lidarrSync.test.ts`.
-- `#3` completed in scope: Lidarr client methods and API branches for
-  `/api/v1/arr/library` and `/api/v1/arr/releases`, with regression coverage in
+- `#3` completed: Lidarr client implemented in `src/lib/server/utils/arr/clients/lidarr.ts`
+  with `getArtists`, `getAlbums`, `getLibrary`, and `getReleases` methods. Library and releases
+  API routes wired in `/api/v1/arr/library` and `/api/v1/arr/releases`. Regression coverage in
   `src/tests/base/lidarrApiParity.test.ts`.
-- `#4` completed in scope: capability metadata adopted across onboarding/list/condition/
-  library UX, with end-to-end flow coverage in
+- `#4` completed: Centralized capability metadata introduced in
+  `src/lib/shared/arr/capabilities.ts`. Onboarding form, Arr list views (CardView/TableView),
+  library page, and custom-format condition targeting all generalized to consume capabilities
+  instead of hardcoded dual-app assumptions. E2E coverage in
   `src/tests/e2e/specs/2.40-lidarr-core-flow.spec.ts`.
-- `#5` completed in scope: v1 decision locked as capability-gated rename/upgrades for
-  Lidarr, enforced in handlers/pages with explicit unsupported responses and covered by
+- `#5` completed: v1 decision locked as capability-gated for Lidarr rename and upgrades.
+  Rename handler (`arrRename.ts`) and page (`rename/+page.server.ts`) return explicit
+  unsupported responses. Upgrades handler (`arrUpgrade.ts`) and page
+  (`upgrades/+page.server.ts`) enforce the same gating. Regression coverage in
   `src/tests/upgrades/lidarrCapabilityGates.test.ts`.
-- `#6` rollup status: child issue scopes `#1`-`#5` are complete in this implementation
-  branch; umbrella is ready for closeout after merge and issue-state sync.
+- `#6` rollup complete: all child issue scopes (`#1`-`#5`) are implemented in branch
+  `feat/lidarr-support`. Umbrella is ready for closeout after merge to `v2` and issue-state
+  sync. Follow-up `#8` tracks deferred quality/custom-format sync parity for Lidarr.
+
+### v1 Scope Decisions
+
+- **Media-management**: reuse existing entity shapes (no `lidarr_*` entities introduced).
+- **Quality profile sync**: capability-gated for Lidarr; deferred to `#8`.
+- **Rename**: capability-gated for Lidarr; explicit unsupported messaging in UI and handlers.
+- **Upgrades**: capability-gated for Lidarr; explicit unsupported messaging in UI and handlers.
+- **Library/releases**: fully supported with Lidarr-specific artist/album domain model.
