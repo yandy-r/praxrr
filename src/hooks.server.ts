@@ -43,7 +43,7 @@ if (!setupStateQueries.isDefaultDatabaseLinked()) {
 	try {
 		await pcdManager.link({
 			name: 'Dictionarry',
-			repositoryUrl: 'https://github.com/Dictionarry-Hub/database',
+			repositoryUrl: 'https://github.com/yandy-r/profilarr-db',
 			branch: 'v2',
 			syncStrategy: 60,
 			autoPull: true,

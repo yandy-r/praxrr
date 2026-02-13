@@ -262,18 +262,18 @@ Example:
 
 ```json
 {
-  "name": "db",
+  "name": "profilarr-db",
   "version": "2.1.35",
   "description": "Seraphys' OCD Playground",
   "arr_types": ["radarr", "sonarr", "whisparr"],
   "dependencies": { "schema": "^1.1.0" },
-  "authors": [{ "name": "Dictionarry Team", "email": "team@dictionarry.dev" }],
+  "authors": [{ "name": "Yandy-R", "email": "yandy-r@yandy-r.github.io" }],
   "license": "MIT",
-  "repository": "https://github.com/dictionarry-hub/database",
+  "repository": "https://github.com/yandy-r/profilarr-db",
   "tags": ["4k", "hdr", "remux", "quality", "archival"],
   "links": {
-    "homepage": "https://dictionarry.dev",
-    "issues": "https://github.com/dictionarry-hub/db/issues"
+    "homepage": "https://github.com/yandy-r/profilarr-db",
+    "issues": "https://github.com/yandy-r/profilarr-db/issues"
   },
   "profilarr": { "minimum_version": "2.0.0" }
 }

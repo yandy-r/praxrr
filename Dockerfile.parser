@@ -31,7 +31,7 @@ FROM mcr.microsoft.com/dotnet/aspnet:8.0-alpine
 # Labels for container metadata
 LABEL org.opencontainers.image.title="Profilarr Parser"
 LABEL org.opencontainers.image.description="Release title parser for Profilarr (optional)"
-LABEL org.opencontainers.image.source="https://github.com/Dictionarry-Hub/profilarr"
+LABEL org.opencontainers.image.source="https://github.com/yandy-r/profilarr"
 LABEL org.opencontainers.image.licenses="AGPL-3.0"
 
 WORKDIR /app

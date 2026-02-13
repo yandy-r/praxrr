@@ -1,10 +1,10 @@
 services:
   profilarr:
-    image: ghcr.io/dictionarry-hub/profilarr:develop
+    image: ghcr.io/yandy-r/profilarr:profilarr-dev
     container_name: profilarr
     restart: unless-stopped
     ports:
-      - "6869:6868"
+      - '6969:6969'
     volumes:
       - ./config:/config
     environment:
@@ -12,7 +12,7 @@ services:
       - PGID=1000
       - UMASK=022
       - TZ=Etc/UTC
-      # - PORT=6868
+      # - PORT=6969
       # - HOST=0.0.0.0
       - PARSER_HOST=parser
       - PARSER_PORT=5000
@@ -22,8 +22,8 @@ services:
 
   # Optional - only needed for CF/QP testing features
   parser:
-    image: ghcr.io/dictionarry-hub/profilarr-parser:develop
+    image: ghcr.io/yandy-r/profilarr-parser:profilarr-dev
     container_name: profilarr-parser
     restart: unless-stopped
     expose:
-      - "5000"
+      - '5000'
