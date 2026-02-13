@@ -187,10 +187,10 @@ export function supportsArrSyncSurface(type: ArrAppType, surface: ArrSyncSurface
  */
 export function supportsFeature(type: ArrAppType, feature: string): boolean {
   const caps = ARR_APPS[type].capabilities;
-  if (feature in caps.workflows) {
+  if (Object.hasOwn(caps.workflows, feature)) {
     return caps.workflows[feature as ArrWorkflowSurface];
   }
-  if (feature in caps.sync) {
+  if (Object.hasOwn(caps.sync, feature)) {
     return caps.sync[feature as ArrSyncSurface];
   }
   return false;

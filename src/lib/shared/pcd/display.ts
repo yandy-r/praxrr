@@ -233,12 +233,16 @@ export interface ProfileLanguage {
 	type: 'must' | 'only' | 'not' | 'simple';
 }
 
+type RequiredCustomFormatScoreApp = Extract<ArrAppType, 'radarr' | 'sonarr'>;
+
+export type CustomFormatCountsByArrType = Record<RequiredCustomFormatScoreApp, number> &
+	Partial<Record<Exclude<ArrAppType, RequiredCustomFormatScoreApp>, number>>;
+
 /** Custom format counts by arr type */
-export interface CustomFormatCounts {
+export interface CustomFormatCounts extends CustomFormatCountsByArrType {
+	/** Shared score applied to all apps */
 	all: number;
-	radarr: number;
-	sonarr: number;
-	lidarr?: number;
+	/** Aggregate of all app-specific and shared counts */
 	total: number;
 }
 
@@ -351,11 +355,14 @@ export interface QualityProfileScoring {
 
 // --- Entity Testing ---
 
+export type CustomFormatScoresByArrType = Record<RequiredCustomFormatScoreApp, number | null> &
+	Partial<Record<Exclude<ArrAppType, RequiredCustomFormatScoreApp>, number | null>>;
+
 /** CF scores for a single profile */
 export interface ProfileCfScores {
 	profileName: string;
 	/** Map of custom format name to score (by arr type) */
-	scores: Record<string, { radarr: number | null; sonarr: number | null; lidarr?: number | null }>;
+	scores: Record<string, CustomFormatScoresByArrType>;
 }
 
 /** All CF scores result for entity testing */

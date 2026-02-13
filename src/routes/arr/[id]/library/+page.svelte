@@ -26,7 +26,6 @@
 	export let data: PageData;
 
 	$: appType = isArrAppType(data.instance.type) ? data.instance.type : null;
-	$: appMetadata = appType ? getArrAppMetadata(appType) : null;
 	$: supportsLibraryWorkflow = appType ? supportsArrWorkflow(appType, 'library') : false;
 	$: isRadarr = data.instance.type === 'radarr';
 	$: isSonarr = data.instance.type === 'sonarr';
@@ -43,21 +42,66 @@
 
 	let library: RadarrLibraryItem[] | SonarrLibraryItem[] | LidarrLibraryItem[] = [];
 	let libraryError: string | null = null;
+	let libraryCapabilityError: string | null = null;
 	let profilesByDatabase: { databaseId: number; databaseName: string; profiles: string[] }[] = [];
 	let loading = true;
 	let refreshing = false;
+
+	function getLibraryUnsupportedMessage(instanceType: string): string {
+		if (isArrAppType(instanceType)) {
+			return `${getArrAppMetadata(instanceType).label} library view is not available in this version yet.`;
+		}
+
+		return 'This instance type does not support library view in this version.';
+	}
+
+	async function getLibraryErrorMessage(response: Response): Promise<string> {
+		try {
+			const payload = await response.json();
+			if (payload && typeof payload.error === 'string' && payload.error.trim().length > 0) {
+				return payload.error;
+			}
+		} catch {
+			// Fall back to status-based messaging when the error body is not JSON.
+		}
+
+		if (response.statusText) {
+			return `Failed to fetch library: ${response.statusText}`;
+		}
+
+		return `Failed to fetch library (${response.status})`;
+	}
+
+	function isUnsupportedLibraryError(status: number, message: string): boolean {
+		if (status < 400 || status >= 500) {
+			return false;
+		}
+
+		const normalizedMessage = message.toLowerCase();
+		return (
+			normalizedMessage.includes('unsupported instance type') ||
+			(normalizedMessage.includes('library') && normalizedMessage.includes('not supported'))
+		);
+	}
+
+	$: defaultUnsupportedLibraryMessage = getLibraryUnsupportedMessage(data.instance.type);
+	$: libraryUnavailableMessage = !supportsLibraryWorkflow
+		? defaultUnsupportedLibraryMessage
+		: libraryCapabilityError;
 
 	async function fetchLibrary(force = false) {
 		if (!supportsLibraryWorkflow) {
 			library = [];
 			profilesByDatabase = [];
 			libraryError = null;
+			libraryCapabilityError = null;
 			loading = false;
 			refreshing = false;
 			return;
 		}
 
 		const instanceId = data.instance.id;
+		libraryCapabilityError = null;
 
 		// Check client cache first (unless forcing refresh)
 		if (!force && libraryCache.has(instanceId)) {
@@ -78,18 +122,28 @@
 
 			const response = await fetch(`/api/v1/arr/library?instanceId=${instanceId}`);
 			if (!response.ok) {
-				throw new Error(`Failed to fetch library: ${response.statusText}`);
+				const message = await getLibraryErrorMessage(response);
+				if (isUnsupportedLibraryError(response.status, message)) {
+					library = [];
+					profilesByDatabase = [];
+					libraryError = null;
+					libraryCapabilityError = defaultUnsupportedLibraryMessage;
+					return;
+				}
+				throw new Error(message);
 			}
 
 			const result = await response.json();
 			library = result.items;
 			libraryError = null;
+			libraryCapabilityError = null;
 			profilesByDatabase = result.profilesByDatabase;
 
 			// Cache the result
 			libraryCache.set(instanceId, result.items, result.profilesByDatabase);
 		} catch (err) {
 			libraryError = err instanceof Error ? err.message : 'Failed to fetch library';
+			libraryCapabilityError = null;
 		} finally {
 			loading = false;
 			refreshing = false;
@@ -681,7 +735,7 @@
 </svelte:head>
 
 <div class="mt-6 space-y-6">
-	{#if !supportsLibraryWorkflow}
+	{#if libraryUnavailableMessage}
 		<div
 			class="rounded-lg border border-neutral-200 bg-white p-6 dark:border-neutral-800 dark:bg-neutral-900"
 		>
@@ -692,11 +746,7 @@
 						Library view not available
 					</h3>
 					<p class="mt-1 text-sm text-neutral-600 dark:text-neutral-400">
-						{#if appMetadata}
-							{appMetadata.label} library view is not available in this version yet.
-						{:else}
-							This instance type does not support library view in this version.
-						{/if}
+						{libraryUnavailableMessage}
 					</p>
 				</div>
 			</div>
