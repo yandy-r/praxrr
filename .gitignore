@@ -58,3 +58,4 @@ src/tests/e2e/playwright-report/
 # Research repos
 research/
 tasks/todo.md
+.claude/settings.local.json
