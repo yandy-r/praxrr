@@ -30,7 +30,7 @@ export const DB_PATH = path.resolve(
 
 /** Git repo URL used for both local and dev database instances */
 export const TEST_REPO_URL =
-  process.env.TEST_REPO_URL || 'https://github.com/Dictionarry-Hub/database-v2-testing';
+  process.env.TEST_REPO_URL || 'https://github.com/yandy-r/profilarr-db-v2-testing';
 
 /** Personal access token for the dev (write) database */
 export const TEST_PAT = process.env.TEST_PAT || '';

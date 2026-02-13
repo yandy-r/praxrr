@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(deno task:*)",
+      "Bash(deno check:*)",
+      "Bash(git log:*)",
+      "Bash(sed:*)",
+      "Bash(deno test:*)",
+      "Bash(xxd:*)",
+      "Bash(APP_BASE_PATH=./dist/test deno test:*)",
+      "Bash(python3:*)",
+      "Bash(npx prettier:*)"
+    ]
+  }
+}

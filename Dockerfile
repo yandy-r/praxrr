@@ -56,7 +56,7 @@ FROM debian:12-slim
 # Labels for container metadata
 LABEL org.opencontainers.image.title="Profilarr"
 LABEL org.opencontainers.image.description="Configuration management for Radarr and Sonarr"
-LABEL org.opencontainers.image.source="https://github.com/Dictionarry-Hub/profilarr"
+LABEL org.opencontainers.image.source="https://github.com/yandy-r/profilarr"
 LABEL org.opencontainers.image.licenses="AGPL-3.0"
 
 # Install runtime dependencies

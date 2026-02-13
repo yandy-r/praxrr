@@ -44,7 +44,7 @@ if (target && !aliases[target]) {
 console.log(`Running tests: ${testPath}\n`);
 
 const cmd = new Deno.Command('deno', {
-	args: ['test', testPath, '--allow-read', '--allow-write', '--allow-env'],
+	args: ['test', testPath, '--allow-read', '--allow-write', '--allow-env', '--allow-ffi'],
 	env: {
 		...Deno.env.toObject(),
 		APP_BASE_PATH: './dist/test'

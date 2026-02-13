@@ -19,8 +19,8 @@ const LIDARR_SUPPORTED_WORKFLOW_MESSAGE = 'You can still use Library and Release
 const CONNECTION_SUCCESS_MESSAGE = 'Connection successful!';
 const DELAY_PROFILES_SAVE_SUCCESS = 'Delay profile sync config saved';
 
-const LIDARR_RENAME_UNSUPPORTED_ERROR = 'Rename is not supported for Lidarr in v1.';
-const LIDARR_UPGRADES_UNSUPPORTED_ERROR = 'Upgrades are not supported for Lidarr in v1.';
+const LIDARR_RENAME_UNSUPPORTED_ERROR = 'Rename is not supported for Lidarr instances';
+const LIDARR_UPGRADES_UNSUPPORTED_ERROR = 'Upgrades are not supported for Lidarr instances';
 
 const LIDARR_LIBRARY_TITLE = 'E2E Lidarr Album';
 const LIDARR_LIBRARY_ARTIST = 'E2E Lidarr Artist';

@@ -43,11 +43,22 @@
 	export let instanceType: string = 'radarr';
 
 	$: isRadarr = instanceType === 'radarr';
-	$: searchPlaceholder = isRadarr ? 'Search movies...' : 'Search series...';
-	$: openLabel = isRadarr ? 'Open in Radarr' : 'Open in Sonarr';
+	$: isLidarr = instanceType === 'lidarr';
+	$: searchPlaceholder = isRadarr
+		? 'Search movies...'
+		: isLidarr
+			? 'Search albums...'
+			: 'Search series...';
+	$: openLabel = isRadarr
+		? 'Open in Radarr'
+		: isLidarr
+			? 'Open in Lidarr'
+			: 'Open in Sonarr';
 	$: filterDescription = isRadarr
 		? 'Filter movies by quality or profile'
-		: 'Filter series by profile';
+		: isLidarr
+			? 'Filter albums by profile'
+			: 'Filter series by profile';
 </script>
 
 <ActionsBar>

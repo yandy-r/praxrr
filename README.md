@@ -10,15 +10,11 @@
 
 <br>
 
-<p align="center">
-  <a href="https://github.com/Dictionarry-Hub/profilarr/releases"><img src="https://img.shields.io/github/v/release/Dictionarry-Hub/profilarr?color=blue" alt="GitHub release"></a>
-  <a href="https://hub.docker.com/r/santiagosayshey/profilarr"><img src="https://img.shields.io/docker/pulls/santiagosayshey/profilarr?color=blue" alt="Docker Pulls"></a>
-  <a href="https://github.com/Dictionarry-Hub/profilarr/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-AGPL--3.0-blue" alt="License"></a>
-  <a href="https://dictionarry.dev/"><img src="https://img.shields.io/badge/Website-dictionarry.dev-blue" alt="Website"></a>
-  <a href="https://discord.gg/2A89tXZMgA"><img src="https://img.shields.io/discord/1202375791556431892?color=blue&logo=discord&logoColor=white" alt="Discord"></a>
-  <a href="https://www.buymeacoffee.com/santiagosayshey"><img src="https://img.shields.io/badge/Buy%20Me%20A%20Coffee-Support-blue?logo=buy-me-a-coffee" alt="Buy Me A Coffee"></a>
-  <a href="https://github.com/sponsors/Dictionarry-Hub"><img src="https://img.shields.io/badge/GitHub%20Sponsors-Support-blue?logo=github-sponsors" alt="GitHub Sponsors"></a>
-</p>
+# Introduction
+
+This is a fork of the [Official Dictionarry Profilarr](https://github.com/Dictionarry-Hub/profilarr) with Lidarr support. I don't plan to merge this back into the main repository, but I will keep it updated with the latest changes from the main repository.
+
+I'm not a developer, though I just know enough to tinker and use lidarr. Don't plan to insult anyone by trying to merge this back into the main repository.
 
 # Introduction
 
@@ -29,9 +25,9 @@ I'm not a developer, though I just know enough to tinker and use lidarr. Don't p
 <p>Manage quality profiles, custom formats, and release profiles across your Radarr and Sonarr instances. Define your profiles once with a Git-backed configuration database, then sync them to any number of *arr instances.</p>
 
 > [!WARNING]
-> V2 is under heavy development and is _NOT_ ready for production use. Use
+> v2-lidarr is under heavy development and is _NOT_ ready for production use. Use
 > [Profilarr V1](https://github.com/Dictionarry-Hub/profilarr/tree/main) until
-> V2 is ready.
+> v2-lidarr is ready.
 
 ## Features
 

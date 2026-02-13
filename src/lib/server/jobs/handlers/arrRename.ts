@@ -5,8 +5,7 @@ import { arrInstancesQueries } from '$db/queries/arrInstances.ts';
 import { processRenameConfig } from '$lib/server/rename/processor.ts';
 import { calculateNextRunFromMinutes } from '../scheduleUtils.ts';
 import { logger } from '$logger/logger.ts';
-
-const LIDARR_RENAME_UNSUPPORTED_OUTPUT = 'Rename is not supported for Lidarr in v1.';
+import { isArrAppType, supportsArrWorkflow, ARR_APPS } from '$shared/arr/capabilities.ts';
 
 const renameRunHandler: JobHandler = async (job) => {
 	const instanceId = Number(job.payload.instanceId);
@@ -24,12 +23,13 @@ const renameRunHandler: JobHandler = async (job) => {
 		return { status: 'failure', error: 'Arr instance not found' };
 	}
 
-	if (instance.type === 'lidarr') {
-		return { status: 'skipped', output: LIDARR_RENAME_UNSUPPORTED_OUTPUT };
+	if (!isArrAppType(instance.type)) {
+		return { status: 'skipped', output: `Rename is not supported for unknown instance type: ${instance.type}` };
 	}
 
-	if (instance.type !== 'radarr' && instance.type !== 'sonarr') {
-		return { status: 'skipped', output: `Rename not supported for ${instance.type}` };
+	if (!supportsArrWorkflow(instance.type, 'rename')) {
+		const label = ARR_APPS[instance.type].label;
+		return { status: 'skipped', output: `Rename is not supported for ${label} instances` };
 	}
 
 	try {

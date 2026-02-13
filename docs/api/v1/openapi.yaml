@@ -82,8 +82,16 @@ components:
       $ref: './schemas/arr.yaml#/SonarrSeasonItem'
     SonarrLibraryItem:
       $ref: './schemas/arr.yaml#/SonarrLibraryItem'
+    LidarrLibraryItem:
+      $ref: './schemas/arr.yaml#/LidarrLibraryItem'
     SonarrEpisodeItem:
       $ref: './schemas/arr.yaml#/SonarrEpisodeItem'
+    LibraryRadarrResponse:
+      $ref: './schemas/arr.yaml#/LibraryRadarrResponse'
+    LibrarySonarrResponse:
+      $ref: './schemas/arr.yaml#/LibrarySonarrResponse'
+    LibraryLidarrResponse:
+      $ref: './schemas/arr.yaml#/LibraryLidarrResponse'
     LibraryResponse:
       $ref: './schemas/arr.yaml#/LibraryResponse'
     EpisodesResponse:

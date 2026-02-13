@@ -760,9 +760,25 @@ export interface SonarrNamingConfig {
 }
 
 /**
+ * Lidarr naming config from /api/v1/config/naming
+ * Note: colonReplacementFormat is an integer, like Sonarr
+ * Lidarr uses track/artist/album naming instead of episode/series naming
+ */
+export interface LidarrNamingConfig {
+	id: number;
+	renameTracks: boolean;
+	replaceIllegalCharacters: boolean;
+	colonReplacementFormat: number;
+	standardTrackFormat: string | null;
+	multiDiscTrackFormat: string | null;
+	artistFolderFormat: string | null;
+	[key: string]: unknown;
+}
+
+/**
  * Union type for naming config (varies by arr type)
  */
-export type ArrNamingConfig = RadarrNamingConfig | SonarrNamingConfig;
+export type ArrNamingConfig = RadarrNamingConfig | SonarrNamingConfig | LidarrNamingConfig;
 
 // =============================================================================
 // Quality Definition Types

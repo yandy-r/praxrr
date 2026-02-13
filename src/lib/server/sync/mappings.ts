@@ -1,7 +1,12 @@
 /**
  * Arr API mappings
  * Constants for transforming PCD data to arr API format
- * Based on Radarr/Sonarr API specifications
+ * Based on Radarr/Sonarr/Lidarr API specifications
+ *
+ * Lidarr shares delay-profile and media-management sync sections with
+ * Radarr/Sonarr but does not yet have quality-profile/custom-format mapping
+ * tables. Functions that require those tables gate Lidarr via
+ * `requireMappedSyncArrType` which throws an explicit error.
  */
 
 import type { ArrType } from '$shared/pcd/types.ts';
@@ -559,11 +564,18 @@ export interface LanguageWithSupport {
   name: string;
   radarr: boolean;
   sonarr: boolean;
+  /** Lidarr language conditions are capability-gated until mapping tables exist */
+  lidarr: boolean;
 }
 
 /**
  * Get all languages with their arr type support (for conditions page)
  * Returns sorted array with Original first, then alphabetically
+ *
+ * Lidarr language support is currently set to false for all languages because
+ * Lidarr quality-profile/custom-format mapping tables are not yet implemented
+ * (see UNSUPPORTED_SYNC_SECTION_REASONS). When Lidarr mapping tables are added,
+ * this function should be updated to reflect actual Lidarr language coverage.
  */
 export function getLanguagesWithSupport(): LanguageWithSupport[] {
   const radarrLangs = new Set(Object.values(LANGUAGES.radarr).map((l) => l.name));
@@ -579,6 +591,7 @@ export function getLanguagesWithSupport(): LanguageWithSupport[] {
       name,
       radarr: radarrLangs.has(name),
       sonarr: sonarrLangs.has(name),
+      lidarr: false,
     });
   }
 

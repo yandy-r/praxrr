@@ -1,15 +1,18 @@
 <script lang="ts">
 	import { Check, Trash2 } from 'lucide-svelte';
 	import { createEventDispatcher } from 'svelte';
-	import RadarrIcon from '$lib/client/assets/Radarr.svg';
-	import SonarrIcon from '$lib/client/assets/Sonarr.svg';
+	import radarrLogo from '$lib/client/assets/Radarr.svg';
+	import sonarrLogo from '$lib/client/assets/Sonarr.svg';
 	import Button from '$ui/button/Button.svelte';
 	import FormInput from '$ui/form/FormInput.svelte';
 	import NumberInput from '$ui/form/NumberInput.svelte';
 	import Toggle from '$ui/toggle/Toggle.svelte';
 	import SearchDropdown from '$ui/form/SearchDropdown.svelte';
 	import {
+		ARR_APP_TYPES,
 		ARR_CONDITION_TARGET_OPTIONS,
+		getArrAppMetadata,
+		type ArrAppType,
 		type ArrConditionTargetType
 	} from '$shared/arr/capabilities.ts';
 	import {
@@ -37,7 +40,7 @@
 
 	// Available patterns and languages from database (passed in)
 	export let availablePatterns: { id: number; name: string; pattern: string }[] = [];
-	export let availableLanguages: { name: string; radarr: boolean; sonarr: boolean }[] = [];
+	export let availableLanguages: { name: string; radarr: boolean; sonarr: boolean; lidarr: boolean }[] = [];
 
 	// Computed states based on mode
 	$: isDraft = mode === 'draft';
@@ -145,12 +148,28 @@
 		}
 	}
 
+	// Available logo assets keyed by ArrAppType.
+	// Apps without a logo asset (e.g. Lidarr) fall back to an initial-letter
+	// badge in the language dropdown template.
+	const logoAssets: Partial<Record<ArrAppType, string>> = {
+		radarr: radarrLogo,
+		sonarr: sonarrLogo
+	};
+
+	// Build a map of language name -> supported app types for use in the
+	// dropdown item slot, where the SearchDropdown Option type erases extra
+	// properties to `unknown`.
+	$: languageSupportMap = new Map(
+		availableLanguages.map((l) => [
+			l.name,
+			ARR_APP_TYPES.filter((type) => l[type as keyof typeof l] === true)
+		])
+	);
+
 	// Language options for SearchDropdown
 	$: languageOptions = availableLanguages.map((l) => ({
 		value: l.name,
-		label: l.name,
-		radarr: l.radarr,
-		sonarr: l.sonarr
+		label: l.name
 	}));
 
 	// Language except state
@@ -302,12 +321,22 @@
 								<span class="flex w-full items-center justify-between">
 									<span>{option.label}</span>
 									<span class="flex gap-1">
-										{#if option.radarr}
-											<img src={RadarrIcon} alt="Radarr" class="h-3.5 w-3.5" title="Radarr" />
-										{/if}
-										{#if option.sonarr}
-											<img src={SonarrIcon} alt="Sonarr" class="h-3.5 w-3.5" title="Sonarr" />
-										{/if}
+										{#each languageSupportMap.get(option.value) ?? [] as appType (appType)}
+											{@const logo = logoAssets[appType]}
+											{@const meta = getArrAppMetadata(appType)}
+											{#if logo}
+												<img src={logo} alt={meta.label} class="h-3.5 w-3.5" title={meta.label} />
+											{:else}
+												<span
+													class="inline-flex h-3.5 w-3.5 items-center justify-center rounded-sm text-[8px] font-bold text-white"
+													style="background-color: {meta.conditionTargetCheckboxColor}"
+													title={meta.label}
+													aria-label={meta.label}
+												>
+													{meta.label.charAt(0)}
+												</span>
+											{/if}
+										{/each}
 									</span>
 								</span>
 							</svelte:fragment>

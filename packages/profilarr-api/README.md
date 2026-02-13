@@ -1,13 +1,13 @@
-# @dictionarry/profilarr-api
+# @yandy-r/profilarr-api
 
 OpenAPI specification and TypeScript types for the
-[Profilarr](https://github.com/Dictionarry-Hub/profilarr) API.
+[Profilarr](https://github.com/yandy-r/profilarr) API.
 
 ## Usage
 
 ```ts
-import { spec } from "@dictionarry/profilarr-api";
-import type { components } from "@dictionarry/profilarr-api";
+import { spec } from "@yandy-r/profilarr-api";
+import type { components } from "@yandy-r/profilarr-api";
 
 // Access the bundled OpenAPI 3.1 spec
 console.log(spec.info.title); // "Profilarr API"

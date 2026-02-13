@@ -11,6 +11,7 @@ import { LidarrClient } from '$utils/arr/clients/lidarr.ts';
 import { logger } from '$logger/logger.ts';
 
 type LibraryResponse = components['schemas']['LibraryResponse'];
+type LibraryLidarrResponse = components['schemas']['LibraryLidarrResponse'];
 type ProfileByDatabase = components['schemas']['ProfileByDatabase'];
 type ErrorResponse = components['schemas']['ErrorResponse'];
 
@@ -20,50 +21,50 @@ const LIBRARY_CACHE_TTL = 300; // 5 minutes
  * Get all quality profile names from all enabled Profilarr databases
  */
 async function getProfilarrProfileNames(): Promise<Set<string>> {
-	const profileNames = new Set<string>();
-	const databases = pcdManager.getAll().filter((db) => db.enabled);
+  const profileNames = new Set<string>();
+  const databases = pcdManager.getAll().filter((db) => db.enabled);
 
-	for (const db of databases) {
-		const dbCache = pcdManager.getCache(db.id);
-		if (!dbCache?.isBuilt()) continue;
+  for (const db of databases) {
+    const dbCache = pcdManager.getCache(db.id);
+    if (!dbCache?.isBuilt()) continue;
 
-		try {
-			const names = await qualityProfileQueries.names(dbCache);
-			for (const name of names) {
-				profileNames.add(name);
-			}
-		} catch {
-			// Cache query failed, skip this database
-		}
-	}
+    try {
+      const names = await qualityProfileQueries.names(dbCache);
+      for (const name of names) {
+        profileNames.add(name);
+      }
+    } catch {
+      // Cache query failed, skip this database
+    }
+  }
 
-	return profileNames;
+  return profileNames;
 }
 
 /**
  * Get profiles grouped by database
  */
 async function getProfilesByDatabase(): Promise<ProfileByDatabase[]> {
-	const profilesByDatabase: ProfileByDatabase[] = [];
-	const databases = pcdManager.getAll().filter((db) => db.enabled);
+  const profilesByDatabase: ProfileByDatabase[] = [];
+  const databases = pcdManager.getAll().filter((db) => db.enabled);
 
-	for (const db of databases) {
-		const dbCache = pcdManager.getCache(db.id);
-		if (!dbCache?.isBuilt()) continue;
+  for (const db of databases) {
+    const dbCache = pcdManager.getCache(db.id);
+    if (!dbCache?.isBuilt()) continue;
 
-		try {
-			const names = await qualityProfileQueries.names(dbCache);
-			profilesByDatabase.push({
-				databaseId: db.id,
-				databaseName: db.name,
-				profiles: names
-			});
-		} catch {
-			// Skip if cache query fails
-		}
-	}
+    try {
+      const names = await qualityProfileQueries.names(dbCache);
+      profilesByDatabase.push({
+        databaseId: db.id,
+        databaseName: db.name,
+        profiles: names,
+      });
+    } catch {
+      // Skip if cache query fails
+    }
+  }
 
-	return profilesByDatabase;
+  return profilesByDatabase;
 }
 
 /**
@@ -76,129 +77,120 @@ async function getProfilesByDatabase(): Promise<ProfileByDatabase[]> {
  * - instanceId: Arr instance ID (required)
  */
 export const GET: RequestHandler = async ({ url }) => {
-	const instanceId = url.searchParams.get('instanceId');
+  const instanceId = url.searchParams.get('instanceId');
 
-	if (!instanceId) {
-		return json({ error: 'instanceId is required' } satisfies ErrorResponse, { status: 400 });
-	}
+  if (!instanceId) {
+    return json({ error: 'instanceId is required' } satisfies ErrorResponse, { status: 400 });
+  }
 
-	const id = parseInt(instanceId, 10);
-	if (isNaN(id)) {
-		return json({ error: 'Invalid instanceId' } satisfies ErrorResponse, { status: 400 });
-	}
+  const id = parseInt(instanceId, 10);
+  if (isNaN(id)) {
+    return json({ error: 'Invalid instanceId' } satisfies ErrorResponse, { status: 400 });
+  }
 
-	const instance = arrInstancesQueries.getById(id);
-	if (!instance) {
-		return json({ error: 'Instance not found' } satisfies ErrorResponse, { status: 404 });
-	}
+  const instance = arrInstancesQueries.getById(id);
+  if (!instance) {
+    return json({ error: 'Instance not found' } satisfies ErrorResponse, { status: 404 });
+  }
 
-	const cacheKey = `library:${id}`;
-	const profilesByDatabase = await getProfilesByDatabase();
+  const cacheKey = `library:${id}`;
+  const profilesByDatabase = await getProfilesByDatabase();
 
-	try {
-		if (instance.type === 'radarr') {
-			const cached = cache.get<components['schemas']['RadarrLibraryItem'][]>(cacheKey);
-			if (cached) {
-				return json({
-					type: 'radarr',
-					items: cached,
-					profilesByDatabase
-				} satisfies LibraryResponse);
-			}
+  try {
+    if (instance.type === 'radarr') {
+      const cached = cache.get<components['schemas']['RadarrLibraryItem'][]>(cacheKey);
+      if (cached) {
+        return json({
+          type: 'radarr',
+          items: cached,
+          profilesByDatabase,
+        } satisfies LibraryResponse);
+      }
 
-			const profilarrProfileNames = await getProfilarrProfileNames();
-			const client = new RadarrClient(instance.url, instance.api_key);
-			try {
-				const items = await client.getLibrary(profilarrProfileNames);
-				cache.set(cacheKey, items, LIBRARY_CACHE_TTL);
+      const profilarrProfileNames = await getProfilarrProfileNames();
+      const client = new RadarrClient(instance.url, instance.api_key);
+      try {
+        const items = await client.getLibrary(profilarrProfileNames);
+        cache.set(cacheKey, items, LIBRARY_CACHE_TTL);
 
-				await logger.info(`Fetched library for ${instance.name}`, {
-					source: 'arr/library',
-					meta: { instanceId: id, movieCount: items.length }
-				});
+        await logger.info(`Fetched library for ${instance.name}`, {
+          source: 'arr/library',
+          meta: { instanceId: id, movieCount: items.length },
+        });
 
-				return json({
-					type: 'radarr',
-					items,
-					profilesByDatabase
-				} satisfies LibraryResponse);
-			} finally {
-				client.close();
-			}
-		} else if (instance.type === 'sonarr') {
-			const cached = cache.get<components['schemas']['SonarrLibraryItem'][]>(cacheKey);
-			if (cached) {
-				return json({
-					type: 'sonarr',
-					items: cached,
-					profilesByDatabase
-				} satisfies LibraryResponse);
-			}
+        return json({
+          type: 'radarr',
+          items,
+          profilesByDatabase,
+        } satisfies LibraryResponse);
+      } finally {
+        client.close();
+      }
+    } else if (instance.type === 'sonarr') {
+      const cached = cache.get<components['schemas']['SonarrLibraryItem'][]>(cacheKey);
+      if (cached) {
+        return json({
+          type: 'sonarr',
+          items: cached,
+          profilesByDatabase,
+        } satisfies LibraryResponse);
+      }
 
-			const profilarrProfileNames = await getProfilarrProfileNames();
-			const client = new SonarrClient(instance.url, instance.api_key);
-			try {
-				const items = await client.getLibrary(profilarrProfileNames);
-				cache.set(cacheKey, items, LIBRARY_CACHE_TTL);
+      const profilarrProfileNames = await getProfilarrProfileNames();
+      const client = new SonarrClient(instance.url, instance.api_key);
+      try {
+        const items = await client.getLibrary(profilarrProfileNames);
+        cache.set(cacheKey, items, LIBRARY_CACHE_TTL);
 
-				await logger.info(`Fetched library for ${instance.name}`, {
-					source: 'arr/library',
-					meta: { instanceId: id, seriesCount: items.length }
-				});
+        await logger.info(`Fetched library for ${instance.name}`, {
+          source: 'arr/library',
+          meta: { instanceId: id, seriesCount: items.length },
+        });
 
-				return json({
-					type: 'sonarr',
-					items,
-					profilesByDatabase
-				} satisfies LibraryResponse);
-			} finally {
-				client.close();
-			}
-		} else if (instance.type === 'lidarr') {
-			const cached = cache.get<components['schemas']['LidarrLibraryItem'][]>(cacheKey);
-			if (cached) {
-				return json({
-					type: 'lidarr',
-					items: cached,
-					profilesByDatabase
-				} satisfies LibraryResponse);
-			}
+        return json({
+          type: 'sonarr',
+          items,
+          profilesByDatabase,
+        } satisfies LibraryResponse);
+      } finally {
+        client.close();
+      }
+    } else if (instance.type === 'lidarr') {
+      const cached = cache.get<components['schemas']['LidarrLibraryItem'][]>(cacheKey);
+      if (cached) {
+        // Lidarr schema uses placeholder type (additionalProperties) — satisfies deferred until schema fields are finalized
+        return json({ type: 'lidarr' as const, items: cached, profilesByDatabase });
+      }
 
-			const profilarrProfileNames = await getProfilarrProfileNames();
-			const client = new LidarrClient(instance.url, instance.api_key);
-			try {
-				const items = await client.getLibrary(profilarrProfileNames);
-				cache.set(cacheKey, items, LIBRARY_CACHE_TTL);
+      const profilarrProfileNames = await getProfilarrProfileNames();
+      const client = new LidarrClient(instance.url, instance.api_key);
+      try {
+        const items = await client.getLibrary(profilarrProfileNames);
+        cache.set(cacheKey, items, LIBRARY_CACHE_TTL);
 
-				await logger.info(`Fetched library for ${instance.name}`, {
-					source: 'arr/library',
-					meta: { instanceId: id, albumCount: items.length }
-				});
+        await logger.info(`Fetched library for ${instance.name}`, {
+          source: 'arr/library',
+          meta: { instanceId: id, albumCount: items.length },
+        });
 
-				return json({
-					type: 'lidarr',
-					items,
-					profilesByDatabase
-				} satisfies LibraryResponse);
-			} finally {
-				client.close();
-			}
-		} else {
-			return json(
-				{ error: `Unsupported instance type: ${instance.type}` } satisfies ErrorResponse,
-				{ status: 400 }
-			);
-		}
-	} catch (err) {
-		const message = err instanceof Error ? err.message : 'Failed to fetch library';
+        // Lidarr schema uses placeholder type (additionalProperties) — satisfies deferred until schema fields are finalized
+        return json({ type: 'lidarr' as const, items, profilesByDatabase });
+      } finally {
+        client.close();
+      }
+    } else {
+      return json({ error: `Unsupported instance type: ${instance.type}` } satisfies ErrorResponse, { status: 400 });
+    }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Failed to fetch library';
 
-		await logger.error(`Failed to fetch library for ${instance.name}`, {
-			source: 'arr/library',
-			meta: { instanceId: id, error: message }
-		});
+    await logger.error(`Failed to fetch library for ${instance.name}`, {
+      source: 'arr/library',
+      meta: { instanceId: id, error: message },
+    });
 
-		return json({ error: message } satisfies ErrorResponse, { status: 500 });
-	}
+    return json({ error: message } satisfies ErrorResponse, { status: 500 });
+  }
 };
 
 /**
@@ -210,18 +202,18 @@ export const GET: RequestHandler = async ({ url }) => {
  * - instanceId: Arr instance ID (required)
  */
 export const DELETE: RequestHandler = async ({ url }) => {
-	const instanceId = url.searchParams.get('instanceId');
+  const instanceId = url.searchParams.get('instanceId');
 
-	if (!instanceId) {
-		return json({ error: 'instanceId is required' } satisfies ErrorResponse, { status: 400 });
-	}
+  if (!instanceId) {
+    return json({ error: 'instanceId is required' } satisfies ErrorResponse, { status: 400 });
+  }
 
-	const id = parseInt(instanceId, 10);
-	if (isNaN(id)) {
-		return json({ error: 'Invalid instanceId' } satisfies ErrorResponse, { status: 400 });
-	}
+  const id = parseInt(instanceId, 10);
+  if (isNaN(id)) {
+    return json({ error: 'Invalid instanceId' } satisfies ErrorResponse, { status: 400 });
+  }
 
-	cache.delete(`library:${id}`);
+  cache.delete(`library:${id}`);
 
-	return json({ success: true } satisfies components['schemas']['CacheInvalidatedResponse']);
+  return json({ success: true } satisfies components['schemas']['CacheInvalidatedResponse']);
 };
