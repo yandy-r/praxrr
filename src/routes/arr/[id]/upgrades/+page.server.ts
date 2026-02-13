@@ -12,12 +12,16 @@ import { scheduleUpgradeForInstance } from '$lib/server/jobs/init.ts';
 import { upsertScheduledJob } from '$lib/server/jobs/queueService.ts';
 import { calculateCooldownUntil } from '$lib/server/jobs/scheduleUtils.ts';
 import { buildJobDisplayName } from '$lib/server/jobs/display.ts';
-
-const LIDARR_UPGRADE_UNSUPPORTED_ERROR = 'Upgrades are not supported for Lidarr in v1.';
+import { isArrAppType, supportsArrWorkflow, ARR_APPS } from '$shared/arr/capabilities.ts';
 
 function getUpgradeUnsupportedError(instanceType: string): string | null {
-  if (instanceType === 'lidarr') {
-    return LIDARR_UPGRADE_UNSUPPORTED_ERROR;
+  if (!isArrAppType(instanceType)) {
+    return `Upgrades are not supported for unknown instance type: ${instanceType}`;
+  }
+
+  if (!supportsArrWorkflow(instanceType, 'upgrades')) {
+    const label = ARR_APPS[instanceType].label;
+    return `Upgrades are not supported for ${label} instances`;
   }
 
   return null;

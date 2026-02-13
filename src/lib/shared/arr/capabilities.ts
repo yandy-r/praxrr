@@ -1,12 +1,37 @@
 import type { ArrType } from '$shared/pcd/types.ts';
 
+// ============================================================================
+// TYPE ALIASES
+// ============================================================================
+
+/** Concrete Arr application type (excludes the 'all' meta-type) */
 export type ArrAppType = Exclude<ArrType, 'all'>;
+
+/** Icon key used to resolve app-specific icon assets */
 export type ArrIconKey = ArrAppType;
+
+/** Condition target type including the 'all' meta-type */
 export type ArrConditionTargetType = ArrType;
+
+/** CSS color value for condition-target checkboxes */
 export type ArrConditionTargetCheckboxColor = 'accent' | `var(--arr-${ArrAppType}-color)`;
 
+// ============================================================================
+// CAPABILITY SURFACES
+// ============================================================================
+
+/** Feature surfaces driven by page/route access */
 export type ArrWorkflowSurface = 'instances' | 'library' | 'releases' | 'rename' | 'upgrades';
-export type ArrSyncSurface = 'quality_profiles' | 'delay_profiles' | 'media_management';
+
+/** Feature surfaces driven by sync pipeline support */
+export type ArrSyncSurface = 'quality_profiles' | 'custom_formats' | 'delay_profiles' | 'media_management';
+
+/** Union of all feature surfaces for generic lookups */
+export type ArrFeature = ArrWorkflowSurface | ArrSyncSurface;
+
+// ============================================================================
+// CAPABILITY INTERFACES
+// ============================================================================
 
 export interface ArrCapabilities {
   workflows: Record<ArrWorkflowSurface, boolean>;
@@ -27,6 +52,10 @@ export interface ArrConditionTargetOption {
   checkboxColor: ArrConditionTargetCheckboxColor;
 }
 
+// ============================================================================
+// APP REGISTRY
+// ============================================================================
+
 export const ARR_APPS: Record<ArrAppType, ArrAppMetadata> = {
   radarr: {
     type: 'radarr',
@@ -43,6 +72,7 @@ export const ARR_APPS: Record<ArrAppType, ArrAppMetadata> = {
       },
       sync: {
         quality_profiles: true,
+        custom_formats: true,
         delay_profiles: true,
         media_management: true,
       },
@@ -63,6 +93,7 @@ export const ARR_APPS: Record<ArrAppType, ArrAppMetadata> = {
       },
       sync: {
         quality_profiles: true,
+        custom_formats: true,
         delay_profiles: true,
         media_management: true,
       },
@@ -82,13 +113,18 @@ export const ARR_APPS: Record<ArrAppType, ArrAppMetadata> = {
         upgrades: false,
       },
       sync: {
-        quality_profiles: true,
+        quality_profiles: false,
+        custom_formats: false,
         delay_profiles: true,
         media_management: true,
       },
     },
   },
 };
+
+// ============================================================================
+// DERIVED CONSTANTS
+// ============================================================================
 
 export const ARR_APP_TYPES: ArrAppType[] = Object.keys(ARR_APPS) as ArrAppType[];
 
@@ -109,18 +145,53 @@ export const ARR_CONDITION_TARGET_OPTIONS: ArrConditionTargetOption[] = [
   }),
 ];
 
+// ============================================================================
+// TYPE GUARDS
+// ============================================================================
+
 export function isArrAppType(value: string): value is ArrAppType {
   return Object.hasOwn(ARR_APPS, value);
 }
 
+// ============================================================================
+// ACCESSORS
+// ============================================================================
+
+/** Return the full metadata record for an Arr app */
 export function getArrAppMetadata(type: ArrAppType): ArrAppMetadata {
   return ARR_APPS[type];
 }
 
+/** Return just the capabilities record for an Arr app */
+export function getArrCapabilities(type: ArrAppType): ArrCapabilities {
+  return ARR_APPS[type].capabilities;
+}
+
+// ============================================================================
+// PREDICATES
+// ============================================================================
+
+/** Check whether an Arr app supports a given workflow surface */
 export function supportsArrWorkflow(type: ArrAppType, workflow: ArrWorkflowSurface): boolean {
   return ARR_APPS[type].capabilities.workflows[workflow];
 }
 
+/** Check whether an Arr app supports a given sync surface */
 export function supportsArrSyncSurface(type: ArrAppType, surface: ArrSyncSurface): boolean {
   return ARR_APPS[type].capabilities.sync[surface];
+}
+
+/**
+ * Generic predicate that checks any feature (workflow or sync) by name.
+ * Returns false if the feature name is not recognized in either category.
+ */
+export function supportsFeature(type: ArrAppType, feature: string): boolean {
+  const caps = ARR_APPS[type].capabilities;
+  if (feature in caps.workflows) {
+    return caps.workflows[feature as ArrWorkflowSurface];
+  }
+  if (feature in caps.sync) {
+    return caps.sync[feature as ArrSyncSurface];
+  }
+  return false;
 }

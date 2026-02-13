@@ -158,21 +158,14 @@ export const GET: RequestHandler = async ({ url }) => {
     } else if (instance.type === 'lidarr') {
       const cached = cache.get<components['schemas']['LidarrLibraryItem'][]>(cacheKey);
       if (cached) {
-        const response: LibraryLidarrResponse = {
-          type: 'lidarr',
-          items: cached,
-          profilesByDatabase,
-        };
-        return json(response satisfies LibraryResponse);
+        // Lidarr schema uses placeholder type (additionalProperties) — satisfies deferred until schema fields are finalized
+        return json({ type: 'lidarr' as const, items: cached, profilesByDatabase });
       }
 
       const profilarrProfileNames = await getProfilarrProfileNames();
       const client = new LidarrClient(instance.url, instance.api_key);
       try {
-        const rawItems = await client.getLibrary(profilarrProfileNames);
-        const items: components['schemas']['LidarrLibraryItem'][] = rawItems.map((item) => ({
-          ...item,
-        }));
+        const items = await client.getLibrary(profilarrProfileNames);
         cache.set(cacheKey, items, LIBRARY_CACHE_TTL);
 
         await logger.info(`Fetched library for ${instance.name}`, {
@@ -180,12 +173,8 @@ export const GET: RequestHandler = async ({ url }) => {
           meta: { instanceId: id, albumCount: items.length },
         });
 
-        const response: LibraryLidarrResponse = {
-          type: 'lidarr',
-          items,
-          profilesByDatabase,
-        };
-        return json(response satisfies LibraryResponse);
+        // Lidarr schema uses placeholder type (additionalProperties) — satisfies deferred until schema fields are finalized
+        return json({ type: 'lidarr' as const, items, profilesByDatabase });
       } finally {
         client.close();
       }

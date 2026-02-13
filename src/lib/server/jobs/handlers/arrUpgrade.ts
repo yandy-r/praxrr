@@ -6,8 +6,7 @@ import type { FilterConfig } from '$shared/upgrades/filters.ts';
 import { processUpgradeConfig } from '$lib/server/upgrades/processor.ts';
 import { calculateCooldownUntil, calculateNextRunFromMinutes } from '../scheduleUtils.ts';
 import { logger } from '$logger/logger.ts';
-
-const LIDARR_UPGRADE_UNSUPPORTED_OUTPUT = 'Upgrades are not supported for Lidarr in v1.';
+import { isArrAppType, supportsArrWorkflow, ARR_APPS } from '$shared/arr/capabilities.ts';
 
 const upgradeRunHandler: JobHandler = async (job) => {
   const instanceId = Number(job.payload.instanceId);
@@ -25,8 +24,13 @@ const upgradeRunHandler: JobHandler = async (job) => {
     return { status: 'failure', error: 'Arr instance not found' };
   }
 
-  if (instance.type === 'lidarr') {
-    return { status: 'skipped', output: LIDARR_UPGRADE_UNSUPPORTED_OUTPUT };
+  if (!isArrAppType(instance.type)) {
+    return { status: 'skipped', output: `Upgrades are not supported for unknown instance type: ${instance.type}` };
+  }
+
+  if (!supportsArrWorkflow(instance.type, 'upgrades')) {
+    const label = ARR_APPS[instance.type].label;
+    return { status: 'skipped', output: `Upgrades are not supported for ${label} instances` };
   }
 
   // Manual runs are only allowed in dry run (unless dev)

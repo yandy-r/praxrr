@@ -8,16 +8,16 @@ import { scheduleRenameForInstance } from '$lib/server/jobs/init.ts';
 import { enqueueJob } from '$lib/server/jobs/queueService.ts';
 import { jobQueueQueries } from '$db/queries/jobQueue.ts';
 import { buildJobDisplayName } from '$lib/server/jobs/display.ts';
-
-const LIDARR_RENAME_UNSUPPORTED_ERROR = 'Rename is not supported for Lidarr in v1.';
+import { isArrAppType, supportsArrWorkflow, ARR_APPS } from '$shared/arr/capabilities.ts';
 
 function getRenameUnsupportedError(instanceType: string): string | null {
-	if (instanceType === 'lidarr') {
-		return LIDARR_RENAME_UNSUPPORTED_ERROR;
+	if (!isArrAppType(instanceType)) {
+		return `Rename is not supported for unknown instance type: ${instanceType}`;
 	}
 
-	if (instanceType !== 'radarr' && instanceType !== 'sonarr') {
-		return `Rename not supported for ${instanceType}`;
+	if (!supportsArrWorkflow(instanceType, 'rename')) {
+		const label = ARR_APPS[instanceType].label;
+		return `Rename is not supported for ${label} instances`;
 	}
 
 	return null;

@@ -5,7 +5,7 @@
 	import Badge from '$ui/badge/Badge.svelte';
 	import type { ArrInstance } from '$db/queries/arrInstances.ts';
 	import type { ArrIconKey } from '$shared/arr/capabilities.ts';
-	import { getArrAppMetadata, isArrAppType } from '$shared/arr/capabilities.ts';
+	import { ARR_APP_TYPES, getArrAppMetadata, isArrAppType } from '$shared/arr/capabilities.ts';
 	import radarrLogo from '$lib/client/assets/Radarr.svg';
 	import sonarrLogo from '$lib/client/assets/Sonarr.svg';
 	import { createEventDispatcher } from 'svelte';
@@ -16,11 +16,19 @@
 		delete: ArrInstance;
 	}>();
 
-	// Logo lookup by Arr metadata icon key
-	const logos: Partial<Record<ArrIconKey, string>> = {
+	// Available logo assets keyed by ArrIconKey.
+	// Apps without a logo asset (e.g. Lidarr) fall back to the initial-letter
+	// display in the template, driven by capability metadata.
+	const logoAssets: Record<string, string> = {
 		radarr: radarrLogo,
 		sonarr: sonarrLogo
 	};
+
+	// Build logo lookup from registered Arr app types so every app in
+	// ARR_APP_TYPES is represented. Missing assets resolve to undefined.
+	const logos: Partial<Record<ArrIconKey, string>> = Object.fromEntries(
+		ARR_APP_TYPES.map((type) => [type, logoAssets[type]])
+	) as Partial<Record<ArrIconKey, string>>;
 
 	// Track loaded images
 	let loadedImages = new SvelteSet<number>();

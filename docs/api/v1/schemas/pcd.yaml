@@ -3,10 +3,20 @@ EntityType:
   description: |
     Portable PCD entity identifiers used by import/export endpoints.
 
-    v1 Lidarr media-management intentionally reuses existing media-management
-    entities (`radarr_media_settings` / `sonarr_media_settings` and
-    `radarr_quality_definitions` / `sonarr_quality_definitions`) rather than
-    introducing `lidarr_*` entity types in this phase.
+    v1 Lidarr media-management strategy: reuse existing entities.
+    Lidarr maps to `radarr_media_settings` / `sonarr_media_settings` and
+    `radarr_quality_definitions` / `sonarr_quality_definitions` rather than
+    introducing dedicated `lidarr_*` entity types in this phase. Downstream
+    sync resolves the Lidarr arr_type against these shared shapes and
+    capability-gates any Lidarr-only fields (e.g. naming formats, music-
+    specific media-info fields) so behavior is deterministic: unsupported
+    fields are explicitly skipped with logged reasons, never silently
+    written or partially applied.
+
+    No new enum values are added for Lidarr here. The `lidarr` arr_type
+    is expressed in per-row `arr_type` columns (e.g. quality_profile_custom_formats,
+    custom_format_conditions, quality_api_mappings) and in the
+    PortableCustomFormatScore.arrType enum, not as a distinct entity family.
   enum:
     - delay_profile
     - regular_expression
@@ -33,17 +43,20 @@ ExportResponse:
         - `delay_profile` → PortableDelayProfile
         - `regular_expression` → PortableRegularExpression
         - `custom_format` → PortableCustomFormat
-        - `quality_profile` → PortableQualityProfile
+        - `quality_profile` → PortableQualityProfile (contains PortableCustomFormatScore with lidarr-aware arrType)
         - `radarr_naming` → PortableRadarrNaming
         - `sonarr_naming` → PortableSonarrNaming
-        - `radarr_media_settings` → PortableMediaSettings
-        - `sonarr_media_settings` → PortableMediaSettings
-        - `radarr_quality_definitions` → PortableQualityDefinitions
-        - `sonarr_quality_definitions` → PortableQualityDefinitions
+        - `radarr_media_settings` → PortableMediaSettings (reused for Lidarr in v1)
+        - `sonarr_media_settings` → PortableMediaSettings (reused for Lidarr in v1)
+        - `radarr_quality_definitions` → PortableQualityDefinitions (reused for Lidarr in v1)
+        - `sonarr_quality_definitions` → PortableQualityDefinitions (reused for Lidarr in v1)
 
-        Notes:
-        - v1 Lidarr media-management reuses existing `radarr_*`/`sonarr_*` entities.
-        - Unsupported Lidarr-only fields remain capability-gated for deterministic sync behavior.
+        v1 Lidarr reuse strategy:
+        Lidarr media-management sync maps to existing `radarr_*`/`sonarr_*` entity
+        shapes. No `lidarr_*` entity types exist in this phase. Unsupported Lidarr-only
+        fields (e.g. music-specific naming tokens, artist/album media-info fields) are
+        capability-gated: the sync layer explicitly skips them with deterministic,
+        logged outcomes rather than silently writing partial data.
       oneOf:
         - $ref: '#/PortableDelayProfile'
         - $ref: '#/PortableRegularExpression'
@@ -215,8 +228,12 @@ PortableCustomFormatScore:
       type: string
       enum: [radarr, sonarr, lidarr, all]
       description: |
-        Arr target for this score mapping. `lidarr` is supported for v1 parity,
-        while unsupported Lidarr-only behavior remains capability-gated elsewhere.
+        Arr target for this score mapping. `lidarr` is a valid value for v1
+        parity so quality profile custom-format scores can be scoped to Lidarr
+        instances. `all` applies the score to every arr type. Unsupported
+        Lidarr-only sync behavior (e.g. naming, music-specific media fields)
+        remains capability-gated in the sync layer; this enum only governs
+        score applicability, not full feature support.
     score:
       type: integer
 
@@ -326,9 +343,14 @@ PortableSonarrNaming:
 PortableMediaSettings:
   type: object
   description: |
-    Shared media-management settings payload for existing Radarr/Sonarr entity
-    families. v1 Lidarr support reuses this shape; Lidarr-only fields not
-    represented here remain capability-gated for deterministic sync.
+    Shared media-management settings payload for Radarr, Sonarr, and (in v1)
+    Lidarr entity families. Lidarr reuses this shape rather than introducing
+    `lidarr_media_settings` entities; the sync layer maps Lidarr instances to
+    the applicable `radarr_media_settings` or `sonarr_media_settings` entity
+    type and capability-gates any Lidarr-only fields not present here (e.g.
+    music-specific media-info flags). Unsupported fields are explicitly
+    skipped with logged reasons so sync outcomes are deterministic and
+    testable.
   required:
     - name
     - propersRepacks
@@ -344,9 +366,14 @@ PortableMediaSettings:
 PortableQualityDefinitions:
   type: object
   description: |
-    Shared quality-definition payload for existing Radarr/Sonarr entity
-    families. v1 Lidarr support reuses this shape; Lidarr-only fields not
-    represented here remain capability-gated for deterministic sync.
+    Shared quality-definition payload for Radarr, Sonarr, and (in v1) Lidarr
+    entity families. Lidarr reuses this shape rather than introducing
+    `lidarr_quality_definitions` entities; the sync layer maps Lidarr
+    instances to the applicable `radarr_quality_definitions` or
+    `sonarr_quality_definitions` entity type and capability-gates any
+    Lidarr-only fields not present here. Unsupported fields are explicitly
+    skipped with logged reasons so sync outcomes are deterministic and
+    testable.
   required:
     - name
     - entries

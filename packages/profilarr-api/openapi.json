@@ -131,7 +131,7 @@
       "get": {
         "operationId": "getLibrary",
         "summary": "Get Arr instance library",
-        "description": "Fetches the full movie or series library from an Arr instance with quality profile,\nscore, and progress information.\n\n- For Radarr: Returns movies with file quality, custom format scores, and cutoff progress\n- For Sonarr: Returns series with season summaries and episode statistics\n\nResults include Profilarr profile matching to indicate which items use managed profiles.\nResponses are cached server-side for 5 minutes.\n",
+        "description": "Fetches the full library from an Arr instance with quality profile,\nscore, and progress information.\n\n- For Radarr: Returns movies with file quality, custom format scores, and cutoff progress\n- For Sonarr: Returns series with season summaries and episode statistics\n- For Lidarr: Returns artists/albums (capability-gated; detailed payload fields deferred to later phases)\n\nResults include Profilarr profile matching to indicate which items use managed profiles.\nResponses are cached server-side for 5 minutes.\n",
         "tags": [
           "Arr"
         ],
@@ -307,7 +307,7 @@
       "get": {
         "operationId": "getReleases",
         "summary": "Search for releases",
-        "description": "Triggers an interactive search on an Arr instance and returns grouped/deduplicated results.\n\nFor Radarr: Searches for releases for the specified movie.\nFor Sonarr: Searches for season pack releases for the specified series and season.\n\nResults are grouped by title, combining information from multiple indexers.\n",
+        "description": "Triggers an interactive search on an Arr instance and returns grouped/deduplicated results.\n\nFor Radarr: Searches for releases for the specified movie.\nFor Sonarr: Searches for season pack releases for the specified series and season.\nFor Lidarr: Searches for releases for the specified album.\n\nResults are grouped by title, combining information from multiple indexers.\n",
         "tags": [
           "Arr"
         ],
@@ -328,7 +328,7 @@
             "schema": {
               "type": "integer"
             },
-            "description": "Movie ID (Radarr) or Series ID (Sonarr)"
+            "description": "Movie ID (Radarr), Series ID (Sonarr), or Album ID (Lidarr)"
           },
           {
             "name": "season",
@@ -1714,7 +1714,7 @@
       },
       "EntityType": {
         "type": "string",
-        "description": "Portable PCD entity identifiers used by import/export endpoints.\n\nv1 Lidarr media-management intentionally reuses existing media-management\nentities (`radarr_media_settings` / `sonarr_media_settings` and\n`radarr_quality_definitions` / `sonarr_quality_definitions`) rather than\nintroducing `lidarr_*` entity types in this phase.\n",
+        "description": "Portable PCD entity identifiers used by import/export endpoints.\n\nv1 Lidarr media-management strategy: reuse existing entities.\nLidarr maps to `radarr_media_settings` / `sonarr_media_settings` and\n`radarr_quality_definitions` / `sonarr_quality_definitions` rather than\nintroducing dedicated `lidarr_*` entity types in this phase. Downstream\nsync resolves the Lidarr arr_type against these shared shapes and\ncapability-gates any Lidarr-only fields (e.g. naming formats, music-\nspecific media-info fields) so behavior is deterministic: unsupported\nfields are explicitly skipped with logged reasons, never silently\nwritten or partially applied.\n\nNo new enum values are added for Lidarr here. The `lidarr` arr_type\nis expressed in per-row `arr_type` columns (e.g. quality_profile_custom_formats,\ncustom_format_conditions, quality_api_mappings) and in the\nPortableCustomFormatScore.arrType enum, not as a distinct entity family.\n",
         "enum": [
           "delay_profile",
           "regular_expression",
@@ -1739,7 +1739,7 @@
             "$ref": "#/components/schemas/EntityType"
           },
           "data": {
-            "description": "The portable entity payload. Shape varies by entityType:\n- `delay_profile` → PortableDelayProfile\n- `regular_expression` → PortableRegularExpression\n- `custom_format` → PortableCustomFormat\n- `quality_profile` → PortableQualityProfile\n- `radarr_naming` → PortableRadarrNaming\n- `sonarr_naming` → PortableSonarrNaming\n- `radarr_media_settings` → PortableMediaSettings\n- `sonarr_media_settings` → PortableMediaSettings\n- `radarr_quality_definitions` → PortableQualityDefinitions\n- `sonarr_quality_definitions` → PortableQualityDefinitions\n\nNotes:\n- v1 Lidarr media-management reuses existing `radarr_*`/`sonarr_*` entities.\n- Unsupported Lidarr-only fields remain capability-gated for deterministic sync behavior.\n",
+            "description": "The portable entity payload. Shape varies by entityType:\n- `delay_profile` → PortableDelayProfile\n- `regular_expression` → PortableRegularExpression\n- `custom_format` → PortableCustomFormat\n- `quality_profile` → PortableQualityProfile (contains PortableCustomFormatScore with lidarr-aware arrType)\n- `radarr_naming` → PortableRadarrNaming\n- `sonarr_naming` → PortableSonarrNaming\n- `radarr_media_settings` → PortableMediaSettings (reused for Lidarr in v1)\n- `sonarr_media_settings` → PortableMediaSettings (reused for Lidarr in v1)\n- `radarr_quality_definitions` → PortableQualityDefinitions (reused for Lidarr in v1)\n- `sonarr_quality_definitions` → PortableQualityDefinitions (reused for Lidarr in v1)\n\nv1 Lidarr reuse strategy:\nLidarr media-management sync maps to existing `radarr_*`/`sonarr_*` entity\nshapes. No `lidarr_*` entity types exist in this phase. Unsupported Lidarr-only\nfields (e.g. music-specific naming tokens, artist/album media-info fields) are\ncapability-gated: the sync layer explicitly skips them with deterministic,\nlogged outcomes rather than silently writing partial data.\n",
             "oneOf": [
               {
                 "$ref": "#/components/schemas/PortableDelayProfile"
@@ -2008,7 +2008,7 @@
               "lidarr",
               "all"
             ],
-            "description": "Arr target for this score mapping. `lidarr` is supported for v1 parity,\nwhile unsupported Lidarr-only behavior remains capability-gated elsewhere.\n"
+            "description": "Arr target for this score mapping. `lidarr` is a valid value for v1\nparity so quality profile custom-format scores can be scoped to Lidarr\ninstances. `all` applies the score to every arr type. Unsupported\nLidarr-only sync behavior (e.g. naming, music-specific media fields)\nremains capability-gated in the sync layer; this enum only governs\nscore applicability, not full feature support.\n"
           },
           "score": {
             "type": "integer"
@@ -2155,7 +2155,7 @@
       },
       "PortableMediaSettings": {
         "type": "object",
-        "description": "Shared media-management settings payload for existing Radarr/Sonarr entity\nfamilies. v1 Lidarr support reuses this shape; Lidarr-only fields not\nrepresented here remain capability-gated for deterministic sync.\n",
+        "description": "Shared media-management settings payload for Radarr, Sonarr, and (in v1)\nLidarr entity families. Lidarr reuses this shape rather than introducing\n`lidarr_media_settings` entities; the sync layer maps Lidarr instances to\nthe applicable `radarr_media_settings` or `sonarr_media_settings` entity\ntype and capability-gates any Lidarr-only fields not present here (e.g.\nmusic-specific media-info flags). Unsupported fields are explicitly\nskipped with logged reasons so sync outcomes are deterministic and\ntestable.\n",
         "required": [
           "name",
           "propersRepacks",
@@ -2175,7 +2175,7 @@
       },
       "PortableQualityDefinitions": {
         "type": "object",
-        "description": "Shared quality-definition payload for existing Radarr/Sonarr entity\nfamilies. v1 Lidarr support reuses this shape; Lidarr-only fields not\nrepresented here remain capability-gated for deterministic sync.\n",
+        "description": "Shared quality-definition payload for Radarr, Sonarr, and (in v1) Lidarr\nentity families. Lidarr reuses this shape rather than introducing\n`lidarr_quality_definitions` entities; the sync layer maps Lidarr\ninstances to the applicable `radarr_quality_definitions` or\n`sonarr_quality_definitions` entity type and capability-gates any\nLidarr-only fields not present here. Unsupported fields are explicitly\nskipped with logged reasons so sync outcomes are deterministic and\ntestable.\n",
         "required": [
           "name",
           "entries"

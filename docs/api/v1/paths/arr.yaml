@@ -3,11 +3,12 @@ library:
     operationId: getLibrary
     summary: Get Arr instance library
     description: |
-      Fetches the full movie or series library from an Arr instance with quality profile,
+      Fetches the full library from an Arr instance with quality profile,
       score, and progress information.
 
       - For Radarr: Returns movies with file quality, custom format scores, and cutoff progress
       - For Sonarr: Returns series with season summaries and episode statistics
+      - For Lidarr: Returns artists/albums (capability-gated; detailed payload fields deferred to later phases)
 
       Results include Profilarr profile matching to indicate which items use managed profiles.
       Responses are cached server-side for 5 minutes.
@@ -136,6 +137,7 @@ releases:
 
       For Radarr: Searches for releases for the specified movie.
       For Sonarr: Searches for season pack releases for the specified series and season.
+      For Lidarr: Searches for releases for the specified album.
 
       Results are grouped by title, combining information from multiple indexers.
     tags:
@@ -152,7 +154,7 @@ releases:
         required: true
         schema:
           type: integer
-        description: Movie ID (Radarr) or Series ID (Sonarr)
+        description: Movie ID (Radarr), Series ID (Sonarr), or Album ID (Lidarr)
       - name: season
         in: query
         required: false
