@@ -26,8 +26,8 @@ Planning workflow requirement:
 ## Recommended Issue Set
 
 1. `feat(lidarr): enable instance onboarding and type contract parity`
-2. `feat(lidarr): implement library and release search support`
-3. `feat(lidarr): extend sync and media-management compatibility`
+2. `feat(lidarr): extend sync and media-management compatibility`
+3. `feat(lidarr): implement library and release search support`
 4. `feat(lidarr): generalize Arr UI controls and capability states`
 5. `chore(lidarr): decide rename/upgrades scope and complete parity test matrix`
 
@@ -73,7 +73,44 @@ Research/spec: `docs/plans/lidarr-support/feature-spec.md`
 
 ---
 
-## 2) feat(lidarr): implement library and release search support
+## 2) feat(lidarr): extend sync and media-management compatibility
+
+### Body
+
+```markdown
+## Summary
+
+Integrate Lidarr into section-based sync flows with clear handling for media-management and mapping constraints.
+
+## Context
+
+Research/spec: `docs/plans/lidarr-support/feature-spec.md`
+
+## Scope
+
+- Extend sync type handling and mappings where needed:
+  - `src/lib/server/sync/mappings.ts`
+  - `src/lib/server/sync/mediaManagement/syncer.ts`
+  - related sync handlers/registry touchpoints
+- Align PCD/shared typing and entity handling strategy for Lidarr-compatible media-management configs.
+- Ensure arr sync job pipeline can process Lidarr instances without breaking Radarr/Sonarr.
+
+## Acceptance Criteria
+
+- Sync jobs can run for Lidarr instances through existing section orchestration.
+- Media-management sync path has an explicit, tested strategy for Lidarr (supported or capability-gated).
+- Quality/delay/media-management section status handling remains consistent.
+
+## Validation
+
+- `deno task check`
+- targeted sync tests
+- manual queue/job smoke test for Lidarr instance.
+```
+
+---
+
+## 3) feat(lidarr): implement library and release search support
 
 ### Body
 
@@ -107,43 +144,6 @@ Research/spec: `docs/plans/lidarr-support/feature-spec.md`
 - `deno task check`
 - Endpoint-focused tests for Lidarr library/releases
 - Manual smoke test against a real Lidarr instance/container.
-```
-
----
-
-## 3) feat(lidarr): extend sync and media-management compatibility
-
-### Body
-
-```markdown
-## Summary
-
-Integrate Lidarr into section-based sync flows with clear handling for media-management and mapping constraints.
-
-## Context
-
-Research/spec: `docs/plans/lidarr-support/feature-spec.md`
-
-## Scope
-
-- Extend sync type handling and mappings where needed:
-  - `src/lib/server/sync/mappings.ts`
-  - `src/lib/server/sync/mediaManagement/syncer.ts`
-  - related sync handlers/registry touchpoints
-- Align PCD/shared typing and entity handling strategy for Lidarr-compatible media-management configs.
-- Ensure arr sync job pipeline can process Lidarr instances without breaking Radarr/Sonarr.
-
-## Acceptance Criteria
-
-- Sync jobs can run for Lidarr instances through existing section orchestration.
-- Media-management sync path has an explicit, tested strategy for Lidarr (supported or capability-gated).
-- Quality/delay/media-management section status handling remains consistent.
-
-## Validation
-
-- `deno task check`
-- targeted sync tests
-- manual queue/job smoke test for Lidarr instance.
 ```
 
 ---
@@ -224,8 +224,8 @@ Research/spec: `docs/plans/lidarr-support/feature-spec.md`
 ### Final Task-to-Issue Mapping (from `parallel-plan.md`)
 
 - `#1` foundation/onboarding/type contracts: `1.1`, `1.3`, `1.4`, `1.5`, `3.4`
-- `#2` library/releases delivery: `2.1`, `2.2`, `2.3`, `3.4`
-- `#3` sync/media-management compatibility: `1.2`, `1.4`, `2.4`, `2.5`, `3.5`
+- `#2` sync/media-management compatibility: `1.2`, `1.4`, `2.1`, `2.4`, `2.5`, `3.5`
+- `#3` library/releases delivery: `2.1`, `2.2`, `2.3`, `3.4`
 - `#4` UI generalization/capability UX: `1.6`, `1.7`, `2.6`, `2.7`, `3.3`, `3.6`
 - `#5` rename/upgrades scope + parity matrix: `3.1`, `3.2`, `3.5`
 - `#6` umbrella rollup: `3.7` (status aggregation and closeout notes for `#1`-`#5`)
@@ -235,12 +235,12 @@ Research/spec: `docs/plans/lidarr-support/feature-spec.md`
 - `#1` completed in scope: onboarding allowlists and contract chain updates
   (`arr.yaml` -> `pcd.yaml` -> generated `src/lib/api/v1.d.ts`) plus onboarding regression
   coverage in `src/tests/base/lidarrOnboarding.test.ts`.
-- `#2` completed in scope: Lidarr client methods and API branches for
-  `/api/v1/arr/library` and `/api/v1/arr/releases`, with regression coverage in
-  `src/tests/base/lidarrApiParity.test.ts`.
-- `#3` completed in scope: sync mappings and media-management behavior implemented with
+- `#2` completed in scope: sync mappings and media-management behavior implemented with
   the v1 entity-reuse strategy and mixed-arr sync regression coverage in
   `src/tests/jobs/lidarrSync.test.ts`.
+- `#3` completed in scope: Lidarr client methods and API branches for
+  `/api/v1/arr/library` and `/api/v1/arr/releases`, with regression coverage in
+  `src/tests/base/lidarrApiParity.test.ts`.
 - `#4` completed in scope: capability metadata adopted across onboarding/list/condition/
   library UX, with end-to-end flow coverage in
   `src/tests/e2e/specs/2.40-lidarr-core-flow.spec.ts`.
