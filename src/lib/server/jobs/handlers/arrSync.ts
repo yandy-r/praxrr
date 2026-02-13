@@ -7,6 +7,7 @@ import type { ArrType } from '$arr/types.ts';
 import { calculateNextRun } from '$lib/server/sync/utils.ts';
 import type { SectionType } from '$lib/server/sync/types.ts';
 import { getSection } from '$lib/server/sync/registry.ts';
+import { SYNC_SECTION_ORDER, getUnsupportedSyncSectionReason, type SyncArrType } from '$lib/server/sync/mappings.ts';
 import { logger } from '$logger/logger.ts';
 
 // Register sync handlers
@@ -14,131 +15,160 @@ import '$lib/server/sync/qualityProfiles/handler.ts';
 import '$lib/server/sync/delayProfiles/handler.ts';
 import '$lib/server/sync/mediaManagement/handler.ts';
 
-const sectionOrder: SectionType[] = ['qualityProfiles', 'delayProfiles', 'mediaManagement'];
-
 const jobTypeToSection = new Map<JobType, SectionType>([
-	['arr.sync.qualityProfiles', 'qualityProfiles'],
-	['arr.sync.delayProfiles', 'delayProfiles'],
-	['arr.sync.mediaManagement', 'mediaManagement']
+  ['arr.sync.qualityProfiles', 'qualityProfiles'],
+  ['arr.sync.delayProfiles', 'delayProfiles'],
+  ['arr.sync.mediaManagement', 'mediaManagement'],
 ]);
 
 function parseLegacySections(payload: Record<string, unknown>): SectionType[] | null {
-	const raw = payload.sections ?? payload.section;
-	if (Array.isArray(raw)) {
-		const sections = raw.filter((value): value is SectionType =>
-			value === 'qualityProfiles' || value === 'delayProfiles' || value === 'mediaManagement'
-		);
-		return sections.length > 0 ? sections : null;
-	}
+  const raw = payload.sections ?? payload.section;
+  if (Array.isArray(raw)) {
+    const sections = raw.filter(
+      (value): value is SectionType =>
+        value === 'qualityProfiles' || value === 'delayProfiles' || value === 'mediaManagement'
+    );
+    return sections.length > 0 ? sections : null;
+  }
 
-	if (typeof raw === 'string') {
-		if (raw === 'qualityProfiles' || raw === 'delayProfiles' || raw === 'mediaManagement') {
-			return [raw];
-		}
-	}
+  if (typeof raw === 'string') {
+    if (raw === 'qualityProfiles' || raw === 'delayProfiles' || raw === 'mediaManagement') {
+      return [raw];
+    }
+  }
 
-	return null;
+  return null;
 }
 
 function resolveSections(jobType: JobType, payload: Record<string, unknown>): SectionType[] {
-	const mapped = jobTypeToSection.get(jobType);
-	if (mapped) return [mapped];
-	if (jobType !== 'arr.sync') return [];
-	return parseLegacySections(payload) ?? sectionOrder;
+  const mapped = jobTypeToSection.get(jobType);
+  if (mapped) return [mapped];
+  if (jobType !== 'arr.sync') return [];
+  return parseLegacySections(payload) ?? SYNC_SECTION_ORDER;
+}
+
+function toSyncArrType(arrType: string): SyncArrType | null {
+  if (arrType === 'radarr' || arrType === 'sonarr' || arrType === 'lidarr') {
+    return arrType;
+  }
+
+  return null;
 }
 
 const arrSyncHandler: JobHandler = async (job) => {
-	const instanceId = Number(job.payload.instanceId);
-	if (!Number.isFinite(instanceId)) {
-		return { status: 'failure', error: 'Invalid instance ID' };
-	}
+  const instanceId = Number(job.payload.instanceId);
+  if (!Number.isFinite(instanceId)) {
+    return { status: 'failure', error: 'Invalid instance ID' };
+  }
 
-	const instance = arrInstancesQueries.getById(instanceId);
-	if (!instance || !instance.enabled) {
-		return { status: 'cancelled', output: 'Arr instance disabled' };
-	}
+  const instance = arrInstancesQueries.getById(instanceId);
+  if (!instance || !instance.enabled) {
+    return { status: 'cancelled', output: 'Arr instance disabled' };
+  }
 
-	const configStatus = arrSyncQueries.getSyncConfigStatus(instanceId);
-	const sectionsToRun = resolveSections(job.jobType, job.payload);
+  const configStatus = arrSyncQueries.getSyncConfigStatus(instanceId);
+  const sectionsToRun = resolveSections(job.jobType, job.payload);
 
-	if (sectionsToRun.length === 0) {
-		return { status: 'skipped', output: 'No sync sections specified' };
-	}
+  if (sectionsToRun.length === 0) {
+    return { status: 'skipped', output: 'No sync sections specified' };
+  }
 
-	const client = createArrClient(instance.type as ArrType, instance.url, instance.api_key);
-	const results: string[] = [];
-	let failures = 0;
-	let ranSections = 0;
-	let rescheduleAt: string | null = null;
+  const syncArrType = toSyncArrType(instance.type);
+  if (!syncArrType) {
+    return { status: 'failure', error: `Unsupported sync instance type: ${instance.type}` };
+  }
 
-	for (const section of sectionsToRun) {
-		const handler = getSection(section);
-		const config = configStatus[section];
+  const client = createArrClient(instance.type as ArrType, instance.url, instance.api_key);
+  const results: string[] = [];
+  let failures = 0;
+  let ranSections = 0;
+  let rescheduleAt: string | null = null;
 
-		if (job.source === 'schedule' && config.trigger !== 'schedule') {
-			results.push(`${section}: skipped`);
-			continue;
-		}
+  for (const section of sectionsToRun) {
+    const handler = getSection(section);
+    const config = configStatus[section];
+    const unsupportedReason = getUnsupportedSyncSectionReason(syncArrType, section);
 
-		if (!handler.hasConfig(instanceId)) {
-			results.push(`${section}: skipped`);
-			continue;
-		}
+    if (unsupportedReason) {
+      results.push(`${section}: skipped (${unsupportedReason})`);
+      await logger.debug('Skipping unsupported sync section', {
+        source: 'ArrSyncJob',
+        meta: {
+          jobId: job.id,
+          instanceId,
+          instanceName: instance.name,
+          instanceType: syncArrType,
+          section,
+          reason: unsupportedReason,
+        },
+      });
+      continue;
+    }
 
-		handler.setStatusPending(instanceId);
-		if (!handler.claimSync(instanceId)) {
-			continue;
-		}
+    if (job.source === 'schedule' && config.trigger !== 'schedule') {
+      results.push(`${section}: skipped`);
+      continue;
+    }
 
-		ranSections++;
-		try {
-			const syncer = handler.createSyncer(client, instance);
-			const result = await syncer.sync();
+    if (!handler.hasConfig(instanceId)) {
+      results.push(`${section}: skipped`);
+      continue;
+    }
 
-			if (result.success) {
-				handler.completeSync(instanceId);
-				results.push(`${section}: ${result.itemsSynced} item(s)`);
-			} else {
-				handler.failSync(instanceId, result.error ?? 'Unknown error');
-				results.push(`${section}: failed`);
-				failures++;
-			}
-		} catch (error) {
-			const message = error instanceof Error ? error.message : 'Unknown error';
-			handler.failSync(instanceId, message);
-			results.push(`${section}: failed`);
-			failures++;
-			await logger.error('Arr sync failed', {
-				source: 'ArrSyncJob',
-				meta: { jobId: job.id, instanceId, instanceName: instance.name, section, error: message }
-			});
-		} finally {
-			if (config.trigger === 'schedule') {
-				const nextRun = calculateNextRun(config.cron);
-				handler.setNextRunAt(instanceId, nextRun);
-				if (job.source === 'schedule') {
-					rescheduleAt = nextRun ?? null;
-				}
-			}
-		}
-	}
+    handler.setStatusPending(instanceId);
+    if (!handler.claimSync(instanceId)) {
+      continue;
+    }
 
-	if (job.source === 'schedule' && job.jobType === 'arr.sync') {
-		const nextRunAt = arrSyncQueries.getNextScheduledRunAt(instanceId);
-		if (nextRunAt) {
-			return {
-				status: failures > 0 ? 'failure' : 'success',
-				output: results.join(', '),
-				rescheduleAt: nextRunAt
-			};
-		}
-	}
+    ranSections++;
+    try {
+      const syncer = handler.createSyncer(client, instance);
+      const result = await syncer.sync();
 
-	return {
-		status: ranSections === 0 ? 'skipped' : failures > 0 ? 'failure' : 'success',
-		output: results.join(', '),
-		rescheduleAt: job.source === 'schedule' ? rescheduleAt : null
-	};
+      if (result.success) {
+        handler.completeSync(instanceId);
+        results.push(`${section}: ${result.itemsSynced} item(s)`);
+      } else {
+        handler.failSync(instanceId, result.error ?? 'Unknown error');
+        results.push(`${section}: failed`);
+        failures++;
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      handler.failSync(instanceId, message);
+      results.push(`${section}: failed`);
+      failures++;
+      await logger.error('Arr sync failed', {
+        source: 'ArrSyncJob',
+        meta: { jobId: job.id, instanceId, instanceName: instance.name, section, error: message },
+      });
+    } finally {
+      if (config.trigger === 'schedule') {
+        const nextRun = calculateNextRun(config.cron);
+        handler.setNextRunAt(instanceId, nextRun);
+        if (job.source === 'schedule') {
+          rescheduleAt = nextRun ?? null;
+        }
+      }
+    }
+  }
+
+  if (job.source === 'schedule' && job.jobType === 'arr.sync') {
+    const nextRunAt = arrSyncQueries.getNextScheduledRunAt(instanceId);
+    if (nextRunAt) {
+      return {
+        status: failures > 0 ? 'failure' : 'success',
+        output: results.join(', '),
+        rescheduleAt: nextRunAt,
+      };
+    }
+  }
+
+  return {
+    status: ranSections === 0 ? 'skipped' : failures > 0 ? 'failure' : 'success',
+    output: results.join(', '),
+    rescheduleAt: job.source === 'schedule' ? rescheduleAt : null,
+  };
 };
 
 jobQueueRegistry.register('arr.sync', arrSyncHandler);

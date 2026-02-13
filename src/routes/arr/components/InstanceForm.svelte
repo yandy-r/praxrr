@@ -13,6 +13,13 @@
 	import DirtyModal from '$ui/modal/DirtyModal.svelte';
 	import Button from '$ui/button/Button.svelte';
 	import StickyCard from '$ui/card/StickyCard.svelte';
+	import {
+		ARR_APP_OPTIONS,
+		isArrAppType,
+		supportsArrWorkflow,
+		type ArrAppType,
+		type ArrWorkflowSurface
+	} from '$shared/arr/capabilities.ts';
 
 	// Props
 	export let mode: 'create' | 'edit';
@@ -71,15 +78,39 @@
 	let showCleanupModal = false;
 
 	// Options for dropdowns
-	const typeOptions = [
-		{ value: 'radarr', label: 'Radarr' },
-		{ value: 'sonarr', label: 'Sonarr' }
-	];
+	const typeOptions = ARR_APP_OPTIONS.map((option) => ({ value: option.value, label: option.label }));
 
 	const enabledOptions = [
 		{ value: 'true', label: 'Enabled' },
 		{ value: 'false', label: 'Disabled' }
 	];
+
+	const downstreamWorkflowSurfaces: ArrWorkflowSurface[] = [
+		'library',
+		'releases',
+		'rename',
+		'upgrades'
+	];
+	const workflowLabels: Record<ArrWorkflowSurface, string> = {
+		instances: 'Settings',
+		library: 'Library',
+		releases: 'Releases',
+		rename: 'Rename',
+		upgrades: 'Upgrades'
+	};
+	const appPorts: Record<ArrAppType, number> = {
+		radarr: 7878,
+		sonarr: 8989,
+		lidarr: 8686
+	};
+	const defaultAppType = ARR_APP_OPTIONS[0]!.value;
+	const defaultUrlHint = `Use container name if on the same Docker network, e.g. http://${defaultAppType}:${appPorts[defaultAppType]}`;
+
+	function joinLabels(labels: string[]): string {
+		if (labels.length === 0) return '';
+		if (labels.length === 1) return labels[0];
+		return `${labels.slice(0, -1).join(', ')} and ${labels[labels.length - 1]}`;
+	}
 
 	// Manual test connection
 	async function testConnection() {
@@ -169,9 +200,33 @@
 	}
 
 	// Display text based on mode
+	$: selectedAppType = isArrAppType(type) ? type : null;
+	$: unsupportedWorkflowLabels = selectedAppType
+		? downstreamWorkflowSurfaces
+				.filter((workflow) => !supportsArrWorkflow(selectedAppType, workflow))
+				.map((workflow) => workflowLabels[workflow])
+		: [];
+	$: supportedWorkflowLabels = selectedAppType
+		? downstreamWorkflowSurfaces
+				.filter((workflow) => supportsArrWorkflow(selectedAppType, workflow))
+				.map((workflow) => workflowLabels[workflow])
+		: [];
+	$: selectedAppLabel = selectedAppType
+		? typeOptions.find((option) => option.value === selectedAppType)?.label ?? 'This app'
+		: '';
+	$: unsupportedWorkflowSummary = joinLabels(unsupportedWorkflowLabels);
+	$: supportedWorkflowSummary = joinLabels(supportedWorkflowLabels);
+	$: unsupportedWorkflowMessage =
+		selectedAppType && unsupportedWorkflowLabels.length > 0
+			? `${selectedAppLabel} does not support ${unsupportedWorkflowSummary} in Profilarr yet.${supportedWorkflowLabels.length > 0 ? ` You can still use ${supportedWorkflowSummary}.` : ''}`
+			: '';
+	$: urlPlaceholder = selectedAppType ? `http://localhost:${appPorts[selectedAppType]}` : 'http://localhost:7878';
+	$: urlDescription = selectedAppType
+		? `Use container name if on the same Docker network, e.g. http://${selectedAppType}:${appPorts[selectedAppType]}`
+		: defaultUrlHint;
 	$: title = mode === 'create' ? 'Add Instance' : 'Settings';
 	$: description = mode === 'create'
-		? 'Configure a new Radarr or Sonarr instance.'
+		? 'Configure a new Arr app instance. Workflow availability depends on app capabilities.'
 		: `Configure connection and sync settings for ${instance?.name || 'this instance'}.`;
 </script>
 
@@ -229,6 +284,11 @@
 				disabled={mode === 'edit'}
 				on:change={(e) => update('type', e.detail)}
 			/>
+			{#if unsupportedWorkflowMessage}
+				<p class="text-xs text-amber-600 dark:text-amber-400" role="status">
+					{unsupportedWorkflowMessage}
+				</p>
+			{/if}
 		</div>
 		<!-- Name + Status Row -->
 		<div class="flex flex-col gap-4 md:flex-row md:items-end">
@@ -237,7 +297,7 @@
 					label="Name"
 					name="name"
 					value={name}
-					placeholder="e.g., Main Radarr, 4K Sonarr"
+					placeholder="e.g., Movies, TV, Music"
 					required
 					on:input={(e) => update('name', e.detail)}
 				/>
@@ -262,8 +322,8 @@
 			name="url"
 			type="url"
 			value={url}
-			placeholder="http://localhost:7878"
-			description="Use container name if on the same Docker network, e.g. http://radarr:7878"
+			placeholder={urlPlaceholder}
+			description={urlDescription}
 			required
 			on:input={(e) => update('url', e.detail)}
 		/>

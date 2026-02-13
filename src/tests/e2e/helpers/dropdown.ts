@@ -4,33 +4,44 @@
  */
 import type { Page, Locator } from '@playwright/test';
 
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 /**
  * Select a value from a DropdownSelect component.
  * @param scope - A locator scoped to the dropdown's container (e.g., a section with label text)
  * @param optionLabel - The visible label of the option to select
  */
-export async function selectDropdownOption(
-  scope: Locator,
-  optionLabel: string
-): Promise<void> {
-  // Click the trigger button within this scope
-  await scope.getByRole('button').first().click();
+export async function selectDropdownOption(scope: Locator, optionLabel: string): Promise<void> {
+  const trigger = scope.locator('div.relative').first().getByRole('button').first();
+  await trigger.waitFor({ state: 'visible', timeout: 10_000 });
+  await trigger.click();
 
-  // Click the option — use last() because the trigger button may also match the text
-  // but the dropdown option always appears after it in DOM order
-  await scope.getByRole('button', { name: optionLabel, exact: true }).last().click();
+  const menu = scope.locator('div.absolute').first();
+  await menu.waitFor({ state: 'visible', timeout: 10_000 });
+
+  const exactOption = menu.getByRole('button', { name: optionLabel, exact: true });
+  if ((await exactOption.count()) > 0) {
+    await exactOption.first().click();
+    return;
+  }
+
+  const escaped = escapeRegExp(optionLabel);
+  const fuzzyOption = menu.getByRole('button', { name: new RegExp(`^\\s*${escaped}\\s*$`) });
+  await fuzzyOption.first().waitFor({ state: 'visible', timeout: 10_000 });
+  await fuzzyOption.first().click();
 }
 
 /**
  * Select a dropdown by its section label text.
  * Finds the nearest .space-y-2 container that has the label, then picks the option.
  */
-export async function selectDropdownByLabel(
-  page: Page,
-  sectionLabel: string,
-  optionLabel: string
-): Promise<void> {
-  const section = page.locator('.space-y-2', { hasText: sectionLabel }).first();
+export async function selectDropdownByLabel(page: Page, sectionLabel: string, optionLabel: string): Promise<void> {
+  const sectionPattern = new RegExp(`\\b${escapeRegExp(sectionLabel)}\\b`, 'i');
+  const section = page.locator('div.space-y-2').filter({ hasText: sectionPattern }).first();
+  await section.waitFor({ state: 'visible', timeout: 10_000 });
+
   await selectDropdownOption(section, optionLabel);
 }
 
@@ -50,9 +61,9 @@ export async function selectSearchDropdownOption(
   const optionButtons = scope.locator('div.absolute').getByRole('button');
   await optionButtons.first().waitFor({ state: 'visible', timeout: 10_000 });
 
-  const escaped = optionLabel.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const escaped = escapeRegExp(optionLabel);
   const prefixMatch = optionButtons.filter({
-    hasText: new RegExp(`^${escaped}`)
+    hasText: new RegExp(`^${escaped}`),
   });
 
   if ((await prefixMatch.count()) > 0) {

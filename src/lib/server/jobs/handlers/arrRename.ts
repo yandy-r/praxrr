@@ -6,6 +6,8 @@ import { processRenameConfig } from '$lib/server/rename/processor.ts';
 import { calculateNextRunFromMinutes } from '../scheduleUtils.ts';
 import { logger } from '$logger/logger.ts';
 
+const LIDARR_RENAME_UNSUPPORTED_OUTPUT = 'Rename is not supported for Lidarr in v1.';
+
 const renameRunHandler: JobHandler = async (job) => {
 	const instanceId = Number(job.payload.instanceId);
 	if (!Number.isFinite(instanceId)) {
@@ -20,6 +22,10 @@ const renameRunHandler: JobHandler = async (job) => {
 	const instance = arrInstancesQueries.getById(instanceId);
 	if (!instance) {
 		return { status: 'failure', error: 'Arr instance not found' };
+	}
+
+	if (instance.type === 'lidarr') {
+		return { status: 'skipped', output: LIDARR_RENAME_UNSUPPORTED_OUTPUT };
 	}
 
 	if (instance.type !== 'radarr' && instance.type !== 'sonarr') {

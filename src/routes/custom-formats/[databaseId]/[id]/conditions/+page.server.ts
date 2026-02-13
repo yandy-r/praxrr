@@ -7,6 +7,7 @@ import * as regularExpressionQueries from '$pcd/entities/regularExpressions/inde
 import { getLanguagesWithSupport } from '$lib/server/sync/mappings.ts';
 import type { OperationLayer } from '$pcd/index.ts';
 import type { ConditionData } from '$shared/pcd/display.ts';
+import { isArrType } from '$shared/pcd/types.ts';
 
 export const load: ServerLoad = async ({ params }) => {
 	const { databaseId, id } = params;
@@ -117,9 +118,7 @@ export const actions: Actions = {
 		}
 
 		// Validate arr type selection
-		const hasMissingArrType = conditions.some(
-			(c) => c.arrType !== 'all' && c.arrType !== 'radarr' && c.arrType !== 'sonarr'
-		);
+		const hasMissingArrType = conditions.some((c) => !isArrType(c.arrType));
 		if (hasMissingArrType) {
 			return fail(400, { error: 'Each condition must have at least one Arr type selected' });
 		}

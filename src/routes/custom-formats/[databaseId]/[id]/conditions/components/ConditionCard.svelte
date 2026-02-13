@@ -9,6 +9,10 @@
 	import Toggle from '$ui/toggle/Toggle.svelte';
 	import SearchDropdown from '$ui/form/SearchDropdown.svelte';
 	import {
+		ARR_CONDITION_TARGET_OPTIONS,
+		type ArrConditionTargetType
+	} from '$shared/arr/capabilities.ts';
+	import {
 		CONDITION_TYPES,
 		PATTERN_TYPES,
 		SOURCE_VALUES,
@@ -48,20 +52,15 @@
 		dispatch('change', { ...condition, ...updates });
 	}
 
-	$: radarrEnabled = condition.arrType === 'all' || condition.arrType === 'radarr';
-	$: sonarrEnabled = condition.arrType === 'all' || condition.arrType === 'sonarr';
+	function handleArrTypeToggle(target: ArrConditionTargetType, enabled: boolean) {
+		if (enabled) {
+			emitChange({ arrType: target });
+			return;
+		}
 
-	function getArrType(r: boolean, s: boolean): ConditionData['arrType'] {
-		if (r && s) return 'all';
-		if (r) return 'radarr';
-		if (s) return 'sonarr';
-		return '';
-	}
-
-	function handleArrTypeToggle(target: 'radarr' | 'sonarr', enabled: boolean) {
-		const nextRadarr = target === 'radarr' ? enabled : radarrEnabled;
-		const nextSonarr = target === 'sonarr' ? enabled : sonarrEnabled;
-		emitChange({ arrType: getArrType(nextRadarr, nextSonarr) });
+		if (condition.arrType === target) {
+			emitChange({ arrType: '' });
+		}
 	}
 
 	// All condition types
@@ -413,20 +412,15 @@
 				color="green"
 				on:change={(e) => emitChange({ required: e.detail })}
 			/>
-			<Toggle
-				checked={radarrEnabled}
-				ariaLabel="Radarr"
-				label="Radarr"
-				checkboxColor="var(--arr-radarr-color)"
-				on:change={(e) => handleArrTypeToggle('radarr', e.detail)}
-			/>
-			<Toggle
-				checked={sonarrEnabled}
-				ariaLabel="Sonarr"
-				label="Sonarr"
-				checkboxColor="var(--arr-sonarr-color)"
-				on:change={(e) => handleArrTypeToggle('sonarr', e.detail)}
-			/>
+			{#each ARR_CONDITION_TARGET_OPTIONS as option (option.value)}
+				<Toggle
+					checked={condition.arrType === option.value}
+					ariaLabel={`${option.label} target`}
+					label={option.label}
+					checkboxColor={option.checkboxColor}
+					on:change={(e) => handleArrTypeToggle(option.value, e.detail)}
+				/>
+			{/each}
 		</div>
 	</div>
 

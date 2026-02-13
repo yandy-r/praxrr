@@ -3,6 +3,7 @@ ArrType:
   enum:
     - radarr
     - sonarr
+    - lidarr
   description: Type of Arr instance
 
 # Shared types
@@ -240,6 +241,13 @@ SonarrLibraryItem:
       type: boolean
       description: Whether the profile is managed by Profilarr
 
+LidarrLibraryItem:
+  type: object
+  additionalProperties: true
+  description: |
+    Placeholder contract for Lidarr library payload items.
+    Lidarr-specific artist/album fields remain capability-gated for later phases.
+
 SonarrEpisodeItem:
   type: object
   required:
@@ -347,11 +355,34 @@ LibrarySonarrResponse:
       items:
         $ref: '#/ProfileByDatabase'
 
+LibraryLidarrResponse:
+  type: object
+  required:
+    - type
+    - items
+    - profilesByDatabase
+  properties:
+    type:
+      type: string
+      enum:
+        - lidarr
+    items:
+      type: array
+      items:
+        $ref: '#/LidarrLibraryItem'
+    profilesByDatabase:
+      type: array
+      items:
+        $ref: '#/ProfileByDatabase'
+
 LibraryResponse:
   oneOf:
     - $ref: '#/LibraryRadarrResponse'
     - $ref: '#/LibrarySonarrResponse'
-  description: Library response varies by instance type
+    - $ref: '#/LibraryLidarrResponse'
+  description: |
+    Library response varies by instance type.
+    Lidarr payload details remain capability-gated until dedicated library route support ships.
 
 EpisodesResponse:
   type: object
@@ -362,7 +393,7 @@ EpisodesResponse:
       type: array
       items:
         $ref: '#/SonarrEpisodeItem'
-      description: Episode details with quality and score data
+      description: Episode details with quality and score data (Sonarr-only in current phase)
 
 CacheInvalidatedResponse:
   type: object

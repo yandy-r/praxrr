@@ -20,7 +20,7 @@ import { getCache, type PCDCache } from '$pcd/index.ts';
 import { getRadarrByName as getRadarrMediaSettings, getSonarrByName as getSonarrMediaSettings } from '$pcd/entities/mediaManagement/media-settings/read.ts';
 import { getRadarrByName as getRadarrNaming, getSonarrByName as getSonarrNaming } from '$pcd/entities/mediaManagement/naming/read.ts';
 import { getRadarrByName as getRadarrQualityDefs, getSonarrByName as getSonarrQualityDefs } from '$pcd/entities/mediaManagement/quality-definitions/read.ts';
-import type { RadarrMediaSettingsRow, SonarrMediaSettingsRow, RadarrNamingRow, SonarrNamingRow } from '$shared/pcd/display.ts';
+import type { RadarrMediaSettingsRow, SonarrMediaSettingsRow } from '$shared/pcd/display.ts';
 import { colonReplacementToDb, multiEpisodeStyleToDb } from '$shared/pcd/mediaManagement.ts';
 import type {
 	ArrType,
@@ -29,6 +29,25 @@ import type {
 	SonarrNamingConfig
 } from '$arr/types.ts';
 import { logger } from '$logger/logger.ts';
+
+const LIDARR_REUSE_ENTITY_REASON =
+	'Lidarr v1 reuses Sonarr media-management entities; Lidarr-only fields stay unchanged';
+const LIDARR_UNSUPPORTED_FIELD_REASON =
+	'Field is not represented by the reused entity strategy and is capability-gated for Lidarr';
+const LIDARR_NAMING_SOURCE_FIELD_REASON =
+	'Sonarr naming fields without a direct Lidarr equivalent are skipped in v1';
+const LIDARR_QUALITY_SKIP_REASON =
+	'Lidarr quality definition sync applies only entries with Lidarr mappings and matching Lidarr definitions';
+
+const LIDARR_UNSUPPORTED_SONARR_NAMING_FIELDS = [
+	'custom_colon_replacement_format',
+	'multi_episode_style',
+	'standard_episode_format',
+	'daily_episode_format',
+	'anime_episode_format',
+	'series_folder_format',
+	'season_folder_format'
+] as const;
 
 export class MediaManagementSyncer extends BaseSyncer {
 	private instanceType: ArrType;
@@ -148,39 +167,97 @@ export class MediaManagementSyncer extends BaseSyncer {
 			return false;
 		}
 
+		const mediaSettingsEntity =
+			this.instanceType === 'radarr' ? 'radarr_media_settings' : 'sonarr_media_settings';
+
 		// Fetch from PCD by config name
 		let mediaSettings: RadarrMediaSettingsRow | SonarrMediaSettingsRow | null = null;
 		if (this.instanceType === 'radarr') {
 			mediaSettings = await getRadarrMediaSettings(cache, configName);
-		} else if (this.instanceType === 'sonarr') {
+		} else if (this.instanceType === 'sonarr' || this.instanceType === 'lidarr') {
 			mediaSettings = await getSonarrMediaSettings(cache, configName);
 		}
 
 		if (!mediaSettings) {
-			await logger.debug(`Media settings config "${configName}" not found in PCD`, {
+			await logger.debug(`Media settings config "${configName}" not found in ${mediaSettingsEntity}`, {
 				source: 'Sync:MediaSettings',
-				meta: { instanceId: this.instanceId, configName }
+				meta: {
+					instanceId: this.instanceId,
+					configName,
+					entityType: mediaSettingsEntity,
+					reason: this.instanceType === 'lidarr' ? LIDARR_REUSE_ENTITY_REASON : undefined
+				}
 			});
 			return false;
 		}
 
 		// GET existing config
 		const existingConfig = await this.client.getMediaManagementConfig();
-
-		// Transform and update
-		const updatedConfig = {
-			...existingConfig,
+		const managedUpdates = {
 			downloadPropersAndRepacks: this.mapPropersRepacks(mediaSettings.propers_repacks),
 			enableMediaInfo: mediaSettings.enable_media_info
 		};
+
+		let updatedConfig = {
+			...existingConfig,
+			...managedUpdates
+		};
+		let appliedFields = Object.keys(managedUpdates);
+
+		if (this.instanceType === 'lidarr') {
+			const applied = this.applyConfigUpdates(existingConfig, managedUpdates);
+			updatedConfig = applied.updatedConfig;
+			appliedFields = applied.appliedFields;
+
+			if (applied.missingFields.length > 0) {
+				await logger.warn('Skipping unsupported Lidarr media settings fields', {
+					source: 'Sync:MediaSettings',
+					meta: {
+						instanceId: this.instanceId,
+						configName,
+						missingFields: applied.missingFields,
+						reason: LIDARR_UNSUPPORTED_FIELD_REASON
+					}
+				});
+			}
+
+			if (appliedFields.length === 0) {
+				await logger.warn('No supported Lidarr media settings fields available to sync', {
+					source: 'Sync:MediaSettings',
+					meta: {
+						instanceId: this.instanceId,
+						configName,
+						reason: LIDARR_REUSE_ENTITY_REASON
+					}
+				});
+				return false;
+			}
+
+			const unchangedFields = this.getUnmanagedConfigFields(existingConfig, [
+				'downloadPropersAndRepacks',
+				'enableMediaInfo'
+			]);
+			if (unchangedFields.length > 0) {
+				await logger.debug('Leaving unsupported Lidarr media settings fields unchanged', {
+					source: 'Sync:MediaSettings',
+					meta: {
+						instanceId: this.instanceId,
+						configName,
+						unchangedFields,
+						reason: LIDARR_UNSUPPORTED_FIELD_REASON
+					}
+				});
+			}
+		}
 
 		await logger.debug('Updating media settings', {
 			source: 'Sync:MediaSettings',
 			meta: {
 				instanceId: this.instanceId,
 				configName,
-				propersRepacks: updatedConfig.downloadPropersAndRepacks,
-				enableMediaInfo: updatedConfig.enableMediaInfo
+				propersRepacks: managedUpdates.downloadPropersAndRepacks,
+				enableMediaInfo: managedUpdates.enableMediaInfo,
+				appliedFields
 			}
 		});
 
@@ -215,6 +292,8 @@ export class MediaManagementSyncer extends BaseSyncer {
 			return this.syncRadarrNaming(cache, configName);
 		} else if (this.instanceType === 'sonarr') {
 			return this.syncSonarrNaming(cache, configName);
+		} else if (this.instanceType === 'lidarr') {
+			return this.syncLidarrNaming(cache, configName);
 		}
 
 		await logger.warn(`Unsupported instance type for naming sync: ${this.instanceType}`, {
@@ -257,6 +336,109 @@ export class MediaManagementSyncer extends BaseSyncer {
 				configName,
 				renameMovies: updatedConfig.renameMovies,
 				colonReplacementFormat: updatedConfig.colonReplacementFormat
+			}
+		});
+
+		await this.client.updateNamingConfig(updatedConfig);
+		return true;
+	}
+
+	private async syncLidarrNaming(
+		cache: PCDCache,
+		configName: string
+	): Promise<boolean> {
+		await logger.debug('Using reused Sonarr naming entity for Lidarr sync', {
+			source: 'Sync:Naming',
+			meta: {
+				instanceId: this.instanceId,
+				configName,
+				entityType: 'sonarr_naming',
+				reason: LIDARR_REUSE_ENTITY_REASON
+			}
+		});
+
+		const naming = await getSonarrNaming(cache, configName);
+		if (!naming) {
+			await logger.debug(`Lidarr naming config "${configName}" not found in sonarr_naming`, {
+				source: 'Sync:Naming',
+				meta: {
+					instanceId: this.instanceId,
+					configName,
+					entityType: 'sonarr_naming',
+					reason: LIDARR_REUSE_ENTITY_REASON
+				}
+			});
+			return false;
+		}
+
+		const existingConfig = await this.client.getNamingConfig();
+		const lidarrUpdates = {
+			renameTracks: naming.rename,
+			replaceIllegalCharacters: naming.replace_illegal_characters,
+			colonReplacementFormat: colonReplacementToDb(naming.colon_replacement_format)
+		};
+		const { updatedConfig, appliedFields, missingFields } = this.applyConfigUpdates(
+			existingConfig,
+			lidarrUpdates
+		);
+
+		if (missingFields.length > 0) {
+			await logger.warn('Skipping unsupported Lidarr naming target fields', {
+				source: 'Sync:Naming',
+				meta: {
+					instanceId: this.instanceId,
+					configName,
+					missingFields,
+					reason: LIDARR_UNSUPPORTED_FIELD_REASON
+				}
+			});
+		}
+
+		await logger.debug('Skipping unsupported Sonarr naming source fields for Lidarr', {
+			source: 'Sync:Naming',
+			meta: {
+				instanceId: this.instanceId,
+				configName,
+				skippedFields: [...LIDARR_UNSUPPORTED_SONARR_NAMING_FIELDS],
+				reason: LIDARR_NAMING_SOURCE_FIELD_REASON
+			}
+		});
+
+		if (appliedFields.length === 0) {
+			await logger.warn('No supported Lidarr naming fields available to sync', {
+				source: 'Sync:Naming',
+				meta: {
+					instanceId: this.instanceId,
+					configName,
+					reason: LIDARR_REUSE_ENTITY_REASON
+				}
+			});
+			return false;
+		}
+
+		const unchangedFields = this.getUnmanagedConfigFields(existingConfig, [
+			'renameTracks',
+			'replaceIllegalCharacters',
+			'colonReplacementFormat'
+		]);
+		if (unchangedFields.length > 0) {
+			await logger.debug('Leaving unsupported Lidarr naming fields unchanged', {
+				source: 'Sync:Naming',
+				meta: {
+					instanceId: this.instanceId,
+					configName,
+					unchangedFields,
+					reason: LIDARR_UNSUPPORTED_FIELD_REASON
+				}
+			});
+		}
+
+		await logger.debug('Updating Lidarr naming from reused Sonarr entity', {
+			source: 'Sync:Naming',
+			meta: {
+				instanceId: this.instanceId,
+				configName,
+				appliedFields
 			}
 		});
 
@@ -324,14 +506,31 @@ export class MediaManagementSyncer extends BaseSyncer {
 			return false;
 		}
 
-		// Fetch quality definitions from PCD by config name
+		const qualityDefinitionsEntity =
+			this.instanceType === 'radarr' ? 'radarr_quality_definitions' : 'sonarr_quality_definitions';
 		const getByName = this.instanceType === 'radarr' ? getRadarrQualityDefs : getSonarrQualityDefs;
+		if (this.instanceType === 'lidarr') {
+			await logger.debug('Using reused quality definitions entity for Lidarr sync', {
+				source: 'Sync:QualityDefinitions',
+				meta: {
+					instanceId: this.instanceId,
+					configName,
+					entityType: qualityDefinitionsEntity,
+					reason: LIDARR_REUSE_ENTITY_REASON
+				}
+			});
+		}
 		const qualityDefsConfig = await getByName(cache, configName);
 
 		if (!qualityDefsConfig) {
-			await logger.debug(`Quality definitions config "${configName}" not found in PCD`, {
+			await logger.debug(`Quality definitions config "${configName}" not found in ${qualityDefinitionsEntity}`, {
 				source: 'Sync:QualityDefinitions',
-				meta: { instanceId: this.instanceId, configName }
+				meta: {
+					instanceId: this.instanceId,
+					configName,
+					entityType: qualityDefinitionsEntity,
+					reason: this.instanceType === 'lidarr' ? LIDARR_REUSE_ENTITY_REASON : undefined
+				}
 			});
 			return false;
 		}
@@ -346,6 +545,17 @@ export class MediaManagementSyncer extends BaseSyncer {
 
 		// Get quality API mappings from PCD (maps quality_name -> api_name)
 		const apiMappings = await this.getQualityApiMappings(cache);
+		if (this.instanceType === 'lidarr' && apiMappings.size === 0) {
+			await logger.warn('Skipping Lidarr quality definitions sync due missing mappings', {
+				source: 'Sync:QualityDefinitions',
+				meta: {
+					instanceId: this.instanceId,
+					configName,
+					reason: LIDARR_QUALITY_SKIP_REASON
+				}
+			});
+			return false;
+		}
 
 		// GET existing quality definitions from ARR
 		const arrDefinitions = await this.client.getQualityDefinitions();
@@ -360,24 +570,32 @@ export class MediaManagementSyncer extends BaseSyncer {
 
 		// Update ARR definitions with PCD values
 		let updatedCount = 0;
+		const missingMappingEntries: string[] = [];
+		const missingDefinitionEntries: string[] = [];
 		for (const entry of qualityDefsConfig.entries) {
 			// Get the API name for this quality
 			const apiName = apiMappings.get(entry.quality_name.toLowerCase());
 			if (!apiName) {
-				await logger.debug(`No API mapping found for quality "${entry.quality_name}"`, {
-					source: 'Sync:QualityDefinitions',
-					meta: { instanceId: this.instanceId, qualityName: entry.quality_name }
-				});
+				missingMappingEntries.push(entry.quality_name);
+				if (this.instanceType !== 'lidarr') {
+					await logger.debug(`No API mapping found for quality "${entry.quality_name}"`, {
+						source: 'Sync:QualityDefinitions',
+						meta: { instanceId: this.instanceId, qualityName: entry.quality_name }
+					});
+				}
 				continue;
 			}
 
 			// Find matching ARR definition
 			const arrDef = arrDefMap.get(apiName.toLowerCase());
 			if (!arrDef) {
-				await logger.debug(`No ARR definition found for quality "${apiName}"`, {
-					source: 'Sync:QualityDefinitions',
-					meta: { instanceId: this.instanceId, apiName }
-				});
+				missingDefinitionEntries.push(entry.quality_name);
+				if (this.instanceType !== 'lidarr') {
+					await logger.debug(`No ARR definition found for quality "${apiName}"`, {
+						source: 'Sync:QualityDefinitions',
+						meta: { instanceId: this.instanceId, apiName }
+					});
+				}
 				continue;
 			}
 
@@ -389,17 +607,46 @@ export class MediaManagementSyncer extends BaseSyncer {
 			updatedCount++;
 		}
 
+		missingMappingEntries.sort();
+		missingDefinitionEntries.sort();
+		if (
+			this.instanceType === 'lidarr' &&
+			(missingMappingEntries.length > 0 || missingDefinitionEntries.length > 0)
+		) {
+			await logger.warn('Skipped unsupported Lidarr quality definitions entries', {
+				source: 'Sync:QualityDefinitions',
+				meta: {
+					instanceId: this.instanceId,
+					configName,
+					missingMappings: missingMappingEntries,
+					missingArrDefinitions: missingDefinitionEntries,
+					reason: LIDARR_QUALITY_SKIP_REASON
+				}
+			});
+		}
+
 		if (updatedCount === 0) {
 			await logger.debug('No quality definitions matched for update', {
 				source: 'Sync:QualityDefinitions',
-				meta: { instanceId: this.instanceId, configName }
+				meta: {
+					instanceId: this.instanceId,
+					configName,
+					missingMappings: missingMappingEntries,
+					missingArrDefinitions: missingDefinitionEntries
+				}
 			});
 			return false;
 		}
 
 		await logger.debug(`Updating ${updatedCount} quality definitions`, {
 			source: 'Sync:QualityDefinitions',
-			meta: { instanceId: this.instanceId, configName, updatedCount }
+			meta: {
+				instanceId: this.instanceId,
+				configName,
+				updatedCount,
+				missingMappings: missingMappingEntries,
+				missingArrDefinitions: missingDefinitionEntries
+			}
 		});
 
 		// PUT the full array back
@@ -426,6 +673,43 @@ export class MediaManagementSyncer extends BaseSyncer {
 		return map;
 	}
 
+	private applyConfigUpdates<TConfig extends Record<string, unknown>>(
+		existingConfig: TConfig,
+		updates: Record<string, unknown>
+	): { updatedConfig: TConfig; appliedFields: string[]; missingFields: string[] } {
+		const updatedConfig: Record<string, unknown> = { ...existingConfig };
+		const appliedFields: string[] = [];
+		const missingFields: string[] = [];
+
+		for (const [field, value] of Object.entries(updates)) {
+			if (Object.hasOwn(existingConfig, field)) {
+				updatedConfig[field] = value;
+				appliedFields.push(field);
+			} else {
+				missingFields.push(field);
+			}
+		}
+
+		appliedFields.sort();
+		missingFields.sort();
+
+		return {
+			updatedConfig: updatedConfig as TConfig,
+			appliedFields,
+			missingFields
+		};
+	}
+
+	private getUnmanagedConfigFields(
+		existingConfig: Record<string, unknown>,
+		managedFields: string[]
+	): string[] {
+		const managed = new Set(['id', ...managedFields]);
+		return Object.keys(existingConfig)
+			.filter((field) => !managed.has(field))
+			.sort();
+	}
+
 	// =========================================================================
 	// Base class abstract methods (not used since we override sync())
 	// =========================================================================
@@ -435,10 +719,12 @@ export class MediaManagementSyncer extends BaseSyncer {
 	}
 
 	protected transformToArr(_pcdData: unknown[]): unknown[] {
+		void _pcdData;
 		return [];
 	}
 
 	protected async pushToArr(_arrData: unknown[]): Promise<void> {
+		void _arrData;
 		// Not used
 	}
 }

@@ -1,14 +1,20 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { AlertTriangle, Film, ExternalLink } from 'lucide-svelte';
+	import { AlertTriangle, Film, ExternalLink, CircleAlert, Check } from 'lucide-svelte';
 	import { browser } from '$app/environment';
-	import { goto, invalidateAll } from '$app/navigation';
 	import ExpandableTable from '$ui/table/ExpandableTable.svelte';
 	import type { Column, SortState } from '$ui/table/types';
+	import Badge from '$ui/badge/Badge.svelte';
 	import type { PageData } from './$types';
-	import type { RadarrLibraryItem, SonarrLibraryItem, SonarrEpisodeItem } from '$utils/arr/types.ts';
+	import type {
+		RadarrLibraryItem,
+		SonarrLibraryItem,
+		SonarrEpisodeItem,
+		LidarrLibraryItem
+	} from '$utils/arr/types.ts';
 	import { getPersistentSearchStore, type SearchStore } from '$stores/search';
 	import { libraryCache } from '$stores/libraryCache';
+	import { getArrAppMetadata, isArrAppType, supportsArrWorkflow } from '$shared/arr/capabilities.ts';
 
 	import LibraryActionBar from './components/LibraryActionBar.svelte';
 	import MovieRow from './components/MovieRow.svelte';
@@ -19,9 +25,12 @@
 
 	export let data: PageData;
 
+	$: appType = isArrAppType(data.instance.type) ? data.instance.type : null;
+	$: appMetadata = appType ? getArrAppMetadata(appType) : null;
+	$: supportsLibraryWorkflow = appType ? supportsArrWorkflow(appType, 'library') : false;
 	$: isRadarr = data.instance.type === 'radarr';
 	$: isSonarr = data.instance.type === 'sonarr';
-	$: isSupported = isRadarr || isSonarr;
+	$: isLidarr = data.instance.type === 'lidarr';
 
 	let searchStore: SearchStore;
 	$: searchStore = getPersistentSearchStore(`arrLibrarySearch:${data.instance.id}`, {
@@ -32,13 +41,22 @@
 	// Library Data State
 	// ==========================================================================
 
-	let library: RadarrLibraryItem[] | SonarrLibraryItem[] = [];
+	let library: RadarrLibraryItem[] | SonarrLibraryItem[] | LidarrLibraryItem[] = [];
 	let libraryError: string | null = null;
 	let profilesByDatabase: { databaseId: number; databaseName: string; profiles: string[] }[] = [];
 	let loading = true;
 	let refreshing = false;
 
 	async function fetchLibrary(force = false) {
+		if (!supportsLibraryWorkflow) {
+			library = [];
+			profilesByDatabase = [];
+			libraryError = null;
+			loading = false;
+			refreshing = false;
+			return;
+		}
+
 		const instanceId = data.instance.id;
 
 		// Check client cache first (unless forcing refresh)
@@ -207,20 +225,73 @@
 	};
 
 	// ==========================================================================
+	// Column Visibility (Lidarr)
+	// ==========================================================================
+
+	const LIDARR_STORAGE_KEY = 'profilarr-library-lidarr-columns';
+	const LIDARR_TOGGLEABLE_COLUMNS = ['tracks', 'progress', 'sizeOnDisk', 'dateAdded'] as const;
+	type LidarrToggleableColumn = (typeof LIDARR_TOGGLEABLE_COLUMNS)[number];
+
+	function loadLidarrColumnVisibility(): Set<LidarrToggleableColumn> {
+		if (!browser) return new Set(LIDARR_TOGGLEABLE_COLUMNS);
+		try {
+			const stored = localStorage.getItem(LIDARR_STORAGE_KEY);
+			if (stored) {
+				const parsed = JSON.parse(stored) as LidarrToggleableColumn[];
+				return new Set(parsed);
+			}
+		} catch {}
+		return new Set(LIDARR_TOGGLEABLE_COLUMNS);
+	}
+
+	function saveLidarrColumnVisibility(visible: Set<LidarrToggleableColumn>) {
+		if (!browser) return;
+		localStorage.setItem(LIDARR_STORAGE_KEY, JSON.stringify([...visible]));
+	}
+
+	let lidarrVisibleColumns = loadLidarrColumnVisibility();
+
+	function toggleLidarrColumn(key: string) {
+		const colKey = key as LidarrToggleableColumn;
+		if (lidarrVisibleColumns.has(colKey)) {
+			lidarrVisibleColumns.delete(colKey);
+		} else {
+			lidarrVisibleColumns.add(colKey);
+		}
+		lidarrVisibleColumns = lidarrVisibleColumns;
+		saveLidarrColumnVisibility(lidarrVisibleColumns);
+	}
+
+	const lidarrColumnLabels: Record<LidarrToggleableColumn, string> = {
+		tracks: 'Tracks',
+		progress: 'Progress',
+		sizeOnDisk: 'Size',
+		dateAdded: 'Added'
+	};
+
+	// ==========================================================================
 	// Unified column toggle (delegates based on type)
 	// ==========================================================================
 
-	$: activeToggleableColumns = isRadarr ? RADARR_TOGGLEABLE_COLUMNS : SONARR_TOGGLEABLE_COLUMNS;
-	$: activeColumnLabels = isRadarr ? radarrColumnLabels : sonarrColumnLabels;
+	$: activeToggleableColumns = isRadarr
+		? RADARR_TOGGLEABLE_COLUMNS
+		: isSonarr
+			? SONARR_TOGGLEABLE_COLUMNS
+			: LIDARR_TOGGLEABLE_COLUMNS;
+	$: activeColumnLabels = isRadarr ? radarrColumnLabels : isSonarr ? sonarrColumnLabels : lidarrColumnLabels;
 	$: activeVisibleColumns = isRadarr
 		? new Set([...radarrVisibleColumns])
-		: new Set([...sonarrVisibleColumns]);
+		: isSonarr
+			? new Set([...sonarrVisibleColumns])
+			: new Set([...lidarrVisibleColumns]);
 
 	function toggleColumn(key: string) {
 		if (isRadarr) {
 			toggleRadarrColumn(key);
-		} else {
+		} else if (isSonarr) {
 			toggleSonarrColumn(key);
+		} else {
+			toggleLidarrColumn(key);
 		}
 	}
 
@@ -447,6 +518,110 @@
 	})) as unknown as SonarrLibraryItem[];
 
 	// ==========================================================================
+	// Lidarr Data & Columns
+	// ==========================================================================
+
+	$: lidarrLibrary = library as LidarrLibraryItem[];
+
+	$: filteredAlbums = (() => {
+		if (!isLidarr) return [];
+		let result = lidarrLibrary.filter(
+			(album) =>
+				!debouncedQuery ||
+				album.title.toLowerCase().includes(debouncedQuery.toLowerCase()) ||
+				album.artistName.toLowerCase().includes(debouncedQuery.toLowerCase())
+		);
+		return applyFilters(result);
+	})();
+
+	const allLidarrColumns: Column<LidarrLibraryItem>[] = [
+		{ key: 'title', header: 'Album', align: 'left', sortable: true },
+		{ key: 'qualityProfileName', header: 'Profile', align: 'left', width: 'w-40', sortable: true },
+		{
+			key: 'tracks',
+			header: 'Tracks',
+			align: 'center',
+			width: 'w-28',
+			sortable: true,
+			sortAccessor: (row) => row.trackCount
+		},
+		{
+			key: 'progress',
+			header: 'Progress',
+			align: 'center',
+			width: 'w-40',
+			sortable: true,
+			sortAccessor: (row) => getLidarrProgressPercent(row),
+			defaultSortDirection: 'desc'
+		},
+		{
+			key: 'sizeOnDisk',
+			header: 'Size',
+			align: 'right',
+			width: 'w-24',
+			sortable: true,
+			sortAccessor: (row) => row.sizeOnDisk,
+			defaultSortDirection: 'desc'
+		},
+		{
+			key: 'dateAdded',
+			header: 'Added',
+			align: 'right',
+			width: 'w-28',
+			sortable: true,
+			sortAccessor: (row) => (row.dateAdded ? new Date(row.dateAdded).getTime() : 0),
+			defaultSortDirection: 'desc'
+		}
+	];
+
+	$: lidarrColumns = allLidarrColumns.filter(
+		(col) =>
+			col.key === 'title' ||
+			col.key === 'qualityProfileName' ||
+			lidarrVisibleColumns.has(col.key as LidarrToggleableColumn)
+	);
+
+	const lidarrDefaultSort: SortState = { key: 'title', direction: 'asc' };
+
+	const lidarrSkeletonData: LidarrLibraryItem[] = Array.from({ length: 12 }, (_, i) => ({
+		id: i,
+		artistId: 0,
+		artistName: '',
+		title: '',
+		qualityProfileId: 0,
+		qualityProfileName: '',
+		isProfilarrProfile: false,
+		monitored: true,
+		trackFileCount: 0,
+		trackCount: 0,
+		totalTrackCount: 0,
+		sizeOnDisk: 0,
+		percentOfTracks: 0,
+		dateAdded: ''
+	}));
+
+	function formatDate(isoString?: string): string {
+		if (!isoString) return '-';
+		const date = new Date(isoString);
+		return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' });
+	}
+
+	function formatSize(bytes: number): string {
+		if (!bytes) return '-';
+		const gb = bytes / (1024 * 1024 * 1024);
+		if (gb >= 1) return `${gb.toFixed(1)} GB`;
+		const mb = bytes / (1024 * 1024);
+		return `${mb.toFixed(0)} MB`;
+	}
+
+	function getLidarrProgressPercent(row: LidarrLibraryItem): number {
+		if (row.trackCount > 0) {
+			return (row.trackFileCount / row.trackCount) * 100;
+		}
+		return row.percentOfTracks;
+	}
+
+	// ==========================================================================
 	// Sonarr Episode Lazy Loading
 	// ==========================================================================
 
@@ -506,7 +681,27 @@
 </svelte:head>
 
 <div class="mt-6 space-y-6">
-	{#if libraryError && !loading}
+	{#if !supportsLibraryWorkflow}
+		<div
+			class="rounded-lg border border-neutral-200 bg-white p-6 dark:border-neutral-800 dark:bg-neutral-900"
+		>
+			<div class="flex items-center gap-3">
+				<Film class="h-5 w-5 text-neutral-400" />
+				<div>
+					<h3 class="font-medium text-neutral-900 dark:text-neutral-50">
+						Library view not available
+					</h3>
+					<p class="mt-1 text-sm text-neutral-600 dark:text-neutral-400">
+						{#if appMetadata}
+							{appMetadata.label} library view is not available in this version yet.
+						{:else}
+							This instance type does not support library view in this version.
+						{/if}
+					</p>
+				</div>
+			</div>
+		</div>
+	{:else if libraryError && !loading}
 		<div
 			class="rounded-lg border border-red-200 bg-red-50 p-6 dark:border-red-800 dark:bg-red-950/40"
 		>
@@ -515,22 +710,6 @@
 				<div>
 					<h3 class="font-medium text-red-800 dark:text-red-200">Failed to load library</h3>
 					<p class="mt-1 text-sm text-red-600 dark:text-red-400">{libraryError}</p>
-				</div>
-			</div>
-		</div>
-	{:else if !isSupported}
-		<div
-			class="rounded-lg border border-neutral-200 bg-white p-6 dark:border-neutral-800 dark:bg-neutral-900"
-		>
-			<div class="flex items-center gap-3">
-				<Film class="h-5 w-5 text-neutral-400" />
-				<div>
-					<h3 class="font-medium text-neutral-900 dark:text-neutral-50">
-						Library view not yet available
-					</h3>
-					<p class="mt-1 text-sm text-neutral-600 dark:text-neutral-400">
-						Library view is currently only supported for Radarr and Sonarr instances.
-					</p>
 				</div>
 			</div>
 		</div>
@@ -614,86 +793,213 @@
 					</ExpandableTable>
 				</div>
 			{/if}
-		{:else if isSonarr}
-			<!-- ============================================================ -->
-			<!-- Sonarr Library -->
-			<!-- ============================================================ -->
-			{#if sonarrLibrary.length === 0 && !loading}
-				<div
-					class="rounded-lg border border-neutral-200 bg-white p-6 dark:border-neutral-800 dark:bg-neutral-900"
-				>
-					<div class="flex items-center gap-3">
-						<Film class="h-5 w-5 text-neutral-400" />
-						<div>
-							<h3 class="font-medium text-neutral-900 dark:text-neutral-50">No series found</h3>
-							<p class="mt-1 text-sm text-neutral-600 dark:text-neutral-400">
-								This Sonarr instance has no series in its library.
-							</p>
+			{:else if isSonarr}
+				<!-- ============================================================ -->
+				<!-- Sonarr Library -->
+				<!-- ============================================================ -->
+				{#if sonarrLibrary.length === 0 && !loading}
+					<div
+						class="rounded-lg border border-neutral-200 bg-white p-6 dark:border-neutral-800 dark:bg-neutral-900"
+					>
+						<div class="flex items-center gap-3">
+							<Film class="h-5 w-5 text-neutral-400" />
+							<div>
+								<h3 class="font-medium text-neutral-900 dark:text-neutral-50">No series found</h3>
+								<p class="mt-1 text-sm text-neutral-600 dark:text-neutral-400">
+									This Sonarr instance has no series in its library.
+								</p>
+							</div>
 						</div>
 					</div>
-				</div>
-			{:else}
-				<div class="transition-all duration-300 {loading ? 'opacity-60' : 'opacity-100'}">
-					<ExpandableTable
-						columns={sonarrColumns}
-						data={loading ? sonarrSkeletonData : filteredSeries}
-						getRowId={(row) => row.id}
-						compact={true}
-						defaultSort={sonarrDefaultSort}
-						responsive
-						flushExpanded
-						bind:expandedRows={sonarrExpandedRows}
-						emptyMessage={activeFilters.length > 0 || debouncedQuery
-							? 'No series match the current filters'
-							: 'No series found'}
-					>
-						<svelte:fragment slot="cell" let:row let:column>
-							{#if loading}
-								<SeriesRowSkeleton {column} />
-							{:else}
-								<SeriesRow {row} {column} />
-							{/if}
-						</svelte:fragment>
-
-						<svelte:fragment slot="actions" let:row>
-							{#if !loading && row.tvdbId}
-								<a
-									href="{baseUrl}/series/{row.title.toLowerCase().replace(/[^a-z0-9]+/g, '-')}"
-									target="_blank"
-									rel="noopener noreferrer"
-									class="inline-flex h-7 w-7 items-center justify-center rounded border border-neutral-300 bg-white text-neutral-700 transition-colors hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-700"
-									title="Open in Sonarr"
-									on:click|stopPropagation
-								>
-									<ExternalLink size={14} />
-								</a>
-							{/if}
-						</svelte:fragment>
-
-						<svelte:fragment slot="expanded" let:row>
-							{#if !loading}
-								{@const seriesId = row.id}
-								{@const isEpisodeLoading = episodeLoadingSet.has(seriesId)}
-								{@const episodesBySeasonNumber = episodesBySeriesAndSeason.get(seriesId) ?? new Map()}
-
-								{#if isEpisodeLoading}
-									<div class="flex items-center gap-2 p-4 text-sm text-neutral-500 dark:text-neutral-400">
-										<div class="h-4 w-4 animate-spin rounded-full border-2 border-neutral-300 border-t-accent-500"></div>
-										Loading episodes...
-									</div>
+				{:else}
+					<div class="transition-all duration-300 {loading ? 'opacity-60' : 'opacity-100'}">
+						<ExpandableTable
+							columns={sonarrColumns}
+							data={loading ? sonarrSkeletonData : filteredSeries}
+							getRowId={(row) => row.id}
+							compact={true}
+							defaultSort={sonarrDefaultSort}
+							responsive
+							flushExpanded
+							bind:expandedRows={sonarrExpandedRows}
+							emptyMessage={activeFilters.length > 0 || debouncedQuery
+								? 'No series match the current filters'
+								: 'No series found'}
+						>
+							<svelte:fragment slot="cell" let:row let:column>
+								{#if loading}
+									<SeriesRowSkeleton {column} />
 								{:else}
-									<div class="p-4">
-										<SeasonTable
-											seasons={row.seasons}
-											{episodesBySeasonNumber}
-										/>
+									<SeriesRow {row} {column} />
+								{/if}
+							</svelte:fragment>
+
+							<svelte:fragment slot="actions" let:row>
+								{#if !loading && row.tvdbId}
+									<a
+										href="{baseUrl}/series/{row.title.toLowerCase().replace(/[^a-z0-9]+/g, '-')}"
+										target="_blank"
+										rel="noopener noreferrer"
+										class="inline-flex h-7 w-7 items-center justify-center rounded border border-neutral-300 bg-white text-neutral-700 transition-colors hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-700"
+										title="Open in Sonarr"
+										on:click|stopPropagation
+									>
+										<ExternalLink size={14} />
+									</a>
+								{/if}
+							</svelte:fragment>
+
+							<svelte:fragment slot="expanded" let:row>
+								{#if !loading}
+									{@const seriesId = row.id}
+									{@const isEpisodeLoading = episodeLoadingSet.has(seriesId)}
+									{@const episodesBySeasonNumber = episodesBySeriesAndSeason.get(seriesId) ?? new Map()}
+
+									{#if isEpisodeLoading}
+										<div class="flex items-center gap-2 p-4 text-sm text-neutral-500 dark:text-neutral-400">
+											<div class="h-4 w-4 animate-spin rounded-full border-2 border-neutral-300 border-t-accent-500"></div>
+											Loading episodes...
+										</div>
+									{:else}
+										<div class="p-4">
+											<SeasonTable
+												seasons={row.seasons}
+												{episodesBySeasonNumber}
+											/>
+										</div>
+									{/if}
+								{/if}
+							</svelte:fragment>
+						</ExpandableTable>
+					</div>
+				{/if}
+			{:else if isLidarr}
+				<!-- ============================================================ -->
+				<!-- Lidarr Library -->
+				<!-- ============================================================ -->
+				{#if lidarrLibrary.length === 0 && !loading}
+					<div
+						class="rounded-lg border border-neutral-200 bg-white p-6 dark:border-neutral-800 dark:bg-neutral-900"
+					>
+						<div class="flex items-center gap-3">
+							<Film class="h-5 w-5 text-neutral-400" />
+							<div>
+								<h3 class="font-medium text-neutral-900 dark:text-neutral-50">No albums found</h3>
+								<p class="mt-1 text-sm text-neutral-600 dark:text-neutral-400">
+									This Lidarr instance has no albums in its library.
+								</p>
+							</div>
+						</div>
+					</div>
+				{:else}
+					<div class="transition-all duration-300 {loading ? 'opacity-60' : 'opacity-100'}">
+						<ExpandableTable
+							columns={lidarrColumns}
+							data={loading ? lidarrSkeletonData : filteredAlbums}
+							getRowId={(row) => row.id}
+							compact={true}
+							defaultSort={lidarrDefaultSort}
+							responsive
+							emptyMessage={activeFilters.length > 0 || debouncedQuery
+								? 'No albums match the current filters'
+								: 'No albums found'}
+						>
+							<svelte:fragment slot="cell" let:row let:column>
+								{#if loading}
+									{#if column.key === 'title'}
+										<div class="space-y-1.5">
+											<div class="h-4 w-36 animate-pulse rounded bg-neutral-200 dark:bg-neutral-700"></div>
+											<div class="h-3 w-24 animate-pulse rounded bg-neutral-100 dark:bg-neutral-800"></div>
+										</div>
+									{:else if column.key === 'qualityProfileName'}
+										<div class="h-5 w-20 animate-pulse rounded-full bg-neutral-200 dark:bg-neutral-700"></div>
+									{:else if column.key === 'tracks'}
+										<div class="h-5 w-14 animate-pulse rounded-full bg-neutral-200 dark:bg-neutral-700"></div>
+									{:else if column.key === 'progress'}
+										<div class="flex items-center gap-2">
+											<div class="h-2 flex-1 animate-pulse rounded-full bg-neutral-200 dark:bg-neutral-700"></div>
+											<div class="h-4 w-8 animate-pulse rounded bg-neutral-100 dark:bg-neutral-800"></div>
+										</div>
+									{:else if column.key === 'sizeOnDisk' || column.key === 'dateAdded'}
+										<div class="h-4 w-16 animate-pulse rounded bg-neutral-200 dark:bg-neutral-700"></div>
+									{/if}
+								{:else if column.key === 'title'}
+									<div>
+										<div class="font-medium text-neutral-900 dark:text-neutral-50">{row.title}</div>
+										<div class="text-xs text-neutral-500 dark:text-neutral-400">
+											{row.artistName}
+											{#if row.year}
+												• {row.year}
+											{/if}
+										</div>
+									</div>
+								{:else if column.key === 'qualityProfileName'}
+									<div class="group relative inline-flex">
+										<Badge
+											variant={row.isProfilarrProfile ? 'accent' : 'warning'}
+											icon={row.isProfilarrProfile ? null : CircleAlert}
+											mono
+										>
+											{row.qualityProfileName}
+										</Badge>
+										{#if !row.isProfilarrProfile}
+											<div
+												class="pointer-events-none absolute bottom-full left-1/2 z-10 mb-1 -translate-x-1/2 rounded bg-neutral-800 px-2 py-1 text-xs whitespace-nowrap text-white opacity-0 group-hover:opacity-100 dark:bg-neutral-700"
+											>
+												Not managed by Profilarr
+											</div>
+										{/if}
+									</div>
+								{:else if column.key === 'tracks'}
+									{@const trackTotal = row.trackCount > 0 ? row.trackCount : row.totalTrackCount}
+									<Badge
+										variant={trackTotal > 0 && row.trackFileCount >= trackTotal ? 'success' : 'neutral'}
+										mono
+									>
+										{row.trackFileCount}/{trackTotal}
+									</Badge>
+								{:else if column.key === 'progress'}
+									{@const progress = Math.max(0, Math.min(getLidarrProgressPercent(row), 100))}
+									<div class="flex items-center gap-2">
+										<div class="h-2 flex-1 overflow-hidden rounded-full bg-neutral-200 dark:bg-neutral-700">
+											<div
+												class="h-full rounded-full transition-all {progress >= 100
+													? 'bg-green-500 dark:bg-green-400'
+													: 'bg-accent-500 dark:bg-accent-400'}"
+												style="width: {progress}%"
+											></div>
+										</div>
+										{#if progress >= 100}
+											<Check size={16} class="flex-shrink-0 text-green-600 dark:text-green-400" />
+										{:else}
+											<span class="w-10 text-right font-mono text-xs text-neutral-500 dark:text-neutral-400">
+												{Math.round(progress)}%
+											</span>
+										{/if}
+									</div>
+								{:else if column.key === 'sizeOnDisk'}
+									<Badge variant="neutral" mono>{formatSize(row.sizeOnDisk)}</Badge>
+								{:else if column.key === 'dateAdded'}
+									<Badge variant="neutral" mono>{formatDate(row.dateAdded)}</Badge>
+								{/if}
+							</svelte:fragment>
+
+							<svelte:fragment slot="expanded" let:row>
+								{#if !loading}
+									<div class="flex flex-wrap items-center gap-2 p-4">
+										<Badge variant="neutral" mono>{row.artistName}</Badge>
+										{#if row.albumType}
+											<Badge variant="neutral" mono>{row.albumType}</Badge>
+										{/if}
+										{#if row.releaseDate}
+											<Badge variant="neutral" mono>{formatDate(row.releaseDate)}</Badge>
+										{/if}
 									</div>
 								{/if}
-							{/if}
-						</svelte:fragment>
-					</ExpandableTable>
-				</div>
+							</svelte:fragment>
+						</ExpandableTable>
+					</div>
+				{/if}
 			{/if}
 		{/if}
-	{/if}
-</div>
+	</div>

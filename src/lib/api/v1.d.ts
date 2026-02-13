@@ -331,7 +331,7 @@ export interface components {
          * @description Type of Arr instance
          * @enum {string}
          */
-        ArrType: "radarr" | "sonarr";
+        ArrType: "radarr" | "sonarr" | "lidarr";
         CustomFormatRef: {
             /** @description Custom format ID */
             id: number;
@@ -486,10 +486,13 @@ export interface components {
             /** @description Whether the cutoff score has been met */
             cutoffMet: boolean;
         };
-        /** @description Library response varies by instance type */
-        LibraryResponse: components["schemas"]["LibraryRadarrResponse"] | components["schemas"]["LibrarySonarrResponse"];
+        /**
+         * @description Library response varies by instance type.
+         *     Lidarr payload details remain capability-gated until dedicated library route support ships.
+         */
+        LibraryResponse: components["schemas"]["LibraryRadarrResponse"] | components["schemas"]["LibrarySonarrResponse"] | components["schemas"]["LibraryLidarrResponse"];
         EpisodesResponse: {
-            /** @description Episode details with quality and score data */
+            /** @description Episode details with quality and score data (Sonarr-only in current phase) */
             episodes: components["schemas"]["SonarrEpisodeItem"][];
         };
         CacheInvalidatedResponse: {
@@ -550,7 +553,15 @@ export interface components {
             /** @description Quality profiles that were skipped (assigned to media) */
             skippedQualityProfiles: components["schemas"]["SkippedItem"][];
         };
-        /** @enum {string} */
+        /**
+         * @description Portable PCD entity identifiers used by import/export endpoints.
+         *
+         *     v1 Lidarr media-management intentionally reuses existing media-management
+         *     entities (`radarr_media_settings` / `sonarr_media_settings` and
+         *     `radarr_quality_definitions` / `sonarr_quality_definitions`) rather than
+         *     introducing `lidarr_*` entity types in this phase.
+         * @enum {string}
+         */
         EntityType: "delay_profile" | "regular_expression" | "custom_format" | "quality_profile" | "radarr_naming" | "sonarr_naming" | "radarr_media_settings" | "sonarr_media_settings" | "radarr_quality_definitions" | "sonarr_quality_definitions";
         ExportResponse: {
             entityType: components["schemas"]["EntityType"];
@@ -566,6 +577,10 @@ export interface components {
              *     - `sonarr_media_settings` → PortableMediaSettings
              *     - `radarr_quality_definitions` → PortableQualityDefinitions
              *     - `sonarr_quality_definitions` → PortableQualityDefinitions
+             *
+             *     Notes:
+             *     - v1 Lidarr media-management reuses existing `radarr_*`/`sonarr_*` entities.
+             *     - Unsupported Lidarr-only fields remain capability-gated for deterministic sync behavior.
              */
             data: components["schemas"]["PortableDelayProfile"] | components["schemas"]["PortableRegularExpression"] | components["schemas"]["PortableCustomFormat"] | components["schemas"]["PortableQualityProfile"] | components["schemas"]["PortableRadarrNaming"] | components["schemas"]["PortableSonarrNaming"] | components["schemas"]["PortableMediaSettings"] | components["schemas"]["PortableQualityDefinitions"];
         };
@@ -667,6 +682,19 @@ export interface components {
             items: components["schemas"]["SonarrLibraryItem"][];
             profilesByDatabase: components["schemas"]["ProfileByDatabase"][];
         };
+        /**
+         * @description Placeholder contract for Lidarr library payload items.
+         *     Lidarr-specific artist/album fields remain capability-gated for later phases.
+         */
+        LidarrLibraryItem: {
+            [key: string]: unknown;
+        };
+        LibraryLidarrResponse: {
+            /** @enum {string} */
+            type: "lidarr";
+            items: components["schemas"]["LidarrLibraryItem"][];
+            profilesByDatabase: components["schemas"]["ProfileByDatabase"][];
+        };
         SkippedItem: {
             item: components["schemas"]["StaleItem"];
             /** @description Why the item was skipped (e.g. "Profile is assigned to media") */
@@ -706,7 +734,12 @@ export interface components {
         };
         PortableCustomFormatScore: {
             customFormatName: string;
-            arrType: string;
+            /**
+             * @description Arr target for this score mapping. `lidarr` is supported for v1 parity,
+             *     while unsupported Lidarr-only behavior remains capability-gated elsewhere.
+             * @enum {string}
+             */
+            arrType: "radarr" | "sonarr" | "lidarr" | "all";
             score: number;
         };
         PortableQualityProfile: {
@@ -741,11 +774,21 @@ export interface components {
             customColonReplacementFormat: string | null;
             multiEpisodeStyle: string;
         };
+        /**
+         * @description Shared media-management settings payload for existing Radarr/Sonarr entity
+         *     families. v1 Lidarr support reuses this shape; Lidarr-only fields not
+         *     represented here remain capability-gated for deterministic sync.
+         */
         PortableMediaSettings: {
             name: string;
             propersRepacks: string;
             enableMediaInfo: boolean;
         };
+        /**
+         * @description Shared quality-definition payload for existing Radarr/Sonarr entity
+         *     families. v1 Lidarr support reuses this shape; Lidarr-only fields not
+         *     represented here remain capability-gated for deterministic sync.
+         */
         PortableQualityDefinitions: {
             name: string;
             entries: Record<string, never>[];

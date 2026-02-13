@@ -3,6 +3,7 @@ import type { Actions, ServerLoad } from '@sveltejs/kit';
 import { arrInstancesQueries } from '$db/queries/arrInstances.ts';
 import { upgradeConfigsQueries } from '$db/queries/upgradeConfigs.ts';
 import { upgradeRunsQueries } from '$db/queries/upgradeRuns.ts';
+import { jobQueueQueries } from '$db/queries/jobQueue.ts';
 import { logger } from '$logger/logger.ts';
 import type { FilterConfig, FilterMode } from '$shared/upgrades/filters.ts';
 import { clearDryRunExclusions } from '$lib/server/upgrades/processor.ts';
@@ -11,6 +12,21 @@ import { scheduleUpgradeForInstance } from '$lib/server/jobs/init.ts';
 import { upsertScheduledJob } from '$lib/server/jobs/queueService.ts';
 import { calculateCooldownUntil } from '$lib/server/jobs/scheduleUtils.ts';
 import { buildJobDisplayName } from '$lib/server/jobs/display.ts';
+
+const LIDARR_UPGRADE_UNSUPPORTED_ERROR = 'Upgrades are not supported for Lidarr in v1.';
+
+function getUpgradeUnsupportedError(instanceType: string): string | null {
+	if (instanceType === 'lidarr') {
+		return LIDARR_UPGRADE_UNSUPPORTED_ERROR;
+	}
+
+	return null;
+}
+
+function cancelQueuedUpgrades(instanceId: number): void {
+	jobQueueQueries.cancelByDedupeKey(`arr.upgrade:${instanceId}`);
+	jobQueueQueries.cancelByDedupeKey(`arr.upgrade.manual:${instanceId}`);
+}
 
 export const load: ServerLoad = ({ params }) => {
 	const id = parseInt(params.id || '', 10);
@@ -48,6 +64,12 @@ export const actions: Actions = {
 		const instance = arrInstancesQueries.getById(id);
 		if (!instance) {
 			return fail(404, { error: 'Instance not found' });
+		}
+
+		const unsupportedError = getUpgradeUnsupportedError(instance.type);
+		if (unsupportedError) {
+			cancelQueuedUpgrades(id);
+			return fail(400, { error: unsupportedError });
 		}
 
 		const formData = await request.formData();
@@ -118,7 +140,7 @@ export const actions: Actions = {
 		}
 	},
 
-	run: async ({ params, request }) => {
+	run: async ({ params }) => {
 		const id = parseInt(params.id || '', 10);
 
 		if (isNaN(id)) {
@@ -128,6 +150,12 @@ export const actions: Actions = {
 		const instance = arrInstancesQueries.getById(id);
 		if (!instance) {
 			return fail(404, { error: 'Instance not found' });
+		}
+
+		const unsupportedError = getUpgradeUnsupportedError(instance.type);
+		if (unsupportedError) {
+			cancelQueuedUpgrades(id);
+			return fail(400, { error: unsupportedError });
 		}
 
 		const config = upgradeConfigsQueries.getByArrInstanceId(id);
@@ -142,11 +170,6 @@ export const actions: Actions = {
 		const enabledFilters = config.filters.filter((f: FilterConfig) => f.enabled);
 		if (enabledFilters.length === 0) {
 			return fail(400, { error: 'No enabled filters. Enable at least one filter.' });
-		}
-
-		// Only support Radarr for now
-		if (instance.type !== 'radarr') {
-			return fail(400, { error: `Upgrade not yet supported for ${instance.type}` });
 		}
 
 		// Check for dev mode - in dev mode, allow manual runs even without dry run

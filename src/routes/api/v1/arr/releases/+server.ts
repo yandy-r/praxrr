@@ -1,9 +1,65 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from '@sveltejs/kit';
 import { arrInstancesQueries } from '$db/queries/arrInstances.ts';
+import { LidarrClient } from '$utils/arr/clients/lidarr.ts';
 import { RadarrClient } from '$utils/arr/clients/radarr.ts';
 import { SonarrClient } from '$utils/arr/clients/sonarr.ts';
-import { groupRadarrReleases, groupSonarrReleases } from '$utils/arr/releaseImport.ts';
+import {
+	decodeSonarrFlags,
+	groupRadarrReleases,
+	groupSonarrReleases,
+	sanitizeIndexerName,
+	titleSimilarity,
+	type GroupedRelease
+} from '$utils/arr/releaseImport.ts';
+import type { LidarrRelease } from '$utils/arr/types.ts';
+
+function union<T>(arr1: T[], arr2: T[]): T[] {
+	return [...new Set([...arr1, ...arr2])];
+}
+
+function groupLidarrReleases(
+	releases: LidarrRelease[],
+	titleThreshold = 0.9,
+	sizeTolerance = 0.05
+): GroupedRelease[] {
+	const groups: GroupedRelease[] = [];
+
+	for (const release of releases) {
+		const title = release.title?.trim() || release.guid?.trim() || 'Unknown Release';
+		const size =
+			typeof release.size === 'number' && Number.isFinite(release.size) ? release.size : 0;
+		const indexer = sanitizeIndexerName(release.indexer?.trim() || 'Unknown Indexer');
+		const flags = decodeSonarrFlags(
+			typeof release.indexerFlags === 'number' && Number.isFinite(release.indexerFlags)
+				? release.indexerFlags
+				: 0
+		);
+
+		const match = groups.find((group) => {
+			const similarity = titleSimilarity(group.title, title);
+			const sizeDiff = Math.abs(group.size - size) / Math.max(group.size, 1);
+			return similarity > titleThreshold && sizeDiff < sizeTolerance;
+		});
+
+		if (match) {
+			match.indexers = union(match.indexers, [indexer]);
+			match.flags = union(match.flags, flags);
+			match.occurrences++;
+		} else {
+			groups.push({
+				title,
+				size,
+				indexers: [indexer],
+				languages: [],
+				flags,
+				occurrences: 1
+			});
+		}
+	}
+
+	return groups;
+}
 
 /**
  * GET /api/v1/arr/releases
@@ -74,6 +130,19 @@ export const GET: RequestHandler = async ({ url }) => {
 				const grouped = groupSonarrReleases(releases);
 				return json({
 					type: 'sonarr',
+					rawCount: releases.length,
+					releases: grouped
+				});
+			} finally {
+				client.close();
+			}
+		} else if (instance.type === 'lidarr') {
+			const client = new LidarrClient(instance.url, instance.api_key);
+			try {
+				const releases = await client.getReleases(itemIdNum);
+				const grouped = groupLidarrReleases(releases);
+				return json({
+					type: 'lidarr',
 					rawCount: releases.length,
 					releases: grouped
 				});

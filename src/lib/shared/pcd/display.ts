@@ -43,13 +43,14 @@ export type PreferredProtocol = DelayProfilesRow['preferred_protocol'];
 // ============================================================================
 
 import type { ArrType } from './types.ts';
+import type { ArrAppType } from '../arr/capabilities.ts';
 
 // Naming
 export type { RadarrNamingRow, SonarrNamingRow } from './types.ts';
 
 export interface NamingListItem {
 	name: string;
-	arr_type: Exclude<ArrType, 'all'>;
+	arr_type: ArrAppType;
 	rename: boolean;
 	updated_at: string;
 }
@@ -59,7 +60,7 @@ export type { RadarrMediaSettingsRow, SonarrMediaSettingsRow } from './types.ts'
 
 export interface MediaSettingsListItem {
 	name: string;
-	arr_type: Exclude<ArrType, 'all'>;
+	arr_type: ArrAppType;
 	propers_repacks: string;
 	enable_media_info: boolean;
 	updated_at: string;
@@ -70,7 +71,7 @@ export type { RadarrQualityDefinitionsRow, SonarrQualityDefinitionsRow } from '.
 
 export interface QualityDefinitionListItem {
 	name: string;
-	arr_type: Exclude<ArrType, 'all'>;
+	arr_type: ArrAppType;
 	quality_count: number;
 	updated_at: string;
 }
@@ -149,7 +150,7 @@ export type CustomFormatGeneral = Omit<CustomFormatsRow, 'description' | 'create
 export interface ConditionData {
 	name: string;
 	type: string;
-	arrType: 'all' | 'radarr' | 'sonarr' | '';
+	arrType: ArrType | '';
 	negate: boolean;
 	required: boolean;
 	// Type-specific data (only one populated based on `type`)
@@ -237,6 +238,7 @@ export interface CustomFormatCounts {
 	all: number;
 	radarr: number;
 	sonarr: number;
+	lidarr?: number;
 	total: number;
 }
 
@@ -353,7 +355,7 @@ export interface QualityProfileScoring {
 export interface ProfileCfScores {
 	profileName: string;
 	/** Map of custom format name to score (by arr type) */
-	scores: Record<string, { radarr: number | null; sonarr: number | null }>;
+	scores: Record<string, { radarr: number | null; sonarr: number | null; lidarr?: number | null }>;
 }
 
 /** All CF scores result for entity testing */

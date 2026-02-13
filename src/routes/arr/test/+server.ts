@@ -3,7 +3,7 @@ import type { RequestHandler } from '@sveltejs/kit';
 import { createArrClient } from '$arr/factory.ts';
 import type { ArrType } from '$arr/types.ts';
 
-const VALID_TYPES = ['radarr', 'sonarr'];
+const VALID_TYPES = ['radarr', 'sonarr', 'lidarr'];
 
 export const POST: RequestHandler = async ({ request }) => {
 	try {

@@ -211,3 +211,36 @@ Research/spec: `docs/plans/lidarr-support/feature-spec.md`
 - `deno task test`
 - relevant `deno task test:e2e` subset(s).
 ```
+
+---
+
+## Rollup Completion Update (Task 3.7)
+
+### Final Task-to-Issue Mapping (from `parallel-plan.md`)
+
+- `#1` foundation/onboarding/type contracts: `1.1`, `1.3`, `1.4`, `1.5`, `3.4`
+- `#2` library/releases delivery: `2.1`, `2.2`, `2.3`, `3.4`
+- `#3` sync/media-management compatibility: `1.2`, `1.4`, `2.4`, `2.5`, `3.5`
+- `#4` UI generalization/capability UX: `1.6`, `1.7`, `2.6`, `2.7`, `3.3`, `3.6`
+- `#5` rename/upgrades scope + parity matrix: `3.1`, `3.2`, `3.5`
+- `#6` umbrella rollup: `3.7` (status aggregation and closeout notes for `#1`-`#5`)
+
+### Completion Notes
+
+- `#1` completed in scope: onboarding allowlists and contract chain updates
+  (`arr.yaml` -> `pcd.yaml` -> generated `src/lib/api/v1.d.ts`) plus onboarding regression
+  coverage in `src/tests/base/lidarrOnboarding.test.ts`.
+- `#2` completed in scope: Lidarr client methods and API branches for
+  `/api/v1/arr/library` and `/api/v1/arr/releases`, with regression coverage in
+  `src/tests/base/lidarrApiParity.test.ts`.
+- `#3` completed in scope: sync mappings and media-management behavior implemented with
+  the v1 entity-reuse strategy and mixed-arr sync regression coverage in
+  `src/tests/jobs/lidarrSync.test.ts`.
+- `#4` completed in scope: capability metadata adopted across onboarding/list/condition/
+  library UX, with end-to-end flow coverage in
+  `src/tests/e2e/specs/2.40-lidarr-core-flow.spec.ts`.
+- `#5` completed in scope: v1 decision locked as capability-gated rename/upgrades for
+  Lidarr, enforced in handlers/pages with explicit unsupported responses and covered by
+  `src/tests/upgrades/lidarrCapabilityGates.test.ts`.
+- `#6` rollup status: child issue scopes `#1`-`#5` are complete in this implementation
+  branch; umbrella is ready for closeout after merge and issue-state sync.

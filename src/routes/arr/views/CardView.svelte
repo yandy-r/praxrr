@@ -1,7 +1,11 @@
 <script lang="ts">
+	import { resolve } from '$app/paths';
 	import { ExternalLink, Trash2 } from 'lucide-svelte';
+	import { SvelteSet } from 'svelte/reactivity';
 	import Badge from '$ui/badge/Badge.svelte';
 	import type { ArrInstance } from '$db/queries/arrInstances.ts';
+	import type { ArrIconKey } from '$shared/arr/capabilities.ts';
+	import { getArrAppMetadata, isArrAppType } from '$shared/arr/capabilities.ts';
 	import radarrLogo from '$lib/client/assets/Radarr.svg';
 	import sonarrLogo from '$lib/client/assets/Sonarr.svg';
 	import { createEventDispatcher } from 'svelte';
@@ -12,23 +16,43 @@
 		delete: ArrInstance;
 	}>();
 
-	// Logo lookup by type
-	const logos: Record<string, string> = {
+	// Logo lookup by Arr metadata icon key
+	const logos: Partial<Record<ArrIconKey, string>> = {
 		radarr: radarrLogo,
 		sonarr: sonarrLogo
 	};
 
 	// Track loaded images
-	let loadedImages: Set<number> = new Set();
+	let loadedImages = new SvelteSet<number>();
 
-	// Get logo path based on arr type
+	function formatType(type: string): string {
+		return type.charAt(0).toUpperCase() + type.slice(1);
+	}
+
+	function getAppLabel(type: string): string {
+		if (!isArrAppType(type)) {
+			return formatType(type);
+		}
+
+		return getArrAppMetadata(type).label;
+	}
+
+	// Get logo path from centralized metadata
 	function getLogoPath(type: string): string {
-		return logos[type] || '';
+		if (!isArrAppType(type)) {
+			return '';
+		}
+
+		const metadata = getArrAppMetadata(type);
+		return logos[metadata.iconKey] ?? '';
+	}
+
+	function getAppInitial(type: string): string {
+		return getAppLabel(type).slice(0, 1).toUpperCase();
 	}
 
 	function handleImageLoad(id: number) {
 		loadedImages.add(id);
-		loadedImages = loadedImages;
 	}
 
 	// Handle delete click
@@ -47,33 +71,45 @@
 </script>
 
 <div class="grid grid-cols-1 gap-3">
-	{#each instances as instance}
+	{#each instances as instance (instance.id)}
+		{@const appLabel = getAppLabel(instance.type)}
+		{@const logoPath = getLogoPath(instance.type)}
+		{@const instanceHref = resolve('/arr/[id]', { id: instance.id.toString() })}
 		<a
-			href="/arr/{instance.id}"
+			href={instanceHref}
 			class="group flex cursor-pointer items-center gap-4 rounded-lg border border-neutral-200 bg-white p-3 text-left transition-all hover:border-neutral-300 hover:shadow-md active:bg-neutral-50 dark:border-neutral-800 dark:bg-neutral-900 dark:hover:border-neutral-700 dark:active:bg-neutral-800"
 		>
 			<!-- Left: Logo + Name -->
 			<div class="flex min-w-0 flex-1 items-center gap-3">
 				<div class="relative h-10 w-10 flex-shrink-0">
-					{#if !loadedImages.has(instance.id)}
+					{#if logoPath}
+						{#if !loadedImages.has(instance.id)}
+							<div
+								class="absolute inset-0 animate-pulse rounded-lg bg-neutral-200 dark:bg-neutral-700"
+							></div>
+						{/if}
+						<img
+							src={logoPath}
+							alt={`${appLabel} logo`}
+							class="h-10 w-10 rounded-lg {loadedImages.has(instance.id)
+								? 'opacity-100'
+								: 'opacity-0'}"
+							on:load={() => handleImageLoad(instance.id)}
+						/>
+					{:else}
 						<div
-							class="absolute inset-0 animate-pulse rounded-lg bg-neutral-200 dark:bg-neutral-700"
-						></div>
+							class="flex h-10 w-10 items-center justify-center rounded-lg bg-neutral-100 text-xs font-semibold text-neutral-600 dark:bg-neutral-800 dark:text-neutral-200"
+						>
+							{getAppInitial(instance.type)}
+						</div>
 					{/if}
-					<img
-						src={getLogoPath(instance.type)}
-						alt="{instance.type} logo"
-						class="h-10 w-10 rounded-lg {loadedImages.has(instance.id)
-							? 'opacity-100'
-							: 'opacity-0'}"
-						on:load={() => handleImageLoad(instance.id)}
-					/>
 				</div>
 				<div class="min-w-0">
 					<h3 class="truncate text-sm font-semibold text-neutral-900 dark:text-neutral-100">
 						{instance.name}
 					</h3>
 					<div class="mt-1 flex flex-col items-start gap-1">
+						<Badge variant="neutral">{appLabel}</Badge>
 						{#if instance.enabled}
 							<Badge variant="success">Enabled</Badge>
 						{:else}

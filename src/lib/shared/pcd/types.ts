@@ -670,7 +670,15 @@ export interface QualityApiMappingsRow {
 // ============================================================================
 
 /** Which arr application the data applies to */
-export type ArrType = 'radarr' | 'sonarr' | 'all';
+export type ArrType = 'radarr' | 'sonarr' | 'lidarr' | 'all';
+
+/** Runtime enum source for ArrType validation */
+export const ARR_TYPES = ['radarr', 'sonarr', 'lidarr', 'all'] as const;
+
+/** Runtime guard for untrusted arr type values */
+export function isArrType(value: string): value is ArrType {
+	return (ARR_TYPES as readonly string[]).includes(value);
+}
 
 // ============================================================================
 // HELPER TYPES

@@ -7,6 +7,8 @@ import { processUpgradeConfig } from '$lib/server/upgrades/processor.ts';
 import { calculateCooldownUntil, calculateNextRunFromMinutes } from '../scheduleUtils.ts';
 import { logger } from '$logger/logger.ts';
 
+const LIDARR_UPGRADE_UNSUPPORTED_OUTPUT = 'Upgrades are not supported for Lidarr in v1.';
+
 const upgradeRunHandler: JobHandler = async (job) => {
 	const instanceId = Number(job.payload.instanceId);
 	if (!Number.isFinite(instanceId)) {
@@ -21,6 +23,10 @@ const upgradeRunHandler: JobHandler = async (job) => {
 	const instance = arrInstancesQueries.getById(instanceId);
 	if (!instance) {
 		return { status: 'failure', error: 'Arr instance not found' };
+	}
+
+	if (instance.type === 'lidarr') {
+		return { status: 'skipped', output: LIDARR_UPGRADE_UNSUPPORTED_OUTPUT };
 	}
 
 	// Manual runs are only allowed in dry run (unless dev)

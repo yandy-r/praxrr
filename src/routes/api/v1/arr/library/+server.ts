@@ -7,6 +7,7 @@ import * as qualityProfileQueries from '$pcd/entities/qualityProfiles/index.ts';
 import { cache } from '$cache/cache.ts';
 import { RadarrClient } from '$utils/arr/clients/radarr.ts';
 import { SonarrClient } from '$utils/arr/clients/sonarr.ts';
+import { LidarrClient } from '$utils/arr/clients/lidarr.ts';
 import { logger } from '$logger/logger.ts';
 
 type LibraryResponse = components['schemas']['LibraryResponse'];
@@ -147,6 +148,35 @@ export const GET: RequestHandler = async ({ url }) => {
 
 				return json({
 					type: 'sonarr',
+					items,
+					profilesByDatabase
+				} satisfies LibraryResponse);
+			} finally {
+				client.close();
+			}
+		} else if (instance.type === 'lidarr') {
+			const cached = cache.get<components['schemas']['LidarrLibraryItem'][]>(cacheKey);
+			if (cached) {
+				return json({
+					type: 'lidarr',
+					items: cached,
+					profilesByDatabase
+				} satisfies LibraryResponse);
+			}
+
+			const profilarrProfileNames = await getProfilarrProfileNames();
+			const client = new LidarrClient(instance.url, instance.api_key);
+			try {
+				const items = await client.getLibrary(profilarrProfileNames);
+				cache.set(cacheKey, items, LIBRARY_CACHE_TTL);
+
+				await logger.info(`Fetched library for ${instance.name}`, {
+					source: 'arr/library',
+					meta: { instanceId: id, albumCount: items.length }
+				});
+
+				return json({
+					type: 'lidarr',
 					items,
 					profilesByDatabase
 				} satisfies LibraryResponse);

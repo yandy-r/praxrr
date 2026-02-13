@@ -1,5 +1,12 @@
 EntityType:
   type: string
+  description: |
+    Portable PCD entity identifiers used by import/export endpoints.
+
+    v1 Lidarr media-management intentionally reuses existing media-management
+    entities (`radarr_media_settings` / `sonarr_media_settings` and
+    `radarr_quality_definitions` / `sonarr_quality_definitions`) rather than
+    introducing `lidarr_*` entity types in this phase.
   enum:
     - delay_profile
     - regular_expression
@@ -33,6 +40,10 @@ ExportResponse:
         - `sonarr_media_settings` → PortableMediaSettings
         - `radarr_quality_definitions` → PortableQualityDefinitions
         - `sonarr_quality_definitions` → PortableQualityDefinitions
+
+        Notes:
+        - v1 Lidarr media-management reuses existing `radarr_*`/`sonarr_*` entities.
+        - Unsupported Lidarr-only fields remain capability-gated for deterministic sync behavior.
       oneOf:
         - $ref: '#/PortableDelayProfile'
         - $ref: '#/PortableRegularExpression'
@@ -202,6 +213,10 @@ PortableCustomFormatScore:
       type: string
     arrType:
       type: string
+      enum: [radarr, sonarr, lidarr, all]
+      description: |
+        Arr target for this score mapping. `lidarr` is supported for v1 parity,
+        while unsupported Lidarr-only behavior remains capability-gated elsewhere.
     score:
       type: integer
 
@@ -310,6 +325,10 @@ PortableSonarrNaming:
 
 PortableMediaSettings:
   type: object
+  description: |
+    Shared media-management settings payload for existing Radarr/Sonarr entity
+    families. v1 Lidarr support reuses this shape; Lidarr-only fields not
+    represented here remain capability-gated for deterministic sync.
   required:
     - name
     - propersRepacks
@@ -324,6 +343,10 @@ PortableMediaSettings:
 
 PortableQualityDefinitions:
   type: object
+  description: |
+    Shared quality-definition payload for existing Radarr/Sonarr entity
+    families. v1 Lidarr support reuses this shape; Lidarr-only fields not
+    represented here remain capability-gated for deterministic sync.
   required:
     - name
     - entries

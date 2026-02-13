@@ -9,6 +9,20 @@ import { enqueueJob } from '$lib/server/jobs/queueService.ts';
 import { jobQueueQueries } from '$db/queries/jobQueue.ts';
 import { buildJobDisplayName } from '$lib/server/jobs/display.ts';
 
+const LIDARR_RENAME_UNSUPPORTED_ERROR = 'Rename is not supported for Lidarr in v1.';
+
+function getRenameUnsupportedError(instanceType: string): string | null {
+	if (instanceType === 'lidarr') {
+		return LIDARR_RENAME_UNSUPPORTED_ERROR;
+	}
+
+	if (instanceType !== 'radarr' && instanceType !== 'sonarr') {
+		return `Rename not supported for ${instanceType}`;
+	}
+
+	return null;
+}
+
 export const load: ServerLoad = ({ params }) => {
 	const id = parseInt(params.id || '', 10);
 
@@ -43,6 +57,12 @@ export const actions: Actions = {
 		const instance = arrInstancesQueries.getById(id);
 		if (!instance) {
 			return fail(404, { error: 'Instance not found' });
+		}
+
+		const unsupportedError = getRenameUnsupportedError(instance.type);
+		if (unsupportedError) {
+			jobQueueQueries.cancelByDedupeKey(`arr.rename:${id}`);
+			return fail(400, { error: unsupportedError });
 		}
 
 		const formData = await request.formData();
@@ -100,6 +120,12 @@ export const actions: Actions = {
 		const instance = arrInstancesQueries.getById(id);
 		if (!instance) {
 			return fail(404, { error: 'Instance not found' });
+		}
+
+		const unsupportedError = getRenameUnsupportedError(instance.type);
+		if (unsupportedError) {
+			jobQueueQueries.cancelByDedupeKey(`arr.rename:${id}`);
+			return fail(400, { error: unsupportedError });
 		}
 
 		const existing = arrRenameSettingsQueries.getByInstanceId(id);
@@ -164,14 +190,15 @@ export const actions: Actions = {
 			return fail(404, { error: 'Instance not found' });
 		}
 
+		const unsupportedError = getRenameUnsupportedError(instance.type);
+		if (unsupportedError) {
+			jobQueueQueries.cancelByDedupeKey(`arr.rename:${id}`);
+			return fail(400, { error: unsupportedError });
+		}
+
 		const settings = arrRenameSettingsQueries.getByInstanceId(id);
 		if (!settings) {
 			return fail(404, { error: 'No rename configuration found. Save a configuration first.' });
-		}
-
-		// Only support Radarr and Sonarr
-		if (instance.type !== 'radarr' && instance.type !== 'sonarr') {
-			return fail(400, { error: `Rename not yet supported for ${instance.type}` });
 		}
 
 		try {

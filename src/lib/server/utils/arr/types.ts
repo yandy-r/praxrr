@@ -403,6 +403,120 @@ export interface SonarrEpisodeFile {
 }
 
 // =============================================================================
+// Lidarr Types
+// =============================================================================
+
+/**
+ * Artist statistics from /api/v1/artist
+ */
+export interface LidarrArtistStatistics {
+	albumCount: number;
+	trackFileCount: number;
+	trackCount: number;
+	totalTrackCount: number;
+	sizeOnDisk: number;
+	percentOfTracks: number;
+}
+
+/**
+ * Artist from /api/v1/artist
+ */
+export interface LidarrArtist {
+	id: number;
+	artistName?: string | null;
+	qualityProfileId: number;
+	monitored: boolean;
+	status?: string;
+	added?: string;
+	statistics?: LidarrArtistStatistics;
+}
+
+/**
+ * Album statistics from /api/v1/album
+ */
+export interface LidarrAlbumStatistics {
+	trackFileCount: number;
+	trackCount: number;
+	totalTrackCount: number;
+	sizeOnDisk: number;
+	percentOfTracks: number;
+}
+
+/**
+ * Minimal artist payload nested in /api/v1/album responses
+ */
+export interface LidarrAlbumArtistRef {
+	id: number;
+	artistName?: string | null;
+	qualityProfileId?: number;
+}
+
+/**
+ * Album from /api/v1/album
+ */
+export interface LidarrAlbum {
+	id: number;
+	artistId: number;
+	title?: string | null;
+	profileId: number;
+	monitored: boolean;
+	albumType?: string | null;
+	releaseDate?: string | null;
+	artist?: LidarrAlbumArtistRef;
+	statistics?: LidarrAlbumStatistics;
+}
+
+/**
+ * Release from /api/v1/release (Lidarr)
+ * Returned by interactive search endpoint
+ */
+export interface LidarrRelease {
+	id?: number;
+	guid?: string | null;
+	title?: string | null;
+	size?: number;
+	indexer?: string | null;
+	indexerId?: number;
+	indexerFlags: number;
+	quality?: {
+		quality?: {
+			id: number;
+			name: string;
+			source?: string;
+			resolution?: number;
+			modifier?: string;
+		};
+		revision?: {
+			version: number;
+			real: number;
+			isRepack: boolean;
+		};
+	};
+	customFormats?: Array<{ id: number; name: string }>;
+	customFormatScore?: number;
+	releaseGroup?: string | null;
+	seeders?: number | null;
+	leechers?: number | null;
+	protocol?: 'torrent' | 'usenet' | 'unknown' | string;
+	age?: number;
+	ageHours?: number;
+	ageMinutes?: number;
+	approved?: boolean;
+	temporarilyRejected?: boolean;
+	rejected?: boolean;
+	rejections?: string[];
+	publishDate?: string;
+	artistName?: string | null;
+	albumTitle?: string | null;
+	downloadUrl?: string | null;
+	infoUrl?: string | null;
+	magnetUrl?: string | null;
+	infoHash?: string | null;
+	artistId?: number | null;
+	albumId?: number | null;
+}
+
+// =============================================================================
 // Library View Types (computed/joined data)
 // =============================================================================
 
@@ -412,6 +526,28 @@ export interface SonarrEpisodeFile {
 export interface ScoreBreakdownItem {
 	name: string;
 	score: number;
+}
+
+/**
+ * Minimal quality profile lookup entry for type-safe profile joins
+ */
+export interface LidarrProfileLookupItem {
+	id: number;
+	name: string;
+}
+
+/**
+ * Lookup map keyed by quality profile ID
+ */
+export type LidarrProfileLookup = ReadonlyMap<number, LidarrProfileLookupItem>;
+
+/**
+ * Shared profile join result for Lidarr library items
+ */
+export interface LidarrProfileJoinResult {
+	qualityProfileId: number;
+	qualityProfileName: string;
+	isProfilarrProfile: boolean;
 }
 
 /**
@@ -499,6 +635,27 @@ export interface SonarrLibraryItem {
 	dateAdded?: string;
 	seasons: SonarrSeasonItem[];
 	isProfilarrProfile: boolean;
+}
+
+/**
+ * Lidarr library item (album-level) with profile attribution and artist context
+ */
+export interface LidarrLibraryItem extends LidarrProfileJoinResult {
+	id: number; // albumId
+	artistId: number;
+	artistName: string;
+	title: string;
+	year?: number;
+	albumType?: string;
+	releaseDate?: string;
+	status?: string;
+	monitored: boolean;
+	trackFileCount: number;
+	trackCount: number;
+	totalTrackCount: number;
+	sizeOnDisk: number;
+	percentOfTracks: number;
+	dateAdded?: string;
 }
 
 // =============================================================================

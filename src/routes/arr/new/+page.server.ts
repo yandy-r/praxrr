@@ -7,7 +7,7 @@ import { getDefaultDelayProfile } from '$arr/defaults.ts';
 import type { ArrType } from '$arr/types.ts';
 import { logger } from '$logger/logger.ts';
 
-const VALID_TYPES = ['radarr', 'sonarr'];
+const VALID_TYPES = ['radarr', 'sonarr', 'lidarr'];
 
 export const actions = {
 	default: async ({ request }) => {

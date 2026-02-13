@@ -27,6 +27,10 @@
     {
       "name": "Arr",
       "description": "Arr instance library and release endpoints"
+    },
+    {
+      "name": "PCD",
+      "description": "PCD entity export and portable format endpoints"
     }
   ],
   "paths": {
@@ -456,6 +460,149 @@
           }
         }
       }
+    },
+    "/pcd/export": {
+      "get": {
+        "operationId": "exportEntity",
+        "summary": "Export a portable entity",
+        "description": "Serializes a PCD entity into its portable JSON representation.\n\nThe portable format strips database IDs and timestamps, producing a\nself-contained snapshot suitable for clipboard copy, file export, or\ncross-database import.\n",
+        "tags": [
+          "PCD"
+        ],
+        "parameters": [
+          {
+            "name": "databaseId",
+            "in": "query",
+            "required": true,
+            "description": "The PCD database ID to export from",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "entityType",
+            "in": "query",
+            "required": true,
+            "description": "The entity type to export",
+            "schema": {
+              "$ref": "#/components/schemas/EntityType"
+            }
+          },
+          {
+            "name": "name",
+            "in": "query",
+            "required": true,
+            "description": "The entity name to export",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Portable entity JSON",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExportResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Missing or invalid parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PcdErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Entity not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PcdErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Database cache not available",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PcdErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/pcd/import": {
+      "post": {
+        "operationId": "importEntity",
+        "summary": "Import a portable entity",
+        "description": "Deserializes a portable entity into PCD operations, creating the entity\nin the target database and layer.\n\nThe request body matches the export response format (`entityType` + `data`),\nplus `databaseId` and `layer` to specify the target.\n\nName uniqueness is validated — importing an entity with a name that already\nexists will return a 400 error.\n",
+        "tags": [
+          "PCD"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ImportRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Entity created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error (missing fields, duplicate name, invalid data)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PcdErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Cannot write to base layer",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PcdErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Database cache not available",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PcdErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -836,7 +983,8 @@
         "type": "string",
         "enum": [
           "radarr",
-          "sonarr"
+          "sonarr",
+          "lidarr"
         ],
         "description": "Type of Arr instance"
       },
@@ -1138,6 +1286,11 @@
           }
         }
       },
+      "LidarrLibraryItem": {
+        "type": "object",
+        "additionalProperties": true,
+        "description": "Placeholder contract for Lidarr library payload items.\nLidarr-specific artist/album fields remain capability-gated for later phases.\n"
+      },
       "SonarrEpisodeItem": {
         "type": "object",
         "required": [
@@ -1279,6 +1432,34 @@
           }
         }
       },
+      "LibraryLidarrResponse": {
+        "type": "object",
+        "required": [
+          "type",
+          "items",
+          "profilesByDatabase"
+        ],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "lidarr"
+            ]
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LidarrLibraryItem"
+            }
+          },
+          "profilesByDatabase": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProfileByDatabase"
+            }
+          }
+        }
+      },
       "LibraryResponse": {
         "oneOf": [
           {
@@ -1286,9 +1467,12 @@
           },
           {
             "$ref": "#/components/schemas/LibrarySonarrResponse"
+          },
+          {
+            "$ref": "#/components/schemas/LibraryLidarrResponse"
           }
         ],
-        "description": "Library response varies by instance type"
+        "description": "Library response varies by instance type.\nLidarr payload details remain capability-gated until dedicated library route support ships.\n"
       },
       "EpisodesResponse": {
         "type": "object",
@@ -1301,7 +1485,7 @@
             "items": {
               "$ref": "#/components/schemas/SonarrEpisodeItem"
             },
-            "description": "Episode details with quality and score data"
+            "description": "Episode details with quality and score data (Sonarr-only in current phase)"
           }
         }
       },
@@ -1525,6 +1709,487 @@
               "$ref": "#/components/schemas/SkippedItem"
             },
             "description": "Quality profiles that were skipped (assigned to media)"
+          }
+        }
+      },
+      "EntityType": {
+        "type": "string",
+        "description": "Portable PCD entity identifiers used by import/export endpoints.\n\nv1 Lidarr media-management intentionally reuses existing media-management\nentities (`radarr_media_settings` / `sonarr_media_settings` and\n`radarr_quality_definitions` / `sonarr_quality_definitions`) rather than\nintroducing `lidarr_*` entity types in this phase.\n",
+        "enum": [
+          "delay_profile",
+          "regular_expression",
+          "custom_format",
+          "quality_profile",
+          "radarr_naming",
+          "sonarr_naming",
+          "radarr_media_settings",
+          "sonarr_media_settings",
+          "radarr_quality_definitions",
+          "sonarr_quality_definitions"
+        ]
+      },
+      "ExportResponse": {
+        "type": "object",
+        "required": [
+          "entityType",
+          "data"
+        ],
+        "properties": {
+          "entityType": {
+            "$ref": "#/components/schemas/EntityType"
+          },
+          "data": {
+            "description": "The portable entity payload. Shape varies by entityType:\n- `delay_profile` → PortableDelayProfile\n- `regular_expression` → PortableRegularExpression\n- `custom_format` → PortableCustomFormat\n- `quality_profile` → PortableQualityProfile\n- `radarr_naming` → PortableRadarrNaming\n- `sonarr_naming` → PortableSonarrNaming\n- `radarr_media_settings` → PortableMediaSettings\n- `sonarr_media_settings` → PortableMediaSettings\n- `radarr_quality_definitions` → PortableQualityDefinitions\n- `sonarr_quality_definitions` → PortableQualityDefinitions\n\nNotes:\n- v1 Lidarr media-management reuses existing `radarr_*`/`sonarr_*` entities.\n- Unsupported Lidarr-only fields remain capability-gated for deterministic sync behavior.\n",
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/PortableDelayProfile"
+              },
+              {
+                "$ref": "#/components/schemas/PortableRegularExpression"
+              },
+              {
+                "$ref": "#/components/schemas/PortableCustomFormat"
+              },
+              {
+                "$ref": "#/components/schemas/PortableQualityProfile"
+              },
+              {
+                "$ref": "#/components/schemas/PortableRadarrNaming"
+              },
+              {
+                "$ref": "#/components/schemas/PortableSonarrNaming"
+              },
+              {
+                "$ref": "#/components/schemas/PortableMediaSettings"
+              },
+              {
+                "$ref": "#/components/schemas/PortableQualityDefinitions"
+              }
+            ]
+          }
+        }
+      },
+      "ImportRequest": {
+        "type": "object",
+        "required": [
+          "databaseId",
+          "layer",
+          "entityType",
+          "data"
+        ],
+        "properties": {
+          "databaseId": {
+            "type": "integer",
+            "description": "The PCD database ID to import into"
+          },
+          "layer": {
+            "type": "string",
+            "enum": [
+              "user",
+              "base"
+            ],
+            "description": "The operation layer to write to"
+          },
+          "entityType": {
+            "$ref": "#/components/schemas/EntityType"
+          },
+          "data": {
+            "description": "The portable entity payload (same shape as ExportResponse.data)",
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/PortableDelayProfile"
+              },
+              {
+                "$ref": "#/components/schemas/PortableRegularExpression"
+              },
+              {
+                "$ref": "#/components/schemas/PortableCustomFormat"
+              },
+              {
+                "$ref": "#/components/schemas/PortableQualityProfile"
+              },
+              {
+                "$ref": "#/components/schemas/PortableRadarrNaming"
+              },
+              {
+                "$ref": "#/components/schemas/PortableSonarrNaming"
+              },
+              {
+                "$ref": "#/components/schemas/PortableMediaSettings"
+              },
+              {
+                "$ref": "#/components/schemas/PortableQualityDefinitions"
+              }
+            ]
+          }
+        }
+      },
+      "ImportResponse": {
+        "type": "object",
+        "required": [
+          "success"
+        ],
+        "properties": {
+          "success": {
+            "type": "boolean"
+          }
+        }
+      },
+      "PcdErrorResponse": {
+        "type": "object",
+        "required": [
+          "error"
+        ],
+        "properties": {
+          "error": {
+            "type": "string"
+          }
+        }
+      },
+      "PortableDelayProfile": {
+        "type": "object",
+        "required": [
+          "name",
+          "preferredProtocol",
+          "usenetDelay",
+          "torrentDelay",
+          "bypassIfHighestQuality",
+          "bypassIfAboveCfScore",
+          "minimumCfScore"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "preferredProtocol": {
+            "type": "string",
+            "enum": [
+              "prefer_usenet",
+              "prefer_torrent",
+              "only_usenet",
+              "only_torrent"
+            ]
+          },
+          "usenetDelay": {
+            "type": "integer"
+          },
+          "torrentDelay": {
+            "type": "integer"
+          },
+          "bypassIfHighestQuality": {
+            "type": "boolean"
+          },
+          "bypassIfAboveCfScore": {
+            "type": "boolean"
+          },
+          "minimumCfScore": {
+            "type": "integer"
+          }
+        }
+      },
+      "PortableRegularExpression": {
+        "type": "object",
+        "required": [
+          "name",
+          "pattern",
+          "tags",
+          "description",
+          "regex101Id"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "pattern": {
+            "type": "string"
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "regex101Id": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "PortableCustomFormatTest": {
+        "type": "object",
+        "required": [
+          "title",
+          "type",
+          "shouldMatch",
+          "description"
+        ],
+        "properties": {
+          "title": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "movie",
+              "series"
+            ]
+          },
+          "shouldMatch": {
+            "type": "boolean"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "PortableCustomFormat": {
+        "type": "object",
+        "required": [
+          "name",
+          "description",
+          "includeInRename",
+          "tags",
+          "conditions",
+          "tests"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "includeInRename": {
+            "type": "boolean"
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "conditions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "description": "Condition data (shape varies by condition type)"
+            }
+          },
+          "tests": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PortableCustomFormatTest"
+            }
+          }
+        }
+      },
+      "PortableCustomFormatScore": {
+        "type": "object",
+        "required": [
+          "customFormatName",
+          "arrType",
+          "score"
+        ],
+        "properties": {
+          "customFormatName": {
+            "type": "string"
+          },
+          "arrType": {
+            "type": "string",
+            "enum": [
+              "radarr",
+              "sonarr",
+              "lidarr",
+              "all"
+            ],
+            "description": "Arr target for this score mapping. `lidarr` is supported for v1 parity,\nwhile unsupported Lidarr-only behavior remains capability-gated elsewhere.\n"
+          },
+          "score": {
+            "type": "integer"
+          }
+        }
+      },
+      "PortableQualityProfile": {
+        "type": "object",
+        "required": [
+          "name",
+          "description",
+          "tags",
+          "language",
+          "orderedItems",
+          "minimumScore",
+          "upgradeUntilScore",
+          "upgradeScoreIncrement",
+          "customFormatScores"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "language": {
+            "type": "string",
+            "nullable": true
+          },
+          "orderedItems": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "description": "Ordered quality item (quality or group)"
+            }
+          },
+          "minimumScore": {
+            "type": "integer"
+          },
+          "upgradeUntilScore": {
+            "type": "integer"
+          },
+          "upgradeScoreIncrement": {
+            "type": "integer"
+          },
+          "customFormatScores": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PortableCustomFormatScore"
+            }
+          }
+        }
+      },
+      "PortableRadarrNaming": {
+        "type": "object",
+        "required": [
+          "name",
+          "rename",
+          "movieFormat",
+          "movieFolderFormat",
+          "replaceIllegalCharacters",
+          "colonReplacementFormat"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "rename": {
+            "type": "boolean"
+          },
+          "movieFormat": {
+            "type": "string"
+          },
+          "movieFolderFormat": {
+            "type": "string"
+          },
+          "replaceIllegalCharacters": {
+            "type": "boolean"
+          },
+          "colonReplacementFormat": {
+            "type": "string"
+          }
+        }
+      },
+      "PortableSonarrNaming": {
+        "type": "object",
+        "required": [
+          "name",
+          "rename",
+          "standardEpisodeFormat",
+          "dailyEpisodeFormat",
+          "animeEpisodeFormat",
+          "seriesFolderFormat",
+          "seasonFolderFormat",
+          "replaceIllegalCharacters",
+          "colonReplacementFormat",
+          "customColonReplacementFormat",
+          "multiEpisodeStyle"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "rename": {
+            "type": "boolean"
+          },
+          "standardEpisodeFormat": {
+            "type": "string"
+          },
+          "dailyEpisodeFormat": {
+            "type": "string"
+          },
+          "animeEpisodeFormat": {
+            "type": "string"
+          },
+          "seriesFolderFormat": {
+            "type": "string"
+          },
+          "seasonFolderFormat": {
+            "type": "string"
+          },
+          "replaceIllegalCharacters": {
+            "type": "boolean"
+          },
+          "colonReplacementFormat": {
+            "type": "string"
+          },
+          "customColonReplacementFormat": {
+            "type": "string",
+            "nullable": true
+          },
+          "multiEpisodeStyle": {
+            "type": "string"
+          }
+        }
+      },
+      "PortableMediaSettings": {
+        "type": "object",
+        "description": "Shared media-management settings payload for existing Radarr/Sonarr entity\nfamilies. v1 Lidarr support reuses this shape; Lidarr-only fields not\nrepresented here remain capability-gated for deterministic sync.\n",
+        "required": [
+          "name",
+          "propersRepacks",
+          "enableMediaInfo"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "propersRepacks": {
+            "type": "string"
+          },
+          "enableMediaInfo": {
+            "type": "boolean"
+          }
+        }
+      },
+      "PortableQualityDefinitions": {
+        "type": "object",
+        "description": "Shared quality-definition payload for existing Radarr/Sonarr entity\nfamilies. v1 Lidarr support reuses this shape; Lidarr-only fields not\nrepresented here remain capability-gated for deterministic sync.\n",
+        "required": [
+          "name",
+          "entries"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "entries": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "description": "Quality definition entry with min/max/preferred sizes"
+            }
           }
         }
       }
