@@ -1,5 +1,10 @@
 {
   "permissions": {
-    "allow": ["Bash(deno task:*)"]
+    "allow": [
+      "Bash(deno task:*)",
+      "Bash(deno check:*)",
+      "Bash(git log:*)",
+      "Bash(sed:*)"
+    ]
   }
 }
