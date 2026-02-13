@@ -20,6 +20,12 @@
   <a href="https://github.com/sponsors/Dictionarry-Hub"><img src="https://img.shields.io/badge/GitHub%20Sponsors-Support-blue?logo=github-sponsors" alt="GitHub Sponsors"></a>
 </p>
 
+# Introduction
+
+This is a fork of the [Official Dictionarry Profilarr](https://github.com/Dictionarry-Hub/profilarr) with Lidarr support. I don't plan to merge this back into the main repository, but I will keep it updated with the latest changes from the main repository.
+
+I'm not a developer, though I just know enough to tinker and use lidarr. Don't plan to insult anyone by trying to merge this back into the main repository.
+
 <p>Manage quality profiles, custom formats, and release profiles across your Radarr and Sonarr instances. Define your profiles once with a Git-backed configuration database, then sync them to any number of *arr instances.</p>
 
 > [!WARNING]
