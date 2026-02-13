@@ -2,20 +2,32 @@ import { jobQueueRegistry } from '../queueRegistry.ts';
 import type { JobHandler } from '../queueTypes.ts';
 import { arrRenameSettingsQueries } from '$db/queries/arrRenameSettings.ts';
 import { arrInstancesQueries } from '$db/queries/arrInstances.ts';
+import { jobQueueQueries } from '$db/queries/jobQueue.ts';
 import { processRenameConfig } from '$lib/server/rename/processor.ts';
 import { calculateNextRunFromMinutes } from '../scheduleUtils.ts';
 import { logger } from '$logger/logger.ts';
 import { isArrAppType, supportsArrWorkflow, ARR_APPS } from '$shared/arr/capabilities.ts';
 
+function cancelQueuedRenameJobs(instanceId: number): void {
+	try {
+		jobQueueQueries.cancelByDedupeKey(`arr.rename:${instanceId}`);
+
+		const queuedRenameJobs = jobQueueQueries
+			.listByJobTypes(['arr.rename'])
+			.filter((job) => job.status === 'queued' && Number(job.payload.instanceId) === instanceId);
+
+		for (const job of queuedRenameJobs) {
+			jobQueueQueries.setStatus(job.id, 'cancelled');
+		}
+	} catch {
+		// Best-effort cleanup for unsupported types; continue with explicit unsupported output.
+	}
+}
+
 const renameRunHandler: JobHandler = async (job) => {
 	const instanceId = Number(job.payload.instanceId);
 	if (!Number.isFinite(instanceId)) {
 		return { status: 'failure', error: 'Invalid instance ID' };
-	}
-
-	const settings = arrRenameSettingsQueries.getByInstanceId(instanceId);
-	if (!settings || !settings.enabled) {
-		return { status: 'cancelled', output: 'Rename config disabled' };
 	}
 
 	const instance = arrInstancesQueries.getById(instanceId);
@@ -24,12 +36,19 @@ const renameRunHandler: JobHandler = async (job) => {
 	}
 
 	if (!isArrAppType(instance.type)) {
+		cancelQueuedRenameJobs(instanceId);
 		return { status: 'skipped', output: `Rename is not supported for unknown instance type: ${instance.type}` };
 	}
 
 	if (!supportsArrWorkflow(instance.type, 'rename')) {
+		cancelQueuedRenameJobs(instanceId);
 		const label = ARR_APPS[instance.type].label;
 		return { status: 'skipped', output: `Rename is not supported for ${label} instances` };
+	}
+
+	const settings = arrRenameSettingsQueries.getByInstanceId(instanceId);
+	if (!settings || !settings.enabled) {
+		return { status: 'cancelled', output: 'Rename config disabled' };
 	}
 
 	try {

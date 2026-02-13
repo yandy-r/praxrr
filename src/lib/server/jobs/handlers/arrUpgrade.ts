@@ -14,11 +14,6 @@ const upgradeRunHandler: JobHandler = async (job) => {
     return { status: 'failure', error: 'Invalid instance ID' };
   }
 
-  const config = upgradeConfigsQueries.getByArrInstanceId(instanceId);
-  if (!config || !config.enabled) {
-    return { status: 'cancelled', output: 'Upgrade config disabled' };
-  }
-
   const instance = arrInstancesQueries.getById(instanceId);
   if (!instance) {
     return { status: 'failure', error: 'Arr instance not found' };
@@ -28,7 +23,19 @@ const upgradeRunHandler: JobHandler = async (job) => {
     return { status: 'skipped', output: `Upgrades are not supported for unknown instance type: ${instance.type}` };
   }
 
-  if (!supportsArrWorkflow(instance.type, 'upgrades')) {
+  const upgradesSupported = supportsArrWorkflow(instance.type, 'upgrades');
+  // Keep unsupported Lidarr messaging explicit even when a stale/disabled config exists.
+  if (!upgradesSupported && instance.type === 'lidarr') {
+    const label = ARR_APPS[instance.type].label;
+    return { status: 'skipped', output: `Upgrades are not supported for ${label} instances` };
+  }
+
+  const config = upgradeConfigsQueries.getByArrInstanceId(instanceId);
+  if (!config || !config.enabled) {
+    return { status: 'cancelled', output: 'Upgrade config disabled' };
+  }
+
+  if (!upgradesSupported) {
     const label = ARR_APPS[instance.type].label;
     return { status: 'skipped', output: `Upgrades are not supported for ${label} instances` };
   }

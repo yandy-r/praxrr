@@ -23,6 +23,18 @@ function getRenameUnsupportedError(instanceType: string): string | null {
 	return null;
 }
 
+function cancelQueuedRenameJobs(instanceId: number): void {
+	jobQueueQueries.cancelByDedupeKey(`arr.rename:${instanceId}`);
+
+	const queuedRenameJobs = jobQueueQueries
+		.listByJobTypes(['arr.rename'])
+		.filter((job) => job.status === 'queued' && Number(job.payload.instanceId) === instanceId);
+
+	for (const job of queuedRenameJobs) {
+		jobQueueQueries.setStatus(job.id, 'cancelled');
+	}
+}
+
 export const load: ServerLoad = ({ params }) => {
 	const id = parseInt(params.id || '', 10);
 
@@ -61,7 +73,7 @@ export const actions: Actions = {
 
 		const unsupportedError = getRenameUnsupportedError(instance.type);
 		if (unsupportedError) {
-			jobQueueQueries.cancelByDedupeKey(`arr.rename:${id}`);
+			cancelQueuedRenameJobs(id);
 			return fail(400, { error: unsupportedError });
 		}
 
@@ -124,7 +136,7 @@ export const actions: Actions = {
 
 		const unsupportedError = getRenameUnsupportedError(instance.type);
 		if (unsupportedError) {
-			jobQueueQueries.cancelByDedupeKey(`arr.rename:${id}`);
+			cancelQueuedRenameJobs(id);
 			return fail(400, { error: unsupportedError });
 		}
 
@@ -192,7 +204,7 @@ export const actions: Actions = {
 
 		const unsupportedError = getRenameUnsupportedError(instance.type);
 		if (unsupportedError) {
-			jobQueueQueries.cancelByDedupeKey(`arr.rename:${id}`);
+			cancelQueuedRenameJobs(id);
 			return fail(400, { error: unsupportedError });
 		}
 
