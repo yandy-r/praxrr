@@ -30,3 +30,17 @@ services:
     volumes:
       - ./.arr/sonarr:/config
       - ./.arr/sonarr/data:/data
+
+  lidarr:
+    container_name: profilarr-lidarr
+    image: lscr.io/linuxserver/lidarr:latest
+    restart: unless-stopped
+    ports:
+      - 18686:8686
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Etc/UTC
+    volumes:
+      - ./.arr/lidarr:/config
+      - ./.arr/lidarr/data:/data

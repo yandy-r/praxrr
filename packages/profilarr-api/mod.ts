@@ -3,8 +3,8 @@
  * OpenAPI specification and TypeScript types for the Profilarr API.
  *
  * ```ts
- * import { spec } from "@dictionarry/profilarr-api";
- * import type { components } from "@dictionarry/profilarr-api";
+ * import { spec } from "@yandy-r/profilarr-api";
+ * import type { components } from "@yandy-r/profilarr-api";
  *
  * // Access the bundled OpenAPI spec
  * console.log(spec.info.title);

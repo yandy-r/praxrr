@@ -7,21 +7,22 @@ import deno from '@deno/vite-plugin';
 const packageJson = JSON.parse(readFileSync('./package.json', 'utf-8'));
 
 export default defineConfig({
-	plugins: [deno(), tailwindcss(), sveltekit()],
-	server: {
-		port: 6969,
-		host: true,
-		hmr: {
-			host: 'localhost'
-		},
-		watch: {
-			usePolling: true,
-			interval: 1000,
-			// Ignore temporary files created by editors
-			ignored: ['**/*.tmp.*', '**/*~', '**/.#*']
-		}
-	},
-	define: {
-		__APP_VERSION__: JSON.stringify(packageJson.version)
-	}
+  plugins: [deno(), tailwindcss(), sveltekit()],
+  server: {
+    port: 6969,
+    host: true,
+    allowedHosts: ['localhost', 'ubsrv'],
+    hmr: {
+      host: 'localhost',
+    },
+    watch: {
+      usePolling: true,
+      interval: 1000,
+      // Ignore temporary files created by editors
+      ignored: ['**/*.tmp.*', '**/*~', '**/.#*'],
+    },
+  },
+  define: {
+    __APP_VERSION__: JSON.stringify(packageJson.version),
+  },
 });
