@@ -122,7 +122,10 @@ export const actions: Actions = {
     }
 
     if (newName.trim() !== decodedName) {
-      arrSyncQueries.updateNamingConfigName(decodedName, newName.trim());
+      arrSyncQueries.updateNamingConfigName(decodedName, newName.trim(), {
+        arrType: 'radarr',
+        databaseId: currentDatabaseId,
+      });
     }
 
     throw redirect(303, `/media-management/${databaseId}/naming`);

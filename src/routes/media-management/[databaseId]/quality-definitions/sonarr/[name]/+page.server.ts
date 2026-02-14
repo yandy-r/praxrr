@@ -113,7 +113,10 @@ export const actions: Actions = {
     }
 
     if (newName.trim() !== decodedName) {
-      arrSyncQueries.updateQualityDefinitionsConfigName(decodedName, newName.trim());
+      arrSyncQueries.updateQualityDefinitionsConfigName(decodedName, newName.trim(), {
+        arrType: 'sonarr',
+        databaseId: currentDatabaseId,
+      });
     }
 
     throw redirect(303, `/media-management/${databaseId}/quality-definitions`);

@@ -108,7 +108,10 @@ export const actions: Actions = {
     }
 
     if (newName.trim() !== decodedName) {
-      arrSyncQueries.updateMediaSettingsConfigName(decodedName, newName.trim());
+      arrSyncQueries.updateMediaSettingsConfigName(decodedName, newName.trim(), {
+        arrType: 'sonarr',
+        databaseId: currentDatabaseId,
+      });
     }
 
     throw redirect(303, `/media-management/${databaseId}/media-settings`);

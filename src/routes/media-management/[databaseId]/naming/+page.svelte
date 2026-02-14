@@ -11,7 +11,7 @@
 	import { alertStore } from '$alerts/store';
 	import { Plus } from 'lucide-svelte';
 	import type { EntityType } from '$shared/pcd/portable.ts';
-	import { isArrAppType } from '$shared/arr/capabilities.ts';
+	import { isArrAppType, type ArrAppType } from '$shared/arr/capabilities.ts';
 	import type { PageData } from './$types';
 
 	export let data: PageData;
@@ -19,6 +19,11 @@
 	let cloneModalOpen = false;
 	let cloneSourceName = '';
 	let cloneEntityType: EntityType = 'radarr_naming';
+	let cloneArrType: ArrAppType | null = null;
+
+	$: cloneExistingNames = cloneArrType
+		? data.namingConfigs.filter((config) => config.arr_type === cloneArrType).map((config) => config.name)
+		: [];
 
 	function toEntityType(arrType: string): EntityType | null {
 		if (!isArrAppType(arrType)) {
@@ -34,7 +39,13 @@
 			return;
 		}
 
-		const entityType = toEntityType(event.detail.arr_type);
+		const arrType = event.detail.arr_type;
+		if (!isArrAppType(arrType)) {
+			alertStore.add('error', `Unknown naming type "${arrType}"`);
+			return;
+		}
+
+		const entityType = toEntityType(arrType);
 		if (!entityType) {
 			alertStore.add('error', `Unknown naming type "${event.detail.arr_type}"`);
 			return;
@@ -42,6 +53,7 @@
 
 		cloneSourceName = event.detail.name;
 		cloneEntityType = entityType;
+		cloneArrType = arrType;
 		cloneModalOpen = true;
 	}
 
@@ -125,6 +137,6 @@
 	databaseId={data.currentDatabase.id}
 	entityType={cloneEntityType}
 	sourceName={cloneSourceName}
-	existingNames={data.namingConfigs.map((c) => c.name)}
+	existingNames={cloneExistingNames}
 	canWriteToBase={data.canWriteToBase}
 />

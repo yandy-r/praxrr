@@ -11,7 +11,7 @@
 	import { alertStore } from '$alerts/store';
 	import { Plus } from 'lucide-svelte';
 	import type { EntityType } from '$shared/pcd/portable.ts';
-	import { getArrAppMetadata, isArrAppType } from '$shared/arr/capabilities.ts';
+	import { getArrAppMetadata, isArrAppType, type ArrAppType } from '$shared/arr/capabilities.ts';
 	import type { PageData } from './$types';
 
 	export let data: PageData;
@@ -19,6 +19,11 @@
 	let cloneModalOpen = false;
 	let cloneSourceName = '';
 	let cloneEntityType: EntityType = 'radarr_quality_definitions';
+	let cloneArrType: ArrAppType | null = null;
+
+	$: cloneExistingNames = cloneArrType
+		? data.qualityDefinitionsConfigs.filter((config) => config.arr_type === cloneArrType).map((config) => config.name)
+		: [];
 
 	function formatType(type: string): string {
 		if (!type) {
@@ -50,7 +55,13 @@
 			return;
 		}
 
-		const resolvedType = resolveQualityDefinitionsEntityType(event.detail.arr_type);
+		const arrType = event.detail.arr_type;
+		if (!isArrAppType(arrType)) {
+			alertStore.add('error', `Unknown quality definitions type: ${resolveQualityTypeLabel(arrType)}`);
+			return;
+		}
+
+		const resolvedType = resolveQualityDefinitionsEntityType(arrType);
 		if (!resolvedType) {
 			alertStore.add('error', `Unknown quality definitions type: ${resolveQualityTypeLabel(event.detail.arr_type)}`);
 			return;
@@ -58,6 +69,7 @@
 
 		cloneSourceName = event.detail.name;
 		cloneEntityType = resolvedType;
+		cloneArrType = arrType;
 		cloneModalOpen = true;
 	}
 
@@ -144,6 +156,6 @@
 	databaseId={data.currentDatabase.id}
 	entityType={cloneEntityType}
 	sourceName={cloneSourceName}
-	existingNames={data.qualityDefinitionsConfigs.map((c) => c.name)}
+	existingNames={cloneExistingNames}
 	canWriteToBase={data.canWriteToBase}
 />

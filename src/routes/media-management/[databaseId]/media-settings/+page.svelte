@@ -20,11 +20,20 @@
 	let cloneModalOpen = false;
 	let cloneSourceName = '';
 	let cloneEntityType: EntityType = 'radarr_media_settings';
+	let cloneArrType: ArrAppType | null = null;
 
 	const validArrTypes: ArrAppType[] = ['radarr', 'sonarr', 'lidarr'];
 
+	function isValidArrType(arrType: string): arrType is ArrAppType {
+		return validArrTypes.includes(arrType as ArrAppType);
+	}
+
+	$: cloneExistingNames = cloneArrType
+		? data.mediaSettingsConfigs.filter((config) => config.arr_type === cloneArrType).map((config) => config.name)
+		: [];
+
 	function resolveEntityType(arrType: string): EntityType | null {
-		if (!validArrTypes.includes(arrType as ArrAppType)) {
+		if (!isValidArrType(arrType)) {
 			return null;
 		}
 
@@ -37,7 +46,13 @@
 			return;
 		}
 
-		const entityType = resolveEntityType(event.detail.arr_type);
+		const arrType = event.detail.arr_type;
+		if (!isValidArrType(arrType)) {
+			alertStore.add('error', `Unknown media settings type "${event.detail.arr_type}"`);
+			return;
+		}
+
+		const entityType = resolveEntityType(arrType);
 		if (!entityType) {
 			alertStore.add('error', `Unknown media settings type "${event.detail.arr_type}"`);
 			return;
@@ -45,6 +60,7 @@
 
 		cloneSourceName = event.detail.name;
 		cloneEntityType = entityType;
+		cloneArrType = arrType;
 		cloneModalOpen = true;
 	}
 
@@ -128,6 +144,6 @@
 	databaseId={data.currentDatabase.id}
 	entityType={cloneEntityType}
 	sourceName={cloneSourceName}
-	existingNames={data.mediaSettingsConfigs.map((c) => c.name)}
+	existingNames={cloneExistingNames}
 	canWriteToBase={data.canWriteToBase}
 />
