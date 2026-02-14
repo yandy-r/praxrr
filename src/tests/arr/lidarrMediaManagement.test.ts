@@ -456,11 +456,67 @@ VALUES ('R-QD-Seed', 'FLAC', 0, 1024, 256);
       assertEquals(before, after);
     });
 
+    this.test('[NM-03b] naming create lidarr duplicate against sonarr-shared name fails deterministically', async () => {
+      await this.bootstrapFixture();
+
+      await this.expectRedirect(async () => {
+        await namingNewActions.default({
+          request: this.createRequest('media-management/901/naming/new', {
+            arrType: 'sonarr',
+            name: 'Shared-Naming-Seed',
+            layer: 'user',
+            rename: 'true',
+            standardEpisodeFormat: 'S{season:00}E{episode:00}',
+            dailyEpisodeFormat: '{Series Title}',
+            animeEpisodeFormat: '{Episode Title}',
+            seriesFolderFormat: '{Series Title}',
+            seasonFolderFormat: 'Season {season:00}',
+            customColonReplacementFormat: ':-',
+            multiEpisodeStyle: 'extend',
+          }),
+          params: {
+            databaseId: `${LidarrMediaManagementTest.DATABASE_ID}`,
+          },
+        } as unknown as FixtureRequest);
+      }, `/media-management/${LidarrMediaManagementTest.DATABASE_ID}/naming`);
+
+      const before = (await this.readNamingList()).namingConfigs.filter(
+        (config) => config.arr_type === 'lidarr' && config.name === 'Shared-Naming-Seed'
+      ).length;
+      const failureRaw = await namingNewActions.default({
+        request: this.createRequest('media-management/901/naming/new', {
+          arrType: 'lidarr',
+          name: 'Shared-Naming-Seed',
+          layer: 'user',
+          rename: 'false',
+          standardEpisodeFormat: 'S{season:00}E{episode:00}',
+          dailyEpisodeFormat: '{Series Title}',
+          animeEpisodeFormat: '{Episode Title}',
+          seriesFolderFormat: '{Series Title}',
+          seasonFolderFormat: 'Season {season:00}',
+          customColonReplacementFormat: ':-',
+          multiEpisodeStyle: 'extend',
+        }),
+        params: {
+          databaseId: `${LidarrMediaManagementTest.DATABASE_ID}`,
+        },
+      } as unknown as FixtureRequest);
+      const failure = failureRaw as ActionFailure;
+
+      assertEquals(failure.status, 400);
+      assertEquals(failure.data.error, 'A lidarr naming config with name "Shared-Naming-Seed" already exists');
+
+      const after = (await this.readNamingList()).namingConfigs.filter(
+        (config) => config.arr_type === 'lidarr' && config.name === 'Shared-Naming-Seed'
+      ).length;
+      assertEquals(before, after);
+    });
+
     this.test('[NM-04] naming edit lidarr rename persists and updates sync mapping reference', async () => {
       await this.bootstrapFixture();
       const validationFailure = await this.expectFailure(
         async () =>
-          namingLidarrEditActions.update({
+          await namingLidarrEditActions.update({
             request: this.createRequest(`media-management/901/naming/lidarr/Lidarr-Naming-Seed`, {
               arrType: 'lidarr',
             }),
