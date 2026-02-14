@@ -2,17 +2,22 @@ import { json } from '@sveltejs/kit';
 import type { RequestHandler } from '@sveltejs/kit';
 import { pcdManager, canWriteToBase } from '$pcd/index.ts';
 import type { PCDCache, OperationLayer } from '$pcd/index.ts';
-import { ENTITY_TYPES } from '$shared/pcd/portable.ts';
-import type {
-  EntityType,
-  PortableDelayProfile,
-  PortableRegularExpression,
-  PortableCustomFormat,
-  PortableQualityProfile,
-  PortableRadarrNaming,
-  PortableSonarrNaming,
-  PortableMediaSettings,
-  PortableQualityDefinitions,
+import {
+  ENTITY_TYPES,
+  LIDARR_MEDIA_MANAGEMENT_PORTABLE_MATRIX,
+  type EntityType,
+  type LidarrMediaManagementPortableEntityType,
+  type PortableCustomFormat,
+  type PortableDelayProfile,
+  type PortableQualityProfile,
+  type PortableRegularExpression,
+  type PortableLidarrMediaSettings,
+  type PortableLidarrNaming,
+  type PortableLidarrQualityDefinitions,
+  type PortableMediaSettings,
+  type PortableQualityDefinitions,
+  type PortableRadarrNaming,
+  type PortableSonarrNaming,
 } from '$shared/pcd/portable.ts';
 import * as deserialize from '$pcd/entities/deserialize.ts';
 import { validatePortableData } from '$pcd/entities/validate.ts';
@@ -56,9 +61,22 @@ export const POST: RequestHandler = async ({ request }) => {
     return json({ error: 'Database cache not available' }, { status: 500 });
   }
 
-  const validationError = validatePortableData(entityType as EntityType, data as Record<string, unknown>);
+  if (typeof data !== 'object' || data === null || Array.isArray(data)) {
+    return json({ error: 'Invalid portable payload: data must be an object' }, { status: 400 });
+  }
+
+  const mixedPayloadError = validateLidarrPayloadMix(entityType as EntityType, data as Record<string, unknown>);
+  if (mixedPayloadError) {
+    return json({ error: mixedPayloadError }, { status: 400 });
+  }
+
+  const validationTarget = resolveValidationEntityType(entityType as EntityType);
+  const validationError = validatePortableData(validationTarget, data as Record<string, unknown>);
   if (validationError) {
-    return json({ error: validationError }, { status: 400 });
+    if (validationTarget === entityType) {
+      return json({ error: validationError }, { status: 400 });
+    }
+    return json({ error: `Unsupported payload for ${entityType}: ${validationError}` }, { status: 400 });
   }
 
   try {
@@ -103,6 +121,8 @@ async function deserializeEntity({ databaseId, cache, layer, entityType, data }:
       return deserialize.deserializeRadarrNaming({ ...opts, portable: data as unknown as PortableRadarrNaming });
     case 'sonarr_naming':
       return deserialize.deserializeSonarrNaming({ ...opts, portable: data as unknown as PortableSonarrNaming });
+    case 'lidarr_naming':
+      return deserialize.deserializeSonarrNaming({ ...opts, portable: data as unknown as PortableLidarrNaming });
     case 'radarr_media_settings':
       return deserialize.deserializeRadarrMediaSettings({
         ...opts,
@@ -112,6 +132,11 @@ async function deserializeEntity({ databaseId, cache, layer, entityType, data }:
       return deserialize.deserializeSonarrMediaSettings({
         ...opts,
         portable: data as unknown as PortableMediaSettings,
+      });
+    case 'lidarr_media_settings':
+      return deserialize.deserializeSonarrMediaSettings({
+        ...opts,
+        portable: data as unknown as PortableLidarrMediaSettings,
       });
     case 'radarr_quality_definitions':
       return deserialize.deserializeRadarrQualityDefinitions({
@@ -123,5 +148,28 @@ async function deserializeEntity({ databaseId, cache, layer, entityType, data }:
         ...opts,
         portable: data as unknown as PortableQualityDefinitions,
       });
+    case 'lidarr_quality_definitions':
+      return deserialize.deserializeSonarrQualityDefinitions({
+        ...opts,
+        portable: data as unknown as PortableLidarrQualityDefinitions,
+      });
   }
+}
+
+function resolveValidationEntityType(entityType: EntityType): EntityType {
+  const reusable = LIDARR_MEDIA_MANAGEMENT_PORTABLE_MATRIX[entityType as LidarrMediaManagementPortableEntityType];
+  return reusable ? reusable.reusableEntityType : entityType;
+}
+
+function validateLidarrPayloadMix(entityType: EntityType, data: Record<string, unknown>): string | null {
+  const matrixEntry = LIDARR_MEDIA_MANAGEMENT_PORTABLE_MATRIX[entityType as LidarrMediaManagementPortableEntityType];
+  if (!matrixEntry?.forbiddenFields || matrixEntry.forbiddenFields.length === 0) return null;
+
+  for (const forbiddenField of matrixEntry.forbiddenFields) {
+    if (Object.hasOwn(data, forbiddenField)) {
+      return `Unsupported payload for ${entityType}: field "${forbiddenField}" is not part of this entity model`;
+    }
+  }
+
+  return null;
 }

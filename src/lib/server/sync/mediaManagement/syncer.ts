@@ -28,8 +28,14 @@ import {
 import {
   getRadarrByName as getRadarrQualityDefs,
   getSonarrByName as getSonarrQualityDefs,
+  getQualityApiMappings,
+  isKnownQualityApiName,
 } from '$pcd/entities/mediaManagement/quality-definitions/read.ts';
-import type { RadarrMediaSettingsRow, SonarrMediaSettingsRow } from '$shared/pcd/display.ts';
+import type {
+  QualityDefinitionsConfig,
+  RadarrMediaSettingsRow,
+  SonarrMediaSettingsRow,
+} from '$shared/pcd/display.ts';
 import { colonReplacementToDb, multiEpisodeStyleToDb } from '$shared/pcd/mediaManagement.ts';
 import type { ArrType, ArrPropersAndRepacks, RadarrNamingConfig, SonarrNamingConfig } from '$arr/types.ts';
 import { logger } from '$logger/logger.ts';
@@ -167,15 +173,20 @@ export class MediaManagementSyncer extends BaseSyncer {
       return false;
     }
 
-    const mediaSettingsEntity = this.instanceType === 'radarr' ? 'radarr_media_settings' : 'sonarr_media_settings';
+    const mediaSettingsSource = this.resolveMediaSettingsSource();
+    if (!mediaSettingsSource) {
+      await logger.warn(`Unsupported instance type for media settings sync: ${this.instanceType}`, {
+        source: 'Sync:MediaSettings',
+        meta: { instanceId: this.instanceId },
+      });
+      return false;
+    }
+
+    const mediaSettingsEntity = mediaSettingsSource.entityType;
 
     // Fetch from PCD by config name
     let mediaSettings: RadarrMediaSettingsRow | SonarrMediaSettingsRow | null = null;
-    if (this.instanceType === 'radarr') {
-      mediaSettings = await getRadarrMediaSettings(cache, configName);
-    } else if (this.instanceType === 'sonarr' || this.instanceType === 'lidarr') {
-      mediaSettings = await getSonarrMediaSettings(cache, configName);
-    }
+    mediaSettings = await mediaSettingsSource.getByName(cache, configName);
 
     if (!mediaSettings) {
       await logger.debug(`Media settings config "${configName}" not found in ${mediaSettingsEntity}`, {
@@ -493,9 +504,17 @@ export class MediaManagementSyncer extends BaseSyncer {
       return false;
     }
 
-    const qualityDefinitionsEntity =
-      this.instanceType === 'radarr' ? 'radarr_quality_definitions' : 'sonarr_quality_definitions';
-    const getByName = this.instanceType === 'radarr' ? getRadarrQualityDefs : getSonarrQualityDefs;
+    const qualityDefinitionsSource = this.resolveQualityDefinitionsSource();
+    if (!qualityDefinitionsSource) {
+      await logger.warn(`Unsupported instance type for quality definitions sync: ${this.instanceType}`, {
+        source: 'Sync:QualityDefinitions',
+        meta: { instanceId: this.instanceId },
+      });
+      return false;
+    }
+
+    const qualityDefinitionsEntity = qualityDefinitionsSource.entityType;
+    const getByName = qualityDefinitionsSource.getByName;
     if (this.instanceType === 'lidarr') {
       await logger.debug('Using reused quality definitions entity for Lidarr sync', {
         source: 'Sync:QualityDefinitions',
@@ -586,6 +605,11 @@ export class MediaManagementSyncer extends BaseSyncer {
         continue;
       }
 
+      if (this.instanceType === 'lidarr' && !isKnownQualityApiName('lidarr', apiName)) {
+        missingMappingEntries.push(entry.quality_name);
+        continue;
+      }
+
       // Update the definition
       // PCD stores 0 for "unlimited", arr API expects null
       arrDef.minSize = entry.min_size;
@@ -638,23 +662,63 @@ export class MediaManagementSyncer extends BaseSyncer {
     return true;
   }
 
-  /**
-   * Get quality API mappings from PCD
-   * Returns a map of quality_name (lowercase) -> api_name
-   */
-  private async getQualityApiMappings(cache: PCDCache): Promise<Map<string, string>> {
-    const arrType = this.instanceType;
-    const rows = await cache.kb
-      .selectFrom('quality_api_mappings as qam')
-      .where('qam.arr_type', '=', arrType)
-      .select(['qam.quality_name', 'qam.api_name'])
-      .execute();
-
-    const map = new Map<string, string>();
-    for (const row of rows) {
-      map.set(row.quality_name.toLowerCase(), row.api_name);
+  private getQualityApiMappings(cache: PCDCache): Promise<Map<string, string>> {
+    if (this.instanceType === 'radarr' || this.instanceType === 'sonarr' || this.instanceType === 'lidarr') {
+      return getQualityApiMappings(cache, this.instanceType).then((lookup) => lookup.qualityToApiName);
     }
-    return map;
+    return Promise.resolve(new Map<string, string>());
+  }
+
+  private resolveMediaSettingsSource():
+    | {
+      getByName: (
+        cache: PCDCache,
+        configName: string,
+      ) => Promise<RadarrMediaSettingsRow | SonarrMediaSettingsRow | null>;
+      entityType: 'radarr_media_settings' | 'sonarr_media_settings';
+    }
+    | null {
+    if (this.instanceType === 'radarr') {
+      return {
+        getByName: getRadarrMediaSettings,
+        entityType: 'radarr_media_settings',
+      };
+    }
+
+    if (this.instanceType === 'sonarr' || this.instanceType === 'lidarr') {
+      return {
+        getByName: getSonarrMediaSettings,
+        entityType: 'sonarr_media_settings',
+      };
+    }
+
+    return null;
+  }
+
+  private resolveQualityDefinitionsSource():
+    | {
+      getByName: (
+        cache: PCDCache,
+        configName: string,
+      ) => Promise<QualityDefinitionsConfig | null>;
+      entityType: 'radarr_quality_definitions' | 'sonarr_quality_definitions';
+    }
+    | null {
+    if (this.instanceType === 'radarr') {
+      return {
+        getByName: getRadarrQualityDefs,
+        entityType: 'radarr_quality_definitions',
+      };
+    }
+
+    if (this.instanceType === 'sonarr' || this.instanceType === 'lidarr') {
+      return {
+        getByName: getSonarrQualityDefs,
+        entityType: 'sonarr_quality_definitions',
+      };
+    }
+
+    return null;
   }
 
   private applyConfigUpdates<TConfig extends Record<string, unknown>>(

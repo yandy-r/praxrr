@@ -13,7 +13,9 @@ EntityType:
     fields are explicitly skipped with logged reasons, never silently
     written or partially applied.
 
-    No new enum values are added for Lidarr here. The `lidarr` arr_type
+    No new entity enum values are added for Lidarr here (for example
+    no `lidarr_naming`, `lidarr_media_settings`, or
+    `lidarr_quality_definitions`). The `lidarr` arr_type
     is expressed in per-row `arr_type` columns (e.g. quality_profile_custom_formats,
     custom_format_conditions, quality_api_mappings) and in the
     PortableCustomFormatScore.arrType enum, not as a distinct entity family.

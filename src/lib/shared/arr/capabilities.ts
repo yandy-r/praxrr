@@ -1,12 +1,16 @@
-import type { ArrType } from '$shared/pcd/types.ts';
+import {
+  type ArrType,
+  type ArrAppType as SharedArrAppType,
+  ARR_APP_TYPES as SHARED_ARR_APP_TYPES,
+} from '$shared/pcd/types.ts';
+
+export type ArrAppType = SharedArrAppType;
 
 // ============================================================================
 // TYPE ALIASES
 // ============================================================================
 
 /** Concrete Arr application type (excludes the 'all' meta-type) */
-export type ArrAppType = Exclude<ArrType, 'all'>;
-
 /** Icon key used to resolve app-specific icon assets */
 export type ArrIconKey = ArrAppType;
 
@@ -25,6 +29,23 @@ export type ArrWorkflowSurface = 'instances' | 'library' | 'releases' | 'rename'
 
 /** Feature surfaces driven by sync pipeline support */
 export type ArrSyncSurface = 'quality_profiles' | 'custom_formats' | 'delay_profiles' | 'media_management';
+
+/** Ordered list of declared workflow surfaces */
+export const ARR_WORKFLOW_SURFACES: ArrWorkflowSurface[] = [
+  'instances',
+  'library',
+  'releases',
+  'rename',
+  'upgrades',
+];
+
+/** Ordered list of declared sync surfaces */
+export const ARR_SYNC_SURFACES: ArrSyncSurface[] = [
+  'quality_profiles',
+  'custom_formats',
+  'delay_profiles',
+  'media_management',
+];
 
 /** Union of all feature surfaces for generic lookups */
 export type ArrFeature = ArrWorkflowSurface | ArrSyncSurface;
@@ -126,10 +147,10 @@ export const ARR_APPS: Record<ArrAppType, ArrAppMetadata> = {
 // DERIVED CONSTANTS
 // ============================================================================
 
-export const ARR_APP_TYPES: ArrAppType[] = Object.keys(ARR_APPS) as ArrAppType[];
+export const ARR_APP_TYPES: ArrAppType[] = [...SHARED_ARR_APP_TYPES];
 
 /** Order for displaying arr target badges (all, then radarr, sonarr, lidarr) */
-export const ARR_TARGET_ORDER: ArrConditionTargetType[] = ['all', 'radarr', 'sonarr', 'lidarr'];
+export const ARR_TARGET_ORDER: ArrConditionTargetType[] = ['all', ...SHARED_ARR_APP_TYPES];
 
 export const ARR_APP_OPTIONS: Array<{ value: ArrAppType; label: string }> = ARR_APP_TYPES.map((type) => ({
   value: type,

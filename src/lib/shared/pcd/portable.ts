@@ -16,6 +16,52 @@ import type { ConditionData, OrderedItem, QualityDefinitionEntry } from './displ
 import type { PreferredProtocol } from './display.ts';
 import type { RadarrNamingRow, SonarrNamingRow, RadarrMediaSettingsRow } from './types.ts';
 
+type ReusedSonarrEntityType = 'sonarr_naming' | 'sonarr_media_settings' | 'sonarr_quality_definitions';
+
+export const LIDARR_MEDIA_MANAGEMENT_PORTABLE_ENTITIES = [
+  'lidarr_naming',
+  'lidarr_media_settings',
+  'lidarr_quality_definitions',
+] as const;
+
+export type LidarrMediaManagementPortableEntityType = (typeof LIDARR_MEDIA_MANAGEMENT_PORTABLE_ENTITIES)[number];
+
+interface LidarrMediaManagementPortableEntry {
+  reusableEntityType: ReusedSonarrEntityType;
+  requiredFields: readonly string[];
+  forbiddenFields?: readonly string[];
+}
+
+export const LIDARR_MEDIA_MANAGEMENT_PORTABLE_MATRIX: Record<
+  LidarrMediaManagementPortableEntityType,
+  LidarrMediaManagementPortableEntry
+> = {
+  lidarr_naming: {
+    reusableEntityType: 'sonarr_naming',
+    requiredFields: [
+      'name',
+      'standardEpisodeFormat',
+      'dailyEpisodeFormat',
+      'animeEpisodeFormat',
+      'seriesFolderFormat',
+      'seasonFolderFormat',
+      'replaceIllegalCharacters',
+      'colonReplacementFormat',
+      'customColonReplacementFormat',
+      'multiEpisodeStyle',
+    ],
+    forbiddenFields: ['movieFormat', 'movieFolderFormat'],
+  },
+  lidarr_media_settings: {
+    reusableEntityType: 'sonarr_media_settings',
+    requiredFields: ['name', 'propersRepacks', 'enableMediaInfo'],
+  },
+  lidarr_quality_definitions: {
+    reusableEntityType: 'sonarr_quality_definitions',
+    requiredFields: ['name', 'entries'],
+  },
+} as const;
+
 // ============================================================================
 // ENTITY TYPE ENUM
 // ============================================================================
@@ -31,6 +77,7 @@ export const ENTITY_TYPES = [
   'sonarr_media_settings',
   'radarr_quality_definitions',
   'sonarr_quality_definitions',
+  ...LIDARR_MEDIA_MANAGEMENT_PORTABLE_ENTITIES,
 ] as const;
 
 export type EntityType = (typeof ENTITY_TYPES)[number];
@@ -128,6 +175,8 @@ export interface PortableSonarrNaming {
   multiEpisodeStyle: SonarrNamingRow['multi_episode_style'];
 }
 
+export type PortableLidarrNaming = PortableSonarrNaming;
+
 // Media Settings
 
 export interface PortableMediaSettings {
@@ -136,9 +185,13 @@ export interface PortableMediaSettings {
   enableMediaInfo: boolean;
 }
 
+export type PortableLidarrMediaSettings = PortableMediaSettings;
+
 // Quality Definitions
 
 export interface PortableQualityDefinitions {
   name: string;
   entries: QualityDefinitionEntry[];
 }
+
+export type PortableLidarrQualityDefinitions = PortableQualityDefinitions;

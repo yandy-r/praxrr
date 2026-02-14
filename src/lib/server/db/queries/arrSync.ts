@@ -1,4 +1,5 @@
 import { db } from '../db.ts';
+import type { ArrType } from '$shared/pcd/types.ts';
 
 // Types
 export type SyncTrigger = 'manual' | 'on_pull' | 'on_change' | 'schedule';
@@ -84,6 +85,128 @@ interface MediaManagementRow {
   media_settings_config_name: string | null;
   trigger: string;
   cron: string | null;
+}
+
+type MediaManagementSection = 'naming' | 'qualityDefinitions' | 'mediaSettings';
+
+interface MediaManagementSectionConfig {
+  nameColumn: string;
+  databaseColumn: string;
+  label: string;
+}
+
+type MediaManagementRenameScope = {
+  instanceId?: number;
+  arrType?: ArrType;
+  databaseId?: number;
+};
+
+const MEDIA_MANAGEMENT_SECTION_CONFIG: Record<MediaManagementSection, MediaManagementSectionConfig> = {
+  naming: {
+    nameColumn: 'naming_config_name',
+    databaseColumn: 'naming_database_id',
+    label: 'naming',
+  },
+  qualityDefinitions: {
+    nameColumn: 'quality_definitions_config_name',
+    databaseColumn: 'quality_definitions_database_id',
+    label: 'qualityDefinitions',
+  },
+  mediaSettings: {
+    nameColumn: 'media_settings_config_name',
+    databaseColumn: 'media_settings_database_id',
+    label: 'mediaSettings',
+  },
+};
+
+interface ArrSyncMediaManagementMatchRow {
+  instance_id: number;
+  instance_type: string;
+  database_id: number | null;
+}
+
+function findMediaManagementSyncRows(
+  section: MediaManagementSection,
+  oldName: string,
+  scope: MediaManagementRenameScope,
+): ArrSyncMediaManagementMatchRow[] {
+  const sectionConfig = MEDIA_MANAGEMENT_SECTION_CONFIG[section];
+  const conditions: string[] = [`asm.${sectionConfig.nameColumn} = ?`];
+  const params: Array<number | string> = [oldName];
+
+  if (scope.instanceId !== undefined) {
+    conditions.push('asm.instance_id = ?');
+    params.push(scope.instanceId);
+  }
+
+  if (scope.arrType) {
+    conditions.push('ai.type = ?');
+    params.push(scope.arrType);
+  }
+
+  if (scope.databaseId !== undefined) {
+    conditions.push(`asm.${sectionConfig.databaseColumn} = ?`);
+    params.push(scope.databaseId);
+  }
+
+  const query = `
+		SELECT asm.instance_id, ai.type AS instance_type, asm.${sectionConfig.databaseColumn} AS database_id
+		FROM arr_sync_media_management asm
+		JOIN arr_instances ai ON ai.id = asm.instance_id
+		WHERE ${conditions.join(' AND ')}
+		ORDER BY asm.instance_id
+	`;
+
+  return db.query<ArrSyncMediaManagementMatchRow>(query, ...params);
+}
+
+function getDeterministicMatchOrThrow(
+  sectionConfig: MediaManagementSectionConfig,
+  oldName: string,
+  matches: ArrSyncMediaManagementMatchRow[],
+): number {
+  if (matches.length === 0) {
+    return 0;
+  }
+
+  if (matches.length > 1) {
+    const collisionRows = matches
+      .map((row) =>
+        `instance_id=${row.instance_id},arr_type=${row.instance_type},database_id=${row.database_id ?? 'null'}`
+      )
+      .sort()
+      .join(';');
+
+    throw new Error(
+      `Cannot safely update ${sectionConfig.label} sync config name '${oldName}' across multiple matches: ${collisionRows}`,
+    );
+  }
+
+  return matches[0].instance_id;
+}
+
+function updateMediaManagementSectionConfigName(
+  section: MediaManagementSection,
+  oldName: string,
+  newName: string,
+  scope: MediaManagementRenameScope = {},
+): number {
+  const sectionConfig = MEDIA_MANAGEMENT_SECTION_CONFIG[section];
+  const matches = findMediaManagementSyncRows(section, oldName, scope);
+  const instanceId = getDeterministicMatchOrThrow(sectionConfig, oldName, matches);
+
+  if (instanceId === 0) {
+    return 0;
+  }
+
+  return db.execute(
+    `UPDATE arr_sync_media_management
+		   SET ${sectionConfig.nameColumn} = ?
+		   WHERE instance_id = ? AND ${sectionConfig.nameColumn} = ?`,
+    newName,
+    instanceId,
+    oldName,
+  );
 }
 
 export const arrSyncQueries = {
@@ -280,27 +403,37 @@ export const arrSyncQueries = {
   /**
    * Update config name references when a media management config is renamed
    */
-  updateNamingConfigName(oldName: string, newName: string): number {
-    return db.execute(
-      'UPDATE arr_sync_media_management SET naming_config_name = ? WHERE naming_config_name = ?',
+  updateNamingConfigName(
+    oldName: string,
+    newName: string,
+    scope: MediaManagementRenameScope = {},
+  ): number {
+    return updateMediaManagementSectionConfigName('naming', oldName, newName, scope);
+  },
+
+  updateQualityDefinitionsConfigName(
+    oldName: string,
+    newName: string,
+    scope: MediaManagementRenameScope = {},
+  ): number {
+    return updateMediaManagementSectionConfigName(
+      'qualityDefinitions',
+      oldName,
       newName,
-      oldName
+      scope,
     );
   },
 
-  updateQualityDefinitionsConfigName(oldName: string, newName: string): number {
-    return db.execute(
-      'UPDATE arr_sync_media_management SET quality_definitions_config_name = ? WHERE quality_definitions_config_name = ?',
+  updateMediaSettingsConfigName(
+    oldName: string,
+    newName: string,
+    scope: MediaManagementRenameScope = {},
+  ): number {
+    return updateMediaManagementSectionConfigName(
+      'mediaSettings',
+      oldName,
       newName,
-      oldName
-    );
-  },
-
-  updateMediaSettingsConfigName(oldName: string, newName: string): number {
-    return db.execute(
-      'UPDATE arr_sync_media_management SET media_settings_config_name = ? WHERE media_settings_config_name = ?',
-      newName,
-      oldName
+      scope,
     );
   },
 
