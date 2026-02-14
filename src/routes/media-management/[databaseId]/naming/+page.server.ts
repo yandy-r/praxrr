@@ -1,9 +1,10 @@
 import { error } from '@sveltejs/kit';
-import type { PageServerLoad } from './$types';
+import type { ServerLoad } from '@sveltejs/kit';
 import { pcdManager } from '$pcd/index.ts';
+import type { NamingListItem } from '$shared/pcd/display.ts';
 import { list } from '$pcd/entities/mediaManagement/naming/read.ts';
 
-export const load: PageServerLoad = async ({ params }) => {
+export const load: ServerLoad = async ({ params }) => {
   const { databaseId } = params;
 
   if (!databaseId) {
@@ -20,7 +21,7 @@ export const load: PageServerLoad = async ({ params }) => {
     throw error(500, 'Database cache not available');
   }
 
-  const namingConfigs = await list(cache);
+  const namingConfigs: NamingListItem[] = await list(cache);
 
   return {
     namingConfigs,

@@ -95,9 +95,12 @@ export interface CreateSonarrNamingOptions {
   input: CreateSonarrNamingInput;
 }
 
-export async function createSonarrNaming(options: CreateSonarrNamingOptions) {
+type SonarrBackedNamingType = 'sonarr' | 'lidarr';
+
+async function createSonarrBackedNaming(options: CreateSonarrNamingOptions, namingType: SonarrBackedNamingType) {
   const { databaseId, cache, layer, input } = options;
   const db = cache.kb;
+  const normalizedType = namingType === 'sonarr' ? 'Sonarr' : 'Lidarr';
 
   // Check if name already exists
   const existing = await db
@@ -107,7 +110,7 @@ export async function createSonarrNaming(options: CreateSonarrNamingOptions) {
     .executeTakeFirst();
 
   if (existing) {
-    throw new Error(`A sonarr naming config with name "${input.name}" already exists`);
+    throw new Error(`A ${namingType} naming config with name "${input.name}" already exists`);
   }
 
   const insertQuery = db
@@ -130,7 +133,7 @@ export async function createSonarrNaming(options: CreateSonarrNamingOptions) {
   return writeOperation({
     databaseId,
     layer,
-    description: `create-sonarr-naming-${input.name}`,
+    description: `create-${namingType}-naming-${input.name}`,
     queries: [insertQuery],
     desiredState: {
       name: input.name,
@@ -150,8 +153,16 @@ export async function createSonarrNaming(options: CreateSonarrNamingOptions) {
       entity: 'sonarr_naming',
       name: input.name,
       stableKey: { key: 'sonarr_naming_name', value: input.name },
-      summary: 'Create Sonarr naming config',
-      title: `Create Sonarr naming "${input.name}"`,
+      summary: `Create ${normalizedType} naming config`,
+      title: `Create ${normalizedType} naming "${input.name}"`,
     },
   });
+}
+
+export async function createSonarrNaming(options: CreateSonarrNamingOptions) {
+  return createSonarrBackedNaming(options, 'sonarr');
+}
+
+export async function createLidarrNaming(options: CreateSonarrNamingOptions) {
+  return createSonarrBackedNaming(options, 'lidarr');
 }

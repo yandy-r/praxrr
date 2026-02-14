@@ -8,6 +8,7 @@
 	import type { NamingListItem } from '$shared/pcd/display.ts';
 	import radarrLogo from '$lib/client/assets/Radarr.svg';
 	import sonarrLogo from '$lib/client/assets/Sonarr.svg';
+	import { isArrAppType } from '$shared/arr/capabilities.ts';
 
 	export let configs: NamingListItem[];
 	export let databaseId: number;
@@ -28,11 +29,33 @@
 		loadedImages.add(name);
 		loadedImages = loadedImages;
 	}
+
+	function getConfigHref(config: NamingListItem): string {
+		if (!config.name?.trim() || !isArrAppType(config.arr_type)) {
+			return `/media-management/${databaseId}/naming`;
+		}
+
+		return `/media-management/${databaseId}/naming/${config.arr_type}/${encodeURIComponent(config.name)}`;
+	}
+
+	function getLogo(config: NamingListItem): string {
+		if (!isArrAppType(config.arr_type)) {
+			return '';
+		}
+		return logos[config.arr_type] ?? '';
+	}
+
+	function getArrTypeInitial(appType: string): string {
+		if (!appType) {
+			return '?';
+		}
+		return appType.charAt(0).toUpperCase();
+	}
 </script>
 
 <CardGrid columns={1} flush>
 	{#each configs as config}
-		<Card href="/media-management/{databaseId}/naming/{config.arr_type}/{encodeURIComponent(config.name)}" hoverable>
+		<Card href={getConfigHref(config)} hoverable>
 			<div class="flex items-center gap-4">
 				<!-- Logo + Name -->
 				<div class="flex min-w-0 flex-1 items-center gap-3">
@@ -42,14 +65,22 @@
 								class="absolute inset-0 animate-pulse rounded-lg bg-neutral-200 dark:bg-neutral-700"
 							></div>
 						{/if}
-						<img
-							src={logos[config.arr_type]}
-							alt="{config.arr_type} logo"
-							class="h-10 w-10 rounded-lg {loadedImages.has(config.name)
-								? 'opacity-100'
-								: 'opacity-0'}"
-							on:load={() => handleImageLoad(config.name)}
-						/>
+						{#if getLogo(config)}
+							<img
+								src={getLogo(config)}
+								alt="{config.arr_type} logo"
+								class="h-10 w-10 rounded-lg {loadedImages.has(config.name)
+									? 'opacity-100'
+									: 'opacity-0'}"
+								on:load={() => handleImageLoad(config.name)}
+							/>
+						{:else}
+							<div
+								class="flex h-10 w-10 items-center justify-center rounded-lg bg-neutral-100 text-xs font-semibold text-neutral-600 dark:bg-neutral-800 dark:text-neutral-200"
+							>
+								{getArrTypeInitial(config.arr_type)}
+							</div>
+						{/if}
 					</div>
 					<div class="min-w-0">
 						<h3 class="truncate text-sm font-semibold text-neutral-900 dark:text-neutral-100">

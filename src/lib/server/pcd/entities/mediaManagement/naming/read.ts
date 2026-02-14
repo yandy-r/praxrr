@@ -28,6 +28,18 @@ export async function list(cache: PCDCache): Promise<NamingListItem[]> {
     });
   }
 
+  // Lidarr reuses the Sonarr naming table contract in phase 1 of Lidarr support.
+  // Keep this as a separate list item type so handlers can dispatch by `arr_type=lidarr`
+  // without introducing dedicated Lidarr tables.
+  for (const row of sonarrRows) {
+    items.push({
+      name: row.name!,
+      arr_type: 'lidarr',
+      rename: row.rename === 1,
+      updated_at: row.updated_at,
+    });
+  }
+
   for (const row of sonarrRows) {
     items.push({
       name: row.name!,
@@ -81,4 +93,8 @@ export async function getSonarrByName(cache: PCDCache, name: string): Promise<So
     created_at: row.created_at,
     updated_at: row.updated_at,
   };
+}
+
+export async function getLidarrByName(cache: PCDCache, name: string): Promise<SonarrNamingRow | null> {
+  return getSonarrByName(cache, name);
 }

@@ -1,13 +1,15 @@
 import { error, redirect, fail } from '@sveltejs/kit';
-import type { PageServerLoad, Actions } from './$types';
+import type { Actions, ServerLoad } from '@sveltejs/kit';
 import { pcdManager } from '$pcd/index.ts';
 import { canWriteToBase } from '$pcd/index.ts';
 import type { OperationLayer } from '$pcd/index.ts';
 import type { RadarrNamingRow, SonarrNamingRow } from '$shared/pcd/display.ts';
 import { createRadarrNaming, createSonarrNaming } from '$pcd/entities/mediaManagement/naming/index.ts';
+import { createLidarrNaming } from '$pcd/entities/mediaManagement/naming/create.ts';
+import type { ArrAppType } from '$shared/pcd/types.ts';
 import { validateNamingFormat } from '$shared/pcd/namingTokens.ts';
 
-export const load: PageServerLoad = async ({ parent }) => {
+export const load: ServerLoad = async ({ parent }) => {
   const parentData = await parent();
   return {
     canWriteToBase: parentData.canWriteToBase,
@@ -33,7 +35,7 @@ export const actions: Actions = {
     }
 
     const formData = await request.formData();
-    const arrType = formData.get('arrType') as 'radarr' | 'sonarr';
+    const arrType = formData.get('arrType') as ArrAppType | null;
     const name = formData.get('name') as string;
     const layer = (formData.get('layer') as OperationLayer) || 'user';
 
@@ -41,7 +43,7 @@ export const actions: Actions = {
       return fail(400, { error: 'Name is required' });
     }
 
-    if (!arrType || (arrType !== 'radarr' && arrType !== 'sonarr')) {
+    if (!arrType || (arrType !== 'radarr' && arrType !== 'sonarr' && arrType !== 'lidarr')) {
       return fail(400, { error: 'Invalid arr type' });
     }
 
@@ -93,7 +95,7 @@ export const actions: Actions = {
       if (!result.success) {
         return fail(500, { error: result.error || 'Failed to create radarr naming config' });
       }
-    } else {
+    } else if (arrType === 'sonarr' || arrType === 'lidarr') {
       const rename = formData.get('rename') === 'true';
       const standardEpisodeFormat = formData.get('standardEpisodeFormat') as string;
       const dailyEpisodeFormat = formData.get('dailyEpisodeFormat') as string;
@@ -123,7 +125,8 @@ export const actions: Actions = {
 
       let result;
       try {
-        result = await createSonarrNaming({
+        const createFn = arrType === 'sonarr' ? createSonarrNaming : createLidarrNaming;
+        result = await createFn({
           databaseId: currentDatabaseId,
           cache,
           layer,
@@ -142,7 +145,9 @@ export const actions: Actions = {
           },
         });
       } catch (err) {
-        const message = err instanceof Error ? err.message : 'Failed to create sonarr naming config';
+        const message = err instanceof Error
+          ? err.message
+          : `Failed to create ${arrType} naming config`;
         if (message.includes('already exists')) {
           return fail(400, { error: message });
         }
@@ -150,7 +155,8 @@ export const actions: Actions = {
       }
 
       if (!result.success) {
-        return fail(500, { error: result.error || 'Failed to create sonarr naming config' });
+        const defaultError = `Failed to create ${arrType} naming config`;
+        return fail(500, { error: result.error || defaultError });
       }
     }
 
