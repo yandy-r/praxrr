@@ -60,6 +60,10 @@ playwright-report/
 src/tests/e2e/test-results/
 src/tests/e2e/playwright-report/
 
+# Release / build artifacts
+artifacts/
+coverage/
+
 # Research repos
 research/
 tasks/todo.md
