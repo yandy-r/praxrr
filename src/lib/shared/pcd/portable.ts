@@ -40,6 +40,7 @@ export const LIDARR_MEDIA_MANAGEMENT_PORTABLE_MATRIX: Record<
     reusableEntityType: 'sonarr_naming',
     requiredFields: [
       'name',
+      'rename',
       'standardEpisodeFormat',
       'dailyEpisodeFormat',
       'animeEpisodeFormat',
@@ -61,6 +62,20 @@ export const LIDARR_MEDIA_MANAGEMENT_PORTABLE_MATRIX: Record<
     requiredFields: ['name', 'entries'],
   },
 } as const;
+
+export function isLidarrMediaManagementPortableEntityType(
+  entityType: string
+): entityType is LidarrMediaManagementPortableEntityType {
+  return (LIDARR_MEDIA_MANAGEMENT_PORTABLE_ENTITIES as readonly string[]).includes(entityType);
+}
+
+export function getLidarrMediaManagementPortableEntry(entityType: EntityType) {
+  if (!isLidarrMediaManagementPortableEntityType(entityType)) {
+    return null;
+  }
+
+  return LIDARR_MEDIA_MANAGEMENT_PORTABLE_MATRIX[entityType];
+}
 
 // ============================================================================
 // ENTITY TYPE ENUM

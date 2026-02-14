@@ -669,15 +669,21 @@ export interface QualityApiMappingsRow {
 // COMMON TYPES
 // ============================================================================
 
-/** Which arr application the data applies to */
-export type ArrType = 'radarr' | 'sonarr' | 'lidarr' | 'all';
-
 /** Concrete Arr application types (no meta type) */
 export const ARR_APP_TYPES = ['radarr', 'sonarr', 'lidarr'] as const;
 export type ArrAppType = (typeof ARR_APP_TYPES)[number];
 
 /** Runtime enum source for ArrType validation (includes condition-target wildcard) */
 export const ARR_TYPES = [...ARR_APP_TYPES, 'all'] as const;
+
+/** Which arr application the data applies to */
+export type ArrType = (typeof ARR_TYPES)[number];
+
+// Non-regression acceptance checks: keep legacy Radarr/Sonarr targets valid.
+const ARR_APP_TYPE_NON_REGRESSION_CHECK = ['radarr', 'sonarr'] as const satisfies readonly ArrAppType[];
+const ARR_TYPE_NON_REGRESSION_CHECK = ['radarr', 'sonarr', 'all'] as const satisfies readonly ArrType[];
+void ARR_APP_TYPE_NON_REGRESSION_CHECK;
+void ARR_TYPE_NON_REGRESSION_CHECK;
 
 /** Runtime guard for untrusted arr type values */
 export function isArrType(value: string): value is ArrType {

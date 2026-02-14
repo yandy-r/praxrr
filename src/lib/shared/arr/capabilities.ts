@@ -31,21 +31,31 @@ export type ArrWorkflowSurface = 'instances' | 'library' | 'releases' | 'rename'
 export type ArrSyncSurface = 'quality_profiles' | 'custom_formats' | 'delay_profiles' | 'media_management';
 
 /** Ordered list of declared workflow surfaces */
-export const ARR_WORKFLOW_SURFACES: ArrWorkflowSurface[] = [
+export const ARR_WORKFLOW_SURFACES = [
   'instances',
   'library',
   'releases',
   'rename',
   'upgrades',
-];
+] as const satisfies readonly ArrWorkflowSurface[];
 
 /** Ordered list of declared sync surfaces */
-export const ARR_SYNC_SURFACES: ArrSyncSurface[] = [
+export const ARR_SYNC_SURFACES = [
   'quality_profiles',
   'custom_formats',
   'delay_profiles',
   'media_management',
-];
+] as const satisfies readonly ArrSyncSurface[];
+
+// Non-regression acceptance checks: capability surface keys stay stable.
+const ARR_CAPABILITY_KEY_NON_REGRESSION_CHECK = {
+  workflows: ARR_WORKFLOW_SURFACES,
+  sync: ARR_SYNC_SURFACES,
+} as const satisfies {
+  workflows: readonly ['instances', 'library', 'releases', 'rename', 'upgrades'];
+  sync: readonly ['quality_profiles', 'custom_formats', 'delay_profiles', 'media_management'];
+};
+void ARR_CAPABILITY_KEY_NON_REGRESSION_CHECK;
 
 /** Union of all feature surfaces for generic lookups */
 export type ArrFeature = ArrWorkflowSurface | ArrSyncSurface;
@@ -73,84 +83,128 @@ export interface ArrConditionTargetOption {
   checkboxColor: ArrConditionTargetCheckboxColor;
 }
 
+const RADARR_CAPABILITIES = {
+  workflows: {
+    instances: true,
+    library: true,
+    releases: true,
+    rename: true,
+    upgrades: true,
+  },
+  sync: {
+    quality_profiles: true,
+    custom_formats: true,
+    delay_profiles: true,
+    media_management: true,
+  },
+} as const satisfies ArrCapabilities;
+
+const SONARR_CAPABILITIES = {
+  workflows: {
+    instances: true,
+    library: true,
+    releases: true,
+    rename: true,
+    upgrades: false,
+  },
+  sync: {
+    quality_profiles: true,
+    custom_formats: true,
+    delay_profiles: true,
+    media_management: true,
+  },
+} as const satisfies ArrCapabilities;
+
+const LIDARR_CAPABILITIES = {
+  workflows: {
+    instances: true,
+    library: true,
+    releases: true,
+    rename: false,
+    upgrades: false,
+  },
+  sync: {
+    quality_profiles: true,
+    custom_formats: true,
+    delay_profiles: true,
+    media_management: true,
+  },
+} as const satisfies ArrCapabilities;
+
 // ============================================================================
 // APP REGISTRY
 // ============================================================================
 
-export const ARR_APPS: Record<ArrAppType, ArrAppMetadata> = {
+export const ARR_APPS = {
   radarr: {
     type: 'radarr',
     label: 'Radarr',
     iconKey: 'radarr',
     conditionTargetCheckboxColor: 'var(--arr-radarr-color)',
-    capabilities: {
-      workflows: {
-        instances: true,
-        library: true,
-        releases: true,
-        rename: true,
-        upgrades: true,
-      },
-      sync: {
-        quality_profiles: true,
-        custom_formats: true,
-        delay_profiles: true,
-        media_management: true,
-      },
-    },
+    capabilities: RADARR_CAPABILITIES,
   },
   sonarr: {
     type: 'sonarr',
     label: 'Sonarr',
     iconKey: 'sonarr',
     conditionTargetCheckboxColor: 'var(--arr-sonarr-color)',
-    capabilities: {
-      workflows: {
-        instances: true,
-        library: true,
-        releases: true,
-        rename: true,
-        upgrades: false,
-      },
-      sync: {
-        quality_profiles: true,
-        custom_formats: true,
-        delay_profiles: true,
-        media_management: true,
-      },
-    },
+    capabilities: SONARR_CAPABILITIES,
   },
   lidarr: {
     type: 'lidarr',
     label: 'Lidarr',
     iconKey: 'lidarr',
     conditionTargetCheckboxColor: 'var(--arr-lidarr-color)',
-    capabilities: {
-      workflows: {
-        instances: true,
-        library: true,
-        releases: true,
-        rename: false,
-        upgrades: false,
-      },
-      sync: {
-        quality_profiles: true,
-        custom_formats: true,
-        delay_profiles: true,
-        media_management: true,
-      },
-    },
+    capabilities: LIDARR_CAPABILITIES,
   },
+} as const satisfies Record<ArrAppType, ArrAppMetadata>;
+
+// Non-regression acceptance checks: Radarr/Sonarr capability behavior is unchanged.
+const ARR_CAPABILITY_NON_REGRESSION_CHECK = {
+  radarr: ARR_APPS.radarr.capabilities,
+  sonarr: ARR_APPS.sonarr.capabilities,
+} as const satisfies {
+  radarr: {
+    workflows: {
+      instances: true;
+      library: true;
+      releases: true;
+      rename: true;
+      upgrades: true;
+    };
+    sync: {
+      quality_profiles: true;
+      custom_formats: true;
+      delay_profiles: true;
+      media_management: true;
+    };
+  };
+  sonarr: {
+    workflows: {
+      instances: true;
+      library: true;
+      releases: true;
+      rename: true;
+      upgrades: false;
+    };
+    sync: {
+      quality_profiles: true;
+      custom_formats: true;
+      delay_profiles: true;
+      media_management: true;
+    };
+  };
 };
+void ARR_CAPABILITY_NON_REGRESSION_CHECK;
 
 // ============================================================================
 // DERIVED CONSTANTS
 // ============================================================================
 
-export const ARR_APP_TYPES: ArrAppType[] = [...SHARED_ARR_APP_TYPES];
+export const ARR_APP_TYPES = SHARED_ARR_APP_TYPES;
 
 /** Order for displaying arr target badges (all, then radarr, sonarr, lidarr) */
-export const ARR_TARGET_ORDER: ArrConditionTargetType[] = ['all', ...SHARED_ARR_APP_TYPES];
+export const ARR_TARGET_ORDER = ['all', ...SHARED_ARR_APP_TYPES] as const satisfies readonly ArrConditionTargetType[];
 
 export const ARR_APP_OPTIONS: Array<{ value: ArrAppType; label: string }> = ARR_APP_TYPES.map((type) => ({
   value: type,

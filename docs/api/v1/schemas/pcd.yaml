@@ -19,6 +19,11 @@ EntityType:
     is expressed in per-row `arr_type` columns (e.g. quality_profile_custom_formats,
     custom_format_conditions, quality_api_mappings) and in the
     PortableCustomFormatScore.arrType enum, not as a distinct entity family.
+
+    Non-regression contract: existing Radarr/Sonarr media-management entity
+    enum members remain unchanged in v1 (`radarr_naming`, `sonarr_naming`,
+    `radarr_media_settings`, `sonarr_media_settings`,
+    `radarr_quality_definitions`, `sonarr_quality_definitions`).
   enum:
     - delay_profile
     - regular_expression
@@ -236,6 +241,10 @@ PortableCustomFormatScore:
         Lidarr-only sync behavior (e.g. naming, music-specific media fields)
         remains capability-gated in the sync layer; this enum only governs
         score applicability, not full feature support.
+
+        Non-regression contract: existing `radarr`, `sonarr`, and `all`
+        enum semantics are unchanged; `lidarr` is an explicit additional arr
+        target value and does not introduce fallback alias behavior.
     score:
       type: integer
 

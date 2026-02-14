@@ -1,11 +1,17 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from '@sveltejs/kit';
 import { pcdManager } from '$pcd/index.ts';
-import { ENTITY_TYPES, type EntityType } from '$shared/pcd/portable.ts';
+import {
+  ENTITY_TYPES,
+  getLidarrMediaManagementPortableEntry,
+  type EntityType,
+  type LidarrMediaManagementPortableEntityType,
+} from '$shared/pcd/portable.ts';
 import type { PCDCache } from '$pcd/index.ts';
 import * as serialize from '$pcd/entities/serialize.ts';
 
 const VALID_ENTITY_TYPES: ReadonlySet<string> = new Set(ENTITY_TYPES);
+type ReusableEntityType = Exclude<EntityType, LidarrMediaManagementPortableEntityType>;
 
 export const GET: RequestHandler = async ({ url }) => {
   const databaseIdParam = url.searchParams.get('databaseId');
@@ -25,13 +31,15 @@ export const GET: RequestHandler = async ({ url }) => {
     return json({ error: `Invalid entityType: ${entityType}` }, { status: 400 });
   }
 
+  const resolvedEntityType = resolveEntityType(entityType as EntityType);
+
   const cache = pcdManager.getCache(databaseId);
   if (!cache) {
     return json({ error: 'Database cache not available' }, { status: 500 });
   }
 
   try {
-    const data = await serializeEntity(cache, entityType as EntityType, name);
+    const data = await serializeEntity(cache, resolvedEntityType, name);
     return json({ entityType, data });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Export failed';
@@ -42,7 +50,12 @@ export const GET: RequestHandler = async ({ url }) => {
   }
 };
 
-async function serializeEntity(cache: PCDCache, entityType: EntityType, name: string) {
+function resolveEntityType(entityType: EntityType): ReusableEntityType {
+  const matrixEntry = getLidarrMediaManagementPortableEntry(entityType);
+  return (matrixEntry?.reusableEntityType ?? entityType) as ReusableEntityType;
+}
+
+async function serializeEntity(cache: PCDCache, entityType: ReusableEntityType, name: string) {
   switch (entityType) {
     case 'delay_profile':
       return serialize.serializeDelayProfile(cache, name);
@@ -56,19 +69,13 @@ async function serializeEntity(cache: PCDCache, entityType: EntityType, name: st
       return serialize.serializeRadarrNaming(cache, name);
     case 'sonarr_naming':
       return serialize.serializeSonarrNaming(cache, name);
-    case 'lidarr_naming':
-      return serialize.serializeSonarrNaming(cache, name);
     case 'radarr_media_settings':
       return serialize.serializeRadarrMediaSettings(cache, name);
     case 'sonarr_media_settings':
       return serialize.serializeSonarrMediaSettings(cache, name);
-    case 'lidarr_media_settings':
-      return serialize.serializeSonarrMediaSettings(cache, name);
     case 'radarr_quality_definitions':
       return serialize.serializeRadarrQualityDefinitions(cache, name);
     case 'sonarr_quality_definitions':
-      return serialize.serializeSonarrQualityDefinitions(cache, name);
-    case 'lidarr_quality_definitions':
       return serialize.serializeSonarrQualityDefinitions(cache, name);
   }
 }
