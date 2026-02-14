@@ -8,6 +8,7 @@
 	import { Copy, Download } from 'lucide-svelte';
 	import type { QualityDefinitionListItem } from '$shared/pcd/display.ts';
 	import { ARR_APP_TYPES, type ArrIconKey, getArrAppMetadata, isArrAppType } from '$shared/arr/capabilities.ts';
+	import { getMediaManagementDisplayName } from '$shared/arr/displayName.ts';
 	import radarrLogo from '$lib/client/assets/Radarr.svg';
 	import sonarrLogo from '$lib/client/assets/Sonarr.svg';
 	import lidarrLogo from '$lib/client/assets/Lidarr.png';
@@ -108,7 +109,7 @@
 					</div>
 					<div class="min-w-0">
 						<h3 class="truncate text-sm font-semibold text-neutral-900 dark:text-neutral-100">
-							{config.name}
+							{getMediaManagementDisplayName(config.name, config.arr_type)}
 						</h3>
 						<div class="mt-1 flex flex-wrap items-center gap-1">
 							<Badge variant={isMappedType ? config.arr_type : 'warning'} size="sm">

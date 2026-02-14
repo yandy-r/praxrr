@@ -10,6 +10,7 @@
 	import sonarrLogo from '$lib/client/assets/Sonarr.svg';
 	import lidarrLogo from '$lib/client/assets/Lidarr.png';
 	import { isArrAppType } from '$shared/arr/capabilities.ts';
+	import { getMediaManagementDisplayName } from '$shared/arr/displayName.ts';
 
 	export let configs: NamingListItem[];
 	export let databaseId: number;
@@ -86,7 +87,7 @@
 					</div>
 					<div class="min-w-0">
 						<h3 class="truncate text-sm font-semibold text-neutral-900 dark:text-neutral-100">
-							{config.name}
+							{getMediaManagementDisplayName(config.name, config.arr_type)}
 						</h3>
 						<div class="mt-1">
 							{#if config.rename}

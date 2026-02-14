@@ -10,6 +10,7 @@
 	import sonarrLogo from '$lib/client/assets/Sonarr.svg';
 	import lidarrLogo from '$lib/client/assets/Lidarr.png';
 	import { isArrAppType } from '$shared/arr/capabilities.ts';
+	import { getMediaManagementDisplayName } from '$shared/arr/displayName.ts';
 
 	export let configs: NamingListItem[];
 	export let databaseId: number;
@@ -72,7 +73,7 @@
 <Table {columns} data={configs} rowHref={getRowHref} hoverable={true}>
 	<svelte:fragment slot="cell" let:row let:column>
 		{#if column.key === 'name'}
-			<span class="font-medium">{row.name}</span>
+			<span class="font-medium">{getMediaManagementDisplayName(row.name, row.arr_type)}</span>
 		{:else if column.key === 'arr_type'}
 			<div class="flex items-center gap-2">
 				{#if getLogo(row)}

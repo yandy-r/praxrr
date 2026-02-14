@@ -7,6 +7,7 @@
 	import { Tag, Copy, Download } from 'lucide-svelte';
 	import type { QualityDefinitionListItem } from '$shared/pcd/display.ts';
 	import { ARR_APP_TYPES, type ArrIconKey, getArrAppMetadata, isArrAppType } from '$shared/arr/capabilities.ts';
+	import { getMediaManagementDisplayName } from '$shared/arr/displayName.ts';
 	import radarrLogo from '$lib/client/assets/Radarr.svg';
 	import sonarrLogo from '$lib/client/assets/Sonarr.svg';
 	import lidarrLogo from '$lib/client/assets/Lidarr.png';
@@ -90,7 +91,7 @@
 <Table {columns} data={configs} rowHref={getRowHref} hoverable={true}>
 	<svelte:fragment slot="cell" let:row let:column>
 		{#if column.key === 'name'}
-			<span class="font-medium">{row.name}</span>
+			<span class="font-medium">{getMediaManagementDisplayName(row.name, row.arr_type)}</span>
 		{:else if column.key === 'arr_type'}
 			{@const appLabel = getAppLabel(row.arr_type)}
 			{@const logoPath = getLogoPath(row.arr_type)}
