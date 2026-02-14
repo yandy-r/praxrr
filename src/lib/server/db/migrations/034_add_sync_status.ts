@@ -11,10 +11,10 @@ import type { Migration } from '../migrations.ts';
  * - failed: Last sync failed (stored for visibility)
  */
 export const migration: Migration = {
-	version: 34,
-	name: 'Add sync status columns',
+  version: 34,
+  name: 'Add sync status columns',
 
-	up: `
+  up: `
 		-- Add sync_status to quality profiles config
 		ALTER TABLE arr_sync_quality_profiles_config
 			ADD COLUMN sync_status TEXT NOT NULL DEFAULT 'idle';
@@ -56,8 +56,8 @@ export const migration: Migration = {
 			SET sync_status = CASE WHEN should_sync = 1 THEN 'pending' ELSE 'idle' END;
 	`,
 
-	down: `
+  down: `
 		-- SQLite doesn't support DROP COLUMN easily
 		-- These columns will remain but be unused if rolled back
-	`
+	`,
 };

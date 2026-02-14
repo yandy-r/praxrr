@@ -7,10 +7,10 @@ import type { Migration } from '../migrations.ts';
  */
 
 export const migration: Migration = {
-	version: 43,
-	name: 'Add git_user_name and git_user_email to database_instances',
+  version: 43,
+  name: 'Add git_user_name and git_user_email to database_instances',
 
-	up: `
+  up: `
 		ALTER TABLE database_instances
 		ADD COLUMN git_user_name TEXT;
 
@@ -18,7 +18,7 @@ export const migration: Migration = {
 		ADD COLUMN git_user_email TEXT;
 	`,
 
-	down: `
+  down: `
 		-- SQLite doesn't support DROP COLUMN easily, so we recreate the table
 		CREATE TABLE database_instances_backup (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -48,5 +48,5 @@ export const migration: Migration = {
 		ALTER TABLE database_instances_backup RENAME TO database_instances;
 
 		CREATE INDEX idx_database_instances_uuid ON database_instances(uuid);
-	`
+	`,
 };

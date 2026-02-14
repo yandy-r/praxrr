@@ -12,19 +12,14 @@ import { TEST_REPO_URL, TEST_PAT, TEST_GIT_NAME, TEST_GIT_EMAIL } from '../env';
 import { linkPcd } from '../helpers/linkPcd';
 import { unlinkPcdByName } from '../helpers/unlinkPcd';
 import { pullChanges, exportAndPush } from '../helpers/sync';
-import {
-  goToConflicts,
-  expectConflict,
-  overrideConflict,
-  alignConflict
-} from '../helpers/conflicts';
+import { goToConflicts, expectConflict, overrideConflict, alignConflict } from '../helpers/conflicts';
 import {
   goToCustomFormatConditions,
   updateConditionNameByName,
   getConditionRequiredByName,
   setConditionRequiredByName,
   hasConditionByName,
-  saveConditionChanges
+  saveConditionChanges,
 } from '../helpers/entity';
 import { getHead, resetToCommit } from '../helpers/reset';
 
@@ -50,7 +45,7 @@ test.describe('1.17 CF condition rename conflict', () => {
       repoUrl: TEST_REPO_URL,
       pat: TEST_PAT,
       gitName: TEST_GIT_NAME,
-      gitEmail: TEST_GIT_EMAIL
+      gitEmail: TEST_GIT_EMAIL,
     });
 
     devHead = getHead(devId);
@@ -64,7 +59,7 @@ test.describe('1.17 CF condition rename conflict', () => {
       syncStrategy: 'Manual (no auto-sync)',
       autoPull: false,
       localOpsEnabled: true,
-      conflictStrategy: 'Ask every time'
+      conflictStrategy: 'Ask every time',
     });
 
     await page.close();
@@ -111,9 +106,7 @@ test.describe('1.17 CF condition rename conflict', () => {
     await goToCustomFormatConditions(page, localId, TEST_CF_NAME);
     expect(await hasConditionByName(page, RENAMED_CONDITION)).toBe(true);
     expect(await hasConditionByName(page, CONDITION_NAME)).toBe(false);
-    expect(await getConditionRequiredByName(page, RENAMED_CONDITION)).toBe(
-      initialRequired
-    );
+    expect(await getConditionRequiredByName(page, RENAMED_CONDITION)).toBe(initialRequired);
   });
 
   test('b) align — original condition, upstream required', async ({ page }) => {
@@ -142,8 +135,6 @@ test.describe('1.17 CF condition rename conflict', () => {
     await goToCustomFormatConditions(page, localId, TEST_CF_NAME);
     expect(await hasConditionByName(page, CONDITION_NAME)).toBe(true);
     expect(await hasConditionByName(page, RENAMED_CONDITION)).toBe(false);
-    expect(await getConditionRequiredByName(page, CONDITION_NAME)).toBe(
-      !initialRequired
-    );
+    expect(await getConditionRequiredByName(page, CONDITION_NAME)).toBe(!initialRequired);
   });
 });

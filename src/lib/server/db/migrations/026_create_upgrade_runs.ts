@@ -26,10 +26,10 @@ import type { Migration } from '../migrations.ts';
  */
 
 export const migration: Migration = {
-	version: 26,
-	name: 'Create upgrade_runs table',
+  version: 26,
+  name: 'Create upgrade_runs table',
 
-	up: `
+  up: `
 		CREATE TABLE upgrade_runs (
 			id TEXT PRIMARY KEY,
 
@@ -85,10 +85,10 @@ export const migration: Migration = {
 		CREATE INDEX idx_upgrade_runs_status ON upgrade_runs(status);
 	`,
 
-	down: `
+  down: `
 		DROP INDEX IF EXISTS idx_upgrade_runs_status;
 		DROP INDEX IF EXISTS idx_upgrade_runs_started_at;
 		DROP INDEX IF EXISTS idx_upgrade_runs_instance;
 		DROP TABLE IF EXISTS upgrade_runs;
-	`
+	`,
 };

@@ -7,10 +7,10 @@ import type { Migration } from '../migrations.ts';
  */
 
 export const migration: Migration = {
-	version: 28,
-	name: 'Simplify delay profile sync to single profile',
+  version: 28,
+  name: 'Simplify delay profile sync to single profile',
 
-	up: `
+  up: `
 		-- Drop the multi-select table
 		DROP INDEX IF EXISTS idx_arr_sync_delay_profiles_instance;
 		DROP TABLE IF EXISTS arr_sync_delay_profiles;
@@ -20,7 +20,7 @@ export const migration: Migration = {
 		ALTER TABLE arr_sync_delay_profiles_config ADD COLUMN profile_id INTEGER;
 	`,
 
-	down: `
+  down: `
 		-- Recreate multi-select table
 		CREATE TABLE arr_sync_delay_profiles (
 			instance_id INTEGER NOT NULL,
@@ -32,5 +32,5 @@ export const migration: Migration = {
 		CREATE INDEX idx_arr_sync_delay_profiles_instance ON arr_sync_delay_profiles(instance_id);
 
 		-- Note: Cannot easily remove columns in SQLite, leaving them
-	`
+	`,
 };

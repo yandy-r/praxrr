@@ -14,10 +14,10 @@ import type { Migration } from '../migrations.ts';
  */
 
 export const migration: Migration = {
-	version: 14,
-	name: 'Create ai_settings table',
+  version: 14,
+  name: 'Create ai_settings table',
 
-	up: `
+  up: `
 		CREATE TABLE ai_settings (
 			id INTEGER PRIMARY KEY CHECK (id = 1),
 
@@ -36,7 +36,7 @@ export const migration: Migration = {
 		INSERT INTO ai_settings (id) VALUES (1);
 	`,
 
-	down: `
+  down: `
 		DROP TABLE IF EXISTS ai_settings;
-	`
+	`,
 };

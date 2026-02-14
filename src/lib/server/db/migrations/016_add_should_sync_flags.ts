@@ -10,18 +10,18 @@ import type { Migration } from '../migrations.ts';
  */
 
 export const migration: Migration = {
-	version: 16,
-	name: 'Add should_sync flags',
+  version: 16,
+  name: 'Add should_sync flags',
 
-	up: `
+  up: `
 		ALTER TABLE arr_sync_quality_profiles_config ADD COLUMN should_sync INTEGER NOT NULL DEFAULT 0;
 		ALTER TABLE arr_sync_delay_profiles_config ADD COLUMN should_sync INTEGER NOT NULL DEFAULT 0;
 		ALTER TABLE arr_sync_media_management ADD COLUMN should_sync INTEGER NOT NULL DEFAULT 0;
 	`,
 
-	down: `
+  down: `
 		ALTER TABLE arr_sync_quality_profiles_config DROP COLUMN should_sync;
 		ALTER TABLE arr_sync_delay_profiles_config DROP COLUMN should_sync;
 		ALTER TABLE arr_sync_media_management DROP COLUMN should_sync;
-	`
+	`,
 };

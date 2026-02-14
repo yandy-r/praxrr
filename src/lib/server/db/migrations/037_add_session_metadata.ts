@@ -13,10 +13,10 @@ import type { Migration } from '../migrations.ts';
  */
 
 export const migration: Migration = {
-	version: 37,
-	name: 'Add session metadata',
+  version: 37,
+  name: 'Add session metadata',
 
-	up: `
+  up: `
 		ALTER TABLE sessions ADD COLUMN ip_address TEXT;
 		ALTER TABLE sessions ADD COLUMN user_agent TEXT;
 		ALTER TABLE sessions ADD COLUMN browser TEXT;
@@ -25,7 +25,7 @@ export const migration: Migration = {
 		ALTER TABLE sessions ADD COLUMN last_active_at DATETIME;
 	`,
 
-	down: `
+  down: `
 		-- SQLite doesn't support DROP COLUMN directly, so we recreate the table
 		CREATE TABLE sessions_new (
 			id TEXT PRIMARY KEY,
@@ -43,5 +43,5 @@ export const migration: Migration = {
 
 		CREATE INDEX idx_sessions_user_id ON sessions(user_id);
 		CREATE INDEX idx_sessions_expires_at ON sessions(expires_at);
-	`
+	`,
 };

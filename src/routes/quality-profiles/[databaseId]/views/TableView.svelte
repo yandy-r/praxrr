@@ -4,6 +4,7 @@
 	import Button from '$ui/button/Button.svelte';
 	import type { Column } from '$ui/table/types';
 	import type { QualityProfileTableRow } from '$shared/pcd/display.ts';
+	import { ARR_APP_TYPES, getArrAppMetadata } from '$shared/arr/capabilities.ts';
 	import { Tag, FileText, Layers, BookOpenText, Gauge, Earth, Copy, Download } from 'lucide-svelte';
 	import { page } from '$app/stores';
 
@@ -96,15 +97,22 @@
 			headerIcon: BookOpenText,
 			align: 'left',
 			width: 'w-48',
-			cell: (row: QualityProfileTableRow) => ({
-				html: `
-					<div class="text-xs space-y-1">
-						<div class="flex items-center gap-1.5">All: <span class="${labelSecondary}">${row.custom_formats.all}</span></div>
-						<div class="flex items-center gap-1.5">Radarr: <span class="${labelSecondary}">${row.custom_formats.radarr}</span></div>
-						<div class="flex items-center gap-1.5">Sonarr: <span class="${labelSecondary}">${row.custom_formats.sonarr}</span></div>
-					</div>
-				`
-			})
+			cell: (row: QualityProfileTableRow) => {
+				const appRows = ARR_APP_TYPES.map((arrType) => {
+					const label = getArrAppMetadata(arrType).label;
+					const count = row.custom_formats[arrType] ?? 0;
+					return `<div class="flex items-center gap-1.5">${label}: <span class="${labelSecondary}">${count}</span></div>`;
+				}).join('');
+
+				return {
+					html: `
+						<div class="text-xs space-y-1">
+							<div class="flex items-center gap-1.5">All: <span class="${labelSecondary}">${row.custom_formats.all}</span></div>
+							${appRows}
+						</div>
+					`
+				};
+			}
 		},
 		{
 			key: 'scores',

@@ -3,154 +3,158 @@ import type { PageServerLoad, Actions } from './$types';
 import { pcdManager } from '$pcd/index.ts';
 import { canWriteToBase } from '$pcd/index.ts';
 import type { OperationLayer } from '$pcd/index.ts';
-import { getSonarrByName, updateSonarrMediaSettings, removeSonarrMediaSettings } from '$pcd/entities/mediaManagement/media-settings/index.ts';
+import {
+  getSonarrByName,
+  updateSonarrMediaSettings,
+  removeSonarrMediaSettings,
+} from '$pcd/entities/mediaManagement/media-settings/index.ts';
 import { arrSyncQueries } from '$db/queries/arrSync.ts';
 import type { PropersRepacks } from '$shared/pcd/mediaManagement.ts';
 
 export const load: PageServerLoad = async ({ params, parent }) => {
-	const { databaseId, name } = params;
+  const { databaseId, name } = params;
 
-	if (!databaseId || !name) {
-		throw error(400, 'Missing parameters');
-	}
+  if (!databaseId || !name) {
+    throw error(400, 'Missing parameters');
+  }
 
-	const currentDatabaseId = parseInt(databaseId, 10);
-	if (isNaN(currentDatabaseId)) {
-		throw error(400, 'Invalid database ID');
-	}
+  const currentDatabaseId = parseInt(databaseId, 10);
+  if (isNaN(currentDatabaseId)) {
+    throw error(400, 'Invalid database ID');
+  }
 
-	const cache = pcdManager.getCache(currentDatabaseId);
-	if (!cache) {
-		throw error(500, 'Database cache not available');
-	}
+  const cache = pcdManager.getCache(currentDatabaseId);
+  if (!cache) {
+    throw error(500, 'Database cache not available');
+  }
 
-	const decodedName = decodeURIComponent(name);
-	const mediaSettingsConfig = await getSonarrByName(cache, decodedName);
+  const decodedName = decodeURIComponent(name);
+  const mediaSettingsConfig = await getSonarrByName(cache, decodedName);
 
-	if (!mediaSettingsConfig) {
-		throw error(404, 'Media settings config not found');
-	}
+  if (!mediaSettingsConfig) {
+    throw error(404, 'Media settings config not found');
+  }
 
-	const parentData = await parent();
+  const parentData = await parent();
 
-	return {
-		mediaSettingsConfig,
-		canWriteToBase: parentData.canWriteToBase
-	};
+  return {
+    mediaSettingsConfig,
+    canWriteToBase: parentData.canWriteToBase,
+  };
 };
 
 export const actions: Actions = {
-	update: async ({ request, params }) => {
-		const { databaseId, name } = params;
+  update: async ({ request, params }) => {
+    const { databaseId, name } = params;
 
-		if (!databaseId || !name) {
-			return fail(400, { error: 'Missing parameters' });
-		}
+    if (!databaseId || !name) {
+      return fail(400, { error: 'Missing parameters' });
+    }
 
-		const currentDatabaseId = parseInt(databaseId, 10);
-		if (isNaN(currentDatabaseId)) {
-			return fail(400, { error: 'Invalid database ID' });
-		}
+    const currentDatabaseId = parseInt(databaseId, 10);
+    if (isNaN(currentDatabaseId)) {
+      return fail(400, { error: 'Invalid database ID' });
+    }
 
-		const cache = pcdManager.getCache(currentDatabaseId);
-		if (!cache) {
-			return fail(500, { error: 'Database cache not available' });
-		}
+    const cache = pcdManager.getCache(currentDatabaseId);
+    if (!cache) {
+      return fail(500, { error: 'Database cache not available' });
+    }
 
-		const decodedName = decodeURIComponent(name);
-		const current = await getSonarrByName(cache, decodedName);
-		if (!current) {
-			return fail(404, { error: 'Media settings config not found' });
-		}
+    const decodedName = decodeURIComponent(name);
+    const current = await getSonarrByName(cache, decodedName);
+    if (!current) {
+      return fail(404, { error: 'Media settings config not found' });
+    }
 
-		const formData = await request.formData();
-		const newName = formData.get('name') as string;
-		const layer = (formData.get('layer') as OperationLayer) || 'user';
+    const formData = await request.formData();
+    const newName = formData.get('name') as string;
+    const layer = (formData.get('layer') as OperationLayer) || 'user';
 
-		if (!newName?.trim()) {
-			return fail(400, { error: 'Name is required' });
-		}
+    if (!newName?.trim()) {
+      return fail(400, { error: 'Name is required' });
+    }
 
-		if (layer === 'base' && !canWriteToBase(currentDatabaseId)) {
-			return fail(403, { error: 'Cannot write to base layer without personal access token' });
-		}
+    if (layer === 'base' && !canWriteToBase(currentDatabaseId)) {
+      return fail(403, { error: 'Cannot write to base layer without personal access token' });
+    }
 
-		const propersRepacks = formData.get('propersRepacks') as PropersRepacks;
-		const enableMediaInfo = formData.get('enableMediaInfo') === 'true';
+    const propersRepacks = formData.get('propersRepacks') as PropersRepacks;
+    const enableMediaInfo = formData.get('enableMediaInfo') === 'true';
 
-		let result;
-		try {
-			result = await updateSonarrMediaSettings({
-				databaseId: currentDatabaseId,
-				cache,
-				layer,
-				current,
-				input: {
-					name: newName.trim(),
-					propersRepacks: propersRepacks || 'doNotPrefer',
-					enableMediaInfo
-				}
-			});
-		} catch (err) {
-			const message = err instanceof Error ? err.message : 'Failed to update media settings config';
-			if (message.includes('already exists')) {
-				return fail(400, { error: message });
-			}
-			return fail(500, { error: message });
-		}
+    let result;
+    try {
+      result = await updateSonarrMediaSettings({
+        databaseId: currentDatabaseId,
+        cache,
+        layer,
+        current,
+        input: {
+          name: newName.trim(),
+          propersRepacks: propersRepacks || 'doNotPrefer',
+          enableMediaInfo,
+        },
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to update media settings config';
+      if (message.includes('already exists')) {
+        return fail(400, { error: message });
+      }
+      return fail(500, { error: message });
+    }
 
-		if (!result.success) {
-			return fail(500, { error: result.error || 'Failed to update media settings config' });
-		}
+    if (!result.success) {
+      return fail(500, { error: result.error || 'Failed to update media settings config' });
+    }
 
-		if (newName.trim() !== decodedName) {
-			arrSyncQueries.updateMediaSettingsConfigName(decodedName, newName.trim());
-		}
+    if (newName.trim() !== decodedName) {
+      arrSyncQueries.updateMediaSettingsConfigName(decodedName, newName.trim());
+    }
 
-		throw redirect(303, `/media-management/${databaseId}/media-settings`);
-	},
+    throw redirect(303, `/media-management/${databaseId}/media-settings`);
+  },
 
-	delete: async ({ request, params }) => {
-		const { databaseId, name } = params;
+  delete: async ({ request, params }) => {
+    const { databaseId, name } = params;
 
-		if (!databaseId || !name) {
-			return fail(400, { error: 'Missing parameters' });
-		}
+    if (!databaseId || !name) {
+      return fail(400, { error: 'Missing parameters' });
+    }
 
-		const currentDatabaseId = parseInt(databaseId, 10);
-		if (isNaN(currentDatabaseId)) {
-			return fail(400, { error: 'Invalid database ID' });
-		}
+    const currentDatabaseId = parseInt(databaseId, 10);
+    if (isNaN(currentDatabaseId)) {
+      return fail(400, { error: 'Invalid database ID' });
+    }
 
-		const cache = pcdManager.getCache(currentDatabaseId);
-		if (!cache) {
-			return fail(500, { error: 'Database cache not available' });
-		}
+    const cache = pcdManager.getCache(currentDatabaseId);
+    if (!cache) {
+      return fail(500, { error: 'Database cache not available' });
+    }
 
-		const decodedName = decodeURIComponent(name);
-		const current = await getSonarrByName(cache, decodedName);
-		if (!current) {
-			return fail(404, { error: 'Media settings config not found' });
-		}
+    const decodedName = decodeURIComponent(name);
+    const current = await getSonarrByName(cache, decodedName);
+    if (!current) {
+      return fail(404, { error: 'Media settings config not found' });
+    }
 
-		const formData = await request.formData();
-		const layer = (formData.get('layer') as OperationLayer) || 'user';
+    const formData = await request.formData();
+    const layer = (formData.get('layer') as OperationLayer) || 'user';
 
-		if (layer === 'base' && !canWriteToBase(currentDatabaseId)) {
-			return fail(403, { error: 'Cannot write to base layer without personal access token' });
-		}
+    if (layer === 'base' && !canWriteToBase(currentDatabaseId)) {
+      return fail(403, { error: 'Cannot write to base layer without personal access token' });
+    }
 
-		const result = await removeSonarrMediaSettings({
-			databaseId: currentDatabaseId,
-			cache,
-			layer,
-			current
-		});
+    const result = await removeSonarrMediaSettings({
+      databaseId: currentDatabaseId,
+      cache,
+      layer,
+      current,
+    });
 
-		if (!result.success) {
-			return fail(500, { error: result.error || 'Failed to delete media settings config' });
-		}
+    if (!result.success) {
+      return fail(500, { error: result.error || 'Failed to delete media settings config' });
+    }
 
-		throw redirect(303, `/media-management/${databaseId}/media-settings`);
-	}
+    throw redirect(303, `/media-management/${databaseId}/media-settings`);
+  },
 };

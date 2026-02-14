@@ -20,67 +20,67 @@
 import { writable, derived, type Writable, type Readable } from 'svelte/store';
 
 export interface ProgressiveListOptions {
-	/** Number of items to render per batch */
-	pageSize: number;
-	/** IntersectionObserver rootMargin — triggers loading before sentinel is visible */
-	rootMargin?: string;
+  /** Number of items to render per batch */
+  pageSize: number;
+  /** IntersectionObserver rootMargin — triggers loading before sentinel is visible */
+  rootMargin?: string;
 }
 
 export interface ProgressiveList {
-	visibleCount: Writable<number>;
-	sentinel: (node: HTMLElement) => { destroy: () => void };
-	reset: () => void;
-	hasMore: Readable<boolean>;
-	setTotalCount: (n: number) => void;
+  visibleCount: Writable<number>;
+  sentinel: (node: HTMLElement) => { destroy: () => void };
+  reset: () => void;
+  hasMore: Readable<boolean>;
+  setTotalCount: (n: number) => void;
 }
 
 export function createProgressiveList(options: ProgressiveListOptions): ProgressiveList {
-	const { pageSize, rootMargin = '200px' } = options;
+  const { pageSize, rootMargin = '200px' } = options;
 
-	const visibleCount = writable(pageSize);
-	const totalCount = writable(0);
+  const visibleCount = writable(pageSize);
+  const totalCount = writable(0);
 
-	const hasMore = derived([visibleCount, totalCount], ([$visible, $total]) => $visible < $total);
+  const hasMore = derived([visibleCount, totalCount], ([$visible, $total]) => $visible < $total);
 
-	let observer: IntersectionObserver | null = null;
+  let observer: IntersectionObserver | null = null;
 
-	function loadMore() {
-		let current = 0;
-		let total = 0;
-		visibleCount.subscribe((v) => (current = v))();
-		totalCount.subscribe((v) => (total = v))();
+  function loadMore() {
+    let current = 0;
+    let total = 0;
+    visibleCount.subscribe((v) => (current = v))();
+    totalCount.subscribe((v) => (total = v))();
 
-		if (current < total) {
-			visibleCount.set(Math.min(current + pageSize, total));
-		}
-	}
+    if (current < total) {
+      visibleCount.set(Math.min(current + pageSize, total));
+    }
+  }
 
-	function sentinel(node: HTMLElement) {
-		observer = new IntersectionObserver(
-			(entries) => {
-				if (entries[0]?.isIntersecting) {
-					loadMore();
-				}
-			},
-			{ rootMargin }
-		);
-		observer.observe(node);
+  function sentinel(node: HTMLElement) {
+    observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) {
+          loadMore();
+        }
+      },
+      { rootMargin }
+    );
+    observer.observe(node);
 
-		return {
-			destroy() {
-				observer?.disconnect();
-				observer = null;
-			}
-		};
-	}
+    return {
+      destroy() {
+        observer?.disconnect();
+        observer = null;
+      },
+    };
+  }
 
-	function reset() {
-		visibleCount.set(pageSize);
-	}
+  function reset() {
+    visibleCount.set(pageSize);
+  }
 
-	function setTotalCount(n: number) {
-		totalCount.set(n);
-	}
+  function setTotalCount(n: number) {
+    totalCount.set(n);
+  }
 
-	return { visibleCount, sentinel, reset, hasMore, setTotalCount };
+  return { visibleCount, sentinel, reset, hasMore, setTotalCount };
 }

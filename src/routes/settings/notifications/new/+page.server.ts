@@ -5,68 +5,68 @@ import { notificationServicesQueries } from '$db/queries/notificationServices.ts
 import { getAllNotificationTypeIds } from '$shared/notifications/types.ts';
 
 export const actions: Actions = {
-	create: async ({ request }: RequestEvent) => {
-		const formData = await request.formData();
-		const serviceType = formData.get('type') as string;
-		const name = formData.get('name') as string;
+  create: async ({ request }: RequestEvent) => {
+    const formData = await request.formData();
+    const serviceType = formData.get('type') as string;
+    const name = formData.get('name') as string;
 
-		if (!serviceType || !name) {
-			return fail(400, { error: 'Service type and name are required' });
-		}
+    if (!serviceType || !name) {
+      return fail(400, { error: 'Service type and name are required' });
+    }
 
-		// Validate name uniqueness
-		if (notificationServicesQueries.existsByName(name)) {
-			return fail(400, { error: 'A service with this name already exists' });
-		}
+    // Validate name uniqueness
+    if (notificationServicesQueries.existsByName(name)) {
+      return fail(400, { error: 'A service with this name already exists' });
+    }
 
-		// Build config based on service type
-		let config: Record<string, unknown> = {};
-		let enabledTypes: string[] = [];
+    // Build config based on service type
+    let config: Record<string, unknown> = {};
+    let enabledTypes: string[] = [];
 
-		if (serviceType === 'discord') {
-			const webhookUrl = formData.get('webhook_url') as string;
-			const username = formData.get('username') as string;
-			const avatarUrl = formData.get('avatar_url') as string;
-			const enableMentions = formData.get('enable_mentions') === 'on';
+    if (serviceType === 'discord') {
+      const webhookUrl = formData.get('webhook_url') as string;
+      const username = formData.get('username') as string;
+      const avatarUrl = formData.get('avatar_url') as string;
+      const enableMentions = formData.get('enable_mentions') === 'on';
 
-			if (!webhookUrl) {
-				return fail(400, { error: 'Webhook URL is required for Discord' });
-			}
+      if (!webhookUrl) {
+        return fail(400, { error: 'Webhook URL is required for Discord' });
+      }
 
-			config = {
-				webhook_url: webhookUrl,
-				...(username && { username }),
-				...(avatarUrl && { avatar_url: avatarUrl }),
-				enable_mentions: enableMentions
-			};
+      config = {
+        webhook_url: webhookUrl,
+        ...(username && { username }),
+        ...(avatarUrl && { avatar_url: avatarUrl }),
+        enable_mentions: enableMentions,
+      };
 
-			// Get enabled notification types dynamically from all available types
-			const allTypeIds = getAllNotificationTypeIds();
-			enabledTypes = allTypeIds.filter((typeId) => formData.get(typeId) === 'on');
-		}
+      // Get enabled notification types dynamically from all available types
+      const allTypeIds = getAllNotificationTypeIds();
+      enabledTypes = allTypeIds.filter((typeId) => formData.get(typeId) === 'on');
+    }
 
-		// Generate UUID for the service
-		const id = crypto.randomUUID();
+    // Generate UUID for the service
+    const id = crypto.randomUUID();
 
-		// Create the service
-		const success = notificationServicesQueries.create({
-			id,
-			name,
-			serviceType,
-			enabled: true,
-			config,
-			enabledTypes
-		});
+    // Create the service
+    const success = notificationServicesQueries.create({
+      id,
+      name,
+      serviceType,
+      enabled: true,
+      config,
+      enabledTypes,
+    });
 
-		if (!success) {
-			return fail(500, { error: 'Failed to create notification service' });
-		}
+    if (!success) {
+      return fail(500, { error: 'Failed to create notification service' });
+    }
 
-		await logger.info('Notification service created', {
-			source: 'settings/notifications/new',
-			meta: { serviceId: id, serviceType, name }
-		});
+    await logger.info('Notification service created', {
+      source: 'settings/notifications/new',
+      meta: { serviceId: id, serviceType, name },
+    });
 
-		throw redirect(303, '/settings/notifications');
-	}
+    throw redirect(303, '/settings/notifications');
+  },
 };

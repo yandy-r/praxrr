@@ -12,12 +12,7 @@ import { TEST_REPO_URL, TEST_PAT, TEST_GIT_NAME, TEST_GIT_EMAIL } from '../env';
 import { linkPcd } from '../helpers/linkPcd';
 import { unlinkPcdByName } from '../helpers/unlinkPcd';
 import { pullChanges, exportAndPush } from '../helpers/sync';
-import {
-  goToConflicts,
-  expectConflict,
-  overrideConflict,
-  alignConflict
-} from '../helpers/conflicts';
+import { goToConflicts, expectConflict, overrideConflict, alignConflict } from '../helpers/conflicts';
 import { goToCustomFormat, updateCfName } from '../helpers/entity';
 import { getConflicts, findOpByEntityName } from '../helpers/db';
 import { getHead, resetToCommit } from '../helpers/reset';
@@ -42,7 +37,7 @@ test.describe('1.1 CF name rename conflict', () => {
       repoUrl: TEST_REPO_URL,
       pat: TEST_PAT,
       gitName: TEST_GIT_NAME,
-      gitEmail: TEST_GIT_EMAIL
+      gitEmail: TEST_GIT_EMAIL,
     });
 
     devHead = getHead(devId);
@@ -56,7 +51,7 @@ test.describe('1.1 CF name rename conflict', () => {
       syncStrategy: 'Manual (no auto-sync)',
       autoPull: false,
       localOpsEnabled: true,
-      conflictStrategy: 'Ask every time'
+      conflictStrategy: 'Ask every time',
     });
 
     await page.close();
@@ -78,7 +73,7 @@ test.describe('1.1 CF name rename conflict', () => {
     await page.close();
   });
 
-  test('a) override — CF gets user\'s desired name', async ({ page }) => {
+  test("a) override — CF gets user's desired name", async ({ page }) => {
     // Local renames CF
     await goToCustomFormat(page, localId, TEST_CF_NAME);
     await updateCfName(page, 'x265 Local Rename');
@@ -106,7 +101,7 @@ test.describe('1.1 CF name rename conflict', () => {
     expect(name).toBe('x265 Local Rename');
   });
 
-  test('b) align — CF keeps upstream\'s name', async ({ page }) => {
+  test("b) align — CF keeps upstream's name", async ({ page }) => {
     // Local renames CF
     await goToCustomFormat(page, localId, TEST_CF_NAME);
     await updateCfName(page, 'x265 Local Rename');

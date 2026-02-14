@@ -14,16 +14,16 @@ import type { Migration } from '../migrations.ts';
  */
 
 export const migration: Migration = {
-	version: 38,
-	name: 'Add media management config names',
+  version: 38,
+  name: 'Add media management config names',
 
-	up: `
+  up: `
 		ALTER TABLE arr_sync_media_management ADD COLUMN naming_config_name TEXT;
 		ALTER TABLE arr_sync_media_management ADD COLUMN quality_definitions_config_name TEXT;
 		ALTER TABLE arr_sync_media_management ADD COLUMN media_settings_config_name TEXT;
 	`,
 
-	down: `
+  down: `
 		-- SQLite doesn't support DROP COLUMN directly, so we recreate the table
 		CREATE TABLE arr_sync_media_management_new (
 			instance_id INTEGER PRIMARY KEY,
@@ -56,5 +56,5 @@ export const migration: Migration = {
 
 		DROP TABLE arr_sync_media_management;
 		ALTER TABLE arr_sync_media_management_new RENAME TO arr_sync_media_management;
-	`
+	`,
 };

@@ -8,10 +8,10 @@ import type { Migration } from '../migrations.ts';
  */
 
 export const migration: Migration = {
-	version: 39,
-	name: 'Create setup_state table',
+  version: 39,
+  name: 'Create setup_state table',
 
-	up: `
+  up: `
 		CREATE TABLE setup_state (
 			id INTEGER PRIMARY KEY CHECK (id = 1),
 			default_database_linked INTEGER NOT NULL DEFAULT 0,
@@ -23,7 +23,7 @@ export const migration: Migration = {
 		INSERT INTO setup_state (id, default_database_linked) VALUES (1, 0);
 	`,
 
-	down: `
+  down: `
 		DROP TABLE setup_state;
-	`
+	`,
 };

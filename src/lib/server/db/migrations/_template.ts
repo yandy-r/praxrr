@@ -33,14 +33,14 @@ import type { Migration } from '../migrations.ts';
  */
 
 export const migration: Migration = {
-	// REQUIRED: Unique version number (increment from last migration)
-	version: 999, // CHANGE THIS
+  // REQUIRED: Unique version number (increment from last migration)
+  version: 999, // CHANGE THIS
 
-	// REQUIRED: Human-readable description
-	name: 'Template migration - CHANGE THIS',
+  // REQUIRED: Human-readable description
+  name: 'Template migration - CHANGE THIS',
 
-	// REQUIRED: SQL to apply the migration (forward migration)
-	up: `
+  // REQUIRED: SQL to apply the migration (forward migration)
+  up: `
 		-- Example: Create a new table
 		CREATE TABLE IF NOT EXISTS example_table (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -57,13 +57,13 @@ export const migration: Migration = {
 		INSERT INTO example_table (name, email) VALUES ('Example', 'example@example.com');
 	`,
 
-	// OPTIONAL: SQL to rollback the migration (reverse migration)
-	// If not provided, migration cannot be rolled back
-	down: `
+  // OPTIONAL: SQL to rollback the migration (reverse migration)
+  // If not provided, migration cannot be rolled back
+  down: `
 		-- Rollback in reverse order of 'up'
 		DROP INDEX IF EXISTS idx_example_email;
 		DROP TABLE IF EXISTS example_table;
-	`
+	`,
 };
 
 // Alternative: You can also use default export

@@ -1,9 +1,9 @@
 import type { Migration } from '../migrations.ts';
 
 export const migration: Migration = {
-	version: 23,
-	name: 'create_pattern_match_cache',
-	up: `
+  version: 23,
+  name: 'create_pattern_match_cache',
+  up: `
 		-- Cache for pattern match results
 		-- Stores regex match results to avoid redundant computation
 		-- Key is title, invalidated when patterns change (via patterns_hash)
@@ -21,9 +21,9 @@ export const migration: Migration = {
 		-- Index for potential cleanup queries by age
 		CREATE INDEX idx_pattern_match_cache_created_at ON pattern_match_cache(created_at);
 	`,
-	down: `
+  down: `
 		DROP INDEX IF EXISTS idx_pattern_match_cache_created_at;
 		DROP INDEX IF EXISTS idx_pattern_match_cache_hash;
 		DROP TABLE IF EXISTS pattern_match_cache;
-	`
+	`,
 };

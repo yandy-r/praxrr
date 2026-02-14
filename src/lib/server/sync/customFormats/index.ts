@@ -4,13 +4,13 @@
  */
 
 export {
-	transformCustomFormat,
-	fetchCustomFormatFromPcd,
-	fetchAllCustomFormatsFromPcd,
-	type ArrCustomFormat,
-	type ArrCustomFormatSpecification,
-	type PcdCustomFormat,
-	type PcdCondition
+  transformCustomFormat,
+  fetchCustomFormatFromPcd,
+  fetchAllCustomFormatsFromPcd,
+  type ArrCustomFormat,
+  type ArrCustomFormatSpecification,
+  type PcdCustomFormat,
+  type PcdCondition,
 } from './transformer.ts';
 
 export { syncCustomFormats } from './syncer.ts';

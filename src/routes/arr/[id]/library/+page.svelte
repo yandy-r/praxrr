@@ -25,14 +25,19 @@
 
 	export let data: PageData;
 
-	$: appType = isArrAppType(data.instance.type) ? data.instance.type : null;
+	$: instance = data?.instance;
+	$: instanceId = instance?.id ?? null;
+	$: instanceType = instance?.type ?? '';
+	$: instanceName = instance?.name ?? 'Arr';
+	$: instanceUrl = instance?.url?.replace(/\/$/, '') ?? '';
+	$: appType = instanceType && isArrAppType(instanceType) ? instanceType : null;
 	$: supportsLibraryWorkflow = appType ? supportsArrWorkflow(appType, 'library') : false;
-	$: isRadarr = data.instance.type === 'radarr';
-	$: isSonarr = data.instance.type === 'sonarr';
-	$: isLidarr = data.instance.type === 'lidarr';
+	$: isRadarr = instanceType === 'radarr';
+	$: isSonarr = instanceType === 'sonarr';
+	$: isLidarr = instanceType === 'lidarr';
 
 	let searchStore: SearchStore;
-	$: searchStore = getPersistentSearchStore(`arrLibrarySearch:${data.instance.id}`, {
+	$: searchStore = getPersistentSearchStore(`arrLibrarySearch:${instanceId ?? 'unknown'}`, {
 		debounceMs: 150
 	});
 
@@ -84,12 +89,22 @@
 		);
 	}
 
-	$: defaultUnsupportedLibraryMessage = getLibraryUnsupportedMessage(data.instance.type);
+	$: defaultUnsupportedLibraryMessage = getLibraryUnsupportedMessage(instanceType);
 	$: libraryUnavailableMessage = !supportsLibraryWorkflow
 		? defaultUnsupportedLibraryMessage
 		: libraryCapabilityError;
 
 	async function fetchLibrary(force = false) {
+		if (!instanceId) {
+			library = [];
+			profilesByDatabase = [];
+			libraryError = null;
+			libraryCapabilityError = null;
+			loading = false;
+			refreshing = false;
+			return;
+		}
+
 		if (!supportsLibraryWorkflow) {
 			library = [];
 			profilesByDatabase = [];
@@ -100,7 +115,6 @@
 			return;
 		}
 
-		const instanceId = data.instance.id;
 		libraryCapabilityError = null;
 
 		// Check client cache first (unless forcing refresh)
@@ -151,8 +165,12 @@
 	}
 
 	async function handleRefresh() {
+		if (!instanceId) {
+			return;
+		}
+
 		refreshing = true;
-		libraryCache.invalidate(data.instance.id);
+		libraryCache.invalidate(instanceId);
 		// Clear episode cache on refresh too
 		if (isSonarr) {
 			episodeCache = new Map();
@@ -162,20 +180,23 @@
 	}
 
 	function handleOpen() {
-		const baseUrl = data.instance.url.replace(/\/$/, '');
-		window.open(baseUrl, '_blank', 'noopener,noreferrer');
+		if (!instanceUrl) {
+			return;
+		}
+
+		window.open(instanceUrl, '_blank', 'noopener,noreferrer');
 	}
 
 	let currentInstanceId: number | null = null;
 
 	onMount(() => {
-		currentInstanceId = data.instance.id;
+		currentInstanceId = instanceId;
 		fetchLibrary();
 	});
 
 	// Refetch if instance changes (navigation between instances)
-	$: if (browser && data.instance.id && data.instance.id !== currentInstanceId) {
-		currentInstanceId = data.instance.id;
+	$: if (browser && instanceId && instanceId !== currentInstanceId) {
+		currentInstanceId = instanceId;
 		loading = true;
 		episodeCache = new Map();
 		episodeLoadingSet = new Set();
@@ -414,7 +435,7 @@
 	// Radarr Data & Columns
 	// ==========================================================================
 
-	$: baseUrl = data.instance.url.replace(/\/$/, '');
+	$: baseUrl = instanceUrl;
 	$: debouncedQuery = $searchStore.query;
 
 	// Radarr
@@ -683,15 +704,14 @@
 	let episodeLoadingSet: Set<number> = new Set();
 
 	async function loadEpisodes(seriesId: number) {
+		if (!instanceId) return;
 		if (episodeCache.has(seriesId) || episodeLoadingSet.has(seriesId)) return;
 
 		episodeLoadingSet.add(seriesId);
 		episodeLoadingSet = episodeLoadingSet;
 
 		try {
-			const response = await fetch(
-				`/api/v1/arr/library/episodes?instanceId=${data.instance.id}&seriesId=${seriesId}`
-			);
+			const response = await fetch(`/api/v1/arr/library/episodes?instanceId=${instanceId}&seriesId=${seriesId}`);
 			if (!response.ok) throw new Error('Failed to fetch episodes');
 			const result = await response.json();
 			episodeCache.set(seriesId, result.episodes);
@@ -731,7 +751,7 @@
 </script>
 
 <svelte:head>
-	<title>{data.instance.name} - Library - Profilarr</title>
+	<title>{instanceName} - Library - Profilarr</title>
 </svelte:head>
 
 <div class="mt-6 space-y-6">
@@ -776,7 +796,7 @@
 			onToggleFilter={toggleFilter}
 			onRefresh={handleRefresh}
 			onOpen={handleOpen}
-			instanceType={data.instance.type}
+			instanceType={instanceType}
 		/>
 
 		{#if isRadarr}

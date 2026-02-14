@@ -10,11 +10,7 @@ import { linkPcd } from '../helpers/linkPcd';
 import { unlinkPcdByName } from '../helpers/unlinkPcd';
 import { pullChanges, exportAndPush } from '../helpers/sync';
 import { goToConflicts, expectNoConflict } from '../helpers/conflicts';
-import {
-  goToCustomFormatGeneral,
-  addCfTag,
-  updateCfDescription
-} from '../helpers/entity';
+import { goToCustomFormatGeneral, addCfTag, updateCfDescription } from '../helpers/entity';
 import { getHead, resetToCommit } from '../helpers/reset';
 
 const LOCAL_DB_NAME = 'E2E Local';
@@ -39,7 +35,7 @@ test.describe('1.11 CF tags-only no-conflict', () => {
       repoUrl: TEST_REPO_URL,
       pat: TEST_PAT,
       gitName: TEST_GIT_NAME,
-      gitEmail: TEST_GIT_EMAIL
+      gitEmail: TEST_GIT_EMAIL,
     });
 
     devHead = getHead(devId);
@@ -53,7 +49,7 @@ test.describe('1.11 CF tags-only no-conflict', () => {
       syncStrategy: 'Manual (no auto-sync)',
       autoPull: false,
       localOpsEnabled: true,
-      conflictStrategy: 'Ask every time'
+      conflictStrategy: 'Ask every time',
     });
 
     await page.close();

@@ -11,10 +11,10 @@ import type { Migration } from '../migrations.ts';
  */
 
 export const migration: Migration = {
-	version: 48,
-	name: 'Restore database_id FK on arr_sync_quality_profiles',
+  version: 48,
+  name: 'Restore database_id FK on arr_sync_quality_profiles',
 
-	up: `
+  up: `
 		-- Remove stale references to deleted databases
 		DELETE FROM arr_sync_quality_profiles
 		WHERE database_id NOT IN (SELECT id FROM database_instances);
@@ -35,5 +35,5 @@ export const migration: Migration = {
 		DROP TABLE arr_sync_quality_profiles;
 		ALTER TABLE arr_sync_quality_profiles_new RENAME TO arr_sync_quality_profiles;
 		CREATE INDEX idx_arr_sync_quality_profiles_instance ON arr_sync_quality_profiles(instance_id);
-	`
+	`,
 };

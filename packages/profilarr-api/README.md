@@ -12,17 +12,17 @@ I'm not a developer, though I just know enough to tinker and use lidarr. Don't p
 ## Usage
 
 ```ts
-import { spec } from "@yandy-r/profilarr-api";
-import type { components } from "@yandy-r/profilarr-api";
+import { spec } from '@yandy-r/profilarr-api';
+import type { components } from '@yandy-r/profilarr-api';
 
 // Access the bundled OpenAPI 3.1 spec
 console.log(spec.info.title); // "Profilarr API"
 console.log(spec.paths);
 
 // Use typed schemas
-type Movie = components["schemas"]["RadarrLibraryItem"];
-type Series = components["schemas"]["SonarrLibraryItem"];
-type Episode = components["schemas"]["SonarrEpisodeItem"];
+type Movie = components['schemas']['RadarrLibraryItem'];
+type Series = components['schemas']['SonarrLibraryItem'];
+type Episode = components['schemas']['SonarrEpisodeItem'];
 ```
 
 ## What's included

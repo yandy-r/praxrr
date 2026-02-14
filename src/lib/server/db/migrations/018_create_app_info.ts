@@ -8,10 +8,10 @@ import type { Migration } from '../migrations.ts';
  */
 
 export const migration: Migration = {
-	version: 18,
-	name: 'Create app_info table',
+  version: 18,
+  name: 'Create app_info table',
 
-	up: `
+  up: `
 		CREATE TABLE app_info (
 			id INTEGER PRIMARY KEY CHECK (id = 1),
 			version TEXT NOT NULL,
@@ -23,7 +23,7 @@ export const migration: Migration = {
 		INSERT INTO app_info (id, version) VALUES (1, '2.0.0');
 	`,
 
-	down: `
+  down: `
 		DROP TABLE IF EXISTS app_info;
-	`
+	`,
 };

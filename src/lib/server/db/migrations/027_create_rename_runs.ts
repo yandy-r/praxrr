@@ -28,10 +28,10 @@ import type { Migration } from '../migrations.ts';
  */
 
 export const migration: Migration = {
-	version: 27,
-	name: 'Create rename_runs table',
+  version: 27,
+  name: 'Create rename_runs table',
 
-	up: `
+  up: `
 		CREATE TABLE rename_runs (
 			id TEXT PRIMARY KEY,
 
@@ -82,10 +82,10 @@ export const migration: Migration = {
 		CREATE INDEX idx_rename_runs_status ON rename_runs(status);
 	`,
 
-	down: `
+  down: `
 		DROP INDEX IF EXISTS idx_rename_runs_status;
 		DROP INDEX IF EXISTS idx_rename_runs_started_at;
 		DROP INDEX IF EXISTS idx_rename_runs_instance;
 		DROP TABLE IF EXISTS rename_runs;
-	`
+	`,
 };

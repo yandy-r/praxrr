@@ -21,16 +21,16 @@ import type { RadarrNamingRow, SonarrNamingRow, RadarrMediaSettingsRow } from '.
 // ============================================================================
 
 export const ENTITY_TYPES = [
-	'delay_profile',
-	'regular_expression',
-	'custom_format',
-	'quality_profile',
-	'radarr_naming',
-	'sonarr_naming',
-	'radarr_media_settings',
-	'sonarr_media_settings',
-	'radarr_quality_definitions',
-	'sonarr_quality_definitions'
+  'delay_profile',
+  'regular_expression',
+  'custom_format',
+  'quality_profile',
+  'radarr_naming',
+  'sonarr_naming',
+  'radarr_media_settings',
+  'sonarr_media_settings',
+  'radarr_quality_definitions',
+  'sonarr_quality_definitions',
 ] as const;
 
 export type EntityType = (typeof ENTITY_TYPES)[number];
@@ -40,13 +40,13 @@ export type EntityType = (typeof ENTITY_TYPES)[number];
 // ============================================================================
 
 export interface PortableDelayProfile {
-	name: string;
-	preferredProtocol: PreferredProtocol;
-	usenetDelay: number;
-	torrentDelay: number;
-	bypassIfHighestQuality: boolean;
-	bypassIfAboveCfScore: boolean;
-	minimumCfScore: number;
+  name: string;
+  preferredProtocol: PreferredProtocol;
+  usenetDelay: number;
+  torrentDelay: number;
+  bypassIfHighestQuality: boolean;
+  bypassIfAboveCfScore: boolean;
+  minimumCfScore: number;
 }
 
 // ============================================================================
@@ -54,11 +54,11 @@ export interface PortableDelayProfile {
 // ============================================================================
 
 export interface PortableRegularExpression {
-	name: string;
-	pattern: string;
-	tags: string[];
-	description: string | null;
-	regex101Id: string | null;
+  name: string;
+  pattern: string;
+  tags: string[];
+  description: string | null;
+  regex101Id: string | null;
 }
 
 // ============================================================================
@@ -66,37 +66,37 @@ export interface PortableRegularExpression {
 // ============================================================================
 
 export interface PortableCustomFormatTest {
-	title: string;
-	type: 'movie' | 'series';
-	shouldMatch: boolean;
-	description: string | null;
+  title: string;
+  type: 'movie' | 'series';
+  shouldMatch: boolean;
+  description: string | null;
 }
 
 export interface PortableCustomFormat {
-	name: string;
-	description: string | null;
-	includeInRename: boolean;
-	tags: string[];
-	conditions: ConditionData[];
-	tests: PortableCustomFormatTest[];
+  name: string;
+  description: string | null;
+  includeInRename: boolean;
+  tags: string[];
+  conditions: ConditionData[];
+  tests: PortableCustomFormatTest[];
 }
 
 export interface PortableCustomFormatScore {
-	customFormatName: string;
-	arrType: string;
-	score: number;
+  customFormatName: string;
+  arrType: string;
+  score: number;
 }
 
 export interface PortableQualityProfile {
-	name: string;
-	description: string | null;
-	tags: string[];
-	language: string | null;
-	orderedItems: OrderedItem[];
-	minimumScore: number;
-	upgradeUntilScore: number;
-	upgradeScoreIncrement: number;
-	customFormatScores: PortableCustomFormatScore[];
+  name: string;
+  description: string | null;
+  tags: string[];
+  language: string | null;
+  orderedItems: OrderedItem[];
+  minimumScore: number;
+  upgradeUntilScore: number;
+  upgradeScoreIncrement: number;
+  customFormatScores: PortableCustomFormatScore[];
 }
 
 // ============================================================================
@@ -106,39 +106,39 @@ export interface PortableQualityProfile {
 // Naming
 
 export interface PortableRadarrNaming {
-	name: string;
-	rename: boolean;
-	movieFormat: string;
-	movieFolderFormat: string;
-	replaceIllegalCharacters: boolean;
-	colonReplacementFormat: RadarrNamingRow['colon_replacement_format'];
+  name: string;
+  rename: boolean;
+  movieFormat: string;
+  movieFolderFormat: string;
+  replaceIllegalCharacters: boolean;
+  colonReplacementFormat: RadarrNamingRow['colon_replacement_format'];
 }
 
 export interface PortableSonarrNaming {
-	name: string;
-	rename: boolean;
-	standardEpisodeFormat: string;
-	dailyEpisodeFormat: string;
-	animeEpisodeFormat: string;
-	seriesFolderFormat: string;
-	seasonFolderFormat: string;
-	replaceIllegalCharacters: boolean;
-	colonReplacementFormat: SonarrNamingRow['colon_replacement_format'];
-	customColonReplacementFormat: string | null;
-	multiEpisodeStyle: SonarrNamingRow['multi_episode_style'];
+  name: string;
+  rename: boolean;
+  standardEpisodeFormat: string;
+  dailyEpisodeFormat: string;
+  animeEpisodeFormat: string;
+  seriesFolderFormat: string;
+  seasonFolderFormat: string;
+  replaceIllegalCharacters: boolean;
+  colonReplacementFormat: SonarrNamingRow['colon_replacement_format'];
+  customColonReplacementFormat: string | null;
+  multiEpisodeStyle: SonarrNamingRow['multi_episode_style'];
 }
 
 // Media Settings
 
 export interface PortableMediaSettings {
-	name: string;
-	propersRepacks: RadarrMediaSettingsRow['propers_repacks'];
-	enableMediaInfo: boolean;
+  name: string;
+  propersRepacks: RadarrMediaSettingsRow['propers_repacks'];
+  enableMediaInfo: boolean;
 }
 
 // Quality Definitions
 
 export interface PortableQualityDefinitions {
-	name: string;
-	entries: QualityDefinitionEntry[];
+  name: string;
+  entries: QualityDefinitionEntry[];
 }

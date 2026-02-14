@@ -20,35 +20,35 @@ import { orderedItemsEqual } from './overrideUtils.ts';
  * does not match "to").
  */
 export function checkFullListConflict(
-	db: Database,
-	metadata: ParsedOpMetadata | null,
-	desiredState: Record<string, unknown> | null
+  db: Database,
+  metadata: ParsedOpMetadata | null,
+  desiredState: Record<string, unknown> | null
 ): boolean {
-	if (!desiredState) return false;
+  if (!desiredState) return false;
 
-	const oi = desiredState.ordered_items;
-	if (!oi || typeof oi !== 'object' || Array.isArray(oi)) return false;
+  const oi = desiredState.ordered_items;
+  if (!oi || typeof oi !== 'object' || Array.isArray(oi)) return false;
 
-	const record = oi as Record<string, unknown>;
-	// Full-list format has from/to arrays and no mode (distinguishes from row patches)
-	if (!Array.isArray(record.from) || !Array.isArray(record.to) || 'mode' in record) {
-		return false;
-	}
+  const record = oi as Record<string, unknown>;
+  // Full-list format has from/to arrays and no mode (distinguishes from row patches)
+  if (!Array.isArray(record.from) || !Array.isArray(record.to) || 'mode' in record) {
+    return false;
+  }
 
-	const profileName = metadata?.stableKey?.value ?? metadata?.name;
-	if (!profileName) return false;
+  const profileName = metadata?.stableKey?.value ?? metadata?.name;
+  if (!profileName) return false;
 
-	const currentItems = readCurrentOrderedItems(db, profileName);
-	return !orderedItemsEqual(currentItems, record.to);
+  const currentItems = readCurrentOrderedItems(db, profileName);
+  return !orderedItemsEqual(currentItems, record.to);
 }
 
 /**
  * Read all quality profile ordered items from the in-memory DB.
  */
 export function readCurrentOrderedItems(db: Database, profileName: string): unknown[] {
-	const rows = db
-		.prepare(
-			`SELECT
+  const rows = db
+    .prepare(
+      `SELECT
 	CASE WHEN quality_name IS NOT NULL THEN 'quality' ELSE 'group' END as type,
 	COALESCE(quality_name, quality_group_name) as name,
 	position,
@@ -57,42 +57,40 @@ export function readCurrentOrderedItems(db: Database, profileName: string): unkn
 FROM quality_profile_qualities
 WHERE quality_profile_name = ?
 ORDER BY position`
-		)
-		.all(profileName) as Array<{
-		type: string;
-		name: string;
-		position: number;
-		enabled: number;
-		upgrade_until: number;
-	}>;
+    )
+    .all(profileName) as Array<{
+    type: string;
+    name: string;
+    position: number;
+    enabled: number;
+    upgrade_until: number;
+  }>;
 
-	const memberRows = db
-		.prepare(
-			`SELECT quality_group_name, quality_name
+  const memberRows = db
+    .prepare(
+      `SELECT quality_group_name, quality_name
 FROM quality_group_members
 WHERE quality_profile_name = ?
 ORDER BY quality_group_name, quality_name`
-		)
-		.all(profileName) as Array<{
-		quality_group_name: string;
-		quality_name: string;
-	}>;
+    )
+    .all(profileName) as Array<{
+    quality_group_name: string;
+    quality_name: string;
+  }>;
 
-	const membersByGroup = new Map<string, string[]>();
-	for (const row of memberRows) {
-		const existing = membersByGroup.get(row.quality_group_name) ?? [];
-		existing.push(row.quality_name);
-		membersByGroup.set(row.quality_group_name, existing);
-	}
+  const membersByGroup = new Map<string, string[]>();
+  for (const row of memberRows) {
+    const existing = membersByGroup.get(row.quality_group_name) ?? [];
+    existing.push(row.quality_name);
+    membersByGroup.set(row.quality_group_name, existing);
+  }
 
-	return rows.map((row) => ({
-		type: row.type,
-		name: row.name,
-		position: row.position,
-		enabled: row.enabled === 1,
-		upgradeUntil: row.upgrade_until === 1,
-		...(row.type === 'group'
-			? { members: (membersByGroup.get(row.name) ?? []).map((n) => ({ name: n })) }
-			: {})
-	}));
+  return rows.map((row) => ({
+    type: row.type,
+    name: row.name,
+    position: row.position,
+    enabled: row.enabled === 1,
+    upgradeUntil: row.upgrade_until === 1,
+    ...(row.type === 'group' ? { members: (membersByGroup.get(row.name) ?? []).map((n) => ({ name: n })) } : {}),
+  }));
 }

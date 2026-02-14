@@ -5,1260 +5,1291 @@
 
 /** API endpoint path definitions mapping URL patterns to their HTTP methods and operations. */
 export interface paths {
-    "/health": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Health check
-         * @description Returns the health status of the application and its components.
-         *
-         *     Status values:
-         *     - `healthy`: All components functioning normally
-         *     - `degraded`: Core functionality works but some components have issues
-         *     - `unhealthy`: Core functionality is broken
-         *
-         *     Use `?verbose=true` for detailed component information.
-         */
-        get: operations["getHealth"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+  '/health': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/openapi.json": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * OpenAPI specification
-         * @description Returns the OpenAPI specification for this API
-         */
-        get: operations["getOpenApiSpec"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    /**
+     * Health check
+     * @description Returns the health status of the application and its components.
+     *
+     *     Status values:
+     *     - `healthy`: All components functioning normally
+     *     - `degraded`: Core functionality works but some components have issues
+     *     - `unhealthy`: Core functionality is broken
+     *
+     *     Use `?verbose=true` for detailed component information.
+     */
+    get: operations['getHealth'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/openapi.json': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/entity-testing/evaluate": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Evaluate releases against custom formats
-         * @description Parses release titles and evaluates them against all custom formats in the specified database.
-         *
-         *     This endpoint:
-         *     - Parses each release title to extract metadata (resolution, source, languages, etc.)
-         *     - Matches regex patterns using .NET-compatible regex via the parser service
-         *     - Evaluates each release against all custom formats in the database
-         *     - Returns which custom formats match each release
-         *
-         *     Results are cached for performance - repeated requests with the same titles will be faster.
-         */
-        post: operations["evaluateReleases"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    /**
+     * OpenAPI specification
+     * @description Returns the OpenAPI specification for this API
+     */
+    get: operations['getOpenApiSpec'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/entity-testing/evaluate': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/arr/library": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Arr instance library
-         * @description Fetches the full library from an Arr instance with quality profile,
-         *     score, and progress information.
-         *
-         *     - For Radarr: Returns movies with file quality, custom format scores, and cutoff progress
-         *     - For Sonarr: Returns series with season summaries and episode statistics
-         *     - For Lidarr: Returns artists/albums (capability-gated; detailed payload fields deferred to later phases)
-         *
-         *     Results include Profilarr profile matching to indicate which items use managed profiles.
-         *     Responses are cached server-side for 5 minutes.
-         */
-        get: operations["getLibrary"];
-        put?: never;
-        post?: never;
-        /**
-         * Invalidate library cache
-         * @description Clears the server-side cache for an Arr instance's library data.
-         *     The next GET request will fetch fresh data from the Arr instance.
-         */
-        delete: operations["invalidateLibraryCache"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    get?: never;
+    put?: never;
+    /**
+     * Evaluate releases against custom formats
+     * @description Parses release titles and evaluates them against all custom formats in the specified database.
+     *
+     *     This endpoint:
+     *     - Parses each release title to extract metadata (resolution, source, languages, etc.)
+     *     - Matches regex patterns using .NET-compatible regex via the parser service
+     *     - Evaluates each release against all custom formats in the database
+     *     - Returns which custom formats match each release
+     *
+     *     Results are cached for performance - repeated requests with the same titles will be faster.
+     */
+    post: operations['evaluateReleases'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/arr/library': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/arr/library/episodes": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get episode details for a Sonarr series
-         * @description Lazy-loads episode-level data for a specific series in a Sonarr instance.
-         *     Returns episodes with quality, custom format scores, and cutoff progress.
-         *
-         *     This endpoint is designed for on-demand loading when a series row is expanded
-         *     in the library view. Sonarr instances only.
-         *
-         *     Results are cached server-side for 5 minutes per series.
-         */
-        get: operations["getLibraryEpisodes"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    /**
+     * Get Arr instance library
+     * @description Fetches the full library from an Arr instance with quality profile,
+     *     score, and progress information.
+     *
+     *     - For Radarr: Returns movies with file quality, custom format scores, and cutoff progress
+     *     - For Sonarr: Returns series with season summaries and episode statistics
+     *     - For Lidarr: Returns artists/albums (capability-gated; detailed payload fields deferred to later phases)
+     *
+     *     Results include Profilarr profile matching to indicate which items use managed profiles.
+     *     Responses are cached server-side for 5 minutes.
+     */
+    get: operations['getLibrary'];
+    put?: never;
+    post?: never;
+    /**
+     * Invalidate library cache
+     * @description Clears the server-side cache for an Arr instance's library data.
+     *     The next GET request will fetch fresh data from the Arr instance.
+     */
+    delete: operations['invalidateLibraryCache'];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/arr/library/episodes': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/arr/releases": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Search for releases
-         * @description Triggers an interactive search on an Arr instance and returns grouped/deduplicated results.
-         *
-         *     For Radarr: Searches for releases for the specified movie.
-         *     For Sonarr: Searches for season pack releases for the specified series and season.
-         *     For Lidarr: Searches for releases for the specified album.
-         *
-         *     Results are grouped by title, combining information from multiple indexers.
-         */
-        get: operations["getReleases"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    /**
+     * Get episode details for a Sonarr series
+     * @description Lazy-loads episode-level data for a specific series in a Sonarr instance.
+     *     Returns episodes with quality, custom format scores, and cutoff progress.
+     *
+     *     This endpoint is designed for on-demand loading when a series row is expanded
+     *     in the library view. Sonarr instances only.
+     *
+     *     Results are cached server-side for 5 minutes per series.
+     */
+    get: operations['getLibraryEpisodes'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/arr/releases': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/arr/cleanup": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Scan or execute cleanup of stale configs
-         * @description Detects and deletes stale namespace-suffixed custom formats and quality profiles
-         *     from an Arr instance that are no longer in the current sync selections.
-         *
-         *     Two actions are supported via the `action` field in the request body:
-         *     - `scan`: Scans for stale items and returns what would be deleted.
-         *     - `execute`: Deletes the stale items from a previous scan result.
-         *
-         *     Quality profiles assigned to media will be skipped with a warning (Arr returns HTTP 500 "in use").
-         */
-        post: operations["arrCleanup"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    /**
+     * Search for releases
+     * @description Triggers an interactive search on an Arr instance and returns grouped/deduplicated results.
+     *
+     *     For Radarr: Searches for releases for the specified movie.
+     *     For Sonarr: Searches for season pack releases for the specified series and season.
+     *     For Lidarr: Searches for releases for the specified album.
+     *
+     *     Results are grouped by title, combining information from multiple indexers.
+     */
+    get: operations['getReleases'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/arr/cleanup': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/pcd/export": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Export a portable entity
-         * @description Serializes a PCD entity into its portable JSON representation.
-         *
-         *     The portable format strips database IDs and timestamps, producing a
-         *     self-contained snapshot suitable for clipboard copy, file export, or
-         *     cross-database import.
-         */
-        get: operations["exportEntity"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    get?: never;
+    put?: never;
+    /**
+     * Scan or execute cleanup of stale configs
+     * @description Detects and deletes stale namespace-suffixed custom formats and quality profiles
+     *     from an Arr instance that are no longer in the current sync selections.
+     *
+     *     Two actions are supported via the `action` field in the request body:
+     *     - `scan`: Scans for stale items and returns what would be deleted.
+     *     - `execute`: Deletes the stale items from a previous scan result.
+     *
+     *     Quality profiles assigned to media will be skipped with a warning (Arr returns HTTP 500 "in use").
+     */
+    post: operations['arrCleanup'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/pcd/export': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/pcd/import": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Import a portable entity
-         * @description Deserializes a portable entity into PCD operations, creating the entity
-         *     in the target database and layer.
-         *
-         *     The request body matches the export response format (`entityType` + `data`),
-         *     plus `databaseId` and `layer` to specify the target.
-         *
-         *     Name uniqueness is validated — importing an entity with a name that already
-         *     exists will return a 400 error.
-         */
-        post: operations["importEntity"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    /**
+     * Export a portable entity
+     * @description Serializes a PCD entity into its portable JSON representation.
+     *
+     *     The portable format strips database IDs and timestamps, producing a
+     *     self-contained snapshot suitable for clipboard copy, file export, or
+     *     cross-database import.
+     */
+    get: operations['exportEntity'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/pcd/import': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
+    get?: never;
+    put?: never;
+    /**
+     * Import a portable entity
+     * @description Deserializes a portable entity into PCD operations, creating the entity
+     *     in the target database and layer.
+     *
+     *     The request body matches the export response format (`entityType` + `data`),
+     *     plus `databaseId` and `layer` to specify the target.
+     *
+     *     Name uniqueness is validated — importing an entity with a name that already
+     *     exists will return a 400 error.
+     */
+    post: operations['importEntity'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
 }
 /** Webhook event definitions. Currently unused. */
 export type webhooks = Record<string, never>;
 /** API component schemas including all request bodies, response types, and shared models. */
 export interface components {
-    schemas: {
-        /**
-         * @description Individual component health status
-         * @enum {string}
-         */
-        ComponentStatus: "healthy" | "degraded" | "unhealthy";
-        /**
-         * @description Overall health status
-         * @enum {string}
-         */
-        HealthStatus: "healthy" | "degraded" | "unhealthy";
-        HealthResponse: {
-            status: components["schemas"]["HealthStatus"];
-            /**
-             * Format: date-time
-             * @description Current server time
-             */
-            timestamp: string;
-            /** @description Application version */
-            version: string;
-            /** @description Server uptime in seconds */
-            uptime: number;
-            components: {
-                sqlite: components["schemas"]["SqliteHealth"];
-                repos: components["schemas"]["ReposHealth"];
-                jobs: components["schemas"]["JobsHealth"];
-                backups: components["schemas"]["BackupsHealth"];
-                logs: components["schemas"]["LogsHealth"];
-            };
-        };
-        /**
-         * @description Type of media
-         * @enum {string}
-         */
-        MediaType: "movie" | "series";
-        ParsedInfo: {
-            /** @description Detected source (e.g., bluray, webdl, webrip) */
-            source: string;
-            /** @description Detected resolution (e.g., 1080p, 2160p) */
-            resolution: string;
-            /** @description Quality modifier (e.g., remux, none) */
-            modifier: string;
-            /** @description Detected languages */
-            languages: string[];
-            /** @description Detected release group */
-            releaseGroup?: string | null;
-            /** @description Detected year */
-            year: number;
-            /** @description Detected edition (e.g., Director's Cut) */
-            edition?: string | null;
-            /** @description Release type for series (single_episode, season_pack, etc.) */
-            releaseType?: string | null;
-        };
-        ReleaseInput: {
-            /** @description Release ID */
-            id: number;
-            /** @description Release title to parse and evaluate */
-            title: string;
-            type: components["schemas"]["MediaType"];
-        };
-        ReleaseEvaluation: {
-            /** @description Release ID */
-            releaseId: number;
-            /** @description Release title */
-            title: string;
-            /** @description Parsed release info (null if parsing failed) */
-            parsed?: components["schemas"]["ParsedInfo"];
-            /** @description Map of custom format ID to whether it matches */
-            cfMatches: {
-                [key: string]: boolean;
-            };
-        };
-        EvaluateRequest: {
-            /** @description Database ID to use for custom format evaluation. If omitted, only parsing is performed (no CF matching). */
-            databaseId?: number;
-            /** @description Releases to evaluate */
-            releases: components["schemas"]["ReleaseInput"][];
-        };
-        EvaluateResponse: {
-            /** @description Whether the parser service is available */
-            parserAvailable: boolean;
-            /** @description Evaluation results for each release */
-            evaluations: components["schemas"]["ReleaseEvaluation"][];
-        };
-        /**
-         * @description Type of Arr instance
-         * @enum {string}
-         */
-        ArrType: "radarr" | "sonarr" | "lidarr";
-        CustomFormatRef: {
-            /** @description Custom format ID */
-            id: number;
-            /** @description Custom format name */
-            name: string;
-        };
-        ScoreBreakdownItem: {
-            /** @description Custom format name */
-            name: string;
-            /** @description Score assigned by the quality profile */
-            score: number;
-        };
-        ProfileByDatabase: {
-            /** @description Profilarr database ID */
-            databaseId: number;
-            /** @description Profilarr database name */
-            databaseName: string;
-            /** @description Quality profile names in this database */
-            profiles: string[];
-        };
-        ErrorResponse: {
-            /** @description Error message */
-            error: string;
-        };
-        RadarrLibraryItem: {
-            /** @description Radarr movie ID */
-            id: number;
-            /** @description TMDB ID */
-            tmdbId?: number;
-            /** @description Movie title */
-            title: string;
-            /** @description Release year */
-            year?: number;
-            /** @description Assigned quality profile ID */
-            qualityProfileId: number;
-            /** @description Assigned quality profile name */
-            qualityProfileName: string;
-            /** @description Whether the movie has a downloaded file */
-            hasFile: boolean;
-            /**
-             * Format: date-time
-             * @description When the movie was added
-             */
-            dateAdded?: string;
-            /** @description TMDB popularity score */
-            popularity?: number;
-            /** @description Quality of the downloaded file (null if no file) */
-            qualityName?: string | null;
-            /** @description File name of the downloaded file (null if no file) */
-            fileName?: string | null;
-            /** @description Custom formats matched on the file */
-            customFormats: components["schemas"]["CustomFormatRef"][];
-            /** @description Total custom format score */
-            customFormatScore: number;
-            /** @description Per-custom-format score breakdown */
-            scoreBreakdown: components["schemas"]["ScoreBreakdownItem"][];
-            /** @description Profile cutoff score threshold */
-            cutoffScore: number;
-            /** @description Profile minimum score threshold */
-            minScore: number;
-            /** @description Score progress toward cutoff (0-1+) */
-            progress: number;
-            /** @description Whether the cutoff score has been met */
-            cutoffMet: boolean;
-            /** @description Whether the profile is managed by Profilarr */
-            isProfilarrProfile: boolean;
-        };
-        SonarrSeasonItem: {
-            /** @description Season number (0 = specials) */
-            seasonNumber: number;
-            /** @description Whether this season is monitored */
-            monitored: boolean;
-            /** @description Number of aired episodes */
-            episodeCount: number;
-            /** @description Number of episodes with files */
-            episodeFileCount: number;
-            /** @description Total episodes including unaired */
-            totalEpisodeCount: number;
-            /** @description Total size of episode files in bytes */
-            sizeOnDisk: number;
-            /** @description Percentage of episodes with files (0-100) */
-            percentOfEpisodes: number;
-        };
-        SonarrLibraryItem: {
-            /** @description Sonarr series ID */
-            id: number;
-            /** @description TVDB ID */
-            tvdbId?: number;
-            /** @description Series title */
-            title: string;
-            /** @description First air year */
-            year?: number;
-            /** @description Assigned quality profile ID */
-            qualityProfileId: number;
-            /** @description Assigned quality profile name */
-            qualityProfileName: string;
-            /** @description Series status (continuing, ended, etc.) */
-            status?: string;
-            /** @description Whether the series is monitored */
-            monitored: boolean;
-            /** @description Number of seasons */
-            seasonCount: number;
-            /** @description Number of aired episodes */
-            episodeCount: number;
-            /** @description Number of episodes with files */
-            episodeFileCount: number;
-            /** @description Total episodes including unaired */
-            totalEpisodeCount: number;
-            /** @description Total size of all episode files in bytes */
-            sizeOnDisk: number;
-            /** @description Percentage of episodes with files (0-100) */
-            percentOfEpisodes: number;
-            /**
-             * Format: date-time
-             * @description When the series was added
-             */
-            dateAdded?: string;
-            /** @description Season-level statistics */
-            seasons: components["schemas"]["SonarrSeasonItem"][];
-            /** @description Whether the profile is managed by Profilarr */
-            isProfilarrProfile: boolean;
-        };
-        /**
-         * @description Placeholder contract for Lidarr library payload items.
-         *     Lidarr-specific artist/album fields remain capability-gated for later phases.
-         */
-        LidarrLibraryItem: {
-            [key: string]: unknown;
-        };
-        SonarrEpisodeItem: {
-            /** @description Sonarr episode ID */
-            id: number;
-            /** @description Episode number within the season */
-            episodeNumber: number;
-            /** @description Season number */
-            seasonNumber: number;
-            /** @description Episode title */
-            title: string;
-            /** @description Whether the episode has a downloaded file */
-            hasFile: boolean;
-            /** @description Whether the episode is monitored */
-            monitored: boolean;
-            /** @description Quality of the downloaded file */
-            qualityName?: string;
-            /** @description File name of the downloaded file */
-            fileName?: string;
-            /** @description File size in bytes */
-            size?: number;
-            /** @description Custom formats matched on the file */
-            customFormats: components["schemas"]["CustomFormatRef"][];
-            /** @description Total custom format score */
-            customFormatScore: number;
-            /** @description Per-custom-format score breakdown */
-            scoreBreakdown: components["schemas"]["ScoreBreakdownItem"][];
-            /** @description Profile cutoff score threshold */
-            cutoffScore: number;
-            /** @description Score progress toward cutoff (0-1+) */
-            progress: number;
-            /** @description Whether the cutoff score has been met */
-            cutoffMet: boolean;
-        };
-        LibraryRadarrResponse: {
-            /** @enum {string} */
-            type: "radarr";
-            items: components["schemas"]["RadarrLibraryItem"][];
-            profilesByDatabase: components["schemas"]["ProfileByDatabase"][];
-        };
-        LibrarySonarrResponse: {
-            /** @enum {string} */
-            type: "sonarr";
-            items: components["schemas"]["SonarrLibraryItem"][];
-            profilesByDatabase: components["schemas"]["ProfileByDatabase"][];
-        };
-        LibraryLidarrResponse: {
-            /** @enum {string} */
-            type: "lidarr";
-            items: components["schemas"]["LidarrLibraryItem"][];
-            profilesByDatabase: components["schemas"]["ProfileByDatabase"][];
-        };
-        /**
-         * @description Library response varies by instance type.
-         *     Lidarr payload details remain capability-gated until dedicated library route support ships.
-         */
-        LibraryResponse: components["schemas"]["LibraryRadarrResponse"] | components["schemas"]["LibrarySonarrResponse"] | components["schemas"]["LibraryLidarrResponse"];
-        EpisodesResponse: {
-            /** @description Episode details with quality and score data (Sonarr-only in current phase) */
-            episodes: components["schemas"]["SonarrEpisodeItem"][];
-        };
-        CacheInvalidatedResponse: {
-            /** @description Whether the cache was invalidated */
-            success: boolean;
-        };
-        GroupedRelease: {
-            /** @description Release title */
-            title: string;
-            /** @description Release size in bytes */
-            size: number;
-            /** @description Languages detected in the release */
-            languages: string[];
-            /** @description Indexers where this release was found */
-            indexers: string[];
-            /** @description Release flags (e.g., freeleech, internal) */
-            flags: string[];
-        };
-        ReleasesResponse: {
-            type: components["schemas"]["ArrType"];
-            /** @description Total number of raw releases before grouping */
-            rawCount: number;
-            /** @description Grouped and deduplicated releases */
-            releases: components["schemas"]["GroupedRelease"][];
-        };
-        StaleItem: {
-            /** @description Arr entity ID */
-            id: number;
-            /** @description Full name including namespace suffix */
-            name: string;
-            /** @description Name with namespace suffix removed */
-            strippedName: string;
-        };
-        CleanupScanRequest: {
-            /** @description Arr instance ID */
-            instanceId: number;
-            /** @enum {string} */
-            action: "scan";
-        };
-        CleanupExecuteRequest: {
-            /** @description Arr instance ID */
-            instanceId: number;
-            /** @enum {string} */
-            action: "execute";
-            scanResult: components["schemas"]["CleanupScanResult"];
-        };
-        CleanupScanResult: {
-            /** @description Custom formats that are no longer in sync selections */
-            staleCustomFormats: components["schemas"]["StaleItem"][];
-            /** @description Quality profiles that are no longer in sync selections */
-            staleQualityProfiles: components["schemas"]["StaleItem"][];
-        };
-        CleanupDeleteResult: {
-            /** @description Custom formats that were successfully deleted */
-            deletedCustomFormats: components["schemas"]["StaleItem"][];
-            /** @description Quality profiles that were successfully deleted */
-            deletedQualityProfiles: components["schemas"]["StaleItem"][];
-            /** @description Quality profiles that were skipped (assigned to media) */
-            skippedQualityProfiles: components["schemas"]["SkippedItem"][];
-        };
-        /**
-         * @description Portable PCD entity identifiers used by import/export endpoints.
-         *
-         *     v1 Lidarr media-management strategy: reuse existing entities.
-         *     Lidarr maps to `radarr_media_settings` / `sonarr_media_settings` and
-         *     `radarr_quality_definitions` / `sonarr_quality_definitions` rather than
-         *     introducing dedicated `lidarr_*` entity types in this phase. Downstream
-         *     sync resolves the Lidarr arr_type against these shared shapes and
-         *     capability-gates any Lidarr-only fields (e.g. naming formats, music-
-         *     specific media-info fields) so behavior is deterministic: unsupported
-         *     fields are explicitly skipped with logged reasons, never silently
-         *     written or partially applied.
-         *
-         *     No new enum values are added for Lidarr here. The `lidarr` arr_type
-         *     is expressed in per-row `arr_type` columns (e.g. quality_profile_custom_formats,
-         *     custom_format_conditions, quality_api_mappings) and in the
-         *     PortableCustomFormatScore.arrType enum, not as a distinct entity family.
-         * @enum {string}
-         */
-        EntityType: "delay_profile" | "regular_expression" | "custom_format" | "quality_profile" | "radarr_naming" | "sonarr_naming" | "radarr_media_settings" | "sonarr_media_settings" | "radarr_quality_definitions" | "sonarr_quality_definitions";
-        ExportResponse: {
-            entityType: components["schemas"]["EntityType"];
-            /**
-             * @description The portable entity payload. Shape varies by entityType:
-             *     - `delay_profile` → PortableDelayProfile
-             *     - `regular_expression` → PortableRegularExpression
-             *     - `custom_format` → PortableCustomFormat
-             *     - `quality_profile` → PortableQualityProfile (contains PortableCustomFormatScore with lidarr-aware arrType)
-             *     - `radarr_naming` → PortableRadarrNaming
-             *     - `sonarr_naming` → PortableSonarrNaming
-             *     - `radarr_media_settings` → PortableMediaSettings (reused for Lidarr in v1)
-             *     - `sonarr_media_settings` → PortableMediaSettings (reused for Lidarr in v1)
-             *     - `radarr_quality_definitions` → PortableQualityDefinitions (reused for Lidarr in v1)
-             *     - `sonarr_quality_definitions` → PortableQualityDefinitions (reused for Lidarr in v1)
-             *
-             *     v1 Lidarr reuse strategy:
-             *     Lidarr media-management sync maps to existing `radarr_*`/`sonarr_*` entity
-             *     shapes. No `lidarr_*` entity types exist in this phase. Unsupported Lidarr-only
-             *     fields (e.g. music-specific naming tokens, artist/album media-info fields) are
-             *     capability-gated: the sync layer explicitly skips them with deterministic,
-             *     logged outcomes rather than silently writing partial data.
-             */
-            data: components["schemas"]["PortableDelayProfile"] | components["schemas"]["PortableRegularExpression"] | components["schemas"]["PortableCustomFormat"] | components["schemas"]["PortableQualityProfile"] | components["schemas"]["PortableRadarrNaming"] | components["schemas"]["PortableSonarrNaming"] | components["schemas"]["PortableMediaSettings"] | components["schemas"]["PortableQualityDefinitions"];
-        };
-        PcdErrorResponse: {
-            error: string;
-        };
-        ImportRequest: {
-            /** @description The PCD database ID to import into */
-            databaseId: number;
-            /**
-             * @description The operation layer to write to
-             * @enum {string}
-             */
-            layer: "user" | "base";
-            entityType: components["schemas"]["EntityType"];
-            /** @description The portable entity payload (same shape as ExportResponse.data) */
-            data: components["schemas"]["PortableDelayProfile"] | components["schemas"]["PortableRegularExpression"] | components["schemas"]["PortableCustomFormat"] | components["schemas"]["PortableQualityProfile"] | components["schemas"]["PortableRadarrNaming"] | components["schemas"]["PortableSonarrNaming"] | components["schemas"]["PortableMediaSettings"] | components["schemas"]["PortableQualityDefinitions"];
-        };
-        ImportResponse: {
-            success: boolean;
-        };
-        SqliteHealth: {
-            status: components["schemas"]["ComponentStatus"];
-            /** @description Database query response time in milliseconds */
-            responseTimeMs: number;
-            /** @description Current migration version */
-            migration: number;
-            /** @description Error message if unhealthy */
-            message?: string;
-        };
-        ReposHealth: {
-            status: components["schemas"]["ComponentStatus"];
-            /** @description Additional status information */
-            message?: string;
-            /** @description Total number of PCD repos configured (verbose only) */
-            total?: number;
-            /** @description Number of enabled repos (verbose only) */
-            enabled?: number;
-            /** @description Number of repos with compiled cache (verbose only) */
-            cached?: number;
-            /** @description Number of disabled repos (verbose only) */
-            disabled?: number;
-        };
-        JobsHealth: {
-            status: components["schemas"]["ComponentStatus"];
-            /** @description Additional status information */
-            message?: string;
-            /** @description Last run time for each job (verbose only) */
-            lastRun?: {
-                [key: string]: string | null;
-            };
-        };
-        BackupsHealth: {
-            status: components["schemas"]["ComponentStatus"];
-            /** @description Whether backups are enabled */
-            enabled: boolean;
-            /** @description Additional status information */
-            message?: string;
-            /**
-             * Format: date-time
-             * @description Timestamp of last backup (verbose only)
-             */
-            lastBackup?: string | null;
-            /** @description Number of backup files (verbose only) */
-            count?: number;
-            /** @description Human-readable total size of all backups (verbose only) */
-            totalSize?: string;
-            /** @description Configured retention period in days (verbose only) */
-            retentionDays?: number;
-        };
-        LogsHealth: {
-            status: components["schemas"]["ComponentStatus"];
-            /** @description Additional status information */
-            message?: string;
-            /** @description Human-readable total size of log files (verbose only) */
-            totalSize?: string;
-            /** @description Number of log files (verbose only) */
-            fileCount?: number;
-            /**
-             * Format: date
-             * @description Date of oldest log file (verbose only)
-             */
-            oldestLog?: string | null;
-            /**
-             * Format: date
-             * @description Date of newest log file (verbose only)
-             */
-            newestLog?: string | null;
-        };
-        SkippedItem: {
-            item: components["schemas"]["StaleItem"];
-            /** @description Why the item was skipped (e.g. "Profile is assigned to media") */
-            reason: string;
-        };
-        PortableDelayProfile: {
-            name: string;
-            /** @enum {string} */
-            preferredProtocol: "prefer_usenet" | "prefer_torrent" | "only_usenet" | "only_torrent";
-            usenetDelay: number;
-            torrentDelay: number;
-            bypassIfHighestQuality: boolean;
-            bypassIfAboveCfScore: boolean;
-            minimumCfScore: number;
-        };
-        PortableRegularExpression: {
-            name: string;
-            pattern: string;
-            tags: string[];
-            description: string | null;
-            regex101Id: string | null;
-        };
-        PortableCustomFormatTest: {
-            title: string;
-            /** @enum {string} */
-            type: "movie" | "series";
-            shouldMatch: boolean;
-            description: string | null;
-        };
-        PortableCustomFormat: {
-            name: string;
-            description: string | null;
-            includeInRename: boolean;
-            tags: string[];
-            conditions: Record<string, never>[];
-            tests: components["schemas"]["PortableCustomFormatTest"][];
-        };
-        PortableCustomFormatScore: {
-            customFormatName: string;
-            /**
-             * @description Arr target for this score mapping. `lidarr` is a valid value for v1
-             *     parity so quality profile custom-format scores can be scoped to Lidarr
-             *     instances. `all` applies the score to every arr type. Unsupported
-             *     Lidarr-only sync behavior (e.g. naming, music-specific media fields)
-             *     remains capability-gated in the sync layer; this enum only governs
-             *     score applicability, not full feature support.
-             * @enum {string}
-             */
-            arrType: "radarr" | "sonarr" | "lidarr" | "all";
-            score: number;
-        };
-        PortableQualityProfile: {
-            name: string;
-            description: string | null;
-            tags: string[];
-            language: string | null;
-            orderedItems: Record<string, never>[];
-            minimumScore: number;
-            upgradeUntilScore: number;
-            upgradeScoreIncrement: number;
-            customFormatScores: components["schemas"]["PortableCustomFormatScore"][];
-        };
-        PortableRadarrNaming: {
-            name: string;
-            rename: boolean;
-            movieFormat: string;
-            movieFolderFormat: string;
-            replaceIllegalCharacters: boolean;
-            colonReplacementFormat: string;
-        };
-        PortableSonarrNaming: {
-            name: string;
-            rename: boolean;
-            standardEpisodeFormat: string;
-            dailyEpisodeFormat: string;
-            animeEpisodeFormat: string;
-            seriesFolderFormat: string;
-            seasonFolderFormat: string;
-            replaceIllegalCharacters: boolean;
-            colonReplacementFormat: string;
-            customColonReplacementFormat: string | null;
-            multiEpisodeStyle: string;
-        };
-        /**
-         * @description Shared media-management settings payload for Radarr, Sonarr, and (in v1)
-         *     Lidarr entity families. Lidarr reuses this shape rather than introducing
-         *     `lidarr_media_settings` entities; the sync layer maps Lidarr instances to
-         *     the applicable `radarr_media_settings` or `sonarr_media_settings` entity
-         *     type and capability-gates any Lidarr-only fields not present here (e.g.
-         *     music-specific media-info flags). Unsupported fields are explicitly
-         *     skipped with logged reasons so sync outcomes are deterministic and
-         *     testable.
-         */
-        PortableMediaSettings: {
-            name: string;
-            propersRepacks: string;
-            enableMediaInfo: boolean;
-        };
-        /**
-         * @description Shared quality-definition payload for Radarr, Sonarr, and (in v1) Lidarr
-         *     entity families. Lidarr reuses this shape rather than introducing
-         *     `lidarr_quality_definitions` entities; the sync layer maps Lidarr
-         *     instances to the applicable `radarr_quality_definitions` or
-         *     `sonarr_quality_definitions` entity type and capability-gates any
-         *     Lidarr-only fields not present here. Unsupported fields are explicitly
-         *     skipped with logged reasons so sync outcomes are deterministic and
-         *     testable.
-         */
-        PortableQualityDefinitions: {
-            name: string;
-            entries: Record<string, never>[];
-        };
+  schemas: {
+    /**
+     * @description Individual component health status
+     * @enum {string}
+     */
+    ComponentStatus: 'healthy' | 'degraded' | 'unhealthy';
+    /**
+     * @description Overall health status
+     * @enum {string}
+     */
+    HealthStatus: 'healthy' | 'degraded' | 'unhealthy';
+    HealthResponse: {
+      status: components['schemas']['HealthStatus'];
+      /**
+       * Format: date-time
+       * @description Current server time
+       */
+      timestamp: string;
+      /** @description Application version */
+      version: string;
+      /** @description Server uptime in seconds */
+      uptime: number;
+      components: {
+        sqlite: components['schemas']['SqliteHealth'];
+        repos: components['schemas']['ReposHealth'];
+        jobs: components['schemas']['JobsHealth'];
+        backups: components['schemas']['BackupsHealth'];
+        logs: components['schemas']['LogsHealth'];
+      };
     };
-    responses: never;
-    parameters: never;
-    requestBodies: never;
-    headers: never;
-    pathItems: never;
+    /**
+     * @description Type of media
+     * @enum {string}
+     */
+    MediaType: 'movie' | 'series';
+    ParsedInfo: {
+      /** @description Detected source (e.g., bluray, webdl, webrip) */
+      source: string;
+      /** @description Detected resolution (e.g., 1080p, 2160p) */
+      resolution: string;
+      /** @description Quality modifier (e.g., remux, none) */
+      modifier: string;
+      /** @description Detected languages */
+      languages: string[];
+      /** @description Detected release group */
+      releaseGroup?: string | null;
+      /** @description Detected year */
+      year: number;
+      /** @description Detected edition (e.g., Director's Cut) */
+      edition?: string | null;
+      /** @description Release type for series (single_episode, season_pack, etc.) */
+      releaseType?: string | null;
+    };
+    ReleaseInput: {
+      /** @description Release ID */
+      id: number;
+      /** @description Release title to parse and evaluate */
+      title: string;
+      type: components['schemas']['MediaType'];
+    };
+    ReleaseEvaluation: {
+      /** @description Release ID */
+      releaseId: number;
+      /** @description Release title */
+      title: string;
+      /** @description Parsed release info (null if parsing failed) */
+      parsed?: components['schemas']['ParsedInfo'];
+      /** @description Map of custom format ID to whether it matches */
+      cfMatches: {
+        [key: string]: boolean;
+      };
+    };
+    EvaluateRequest: {
+      /** @description Database ID to use for custom format evaluation. If omitted, only parsing is performed (no CF matching). */
+      databaseId?: number;
+      /** @description Releases to evaluate */
+      releases: components['schemas']['ReleaseInput'][];
+    };
+    EvaluateResponse: {
+      /** @description Whether the parser service is available */
+      parserAvailable: boolean;
+      /** @description Evaluation results for each release */
+      evaluations: components['schemas']['ReleaseEvaluation'][];
+    };
+    /**
+     * @description Type of Arr instance
+     * @enum {string}
+     */
+    ArrType: 'radarr' | 'sonarr' | 'lidarr';
+    CustomFormatRef: {
+      /** @description Custom format ID */
+      id: number;
+      /** @description Custom format name */
+      name: string;
+    };
+    ScoreBreakdownItem: {
+      /** @description Custom format name */
+      name: string;
+      /** @description Score assigned by the quality profile */
+      score: number;
+    };
+    ProfileByDatabase: {
+      /** @description Profilarr database ID */
+      databaseId: number;
+      /** @description Profilarr database name */
+      databaseName: string;
+      /** @description Quality profile names in this database */
+      profiles: string[];
+    };
+    ErrorResponse: {
+      /** @description Error message */
+      error: string;
+    };
+    RadarrLibraryItem: {
+      /** @description Radarr movie ID */
+      id: number;
+      /** @description TMDB ID */
+      tmdbId?: number;
+      /** @description Movie title */
+      title: string;
+      /** @description Release year */
+      year?: number;
+      /** @description Assigned quality profile ID */
+      qualityProfileId: number;
+      /** @description Assigned quality profile name */
+      qualityProfileName: string;
+      /** @description Whether the movie has a downloaded file */
+      hasFile: boolean;
+      /**
+       * Format: date-time
+       * @description When the movie was added
+       */
+      dateAdded?: string;
+      /** @description TMDB popularity score */
+      popularity?: number;
+      /** @description Quality of the downloaded file (null if no file) */
+      qualityName?: string | null;
+      /** @description File name of the downloaded file (null if no file) */
+      fileName?: string | null;
+      /** @description Custom formats matched on the file */
+      customFormats: components['schemas']['CustomFormatRef'][];
+      /** @description Total custom format score */
+      customFormatScore: number;
+      /** @description Per-custom-format score breakdown */
+      scoreBreakdown: components['schemas']['ScoreBreakdownItem'][];
+      /** @description Profile cutoff score threshold */
+      cutoffScore: number;
+      /** @description Profile minimum score threshold */
+      minScore: number;
+      /** @description Score progress toward cutoff (0-1+) */
+      progress: number;
+      /** @description Whether the cutoff score has been met */
+      cutoffMet: boolean;
+      /** @description Whether the profile is managed by Profilarr */
+      isProfilarrProfile: boolean;
+    };
+    SonarrSeasonItem: {
+      /** @description Season number (0 = specials) */
+      seasonNumber: number;
+      /** @description Whether this season is monitored */
+      monitored: boolean;
+      /** @description Number of aired episodes */
+      episodeCount: number;
+      /** @description Number of episodes with files */
+      episodeFileCount: number;
+      /** @description Total episodes including unaired */
+      totalEpisodeCount: number;
+      /** @description Total size of episode files in bytes */
+      sizeOnDisk: number;
+      /** @description Percentage of episodes with files (0-100) */
+      percentOfEpisodes: number;
+    };
+    SonarrLibraryItem: {
+      /** @description Sonarr series ID */
+      id: number;
+      /** @description TVDB ID */
+      tvdbId?: number;
+      /** @description Series title */
+      title: string;
+      /** @description First air year */
+      year?: number;
+      /** @description Assigned quality profile ID */
+      qualityProfileId: number;
+      /** @description Assigned quality profile name */
+      qualityProfileName: string;
+      /** @description Series status (continuing, ended, etc.) */
+      status?: string;
+      /** @description Whether the series is monitored */
+      monitored: boolean;
+      /** @description Number of seasons */
+      seasonCount: number;
+      /** @description Number of aired episodes */
+      episodeCount: number;
+      /** @description Number of episodes with files */
+      episodeFileCount: number;
+      /** @description Total episodes including unaired */
+      totalEpisodeCount: number;
+      /** @description Total size of all episode files in bytes */
+      sizeOnDisk: number;
+      /** @description Percentage of episodes with files (0-100) */
+      percentOfEpisodes: number;
+      /**
+       * Format: date-time
+       * @description When the series was added
+       */
+      dateAdded?: string;
+      /** @description Season-level statistics */
+      seasons: components['schemas']['SonarrSeasonItem'][];
+      /** @description Whether the profile is managed by Profilarr */
+      isProfilarrProfile: boolean;
+    };
+    /**
+     * @description Placeholder contract for Lidarr library payload items.
+     *     Lidarr-specific artist/album fields remain capability-gated for later phases.
+     */
+    LidarrLibraryItem: {
+      [key: string]: unknown;
+    };
+    SonarrEpisodeItem: {
+      /** @description Sonarr episode ID */
+      id: number;
+      /** @description Episode number within the season */
+      episodeNumber: number;
+      /** @description Season number */
+      seasonNumber: number;
+      /** @description Episode title */
+      title: string;
+      /** @description Whether the episode has a downloaded file */
+      hasFile: boolean;
+      /** @description Whether the episode is monitored */
+      monitored: boolean;
+      /** @description Quality of the downloaded file */
+      qualityName?: string;
+      /** @description File name of the downloaded file */
+      fileName?: string;
+      /** @description File size in bytes */
+      size?: number;
+      /** @description Custom formats matched on the file */
+      customFormats: components['schemas']['CustomFormatRef'][];
+      /** @description Total custom format score */
+      customFormatScore: number;
+      /** @description Per-custom-format score breakdown */
+      scoreBreakdown: components['schemas']['ScoreBreakdownItem'][];
+      /** @description Profile cutoff score threshold */
+      cutoffScore: number;
+      /** @description Score progress toward cutoff (0-1+) */
+      progress: number;
+      /** @description Whether the cutoff score has been met */
+      cutoffMet: boolean;
+    };
+    LibraryRadarrResponse: {
+      /** @enum {string} */
+      type: 'radarr';
+      items: components['schemas']['RadarrLibraryItem'][];
+      profilesByDatabase: components['schemas']['ProfileByDatabase'][];
+    };
+    LibrarySonarrResponse: {
+      /** @enum {string} */
+      type: 'sonarr';
+      items: components['schemas']['SonarrLibraryItem'][];
+      profilesByDatabase: components['schemas']['ProfileByDatabase'][];
+    };
+    LibraryLidarrResponse: {
+      /** @enum {string} */
+      type: 'lidarr';
+      items: components['schemas']['LidarrLibraryItem'][];
+      profilesByDatabase: components['schemas']['ProfileByDatabase'][];
+    };
+    /**
+     * @description Library response varies by instance type.
+     *     Lidarr payload details remain capability-gated until dedicated library route support ships.
+     */
+    LibraryResponse:
+      | components['schemas']['LibraryRadarrResponse']
+      | components['schemas']['LibrarySonarrResponse']
+      | components['schemas']['LibraryLidarrResponse'];
+    EpisodesResponse: {
+      /** @description Episode details with quality and score data (Sonarr-only in current phase) */
+      episodes: components['schemas']['SonarrEpisodeItem'][];
+    };
+    CacheInvalidatedResponse: {
+      /** @description Whether the cache was invalidated */
+      success: boolean;
+    };
+    GroupedRelease: {
+      /** @description Release title */
+      title: string;
+      /** @description Release size in bytes */
+      size: number;
+      /** @description Languages detected in the release */
+      languages: string[];
+      /** @description Indexers where this release was found */
+      indexers: string[];
+      /** @description Release flags (e.g., freeleech, internal) */
+      flags: string[];
+    };
+    ReleasesResponse: {
+      type: components['schemas']['ArrType'];
+      /** @description Total number of raw releases before grouping */
+      rawCount: number;
+      /** @description Grouped and deduplicated releases */
+      releases: components['schemas']['GroupedRelease'][];
+    };
+    StaleItem: {
+      /** @description Arr entity ID */
+      id: number;
+      /** @description Full name including namespace suffix */
+      name: string;
+      /** @description Name with namespace suffix removed */
+      strippedName: string;
+    };
+    CleanupScanRequest: {
+      /** @description Arr instance ID */
+      instanceId: number;
+      /** @enum {string} */
+      action: 'scan';
+    };
+    CleanupExecuteRequest: {
+      /** @description Arr instance ID */
+      instanceId: number;
+      /** @enum {string} */
+      action: 'execute';
+      scanResult: components['schemas']['CleanupScanResult'];
+    };
+    CleanupScanResult: {
+      /** @description Custom formats that are no longer in sync selections */
+      staleCustomFormats: components['schemas']['StaleItem'][];
+      /** @description Quality profiles that are no longer in sync selections */
+      staleQualityProfiles: components['schemas']['StaleItem'][];
+    };
+    CleanupDeleteResult: {
+      /** @description Custom formats that were successfully deleted */
+      deletedCustomFormats: components['schemas']['StaleItem'][];
+      /** @description Quality profiles that were successfully deleted */
+      deletedQualityProfiles: components['schemas']['StaleItem'][];
+      /** @description Quality profiles that were skipped (assigned to media) */
+      skippedQualityProfiles: components['schemas']['SkippedItem'][];
+    };
+    /**
+     * @description Portable PCD entity identifiers used by import/export endpoints.
+     *
+     *     v1 Lidarr media-management strategy: reuse existing entities.
+     *     Lidarr maps to `radarr_media_settings` / `sonarr_media_settings` and
+     *     `radarr_quality_definitions` / `sonarr_quality_definitions` rather than
+     *     introducing dedicated `lidarr_*` entity types in this phase. Downstream
+     *     sync resolves the Lidarr arr_type against these shared shapes and
+     *     capability-gates any Lidarr-only fields (e.g. naming formats, music-
+     *     specific media-info fields) so behavior is deterministic: unsupported
+     *     fields are explicitly skipped with logged reasons, never silently
+     *     written or partially applied.
+     *
+     *     No new enum values are added for Lidarr here. The `lidarr` arr_type
+     *     is expressed in per-row `arr_type` columns (e.g. quality_profile_custom_formats,
+     *     custom_format_conditions, quality_api_mappings) and in the
+     *     PortableCustomFormatScore.arrType enum, not as a distinct entity family.
+     * @enum {string}
+     */
+    EntityType:
+      | 'delay_profile'
+      | 'regular_expression'
+      | 'custom_format'
+      | 'quality_profile'
+      | 'radarr_naming'
+      | 'sonarr_naming'
+      | 'radarr_media_settings'
+      | 'sonarr_media_settings'
+      | 'radarr_quality_definitions'
+      | 'sonarr_quality_definitions';
+    ExportResponse: {
+      entityType: components['schemas']['EntityType'];
+      /**
+       * @description The portable entity payload. Shape varies by entityType:
+       *     - `delay_profile` → PortableDelayProfile
+       *     - `regular_expression` → PortableRegularExpression
+       *     - `custom_format` → PortableCustomFormat
+       *     - `quality_profile` → PortableQualityProfile (contains PortableCustomFormatScore with lidarr-aware arrType)
+       *     - `radarr_naming` → PortableRadarrNaming
+       *     - `sonarr_naming` → PortableSonarrNaming
+       *     - `radarr_media_settings` → PortableMediaSettings (reused for Lidarr in v1)
+       *     - `sonarr_media_settings` → PortableMediaSettings (reused for Lidarr in v1)
+       *     - `radarr_quality_definitions` → PortableQualityDefinitions (reused for Lidarr in v1)
+       *     - `sonarr_quality_definitions` → PortableQualityDefinitions (reused for Lidarr in v1)
+       *
+       *     v1 Lidarr reuse strategy:
+       *     Lidarr media-management sync maps to existing `radarr_*`/`sonarr_*` entity
+       *     shapes. No `lidarr_*` entity types exist in this phase. Unsupported Lidarr-only
+       *     fields (e.g. music-specific naming tokens, artist/album media-info fields) are
+       *     capability-gated: the sync layer explicitly skips them with deterministic,
+       *     logged outcomes rather than silently writing partial data.
+       */
+      data:
+        | components['schemas']['PortableDelayProfile']
+        | components['schemas']['PortableRegularExpression']
+        | components['schemas']['PortableCustomFormat']
+        | components['schemas']['PortableQualityProfile']
+        | components['schemas']['PortableRadarrNaming']
+        | components['schemas']['PortableSonarrNaming']
+        | components['schemas']['PortableMediaSettings']
+        | components['schemas']['PortableQualityDefinitions'];
+    };
+    PcdErrorResponse: {
+      error: string;
+    };
+    ImportRequest: {
+      /** @description The PCD database ID to import into */
+      databaseId: number;
+      /**
+       * @description The operation layer to write to
+       * @enum {string}
+       */
+      layer: 'user' | 'base';
+      entityType: components['schemas']['EntityType'];
+      /** @description The portable entity payload (same shape as ExportResponse.data) */
+      data:
+        | components['schemas']['PortableDelayProfile']
+        | components['schemas']['PortableRegularExpression']
+        | components['schemas']['PortableCustomFormat']
+        | components['schemas']['PortableQualityProfile']
+        | components['schemas']['PortableRadarrNaming']
+        | components['schemas']['PortableSonarrNaming']
+        | components['schemas']['PortableMediaSettings']
+        | components['schemas']['PortableQualityDefinitions'];
+    };
+    ImportResponse: {
+      success: boolean;
+    };
+    SqliteHealth: {
+      status: components['schemas']['ComponentStatus'];
+      /** @description Database query response time in milliseconds */
+      responseTimeMs: number;
+      /** @description Current migration version */
+      migration: number;
+      /** @description Error message if unhealthy */
+      message?: string;
+    };
+    ReposHealth: {
+      status: components['schemas']['ComponentStatus'];
+      /** @description Additional status information */
+      message?: string;
+      /** @description Total number of PCD repos configured (verbose only) */
+      total?: number;
+      /** @description Number of enabled repos (verbose only) */
+      enabled?: number;
+      /** @description Number of repos with compiled cache (verbose only) */
+      cached?: number;
+      /** @description Number of disabled repos (verbose only) */
+      disabled?: number;
+    };
+    JobsHealth: {
+      status: components['schemas']['ComponentStatus'];
+      /** @description Additional status information */
+      message?: string;
+      /** @description Last run time for each job (verbose only) */
+      lastRun?: {
+        [key: string]: string | null;
+      };
+    };
+    BackupsHealth: {
+      status: components['schemas']['ComponentStatus'];
+      /** @description Whether backups are enabled */
+      enabled: boolean;
+      /** @description Additional status information */
+      message?: string;
+      /**
+       * Format: date-time
+       * @description Timestamp of last backup (verbose only)
+       */
+      lastBackup?: string | null;
+      /** @description Number of backup files (verbose only) */
+      count?: number;
+      /** @description Human-readable total size of all backups (verbose only) */
+      totalSize?: string;
+      /** @description Configured retention period in days (verbose only) */
+      retentionDays?: number;
+    };
+    LogsHealth: {
+      status: components['schemas']['ComponentStatus'];
+      /** @description Additional status information */
+      message?: string;
+      /** @description Human-readable total size of log files (verbose only) */
+      totalSize?: string;
+      /** @description Number of log files (verbose only) */
+      fileCount?: number;
+      /**
+       * Format: date
+       * @description Date of oldest log file (verbose only)
+       */
+      oldestLog?: string | null;
+      /**
+       * Format: date
+       * @description Date of newest log file (verbose only)
+       */
+      newestLog?: string | null;
+    };
+    SkippedItem: {
+      item: components['schemas']['StaleItem'];
+      /** @description Why the item was skipped (e.g. "Profile is assigned to media") */
+      reason: string;
+    };
+    PortableDelayProfile: {
+      name: string;
+      /** @enum {string} */
+      preferredProtocol: 'prefer_usenet' | 'prefer_torrent' | 'only_usenet' | 'only_torrent';
+      usenetDelay: number;
+      torrentDelay: number;
+      bypassIfHighestQuality: boolean;
+      bypassIfAboveCfScore: boolean;
+      minimumCfScore: number;
+    };
+    PortableRegularExpression: {
+      name: string;
+      pattern: string;
+      tags: string[];
+      description: string | null;
+      regex101Id: string | null;
+    };
+    PortableCustomFormatTest: {
+      title: string;
+      /** @enum {string} */
+      type: 'movie' | 'series';
+      shouldMatch: boolean;
+      description: string | null;
+    };
+    PortableCustomFormat: {
+      name: string;
+      description: string | null;
+      includeInRename: boolean;
+      tags: string[];
+      conditions: Record<string, never>[];
+      tests: components['schemas']['PortableCustomFormatTest'][];
+    };
+    PortableCustomFormatScore: {
+      customFormatName: string;
+      /**
+       * @description Arr target for this score mapping. `lidarr` is a valid value for v1
+       *     parity so quality profile custom-format scores can be scoped to Lidarr
+       *     instances. `all` applies the score to every arr type. Unsupported
+       *     Lidarr-only sync behavior (e.g. naming, music-specific media fields)
+       *     remains capability-gated in the sync layer; this enum only governs
+       *     score applicability, not full feature support.
+       * @enum {string}
+       */
+      arrType: 'radarr' | 'sonarr' | 'lidarr' | 'all';
+      score: number;
+    };
+    PortableQualityProfile: {
+      name: string;
+      description: string | null;
+      tags: string[];
+      language: string | null;
+      orderedItems: Record<string, never>[];
+      minimumScore: number;
+      upgradeUntilScore: number;
+      upgradeScoreIncrement: number;
+      customFormatScores: components['schemas']['PortableCustomFormatScore'][];
+    };
+    PortableRadarrNaming: {
+      name: string;
+      rename: boolean;
+      movieFormat: string;
+      movieFolderFormat: string;
+      replaceIllegalCharacters: boolean;
+      colonReplacementFormat: string;
+    };
+    PortableSonarrNaming: {
+      name: string;
+      rename: boolean;
+      standardEpisodeFormat: string;
+      dailyEpisodeFormat: string;
+      animeEpisodeFormat: string;
+      seriesFolderFormat: string;
+      seasonFolderFormat: string;
+      replaceIllegalCharacters: boolean;
+      colonReplacementFormat: string;
+      customColonReplacementFormat: string | null;
+      multiEpisodeStyle: string;
+    };
+    /**
+     * @description Shared media-management settings payload for Radarr, Sonarr, and (in v1)
+     *     Lidarr entity families. Lidarr reuses this shape rather than introducing
+     *     `lidarr_media_settings` entities; the sync layer maps Lidarr instances to
+     *     the applicable `radarr_media_settings` or `sonarr_media_settings` entity
+     *     type and capability-gates any Lidarr-only fields not present here (e.g.
+     *     music-specific media-info flags). Unsupported fields are explicitly
+     *     skipped with logged reasons so sync outcomes are deterministic and
+     *     testable.
+     */
+    PortableMediaSettings: {
+      name: string;
+      propersRepacks: string;
+      enableMediaInfo: boolean;
+    };
+    /**
+     * @description Shared quality-definition payload for Radarr, Sonarr, and (in v1) Lidarr
+     *     entity families. Lidarr reuses this shape rather than introducing
+     *     `lidarr_quality_definitions` entities; the sync layer maps Lidarr
+     *     instances to the applicable `radarr_quality_definitions` or
+     *     `sonarr_quality_definitions` entity type and capability-gates any
+     *     Lidarr-only fields not present here. Unsupported fields are explicitly
+     *     skipped with logged reasons so sync outcomes are deterministic and
+     *     testable.
+     */
+    PortableQualityDefinitions: {
+      name: string;
+      entries: Record<string, never>[];
+    };
+  };
+  responses: never;
+  parameters: never;
+  requestBodies: never;
+  headers: never;
+  pathItems: never;
 }
 /** JSON Schema definitions. Currently unused. */
 export type $defs = Record<string, never>;
 /** API operation definitions with typed parameters, request bodies, and responses. */
 export interface operations {
-    getHealth: {
-        parameters: {
-            query?: {
-                /** @description Include detailed component information */
-                verbose?: boolean;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Health check response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HealthResponse"];
-                };
-            };
-        };
+  getHealth: {
+    parameters: {
+      query?: {
+        /** @description Include detailed component information */
+        verbose?: boolean;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    getOpenApiSpec: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
+    requestBody?: never;
+    responses: {
+      /** @description Health check response */
+      200: {
+        headers: {
+          [name: string]: unknown;
         };
-        requestBody?: never;
-        responses: {
-            /** @description OpenAPI specification */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": Record<string, never>;
-                };
-            };
+        content: {
+          'application/json': components['schemas']['HealthResponse'];
         };
+      };
     };
-    evaluateReleases: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["EvaluateRequest"];
-            };
-        };
-        responses: {
-            /** @description Evaluation results */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["EvaluateResponse"];
-                };
-            };
-            /** @description Invalid request (missing databaseId or releases) */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Database cache not available */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
+  };
+  getOpenApiSpec: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    getLibrary: {
-        parameters: {
-            query: {
-                /** @description Arr instance ID */
-                instanceId: number;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
+    requestBody?: never;
+    responses: {
+      /** @description OpenAPI specification */
+      200: {
+        headers: {
+          [name: string]: unknown;
         };
-        requestBody?: never;
-        responses: {
-            /** @description Library items with quality and score data */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LibraryResponse"];
-                };
-            };
-            /** @description Invalid or missing instanceId */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Instance not found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Failed to fetch library */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
+        content: {
+          'application/json': Record<string, never>;
         };
+      };
     };
-    invalidateLibraryCache: {
-        parameters: {
-            query: {
-                /** @description Arr instance ID */
-                instanceId: number;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Cache invalidated */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CacheInvalidatedResponse"];
-                };
-            };
-            /** @description Invalid or missing instanceId */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-        };
+  };
+  evaluateReleases: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    getLibraryEpisodes: {
-        parameters: {
-            query: {
-                /** @description Arr instance ID (must be a Sonarr instance) */
-                instanceId: number;
-                /** @description Sonarr series ID */
-                seriesId: number;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Episode details with quality and score data */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["EpisodesResponse"];
-                };
-            };
-            /** @description Invalid parameters or not a Sonarr instance */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Instance not found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Failed to fetch episode details */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-        };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['EvaluateRequest'];
+      };
     };
-    getReleases: {
-        parameters: {
-            query: {
-                /** @description Arr instance ID */
-                instanceId: number;
-                /** @description Movie ID (Radarr), Series ID (Sonarr), or Album ID (Lidarr) */
-                itemId: number;
-                /** @description Season number for Sonarr searches (defaults to 1) */
-                season?: number;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
+    responses: {
+      /** @description Evaluation results */
+      200: {
+        headers: {
+          [name: string]: unknown;
         };
-        requestBody?: never;
-        responses: {
-            /** @description Release search results */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ReleasesResponse"];
-                };
-            };
-            /** @description Invalid or missing parameters */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Instance not found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Failed to fetch releases */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
+        content: {
+          'application/json': components['schemas']['EvaluateResponse'];
         };
+      };
+      /** @description Invalid request (missing databaseId or releases) */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Database cache not available */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
     };
-    arrCleanup: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["CleanupScanRequest"] | components["schemas"]["CleanupExecuteRequest"];
-            };
-        };
-        responses: {
-            /** @description Scan or delete result */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CleanupScanResult"] | components["schemas"]["CleanupDeleteResult"];
-                };
-            };
-            /** @description Invalid request (missing instanceId, invalid action) */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Instance not found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Failed to perform cleanup */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-        };
+  };
+  getLibrary: {
+    parameters: {
+      query: {
+        /** @description Arr instance ID */
+        instanceId: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    exportEntity: {
-        parameters: {
-            query: {
-                /** @description The PCD database ID to export from */
-                databaseId: number;
-                /** @description The entity type to export */
-                entityType: components["schemas"]["EntityType"];
-                /** @description The entity name to export */
-                name: string;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
+    requestBody?: never;
+    responses: {
+      /** @description Library items with quality and score data */
+      200: {
+        headers: {
+          [name: string]: unknown;
         };
-        requestBody?: never;
-        responses: {
-            /** @description Portable entity JSON */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ExportResponse"];
-                };
-            };
-            /** @description Missing or invalid parameters */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PcdErrorResponse"];
-                };
-            };
-            /** @description Entity not found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PcdErrorResponse"];
-                };
-            };
-            /** @description Database cache not available */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PcdErrorResponse"];
-                };
-            };
+        content: {
+          'application/json': components['schemas']['LibraryResponse'];
         };
+      };
+      /** @description Invalid or missing instanceId */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Instance not found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Failed to fetch library */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
     };
-    importEntity: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ImportRequest"];
-            };
-        };
-        responses: {
-            /** @description Entity created successfully */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ImportResponse"];
-                };
-            };
-            /** @description Validation error (missing fields, duplicate name, invalid data) */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PcdErrorResponse"];
-                };
-            };
-            /** @description Cannot write to base layer */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PcdErrorResponse"];
-                };
-            };
-            /** @description Database cache not available */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PcdErrorResponse"];
-                };
-            };
-        };
+  };
+  invalidateLibraryCache: {
+    parameters: {
+      query: {
+        /** @description Arr instance ID */
+        instanceId: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
+    requestBody?: never;
+    responses: {
+      /** @description Cache invalidated */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['CacheInvalidatedResponse'];
+        };
+      };
+      /** @description Invalid or missing instanceId */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+    };
+  };
+  getLibraryEpisodes: {
+    parameters: {
+      query: {
+        /** @description Arr instance ID (must be a Sonarr instance) */
+        instanceId: number;
+        /** @description Sonarr series ID */
+        seriesId: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Episode details with quality and score data */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['EpisodesResponse'];
+        };
+      };
+      /** @description Invalid parameters or not a Sonarr instance */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Instance not found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Failed to fetch episode details */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+    };
+  };
+  getReleases: {
+    parameters: {
+      query: {
+        /** @description Arr instance ID */
+        instanceId: number;
+        /** @description Movie ID (Radarr), Series ID (Sonarr), or Album ID (Lidarr) */
+        itemId: number;
+        /** @description Season number for Sonarr searches (defaults to 1) */
+        season?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Release search results */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ReleasesResponse'];
+        };
+      };
+      /** @description Invalid or missing parameters */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Instance not found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Failed to fetch releases */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+    };
+  };
+  arrCleanup: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json':
+          | components['schemas']['CleanupScanRequest']
+          | components['schemas']['CleanupExecuteRequest'];
+      };
+    };
+    responses: {
+      /** @description Scan or delete result */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['CleanupScanResult'] | components['schemas']['CleanupDeleteResult'];
+        };
+      };
+      /** @description Invalid request (missing instanceId, invalid action) */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Instance not found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Failed to perform cleanup */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+    };
+  };
+  exportEntity: {
+    parameters: {
+      query: {
+        /** @description The PCD database ID to export from */
+        databaseId: number;
+        /** @description The entity type to export */
+        entityType: components['schemas']['EntityType'];
+        /** @description The entity name to export */
+        name: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Portable entity JSON */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ExportResponse'];
+        };
+      };
+      /** @description Missing or invalid parameters */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PcdErrorResponse'];
+        };
+      };
+      /** @description Entity not found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PcdErrorResponse'];
+        };
+      };
+      /** @description Database cache not available */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PcdErrorResponse'];
+        };
+      };
+    };
+  };
+  importEntity: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ImportRequest'];
+      };
+    };
+    responses: {
+      /** @description Entity created successfully */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ImportResponse'];
+        };
+      };
+      /** @description Validation error (missing fields, duplicate name, invalid data) */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PcdErrorResponse'];
+        };
+      };
+      /** @description Cannot write to base layer */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PcdErrorResponse'];
+        };
+      };
+      /** @description Database cache not available */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PcdErrorResponse'];
+        };
+      };
+    };
+  };
 }

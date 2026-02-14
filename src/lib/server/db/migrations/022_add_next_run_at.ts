@@ -8,18 +8,18 @@ import type { Migration } from '../migrations.ts';
  */
 
 export const migration: Migration = {
-	version: 22,
-	name: 'Add next_run_at to sync configs',
+  version: 22,
+  name: 'Add next_run_at to sync configs',
 
-	up: `
+  up: `
 		ALTER TABLE arr_sync_quality_profiles_config ADD COLUMN next_run_at TEXT;
 		ALTER TABLE arr_sync_delay_profiles_config ADD COLUMN next_run_at TEXT;
 		ALTER TABLE arr_sync_media_management ADD COLUMN next_run_at TEXT;
 	`,
 
-	down: `
+  down: `
 		ALTER TABLE arr_sync_quality_profiles_config DROP COLUMN next_run_at;
 		ALTER TABLE arr_sync_delay_profiles_config DROP COLUMN next_run_at;
 		ALTER TABLE arr_sync_media_management DROP COLUMN next_run_at;
-	`
+	`,
 };

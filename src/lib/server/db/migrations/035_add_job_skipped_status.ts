@@ -14,10 +14,10 @@ import type { Migration } from '../migrations.ts';
  */
 
 export const migration: Migration = {
-	version: 35,
-	name: 'Add skipped status to job_runs',
+  version: 35,
+  name: 'Add skipped status to job_runs',
 
-	up: `
+  up: `
 		-- Create new table with updated CHECK constraint
 		CREATE TABLE job_runs_new (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -48,7 +48,7 @@ export const migration: Migration = {
 		CREATE INDEX idx_job_runs_status ON job_runs(status);
 	`,
 
-	down: `
+  down: `
 		-- Create old table with original CHECK constraint
 		CREATE TABLE job_runs_old (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -78,5 +78,5 @@ export const migration: Migration = {
 		-- Recreate original indexes
 		CREATE INDEX idx_job_runs_job_id ON job_runs(job_id);
 		CREATE INDEX idx_job_runs_started_at ON job_runs(started_at);
-	`
+	`,
 };

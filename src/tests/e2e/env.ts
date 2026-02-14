@@ -11,7 +11,10 @@ try {
     const eqIndex = trimmed.indexOf('=');
     if (eqIndex === -1) continue;
     const key = trimmed.slice(0, eqIndex).trim();
-    const value = trimmed.slice(eqIndex + 1).trim().replace(/^["']|["']$/g, '');
+    const value = trimmed
+      .slice(eqIndex + 1)
+      .trim()
+      .replace(/^["']|["']$/g, '');
     if (!process.env[key]) {
       process.env[key] = value;
     }
@@ -24,13 +27,10 @@ try {
 export const BASE_URL = process.env.BASE_URL || 'http://localhost:6969';
 
 /** Path to the main Profilarr SQLite database */
-export const DB_PATH = path.resolve(
-  process.env.DB_PATH || 'dist/dev/data/profilarr.db'
-);
+export const DB_PATH = path.resolve(process.env.DB_PATH || 'dist/dev/data/profilarr.db');
 
 /** Git repo URL used for both local and dev database instances */
-export const TEST_REPO_URL =
-  process.env.TEST_REPO_URL || 'https://github.com/yandy-r/profilarr-db-v2-testing';
+export const TEST_REPO_URL = process.env.TEST_REPO_URL || 'https://github.com/yandy-r/profilarr-db-v2-testing';
 
 /** Personal access token for the dev (write) database */
 export const TEST_PAT = process.env.TEST_PAT || '';
@@ -39,5 +39,4 @@ export const TEST_PAT = process.env.TEST_PAT || '';
 export const TEST_GIT_NAME = process.env.TEST_GIT_NAME || 'Test User';
 
 /** Git author email for the dev database */
-export const TEST_GIT_EMAIL =
-  process.env.TEST_GIT_EMAIL || 'test@example.com';
+export const TEST_GIT_EMAIL = process.env.TEST_GIT_EMAIL || 'test@example.com';

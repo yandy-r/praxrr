@@ -13,10 +13,10 @@ import type { Migration } from '../migrations.ts';
  */
 
 export const migration: Migration = {
-	version: 29,
-	name: 'Add database_id foreign key constraints',
+  version: 29,
+  name: 'Add database_id foreign key constraints',
 
-	up: `
+  up: `
 		-- ============================================================
 		-- arr_sync_quality_profiles: Add FK with CASCADE DELETE
 		-- ============================================================
@@ -122,7 +122,7 @@ export const migration: Migration = {
 		ALTER TABLE arr_sync_media_management_new RENAME TO arr_sync_media_management;
 	`,
 
-	down: `
+  down: `
 		-- Recreate tables without database_id foreign keys
 		-- (Cannot easily remove FK constraints in SQLite)
 
@@ -169,5 +169,5 @@ export const migration: Migration = {
 		INSERT INTO arr_sync_media_management_new SELECT * FROM arr_sync_media_management;
 		DROP TABLE arr_sync_media_management;
 		ALTER TABLE arr_sync_media_management_new RENAME TO arr_sync_media_management;
-	`
+	`,
 };

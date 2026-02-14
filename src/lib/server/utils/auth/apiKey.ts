@@ -8,5 +8,5 @@
  * Returns 32 lowercase hex characters (128 bits)
  */
 export function generateApiKey(): string {
-	return crypto.randomUUID().replace(/-/g, '');
+  return crypto.randomUUID().replace(/-/g, '');
 }

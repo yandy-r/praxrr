@@ -7,9 +7,15 @@
 	import { sortConditions } from '$shared/pcd/conditions';
 	import CardGrid from '$ui/card/CardGrid.svelte';
 	import Card from '$ui/card/Card.svelte';
+	import Badge from '$ui/badge/Badge.svelte';
 	import Label from '$ui/label/Label.svelte';
 	import Button from '$ui/button/Button.svelte';
 	import { createProgressiveList } from '$lib/client/utils/progressiveList';
+	import {
+		getArrAppMetadata,
+		isArrAppType,
+		type ArrConditionTargetType
+	} from '$shared/arr/capabilities.ts';
 
 	export let formats: CustomFormatTableRow[];
 
@@ -34,6 +40,10 @@
 		if (condition.required) return 'success';
 		if (condition.negate) return 'warning';
 		return 'secondary';
+	}
+
+	function getArrTargetLabel(target: ArrConditionTargetType): string {
+		return target === 'all' ? 'All Apps' : getArrAppMetadata(target).label;
 	}
 </script>
 
@@ -79,6 +89,18 @@
 					<div class="flex flex-wrap gap-1">
 						{#each format.tags as tag}
 							<Label variant="info" size="sm" rounded="md">{tag.name}</Label>
+						{/each}
+					</div>
+				{/if}
+
+				{#if format.arrTargets.length > 0}
+					<div class="flex flex-wrap gap-1">
+						{#each format.arrTargets as target}
+							{#if isArrAppType(target)}
+								<Badge variant={target} size="sm">{getArrTargetLabel(target)}</Badge>
+							{:else}
+								<Badge variant="neutral" size="sm">{getArrTargetLabel(target)}</Badge>
+							{/if}
 						{/each}
 					</div>
 				{/if}

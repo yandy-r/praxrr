@@ -12,10 +12,10 @@ import type { Migration } from '../migrations.ts';
  */
 
 export const migration: Migration = {
-	version: 46,
-	name: 'Change quality profile sync to use profile_name',
+  version: 46,
+  name: 'Change quality profile sync to use profile_name',
 
-	up: `
+  up: `
 		CREATE TABLE arr_sync_quality_profiles_new (
 			instance_id INTEGER NOT NULL,
 			database_id INTEGER NOT NULL,
@@ -27,5 +27,5 @@ export const migration: Migration = {
 		DROP TABLE arr_sync_quality_profiles;
 		ALTER TABLE arr_sync_quality_profiles_new RENAME TO arr_sync_quality_profiles;
 		CREATE INDEX idx_arr_sync_quality_profiles_instance ON arr_sync_quality_profiles(instance_id);
-	`
+	`,
 };

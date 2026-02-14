@@ -30,7 +30,7 @@ async function createCustomFormat(
   await fillMarkdownInput(page, 'description', description);
   await page.getByRole('button', { name: 'Create' }).click();
   await page.waitForURL(new RegExp(`/custom-formats/${databaseId}/\\d+/conditions`), {
-    timeout: 15_000
+    timeout: 15_000,
   });
   await page.waitForLoadState('networkidle');
 }
@@ -44,7 +44,7 @@ async function deleteCustomFormat(
   await page.getByRole('button', { name: 'Delete' }).first().click();
   await page.getByRole('button', { name: 'Delete' }).last().click();
   await page.waitForURL(new RegExp(`/custom-formats/${databaseId}$`), {
-    timeout: 15_000
+    timeout: 15_000,
   });
   await page.waitForLoadState('networkidle');
 }
@@ -65,7 +65,7 @@ test.describe('1.16 CF delete upstream deleted', () => {
       repoUrl: TEST_REPO_URL,
       pat: TEST_PAT,
       gitName: TEST_GIT_NAME,
-      gitEmail: TEST_GIT_EMAIL
+      gitEmail: TEST_GIT_EMAIL,
     });
 
     devHead = getHead(devId);
@@ -79,7 +79,7 @@ test.describe('1.16 CF delete upstream deleted', () => {
       syncStrategy: 'Manual (no auto-sync)',
       autoPull: false,
       localOpsEnabled: true,
-      conflictStrategy: 'Ask every time'
+      conflictStrategy: 'Ask every time',
     });
 
     await page.close();

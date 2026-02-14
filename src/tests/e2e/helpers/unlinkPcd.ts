@@ -8,10 +8,7 @@ import { getDatabaseByName } from './db';
 /**
  * Unlink a database by its ID via the settings page.
  */
-export async function unlinkPcd(
-  page: Page,
-  databaseId: number
-): Promise<void> {
+export async function unlinkPcd(page: Page, databaseId: number): Promise<void> {
   // Dismiss any beforeunload dialogs from previous dirty forms
   page.on('dialog', (dialog) => dialog.accept());
 
@@ -28,13 +25,16 @@ export async function unlinkPcd(
         if (form instanceof HTMLFormElement) {
           form.requestSubmit();
         }
-      })
+      }),
     ]);
     return;
   }
 
   // Fallback: click through the modal flow.
-  await page.getByRole('button', { name: /unlink/i }).first().click();
+  await page
+    .getByRole('button', { name: /unlink/i })
+    .first()
+    .click();
 
   const modal = page.getByRole('dialog');
   await expect(modal).toBeVisible();
@@ -46,10 +46,7 @@ export async function unlinkPcd(
 /**
  * Unlink a database by name. No-op if it doesn't exist.
  */
-export async function unlinkPcdByName(
-  page: Page,
-  name: string
-): Promise<void> {
+export async function unlinkPcdByName(page: Page, name: string): Promise<void> {
   const db = getDatabaseByName(name);
   if (!db) return;
   await unlinkPcd(page, db.id);

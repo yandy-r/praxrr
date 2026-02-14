@@ -13,18 +13,8 @@ import { TEST_REPO_URL, TEST_PAT, TEST_GIT_NAME, TEST_GIT_EMAIL } from '../env';
 import { linkPcd } from '../helpers/linkPcd';
 import { unlinkPcdByName } from '../helpers/unlinkPcd';
 import { pullChanges, exportAndPush } from '../helpers/sync';
-import {
-  goToConflicts,
-  expectConflict,
-  overrideConflict,
-  alignConflict
-} from '../helpers/conflicts';
-import {
-  goToCustomFormatGeneral,
-  updateCfDescription,
-  addCfTag,
-  getCfIncludeInRename
-} from '../helpers/entity';
+import { goToConflicts, expectConflict, overrideConflict, alignConflict } from '../helpers/conflicts';
+import { goToCustomFormatGeneral, updateCfDescription, addCfTag, getCfIncludeInRename } from '../helpers/entity';
 import { fillMarkdownInput } from '../helpers/markdown';
 import { setIconCheckboxByLabel } from '../helpers/checkbox';
 import { getHead, resetToCommit } from '../helpers/reset';
@@ -36,10 +26,7 @@ const LOCAL_DESCRIPTION = 'Local description 1.12';
 const DEV_DESCRIPTION = 'Dev description 1.12';
 const DEV_TAG = 'DevTag-1-12';
 
-async function applyUpstreamGeneralChanges(
-  page: Page,
-  devId: number
-): Promise<{ includeInRename: boolean }> {
+async function applyUpstreamGeneralChanges(page: Page, devId: number): Promise<{ includeInRename: boolean }> {
   await goToCustomFormatGeneral(page, devId, TEST_CF_NAME);
 
   const includeNext = !(await getCfIncludeInRename(page));
@@ -70,7 +57,7 @@ test.describe('1.12 CF general multi-field conflict', () => {
       repoUrl: TEST_REPO_URL,
       pat: TEST_PAT,
       gitName: TEST_GIT_NAME,
-      gitEmail: TEST_GIT_EMAIL
+      gitEmail: TEST_GIT_EMAIL,
     });
 
     devHead = getHead(devId);
@@ -84,7 +71,7 @@ test.describe('1.12 CF general multi-field conflict', () => {
       syncStrategy: 'Manual (no auto-sync)',
       autoPull: false,
       localOpsEnabled: true,
-      conflictStrategy: 'Ask every time'
+      conflictStrategy: 'Ask every time',
     });
 
     await page.close();
@@ -105,9 +92,7 @@ test.describe('1.12 CF general multi-field conflict', () => {
     await page.close();
   });
 
-  test('a) override — keep local description, upstream include/tags', async ({
-    page
-  }) => {
+  test('a) override — keep local description, upstream include/tags', async ({ page }) => {
     // Local edits description only
     await goToCustomFormatGeneral(page, localId, TEST_CF_NAME);
     await updateCfDescription(page, LOCAL_DESCRIPTION);

@@ -9,10 +9,10 @@ import type { Migration } from '../migrations.ts';
  */
 
 export const migration: Migration = {
-	version: 7,
-	name: 'Create notification tables',
+  version: 7,
+  name: 'Create notification tables',
 
-	up: `
+  up: `
 		-- Create notification_services table
 		CREATE TABLE notification_services (
 			id TEXT PRIMARY KEY,                        -- UUID
@@ -64,7 +64,7 @@ export const migration: Migration = {
 		CREATE INDEX idx_notification_history_status ON notification_history(status);
 	`,
 
-	down: `
+  down: `
 		-- Drop indexes first
 		DROP INDEX IF EXISTS idx_notification_history_status;
 		DROP INDEX IF EXISTS idx_notification_history_sent_at;
@@ -75,5 +75,5 @@ export const migration: Migration = {
 		-- Drop tables
 		DROP TABLE IF EXISTS notification_history;
 		DROP TABLE IF EXISTS notification_services;
-	`
+	`,
 };

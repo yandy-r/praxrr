@@ -14,16 +14,16 @@ import { ChaptarrClient } from './clients/chaptarr.ts';
  * @returns Arr client instance
  */
 export function createArrClient(type: ArrType, url: string, apiKey: string, options?: ArrClientOptions): BaseArrClient {
-	switch (type) {
-		case 'radarr':
-			return new RadarrClient(url, apiKey, options);
-		case 'sonarr':
-			return new SonarrClient(url, apiKey, options);
-		case 'lidarr':
-			return new LidarrClient(url, apiKey, options);
-		case 'chaptarr':
-			return new ChaptarrClient(url, apiKey, options);
-		default:
-			throw new Error(`Unknown arr type: ${type}`);
-	}
+  switch (type) {
+    case 'radarr':
+      return new RadarrClient(url, apiKey, options);
+    case 'sonarr':
+      return new SonarrClient(url, apiKey, options);
+    case 'lidarr':
+      return new LidarrClient(url, apiKey, options);
+    case 'chaptarr':
+      return new ChaptarrClient(url, apiKey, options);
+    default:
+      throw new Error(`Unknown arr type: ${type}`);
+  }
 }
