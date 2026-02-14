@@ -24,7 +24,7 @@ const QUALITY_LOOKUP_MISSING_WARNING_REASON =
 const LIDARR_REUSE_ENTITY_REASON =
   "Lidarr v1 reuses Sonarr media-management entities; Lidarr-only fields stay unchanged";
 const LIDARR_QUALITY_SKIP_REASON =
-  "Lidarr quality definition sync applies only entries with Lidarr mappings and matching Lidarr definitions";
+  "Lidarr quality definition sync applies only to entries with Lidarr mappings and matching Lidarr definitions";
 
 interface CacheFixture {
   cache: PCDCache;
