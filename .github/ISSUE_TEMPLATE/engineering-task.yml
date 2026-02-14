@@ -1,0 +1,129 @@
+name: 🛠️ Engineering Task
+description: Structured implementation task for scoped, dependency-aware execution
+title: '[Task] <initiative> | <surface> | <action>'
+type: Feature
+labels:
+  - enhancement
+
+body:
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: Link this task to the broader initiative or problem.
+      placeholder: |
+        Initiative:
+        Background:
+        Why this task exists now:
+    validations:
+      required: true
+
+  - type: textarea
+    id: goal
+    attributes:
+      label: Goal
+      description: Define the single outcome this task must deliver.
+      placeholder: Clear, testable outcome statement
+    validations:
+      required: true
+
+  - type: textarea
+    id: in_scope
+    attributes:
+      label: In Scope
+      description: List explicit items this issue must include.
+      placeholder: |
+        - Item 1
+        - Item 2
+        - Item 3
+    validations:
+      required: true
+
+  - type: textarea
+    id: out_of_scope
+    attributes:
+      label: Out of Scope
+      description: List explicit non-goals to prevent scope creep.
+      placeholder: |
+        - Non-goal 1
+        - Non-goal 2
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Primary Area
+      description: Select the main domain impacted by this task.
+      options:
+        - API
+        - Arr Integration
+        - UI
+        - Sync
+        - Docs
+        - Tests
+    validations:
+      required: true
+
+  - type: input
+    id: dependencies
+    attributes:
+      label: Dependencies
+      description: Blocking issues only. Use issue references or `none`.
+      placeholder: '#123, #456 or none'
+    validations:
+      required: true
+
+  - type: textarea
+    id: implementation_notes
+    attributes:
+      label: Implementation Notes
+      description: Include affected files, constraints, and key decisions.
+      placeholder: |
+        Files:
+        Constraints:
+        Notes:
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance_criteria
+    attributes:
+      label: Acceptance Criteria
+      description: Provide pass/fail checks as a checklist.
+      placeholder: |
+        - [ ] Criterion 1
+        - [ ] Criterion 2
+        - [ ] Criterion 3
+    validations:
+      required: true
+
+  - type: textarea
+    id: test_plan
+    attributes:
+      label: Test Plan
+      description: Include exact commands and/or reproducible validation scenarios.
+      placeholder: |
+        Commands:
+        - deno task check
+        - deno task test <target>
+        Manual checks:
+        - Scenario 1
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: definition_of_done
+    attributes:
+      label: Definition of Done
+      options:
+        - label: Implementation is complete and scoped to this issue only.
+        - label: Acceptance criteria are met.
+        - label: Tests/checks in the test plan are run or explicitly documented if blocked.
+        - label: Related PR and follow-up issues are linked.
+
+  - type: input
+    id: related
+    attributes:
+      label: Related issues or PRs
+      placeholder: '#123, #456, owner/repo#789'
