@@ -401,7 +401,7 @@ VALUES ('R-QD-Seed', 'FLAC', 0, 1024, 256);
   }
 
   runTests(): void {
-    // Matrix: Naming (NM-01..NM-05)
+    // Matrix: Naming (NM-01..NM-07)
     this.test('[NM-01] naming list includes Lidarr config projection', async () => {
       await this.bootstrapFixture();
 
