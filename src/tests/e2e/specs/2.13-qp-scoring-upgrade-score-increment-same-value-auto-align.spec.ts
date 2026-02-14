@@ -17,90 +17,89 @@ const LOCAL_DB_NAME = 'E2E Local';
 const DEV_DB_NAME = 'E2E Dev';
 
 test.describe('2.13 QP scoring upgrade score increment desired already matches upstream', () => {
-	test.describe.configure({ timeout: 120_000 });
+  test.describe.configure({ timeout: 120_000 });
 
-	let localId: number;
-	let devId: number;
-	let devHead: string;
-	let profileName: string;
-	let desiredUpgradeScoreIncrement: number;
+  let localId: number;
+  let devId: number;
+  let devHead: string;
+  let profileName: string;
+  let desiredUpgradeScoreIncrement: number;
 
-	test.beforeEach(async ({ browser }) => {
-		const page = await browser.newPage();
-		await unlinkPcdByName(page, LOCAL_DB_NAME);
-		await unlinkPcdByName(page, DEV_DB_NAME);
+  test.beforeEach(async ({ browser }) => {
+    const page = await browser.newPage();
+    await unlinkPcdByName(page, LOCAL_DB_NAME);
+    await unlinkPcdByName(page, DEV_DB_NAME);
 
-		devId = await linkPcd(page, {
-			name: DEV_DB_NAME,
-			repoUrl: TEST_REPO_URL,
-			pat: TEST_PAT,
-			gitName: TEST_GIT_NAME,
-			gitEmail: TEST_GIT_EMAIL
-		});
-		devHead = getHead(devId);
+    devId = await linkPcd(page, {
+      name: DEV_DB_NAME,
+      repoUrl: TEST_REPO_URL,
+      pat: TEST_PAT,
+      gitName: TEST_GIT_NAME,
+      gitEmail: TEST_GIT_EMAIL,
+    });
+    devHead = getHead(devId);
 
-		localId = await linkPcd(page, {
-			name: LOCAL_DB_NAME,
-			repoUrl: TEST_REPO_URL,
-			pat: TEST_PAT,
-			gitName: TEST_GIT_NAME,
-			gitEmail: TEST_GIT_EMAIL,
-			syncStrategy: 'Manual (no auto-sync)',
-			autoPull: false,
-			localOpsEnabled: true,
-			conflictStrategy: 'Ask every time'
-		});
+    localId = await linkPcd(page, {
+      name: LOCAL_DB_NAME,
+      repoUrl: TEST_REPO_URL,
+      pat: TEST_PAT,
+      gitName: TEST_GIT_NAME,
+      gitEmail: TEST_GIT_EMAIL,
+      syncStrategy: 'Manual (no auto-sync)',
+      autoPull: false,
+      localOpsEnabled: true,
+      conflictStrategy: 'Ask every time',
+    });
 
-		profileName = await openFirstQualityProfileGeneral(page, localId);
-		await page.close();
-	});
+    profileName = await openFirstQualityProfileGeneral(page, localId);
+    await page.close();
+  });
 
-	test.afterEach(async ({ browser }) => {
-		if (devId && devHead) {
-			try {
-				resetToCommit(devId, devHead, true);
-			} catch {
-				// Best-effort reset
-			}
-		}
-		const page = await browser.newPage();
-		await unlinkPcdByName(page, LOCAL_DB_NAME);
-		await unlinkPcdByName(page, DEV_DB_NAME);
-		await page.close();
-	});
+  test.afterEach(async ({ browser }) => {
+    if (devId && devHead) {
+      try {
+        resetToCommit(devId, devHead, true);
+      } catch {
+        // Best-effort reset
+      }
+    }
+    const page = await browser.newPage();
+    await unlinkPcdByName(page, LOCAL_DB_NAME);
+    await unlinkPcdByName(page, DEV_DB_NAME);
+    await page.close();
+  });
 
-	test('auto-align', async ({ page }) => {
-		await goToQualityProfileScoring(page, localId, profileName);
-		const localInput = page.locator('input[name="upgradeScoreIncrement"]:not([type="hidden"])');
-		const localCurrent = Number(await localInput.inputValue());
-		desiredUpgradeScoreIncrement = localCurrent + 1;
-		await localInput.fill(String(desiredUpgradeScoreIncrement));
-		await page.getByRole('button', { name: 'Save' }).click();
-		await page.waitForLoadState('networkidle');
+  test('auto-align', async ({ page }) => {
+    await goToQualityProfileScoring(page, localId, profileName);
+    const localInput = page.locator('input[name="upgradeScoreIncrement"]:not([type="hidden"])');
+    const localCurrent = Number(await localInput.inputValue());
+    desiredUpgradeScoreIncrement = localCurrent + 1;
+    await localInput.fill(String(desiredUpgradeScoreIncrement));
+    await page.getByRole('button', { name: 'Save' }).click();
+    await page.waitForLoadState('networkidle');
 
-		await goToQualityProfileScoring(page, devId, profileName);
-		const devInput = page.locator('input[name="upgradeScoreIncrement"]:not([type="hidden"])');
-		await devInput.fill(String(desiredUpgradeScoreIncrement));
-		await page.getByRole('button', { name: 'Save' }).click();
-		await page.waitForLoadState('networkidle');
+    await goToQualityProfileScoring(page, devId, profileName);
+    const devInput = page.locator('input[name="upgradeScoreIncrement"]:not([type="hidden"])');
+    await devInput.fill(String(desiredUpgradeScoreIncrement));
+    await page.getByRole('button', { name: 'Save' }).click();
+    await page.waitForLoadState('networkidle');
 
-		await exportAndPush(
-			page,
-			devId,
-			'e2e: 2.13 qp scoring upgrade score increment desired matches upstream auto-align'
-		);
-		await pullChanges(page, localId);
+    await exportAndPush(
+      page,
+      devId,
+      'e2e: 2.13 qp scoring upgrade score increment desired matches upstream auto-align'
+    );
+    await pullChanges(page, localId);
 
-		await goToConflicts(page, localId);
-		expect(await getConflictCount(page)).toBe(0);
+    await goToConflicts(page, localId);
+    expect(await getConflictCount(page)).toBe(0);
 
-		await page.goto(`/databases/${localId}/changes`);
-		await page.waitForLoadState('networkidle');
-		await expect(page.getByText('No unpublished changes')).toBeVisible({ timeout: 15_000 });
+    await page.goto(`/databases/${localId}/changes`);
+    await page.waitForLoadState('networkidle');
+    await expect(page.getByText('No unpublished changes')).toBeVisible({ timeout: 15_000 });
 
-		await goToQualityProfileScoring(page, localId, profileName);
-		const finalInput = page.locator('input[name="upgradeScoreIncrement"]:not([type="hidden"])');
-		expect(Number(await finalInput.inputValue())).toBe(desiredUpgradeScoreIncrement);
-	});
+    await goToQualityProfileScoring(page, localId, profileName);
+    const finalInput = page.locator('input[name="upgradeScoreIncrement"]:not([type="hidden"])');
+    expect(Number(await finalInput.inputValue())).toBe(desiredUpgradeScoreIncrement);
+  });
 });
-

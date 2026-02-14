@@ -8,27 +8,21 @@
 
 // Types (consolidated in types.ts)
 export type {
-	SyncResult,
-	ProcessSyncsResult,
-	InstanceSyncResult,
-	SectionType,
-	SectionHandler,
-	ScheduledConfig,
-	SyncTriggerEvent,
-	TriggerContext
+  SyncResult,
+  ProcessSyncsResult,
+  InstanceSyncResult,
+  SectionType,
+  SectionHandler,
+  ScheduledConfig,
+  SyncTriggerEvent,
+  TriggerContext,
 } from './types.ts';
 
 // Base class
 export { BaseSyncer } from './base.ts';
 
 // Registry
-export {
-	getSection,
-	getAllSections,
-	getAllSectionTypes,
-	hasSection,
-	registerSection
-} from './registry.ts';
+export { getSection, getAllSections, getAllSectionTypes, hasSection, registerSection } from './registry.ts';
 
 // Syncer implementations
 export { QualityProfileSyncer } from './qualityProfiles/index.ts';

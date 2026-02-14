@@ -10,67 +10,67 @@ import { db } from '../db.ts';
  */
 
 interface LegacyFilterConfig {
-	id: string;
-	name: string;
-	enabled: boolean;
-	group: unknown;
-	selector: string;
-	count: number;
-	cutoff: number;
-	searchCooldown?: number; // Field being removed
+  id: string;
+  name: string;
+  enabled: boolean;
+  group: unknown;
+  selector: string;
+  count: number;
+  cutoff: number;
+  searchCooldown?: number; // Field being removed
 }
 
 interface UpgradeConfigRow {
-	id: number;
-	filters: string;
+  id: number;
+  filters: string;
 }
 
 /**
  * Remove searchCooldown from filter configs
  */
 function migrateFilterConfigs(): void {
-	const rows = db.query<UpgradeConfigRow>('SELECT id, filters FROM upgrade_configs');
+  const rows = db.query<UpgradeConfigRow>('SELECT id, filters FROM upgrade_configs');
 
-	for (const row of rows) {
-		try {
-			const filters = JSON.parse(row.filters) as LegacyFilterConfig[];
-			let modified = false;
+  for (const row of rows) {
+    try {
+      const filters = JSON.parse(row.filters) as LegacyFilterConfig[];
+      let modified = false;
 
-			const updatedFilters = filters.map((filter) => {
-				if ('searchCooldown' in filter) {
-					modified = true;
-					const { searchCooldown: _, ...rest } = filter;
-					return rest;
-				}
-				return filter;
-			});
+      const updatedFilters = filters.map((filter) => {
+        if ('searchCooldown' in filter) {
+          modified = true;
+          const { searchCooldown: _, ...rest } = filter;
+          return rest;
+        }
+        return filter;
+      });
 
-			if (modified) {
-				db.execute(
-					'UPDATE upgrade_configs SET filters = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-					JSON.stringify(updatedFilters),
-					row.id
-				);
-			}
-		} catch {
-			// Skip rows with invalid JSON - shouldn't happen but be safe
-		}
-	}
+      if (modified) {
+        db.execute(
+          'UPDATE upgrade_configs SET filters = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+          JSON.stringify(updatedFilters),
+          row.id
+        );
+      }
+    } catch {
+      // Skip rows with invalid JSON - shouldn't happen but be safe
+    }
+  }
 }
 
 export const migration: Migration = {
-	version: 31,
-	name: 'Remove searchCooldown from filter configs',
+  version: 31,
+  name: 'Remove searchCooldown from filter configs',
 
-	up: `
+  up: `
 		-- Data migration handled by afterUp callback
 		SELECT 1;
 	`,
 
-	down: `
+  down: `
 		-- Cannot restore removed searchCooldown values
 		SELECT 1;
 	`,
 
-	afterUp: migrateFilterConfigs
+  afterUp: migrateFilterConfigs,
 };

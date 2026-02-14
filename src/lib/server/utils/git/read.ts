@@ -7,144 +7,135 @@ import { fetch } from './write.ts';
 import type { GitStatus, UpdateInfo, Commit, IncomingChanges } from './types.ts';
 
 function normalizeAuthorName(name: string): string {
-	const trimmed = name.trim();
-	const normalized = trimmed.toLowerCase().replace(/\s+/g, ' ');
-	if (normalized === 'xshatterx') return 'Seraphys';
-	if (normalized === 'sam chau' || normalized === 'samuel chau') {
-		return 'santiagosayshey';
-	}
-	return trimmed;
+  const trimmed = name.trim();
+  const normalized = trimmed.toLowerCase().replace(/\s+/g, ' ');
+  if (normalized === 'xshatterx') return 'Seraphys';
+  if (normalized === 'sam chau' || normalized === 'samuel chau') {
+    return 'santiagosayshey';
+  }
+  return trimmed;
 }
 
 /**
  * Get current branch name
  */
 export async function getBranch(repoPath: string): Promise<string> {
-	return await execGit(['branch', '--show-current'], repoPath);
+  return await execGit(['branch', '--show-current'], repoPath);
 }
 
 export interface GetStatusOptions {
-	/** Whether to fetch from remote first (slower but accurate ahead/behind) */
-	fetch?: boolean;
+  /** Whether to fetch from remote first (slower but accurate ahead/behind) */
+  fetch?: boolean;
 }
 
 /**
  * Get full repository status
  */
-export async function getStatus(
-	repoPath: string,
-	options: GetStatusOptions = {}
-): Promise<GitStatus> {
-	const branch = await getBranch(repoPath);
+export async function getStatus(repoPath: string, options: GetStatusOptions = {}): Promise<GitStatus> {
+  const branch = await getBranch(repoPath);
 
-	// Optionally fetch to get accurate ahead/behind
-	if (options.fetch) {
-		await fetch(repoPath);
-	}
+  // Optionally fetch to get accurate ahead/behind
+  if (options.fetch) {
+    await fetch(repoPath);
+  }
 
-	// Get ahead/behind
-	let ahead = 0;
-	let behind = 0;
-	const revOutput = await execGitSafe(
-		['rev-list', '--left-right', '--count', `origin/${branch}...HEAD`],
-		repoPath
-	);
-	if (revOutput) {
-		const parts = revOutput.split('\t').map((n) => parseInt(n, 10) || 0);
-		behind = parts[0] || 0;
-		ahead = parts[1] || 0;
-	}
+  // Get ahead/behind
+  let ahead = 0;
+  let behind = 0;
+  const revOutput = await execGitSafe(['rev-list', '--left-right', '--count', `origin/${branch}...HEAD`], repoPath);
+  if (revOutput) {
+    const parts = revOutput.split('\t').map((n) => parseInt(n, 10) || 0);
+    behind = parts[0] || 0;
+    ahead = parts[1] || 0;
+  }
 
-	// Get file status — use raw output to preserve leading spaces in porcelain format
-	const statusCmd = new Deno.Command('git', {
-		args: ['status', '--porcelain'],
-		cwd: repoPath,
-		stdout: 'piped',
-		stderr: 'piped'
-	});
-	const statusResult = await statusCmd.output();
-	const statusOutput = new TextDecoder().decode(statusResult.stdout);
-	const untracked: string[] = [];
-	const modified: string[] = [];
-	const staged: string[] = [];
+  // Get file status — use raw output to preserve leading spaces in porcelain format
+  const statusCmd = new Deno.Command('git', {
+    args: ['status', '--porcelain'],
+    cwd: repoPath,
+    stdout: 'piped',
+    stderr: 'piped',
+  });
+  const statusResult = await statusCmd.output();
+  const statusOutput = new TextDecoder().decode(statusResult.stdout);
+  const untracked: string[] = [];
+  const modified: string[] = [];
+  const staged: string[] = [];
 
-	for (const line of statusOutput.split('\n')) {
-		if (!line || line.length < 4) continue;
+  for (const line of statusOutput.split('\n')) {
+    if (!line || line.length < 4) continue;
 
-		const status = line.substring(0, 2);
-		const file = line.substring(3);
+    const status = line.substring(0, 2);
+    const file = line.substring(3);
 
-		if (status.startsWith('??')) {
-			untracked.push(file);
-		} else if (status[1] === 'M' || status[1] === 'D') {
-			modified.push(file);
-		}
-		if (status[0] === 'M' || status[0] === 'A' || status[0] === 'D') {
-			staged.push(file);
-		}
-	}
+    if (status.startsWith('??')) {
+      untracked.push(file);
+    } else if (status[1] === 'M' || status[1] === 'D') {
+      modified.push(file);
+    }
+    if (status[0] === 'M' || status[0] === 'A' || status[0] === 'D') {
+      staged.push(file);
+    }
+  }
 
-	const isDirty = untracked.length > 0 || modified.length > 0 || staged.length > 0;
+  const isDirty = untracked.length > 0 || modified.length > 0 || staged.length > 0;
 
-	return { branch, isDirty, ahead, behind, untracked, modified, staged };
+  return { branch, isDirty, ahead, behind, untracked, modified, staged };
 }
 
 /**
  * Check for updates from remote
  */
 export async function checkForUpdates(repoPath: string): Promise<UpdateInfo> {
-	await fetch(repoPath);
+  await fetch(repoPath);
 
-	const branch = await getBranch(repoPath);
-	const remoteBranch = `origin/${branch}`;
+  const branch = await getBranch(repoPath);
+  const remoteBranch = `origin/${branch}`;
 
-	const currentLocalCommit = await execGit(['rev-parse', 'HEAD'], repoPath);
+  const currentLocalCommit = await execGit(['rev-parse', 'HEAD'], repoPath);
 
-	let latestRemoteCommit: string;
-	try {
-		latestRemoteCommit = await execGit(['rev-parse', remoteBranch], repoPath);
-	} catch {
-		return {
-			hasUpdates: false,
-			commitsBehind: 0,
-			commitsAhead: 0,
-			latestRemoteCommit: currentLocalCommit,
-			currentLocalCommit
-		};
-	}
+  let latestRemoteCommit: string;
+  try {
+    latestRemoteCommit = await execGit(['rev-parse', remoteBranch], repoPath);
+  } catch {
+    return {
+      hasUpdates: false,
+      commitsBehind: 0,
+      commitsAhead: 0,
+      latestRemoteCommit: currentLocalCommit,
+      currentLocalCommit,
+    };
+  }
 
-	const behindOutput = await execGitSafe(
-		['rev-list', '--count', `HEAD..${remoteBranch}`],
-		repoPath
-	);
-	const commitsBehind = parseInt(behindOutput || '0') || 0;
+  const behindOutput = await execGitSafe(['rev-list', '--count', `HEAD..${remoteBranch}`], repoPath);
+  const commitsBehind = parseInt(behindOutput || '0') || 0;
 
-	const aheadOutput = await execGitSafe(['rev-list', '--count', `${remoteBranch}..HEAD`], repoPath);
-	const commitsAhead = parseInt(aheadOutput || '0') || 0;
+  const aheadOutput = await execGitSafe(['rev-list', '--count', `${remoteBranch}..HEAD`], repoPath);
+  const commitsAhead = parseInt(aheadOutput || '0') || 0;
 
-	return {
-		hasUpdates: commitsBehind > 0,
-		commitsBehind,
-		commitsAhead,
-		latestRemoteCommit,
-		currentLocalCommit
-	};
+  return {
+    hasUpdates: commitsBehind > 0,
+    commitsBehind,
+    commitsAhead,
+    latestRemoteCommit,
+    currentLocalCommit,
+  };
 }
 
 /**
  * Get all local and remote branches
  */
 export async function getBranches(repoPath: string): Promise<string[]> {
-	// Get all branches (local and remote tracking)
-	const output = await execGit(['branch', '-a', '--format=%(refname:short)'], repoPath);
-	const branches = output
-		.split('\n')
-		.map((b) => b.trim())
-		.filter((b) => b && !b.includes('HEAD'))
-		.map((b) => b.replace(/^origin\//, ''))
-		.filter((b, i, arr) => arr.indexOf(b) === i); // dedupe
+  // Get all branches (local and remote tracking)
+  const output = await execGit(['branch', '-a', '--format=%(refname:short)'], repoPath);
+  const branches = output
+    .split('\n')
+    .map((b) => b.trim())
+    .filter((b) => b && !b.includes('HEAD'))
+    .map((b) => b.replace(/^origin\//, ''))
+    .filter((b, i, arr) => arr.indexOf(b) === i); // dedupe
 
-	return branches;
+  return branches;
 }
 
 /**
@@ -152,144 +143,132 @@ export async function getBranches(repoPath: string): Promise<string[]> {
  * Handles both tracked (modified) and untracked (new) files
  */
 export async function getDiff(repoPath: string, filepaths?: string[]): Promise<string> {
-	const diffs: string[] = [];
+  const diffs: string[] = [];
 
-	if (filepaths && filepaths.length > 0) {
-		for (const filepath of filepaths) {
-			const relativePath = filepath.startsWith(repoPath + '/')
-				? filepath.slice(repoPath.length + 1)
-				: filepath;
+  if (filepaths && filepaths.length > 0) {
+    for (const filepath of filepaths) {
+      const relativePath = filepath.startsWith(repoPath + '/') ? filepath.slice(repoPath.length + 1) : filepath;
 
-			// Check if file is untracked
-			const status = await execGitSafe(['status', '--porcelain', relativePath], repoPath);
-			const isUntracked = status?.startsWith('??');
+      // Check if file is untracked
+      const status = await execGitSafe(['status', '--porcelain', relativePath], repoPath);
+      const isUntracked = status?.startsWith('??');
 
-			if (isUntracked) {
-				// For untracked files, show as new file diff
-				try {
-					const content = await Deno.readTextFile(`${repoPath}/${relativePath}`);
-					diffs.push(`diff --git a/${relativePath} b/${relativePath}
+      if (isUntracked) {
+        // For untracked files, show as new file diff
+        try {
+          const content = await Deno.readTextFile(`${repoPath}/${relativePath}`);
+          diffs.push(`diff --git a/${relativePath} b/${relativePath}
 new file mode 100644
 --- /dev/null
 +++ b/${relativePath}
 @@ -0,0 +1,${content.split('\n').length} @@
 ${content
-	.split('\n')
-	.map((line) => '+' + line)
-	.join('\n')}`);
-				} catch {
-					// File doesn't exist or can't be read
-				}
-			} else {
-				// For tracked files, use git diff
-				const diff = await execGitSafe(['diff', 'HEAD', '--', relativePath], repoPath);
-				if (diff) {
-					diffs.push(diff);
-				}
-			}
-		}
-	} else {
-		// No specific files, get all changes
-		const diff = await execGitSafe(['diff', 'HEAD'], repoPath);
-		if (diff) {
-			diffs.push(diff);
-		}
-	}
+  .split('\n')
+  .map((line) => '+' + line)
+  .join('\n')}`);
+        } catch {
+          // File doesn't exist or can't be read
+        }
+      } else {
+        // For tracked files, use git diff
+        const diff = await execGitSafe(['diff', 'HEAD', '--', relativePath], repoPath);
+        if (diff) {
+          diffs.push(diff);
+        }
+      }
+    }
+  } else {
+    // No specific files, get all changes
+    const diff = await execGitSafe(['diff', 'HEAD'], repoPath);
+    if (diff) {
+      diffs.push(diff);
+    }
+  }
 
-	return diffs.join('\n\n');
+  return diffs.join('\n\n');
 }
 
 /**
  * Get commit history
  */
-export async function getCommits(
-	repoPath: string,
-	limit: number = 50,
-	ref?: string
-): Promise<Commit[]> {
-	// Format: hash|shortHash|message|author|email|date
-	const format = '%H|%h|%s|%an|%ae|%cI';
-	const args = ['log', `--format=${format}`, `-${limit}`];
-	if (ref) args.push(ref);
-	const output = await execGit(args, repoPath);
+export async function getCommits(repoPath: string, limit: number = 50, ref?: string): Promise<Commit[]> {
+  // Format: hash|shortHash|message|author|email|date
+  const format = '%H|%h|%s|%an|%ae|%cI';
+  const args = ['log', `--format=${format}`, `-${limit}`];
+  if (ref) args.push(ref);
+  const output = await execGit(args, repoPath);
 
-	if (!output.trim()) {
-		return [];
-	}
+  if (!output.trim()) {
+    return [];
+  }
 
-	const commits: Commit[] = [];
+  const commits: Commit[] = [];
 
-	for (const line of output.split('\n')) {
-		if (!line.trim()) continue;
+  for (const line of output.split('\n')) {
+    if (!line.trim()) continue;
 
-		const [hash, shortHash, message, author, authorEmail, date] = line.split('|');
+    const [hash, shortHash, message, author, authorEmail, date] = line.split('|');
 
-		// Get files changed for this commit
-		const statOutput = await execGitSafe(
-			['diff-tree', '--no-commit-id', '--name-only', '-r', hash],
-			repoPath
-		);
-		const files = statOutput ? statOutput.split('\n').filter((f) => f.trim()) : [];
+    // Get files changed for this commit
+    const statOutput = await execGitSafe(['diff-tree', '--no-commit-id', '--name-only', '-r', hash], repoPath);
+    const files = statOutput ? statOutput.split('\n').filter((f) => f.trim()) : [];
 
-		commits.push({
-			hash,
-			shortHash,
-			message,
-			author: normalizeAuthorName(author),
-			authorEmail,
-			date,
-			files
-		});
-	}
+    commits.push({
+      hash,
+      shortHash,
+      message,
+      author: normalizeAuthorName(author),
+      authorEmail,
+      date,
+      files,
+    });
+  }
 
-	return commits;
+  return commits;
 }
 
 /**
  * Get incoming changes (commits available to pull from remote)
  */
 export async function getIncomingChanges(repoPath: string): Promise<IncomingChanges> {
-	await fetch(repoPath);
+  await fetch(repoPath);
 
-	const branch = await getBranch(repoPath);
-	const remoteBranch = `origin/${branch}`;
+  const branch = await getBranch(repoPath);
+  const remoteBranch = `origin/${branch}`;
 
-	// Count commits behind
-	const countOutput = await execGitSafe(['rev-list', '--count', `HEAD..${remoteBranch}`], repoPath);
-	const commitsBehind = parseInt(countOutput || '0') || 0;
+  // Count commits behind
+  const countOutput = await execGitSafe(['rev-list', '--count', `HEAD..${remoteBranch}`], repoPath);
+  const commitsBehind = parseInt(countOutput || '0') || 0;
 
-	if (commitsBehind === 0) {
-		return { hasUpdates: false, commitsBehind: 0, commits: [] };
-	}
+  if (commitsBehind === 0) {
+    return { hasUpdates: false, commitsBehind: 0, commits: [] };
+  }
 
-	// Get commit details for incoming commits
-	const format = '%H|%h|%s|%an|%ae|%cI';
-	const output = await execGit(['log', `--format=${format}`, `HEAD..${remoteBranch}`], repoPath);
+  // Get commit details for incoming commits
+  const format = '%H|%h|%s|%an|%ae|%cI';
+  const output = await execGit(['log', `--format=${format}`, `HEAD..${remoteBranch}`], repoPath);
 
-	const commits: Commit[] = [];
+  const commits: Commit[] = [];
 
-	for (const line of output.split('\n')) {
-		if (!line.trim()) continue;
+  for (const line of output.split('\n')) {
+    if (!line.trim()) continue;
 
-		const [hash, shortHash, message, author, authorEmail, date] = line.split('|');
+    const [hash, shortHash, message, author, authorEmail, date] = line.split('|');
 
-		// Get files changed for this commit
-		const filesOutput = await execGitSafe(
-			['diff-tree', '--no-commit-id', '--name-only', '-r', hash],
-			repoPath
-		);
-		const files = filesOutput ? filesOutput.split('\n').filter((f) => f.trim()) : [];
+    // Get files changed for this commit
+    const filesOutput = await execGitSafe(['diff-tree', '--no-commit-id', '--name-only', '-r', hash], repoPath);
+    const files = filesOutput ? filesOutput.split('\n').filter((f) => f.trim()) : [];
 
-		commits.push({
-			hash,
-			shortHash,
-			message,
-			author: normalizeAuthorName(author),
-			authorEmail,
-			date,
-			files
-		});
-	}
+    commits.push({
+      hash,
+      shortHash,
+      message,
+      author: normalizeAuthorName(author),
+      authorEmail,
+      date,
+      files,
+    });
+  }
 
-	return { hasUpdates: true, commitsBehind, commits };
+  return { hasUpdates: true, commitsBehind, commits };
 }

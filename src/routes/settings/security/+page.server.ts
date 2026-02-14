@@ -7,139 +7,139 @@ import { hashPassword, verifyPassword } from '$auth/password.ts';
 import { logger } from '$logger/logger.ts';
 
 export const load: ServerLoad = async ({ cookies }) => {
-	const currentSessionId = cookies.get('session');
-	const user = usersQueries.getByUsername('admin') ?? usersQueries.getById(1);
+  const currentSessionId = cookies.get('session');
+  const user = usersQueries.getByUsername('admin') ?? usersQueries.getById(1);
 
-	if (!user) {
-		return { sessions: [], apiKey: null, currentSessionId: null };
-	}
+  if (!user) {
+    return { sessions: [], apiKey: null, currentSessionId: null };
+  }
 
-	const sessions = sessionsQueries.getByUserId(user.id);
-	const apiKey = authSettingsQueries.getApiKey();
+  const sessions = sessionsQueries.getByUserId(user.id);
+  const apiKey = authSettingsQueries.getApiKey();
 
-	return {
-		sessions: sessions.map(s => ({
-			id: s.id,
-			created_at: s.created_at,
-			expires_at: s.expires_at,
-			last_active_at: s.last_active_at,
-			ip_address: s.ip_address,
-			browser: s.browser,
-			os: s.os,
-			device_type: s.device_type,
-			isCurrent: s.id === currentSessionId
-		})),
-		apiKey,
-		currentSessionId
-	};
+  return {
+    sessions: sessions.map((s) => ({
+      id: s.id,
+      created_at: s.created_at,
+      expires_at: s.expires_at,
+      last_active_at: s.last_active_at,
+      ip_address: s.ip_address,
+      browser: s.browser,
+      os: s.os,
+      device_type: s.device_type,
+      isCurrent: s.id === currentSessionId,
+    })),
+    apiKey,
+    currentSessionId,
+  };
 };
 
 export const actions: Actions = {
-	changePassword: async ({ request, cookies }) => {
-		const formData = await request.formData();
-		const currentPassword = formData.get('currentPassword') as string;
-		const newPassword = formData.get('newPassword') as string;
-		const confirmPassword = formData.get('confirmPassword') as string;
+  changePassword: async ({ request, cookies }) => {
+    const formData = await request.formData();
+    const currentPassword = formData.get('currentPassword') as string;
+    const newPassword = formData.get('newPassword') as string;
+    const confirmPassword = formData.get('confirmPassword') as string;
 
-		if (!currentPassword || !newPassword || !confirmPassword) {
-			return fail(400, { passwordError: 'All fields are required' });
-		}
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      return fail(400, { passwordError: 'All fields are required' });
+    }
 
-		if (newPassword.length < 8) {
-			return fail(400, { passwordError: 'New password must be at least 8 characters' });
-		}
+    if (newPassword.length < 8) {
+      return fail(400, { passwordError: 'New password must be at least 8 characters' });
+    }
 
-		if (newPassword !== confirmPassword) {
-			return fail(400, { passwordError: 'Passwords do not match' });
-		}
+    if (newPassword !== confirmPassword) {
+      return fail(400, { passwordError: 'Passwords do not match' });
+    }
 
-		// Get current user from session
-		const sessionId = cookies.get('session');
-		if (!sessionId) {
-			return fail(401, { passwordError: 'Not authenticated' });
-		}
+    // Get current user from session
+    const sessionId = cookies.get('session');
+    if (!sessionId) {
+      return fail(401, { passwordError: 'Not authenticated' });
+    }
 
-		const session = sessionsQueries.getValidById(sessionId);
-		if (!session) {
-			return fail(401, { passwordError: 'Invalid session' });
-		}
+    const session = sessionsQueries.getValidById(sessionId);
+    if (!session) {
+      return fail(401, { passwordError: 'Invalid session' });
+    }
 
-		const user = usersQueries.getById(session.user_id);
-		if (!user) {
-			return fail(401, { passwordError: 'User not found' });
-		}
+    const user = usersQueries.getById(session.user_id);
+    if (!user) {
+      return fail(401, { passwordError: 'User not found' });
+    }
 
-		// Verify current password
-		const valid = await verifyPassword(currentPassword, user.password_hash);
-		if (!valid) {
-			return fail(400, { passwordError: 'Current password is incorrect' });
-		}
+    // Verify current password
+    const valid = await verifyPassword(currentPassword, user.password_hash);
+    if (!valid) {
+      return fail(400, { passwordError: 'Current password is incorrect' });
+    }
 
-		// Update password
-		const newHash = await hashPassword(newPassword);
-		usersQueries.updatePassword(user.id, newHash);
+    // Update password
+    const newHash = await hashPassword(newPassword);
+    usersQueries.updatePassword(user.id, newHash);
 
-		await logger.info(`Password changed for '${user.username}'`, {
-			source: 'Auth',
-			meta: { userId: user.id, username: user.username }
-		});
+    await logger.info(`Password changed for '${user.username}'`, {
+      source: 'Auth',
+      meta: { userId: user.id, username: user.username },
+    });
 
-		return { passwordSuccess: true };
-	},
+    return { passwordSuccess: true };
+  },
 
-	regenerateApiKey: async () => {
-		const newKey = authSettingsQueries.regenerateApiKey();
+  regenerateApiKey: async () => {
+    const newKey = authSettingsQueries.regenerateApiKey();
 
-		await logger.info('API key regenerated', {
-			source: 'Auth:APIKey'
-		});
+    await logger.info('API key regenerated', {
+      source: 'Auth:APIKey',
+    });
 
-		return { apiKey: newKey, apiKeyRegenerated: true };
-	},
+    return { apiKey: newKey, apiKeyRegenerated: true };
+  },
 
-	revokeSession: async ({ request, cookies }) => {
-		const formData = await request.formData();
-		const sessionId = formData.get('sessionId') as string;
-		const currentSessionId = cookies.get('session');
+  revokeSession: async ({ request, cookies }) => {
+    const formData = await request.formData();
+    const sessionId = formData.get('sessionId') as string;
+    const currentSessionId = cookies.get('session');
 
-		if (!sessionId) {
-			return fail(400, { sessionError: 'Session ID required' });
-		}
+    if (!sessionId) {
+      return fail(400, { sessionError: 'Session ID required' });
+    }
 
-		if (sessionId === currentSessionId) {
-			return fail(400, { sessionError: 'Cannot revoke current session' });
-		}
+    if (sessionId === currentSessionId) {
+      return fail(400, { sessionError: 'Cannot revoke current session' });
+    }
 
-		sessionsQueries.deleteById(sessionId);
+    sessionsQueries.deleteById(sessionId);
 
-		await logger.info('Session revoked', {
-			source: 'Auth:Session',
-			meta: { revokedSessionId: sessionId.slice(0, 8) + '...' }
-		});
+    await logger.info('Session revoked', {
+      source: 'Auth:Session',
+      meta: { revokedSessionId: sessionId.slice(0, 8) + '...' },
+    });
 
-		return { sessionRevoked: true };
-	},
+    return { sessionRevoked: true };
+  },
 
-	revokeOtherSessions: async ({ cookies }) => {
-		const currentSessionId = cookies.get('session');
-		if (!currentSessionId) {
-			return fail(401, { sessionError: 'Not authenticated' });
-		}
+  revokeOtherSessions: async ({ cookies }) => {
+    const currentSessionId = cookies.get('session');
+    if (!currentSessionId) {
+      return fail(401, { sessionError: 'Not authenticated' });
+    }
 
-		const session = sessionsQueries.getValidById(currentSessionId);
-		if (!session) {
-			return fail(401, { sessionError: 'Invalid session' });
-		}
+    const session = sessionsQueries.getValidById(currentSessionId);
+    if (!session) {
+      return fail(401, { sessionError: 'Invalid session' });
+    }
 
-		const count = sessionsQueries.deleteOthersByUserId(session.user_id, currentSessionId);
+    const count = sessionsQueries.deleteOthersByUserId(session.user_id, currentSessionId);
 
-		if (count > 0) {
-			await logger.info(`Revoked ${count} other session${count === 1 ? '' : 's'}`, {
-				source: 'Auth:Session',
-				meta: { userId: session.user_id, count }
-			});
-		}
+    if (count > 0) {
+      await logger.info(`Revoked ${count} other session${count === 1 ? '' : 's'}`, {
+        source: 'Auth:Session',
+        meta: { userId: session.user_id, count },
+      });
+    }
 
-		return { sessionsRevoked: count };
-	}
+    return { sessionsRevoked: count };
+  },
 };

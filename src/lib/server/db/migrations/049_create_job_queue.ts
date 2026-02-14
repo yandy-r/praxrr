@@ -6,9 +6,9 @@ import type { Migration } from '../migrations.ts';
  * - job_run_history: stores execution history for job instances
  */
 export const migration: Migration = {
-	version: 49,
-	name: 'Create job queue tables',
-	up: `
+  version: 49,
+  name: 'Create job queue tables',
+  up: `
 		CREATE TABLE job_queue (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
 			job_type TEXT NOT NULL,
@@ -46,7 +46,7 @@ export const migration: Migration = {
 		CREATE INDEX idx_job_run_history_started_at ON job_run_history(started_at);
 		CREATE INDEX idx_job_run_history_status ON job_run_history(status);
 	`,
-	down: `
+  down: `
 		DROP INDEX IF EXISTS idx_job_run_history_status;
 		DROP INDEX IF EXISTS idx_job_run_history_started_at;
 		DROP INDEX IF EXISTS idx_job_run_history_queue_id;
@@ -55,5 +55,5 @@ export const migration: Migration = {
 		DROP INDEX IF EXISTS idx_job_queue_dedupe_key;
 		DROP TABLE IF EXISTS job_run_history;
 		DROP TABLE IF EXISTS job_queue;
-	`
+	`,
 };

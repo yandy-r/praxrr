@@ -1,10 +1,10 @@
 import type { Migration } from '../migrations.ts';
 
 export const migration: Migration = {
-	version: 17,
-	name: 'Create regex101 cache table',
+  version: 17,
+  name: 'Create regex101 cache table',
 
-	up: `
+  up: `
 		CREATE TABLE IF NOT EXISTS regex101_cache (
 			regex101_id TEXT PRIMARY KEY,
 			response TEXT NOT NULL,
@@ -12,7 +12,7 @@ export const migration: Migration = {
 		);
 	`,
 
-	down: `
+  down: `
 		DROP TABLE IF EXISTS regex101_cache;
-	`
+	`,
 };

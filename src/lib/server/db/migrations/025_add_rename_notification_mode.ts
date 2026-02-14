@@ -11,14 +11,14 @@ import type { Migration } from '../migrations.ts';
  */
 
 export const migration: Migration = {
-	version: 25,
-	name: 'Add summary_notifications to arr_rename_settings',
+  version: 25,
+  name: 'Add summary_notifications to arr_rename_settings',
 
-	up: `
+  up: `
 		ALTER TABLE arr_rename_settings ADD COLUMN summary_notifications INTEGER NOT NULL DEFAULT 1;
 	`,
 
-	down: `
+  down: `
 		ALTER TABLE arr_rename_settings DROP COLUMN summary_notifications;
-	`
+	`,
 };

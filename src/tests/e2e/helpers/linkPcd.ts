@@ -21,10 +21,7 @@ export interface LinkPcdOpts {
 /**
  * Navigate to /databases/new, fill the form, save, and return the new database ID.
  */
-export async function linkPcd(
-  page: Page,
-  opts: LinkPcdOpts
-): Promise<number> {
+export async function linkPcd(page: Page, opts: LinkPcdOpts): Promise<number> {
   await page.goto('/databases/new');
   await page.waitForLoadState('networkidle');
 

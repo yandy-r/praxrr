@@ -1,93 +1,90 @@
 import { error, fail } from '@sveltejs/kit';
 import type { PageServerLoad, Actions } from './$types';
 import {
-	readManifest,
-	writeManifest,
-	validateManifest,
-	readReadme,
-	writeReadme,
-	type Manifest,
-	syncDependencies,
-	compile
+  readManifest,
+  writeManifest,
+  validateManifest,
+  readReadme,
+  writeReadme,
+  type Manifest,
+  syncDependencies,
+  compile,
 } from '$pcd/index.ts';
 import { parseMarkdown } from '$utils/markdown/markdown.ts';
 import { databaseInstancesQueries } from '$db/queries/databaseInstances.ts';
 
 export const load: PageServerLoad = async ({ parent }) => {
-	const { database } = await parent();
+  const { database } = await parent();
 
-	if (!database.personal_access_token) {
-		error(403, 'Config page requires a personal access token');
-	}
+  if (!database.personal_access_token) {
+    error(403, 'Config page requires a personal access token');
+  }
 
-	let manifest: Manifest | null = null;
-	let readmeRaw: string | null = null;
-	let readmeHtml: string | null = null;
+  let manifest: Manifest | null = null;
+  let readmeRaw: string | null = null;
+  let readmeHtml: string | null = null;
 
-	try {
-		manifest = await readManifest(database.local_path);
-	} catch {
-		// Manifest might not exist yet
-	}
+  try {
+    manifest = await readManifest(database.local_path);
+  } catch {
+    // Manifest might not exist yet
+  }
 
-	readmeRaw = await readReadme(database.local_path);
-	if (readmeRaw) {
-		readmeHtml = parseMarkdown(readmeRaw);
-	}
+  readmeRaw = await readReadme(database.local_path);
+  if (readmeRaw) {
+    readmeHtml = parseMarkdown(readmeRaw);
+  }
 
-	return {
-		manifest,
-		readmeRaw,
-		readmeHtml
-	};
+  return {
+    manifest,
+    readmeRaw,
+    readmeHtml,
+  };
 };
 
 export const actions: Actions = {
-	save: async ({ request, params }) => {
-		const id = parseInt(params.id, 10);
-		const database = databaseInstancesQueries.getById(id);
+  save: async ({ request, params }) => {
+    const id = parseInt(params.id, 10);
+    const database = databaseInstancesQueries.getById(id);
 
-		if (!database) {
-			return fail(404, { error: 'Database not found' });
-		}
+    if (!database) {
+      return fail(404, { error: 'Database not found' });
+    }
 
-		if (!database.personal_access_token) {
-			return fail(403, { error: 'Personal access token required' });
-		}
+    if (!database.personal_access_token) {
+      return fail(403, { error: 'Personal access token required' });
+    }
 
-		const formData = await request.formData();
-		const manifestJson = formData.get('manifest') as string;
-		const readme = formData.get('readme') as string;
+    const formData = await request.formData();
+    const manifestJson = formData.get('manifest') as string;
+    const readme = formData.get('readme') as string;
 
-		try {
-			const manifest = JSON.parse(manifestJson);
-			validateManifest(manifest);
-			await writeManifest(database.local_path, manifest);
-			await writeReadme(database.local_path, readme);
+    try {
+      const manifest = JSON.parse(manifestJson);
+      validateManifest(manifest);
+      await writeManifest(database.local_path, manifest);
+      await writeReadme(database.local_path, readme);
 
-			try {
-				await syncDependencies(
-					database.local_path,
-					database.personal_access_token ?? undefined
-				);
-			} catch (error) {
-				const message = error instanceof Error ? error.message : String(error);
-				return fail(500, { error: `Failed to sync dependencies: ${message}` });
-			}
+      try {
+        await syncDependencies(database.local_path, database.personal_access_token ?? undefined);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        return fail(500, { error: `Failed to sync dependencies: ${message}` });
+      }
 
-			if (database.enabled) {
-				try {
-					await compile(database.local_path, id);
-				} catch (error) {
-					const message = error instanceof Error ? error.message : String(error);
-					return fail(500, { error: `Failed to rebuild cache: ${message}` });
-				}
-			}
+      if (database.enabled) {
+        try {
+          await compile(database.local_path, id);
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          return fail(500, { error: `Failed to rebuild cache: ${message}` });
+        }
+      }
 
-			return { success: true };
-		} catch (err) {
-			const message = err instanceof Error ? err.message : String(err);
-			return fail(400, { error: message });
-		}
-	}
+      return { success: true };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      return fail(400, { error: message });
+    }
+  },
 };

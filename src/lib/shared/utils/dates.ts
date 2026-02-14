@@ -24,14 +24,14 @@
  * toUTC(null)                      // null
  */
 export function toUTC(timestamp: string | null | undefined): string | null {
-	if (!timestamp) return null;
+  if (!timestamp) return null;
 
-	const trimmed = timestamp.trim();
-	// Already has timezone info - return as-is
-	if (/[+-]\d{2}:\d{2}$/.test(trimmed) || trimmed.endsWith('Z')) return trimmed;
+  const trimmed = timestamp.trim();
+  // Already has timezone info - return as-is
+  if (/[+-]\d{2}:\d{2}$/.test(trimmed) || trimmed.endsWith('Z')) return trimmed;
 
-	// Replace space with T (SQLite format) and add Z
-	return trimmed.replace(' ', 'T') + 'Z';
+  // Replace space with T (SQLite format) and add Z
+  return trimmed.replace(' ', 'T') + 'Z';
 }
 
 /**
@@ -46,7 +46,7 @@ export function toUTC(timestamp: string | null | undefined): string | null {
  * parseUTC(null)                   // null
  */
 export function parseUTC(timestamp: string | null | undefined): Date | null {
-	const normalized = toUTC(timestamp);
-	if (!normalized) return null;
-	return new Date(normalized);
+  const normalized = toUTC(timestamp);
+  if (!normalized) return null;
+  return new Date(normalized);
 }

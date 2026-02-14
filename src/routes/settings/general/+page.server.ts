@@ -10,279 +10,279 @@ import { logger } from '$logger/logger.ts';
 import { scheduleBackupJobs, scheduleLogCleanup } from '$lib/server/jobs/init.ts';
 
 export const load = () => {
-	const logSetting = logSettingsQueries.get();
-	const backupSetting = backupSettingsQueries.get();
-	const aiSetting = aiSettingsQueries.get();
-	const tmdbSetting = tmdbSettingsQueries.get();
-	const generalSetting = generalSettingsQueries.get();
+  const logSetting = logSettingsQueries.get();
+  const backupSetting = backupSettingsQueries.get();
+  const aiSetting = aiSettingsQueries.get();
+  const tmdbSetting = tmdbSettingsQueries.get();
+  const generalSetting = generalSettingsQueries.get();
 
-	if (!logSetting) {
-		throw new Error('Log settings not found in database');
-	}
+  if (!logSetting) {
+    throw new Error('Log settings not found in database');
+  }
 
-	if (!backupSetting) {
-		throw new Error('Backup settings not found in database');
-	}
+  if (!backupSetting) {
+    throw new Error('Backup settings not found in database');
+  }
 
-	if (!aiSetting) {
-		throw new Error('AI settings not found in database');
-	}
+  if (!aiSetting) {
+    throw new Error('AI settings not found in database');
+  }
 
-	if (!tmdbSetting) {
-		throw new Error('TMDB settings not found in database');
-	}
+  if (!tmdbSetting) {
+    throw new Error('TMDB settings not found in database');
+  }
 
-	if (!generalSetting) {
-		throw new Error('General settings not found in database');
-	}
+  if (!generalSetting) {
+    throw new Error('General settings not found in database');
+  }
 
-	return {
-		logSettings: {
-			retention_days: logSetting.retention_days,
-			min_level: logSetting.min_level,
-			enabled: logSetting.enabled === 1,
-			file_logging: logSetting.file_logging === 1,
-			console_logging: logSetting.console_logging === 1
-		},
-		backupSettings: {
-			schedule: backupSetting.schedule,
-			retention_days: backupSetting.retention_days,
-			enabled: backupSetting.enabled === 1,
-			include_database: backupSetting.include_database === 1,
-			compression_enabled: backupSetting.compression_enabled === 1
-		},
-		aiSettings: {
-			enabled: aiSetting.enabled === 1,
-			api_url: aiSetting.api_url,
-			api_key: aiSetting.api_key,
-			model: aiSetting.model
-		},
-		tmdbSettings: {
-			api_key: tmdbSetting.api_key
-		},
-		generalSettings: {
-			apply_default_delay_profiles: generalSetting.apply_default_delay_profiles === 1
-		}
-	};
+  return {
+    logSettings: {
+      retention_days: logSetting.retention_days,
+      min_level: logSetting.min_level,
+      enabled: logSetting.enabled === 1,
+      file_logging: logSetting.file_logging === 1,
+      console_logging: logSetting.console_logging === 1,
+    },
+    backupSettings: {
+      schedule: backupSetting.schedule,
+      retention_days: backupSetting.retention_days,
+      enabled: backupSetting.enabled === 1,
+      include_database: backupSetting.include_database === 1,
+      compression_enabled: backupSetting.compression_enabled === 1,
+    },
+    aiSettings: {
+      enabled: aiSetting.enabled === 1,
+      api_url: aiSetting.api_url,
+      api_key: aiSetting.api_key,
+      model: aiSetting.model,
+    },
+    tmdbSettings: {
+      api_key: tmdbSetting.api_key,
+    },
+    generalSettings: {
+      apply_default_delay_profiles: generalSetting.apply_default_delay_profiles === 1,
+    },
+  };
 };
 
 export const actions: Actions = {
-	updateLogs: async ({ request }: RequestEvent) => {
-		const formData = await request.formData();
+  updateLogs: async ({ request }: RequestEvent) => {
+    const formData = await request.formData();
 
-		// Parse form data
-		const retentionDays = parseInt(formData.get('retention_days') as string);
-		const minLevel = formData.get('min_level') as 'DEBUG' | 'INFO' | 'WARN' | 'ERROR';
-		const enabled = formData.get('enabled') === 'on';
-		const fileLogging = formData.get('file_logging') === 'on';
-		const consoleLogging = formData.get('console_logging') === 'on';
+    // Parse form data
+    const retentionDays = parseInt(formData.get('retention_days') as string);
+    const minLevel = formData.get('min_level') as 'DEBUG' | 'INFO' | 'WARN' | 'ERROR';
+    const enabled = formData.get('enabled') === 'on';
+    const fileLogging = formData.get('file_logging') === 'on';
+    const consoleLogging = formData.get('console_logging') === 'on';
 
-		// Validate
-		if (isNaN(retentionDays) || retentionDays < 1 || retentionDays > 365) {
-			return fail(400, { error: 'Retention days must be between 1 and 365' });
-		}
+    // Validate
+    if (isNaN(retentionDays) || retentionDays < 1 || retentionDays > 365) {
+      return fail(400, { error: 'Retention days must be between 1 and 365' });
+    }
 
-		if (!minLevel || !['DEBUG', 'INFO', 'WARN', 'ERROR'].includes(minLevel)) {
-			return fail(400, { error: 'Invalid minimum log level' });
-		}
+    if (!minLevel || !['DEBUG', 'INFO', 'WARN', 'ERROR'].includes(minLevel)) {
+      return fail(400, { error: 'Invalid minimum log level' });
+    }
 
-		// Update settings
-		const updated = logSettingsQueries.update({
-			retentionDays,
-			minLevel,
-			enabled,
-			fileLogging,
-			consoleLogging
-		});
+    // Update settings
+    const updated = logSettingsQueries.update({
+      retentionDays,
+      minLevel,
+      enabled,
+      fileLogging,
+      consoleLogging,
+    });
 
-		if (!updated) {
-			await logger.error('Failed to update log settings', {
-				source: 'settings/general'
-			});
-			return fail(500, { error: 'Failed to update settings' });
-		}
+    if (!updated) {
+      await logger.error('Failed to update log settings', {
+        source: 'settings/general',
+      });
+      return fail(500, { error: 'Failed to update settings' });
+    }
 
-		// Reload settings into cache
-		logSettings.reload();
-		scheduleLogCleanup();
+    // Reload settings into cache
+    logSettings.reload();
+    scheduleLogCleanup();
 
-		await logger.info('Log settings updated', {
-			source: 'settings/general',
-			meta: {
-				retentionDays,
-				minLevel,
-				enabled,
-				fileLogging,
-				consoleLogging
-			}
-		});
+    await logger.info('Log settings updated', {
+      source: 'settings/general',
+      meta: {
+        retentionDays,
+        minLevel,
+        enabled,
+        fileLogging,
+        consoleLogging,
+      },
+    });
 
-		return { success: true };
-	},
+    return { success: true };
+  },
 
-	resetLogs: async () => {
-		const reset = logSettingsQueries.reset();
+  resetLogs: async () => {
+    const reset = logSettingsQueries.reset();
 
-		if (!reset) {
-			await logger.error('Failed to reset log settings', {
-				source: 'settings/general'
-			});
-			return fail(500, { error: 'Failed to reset settings' });
-		}
+    if (!reset) {
+      await logger.error('Failed to reset log settings', {
+        source: 'settings/general',
+      });
+      return fail(500, { error: 'Failed to reset settings' });
+    }
 
-		// Reload settings into cache
-		logSettings.reload();
-		scheduleLogCleanup();
+    // Reload settings into cache
+    logSettings.reload();
+    scheduleLogCleanup();
 
-		await logger.info('Log settings reset to defaults', {
-			source: 'settings/general'
-		});
+    await logger.info('Log settings reset to defaults', {
+      source: 'settings/general',
+    });
 
-		return { success: true, reset: true };
-	},
+    return { success: true, reset: true };
+  },
 
-	updateBackups: async ({ request }: RequestEvent) => {
-		const formData = await request.formData();
+  updateBackups: async ({ request }: RequestEvent) => {
+    const formData = await request.formData();
 
-		// Parse form data
-		const schedule = formData.get('schedule') as string;
-		const retentionDays = parseInt(formData.get('retention_days') as string);
-		const enabled = formData.get('enabled') === 'on';
-		const compressionEnabled = formData.get('compression_enabled') === 'on';
+    // Parse form data
+    const schedule = formData.get('schedule') as string;
+    const retentionDays = parseInt(formData.get('retention_days') as string);
+    const enabled = formData.get('enabled') === 'on';
+    const compressionEnabled = formData.get('compression_enabled') === 'on';
 
-		// Validate
-		if (!schedule) {
-			return fail(400, { error: 'Schedule is required' });
-		}
+    // Validate
+    if (!schedule) {
+      return fail(400, { error: 'Schedule is required' });
+    }
 
-		if (isNaN(retentionDays) || retentionDays < 1 || retentionDays > 365) {
-			return fail(400, { error: 'Retention days must be between 1 and 365' });
-		}
+    if (isNaN(retentionDays) || retentionDays < 1 || retentionDays > 365) {
+      return fail(400, { error: 'Retention days must be between 1 and 365' });
+    }
 
-		// Update settings
-		const updated = backupSettingsQueries.update({
-			schedule,
-			retentionDays,
-			enabled,
-			compressionEnabled
-		});
+    // Update settings
+    const updated = backupSettingsQueries.update({
+      schedule,
+      retentionDays,
+      enabled,
+      compressionEnabled,
+    });
 
-		if (!updated) {
-			await logger.error('Failed to update backup settings', {
-				source: 'settings/general'
-			});
-			return fail(500, { error: 'Failed to update settings' });
-		}
+    if (!updated) {
+      await logger.error('Failed to update backup settings', {
+        source: 'settings/general',
+      });
+      return fail(500, { error: 'Failed to update settings' });
+    }
 
-		await logger.info('Backup settings updated', {
-			source: 'settings/general',
-			meta: {
-				schedule,
-				retentionDays,
-				enabled,
-				compressionEnabled
-			}
-		});
+    await logger.info('Backup settings updated', {
+      source: 'settings/general',
+      meta: {
+        schedule,
+        retentionDays,
+        enabled,
+        compressionEnabled,
+      },
+    });
 
-		scheduleBackupJobs();
+    scheduleBackupJobs();
 
-		return { success: true };
-	},
+    return { success: true };
+  },
 
-	updateAI: async ({ request }: RequestEvent) => {
-		const formData = await request.formData();
+  updateAI: async ({ request }: RequestEvent) => {
+    const formData = await request.formData();
 
-		// Parse form data
-		const enabled = formData.get('enabled') === 'on';
-		const apiUrl = formData.get('api_url') as string;
-		const apiKey = formData.get('api_key') as string;
-		const model = formData.get('model') as string;
+    // Parse form data
+    const enabled = formData.get('enabled') === 'on';
+    const apiUrl = formData.get('api_url') as string;
+    const apiKey = formData.get('api_key') as string;
+    const model = formData.get('model') as string;
 
-		// Validate
-		if (enabled && !apiUrl) {
-			return fail(400, { error: 'API URL is required when AI is enabled' });
-		}
+    // Validate
+    if (enabled && !apiUrl) {
+      return fail(400, { error: 'API URL is required when AI is enabled' });
+    }
 
-		if (enabled && !model) {
-			return fail(400, { error: 'Model is required when AI is enabled' });
-		}
+    if (enabled && !model) {
+      return fail(400, { error: 'Model is required when AI is enabled' });
+    }
 
-		// Update settings
-		const updated = aiSettingsQueries.update({
-			enabled,
-			apiUrl: apiUrl || 'https://api.openai.com/v1',
-			apiKey: apiKey || '',
-			model: model || 'gpt-4o-mini'
-		});
+    // Update settings
+    const updated = aiSettingsQueries.update({
+      enabled,
+      apiUrl: apiUrl || 'https://api.openai.com/v1',
+      apiKey: apiKey || '',
+      model: model || 'gpt-4o-mini',
+    });
 
-		if (!updated) {
-			await logger.error('Failed to update AI settings', {
-				source: 'settings/general'
-			});
-			return fail(500, { error: 'Failed to update settings' });
-		}
+    if (!updated) {
+      await logger.error('Failed to update AI settings', {
+        source: 'settings/general',
+      });
+      return fail(500, { error: 'Failed to update settings' });
+    }
 
-		await logger.info('AI settings updated', {
-			source: 'settings/general',
-			meta: {
-				enabled,
-				apiUrl,
-				model
-				// Note: Don't log apiKey for security
-			}
-		});
+    await logger.info('AI settings updated', {
+      source: 'settings/general',
+      meta: {
+        enabled,
+        apiUrl,
+        model,
+        // Note: Don't log apiKey for security
+      },
+    });
 
-		return { success: true };
-	},
+    return { success: true };
+  },
 
-	updateTMDB: async ({ request }: RequestEvent) => {
-		const formData = await request.formData();
+  updateTMDB: async ({ request }: RequestEvent) => {
+    const formData = await request.formData();
 
-		// Parse form data
-		const apiKey = formData.get('api_key') as string;
+    // Parse form data
+    const apiKey = formData.get('api_key') as string;
 
-		// Update settings
-		const updated = tmdbSettingsQueries.update({
-			apiKey: apiKey || ''
-		});
+    // Update settings
+    const updated = tmdbSettingsQueries.update({
+      apiKey: apiKey || '',
+    });
 
-		if (!updated) {
-			await logger.error('Failed to update TMDB settings', {
-				source: 'settings/general'
-			});
-			return fail(500, { error: 'Failed to update settings' });
-		}
+    if (!updated) {
+      await logger.error('Failed to update TMDB settings', {
+        source: 'settings/general',
+      });
+      return fail(500, { error: 'Failed to update settings' });
+    }
 
-		await logger.info('TMDB settings updated', {
-			source: 'settings/general'
-		});
+    await logger.info('TMDB settings updated', {
+      source: 'settings/general',
+    });
 
-		return { success: true };
-	},
+    return { success: true };
+  },
 
-	updateArrDefaults: async ({ request }: RequestEvent) => {
-		const formData = await request.formData();
+  updateArrDefaults: async ({ request }: RequestEvent) => {
+    const formData = await request.formData();
 
-		// Parse form data
-		const applyDefaultDelayProfiles = formData.get('apply_default_delay_profiles') === 'on';
+    // Parse form data
+    const applyDefaultDelayProfiles = formData.get('apply_default_delay_profiles') === 'on';
 
-		// Update settings
-		const updated = generalSettingsQueries.update({
-			applyDefaultDelayProfiles
-		});
+    // Update settings
+    const updated = generalSettingsQueries.update({
+      applyDefaultDelayProfiles,
+    });
 
-		if (!updated) {
-			await logger.error('Failed to update arr default settings', {
-				source: 'settings/general'
-			});
-			return fail(500, { error: 'Failed to update settings' });
-		}
+    if (!updated) {
+      await logger.error('Failed to update arr default settings', {
+        source: 'settings/general',
+      });
+      return fail(500, { error: 'Failed to update settings' });
+    }
 
-		await logger.info('Arr default settings updated', {
-			source: 'settings/general',
-			meta: { applyDefaultDelayProfiles }
-		});
+    await logger.info('Arr default settings updated', {
+      source: 'settings/general',
+      meta: { applyDefaultDelayProfiles },
+    });
 
-		return { success: true };
-	}
+    return { success: true };
+  },
 };

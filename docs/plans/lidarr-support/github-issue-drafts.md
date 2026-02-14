@@ -278,14 +278,14 @@ Completed: 2026-02-13
 
 ### Final Task-to-Issue Mapping (from `parallel-plan.md`)
 
-| Issue | Scope | Tasks |
-|-------|-------|-------|
-| `#1` | Foundation/onboarding/type contracts | `1.1`, `1.3`, `1.4`, `1.5`, `3.4` |
-| `#2` | Sync/media-management compatibility | `1.2`, `1.4`, `2.1`, `2.4`, `2.5`, `3.5` |
-| `#3` | Library/releases delivery | `2.1`, `2.2`, `2.3`, `3.4` |
-| `#4` | UI generalization/capability UX | `1.6`, `1.7`, `2.6`, `2.7`, `3.3`, `3.6` |
-| `#5` | Rename/upgrades scope + parity matrix | `3.1`, `3.2`, `3.5` |
-| `#6` | Umbrella rollup | `3.7` (status aggregation and closeout notes for `#1`-`#5`) |
+| Issue | Scope                                 | Tasks                                                       |
+| ----- | ------------------------------------- | ----------------------------------------------------------- |
+| `#1`  | Foundation/onboarding/type contracts  | `1.1`, `1.3`, `1.4`, `1.5`, `3.4`                           |
+| `#2`  | Sync/media-management compatibility   | `1.2`, `1.4`, `2.1`, `2.4`, `2.5`, `3.5`                    |
+| `#3`  | Library/releases delivery             | `2.1`, `2.2`, `2.3`, `3.4`                                  |
+| `#4`  | UI generalization/capability UX       | `1.6`, `1.7`, `2.6`, `2.7`, `3.3`, `3.6`                    |
+| `#5`  | Rename/upgrades scope + parity matrix | `3.1`, `3.2`, `3.5`                                         |
+| `#6`  | Umbrella rollup                       | `3.7` (status aggregation and closeout notes for `#1`-`#5`) |
 
 ### Completion Notes
 

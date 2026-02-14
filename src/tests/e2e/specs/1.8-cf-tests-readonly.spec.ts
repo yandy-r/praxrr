@@ -21,7 +21,7 @@ function escapeRegex(value: string): string {
 function getAlertByType(page: import('@playwright/test').Page, type: 'Info' | 'Error') {
   const escaped = escapeRegex(READ_ONLY_MESSAGE);
   return page.getByRole('button', {
-    name: new RegExp(`^${type}\\s+${escaped}\\.?$`)
+    name: new RegExp(`^${type}\\s+${escaped}\\.?$`),
   });
 }
 
@@ -36,7 +36,7 @@ test.describe('1.8 CF tests read-only', () => {
       name: LOCAL_DB_NAME,
       repoUrl: TEST_REPO_URL,
       syncStrategy: 'Manual (no auto-sync)',
-      autoPull: false
+      autoPull: false,
     });
 
     await page.close();
@@ -73,9 +73,7 @@ test.describe('1.8 CF tests read-only', () => {
 
     await page.locator('#title').fill('Read-only test');
     const createResponse = page.waitForResponse(
-      (response) =>
-        response.request().method() === 'POST' &&
-        response.url().includes('/testing/new')
+      (response) => response.request().method() === 'POST' && response.url().includes('/testing/new')
     );
     await page.getByRole('button', { name: 'Create' }).click();
     await createResponse;

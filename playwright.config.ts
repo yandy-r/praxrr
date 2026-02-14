@@ -12,6 +12,6 @@ export default defineConfig({
     baseURL: process.env.BASE_URL || 'http://localhost:6969',
     headless: process.env.HEADED !== '1',
     screenshot: 'only-on-failure',
-    trace: 'retain-on-failure'
-  }
+    trace: 'retain-on-failure',
+  },
 });

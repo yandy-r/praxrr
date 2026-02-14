@@ -14,7 +14,7 @@ import {
   openFirstQualityProfileGeneral,
   goToQualityProfileGeneral,
   updateQpName,
-  updateQpDescription
+  updateQpDescription,
 } from '../helpers/entity';
 import { getHead, resetToCommit } from '../helpers/reset';
 
@@ -40,7 +40,7 @@ test.describe('2.2 QP local rename vs upstream description', () => {
       repoUrl: TEST_REPO_URL,
       pat: TEST_PAT,
       gitName: TEST_GIT_NAME,
-      gitEmail: TEST_GIT_EMAIL
+      gitEmail: TEST_GIT_EMAIL,
     });
 
     devHead = getHead(devId);
@@ -54,7 +54,7 @@ test.describe('2.2 QP local rename vs upstream description', () => {
       syncStrategy: 'Manual (no auto-sync)',
       autoPull: false,
       localOpsEnabled: true,
-      conflictStrategy: 'Ask every time'
+      conflictStrategy: 'Ask every time',
     });
 
     profileName = await openFirstQualityProfileGeneral(page, localId);

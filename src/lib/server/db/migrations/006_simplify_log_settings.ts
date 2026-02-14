@@ -8,10 +8,10 @@ import type { Migration } from '../migrations.ts';
  */
 
 export const migration: Migration = {
-	version: 6,
-	name: 'Simplify log settings to daily-only rotation',
+  version: 6,
+  name: 'Simplify log settings to daily-only rotation',
 
-	up: `
+  up: `
 		-- Remove rotation strategy and max file size columns
 		-- SQLite doesn't support DROP COLUMN directly in all versions,
 		-- so we need to recreate the table
@@ -65,7 +65,7 @@ export const migration: Migration = {
 		ALTER TABLE log_settings_new RENAME TO log_settings;
 	`,
 
-	down: `
+  down: `
 		-- Recreate table with rotation_strategy and max_file_size columns
 
 		CREATE TABLE log_settings_new (
@@ -117,5 +117,5 @@ export const migration: Migration = {
 
 		DROP TABLE log_settings;
 		ALTER TABLE log_settings_new RENAME TO log_settings;
-	`
+	`,
 };

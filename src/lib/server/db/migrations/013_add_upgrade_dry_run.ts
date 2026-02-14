@@ -9,15 +9,15 @@ import type { Migration } from '../migrations.ts';
  */
 
 export const migration: Migration = {
-	version: 13,
-	name: 'Add dry_run to upgrade_configs',
+  version: 13,
+  name: 'Add dry_run to upgrade_configs',
 
-	up: `
+  up: `
 		ALTER TABLE upgrade_configs
 		ADD COLUMN dry_run INTEGER NOT NULL DEFAULT 0;
 	`,
 
-	down: `
+  down: `
 		-- SQLite doesn't support DROP COLUMN easily, so we recreate the table
 		CREATE TABLE upgrade_configs_backup (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -43,5 +43,5 @@ export const migration: Migration = {
 		ALTER TABLE upgrade_configs_backup RENAME TO upgrade_configs;
 
 		CREATE INDEX idx_upgrade_configs_arr_instance ON upgrade_configs(arr_instance_id);
-	`
+	`,
 };

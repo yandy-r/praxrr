@@ -12,12 +12,7 @@ import { TEST_REPO_URL, TEST_PAT, TEST_GIT_NAME, TEST_GIT_EMAIL } from '../env';
 import { linkPcd } from '../helpers/linkPcd';
 import { unlinkPcdByName } from '../helpers/unlinkPcd';
 import { pullChanges, exportAndPush } from '../helpers/sync';
-import {
-  goToConflicts,
-  expectConflict,
-  overrideConflict,
-  alignConflict
-} from '../helpers/conflicts';
+import { goToConflicts, expectConflict, overrideConflict, alignConflict } from '../helpers/conflicts';
 import { goToCustomFormat, updateCfDescription } from '../helpers/entity';
 import { getHead, resetToCommit } from '../helpers/reset';
 
@@ -41,7 +36,7 @@ test.describe('1.2 CF description change conflict', () => {
       repoUrl: TEST_REPO_URL,
       pat: TEST_PAT,
       gitName: TEST_GIT_NAME,
-      gitEmail: TEST_GIT_EMAIL
+      gitEmail: TEST_GIT_EMAIL,
     });
 
     devHead = getHead(devId);
@@ -55,7 +50,7 @@ test.describe('1.2 CF description change conflict', () => {
       syncStrategy: 'Manual (no auto-sync)',
       autoPull: false,
       localOpsEnabled: true,
-      conflictStrategy: 'Ask every time'
+      conflictStrategy: 'Ask every time',
     });
 
     await page.close();
@@ -76,7 +71,7 @@ test.describe('1.2 CF description change conflict', () => {
     await page.close();
   });
 
-  test('a) override — CF gets user\'s desired description', async ({ page }) => {
+  test("a) override — CF gets user's desired description", async ({ page }) => {
     // Local edits CF description
     await goToCustomFormat(page, localId, TEST_CF_NAME);
     await updateCfDescription(page, 'Local description edit');
@@ -104,7 +99,7 @@ test.describe('1.2 CF description change conflict', () => {
     expect(descriptionText).toContain('Local description edit');
   });
 
-  test('b) align — CF keeps upstream\'s description', async ({ page }) => {
+  test("b) align — CF keeps upstream's description", async ({ page }) => {
     // Local edits CF description
     await goToCustomFormat(page, localId, TEST_CF_NAME);
     await updateCfDescription(page, 'Local description edit');

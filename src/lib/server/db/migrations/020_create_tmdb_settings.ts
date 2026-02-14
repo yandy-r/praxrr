@@ -11,10 +11,10 @@ import type { Migration } from '../migrations.ts';
  */
 
 export const migration: Migration = {
-	version: 20,
-	name: 'Create tmdb_settings table',
+  version: 20,
+  name: 'Create tmdb_settings table',
 
-	up: `
+  up: `
 		CREATE TABLE tmdb_settings (
 			id INTEGER PRIMARY KEY CHECK (id = 1),
 
@@ -30,7 +30,7 @@ export const migration: Migration = {
 		INSERT INTO tmdb_settings (id) VALUES (1);
 	`,
 
-	down: `
+  down: `
 		DROP TABLE IF EXISTS tmdb_settings;
-	`
+	`,
 };

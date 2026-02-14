@@ -10,10 +10,10 @@ import type { Migration } from '../migrations.ts';
  */
 
 export const migration: Migration = {
-	version: 36,
-	name: 'Create auth tables',
+  version: 36,
+  name: 'Create auth tables',
 
-	up: `
+  up: `
 		-- Users table (single admin user)
 		CREATE TABLE users (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -48,11 +48,11 @@ export const migration: Migration = {
 		INSERT INTO auth_settings (id, api_key) VALUES (1, lower(hex(randomblob(16))));
 	`,
 
-	down: `
+  down: `
 		DROP TABLE IF EXISTS auth_settings;
 		DROP INDEX IF EXISTS idx_sessions_expires_at;
 		DROP INDEX IF EXISTS idx_sessions_user_id;
 		DROP TABLE IF EXISTS sessions;
 		DROP TABLE IF EXISTS users;
-	`
+	`,
 };

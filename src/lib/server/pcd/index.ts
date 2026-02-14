@@ -27,7 +27,14 @@ export { writeOperation, canWriteToBase } from './ops/writer.ts';
 // MANIFEST
 // ============================================================================
 
-export { loadManifest, readManifest, validateManifest, writeManifest, readReadme, writeReadme } from './manifest/manifest.ts';
+export {
+  loadManifest,
+  readManifest,
+  validateManifest,
+  writeManifest,
+  readReadme,
+  writeReadme,
+} from './manifest/manifest.ts';
 export type { Manifest } from './manifest/manifest.ts';
 
 // ============================================================================
@@ -42,11 +49,11 @@ export { processDependencies, syncDependencies, validateDependencies } from './g
 
 export { loadAllOperations } from './ops/loadOps.ts';
 export {
-	loadOperationsFromDir,
-	validateOperations,
-	getPCDPath,
-	getUserOpsPath,
-	getBaseOpsPath
+  loadOperationsFromDir,
+  validateOperations,
+  getPCDPath,
+  getUserOpsPath,
+  getBaseOpsPath,
 } from './utils/operations.ts';
 export { compiledQueryToSql, formatValue } from './utils/sql.ts';
 
@@ -55,17 +62,17 @@ export { compiledQueryToSql, formatValue } from './utils/sql.ts';
 // ============================================================================
 
 export type {
-	CacheBuildStats,
-	Operation,
-	OperationLayer,
-	OperationType,
-	OperationMetadata,
-	WritableLayer,
-	WriteOptions,
-	WriteResult,
-	ValidationResult,
-	LinkOptions,
-	SyncResult
+  CacheBuildStats,
+  Operation,
+  OperationLayer,
+  OperationType,
+  OperationMetadata,
+  WritableLayer,
+  WriteOptions,
+  WriteResult,
+  ValidationResult,
+  LinkOptions,
+  SyncResult,
 } from './core/types.ts';
 
 // ============================================================================
@@ -73,10 +80,10 @@ export type {
 // ============================================================================
 
 export {
-	PCDError,
-	CacheBuildError,
-	OperationError,
-	ValidationError,
-	DependencyError,
-	ManifestValidationError
+  PCDError,
+  CacheBuildError,
+  OperationError,
+  ValidationError,
+  DependencyError,
+  ManifestValidationError,
 } from './core/errors.ts';

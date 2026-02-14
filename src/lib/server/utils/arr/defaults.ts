@@ -20,15 +20,15 @@ import type { ArrDelayProfile } from './types.ts';
  * Applied to the default profile (id=1) when adding a new Radarr instance
  */
 export const RADARR_DEFAULT_DELAY_PROFILE: Omit<ArrDelayProfile, 'id' | 'order'> = {
-	enableUsenet: true,
-	enableTorrent: true,
-	preferredProtocol: 'torrent',
-	usenetDelay: 600,
-	torrentDelay: 600,
-	bypassIfHighestQuality: false,
-	bypassIfAboveCustomFormatScore: false,
-	minimumCustomFormatScore: 0,
-	tags: []
+  enableUsenet: true,
+  enableTorrent: true,
+  preferredProtocol: 'torrent',
+  usenetDelay: 600,
+  torrentDelay: 600,
+  bypassIfHighestQuality: false,
+  bypassIfAboveCustomFormatScore: false,
+  minimumCustomFormatScore: 0,
+  tags: [],
 };
 
 /**
@@ -36,29 +36,27 @@ export const RADARR_DEFAULT_DELAY_PROFILE: Omit<ArrDelayProfile, 'id' | 'order'>
  * Applied to the default profile (id=1) when adding a new Sonarr instance
  */
 export const SONARR_DEFAULT_DELAY_PROFILE: Omit<ArrDelayProfile, 'id' | 'order'> = {
-	enableUsenet: true,
-	enableTorrent: true,
-	preferredProtocol: 'torrent',
-	usenetDelay: 600,
-	torrentDelay: 600,
-	bypassIfHighestQuality: false,
-	bypassIfAboveCustomFormatScore: false,
-	minimumCustomFormatScore: 0,
-	tags: []
+  enableUsenet: true,
+  enableTorrent: true,
+  preferredProtocol: 'torrent',
+  usenetDelay: 600,
+  torrentDelay: 600,
+  bypassIfHighestQuality: false,
+  bypassIfAboveCustomFormatScore: false,
+  minimumCustomFormatScore: 0,
+  tags: [],
 };
 
 /**
  * Get the default delay profile for an arr type
  */
-export function getDefaultDelayProfile(
-	arrType: 'radarr' | 'sonarr'
-): Omit<ArrDelayProfile, 'id' | 'order'> {
-	switch (arrType) {
-		case 'radarr':
-			return RADARR_DEFAULT_DELAY_PROFILE;
-		case 'sonarr':
-			return SONARR_DEFAULT_DELAY_PROFILE;
-		default:
-			throw new Error(`No default delay profile for arr type: ${arrType}`);
-	}
+export function getDefaultDelayProfile(arrType: 'radarr' | 'sonarr'): Omit<ArrDelayProfile, 'id' | 'order'> {
+  switch (arrType) {
+    case 'radarr':
+      return RADARR_DEFAULT_DELAY_PROFILE;
+    case 'sonarr':
+      return SONARR_DEFAULT_DELAY_PROFILE;
+    default:
+      throw new Error(`No default delay profile for arr type: ${arrType}`);
+  }
 }

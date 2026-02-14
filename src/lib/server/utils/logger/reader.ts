@@ -11,71 +11,71 @@ import type { LogEntry } from './types.ts';
  * Get all log files sorted by modification time (newest first)
  */
 async function getLogFiles(): Promise<string[]> {
-	const logsDir = config.paths.logs;
-	const logFiles: Array<{ path: string; mtime: Date }> = [];
+  const logsDir = config.paths.logs;
+  const logFiles: Array<{ path: string; mtime: Date }> = [];
 
-	try {
-		for await (const entry of Deno.readDir(logsDir)) {
-			if (entry.isFile && entry.name.endsWith('.log')) {
-				const filePath = `${logsDir}/${entry.name}`;
-				try {
-					const stat = await Deno.stat(filePath);
-					if (stat.mtime) {
-						logFiles.push({ path: filePath, mtime: stat.mtime });
-					}
-				} catch {
-					// Skip files we can't stat
-				}
-			}
-		}
-	} catch {
-		// If directory doesn't exist, return empty array
-		return [];
-	}
+  try {
+    for await (const entry of Deno.readDir(logsDir)) {
+      if (entry.isFile && entry.name.endsWith('.log')) {
+        const filePath = `${logsDir}/${entry.name}`;
+        try {
+          const stat = await Deno.stat(filePath);
+          if (stat.mtime) {
+            logFiles.push({ path: filePath, mtime: stat.mtime });
+          }
+        } catch {
+          // Skip files we can't stat
+        }
+      }
+    }
+  } catch {
+    // If directory doesn't exist, return empty array
+    return [];
+  }
 
-	// Sort by modification time (newest first)
-	logFiles.sort((a, b) => b.mtime.getTime() - a.mtime.getTime());
+  // Sort by modification time (newest first)
+  logFiles.sort((a, b) => b.mtime.getTime() - a.mtime.getTime());
 
-	return logFiles.map((f) => f.path);
+  return logFiles.map((f) => f.path);
 }
 
 /**
  * Get all log files with metadata
  */
 export async function getLogFilesList(): Promise<
-	Array<{ filename: string; path: string; size: number; modified: Date }>
+  Array<{ filename: string; path: string; size: number; modified: Date }>
 > {
-	const logsDir = config.paths.logs;
-	const logFiles: Array<{ filename: string; path: string; size: number; modified: Date }> = [];
+  const logsDir = config.paths.logs;
+  const logFiles: Array<{ filename: string; path: string; size: number; modified: Date }> = [];
 
-	try {
-		for await (const entry of Deno.readDir(logsDir)) {
-			if (entry.isFile && entry.name.endsWith('.log')) {
-				const filePath = `${logsDir}/${entry.name}`;
-				try {
-					const stat = await Deno.stat(filePath);
-					if (stat.mtime) {
-						logFiles.push({
-							filename: entry.name,
-							path: filePath,
-							size: stat.size,
-							modified: stat.mtime
-						});
-					}
-				} catch {
-					// Skip files we can't stat
-				}
-			}
-		}
-	} catch {
-		// If directory doesn't exist, return empty array
-		return [];
-	}
+  try {
+    for await (const entry of Deno.readDir(logsDir)) {
+      if (entry.isFile && entry.name.endsWith('.log')) {
+        const filePath = `${logsDir}/${entry.name}`;
+        try {
+          const stat = await Deno.stat(filePath);
+          if (stat.mtime) {
+            logFiles.push({
+              filename: entry.name,
+              path: filePath,
+              size: stat.size,
+              modified: stat.mtime,
+            });
+          }
+        } catch {
+          // Skip files we can't stat
+        }
+      }
+    }
+  } catch {
+    // If directory doesn't exist, return empty array
+    return [];
+  }
 
-	// Sort by modification time (newest first)
-	logFiles.sort((a, b) => b.modified.getTime() - a.modified.getTime());
+  // Sort by modification time (newest first)
+  logFiles.sort((a, b) => b.modified.getTime() - a.modified.getTime());
 
-	return logFiles;
+  return logFiles;
 }
 
 /**
@@ -84,32 +84,32 @@ export async function getLogFilesList(): Promise<
  * @returns Array of log entries sorted by timestamp (oldest first)
  */
 export async function readLogsFromFile(filename: string): Promise<LogEntry[]> {
-	try {
-		const logsDir = config.paths.logs;
-		const filePath = `${logsDir}/${filename}`;
-		const logs: LogEntry[] = [];
+  try {
+    const logsDir = config.paths.logs;
+    const filePath = `${logsDir}/${filename}`;
+    const logs: LogEntry[] = [];
 
-		const content = await Deno.readTextFile(filePath);
-		const lines = content.split('\n').filter((line) => line.trim());
+    const content = await Deno.readTextFile(filePath);
+    const lines = content.split('\n').filter((line) => line.trim());
 
-		// Parse each line as JSON
-		for (const line of lines) {
-			try {
-				const entry = JSON.parse(line) as LogEntry;
-				logs.push(entry);
-			} catch {
-				// Skip invalid JSON lines
-			}
-		}
+    // Parse each line as JSON
+    for (const line of lines) {
+      try {
+        const entry = JSON.parse(line) as LogEntry;
+        logs.push(entry);
+      } catch {
+        // Skip invalid JSON lines
+      }
+    }
 
-		// Sort by timestamp (oldest first)
-		logs.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+    // Sort by timestamp (oldest first)
+    logs.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
 
-		return logs;
-	} catch (_error) {
-		// If anything fails, return empty array
-		return [];
-	}
+    return logs;
+  } catch (_error) {
+    // If anything fails, return empty array
+    return [];
+  }
 }
 
 /**
@@ -117,38 +117,38 @@ export async function readLogsFromFile(filename: string): Promise<LogEntry[]> {
  * @returns Array of log entries sorted by timestamp (oldest first)
  */
 export async function readLastLogs(): Promise<LogEntry[]> {
-	try {
-		const logFiles = await getLogFiles();
-		const logs: LogEntry[] = [];
+  try {
+    const logFiles = await getLogFiles();
+    const logs: LogEntry[] = [];
 
-		// Read from all log files
-		for (const filePath of logFiles) {
-			try {
-				const content = await Deno.readTextFile(filePath);
-				const lines = content.split('\n').filter((line) => line.trim());
+    // Read from all log files
+    for (const filePath of logFiles) {
+      try {
+        const content = await Deno.readTextFile(filePath);
+        const lines = content.split('\n').filter((line) => line.trim());
 
-				// Parse each line as JSON
-				for (const line of lines) {
-					try {
-						const entry = JSON.parse(line) as LogEntry;
-						logs.push(entry);
-					} catch {
-						// Skip invalid JSON lines
-					}
-				}
-			} catch {
-				// Skip files we can't read
-			}
-		}
+        // Parse each line as JSON
+        for (const line of lines) {
+          try {
+            const entry = JSON.parse(line) as LogEntry;
+            logs.push(entry);
+          } catch {
+            // Skip invalid JSON lines
+          }
+        }
+      } catch {
+        // Skip files we can't read
+      }
+    }
 
-		// Sort by timestamp (oldest first)
-		logs.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+    // Sort by timestamp (oldest first)
+    logs.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
 
-		return logs;
-	} catch (_error) {
-		// If anything fails, return empty array
-		return [];
-	}
+    return logs;
+  } catch (_error) {
+    // If anything fails, return empty array
+    return [];
+  }
 }
 
 /**
@@ -157,21 +157,21 @@ export async function readLastLogs(): Promise<LogEntry[]> {
  * @returns Parsed log entry or null if invalid
  */
 export function parseLogLine(line: string): LogEntry | null {
-	try {
-		const trimmed = line.trim();
-		if (!trimmed) return null;
-		return JSON.parse(trimmed) as LogEntry;
-	} catch {
-		return null;
-	}
+  try {
+    const trimmed = line.trim();
+    if (!trimmed) return null;
+    return JSON.parse(trimmed) as LogEntry;
+  } catch {
+    return null;
+  }
 }
 
 /**
  * Filter options for reading logs
  */
 export interface LogFilterOptions {
-	source?: string;
-	instanceId?: number;
+  source?: string;
+  instanceId?: number;
 }
 
 /**
@@ -180,51 +180,51 @@ export interface LogFilterOptions {
  * @returns Array of filtered log entries (newest first)
  */
 export async function readFilteredLogs(options: LogFilterOptions = {}): Promise<LogEntry[]> {
-	const { source, instanceId } = options;
+  const { source, instanceId } = options;
 
-	try {
-		const logFiles = await getLogFiles();
-		const logs: LogEntry[] = [];
+  try {
+    const logFiles = await getLogFiles();
+    const logs: LogEntry[] = [];
 
-		// Read from all log files
-		for (const filePath of logFiles) {
-			try {
-				const content = await Deno.readTextFile(filePath);
-				const lines = content.split('\n').filter((line) => line.trim());
+    // Read from all log files
+    for (const filePath of logFiles) {
+      try {
+        const content = await Deno.readTextFile(filePath);
+        const lines = content.split('\n').filter((line) => line.trim());
 
-				// Parse each line as JSON
-				for (const line of lines) {
-					try {
-						const entry = JSON.parse(line) as LogEntry;
+        // Parse each line as JSON
+        for (const line of lines) {
+          try {
+            const entry = JSON.parse(line) as LogEntry;
 
-						// Apply filters
-						if (source && entry.source !== source) {
-							continue;
-						}
+            // Apply filters
+            if (source && entry.source !== source) {
+              continue;
+            }
 
-						if (instanceId !== undefined && entry.meta) {
-							const meta = entry.meta as Record<string, unknown>;
-							if (meta.instanceId !== instanceId) {
-								continue;
-							}
-						}
+            if (instanceId !== undefined && entry.meta) {
+              const meta = entry.meta as Record<string, unknown>;
+              if (meta.instanceId !== instanceId) {
+                continue;
+              }
+            }
 
-						logs.push(entry);
-					} catch {
-						// Skip invalid JSON lines
-					}
-				}
-			} catch {
-				// Skip files we can't read
-			}
-		}
+            logs.push(entry);
+          } catch {
+            // Skip invalid JSON lines
+          }
+        }
+      } catch {
+        // Skip files we can't read
+      }
+    }
 
-		// Sort by timestamp (newest first)
-		logs.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+    // Sort by timestamp (newest first)
+    logs.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
-		return logs;
-	} catch (_error) {
-		// If anything fails, return empty array
-		return [];
-	}
+    return logs;
+  } catch (_error) {
+    // If anything fails, return empty array
+    return [];
+  }
 }

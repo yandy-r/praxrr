@@ -10,20 +10,13 @@ function getBooleanControlBySectionLabel(page: Page, label: string): Locator {
   return section.locator('[role="switch"], button[role="checkbox"]').first();
 }
 
-export async function isIconCheckboxCheckedByLabel(
-  page: Page,
-  label: string
-): Promise<boolean> {
+export async function isIconCheckboxCheckedByLabel(page: Page, label: string): Promise<boolean> {
   const control = getBooleanControlBySectionLabel(page, label);
   await expect(control).toBeVisible();
   return (await control.getAttribute('aria-checked')) === 'true';
 }
 
-export async function setIconCheckboxByLabel(
-  page: Page,
-  label: string,
-  enabled: boolean
-): Promise<void> {
+export async function setIconCheckboxByLabel(page: Page, label: string, enabled: boolean): Promise<void> {
   const control = getBooleanControlBySectionLabel(page, label);
   await expect(control).toBeVisible();
   const isChecked = (await control.getAttribute('aria-checked')) === 'true';

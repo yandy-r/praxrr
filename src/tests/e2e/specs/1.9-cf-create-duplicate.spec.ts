@@ -12,12 +12,7 @@ import { TEST_REPO_URL, TEST_PAT, TEST_GIT_NAME, TEST_GIT_EMAIL } from '../env';
 import { linkPcd } from '../helpers/linkPcd';
 import { unlinkPcdByName } from '../helpers/unlinkPcd';
 import { pullChanges, exportAndPush } from '../helpers/sync';
-import {
-  goToConflicts,
-  expectConflict,
-  overrideConflict,
-  alignConflict
-} from '../helpers/conflicts';
+import { goToConflicts, expectConflict, overrideConflict, alignConflict } from '../helpers/conflicts';
 import { goToCustomFormat } from '../helpers/entity';
 import { fillMarkdownInput } from '../helpers/markdown';
 import { getHead, resetToCommit } from '../helpers/reset';
@@ -40,7 +35,7 @@ async function createCustomFormat(
   await fillMarkdownInput(page, 'description', description);
   await page.getByRole('button', { name: 'Create' }).click();
   await page.waitForURL(new RegExp(`/custom-formats/${databaseId}/\\d+/conditions`), {
-    timeout: 15_000
+    timeout: 15_000,
   });
   await page.waitForLoadState('networkidle');
 }
@@ -61,7 +56,7 @@ test.describe('1.9 CF create duplicate conflict', () => {
       repoUrl: TEST_REPO_URL,
       pat: TEST_PAT,
       gitName: TEST_GIT_NAME,
-      gitEmail: TEST_GIT_EMAIL
+      gitEmail: TEST_GIT_EMAIL,
     });
 
     devHead = getHead(devId);
@@ -75,7 +70,7 @@ test.describe('1.9 CF create duplicate conflict', () => {
       syncStrategy: 'Manual (no auto-sync)',
       autoPull: false,
       localOpsEnabled: true,
-      conflictStrategy: 'Ask every time'
+      conflictStrategy: 'Ask every time',
     });
 
     await page.close();

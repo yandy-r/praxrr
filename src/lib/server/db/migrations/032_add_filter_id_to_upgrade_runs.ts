@@ -11,16 +11,16 @@ import type { Migration } from '../migrations.ts';
  */
 
 export const migration: Migration = {
-	version: 32,
-	name: 'Add filter_id to upgrade_runs',
+  version: 32,
+  name: 'Add filter_id to upgrade_runs',
 
-	up: `
+  up: `
 		ALTER TABLE upgrade_runs ADD COLUMN filter_id TEXT NOT NULL DEFAULT '';
 	`,
 
-	down: `
+  down: `
 		-- SQLite doesn't support dropping columns easily
 		-- The column will remain but won't be used
 		SELECT 1;
-	`
+	`,
 };

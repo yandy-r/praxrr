@@ -8,10 +8,7 @@ import { expect } from '@playwright/test';
  * Navigate to the changes tab and pull incoming changes.
  * Waits for the pull to complete and verifies success.
  */
-export async function pullChanges(
-  page: Page,
-  databaseId: number
-): Promise<void> {
+export async function pullChanges(page: Page, databaseId: number): Promise<void> {
   await page.goto(`/databases/${databaseId}/changes`);
   await page.waitForLoadState('networkidle');
 
@@ -71,11 +68,7 @@ export async function pullChanges(
  * Export and push outgoing changes on the dev database.
  * Selects all changes, fills commit message, previews, and confirms.
  */
-export async function exportAndPush(
-  page: Page,
-  databaseId: number,
-  commitMessage: string
-): Promise<void> {
+export async function exportAndPush(page: Page, databaseId: number, commitMessage: string): Promise<void> {
   await page.goto(`/databases/${databaseId}/changes`);
   await page.waitForLoadState('networkidle');
 
@@ -88,14 +81,17 @@ export async function exportAndPush(
   await expect(selectAllButton).toBeVisible({ timeout: 15_000 });
 
   await expect
-    .poll(async () => {
-      if (await noChanges.isVisible()) return 'none';
-      const text = await selectAllButton.innerText();
-      const match = text.match(/\((\d+)\)/);
-      if (match && Number(match[1]) > 0) return 'ready';
-      const rowCount = await page.locator('table tbody tr').count();
-      return rowCount > 0 ? 'rows' : 'wait';
-    }, { timeout: 15_000 })
+    .poll(
+      async () => {
+        if (await noChanges.isVisible()) return 'none';
+        const text = await selectAllButton.innerText();
+        const match = text.match(/\((\d+)\)/);
+        if (match && Number(match[1]) > 0) return 'ready';
+        const rowCount = await page.locator('table tbody tr').count();
+        return rowCount > 0 ? 'rows' : 'wait';
+      },
+      { timeout: 15_000 }
+    )
     .not.toBe('wait');
 
   if (await noChanges.isVisible()) {
@@ -123,9 +119,7 @@ export async function exportAndPush(
   await expect(modal).toBeVisible();
 
   // Wait for preview to finish loading (Approve button becomes enabled)
-  await expect(
-    modal.getByRole('button', { name: 'Approve & Export' })
-  ).toBeEnabled({ timeout: 15_000 });
+  await expect(modal.getByRole('button', { name: 'Approve & Export' })).toBeEnabled({ timeout: 15_000 });
 
   // Click Approve & Export
   const commitResponsePromise = page.waitForResponse((response) => {
@@ -136,7 +130,7 @@ export async function exportAndPush(
 
   const [commitResponse] = await Promise.all([
     commitResponsePromise,
-    modal.getByRole('button', { name: 'Approve & Export' }).click()
+    modal.getByRole('button', { name: 'Approve & Export' }).click(),
   ]);
 
   if (!commitResponse.ok()) {
@@ -150,10 +144,7 @@ export async function exportAndPush(
 /**
  * Check if there are incoming changes without pulling them.
  */
-export async function hasIncomingChanges(
-  page: Page,
-  databaseId: number
-): Promise<boolean> {
+export async function hasIncomingChanges(page: Page, databaseId: number): Promise<boolean> {
   await page.goto(`/databases/${databaseId}/changes`);
   await page.waitForLoadState('networkidle');
   await expect(page.getByText('Incoming Changes')).toBeVisible();

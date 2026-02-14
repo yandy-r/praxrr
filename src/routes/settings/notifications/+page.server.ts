@@ -6,135 +6,135 @@ import { notificationHistoryQueries } from '$db/queries/notificationHistory.ts';
 import type { NotificationService } from '$db/queries/notificationServices.ts';
 
 interface NotificationServiceWithStats extends NotificationService {
-	successCount: number;
-	failedCount: number;
-	successRate: number;
+  successCount: number;
+  failedCount: number;
+  successRate: number;
 }
 
 export const load = () => {
-	const services = notificationServicesQueries.getAll();
+  const services = notificationServicesQueries.getAll();
 
-	// Get stats for each service
-	const servicesWithStats: NotificationServiceWithStats[] = services.map((service) => {
-		const stats = notificationHistoryQueries.getStats(service.id);
-		return {
-			...service,
-			successCount: stats.success,
-			failedCount: stats.failed,
-			successRate: stats.successRate
-		};
-	});
+  // Get stats for each service
+  const servicesWithStats: NotificationServiceWithStats[] = services.map((service) => {
+    const stats = notificationHistoryQueries.getStats(service.id);
+    return {
+      ...service,
+      successCount: stats.success,
+      failedCount: stats.failed,
+      successRate: stats.successRate,
+    };
+  });
 
-	// Get recent notification history (last 50)
-	const history = notificationHistoryQueries.getRecent(50);
+  // Get recent notification history (last 50)
+  const history = notificationHistoryQueries.getRecent(50);
 
-	return {
-		services: servicesWithStats,
-		history
-	};
+  return {
+    services: servicesWithStats,
+    history,
+  };
 };
 
 export const actions: Actions = {
-	toggleEnabled: async ({ request }: RequestEvent) => {
-		const formData = await request.formData();
-		const id = formData.get('id') as string;
-		const enabled = formData.get('enabled') === 'true';
+  toggleEnabled: async ({ request }: RequestEvent) => {
+    const formData = await request.formData();
+    const id = formData.get('id') as string;
+    const enabled = formData.get('enabled') === 'true';
 
-		if (!id) {
-			return fail(400, { error: 'Service ID is required' });
-		}
+    if (!id) {
+      return fail(400, { error: 'Service ID is required' });
+    }
 
-		try {
-			const success = notificationServicesQueries.update(id, { enabled });
+    try {
+      const success = notificationServicesQueries.update(id, { enabled });
 
-			if (!success) {
-				return fail(400, { error: 'Failed to update service' });
-			}
+      if (!success) {
+        return fail(400, { error: 'Failed to update service' });
+      }
 
-			await logger.info(`Notification service ${enabled ? 'enabled' : 'disabled'}`, {
-				source: 'settings/notifications',
-				meta: { serviceId: id, enabled }
-			});
+      await logger.info(`Notification service ${enabled ? 'enabled' : 'disabled'}`, {
+        source: 'settings/notifications',
+        meta: { serviceId: id, enabled },
+      });
 
-			return { success: true };
-		} catch (err) {
-			await logger.error('Failed to toggle notification service', {
-				source: 'settings/notifications',
-				meta: { serviceId: id, error: err }
-			});
-			return fail(500, { error: 'Failed to update service' });
-		}
-	},
+      return { success: true };
+    } catch (err) {
+      await logger.error('Failed to toggle notification service', {
+        source: 'settings/notifications',
+        meta: { serviceId: id, error: err },
+      });
+      return fail(500, { error: 'Failed to update service' });
+    }
+  },
 
-	delete: async ({ request }: RequestEvent) => {
-		const formData = await request.formData();
-		const id = formData.get('id') as string;
+  delete: async ({ request }: RequestEvent) => {
+    const formData = await request.formData();
+    const id = formData.get('id') as string;
 
-		if (!id) {
-			return fail(400, { error: 'Service ID is required' });
-		}
+    if (!id) {
+      return fail(400, { error: 'Service ID is required' });
+    }
 
-		try {
-			const success = notificationServicesQueries.delete(id);
+    try {
+      const success = notificationServicesQueries.delete(id);
 
-			if (!success) {
-				return fail(400, { error: 'Failed to delete service' });
-			}
+      if (!success) {
+        return fail(400, { error: 'Failed to delete service' });
+      }
 
-			await logger.info('Notification service deleted', {
-				source: 'settings/notifications',
-				meta: { serviceId: id }
-			});
+      await logger.info('Notification service deleted', {
+        source: 'settings/notifications',
+        meta: { serviceId: id },
+      });
 
-			return { success: true };
-		} catch (err) {
-			await logger.error('Failed to delete notification service', {
-				source: 'settings/notifications',
-				meta: { serviceId: id, error: err }
-			});
-			return fail(500, { error: 'Failed to delete service' });
-		}
-	},
+      return { success: true };
+    } catch (err) {
+      await logger.error('Failed to delete notification service', {
+        source: 'settings/notifications',
+        meta: { serviceId: id, error: err },
+      });
+      return fail(500, { error: 'Failed to delete service' });
+    }
+  },
 
-	testNotification: async ({ request }: RequestEvent) => {
-		const formData = await request.formData();
-		const id = formData.get('id') as string;
+  testNotification: async ({ request }: RequestEvent) => {
+    const formData = await request.formData();
+    const id = formData.get('id') as string;
 
-		if (!id) {
-			return fail(400, { error: 'Service ID is required' });
-		}
+    if (!id) {
+      return fail(400, { error: 'Service ID is required' });
+    }
 
-		try {
-			const service = notificationServicesQueries.getById(id);
+    try {
+      const service = notificationServicesQueries.getById(id);
 
-			if (!service) {
-				return fail(404, { error: 'Service not found' });
-			}
+      if (!service) {
+        return fail(404, { error: 'Service not found' });
+      }
 
-			// Send test notification directly (bypass enabled_types filter)
-			const { DiscordNotifier } = await import('$notifications/notifiers/discord/index.ts');
-			const { notifications } = await import('$notifications/definitions/index.ts');
+      // Send test notification directly (bypass enabled_types filter)
+      const { DiscordNotifier } = await import('$notifications/notifiers/discord/index.ts');
+      const { notifications } = await import('$notifications/definitions/index.ts');
 
-			const config = JSON.parse(service.config);
+      const config = JSON.parse(service.config);
 
-			let notifier;
-			if (service.service_type === 'discord') {
-				notifier = new DiscordNotifier(config);
-			} else {
-				return fail(400, { error: 'Unknown service type' });
-			}
+      let notifier;
+      if (service.service_type === 'discord') {
+        notifier = new DiscordNotifier(config);
+      } else {
+        return fail(400, { error: 'Unknown service type' });
+      }
 
-			const notification = notifications.test({ config }).build();
+      const notification = notifications.test({ config }).build();
 
-			await notifier.notify(notification);
+      await notifier.notify(notification);
 
-			return { success: true };
-		} catch (err) {
-			await logger.error('Failed to send test notification', {
-				source: 'settings/notifications',
-				meta: { serviceId: id, error: err }
-			});
-			return fail(500, { error: 'Failed to send test notification' });
-		}
-	}
+      return { success: true };
+    } catch (err) {
+      await logger.error('Failed to send test notification', {
+        source: 'settings/notifications',
+        meta: { serviceId: id, error: err },
+      });
+      return fail(500, { error: 'Failed to send test notification' });
+    }
+  },
 };

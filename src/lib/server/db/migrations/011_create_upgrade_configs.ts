@@ -20,10 +20,10 @@ import type { Migration } from '../migrations.ts';
  */
 
 export const migration: Migration = {
-	version: 11,
-	name: 'Create upgrade_configs table',
+  version: 11,
+  name: 'Create upgrade_configs table',
 
-	up: `
+  up: `
 		CREATE TABLE upgrade_configs (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
 
@@ -51,8 +51,8 @@ export const migration: Migration = {
 		CREATE INDEX idx_upgrade_configs_arr_instance ON upgrade_configs(arr_instance_id);
 	`,
 
-	down: `
+  down: `
 		DROP INDEX IF EXISTS idx_upgrade_configs_arr_instance;
 		DROP TABLE IF EXISTS upgrade_configs;
-	`
+	`,
 };

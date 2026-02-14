@@ -20,10 +20,10 @@ import type { Migration } from '../migrations.ts';
  */
 
 export const migration: Migration = {
-	version: 1,
-	name: 'Create arr_instances table',
+  version: 1,
+  name: 'Create arr_instances table',
 
-	up: `
+  up: `
 		CREATE TABLE arr_instances (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
 
@@ -46,7 +46,7 @@ export const migration: Migration = {
 		);
 	`,
 
-	down: `
+  down: `
 		DROP TABLE IF EXISTS arr_instances;
-	`
+	`,
 };
