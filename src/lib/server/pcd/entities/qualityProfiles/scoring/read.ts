@@ -34,7 +34,7 @@ export async function scoring(
   }
 
   // 2. Define display arr types ('all' is not a column)
-  const arrTypes = ARR_APP_TYPES;
+  const arrTypes = [...ARR_APP_TYPES];
 
   // 3. Get all custom formats
   const customFormats = await db.selectFrom('custom_formats').select(['name']).orderBy('name').execute();
