@@ -128,6 +128,9 @@ export const ARR_APPS: Record<ArrAppType, ArrAppMetadata> = {
 
 export const ARR_APP_TYPES: ArrAppType[] = Object.keys(ARR_APPS) as ArrAppType[];
 
+/** Order for displaying arr target badges (all, then radarr, sonarr, lidarr) */
+export const ARR_TARGET_ORDER: ArrConditionTargetType[] = ['all', 'radarr', 'sonarr', 'lidarr'];
+
 export const ARR_APP_OPTIONS: Array<{ value: ArrAppType; label: string }> = ARR_APP_TYPES.map((type) => ({
   value: type,
   label: ARR_APPS[type].label,
@@ -179,6 +182,16 @@ export function supportsArrWorkflow(type: ArrAppType, workflow: ArrWorkflowSurfa
 /** Check whether an Arr app supports a given sync surface */
 export function supportsArrSyncSurface(type: ArrAppType, surface: ArrSyncSurface): boolean {
   return ARR_APPS[type].capabilities.sync[surface];
+}
+
+/**
+ * Resolve arr targets for display (e.g., custom format list badges).
+ * Preserves both 'all' and app-specific targets when present—mixed data is valid
+ * (e.g., arr_type='all' condition plus Sonarr-specific score override).
+ */
+export function resolveArrTargets(targets: Set<ArrConditionTargetType> | undefined): ArrConditionTargetType[] {
+  if (!targets || targets.size === 0) return ['all'];
+  return ARR_TARGET_ORDER.filter((target) => targets.has(target));
 }
 
 /**

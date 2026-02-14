@@ -4,9 +4,7 @@
 
 import type { PCDCache } from '$pcd/index.ts';
 import type { Tag, CustomFormatTableRow, ConditionRef } from '$shared/pcd/display.ts';
-import type { ArrConditionTargetType } from '$shared/arr/capabilities.ts';
-
-const ARR_TARGET_ORDER: ArrConditionTargetType[] = ['all', 'radarr', 'sonarr', 'lidarr'];
+import { type ArrConditionTargetType, ARR_TARGET_ORDER, resolveArrTargets } from '$shared/arr/capabilities.ts';
 
 function isArrConditionTargetType(value: string): value is ArrConditionTargetType {
   return ARR_TARGET_ORDER.includes(value as ArrConditionTargetType);
@@ -108,14 +106,7 @@ export async function list(cache: PCDCache): Promise<CustomFormatTableRow[]> {
   }
 
   function getArrTargets(customFormatName: string): ArrConditionTargetType[] {
-    const targets = arrTargetsMap.get(customFormatName);
-    if (!targets || targets.size === 0) return ['all'];
-
-    const hasSpecificTargets = ARR_TARGET_ORDER.some((target) => target !== 'all' && targets.has(target));
-    const orderedTargets = ARR_TARGET_ORDER.filter((target) => targets.has(target));
-
-    // If specific arr targets are present, hide the redundant "all" marker.
-    return hasSpecificTargets ? orderedTargets.filter((target) => target !== 'all') : orderedTargets;
+    return resolveArrTargets(arrTargetsMap.get(customFormatName));
   }
 
   // Build the final result
