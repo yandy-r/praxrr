@@ -1,11 +1,5 @@
 node_modules
 
-# Claude context
-CLAUDE.md
-CODEX.md
-.claudeignore
-AGENTS.md
-
 # Output
 .output
 .vercel
