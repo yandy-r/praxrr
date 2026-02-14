@@ -128,7 +128,7 @@ interface ArrSyncMediaManagementMatchRow {
 function findMediaManagementSyncRows(
   section: MediaManagementSection,
   oldName: string,
-  scope: MediaManagementRenameScope,
+  scope: MediaManagementRenameScope
 ): ArrSyncMediaManagementMatchRow[] {
   const sectionConfig = MEDIA_MANAGEMENT_SECTION_CONFIG[section];
   const conditions: string[] = [`asm.${sectionConfig.nameColumn} = ?`];
@@ -164,7 +164,7 @@ function updateMediaManagementSectionConfigName(
   section: MediaManagementSection,
   oldName: string,
   newName: string,
-  scope: MediaManagementRenameScope = {},
+  scope: MediaManagementRenameScope = {}
 ): number {
   const sectionConfig = MEDIA_MANAGEMENT_SECTION_CONFIG[section];
   const matches = findMediaManagementSyncRows(section, oldName, scope);
@@ -181,7 +181,7 @@ function updateMediaManagementSectionConfigName(
 		   WHERE instance_id IN (${placeholders}) AND ${sectionConfig.nameColumn} = ?`,
     newName,
     ...instanceIds,
-    oldName,
+    oldName
   );
 }
 
@@ -379,38 +379,16 @@ export const arrSyncQueries = {
   /**
    * Update config name references when a media management config is renamed
    */
-  updateNamingConfigName(
-    oldName: string,
-    newName: string,
-    scope: MediaManagementRenameScope = {},
-  ): number {
+  updateNamingConfigName(oldName: string, newName: string, scope: MediaManagementRenameScope = {}): number {
     return updateMediaManagementSectionConfigName('naming', oldName, newName, scope);
   },
 
-  updateQualityDefinitionsConfigName(
-    oldName: string,
-    newName: string,
-    scope: MediaManagementRenameScope = {},
-  ): number {
-    return updateMediaManagementSectionConfigName(
-      'qualityDefinitions',
-      oldName,
-      newName,
-      scope,
-    );
+  updateQualityDefinitionsConfigName(oldName: string, newName: string, scope: MediaManagementRenameScope = {}): number {
+    return updateMediaManagementSectionConfigName('qualityDefinitions', oldName, newName, scope);
   },
 
-  updateMediaSettingsConfigName(
-    oldName: string,
-    newName: string,
-    scope: MediaManagementRenameScope = {},
-  ): number {
-    return updateMediaManagementSectionConfigName(
-      'mediaSettings',
-      oldName,
-      newName,
-      scope,
-    );
+  updateMediaSettingsConfigName(oldName: string, newName: string, scope: MediaManagementRenameScope = {}): number {
+    return updateMediaManagementSectionConfigName('mediaSettings', oldName, newName, scope);
   },
 
   /**

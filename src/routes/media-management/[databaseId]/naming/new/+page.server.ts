@@ -145,9 +145,7 @@ export const actions: Actions = {
           },
         });
       } catch (err) {
-        const message = err instanceof Error
-          ? err.message
-          : `Failed to create ${arrType} naming config`;
+        const message = err instanceof Error ? err.message : `Failed to create ${arrType} naming config`;
         if (message.includes('already exists')) {
           return fail(400, { error: message });
         }

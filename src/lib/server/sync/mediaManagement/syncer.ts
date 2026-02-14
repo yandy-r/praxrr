@@ -31,11 +31,7 @@ import {
   getQualityApiMappings,
   isKnownQualityApiName,
 } from '$pcd/entities/mediaManagement/quality-definitions/read.ts';
-import type {
-  QualityDefinitionsConfig,
-  RadarrMediaSettingsRow,
-  SonarrMediaSettingsRow,
-} from '$shared/pcd/display.ts';
+import type { QualityDefinitionsConfig, RadarrMediaSettingsRow, SonarrMediaSettingsRow } from '$shared/pcd/display.ts';
 import { colonReplacementToDb, multiEpisodeStyleToDb } from '$shared/pcd/mediaManagement.ts';
 import type { ArrType, ArrPropersAndRepacks, RadarrNamingConfig, SonarrNamingConfig } from '$arr/types.ts';
 import { logger } from '$logger/logger.ts';
@@ -669,15 +665,10 @@ export class MediaManagementSyncer extends BaseSyncer {
     return Promise.resolve(new Map<string, string>());
   }
 
-  private resolveMediaSettingsSource():
-    | {
-      getByName: (
-        cache: PCDCache,
-        configName: string,
-      ) => Promise<RadarrMediaSettingsRow | SonarrMediaSettingsRow | null>;
-      entityType: 'radarr_media_settings' | 'sonarr_media_settings';
-    }
-    | null {
+  private resolveMediaSettingsSource(): {
+    getByName: (cache: PCDCache, configName: string) => Promise<RadarrMediaSettingsRow | SonarrMediaSettingsRow | null>;
+    entityType: 'radarr_media_settings' | 'sonarr_media_settings';
+  } | null {
     if (this.instanceType === 'radarr') {
       return {
         getByName: getRadarrMediaSettings,
@@ -695,15 +686,10 @@ export class MediaManagementSyncer extends BaseSyncer {
     return null;
   }
 
-  private resolveQualityDefinitionsSource():
-    | {
-      getByName: (
-        cache: PCDCache,
-        configName: string,
-      ) => Promise<QualityDefinitionsConfig | null>;
-      entityType: 'radarr_quality_definitions' | 'sonarr_quality_definitions';
-    }
-    | null {
+  private resolveQualityDefinitionsSource(): {
+    getByName: (cache: PCDCache, configName: string) => Promise<QualityDefinitionsConfig | null>;
+    entityType: 'radarr_quality_definitions' | 'sonarr_quality_definitions';
+  } | null {
     if (this.instanceType === 'radarr') {
       return {
         getByName: getRadarrQualityDefs,

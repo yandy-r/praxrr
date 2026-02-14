@@ -95,38 +95,32 @@ class LidarrMediaManagementTest extends BaseTest {
   }
 
   private async readNamingList() {
-    return (await namingListLoad(
-      {
+    return (await namingListLoad({
       params: {
         databaseId: `${LidarrMediaManagementTest.DATABASE_ID}`,
       },
-    } as unknown as Parameters<typeof namingListLoad>[0]
-  )) as {
-      namingConfigs: Array<{ name: string; arr_type: string }>
+    } as unknown as Parameters<typeof namingListLoad>[0])) as {
+      namingConfigs: Array<{ name: string; arr_type: string }>;
     };
   }
 
   private async readMediaSettingsList() {
-    return (await mediaSettingsListLoad(
-      {
+    return (await mediaSettingsListLoad({
       params: {
         databaseId: `${LidarrMediaManagementTest.DATABASE_ID}`,
       },
-    } as unknown as Parameters<typeof mediaSettingsListLoad>[0]
-  )) as {
-      mediaSettingsConfigs: Array<{ name: string; arr_type: string }>
+    } as unknown as Parameters<typeof mediaSettingsListLoad>[0])) as {
+      mediaSettingsConfigs: Array<{ name: string; arr_type: string }>;
     };
   }
 
   private async readQualityDefinitionsList() {
-    return (await qualityDefinitionsListLoad(
-      {
+    return (await qualityDefinitionsListLoad({
       params: {
         databaseId: `${LidarrMediaManagementTest.DATABASE_ID}`,
       },
-    } as unknown as Parameters<typeof qualityDefinitionsListLoad>[0]
-  )) as {
-      qualityDefinitionsConfigs: Array<{ name: string; arr_type: string; quality_count: number }>
+    } as unknown as Parameters<typeof qualityDefinitionsListLoad>[0])) as {
+      qualityDefinitionsConfigs: Array<{ name: string; arr_type: string; quality_count: number }>;
     };
   }
 
@@ -191,33 +185,25 @@ class LidarrMediaManagementTest extends BaseTest {
     });
 
     this.patch(pcdOpsQueries, 'listByDatabase', (databaseId) => {
-      return operations
-        .filter((operation) => operation.database_id === databaseId)
-        .sort((a, b) => a.id - b.id);
+      return operations.filter((operation) => operation.database_id === databaseId).sort((a, b) => a.id - b.id);
     });
 
-    this.patch(
-      pcdOpsQueries,
-      'listByDatabaseAndOrigin',
-      (databaseId, _origin, options) => {
-        const queryOptions = options ?? {};
-        let rows = operations.filter(
-          (operation) => operation.database_id === databaseId && operation.origin === _origin,
-        );
+    this.patch(pcdOpsQueries, 'listByDatabaseAndOrigin', (databaseId, _origin, options) => {
+      const queryOptions = options ?? {};
+      let rows = operations.filter((operation) => operation.database_id === databaseId && operation.origin === _origin);
 
-        const states = queryOptions.states as string[] | undefined;
+      const states = queryOptions.states as string[] | undefined;
 
-        if (states && states.length > 0) {
-          rows = rows.filter((row) => states.includes(row.state));
-        }
-
-        if (queryOptions.source) {
-          rows = rows.filter((row) => row.source === queryOptions.source);
-        }
-
-        return rows.sort((a, b) => a.id - b.id);
+      if (states && states.length > 0) {
+        rows = rows.filter((row) => states.includes(row.state));
       }
-    );
+
+      if (queryOptions.source) {
+        rows = rows.filter((row) => row.source === queryOptions.source);
+      }
+
+      return rows.sort((a, b) => a.id - b.id);
+    });
 
     this.patch(pcdOpsQueries, 'update', (id, update) => {
       const row = operations.find((operation) => operation.id === id);
@@ -410,29 +396,26 @@ VALUES ('R-QD-Seed', 'FLAC', 0, 1024, 256);
     this.test('[NM-02] naming create lidarr success redirects and persists new config', async () => {
       await this.bootstrapFixture();
 
-      await this.expectRedirect(
-        async () => {
-          await namingNewActions.default({
-            request: this.createRequest('media-management/901/naming/new', {
-              arrType: 'lidarr',
-              name: 'Lidarr-Naming-New',
-              layer: 'user',
-              rename: 'true',
-              standardEpisodeFormat: 'S{season:00}E{episode:00}',
-              dailyEpisodeFormat: '{Series Title}',
-              animeEpisodeFormat: '{Episode Title}',
-              seriesFolderFormat: '{Series Title}',
-              seasonFolderFormat: 'Season {season:00}',
-              customColonReplacementFormat: ':-',
-              multiEpisodeStyle: 'extend',
-            }),
-            params: {
-              databaseId: `${LidarrMediaManagementTest.DATABASE_ID}`,
-            },
-          } as unknown as FixtureRequest);
-        },
-        `/media-management/${LidarrMediaManagementTest.DATABASE_ID}/naming`
-      );
+      await this.expectRedirect(async () => {
+        await namingNewActions.default({
+          request: this.createRequest('media-management/901/naming/new', {
+            arrType: 'lidarr',
+            name: 'Lidarr-Naming-New',
+            layer: 'user',
+            rename: 'true',
+            standardEpisodeFormat: 'S{season:00}E{episode:00}',
+            dailyEpisodeFormat: '{Series Title}',
+            animeEpisodeFormat: '{Episode Title}',
+            seriesFolderFormat: '{Series Title}',
+            seasonFolderFormat: 'Season {season:00}',
+            customColonReplacementFormat: ':-',
+            multiEpisodeStyle: 'extend',
+          }),
+          params: {
+            databaseId: `${LidarrMediaManagementTest.DATABASE_ID}`,
+          },
+        } as unknown as FixtureRequest);
+      }, `/media-management/${LidarrMediaManagementTest.DATABASE_ID}/naming`);
 
       const { namingConfigs } = await this.readNamingList();
       const created = namingConfigs.find((item) => item.arr_type === 'lidarr' && item.name === 'Lidarr-Naming-New');
@@ -443,7 +426,9 @@ VALUES ('R-QD-Seed', 'FLAC', 0, 1024, 256);
     this.test('[NM-03] naming create duplicate lidarr name fails with 400 and no state change', async () => {
       await this.bootstrapFixture();
 
-      const before = (await this.readNamingList()).namingConfigs.filter((config) => config.arr_type === 'lidarr').length;
+      const before = (await this.readNamingList()).namingConfigs.filter(
+        (config) => config.arr_type === 'lidarr'
+      ).length;
       const failureRaw = await namingNewActions.default({
         request: this.createRequest('media-management/901/naming/new', {
           arrType: 'lidarr',
@@ -483,7 +468,7 @@ VALUES ('R-QD-Seed', 'FLAC', 0, 1024, 256);
               databaseId: `${LidarrMediaManagementTest.DATABASE_ID}`,
               name: 'Lidarr-Naming-Seed',
             },
-          } as unknown as Parameters<typeof namingLidarrEditActions.update>[0]) ,
+          } as unknown as Parameters<typeof namingLidarrEditActions.update>[0]),
         400,
         'Name is required'
       );
@@ -491,38 +476,31 @@ VALUES ('R-QD-Seed', 'FLAC', 0, 1024, 256);
       assertEquals(validationFailure.data.error, 'Name is required');
 
       const renameCalls: Array<{ oldName: string; newName: string }> = [];
-      this.patch(
-        arrSyncQueries,
-        'updateNamingConfigName',
-        (oldName: string, newName: string) => {
-          renameCalls.push({ oldName, newName });
-          return 1;
-        }
-      );
+      this.patch(arrSyncQueries, 'updateNamingConfigName', (oldName: string, newName: string) => {
+        renameCalls.push({ oldName, newName });
+        return 1;
+      });
 
-      await this.expectRedirect(
-        async () => {
-          await namingLidarrEditActions.update({
-            request: this.createRequest(`media-management/901/naming/lidarr/Lidarr-Naming-Seed`, {
-              layer: 'user',
-              name: 'Lidarr-Naming-Renamed',
-              rename: 'true',
-              standardEpisodeFormat: 'S{season:00}E{episode:00}',
-              dailyEpisodeFormat: '{Series Title}',
-              animeEpisodeFormat: '{Episode Title}',
-              seriesFolderFormat: '{Series Title}',
-              seasonFolderFormat: 'Season {season:00}',
-              multiEpisodeStyle: 'extend',
-              customColonReplacementFormat: ':-',
-            }),
-            params: {
-              databaseId: `${LidarrMediaManagementTest.DATABASE_ID}`,
-              name: 'Lidarr-Naming-Seed',
-            },
-          } as unknown as Parameters<typeof namingLidarrEditActions.update>[0]) ;
-        },
-        `/media-management/${LidarrMediaManagementTest.DATABASE_ID}/naming`
-      );
+      await this.expectRedirect(async () => {
+        await namingLidarrEditActions.update({
+          request: this.createRequest(`media-management/901/naming/lidarr/Lidarr-Naming-Seed`, {
+            layer: 'user',
+            name: 'Lidarr-Naming-Renamed',
+            rename: 'true',
+            standardEpisodeFormat: 'S{season:00}E{episode:00}',
+            dailyEpisodeFormat: '{Series Title}',
+            animeEpisodeFormat: '{Episode Title}',
+            seriesFolderFormat: '{Series Title}',
+            seasonFolderFormat: 'Season {season:00}',
+            multiEpisodeStyle: 'extend',
+            customColonReplacementFormat: ':-',
+          }),
+          params: {
+            databaseId: `${LidarrMediaManagementTest.DATABASE_ID}`,
+            name: 'Lidarr-Naming-Seed',
+          },
+        } as unknown as Parameters<typeof namingLidarrEditActions.update>[0]);
+      }, `/media-management/${LidarrMediaManagementTest.DATABASE_ID}/naming`);
 
       const { namingConfigs } = await this.readNamingList();
       assertEquals(renameCalls.length, 1);
@@ -553,23 +531,20 @@ VALUES ('R-QD-Seed', 'FLAC', 0, 1024, 256);
     this.test('[MS-02] media-settings create lidarr success redirects and persists', async () => {
       await this.bootstrapFixture();
 
-      await this.expectRedirect(
-        async () => {
-          await mediaSettingsNewActions.default({
-            request: this.createRequest('media-management/901/media-settings/new', {
-              arrType: 'lidarr',
-              name: 'Lidarr-Media-New',
-              propersRepacks: 'preferAndUpgrade',
-              enableMediaInfo: 'true',
-              layer: 'user',
-            }),
-            params: {
-              databaseId: `${LidarrMediaManagementTest.DATABASE_ID}`,
-            },
-          } as unknown as Parameters<typeof mediaSettingsNewActions.default>[0]) ;
-        },
-        `/media-management/${LidarrMediaManagementTest.DATABASE_ID}/media-settings`
-      );
+      await this.expectRedirect(async () => {
+        await mediaSettingsNewActions.default({
+          request: this.createRequest('media-management/901/media-settings/new', {
+            arrType: 'lidarr',
+            name: 'Lidarr-Media-New',
+            propersRepacks: 'preferAndUpgrade',
+            enableMediaInfo: 'true',
+            layer: 'user',
+          }),
+          params: {
+            databaseId: `${LidarrMediaManagementTest.DATABASE_ID}`,
+          },
+        } as unknown as Parameters<typeof mediaSettingsNewActions.default>[0]);
+      }, `/media-management/${LidarrMediaManagementTest.DATABASE_ID}/media-settings`);
 
       const { mediaSettingsConfigs } = await this.readMediaSettingsList();
       const created = mediaSettingsConfigs.find(
@@ -593,7 +568,7 @@ VALUES ('R-QD-Seed', 'FLAC', 0, 1024, 256);
         params: {
           databaseId: `${LidarrMediaManagementTest.DATABASE_ID}`,
         },
-      } as unknown as Parameters<typeof mediaSettingsNewActions.default>[0]) ;
+      } as unknown as Parameters<typeof mediaSettingsNewActions.default>[0]);
       const failure = failureRaw as ActionFailure;
 
       assertEquals(failure.status, 400);
@@ -611,39 +586,32 @@ VALUES ('R-QD-Seed', 'FLAC', 0, 1024, 256);
           databaseId: `${LidarrMediaManagementTest.DATABASE_ID}`,
           name: 'Lidarr-Media-Seed',
         },
-      } as unknown as Parameters<typeof mediaSettingsLidarrEditActions.update>[0]) ;
+      } as unknown as Parameters<typeof mediaSettingsLidarrEditActions.update>[0]);
       const loadResult = loadFailureRaw as ActionFailure;
 
       assertEquals(loadResult.status, 400);
       assertEquals(loadResult.data.error.includes('Name is required'), true);
 
       const renameCalls: Array<{ oldName: string; newName: string }> = [];
-      this.patch(
-        arrSyncQueries,
-        'updateMediaSettingsConfigName',
-        (oldName: string, newName: string) => {
-          renameCalls.push({ oldName, newName });
-          return 1;
-        }
-      );
+      this.patch(arrSyncQueries, 'updateMediaSettingsConfigName', (oldName: string, newName: string) => {
+        renameCalls.push({ oldName, newName });
+        return 1;
+      });
 
-      await this.expectRedirect(
-        async () => {
-          await mediaSettingsLidarrEditActions.update({
-            request: this.createRequest(`media-management/901/media-settings/lidarr/Lidarr-Media-Seed`, {
-              layer: 'user',
-              name: 'Lidarr-Media-Renamed',
-              propersRepacks: 'preferAndUpgrade',
-              enableMediaInfo: 'false',
-            }),
-            params: {
-              databaseId: `${LidarrMediaManagementTest.DATABASE_ID}`,
-              name: 'Lidarr-Media-Seed',
-            },
-          } as unknown as Parameters<typeof mediaSettingsLidarrEditActions.update>[0]) ;
-        },
-        `/media-management/${LidarrMediaManagementTest.DATABASE_ID}/media-settings`
-      );
+      await this.expectRedirect(async () => {
+        await mediaSettingsLidarrEditActions.update({
+          request: this.createRequest(`media-management/901/media-settings/lidarr/Lidarr-Media-Seed`, {
+            layer: 'user',
+            name: 'Lidarr-Media-Renamed',
+            propersRepacks: 'preferAndUpgrade',
+            enableMediaInfo: 'false',
+          }),
+          params: {
+            databaseId: `${LidarrMediaManagementTest.DATABASE_ID}`,
+            name: 'Lidarr-Media-Seed',
+          },
+        } as unknown as Parameters<typeof mediaSettingsLidarrEditActions.update>[0]);
+      }, `/media-management/${LidarrMediaManagementTest.DATABASE_ID}/media-settings`);
 
       const { mediaSettingsConfigs } = await this.readMediaSettingsList();
       assertEquals(renameCalls.length, 1);
@@ -652,7 +620,8 @@ VALUES ('R-QD-Seed', 'FLAC', 0, 1024, 256);
         newName: 'Lidarr-Media-Renamed',
       });
       assertEquals(
-        mediaSettingsConfigs.find((item) => item.arr_type === 'lidarr' && item.name === 'Lidarr-Media-Renamed') !== undefined,
+        mediaSettingsConfigs.find((item) => item.arr_type === 'lidarr' && item.name === 'Lidarr-Media-Renamed') !==
+          undefined,
         true
       );
       assertEquals(
@@ -675,35 +644,32 @@ VALUES ('R-QD-Seed', 'FLAC', 0, 1024, 256);
     this.test('[QD-02] quality-definitions create lidarr success redirects and persists mapped entries', async () => {
       await this.bootstrapFixture();
 
-      await this.expectRedirect(
-        async () => {
-          await qualityDefinitionsNewActions.default({
-            request: this.createRequest('media-management/901/quality-definitions/new', {
-              arrType: 'lidarr',
-              name: 'Lidarr-QD-New',
-              layer: 'user',
-              entries: JSON.stringify([
-                {
-                  quality_name: 'FLAC',
-                  min_size: 0,
-                  max_size: 2000,
-                  preferred_size: 500,
-                },
-                {
-                  quality_name: 'AAC-192',
-                  min_size: 0,
-                  max_size: 2000,
-                  preferred_size: 600,
-                },
-              ]),
-            }),
-            params: {
-              databaseId: `${LidarrMediaManagementTest.DATABASE_ID}`,
-            },
-          } as unknown as Parameters<typeof qualityDefinitionsNewActions.default>[0]) ;
-        },
-        `/media-management/${LidarrMediaManagementTest.DATABASE_ID}/quality-definitions`
-      );
+      await this.expectRedirect(async () => {
+        await qualityDefinitionsNewActions.default({
+          request: this.createRequest('media-management/901/quality-definitions/new', {
+            arrType: 'lidarr',
+            name: 'Lidarr-QD-New',
+            layer: 'user',
+            entries: JSON.stringify([
+              {
+                quality_name: 'FLAC',
+                min_size: 0,
+                max_size: 2000,
+                preferred_size: 500,
+              },
+              {
+                quality_name: 'AAC-192',
+                min_size: 0,
+                max_size: 2000,
+                preferred_size: 600,
+              },
+            ]),
+          }),
+          params: {
+            databaseId: `${LidarrMediaManagementTest.DATABASE_ID}`,
+          },
+        } as unknown as Parameters<typeof qualityDefinitionsNewActions.default>[0]);
+      }, `/media-management/${LidarrMediaManagementTest.DATABASE_ID}/quality-definitions`);
 
       const { qualityDefinitionsConfigs } = await this.readQualityDefinitionsList();
       const created = qualityDefinitionsConfigs.find(
@@ -733,7 +699,7 @@ VALUES ('R-QD-Seed', 'FLAC', 0, 1024, 256);
         params: {
           databaseId: `${LidarrMediaManagementTest.DATABASE_ID}`,
         },
-      } as unknown as Parameters<typeof qualityDefinitionsNewActions.default>[0]) ;
+      } as unknown as Parameters<typeof qualityDefinitionsNewActions.default>[0]);
       const failure = failureRaw as ActionFailure;
 
       assertEquals(failure.status, 400);
@@ -747,41 +713,38 @@ VALUES ('R-QD-Seed', 'FLAC', 0, 1024, 256);
       );
     });
 
-    this.test('[QD-04] quality-definitions edit lidarr updates rename and entries with sync mapping callback', async () => {
-      await this.bootstrapFixture();
+    this.test(
+      '[QD-04] quality-definitions edit lidarr updates rename and entries with sync mapping callback',
+      async () => {
+        await this.bootstrapFixture();
 
-      const editLoadRaw = await qualityDefinitionsLidarrEditActions.update({
-        request: this.createRequest(`media-management/901/quality-definitions/lidarr/Lidarr-QD-Mixed`, {
-          entries: JSON.stringify([
-            {
-              quality_name: 'FLAC',
-              min_size: 0,
-              max_size: 1000,
-              preferred_size: 300,
-            },
-          ]),
-        }),
-        params: {
-          databaseId: `${LidarrMediaManagementTest.DATABASE_ID}`,
-          name: 'Lidarr-QD-Mixed',
-        },
-      } as unknown as Parameters<typeof qualityDefinitionsLidarrEditActions.update>[0]) ;
-      const editLoad = editLoadRaw as ActionFailure;
+        const editLoadRaw = await qualityDefinitionsLidarrEditActions.update({
+          request: this.createRequest(`media-management/901/quality-definitions/lidarr/Lidarr-QD-Mixed`, {
+            entries: JSON.stringify([
+              {
+                quality_name: 'FLAC',
+                min_size: 0,
+                max_size: 1000,
+                preferred_size: 300,
+              },
+            ]),
+          }),
+          params: {
+            databaseId: `${LidarrMediaManagementTest.DATABASE_ID}`,
+            name: 'Lidarr-QD-Mixed',
+          },
+        } as unknown as Parameters<typeof qualityDefinitionsLidarrEditActions.update>[0]);
+        const editLoad = editLoadRaw as ActionFailure;
 
-      assertEquals(editLoad.status, 400);
+        assertEquals(editLoad.status, 400);
 
-      const renameCalls: Array<{ oldName: string; newName: string }> = [];
-      this.patch(
-        arrSyncQueries,
-        'updateQualityDefinitionsConfigName',
-        (oldName: string, newName: string) => {
+        const renameCalls: Array<{ oldName: string; newName: string }> = [];
+        this.patch(arrSyncQueries, 'updateQualityDefinitionsConfigName', (oldName: string, newName: string) => {
           renameCalls.push({ oldName, newName });
           return 1;
-        }
-      );
+        });
 
-      await this.expectRedirect(
-        async () => {
+        await this.expectRedirect(async () => {
           await qualityDefinitionsLidarrEditActions.update({
             request: this.createRequest(`media-management/901/quality-definitions/lidarr/Lidarr-QD-Mixed`, {
               layer: 'user',
@@ -805,24 +768,25 @@ VALUES ('R-QD-Seed', 'FLAC', 0, 1024, 256);
               databaseId: `${LidarrMediaManagementTest.DATABASE_ID}`,
               name: 'Lidarr-QD-Mixed',
             },
-          } as unknown as Parameters<typeof qualityDefinitionsLidarrEditActions.update>[0]) ;
-        },
-        `/media-management/${LidarrMediaManagementTest.DATABASE_ID}/quality-definitions`
-      );
+          } as unknown as Parameters<typeof qualityDefinitionsLidarrEditActions.update>[0]);
+        }, `/media-management/${LidarrMediaManagementTest.DATABASE_ID}/quality-definitions`);
 
-      const { qualityDefinitionsConfigs } = await this.readQualityDefinitionsList();
-      assertEquals(renameCalls.length, 1);
-      assertEquals(renameCalls[0], {
-        oldName: 'Lidarr-QD-Mixed',
-        newName: 'Lidarr-QD-Renamed',
-      });
-      const updated = qualityDefinitionsConfigs.find((item) => item.arr_type === 'lidarr' && item.name === 'Lidarr-QD-Renamed');
-      assertEquals(updated?.quality_count, 2);
-      assertEquals(
-        qualityDefinitionsConfigs.find((item) => item.arr_type === 'lidarr' && item.name === 'Lidarr-QD-Mixed'),
-        undefined
-      );
-    });
+        const { qualityDefinitionsConfigs } = await this.readQualityDefinitionsList();
+        assertEquals(renameCalls.length, 1);
+        assertEquals(renameCalls[0], {
+          oldName: 'Lidarr-QD-Mixed',
+          newName: 'Lidarr-QD-Renamed',
+        });
+        const updated = qualityDefinitionsConfigs.find(
+          (item) => item.arr_type === 'lidarr' && item.name === 'Lidarr-QD-Renamed'
+        );
+        assertEquals(updated?.quality_count, 2);
+        assertEquals(
+          qualityDefinitionsConfigs.find((item) => item.arr_type === 'lidarr' && item.name === 'Lidarr-QD-Mixed'),
+          undefined
+        );
+      }
+    );
 
     this.test('[QD-05] quality-definitions create duplicate lidarr mapped name fails with 400', async () => {
       await this.bootstrapFixture();
@@ -844,7 +808,7 @@ VALUES ('R-QD-Seed', 'FLAC', 0, 1024, 256);
         params: {
           databaseId: `${LidarrMediaManagementTest.DATABASE_ID}`,
         },
-      } as unknown as Parameters<typeof qualityDefinitionsNewActions.default>[0]) ;
+      } as unknown as Parameters<typeof qualityDefinitionsNewActions.default>[0]);
       const failure = failureRaw as ActionFailure;
 
       assertEquals(failure.status, 400);

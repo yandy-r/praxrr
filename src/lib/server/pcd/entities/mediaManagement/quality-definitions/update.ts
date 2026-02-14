@@ -39,7 +39,10 @@ export function updateLidarrQualityDefinitions(options: UpdateQualityDefinitions
   return updateQualityDefinitions(options, 'lidarr');
 }
 
-async function updateQualityDefinitions(options: UpdateQualityDefinitionsOptions, qualityDefinitionsType: QualityDefinitionsType) {
+async function updateQualityDefinitions(
+  options: UpdateQualityDefinitionsOptions,
+  qualityDefinitionsType: QualityDefinitionsType
+) {
   const { databaseId, cache, layer, current, input } = options;
   const db = cache.kb;
   const storageType = getQualityDefinitionsStorage(qualityDefinitionsType);
@@ -190,7 +193,11 @@ function ensureUniqueEntries(entries: QualityDefinitionEntry[]) {
   }
 }
 
-async function ensureMappedEntries(cache: PCDCache, qualityDefinitionsType: QualityDefinitionsType, entries: QualityDefinitionEntry[]) {
+async function ensureMappedEntries(
+  cache: PCDCache,
+  qualityDefinitionsType: QualityDefinitionsType,
+  entries: QualityDefinitionEntry[]
+) {
   const { qualityToApiName } = await getQualityApiMappings(cache, qualityDefinitionsType);
   const unmappedEntries: string[] = [];
   const seenQualityNames = new Set<string>();

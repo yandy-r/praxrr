@@ -251,7 +251,7 @@ export async function deserializeSonarrQualityDefinitions(options: DeserializeOp
 }
 
 export async function deserializeLidarrQualityDefinitions(
-  options: DeserializeOptions<PortableLidarrQualityDefinitions>,
+  options: DeserializeOptions<PortableLidarrQualityDefinitions>
 ) {
   const { databaseId, cache, layer, portable } = options;
 
