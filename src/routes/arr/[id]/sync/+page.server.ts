@@ -13,6 +13,7 @@ import { calculateNextRun } from '$lib/server/sync/utils.ts';
 import { scheduleArrSyncForInstance } from '$lib/server/jobs/init.ts';
 import { enqueueJob } from '$lib/server/jobs/queueService.ts';
 import { buildJobDisplayName } from '$lib/server/jobs/display.ts';
+import type { ArrAppType } from '$shared/arr/capabilities.ts';
 
 export const load: ServerLoad = async ({ params }) => {
 	const id = parseInt(params.id || '', 10);
@@ -29,7 +30,7 @@ export const load: ServerLoad = async ({ params }) => {
 
 	// Get all databases
 	const databases = pcdManager.getAll();
-	const arrType = instance.type as 'radarr' | 'sonarr';
+	const arrType = instance.type as ArrAppType;
 
 	// Fetch profiles and configs from each database
 	const databasesWithProfiles = await Promise.all(

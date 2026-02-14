@@ -2,11 +2,6 @@
  * Arr API mappings
  * Constants for transforming PCD data to arr API format
  * Based on Radarr/Sonarr/Lidarr API specifications
- *
- * Lidarr shares delay-profile and media-management sync sections with
- * Radarr/Sonarr but does not yet have quality-profile/custom-format mapping
- * tables. Functions that require those tables gate Lidarr via
- * `requireMappedSyncArrType` which throws an explicit error.
  */
 
 import type { ArrType } from '$shared/pcd/types.ts';
@@ -20,15 +15,10 @@ export const SYNC_SECTION_ORDER: SectionType[] = ['qualityProfiles', 'delayProfi
 const SUPPORTED_SYNC_SECTIONS: Record<SyncArrType, readonly SectionType[]> = {
   radarr: SYNC_SECTION_ORDER,
   sonarr: SYNC_SECTION_ORDER,
-  lidarr: ['delayProfiles', 'mediaManagement'],
+  lidarr: SYNC_SECTION_ORDER,
 };
 
-const UNSUPPORTED_SYNC_SECTION_REASONS: Partial<Record<SyncArrType, Partial<Record<SectionType, string>>>> = {
-  lidarr: {
-    qualityProfiles:
-      'Lidarr quality profile sync is not supported yet (quality/custom format mappings are Radarr/Sonarr-only)',
-  },
-};
+const UNSUPPORTED_SYNC_SECTION_REASONS: Partial<Record<SyncArrType, Partial<Record<SectionType, string>>>> = {};
 
 export function isSyncSectionSupported(arrType: SyncArrType, section: SectionType): boolean {
   return SUPPORTED_SYNC_SECTIONS[arrType].includes(section);
@@ -42,17 +32,10 @@ export function getUnsupportedSyncSectionReason(arrType: SyncArrType, section: S
   return UNSUPPORTED_SYNC_SECTION_REASONS[arrType]?.[section] ?? `Section ${section} is not supported for ${arrType}`;
 }
 
-// Mapping tables below are currently implemented for Radarr/Sonarr only.
-type MappedSyncArrType = Exclude<SyncArrType, 'lidarr'>;
+type MappedSyncArrType = SyncArrType;
 
 function requireMappedSyncArrType(arrType: SyncArrType): MappedSyncArrType {
-  switch (arrType) {
-    case 'radarr':
-    case 'sonarr':
-      return arrType;
-    case 'lidarr':
-      throw new Error('Lidarr sync mappings are not yet supported for quality profile/custom format transforms');
-  }
+  return arrType;
 }
 
 // =============================================================================
@@ -82,6 +65,15 @@ export const INDEXER_FLAGS = {
     freeleech_25: 64,
     nuked: 128,
   },
+  lidarr: {
+    freeleech: 1,
+    halfleech: 2,
+    double_upload: 4,
+    internal: 8,
+    scene: 16,
+    freeleech_75: 32,
+    freeleech_25: 64,
+  },
 } as const;
 
 // =============================================================================
@@ -101,6 +93,15 @@ export const SOURCES = {
     bluray: 9,
   },
   sonarr: {
+    television: 1,
+    television_raw: 2,
+    web_dl: 3,
+    webrip: 4,
+    dvd: 5,
+    bluray: 6,
+    bluray_raw: 7,
+  },
+  lidarr: {
     television: 1,
     television_raw: 2,
     web_dl: 3,
@@ -227,6 +228,46 @@ export const QUALITIES: Record<MappedSyncArrType, Record<string, QualityDefiniti
     },
     'Bluray-576p': { id: 22, name: 'Bluray-576p', source: 'bluray', resolution: 576 },
   },
+  lidarr: {
+    Unknown: { id: 0, name: 'Unknown', source: 'audio', resolution: 0 },
+    'MP3-192': { id: 1, name: 'MP3-192', source: 'audio', resolution: 0 },
+    'MP3-VBR-V0': { id: 2, name: 'MP3-VBR-V0', source: 'audio', resolution: 0 },
+    'MP3-256': { id: 3, name: 'MP3-256', source: 'audio', resolution: 0 },
+    'MP3-320': { id: 4, name: 'MP3-320', source: 'audio', resolution: 0 },
+    'MP3-160': { id: 5, name: 'MP3-160', source: 'audio', resolution: 0 },
+    FLAC: { id: 6, name: 'FLAC', source: 'audio', resolution: 0 },
+    ALAC: { id: 7, name: 'ALAC', source: 'audio', resolution: 0 },
+    'MP3-VBR-V2': { id: 8, name: 'MP3-VBR-V2', source: 'audio', resolution: 0 },
+    'AAC-192': { id: 9, name: 'AAC-192', source: 'audio', resolution: 0 },
+    'AAC-256': { id: 10, name: 'AAC-256', source: 'audio', resolution: 0 },
+    'AAC-320': { id: 11, name: 'AAC-320', source: 'audio', resolution: 0 },
+    'AAC-VBR': { id: 12, name: 'AAC-VBR', source: 'audio', resolution: 0 },
+    WAV: { id: 13, name: 'WAV', source: 'audio', resolution: 0 },
+    'OGG Vorbis Q10': { id: 14, name: 'OGG Vorbis Q10', source: 'audio', resolution: 0 },
+    'OGG Vorbis Q9': { id: 15, name: 'OGG Vorbis Q9', source: 'audio', resolution: 0 },
+    'OGG Vorbis Q8': { id: 16, name: 'OGG Vorbis Q8', source: 'audio', resolution: 0 },
+    'OGG Vorbis Q7': { id: 17, name: 'OGG Vorbis Q7', source: 'audio', resolution: 0 },
+    'OGG Vorbis Q6': { id: 18, name: 'OGG Vorbis Q6', source: 'audio', resolution: 0 },
+    'OGG Vorbis Q5': { id: 19, name: 'OGG Vorbis Q5', source: 'audio', resolution: 0 },
+    WMA: { id: 20, name: 'WMA', source: 'audio', resolution: 0 },
+    'FLAC 24bit': { id: 21, name: 'FLAC 24bit', source: 'audio', resolution: 0 },
+    'MP3-128': { id: 22, name: 'MP3-128', source: 'audio', resolution: 0 },
+    'MP3-96': { id: 23, name: 'MP3-96', source: 'audio', resolution: 0 },
+    'MP3-80': { id: 24, name: 'MP3-80', source: 'audio', resolution: 0 },
+    'MP3-64': { id: 25, name: 'MP3-64', source: 'audio', resolution: 0 },
+    'MP3-56': { id: 26, name: 'MP3-56', source: 'audio', resolution: 0 },
+    'MP3-48': { id: 27, name: 'MP3-48', source: 'audio', resolution: 0 },
+    'MP3-40': { id: 28, name: 'MP3-40', source: 'audio', resolution: 0 },
+    'MP3-32': { id: 29, name: 'MP3-32', source: 'audio', resolution: 0 },
+    'MP3-24': { id: 30, name: 'MP3-24', source: 'audio', resolution: 0 },
+    'MP3-16': { id: 31, name: 'MP3-16', source: 'audio', resolution: 0 },
+    'MP3-8': { id: 32, name: 'MP3-8', source: 'audio', resolution: 0 },
+    'MP3-112': { id: 33, name: 'MP3-112', source: 'audio', resolution: 0 },
+    'MP3-224': { id: 34, name: 'MP3-224', source: 'audio', resolution: 0 },
+    APE: { id: 35, name: 'APE', source: 'audio', resolution: 0 },
+    WavPack: { id: 36, name: 'WavPack', source: 'audio', resolution: 0 },
+    'ALAC 24bit': { id: 37, name: 'ALAC 24bit', source: 'audio', resolution: 0 },
+  },
 };
 
 // =============================================================================
@@ -351,6 +392,42 @@ export const LANGUAGES: Record<MappedSyncArrType, Record<string, LanguageDefinit
     slovenian: { id: 46, name: 'Slovenian' },
     original: { id: -2, name: 'Original' },
   },
+  lidarr: {
+    unknown: { id: 0, name: 'Unknown' },
+    english: { id: 1, name: 'English' },
+    french: { id: 2, name: 'French' },
+    spanish: { id: 3, name: 'Spanish' },
+    german: { id: 4, name: 'German' },
+    italian: { id: 5, name: 'Italian' },
+    danish: { id: 6, name: 'Danish' },
+    dutch: { id: 7, name: 'Dutch' },
+    japanese: { id: 8, name: 'Japanese' },
+    icelandic: { id: 9, name: 'Icelandic' },
+    chinese: { id: 10, name: 'Chinese' },
+    russian: { id: 11, name: 'Russian' },
+    polish: { id: 12, name: 'Polish' },
+    vietnamese: { id: 13, name: 'Vietnamese' },
+    swedish: { id: 14, name: 'Swedish' },
+    norwegian: { id: 15, name: 'Norwegian' },
+    finnish: { id: 16, name: 'Finnish' },
+    turkish: { id: 17, name: 'Turkish' },
+    portuguese: { id: 18, name: 'Portuguese' },
+    flemish: { id: 19, name: 'Flemish' },
+    greek: { id: 20, name: 'Greek' },
+    korean: { id: 21, name: 'Korean' },
+    hungarian: { id: 22, name: 'Hungarian' },
+    hebrew: { id: 23, name: 'Hebrew' },
+    lithuanian: { id: 24, name: 'Lithuanian' },
+    czech: { id: 25, name: 'Czech' },
+    hindi: { id: 26, name: 'Hindi' },
+    romanian: { id: 27, name: 'Romanian' },
+    thai: { id: 28, name: 'Thai' },
+    bulgarian: { id: 29, name: 'Bulgarian' },
+    'portuguese (brazil)': { id: 30, name: 'Portuguese (Brazil)' },
+    arabic: { id: 31, name: 'Arabic' },
+    any: { id: -1, name: 'Any' },
+    original: { id: -2, name: 'Original' },
+  },
 };
 
 // =============================================================================
@@ -370,6 +447,7 @@ const REMUX_MAPPINGS: Record<MappedSyncArrType, Record<string, string>> = {
     'Remux-1080p': 'Remux-1080p',
     'Remux-2160p': 'Remux-2160p',
   },
+  lidarr: {},
 };
 
 const ALTERNATE_QUALITY_NAMES: Record<string, string> = {
@@ -434,6 +512,15 @@ const SOURCE_ALIASES: Record<MappedSyncArrType, Record<string, string>> = {
   },
   sonarr: {
     // Sonarr uses "television" directly, but add common aliases
+    hdtv: 'television',
+    tv: 'television',
+    webdl: 'web_dl',
+    'web-dl': 'web_dl',
+    web: 'web_dl',
+    web_rip: 'webrip',
+    'web-rip': 'webrip',
+  },
+  lidarr: {
     hdtv: 'television',
     tv: 'television',
     webdl: 'web_dl',
@@ -524,13 +611,13 @@ export function getLanguage(name: string, arrType: SyncArrType): LanguageDefinit
 }
 
 /**
- * Get language for profile (Sonarr always uses Original)
+ * Get language for profile (Sonarr/Lidarr always use Original)
  */
 export function getLanguageForProfile(name: string, arrType: SyncArrType): LanguageDefinition {
   const mappedArrType = requireMappedSyncArrType(arrType);
 
-  // Sonarr profiles don't use language settings
-  if (mappedArrType === 'sonarr') {
+  // Sonarr/Lidarr profiles don't use language settings
+  if (mappedArrType === 'sonarr' || mappedArrType === 'lidarr') {
     return { id: -2, name: 'Original' };
   }
 
@@ -564,18 +651,16 @@ export interface LanguageWithSupport {
   name: string;
   radarr: boolean;
   sonarr: boolean;
-  /** Lidarr language conditions are capability-gated until mapping tables exist */
+  /**
+   * Lidarr quality-profile parity is supported, but Lidarr custom-format language
+   * specifications are still unsupported and are deterministically skipped.
+   */
   lidarr: boolean;
 }
 
 /**
  * Get all languages with their arr type support (for conditions page)
  * Returns sorted array with Original first, then alphabetically
- *
- * Lidarr language support is currently set to false for all languages because
- * Lidarr quality-profile/custom-format mapping tables are not yet implemented
- * (see UNSUPPORTED_SYNC_SECTION_REASONS). When Lidarr mapping tables are added,
- * this function should be updated to reflect actual Lidarr language coverage.
  */
 export function getLanguagesWithSupport(): LanguageWithSupport[] {
   const radarrLangs = new Set(Object.values(LANGUAGES.radarr).map((l) => l.name));

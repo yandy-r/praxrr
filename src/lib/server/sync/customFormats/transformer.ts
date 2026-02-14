@@ -34,6 +34,17 @@ export interface ArrCustomFormat {
 	specifications: ArrCustomFormatSpecification[];
 }
 
+export interface SkippedCustomFormatCondition {
+	name: string;
+	type: string;
+	reason: string;
+}
+
+export interface CustomFormatTransformResult {
+	format: ArrCustomFormat;
+	skippedConditions: SkippedCustomFormatCondition[];
+}
+
 // =============================================================================
 // PCD Data Types
 // =============================================================================
@@ -81,6 +92,18 @@ const CONDITION_IMPLEMENTATIONS: Record<string, string> = {
 	year: 'YearSpecification'
 };
 
+const LIDARR_SUPPORTED_CONDITION_TYPES = new Set<string>([
+	'release_title',
+	'release_group',
+	'indexer_flag',
+	'size'
+]);
+
+interface ConditionTransformResult {
+	specification: ArrCustomFormatSpecification | null;
+	skipReason: string | null;
+}
+
 // =============================================================================
 // Transformer Functions
 // =============================================================================
@@ -92,25 +115,32 @@ const CONDITION_IMPLEMENTATIONS: Record<string, string> = {
 function transformCondition(
 	condition: PcdCondition,
 	arrType: SyncArrType
-): ArrCustomFormatSpecification | null {
+): ConditionTransformResult {
 	// Skip conditions not applicable to this arr type
 	if (condition.arrType !== 'all' && condition.arrType !== arrType) {
-		return null;
+		return { specification: null, skipReason: null };
+	}
+
+	if (arrType === 'lidarr' && !LIDARR_SUPPORTED_CONDITION_TYPES.has(condition.type)) {
+		return {
+			specification: null,
+			skipReason: `Condition type "${condition.type}" is not supported by Lidarr custom formats`
+		};
 	}
 
 	// Quality modifier is Radarr-only
 	if (condition.type === 'quality_modifier' && arrType === 'sonarr') {
-		return null;
+		return { specification: null, skipReason: null };
 	}
 
 	// Release type is Sonarr-only
 	if (condition.type === 'release_type' && arrType === 'radarr') {
-		return null;
+		return { specification: null, skipReason: null };
 	}
 
 	const implementation = CONDITION_IMPLEMENTATIONS[condition.type];
 	if (!implementation) {
-		return null;
+		return { specification: null, skipReason: `Unknown condition type "${condition.type}"` };
 	}
 
 	const spec: ArrCustomFormatSpecification = {
@@ -128,49 +158,91 @@ function transformCondition(
 		case 'edition': {
 			// Pattern-based conditions use the regex pattern
 			const pattern = condition.patterns?.[0]?.pattern;
-			if (!pattern) return null;
+			if (!pattern) {
+				return {
+					specification: null,
+					skipReason: `Condition "${condition.name}" is missing regex pattern data`
+				};
+			}
 			spec.fields = [{ name: 'value', value: pattern }];
 			break;
 		}
 
 		case 'source': {
 			const source = condition.sources?.[0];
-			if (!source) return null;
+			if (!source) {
+				return {
+					specification: null,
+					skipReason: `Condition "${condition.name}" is missing source data`
+				};
+			}
 			spec.fields = [{ name: 'value', value: getSource(source, arrType) }];
 			break;
 		}
 
 		case 'resolution': {
 			const resolution = condition.resolutions?.[0];
-			if (!resolution) return null;
+			if (!resolution) {
+				return {
+					specification: null,
+					skipReason: `Condition "${condition.name}" is missing resolution data`
+				};
+			}
 			spec.fields = [{ name: 'value', value: getResolution(resolution) }];
 			break;
 		}
 
 		case 'indexer_flag': {
 			const flag = condition.indexerFlags?.[0];
-			if (!flag) return null;
-			spec.fields = [{ name: 'value', value: getIndexerFlag(flag, arrType) }];
+			if (!flag) {
+				return {
+					specification: null,
+					skipReason: `Condition "${condition.name}" is missing indexer flag data`
+				};
+			}
+			const flagValue = getIndexerFlag(flag, arrType);
+			if (arrType === 'lidarr' && flagValue === 0) {
+				return {
+					specification: null,
+					skipReason: `Indexer flag "${flag}" is not supported by Lidarr`
+				};
+			}
+			spec.fields = [{ name: 'value', value: flagValue }];
 			break;
 		}
 
 		case 'quality_modifier': {
 			const modifier = condition.qualityModifiers?.[0];
-			if (!modifier) return null;
+			if (!modifier) {
+				return {
+					specification: null,
+					skipReason: `Condition "${condition.name}" is missing quality modifier data`
+				};
+			}
 			spec.fields = [{ name: 'value', value: getQualityModifier(modifier) }];
 			break;
 		}
 
 		case 'release_type': {
 			const releaseType = condition.releaseTypes?.[0];
-			if (!releaseType) return null;
+			if (!releaseType) {
+				return {
+					specification: null,
+					skipReason: `Condition "${condition.name}" is missing release type data`
+				};
+			}
 			spec.fields = [{ name: 'value', value: getReleaseType(releaseType) }];
 			break;
 		}
 
 		case 'size': {
 			const size = condition.size;
-			if (!size) return null;
+			if (!size) {
+				return {
+					specification: null,
+					skipReason: `Condition "${condition.name}" is missing size bounds`
+				};
+			}
 			spec.fields = [
 				{ name: 'min', value: size.minBytes ?? 0 },
 				{ name: 'max', value: size.maxBytes ?? 0 }
@@ -180,7 +252,12 @@ function transformCondition(
 
 		case 'year': {
 			const years = condition.years;
-			if (!years) return null;
+			if (!years) {
+				return {
+					specification: null,
+					skipReason: `Condition "${condition.name}" is missing year bounds`
+				};
+			}
 			spec.fields = [
 				{ name: 'min', value: years.minYear ?? 0 },
 				{ name: 'max', value: years.maxYear ?? 0 }
@@ -190,7 +267,12 @@ function transformCondition(
 
 		case 'language': {
 			const lang = condition.languages?.[0];
-			if (!lang) return null;
+			if (!lang) {
+				return {
+					specification: null,
+					skipReason: `Condition "${condition.name}" is missing language data`
+				};
+			}
 			const langData = getLanguage(lang.name, arrType);
 			spec.fields = [{ name: 'value', value: langData.id }];
 			// Add exceptLanguage field if present
@@ -201,25 +283,32 @@ function transformCondition(
 		}
 
 		default:
-			return null;
+			return { specification: null, skipReason: `Condition type "${condition.type}" is unsupported` };
 	}
 
-	return spec;
+	return { specification: spec, skipReason: null };
 }
 
 /**
- * Transform a PCD custom format to arr API format
+ * Transform a PCD custom format and report deterministic skipped conditions.
  */
-export function transformCustomFormat(
+export function transformCustomFormatWithDiagnostics(
 	format: PcdCustomFormat,
 	arrType: SyncArrType
-): ArrCustomFormat {
+): CustomFormatTransformResult {
 	const specifications: ArrCustomFormatSpecification[] = [];
+	const skippedConditions: SkippedCustomFormatCondition[] = [];
 
 	for (const condition of sortConditions(format.conditions)) {
-		const spec = transformCondition(condition, arrType);
-		if (spec) {
-			specifications.push(spec);
+		const transformed = transformCondition(condition, arrType);
+		if (transformed.specification) {
+			specifications.push(transformed.specification);
+		} else if (transformed.skipReason) {
+			skippedConditions.push({
+				name: condition.name,
+				type: condition.type,
+				reason: transformed.skipReason
+			});
 		}
 	}
 
@@ -232,7 +321,17 @@ export function transformCustomFormat(
 		result.includeCustomFormatWhenRenaming = true;
 	}
 
-	return result;
+	return {
+		format: result,
+		skippedConditions
+	};
+}
+
+/**
+ * Transform a PCD custom format to arr API format.
+ */
+export function transformCustomFormat(format: PcdCustomFormat, arrType: SyncArrType): ArrCustomFormat {
+	return transformCustomFormatWithDiagnostics(format, arrType).format;
 }
 
 // =============================================================================

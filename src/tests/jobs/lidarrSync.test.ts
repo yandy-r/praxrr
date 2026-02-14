@@ -1,4 +1,4 @@
-import { assertEquals, assertExists, assertStringIncludes } from '@std/assert';
+import { assertEquals, assertExists } from '@std/assert';
 import type { ArrInstance } from '$db/queries/arrInstances.ts';
 import { arrInstancesQueries } from '$db/queries/arrInstances.ts';
 import { arrSyncQueries } from '$db/queries/arrSync.ts';
@@ -63,8 +63,8 @@ Deno.test('isSyncSectionSupported: lidarr supports mediaManagement', () => {
 	assertEquals(isSyncSectionSupported('lidarr', 'mediaManagement'), true);
 });
 
-Deno.test('isSyncSectionSupported: lidarr does not support qualityProfiles', () => {
-	assertEquals(isSyncSectionSupported('lidarr', 'qualityProfiles'), false);
+Deno.test('isSyncSectionSupported: lidarr supports qualityProfiles', () => {
+	assertEquals(isSyncSectionSupported('lidarr', 'qualityProfiles'), true);
 });
 
 Deno.test('isSyncSectionSupported: radarr supports all sections', () => {
@@ -87,6 +87,7 @@ Deno.test('getUnsupportedSyncSectionReason: returns null for supported sections'
 		['sonarr', 'qualityProfiles'],
 		['sonarr', 'delayProfiles'],
 		['sonarr', 'mediaManagement'],
+		['lidarr', 'qualityProfiles'],
 		['lidarr', 'delayProfiles'],
 		['lidarr', 'mediaManagement'],
 	];
@@ -95,10 +96,8 @@ Deno.test('getUnsupportedSyncSectionReason: returns null for supported sections'
 	}
 });
 
-Deno.test('getUnsupportedSyncSectionReason: returns reason for lidarr qualityProfiles', () => {
-	const reason = getUnsupportedSyncSectionReason('lidarr', 'qualityProfiles');
-	assertEquals(typeof reason, 'string');
-	assertStringIncludes(reason!, 'Lidarr quality profile sync is not supported yet');
+Deno.test('getUnsupportedSyncSectionReason: lidarr qualityProfiles has no unsupported reason', () => {
+	assertEquals(getUnsupportedSyncSectionReason('lidarr', 'qualityProfiles'), null);
 });
 
 Deno.test('SYNC_SECTION_ORDER: contains all three sections in expected order', () => {
@@ -110,7 +109,7 @@ Deno.test('SYNC_SECTION_ORDER: contains all three sections in expected order', (
 // =============================================================================
 
 Deno.test({
-	name: 'arr.sync qualityProfiles: lidarr is explicitly unsupported without regressing radarr/sonarr',
+	name: 'arr.sync qualityProfiles: lidarr has parity behavior with radarr/sonarr skip semantics',
 	sanitizeResources: false,
 	fn: async () => {
 		const handler = jobQueueRegistry.get('arr.sync');
@@ -124,6 +123,7 @@ Deno.test({
 
 		const originalGetById = arrInstancesQueries.getById;
 		const originalGetSyncConfigStatus = arrSyncQueries.getSyncConfigStatus;
+		const originalGetQualityProfilesSync = arrSyncQueries.getQualityProfilesSync;
 		const originalGetNextScheduledRunAt = arrSyncQueries.getNextScheduledRunAt;
 
 		arrInstancesQueries.getById = (id: number) => instances.get(id);
@@ -147,13 +147,19 @@ Deno.test({
 				syncStatus: 'idle',
 			},
 		});
+		arrSyncQueries.getQualityProfilesSync = () => ({
+			selections: [],
+			config: {
+				trigger: 'manual',
+				cron: null,
+			},
+		});
 		arrSyncQueries.getNextScheduledRunAt = () => null;
 
 		try {
 			const lidarrResult = await handler(createSyncJob(101, 'manual'));
 			assertEquals(lidarrResult.status, 'skipped');
-			assertStringIncludes(lidarrResult.output ?? '', 'qualityProfiles: skipped (');
-			assertStringIncludes(lidarrResult.output ?? '', 'Lidarr quality profile sync is not supported yet');
+			assertEquals(lidarrResult.output, 'qualityProfiles: skipped');
 
 			for (const supportedId of [102, 103]) {
 				const supportedResult = await handler(createSyncJob(supportedId, 'schedule'));
@@ -163,6 +169,7 @@ Deno.test({
 		} finally {
 			arrInstancesQueries.getById = originalGetById;
 			arrSyncQueries.getSyncConfigStatus = originalGetSyncConfigStatus;
+			arrSyncQueries.getQualityProfilesSync = originalGetQualityProfilesSync;
 			arrSyncQueries.getNextScheduledRunAt = originalGetNextScheduledRunAt;
 		}
 	},

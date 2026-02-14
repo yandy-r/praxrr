@@ -9,9 +9,26 @@ import type {
 	QualityItem,
 	ProfileLanguage,
 	CustomFormatCounts,
+	CustomFormatCountsByArrType,
 	QualityProfileOption
 } from '$shared/pcd/display.ts';
+import { ARR_APP_TYPES, isArrAppType } from '$shared/arr/capabilities.ts';
 import { parseMarkdown } from '$utils/markdown/markdown.ts';
+
+function createEmptyArrTypeCounts(): CustomFormatCountsByArrType {
+	const counts: Partial<CustomFormatCountsByArrType> = {};
+	for (const arrType of ARR_APP_TYPES) {
+		counts[arrType] = 0;
+	}
+	return counts as CustomFormatCountsByArrType;
+}
+
+function createEmptyCustomFormatCounts(): Omit<CustomFormatCounts, 'total'> {
+	return {
+		all: 0,
+		...createEmptyArrTypeCounts()
+	};
+}
 
 /**
  * Get quality profiles with full data for table/card views
@@ -105,13 +122,12 @@ export async function list(cache: PCDCache): Promise<QualityProfileTableRow[]> {
 	const formatCountsMap = new Map<string, Omit<CustomFormatCounts, 'total'>>();
 	for (const fc of formatCounts) {
 		if (!formatCountsMap.has(fc.quality_profile_name)) {
-			formatCountsMap.set(fc.quality_profile_name, { all: 0, radarr: 0, sonarr: 0 });
+			formatCountsMap.set(fc.quality_profile_name, createEmptyCustomFormatCounts());
 		}
 		const counts = formatCountsMap.get(fc.quality_profile_name)!;
 		const count = Number(fc.count);
 		if (fc.arr_type === 'all') counts.all = count;
-		else if (fc.arr_type === 'radarr') counts.radarr = count;
-		else if (fc.arr_type === 'sonarr') counts.sonarr = count;
+		else if (isArrAppType(fc.arr_type)) counts[fc.arr_type] = count;
 	}
 
 	const qualitiesMap = new Map<string, QualityItem[]>();
@@ -138,7 +154,9 @@ export async function list(cache: PCDCache): Promise<QualityProfileTableRow[]> {
 
 	// Build the final result
 	const results = profiles.map((profile) => {
-		const counts = formatCountsMap.get(profile.name) || { all: 0, radarr: 0, sonarr: 0 };
+		const counts = formatCountsMap.get(profile.name) || createEmptyCustomFormatCounts();
+		const totalCount =
+			counts.all + ARR_APP_TYPES.reduce((sum, arrType) => sum + (counts[arrType] ?? 0), 0);
 
 		const result: QualityProfileTableRow = {
 			id: profile.id,
@@ -148,10 +166,8 @@ export async function list(cache: PCDCache): Promise<QualityProfileTableRow[]> {
 			upgrades_allowed: profile.upgrades_allowed === 1,
 			minimum_custom_format_score: profile.minimum_custom_format_score,
 			custom_formats: {
-				all: counts.all,
-				radarr: counts.radarr,
-				sonarr: counts.sonarr,
-				total: counts.all + counts.radarr + counts.sonarr
+				...counts,
+				total: totalCount
 			},
 			qualities: qualitiesMap.get(profile.name) || [],
 			language: languagesMap.get(profile.name)

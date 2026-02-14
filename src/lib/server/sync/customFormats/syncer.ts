@@ -12,7 +12,7 @@
 import type { BaseArrClient } from '$arr/base.ts';
 import { logger } from '$logger/logger.ts';
 import type { SyncArrType } from '../mappings.ts';
-import { transformCustomFormat, type PcdCustomFormat } from './transformer.ts';
+import { transformCustomFormatWithDiagnostics, type PcdCustomFormat } from './transformer.ts';
 
 /**
  * Sync custom formats for a single database to an arr instance.
@@ -36,9 +36,35 @@ export async function syncCustomFormats(
 	const pcdFormatIdMap = new Map<string, number>();
 
 	for (const [pcdName, pcdFormat] of pcdFormats) {
-		const arrFormat = transformCustomFormat(pcdFormat, instanceType);
+		const transformed = transformCustomFormatWithDiagnostics(pcdFormat, instanceType);
+		const arrFormat = transformed.format;
 		const suffixedName = pcdName + suffix;
 		arrFormat.name = suffixedName;
+
+		if (instanceType === 'lidarr' && transformed.skippedConditions.length > 0) {
+			await logger.warn('Skipping unsupported Lidarr custom format conditions', {
+				source: 'Sync:CustomFormats',
+				meta: {
+					instanceId,
+					pcdName,
+					suffixedName,
+					skippedConditions: transformed.skippedConditions
+				}
+			});
+		}
+
+		if (instanceType === 'lidarr' && pcdFormat.conditions.length > 0 && arrFormat.specifications.length === 0) {
+			await logger.warn('Skipping Lidarr custom format with no supported conditions', {
+				source: 'Sync:CustomFormats',
+				meta: {
+					instanceId,
+					pcdName,
+					suffixedName,
+					conditionCount: pcdFormat.conditions.length
+				}
+			});
+			continue;
+		}
 
 		await logger.debug(`Compiled custom format "${pcdName}" (suffixed)`, {
 			source: 'Compile:CustomFormat',

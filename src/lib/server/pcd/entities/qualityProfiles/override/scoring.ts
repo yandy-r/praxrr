@@ -5,6 +5,7 @@ import { updateScoring } from '../scoring/update.ts';
 import type { StoredOpMetadata, StoredDesiredState } from '$pcd/conflicts/overrideUtils.ts';
 import { getDesiredTo, valuesEqual, followRenameChain } from '$pcd/conflicts/overrideUtils.ts';
 import { resolveProfileName } from './resolve.ts';
+import { isArrAppType } from '$shared/arr/capabilities.ts';
 
 /**
  * Extract desired CF score changes from the op's desired_state.
@@ -90,7 +91,7 @@ export async function overrideScoring(
 		const resolvedName = followRenameChain(databaseId, 'custom_format', change.customFormatName);
 		const cf = currentScoring.customFormats.find((c) => c.name === resolvedName);
 		if (!cf) return change.score === null;
-		const currentScore = cf.scores[change.arrType] ?? null;
+		const currentScore = isArrAppType(change.arrType) ? (cf.scores[change.arrType] ?? null) : null;
 		return valuesEqual(change.score, currentScore);
 	});
 

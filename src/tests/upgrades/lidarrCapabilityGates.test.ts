@@ -15,6 +15,7 @@ import {
 	ARR_APPS,
 	type ArrAppType,
 } from '$shared/arr/capabilities.ts';
+import { getUnsupportedSyncSectionReason } from '$lib/server/sync/mappings.ts';
 
 import '$jobs/handlers/arrRename.ts';
 import '$jobs/handlers/arrUpgrade.ts';
@@ -119,8 +120,8 @@ Deno.test('supportsArrWorkflow: sonarr supports rename but not upgrades', () => 
 });
 
 Deno.test('supportsArrSyncSurface: lidarr sync capabilities match expected', () => {
-	assertEquals(supportsArrSyncSurface('lidarr', 'quality_profiles'), false);
-	assertEquals(supportsArrSyncSurface('lidarr', 'custom_formats'), false);
+	assertEquals(supportsArrSyncSurface('lidarr', 'quality_profiles'), true);
+	assertEquals(supportsArrSyncSurface('lidarr', 'custom_formats'), true);
 	assertEquals(supportsArrSyncSurface('lidarr', 'delay_profiles'), true);
 	assertEquals(supportsArrSyncSurface('lidarr', 'media_management'), true);
 });
@@ -137,10 +138,15 @@ Deno.test('supportsArrSyncSurface: radarr and sonarr support all sync surfaces',
 Deno.test('supportsFeature: generic predicate covers workflow and sync surfaces', () => {
 	assertEquals(supportsFeature('lidarr', 'rename'), false);
 	assertEquals(supportsFeature('lidarr', 'upgrades'), false);
-	assertEquals(supportsFeature('lidarr', 'quality_profiles'), false);
+	assertEquals(supportsFeature('lidarr', 'quality_profiles'), true);
+	assertEquals(supportsFeature('lidarr', 'custom_formats'), true);
 	assertEquals(supportsFeature('lidarr', 'delay_profiles'), true);
 	assertEquals(supportsFeature('lidarr', 'media_management'), true);
 	assertEquals(supportsFeature('lidarr', 'nonexistent_feature'), false);
+});
+
+Deno.test('getUnsupportedSyncSectionReason: lidarr qualityProfiles has no unsupported reason', () => {
+	assertEquals(getUnsupportedSyncSectionReason('lidarr', 'qualityProfiles'), null);
 });
 
 Deno.test('isArrAppType: validates all known types and rejects invalid ones', () => {
@@ -158,8 +164,8 @@ Deno.test('ARR_APPS: lidarr metadata has correct label and capability flags', ()
 	assertEquals(lidarr.label, 'Lidarr');
 	assertEquals(lidarr.capabilities.workflows.rename, false);
 	assertEquals(lidarr.capabilities.workflows.upgrades, false);
-	assertEquals(lidarr.capabilities.sync.quality_profiles, false);
-	assertEquals(lidarr.capabilities.sync.custom_formats, false);
+	assertEquals(lidarr.capabilities.sync.quality_profiles, true);
+	assertEquals(lidarr.capabilities.sync.custom_formats, true);
 	assertEquals(lidarr.capabilities.sync.delay_profiles, true);
 	assertEquals(lidarr.capabilities.sync.media_management, true);
 });

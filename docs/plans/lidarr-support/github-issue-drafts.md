@@ -20,7 +20,7 @@ Status sync (2026-02-13):
 - `#1`-`#5` have been verified against implementation scope and acceptance criteria in this branch.
 - `#1`-`#5` are ready for issue-state closeout once merged to the target branch.
 - `#6` umbrella rollup is complete; see "Rollup Completion Update" section below.
-- `#8` (follow-up) remains open for future Lidarr quality/custom-format sync parity work.
+- `#8` (follow-up) is implemented in this branch as of 2026-02-13; issue-state closeout remains pending merge/state sync.
 
 Planning workflow requirement:
 
@@ -222,9 +222,9 @@ Research/spec: `docs/plans/lidarr-support/feature-spec.md`
 
 ---
 
-## Proposed Follow-Up Child Issue (under #6)
+## Follow-Up Child Issue (under #6)
 
-## 6) feat(lidarr): add quality profile and custom-format sync parity
+## 8) feat(lidarr): add quality profile and custom-format sync parity
 
 ### Body
 
@@ -296,8 +296,7 @@ Completed: 2026-02-13
 - `#2` completed: PCD entity strategy encoded as v1 reuse of existing media-management shapes.
   Sync orchestration extended in `src/lib/server/sync/mappings.ts` and
   `src/lib/server/jobs/handlers/arrSync.ts`. Media-management syncer updated to handle Lidarr
-  with explicit capability gating for unsupported fields. Quality profile sync for Lidarr
-  intentionally deferred to follow-up `#8`. Regression coverage in
+  with explicit capability gating for unsupported fields. Regression coverage in
   `src/tests/jobs/lidarrSync.test.ts`.
 - `#3` completed: Lidarr client implemented in `src/lib/server/utils/arr/clients/lidarr.ts`
   with `getArtists`, `getAlbums`, `getLibrary`, and `getReleases` methods. Library and releases
@@ -315,12 +314,20 @@ Completed: 2026-02-13
   `src/tests/upgrades/lidarrCapabilityGates.test.ts`.
 - `#6` rollup complete: all child issue scopes (`#1`-`#5`) are implemented in branch
   `feat/lidarr-support`. Umbrella is ready for closeout after merge to `v2` and issue-state
-  sync. Follow-up `#8` tracks deferred quality/custom-format sync parity for Lidarr.
+  sync.
+- `#8` completed: Lidarr quality-profile/custom-format sync parity implemented by enabling
+  `qualityProfiles` section support for Lidarr in `src/lib/server/sync/mappings.ts`,
+  adding Lidarr quality/language/indexer mappings in sync transforms, and updating
+  deterministic custom-format condition handling for unsupported Lidarr spec types in
+  `src/lib/server/sync/customFormats/transformer.ts` and
+  `src/lib/server/sync/customFormats/syncer.ts`. Regression coverage updated in
+  `src/tests/jobs/lidarrSync.test.ts` and `src/tests/upgrades/lidarrCapabilityGates.test.ts`.
 
 ### v1 Scope Decisions
 
 - **Media-management**: reuse existing entity shapes (no `lidarr_*` entities introduced).
-- **Quality profile sync**: capability-gated for Lidarr; deferred to `#8`.
+- **Quality profile sync**: supported for Lidarr in v1 via issue `#8`, with explicit
+  deterministic skips for unsupported custom-format condition types.
 - **Rename**: capability-gated for Lidarr; explicit unsupported messaging in UI and handlers.
 - **Upgrades**: capability-gated for Lidarr; explicit unsupported messaging in UI and handlers.
 - **Library/releases**: fully supported with Lidarr-specific artist/album domain model.

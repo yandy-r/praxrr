@@ -26,7 +26,7 @@ function toConditionData(entry: Record<string, unknown>): ConditionData | null {
 	return {
 		name,
 		type: (base?.type as string) ?? '',
-		arrType: (base?.arrType as 'all' | 'radarr' | 'sonarr') ?? 'all',
+		arrType: (base?.arrType as ConditionData['arrType']) ?? 'all',
 		negate: (base?.negate as boolean) ?? false,
 		required: (base?.required as boolean) ?? false,
 		patterns: values?.patterns as ConditionData['patterns'],

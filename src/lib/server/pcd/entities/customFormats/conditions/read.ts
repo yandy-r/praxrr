@@ -192,7 +192,7 @@ export async function getConditionsForEvaluation(
 	return conditions.map((c) => ({
 		name: c.name,
 		type: c.type,
-		arrType: c.arr_type as 'all' | 'radarr' | 'sonarr',
+		arrType: c.arr_type as ConditionData['arrType'],
 		negate: c.negate === 1,
 		required: c.required === 1,
 		patterns: patternsMap.get(c.name),
@@ -402,7 +402,7 @@ export async function getAllConditionsForEvaluation(
 		conditionsByFormat.get(c.custom_format_name)!.push({
 			name: c.name,
 			type: c.type,
-			arrType: c.arr_type as 'all' | 'radarr' | 'sonarr',
+			arrType: c.arr_type as ConditionData['arrType'],
 			negate: c.negate === 1,
 			required: c.required === 1,
 			patterns: patternsMap.get(key),

@@ -3,7 +3,13 @@
  */
 
 import type { PCDCache } from '$pcd/index.ts';
-import type { QualityProfileScoring, ProfileCfScores, AllCfScoresResult } from '$shared/pcd/display.ts';
+import { ARR_APP_TYPES } from '$shared/arr/capabilities.ts';
+import type {
+	QualityProfileScoring,
+	ProfileCfScores,
+	AllCfScoresResult,
+	CustomFormatScoresByArrType
+} from '$shared/pcd/display.ts';
 
 /**
  * Get quality profile scoring data
@@ -27,8 +33,8 @@ export async function scoring(
 		throw new Error(`Quality profile ${profileName} not found`);
 	}
 
-	// 2. Define display arr types (radarr, sonarr) - 'all' is not a column
-	const arrTypes = ['radarr', 'sonarr'];
+	// 2. Define display arr types ('all' is not a column)
+	const arrTypes = ARR_APP_TYPES;
 
 	// 3. Get all custom formats
 	const customFormats = await db
@@ -71,7 +77,7 @@ export async function scoring(
 
 	// 7. Build custom format scoring data
 	const customFormatScoring = customFormats.map((cf: { name: string }) => {
-		const formatScores: Record<string, number | null> = {};
+		const formatScores = {} as CustomFormatScoresByArrType;
 		const cfScores = scoresMap.get(cf.name);
 
 		// Get the 'all' score if it exists (used as default for all types)
@@ -144,16 +150,18 @@ export async function allCfScores(cache: PCDCache): Promise<AllCfScoresResult> {
 	// Build result
 	const profilesResult: ProfileCfScores[] = profiles.map((profile) => {
 		const profileScores = scoresMap.get(profile.name);
-		const scores: Record<string, { radarr: number | null; sonarr: number | null }> = {};
+		const scores: Record<string, CustomFormatScoresByArrType> = {};
 
 		for (const cf of customFormats) {
 			const cfScores = profileScores?.get(cf.name);
 			const allScore = cfScores?.get('all') ?? null;
 
-			scores[cf.name] = {
-				radarr: cfScores?.get('radarr') ?? allScore,
-				sonarr: cfScores?.get('sonarr') ?? allScore
-			};
+			const arrTypeScores = {} as CustomFormatScoresByArrType;
+			for (const arrType of ARR_APP_TYPES) {
+				arrTypeScores[arrType] = cfScores?.get(arrType) ?? allScore;
+			}
+
+			scores[cf.name] = arrTypeScores;
 		}
 
 		return {

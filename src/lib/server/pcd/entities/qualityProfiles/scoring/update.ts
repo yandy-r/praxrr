@@ -5,6 +5,7 @@
 import type { PCDCache } from '$pcd/index.ts';
 import { writeOperation, type OperationLayer, type WriteResult } from '$pcd/index.ts';
 import { logger } from '$logger/logger.ts';
+import { ARR_APP_TYPES } from '$shared/arr/capabilities.ts';
 import type { CompiledQuery } from 'kysely';
 
 // ============================================================================
@@ -91,7 +92,7 @@ export async function updateScoring(options: UpdateScoringOptions) {
 	// 'all' value — otherwise the user didn't change anything and expanding
 	// would create spurious user ops that can later conflict.
 	const modifiedCfNames = new Set(input.customFormatScores.map((s) => s.customFormatName));
-	const arrTypes = ['radarr', 'sonarr'];
+	const arrTypes = ARR_APP_TYPES;
 
 	for (const cfName of modifiedCfNames) {
 		const allKey = `${cfName}::all`;

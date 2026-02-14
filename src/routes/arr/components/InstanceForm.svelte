@@ -4,7 +4,7 @@
 	import { Save, Wifi, Trash2, Eraser, Loader2 } from 'lucide-svelte';
 	import CleanupModal from './CleanupModal.svelte';
 	import { alertStore } from '$alerts/store';
-	import { isDirty, initEdit, initCreate, update, current, clear } from '$lib/client/stores/dirty';
+	import { isDirty, initEdit, update, current, clear } from '$lib/client/stores/dirty';
 	import type { ArrInstance } from '$db/queries/arrInstances.ts';
 	import FormInput from '$ui/form/FormInput.svelte';
 	import DropdownSelect from '$ui/dropdown/DropdownSelect.svelte';
@@ -52,7 +52,9 @@
 				tags: JSON.stringify(parseTags(instance.tags))
 			});
 		} else {
-			initCreate({
+			// Treat create mode as clean until the user actually edits fields.
+			// This avoids false "stay/discard" prompts when navigating away untouched.
+			initEdit({
 				name: '',
 				type: initialType,
 				url: '',

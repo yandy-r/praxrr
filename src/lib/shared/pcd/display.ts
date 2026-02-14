@@ -340,13 +340,13 @@ export interface QualitiesPageData {
 export interface CustomFormatScoring {
 	name: string;
 	tags: string[];
-	scores: Record<string, number | null>;
+	scores: CustomFormatScoresByArrType;
 }
 
 /** Quality profile scoring data for the scoring page */
 export interface QualityProfileScoring {
 	databaseId: number;
-	arrTypes: string[];
+	arrTypes: ArrAppType[];
 	customFormats: CustomFormatScoring[];
 	minimum_custom_format_score: number;
 	upgrade_until_score: number;

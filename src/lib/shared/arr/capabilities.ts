@@ -113,8 +113,8 @@ export const ARR_APPS: Record<ArrAppType, ArrAppMetadata> = {
         upgrades: false,
       },
       sync: {
-        quality_profiles: false,
-        custom_formats: false,
+        quality_profiles: true,
+        custom_formats: true,
         delay_profiles: true,
         media_management: true,
       },
