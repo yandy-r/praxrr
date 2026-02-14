@@ -30,5 +30,5 @@ Deno.test('resolveArrTargets: multiple targets returns in ARR_TARGET_ORDER', () 
 
 Deno.test('resolveArrTargets: all four targets returns full order', () => {
   const targets = new Set<ArrConditionTargetType>(['all', 'radarr', 'sonarr', 'lidarr']);
-  assertEquals(resolveArrTargets(targets), ARR_TARGET_ORDER);
+  assertEquals(resolveArrTargets(targets), [...ARR_TARGET_ORDER]);
 });

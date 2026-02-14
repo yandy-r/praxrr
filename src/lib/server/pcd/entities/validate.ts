@@ -12,9 +12,9 @@ import {
 } from '$shared/pcd/portable.ts';
 
 const VALID_PROTOCOLS = new Set(['prefer_usenet', 'prefer_torrent', 'only_usenet', 'only_torrent']);
-const VALID_COLON_FORMATS = new Set(['delete', 'dash', 'space_dash', 'space_dash_space', 'smart']);
-const VALID_MULTI_EPISODE_STYLES = new Set(['extend', 'duplicate', 'repeat', 'scene', 'range', 'prefixed_range']);
-const VALID_PROPERS_REPACKS = new Set(['do_not_prefer', 'prefer_and_upgrade', 'do_not_upgrade_automatically']);
+const VALID_COLON_FORMATS = new Set(['delete', 'dash', 'spaceDash', 'spaceDashSpace', 'smart']);
+const VALID_MULTI_EPISODE_STYLES = new Set(['extend', 'duplicate', 'repeat', 'scene', 'range', 'prefixedRange']);
+const VALID_PROPERS_REPACKS = new Set(['doNotPrefer', 'preferAndUpgrade', 'doNotUpgradeAutomatically']);
 
 export function validatePortableData(entityType: EntityType, data: Record<string, unknown>): string | null {
   switch (entityType) {
