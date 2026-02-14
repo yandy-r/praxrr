@@ -5,12 +5,16 @@
  * Returns a string error message if invalid, null if valid.
  */
 
-import type { EntityType } from '$shared/pcd/portable.ts';
+import {
+  type EntityType,
+  getLidarrMediaManagementPortableEntry,
+  type LidarrMediaManagementPortableEntityType,
+} from '$shared/pcd/portable.ts';
 
 const VALID_PROTOCOLS = new Set(['prefer_usenet', 'prefer_torrent', 'only_usenet', 'only_torrent']);
-const VALID_COLON_FORMATS = new Set(['delete', 'dash', 'space_dash', 'space_dash_space', 'smart']);
-const VALID_MULTI_EPISODE_STYLES = new Set(['extend', 'duplicate', 'repeat', 'scene', 'range', 'prefixed_range']);
-const VALID_PROPERS_REPACKS = new Set(['do_not_prefer', 'prefer_and_upgrade', 'do_not_upgrade_automatically']);
+const VALID_COLON_FORMATS = new Set(['delete', 'dash', 'spaceDash', 'spaceDashSpace', 'smart']);
+const VALID_MULTI_EPISODE_STYLES = new Set(['extend', 'duplicate', 'repeat', 'scene', 'range', 'prefixedRange']);
+const VALID_PROPERS_REPACKS = new Set(['doNotPrefer', 'preferAndUpgrade', 'doNotUpgradeAutomatically']);
 
 export function validatePortableData(entityType: EntityType, data: Record<string, unknown>): string | null {
   switch (entityType) {
@@ -27,15 +31,17 @@ export function validatePortableData(entityType: EntityType, data: Record<string
     case 'sonarr_naming':
       return validateSonarrNaming(data);
     case 'lidarr_naming':
-      return validateLidarrNaming(data);
+      return validateLidarrPortableData('lidarr_naming', data, validateSonarrNaming);
     case 'radarr_media_settings':
     case 'sonarr_media_settings':
-    case 'lidarr_media_settings':
       return validateMediaSettings(data);
+    case 'lidarr_media_settings':
+      return validateLidarrPortableData('lidarr_media_settings', data, validateMediaSettings);
     case 'radarr_quality_definitions':
     case 'sonarr_quality_definitions':
-    case 'lidarr_quality_definitions':
       return validateQualityDefinitions(data);
+    case 'lidarr_quality_definitions':
+      return validateLidarrPortableData('lidarr_quality_definitions', data, validateQualityDefinitions);
     default:
       return null;
   }
@@ -198,22 +204,37 @@ function validateSonarrNaming(data: Record<string, unknown>): string | null {
   return null;
 }
 
-function validateLidarrNaming(data: Record<string, unknown>): string | null {
-  const mediaFormatError = validateLidarrMediaManagementNamingFields(data);
-  if (mediaFormatError) {
-    return mediaFormatError;
+function validateLidarrPortableData(
+  entityType: LidarrMediaManagementPortableEntityType,
+  data: Record<string, unknown>,
+  validator: (data: Record<string, unknown>) => string | null
+): string | null {
+  const matrixEntry = getLidarrMediaManagementPortableEntry(entityType);
+  if (!matrixEntry) {
+    return `Unsupported payload for ${entityType}: unknown Lidarr media-management entity type`;
   }
-  return validateSonarrNaming(data);
-}
 
-function validateLidarrMediaManagementNamingFields(data: Record<string, unknown>): string | null {
-  if (Object.hasOwn(data, 'movieFormat')) {
-    return 'lidarr_naming does not support movieFormat';
+  const mixedFields = (matrixEntry.forbiddenFields ?? [])
+    .filter((field) => Object.hasOwn(data, field))
+    .sort((a, b) => a.localeCompare(b));
+  if (mixedFields.length > 0) {
+    return `Mixed payload for ${entityType}: unsupported fields from another model: ${mixedFields.join(', ')}`;
   }
-  if (Object.hasOwn(data, 'movieFolderFormat')) {
-    return 'lidarr_naming does not support movieFolderFormat';
+
+  const missingRequiredFields = matrixEntry.requiredFields.filter((field) => !Object.hasOwn(data, field));
+  if (missingRequiredFields.length > 0) {
+    return `Unsupported payload for ${entityType}: missing required fields: ${missingRequiredFields.join(', ')}`;
   }
-  return null;
+
+  const allowedFields = new Set(matrixEntry.requiredFields);
+  const unsupportedFields = Object.keys(data)
+    .filter((field) => !allowedFields.has(field))
+    .sort((a, b) => a.localeCompare(b));
+  if (unsupportedFields.length > 0) {
+    return `Unsupported payload for ${entityType}: unsupported fields: ${unsupportedFields.join(', ')}`;
+  }
+
+  return validator(data);
 }
 
 function validateMediaSettings(data: Record<string, unknown>): string | null {

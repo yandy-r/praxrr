@@ -7,6 +7,7 @@
 </script>
 
 <SonarrNamingForm
+	arrType="lidarr"
 	mode="edit"
 	databaseName={data.currentDatabase.name}
 	canWriteToBase={data.canWriteToBase}

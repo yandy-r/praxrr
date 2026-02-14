@@ -5,13 +5,13 @@
  * default Sonarr-named rows can appear under arr_type=lidarr.
  */
 export function getMediaManagementDisplayName(name: string, arrType: string): string {
-	if (arrType !== 'lidarr') {
-		return name;
-	}
+  if (arrType !== 'lidarr') {
+    return name;
+  }
 
-	if (name.trim().toLowerCase() === 'sonarr') {
-		return 'Lidarr';
-	}
+  if (name.trim().toLowerCase() === 'sonarr') {
+    return 'Lidarr';
+  }
 
-	return name;
+  return name;
 }

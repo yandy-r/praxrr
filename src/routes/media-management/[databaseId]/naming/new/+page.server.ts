@@ -9,6 +9,12 @@ import { createLidarrNaming } from '$pcd/entities/mediaManagement/naming/create.
 import type { ArrAppType } from '$shared/pcd/types.ts';
 import { validateNamingFormat } from '$shared/pcd/namingTokens.ts';
 
+const SUPPORTED_NAMING_ARR_TYPES = ['radarr', 'sonarr', 'lidarr'] as const;
+
+function isSupportedNamingArrType(value: FormDataEntryValue | null): value is ArrAppType {
+  return typeof value === 'string' && SUPPORTED_NAMING_ARR_TYPES.some((arrType) => arrType === value);
+}
+
 export const load: ServerLoad = async ({ parent }) => {
   const parentData = await parent();
   return {
@@ -35,7 +41,7 @@ export const actions: Actions = {
     }
 
     const formData = await request.formData();
-    const arrType = formData.get('arrType') as ArrAppType | null;
+    const arrTypeRaw = formData.get('arrType');
     const name = formData.get('name') as string;
     const layer = (formData.get('layer') as OperationLayer) || 'user';
 
@@ -43,9 +49,10 @@ export const actions: Actions = {
       return fail(400, { error: 'Name is required' });
     }
 
-    if (!arrType || (arrType !== 'radarr' && arrType !== 'sonarr' && arrType !== 'lidarr')) {
+    if (!isSupportedNamingArrType(arrTypeRaw)) {
       return fail(400, { error: 'Invalid arr type' });
     }
+    const arrType = arrTypeRaw;
 
     if (layer === 'base' && !canWriteToBase(currentDatabaseId)) {
       return fail(403, { error: 'Cannot write to base layer without personal access token' });
@@ -145,9 +152,7 @@ export const actions: Actions = {
           },
         });
       } catch (err) {
-        const message = err instanceof Error
-          ? err.message
-          : `Failed to create ${arrType} naming config`;
+        const message = err instanceof Error ? err.message : `Failed to create ${arrType} naming config`;
         if (message.includes('already exists')) {
           return fail(400, { error: message });
         }
