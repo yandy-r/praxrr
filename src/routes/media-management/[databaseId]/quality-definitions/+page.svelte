@@ -11,6 +11,7 @@
 	import { alertStore } from '$alerts/store';
 	import { Plus } from 'lucide-svelte';
 	import type { EntityType } from '$shared/pcd/portable.ts';
+	import { getArrAppMetadata, isArrAppType } from '$shared/arr/capabilities.ts';
 	import type { PageData } from './$types';
 
 	export let data: PageData;
@@ -19,18 +20,64 @@
 	let cloneSourceName = '';
 	let cloneEntityType: EntityType = 'radarr_quality_definitions';
 
+	function formatType(type: string): string {
+		if (!type) {
+			return 'Unknown';
+		}
+
+		return type.charAt(0).toUpperCase() + type.slice(1);
+	}
+
+	function resolveQualityTypeLabel(arrType: string): string {
+		if (!isArrAppType(arrType)) {
+			return formatType(arrType);
+		}
+
+		return getArrAppMetadata(arrType).label;
+	}
+
+	function resolveQualityDefinitionsEntityType(arrType: string): EntityType | null {
+		if (!isArrAppType(arrType)) {
+			return null;
+		}
+
+		return `${arrType}_quality_definitions` as EntityType;
+	}
+
 	function handleClone(event: CustomEvent<{ name: string; arr_type: string }>) {
+		if (!event.detail.name?.trim()) {
+			alertStore.add('error', 'Cannot clone quality definitions without a config name');
+			return;
+		}
+
+		const resolvedType = resolveQualityDefinitionsEntityType(event.detail.arr_type);
+		if (!resolvedType) {
+			alertStore.add('error', `Unknown quality definitions type: ${resolveQualityTypeLabel(event.detail.arr_type)}`);
+			return;
+		}
+
 		cloneSourceName = event.detail.name;
-		cloneEntityType = `${event.detail.arr_type}_quality_definitions` as EntityType;
+		cloneEntityType = resolvedType;
 		cloneModalOpen = true;
 	}
 
 	async function handleExport(event: CustomEvent<{ name: string; arr_type: string }>) {
-		const { name, arr_type } = event.detail;
+		if (!event.detail.name?.trim()) {
+			alertStore.add('error', 'Cannot export quality definitions without a config name');
+			return;
+		}
+
+		const entityType = resolveQualityDefinitionsEntityType(event.detail.arr_type);
+		if (!entityType) {
+			alertStore.add('error', `Unknown quality definitions type: ${resolveQualityTypeLabel(event.detail.arr_type)}`);
+			return;
+		}
+
+		const { name } = event.detail;
 		try {
 			const params = new URLSearchParams({
 				databaseId: String(data.currentDatabase.id),
-				entityType: `${arr_type}_quality_definitions`,
+				entityType,
 				name
 			});
 			const res = await fetch(`/api/v1/pcd/export?${params}`);
