@@ -160,31 +160,6 @@ function findMediaManagementSyncRows(
   return db.query<ArrSyncMediaManagementMatchRow>(query, ...params);
 }
 
-function getDeterministicMatchOrThrow(
-  sectionConfig: MediaManagementSectionConfig,
-  oldName: string,
-  matches: ArrSyncMediaManagementMatchRow[],
-): number {
-  if (matches.length === 0) {
-    return 0;
-  }
-
-  if (matches.length > 1) {
-    const collisionRows = matches
-      .map((row) =>
-        `instance_id=${row.instance_id},arr_type=${row.instance_type},database_id=${row.database_id ?? 'null'}`
-      )
-      .sort()
-      .join(';');
-
-    throw new Error(
-      `Cannot safely update ${sectionConfig.label} sync config name '${oldName}' across multiple matches: ${collisionRows}`,
-    );
-  }
-
-  return matches[0].instance_id;
-}
-
 function updateMediaManagementSectionConfigName(
   section: MediaManagementSection,
   oldName: string,
@@ -193,18 +168,19 @@ function updateMediaManagementSectionConfigName(
 ): number {
   const sectionConfig = MEDIA_MANAGEMENT_SECTION_CONFIG[section];
   const matches = findMediaManagementSyncRows(section, oldName, scope);
-  const instanceId = getDeterministicMatchOrThrow(sectionConfig, oldName, matches);
 
-  if (instanceId === 0) {
+  if (matches.length === 0) {
     return 0;
   }
 
+  const instanceIds = matches.map((row) => row.instance_id);
+  const placeholders = instanceIds.map(() => '?').join(', ');
   return db.execute(
     `UPDATE arr_sync_media_management
 		   SET ${sectionConfig.nameColumn} = ?
-		   WHERE instance_id = ? AND ${sectionConfig.nameColumn} = ?`,
+		   WHERE instance_id IN (${placeholders}) AND ${sectionConfig.nameColumn} = ?`,
     newName,
-    instanceId,
+    ...instanceIds,
     oldName,
   );
 }

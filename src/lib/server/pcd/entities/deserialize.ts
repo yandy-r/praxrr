@@ -16,6 +16,7 @@ import type {
   PortableSonarrNaming,
   PortableMediaSettings,
   PortableQualityDefinitions,
+  PortableLidarrQualityDefinitions,
 } from '$shared/pcd/portable.ts';
 import * as delayProfileQueries from './delayProfiles/index.ts';
 import * as regexQueries from './regularExpressions/index.ts';
@@ -242,6 +243,19 @@ export async function deserializeSonarrQualityDefinitions(options: DeserializeOp
   const { databaseId, cache, layer, portable } = options;
 
   return qualityDefsQueries.createSonarrQualityDefinitions({
+    databaseId,
+    cache,
+    layer,
+    input: portable,
+  });
+}
+
+export async function deserializeLidarrQualityDefinitions(
+  options: DeserializeOptions<PortableLidarrQualityDefinitions>,
+) {
+  const { databaseId, cache, layer, portable } = options;
+
+  return qualityDefsQueries.createLidarrQualityDefinitions({
     databaseId,
     cache,
     layer,

@@ -85,5 +85,11 @@ export async function clone(options: CloneOptions) {
       portable.name = newName;
       return deserialize.deserializeSonarrQualityDefinitions({ databaseId, cache, layer, portable });
     }
+
+    case 'lidarr_quality_definitions': {
+      const portable = await serialize.serializeSonarrQualityDefinitions(cache, sourceName);
+      portable.name = newName;
+      return deserialize.deserializeLidarrQualityDefinitions({ databaseId, cache, layer, portable });
+    }
   }
 }

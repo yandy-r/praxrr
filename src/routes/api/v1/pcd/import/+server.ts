@@ -149,7 +149,7 @@ async function deserializeEntity({ databaseId, cache, layer, entityType, data }:
         portable: data as unknown as PortableQualityDefinitions,
       });
     case 'lidarr_quality_definitions':
-      return deserialize.deserializeSonarrQualityDefinitions({
+      return deserialize.deserializeLidarrQualityDefinitions({
         ...opts,
         portable: data as unknown as PortableLidarrQualityDefinitions,
       });
