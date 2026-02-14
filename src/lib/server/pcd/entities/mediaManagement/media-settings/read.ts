@@ -31,6 +31,19 @@ export async function list(cache: PCDCache): Promise<MediaSettingsListItem[]> {
     });
   }
 
+  // Lidarr reuses the Sonarr storage table in this phase.
+  // Keep Sonarr- and Lidarr-named entries in shared storage distinct in UI payloads
+  // so duplicate-name collisions are explicit and deterministic.
+  for (const row of sonarrRows) {
+    items.push({
+      name: row.name!,
+      arr_type: 'lidarr',
+      propers_repacks: row.propers_repacks,
+      enable_media_info: row.enable_media_info === 1,
+      updated_at: row.updated_at,
+    });
+  }
+
   for (const row of sonarrRows) {
     items.push({
       name: row.name!,
@@ -61,6 +74,22 @@ export async function getRadarrByName(cache: PCDCache, name: string): Promise<Ra
 }
 
 export async function getSonarrByName(cache: PCDCache, name: string): Promise<SonarrMediaSettingsRow | null> {
+  const db = cache.kb;
+
+  const row = await db.selectFrom('sonarr_media_settings').selectAll().where('name', '=', name).executeTakeFirst();
+
+  if (!row) return null;
+
+  return {
+    name: row.name!,
+    propers_repacks: row.propers_repacks as SonarrMediaSettingsRow['propers_repacks'],
+    enable_media_info: row.enable_media_info === 1,
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+  };
+}
+
+export async function getLidarrByName(cache: PCDCache, name: string): Promise<SonarrMediaSettingsRow | null> {
   const db = cache.kb;
 
   const row = await db.selectFrom('sonarr_media_settings').selectAll().where('name', '=', name).executeTakeFirst();

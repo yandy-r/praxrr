@@ -10,7 +10,14 @@
 
 	let selectedArrType: ArrType | null = null;
 
-	const arrTypeOptions: { value: ArrType; label: string; description: string; icon: string }[] = [
+	interface ArrTypeOption {
+		value: ArrType;
+		label: string;
+		description: string;
+		icon?: string;
+	}
+
+	const arrTypeOptions: ArrTypeOption[] = [
 		{
 			value: 'radarr',
 			label: 'Radarr',
@@ -22,20 +29,31 @@
 			label: 'Sonarr',
 			description: 'TV series media settings configuration',
 			icon: SonarrIcon
+		},
+		{
+			value: 'lidarr',
+			label: 'Lidarr',
+			description: 'Music media settings configuration'
 		}
 	];
 </script>
 
 {#if !selectedArrType}
 	<div class="grid gap-4 sm:grid-cols-2">
-		{#each arrTypeOptions as option}
+		{#each arrTypeOptions as option (option.value)}
 			<button
 				type="button"
 				onclick={() => (selectedArrType = option.value)}
 				class="flex items-center gap-4 rounded-lg border border-neutral-200 bg-white p-6 text-left transition-colors hover:border-accent-500 dark:border-neutral-800 dark:bg-neutral-900 dark:hover:border-accent-400"
 			>
 				<div class="flex h-12 w-12 items-center justify-center">
-					<img src={option.icon} alt={option.label} class="h-10 w-10" />
+					{#if option.icon}
+						<img src={option.icon} alt={option.label} class="h-10 w-10" />
+					{:else}
+						<div class="flex h-10 w-10 items-center justify-center rounded-lg bg-neutral-100 text-xs font-semibold text-neutral-600 dark:bg-neutral-800 dark:text-neutral-200">
+							{option.label[0].toUpperCase()}
+						</div>
+					{/if}
 				</div>
 				<div>
 					<div class="text-lg font-semibold text-neutral-900 dark:text-neutral-100">
