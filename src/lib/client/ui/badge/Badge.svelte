@@ -9,7 +9,8 @@
 		| 'danger'
 		| 'info'
 		| 'radarr'
-		| 'sonarr' = 'accent';
+		| 'sonarr'
+		| 'lidarr' = 'accent';
 	export let size: 'sm' | 'md' = 'sm';
 	export let icon: ComponentType | null = null;
 	export let mono: boolean = false;
@@ -22,7 +23,8 @@
 		danger: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200',
 		info: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
 		radarr: 'text-neutral-900 dark:text-neutral-100',
-		sonarr: 'text-neutral-900 dark:text-neutral-100'
+		sonarr: 'text-neutral-900 dark:text-neutral-100',
+		lidarr: 'text-neutral-900 dark:text-neutral-100'
 	};
 
 	const sizeClasses: Record<typeof size, string> = {
@@ -36,6 +38,8 @@
 			? 'background-color: var(--arr-radarr-color); color: #111827;'
 			: variant === 'sonarr'
 				? 'background-color: var(--arr-sonarr-color); color: #111827;'
+				: variant === 'lidarr'
+					? 'background-color: var(--arr-lidarr-color); color: #111827;'
 				: '';
 </script>
 

@@ -43,7 +43,7 @@ export type PreferredProtocol = DelayProfilesRow['preferred_protocol'];
 // ============================================================================
 
 import type { ArrType } from './types.ts';
-import type { ArrAppType } from '../arr/capabilities.ts';
+import type { ArrAppType, ArrConditionTargetType } from '../arr/capabilities.ts';
 
 // Naming
 export type { RadarrNamingRow, SonarrNamingRow } from './types.ts';
@@ -137,6 +137,7 @@ export type CustomFormatTest = Omit<CustomFormatTestsRow, 'id' | 'created_at'>;
 export type CustomFormatTableRow = Omit<CustomFormatsRow, 'include_in_rename' | 'created_at' | 'updated_at'> & {
 	tags: Tag[];
 	conditions: ConditionRef[];
+	arrTargets: ArrConditionTargetType[];
 	testCount: number;
 };
 

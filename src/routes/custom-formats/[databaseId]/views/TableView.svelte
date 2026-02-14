@@ -4,6 +4,7 @@
 	import Button from '$ui/button/Button.svelte';
 	import type { Column } from '$ui/table/types';
 	import type { CustomFormatTableRow } from '$shared/pcd/display.ts';
+	import { getArrAppMetadata, type ArrConditionTargetType } from '$shared/arr/capabilities.ts';
 	import { Tag, FileText, Layers, FlaskConical, Copy, Download } from 'lucide-svelte';
 	import { marked } from 'marked';
 	import { page } from '$app/stores';
@@ -31,6 +32,20 @@
 	function parseMarkdown(text: string | null): string {
 		if (!text) return '';
 		return marked.parseInline(text) as string;
+	}
+
+	function getArrTargetBadgeHtml(target: ArrConditionTargetType): string {
+		if (target === 'all') {
+			return '<span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-neutral-100 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300">All Apps</span>';
+		}
+
+		const label = escapeHtml(getArrAppMetadata(target).label);
+		return `<span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium" style="background-color: var(--arr-${target}-color); color: #111827;">${label}</span>`;
+	}
+
+	function getArrTargetsHtml(targets: ArrConditionTargetType[]): string {
+		if (targets.length === 0) return '';
+		return `<div class="mt-1 flex flex-wrap gap-1">${targets.map((target) => getArrTargetBadgeHtml(target)).join('')}</div>`;
 	}
 
 	const columns: Column<CustomFormatTableRow>[] = [
@@ -62,6 +77,7 @@
 						`
 								: ''
 						}
+						${getArrTargetsHtml(row.arrTargets)}
 					</div>
 				`
 			})
