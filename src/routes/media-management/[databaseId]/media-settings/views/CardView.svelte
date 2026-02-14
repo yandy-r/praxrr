@@ -10,6 +10,7 @@
 	import type { ArrAppType } from '$shared/arr/capabilities.ts';
 	import radarrLogo from '$lib/client/assets/Radarr.svg';
 	import sonarrLogo from '$lib/client/assets/Sonarr.svg';
+	import lidarrLogo from '$lib/client/assets/Lidarr.png';
 
 	export let configs: MediaSettingsListItem[];
 	export let databaseId: number;
@@ -21,7 +22,8 @@
 
 	const logos: Partial<Record<ArrAppType, string>> = {
 		radarr: radarrLogo,
-		sonarr: sonarrLogo
+		sonarr: sonarrLogo,
+		lidarr: lidarrLogo
 	};
 	const validArrTypes: ArrAppType[] = ['radarr', 'sonarr', 'lidarr'];
 

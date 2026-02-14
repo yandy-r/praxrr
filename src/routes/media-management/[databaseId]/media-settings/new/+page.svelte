@@ -3,6 +3,7 @@
 	import DirtyModal from '$ui/modal/DirtyModal.svelte';
 	import RadarrIcon from '$lib/client/assets/Radarr.svg';
 	import SonarrIcon from '$lib/client/assets/Sonarr.svg';
+	import LidarrIcon from '$lib/client/assets/Lidarr.png';
 	import type { PageData } from './$types';
 	import type { ArrType } from '$shared/pcd/types.ts';
 
@@ -33,7 +34,8 @@
 		{
 			value: 'lidarr',
 			label: 'Lidarr',
-			description: 'Music media settings configuration'
+			description: 'Music media settings configuration',
+			icon: LidarrIcon
 		}
 	];
 </script>

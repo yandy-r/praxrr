@@ -8,6 +8,7 @@
 	import type { NamingListItem } from '$shared/pcd/display.ts';
 	import radarrLogo from '$lib/client/assets/Radarr.svg';
 	import sonarrLogo from '$lib/client/assets/Sonarr.svg';
+	import lidarrLogo from '$lib/client/assets/Lidarr.png';
 	import { isArrAppType } from '$shared/arr/capabilities.ts';
 
 	export let configs: NamingListItem[];
@@ -20,7 +21,8 @@
 
 	const logos: Record<string, string> = {
 		radarr: radarrLogo,
-		sonarr: sonarrLogo
+		sonarr: sonarrLogo,
+		lidarr: lidarrLogo
 	};
 
 	let loadedImages: Set<string> = new Set();

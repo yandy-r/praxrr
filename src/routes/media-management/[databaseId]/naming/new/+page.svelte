@@ -4,6 +4,7 @@
 	import DirtyModal from '$ui/modal/DirtyModal.svelte';
 	import RadarrIcon from '$lib/client/assets/Radarr.svg';
 	import SonarrIcon from '$lib/client/assets/Sonarr.svg';
+	import LidarrIcon from '$lib/client/assets/Lidarr.png';
 	import type { ArrAppType } from '$shared/pcd/types.ts';
 	import type { PageData } from './$types';
 
@@ -28,7 +29,7 @@
 			value: 'lidarr',
 			label: 'Lidarr',
 			description: 'Music naming configuration',
-			icon: SonarrIcon
+			icon: LidarrIcon
 		}
 	];
 </script>

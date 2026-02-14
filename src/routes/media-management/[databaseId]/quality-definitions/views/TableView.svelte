@@ -9,6 +9,7 @@
 	import { ARR_APP_TYPES, type ArrIconKey, getArrAppMetadata, isArrAppType } from '$shared/arr/capabilities.ts';
 	import radarrLogo from '$lib/client/assets/Radarr.svg';
 	import sonarrLogo from '$lib/client/assets/Sonarr.svg';
+	import lidarrLogo from '$lib/client/assets/Lidarr.png';
 
 	export let configs: QualityDefinitionListItem[];
 	export let databaseId: number;
@@ -19,10 +20,10 @@
 	}>();
 
 	// Available logo assets keyed by ArrIconKey.
-	// Lidarr does not currently have a dedicated asset, so initial fallback is used.
 	const logoAssets: Record<string, string> = {
 		radarr: radarrLogo,
-		sonarr: sonarrLogo
+		sonarr: sonarrLogo,
+		lidarr: lidarrLogo
 	};
 
 	const appLogos: Partial<Record<ArrIconKey, string>> = Object.fromEntries(
