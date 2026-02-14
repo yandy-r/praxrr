@@ -81,5 +81,6 @@
   },
   "lint": {
     "exclude": ["dist/", "node_modules/"]
-  }
+  },
+  "allowScripts": ["npm:better-sqlite3@12.6.2", "npm:esbuild@0.24.2", "npm:esbuild@0.27.2", "npm:fsevents@2.3.2", "npm:fsevents@2.3.3"]
 }
