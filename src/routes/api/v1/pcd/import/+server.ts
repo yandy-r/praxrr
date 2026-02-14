@@ -4,9 +4,8 @@ import { pcdManager, canWriteToBase } from '$pcd/index.ts';
 import type { PCDCache, OperationLayer } from '$pcd/index.ts';
 import {
   ENTITY_TYPES,
-  LIDARR_MEDIA_MANAGEMENT_PORTABLE_MATRIX,
+  getLidarrMediaManagementPortableEntry,
   type EntityType,
-  type LidarrMediaManagementPortableEntityType,
   type PortableCustomFormat,
   type PortableDelayProfile,
   type PortableQualityProfile,
@@ -52,6 +51,8 @@ export const POST: RequestHandler = async ({ request }) => {
     return json({ error: `Invalid entityType: ${entityType}` }, { status: 400 });
   }
 
+  const typedEntityType = entityType as EntityType;
+
   if (layer === 'base' && !canWriteToBase(databaseId as number)) {
     return json({ error: 'Cannot write to base layer' }, { status: 403 });
   }
@@ -65,18 +66,18 @@ export const POST: RequestHandler = async ({ request }) => {
     return json({ error: 'Invalid portable payload: data must be an object' }, { status: 400 });
   }
 
-  const mixedPayloadError = validateLidarrPayloadMix(entityType as EntityType, data as Record<string, unknown>);
-  if (mixedPayloadError) {
-    return json({ error: mixedPayloadError }, { status: 400 });
+  const lidarrPayloadError = validateLidarrPayload(typedEntityType, data as Record<string, unknown>);
+  if (lidarrPayloadError) {
+    return json({ error: lidarrPayloadError }, { status: 400 });
   }
 
-  const validationTarget = resolveValidationEntityType(entityType as EntityType);
+  const validationTarget = resolveValidationEntityType(typedEntityType);
   const validationError = validatePortableData(validationTarget, data as Record<string, unknown>);
   if (validationError) {
-    if (validationTarget === entityType) {
+    if (validationTarget === typedEntityType) {
       return json({ error: validationError }, { status: 400 });
     }
-    return json({ error: `Unsupported payload for ${entityType}: ${validationError}` }, { status: 400 });
+    return json({ error: `Unsupported payload for ${typedEntityType}: ${validationError}` }, { status: 400 });
   }
 
   try {
@@ -84,7 +85,7 @@ export const POST: RequestHandler = async ({ request }) => {
       databaseId: databaseId as number,
       cache,
       layer: layer as OperationLayer,
-      entityType: entityType as EntityType,
+      entityType: typedEntityType,
       data: data as Record<string, unknown>,
     });
     return json({ success: true });
@@ -157,18 +158,34 @@ async function deserializeEntity({ databaseId, cache, layer, entityType, data }:
 }
 
 function resolveValidationEntityType(entityType: EntityType): EntityType {
-  const reusable = LIDARR_MEDIA_MANAGEMENT_PORTABLE_MATRIX[entityType as LidarrMediaManagementPortableEntityType];
-  return reusable ? reusable.reusableEntityType : entityType;
+  const matrixEntry = getLidarrMediaManagementPortableEntry(entityType);
+  return matrixEntry ? matrixEntry.reusableEntityType : entityType;
 }
 
-function validateLidarrPayloadMix(entityType: EntityType, data: Record<string, unknown>): string | null {
-  const matrixEntry = LIDARR_MEDIA_MANAGEMENT_PORTABLE_MATRIX[entityType as LidarrMediaManagementPortableEntityType];
-  if (!matrixEntry?.forbiddenFields || matrixEntry.forbiddenFields.length === 0) return null;
+function validateLidarrPayload(entityType: EntityType, data: Record<string, unknown>): string | null {
+  const matrixEntry = getLidarrMediaManagementPortableEntry(entityType);
+  if (!matrixEntry) {
+    return null;
+  }
 
-  for (const forbiddenField of matrixEntry.forbiddenFields) {
-    if (Object.hasOwn(data, forbiddenField)) {
-      return `Unsupported payload for ${entityType}: field "${forbiddenField}" is not part of this entity model`;
-    }
+  const mixedFields = (matrixEntry.forbiddenFields ?? [])
+    .filter((field) => Object.hasOwn(data, field))
+    .sort((a, b) => a.localeCompare(b));
+  if (mixedFields.length > 0) {
+    return `Mixed payload for ${entityType}: unsupported fields from another model: ${mixedFields.join(', ')}`;
+  }
+
+  const missingRequiredFields = matrixEntry.requiredFields.filter((field) => !Object.hasOwn(data, field));
+  if (missingRequiredFields.length > 0) {
+    return `Unsupported payload for ${entityType}: missing required fields: ${missingRequiredFields.join(', ')}`;
+  }
+
+  const allowedFields = new Set(matrixEntry.requiredFields);
+  const unsupportedFields = Object.keys(data)
+    .filter((field) => !allowedFields.has(field))
+    .sort((a, b) => a.localeCompare(b));
+  if (unsupportedFields.length > 0) {
+    return `Unsupported payload for ${entityType}: unsupported fields: ${unsupportedFields.join(', ')}`;
   }
 
   return null;
