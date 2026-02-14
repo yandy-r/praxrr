@@ -37,6 +37,10 @@ Thumbs.db
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 
+# SvelteKit
+.svelte-kit
+/**/$types.ts
+
 # .NET
 bin/
 obj/
@@ -55,6 +59,10 @@ test-results/
 playwright-report/
 src/tests/e2e/test-results/
 src/tests/e2e/playwright-report/
+
+# Release / build artifacts
+artifacts/
+coverage/
 
 # Research repos
 research/

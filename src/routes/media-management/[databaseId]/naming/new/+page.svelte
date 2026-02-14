@@ -4,14 +4,15 @@
 	import DirtyModal from '$ui/modal/DirtyModal.svelte';
 	import RadarrIcon from '$lib/client/assets/Radarr.svg';
 	import SonarrIcon from '$lib/client/assets/Sonarr.svg';
+	import LidarrIcon from '$lib/client/assets/Lidarr.png';
+	import type { ArrAppType } from '$shared/pcd/types.ts';
 	import type { PageData } from './$types';
-	import type { ArrType } from '$shared/pcd/types.ts';
 
 	export let data: PageData;
 
-	let selectedArrType: Exclude<ArrType, 'all'> | null = null;
+	let selectedArrType: ArrAppType | null = null;
 
-	const arrTypeOptions: { value: Exclude<ArrType, 'all'>; label: string; description: string; icon: string }[] = [
+	const arrTypeOptions: { value: ArrAppType; label: string; description: string; icon: string }[] = [
 		{
 			value: 'radarr',
 			label: 'Radarr',
@@ -23,13 +24,19 @@
 			label: 'Sonarr',
 			description: 'TV series naming configuration',
 			icon: SonarrIcon
+		},
+		{
+			value: 'lidarr',
+			label: 'Lidarr',
+			description: 'Music naming configuration',
+			icon: LidarrIcon
 		}
 	];
 </script>
 
 {#if !selectedArrType}
 	<div class="grid gap-4 sm:grid-cols-2">
-		{#each arrTypeOptions as option}
+		{#each arrTypeOptions as option (option.value)}
 			<button
 				type="button"
 				onclick={() => (selectedArrType = option.value)}
@@ -58,6 +65,7 @@
 	/>
 {:else}
 	<SonarrNamingForm
+		arrType={selectedArrType}
 		mode="create"
 		databaseName={data.currentDatabase.name}
 		canWriteToBase={data.canWriteToBase}

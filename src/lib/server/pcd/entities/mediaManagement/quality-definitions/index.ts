@@ -6,7 +6,11 @@
 export { list, getRadarrByName, getSonarrByName, getAvailableQualities } from './read.ts';
 
 // Create
-export { createRadarrQualityDefinitions, createSonarrQualityDefinitions } from './create.ts';
+export {
+  createRadarrQualityDefinitions,
+  createSonarrQualityDefinitions,
+  createLidarrQualityDefinitions,
+} from './create.ts';
 
 // Update
 export { updateRadarrQualityDefinitions, updateSonarrQualityDefinitions } from './update.ts';

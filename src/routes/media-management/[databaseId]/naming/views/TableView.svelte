@@ -8,6 +8,9 @@
 	import type { NamingListItem } from '$shared/pcd/display.ts';
 	import radarrLogo from '$lib/client/assets/Radarr.svg';
 	import sonarrLogo from '$lib/client/assets/Sonarr.svg';
+	import lidarrLogo from '$lib/client/assets/Lidarr.png';
+	import { isArrAppType } from '$shared/arr/capabilities.ts';
+	import { getMediaManagementDisplayName } from '$shared/arr/displayName.ts';
 
 	export let configs: NamingListItem[];
 	export let databaseId: number;
@@ -19,11 +22,31 @@
 
 	const logos: Record<string, string> = {
 		radarr: radarrLogo,
-		sonarr: sonarrLogo
+		sonarr: sonarrLogo,
+		lidarr: lidarrLogo
 	};
 
 	function getRowHref(config: NamingListItem): string {
+		if (!config.name?.trim() || !isArrAppType(config.arr_type)) {
+			return `/media-management/${databaseId}/naming`;
+		}
+
 		return `/media-management/${databaseId}/naming/${config.arr_type}/${encodeURIComponent(config.name)}`;
+	}
+
+	function getLogo(config: NamingListItem): string {
+		if (!isArrAppType(config.arr_type)) {
+			return '';
+		}
+
+		return logos[config.arr_type] ?? '';
+	}
+
+	function getArrTypeInitial(appType: string): string {
+		if (!appType) {
+			return '?';
+		}
+		return appType.charAt(0).toUpperCase();
 	}
 
 	const columns: Column<NamingListItem>[] = [
@@ -50,14 +73,22 @@
 <Table {columns} data={configs} rowHref={getRowHref} hoverable={true}>
 	<svelte:fragment slot="cell" let:row let:column>
 		{#if column.key === 'name'}
-			<span class="font-medium">{row.name}</span>
+			<span class="font-medium">{getMediaManagementDisplayName(row.name, row.arr_type)}</span>
 		{:else if column.key === 'arr_type'}
 			<div class="flex items-center gap-2">
-				<img
-					src={logos[row.arr_type]}
-					alt={row.arr_type}
-					class="h-5 w-5"
-				/>
+				{#if getLogo(row)}
+					<img
+						src={getLogo(row)}
+						alt={row.arr_type}
+						class="h-5 w-5"
+					/>
+				{:else}
+					<div
+						class="flex h-5 w-5 items-center justify-center rounded bg-neutral-100 text-[10px] font-semibold text-neutral-600 dark:bg-neutral-800 dark:text-neutral-200"
+					>
+						{getArrTypeInitial(row.arr_type)}
+					</div>
+				{/if}
 			</div>
 		{:else if column.key === 'rename'}
 			{#if row.rename}

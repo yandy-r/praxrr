@@ -8,9 +8,11 @@
 	import CardView from './views/CardView.svelte';
 	import { createDataPageStore } from '$lib/client/stores/dataPage';
 	import { goto } from '$app/navigation';
+	import { resolve } from '$app/paths';
 	import { alertStore } from '$alerts/store';
 	import { Plus } from 'lucide-svelte';
 	import type { EntityType } from '$shared/pcd/portable.ts';
+	import type { ArrAppType } from '$shared/arr/capabilities.ts';
 	import type { PageData } from './$types';
 
 	export let data: PageData;
@@ -18,19 +20,65 @@
 	let cloneModalOpen = false;
 	let cloneSourceName = '';
 	let cloneEntityType: EntityType = 'radarr_media_settings';
+	let cloneArrType: ArrAppType | null = null;
+
+	const validArrTypes: ArrAppType[] = ['radarr', 'sonarr', 'lidarr'];
+
+	function isValidArrType(arrType: string): arrType is ArrAppType {
+		return validArrTypes.includes(arrType as ArrAppType);
+	}
+
+	$: cloneExistingNames = cloneArrType
+		? data.mediaSettingsConfigs.filter((config) => config.arr_type === cloneArrType).map((config) => config.name)
+		: [];
+
+	function resolveEntityType(arrType: string): EntityType | null {
+		if (!isValidArrType(arrType)) {
+			return null;
+		}
+
+		return `${arrType}_media_settings` as EntityType;
+	}
 
 	function handleClone(event: CustomEvent<{ name: string; arr_type: string }>) {
+		if (!event.detail.name?.trim()) {
+			alertStore.add('error', 'Missing media settings name');
+			return;
+		}
+
+		const arrType = event.detail.arr_type;
+		if (!isValidArrType(arrType)) {
+			alertStore.add('error', `Unknown media settings type "${event.detail.arr_type}"`);
+			return;
+		}
+
+		const entityType = resolveEntityType(arrType);
+		if (!entityType) {
+			alertStore.add('error', `Unknown media settings type "${event.detail.arr_type}"`);
+			return;
+		}
+
 		cloneSourceName = event.detail.name;
-		cloneEntityType = `${event.detail.arr_type}_media_settings` as EntityType;
+		cloneEntityType = entityType;
+		cloneArrType = arrType;
 		cloneModalOpen = true;
 	}
 
 	async function handleExport(event: CustomEvent<{ name: string; arr_type: string }>) {
 		const { name, arr_type } = event.detail;
+		if (!name?.trim()) {
+			alertStore.add('error', 'Missing media settings details');
+			return;
+		}
+		const entityType = resolveEntityType(arr_type);
+		if (!entityType) {
+			alertStore.add('error', `Unknown media settings type "${arr_type}"`);
+			return;
+		}
 		try {
 			const params = new URLSearchParams({
 				databaseId: String(data.currentDatabase.id),
-				entityType: `${arr_type}_media_settings`,
+				entityType,
 				name
 			});
 			const res = await fetch(`/api/v1/pcd/export?${params}`);
@@ -62,7 +110,8 @@
 	<SearchAction searchStore={search} placeholder="Search media settings..." responsive />
 	<ActionButton
 		icon={Plus}
-		on:click={() => goto(`/media-management/${data.currentDatabase.id}/media-settings/new`)}
+		on:click={() =>
+			goto(resolve('/media-management/[databaseId]/media-settings/new', { databaseId: data.currentDatabase.id.toString() }))}
 	/>
 	<ViewToggle bind:value={$view} />
 </ActionsBar>
@@ -95,6 +144,6 @@
 	databaseId={data.currentDatabase.id}
 	entityType={cloneEntityType}
 	sourceName={cloneSourceName}
-	existingNames={data.mediaSettingsConfigs.map((c) => c.name)}
+	existingNames={cloneExistingNames}
 	canWriteToBase={data.canWriteToBase}
 />

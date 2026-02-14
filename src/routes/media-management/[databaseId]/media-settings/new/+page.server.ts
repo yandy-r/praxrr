@@ -1,16 +1,17 @@
-import { error, redirect, fail } from '@sveltejs/kit';
-import type { PageServerLoad, Actions } from './$types';
+import { redirect, fail } from '@sveltejs/kit';
+import type { Actions, ServerLoad } from '@sveltejs/kit';
 import { pcdManager } from '$pcd/index.ts';
 import { canWriteToBase } from '$pcd/index.ts';
 import type { OperationLayer } from '$pcd/index.ts';
 import type { ArrType } from '$shared/pcd/types.ts';
 import type { PropersRepacks } from '$shared/pcd/mediaManagement.ts';
 import {
+  createLidarrMediaSettings,
   createRadarrMediaSettings,
   createSonarrMediaSettings,
-} from '$pcd/entities/mediaManagement/media-settings/index.ts';
+} from '$pcd/entities/mediaManagement/media-settings/create.ts';
 
-export const load: PageServerLoad = async ({ parent }) => {
+export const load: ServerLoad = async ({ parent }) => {
   const parentData = await parent();
   return {
     canWriteToBase: parentData.canWriteToBase,
@@ -44,7 +45,7 @@ export const actions: Actions = {
       return fail(400, { error: 'Name is required' });
     }
 
-    if (!arrType || (arrType !== 'radarr' && arrType !== 'sonarr')) {
+    if (!arrType || (arrType !== 'radarr' && arrType !== 'sonarr' && arrType !== 'lidarr')) {
       return fail(400, { error: 'Invalid arr type' });
     }
 
@@ -55,7 +56,12 @@ export const actions: Actions = {
     const propersRepacks = formData.get('propersRepacks') as PropersRepacks;
     const enableMediaInfo = formData.get('enableMediaInfo') === 'true';
 
-    const createFn = arrType === 'radarr' ? createRadarrMediaSettings : createSonarrMediaSettings;
+    const createFn =
+      arrType === 'radarr'
+        ? createRadarrMediaSettings
+        : arrType === 'sonarr'
+          ? createSonarrMediaSettings
+          : createLidarrMediaSettings;
 
     let result;
     try {

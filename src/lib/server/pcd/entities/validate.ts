@@ -26,11 +26,15 @@ export function validatePortableData(entityType: EntityType, data: Record<string
       return validateRadarrNaming(data);
     case 'sonarr_naming':
       return validateSonarrNaming(data);
+    case 'lidarr_naming':
+      return validateLidarrNaming(data);
     case 'radarr_media_settings':
     case 'sonarr_media_settings':
+    case 'lidarr_media_settings':
       return validateMediaSettings(data);
     case 'radarr_quality_definitions':
     case 'sonarr_quality_definitions':
+    case 'lidarr_quality_definitions':
       return validateQualityDefinitions(data);
     default:
       return null;
@@ -190,6 +194,24 @@ function validateSonarrNaming(data: Record<string, unknown>): string | null {
   }
   if (!VALID_MULTI_EPISODE_STYLES.has(data.multiEpisodeStyle as string)) {
     return `data.multiEpisodeStyle must be one of: ${[...VALID_MULTI_EPISODE_STYLES].join(', ')}`;
+  }
+  return null;
+}
+
+function validateLidarrNaming(data: Record<string, unknown>): string | null {
+  const mediaFormatError = validateLidarrMediaManagementNamingFields(data);
+  if (mediaFormatError) {
+    return mediaFormatError;
+  }
+  return validateSonarrNaming(data);
+}
+
+function validateLidarrMediaManagementNamingFields(data: Record<string, unknown>): string | null {
+  if (Object.hasOwn(data, 'movieFormat')) {
+    return 'lidarr_naming does not support movieFormat';
+  }
+  if (Object.hasOwn(data, 'movieFolderFormat')) {
+    return 'lidarr_naming does not support movieFolderFormat';
   }
   return null;
 }

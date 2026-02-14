@@ -171,7 +171,10 @@ export interface UpdateSonarrNamingOptions {
   input: UpdateSonarrNamingInput;
 }
 
-export async function updateSonarrNaming(options: UpdateSonarrNamingOptions) {
+type SonarrBackedNamingType = 'sonarr' | 'lidarr';
+
+async function updateSonarrBackedNaming(options: UpdateSonarrNamingOptions, namingType: SonarrBackedNamingType) {
+  const normalizedType = namingType === 'sonarr' ? 'Sonarr' : 'Lidarr';
   const { databaseId, cache, layer, current, input } = options;
   const db = cache.kb;
 
@@ -184,7 +187,7 @@ export async function updateSonarrNaming(options: UpdateSonarrNamingOptions) {
       .executeTakeFirst();
 
     if (existing) {
-      throw new Error(`A sonarr naming config with name "${input.name}" already exists`);
+      throw new Error(`A ${namingType} naming config with name "${input.name}" already exists`);
     }
   }
 
@@ -387,7 +390,7 @@ export async function updateSonarrNaming(options: UpdateSonarrNamingOptions) {
   return writeOperation({
     databaseId,
     layer,
-    description: `update-sonarr-naming-${input.name}`,
+    description: `update-${namingType}-naming-${input.name}`,
     queries: [updateQueryCompiled],
     desiredState,
     metadata: {
@@ -397,8 +400,16 @@ export async function updateSonarrNaming(options: UpdateSonarrNamingOptions) {
       ...(current.name !== input.name && { previousName: current.name }),
       stableKey: { key: 'sonarr_naming_name', value: current.name },
       changedFields,
-      summary: 'Update Sonarr naming config',
-      title: `Update Sonarr naming "${input.name}"`,
+      summary: `Update ${normalizedType} naming config`,
+      title: `Update ${normalizedType} naming "${input.name}"`,
     },
   });
+}
+
+export async function updateSonarrNaming(options: UpdateSonarrNamingOptions) {
+  return updateSonarrBackedNaming(options, 'sonarr');
+}
+
+export async function updateLidarrNaming(options: UpdateSonarrNamingOptions) {
+  return updateSonarrBackedNaming(options, 'lidarr');
 }

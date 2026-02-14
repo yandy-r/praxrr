@@ -1,16 +1,18 @@
-import { error, redirect, fail } from '@sveltejs/kit';
-import type { PageServerLoad, Actions } from './$types';
+import { error, redirect, fail, type Actions, type ServerLoad } from '@sveltejs/kit';
 import { pcdManager } from '$pcd/index.ts';
 import { canWriteToBase } from '$pcd/index.ts';
 import type { OperationLayer } from '$pcd/index.ts';
 import type { ArrType } from '$shared/pcd/types.ts';
 import { getAvailableQualities } from '$pcd/entities/mediaManagement/quality-definitions/read.ts';
 import {
+  createLidarrQualityDefinitions,
   createRadarrQualityDefinitions,
   createSonarrQualityDefinitions,
-} from '$pcd/entities/mediaManagement/quality-definitions/index.ts';
+} from '$pcd/entities/mediaManagement/quality-definitions/create.ts';
 
-export const load: PageServerLoad = async ({ params, parent }) => {
+const QUALITY_DEFINITION_UNSUPPORTED_ERROR_PREFIX = 'Unsupported quality names for quality definitions';
+
+export const load: ServerLoad = async ({ params, parent }) => {
   const { databaseId } = params;
 
   if (!databaseId) {
@@ -30,6 +32,7 @@ export const load: PageServerLoad = async ({ params, parent }) => {
   // Get available qualities for both arr types
   const radarrQualities = await getAvailableQualities(cache, 'radarr');
   const sonarrQualities = await getAvailableQualities(cache, 'sonarr');
+  const lidarrQualities = await getAvailableQualities(cache, 'lidarr');
 
   const parentData = await parent();
 
@@ -37,8 +40,36 @@ export const load: PageServerLoad = async ({ params, parent }) => {
     canWriteToBase: parentData.canWriteToBase,
     radarrQualities,
     sonarrQualities,
+    lidarrQualities,
   };
 };
+
+function isUnmappedQualityError(message: string): boolean {
+  return (
+    message.startsWith(QUALITY_DEFINITION_UNSUPPORTED_ERROR_PREFIX) ||
+    message.toLowerCase().includes('unsupported quality')
+  );
+}
+
+function failWithDomainError(message: string) {
+  if (
+    isUnmappedQualityError(message) ||
+    message.includes('already exists') ||
+    message.toLowerCase().includes('duplicate')
+  ) {
+    return fail(400, {
+      status: 400,
+      message,
+      error: message,
+    });
+  }
+
+  return fail(500, {
+    status: 500,
+    message,
+    error: message,
+  });
+}
 
 export const actions: Actions = {
   default: async ({ request, params }) => {
@@ -68,7 +99,7 @@ export const actions: Actions = {
       return fail(400, { error: 'Name is required' });
     }
 
-    if (!arrType || (arrType !== 'radarr' && arrType !== 'sonarr')) {
+    if (!arrType || (arrType !== 'radarr' && arrType !== 'sonarr' && arrType !== 'lidarr')) {
       return fail(400, { error: 'Invalid arr type' });
     }
 
@@ -87,7 +118,12 @@ export const actions: Actions = {
       return fail(400, { error: 'At least one quality definition is required' });
     }
 
-    const createFn = arrType === 'radarr' ? createRadarrQualityDefinitions : createSonarrQualityDefinitions;
+    const createFn =
+      arrType === 'radarr'
+        ? createRadarrQualityDefinitions
+        : arrType === 'sonarr'
+          ? createSonarrQualityDefinitions
+          : createLidarrQualityDefinitions;
 
     let result;
     try {
@@ -102,10 +138,7 @@ export const actions: Actions = {
       });
     } catch (err) {
       const message = err instanceof Error ? err.message : `Failed to create ${arrType} quality definitions`;
-      if (message.includes('already exists') || message.toLowerCase().includes('duplicate')) {
-        return fail(400, { error: message });
-      }
-      return fail(500, { error: message });
+      return failWithDomainError(message);
     }
 
     if (!result.success) {

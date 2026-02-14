@@ -1,9 +1,9 @@
 import { error } from '@sveltejs/kit';
-import type { PageServerLoad } from './$types';
+import type { ServerLoad } from '@sveltejs/kit';
 import { pcdManager } from '$pcd/index.ts';
 import { list } from '$pcd/entities/mediaManagement/media-settings/read.ts';
 
-export const load: PageServerLoad = async ({ params }) => {
+export const load: ServerLoad = async ({ params }) => {
   const { databaseId } = params;
 
   if (!databaseId) {

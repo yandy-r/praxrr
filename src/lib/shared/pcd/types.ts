@@ -672,8 +672,12 @@ export interface QualityApiMappingsRow {
 /** Which arr application the data applies to */
 export type ArrType = 'radarr' | 'sonarr' | 'lidarr' | 'all';
 
-/** Runtime enum source for ArrType validation */
-export const ARR_TYPES = ['radarr', 'sonarr', 'lidarr', 'all'] as const;
+/** Concrete Arr application types (no meta type) */
+export const ARR_APP_TYPES = ['radarr', 'sonarr', 'lidarr'] as const;
+export type ArrAppType = (typeof ARR_APP_TYPES)[number];
+
+/** Runtime enum source for ArrType validation (includes condition-target wildcard) */
+export const ARR_TYPES = [...ARR_APP_TYPES, 'all'] as const;
 
 /** Runtime guard for untrusted arr type values */
 export function isArrType(value: string): value is ArrType {

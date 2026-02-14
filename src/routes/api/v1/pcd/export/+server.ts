@@ -1,8 +1,7 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from '@sveltejs/kit';
 import { pcdManager } from '$pcd/index.ts';
-import { ENTITY_TYPES } from '$shared/pcd/portable.ts';
-import type { EntityType } from '$shared/pcd/portable.ts';
+import { ENTITY_TYPES, type EntityType } from '$shared/pcd/portable.ts';
 import type { PCDCache } from '$pcd/index.ts';
 import * as serialize from '$pcd/entities/serialize.ts';
 
@@ -57,13 +56,19 @@ async function serializeEntity(cache: PCDCache, entityType: EntityType, name: st
       return serialize.serializeRadarrNaming(cache, name);
     case 'sonarr_naming':
       return serialize.serializeSonarrNaming(cache, name);
+    case 'lidarr_naming':
+      return serialize.serializeSonarrNaming(cache, name);
     case 'radarr_media_settings':
       return serialize.serializeRadarrMediaSettings(cache, name);
     case 'sonarr_media_settings':
       return serialize.serializeSonarrMediaSettings(cache, name);
+    case 'lidarr_media_settings':
+      return serialize.serializeSonarrMediaSettings(cache, name);
     case 'radarr_quality_definitions':
       return serialize.serializeRadarrQualityDefinitions(cache, name);
     case 'sonarr_quality_definitions':
+      return serialize.serializeSonarrQualityDefinitions(cache, name);
+    case 'lidarr_quality_definitions':
       return serialize.serializeSonarrQualityDefinitions(cache, name);
   }
 }

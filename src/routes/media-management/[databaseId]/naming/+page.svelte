@@ -11,6 +11,7 @@
 	import { alertStore } from '$alerts/store';
 	import { Plus } from 'lucide-svelte';
 	import type { EntityType } from '$shared/pcd/portable.ts';
+	import { isArrAppType, type ArrAppType } from '$shared/arr/capabilities.ts';
 	import type { PageData } from './$types';
 
 	export let data: PageData;
@@ -18,15 +19,56 @@
 	let cloneModalOpen = false;
 	let cloneSourceName = '';
 	let cloneEntityType: EntityType = 'radarr_naming';
+	let cloneArrType: ArrAppType | null = null;
+
+	$: cloneExistingNames = cloneArrType
+		? data.namingConfigs.filter((config) => config.arr_type === cloneArrType).map((config) => config.name)
+		: [];
+
+	function toEntityType(arrType: string): EntityType | null {
+		if (!isArrAppType(arrType)) {
+			return null;
+		}
+
+		return `${arrType}_naming` as EntityType;
+	}
 
 	function handleClone(event: CustomEvent<{ name: string; arr_type: string }>) {
+		if (!event.detail.name?.trim()) {
+			alertStore.add('error', 'Missing naming config name');
+			return;
+		}
+
+		const arrType = event.detail.arr_type;
+		if (!isArrAppType(arrType)) {
+			alertStore.add('error', `Unknown naming type "${arrType}"`);
+			return;
+		}
+
+		const entityType = toEntityType(arrType);
+		if (!entityType) {
+			alertStore.add('error', `Unknown naming type "${event.detail.arr_type}"`);
+			return;
+		}
+
 		cloneSourceName = event.detail.name;
-		cloneEntityType = `${event.detail.arr_type}_naming` as EntityType;
+		cloneEntityType = entityType;
+		cloneArrType = arrType;
 		cloneModalOpen = true;
 	}
 
 	async function handleExport(event: CustomEvent<{ name: string; arr_type: string }>) {
 		const { name, arr_type } = event.detail;
+		if (!name?.trim()) {
+			alertStore.add('error', 'Missing naming config name');
+			return;
+		}
+
+		if (!toEntityType(arr_type)) {
+			alertStore.add('error', `Unknown naming type "${arr_type}"`);
+			return;
+		}
+
 		try {
 			const params = new URLSearchParams({
 				databaseId: String(data.currentDatabase.id),
@@ -49,7 +91,7 @@
 	// Initialize data page store
 	const { search, view, filtered, setItems } = createDataPageStore(data.namingConfigs, {
 		storageKey: 'namingSettingsView',
-		searchKeys: ['name'],
+		searchKeys: ['name', 'arr_type'],
 		searchKey: `namingConfigsSearch:${data.currentDatabase.id}`
 	});
 
@@ -95,6 +137,6 @@
 	databaseId={data.currentDatabase.id}
 	entityType={cloneEntityType}
 	sourceName={cloneSourceName}
-	existingNames={data.namingConfigs.map((c) => c.name)}
+	existingNames={cloneExistingNames}
 	canWriteToBase={data.canWriteToBase}
 />

@@ -108,3 +108,49 @@ export async function createSonarrMediaSettings(options: CreateMediaSettingsOpti
     },
   });
 }
+
+export async function createLidarrMediaSettings(options: CreateMediaSettingsOptions) {
+  const { databaseId, cache, layer, input } = options;
+  const db = cache.kb;
+
+  // Lidarr shares Sonarr media-settings storage in this phase.
+  // Use Sonarr table identity for deterministic collision behavior.
+  const existing = await db
+    .selectFrom('sonarr_media_settings')
+    .where((eb) => eb(eb.fn('lower', [eb.ref('name')]), '=', input.name.toLowerCase()))
+    .select('name')
+    .executeTakeFirst();
+
+  if (existing) {
+    throw new Error(`A sonarr media settings config with name "${input.name}" already exists`);
+  }
+
+  const insertQuery = db
+    .insertInto('sonarr_media_settings')
+    .values({
+      name: input.name,
+      propers_repacks: input.propersRepacks,
+      enable_media_info: input.enableMediaInfo ? 1 : 0,
+    })
+    .compile();
+
+  return writeOperation({
+    databaseId,
+    layer,
+    description: `create-lidarr-media-settings-${input.name}`,
+    queries: [insertQuery],
+    desiredState: {
+      name: input.name,
+      propers_repacks: input.propersRepacks,
+      enable_media_info: input.enableMediaInfo,
+    },
+    metadata: {
+      operation: 'create',
+      entity: 'sonarr_media_settings',
+      name: input.name,
+      stableKey: { key: 'sonarr_media_settings_name', value: input.name },
+      summary: 'Create Lidarr media settings',
+      title: `Create Lidarr media settings "${input.name}"`,
+    },
+  });
+}
