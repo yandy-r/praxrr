@@ -73,15 +73,15 @@ class MockQualityDefinitionsClient extends BaseArrClient {
     this.currentDefinitions = cloneQualityDefinitions(initialDefinitions);
   }
 
-  override async getQualityDefinitions(): Promise<ArrQualityDefinition[]> {
-    return cloneQualityDefinitions(this.currentDefinitions);
+  override getQualityDefinitions(): Promise<ArrQualityDefinition[]> {
+    return Promise.resolve(cloneQualityDefinitions(this.currentDefinitions));
   }
 
-  override async updateQualityDefinitions(definitions: ArrQualityDefinition[]): Promise<ArrQualityDefinition[]> {
+  override updateQualityDefinitions(definitions: ArrQualityDefinition[]): Promise<ArrQualityDefinition[]> {
     const cloned = cloneQualityDefinitions(definitions);
     this.updatedPayloads.push(cloned);
     this.currentDefinitions = cloned;
-    return cloned;
+    return Promise.resolve(cloned);
   }
 }
 
@@ -137,15 +137,18 @@ Deno.test({
     let activeDatabaseId = 1701;
     let activeConfigName = 'Lidarr-Sync-Mixed';
 
-    logger.warn = async (message: string, options?: LogOptions) => {
+    logger.warn = (message: string, options?: LogOptions) => {
       warnLogs.push({ message, options });
+      return Promise.resolve();
     };
-    logger.debug = async (message: string, options?: LogOptions) => {
+    logger.debug = (message: string, options?: LogOptions) => {
       debugLogs.push({ message, options });
+      return Promise.resolve();
     };
-    logger.info = async (_message: string, _options?: LogOptions) => {
+    logger.info = (_message: string, _options?: LogOptions) => {
       void _message;
       void _options;
+      return Promise.resolve();
     };
     arrSyncQueries.getMediaManagementSync = (_instanceId: number): MediaManagementSyncData => ({
       namingDatabaseId: null,
@@ -184,6 +187,15 @@ CREATE TABLE sonarr_quality_definitions (
   updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE lidarr_quality_definitions (
+  name TEXT NOT NULL,
+  quality_name TEXT NOT NULL,
+  min_size INTEGER NOT NULL,
+  max_size INTEGER NOT NULL,
+  preferred_size INTEGER NOT NULL,
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
 INSERT INTO quality_api_mappings (quality_name, arr_type, api_name) VALUES
   ('Unknown', 'lidarr', 'Unknown'),
   ('FLAC', 'lidarr', 'FLAC'),
@@ -191,6 +203,13 @@ INSERT INTO quality_api_mappings (quality_name, arr_type, api_name) VALUES
   ('Unknown', 'sonarr', 'Unknown'),
   ('HDTV', 'sonarr', 'HDTV-720p'),
   ('Cinema', 'radarr', 'Bluray-1080p');
+
+INSERT INTO lidarr_quality_definitions (name, quality_name, min_size, max_size, preferred_size) VALUES
+  ('Lidarr-List-Mixed', 'Unknown', 0, 900, 300),
+  ('Lidarr-List-Mixed', 'Unmapped-Audio', 0, 700, 200),
+  ('Lidarr-Sync-Mixed', 'FLAC', 64, 1024, 320),
+  ('Lidarr-Sync-Mixed', 'Missing Arr', 32, 800, 200),
+  ('Lidarr-Sync-Mixed', 'Unmapped Entry', 16, 400, 128);
 
 INSERT INTO sonarr_quality_definitions (name, quality_name, min_size, max_size, preferred_size) VALUES
   ('Lidarr-List-Mixed', 'Unknown', 0, 900, 300),
@@ -229,8 +248,20 @@ CREATE TABLE sonarr_quality_definitions (
   updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE lidarr_quality_definitions (
+  name TEXT NOT NULL,
+  quality_name TEXT NOT NULL,
+  min_size INTEGER NOT NULL,
+  max_size INTEGER NOT NULL,
+  preferred_size INTEGER NOT NULL,
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
 INSERT INTO quality_api_mappings (quality_name, arr_type, api_name) VALUES
   ('Unknown', 'sonarr', 'Unknown');
+
+INSERT INTO lidarr_quality_definitions (name, quality_name, min_size, max_size, preferred_size) VALUES
+  ('Lidarr-No-Mappings', 'Unknown', 8, 80, 20);
 
 INSERT INTO sonarr_quality_definitions (name, quality_name, min_size, max_size, preferred_size) VALUES
   ('Lidarr-No-Mappings', 'Unknown', 8, 80, 20);

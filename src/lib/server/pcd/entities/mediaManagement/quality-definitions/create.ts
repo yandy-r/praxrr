@@ -3,7 +3,8 @@
  */
 
 import type { PCDCache } from '$pcd/index.ts';
-import { writeOperation, type OperationLayer } from '$pcd/index.ts';
+import { type OperationLayer, writeOperation } from '$pcd/index.ts';
+import type { PCDDatabase } from '$shared/pcd/types.ts';
 import type { QualityDefinitionEntry } from '$shared/pcd/display.ts';
 import {
   getQualityApiMappings,
@@ -70,8 +71,7 @@ async function createQualityDefinitions(
   const { databaseId, cache, layer, input } = options;
   const db = cache.kb;
   const storageType = getQualityDefinitionsStorage(qualityDefinitionsType);
-  // Lidarr shares Sonarr-backed identity; duplicate checks must collide with Sonarr names.
-  const storageIdentityForDuplicates = storageType === 'radarr' ? 'radarr' : 'sonarr';
+  const storageIdentityForDuplicates = storageType;
   const displayType =
     qualityDefinitionsType === 'radarr' ? 'Radarr' : qualityDefinitionsType === 'sonarr' ? 'Sonarr' : 'Lidarr';
 
@@ -86,9 +86,15 @@ async function createQualityDefinitions(
       .where((eb) => eb(eb.fn('lower', [eb.ref('name')]), '=', input.name.toLowerCase()))
       .select('name')
       .executeTakeFirst();
-  } else {
+  } else if (storageType === 'sonarr') {
     existing = await db
       .selectFrom('sonarr_quality_definitions')
+      .where((eb) => eb(eb.fn('lower', [eb.ref('name')]), '=', input.name.toLowerCase()))
+      .select('name')
+      .executeTakeFirst();
+  } else {
+    existing = await db
+      .selectFrom('lidarr_quality_definitions' as keyof PCDDatabase)
       .where((eb) => eb(eb.fn('lower', [eb.ref('name')]), '=', input.name.toLowerCase()))
       .select('name')
       .executeTakeFirst();
@@ -115,8 +121,21 @@ async function createQualityDefinitions(
         .compile();
     }
 
+    if (storageType === 'sonarr') {
+      return db
+        .insertInto('sonarr_quality_definitions')
+        .values({
+          name: input.name,
+          quality_name: entry.quality_name,
+          min_size: entry.min_size,
+          max_size: entry.max_size,
+          preferred_size: entry.preferred_size,
+        })
+        .compile();
+    }
+
     return db
-      .insertInto('sonarr_quality_definitions')
+      .insertInto('lidarr_quality_definitions' as keyof PCDDatabase)
       .values({
         name: input.name,
         quality_name: entry.quality_name,
@@ -138,10 +157,20 @@ async function createQualityDefinitions(
     },
     metadata: {
       operation: 'create',
-      entity: storageType === 'radarr' ? 'radarr_quality_definitions' : 'sonarr_quality_definitions',
+      entity:
+        storageType === 'radarr'
+          ? 'radarr_quality_definitions'
+          : storageType === 'sonarr'
+            ? 'sonarr_quality_definitions'
+            : 'lidarr_quality_definitions',
       name: input.name,
       stableKey: {
-        key: storageType === 'radarr' ? 'radarr_quality_definitions_name' : 'sonarr_quality_definitions_name',
+        key:
+          storageType === 'radarr'
+            ? 'radarr_quality_definitions_name'
+            : storageType === 'sonarr'
+              ? 'sonarr_quality_definitions_name'
+              : 'lidarr_quality_definitions_name',
         value: input.name,
       },
       summary: `Create ${displayType} quality definitions`,

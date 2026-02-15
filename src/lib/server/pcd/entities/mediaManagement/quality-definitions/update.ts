@@ -3,8 +3,9 @@
  */
 
 import type { PCDCache } from '$pcd/index.ts';
-import { writeOperation, type OperationLayer } from '$pcd/index.ts';
+import { type OperationLayer, writeOperation } from '$pcd/index.ts';
 import type { QualityDefinitionEntry, QualityDefinitionsConfig } from '$shared/pcd/display.ts';
+import type { PCDDatabase } from '$shared/pcd/types.ts';
 import {
   getQualityApiMappings,
   getQualityDefinitionsStorage,
@@ -71,8 +72,7 @@ async function updateQualityDefinitions(
   const { databaseId, cache, layer, current, input } = options;
   const db = cache.kb;
   const storageType = getQualityDefinitionsStorage(qualityDefinitionsType);
-  // Lidarr shares Sonarr-backed identity; duplicate checks must collide with Sonarr names.
-  const storageIdentityForDuplicates = storageType === 'radarr' ? 'radarr' : 'sonarr';
+  const storageIdentityForDuplicates = storageType;
   const displayType =
     qualityDefinitionsType === 'radarr' ? 'Radarr' : qualityDefinitionsType === 'sonarr' ? 'Sonarr' : 'Lidarr';
 
@@ -88,9 +88,15 @@ async function updateQualityDefinitions(
         .where((eb) => eb(eb.fn('lower', [eb.ref('name')]), '=', input.name.toLowerCase()))
         .select('name')
         .executeTakeFirst();
-    } else {
+    } else if (storageType === 'sonarr') {
       existing = await db
         .selectFrom('sonarr_quality_definitions')
+        .where((eb) => eb(eb.fn('lower', [eb.ref('name')]), '=', input.name.toLowerCase()))
+        .select('name')
+        .executeTakeFirst();
+    } else {
+      existing = await db
+        .selectFrom('lidarr_quality_definitions' as keyof PCDDatabase)
         .where((eb) => eb(eb.fn('lower', [eb.ref('name')]), '=', input.name.toLowerCase()))
         .select('name')
         .executeTakeFirst();
@@ -111,7 +117,7 @@ async function updateQualityDefinitions(
   const entriesToDelete =
     qualityDefinitionsType === 'lidarr'
       ? await db
-          .selectFrom('sonarr_quality_definitions')
+          .selectFrom('lidarr_quality_definitions' as keyof PCDDatabase)
           .where('name', '=', current.name)
           .select(['quality_name', 'min_size', 'max_size', 'preferred_size'])
           .execute()
@@ -130,10 +136,21 @@ async function updateQualityDefinitions(
           .where('preferred_size', '=', entry.preferred_size)
           .compile()
       );
-    } else {
+    } else if (storageType === 'sonarr') {
       queries.push(
         db
           .deleteFrom('sonarr_quality_definitions')
+          .where('name', '=', current.name)
+          .where('quality_name', '=', entry.quality_name)
+          .where('min_size', '=', entry.min_size)
+          .where('max_size', '=', entry.max_size)
+          .where('preferred_size', '=', entry.preferred_size)
+          .compile()
+      );
+    } else {
+      queries.push(
+        db
+          .deleteFrom('lidarr_quality_definitions' as keyof PCDDatabase)
           .where('name', '=', current.name)
           .where('quality_name', '=', entry.quality_name)
           .where('min_size', '=', entry.min_size)
@@ -159,10 +176,23 @@ async function updateQualityDefinitions(
           })
           .compile()
       );
-    } else {
+    } else if (storageType === 'sonarr') {
       queries.push(
         db
           .insertInto('sonarr_quality_definitions')
+          .values({
+            name: input.name,
+            quality_name: entry.quality_name,
+            min_size: entry.min_size,
+            max_size: entry.max_size,
+            preferred_size: entry.preferred_size,
+          })
+          .compile()
+      );
+    } else {
+      queries.push(
+        db
+          .insertInto('lidarr_quality_definitions' as keyof PCDDatabase)
           .values({
             name: input.name,
             quality_name: entry.quality_name,
@@ -194,11 +224,21 @@ async function updateQualityDefinitions(
     desiredState,
     metadata: {
       operation: 'update',
-      entity: storageType === 'radarr' ? 'radarr_quality_definitions' : 'sonarr_quality_definitions',
+      entity:
+        storageType === 'radarr'
+          ? 'radarr_quality_definitions'
+          : storageType === 'sonarr'
+            ? 'sonarr_quality_definitions'
+            : 'lidarr_quality_definitions',
       name: input.name,
       ...(current.name !== input.name && { previousName: current.name }),
       stableKey: {
-        key: storageType === 'radarr' ? 'radarr_quality_definitions_name' : 'sonarr_quality_definitions_name',
+        key:
+          storageType === 'radarr'
+            ? 'radarr_quality_definitions_name'
+            : storageType === 'sonarr'
+              ? 'sonarr_quality_definitions_name'
+              : 'lidarr_quality_definitions_name',
         value: current.name,
       },
       changedFields,

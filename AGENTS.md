@@ -52,3 +52,9 @@ Place tests by domain (`src/tests/upgrades`, `src/tests/jobs`, etc.). Use `*.tes
 ## Commit & Pull Request Guidelines
 
 Follow Conventional Commits (`feat:`, `fix:`, `refactor:`, `docs:`, `chore:`). Keep commits and PRs focused on one logical change. PR descriptions should include behavior changes, validation steps (commands run), and linked issues when relevant. Include screenshots for UI updates and update docs when API contracts or workflows change.
+
+### GitHub CLI PR Editing Reliability
+
+- When creating or updating PR bodies via shell commands, prefer `--body-file` over inline `--body` strings.
+- Do not include unescaped backticks in inline shell arguments because command substitution can corrupt PR body content.
+- If `gh pr edit` fails with GraphQL `projectCards` deprecation errors, update PR fields using `gh api` (REST) instead of retrying `gh pr edit`.

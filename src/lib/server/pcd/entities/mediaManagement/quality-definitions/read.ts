@@ -5,11 +5,12 @@
 import type { PCDCache } from '$pcd/index.ts';
 import { logger } from '$logger/logger.ts';
 import type { ArrType } from '$shared/pcd/types.ts';
+import type { PCDDatabase } from '$shared/pcd/types.ts';
 import { QUALITIES } from '$sync/mappings.ts';
 import type {
+  QualityDefinitionEntry,
   QualityDefinitionListItem,
   QualityDefinitionsConfig,
-  QualityDefinitionEntry,
 } from '$shared/pcd/display.ts';
 
 type QualityDefinitionConfigRow = {
@@ -35,12 +36,12 @@ const QUALITY_API_NAMES_BY_ARR_TYPE: Record<ConcreteArrType, ReadonlySet<Quality
   lidarr: new Set(Object.keys(QUALITIES.lidarr)),
 };
 
-type QualityDefinitionsStorageTable = 'radarr' | 'sonarr';
+type QualityDefinitionsStorageTable = 'radarr' | 'sonarr' | 'lidarr';
 
 const QUALITY_DEFINITIONS_STORAGE: Record<ConcreteArrType, QualityDefinitionsStorageTable> = {
   radarr: 'radarr',
   sonarr: 'sonarr',
-  lidarr: 'sonarr',
+  lidarr: 'lidarr',
 };
 
 const QUALITY_LOOKUP_MISSING_WARNING_REASON =
@@ -77,8 +78,6 @@ export function isKnownQualityApiName(arrType: ConcreteArrType, apiName: string)
 
 /**
  * Resolve quality-definition storage table segment for a concrete arr type.
- *
- * Lidarr reuses Sonarr-backed storage and should map to 'sonarr'.
  */
 export function getQualityDefinitionsStorage(arrType: ArrType): QualityDefinitionsStorageTable {
   assertConcreteArrType(arrType);
@@ -118,7 +117,10 @@ export async function getQualityApiMappings(cache: PCDCache, arrType: ArrType): 
     const apiName = row.api_name?.trim();
 
     if (!qualityName || !apiName) {
-      skippedMappings.push({ qualityName: row.quality_name, apiName: row.api_name });
+      skippedMappings.push({
+        qualityName: row.quality_name,
+        apiName: row.api_name,
+      });
       continue;
     }
 
@@ -247,7 +249,14 @@ async function pushListRows(
   apiLookup: Map<string, string>,
   result: QualityDefinitionListItem[]
 ): Promise<void> {
-  const configs = new Map<string, { quality_count: number; updated_at: string; skippedQualityNames: Set<string> }>();
+  const configs = new Map<
+    string,
+    {
+      quality_count: number;
+      updated_at: string;
+      skippedQualityNames: Set<string>;
+    }
+  >();
 
   for (const row of rows) {
     const current = configs.get(row.name) ?? {
@@ -293,13 +302,18 @@ async function pushListRows(
  * Returns distinct config names with quality counts for mapped entries.
  */
 export async function list(cache: PCDCache): Promise<QualityDefinitionListItem[]> {
-  const [radarrRows, sonarrRows, radarrMappings, sonarrMappings, lidarrMappings] = await Promise.all([
+  const [radarrRows, sonarrRows, lidarrRowsRaw, radarrMappings, sonarrMappings, lidarrMappings] = await Promise.all([
     cache.kb.selectFrom('radarr_quality_definitions').select(['name', 'quality_name', 'updated_at']).execute(),
     cache.kb.selectFrom('sonarr_quality_definitions').select(['name', 'quality_name', 'updated_at']).execute(),
+    cache.kb
+      .selectFrom('lidarr_quality_definitions' as keyof PCDDatabase)
+      .select(['name', 'quality_name', 'updated_at'])
+      .execute(),
     getQualityApiMappings(cache, 'radarr'),
     getQualityApiMappings(cache, 'sonarr'),
     getQualityApiMappings(cache, 'lidarr'),
   ]);
+  const lidarrRows = lidarrRowsRaw as QualityDefinitionConfigRow[];
 
   const result: QualityDefinitionListItem[] = [];
 
@@ -310,7 +324,7 @@ export async function list(cache: PCDCache): Promise<QualityDefinitionListItem[]
   ]);
 
   await pushListRows(cache, radarrRows, 'radarr', radarrMappings.qualityToApiName, result);
-  await pushListRows(cache, sonarrRows, 'lidarr', lidarrMappings.qualityToApiName, result);
+  await pushListRows(cache, lidarrRows, 'lidarr', lidarrMappings.qualityToApiName, result);
   await pushListRows(cache, sonarrRows, 'sonarr', sonarrMappings.qualityToApiName, result);
 
   // Sort by updated_at desc
@@ -370,19 +384,18 @@ export async function getSonarrByName(cache: PCDCache, name: string): Promise<Qu
 
 /**
  * Get a Lidarr quality definitions config by name.
- *
- * Lidarr uses Sonarr-backed storage/identity in this phase.
  * Rows without Lidarr mappings are filtered out with warning metadata.
  */
 export async function getLidarrByName(cache: PCDCache, name: string): Promise<QualityDefinitionsConfig | null> {
-  const [rows, { qualityToApiName }] = await Promise.all([
+  const [rowsRaw, { qualityToApiName }] = await Promise.all([
     cache.kb
-      .selectFrom('sonarr_quality_definitions')
+      .selectFrom('lidarr_quality_definitions' as keyof PCDDatabase)
       .where('name', '=', name)
       .select(['quality_name', 'min_size', 'max_size', 'preferred_size'])
       .execute(),
     getQualityApiMappings(cache, 'lidarr'),
   ]);
+  const rows = rowsRaw as QualityDefinitionEntryRow[];
 
   if (rows.length === 0) {
     return null;
