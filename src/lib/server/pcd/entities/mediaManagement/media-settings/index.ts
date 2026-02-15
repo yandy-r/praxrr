@@ -3,13 +3,13 @@
  */
 
 // Read
-export { list, getRadarrByName, getSonarrByName } from './read.ts';
+export { list, getRadarrByName, getSonarrByName, getLidarrByName } from './read.ts';
 
 // Create
-export { createRadarrMediaSettings, createSonarrMediaSettings } from './create.ts';
+export { createRadarrMediaSettings, createSonarrMediaSettings, createLidarrMediaSettings } from './create.ts';
 
 // Update
-export { updateRadarrMediaSettings, updateSonarrMediaSettings } from './update.ts';
+export { updateRadarrMediaSettings, updateSonarrMediaSettings, updateLidarrMediaSettings } from './update.ts';
 
 // Delete
-export { removeRadarrMediaSettings, removeSonarrMediaSettings } from './delete.ts';
+export { removeRadarrMediaSettings, removeSonarrMediaSettings, removeLidarrMediaSettings } from './delete.ts';
