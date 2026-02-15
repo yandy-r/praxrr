@@ -13,6 +13,17 @@ import {
 type QualityDefinitionsType = 'radarr' | 'sonarr' | 'lidarr';
 
 const QUALITY_DEFINITION_UNMAPPED_ERROR_PREFIX = 'Unsupported quality names for quality definitions';
+const QUALITY_DEFINITION_DUPLICATE_QUALITIES_ERROR = 'Quality definitions cannot contain duplicate quality names';
+
+type QualityDefinitionsBadRequestCode =
+  | 'quality_definitions_duplicate_qualities'
+  | 'quality_definitions_duplicate_name'
+  | 'quality_definitions_unmapped';
+
+interface QualityDefinitionsBadRequestError extends Error {
+  status: 400;
+  code: QualityDefinitionsBadRequestCode;
+}
 
 export interface CreateQualityDefinitionsInput {
   name: string;
@@ -38,6 +49,20 @@ export function createLidarrQualityDefinitions(options: CreateQualityDefinitions
   return createQualityDefinitions(options, 'lidarr');
 }
 
+function createBadRequestError(
+  message: string,
+  code: QualityDefinitionsBadRequestCode
+): QualityDefinitionsBadRequestError {
+  const err = new Error(message) as QualityDefinitionsBadRequestError;
+  err.status = 400;
+  err.code = code;
+  return err;
+}
+
+function formatUnmappedError(qualityDefinitionsType: QualityDefinitionsType, unmappedEntries: string[]): string {
+  return `${QUALITY_DEFINITION_UNMAPPED_ERROR_PREFIX} for ${qualityDefinitionsType}: ${unmappedEntries.join(', ')}`;
+}
+
 async function createQualityDefinitions(
   options: CreateQualityDefinitionsOptions,
   qualityDefinitionsType: QualityDefinitionsType
@@ -45,7 +70,8 @@ async function createQualityDefinitions(
   const { databaseId, cache, layer, input } = options;
   const db = cache.kb;
   const storageType = getQualityDefinitionsStorage(qualityDefinitionsType);
-  const configTypeForMessages = storageType === 'radarr' ? 'radarr' : 'sonarr';
+  // Lidarr shares Sonarr-backed identity; duplicate checks must collide with Sonarr names.
+  const storageIdentityForDuplicates = storageType === 'radarr' ? 'radarr' : 'sonarr';
   const displayType =
     qualityDefinitionsType === 'radarr' ? 'Radarr' : qualityDefinitionsType === 'sonarr' ? 'Sonarr' : 'Lidarr';
 
@@ -69,7 +95,10 @@ async function createQualityDefinitions(
   }
 
   if (existing) {
-    throw new Error(`A ${configTypeForMessages} quality definitions config with name "${input.name}" already exists`);
+    throw createBadRequestError(
+      `A ${storageIdentityForDuplicates} quality definitions config with name "${input.name}" already exists`,
+      'quality_definitions_duplicate_name'
+    );
   }
 
   const queries = input.entries.map((entry) => {
@@ -145,8 +174,9 @@ async function ensureMappedEntries(
 
   if (unmappedEntries.length > 0) {
     unmappedEntries.sort((a, b) => a.localeCompare(b));
-    throw new Error(
-      `${QUALITY_DEFINITION_UNMAPPED_ERROR_PREFIX} for ${qualityDefinitionsType}: ${unmappedEntries.join(', ')}`
+    throw createBadRequestError(
+      formatUnmappedError(qualityDefinitionsType, unmappedEntries),
+      'quality_definitions_unmapped'
     );
   }
 }
@@ -155,6 +185,9 @@ function ensureUniqueEntries(entries: QualityDefinitionEntry[]) {
   const normalized = entries.map((entry) => entry.quality_name.trim().toLowerCase());
   const unique = new Set(normalized);
   if (unique.size !== normalized.length) {
-    throw new Error('Quality definitions cannot contain duplicate quality names');
+    throw createBadRequestError(
+      QUALITY_DEFINITION_DUPLICATE_QUALITIES_ERROR,
+      'quality_definitions_duplicate_qualities'
+    );
   }
 }

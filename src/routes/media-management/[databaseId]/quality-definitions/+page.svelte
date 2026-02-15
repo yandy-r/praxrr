@@ -8,6 +8,7 @@
 	import CardView from './views/CardView.svelte';
 	import { createDataPageStore } from '$lib/client/stores/dataPage';
 	import { goto } from '$app/navigation';
+	import { resolve } from '$app/paths';
 	import { alertStore } from '$alerts/store';
 	import { Plus } from 'lucide-svelte';
 	import type { EntityType } from '$shared/pcd/portable.ts';
@@ -20,6 +21,11 @@
 	let cloneSourceName = '';
 	let cloneEntityType: EntityType = 'radarr_quality_definitions';
 	let cloneArrType: ArrAppType | null = null;
+	const supportedQualityDefinitionsArrTypes: ArrAppType[] = ['radarr', 'sonarr', 'lidarr'];
+
+	function isSupportedQualityDefinitionsArrType(arrType: string): arrType is ArrAppType {
+		return supportedQualityDefinitionsArrTypes.includes(arrType as ArrAppType);
+	}
 
 	$: cloneExistingNames = cloneArrType
 		? data.qualityDefinitionsConfigs.filter((config) => config.arr_type === cloneArrType).map((config) => config.name)
@@ -42,7 +48,7 @@
 	}
 
 	function resolveQualityDefinitionsEntityType(arrType: string): EntityType | null {
-		if (!isArrAppType(arrType)) {
+		if (!isSupportedQualityDefinitionsArrType(arrType)) {
 			return null;
 		}
 
@@ -51,19 +57,19 @@
 
 	function handleClone(event: CustomEvent<{ name: string; arr_type: string }>) {
 		if (!event.detail.name?.trim()) {
-			alertStore.add('error', 'Cannot clone quality definitions without a config name');
+			alertStore.add('error', 'Missing quality definitions config name');
 			return;
 		}
 
 		const arrType = event.detail.arr_type;
-		if (!isArrAppType(arrType)) {
-			alertStore.add('error', `Unknown quality definitions type: ${resolveQualityTypeLabel(arrType)}`);
+		if (!isSupportedQualityDefinitionsArrType(arrType)) {
+			alertStore.add('error', `Unknown quality definitions type "${resolveQualityTypeLabel(arrType)}"`);
 			return;
 		}
 
 		const resolvedType = resolveQualityDefinitionsEntityType(arrType);
 		if (!resolvedType) {
-			alertStore.add('error', `Unknown quality definitions type: ${resolveQualityTypeLabel(event.detail.arr_type)}`);
+			alertStore.add('error', `Unknown quality definitions type "${resolveQualityTypeLabel(event.detail.arr_type)}"`);
 			return;
 		}
 
@@ -75,13 +81,13 @@
 
 	async function handleExport(event: CustomEvent<{ name: string; arr_type: string }>) {
 		if (!event.detail.name?.trim()) {
-			alertStore.add('error', 'Cannot export quality definitions without a config name');
+			alertStore.add('error', 'Missing quality definitions config name');
 			return;
 		}
 
 		const entityType = resolveQualityDefinitionsEntityType(event.detail.arr_type);
 		if (!entityType) {
-			alertStore.add('error', `Unknown quality definitions type: ${resolveQualityTypeLabel(event.detail.arr_type)}`);
+			alertStore.add('error', `Unknown quality definitions type "${resolveQualityTypeLabel(event.detail.arr_type)}"`);
 			return;
 		}
 
@@ -121,7 +127,12 @@
 	<SearchAction searchStore={search} placeholder="Search quality definitions..." responsive />
 	<ActionButton
 		icon={Plus}
-		on:click={() => goto(`/media-management/${data.currentDatabase.id}/quality-definitions/new`)}
+		on:click={() =>
+			goto(
+				resolve('/media-management/[databaseId]/quality-definitions/new', {
+					databaseId: data.currentDatabase.id.toString()
+				})
+			)}
 	/>
 	<ViewToggle bind:value={$view} />
 </ActionsBar>

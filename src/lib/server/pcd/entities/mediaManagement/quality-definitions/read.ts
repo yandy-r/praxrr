@@ -18,6 +18,13 @@ type QualityDefinitionConfigRow = {
   updated_at: string | null;
 };
 
+type QualityDefinitionEntryRow = {
+  quality_name: string;
+  min_size: number;
+  max_size: number;
+  preferred_size: number;
+};
+
 type ConcreteArrType = Exclude<ArrType, 'all'>;
 
 type QualityApiName = string;
@@ -149,6 +156,15 @@ export async function getAvailableQualities(cache: PCDCache, arrType: ArrType): 
   return availableQualityNames;
 }
 
+function mapRowsToEntries(rows: QualityDefinitionEntryRow[]): QualityDefinitionEntry[] {
+  return rows.map((row) => ({
+    quality_name: row.quality_name,
+    min_size: row.min_size,
+    max_size: row.max_size,
+    preferred_size: row.preferred_size,
+  }));
+}
+
 async function pushListRows(
   rows: QualityDefinitionConfigRow[],
   arrType: ConcreteArrType,
@@ -254,16 +270,9 @@ export async function getRadarrByName(cache: PCDCache, name: string): Promise<Qu
     return null;
   }
 
-  const entries: QualityDefinitionEntry[] = rows.map((row) => ({
-    quality_name: row.quality_name,
-    min_size: row.min_size,
-    max_size: row.max_size,
-    preferred_size: row.preferred_size,
-  }));
-
   return {
     name,
-    entries,
+    entries: mapRowsToEntries(rows),
   };
 }
 
@@ -281,24 +290,58 @@ export async function getSonarrByName(cache: PCDCache, name: string): Promise<Qu
     return null;
   }
 
-  const entries: QualityDefinitionEntry[] = rows.map((row) => ({
-    quality_name: row.quality_name,
-    min_size: row.min_size,
-    max_size: row.max_size,
-    preferred_size: row.preferred_size,
-  }));
-
   return {
     name,
-    entries,
+    entries: mapRowsToEntries(rows),
   };
 }
 
 /**
  * Get a Lidarr quality definitions config by name.
  *
- * Lidarr uses Sonarr-backed storage in this phase.
+ * Lidarr uses Sonarr-backed storage/identity in this phase.
+ * Rows without Lidarr mappings are filtered out with warning metadata.
  */
-export function getLidarrByName(cache: PCDCache, name: string): Promise<QualityDefinitionsConfig | null> {
-  return getSonarrByName(cache, name);
+export async function getLidarrByName(cache: PCDCache, name: string): Promise<QualityDefinitionsConfig | null> {
+  const [rows, { qualityToApiName }] = await Promise.all([
+    cache.kb
+      .selectFrom('sonarr_quality_definitions')
+      .where('name', '=', name)
+      .select(['quality_name', 'min_size', 'max_size', 'preferred_size'])
+      .execute(),
+    getQualityApiMappings(cache, 'lidarr'),
+  ]);
+
+  if (rows.length === 0) {
+    return null;
+  }
+
+  const mappedRows: QualityDefinitionEntryRow[] = [];
+  const skippedQualityNames = new Set<string>();
+
+  for (const row of rows) {
+    if (qualityToApiName.has(row.quality_name.toLowerCase())) {
+      mappedRows.push(row);
+      continue;
+    }
+
+    skippedQualityNames.add(row.quality_name);
+  }
+
+  if (skippedQualityNames.size > 0) {
+    await logger.warn('Skipping unmapped quality definition rows in Lidarr quality definitions read', {
+      source: 'PCD:QualityDefinitions',
+      meta: {
+        arrType: 'lidarr',
+        configName: name,
+        skippedQualityNames: [...skippedQualityNames].sort(),
+        reason: QUALITY_LOOKUP_MISSING_WARNING_REASON,
+      },
+    });
+  }
+
+  return {
+    name,
+    entries: mapRowsToEntries(mappedRows),
+  };
 }

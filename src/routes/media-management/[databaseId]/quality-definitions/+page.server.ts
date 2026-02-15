@@ -1,5 +1,6 @@
 import { error, type ServerLoad } from '@sveltejs/kit';
 import { pcdManager } from '$pcd/index.ts';
+import type { QualityDefinitionListItem } from '$shared/pcd/display.ts';
 import { list } from '$pcd/entities/mediaManagement/quality-definitions/read.ts';
 
 export const load: ServerLoad = async ({ params }) => {
@@ -19,9 +20,7 @@ export const load: ServerLoad = async ({ params }) => {
     throw error(500, 'Database cache not available');
   }
 
-  // Mapping-backed list results include Radarr, Sonarr, and Lidarr-backed entries
-  // via quality-definition quality-api mapping filtering rules.
-  const qualityDefinitionsConfigs = await list(cache);
+  const qualityDefinitionsConfigs: QualityDefinitionListItem[] = await list(cache);
 
   return {
     qualityDefinitionsConfigs,

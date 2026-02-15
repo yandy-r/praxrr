@@ -2,7 +2,7 @@ import { error, redirect, fail, type Actions, type ServerLoad } from '@sveltejs/
 import { pcdManager } from '$pcd/index.ts';
 import { canWriteToBase } from '$pcd/index.ts';
 import type { OperationLayer } from '$pcd/index.ts';
-import type { ArrType } from '$shared/pcd/types.ts';
+import type { ArrAppType } from '$shared/pcd/types.ts';
 import { getAvailableQualities } from '$pcd/entities/mediaManagement/quality-definitions/read.ts';
 import {
   createLidarrQualityDefinitions,
@@ -11,6 +11,31 @@ import {
 } from '$pcd/entities/mediaManagement/quality-definitions/create.ts';
 
 const QUALITY_DEFINITION_UNSUPPORTED_ERROR_PREFIX = 'Unsupported quality names for quality definitions';
+const SUPPORTED_QUALITY_DEFINITION_ARR_TYPES = ['radarr', 'sonarr', 'lidarr'] as const;
+
+type QualityDefinitionsBadRequestCode =
+  | 'quality_definitions_duplicate_qualities'
+  | 'quality_definitions_duplicate_name'
+  | 'quality_definitions_unmapped';
+
+interface QualityDefinitionsBadRequestError extends Error {
+  status: 400;
+  code: QualityDefinitionsBadRequestCode;
+}
+
+function isSupportedQualityDefinitionsArrType(value: FormDataEntryValue | null): value is ArrAppType {
+  return typeof value === 'string' && SUPPORTED_QUALITY_DEFINITION_ARR_TYPES.some((arrType) => arrType === value);
+}
+
+function isQualityDefinitionsBadRequestError(value: unknown): value is QualityDefinitionsBadRequestError {
+  return (
+    value instanceof Error &&
+    'status' in value &&
+    (value as { status?: unknown }).status === 400 &&
+    'code' in value &&
+    typeof (value as { code?: unknown }).code === 'string'
+  );
+}
 
 export const load: ServerLoad = async ({ params, parent }) => {
   const { databaseId } = params;
@@ -29,7 +54,6 @@ export const load: ServerLoad = async ({ params, parent }) => {
     throw error(500, 'Database cache not available');
   }
 
-  // Get available qualities for both arr types
   const radarrQualities = await getAvailableQualities(cache, 'radarr');
   const sonarrQualities = await getAvailableQualities(cache, 'sonarr');
   const lidarrQualities = await getAvailableQualities(cache, 'lidarr');
@@ -51,16 +75,34 @@ function isUnmappedQualityError(message: string): boolean {
   );
 }
 
-function failWithDomainError(message: string) {
-  if (
-    isUnmappedQualityError(message) ||
-    message.includes('already exists') ||
-    message.toLowerCase().includes('duplicate')
-  ) {
+function getQualityDefinitionsBadRequestCode(message: string): QualityDefinitionsBadRequestCode | null {
+  if (isUnmappedQualityError(message)) {
+    return 'quality_definitions_unmapped';
+  }
+
+  if (message.toLowerCase().includes('duplicate quality')) {
+    return 'quality_definitions_duplicate_qualities';
+  }
+
+  if (message.includes('already exists') || message.toLowerCase().includes('duplicate')) {
+    return 'quality_definitions_duplicate_name';
+  }
+
+  return null;
+}
+
+function failWithDomainError(errorValue: unknown, fallbackMessage: string) {
+  const message = errorValue instanceof Error ? errorValue.message : fallbackMessage;
+  const code = isQualityDefinitionsBadRequestError(errorValue)
+    ? errorValue.code
+    : getQualityDefinitionsBadRequestCode(message);
+
+  if (code) {
     return fail(400, {
       status: 400,
       message,
       error: message,
+      code,
     });
   }
 
@@ -90,7 +132,7 @@ export const actions: Actions = {
     }
 
     const formData = await request.formData();
-    const arrType = formData.get('arrType') as ArrType;
+    const arrTypeRaw = formData.get('arrType');
     const name = formData.get('name') as string;
     const layer = (formData.get('layer') as OperationLayer) || 'user';
     const entriesJson = formData.get('entries') as string;
@@ -99,9 +141,10 @@ export const actions: Actions = {
       return fail(400, { error: 'Name is required' });
     }
 
-    if (!arrType || (arrType !== 'radarr' && arrType !== 'sonarr' && arrType !== 'lidarr')) {
-      return fail(400, { error: 'Invalid arr type' });
+    if (!isSupportedQualityDefinitionsArrType(arrTypeRaw)) {
+      return fail(400, { status: 400, message: 'Invalid arr type', error: 'Invalid arr type' });
     }
+    const arrType = arrTypeRaw;
 
     if (layer === 'base' && !canWriteToBase(currentDatabaseId)) {
       return fail(403, { error: 'Cannot write to base layer without personal access token' });
@@ -137,12 +180,12 @@ export const actions: Actions = {
         },
       });
     } catch (err) {
-      const message = err instanceof Error ? err.message : `Failed to create ${arrType} quality definitions`;
-      return failWithDomainError(message);
+      return failWithDomainError(err, `Failed to create ${arrType} quality definitions`);
     }
 
     if (!result.success) {
-      return fail(500, { error: result.error || `Failed to create ${arrType} quality definitions` });
+      const message = result.error || `Failed to create ${arrType} quality definitions`;
+      return fail(500, { status: 500, message, error: message });
     }
 
     throw redirect(303, `/media-management/${databaseId}/quality-definitions`);

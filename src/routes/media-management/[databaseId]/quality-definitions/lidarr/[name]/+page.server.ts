@@ -2,12 +2,36 @@ import { error, redirect, fail, type Actions, type ServerLoad } from '@sveltejs/
 import { pcdManager } from '$pcd/index.ts';
 import { canWriteToBase } from '$pcd/index.ts';
 import type { OperationLayer } from '$pcd/index.ts';
-import { getLidarrByName, getAvailableQualities } from '$pcd/entities/mediaManagement/quality-definitions/read.ts';
+import {
+  getLidarrByName,
+  getAvailableQualities,
+  getSonarrByName,
+} from '$pcd/entities/mediaManagement/quality-definitions/read.ts';
 import { updateLidarrQualityDefinitions } from '$pcd/entities/mediaManagement/quality-definitions/update.ts';
 import { removeSonarrQualityDefinitions } from '$pcd/entities/mediaManagement/quality-definitions/delete.ts';
 import { arrSyncQueries } from '$db/queries/arrSync.ts';
 
 const QUALITY_DEFINITION_UNSUPPORTED_ERROR_PREFIX = 'Unsupported quality names for quality definitions';
+
+type QualityDefinitionsBadRequestCode =
+  | 'quality_definitions_duplicate_qualities'
+  | 'quality_definitions_duplicate_name'
+  | 'quality_definitions_unmapped';
+
+interface QualityDefinitionsBadRequestError extends Error {
+  status: 400;
+  code: QualityDefinitionsBadRequestCode;
+}
+
+function isQualityDefinitionsBadRequestError(value: unknown): value is QualityDefinitionsBadRequestError {
+  return (
+    value instanceof Error &&
+    'status' in value &&
+    (value as { status?: unknown }).status === 400 &&
+    'code' in value &&
+    typeof (value as { code?: unknown }).code === 'string'
+  );
+}
 
 function isUnmappedQualityError(message: string): boolean {
   return (
@@ -16,16 +40,34 @@ function isUnmappedQualityError(message: string): boolean {
   );
 }
 
-function failWithDomainError(message: string) {
-  if (
-    isUnmappedQualityError(message) ||
-    message.includes('already exists') ||
-    message.toLowerCase().includes('duplicate')
-  ) {
+function getQualityDefinitionsBadRequestCode(message: string): QualityDefinitionsBadRequestCode | null {
+  if (isUnmappedQualityError(message)) {
+    return 'quality_definitions_unmapped';
+  }
+
+  if (message.toLowerCase().includes('duplicate quality')) {
+    return 'quality_definitions_duplicate_qualities';
+  }
+
+  if (message.includes('already exists') || message.toLowerCase().includes('duplicate')) {
+    return 'quality_definitions_duplicate_name';
+  }
+
+  return null;
+}
+
+function failWithDomainError(errorValue: unknown, fallbackMessage: string) {
+  const message = errorValue instanceof Error ? errorValue.message : fallbackMessage;
+  const code = isQualityDefinitionsBadRequestError(errorValue)
+    ? errorValue.code
+    : getQualityDefinitionsBadRequestCode(message);
+
+  if (code) {
     return fail(400, {
       status: 400,
       message,
       error: message,
+      code,
     });
   }
 
@@ -127,12 +169,12 @@ export const actions: Actions = {
         },
       });
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to update quality definitions config';
-      return failWithDomainError(message);
+      return failWithDomainError(err, 'Failed to update quality definitions config');
     }
 
     if (!result.success) {
-      return fail(500, { error: result.error || 'Failed to update quality definitions config' });
+      const message = result.error || 'Failed to update quality definitions config';
+      return fail(500, { status: 500, message, error: message });
     }
 
     if (newName.trim() !== decodedName) {
@@ -168,6 +210,11 @@ export const actions: Actions = {
       return fail(404, { error: 'Quality definitions config not found' });
     }
 
+    const storageCurrent = await getSonarrByName(cache, decodedName);
+    if (!storageCurrent) {
+      return fail(404, { error: 'Quality definitions config not found' });
+    }
+
     const formData = await request.formData();
     const layer = (formData.get('layer') as OperationLayer) || 'user';
 
@@ -179,7 +226,7 @@ export const actions: Actions = {
       databaseId: currentDatabaseId,
       cache,
       layer,
-      current,
+      current: storageCurrent,
     });
 
     if (!result.success) {
