@@ -1,3 +1,8 @@
+> [!WARNING]
+> Superseded on 2026-02-15 by the first-class Lidarr initiative plan in `docs/plans/enhance-lidarr-support/parallel-plan.md` (tracked by GitHub issue #130 and umbrella #13).
+>
+> This document captures the legacy Sonarr-reuse rollout model and is retained for historical context only. Do not use it for current implementation planning.
+
 ### Executive Summary
 
 Lidarr support for media-management naming, media settings, and quality definitions requires extending existing Radarr/Sonarr route actions, entity helpers, and portable import/export metadata so `arr_type = 'lidarr'` can be listed, created, edited, and synced. The UI routes under `/src/routes/media-management/[databaseId]/{naming,quality-definitions,media-settings}` and backend PCD entity modules currently branch only on Radarr/Sonarr. The plan should add Lidarr across those layers while preserving the existing Lidarr syncer strategy that reuses Sonarr-backed entities with capability gating.

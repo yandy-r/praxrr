@@ -1,3 +1,8 @@
+> [!WARNING]
+> Superseded on 2026-02-15 by the first-class Lidarr initiative plan in `docs/plans/enhance-lidarr-support/parallel-plan.md` (tracked by GitHub issue #130 and umbrella #13).
+>
+> This document captures the legacy Sonarr-reuse rollout model and is retained for historical context only. Do not use it for current implementation planning.
+
 # Integration Research: lidarr-support
 
 ## API Endpoints

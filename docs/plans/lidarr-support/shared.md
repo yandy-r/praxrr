@@ -1,3 +1,8 @@
+> [!WARNING]
+> Superseded on 2026-02-15 by the first-class Lidarr initiative plan in `docs/plans/enhance-lidarr-support/parallel-plan.md` (tracked by GitHub issue #130 and umbrella #13).
+>
+> This document captures the legacy Sonarr-reuse rollout model and is retained for historical context only. Do not use it for current implementation planning.
+
 # Lidarr Support
 
 Lidarr support for media-management is partially wired: the shared arr types and sync stack already recognize `lidarr`, but the UI CRUD routes and entity readers/writers for naming, media settings, and quality definitions still branch only on `radarr` and `sonarr`. The media-management route tree under `/src/routes/media-management/[databaseId]/...` drives listing and form actions, while actual data access lives in `/src/lib/server/pcd/entities/mediaManagement/...` against PCD cache tables. Sync behavior in `/src/lib/server/sync/mediaManagement/syncer.ts` already applies Lidarr by reusing Sonarr-backed entities with capability gating, which creates a mismatch between sync capability and UI/config creation capability. Finalizing this feature means extending route/action validation, table/query selection, and portable entity handling so Lidarr presets can be viewed, created, edited, exported, and imported consistently.

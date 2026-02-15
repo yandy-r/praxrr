@@ -1,3 +1,8 @@
+> [!WARNING]
+> Superseded on 2026-02-15 by the first-class Lidarr initiative plan in `docs/plans/enhance-lidarr-support/parallel-plan.md` (tracked by GitHub issue #130 and umbrella #13).
+>
+> This document captures the legacy Sonarr-reuse rollout model and is retained for historical context only. Do not use it for current implementation planning.
+
 ### Executive Summary
 
 Use a three-phase plan: establish shared type/schema/mapping readiness, implement Lidarr support across media-management CRUD paths, then align sync/import-export and validate with focused tests. This ordering minimizes risk by resolving contract-level dependencies before route/entity changes. It also enables meaningful parallelism by splitting naming, quality-definitions, and media-settings streams while keeping shared dependency tasks explicit.

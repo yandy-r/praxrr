@@ -1,3 +1,8 @@
+> [!WARNING]
+> Superseded on 2026-02-15 by the first-class Lidarr initiative plan in `docs/plans/enhance-lidarr-support/parallel-plan.md` (tracked by GitHub issue #130 and umbrella #13).
+>
+> This document captures the legacy Sonarr-reuse rollout model and is retained for historical context only. Do not use it for current implementation planning.
+
 ### Executive Summary
 
 The media-management stack is already modular by entity and arr type, which makes Lidarr support a targeted extension rather than a new subsystem. Route actions currently gate `arrType` to Radarr/Sonarr and entity modules read/write only Radarr/Sonarr tables, so Lidarr never appears in UI flows. The syncer already handles Lidarr through capability-gated reuse, so code changes should align UI CRUD and portable contracts with that existing behavior.

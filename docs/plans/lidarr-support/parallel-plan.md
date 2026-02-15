@@ -1,6 +1,28 @@
+> [!WARNING]
+> Superseded on 2026-02-15 by the first-class Lidarr initiative plan in `docs/plans/enhance-lidarr-support/parallel-plan.md` (tracked by GitHub issue #130 and umbrella #13).
+>
+> This document captures the legacy Sonarr-reuse rollout model and is retained for historical context only. Do not use it for current implementation planning.
+
 # Lidarr Support Implementation Plan
 
 Lidarr support is partially available in sync flows but blocked in media-management CRUD surfaces because route handlers and entity modules still branch on Radarr/Sonarr only. The safest strategy is to align contracts first (arr types, portable entities, validators, quality mappings), then enable Lidarr per surface (naming, media-settings, quality-definitions) across server and UI layers in parallel. Final integration work reconciles sync metadata and verifies behavior through focused Lidarr regression tests. This plan keeps tasks narrowly scoped (1-3 files) while preserving explicit dependencies where shared contracts or mapping data are required.
+
+## Supersession Mapping (2026-02-15)
+
+The active issue decomposition for this initiative moved to first-class Lidarr tracking:
+
+- Critical parent: `#130`
+- Active umbrella: `#13`
+- Active task issues: `#132`-`#141`
+
+Legacy issues from this plan were explicitly superseded and closed:
+
+- `#30` -> superseded by `#135` and `#138`
+- `#31` -> superseded by `#136` and `#138`
+- `#32` -> superseded by `#137` and `#138`
+- `#33` -> superseded by `#138` and `#139`
+- `#34` -> superseded by `#140`
+- `#35` -> superseded by `#140` and `#141`
 
 ## Critically Relevant Files and Documentation
 
