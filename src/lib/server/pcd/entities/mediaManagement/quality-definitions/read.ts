@@ -169,10 +169,31 @@ function mapRowsToEntries(rows: QualityDefinitionEntryRow[]): QualityDefinitionE
   }));
 }
 
-function getUnmappedQualityWarningKey(arrType: ConcreteArrType, configName: string, skippedQualityNames: string[]): string {
-  return `${arrType}:${configName}:${skippedQualityNames.join('\u0001')}`;
+const MAX_SKIPPED_QUALITY_NAMES_IN_KEY = 50;
+
+function hashString(value: string): string {
+  let hash = 0;
+
+  for (let i = 0; i < value.length; i++) {
+    const chr = value.charCodeAt(i);
+    hash = (hash << 5) - hash + chr;
+    hash |= 0; // Convert to 32-bit integer
+  }
+
+  return hash.toString(16);
 }
 
+function getUnmappedQualityWarningKey(
+  arrType: ConcreteArrType,
+  configName: string,
+  skippedQualityNames: string[]
+): string {
+  const keyQualityNames = skippedQualityNames.slice(0, MAX_SKIPPED_QUALITY_NAMES_IN_KEY);
+  const joinedNames = keyQualityNames.join('\u0001');
+  const namesHash = hashString(joinedNames);
+
+  return `${arrType}:${configName}:${namesHash}`;
+}
 async function warnUnmappedQualityDefinitionRows(
   message: string,
   arrType: ConcreteArrType,
