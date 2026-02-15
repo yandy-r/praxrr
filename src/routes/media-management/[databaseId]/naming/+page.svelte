@@ -8,6 +8,7 @@
 	import CardView from './views/CardView.svelte';
 	import { createDataPageStore } from '$lib/client/stores/dataPage';
 	import { goto } from '$app/navigation';
+	import { resolve } from '$app/paths';
 	import { alertStore } from '$alerts/store';
 	import { Plus } from 'lucide-svelte';
 	import type { EntityType } from '$shared/pcd/portable.ts';
@@ -20,6 +21,7 @@
 	let cloneSourceName = '';
 	let cloneEntityType: EntityType = 'radarr_naming';
 	let cloneArrType: ArrAppType | null = null;
+	const namingSearchKeys: Array<keyof PageData['namingConfigs'][number]> = ['name', 'arr_type'];
 	const supportedNamingArrTypes: ArrAppType[] = ['radarr', 'sonarr', 'lidarr'];
 
 	function isSupportedArrType(arrType: string): arrType is ArrAppType {
@@ -69,7 +71,8 @@
 			return;
 		}
 
-		if (!toEntityType(arr_type)) {
+		const entityType = toEntityType(arr_type);
+		if (!entityType) {
 			alertStore.add('error', `Unknown naming type "${arr_type}"`);
 			return;
 		}
@@ -77,7 +80,7 @@
 		try {
 			const params = new URLSearchParams({
 				databaseId: String(data.currentDatabase.id),
-				entityType: `${arr_type}_naming`,
+				entityType,
 				name
 			});
 			const res = await fetch(`/api/v1/pcd/export?${params}`);
@@ -96,7 +99,7 @@
 	// Initialize data page store
 	const { search, view, filtered, setItems } = createDataPageStore(data.namingConfigs, {
 		storageKey: 'namingSettingsView',
-		searchKeys: ['name', 'arr_type'],
+		searchKeys: namingSearchKeys,
 		searchKey: `namingConfigsSearch:${data.currentDatabase.id}`
 	});
 
@@ -109,7 +112,8 @@
 	<SearchAction searchStore={search} placeholder="Search naming configs..." responsive />
 	<ActionButton
 		icon={Plus}
-		on:click={() => goto(`/media-management/${data.currentDatabase.id}/naming/new`)}
+		on:click={() =>
+			goto(resolve('/media-management/[databaseId]/naming/new', { databaseId: data.currentDatabase.id.toString() }))}
 	/>
 	<ViewToggle bind:value={$view} />
 </ActionsBar>

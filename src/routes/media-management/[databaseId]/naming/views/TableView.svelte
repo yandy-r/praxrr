@@ -6,10 +6,10 @@
 	import type { Column } from '$ui/table/types';
 	import { Tag, ToggleRight, Copy, Download } from 'lucide-svelte';
 	import type { NamingListItem } from '$shared/pcd/display.ts';
+	import type { ArrAppType } from '$shared/arr/capabilities.ts';
 	import radarrLogo from '$lib/client/assets/Radarr.svg';
 	import sonarrLogo from '$lib/client/assets/Sonarr.svg';
 	import lidarrLogo from '$lib/client/assets/Lidarr.png';
-	import { isArrAppType } from '$shared/arr/capabilities.ts';
 	import { getMediaManagementDisplayName } from '$shared/arr/displayName.ts';
 
 	export let configs: NamingListItem[];
@@ -20,22 +20,29 @@
 		export: { name: string; arr_type: string };
 	}>();
 
-	const logos: Record<string, string> = {
+	const supportedArrTypes: ArrAppType[] = ['radarr', 'sonarr', 'lidarr'];
+
+	const logos: Partial<Record<ArrAppType, string>> = {
 		radarr: radarrLogo,
 		sonarr: sonarrLogo,
 		lidarr: lidarrLogo
 	};
 
+	function isSupportedArrType(arrType: string): arrType is ArrAppType {
+		return supportedArrTypes.includes(arrType as ArrAppType);
+	}
+
 	function getRowHref(config: NamingListItem): string {
-		if (!config.name?.trim() || !isArrAppType(config.arr_type)) {
+		const trimmedName = config.name?.trim();
+		if (!trimmedName || !isSupportedArrType(config.arr_type)) {
 			return `/media-management/${databaseId}/naming`;
 		}
 
-		return `/media-management/${databaseId}/naming/${config.arr_type}/${encodeURIComponent(config.name)}`;
+		return `/media-management/${databaseId}/naming/${config.arr_type}/${encodeURIComponent(trimmedName)}`;
 	}
 
 	function getLogo(config: NamingListItem): string {
-		if (!isArrAppType(config.arr_type)) {
+		if (!isSupportedArrType(config.arr_type)) {
 			return '';
 		}
 

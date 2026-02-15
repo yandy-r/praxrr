@@ -64,12 +64,21 @@
 		return isArrAppType(type) ? type : 'warning';
 	}
 
+	function getMappedQualityLabel(qualityCount: number): string {
+		if (qualityCount === 0) {
+			return 'No mapped qualities';
+		}
+
+		return qualityCount === 1 ? '1 mapped quality' : `${qualityCount} mapped qualities`;
+	}
+
 	function getRowHref(config: QualityDefinitionListItem): string {
-		if (!config.name?.trim() || !isArrAppType(config.arr_type)) {
+		const normalizedName = config.name?.trim();
+		if (!normalizedName || !isArrAppType(config.arr_type)) {
 			return `/media-management/${databaseId}/quality-definitions`;
 		}
 
-		return `/media-management/${databaseId}/quality-definitions/${config.arr_type}/${encodeURIComponent(config.name)}`;
+		return `/media-management/${databaseId}/quality-definitions/${config.arr_type}/${encodeURIComponent(normalizedName)}`;
 	}
 
 	const columns: Column<QualityDefinitionListItem>[] = [
@@ -95,6 +104,8 @@
 		{:else if column.key === 'arr_type'}
 			{@const appLabel = getAppLabel(row.arr_type)}
 			{@const logoPath = getLogoPath(row.arr_type)}
+			{@const hasAppMapping = isArrAppType(row.arr_type)}
+			{@const hasMappedQualities = row.quality_count > 0}
 			<div class="flex items-center gap-2">
 				{#if logoPath}
 					<img src={logoPath} alt={`${appLabel} logo`} class="h-5 w-5" />
@@ -107,6 +118,14 @@
 					</div>
 				{/if}
 				<Badge variant={getBadgeVariant(row.arr_type)} size="sm">{appLabel}</Badge>
+				{#if !hasAppMapping}
+					<Badge variant="warning" size="sm">Missing app mapping</Badge>
+				{:else if !hasMappedQualities}
+					<Badge variant="warning" size="sm">Missing quality mappings</Badge>
+				{/if}
+				<Badge variant={hasMappedQualities ? 'neutral' : 'warning'} size="sm">
+					{getMappedQualityLabel(row.quality_count)}
+				</Badge>
 			</div>
 		{/if}
 	</svelte:fragment>

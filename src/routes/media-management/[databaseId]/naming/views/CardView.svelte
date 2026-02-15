@@ -1,15 +1,16 @@
 <script lang="ts">
 	import { createEventDispatcher } from 'svelte';
+	import { SvelteSet } from 'svelte/reactivity';
 	import CardGrid from '$ui/card/CardGrid.svelte';
 	import Card from '$ui/card/Card.svelte';
 	import Label from '$ui/label/Label.svelte';
 	import Button from '$ui/button/Button.svelte';
 	import { Copy, Download } from 'lucide-svelte';
 	import type { NamingListItem } from '$shared/pcd/display.ts';
+	import type { ArrAppType } from '$shared/arr/capabilities.ts';
 	import radarrLogo from '$lib/client/assets/Radarr.svg';
 	import sonarrLogo from '$lib/client/assets/Sonarr.svg';
 	import lidarrLogo from '$lib/client/assets/Lidarr.png';
-	import { isArrAppType } from '$shared/arr/capabilities.ts';
 	import { getMediaManagementDisplayName } from '$shared/arr/displayName.ts';
 
 	export let configs: NamingListItem[];
@@ -20,21 +21,26 @@
 		export: { name: string; arr_type: string };
 	}>();
 
-	const logos: Record<string, string> = {
+	const supportedArrTypes: ArrAppType[] = ['radarr', 'sonarr', 'lidarr'];
+
+	const logos: Partial<Record<ArrAppType, string>> = {
 		radarr: radarrLogo,
 		sonarr: sonarrLogo,
 		lidarr: lidarrLogo
 	};
 
-	let loadedImages: Set<string> = new Set();
+	let loadedImages = new SvelteSet<string>();
 
 	function handleImageLoad(name: string) {
 		loadedImages.add(name);
-		loadedImages = loadedImages;
+	}
+
+	function isSupportedArrType(arrType: string): arrType is ArrAppType {
+		return supportedArrTypes.includes(arrType as ArrAppType);
 	}
 
 	function getConfigHref(config: NamingListItem): string {
-		if (!config.name?.trim() || !isArrAppType(config.arr_type)) {
+		if (config.name == null || config.name === '' || !isSupportedArrType(config.arr_type)) {
 			return `/media-management/${databaseId}/naming`;
 		}
 
@@ -42,7 +48,7 @@
 	}
 
 	function getLogo(config: NamingListItem): string {
-		if (!isArrAppType(config.arr_type)) {
+		if (!isSupportedArrType(config.arr_type)) {
 			return '';
 		}
 		return logos[config.arr_type] ?? '';
@@ -57,7 +63,7 @@
 </script>
 
 <CardGrid columns={1} flush>
-	{#each configs as config}
+	{#each configs as config (config.arr_type + ':' + config.name)}
 		<Card href={getConfigHref(config)} hoverable>
 			<div class="flex items-center gap-4">
 				<!-- Logo + Name -->
