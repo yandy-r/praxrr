@@ -24,45 +24,33 @@ async function resolveName(
     metadata?.stable_key?.value,
     metadata?.name,
     getDesiredTo<string>(desiredState?.name),
-    typeof desiredState?.name === 'string' ? (desiredState.name as string) : null,
-  ].filter((v): v is string => typeof v === 'string' && v.length > 0);
+    typeof desiredState?.name === 'string' ? desiredState.name : null,
+  ].filter((value): value is string => typeof value === 'string' && value.length > 0);
 
   if (candidates.length === 0) return null;
 
+  const tableName = table as keyof PCDDatabase;
+
   for (const name of candidates) {
-    const row = await cache.kb.selectFrom(table).select('name').where('name', '=', name).executeTakeFirst();
-    if (row) return row.name;
-  }
-  for (const name of candidates) {
-    const row = await cache.kb
-      .selectFrom(table as keyof PCDDatabase)
-      .select('name')
-      .where('name', '=', name)
-      .executeTakeFirst();
-    if (row) return row.name;
+    const row = await cache.kb.selectFrom(tableName).select('name').where('name', '=', name).executeTakeFirst();
+    if (row) return row.name ?? null;
   }
 
-  const entityType =
-    table === 'radarr_quality_definitions' ? 'radarr_quality_definitions' : 'sonarr_quality_definitions';
-  const resolved = followRenameChain(databaseId, entityType, candidates[0]);
-  if (resolved !== candidates[0]) {
-    const row = await cache.kb.selectFrom(table).select('name').where('name', '=', resolved).executeTakeFirst();
-    if (row) return row.name;
-  }
-  const entityType =
+  const entityType: QdTable =
     table === 'radarr_quality_definitions'
       ? 'radarr_quality_definitions'
       : table === 'sonarr_quality_definitions'
         ? 'sonarr_quality_definitions'
         : 'lidarr_quality_definitions';
   const resolved = followRenameChain(databaseId, entityType, candidates[0]);
+
   if (resolved !== candidates[0]) {
     const row = await cache.kb
-      .selectFrom(table as keyof PCDDatabase)
+      .selectFrom(tableName)
       .select('name')
       .where('name', '=', resolved)
       .executeTakeFirst();
-    if (row) return row.name;
+    if (row) return row.name ?? null;
   }
 
   return null;
@@ -72,26 +60,31 @@ function resolveEntries(desiredState: StoredDesiredState): QualityDefinitionEntr
   const field = desiredState.entries;
   if (!field) return null;
 
-  // { from, to } diff — take the "to" side
   if (typeof field === 'object' && 'to' in (field as Record<string, unknown>)) {
     const to = (field as { to: unknown }).to;
     if (Array.isArray(to)) return to as QualityDefinitionEntry[];
   }
 
-  // Flat array
   if (Array.isArray(field)) return field as QualityDefinitionEntry[];
 
   return null;
 }
 
+function resolveDesiredName(desiredState: StoredDesiredState, fallback: string): string {
+  const resolved = getDesiredTo<string>(desiredState.name);
+  if (typeof resolved === 'string') return resolved;
+  if (typeof desiredState.name === 'string') return desiredState.name;
+  return fallback;
+}
+
 function entriesEqual(a: QualityDefinitionEntry[], b: QualityDefinitionEntry[]): boolean {
   const normalize = (entries: QualityDefinitionEntry[]) =>
     entries
-      .map((e) => ({
-        quality_name: e.quality_name,
-        min_size: e.min_size,
-        max_size: e.max_size,
-        preferred_size: e.preferred_size,
+      .map((entry) => ({
+        quality_name: entry.quality_name,
+        min_size: entry.min_size,
+        max_size: entry.max_size,
+        preferred_size: entry.preferred_size,
       }))
       .sort((x, y) => x.quality_name.localeCompare(y.quality_name));
 
@@ -106,12 +99,6 @@ async function overrideRadarr(
   if (!desiredState) {
     return { success: false, error: 'Missing desired state for radarr quality definitions override' };
   }
-  if (!desiredState) {
-    return {
-      success: false,
-      error: 'Missing desired state for radarr quality definitions override',
-    };
-  }
 
   const cache = getCache(databaseId);
   if (!cache) {
@@ -122,29 +109,13 @@ async function overrideRadarr(
   if (!name) {
     return { success: false, error: 'Radarr quality definitions not found for override' };
   }
-  const name = await resolveName(cache, databaseId, 'radarr_quality_definitions', metadata, desiredState);
-  if (!name) {
-    return {
-      success: false,
-      error: 'Radarr quality definitions not found for override',
-    };
-  }
 
   const current = await getRadarrByName(cache, name);
   if (!current) {
     return { success: false, error: 'Radarr quality definitions not found for override' };
   }
-  const current = await getRadarrByName(cache, name);
-  if (!current) {
-    return {
-      success: false,
-      error: 'Radarr quality definitions not found for override',
-    };
-  }
 
-  const desiredName =
-    getDesiredTo<string>(desiredState.name) ??
-    (typeof desiredState.name === 'string' ? (desiredState.name as string) : current.name);
+  const desiredName = resolveDesiredName(desiredState, current.name);
   const desiredEntries = resolveEntries(desiredState) ?? current.entries;
 
   if (current.name === desiredName && entriesEqual(current.entries, desiredEntries)) {
@@ -171,12 +142,6 @@ async function overrideSonarr(
   if (!desiredState) {
     return { success: false, error: 'Missing desired state for sonarr quality definitions override' };
   }
-  if (!desiredState) {
-    return {
-      success: false,
-      error: 'Missing desired state for sonarr quality definitions override',
-    };
-  }
 
   const cache = getCache(databaseId);
   if (!cache) {
@@ -187,45 +152,19 @@ async function overrideSonarr(
   if (!name) {
     return { success: false, error: 'Sonarr quality definitions not found for override' };
   }
-  const name = await resolveName(cache, databaseId, 'sonarr_quality_definitions', metadata, desiredState);
-  if (!name) {
-    return {
-      success: false,
-      error: 'Sonarr quality definitions not found for override',
-    };
-  }
 
   const current = await getSonarrByName(cache, name);
   if (!current) {
     return { success: false, error: 'Sonarr quality definitions not found for override' };
   }
-  const current = await getSonarrByName(cache, name);
-  if (!current) {
-    return {
-      success: false,
-      error: 'Sonarr quality definitions not found for override',
-    };
-  }
 
-  const desiredName =
-    getDesiredTo<string>(desiredState.name) ??
-    (typeof desiredState.name === 'string' ? (desiredState.name as string) : current.name);
+  const desiredName = resolveDesiredName(desiredState, current.name);
   const desiredEntries = resolveEntries(desiredState) ?? current.entries;
 
   if (current.name === desiredName && entriesEqual(current.entries, desiredEntries)) {
     return { success: true };
   }
 
-  return updateSonarrQualityDefinitions({
-    databaseId,
-    cache,
-    layer: 'user',
-    current,
-    input: {
-      name: desiredName,
-      entries: desiredEntries,
-    },
-  });
   return updateSonarrQualityDefinitions({
     databaseId,
     cache,
@@ -244,10 +183,7 @@ async function overrideLidarr(
   desiredState: StoredDesiredState | null
 ): Promise<WriteResult> {
   if (!desiredState) {
-    return {
-      success: false,
-      error: 'Missing desired state for lidarr quality definitions override',
-    };
+    return { success: false, error: 'Missing desired state for lidarr quality definitions override' };
   }
 
   const cache = getCache(databaseId);
@@ -257,23 +193,15 @@ async function overrideLidarr(
 
   const name = await resolveName(cache, databaseId, 'lidarr_quality_definitions', metadata, desiredState);
   if (!name) {
-    return {
-      success: false,
-      error: 'Lidarr quality definitions not found for override',
-    };
+    return { success: false, error: 'Lidarr quality definitions not found for override' };
   }
 
   const current = await getLidarrByName(cache, name);
   if (!current) {
-    return {
-      success: false,
-      error: 'Lidarr quality definitions not found for override',
-    };
+    return { success: false, error: 'Lidarr quality definitions not found for override' };
   }
 
-  const desiredName =
-    getDesiredTo<string>(desiredState.name) ??
-    (typeof desiredState.name === 'string' ? (desiredState.name as string) : current.name);
+  const desiredName = resolveDesiredName(desiredState, current.name);
   const desiredEntries = resolveEntries(desiredState) ?? current.entries;
 
   if (current.name === desiredName && entriesEqual(current.entries, desiredEntries)) {
@@ -297,9 +225,6 @@ export function overrideCreate(
   metadata: StoredOpMetadata | null,
   desiredState: StoredDesiredState | null
 ): Promise<WriteResult> {
-  return metadata?.entity === 'sonarr_quality_definitions'
-    ? overrideSonarr(databaseId, metadata, desiredState)
-    : overrideRadarr(databaseId, metadata, desiredState);
   switch (metadata?.entity) {
     case 'radarr_quality_definitions':
       return overrideRadarr(databaseId, metadata, desiredState);
@@ -320,8 +245,5 @@ export function overrideUpdate(
   metadata: StoredOpMetadata | null,
   desiredState: StoredDesiredState | null
 ): Promise<WriteResult> {
-  return metadata?.entity === 'sonarr_quality_definitions'
-    ? overrideSonarr(databaseId, metadata, desiredState)
-    : overrideRadarr(databaseId, metadata, desiredState);
   return overrideCreate(databaseId, metadata, desiredState);
 }

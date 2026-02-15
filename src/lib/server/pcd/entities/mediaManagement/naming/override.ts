@@ -19,28 +19,23 @@ async function resolveNamingName(
     metadata?.stable_key?.value,
     metadata?.name,
     getDesiredTo<string>(desiredState?.name),
-    typeof desiredState?.name === 'string' ? (desiredState.name as string) : null,
-  ].filter((v): v is string => typeof v === 'string' && v.length > 0);
+    typeof desiredState?.name === 'string' ? desiredState.name : null,
+  ].filter((value): value is string => typeof value === 'string' && value.length > 0);
 
   if (candidates.length === 0) return null;
 
   for (const name of candidates) {
     const row = await cache.kb.selectFrom(table).select('name').where('name', '=', name).executeTakeFirst();
-    if (row) return row.name!;
+    if (row) return row.name ?? null;
   }
 
-  const entityType = table === 'radarr_naming' ? 'radarr_naming' : 'sonarr_naming';
-  const resolved = followRenameChain(databaseId, entityType, candidates[0]);
-  if (resolved !== candidates[0]) {
-    const row = await cache.kb.selectFrom(table).select('name').where('name', '=', resolved).executeTakeFirst();
-    if (row) return row.name!;
-  }
-  const entityType =
+  const entityType: NamingTable =
     table === 'radarr_naming' ? 'radarr_naming' : table === 'sonarr_naming' ? 'sonarr_naming' : 'lidarr_naming';
   const resolved = followRenameChain(databaseId, entityType, candidates[0]);
+
   if (resolved !== candidates[0]) {
     const row = await cache.kb.selectFrom(table).select('name').where('name', '=', resolved).executeTakeFirst();
-    if (row) return row.name!;
+    if (row) return row.name ?? null;
   }
 
   return null;
@@ -56,13 +51,7 @@ function resolveString(value: unknown, fallback: string): string {
 function resolveNullableString(value: unknown, fallback: string | null): string | null {
   const resolved = getDesiredTo<string | null>(value);
   if (resolved !== undefined) return resolved;
-  if (typeof value === 'string' || value === null) return value as string | null;
-  return fallback;
-  const resolved = getDesiredTo<string | null>(value);
-  if (resolved !== undefined) return resolved;
-  if (typeof value === 'string' || value === null) {
-    return value as string | null;
-  }
+  if (typeof value === 'string' || value === null) return value;
   return fallback;
 }
 
@@ -74,8 +63,6 @@ function resolveBoolean(value: unknown, fallback: boolean): boolean {
   return fallback;
 }
 
-// ── Radarr ──
-
 async function overrideRadarr(
   databaseId: number,
   metadata: StoredOpMetadata | null,
@@ -83,12 +70,6 @@ async function overrideRadarr(
 ): Promise<WriteResult> {
   if (!desiredState) {
     return { success: false, error: 'Missing desired state for radarr naming override' };
-  }
-  if (!desiredState) {
-    return {
-      success: false,
-      error: 'Missing desired state for radarr naming override',
-    };
   }
 
   const cache = getCache(databaseId);
@@ -100,24 +81,10 @@ async function overrideRadarr(
   if (!name) {
     return { success: false, error: 'Radarr naming config not found for override' };
   }
-  const name = await resolveNamingName(cache, databaseId, 'radarr_naming', metadata, desiredState);
-  if (!name) {
-    return {
-      success: false,
-      error: 'Radarr naming config not found for override',
-    };
-  }
 
   const current = await getRadarrByName(cache, name);
   if (!current) {
     return { success: false, error: 'Radarr naming config not found for override' };
-  }
-  const current = await getRadarrByName(cache, name);
-  if (!current) {
-    return {
-      success: false,
-      error: 'Radarr naming config not found for override',
-    };
   }
 
   const desiredName = resolveString(desiredState.name, current.name);
@@ -161,8 +128,6 @@ async function overrideRadarr(
   });
 }
 
-// ── Sonarr ──
-
 async function overrideSonarr(
   databaseId: number,
   metadata: StoredOpMetadata | null,
@@ -170,12 +135,6 @@ async function overrideSonarr(
 ): Promise<WriteResult> {
   if (!desiredState) {
     return { success: false, error: 'Missing desired state for sonarr naming override' };
-  }
-  if (!desiredState) {
-    return {
-      success: false,
-      error: 'Missing desired state for sonarr naming override',
-    };
   }
 
   const cache = getCache(databaseId);
@@ -187,24 +146,10 @@ async function overrideSonarr(
   if (!name) {
     return { success: false, error: 'Sonarr naming config not found for override' };
   }
-  const name = await resolveNamingName(cache, databaseId, 'sonarr_naming', metadata, desiredState);
-  if (!name) {
-    return {
-      success: false,
-      error: 'Sonarr naming config not found for override',
-    };
-  }
 
   const current = await getSonarrByName(cache, name);
   if (!current) {
     return { success: false, error: 'Sonarr naming config not found for override' };
-  }
-  const current = await getSonarrByName(cache, name);
-  if (!current) {
-    return {
-      success: false,
-      error: 'Sonarr naming config not found for override',
-    };
   }
 
   const desiredName = resolveString(desiredState.name, current.name);
@@ -267,28 +212,7 @@ async function overrideSonarr(
       multiEpisodeStyle: desiredMultiEpisode,
     },
   });
-  return updateSonarrNaming({
-    databaseId,
-    cache,
-    layer: 'user',
-    current,
-    input: {
-      name: desiredName,
-      rename: desiredRename,
-      standardEpisodeFormat: desiredStandard,
-      dailyEpisodeFormat: desiredDaily,
-      animeEpisodeFormat: desiredAnime,
-      seriesFolderFormat: desiredSeriesFolder,
-      seasonFolderFormat: desiredSeasonFolder,
-      replaceIllegalCharacters: desiredReplaceIllegal,
-      colonReplacementFormat: desiredColonFormat,
-      customColonReplacementFormat: desiredCustomColon,
-      multiEpisodeStyle: desiredMultiEpisode,
-    },
-  });
 }
-
-// ── Lidarr ──
 
 async function overrideLidarr(
   databaseId: number,
@@ -296,10 +220,7 @@ async function overrideLidarr(
   desiredState: StoredDesiredState | null
 ): Promise<WriteResult> {
   if (!desiredState) {
-    return {
-      success: false,
-      error: 'Missing desired state for lidarr naming override',
-    };
+    return { success: false, error: 'Missing desired state for lidarr naming override' };
   }
 
   const cache = getCache(databaseId);
@@ -309,18 +230,12 @@ async function overrideLidarr(
 
   const name = await resolveNamingName(cache, databaseId, 'lidarr_naming', metadata, desiredState);
   if (!name) {
-    return {
-      success: false,
-      error: 'Lidarr naming config not found for override',
-    };
+    return { success: false, error: 'Lidarr naming config not found for override' };
   }
 
   const current = await getLidarrByName(cache, name);
   if (!current) {
-    return {
-      success: false,
-      error: 'Lidarr naming config not found for override',
-    };
+    return { success: false, error: 'Lidarr naming config not found for override' };
   }
 
   const desiredName = resolveString(desiredState.name, current.name);
@@ -376,16 +291,11 @@ async function overrideLidarr(
   });
 }
 
-// ── Exports ──
-
 export function overrideCreate(
   databaseId: number,
   metadata: StoredOpMetadata | null,
   desiredState: StoredDesiredState | null
 ): Promise<WriteResult> {
-  return metadata?.entity === 'sonarr_naming'
-    ? overrideSonarr(databaseId, metadata, desiredState)
-    : overrideRadarr(databaseId, metadata, desiredState);
   switch (metadata?.entity) {
     case 'radarr_naming':
       return overrideRadarr(databaseId, metadata, desiredState);
@@ -406,8 +316,5 @@ export function overrideUpdate(
   metadata: StoredOpMetadata | null,
   desiredState: StoredDesiredState | null
 ): Promise<WriteResult> {
-  return metadata?.entity === 'sonarr_naming'
-    ? overrideSonarr(databaseId, metadata, desiredState)
-    : overrideRadarr(databaseId, metadata, desiredState);
   return overrideCreate(databaseId, metadata, desiredState);
 }

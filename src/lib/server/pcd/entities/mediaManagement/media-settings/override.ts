@@ -1,6 +1,6 @@
 import { getCache } from '$pcd/index.ts';
 import type { PCDCache, WriteResult } from '$pcd/index.ts';
-import type { LidarrMediaSettingsRow, RadarrMediaSettingsRow } from '$shared/pcd/display.ts';
+import type { LidarrMediaSettingsRow, RadarrMediaSettingsRow, SonarrMediaSettingsRow } from '$shared/pcd/display.ts';
 import { getLidarrByName, getRadarrByName, getSonarrByName } from './read.ts';
 import { updateLidarrMediaSettings, updateRadarrMediaSettings, updateSonarrMediaSettings } from './update.ts';
 import type { StoredDesiredState, StoredOpMetadata } from '$pcd/conflicts/overrideUtils.ts';
@@ -19,32 +19,27 @@ async function resolveName(
     metadata?.stable_key?.value,
     metadata?.name,
     getDesiredTo<string>(desiredState?.name),
-    typeof desiredState?.name === 'string' ? (desiredState.name as string) : null,
-  ].filter((v): v is string => typeof v === 'string' && v.length > 0);
+    typeof desiredState?.name === 'string' ? desiredState.name : null,
+  ].filter((value): value is string => typeof value === 'string' && value.length > 0);
 
   if (candidates.length === 0) return null;
 
   for (const name of candidates) {
     const row = await cache.kb.selectFrom(table).select('name').where('name', '=', name).executeTakeFirst();
-    if (row) return row.name!;
+    if (row) return row.name ?? null;
   }
 
-  const entityType = table === 'radarr_media_settings' ? 'radarr_media_settings' : 'sonarr_media_settings';
-  const resolved = followRenameChain(databaseId, entityType, candidates[0]);
-  if (resolved !== candidates[0]) {
-    const row = await cache.kb.selectFrom(table).select('name').where('name', '=', resolved).executeTakeFirst();
-    if (row) return row.name!;
-  }
-  const entityType =
+  const entityType: SettingsTable =
     table === 'radarr_media_settings'
       ? 'radarr_media_settings'
       : table === 'sonarr_media_settings'
         ? 'sonarr_media_settings'
         : 'lidarr_media_settings';
   const resolved = followRenameChain(databaseId, entityType, candidates[0]);
+
   if (resolved !== candidates[0]) {
     const row = await cache.kb.selectFrom(table).select('name').where('name', '=', resolved).executeTakeFirst();
-    if (row) return row.name!;
+    if (row) return row.name ?? null;
   }
 
   return null;
@@ -65,9 +60,6 @@ function resolveBoolean(value: unknown, fallback: boolean): boolean {
   return fallback;
 }
 
-// Both radarr and sonarr share the same fields, so one function handles both.
-// The only difference is which table/read/update function to use.
-
 async function overrideRadarr(
   databaseId: number,
   metadata: StoredOpMetadata | null,
@@ -75,12 +67,6 @@ async function overrideRadarr(
 ): Promise<WriteResult> {
   if (!desiredState) {
     return { success: false, error: 'Missing desired state for radarr media settings override' };
-  }
-  if (!desiredState) {
-    return {
-      success: false,
-      error: 'Missing desired state for radarr media settings override',
-    };
   }
 
   const cache = getCache(databaseId);
@@ -92,24 +78,10 @@ async function overrideRadarr(
   if (!name) {
     return { success: false, error: 'Radarr media settings not found for override' };
   }
-  const name = await resolveName(cache, databaseId, 'radarr_media_settings', metadata, desiredState);
-  if (!name) {
-    return {
-      success: false,
-      error: 'Radarr media settings not found for override',
-    };
-  }
 
   const current = await getRadarrByName(cache, name);
   if (!current) {
     return { success: false, error: 'Radarr media settings not found for override' };
-  }
-  const current = await getRadarrByName(cache, name);
-  if (!current) {
-    return {
-      success: false,
-      error: 'Radarr media settings not found for override',
-    };
   }
 
   const desiredName = resolveString(desiredState.name, current.name);
@@ -149,12 +121,6 @@ async function overrideSonarr(
   if (!desiredState) {
     return { success: false, error: 'Missing desired state for sonarr media settings override' };
   }
-  if (!desiredState) {
-    return {
-      success: false,
-      error: 'Missing desired state for sonarr media settings override',
-    };
-  }
 
   const cache = getCache(databaseId);
   if (!cache) {
@@ -165,31 +131,17 @@ async function overrideSonarr(
   if (!name) {
     return { success: false, error: 'Sonarr media settings not found for override' };
   }
-  const name = await resolveName(cache, databaseId, 'sonarr_media_settings', metadata, desiredState);
-  if (!name) {
-    return {
-      success: false,
-      error: 'Sonarr media settings not found for override',
-    };
-  }
 
   const current = await getSonarrByName(cache, name);
   if (!current) {
     return { success: false, error: 'Sonarr media settings not found for override' };
-  }
-  const current = await getSonarrByName(cache, name);
-  if (!current) {
-    return {
-      success: false,
-      error: 'Sonarr media settings not found for override',
-    };
   }
 
   const desiredName = resolveString(desiredState.name, current.name);
   const desiredPropersRepacks = resolveString(
     desiredState.propers_repacks,
     current.propers_repacks
-  ) as RadarrMediaSettingsRow['propers_repacks'];
+  ) as SonarrMediaSettingsRow['propers_repacks'];
   const desiredEnableMediaInfo = resolveBoolean(desiredState.enable_media_info, current.enable_media_info);
 
   const matches =
@@ -212,17 +164,6 @@ async function overrideSonarr(
       enableMediaInfo: desiredEnableMediaInfo,
     },
   });
-  return updateSonarrMediaSettings({
-    databaseId,
-    cache,
-    layer: 'user',
-    current,
-    input: {
-      name: desiredName,
-      propersRepacks: desiredPropersRepacks,
-      enableMediaInfo: desiredEnableMediaInfo,
-    },
-  });
 }
 
 async function overrideLidarr(
@@ -231,10 +172,7 @@ async function overrideLidarr(
   desiredState: StoredDesiredState | null
 ): Promise<WriteResult> {
   if (!desiredState) {
-    return {
-      success: false,
-      error: 'Missing desired state for lidarr media settings override',
-    };
+    return { success: false, error: 'Missing desired state for lidarr media settings override' };
   }
 
   const cache = getCache(databaseId);
@@ -244,18 +182,12 @@ async function overrideLidarr(
 
   const name = await resolveName(cache, databaseId, 'lidarr_media_settings', metadata, desiredState);
   if (!name) {
-    return {
-      success: false,
-      error: 'Lidarr media settings not found for override',
-    };
+    return { success: false, error: 'Lidarr media settings not found for override' };
   }
 
   const current = await getLidarrByName(cache, name);
   if (!current) {
-    return {
-      success: false,
-      error: 'Lidarr media settings not found for override',
-    };
+    return { success: false, error: 'Lidarr media settings not found for override' };
   }
 
   const desiredName = resolveString(desiredState.name, current.name);
@@ -292,9 +224,6 @@ export function overrideCreate(
   metadata: StoredOpMetadata | null,
   desiredState: StoredDesiredState | null
 ): Promise<WriteResult> {
-  return metadata?.entity === 'sonarr_media_settings'
-    ? overrideSonarr(databaseId, metadata, desiredState)
-    : overrideRadarr(databaseId, metadata, desiredState);
   switch (metadata?.entity) {
     case 'radarr_media_settings':
       return overrideRadarr(databaseId, metadata, desiredState);
@@ -315,8 +244,5 @@ export function overrideUpdate(
   metadata: StoredOpMetadata | null,
   desiredState: StoredDesiredState | null
 ): Promise<WriteResult> {
-  return metadata?.entity === 'sonarr_media_settings'
-    ? overrideSonarr(databaseId, metadata, desiredState)
-    : overrideRadarr(databaseId, metadata, desiredState);
   return overrideCreate(databaseId, metadata, desiredState);
 }
