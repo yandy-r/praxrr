@@ -8,3 +8,4 @@
 - For all enhancements, features, and bug fixes touching Arr apps, validate per-app semantics (`arr_type`) explicitly and never treat Sonarr/Radarr/Lidarr data models as interchangeable by API shape alone.
 - When seeding built-in `pcd_ops` via migrations, also provide runtime seeding for newly linked `database_instances`; migration-time inserts alone do not cover future links.
 - Keep OpenAPI portable schema definitions aligned with runtime import validation and persistence behavior; do not publish Lidarr field names that runtime rejects, and never trim persisted identifier fields that must be exact-match lookup keys.
+- When introducing transitional shared-table contracts (for example Sonarr-backed Lidarr naming), define table-name constants once in a shared module and reuse them across `read/create/update/delete` to prevent silent divergence between operation files.

@@ -43,6 +43,7 @@ Checklist (required for Arr-touching changes):
 - Do not publish Arr-specific portable field names unless runtime currently accepts them.
 - For persisted config names used in sync lookups, preserve exact values (no normalization that changes identifier bytes, such as trim).
 - When testing scoped rename propagation, assert targeted `instance_id` coverage, not only affected row counts.
+- For transitional shared-table contracts (for example Sonarr-backed Lidarr entities), define table identifiers once in a shared constants module and reuse across read/create/update/delete paths to prevent silent contract drift between files.
 
 ## Testing Guidelines
 

@@ -6,6 +6,7 @@ import type { PCDCache } from '$pcd/index.ts';
 import { writeOperation, type OperationLayer } from '$pcd/index.ts';
 import type { RadarrNamingRow, SonarrNamingRow } from '$shared/pcd/display.ts';
 import { colonReplacementToDb, multiEpisodeStyleToDb } from '$shared/pcd/mediaManagement.ts';
+import { RADARR_NAMING_TABLE, SONARR_BACKED_NAMING_TABLE } from './constants.ts';
 
 export interface UpdateRadarrNamingInput {
   name: string;
@@ -31,7 +32,7 @@ export async function updateRadarrNaming(options: UpdateRadarrNamingOptions) {
   // If renaming, check if new name already exists
   if (input.name !== current.name) {
     const existing = await db
-      .selectFrom('radarr_naming')
+      .selectFrom(RADARR_NAMING_TABLE)
       .where((eb) => eb(eb.fn('lower', [eb.ref('name')]), '=', input.name.toLowerCase()))
       .select('name')
       .executeTakeFirst();
@@ -55,7 +56,7 @@ export async function updateRadarrNaming(options: UpdateRadarrNamingOptions) {
     setValues.colon_replacement_format = input.colonReplacementFormat;
   }
 
-  let updateQuery = db.updateTable('radarr_naming').set(setValues).where('name', '=', current.name);
+  let updateQuery = db.updateTable(RADARR_NAMING_TABLE).set(setValues).where('name', '=', current.name);
 
   if (current.rename !== input.rename) {
     updateQuery = updateQuery.where('rename', '=', current.rename ? 1 : 0);
@@ -178,10 +179,13 @@ async function updateSonarrBackedNaming(options: UpdateSonarrNamingOptions, nami
   const { databaseId, cache, layer, current, input } = options;
   const db = cache.kb;
 
-  // If renaming, check if new name already exists
+  // Lidarr reuses Sonarr-backed naming storage in this phase.
+  // Acceptance criteria under shared-table reuse:
+  // - Sonarr and Lidarr rename-collision checks run against the same storage rows
+  // - duplicate error messages keep the requested arr identity for deterministic UX
   if (input.name !== current.name) {
     const existing = await db
-      .selectFrom('sonarr_naming')
+      .selectFrom(SONARR_BACKED_NAMING_TABLE)
       .where((eb) => eb(eb.fn('lower', [eb.ref('name')]), '=', input.name.toLowerCase()))
       .select('name')
       .executeTakeFirst();
@@ -227,7 +231,7 @@ async function updateSonarrBackedNaming(options: UpdateSonarrNamingOptions, nami
     setValues.multi_episode_style = nextMultiEpisode;
   }
 
-  let updateQuery = db.updateTable('sonarr_naming').set(setValues).where('name', '=', current.name);
+  let updateQuery = db.updateTable(SONARR_BACKED_NAMING_TABLE).set(setValues).where('name', '=', current.name);
 
   if (current.rename !== input.rename) {
     updateQuery = updateQuery.where('rename', '=', current.rename ? 1 : 0);

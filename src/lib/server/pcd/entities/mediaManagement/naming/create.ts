@@ -6,6 +6,7 @@ import type { PCDCache } from '$pcd/index.ts';
 import { writeOperation, type OperationLayer } from '$pcd/index.ts';
 import type { RadarrNamingRow, SonarrNamingRow } from '$shared/pcd/display.ts';
 import { colonReplacementToDb, multiEpisodeStyleToDb } from '$shared/pcd/mediaManagement.ts';
+import { RADARR_NAMING_TABLE, SONARR_BACKED_NAMING_TABLE } from './constants.ts';
 
 export interface CreateRadarrNamingInput {
   name: string;
@@ -29,7 +30,7 @@ export async function createRadarrNaming(options: CreateRadarrNamingOptions) {
 
   // Check if name already exists
   const existing = await db
-    .selectFrom('radarr_naming')
+    .selectFrom(RADARR_NAMING_TABLE)
     .where((eb) => eb(eb.fn('lower', [eb.ref('name')]), '=', input.name.toLowerCase()))
     .select('name')
     .executeTakeFirst();
@@ -39,7 +40,7 @@ export async function createRadarrNaming(options: CreateRadarrNamingOptions) {
   }
 
   const insertQuery = db
-    .insertInto('radarr_naming')
+    .insertInto(RADARR_NAMING_TABLE)
     .values({
       name: input.name,
       rename: input.rename ? 1 : 0,
@@ -102,9 +103,12 @@ async function createSonarrBackedNaming(options: CreateSonarrNamingOptions, nami
   const db = cache.kb;
   const normalizedType = namingType === 'sonarr' ? 'Sonarr' : 'Lidarr';
 
-  // Check if name already exists
+  // Lidarr reuses Sonarr-backed naming storage in this phase.
+  // Acceptance criteria under shared-table reuse:
+  // - Sonarr and Lidarr duplicate checks collide on the same storage rows
+  // - duplicate error messages keep the requested arr identity for deterministic UX
   const existing = await db
-    .selectFrom('sonarr_naming')
+    .selectFrom(SONARR_BACKED_NAMING_TABLE)
     .where((eb) => eb(eb.fn('lower', [eb.ref('name')]), '=', input.name.toLowerCase()))
     .select('name')
     .executeTakeFirst();
@@ -114,7 +118,7 @@ async function createSonarrBackedNaming(options: CreateSonarrNamingOptions, nami
   }
 
   const insertQuery = db
-    .insertInto('sonarr_naming')
+    .insertInto(SONARR_BACKED_NAMING_TABLE)
     .values({
       name: input.name,
       rename: input.rename ? 1 : 0,

@@ -5,6 +5,7 @@
 import type { PCDCache } from '$pcd/index.ts';
 import type { RadarrNamingRow, SonarrNamingRow, NamingListItem } from '$shared/pcd/display.ts';
 import { colonReplacementFromDb, multiEpisodeStyleFromDb } from '$shared/pcd/mediaManagement.ts';
+import { RADARR_NAMING_TABLE, SONARR_BACKED_NAMING_TABLE } from './constants.ts';
 
 // Note: name is PRIMARY KEY so never null, but Kysely types it as nullable
 // because the generator doesn't detect non-INTEGER primary keys
@@ -13,8 +14,8 @@ export async function list(cache: PCDCache): Promise<NamingListItem[]> {
   const db = cache.kb;
 
   const [radarrRows, sonarrRows] = await Promise.all([
-    db.selectFrom('radarr_naming').select(['name', 'rename', 'updated_at']).execute(),
-    db.selectFrom('sonarr_naming').select(['name', 'rename', 'updated_at']).execute(),
+    db.selectFrom(RADARR_NAMING_TABLE).select(['name', 'rename', 'updated_at']).execute(),
+    db.selectFrom(SONARR_BACKED_NAMING_TABLE).select(['name', 'rename', 'updated_at']).execute(),
   ]);
 
   const items: NamingListItem[] = [];
@@ -29,8 +30,10 @@ export async function list(cache: PCDCache): Promise<NamingListItem[]> {
   }
 
   // Lidarr reuses the Sonarr naming table contract in phase 1 of Lidarr support.
-  // Keep this as a separate list item type so handlers can dispatch by `arr_type=lidarr`
-  // without introducing dedicated Lidarr tables.
+  // Acceptance criteria:
+  // - one shared storage row can surface as both `arr_type=sonarr` and `arr_type=lidarr`
+  // - handlers can still dispatch on arr type without adding `lidarr_naming` tables
+  // - duplicate-name collisions stay deterministic for cross-arr shared storage
   for (const row of sonarrRows) {
     items.push({
       name: row.name!,
@@ -55,7 +58,7 @@ export async function list(cache: PCDCache): Promise<NamingListItem[]> {
 export async function getRadarrByName(cache: PCDCache, name: string): Promise<RadarrNamingRow | null> {
   const db = cache.kb;
 
-  const row = await db.selectFrom('radarr_naming').selectAll().where('name', '=', name).executeTakeFirst();
+  const row = await db.selectFrom(RADARR_NAMING_TABLE).selectAll().where('name', '=', name).executeTakeFirst();
 
   if (!row) return null;
 
@@ -74,7 +77,7 @@ export async function getRadarrByName(cache: PCDCache, name: string): Promise<Ra
 export async function getSonarrByName(cache: PCDCache, name: string): Promise<SonarrNamingRow | null> {
   const db = cache.kb;
 
-  const row = await db.selectFrom('sonarr_naming').selectAll().where('name', '=', name).executeTakeFirst();
+  const row = await db.selectFrom(SONARR_BACKED_NAMING_TABLE).selectAll().where('name', '=', name).executeTakeFirst();
 
   if (!row) return null;
 
@@ -96,5 +99,6 @@ export async function getSonarrByName(cache: PCDCache, name: string): Promise<So
 }
 
 export async function getLidarrByName(cache: PCDCache, name: string): Promise<SonarrNamingRow | null> {
+  // Lidarr naming reads intentionally use Sonarr-backed storage in this phase.
   return getSonarrByName(cache, name);
 }
