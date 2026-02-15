@@ -654,6 +654,14 @@ export interface SonarrMediaSettingsRow {
   updated_at: string;
 }
 
+export interface LidarrMediaSettingsRow {
+  name: string;
+  propers_repacks: 'doNotPrefer' | 'preferAndUpgrade' | 'doNotUpgradeAutomatically';
+  enable_media_info: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface RadarrQualityDefinitionsRow {
   name: string;
   quality_name: string;

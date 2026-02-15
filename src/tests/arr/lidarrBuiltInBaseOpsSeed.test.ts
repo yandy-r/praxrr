@@ -8,6 +8,8 @@ import {
   LIDARR_MEDIA_MANAGEMENT_OP_METADATA,
   LIDARR_MEDIA_MANAGEMENT_OP_VERSION,
 } from '$db/migrations/20260215_add_lidarr_media_management_entities.ts';
+import { LIDARR_NATIVE_QUALITY_MAPPINGS_OP_FILENAME } from '$db/migrations/20260216_enforce_native_lidarr_quality_mappings.ts';
+import { LIDARR_NAMING_DEFAULTS_OP_FILENAME } from '$db/migrations/20260217_set_lidarr_naming_defaults.ts';
 
 type Restore = () => void;
 
@@ -30,7 +32,7 @@ class LidarrBuiltInBaseOpsSeedTest extends BaseTest {
   }
 
   runTests(): void {
-    this.test('creates built-in base op when missing', async () => {
+    this.test('creates all built-in base ops when missing', async () => {
       const createdInputs: Array<Parameters<(typeof pcdOpsQueries)['create']>[0]> = [];
 
       this.patch(pcdOpsQueries, 'getBaseByFilename', () => undefined);
@@ -42,8 +44,10 @@ class LidarrBuiltInBaseOpsSeedTest extends BaseTest {
 
       const result = await seedBuiltInBaseOps(42);
 
-      assertEquals(result, { created: 1, skipped: 0 });
-      assertEquals(createdInputs.length, 1);
+      assertEquals(result, { created: 3, skipped: 0 });
+      assertEquals(createdInputs.length, 3);
+
+      // First op: Lidarr media management entities
       assertEquals(createdInputs[0].databaseId, 42);
       assertEquals(createdInputs[0].origin, 'base');
       assertEquals(createdInputs[0].state, 'published');
@@ -53,6 +57,12 @@ class LidarrBuiltInBaseOpsSeedTest extends BaseTest {
       assertEquals(createdInputs[0].sequence, LIDARR_MEDIA_MANAGEMENT_OP_VERSION);
       assertEquals(createdInputs[0].metadata, LIDARR_MEDIA_MANAGEMENT_OP_METADATA);
       assertStringIncludes(createdInputs[0].sql, 'CREATE TABLE IF NOT EXISTS lidarr_naming');
+
+      // Second op: Lidarr native quality mappings
+      assertEquals(createdInputs[1].filename, LIDARR_NATIVE_QUALITY_MAPPINGS_OP_FILENAME);
+
+      // Third op: Lidarr naming defaults
+      assertEquals(createdInputs[2].filename, LIDARR_NAMING_DEFAULTS_OP_FILENAME);
     });
 
     this.test('skips creation when built-in base op already exists', async () => {
@@ -86,7 +96,7 @@ class LidarrBuiltInBaseOpsSeedTest extends BaseTest {
 
       const result = await seedBuiltInBaseOps(42);
 
-      assertEquals(result, { created: 0, skipped: 1 });
+      assertEquals(result, { created: 0, skipped: 3 });
       assertEquals(createCalls, 0);
     });
   }

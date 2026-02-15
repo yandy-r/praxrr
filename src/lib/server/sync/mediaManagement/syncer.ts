@@ -2,10 +2,10 @@
  * Media management syncer
  * Syncs media management settings from PCD to arr instances
  *
- * Handles three types of configs:
+ * Handles three types of configs per arr_type (radarr, sonarr, lidarr):
  * 1. Media Settings (downloadPropersAndRepacks, enableMediaInfo)
- * 2. Naming (movie/episode naming formats, folder formats)
- * 3. Quality Definitions (TODO)
+ * 2. Naming (arr-specific naming formats, folder formats)
+ * 3. Quality Definitions (quality size limits per mapping)
  *
  * Flow for each:
  * 1. GET existing config from arr
@@ -34,7 +34,12 @@ import {
   getSonarrByName as getSonarrQualityDefs,
   isKnownQualityApiName,
 } from '$pcd/entities/mediaManagement/quality-definitions/read.ts';
-import type { QualityDefinitionsConfig, RadarrMediaSettingsRow, SonarrMediaSettingsRow } from '$shared/pcd/display.ts';
+import type {
+  LidarrMediaSettingsRow,
+  QualityDefinitionsConfig,
+  RadarrMediaSettingsRow,
+  SonarrMediaSettingsRow,
+} from '$shared/pcd/display.ts';
 import { colonReplacementToDb, multiEpisodeStyleToDb } from '$shared/pcd/mediaManagement.ts';
 import type { ArrPropersAndRepacks, ArrType, RadarrNamingConfig, SonarrNamingConfig } from '$arr/types.ts';
 import { logger } from '$logger/logger.ts';
@@ -175,7 +180,7 @@ export class MediaManagementSyncer extends BaseSyncer {
     const mediaSettingsEntity = mediaSettingsSource.entityType;
 
     // Fetch from PCD by config name
-    let mediaSettings: RadarrMediaSettingsRow | SonarrMediaSettingsRow | null = null;
+    let mediaSettings: RadarrMediaSettingsRow | SonarrMediaSettingsRow | LidarrMediaSettingsRow | null = null;
     mediaSettings = await mediaSettingsSource.getByName(cache, configName);
 
     if (!mediaSettings) {
@@ -645,7 +650,10 @@ export class MediaManagementSyncer extends BaseSyncer {
   }
 
   private resolveMediaSettingsSource(): {
-    getByName: (cache: PCDCache, configName: string) => Promise<RadarrMediaSettingsRow | SonarrMediaSettingsRow | null>;
+    getByName: (
+      cache: PCDCache,
+      configName: string
+    ) => Promise<RadarrMediaSettingsRow | SonarrMediaSettingsRow | LidarrMediaSettingsRow | null>;
     entityType: 'radarr_media_settings' | 'sonarr_media_settings' | 'lidarr_media_settings';
   } | null {
     if (this.instanceType === 'radarr') {

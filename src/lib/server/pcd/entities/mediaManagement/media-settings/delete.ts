@@ -4,7 +4,7 @@
 
 import type { PCDCache } from '$pcd/index.ts';
 import { writeOperation, type OperationLayer } from '$pcd/index.ts';
-import type { RadarrMediaSettingsRow, SonarrMediaSettingsRow } from '$shared/pcd/display.ts';
+import type { LidarrMediaSettingsRow, RadarrMediaSettingsRow, SonarrMediaSettingsRow } from '$shared/pcd/display.ts';
 
 export interface RemoveMediaSettingsOptions {
   databaseId: number;
@@ -92,7 +92,7 @@ export interface RemoveLidarrMediaSettingsOptions {
   databaseId: number;
   cache: PCDCache;
   layer: OperationLayer;
-  current: SonarrMediaSettingsRow;
+  current: LidarrMediaSettingsRow;
 }
 
 export async function removeLidarrMediaSettings(options: RemoveLidarrMediaSettingsOptions) {

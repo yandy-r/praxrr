@@ -19,6 +19,7 @@ import { arrSyncQueries } from '$db/queries/arrSync.ts';
 import { databaseInstancesQueries } from '$db/queries/databaseInstances.ts';
 import { pcdOpsQueries, type PcdOp } from '$db/queries/pcdOps.ts';
 import { pcdOpHistoryQueries } from '$db/queries/pcdOpHistory.ts';
+import type { PCDDatabase } from '$shared/pcd/types.ts';
 
 interface ActionFailure {
   status: number;
@@ -281,9 +282,23 @@ CREATE TABLE IF NOT EXISTS sonarr_naming (
   series_folder_format TEXT NOT NULL DEFAULT '',
   season_folder_format TEXT NOT NULL DEFAULT '',
   replace_illegal_characters INTEGER NOT NULL DEFAULT 0,
-  colon_replacement_format TEXT NOT NULL DEFAULT 'delete',
+  colon_replacement_format INTEGER NOT NULL DEFAULT 4,
   custom_colon_replacement_format TEXT,
-  multi_episode_style TEXT NOT NULL DEFAULT 'extend',
+  multi_episode_style INTEGER NOT NULL DEFAULT 5,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS lidarr_naming (
+  name TEXT NOT NULL PRIMARY KEY,
+  rename INTEGER NOT NULL DEFAULT 0,
+  standard_track_format TEXT NOT NULL DEFAULT '',
+  artist_name TEXT NOT NULL DEFAULT '',
+  multi_disc_track_format TEXT NOT NULL DEFAULT '',
+  artist_folder_format TEXT NOT NULL DEFAULT '',
+  replace_illegal_characters INTEGER NOT NULL DEFAULT 0,
+  colon_replacement_format INTEGER NOT NULL DEFAULT 4,
+  custom_colon_replacement_format TEXT,
   created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
@@ -297,6 +312,14 @@ CREATE TABLE IF NOT EXISTS radarr_media_settings (
 );
 
 CREATE TABLE IF NOT EXISTS sonarr_media_settings (
+  name TEXT NOT NULL PRIMARY KEY,
+  propers_repacks TEXT NOT NULL,
+  enable_media_info INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS lidarr_media_settings (
   name TEXT NOT NULL PRIMARY KEY,
   propers_repacks TEXT NOT NULL,
   enable_media_info INTEGER NOT NULL DEFAULT 0,
@@ -319,7 +342,8 @@ CREATE TABLE IF NOT EXISTS radarr_quality_definitions (
   max_size INTEGER NOT NULL,
   preferred_size INTEGER NOT NULL,
   created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (name, quality_name)
 );
 
 CREATE TABLE IF NOT EXISTS sonarr_quality_definitions (
@@ -329,23 +353,36 @@ CREATE TABLE IF NOT EXISTS sonarr_quality_definitions (
   max_size INTEGER NOT NULL,
   preferred_size INTEGER NOT NULL,
   created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (name, quality_name)
+);
+
+CREATE TABLE IF NOT EXISTS lidarr_quality_definitions (
+  name TEXT NOT NULL,
+  quality_name TEXT NOT NULL,
+  min_size INTEGER NOT NULL,
+  max_size INTEGER NOT NULL,
+  preferred_size INTEGER NOT NULL,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (name, quality_name)
 );
 
 INSERT OR REPLACE INTO radarr_naming (name, rename, movie_format, movie_folder_format, replace_illegal_characters, colon_replacement_format)
 VALUES ('R-Naming-Seed', 0, 'Movie Format', 'Movie Folder', 0, 'delete');
 
-INSERT OR REPLACE INTO sonarr_naming
-  (name, rename, standard_episode_format, daily_episode_format, anime_episode_format,
-   series_folder_format, season_folder_format, replace_illegal_characters,
-   colon_replacement_format, custom_colon_replacement_format, multi_episode_style)
+INSERT OR REPLACE INTO lidarr_naming
+  (name, rename, standard_track_format, artist_name, multi_disc_track_format,
+   artist_folder_format, replace_illegal_characters, colon_replacement_format,
+   custom_colon_replacement_format)
 VALUES
-  ('Lidarr-Naming-Seed', 1, 'S{season:00}E{episode}', '{Series Title}', '{Series Title}', 'Series Folder', 'Season {season:00}', 0, 'delete', NULL, 'extend');
+  ('Lidarr-Naming-Seed', 1, '{Artist Name} - {Album Title} - {Track Title}', '{Artist Name}',
+   '{Artist Name} - CD{medium:00} - {Track Title}', '{Artist Name}', 0, 4, NULL);
 
 INSERT OR REPLACE INTO radarr_media_settings (name, propers_repacks, enable_media_info)
 VALUES ('R-Media-Seed', 'doNotPrefer', 1);
 
-INSERT OR REPLACE INTO sonarr_media_settings (name, propers_repacks, enable_media_info)
+INSERT OR REPLACE INTO lidarr_media_settings (name, propers_repacks, enable_media_info)
 VALUES ('Lidarr-Media-Seed', 'preferAndUpgrade', 1);
 
 INSERT OR REPLACE INTO quality_api_mappings (quality_name, arr_type, api_name)
@@ -354,12 +391,15 @@ VALUES
   ('AAC-192', 'lidarr', 'AAC-192'),
   ('Unknown', 'lidarr', 'Unknown');
 
-INSERT OR REPLACE INTO sonarr_quality_definitions
+INSERT OR REPLACE INTO lidarr_quality_definitions
   (name, quality_name, min_size, max_size, preferred_size)
 VALUES
   ('Lidarr-QD-Mixed', 'FLAC', 0, 1200, 300),
-  ('Lidarr-QD-Mixed', 'Unknown', 0, 800, 200),
-  ('S-QD-Seed', 'FLAC', 0, 512, 128);
+  ('Lidarr-QD-Mixed', 'Unknown', 0, 800, 200);
+
+INSERT OR REPLACE INTO sonarr_quality_definitions
+  (name, quality_name, min_size, max_size, preferred_size)
+VALUES ('S-QD-Seed', 'FLAC', 0, 512, 128);
 
 INSERT OR REPLACE INTO radarr_quality_definitions
   (name, quality_name, min_size, max_size, preferred_size)
@@ -402,8 +442,8 @@ VALUES ('R-QD-Seed', 'FLAC', 0, 1024, 256);
   }
 
   runTests(): void {
-    // Matrix: Naming (NM-01..NM-07)
-    this.test('[NM-01] naming list includes Lidarr config projection', async () => {
+    // Matrix: Naming (NM-01..NM-09)
+    this.test('[NM-01] naming list includes Lidarr config from dedicated lidarr_naming table', async () => {
       await this.bootstrapFixture();
 
       const { namingConfigs } = await this.readNamingList();
@@ -412,7 +452,7 @@ VALUES ('R-QD-Seed', 'FLAC', 0, 1024, 256);
       assertEquals(lidarrListing?.arr_type, 'lidarr');
     });
 
-    this.test('[NM-02] naming create lidarr success redirects and persists new config', async () => {
+    this.test('[NM-02] naming create lidarr writes to lidarr_naming table and redirects', async () => {
       await this.bootstrapFixture();
 
       await this.expectRedirect(async () => {
@@ -420,6 +460,71 @@ VALUES ('R-QD-Seed', 'FLAC', 0, 1024, 256);
           request: this.createRequest('media-management/901/naming/new', {
             arrType: 'lidarr',
             name: 'Lidarr-Naming-New',
+            layer: 'user',
+            rename: 'true',
+            standardTrackFormat: '{Artist Name} - {Album Title}',
+            artistName: '{Artist Name}',
+            multiDiscTrackFormat: '{Artist Name} - CD{medium:00}',
+            artistFolderFormat: '{Artist Name}',
+            replaceIllegalCharacters: 'true',
+            colonReplacementFormat: 'delete',
+          }),
+          params: {
+            databaseId: `${LidarrMediaManagementTest.DATABASE_ID}`,
+          },
+        } as unknown as FixtureRequest);
+      }, `/media-management/${LidarrMediaManagementTest.DATABASE_ID}/naming`);
+
+      const { namingConfigs } = await this.readNamingList();
+      const created = namingConfigs.find((item) => item.arr_type === 'lidarr' && item.name === 'Lidarr-Naming-New');
+      assertEquals(!!created, true);
+
+      // Verify no sonarr_naming row was created
+      const sonarrNamingCount = namingConfigs.filter(
+        (item) => item.arr_type === 'sonarr' && item.name === 'Lidarr-Naming-New'
+      ).length;
+      assertEquals(sonarrNamingCount, 0);
+    });
+
+    this.test('[NM-03] naming create duplicate lidarr name fails with 400 and no state change', async () => {
+      await this.bootstrapFixture();
+
+      const before = (await this.readNamingList()).namingConfigs.filter(
+        (config) => config.arr_type === 'lidarr'
+      ).length;
+      const failureRaw = await namingNewActions.default({
+        request: this.createRequest('media-management/901/naming/new', {
+          arrType: 'lidarr',
+          name: 'Lidarr-Naming-Seed',
+          layer: 'user',
+          rename: 'false',
+          standardTrackFormat: '{Artist Name} - {Album Title}',
+          artistName: '{Artist Name}',
+          multiDiscTrackFormat: '{Artist Name} - CD{medium:00}',
+          artistFolderFormat: '{Artist Name}',
+        }),
+        params: {
+          databaseId: `${LidarrMediaManagementTest.DATABASE_ID}`,
+        },
+      } as unknown as FixtureRequest);
+      const failure = failureRaw as ActionFailure;
+
+      assertEquals(failure.status, 400);
+      assertEquals(failure.data.error, 'A lidarr naming config with name "Lidarr-Naming-Seed" already exists');
+
+      const after = (await this.readNamingList()).namingConfigs.filter((config) => config.arr_type === 'lidarr').length;
+      assertEquals(before, after);
+    });
+
+    this.test('[NM-03b] naming create lidarr name does not collide with sonarr name of same value', async () => {
+      await this.bootstrapFixture();
+
+      // Create a sonarr naming config
+      await this.expectRedirect(async () => {
+        await namingNewActions.default({
+          request: this.createRequest('media-management/901/naming/new', {
+            arrType: 'sonarr',
+            name: 'Shared-Naming-Seed',
             layer: 'user',
             rename: 'true',
             standardEpisodeFormat: 'S{season:00}E{episode:00}',
@@ -436,103 +541,35 @@ VALUES ('R-QD-Seed', 'FLAC', 0, 1024, 256);
         } as unknown as FixtureRequest);
       }, `/media-management/${LidarrMediaManagementTest.DATABASE_ID}/naming`);
 
-      const { namingConfigs } = await this.readNamingList();
-      const created = namingConfigs.find((item) => item.arr_type === 'lidarr' && item.name === 'Lidarr-Naming-New');
-
-      assertEquals(!!created, true);
-    });
-
-    this.test('[NM-03] naming create duplicate lidarr name fails with 400 and no state change', async () => {
-      await this.bootstrapFixture();
-
-      const before = (await this.readNamingList()).namingConfigs.filter(
-        (config) => config.arr_type === 'lidarr'
-      ).length;
-      const failureRaw = await namingNewActions.default({
-        request: this.createRequest('media-management/901/naming/new', {
-          arrType: 'lidarr',
-          name: 'Lidarr-Naming-Seed',
-          layer: 'user',
-          rename: 'false',
-          standardEpisodeFormat: 'S{season:00}E{episode:00}',
-          dailyEpisodeFormat: '{Series Title}',
-          animeEpisodeFormat: '{Episode Title}',
-          seriesFolderFormat: '{Series Title}',
-          seasonFolderFormat: 'Season {season:00}',
-          customColonReplacementFormat: ':-',
-          multiEpisodeStyle: 'extend',
-        }),
-        params: {
-          databaseId: `${LidarrMediaManagementTest.DATABASE_ID}`,
-        },
-      } as unknown as FixtureRequest);
-      const failure = failureRaw as ActionFailure;
-
-      assertEquals(failure.status, 400);
-      assertEquals(failure.data.error, 'A lidarr naming config with name "Lidarr-Naming-Seed" already exists');
-
-      const after = (await this.readNamingList()).namingConfigs.filter((config) => config.arr_type === 'lidarr').length;
-      assertEquals(before, after);
-    });
-
-    this.test(
-      '[NM-03b] naming create lidarr duplicate against sonarr-shared name fails deterministically',
-      async () => {
-        await this.bootstrapFixture();
-
-        await this.expectRedirect(async () => {
-          await namingNewActions.default({
-            request: this.createRequest('media-management/901/naming/new', {
-              arrType: 'sonarr',
-              name: 'Shared-Naming-Seed',
-              layer: 'user',
-              rename: 'true',
-              standardEpisodeFormat: 'S{season:00}E{episode:00}',
-              dailyEpisodeFormat: '{Series Title}',
-              animeEpisodeFormat: '{Episode Title}',
-              seriesFolderFormat: '{Series Title}',
-              seasonFolderFormat: 'Season {season:00}',
-              customColonReplacementFormat: ':-',
-              multiEpisodeStyle: 'extend',
-            }),
-            params: {
-              databaseId: `${LidarrMediaManagementTest.DATABASE_ID}`,
-            },
-          } as unknown as FixtureRequest);
-        }, `/media-management/${LidarrMediaManagementTest.DATABASE_ID}/naming`);
-
-        const before = (await this.readNamingList()).namingConfigs.filter(
-          (config) => config.arr_type === 'lidarr' && config.name === 'Shared-Naming-Seed'
-        ).length;
-        const failureRaw = await namingNewActions.default({
+      // Create lidarr naming with same name -- should succeed since tables are isolated
+      await this.expectRedirect(async () => {
+        await namingNewActions.default({
           request: this.createRequest('media-management/901/naming/new', {
             arrType: 'lidarr',
             name: 'Shared-Naming-Seed',
             layer: 'user',
             rename: 'false',
-            standardEpisodeFormat: 'S{season:00}E{episode:00}',
-            dailyEpisodeFormat: '{Series Title}',
-            animeEpisodeFormat: '{Episode Title}',
-            seriesFolderFormat: '{Series Title}',
-            seasonFolderFormat: 'Season {season:00}',
-            customColonReplacementFormat: ':-',
-            multiEpisodeStyle: 'extend',
+            standardTrackFormat: '{Artist Name} - {Album Title}',
+            artistName: '{Artist Name}',
+            multiDiscTrackFormat: '{Artist Name} - CD{medium:00}',
+            artistFolderFormat: '{Artist Name}',
           }),
           params: {
             databaseId: `${LidarrMediaManagementTest.DATABASE_ID}`,
           },
         } as unknown as FixtureRequest);
-        const failure = failureRaw as ActionFailure;
+      }, `/media-management/${LidarrMediaManagementTest.DATABASE_ID}/naming`);
 
-        assertEquals(failure.status, 400);
-        assertEquals(failure.data.error, 'A lidarr naming config with name "Shared-Naming-Seed" already exists');
-
-        const after = (await this.readNamingList()).namingConfigs.filter(
-          (config) => config.arr_type === 'lidarr' && config.name === 'Shared-Naming-Seed'
-        ).length;
-        assertEquals(before, after);
-      }
-    );
+      const { namingConfigs } = await this.readNamingList();
+      const lidarrShared = namingConfigs.filter(
+        (config) => config.arr_type === 'lidarr' && config.name === 'Shared-Naming-Seed'
+      );
+      const sonarrShared = namingConfigs.filter(
+        (config) => config.arr_type === 'sonarr' && config.name === 'Shared-Naming-Seed'
+      );
+      assertEquals(lidarrShared.length, 1);
+      assertEquals(sonarrShared.length, 1);
+    });
 
     this.test('[NM-03c] naming create invalid arr type fails with deterministic 400', async () => {
       await this.bootstrapFixture();
@@ -575,13 +612,10 @@ VALUES ('R-QD-Seed', 'FLAC', 0, 1024, 256);
           name: 'Lidarr-Base-Denied',
           layer: 'base',
           rename: 'true',
-          standardEpisodeFormat: 'S{season:00}E{episode:00}',
-          dailyEpisodeFormat: '{Series Title}',
-          animeEpisodeFormat: '{Episode Title}',
-          seriesFolderFormat: '{Series Title}',
-          seasonFolderFormat: 'Season {season:00}',
-          customColonReplacementFormat: ':-',
-          multiEpisodeStyle: 'extend',
+          standardTrackFormat: '{Artist Name} - {Album Title}',
+          artistName: '{Artist Name}',
+          multiDiscTrackFormat: '{Artist Name} - CD{medium:00}',
+          artistFolderFormat: '{Artist Name}',
         }),
         params: {
           databaseId: `${LidarrMediaManagementTest.DATABASE_ID}`,
@@ -628,12 +662,10 @@ VALUES ('R-QD-Seed', 'FLAC', 0, 1024, 256);
             layer: 'user',
             name: 'Lidarr-Naming-Renamed',
             rename: 'true',
-            standardEpisodeFormat: 'S{season:00}E{episode:00}',
-            dailyEpisodeFormat: '{Series Title}',
-            animeEpisodeFormat: '{Episode Title}',
-            seriesFolderFormat: '{Series Title}',
-            seasonFolderFormat: 'Season {season:00}',
-            multiEpisodeStyle: 'extend',
+            standardTrackFormat: '{Artist Name} - {Album Title} - {Track Title}',
+            artistName: '{Artist Name}',
+            multiDiscTrackFormat: '{Artist Name} - CD{medium:00} - {Track Title}',
+            artistFolderFormat: '{Artist Name}',
             customColonReplacementFormat: ':-',
           }),
           params: {
@@ -684,12 +716,10 @@ VALUES ('R-QD-Seed', 'FLAC', 0, 1024, 256);
           layer: 'base',
           name: 'Lidarr-Naming-Seed',
           rename: 'true',
-          standardEpisodeFormat: 'S{season:00}E{episode:00}',
-          dailyEpisodeFormat: '{Series Title}',
-          animeEpisodeFormat: '{Episode Title}',
-          seriesFolderFormat: '{Series Title}',
-          seasonFolderFormat: 'Season {season:00}',
-          multiEpisodeStyle: 'extend',
+          standardTrackFormat: '{Artist Name} - {Album Title} - {Track Title}',
+          artistName: '{Artist Name}',
+          multiDiscTrackFormat: '{Artist Name} - CD{medium:00} - {Track Title}',
+          artistFolderFormat: '{Artist Name}',
           customColonReplacementFormat: ':-',
         }),
         params: {
@@ -703,7 +733,7 @@ VALUES ('R-QD-Seed', 'FLAC', 0, 1024, 256);
       assertEquals(failure.data.error, 'Cannot write to base layer without personal access token');
     });
 
-    this.test('[NM-06] naming lidarr deep-link load returns expected page state for encoded name', async () => {
+    this.test('[NM-06] naming lidarr deep-link load returns Lidarr-native fields', async () => {
       await this.bootstrapFixture();
 
       await this.expectRedirect(async () => {
@@ -713,13 +743,11 @@ VALUES ('R-QD-Seed', 'FLAC', 0, 1024, 256);
             name: 'Lidarr Naming Deep Link',
             layer: 'user',
             rename: 'true',
-            standardEpisodeFormat: 'S{season:00}E{episode:00}',
-            dailyEpisodeFormat: '{Series Title}',
-            animeEpisodeFormat: '{Episode Title}',
-            seriesFolderFormat: '{Series Title}',
-            seasonFolderFormat: 'Season {season:00}',
-            customColonReplacementFormat: ':-',
-            multiEpisodeStyle: 'extend',
+            standardTrackFormat: '{Artist Name} - {Album Title} - {Track Title}',
+            artistName: '{Artist Name}',
+            multiDiscTrackFormat: '{Artist Name} - CD{medium:00} - {Track Title}',
+            artistFolderFormat: '{Artist Name}',
+            colonReplacementFormat: 'delete',
           }),
           params: {
             databaseId: `${LidarrMediaManagementTest.DATABASE_ID}`,
@@ -736,12 +764,13 @@ VALUES ('R-QD-Seed', 'FLAC', 0, 1024, 256);
           canWriteToBase: false,
         }),
       } as unknown as Parameters<typeof namingLidarrEditLoad>[0])) as {
-        namingConfig: { name: string; standard_episode_format: string };
+        namingConfig: { name: string; standard_track_format: string; artist_name: string };
         canWriteToBase: boolean;
       };
 
       assertEquals(loaded.namingConfig.name, 'Lidarr Naming Deep Link');
-      assertEquals(loaded.namingConfig.standard_episode_format, 'S{season:00}E{episode:00}');
+      assertEquals(loaded.namingConfig.standard_track_format, '{Artist Name} - {Album Title} - {Track Title}');
+      assertEquals(loaded.namingConfig.artist_name, '{Artist Name}');
       assertEquals(loaded.canWriteToBase, false);
     });
 
@@ -764,8 +793,24 @@ VALUES ('R-QD-Seed', 'FLAC', 0, 1024, 256);
       );
     });
 
-    // Matrix: Media-settings (MS-01..MS-04)
-    this.test('[MS-01] media-settings list includes Lidarr projection from shared Sonarr table', async () => {
+    this.test('[NM-08] naming list returns only lidarr entries from lidarr_naming table', async () => {
+      await this.bootstrapFixture();
+
+      const { namingConfigs } = await this.readNamingList();
+      const lidarrNames = namingConfigs.filter((config) => config.arr_type === 'lidarr').map((c) => c.name);
+
+      // Only the seed row from lidarr_naming should appear
+      assertEquals(lidarrNames, ['Lidarr-Naming-Seed']);
+
+      // Sonarr names should not leak into lidarr results
+      const sonarrAsLidarr = namingConfigs.filter(
+        (config) => config.arr_type === 'lidarr' && config.name === 'S-Naming-Seed'
+      );
+      assertEquals(sonarrAsLidarr.length, 0);
+    });
+
+    // Matrix: Media-settings (MS-01..MS-05)
+    this.test('[MS-01] media-settings list includes Lidarr config from dedicated lidarr_media_settings', async () => {
       await this.bootstrapFixture();
 
       const { mediaSettingsConfigs } = await this.readMediaSettingsList();
@@ -774,7 +819,7 @@ VALUES ('R-QD-Seed', 'FLAC', 0, 1024, 256);
       assertEquals(lidarrListing?.arr_type, 'lidarr');
     });
 
-    this.test('[MS-02] media-settings create lidarr success redirects and persists', async () => {
+    this.test('[MS-02] media-settings create lidarr writes to lidarr_media_settings and redirects', async () => {
       await this.bootstrapFixture();
 
       await this.expectRedirect(async () => {
@@ -796,8 +841,13 @@ VALUES ('R-QD-Seed', 'FLAC', 0, 1024, 256);
       const created = mediaSettingsConfigs.find(
         (item) => item.arr_type === 'lidarr' && item.name === 'Lidarr-Media-New'
       );
-
       assertEquals(!!created, true);
+
+      // Verify no sonarr_media_settings row was created
+      const sonarrCount = mediaSettingsConfigs.filter(
+        (item) => item.arr_type === 'sonarr' && item.name === 'Lidarr-Media-New'
+      ).length;
+      assertEquals(sonarrCount, 0);
     });
 
     this.test('[MS-03] media-settings create invalid arr type fails with 400', async () => {
@@ -876,7 +926,16 @@ VALUES ('R-QD-Seed', 'FLAC', 0, 1024, 256);
       );
     });
 
-    // Matrix: Quality-definitions (QD-01..QD-05)
+    this.test('[MS-05] media-settings list returns only lidarr entries from lidarr_media_settings', async () => {
+      await this.bootstrapFixture();
+
+      const { mediaSettingsConfigs } = await this.readMediaSettingsList();
+      const lidarrNames = mediaSettingsConfigs.filter((c) => c.arr_type === 'lidarr').map((c) => c.name);
+
+      assertEquals(lidarrNames, ['Lidarr-Media-Seed']);
+    });
+
+    // Matrix: Quality-definitions (QD-01..QD-07)
     this.test('[QD-01] quality-definitions list includes Lidarr projected count with mapped filter', async () => {
       await this.bootstrapFixture();
 
@@ -887,7 +946,7 @@ VALUES ('R-QD-Seed', 'FLAC', 0, 1024, 256);
       assertEquals(mixed?.quality_count, 2);
     });
 
-    this.test('[QD-02] quality-definitions create lidarr success redirects and persists mapped entries', async () => {
+    this.test('[QD-02] quality-definitions create lidarr redirects and persists mapped entries', async () => {
       await this.bootstrapFixture();
 
       await this.expectRedirect(async () => {
@@ -921,8 +980,13 @@ VALUES ('R-QD-Seed', 'FLAC', 0, 1024, 256);
       const created = qualityDefinitionsConfigs.find(
         (item) => item.arr_type === 'lidarr' && item.name === 'Lidarr-QD-New'
       );
-
       assertEquals(created?.quality_count, 2);
+
+      // Verify no sonarr_quality_definitions row was created
+      const sonarrCount = qualityDefinitionsConfigs.filter(
+        (item) => item.arr_type === 'sonarr' && item.name === 'Lidarr-QD-New'
+      ).length;
+      assertEquals(sonarrCount, 0);
     });
 
     this.test('[QD-03] quality-definitions mapping-gated unmapped input returns 400 domain failure', async () => {
@@ -1098,6 +1162,25 @@ VALUES ('R-QD-Seed', 'FLAC', 0, 1024, 256);
       assertEquals(failure.data.code, 'quality_definitions_duplicate_qualities');
       assertMatch(failure.data.error, /duplicate quality names/i);
     });
+
+    this.test(
+      '[QD-07] quality-definitions list returns only lidarr entries from lidarr_quality_definitions',
+      async () => {
+        await this.bootstrapFixture();
+
+        const { qualityDefinitionsConfigs } = await this.readQualityDefinitionsList();
+        const lidarrNames = qualityDefinitionsConfigs.filter((c) => c.arr_type === 'lidarr').map((c) => c.name);
+
+        // Only Lidarr-QD-Mixed from lidarr_quality_definitions
+        assertEquals(lidarrNames, ['Lidarr-QD-Mixed']);
+
+        // Sonarr seed should not appear as lidarr
+        const sonarrAsLidarr = qualityDefinitionsConfigs.filter(
+          (c) => c.arr_type === 'lidarr' && c.name === 'S-QD-Seed'
+        );
+        assertEquals(sonarrAsLidarr.length, 0);
+      }
+    );
   }
 }
 

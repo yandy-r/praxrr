@@ -3,9 +3,13 @@
  */
 
 import type { PCDCache } from '$pcd/index.ts';
-import type { RadarrMediaSettingsRow, SonarrMediaSettingsRow, MediaSettingsListItem } from '$shared/pcd/display.ts';
+import type {
+  LidarrMediaSettingsRow,
+  RadarrMediaSettingsRow,
+  SonarrMediaSettingsRow,
+  MediaSettingsListItem,
+} from '$shared/pcd/display.ts';
 import type { PCDDatabase } from '$shared/pcd/types.ts';
-
 export async function list(cache: PCDCache): Promise<MediaSettingsListItem[]> {
   const db = cache.kb;
 
@@ -91,7 +95,7 @@ export async function getSonarrByName(cache: PCDCache, name: string): Promise<So
   };
 }
 
-export async function getLidarrByName(cache: PCDCache, name: string): Promise<SonarrMediaSettingsRow | null> {
+export async function getLidarrByName(cache: PCDCache, name: string): Promise<LidarrMediaSettingsRow | null> {
   const db = cache.kb;
 
   const tableName = 'lidarr_media_settings' as keyof PCDDatabase;
@@ -101,7 +105,7 @@ export async function getLidarrByName(cache: PCDCache, name: string): Promise<So
 
   return {
     name: row.name!,
-    propers_repacks: row.propers_repacks as SonarrMediaSettingsRow['propers_repacks'],
+    propers_repacks: row.propers_repacks as LidarrMediaSettingsRow['propers_repacks'],
     enable_media_info: row.enable_media_info === 1,
     created_at: row.created_at,
     updated_at: row.updated_at,

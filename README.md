@@ -14,9 +14,11 @@
 
 This is a fork of the [Official Dictionarry Profilarr](https://github.com/Dictionarry-Hub/profilarr) with Lidarr support. I don't plan to merge this back into the main repository, but I will keep it updated with the latest changes from the main repository.
 
+For day to day use, I recommend using the [Official Dictionarry Profilarr](https://github.com/Dictionarry-Hub/profilarr) with Lidarr support.
+
 I'm not a developer, though I just know enough to tinker and use lidarr. Don't plan to insult anyone by trying to merge this back into the main repository.
 
-<p>Manage quality profiles, custom formats, and release profiles across your Radarr and Sonarr instances. Define your profiles once with a Git-backed configuration database, then sync them to any number of *arr instances.</p>
+<p>Manage quality profiles, custom formats, and media management settings across your Radarr, Sonarr, and Lidarr instances. Define your profiles once with a Git-backed configuration database, then sync them to any number of *arr instances.</p>
 
 > [!WARNING]
 > v2-lidarr is under heavy development and is _NOT_ ready for production use. Use
@@ -30,7 +32,7 @@ I'm not a developer, though I just know enough to tinker and use lidarr. Don't p
 - **Link** - Connect to configuration databases like the
   [Dictionarry database](https://github.com/Dictionarry-Hub/db) or any Profilarr
   Compliant Database (PCD)
-- **Bridge** - Add your Radarr and Sonarr instances by URL and API key
+- **Bridge** - Add your Radarr, Sonarr, and Lidarr instances by URL and API key
 - **Sync** - Push configurations to your instances. Profilarr compiles
   everything to the right format automatically
 
@@ -49,8 +51,8 @@ I'm not a developer, though I just know enough to tinker and use lidarr. Don't p
 ### For Developers
 
 - **Unified Architecture** - One configuration language that compiles to
-  Radarr/Sonarr-specific formats on sync. No more maintaining separate configs
-  for each app
+  Radarr/Sonarr/Lidarr-specific formats on sync. No more maintaining separate
+  configs for each app
 - **Reusable Components** - Regular expressions are separate entities shared
   across custom formats. Change once, update everywhere
 - **OSQL** - Configurations stored as append-only SQL operations. Readable,

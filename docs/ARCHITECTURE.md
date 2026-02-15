@@ -2,8 +2,9 @@
 
 ## 1) Purpose & Audience
 
-Profilarr manages configuration for Radarr and Sonarr by syncing curated
-configuration databases (PCDs) into Arr instances. It targets two audiences:
+Profilarr manages configuration for Radarr, Sonarr, and Lidarr by syncing
+curated configuration databases (PCDs) into Arr instances. It targets two
+audiences:
 
 - **End users** who link a database and sync it to their Arr instance, while
   keeping local tweaks.
@@ -26,7 +27,7 @@ exported when publishing.
 
 ## 2) Glossary
 
-- **Arr** — Radarr/Sonarr instances managed by Profilarr.
+- **Arr** — Radarr/Sonarr/Lidarr instances managed by Profilarr.
 - **PCD** — “Profilarr Config Database”: the configuration dataset (custom
   formats, profiles, media settings) stored as ops.
 - **Op** — An append‑only SQL operation (create/update/delete) applied to build
@@ -529,9 +530,11 @@ category.
 
 ## 12) Media Management
 
-Media management configs are stored as **named presets** for Radarr and Sonarr:
-Naming, Media Settings, and Quality Definitions. Each preset is a distinct
-entity with its own CRUD ops and value guards.
+Media management configs are stored as **named presets** for Radarr, Sonarr,
+and Lidarr: Naming, Media Settings, and Quality Definitions. Each Arr app has
+dedicated tables and entity operations; there is no cross‑Arr table reuse or
+fallback behavior. Each preset is a distinct entity with its own CRUD ops and
+value guards.
 
 **UI routes:** `src/routes/media-management/**`
 
@@ -541,6 +544,7 @@ Tables:
 
 - `radarr_naming`
 - `sonarr_naming`
+- `lidarr_naming`
 
 Ops live in `src/lib/server/pcd/entities/mediaManagement/naming/`:
 
@@ -548,8 +552,9 @@ Ops live in `src/lib/server/pcd/entities/mediaManagement/naming/`:
 - **Update:** guarded update; supports rename with collision checks.
 - **Delete:** guarded delete using all fields as value guards.
 
-Both variants store format strings and flags (rename, illegal characters, colon
-replacement, multi‑episode style).
+Each Arr variant stores format strings and flags specific to its domain.
+Radarr uses movie formats; Sonarr uses episode/season formats; Lidarr uses
+artist/album/track formats.
 
 ### 12.2 Media Settings
 
@@ -557,6 +562,7 @@ Tables:
 
 - `radarr_media_settings`
 - `sonarr_media_settings`
+- `lidarr_media_settings`
 
 Ops live in `mediaManagement/media-settings/`:
 
@@ -572,6 +578,7 @@ Tables:
 
 - `radarr_quality_definitions`
 - `sonarr_quality_definitions`
+- `lidarr_quality_definitions`
 
 Ops live in `mediaManagement/quality-definitions/`:
 
@@ -581,7 +588,17 @@ Ops live in `mediaManagement/quality-definitions/`:
 - **Delete:** delete all entries for the named config (guarded).
 
 Quality definitions are list‑style configs; updates are applied as a full
-replace to keep ordering and sizes consistent.
+replace to keep ordering and sizes consistent. Lidarr quality definitions
+use Lidarr‑native quality names (e.g., "FLAC", "MP3‑320", "ALAC") resolved
+through `quality_api_mappings` with `arr_type = 'lidarr'`.
+
+### 12.4 Lidarr Migration
+
+Lidarr entities were promoted from Sonarr‑backed reuse to first‑class tables.
+Existing installations are migrated automatically via PCD base‑op migrations
+that copy legacy rows, normalize names, and seed Lidarr‑native defaults. See
+[migration runbook](plans/enhance-lidarr-support/migration-runbook.md) for
+operator steps and rollback procedures.
 
 ## 13) Regular Expressions
 
@@ -1045,7 +1062,7 @@ The shared HTTP stack lives in `utils/http/`:
 Arr integration is an object‑oriented stack:
 
 - `utils/arr/base.ts` extends `BaseHttpClient` and injects API key handling.
-- `utils/arr/clients/*` implement app‑specific endpoints.
+- `utils/arr/clients/*` implement app‑specific endpoints (Radarr, Sonarr, Lidarr).
 - `createArrClient()` selects a client by type.
 - `utils/arr/defaults.ts` provides default delay profiles.
 - `utils/arr/releaseImport.ts` normalizes + groups releases for entity testing.

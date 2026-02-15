@@ -6,7 +6,7 @@ import type { PCDCache } from '$pcd/index.ts';
 import { writeOperation, type OperationLayer } from '$pcd/index.ts';
 import type { LidarrNamingRow, RadarrNamingRow, SonarrNamingRow } from '$shared/pcd/display.ts';
 import { colonReplacementToDb, multiEpisodeStyleToDb } from '$shared/pcd/mediaManagement.ts';
-import { LIDARR_NAMING_TABLE, RADARR_NAMING_TABLE, SONARR_BACKED_NAMING_TABLE } from './constants.ts';
+import { LIDARR_NAMING_TABLE, RADARR_NAMING_TABLE, SONARR_NAMING_TABLE } from './constants.ts';
 
 export interface RemoveRadarrNamingOptions {
   databaseId: number;
@@ -70,7 +70,7 @@ export async function removeSonarrNaming(options: RemoveSonarrNamingOptions) {
   const currentMultiEpisode = multiEpisodeStyleToDb(current.multi_episode_style);
 
   let deleteQuery = db
-    .deleteFrom(SONARR_BACKED_NAMING_TABLE)
+    .deleteFrom(SONARR_NAMING_TABLE)
     .where('name', '=', current.name)
     .where('rename', '=', current.rename ? 1 : 0)
     .where('standard_episode_format', '=', current.standard_episode_format)

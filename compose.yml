@@ -8,8 +8,8 @@ services:
     volumes:
       - ./config:/config
     environment:
-      - PUID=1000
-      - PGID=1000
+      - PUID=${PUID:-1000}
+      - PGID=${PGID:-1000}
       - UMASK=022
       - TZ=Etc/UTC
       # - PORT=6969

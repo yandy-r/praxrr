@@ -72,16 +72,19 @@ async function overrideEntity(
         : dpOverrideUpdate(databaseId, metadata, desiredState);
     case 'radarr_naming':
     case 'sonarr_naming':
+    case 'lidarr_naming':
       return operation === 'create'
         ? namingOverrideCreate(databaseId, metadata, desiredState)
         : namingOverrideUpdate(databaseId, metadata, desiredState);
     case 'radarr_media_settings':
     case 'sonarr_media_settings':
+    case 'lidarr_media_settings':
       return operation === 'create'
         ? msOverrideCreate(databaseId, metadata, desiredState)
         : msOverrideUpdate(databaseId, metadata, desiredState);
     case 'radarr_quality_definitions':
     case 'sonarr_quality_definitions':
+    case 'lidarr_quality_definitions':
       return operation === 'create'
         ? qdOverrideCreate(databaseId, metadata, desiredState)
         : qdOverrideUpdate(databaseId, metadata, desiredState);

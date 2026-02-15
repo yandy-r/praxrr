@@ -5,7 +5,7 @@
 import type { PCDCache } from '$pcd/index.ts';
 import type { LidarrNamingRow, NamingListItem, RadarrNamingRow, SonarrNamingRow } from '$shared/pcd/display.ts';
 import { colonReplacementFromDb, multiEpisodeStyleFromDb } from '$shared/pcd/mediaManagement.ts';
-import { LIDARR_NAMING_TABLE, RADARR_NAMING_TABLE, SONARR_BACKED_NAMING_TABLE } from './constants.ts';
+import { LIDARR_NAMING_TABLE, RADARR_NAMING_TABLE, SONARR_NAMING_TABLE } from './constants.ts';
 
 // Note: name is PRIMARY KEY so never null, but Kysely types it as nullable
 // because the generator doesn't detect non-INTEGER primary keys
@@ -16,7 +16,7 @@ export async function list(cache: PCDCache): Promise<NamingListItem[]> {
   const [radarrRows, lidarrRows, sonarrRows] = await Promise.all([
     db.selectFrom(RADARR_NAMING_TABLE).select(['name', 'rename', 'updated_at']).execute(),
     db.selectFrom(LIDARR_NAMING_TABLE).select(['name', 'rename', 'updated_at']).execute(),
-    db.selectFrom(SONARR_BACKED_NAMING_TABLE).select(['name', 'rename', 'updated_at']).execute(),
+    db.selectFrom(SONARR_NAMING_TABLE).select(['name', 'rename', 'updated_at']).execute(),
   ]);
 
   const items: NamingListItem[] = [];
@@ -73,7 +73,7 @@ export async function getRadarrByName(cache: PCDCache, name: string): Promise<Ra
 export async function getSonarrByName(cache: PCDCache, name: string): Promise<SonarrNamingRow | null> {
   const db = cache.kb;
 
-  const row = await db.selectFrom(SONARR_BACKED_NAMING_TABLE).selectAll().where('name', '=', name).executeTakeFirst();
+  const row = await db.selectFrom(SONARR_NAMING_TABLE).selectAll().where('name', '=', name).executeTakeFirst();
 
   if (!row) return null;
 

@@ -56,7 +56,7 @@ export interface NamingListItem {
 }
 
 // Media Settings
-export type { RadarrMediaSettingsRow, SonarrMediaSettingsRow } from './types.ts';
+export type { LidarrMediaSettingsRow, RadarrMediaSettingsRow, SonarrMediaSettingsRow } from './types.ts';
 
 export interface MediaSettingsListItem {
   name: string;

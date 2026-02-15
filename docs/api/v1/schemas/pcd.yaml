@@ -13,9 +13,7 @@ EntityType:
     fields are present, or when cross-family fields are mixed into the payload
     (for example Radarr naming fields with `lidarr_naming`).
 
-    Temporary legacy aliases may still be accepted by runtime import paths for
-    backwards compatibility, but clients should emit `lidarr_*` entity types for
-    Lidarr entities.
+    Clients must emit `lidarr_*` entity types for Lidarr entities.
   enum:
     - delay_profile
     - regular_expression
@@ -65,8 +63,11 @@ ExportResponse:
         - $ref: '#/PortableQualityProfile'
         - $ref: '#/PortableRadarrNaming'
         - $ref: '#/PortableSonarrNaming'
+        - $ref: '#/PortableLidarrNaming'
         - $ref: '#/PortableMediaSettings'
+        - $ref: '#/PortableLidarrMediaSettings'
         - $ref: '#/PortableQualityDefinitions'
+        - $ref: '#/PortableLidarrQualityDefinitions'
 
 ImportRequest:
   type: object
@@ -97,8 +98,11 @@ ImportRequest:
         - $ref: '#/PortableQualityProfile'
         - $ref: '#/PortableRadarrNaming'
         - $ref: '#/PortableSonarrNaming'
+        - $ref: '#/PortableLidarrNaming'
         - $ref: '#/PortableMediaSettings'
+        - $ref: '#/PortableLidarrMediaSettings'
         - $ref: '#/PortableQualityDefinitions'
+        - $ref: '#/PortableLidarrQualityDefinitions'
 
 ImportResponse:
   type: object
@@ -232,12 +236,9 @@ PortableCustomFormatScore:
       type: string
       enum: [radarr, sonarr, lidarr, all]
       description: |
-        Arr target for this score mapping. `lidarr` is a valid value for v1
-        parity so quality profile custom-format scores can be scoped to Lidarr
-        instances. `all` applies the score to every arr type. Unsupported
-        Lidarr-only sync behavior (e.g. naming, music-specific media fields)
-        remains capability-gated in the sync layer; this enum only governs
-        score applicability, not full feature support.
+        Arr target for this score mapping. `lidarr` is a first-class value
+        so quality profile custom-format scores can be scoped to Lidarr
+        instances. `all` applies the score to every arr type.
 
         Non-regression contract: existing `radarr`, `sonarr`, and `all`
         enum semantics are unchanged; `lidarr` is an explicit additional arr
@@ -353,8 +354,8 @@ PortableSonarrNaming:
 PortableLidarrNaming:
   description: |
     Portable naming payload for `lidarr_naming`.
-    During first-class Lidarr table cutover, runtime import/export validation
-    currently uses the Sonarr naming wire shape.
+    The wire shape matches `PortableSonarrNaming` (shared column structure).
+    Field semantics are Lidarr-native (artist/album/track tokens).
   allOf:
     - $ref: '#/PortableSonarrNaming'
 
@@ -377,8 +378,8 @@ PortableMediaSettings:
 
 PortableLidarrMediaSettings:
   description: |
-    First-class portable payload for `lidarr_media_settings`.
-    The shape currently matches `PortableMediaSettings`.
+    Portable payload for `lidarr_media_settings`.
+    The shape matches `PortableMediaSettings`.
   allOf:
     - $ref: '#/PortableMediaSettings'
 
@@ -401,7 +402,7 @@ PortableQualityDefinitions:
 
 PortableLidarrQualityDefinitions:
   description: |
-    First-class portable payload for `lidarr_quality_definitions`.
-    The shape currently matches `PortableQualityDefinitions`.
+    Portable payload for `lidarr_quality_definitions`.
+    The shape matches `PortableQualityDefinitions`.
   allOf:
     - $ref: '#/PortableQualityDefinitions'

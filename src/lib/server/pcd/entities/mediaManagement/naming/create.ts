@@ -7,7 +7,7 @@ import { writeOperation, type OperationLayer } from '$pcd/index.ts';
 import type { LidarrNamingRow, RadarrNamingRow, SonarrNamingRow } from '$shared/pcd/display.ts';
 import type { PCDDatabase } from '$shared/pcd/types.ts';
 import { colonReplacementToDb, multiEpisodeStyleToDb } from '$shared/pcd/mediaManagement.ts';
-import { LIDARR_NAMING_TABLE, RADARR_NAMING_TABLE, SONARR_BACKED_NAMING_TABLE } from './constants.ts';
+import { LIDARR_NAMING_TABLE, RADARR_NAMING_TABLE, SONARR_NAMING_TABLE } from './constants.ts';
 
 export interface CreateRadarrNamingInput {
   name: string;
@@ -97,15 +97,15 @@ export interface CreateSonarrNamingOptions {
   input: CreateSonarrNamingInput;
 }
 
-type SonarrBackedNamingType = 'sonarr';
+type SonarrNamingType = 'sonarr';
 
-async function createSonarrBackedNaming(options: CreateSonarrNamingOptions, namingType: SonarrBackedNamingType) {
+async function createSonarrNamingInternal(options: CreateSonarrNamingOptions, namingType: SonarrNamingType) {
   const { databaseId, cache, layer, input } = options;
   const db = cache.kb;
   const normalizedType = 'Sonarr';
 
   const existing = await db
-    .selectFrom(SONARR_BACKED_NAMING_TABLE)
+    .selectFrom(SONARR_NAMING_TABLE)
     .where((eb) => eb(eb.fn('lower', [eb.ref('name')]), '=', input.name.toLowerCase()))
     .select('name')
     .executeTakeFirst();
@@ -115,7 +115,7 @@ async function createSonarrBackedNaming(options: CreateSonarrNamingOptions, nami
   }
 
   const insertQuery = db
-    .insertInto(SONARR_BACKED_NAMING_TABLE)
+    .insertInto(SONARR_NAMING_TABLE)
     .values({
       name: input.name,
       rename: input.rename ? 1 : 0,
@@ -161,7 +161,7 @@ async function createSonarrBackedNaming(options: CreateSonarrNamingOptions, nami
 }
 
 export async function createSonarrNaming(options: CreateSonarrNamingOptions) {
-  return createSonarrBackedNaming(options, 'sonarr');
+  return createSonarrNamingInternal(options, 'sonarr');
 }
 
 interface LegacyPortableLidarrNamingInput {

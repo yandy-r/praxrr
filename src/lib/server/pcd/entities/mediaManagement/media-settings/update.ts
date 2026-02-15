@@ -4,7 +4,7 @@
 
 import type { PCDCache } from '$pcd/index.ts';
 import { writeOperation, type OperationLayer } from '$pcd/index.ts';
-import type { RadarrMediaSettingsRow, SonarrMediaSettingsRow } from '$shared/pcd/display.ts';
+import type { LidarrMediaSettingsRow, RadarrMediaSettingsRow, SonarrMediaSettingsRow } from '$shared/pcd/display.ts';
 import type { PCDDatabase } from '$shared/pcd/types.ts';
 
 export interface UpdateMediaSettingsInput {
@@ -118,7 +118,7 @@ export interface UpdateLidarrMediaSettingsOptions {
   databaseId: number;
   cache: PCDCache;
   layer: OperationLayer;
-  current: SonarrMediaSettingsRow;
+  current: LidarrMediaSettingsRow;
   input: UpdateMediaSettingsInput;
 }
 

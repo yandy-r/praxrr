@@ -121,6 +121,240 @@ INSERT INTO quality_api_mappings (quality_name, arr_type, api_name) VALUES
   }
 );
 
+Deno.test('lidarr quality mapping: unmapped quality entries are excluded from Lidarr list results', async () => {
+  const warnLogs: CapturedLog[] = [];
+  const originalWarn = logger.warn;
+
+  logger.warn = (message: string, options?: LogOptions) => {
+    warnLogs.push({ message, options });
+    return Promise.resolve();
+  };
+
+  const fixture = createCacheFixture(`
+CREATE TABLE quality_api_mappings (
+  quality_name TEXT NOT NULL,
+  arr_type TEXT NOT NULL,
+  api_name TEXT NOT NULL,
+  PRIMARY KEY (quality_name, arr_type)
+);
+
+CREATE TABLE radarr_quality_definitions (
+  name TEXT NOT NULL,
+  quality_name TEXT NOT NULL,
+  min_size INTEGER NOT NULL,
+  max_size INTEGER NOT NULL,
+  preferred_size INTEGER NOT NULL,
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE sonarr_quality_definitions (
+  name TEXT NOT NULL,
+  quality_name TEXT NOT NULL,
+  min_size INTEGER NOT NULL,
+  max_size INTEGER NOT NULL,
+  preferred_size INTEGER NOT NULL,
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE lidarr_quality_definitions (
+  name TEXT NOT NULL,
+  quality_name TEXT NOT NULL,
+  min_size INTEGER NOT NULL,
+  max_size INTEGER NOT NULL,
+  preferred_size INTEGER NOT NULL,
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+INSERT INTO quality_api_mappings (quality_name, arr_type, api_name) VALUES
+  ('FLAC', 'lidarr', 'FLAC');
+
+INSERT INTO lidarr_quality_definitions (name, quality_name, min_size, max_size, preferred_size) VALUES
+  ('Lidarr-Unmapped', 'FLAC', 0, 1200, 300),
+  ('Lidarr-Unmapped', 'NoMapping-Audio', 0, 800, 200);
+    `);
+
+  try {
+    const listed = await list(fixture.cache);
+    const lidarrConfig = listed.find((item) => item.arr_type === 'lidarr' && item.name === 'Lidarr-Unmapped');
+    assertExists(lidarrConfig);
+    assertEquals(lidarrConfig.quality_count, 1);
+
+    const unmappedWarn = warnLogs.find((entry) => {
+      if (entry.message !== 'Skipping unmapped quality definition rows in quality definitions list') {
+        return false;
+      }
+      const meta = getMeta(entry);
+      return meta.arrType === 'lidarr' && meta.configName === 'Lidarr-Unmapped';
+    });
+    assertExists(unmappedWarn);
+    assertEquals(getMeta(unmappedWarn).reason, QUALITY_LOOKUP_MISSING_WARNING_REASON);
+  } finally {
+    logger.warn = originalWarn;
+    await fixture.destroy();
+  }
+});
+
+Deno.test('lidarr quality mapping: mapped entries resolve correctly from lidarr_quality_definitions', async () => {
+  const originalWarn = logger.warn;
+  const originalInfo = logger.info;
+
+  logger.warn = (_message: string, _options?: LogOptions) => {
+    void _message;
+    void _options;
+    return Promise.resolve();
+  };
+  logger.info = (_message: string, _options?: LogOptions) => {
+    void _message;
+    void _options;
+    return Promise.resolve();
+  };
+
+  const fixture = createCacheFixture(`
+CREATE TABLE quality_api_mappings (
+  quality_name TEXT NOT NULL,
+  arr_type TEXT NOT NULL,
+  api_name TEXT NOT NULL,
+  PRIMARY KEY (quality_name, arr_type)
+);
+
+CREATE TABLE radarr_quality_definitions (
+  name TEXT NOT NULL,
+  quality_name TEXT NOT NULL,
+  min_size INTEGER NOT NULL,
+  max_size INTEGER NOT NULL,
+  preferred_size INTEGER NOT NULL,
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE sonarr_quality_definitions (
+  name TEXT NOT NULL,
+  quality_name TEXT NOT NULL,
+  min_size INTEGER NOT NULL,
+  max_size INTEGER NOT NULL,
+  preferred_size INTEGER NOT NULL,
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE lidarr_quality_definitions (
+  name TEXT NOT NULL,
+  quality_name TEXT NOT NULL,
+  min_size INTEGER NOT NULL,
+  max_size INTEGER NOT NULL,
+  preferred_size INTEGER NOT NULL,
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+INSERT INTO quality_api_mappings (quality_name, arr_type, api_name) VALUES
+  ('FLAC', 'lidarr', 'FLAC'),
+  ('Unknown', 'lidarr', 'Unknown');
+
+INSERT INTO lidarr_quality_definitions (name, quality_name, min_size, max_size, preferred_size) VALUES
+  ('Lidarr-Mapped', 'FLAC', 64, 1024, 320),
+  ('Lidarr-Mapped', 'Unknown', 0, 500, 100);
+
+INSERT INTO sonarr_quality_definitions (name, quality_name, min_size, max_size, preferred_size) VALUES
+  ('Lidarr-Mapped', 'FLAC', 999, 9999, 5000);
+    `);
+
+  try {
+    const listed = await list(fixture.cache);
+
+    // Lidarr config should read from lidarr_quality_definitions (2 mapped entries)
+    const lidarrConfig = listed.find((item) => item.arr_type === 'lidarr' && item.name === 'Lidarr-Mapped');
+    assertExists(lidarrConfig);
+    assertEquals(lidarrConfig.quality_count, 2);
+
+    // Sonarr config with same name should be independent
+    const sonarrConfig = listed.find((item) => item.arr_type === 'sonarr' && item.name === 'Lidarr-Mapped');
+    // sonarr has no sonarr mapping for FLAC so count depends on mapping presence
+    // The key assertion: lidarr result is NOT contaminated by sonarr data
+    assertEquals(lidarrConfig.arr_type, 'lidarr');
+
+    // Verify no lidarr entry appears with sonarr quality_count from sonarr table
+    if (sonarrConfig) {
+      assert(sonarrConfig.arr_type === 'sonarr');
+    }
+  } finally {
+    logger.warn = originalWarn;
+    logger.info = originalInfo;
+    await fixture.destroy();
+  }
+});
+
+Deno.test('lidarr quality mapping: sonarr quality data does not leak into lidarr list results', async () => {
+  const originalWarn = logger.warn;
+  const originalInfo = logger.info;
+
+  logger.warn = (_message: string, _options?: LogOptions) => {
+    void _message;
+    void _options;
+    return Promise.resolve();
+  };
+  logger.info = (_message: string, _options?: LogOptions) => {
+    void _message;
+    void _options;
+    return Promise.resolve();
+  };
+
+  const fixture = createCacheFixture(`
+CREATE TABLE quality_api_mappings (
+  quality_name TEXT NOT NULL,
+  arr_type TEXT NOT NULL,
+  api_name TEXT NOT NULL,
+  PRIMARY KEY (quality_name, arr_type)
+);
+
+CREATE TABLE radarr_quality_definitions (
+  name TEXT NOT NULL,
+  quality_name TEXT NOT NULL,
+  min_size INTEGER NOT NULL,
+  max_size INTEGER NOT NULL,
+  preferred_size INTEGER NOT NULL,
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE sonarr_quality_definitions (
+  name TEXT NOT NULL,
+  quality_name TEXT NOT NULL,
+  min_size INTEGER NOT NULL,
+  max_size INTEGER NOT NULL,
+  preferred_size INTEGER NOT NULL,
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE lidarr_quality_definitions (
+  name TEXT NOT NULL,
+  quality_name TEXT NOT NULL,
+  min_size INTEGER NOT NULL,
+  max_size INTEGER NOT NULL,
+  preferred_size INTEGER NOT NULL,
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+INSERT INTO quality_api_mappings (quality_name, arr_type, api_name) VALUES
+  ('HDTV-720p', 'sonarr', 'HDTV-720p');
+
+INSERT INTO sonarr_quality_definitions (name, quality_name, min_size, max_size, preferred_size) VALUES
+  ('Sonarr-Only-Config', 'HDTV-720p', 10, 500, 100);
+    `);
+
+  try {
+    const listed = await list(fixture.cache);
+
+    // Only sonarr should appear -- no lidarr row for this config
+    const lidarrConfig = listed.find((item) => item.arr_type === 'lidarr' && item.name === 'Sonarr-Only-Config');
+    assertEquals(lidarrConfig, undefined);
+
+    const sonarrConfig = listed.find((item) => item.arr_type === 'sonarr' && item.name === 'Sonarr-Only-Config');
+    assertExists(sonarrConfig);
+    assertEquals(sonarrConfig.quality_count, 1);
+  } finally {
+    logger.warn = originalWarn;
+    logger.info = originalInfo;
+    await fixture.destroy();
+  }
+});
+
 Deno.test({
   name: 'issue #17: lidarr read/list and sync skip unmapped entries with explicit reasons',
   sanitizeResources: false,

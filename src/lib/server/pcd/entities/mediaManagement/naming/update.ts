@@ -7,7 +7,7 @@ import { writeOperation, type OperationLayer } from '$pcd/index.ts';
 import type { LidarrNamingRow, RadarrNamingRow, SonarrNamingRow } from '$shared/pcd/display.ts';
 import type { PCDDatabase } from '$shared/pcd/types.ts';
 import { colonReplacementToDb, multiEpisodeStyleToDb } from '$shared/pcd/mediaManagement.ts';
-import { LIDARR_NAMING_TABLE, RADARR_NAMING_TABLE, SONARR_BACKED_NAMING_TABLE } from './constants.ts';
+import { LIDARR_NAMING_TABLE, RADARR_NAMING_TABLE, SONARR_NAMING_TABLE } from './constants.ts';
 
 export interface UpdateRadarrNamingInput {
   name: string;
@@ -173,16 +173,16 @@ export interface UpdateSonarrNamingOptions {
   input: UpdateSonarrNamingInput;
 }
 
-type SonarrBackedNamingType = 'sonarr';
+type SonarrNamingType = 'sonarr';
 
-async function updateSonarrBackedNaming(options: UpdateSonarrNamingOptions, namingType: SonarrBackedNamingType) {
+async function updateSonarrNamingInternal(options: UpdateSonarrNamingOptions, namingType: SonarrNamingType) {
   const normalizedType = 'Sonarr';
   const { databaseId, cache, layer, current, input } = options;
   const db = cache.kb;
 
   if (input.name !== current.name) {
     const existing = await db
-      .selectFrom(SONARR_BACKED_NAMING_TABLE)
+      .selectFrom(SONARR_NAMING_TABLE)
       .where((eb) => eb(eb.fn('lower', [eb.ref('name')]), '=', input.name.toLowerCase()))
       .select('name')
       .executeTakeFirst();
@@ -228,7 +228,7 @@ async function updateSonarrBackedNaming(options: UpdateSonarrNamingOptions, nami
     setValues.multi_episode_style = nextMultiEpisode;
   }
 
-  let updateQuery = db.updateTable(SONARR_BACKED_NAMING_TABLE).set(setValues).where('name', '=', current.name);
+  let updateQuery = db.updateTable(SONARR_NAMING_TABLE).set(setValues).where('name', '=', current.name);
 
   if (current.rename !== input.rename) {
     updateQuery = updateQuery.where('rename', '=', current.rename ? 1 : 0);
@@ -408,7 +408,7 @@ async function updateSonarrBackedNaming(options: UpdateSonarrNamingOptions, nami
 }
 
 export async function updateSonarrNaming(options: UpdateSonarrNamingOptions) {
-  return updateSonarrBackedNaming(options, 'sonarr');
+  return updateSonarrNamingInternal(options, 'sonarr');
 }
 
 export interface UpdateLidarrNamingInput {

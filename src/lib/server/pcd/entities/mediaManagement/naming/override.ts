@@ -1,12 +1,12 @@
 import { getCache } from '$pcd/index.ts';
 import type { PCDCache, WriteResult } from '$pcd/index.ts';
-import type { RadarrNamingRow, SonarrNamingRow } from '$shared/pcd/display.ts';
-import { getRadarrByName, getSonarrByName } from './read.ts';
-import { updateRadarrNaming, updateSonarrNaming } from './update.ts';
-import type { StoredOpMetadata, StoredDesiredState } from '$pcd/conflicts/overrideUtils.ts';
-import { getDesiredTo, followRenameChain, valuesEqual } from '$pcd/conflicts/overrideUtils.ts';
+import type { LidarrNamingRow, RadarrNamingRow, SonarrNamingRow } from '$shared/pcd/display.ts';
+import { getLidarrByName, getRadarrByName, getSonarrByName } from './read.ts';
+import { updateLidarrNaming, updateRadarrNaming, updateSonarrNaming } from './update.ts';
+import type { StoredDesiredState, StoredOpMetadata } from '$pcd/conflicts/overrideUtils.ts';
+import { followRenameChain, getDesiredTo, valuesEqual } from '$pcd/conflicts/overrideUtils.ts';
 
-type NamingTable = 'radarr_naming' | 'sonarr_naming';
+type NamingTable = 'radarr_naming' | 'sonarr_naming' | 'lidarr_naming';
 
 async function resolveNamingName(
   cache: PCDCache,
@@ -35,6 +35,13 @@ async function resolveNamingName(
     const row = await cache.kb.selectFrom(table).select('name').where('name', '=', resolved).executeTakeFirst();
     if (row) return row.name!;
   }
+  const entityType =
+    table === 'radarr_naming' ? 'radarr_naming' : table === 'sonarr_naming' ? 'sonarr_naming' : 'lidarr_naming';
+  const resolved = followRenameChain(databaseId, entityType, candidates[0]);
+  if (resolved !== candidates[0]) {
+    const row = await cache.kb.selectFrom(table).select('name').where('name', '=', resolved).executeTakeFirst();
+    if (row) return row.name!;
+  }
 
   return null;
 }
@@ -50,6 +57,12 @@ function resolveNullableString(value: unknown, fallback: string | null): string 
   const resolved = getDesiredTo<string | null>(value);
   if (resolved !== undefined) return resolved;
   if (typeof value === 'string' || value === null) return value as string | null;
+  return fallback;
+  const resolved = getDesiredTo<string | null>(value);
+  if (resolved !== undefined) return resolved;
+  if (typeof value === 'string' || value === null) {
+    return value as string | null;
+  }
   return fallback;
 }
 
@@ -71,6 +84,12 @@ async function overrideRadarr(
   if (!desiredState) {
     return { success: false, error: 'Missing desired state for radarr naming override' };
   }
+  if (!desiredState) {
+    return {
+      success: false,
+      error: 'Missing desired state for radarr naming override',
+    };
+  }
 
   const cache = getCache(databaseId);
   if (!cache) {
@@ -81,10 +100,24 @@ async function overrideRadarr(
   if (!name) {
     return { success: false, error: 'Radarr naming config not found for override' };
   }
+  const name = await resolveNamingName(cache, databaseId, 'radarr_naming', metadata, desiredState);
+  if (!name) {
+    return {
+      success: false,
+      error: 'Radarr naming config not found for override',
+    };
+  }
 
   const current = await getRadarrByName(cache, name);
   if (!current) {
     return { success: false, error: 'Radarr naming config not found for override' };
+  }
+  const current = await getRadarrByName(cache, name);
+  if (!current) {
+    return {
+      success: false,
+      error: 'Radarr naming config not found for override',
+    };
   }
 
   const desiredName = resolveString(desiredState.name, current.name);
@@ -138,6 +171,12 @@ async function overrideSonarr(
   if (!desiredState) {
     return { success: false, error: 'Missing desired state for sonarr naming override' };
   }
+  if (!desiredState) {
+    return {
+      success: false,
+      error: 'Missing desired state for sonarr naming override',
+    };
+  }
 
   const cache = getCache(databaseId);
   if (!cache) {
@@ -148,10 +187,24 @@ async function overrideSonarr(
   if (!name) {
     return { success: false, error: 'Sonarr naming config not found for override' };
   }
+  const name = await resolveNamingName(cache, databaseId, 'sonarr_naming', metadata, desiredState);
+  if (!name) {
+    return {
+      success: false,
+      error: 'Sonarr naming config not found for override',
+    };
+  }
 
   const current = await getSonarrByName(cache, name);
   if (!current) {
     return { success: false, error: 'Sonarr naming config not found for override' };
+  }
+  const current = await getSonarrByName(cache, name);
+  if (!current) {
+    return {
+      success: false,
+      error: 'Sonarr naming config not found for override',
+    };
   }
 
   const desiredName = resolveString(desiredState.name, current.name);
@@ -214,6 +267,113 @@ async function overrideSonarr(
       multiEpisodeStyle: desiredMultiEpisode,
     },
   });
+  return updateSonarrNaming({
+    databaseId,
+    cache,
+    layer: 'user',
+    current,
+    input: {
+      name: desiredName,
+      rename: desiredRename,
+      standardEpisodeFormat: desiredStandard,
+      dailyEpisodeFormat: desiredDaily,
+      animeEpisodeFormat: desiredAnime,
+      seriesFolderFormat: desiredSeriesFolder,
+      seasonFolderFormat: desiredSeasonFolder,
+      replaceIllegalCharacters: desiredReplaceIllegal,
+      colonReplacementFormat: desiredColonFormat,
+      customColonReplacementFormat: desiredCustomColon,
+      multiEpisodeStyle: desiredMultiEpisode,
+    },
+  });
+}
+
+// ── Lidarr ──
+
+async function overrideLidarr(
+  databaseId: number,
+  metadata: StoredOpMetadata | null,
+  desiredState: StoredDesiredState | null
+): Promise<WriteResult> {
+  if (!desiredState) {
+    return {
+      success: false,
+      error: 'Missing desired state for lidarr naming override',
+    };
+  }
+
+  const cache = getCache(databaseId);
+  if (!cache) {
+    return { success: false, error: 'Cache not available' };
+  }
+
+  const name = await resolveNamingName(cache, databaseId, 'lidarr_naming', metadata, desiredState);
+  if (!name) {
+    return {
+      success: false,
+      error: 'Lidarr naming config not found for override',
+    };
+  }
+
+  const current = await getLidarrByName(cache, name);
+  if (!current) {
+    return {
+      success: false,
+      error: 'Lidarr naming config not found for override',
+    };
+  }
+
+  const desiredName = resolveString(desiredState.name, current.name);
+  const desiredRename = resolveBoolean(desiredState.rename, current.rename);
+  const desiredStandardTrack = resolveString(desiredState.standard_track_format, current.standard_track_format);
+  const desiredArtistName = resolveString(desiredState.artist_name, current.artist_name);
+  const desiredMultiDiscTrack = resolveString(desiredState.multi_disc_track_format, current.multi_disc_track_format);
+  const desiredArtistFolder = resolveString(desiredState.artist_folder_format, current.artist_folder_format);
+  const desiredReplaceIllegal = resolveBoolean(
+    desiredState.replace_illegal_characters,
+    current.replace_illegal_characters
+  );
+  const desiredColonFormat = resolveString(
+    desiredState.colon_replacement_format,
+    current.colon_replacement_format
+  ) as LidarrNamingRow['colon_replacement_format'];
+  const desiredCustomColon = resolveNullableString(
+    desiredState.custom_colon_replacement_format,
+    current.custom_colon_replacement_format
+  );
+
+  const matches =
+    current.name === desiredName &&
+    valuesEqual(current.rename, desiredRename) &&
+    current.standard_track_format === desiredStandardTrack &&
+    current.artist_name === desiredArtistName &&
+    current.multi_disc_track_format === desiredMultiDiscTrack &&
+    current.artist_folder_format === desiredArtistFolder &&
+    valuesEqual(current.replace_illegal_characters, desiredReplaceIllegal) &&
+    current.colon_replacement_format === desiredColonFormat &&
+    current.custom_colon_replacement_format === desiredCustomColon;
+
+  if (matches) {
+    return { success: true };
+  }
+
+  return updateLidarrNaming({
+    databaseId,
+    cache,
+    layer: 'user',
+    current,
+    input: {
+      name: desiredName,
+      rename: desiredRename,
+      standardTrackFormat: desiredStandardTrack,
+      artistName: desiredArtistName,
+      multiDiscTrackFormat: desiredMultiDiscTrack,
+      artistFolderFormat: desiredArtistFolder,
+      replaceIllegalCharacters: desiredReplaceIllegal,
+      colonReplacementFormat: desiredColonFormat,
+      customColonReplacementFormat: desiredCustomColon,
+    },
+  });
 }
 
 // ── Exports ──
@@ -226,6 +386,19 @@ export function overrideCreate(
   return metadata?.entity === 'sonarr_naming'
     ? overrideSonarr(databaseId, metadata, desiredState)
     : overrideRadarr(databaseId, metadata, desiredState);
+  switch (metadata?.entity) {
+    case 'radarr_naming':
+      return overrideRadarr(databaseId, metadata, desiredState);
+    case 'sonarr_naming':
+      return overrideSonarr(databaseId, metadata, desiredState);
+    case 'lidarr_naming':
+      return overrideLidarr(databaseId, metadata, desiredState);
+    default:
+      return Promise.resolve({
+        success: false,
+        error: `Unsupported naming override entity: ${metadata?.entity ?? 'unknown'}`,
+      });
+  }
 }
 
 export function overrideUpdate(
@@ -236,4 +409,5 @@ export function overrideUpdate(
   return metadata?.entity === 'sonarr_naming'
     ? overrideSonarr(databaseId, metadata, desiredState)
     : overrideRadarr(databaseId, metadata, desiredState);
+  return overrideCreate(databaseId, metadata, desiredState);
 }
