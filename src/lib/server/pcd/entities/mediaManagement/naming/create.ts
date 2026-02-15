@@ -159,10 +159,10 @@ async function createSonarrBackedNaming(options: CreateSonarrNamingOptions, nami
   });
 }
 
-export async function createSonarrNaming(options: CreateSonarrNamingOptions) {
+export function createSonarrNaming(options: CreateSonarrNamingOptions) {
   return createSonarrBackedNaming(options, 'sonarr');
 }
 
-export async function createLidarrNaming(options: CreateSonarrNamingOptions) {
+export function createLidarrNaming(options: CreateSonarrNamingOptions) {
   return createSonarrBackedNaming(options, 'lidarr');
 }

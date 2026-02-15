@@ -4,14 +4,17 @@ EntityType:
     Portable PCD entity identifiers used by import/export endpoints.
 
     v1 Lidarr media-management strategy: reuse existing entities.
-    Lidarr maps to `radarr_media_settings` / `sonarr_media_settings` and
-    `radarr_quality_definitions` / `sonarr_quality_definitions` rather than
-    introducing dedicated `lidarr_*` entity types in this phase. Downstream
-    sync resolves the Lidarr arr_type against these shared shapes and
-    capability-gates any Lidarr-only fields (e.g. naming formats, music-
-    specific media-info fields) so behavior is deterministic: unsupported
-    fields are explicitly skipped with logged reasons, never silently
-    written or partially applied.
+    Lidarr maps to existing Radarr/Sonarr entity shapes instead of dedicated
+    `lidarr_*` entity types in this phase. Specifically:
+    - naming -> `sonarr_naming`
+    - media settings -> `radarr_media_settings` and `sonarr_media_settings`
+    - quality definitions -> `radarr_quality_definitions` and
+      `sonarr_quality_definitions`
+    Downstream sync resolves the Lidarr arr_type against these shared shapes and
+    capability-gates any Lidarr-only fields (e.g. naming formats,
+    music-specific media-info fields) so behavior is deterministic: unsupported
+    fields are explicitly skipped with logged reasons, never silently written or
+    partially applied.
 
     No new entity enum values are added for Lidarr here (for example
     no `lidarr_naming`, `lidarr_media_settings`, or
@@ -24,6 +27,8 @@ EntityType:
     enum members remain unchanged in v1 (`radarr_naming`, `sonarr_naming`,
     `radarr_media_settings`, `sonarr_media_settings`,
     `radarr_quality_definitions`, `sonarr_quality_definitions`).
+    Non-regression contract: `radarr_*` and `sonarr_*` entity enum members are
+    preserved and no `lidarr_*` media-management members are introduced in v1.
   enum:
     - delay_profile
     - regular_expression
@@ -52,7 +57,7 @@ ExportResponse:
         - `custom_format` → PortableCustomFormat
         - `quality_profile` → PortableQualityProfile (contains PortableCustomFormatScore with lidarr-aware arrType)
         - `radarr_naming` → PortableRadarrNaming
-        - `sonarr_naming` → PortableSonarrNaming
+        - `sonarr_naming` → PortableSonarrNaming (shared for Lidarr and Sonarr in v1)
         - `radarr_media_settings` → PortableMediaSettings (reused for Lidarr in v1)
         - `sonarr_media_settings` → PortableMediaSettings (reused for Lidarr in v1)
         - `radarr_quality_definitions` → PortableQualityDefinitions (reused for Lidarr in v1)
@@ -313,6 +318,10 @@ PortableRadarrNaming:
       type: string
 
 PortableSonarrNaming:
+  description: |
+    Shared naming payload for Sonarr and v1 Lidarr media-management flows.
+    Lidarr uses this payload shape with unsupported Sonarr source fields being
+    filtered out during sync; no `lidarr_naming` entity exists in v1.
   type: object
   required:
     - name

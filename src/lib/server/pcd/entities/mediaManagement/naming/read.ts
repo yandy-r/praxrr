@@ -95,6 +95,6 @@ export async function getSonarrByName(cache: PCDCache, name: string): Promise<So
   };
 }
 
-export async function getLidarrByName(cache: PCDCache, name: string): Promise<SonarrNamingRow | null> {
+export function getLidarrByName(cache: PCDCache, name: string): Promise<SonarrNamingRow | null> {
   return getSonarrByName(cache, name);
 }

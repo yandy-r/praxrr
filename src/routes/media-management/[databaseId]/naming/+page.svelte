@@ -11,7 +11,7 @@
 	import { alertStore } from '$alerts/store';
 	import { Plus } from 'lucide-svelte';
 	import type { EntityType } from '$shared/pcd/portable.ts';
-	import { isArrAppType, type ArrAppType } from '$shared/arr/capabilities.ts';
+	import type { ArrAppType } from '$shared/arr/capabilities.ts';
 	import type { PageData } from './$types';
 
 	export let data: PageData;
@@ -20,13 +20,18 @@
 	let cloneSourceName = '';
 	let cloneEntityType: EntityType = 'radarr_naming';
 	let cloneArrType: ArrAppType | null = null;
+	const supportedNamingArrTypes: ArrAppType[] = ['radarr', 'sonarr', 'lidarr'];
+
+	function isSupportedArrType(arrType: string): arrType is ArrAppType {
+		return supportedNamingArrTypes.includes(arrType as ArrAppType);
+	}
 
 	$: cloneExistingNames = cloneArrType
 		? data.namingConfigs.filter((config) => config.arr_type === cloneArrType).map((config) => config.name)
 		: [];
 
 	function toEntityType(arrType: string): EntityType | null {
-		if (!isArrAppType(arrType)) {
+		if (!isSupportedArrType(arrType)) {
 			return null;
 		}
 
@@ -40,7 +45,7 @@
 		}
 
 		const arrType = event.detail.arr_type;
-		if (!isArrAppType(arrType)) {
+		if (!isSupportedArrType(arrType)) {
 			alertStore.add('error', `Unknown naming type "${arrType}"`);
 			return;
 		}
