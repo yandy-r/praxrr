@@ -5,6 +5,7 @@
 import type { PCDCache } from '$pcd/index.ts';
 import { writeOperation, type OperationLayer } from '$pcd/index.ts';
 import type { RadarrMediaSettingsRow, SonarrMediaSettingsRow } from '$shared/pcd/display.ts';
+import type { PCDDatabase } from '$shared/pcd/types.ts';
 
 export interface UpdateMediaSettingsInput {
   name: string;
@@ -210,17 +211,15 @@ export async function updateLidarrMediaSettings(options: UpdateLidarrMediaSettin
   const { databaseId, cache, layer, current, input } = options;
   const db = cache.kb;
 
-  // Lidarr reuses Sonarr media-settings storage in this phase.
-  // Collision checks must use the same table and stable identity as Sonarr.
   if (input.name !== current.name) {
     const existing = await db
-      .selectFrom('sonarr_media_settings')
+      .selectFrom('lidarr_media_settings' as keyof PCDDatabase)
       .where((eb) => eb(eb.fn('lower', [eb.ref('name')]), '=', input.name.toLowerCase()))
       .select('name')
       .executeTakeFirst();
 
     if (existing) {
-      throw new Error(`A sonarr media settings config with name "${input.name}" already exists`);
+      throw new Error(`A lidarr media settings config with name "${input.name}" already exists`);
     }
   }
 
@@ -233,7 +232,10 @@ export async function updateLidarrMediaSettings(options: UpdateLidarrMediaSettin
     setValues.enable_media_info = input.enableMediaInfo ? 1 : 0;
   }
 
-  let updateQuery = db.updateTable('sonarr_media_settings').set(setValues).where('name', '=', current.name);
+  let updateQuery = db
+    .updateTable('lidarr_media_settings' as keyof PCDDatabase)
+    .set(setValues)
+    .where('name', '=', current.name);
 
   if (current.propers_repacks !== input.propersRepacks) {
     updateQuery = updateQuery.where('propers_repacks', '=', current.propers_repacks);
@@ -281,10 +283,10 @@ export async function updateLidarrMediaSettings(options: UpdateLidarrMediaSettin
     desiredState,
     metadata: {
       operation: 'update',
-      entity: 'sonarr_media_settings',
+      entity: 'lidarr_media_settings',
       name: input.name,
       ...(current.name !== input.name && { previousName: current.name }),
-      stableKey: { key: 'sonarr_media_settings_name', value: current.name },
+      stableKey: { key: 'lidarr_media_settings_name', value: current.name },
       changedFields,
       summary: 'Update Lidarr media settings',
       title: `Update Lidarr media settings "${input.name}"`,

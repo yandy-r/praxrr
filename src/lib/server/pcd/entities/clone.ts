@@ -74,6 +74,12 @@ export async function clone(options: CloneOptions) {
       return deserialize.deserializeSonarrMediaSettings({ databaseId, cache, layer, portable });
     }
 
+    case 'lidarr_media_settings': {
+      const portable = await serialize.serializeLidarrMediaSettings(cache, sourceName);
+      portable.name = newName;
+      return deserialize.deserializeLidarrMediaSettings({ databaseId, cache, layer, portable });
+    }
+
     case 'radarr_quality_definitions': {
       const portable = await serialize.serializeRadarrQualityDefinitions(cache, sourceName);
       portable.name = newName;

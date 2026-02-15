@@ -99,9 +99,8 @@ export async function removeLidarrMediaSettings(options: RemoveLidarrMediaSettin
   const { databaseId, cache, layer, current } = options;
   const db = cache.kb;
 
-  // Lidarr reuses Sonarr media-settings storage in this phase.
   const deleteQuery = db
-    .deleteFrom('sonarr_media_settings')
+    .deleteFrom('lidarr_media_settings')
     .where('name', '=', current.name)
     .where('propers_repacks', '=', current.propers_repacks)
     .where('enable_media_info', '=', current.enable_media_info ? 1 : 0)
@@ -120,9 +119,9 @@ export async function removeLidarrMediaSettings(options: RemoveLidarrMediaSettin
     },
     metadata: {
       operation: 'delete',
-      entity: 'sonarr_media_settings',
+      entity: 'lidarr_media_settings',
       name: current.name,
-      stableKey: { key: 'sonarr_media_settings_name', value: current.name },
+      stableKey: { key: 'lidarr_media_settings_name', value: current.name },
       changedFields: ['deleted'],
       summary: 'Delete Lidarr media settings',
       title: `Delete Lidarr media settings "${current.name}"`,

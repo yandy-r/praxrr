@@ -1,17 +1,12 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from '@sveltejs/kit';
 import { pcdManager } from '$pcd/index.ts';
-import {
-  ENTITY_TYPES,
-  getLidarrMediaManagementPortableEntry,
-  type EntityType,
-  type LidarrMediaManagementPortableEntityType,
-} from '$shared/pcd/portable.ts';
+import { ENTITY_TYPES, getLidarrMediaManagementPortableEntry, type EntityType } from '$shared/pcd/portable.ts';
 import type { PCDCache } from '$pcd/index.ts';
 import * as serialize from '$pcd/entities/serialize.ts';
 
 const VALID_ENTITY_TYPES: ReadonlySet<string> = new Set(ENTITY_TYPES);
-type ReusableEntityType = Exclude<EntityType, LidarrMediaManagementPortableEntityType>;
+type ResolvedEntityType = Exclude<EntityType, 'lidarr_naming' | 'lidarr_quality_definitions'>;
 
 export const GET: RequestHandler = async ({ url }) => {
   const databaseIdParam = url.searchParams.get('databaseId');
@@ -50,12 +45,16 @@ export const GET: RequestHandler = async ({ url }) => {
   }
 };
 
-function resolveEntityType(entityType: EntityType): ReusableEntityType {
+function resolveEntityType(entityType: EntityType): ResolvedEntityType {
+  if (entityType === 'lidarr_media_settings') {
+    return entityType;
+  }
+
   const matrixEntry = getLidarrMediaManagementPortableEntry(entityType);
-  return (matrixEntry?.reusableEntityType ?? entityType) as ReusableEntityType;
+  return (matrixEntry?.reusableEntityType ?? entityType) as ResolvedEntityType;
 }
 
-async function serializeEntity(cache: PCDCache, entityType: ReusableEntityType, name: string) {
+async function serializeEntity(cache: PCDCache, entityType: ResolvedEntityType, name: string) {
   switch (entityType) {
     case 'delay_profile':
       return serialize.serializeDelayProfile(cache, name);
@@ -73,6 +72,8 @@ async function serializeEntity(cache: PCDCache, entityType: ReusableEntityType, 
       return serialize.serializeRadarrMediaSettings(cache, name);
     case 'sonarr_media_settings':
       return serialize.serializeSonarrMediaSettings(cache, name);
+    case 'lidarr_media_settings':
+      return serialize.serializeLidarrMediaSettings(cache, name);
     case 'radarr_quality_definitions':
       return serialize.serializeRadarrQualityDefinitions(cache, name);
     case 'sonarr_quality_definitions':

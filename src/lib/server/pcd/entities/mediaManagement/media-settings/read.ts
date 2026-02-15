@@ -4,13 +4,18 @@
 
 import type { PCDCache } from '$pcd/index.ts';
 import type { RadarrMediaSettingsRow, SonarrMediaSettingsRow, MediaSettingsListItem } from '$shared/pcd/display.ts';
+import type { PCDDatabase } from '$shared/pcd/types.ts';
 
 export async function list(cache: PCDCache): Promise<MediaSettingsListItem[]> {
   const db = cache.kb;
 
-  const [radarrRows, sonarrRows] = await Promise.all([
+  const [radarrRows, lidarrRows, sonarrRows] = await Promise.all([
     db
       .selectFrom('radarr_media_settings')
+      .select(['name', 'propers_repacks', 'enable_media_info', 'updated_at'])
+      .execute(),
+    db
+      .selectFrom('lidarr_media_settings' as keyof PCDDatabase)
       .select(['name', 'propers_repacks', 'enable_media_info', 'updated_at'])
       .execute(),
     db
@@ -31,10 +36,7 @@ export async function list(cache: PCDCache): Promise<MediaSettingsListItem[]> {
     });
   }
 
-  // Lidarr reuses the Sonarr storage table in this phase.
-  // Keep Sonarr- and Lidarr-named entries in shared storage distinct in UI payloads
-  // so duplicate-name collisions are explicit and deterministic.
-  for (const row of sonarrRows) {
+  for (const row of lidarrRows) {
     items.push({
       name: row.name!,
       arr_type: 'lidarr',
@@ -92,7 +94,8 @@ export async function getSonarrByName(cache: PCDCache, name: string): Promise<So
 export async function getLidarrByName(cache: PCDCache, name: string): Promise<SonarrMediaSettingsRow | null> {
   const db = cache.kb;
 
-  const row = await db.selectFrom('sonarr_media_settings').selectAll().where('name', '=', name).executeTakeFirst();
+  const tableName = 'lidarr_media_settings' as keyof PCDDatabase;
+  const row = await db.selectFrom(tableName).selectAll().where('name', '=', name).executeTakeFirst();
 
   if (!row) return null;
 

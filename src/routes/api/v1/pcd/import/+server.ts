@@ -135,7 +135,7 @@ async function deserializeEntity({ databaseId, cache, layer, entityType, data }:
         portable: data as unknown as PortableMediaSettings,
       });
     case 'lidarr_media_settings':
-      return deserialize.deserializeSonarrMediaSettings({
+      return deserialize.deserializeLidarrMediaSettings({
         ...opts,
         portable: data as unknown as PortableLidarrMediaSettings,
       });

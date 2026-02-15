@@ -11,6 +11,7 @@ import type {
   PortableRegularExpression,
   PortableCustomFormat,
   PortableQualityProfile,
+  PortableLidarrMediaSettings,
   PortableRadarrNaming,
   PortableSonarrNaming,
   PortableMediaSettings,
@@ -225,6 +226,20 @@ export async function serializeRadarrMediaSettings(cache: PCDCache, name: string
 export async function serializeSonarrMediaSettings(cache: PCDCache, name: string): Promise<PortableMediaSettings> {
   const row = await mediaSettingsQueries.getSonarrByName(cache, name);
   if (!row) throw new Error(`Sonarr media settings "${name}" not found`);
+
+  return {
+    name: row.name,
+    propersRepacks: row.propers_repacks,
+    enableMediaInfo: row.enable_media_info,
+  };
+}
+
+export async function serializeLidarrMediaSettings(
+  cache: PCDCache,
+  name: string
+): Promise<PortableLidarrMediaSettings> {
+  const row = await mediaSettingsQueries.getLidarrByName(cache, name);
+  if (!row) throw new Error(`Lidarr media settings "${name}" not found`);
 
   return {
     name: row.name,

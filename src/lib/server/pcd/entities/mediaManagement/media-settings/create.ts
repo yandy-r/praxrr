@@ -4,6 +4,7 @@
 
 import type { PCDCache } from '$pcd/index.ts';
 import { writeOperation, type OperationLayer } from '$pcd/index.ts';
+import type { PCDDatabase } from '$shared/pcd/types.ts';
 import type { RadarrMediaSettingsRow } from '$shared/pcd/display.ts';
 
 export interface CreateMediaSettingsInput {
@@ -113,20 +114,19 @@ export async function createLidarrMediaSettings(options: CreateMediaSettingsOpti
   const { databaseId, cache, layer, input } = options;
   const db = cache.kb;
 
-  // Lidarr shares Sonarr media-settings storage in this phase.
-  // Use Sonarr table identity for deterministic collision behavior.
+  const tableName = 'lidarr_media_settings' as keyof PCDDatabase;
   const existing = await db
-    .selectFrom('sonarr_media_settings')
+    .selectFrom(tableName)
     .where((eb) => eb(eb.fn('lower', [eb.ref('name')]), '=', input.name.toLowerCase()))
     .select('name')
     .executeTakeFirst();
 
   if (existing) {
-    throw new Error(`A sonarr media settings config with name "${input.name}" already exists`);
+    throw new Error(`A lidarr media settings config with name "${input.name}" already exists`);
   }
 
   const insertQuery = db
-    .insertInto('sonarr_media_settings')
+    .insertInto(tableName)
     .values({
       name: input.name,
       propers_repacks: input.propersRepacks,
@@ -146,9 +146,9 @@ export async function createLidarrMediaSettings(options: CreateMediaSettingsOpti
     },
     metadata: {
       operation: 'create',
-      entity: 'sonarr_media_settings',
+      entity: 'lidarr_media_settings',
       name: input.name,
-      stableKey: { key: 'sonarr_media_settings_name', value: input.name },
+      stableKey: { key: 'lidarr_media_settings_name', value: input.name },
       summary: 'Create Lidarr media settings',
       title: `Create Lidarr media settings "${input.name}"`,
     },
