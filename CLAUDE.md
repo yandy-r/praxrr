@@ -165,6 +165,7 @@ SQLite file (`profilarr.db`) managed by `DatabaseManager` in `$db/db.ts`. Schema
 - **Conventional commits.** `feat:`, `fix:`, `docs:`, `refactor:`, `chore:`.
 - **Formatting.** Tabs, single quotes, no trailing commas, 100 char print width (Prettier + prettier-plugin-svelte + prettier-plugin-tailwindcss).
 - **Entity names.** Case-insensitive uniqueness enforced on create/rename for all PCD entities.
+- **PR body updates.** Use `gh pr create/edit --body-file <file>` rather than inline `--body`; if `gh pr edit` fails with GraphQL `projectCards` deprecation errors, patch the PR via `gh api -X PATCH repos/<owner>/<repo>/pulls/<number> -f body=...`.
 
 ### Cross-Arr Semantic Validation Policy
 
