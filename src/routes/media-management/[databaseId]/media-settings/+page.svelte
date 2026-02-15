@@ -97,7 +97,7 @@
 	// Initialize data page store
 	const { search, view, filtered, setItems } = createDataPageStore(data.mediaSettingsConfigs, {
 		storageKey: 'mediaSettingsView',
-		searchKeys: ['name'],
+		searchKeys: ['name', 'arr_type'],
 		searchKey: `mediaSettingsConfigsSearch:${data.currentDatabase.id}`
 	});
 

@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { createEventDispatcher } from 'svelte';
+	import { SvelteSet } from 'svelte/reactivity';
 	import CardGrid from '$ui/card/CardGrid.svelte';
 	import Card from '$ui/card/Card.svelte';
 	import Label from '$ui/label/Label.svelte';
@@ -32,7 +33,7 @@
 		ARR_APP_TYPES.map((type) => [type, logoAssets[type]])
 	) as Partial<Record<ArrIconKey, string>>;
 
-	let loadedImages: Set<string> = new Set();
+	let loadedImages = new SvelteSet<string>();
 
 	function formatTypeLabel(type: string): string {
 		if (!type) {
@@ -63,25 +64,35 @@
 		return getAppLabel(arrType).slice(0, 1).toUpperCase();
 	}
 
+	function getMappedQualityLabel(qualityCount: number): string {
+		if (qualityCount === 0) {
+			return 'No mapped qualities';
+		}
+
+		return qualityCount === 1 ? '1 mapped quality' : `${qualityCount} mapped qualities`;
+	}
+
 	function getRowHref(config: QualityDefinitionListItem): string {
-		if (!config.name?.trim() || !isArrAppType(config.arr_type)) {
+		const normalizedName = config.name?.trim();
+		if (!normalizedName || !isArrAppType(config.arr_type)) {
 			return `/media-management/${databaseId}/quality-definitions`;
 		}
 
-		return `/media-management/${databaseId}/quality-definitions/${config.arr_type}/${encodeURIComponent(config.name)}`;
+		return `/media-management/${databaseId}/quality-definitions/${config.arr_type}/${encodeURIComponent(normalizedName)}`;
 	}
 
 	function handleImageLoad(name: string) {
 		loadedImages.add(name);
-		loadedImages = loadedImages;
 	}
 </script>
 
 <CardGrid columns={1} flush>
-	{#each configs as config}
+	{#each configs as config (config.arr_type + ':' + config.name)}
 		{@const appLabel = getAppLabel(config.arr_type)}
 		{@const logoPath = getLogoPath(config.arr_type)}
-		{@const isMappedType = isArrAppType(config.arr_type)}
+		{@const hasAppMapping = isArrAppType(config.arr_type)}
+		{@const hasMappedQualities = config.quality_count > 0}
+		{@const mappedQualityLabel = getMappedQualityLabel(config.quality_count)}
 		<Card href={getRowHref(config)} hoverable>
 			<div class="flex items-center gap-4">
 				<!-- Logo + Name -->
@@ -112,13 +123,17 @@
 							{getMediaManagementDisplayName(config.name, config.arr_type)}
 						</h3>
 						<div class="mt-1 flex flex-wrap items-center gap-1">
-							<Badge variant={isMappedType ? config.arr_type : 'warning'} size="sm">
+							<Badge variant={hasAppMapping ? config.arr_type : 'warning'} size="sm">
 								{appLabel}
 							</Badge>
-							{#if !isMappedType}
+							{#if !hasAppMapping}
 								<Label variant="warning" size="sm" rounded="md">Missing app mapping</Label>
+							{:else if !hasMappedQualities}
+								<Label variant="warning" size="sm" rounded="md">Missing quality mappings</Label>
 							{/if}
-							<Label variant="secondary" size="sm" rounded="md">{config.quality_count} qualities</Label>
+							<Label variant={hasMappedQualities ? 'secondary' : 'warning'} size="sm" rounded="md">
+								{mappedQualityLabel}
+							</Label>
 						</div>
 					</div>
 				</div>

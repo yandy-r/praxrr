@@ -66,11 +66,12 @@
 	}
 
 	function getRowHref(config: MediaSettingsListItem): string {
-		if (!isSupportedArrType(config.arr_type)) {
+		const normalizedName = config.name?.trim();
+		if (!normalizedName || !isSupportedArrType(config.arr_type)) {
 			return `/media-management/${databaseId}/media-settings`;
 		}
 
-		return `/media-management/${databaseId}/media-settings/${config.arr_type}/${encodeURIComponent(config.name)}`;
+		return `/media-management/${databaseId}/media-settings/${config.arr_type}/${encodeURIComponent(normalizedName)}`;
 	}
 </script>
 

@@ -26,6 +26,7 @@
 	$: cloneExistingNames = cloneArrType
 		? data.qualityDefinitionsConfigs.filter((config) => config.arr_type === cloneArrType).map((config) => config.name)
 		: [];
+	$: hasMissingQualityMappings = data.qualityDefinitionsConfigs.some((config) => config.quality_count === 0);
 
 	function formatType(type: string): string {
 		if (!type) {
@@ -119,6 +120,14 @@
 
 <!-- Quality Definitions Content -->
 <div class="mt-6">
+	{#if hasMissingQualityMappings}
+		<div
+			class="mb-4 rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200"
+		>
+			Some quality definitions are missing API mappings and are shown as "No mapped qualities".
+		</div>
+	{/if}
+
 	{#if data.qualityDefinitionsConfigs.length === 0}
 		<div
 			class="rounded-lg border border-neutral-200 bg-white p-8 text-center dark:border-neutral-800 dark:bg-neutral-900"

@@ -46,6 +46,10 @@ const QUALITY_DEFINITIONS_STORAGE: Record<ConcreteArrType, QualityDefinitionsSto
 const QUALITY_LOOKUP_MISSING_WARNING_REASON =
   'Quality entries are filtered out when quality_api_mappings reference unknown API quality names';
 
+const WARNED_UNMAPPED_QUALITY_ROWS = new Set<string>();
+const WARNED_UNMAPPED_QUALITY_ROWS_MAX = 2048;
+const MAX_LOGGED_SKIPPED_QUALITY_NAMES = 10;
+
 /**
  * Assert arr type is concrete for quality mapping lookups.
  */
@@ -165,6 +169,45 @@ function mapRowsToEntries(rows: QualityDefinitionEntryRow[]): QualityDefinitionE
   }));
 }
 
+function getUnmappedQualityWarningKey(arrType: ConcreteArrType, configName: string, skippedQualityNames: string[]): string {
+  return `${arrType}:${configName}:${skippedQualityNames.join('\u0001')}`;
+}
+
+async function warnUnmappedQualityDefinitionRows(
+  message: string,
+  arrType: ConcreteArrType,
+  configName: string,
+  skippedQualityNames: Set<string>
+): Promise<void> {
+  if (skippedQualityNames.size === 0) {
+    return;
+  }
+
+  const sortedSkippedQualityNames = [...skippedQualityNames].sort();
+  const warningKey = getUnmappedQualityWarningKey(arrType, configName, sortedSkippedQualityNames);
+  if (WARNED_UNMAPPED_QUALITY_ROWS.has(warningKey)) {
+    return;
+  }
+
+  if (WARNED_UNMAPPED_QUALITY_ROWS.size >= WARNED_UNMAPPED_QUALITY_ROWS_MAX) {
+    WARNED_UNMAPPED_QUALITY_ROWS.clear();
+  }
+  WARNED_UNMAPPED_QUALITY_ROWS.add(warningKey);
+
+  const visibleSkippedQualityNames = sortedSkippedQualityNames.slice(0, MAX_LOGGED_SKIPPED_QUALITY_NAMES);
+
+  await logger.warn(message, {
+    source: 'PCD:QualityDefinitions',
+    meta: {
+      arrType,
+      configName,
+      skippedQualityNames: visibleSkippedQualityNames,
+      skippedQualityNamesHiddenCount: sortedSkippedQualityNames.length - visibleSkippedQualityNames.length,
+      reason: QUALITY_LOOKUP_MISSING_WARNING_REASON,
+    },
+  });
+}
+
 async function pushListRows(
   rows: QualityDefinitionConfigRow[],
   arrType: ConcreteArrType,
@@ -195,17 +238,12 @@ async function pushListRows(
   }
 
   for (const [name, data] of configs) {
-    if (data.skippedQualityNames.size > 0) {
-      await logger.warn('Skipping unmapped quality definition rows in quality definitions list', {
-        source: 'PCD:QualityDefinitions',
-        meta: {
-          arrType,
-          configName: name,
-          skippedQualityNames: [...data.skippedQualityNames].sort(),
-          reason: QUALITY_LOOKUP_MISSING_WARNING_REASON,
-        },
-      });
-    }
+    await warnUnmappedQualityDefinitionRows(
+      'Skipping unmapped quality definition rows in quality definitions list',
+      arrType,
+      name,
+      data.skippedQualityNames
+    );
 
     result.push({
       name,
@@ -328,17 +366,12 @@ export async function getLidarrByName(cache: PCDCache, name: string): Promise<Qu
     skippedQualityNames.add(row.quality_name);
   }
 
-  if (skippedQualityNames.size > 0) {
-    await logger.warn('Skipping unmapped quality definition rows in Lidarr quality definitions read', {
-      source: 'PCD:QualityDefinitions',
-      meta: {
-        arrType: 'lidarr',
-        configName: name,
-        skippedQualityNames: [...skippedQualityNames].sort(),
-        reason: QUALITY_LOOKUP_MISSING_WARNING_REASON,
-      },
-    });
-  }
+  await warnUnmappedQualityDefinitionRows(
+    'Skipping unmapped quality definition rows in Lidarr quality definitions read',
+    'lidarr',
+    name,
+    skippedQualityNames
+  );
 
   return {
     name,
