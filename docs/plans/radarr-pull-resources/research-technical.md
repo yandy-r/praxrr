@@ -66,7 +66,7 @@ Request (explicit mode):
 }
 ```
 
-Request (implicit import-all mode):
+Request (implicit import-all mode): `selections` is **omitted** (property absent):
 
 ```json
 {
@@ -75,6 +75,14 @@ Request (implicit import-all mode):
   "previewId": "pvw_123"
 }
 ```
+
+**Empty vs omitted (client contract):** To avoid ambiguity for clients that send `selections: {}` or per-category empty arrays (e.g. `customFormats: []`), the server MUST treat **empty** the same as **omitted**:
+
+- **Omitted:** `selections` property absent → import-all (implicit mode).
+- **Empty:** `selections` present but `{}`, or all category arrays empty → **same as omitted** → import-all (implicit mode).
+- **Import-none** is not a valid outcome for empty payloads; if a client wants to commit without importing any resource, it must either not call execute or use explicit mode with all items set to a skip/no-import action (if supported).
+
+This gives a single rule: “no explicit non-empty choices” ⇒ import-all.
 
 Behavior in implicit mode:
 
