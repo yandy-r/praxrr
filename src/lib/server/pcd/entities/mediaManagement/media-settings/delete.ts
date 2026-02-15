@@ -87,3 +87,45 @@ export async function removeSonarrMediaSettings(options: RemoveSonarrMediaSettin
     },
   });
 }
+
+export interface RemoveLidarrMediaSettingsOptions {
+  databaseId: number;
+  cache: PCDCache;
+  layer: OperationLayer;
+  current: SonarrMediaSettingsRow;
+}
+
+export async function removeLidarrMediaSettings(options: RemoveLidarrMediaSettingsOptions) {
+  const { databaseId, cache, layer, current } = options;
+  const db = cache.kb;
+
+  // Lidarr reuses Sonarr media-settings storage in this phase.
+  const deleteQuery = db
+    .deleteFrom('sonarr_media_settings')
+    .where('name', '=', current.name)
+    .where('propers_repacks', '=', current.propers_repacks)
+    .where('enable_media_info', '=', current.enable_media_info ? 1 : 0)
+    .compile();
+
+  return writeOperation({
+    databaseId,
+    layer,
+    description: `delete-lidarr-media-settings-${current.name}`,
+    queries: [deleteQuery],
+    desiredState: {
+      deleted: true,
+      name: current.name,
+      propers_repacks: current.propers_repacks,
+      enable_media_info: current.enable_media_info,
+    },
+    metadata: {
+      operation: 'delete',
+      entity: 'sonarr_media_settings',
+      name: current.name,
+      stableKey: { key: 'sonarr_media_settings_name', value: current.name },
+      changedFields: ['deleted'],
+      summary: 'Delete Lidarr media settings',
+      title: `Delete Lidarr media settings "${current.name}"`,
+    },
+  });
+}

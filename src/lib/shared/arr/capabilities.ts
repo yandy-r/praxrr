@@ -197,6 +197,28 @@ const ARR_CAPABILITY_NON_REGRESSION_CHECK = {
 };
 void ARR_CAPABILITY_NON_REGRESSION_CHECK;
 
+// Non-regression acceptance checks:
+// - arr app keys remain explicit and complete;
+// - Radarr/Sonarr media-management support stays true;
+// - Lidarr media-management support is explicit in this contract surface.
+const ARR_APP_KEY_NON_REGRESSION_CHECK = {
+  radarr: 'radarr',
+  sonarr: 'sonarr',
+  lidarr: 'lidarr',
+} as const satisfies Record<ArrAppType, ArrAppType>;
+
+const ARR_MEDIA_MANAGEMENT_SYNC_CAPABILITY_NON_REGRESSION_CHECK = {
+  radarr: ARR_APPS.radarr.capabilities.sync.media_management,
+  sonarr: ARR_APPS.sonarr.capabilities.sync.media_management,
+  lidarr: ARR_APPS.lidarr.capabilities.sync.media_management,
+} as const satisfies {
+  radarr: true;
+  sonarr: true;
+  lidarr: true;
+};
+void ARR_APP_KEY_NON_REGRESSION_CHECK;
+void ARR_MEDIA_MANAGEMENT_SYNC_CAPABILITY_NON_REGRESSION_CHECK;
+
 // ============================================================================
 // DERIVED CONSTANTS
 // ============================================================================

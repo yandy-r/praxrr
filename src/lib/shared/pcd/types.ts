@@ -679,10 +679,14 @@ export const ARR_TYPES = [...ARR_APP_TYPES, 'all'] as const;
 /** Which arr application the data applies to */
 export type ArrType = (typeof ARR_TYPES)[number];
 
-// Non-regression acceptance checks: keep legacy Radarr/Sonarr targets valid.
+// Non-regression acceptance checks:
+// - Radarr/Sonarr legacy targets remain valid.
+// - Lidarr is an explicit, intentional Arr app type addition (no string fallback).
 const ARR_APP_TYPE_NON_REGRESSION_CHECK = ['radarr', 'sonarr'] as const satisfies readonly ArrAppType[];
+const ARR_APP_TYPE_WITH_LIDARR_CHECK = ['radarr', 'sonarr', 'lidarr'] as const satisfies readonly ArrAppType[];
 const ARR_TYPE_NON_REGRESSION_CHECK = ['radarr', 'sonarr', 'all'] as const satisfies readonly ArrType[];
 void ARR_APP_TYPE_NON_REGRESSION_CHECK;
+void ARR_APP_TYPE_WITH_LIDARR_CHECK;
 void ARR_TYPE_NON_REGRESSION_CHECK;
 
 /** Runtime guard for untrusted arr type values */
