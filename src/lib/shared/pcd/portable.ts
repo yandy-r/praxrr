@@ -16,7 +16,14 @@ import type { ConditionData, OrderedItem, QualityDefinitionEntry } from './displ
 import type { PreferredProtocol } from './display.ts';
 import type { RadarrNamingRow, SonarrNamingRow, RadarrMediaSettingsRow } from './types.ts';
 
-type ReusedSonarrEntityType = 'sonarr_naming' | 'sonarr_media_settings' | 'sonarr_quality_definitions';
+type LidarrPortableValidationEntityType = 'sonarr_naming' | 'sonarr_media_settings' | 'sonarr_quality_definitions';
+
+type LidarrPortableLegacyAliasEntityType =
+  | 'sonarr_naming'
+  | 'radarr_media_settings'
+  | 'sonarr_media_settings'
+  | 'radarr_quality_definitions'
+  | 'sonarr_quality_definitions';
 
 export const LIDARR_MEDIA_MANAGEMENT_PORTABLE_ENTITIES = [
   'lidarr_naming',
@@ -27,7 +34,8 @@ export const LIDARR_MEDIA_MANAGEMENT_PORTABLE_ENTITIES = [
 export type LidarrMediaManagementPortableEntityType = (typeof LIDARR_MEDIA_MANAGEMENT_PORTABLE_ENTITIES)[number];
 
 interface LidarrMediaManagementPortableEntry {
-  reusableEntityType: ReusedSonarrEntityType;
+  reusableEntityType: LidarrPortableValidationEntityType;
+  legacyAliasEntityTypes?: readonly LidarrPortableLegacyAliasEntityType[];
   requiredFields: readonly string[];
   forbiddenFields?: readonly string[];
 }
@@ -38,6 +46,7 @@ export const LIDARR_MEDIA_MANAGEMENT_PORTABLE_MATRIX: Record<
 > = {
   lidarr_naming: {
     reusableEntityType: 'sonarr_naming',
+    legacyAliasEntityTypes: ['sonarr_naming'],
     requiredFields: [
       'name',
       'rename',
@@ -55,10 +64,12 @@ export const LIDARR_MEDIA_MANAGEMENT_PORTABLE_MATRIX: Record<
   },
   lidarr_media_settings: {
     reusableEntityType: 'sonarr_media_settings',
+    legacyAliasEntityTypes: ['radarr_media_settings', 'sonarr_media_settings'],
     requiredFields: ['name', 'propersRepacks', 'enableMediaInfo'],
   },
   lidarr_quality_definitions: {
     reusableEntityType: 'sonarr_quality_definitions',
+    legacyAliasEntityTypes: ['radarr_quality_definitions', 'sonarr_quality_definitions'],
     requiredFields: ['name', 'entries'],
   },
 } as const;

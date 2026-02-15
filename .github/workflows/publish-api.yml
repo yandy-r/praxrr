@@ -25,7 +25,7 @@ jobs:
           deno-version: '2.5.6'
 
       - name: Bundle API spec
-        run: deno task bundle:api
+        run: deno run -A scripts/bundle-api.ts
 
       - name: Verify generated files are the only changes
         run: |
