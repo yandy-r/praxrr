@@ -80,25 +80,25 @@ deno task generate:pcd-types   # PCD schema -> TypeScript types (src/lib/shared/
 
 Defined in `svelte.config.js` and mirrored in `deno.json`:
 
-| Alias | Path |
-|-------|------|
-| `$lib/` | `src/lib/` |
-| `$api/` | `src/lib/api/` |
-| `$config` | `src/lib/server/utils/config/config.ts` |
-| `$logger/` | `src/lib/server/utils/logger/` |
-| `$shared/` | `src/lib/shared/` |
-| `$stores/` | `src/lib/client/stores/` |
-| `$ui/` | `src/lib/client/ui/` |
-| `$db/` | `src/lib/server/db/` |
-| `$pcd/` | `src/lib/server/pcd/` |
-| `$jobs/` | `src/lib/server/jobs/` |
-| `$arr/` | `src/lib/server/utils/arr/` |
-| `$sync/` | `src/lib/server/sync/` |
-| `$auth/` | `src/lib/server/utils/auth/` |
-| `$notifications/` | `src/lib/server/notifications/` |
-| `$cache/` | `src/lib/server/utils/cache/` |
-| `$http/` | `src/lib/server/utils/http/` |
-| `$utils/` | `src/lib/server/utils/` |
+| Alias             | Path                                    |
+| ----------------- | --------------------------------------- |
+| `$lib/`           | `src/lib/`                              |
+| `$api/`           | `src/lib/api/`                          |
+| `$config`         | `src/lib/server/utils/config/config.ts` |
+| `$logger/`        | `src/lib/server/utils/logger/`          |
+| `$shared/`        | `src/lib/shared/`                       |
+| `$stores/`        | `src/lib/client/stores/`                |
+| `$ui/`            | `src/lib/client/ui/`                    |
+| `$db/`            | `src/lib/server/db/`                    |
+| `$pcd/`           | `src/lib/server/pcd/`                   |
+| `$jobs/`          | `src/lib/server/jobs/`                  |
+| `$arr/`           | `src/lib/server/utils/arr/`             |
+| `$sync/`          | `src/lib/server/sync/`                  |
+| `$auth/`          | `src/lib/server/utils/auth/`            |
+| `$notifications/` | `src/lib/server/notifications/`         |
+| `$cache/`         | `src/lib/server/utils/cache/`           |
+| `$http/`          | `src/lib/server/utils/http/`            |
+| `$utils/`         | `src/lib/server/utils/`                 |
 
 ### Server-Side Layout
 
