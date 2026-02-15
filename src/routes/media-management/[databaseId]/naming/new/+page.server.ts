@@ -3,9 +3,12 @@ import type { Actions, ServerLoad } from '@sveltejs/kit';
 import { pcdManager } from '$pcd/index.ts';
 import { canWriteToBase } from '$pcd/index.ts';
 import type { OperationLayer } from '$pcd/index.ts';
-import type { RadarrNamingRow, SonarrNamingRow } from '$shared/pcd/display.ts';
-import { createRadarrNaming, createSonarrNaming } from '$pcd/entities/mediaManagement/naming/index.ts';
-import { createLidarrNaming } from '$pcd/entities/mediaManagement/naming/create.ts';
+import type { LidarrNamingRow, RadarrNamingRow, SonarrNamingRow } from '$shared/pcd/display.ts';
+import {
+  createLidarrNaming,
+  createRadarrNaming,
+  createSonarrNaming,
+} from '$pcd/entities/mediaManagement/naming/index.ts';
 import type { ArrAppType } from '$shared/pcd/types.ts';
 import { validateNamingFormat } from '$shared/pcd/namingTokens.ts';
 
@@ -102,7 +105,7 @@ export const actions: Actions = {
       if (!result.success) {
         return fail(500, { error: result.error || 'Failed to create radarr naming config' });
       }
-    } else if (arrType === 'sonarr' || arrType === 'lidarr') {
+    } else if (arrType === 'sonarr') {
       const rename = formData.get('rename') === 'true';
       const standardEpisodeFormat = formData.get('standardEpisodeFormat') as string;
       const dailyEpisodeFormat = formData.get('dailyEpisodeFormat') as string;
@@ -132,8 +135,7 @@ export const actions: Actions = {
 
       let result;
       try {
-        const createFn = arrType === 'sonarr' ? createSonarrNaming : createLidarrNaming;
-        result = await createFn({
+        result = await createSonarrNaming({
           databaseId: currentDatabaseId,
           cache,
           layer,
@@ -152,7 +154,7 @@ export const actions: Actions = {
           },
         });
       } catch (err) {
-        const message = err instanceof Error ? err.message : `Failed to create ${arrType} naming config`;
+        const message = err instanceof Error ? err.message : 'Failed to create sonarr naming config';
         if (message.includes('already exists')) {
           return fail(400, { error: message });
         }
@@ -160,8 +162,61 @@ export const actions: Actions = {
       }
 
       if (!result.success) {
-        const defaultError = `Failed to create ${arrType} naming config`;
-        return fail(500, { error: result.error || defaultError });
+        return fail(500, { error: result.error || 'Failed to create sonarr naming config' });
+      }
+    } else if (arrType === 'lidarr') {
+      const rename = formData.get('rename') === 'true';
+      const standardTrackFormat = formData.get('standardTrackFormat') as string;
+      const artistName = formData.get('artistName') as string;
+      const multiDiscTrackFormat = formData.get('multiDiscTrackFormat') as string;
+      const artistFolderFormat = formData.get('artistFolderFormat') as string;
+      const replaceIllegalCharacters = formData.get('replaceIllegalCharacters') === 'true';
+      const colonReplacementFormat = formData.get(
+        'colonReplacementFormat'
+      ) as LidarrNamingRow['colon_replacement_format'];
+      const customColonReplacementFormat = formData.get('customColonReplacementFormat') as string;
+
+      const requiredFields = [
+        { name: 'Standard track format', value: standardTrackFormat },
+        { name: 'Multi-disc track format', value: multiDiscTrackFormat },
+        { name: 'Artist folder format', value: artistFolderFormat },
+      ];
+
+      for (const field of requiredFields) {
+        if (!field.value?.trim()) {
+          return fail(400, { error: `${field.name} is required` });
+        }
+      }
+
+      const artistNameValue = (artistName as string)?.trim();
+      let result;
+      try {
+        result = await createLidarrNaming({
+          databaseId: currentDatabaseId,
+          cache,
+          layer,
+          input: {
+            name: name.trim(),
+            rename,
+            standardTrackFormat: standardTrackFormat.trim(),
+            artistName: artistNameValue || undefined,
+            multiDiscTrackFormat: multiDiscTrackFormat.trim(),
+            artistFolderFormat: artistFolderFormat.trim(),
+            replaceIllegalCharacters,
+            colonReplacementFormat: colonReplacementFormat || 'delete',
+            customColonReplacementFormat: customColonReplacementFormat || null,
+          },
+        });
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Failed to create lidarr naming config';
+        if (message.includes('already exists')) {
+          return fail(400, { error: message });
+        }
+        return fail(500, { error: message });
+      }
+
+      if (!result.success) {
+        return fail(500, { error: result.error || 'Failed to create lidarr naming config' });
       }
     }
 

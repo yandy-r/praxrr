@@ -4,9 +4,10 @@
 
 import type { PCDCache } from '$pcd/index.ts';
 import { writeOperation, type OperationLayer } from '$pcd/index.ts';
-import type { RadarrNamingRow, SonarrNamingRow } from '$shared/pcd/display.ts';
+import type { LidarrNamingRow, RadarrNamingRow, SonarrNamingRow } from '$shared/pcd/display.ts';
+import type { PCDDatabase } from '$shared/pcd/types.ts';
 import { colonReplacementToDb, multiEpisodeStyleToDb } from '$shared/pcd/mediaManagement.ts';
-import { RADARR_NAMING_TABLE, SONARR_BACKED_NAMING_TABLE } from './constants.ts';
+import { LIDARR_NAMING_TABLE, RADARR_NAMING_TABLE, SONARR_BACKED_NAMING_TABLE } from './constants.ts';
 
 export interface CreateRadarrNamingInput {
   name: string;
@@ -96,17 +97,13 @@ export interface CreateSonarrNamingOptions {
   input: CreateSonarrNamingInput;
 }
 
-type SonarrBackedNamingType = 'sonarr' | 'lidarr';
+type SonarrBackedNamingType = 'sonarr';
 
 async function createSonarrBackedNaming(options: CreateSonarrNamingOptions, namingType: SonarrBackedNamingType) {
   const { databaseId, cache, layer, input } = options;
   const db = cache.kb;
-  const normalizedType = namingType === 'sonarr' ? 'Sonarr' : 'Lidarr';
+  const normalizedType = 'Sonarr';
 
-  // Lidarr reuses Sonarr-backed naming storage in this phase.
-  // Acceptance criteria under shared-table reuse:
-  // - Sonarr and Lidarr duplicate checks collide on the same storage rows
-  // - duplicate error messages keep the requested arr identity for deterministic UX
   const existing = await db
     .selectFrom(SONARR_BACKED_NAMING_TABLE)
     .where((eb) => eb(eb.fn('lower', [eb.ref('name')]), '=', input.name.toLowerCase()))
@@ -167,6 +164,113 @@ export async function createSonarrNaming(options: CreateSonarrNamingOptions) {
   return createSonarrBackedNaming(options, 'sonarr');
 }
 
-export async function createLidarrNaming(options: CreateSonarrNamingOptions) {
-  return createSonarrBackedNaming(options, 'lidarr');
+interface LegacyPortableLidarrNamingInput {
+  standardEpisodeFormat?: string;
+  dailyEpisodeFormat?: string;
+  animeEpisodeFormat?: string;
+  seriesFolderFormat?: string;
+}
+
+export interface CreateLidarrNamingInput extends LegacyPortableLidarrNamingInput {
+  name: string;
+  rename: boolean;
+  standardTrackFormat?: string;
+  artistName?: string;
+  multiDiscTrackFormat?: string;
+  artistFolderFormat?: string;
+  replaceIllegalCharacters: boolean;
+  colonReplacementFormat: LidarrNamingRow['colon_replacement_format'];
+  customColonReplacementFormat: string | null;
+}
+
+export interface CreateLidarrNamingOptions {
+  databaseId: number;
+  cache: PCDCache;
+  layer: OperationLayer;
+  input: CreateLidarrNamingInput;
+}
+
+const LIDARR_DEFAULT_ARTIST_NAME = '{Artist Name}';
+
+function normalizeLidarrNamingInput(input: CreateLidarrNamingInput) {
+  const standardTrackFormat = input.standardTrackFormat ?? input.standardEpisodeFormat ?? '';
+  const artistName =
+    (input.artistName ?? input.dailyEpisodeFormat ?? LIDARR_DEFAULT_ARTIST_NAME).trim() || LIDARR_DEFAULT_ARTIST_NAME;
+  const multiDiscTrackFormat = input.multiDiscTrackFormat ?? input.animeEpisodeFormat ?? '';
+  const artistFolderFormat = input.artistFolderFormat ?? input.seriesFolderFormat ?? '';
+
+  return {
+    standardTrackFormat,
+    artistName,
+    multiDiscTrackFormat,
+    artistFolderFormat,
+  };
+}
+
+export async function createLidarrNaming(options: CreateLidarrNamingOptions) {
+  const { databaseId, cache, layer, input } = options;
+  const db = cache.kb;
+  const tableName = LIDARR_NAMING_TABLE as keyof PCDDatabase;
+
+  const existing = await db
+    .selectFrom(tableName)
+    .where((eb) => eb(eb.fn('lower', [eb.ref('name')]), '=', input.name.toLowerCase()))
+    .select('name')
+    .executeTakeFirst();
+
+  if (existing) {
+    throw new Error(`A lidarr naming config with name "${input.name}" already exists`);
+  }
+
+  const normalized = normalizeLidarrNamingInput(input);
+  if (!normalized.standardTrackFormat.trim()) {
+    throw new Error('Standard track format is required');
+  }
+  if (!normalized.multiDiscTrackFormat.trim()) {
+    throw new Error('Multi-disc track format is required');
+  }
+  if (!normalized.artistFolderFormat.trim()) {
+    throw new Error('Artist folder format is required');
+  }
+
+  const insertQuery = db
+    .insertInto(tableName)
+    .values({
+      name: input.name,
+      rename: input.rename ? 1 : 0,
+      standard_track_format: normalized.standardTrackFormat,
+      artist_name: normalized.artistName,
+      multi_disc_track_format: normalized.multiDiscTrackFormat,
+      artist_folder_format: normalized.artistFolderFormat,
+      replace_illegal_characters: input.replaceIllegalCharacters ? 1 : 0,
+      colon_replacement_format: colonReplacementToDb(input.colonReplacementFormat),
+      custom_colon_replacement_format: input.customColonReplacementFormat,
+    })
+    .compile();
+
+  return writeOperation({
+    databaseId,
+    layer,
+    description: `create-lidarr-naming-${input.name}`,
+    queries: [insertQuery],
+    desiredState: {
+      name: input.name,
+      rename: input.rename,
+      standard_track_format: normalized.standardTrackFormat,
+      artist_name: normalized.artistName,
+      multi_disc_track_format: normalized.multiDiscTrackFormat,
+      artist_folder_format: normalized.artistFolderFormat,
+      replace_illegal_characters: input.replaceIllegalCharacters,
+      colon_replacement_format: input.colonReplacementFormat,
+      custom_colon_replacement_format: input.customColonReplacementFormat,
+    },
+    metadata: {
+      operation: 'create',
+      entity: 'lidarr_naming',
+      name: input.name,
+      stableKey: { key: 'lidarr_naming_name', value: input.name },
+      summary: 'Create Lidarr naming config',
+      title: `Create Lidarr naming "${input.name}"`,
+    },
+  });
 }

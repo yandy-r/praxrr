@@ -5,10 +5,22 @@ import { canWriteToBase } from '$pcd/index.ts';
 import type { OperationLayer } from '$pcd/index.ts';
 import { getLidarrByName } from '$pcd/entities/mediaManagement/naming/read.ts';
 import { updateLidarrNaming } from '$pcd/entities/mediaManagement/naming/update.ts';
-import { removeSonarrNaming } from '$pcd/entities/mediaManagement/naming/index.ts';
+import { removeLidarrNaming } from '$pcd/entities/mediaManagement/naming/index.ts';
 import { arrSyncQueries } from '$db/queries/arrSync.ts';
-import type { SonarrNamingRow } from '$shared/pcd/display.ts';
-import { validateNamingFormat } from '$shared/pcd/namingTokens.ts';
+import type { LidarrNamingRow } from '$shared/pcd/display.ts';
+
+async function resolveLidarrNamingByRouteName(cache: ReturnType<typeof pcdManager.getCache>, routeName: string) {
+  if (!cache) {
+    return null;
+  }
+
+  const decodedName = decodeURIComponent(routeName);
+  const directMatch = await getLidarrByName(cache, decodedName);
+  if (directMatch) {
+    return { config: directMatch, resolvedName: decodedName };
+  }
+  return null;
+}
 
 export const load: ServerLoad = async ({ params, parent }) => {
   const { databaseId, name } = params;
@@ -27,17 +39,15 @@ export const load: ServerLoad = async ({ params, parent }) => {
     throw error(500, 'Database cache not available');
   }
 
-  const decodedName = decodeURIComponent(name);
-  const namingConfig = await getLidarrByName(cache, decodedName);
-
-  if (!namingConfig) {
+  const resolved = await resolveLidarrNamingByRouteName(cache, name);
+  if (!resolved) {
     throw error(404, 'Naming config not found');
   }
 
   const parentData = await parent();
 
   return {
-    namingConfig,
+    namingConfig: resolved.config,
     canWriteToBase: parentData.canWriteToBase,
   };
 };
@@ -60,11 +70,12 @@ export const actions: Actions = {
       return fail(500, { error: 'Database cache not available' });
     }
 
-    const decodedName = decodeURIComponent(name);
-    const current = await getLidarrByName(cache, decodedName);
-    if (!current) {
+    const resolved = await resolveLidarrNamingByRouteName(cache, name);
+    if (!resolved) {
       return fail(404, { error: 'Naming config not found' });
     }
+    const current = resolved.config;
+    const resolvedName = resolved.resolvedName;
 
     const formData = await request.formData();
     const newName = formData.get('name') as string;
@@ -79,29 +90,24 @@ export const actions: Actions = {
     }
 
     const rename = formData.get('rename') === 'true';
-    const standardEpisodeFormat = formData.get('standardEpisodeFormat') as string;
-    const dailyEpisodeFormat = formData.get('dailyEpisodeFormat') as string;
-    const animeEpisodeFormat = formData.get('animeEpisodeFormat') as string;
-    const seriesFolderFormat = formData.get('seriesFolderFormat') as string;
-    const seasonFolderFormat = formData.get('seasonFolderFormat') as string;
+    const standardTrackFormat = formData.get('standardTrackFormat') as string;
+    const artistName = formData.get('artistName') as string;
+    const multiDiscTrackFormat = formData.get('multiDiscTrackFormat') as string;
+    const artistFolderFormat = formData.get('artistFolderFormat') as string;
     const replaceIllegalCharacters = formData.get('replaceIllegalCharacters') === 'true';
     const colonReplacementFormat = formData.get(
       'colonReplacementFormat'
-    ) as SonarrNamingRow['colon_replacement_format'];
+    ) as LidarrNamingRow['colon_replacement_format'];
     const customColonReplacementFormat = formData.get('customColonReplacementFormat') as string;
-    const multiEpisodeStyle = formData.get('multiEpisodeStyle') as SonarrNamingRow['multi_episode_style'];
 
     const formatFields = [
-      { name: 'Standard episode format', value: standardEpisodeFormat },
-      { name: 'Daily episode format', value: dailyEpisodeFormat },
-      { name: 'Anime episode format', value: animeEpisodeFormat },
-      { name: 'Series folder format', value: seriesFolderFormat },
-      { name: 'Season folder format', value: seasonFolderFormat },
+      { name: 'Standard track format', value: standardTrackFormat },
+      { name: 'Multi-disc track format', value: multiDiscTrackFormat },
+      { name: 'Artist folder format', value: artistFolderFormat },
     ];
     for (const field of formatFields) {
-      const validation = validateNamingFormat(field.value || '', 'sonarr');
-      if (!validation.valid) {
-        return fail(400, { error: `${field.name}: ${validation.errors.join(', ')}` });
+      if (!field.value?.trim()) {
+        return fail(400, { error: `${field.name} is required` });
       }
     }
 
@@ -115,15 +121,13 @@ export const actions: Actions = {
         input: {
           name: newName.trim(),
           rename,
-          standardEpisodeFormat: standardEpisodeFormat || '',
-          dailyEpisodeFormat: dailyEpisodeFormat || '',
-          animeEpisodeFormat: animeEpisodeFormat || '',
-          seriesFolderFormat: seriesFolderFormat || '',
-          seasonFolderFormat: seasonFolderFormat || '',
+          standardTrackFormat: standardTrackFormat.trim(),
+          artistName: (artistName as string)?.trim() || current.artist_name,
+          multiDiscTrackFormat: multiDiscTrackFormat.trim(),
+          artistFolderFormat: artistFolderFormat.trim(),
           replaceIllegalCharacters,
           colonReplacementFormat: colonReplacementFormat || 'delete',
           customColonReplacementFormat: customColonReplacementFormat || null,
-          multiEpisodeStyle: multiEpisodeStyle || 'extend',
         },
       });
     } catch (err) {
@@ -138,8 +142,8 @@ export const actions: Actions = {
       return fail(500, { error: result.error || 'Failed to update naming config' });
     }
 
-    if (newName.trim() !== decodedName) {
-      arrSyncQueries.updateNamingConfigName(decodedName, newName.trim(), {
+    if (newName.trim() !== resolvedName) {
+      arrSyncQueries.updateNamingConfigName(resolvedName, newName.trim(), {
         arrType: 'lidarr',
         databaseId: currentDatabaseId,
       });
@@ -165,11 +169,11 @@ export const actions: Actions = {
       return fail(500, { error: 'Database cache not available' });
     }
 
-    const decodedName = decodeURIComponent(name);
-    const current = await getLidarrByName(cache, decodedName);
-    if (!current) {
+    const resolved = await resolveLidarrNamingByRouteName(cache, name);
+    if (!resolved) {
       return fail(404, { error: 'Naming config not found' });
     }
+    const current = resolved.config;
 
     const formData = await request.formData();
     const layer = (formData.get('layer') as OperationLayer) || 'user';
@@ -178,7 +182,7 @@ export const actions: Actions = {
       return fail(403, { error: 'Cannot write to base layer without personal access token' });
     }
 
-    const result = await removeSonarrNaming({
+    const result = await removeLidarrNaming({
       databaseId: currentDatabaseId,
       cache,
       layer,

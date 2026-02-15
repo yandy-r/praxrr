@@ -1,5 +1,6 @@
 <script lang="ts">
 	import RadarrNamingForm from '../components/RadarrNamingForm.svelte';
+	import LidarrNamingForm from '../components/LidarrNamingForm.svelte';
 	import SonarrNamingForm from '../components/SonarrNamingForm.svelte';
 	import DirtyModal from '$ui/modal/DirtyModal.svelte';
 	import RadarrIcon from '$lib/client/assets/Radarr.svg';
@@ -58,6 +59,13 @@
 	</div>
 {:else if selectedArrType === 'radarr'}
 	<RadarrNamingForm
+		mode="create"
+		databaseName={data.currentDatabase.name}
+		canWriteToBase={data.canWriteToBase}
+		initialData={null}
+	/>
+{:else if selectedArrType === 'lidarr'}
+	<LidarrNamingForm
 		mode="create"
 		databaseName={data.currentDatabase.name}
 		canWriteToBase={data.canWriteToBase}

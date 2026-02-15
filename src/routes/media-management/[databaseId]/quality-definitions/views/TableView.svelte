@@ -7,7 +7,7 @@
 	import { Tag, Copy, Download } from 'lucide-svelte';
 	import type { QualityDefinitionListItem } from '$shared/pcd/display.ts';
 	import { ARR_APP_TYPES, type ArrIconKey, getArrAppMetadata, isArrAppType } from '$shared/arr/capabilities.ts';
-	import { getMediaManagementDisplayName } from '$shared/arr/displayName.ts';
+	import { getMediaManagementDisplayName, getMediaManagementRouteName } from '$shared/arr/displayName.ts';
 	import radarrLogo from '$lib/client/assets/Radarr.svg';
 	import sonarrLogo from '$lib/client/assets/Sonarr.svg';
 	import lidarrLogo from '$lib/client/assets/Lidarr.png';
@@ -73,12 +73,12 @@
 	}
 
 	function getRowHref(config: QualityDefinitionListItem): string {
-		const normalizedName = config.name?.trim();
-		if (!normalizedName || !isArrAppType(config.arr_type)) {
+		const routeName = getMediaManagementRouteName(config.name, config.arr_type).trim();
+		if (!routeName || !isArrAppType(config.arr_type)) {
 			return `/media-management/${databaseId}/quality-definitions`;
 		}
 
-		return `/media-management/${databaseId}/quality-definitions/${config.arr_type}/${encodeURIComponent(normalizedName)}`;
+		return `/media-management/${databaseId}/quality-definitions/${config.arr_type}/${encodeURIComponent(routeName)}`;
 	}
 
 	const columns: Column<QualityDefinitionListItem>[] = [

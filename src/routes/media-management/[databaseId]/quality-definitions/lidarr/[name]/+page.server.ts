@@ -2,13 +2,9 @@ import { error, redirect, fail, type Actions, type ServerLoad } from '@sveltejs/
 import { pcdManager } from '$pcd/index.ts';
 import { canWriteToBase } from '$pcd/index.ts';
 import type { OperationLayer } from '$pcd/index.ts';
-import {
-  getLidarrByName,
-  getAvailableQualities,
-  getSonarrByName,
-} from '$pcd/entities/mediaManagement/quality-definitions/read.ts';
+import { getLidarrByName, getAvailableQualities } from '$pcd/entities/mediaManagement/quality-definitions/read.ts';
 import { updateLidarrQualityDefinitions } from '$pcd/entities/mediaManagement/quality-definitions/update.ts';
-import { removeSonarrQualityDefinitions } from '$pcd/entities/mediaManagement/quality-definitions/delete.ts';
+import { removeLidarrQualityDefinitions } from '$pcd/entities/mediaManagement/quality-definitions/delete.ts';
 import { arrSyncQueries } from '$db/queries/arrSync.ts';
 
 const QUALITY_DEFINITION_UNSUPPORTED_ERROR_PREFIX = 'Unsupported quality names for quality definitions';
@@ -78,6 +74,22 @@ function failWithDomainError(errorValue: unknown, fallbackMessage: string) {
   });
 }
 
+async function resolveLidarrQualityDefinitionsByRouteName(
+  cache: ReturnType<typeof pcdManager.getCache>,
+  routeName: string
+) {
+  if (!cache) {
+    return null;
+  }
+
+  const decodedName = decodeURIComponent(routeName);
+  const directMatch = await getLidarrByName(cache, decodedName);
+  if (directMatch) {
+    return { config: directMatch, resolvedName: decodedName };
+  }
+  return null;
+}
+
 export const load: ServerLoad = async ({ params, parent }) => {
   const { databaseId, name } = params;
 
@@ -95,10 +107,8 @@ export const load: ServerLoad = async ({ params, parent }) => {
     throw error(500, 'Database cache not available');
   }
 
-  const decodedName = decodeURIComponent(name);
-  const qualityDefinitionsConfig = await getLidarrByName(cache, decodedName);
-
-  if (!qualityDefinitionsConfig) {
+  const resolved = await resolveLidarrQualityDefinitionsByRouteName(cache, name);
+  if (!resolved) {
     throw error(404, 'Quality definitions config not found');
   }
 
@@ -106,7 +116,7 @@ export const load: ServerLoad = async ({ params, parent }) => {
   const parentData = await parent();
 
   return {
-    qualityDefinitionsConfig,
+    qualityDefinitionsConfig: resolved.config,
     availableQualities,
     canWriteToBase: parentData.canWriteToBase,
   };
@@ -130,11 +140,12 @@ export const actions: Actions = {
       return fail(500, { error: 'Database cache not available' });
     }
 
-    const decodedName = decodeURIComponent(name);
-    const current = await getLidarrByName(cache, decodedName);
-    if (!current) {
+    const resolved = await resolveLidarrQualityDefinitionsByRouteName(cache, name);
+    if (!resolved) {
       return fail(404, { error: 'Quality definitions config not found' });
     }
+    const current = resolved.config;
+    const resolvedName = resolved.resolvedName;
 
     const formData = await request.formData();
     const newName = formData.get('name') as string;
@@ -177,8 +188,8 @@ export const actions: Actions = {
       return fail(500, { status: 500, message, error: message });
     }
 
-    if (newName.trim() !== decodedName) {
-      arrSyncQueries.updateQualityDefinitionsConfigName(decodedName, newName.trim(), {
+    if (newName.trim() !== resolvedName) {
+      arrSyncQueries.updateQualityDefinitionsConfigName(resolvedName, newName.trim(), {
         arrType: 'lidarr',
         databaseId: currentDatabaseId,
       });
@@ -204,13 +215,14 @@ export const actions: Actions = {
       return fail(500, { error: 'Database cache not available' });
     }
 
-    const decodedName = decodeURIComponent(name);
-    const current = await getLidarrByName(cache, decodedName);
-    if (!current) {
+    const resolved = await resolveLidarrQualityDefinitionsByRouteName(cache, name);
+    if (!resolved) {
       return fail(404, { error: 'Quality definitions config not found' });
     }
+    const current = resolved.config;
+    const resolvedName = resolved.resolvedName;
 
-    const storageCurrent = await getSonarrByName(cache, decodedName);
+    const storageCurrent = await getLidarrByName(cache, resolvedName);
     if (!storageCurrent) {
       return fail(404, { error: 'Quality definitions config not found' });
     }
@@ -222,7 +234,7 @@ export const actions: Actions = {
       return fail(403, { error: 'Cannot write to base layer without personal access token' });
     }
 
-    const result = await removeSonarrQualityDefinitions({
+    const result = await removeLidarrQualityDefinitions({
       databaseId: currentDatabaseId,
       cache,
       layer,

@@ -45,6 +45,12 @@ Checklist (required for Arr-touching changes):
 - When testing scoped rename propagation, assert targeted `instance_id` coverage, not only affected row counts.
 - For transitional shared-table contracts (for example Sonarr-backed Lidarr entities), define table identifiers once in a shared constants module and reuse across read/create/update/delete paths to prevent silent contract drift between files.
 
+### Arr Cutover Guardrails (Required)
+
+- After promoting an Arr entity family to first-class tables, remove legacy sibling-app fallback paths immediately in route/read/write/sync resolution.
+- When introducing built-in PCD base-op migrations, also register them in `src/lib/server/pcd/ops/seedBuiltInBaseOps.ts` so newly initialized databases receive them without rerunning migrations.
+- For Arr-specific default templates, update both runtime form defaults and migration/backfill ops in the same change to avoid mixed legacy/native defaults.
+
 ## Testing Guidelines
 
 Place tests by domain (`src/tests/upgrades`, `src/tests/jobs`, etc.). Use `*.test.ts` for Deno tests and `*.spec.ts` for Playwright specs; keep the numeric prefix pattern for E2E files (for example `2.31-...spec.ts`). For regressions, add a test that fails before the fix and passes after it. You can run scoped suites with aliases from `scripts/test.ts`, such as `deno task test upgrades`.
