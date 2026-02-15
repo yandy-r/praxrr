@@ -13,7 +13,7 @@ import { goToConflicts, expectNoConflict } from '../helpers/conflicts';
 import {
   openFirstQualityProfileGeneral,
   goToQualityProfileQualities,
-  goToQualityProfileScoring
+  goToQualityProfileScoring,
 } from '../helpers/entity';
 import { getHead, resetToCommit } from '../helpers/reset';
 
@@ -42,7 +42,7 @@ test.describe('2.5 QP local qualities-only vs upstream scoring-only', () => {
       repoUrl: TEST_REPO_URL,
       pat: TEST_PAT,
       gitName: TEST_GIT_NAME,
-      gitEmail: TEST_GIT_EMAIL
+      gitEmail: TEST_GIT_EMAIL,
     });
 
     devHead = getHead(devId);
@@ -56,7 +56,7 @@ test.describe('2.5 QP local qualities-only vs upstream scoring-only', () => {
       syncStrategy: 'Manual (no auto-sync)',
       autoPull: false,
       localOpsEnabled: true,
-      conflictStrategy: 'Ask every time'
+      conflictStrategy: 'Ask every time',
     });
 
     profileName = await openFirstQualityProfileGeneral(page, localId);
@@ -131,8 +131,7 @@ test.describe('2.5 QP local qualities-only vs upstream scoring-only', () => {
       .filter({ has: page.locator('div.font-medium', { hasText: targetQualityName }) })
       .first();
     await expect(finalRow).toBeVisible();
-    const finalEnabled =
-      (await finalRow.locator('[role="checkbox"]').last().getAttribute('aria-checked')) === 'true';
+    const finalEnabled = (await finalRow.locator('[role="checkbox"]').last().getAttribute('aria-checked')) === 'true';
     expect(finalEnabled).toBe(localEnabledValue);
 
     // Verify upstream scoring change

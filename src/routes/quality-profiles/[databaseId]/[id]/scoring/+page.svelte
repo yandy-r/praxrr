@@ -33,6 +33,11 @@
 	import { invalidateAll } from '$app/navigation';
 	import { current, isDirty, initEdit, update } from '$lib/client/stores/dirty';
 	import { alertStore } from '$alerts/store';
+	import {
+		getArrAppMetadata,
+		isArrAppType,
+		type ArrAppType
+	} from '$shared/arr/capabilities.ts';
 	import type { PageData } from './$types';
 
 	export let data: PageData;
@@ -112,10 +117,22 @@
 	let selectedLayer: 'user' | 'base' = data.canWriteToBase ? 'base' : 'user';
 	let formElement: HTMLFormElement;
 
-	type SortKey = 'name' | 'radarr' | 'sonarr';
+	type SortKey = 'name' | ArrAppType;
 	type SortDirection = 'asc' | 'desc';
 
 	let sortState: { key: SortKey; direction: SortDirection } | null = null;
+
+	function getArrSortKeys(arrTypes: string[]): ArrAppType[] {
+		return arrTypes.filter((arrType): arrType is ArrAppType => isArrAppType(arrType));
+	}
+
+	function getDefaultSortKey(arrTypes: string[]): SortKey {
+		const keys = getArrSortKeys(arrTypes);
+		if (keys.includes('radarr')) {
+			return 'radarr';
+		}
+		return keys[0] ?? 'name';
+	}
 
 	// Tiling
 	let tileColumns: number = 1;
@@ -380,7 +397,7 @@
 
 		// Apply default settings
 		searchStore.setQuery('');
-		sortState = { key: 'radarr', direction: 'desc' };
+		sortState = { key: getDefaultSortKey(data.scoring?.arrTypes ?? []), direction: 'desc' };
 		selectedGroups = new Set();
 		customGroups = [];
 		tileColumns = 1;
@@ -405,14 +422,14 @@
 		| `#${string}`
 		| `var(--${string})`;
 
-	// Arr type color mapping
-	const arrTypeColors: Record<string, IconCheckboxColor> = {
-		radarr: 'var(--arr-radarr-color)',
-		sonarr: 'var(--arr-sonarr-color)'
-	};
+	function getArrTypeLabel(arrType: string): string {
+		return isArrAppType(arrType) ? getArrAppMetadata(arrType).label : arrType;
+	}
 
 	function getArrTypeColor(arrType: string): IconCheckboxColor {
-		return arrTypeColors[arrType] || '#3b82f6'; // default to blue
+		return isArrAppType(arrType)
+			? getArrAppMetadata(arrType).conditionTargetCheckboxColor
+			: '#3b82f6';
 	}
 
 	$: scoring = data.scoring;
@@ -435,12 +452,7 @@
 
 	// Apply default sort
 	$: if (scoring && !sortState) {
-		const defaultSortKey = (
-			scoring.arrTypes.includes('radarr') ? 'radarr' : scoring.arrTypes[0]
-		) as SortKey;
-		if (defaultSortKey) {
-			sortState = { key: defaultSortKey, direction: 'desc' };
-		}
+		sortState = { key: getDefaultSortKey(scoring.arrTypes), direction: 'desc' };
 	}
 
 	// Build custom format scores array for form submission
@@ -525,7 +537,7 @@
 				bVal = b.name?.toLowerCase() || '';
 				return sortState.direction === 'asc' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
 			} else {
-				// Sort by score (radarr or sonarr)
+				// Sort by score for selected Arr app.
 				aVal = scores[a.name]?.[sortState.key] ?? null;
 				bVal = scores[b.name]?.[sortState.key] ?? null;
 
@@ -702,9 +714,9 @@
 				<svelte:fragment slot="dropdown" let:dropdownPosition let:open>
 					<Dropdown position={dropdownPosition} mobilePosition="middle" minWidth="10rem">
 						<div class="py-1">
-							<button
-								type="button"
-								on:click={() => toggleSort('name', 'asc')}
+								<button
+									type="button"
+									on:click={() => toggleSort('name', 'asc')}
 								class="flex w-full items-center justify-between gap-3 px-4 py-2 text-sm transition-colors hover:bg-neutral-100 dark:hover:bg-neutral-700 {sortState?.key ===
 								'name'
 									? 'bg-neutral-50 dark:bg-neutral-700'
@@ -716,50 +728,36 @@
 									icon={sortState?.key === 'name' && sortState.direction === 'desc'
 										? ArrowDown
 										: ArrowUp}
-									color="blue"
-									shape="circle"
-								/>
-							</button>
-							<button
-								type="button"
-								on:click={() => toggleSort('radarr', 'desc')}
-								class="flex w-full items-center justify-between gap-3 px-4 py-2 text-sm transition-colors hover:bg-neutral-100 dark:hover:bg-neutral-700 {sortState?.key ===
-								'radarr'
-									? 'bg-neutral-50 dark:bg-neutral-700'
-									: ''}"
-							>
-								<span class="text-neutral-700 dark:text-neutral-300">Radarr</span>
-								<IconCheckbox
-									checked={sortState?.key === 'radarr'}
-									icon={sortState?.key === 'radarr' && sortState.direction === 'asc'
-										? ArrowUp
-										: ArrowDown}
-									color={getArrTypeColor('radarr')}
-									shape="circle"
-								/>
-							</button>
-							<button
-								type="button"
-								on:click={() => toggleSort('sonarr', 'desc')}
-								class="flex w-full items-center justify-between gap-3 px-4 py-2 text-sm transition-colors hover:bg-neutral-100 dark:hover:bg-neutral-700 {sortState?.key ===
-								'sonarr'
-									? 'bg-neutral-50 dark:bg-neutral-700'
-									: ''}"
-							>
-								<span class="text-neutral-700 dark:text-neutral-300">Sonarr</span>
-								<IconCheckbox
-									checked={sortState?.key === 'sonarr'}
-									icon={sortState?.key === 'sonarr' && sortState.direction === 'asc'
-										? ArrowUp
-										: ArrowDown}
-									color={getArrTypeColor('sonarr')}
-									shape="circle"
-								/>
-							</button>
-						</div>
-					</Dropdown>
-				</svelte:fragment>
-			</ActionButton>
+										color="blue"
+										shape="circle"
+									/>
+								</button>
+								{#each getArrSortKeys(scoring.arrTypes) as arrType}
+									<button
+										type="button"
+										on:click={() => toggleSort(arrType, 'desc')}
+										class="flex w-full items-center justify-between gap-3 px-4 py-2 text-sm transition-colors hover:bg-neutral-100 dark:hover:bg-neutral-700 {sortState?.key ===
+										arrType
+											? 'bg-neutral-50 dark:bg-neutral-700'
+											: ''}"
+									>
+										<span class="text-neutral-700 dark:text-neutral-300">
+											{getArrTypeLabel(arrType)}
+										</span>
+										<IconCheckbox
+											checked={sortState?.key === arrType}
+											icon={sortState?.key === arrType && sortState.direction === 'asc'
+												? ArrowUp
+												: ArrowDown}
+											color={getArrTypeColor(arrType)}
+											shape="circle"
+										/>
+									</button>
+								{/each}
+							</div>
+						</Dropdown>
+					</svelte:fragment>
+				</ActionButton>
 			<ActionButton icon={Layers} hasDropdown={true} dropdownPosition="right">
 				<svelte:fragment slot="dropdown" let:dropdownPosition let:open>
 					<Dropdown position={dropdownPosition} mobilePosition="middle" minWidth="14rem">

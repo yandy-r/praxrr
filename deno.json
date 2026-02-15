@@ -43,6 +43,9 @@
     "preview": "PORT=6869 HOST=0.0.0.0 APP_BASE_PATH=./dist/dev PARSER_HOST=localhost PARSER_PORT=5000 ./dist/build/profilarr",
     "clean:dev": "rm -rf dist/dev",
     "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "format:docs": "prettier --write docs/**/*.md",
+    "format:plans": "prettier --write docs/plans/**/*.md",
     "lint": "prettier --check . && eslint .",
     "check": "deno task check:server && deno task check:client",
     "check:server": "deno check --quiet src/lib/server/**/*.ts",
@@ -78,5 +81,12 @@
   },
   "lint": {
     "exclude": ["dist/", "node_modules/"]
-  }
+  },
+  "allowScripts": [
+    "npm:better-sqlite3@12.6.2",
+    "npm:esbuild@0.24.2",
+    "npm:esbuild@0.27.2",
+    "npm:fsevents@2.3.2",
+    "npm:fsevents@2.3.3"
+  ]
 }

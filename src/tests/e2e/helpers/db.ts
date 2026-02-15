@@ -49,9 +49,7 @@ export function openDb(): Database.Database {
 export function getDatabaseByName(name: string): DatabaseInstance | undefined {
   const db = openDb();
   try {
-    return db
-      .prepare('SELECT * FROM database_instances WHERE name = ?')
-      .get(name) as DatabaseInstance | undefined;
+    return db.prepare('SELECT * FROM database_instances WHERE name = ?').get(name) as DatabaseInstance | undefined;
   } finally {
     db.close();
   }
@@ -61,19 +59,14 @@ export function getDatabaseByName(name: string): DatabaseInstance | undefined {
 export function getOp(opId: number): PcdOp | undefined {
   const db = openDb();
   try {
-    return db.prepare('SELECT * FROM pcd_ops WHERE id = ?').get(opId) as
-      | PcdOp
-      | undefined;
+    return db.prepare('SELECT * FROM pcd_ops WHERE id = ?').get(opId) as PcdOp | undefined;
   } finally {
     db.close();
   }
 }
 
 /** Get all ops for a database, optionally filtered by origin and/or state */
-export function getOps(
-  databaseId: number,
-  filters?: { origin?: string; state?: string }
-): PcdOp[] {
+export function getOps(databaseId: number, filters?: { origin?: string; state?: string }): PcdOp[] {
   const db = openDb();
   try {
     let sql = 'SELECT * FROM pcd_ops WHERE database_id = ?';
@@ -96,16 +89,12 @@ export function getOps(
 }
 
 /** Get the latest history entry for an op */
-export function getLatestHistory(
-  opId: number
-): PcdOpHistory | undefined {
+export function getLatestHistory(opId: number): PcdOpHistory | undefined {
   const db = openDb();
   try {
-    return db
-      .prepare(
-        'SELECT * FROM pcd_op_history WHERE op_id = ? ORDER BY id DESC LIMIT 1'
-      )
-      .get(opId) as PcdOpHistory | undefined;
+    return db.prepare('SELECT * FROM pcd_op_history WHERE op_id = ? ORDER BY id DESC LIMIT 1').get(opId) as
+      | PcdOpHistory
+      | undefined;
   } finally {
     db.close();
   }
@@ -115,9 +104,7 @@ export function getLatestHistory(
 export function getOpHistory(opId: number): PcdOpHistory[] {
   const db = openDb();
   try {
-    return db
-      .prepare('SELECT * FROM pcd_op_history WHERE op_id = ? ORDER BY id DESC')
-      .all(opId) as PcdOpHistory[];
+    return db.prepare('SELECT * FROM pcd_op_history WHERE op_id = ? ORDER BY id DESC').all(opId) as PcdOpHistory[];
   } finally {
     db.close();
   }
@@ -181,9 +168,7 @@ export function parseMetadata(op: PcdOp): Record<string, unknown> | null {
 }
 
 /** Parse the desired_state JSON from an op */
-export function parseDesiredState(
-  op: PcdOp
-): Record<string, unknown> | null {
+export function parseDesiredState(op: PcdOp): Record<string, unknown> | null {
   if (!op.desired_state) return null;
   try {
     return JSON.parse(op.desired_state);

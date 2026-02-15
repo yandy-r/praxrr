@@ -10,10 +10,10 @@ import type { Migration } from '../migrations.ts';
  */
 
 export const migration: Migration = {
-	version: 47,
-	name: 'Create arr_database_namespaces table',
+  version: 47,
+  name: 'Create arr_database_namespaces table',
 
-	up: `
+  up: `
 		CREATE TABLE arr_database_namespaces (
 			instance_id    INTEGER NOT NULL,
 			database_id    INTEGER NOT NULL,
@@ -25,5 +25,5 @@ export const migration: Migration = {
 		);
 	`,
 
-	down: `DROP TABLE IF EXISTS arr_database_namespaces;`
+  down: `DROP TABLE IF EXISTS arr_database_namespaces;`,
 };

@@ -20,91 +20,87 @@ const REGEX_NAME = '3L';
 const DEV_NAME = '3L Dev Rename';
 
 async function renameRegex(page: import('@playwright/test').Page, newName: string): Promise<void> {
-	await page.locator('#name').fill(newName);
-	await page.getByRole('button', { name: 'Save Changes' }).click();
-	await page.waitForLoadState('networkidle');
+  await page.locator('#name').fill(newName);
+  await page.getByRole('button', { name: 'Save Changes' }).click();
+  await page.waitForLoadState('networkidle');
 }
 
-async function deleteRegex(
-	page: import('@playwright/test').Page,
-	databaseId: number,
-	name: string
-): Promise<void> {
-	await goToRegex(page, databaseId, name);
-	await page.getByRole('button', { name: 'Delete' }).first().click();
-	await page.getByRole('button', { name: 'Delete' }).last().click();
-	await page.waitForURL(new RegExp(`/regular-expressions/${databaseId}$`), {
-		timeout: 15_000
-	});
-	await page.waitForLoadState('networkidle');
+async function deleteRegex(page: import('@playwright/test').Page, databaseId: number, name: string): Promise<void> {
+  await goToRegex(page, databaseId, name);
+  await page.getByRole('button', { name: 'Delete' }).first().click();
+  await page.getByRole('button', { name: 'Delete' }).last().click();
+  await page.waitForURL(new RegExp(`/regular-expressions/${databaseId}$`), {
+    timeout: 15_000,
+  });
+  await page.waitForLoadState('networkidle');
 }
 
 test.describe('3.6 Regex delete vs upstream rename', () => {
-	let localId: number;
-	let devId: number;
-	let devHead: string;
+  let localId: number;
+  let devId: number;
+  let devHead: string;
 
-	test.beforeEach(async ({ browser }) => {
-		const page = await browser.newPage();
-		await unlinkPcdByName(page, LOCAL_DB_NAME);
-		await unlinkPcdByName(page, DEV_DB_NAME);
+  test.beforeEach(async ({ browser }) => {
+    const page = await browser.newPage();
+    await unlinkPcdByName(page, LOCAL_DB_NAME);
+    await unlinkPcdByName(page, DEV_DB_NAME);
 
-		devId = await linkPcd(page, {
-			name: DEV_DB_NAME,
-			repoUrl: TEST_REPO_URL,
-			pat: TEST_PAT,
-			gitName: TEST_GIT_NAME,
-			gitEmail: TEST_GIT_EMAIL
-		});
-		devHead = getHead(devId);
+    devId = await linkPcd(page, {
+      name: DEV_DB_NAME,
+      repoUrl: TEST_REPO_URL,
+      pat: TEST_PAT,
+      gitName: TEST_GIT_NAME,
+      gitEmail: TEST_GIT_EMAIL,
+    });
+    devHead = getHead(devId);
 
-		localId = await linkPcd(page, {
-			name: LOCAL_DB_NAME,
-			repoUrl: TEST_REPO_URL,
-			pat: TEST_PAT,
-			gitName: TEST_GIT_NAME,
-			gitEmail: TEST_GIT_EMAIL,
-			syncStrategy: 'Manual (no auto-sync)',
-			autoPull: false,
-			localOpsEnabled: true,
-			conflictStrategy: 'Ask every time'
-		});
+    localId = await linkPcd(page, {
+      name: LOCAL_DB_NAME,
+      repoUrl: TEST_REPO_URL,
+      pat: TEST_PAT,
+      gitName: TEST_GIT_NAME,
+      gitEmail: TEST_GIT_EMAIL,
+      syncStrategy: 'Manual (no auto-sync)',
+      autoPull: false,
+      localOpsEnabled: true,
+      conflictStrategy: 'Ask every time',
+    });
 
-		await page.close();
-	});
+    await page.close();
+  });
 
-	test.afterEach(async ({ browser }) => {
-		if (devId && devHead) {
-			try {
-				resetToCommit(devId, devHead, true);
-			} catch {
-				// Best-effort reset
-			}
-		}
-		const page = await browser.newPage();
-		await unlinkPcdByName(page, LOCAL_DB_NAME);
-		await unlinkPcdByName(page, DEV_DB_NAME);
-		await page.close();
-	});
+  test.afterEach(async ({ browser }) => {
+    if (devId && devHead) {
+      try {
+        resetToCommit(devId, devHead, true);
+      } catch {
+        // Best-effort reset
+      }
+    }
+    const page = await browser.newPage();
+    await unlinkPcdByName(page, LOCAL_DB_NAME);
+    await unlinkPcdByName(page, DEV_DB_NAME);
+    await page.close();
+  });
 
-	test('a) auto-align — no conflict, regex persists with dev name', async ({ page }) => {
-		// Local deletes the regex
-		await deleteRegex(page, localId, REGEX_NAME);
+  test('a) auto-align — no conflict, regex persists with dev name', async ({ page }) => {
+    // Local deletes the regex
+    await deleteRegex(page, localId, REGEX_NAME);
 
-		// Dev renames the regex
-		await goToRegex(page, devId, REGEX_NAME);
-		await renameRegex(page, DEV_NAME);
+    // Dev renames the regex
+    await goToRegex(page, devId, REGEX_NAME);
+    await renameRegex(page, DEV_NAME);
 
-		await exportAndPush(page, devId, 'e2e: 3.6 rename');
-		await pullChanges(page, localId);
+    await exportAndPush(page, devId, 'e2e: 3.6 rename');
+    await pullChanges(page, localId);
 
-		// No conflict expected
-		await goToConflicts(page, localId);
-		await expectNoConflict(page, REGEX_NAME);
+    // No conflict expected
+    await goToConflicts(page, localId);
+    await expectNoConflict(page, REGEX_NAME);
 
-		// Regex persists with dev's name
-		await goToRegex(page, localId, DEV_NAME);
-		const name = await page.locator('#name').inputValue();
-		expect(name).toBe(DEV_NAME);
-	});
+    // Regex persists with dev's name
+    await goToRegex(page, localId, DEV_NAME);
+    const name = await page.locator('#name').inputValue();
+    expect(name).toBe(DEV_NAME);
+  });
 });

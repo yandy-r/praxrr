@@ -5,225 +5,222 @@ import type { FilterConfig, FilterMode, UpgradeConfig } from '$shared/upgrades/f
  * Database row type for upgrade_configs table
  */
 interface UpgradeConfigRow {
-	id: number;
-	arr_instance_id: number;
-	enabled: number;
-	dry_run: number;
-	schedule: number;
-	filter_mode: string;
-	filters: string;
-	current_filter_index: number;
-	last_run_at: string | null;
-	created_at: string;
-	updated_at: string;
+  id: number;
+  arr_instance_id: number;
+  enabled: number;
+  dry_run: number;
+  schedule: number;
+  filter_mode: string;
+  filters: string;
+  current_filter_index: number;
+  last_run_at: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 /**
  * Input for creating/updating an upgrade config
  */
 export interface UpgradeConfigInput {
-	enabled?: boolean;
-	dryRun?: boolean;
-	schedule?: number;
-	filterMode?: FilterMode;
-	filters?: FilterConfig[];
-	currentFilterIndex?: number;
+  enabled?: boolean;
+  dryRun?: boolean;
+  schedule?: number;
+  filterMode?: FilterMode;
+  filters?: FilterConfig[];
+  currentFilterIndex?: number;
 }
 
 /**
  * Convert database row to UpgradeConfig
  */
 function rowToConfig(row: UpgradeConfigRow): UpgradeConfig {
-	return {
-		id: row.id,
-		arrInstanceId: row.arr_instance_id,
-		enabled: row.enabled === 1,
-		dryRun: row.dry_run === 1,
-		schedule: row.schedule,
-		filterMode: row.filter_mode as FilterMode,
-		filters: JSON.parse(row.filters) as FilterConfig[],
-		currentFilterIndex: row.current_filter_index,
-		lastRunAt: row.last_run_at,
-		createdAt: row.created_at,
-		updatedAt: row.updated_at
-	};
+  return {
+    id: row.id,
+    arrInstanceId: row.arr_instance_id,
+    enabled: row.enabled === 1,
+    dryRun: row.dry_run === 1,
+    schedule: row.schedule,
+    filterMode: row.filter_mode as FilterMode,
+    filters: JSON.parse(row.filters) as FilterConfig[],
+    currentFilterIndex: row.current_filter_index,
+    lastRunAt: row.last_run_at,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
 }
 
 /**
  * All queries for upgrade_configs table
  */
 export const upgradeConfigsQueries = {
-	/**
-	 * Get upgrade config by arr instance ID
-	 */
-	getByArrInstanceId(arrInstanceId: number): UpgradeConfig | undefined {
-		const row = db.queryFirst<UpgradeConfigRow>(
-			'SELECT * FROM upgrade_configs WHERE arr_instance_id = ?',
-			arrInstanceId
-		);
-		return row ? rowToConfig(row) : undefined;
-	},
+  /**
+   * Get upgrade config by arr instance ID
+   */
+  getByArrInstanceId(arrInstanceId: number): UpgradeConfig | undefined {
+    const row = db.queryFirst<UpgradeConfigRow>(
+      'SELECT * FROM upgrade_configs WHERE arr_instance_id = ?',
+      arrInstanceId
+    );
+    return row ? rowToConfig(row) : undefined;
+  },
 
-	/**
-	 * Get all upgrade configs
-	 */
-	getAll(): UpgradeConfig[] {
-		const rows = db.query<UpgradeConfigRow>('SELECT * FROM upgrade_configs');
-		return rows.map(rowToConfig);
-	},
+  /**
+   * Get all upgrade configs
+   */
+  getAll(): UpgradeConfig[] {
+    const rows = db.query<UpgradeConfigRow>('SELECT * FROM upgrade_configs');
+    return rows.map(rowToConfig);
+  },
 
-	/**
-	 * Get all enabled upgrade configs
-	 */
-	getEnabled(): UpgradeConfig[] {
-		const rows = db.query<UpgradeConfigRow>('SELECT * FROM upgrade_configs WHERE enabled = 1');
-		return rows.map(rowToConfig);
-	},
+  /**
+   * Get all enabled upgrade configs
+   */
+  getEnabled(): UpgradeConfig[] {
+    const rows = db.query<UpgradeConfigRow>('SELECT * FROM upgrade_configs WHERE enabled = 1');
+    return rows.map(rowToConfig);
+  },
 
-	/**
-	 * Create or update an upgrade config for an arr instance
-	 * Uses upsert pattern since there's one config per instance
-	 */
-	upsert(arrInstanceId: number, input: UpgradeConfigInput): UpgradeConfig {
-		const existing = this.getByArrInstanceId(arrInstanceId);
+  /**
+   * Create or update an upgrade config for an arr instance
+   * Uses upsert pattern since there's one config per instance
+   */
+  upsert(arrInstanceId: number, input: UpgradeConfigInput): UpgradeConfig {
+    const existing = this.getByArrInstanceId(arrInstanceId);
 
-		if (existing) {
-			// Update existing
-			this.update(arrInstanceId, input);
-			return this.getByArrInstanceId(arrInstanceId)!;
-		}
+    if (existing) {
+      // Update existing
+      this.update(arrInstanceId, input);
+      return this.getByArrInstanceId(arrInstanceId)!;
+    }
 
-		// Create new
-		const enabled = input.enabled !== undefined ? (input.enabled ? 1 : 0) : 0;
-		const dryRun = input.dryRun !== undefined ? (input.dryRun ? 1 : 0) : 0;
-		const schedule = input.schedule ?? 360;
-		const filterMode = input.filterMode ?? 'round_robin';
-		const filters = JSON.stringify(input.filters ?? []);
-		const currentFilterIndex = input.currentFilterIndex ?? 0;
+    // Create new
+    const enabled = input.enabled !== undefined ? (input.enabled ? 1 : 0) : 0;
+    const dryRun = input.dryRun !== undefined ? (input.dryRun ? 1 : 0) : 0;
+    const schedule = input.schedule ?? 360;
+    const filterMode = input.filterMode ?? 'round_robin';
+    const filters = JSON.stringify(input.filters ?? []);
+    const currentFilterIndex = input.currentFilterIndex ?? 0;
 
-		db.execute(
-			`INSERT INTO upgrade_configs
+    db.execute(
+      `INSERT INTO upgrade_configs
 			(arr_instance_id, enabled, dry_run, schedule, filter_mode, filters, current_filter_index)
 			VALUES (?, ?, ?, ?, ?, ?, ?)`,
-			arrInstanceId,
-			enabled,
-			dryRun,
-			schedule,
-			filterMode,
-			filters,
-			currentFilterIndex
-		);
+      arrInstanceId,
+      enabled,
+      dryRun,
+      schedule,
+      filterMode,
+      filters,
+      currentFilterIndex
+    );
 
-		return this.getByArrInstanceId(arrInstanceId)!;
-	},
+    return this.getByArrInstanceId(arrInstanceId)!;
+  },
 
-	/**
-	 * Update an upgrade config
-	 */
-	update(arrInstanceId: number, input: UpgradeConfigInput): boolean {
-		const updates: string[] = [];
-		const params: (string | number)[] = [];
+  /**
+   * Update an upgrade config
+   */
+  update(arrInstanceId: number, input: UpgradeConfigInput): boolean {
+    const updates: string[] = [];
+    const params: (string | number)[] = [];
 
-		if (input.enabled !== undefined) {
-			updates.push('enabled = ?');
-			params.push(input.enabled ? 1 : 0);
-		}
-		if (input.dryRun !== undefined) {
-			updates.push('dry_run = ?');
-			params.push(input.dryRun ? 1 : 0);
-		}
-		if (input.schedule !== undefined) {
-			updates.push('schedule = ?');
-			params.push(input.schedule);
-		}
-		if (input.filterMode !== undefined) {
-			updates.push('filter_mode = ?');
-			params.push(input.filterMode);
-		}
-		if (input.filters !== undefined) {
-			updates.push('filters = ?');
-			params.push(JSON.stringify(input.filters));
-		}
-		if (input.currentFilterIndex !== undefined) {
-			updates.push('current_filter_index = ?');
-			params.push(input.currentFilterIndex);
-		}
+    if (input.enabled !== undefined) {
+      updates.push('enabled = ?');
+      params.push(input.enabled ? 1 : 0);
+    }
+    if (input.dryRun !== undefined) {
+      updates.push('dry_run = ?');
+      params.push(input.dryRun ? 1 : 0);
+    }
+    if (input.schedule !== undefined) {
+      updates.push('schedule = ?');
+      params.push(input.schedule);
+    }
+    if (input.filterMode !== undefined) {
+      updates.push('filter_mode = ?');
+      params.push(input.filterMode);
+    }
+    if (input.filters !== undefined) {
+      updates.push('filters = ?');
+      params.push(JSON.stringify(input.filters));
+    }
+    if (input.currentFilterIndex !== undefined) {
+      updates.push('current_filter_index = ?');
+      params.push(input.currentFilterIndex);
+    }
 
-		if (updates.length === 0) {
-			return false;
-		}
+    if (updates.length === 0) {
+      return false;
+    }
 
-		updates.push('updated_at = CURRENT_TIMESTAMP');
-		params.push(arrInstanceId);
+    updates.push('updated_at = CURRENT_TIMESTAMP');
+    params.push(arrInstanceId);
 
-		const affected = db.execute(
-			`UPDATE upgrade_configs SET ${updates.join(', ')} WHERE arr_instance_id = ?`,
-			...params
-		);
+    const affected = db.execute(
+      `UPDATE upgrade_configs SET ${updates.join(', ')} WHERE arr_instance_id = ?`,
+      ...params
+    );
 
-		return affected > 0;
-	},
+    return affected > 0;
+  },
 
-	/**
-	 * Delete an upgrade config
-	 */
-	delete(arrInstanceId: number): boolean {
-		const affected = db.execute(
-			'DELETE FROM upgrade_configs WHERE arr_instance_id = ?',
-			arrInstanceId
-		);
-		return affected > 0;
-	},
+  /**
+   * Delete an upgrade config
+   */
+  delete(arrInstanceId: number): boolean {
+    const affected = db.execute('DELETE FROM upgrade_configs WHERE arr_instance_id = ?', arrInstanceId);
+    return affected > 0;
+  },
 
-	/**
-	 * Increment the current filter index (for round-robin mode)
-	 * Wraps around to 0 when reaching the end
-	 */
-	incrementFilterIndex(arrInstanceId: number): number {
-		const config = this.getByArrInstanceId(arrInstanceId);
-		if (!config) return 0;
+  /**
+   * Increment the current filter index (for round-robin mode)
+   * Wraps around to 0 when reaching the end
+   */
+  incrementFilterIndex(arrInstanceId: number): number {
+    const config = this.getByArrInstanceId(arrInstanceId);
+    if (!config) return 0;
 
-		const enabledFilters = config.filters.filter((f) => f.enabled);
-		if (enabledFilters.length === 0) return 0;
+    const enabledFilters = config.filters.filter((f) => f.enabled);
+    if (enabledFilters.length === 0) return 0;
 
-		const nextIndex = (config.currentFilterIndex + 1) % enabledFilters.length;
+    const nextIndex = (config.currentFilterIndex + 1) % enabledFilters.length;
 
-		db.execute(
-			'UPDATE upgrade_configs SET current_filter_index = ?, updated_at = CURRENT_TIMESTAMP WHERE arr_instance_id = ?',
-			nextIndex,
-			arrInstanceId
-		);
+    db.execute(
+      'UPDATE upgrade_configs SET current_filter_index = ?, updated_at = CURRENT_TIMESTAMP WHERE arr_instance_id = ?',
+      nextIndex,
+      arrInstanceId
+    );
 
-		return nextIndex;
-	},
+    return nextIndex;
+  },
 
-	/**
-	 * Reset the filter index to 0
-	 */
-	resetFilterIndex(arrInstanceId: number): void {
-		db.execute(
-			'UPDATE upgrade_configs SET current_filter_index = 0, updated_at = CURRENT_TIMESTAMP WHERE arr_instance_id = ?',
-			arrInstanceId
-		);
-	},
+  /**
+   * Reset the filter index to 0
+   */
+  resetFilterIndex(arrInstanceId: number): void {
+    db.execute(
+      'UPDATE upgrade_configs SET current_filter_index = 0, updated_at = CURRENT_TIMESTAMP WHERE arr_instance_id = ?',
+      arrInstanceId
+    );
+  },
 
-	/**
-	 * Update last_run_at to current timestamp
-	 */
-	updateLastRun(arrInstanceId: number): void {
-		db.execute(
-			'UPDATE upgrade_configs SET last_run_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE arr_instance_id = ?',
-			arrInstanceId
-		);
-	},
+  /**
+   * Update last_run_at to current timestamp
+   */
+  updateLastRun(arrInstanceId: number): void {
+    db.execute(
+      'UPDATE upgrade_configs SET last_run_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE arr_instance_id = ?',
+      arrInstanceId
+    );
+  },
 
-	/**
-	 * Get all enabled configs that are due to run
-	 * A config is due if: last_run_at is null OR (now - last_run_at) >= schedule minutes
-	 * Note: last_run_at may be stored as ISO string with T and Z, normalize for julianday
-	 */
-	getDueConfigs(): UpgradeConfig[] {
-		const rows = db.query<UpgradeConfigRow>(`
+  /**
+   * Get all enabled configs that are due to run
+   * A config is due if: last_run_at is null OR (now - last_run_at) >= schedule minutes
+   * Note: last_run_at may be stored as ISO string with T and Z, normalize for julianday
+   */
+  getDueConfigs(): UpgradeConfig[] {
+    const rows = db.query<UpgradeConfigRow>(`
 			SELECT * FROM upgrade_configs
 			WHERE enabled = 1
 			AND (
@@ -231,6 +228,6 @@ export const upgradeConfigsQueries = {
 				OR (julianday('now') - julianday(replace(replace(last_run_at, 'T', ' '), 'Z', ''))) * 24 * 60 >= schedule
 			)
 		`);
-		return rows.map(rowToConfig);
-	}
+    return rows.map(rowToConfig);
+  },
 };

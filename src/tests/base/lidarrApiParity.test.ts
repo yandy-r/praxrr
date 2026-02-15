@@ -1,9 +1,11 @@
-import { assertArrayIncludes, assertEquals } from '@std/assert';
+import { assertArrayIncludes, assertEquals, assertExists } from '@std/assert';
 import { BaseTest, type TestContext } from './BaseTest.ts';
 import { GET as libraryGet } from '../../routes/api/v1/arr/library/+server.ts';
 import { GET as releasesGet } from '../../routes/api/v1/arr/releases/+server.ts';
+import { GET as exportGet } from '../../routes/api/v1/pcd/export/+server.ts';
+import { POST as importPost } from '../../routes/api/v1/pcd/import/+server.ts';
 import { type ArrInstance, arrInstancesQueries } from '../../lib/server/db/queries/arrInstances.ts';
-import { pcdManager } from '../../lib/server/pcd/index.ts';
+import { pcdManager, type PCDCache as PCDCacheType } from '../../lib/server/pcd/index.ts';
 import { cache } from '../../lib/server/utils/cache/cache.ts';
 import { LidarrClient } from '../../lib/server/utils/arr/clients/lidarr.ts';
 import { RadarrClient } from '../../lib/server/utils/arr/clients/radarr.ts';
@@ -16,6 +18,10 @@ import type {
   SonarrLibraryItem,
   SonarrRelease,
 } from '../../lib/server/utils/arr/types.ts';
+import {
+  LIDARR_MEDIA_MANAGEMENT_PORTABLE_ENTITIES,
+  ENTITY_TYPES,
+} from '../../lib/shared/pcd/portable.ts';
 
 type Restore = () => void;
 
@@ -534,6 +540,166 @@ class LidarrApiParityTest extends BaseTest {
       assertEquals((await response.json()) as ErrorEnvelope, {
         error: 'lidarr releases failed',
       });
+    });
+
+    this.test('export uses first-class Lidarr portable entity types in ENTITY_TYPES', async () => {
+      // Verify all Lidarr media management portable entity types are registered
+      const entityTypeSet = new Set(ENTITY_TYPES);
+      for (const lidarrEntityType of LIDARR_MEDIA_MANAGEMENT_PORTABLE_ENTITIES) {
+        assertEquals(entityTypeSet.has(lidarrEntityType), true);
+      }
+
+      // Verify export endpoint rejects unknown entity types
+      const response = await exportGet({
+        url: this.createUrl(
+          '/api/v1/pcd/export?databaseId=1&entityType=not_a_real_type&name=test'
+        ),
+      } as Parameters<typeof exportGet>[0]);
+
+      assertEquals(response.status, 400);
+      const body = (await response.json()) as ErrorEnvelope;
+      assertEquals(body.error, 'Invalid entityType: not_a_real_type');
+    });
+
+    this.test('export accepts lidarr_naming as a valid entity type', async () => {
+      // Patch pcdManager.getCache to return null so we get a controlled 500
+      const getCacheMock: typeof pcdManager.getCache = () => undefined;
+      this.patch(pcdManager, 'getCache', getCacheMock);
+
+      const response = await exportGet({
+        url: this.createUrl(
+          '/api/v1/pcd/export?databaseId=999&entityType=lidarr_naming&name=TestNaming'
+        ),
+      } as Parameters<typeof exportGet>[0]);
+
+      // We expect 500 (cache not available) rather than 400 (invalid entity type)
+      // This proves the entity type was accepted as valid
+      assertEquals(response.status, 500);
+      const body = (await response.json()) as ErrorEnvelope;
+      assertEquals(body.error, 'Database cache not available');
+    });
+
+    this.test('import rejects mixed Lidarr payload with Radarr fields', async () => {
+      const getCacheMock: typeof pcdManager.getCache = () =>
+        ({ kb: {} } as unknown as PCDCacheType);
+      this.patch(pcdManager, 'getCache', getCacheMock);
+
+      const response = await importPost({
+        request: new Request('http://localhost/api/v1/pcd/import', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            databaseId: 1,
+            layer: 'user',
+            entityType: 'lidarr_naming',
+            data: {
+              name: 'Mixed Payload',
+              rename: true,
+              standardEpisodeFormat: '{Artist Name}',
+              dailyEpisodeFormat: '{Artist Name}',
+              animeEpisodeFormat: '{Artist Name}',
+              seriesFolderFormat: '{Artist Name}',
+              seasonFolderFormat: '{Release Year}',
+              replaceIllegalCharacters: true,
+              colonReplacementFormat: 'dash',
+              customColonReplacementFormat: null,
+              multiEpisodeStyle: 'extend',
+              movieFormat: '{Movie Title}',
+              movieFolderFormat: '{Movie Title}',
+            },
+          }),
+        }),
+      } as Parameters<typeof importPost>[0]);
+
+      assertEquals(response.status, 400);
+      const body = (await response.json()) as ErrorEnvelope;
+      assertEquals(
+        body.error.includes('Mixed payload for lidarr_naming'),
+        true
+      );
+    });
+
+    this.test('import accepts first-class lidarr_media_settings entity type', async () => {
+      const getCacheMock: typeof pcdManager.getCache = () =>
+        ({ kb: {} } as unknown as PCDCacheType);
+      this.patch(pcdManager, 'getCache', getCacheMock);
+
+      // Submit a valid lidarr_media_settings payload
+      // It will fail at the actual deserialization step (no real DB),
+      // but the entity type and validation should pass
+      const response = await importPost({
+        request: new Request('http://localhost/api/v1/pcd/import', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            databaseId: 1,
+            layer: 'user',
+            entityType: 'lidarr_media_settings',
+            data: {
+              name: 'Lidarr Media Import',
+              propersRepacks: 'preferAndUpgrade',
+              enableMediaInfo: true,
+            },
+          }),
+        }),
+      } as Parameters<typeof importPost>[0]);
+
+      // The entity type is accepted (not rejected as invalid).
+      // The response may be 400 from deserialization or 200 on success.
+      // The key assertion: it must NOT be a 400 with "Invalid entityType".
+      const body = (await response.json()) as Record<string, unknown>;
+      if (response.status === 400) {
+        assertEquals(
+          (body.error as string).includes('Invalid entityType'),
+          false
+        );
+      }
+    });
+
+    this.test('no cross-Arr entity leakage: library responses contain only matching arr_type', async () => {
+      const getAllDatabasesMock: typeof pcdManager.getAll = () => [];
+      this.patch(pcdManager, 'getAll', getAllDatabasesMock);
+
+      const instances = new Map<number, ArrInstance>([
+        [51, buildInstance(51, 'lidarr')],
+        [52, buildInstance(52, 'radarr')],
+      ]);
+      const getByIdMock: typeof arrInstancesQueries.getById = (id) => instances.get(id);
+      this.patch(arrInstancesQueries, 'getById', getByIdMock);
+
+      const lidarrLibraryMock: typeof LidarrClient.prototype.getLibrary = async () => {
+        return [LIDARR_LIBRARY_ITEM];
+      };
+      const radarrLibraryMock: typeof RadarrClient.prototype.getLibrary = async () => {
+        return [RADARR_LIBRARY_ITEM];
+      };
+
+      this.patch(LidarrClient.prototype, 'getLibrary', lidarrLibraryMock);
+      this.patch(RadarrClient.prototype, 'getLibrary', radarrLibraryMock);
+
+      const lidarrResponse = await libraryGet({
+        url: this.createUrl('/api/v1/arr/library?instanceId=51'),
+      } as Parameters<typeof libraryGet>[0]);
+      const radarrResponse = await libraryGet({
+        url: this.createUrl('/api/v1/arr/library?instanceId=52'),
+      } as Parameters<typeof libraryGet>[0]);
+
+      const lidarrPayload = (await lidarrResponse.json()) as LibraryEnvelope;
+      const radarrPayload = (await radarrResponse.json()) as LibraryEnvelope;
+
+      // Lidarr response must be type lidarr, not radarr or sonarr
+      assertEquals(lidarrPayload.type, 'lidarr');
+      assertEquals(radarrPayload.type, 'radarr');
+
+      // Lidarr items must contain Lidarr-specific fields, not Radarr fields
+      const lidarrItem = lidarrPayload.items[0] as LidarrLibraryItem;
+      assertExists(lidarrItem.artistName);
+      assertEquals(lidarrItem.albumType, 'album');
+
+      // Radarr items must contain Radarr-specific fields, not Lidarr fields
+      const radarrItem = radarrPayload.items[0] as RadarrLibraryItem;
+      assertExists(radarrItem.tmdbId);
+      assertEquals((radarrItem as unknown as Record<string, unknown>).artistName, undefined);
     });
   }
 }

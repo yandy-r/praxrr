@@ -29,10 +29,10 @@ import type { Migration } from '../migrations.ts';
  */
 
 export const migration: Migration = {
-	version: 41,
-	name: 'Create pcd_ops table',
+  version: 41,
+  name: 'Create pcd_ops table',
 
-	up: `
+  up: `
 		CREATE TABLE pcd_ops (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
 			database_id INTEGER NOT NULL,
@@ -67,10 +67,10 @@ export const migration: Migration = {
 			ON pcd_ops(database_id, origin, content_hash);
 	`,
 
-	down: `
+  down: `
 		DROP INDEX IF EXISTS idx_pcd_ops_hash;
 		DROP INDEX IF EXISTS idx_pcd_ops_base_filename;
 		DROP INDEX IF EXISTS idx_pcd_ops_apply_order;
 		DROP TABLE IF EXISTS pcd_ops;
-	`
+	`,
 };

@@ -14,7 +14,7 @@ import {
   openFirstQualityProfileGeneral,
   goToQualityProfileGeneral,
   goToQualityProfileScoring,
-  updateQpDescription
+  updateQpDescription,
 } from '../helpers/entity';
 import { getHead, resetToCommit } from '../helpers/reset';
 
@@ -42,7 +42,7 @@ test.describe('2.4 QP local scoring-only vs upstream general-only', () => {
       repoUrl: TEST_REPO_URL,
       pat: TEST_PAT,
       gitName: TEST_GIT_NAME,
-      gitEmail: TEST_GIT_EMAIL
+      gitEmail: TEST_GIT_EMAIL,
     });
 
     devHead = getHead(devId);
@@ -56,7 +56,7 @@ test.describe('2.4 QP local scoring-only vs upstream general-only', () => {
       syncStrategy: 'Manual (no auto-sync)',
       autoPull: false,
       localOpsEnabled: true,
-      conflictStrategy: 'Ask every time'
+      conflictStrategy: 'Ask every time',
     });
 
     profileName = await openFirstQualityProfileGeneral(page, localId);

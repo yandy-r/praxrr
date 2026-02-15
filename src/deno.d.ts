@@ -10,6 +10,6 @@ declare const __APP_VERSION__: string;
 
 // JSR package declarations for svelte-check compatibility
 declare module '@felix/bcrypt' {
-	export function hash(password: string, rounds?: number): Promise<string>;
-	export function verify(password: string, hash: string): Promise<boolean>;
+  export function hash(password: string, rounds?: number): Promise<string>;
+  export function verify(password: string, hash: string): Promise<boolean>;
 }

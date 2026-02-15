@@ -12,27 +12,27 @@ import { logger } from '$logger/logger.ts';
  * https://github.com/Dictionarry-Hub/schema -> schema
  */
 function getRepoName(repoUrl: string): string {
-	const parts = repoUrl.split('/');
-	return parts[parts.length - 1];
+  const parts = repoUrl.split('/');
+  return parts[parts.length - 1];
 }
 
 /**
  * Get dependency path
  */
 function getDependencyPath(pcdPath: string, repoName: string): string {
-	return `${pcdPath}/deps/${repoName}`;
+  return `${pcdPath}/deps/${repoName}`;
 }
 
 /**
  * Check if a directory exists
  */
 async function dirExists(path: string): Promise<boolean> {
-	try {
-		const stat = await Deno.stat(path);
-		return stat.isDirectory;
-	} catch {
-		return false;
-	}
+  try {
+    const stat = await Deno.stat(path);
+    return stat.isDirectory;
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -40,86 +40,83 @@ async function dirExists(path: string): Promise<boolean> {
  * Keeps .git, ops, and pcd.json - removes everything else
  */
 async function cloneDependency(
-	pcdPath: string,
-	repoUrl: string,
-	version: string,
-	personalAccessToken?: string
+  pcdPath: string,
+  repoUrl: string,
+  version: string,
+  personalAccessToken?: string
 ): Promise<void> {
-	const repoName = getRepoName(repoUrl);
-	const depPath = getDependencyPath(pcdPath, repoName);
+  const repoName = getRepoName(repoUrl);
+  const depPath = getDependencyPath(pcdPath, repoName);
 
-	// Clone the dependency repository
-	await clone(repoUrl, depPath, undefined, personalAccessToken);
+  // Clone the dependency repository
+  await clone(repoUrl, depPath, undefined, personalAccessToken);
 
-	// Checkout the specific version tag
-	await checkout(depPath, version);
+  // Checkout the specific version tag
+  await checkout(depPath, version);
 
-	// Clean up dependency - keep only .git, ops folder and pcd.json
-	const keepItems = new Set(['.git', 'ops', 'pcd.json']);
+  // Clean up dependency - keep only .git, ops folder and pcd.json
+  const keepItems = new Set(['.git', 'ops', 'pcd.json']);
 
-	for await (const entry of Deno.readDir(depPath)) {
-		if (!keepItems.has(entry.name)) {
-			const itemPath = `${depPath}/${entry.name}`;
-			await Deno.remove(itemPath, { recursive: true });
-		}
-	}
+  for await (const entry of Deno.readDir(depPath)) {
+    if (!keepItems.has(entry.name)) {
+      const itemPath = `${depPath}/${entry.name}`;
+      await Deno.remove(itemPath, { recursive: true });
+    }
+  }
 }
 
 /**
  * Get the installed version of a dependency from its manifest
  */
 async function getInstalledVersion(pcdPath: string, repoName: string): Promise<string | null> {
-	const depManifestPath = `${pcdPath}/deps/${repoName}/pcd.json`;
-	try {
-		const content = await Deno.readTextFile(depManifestPath);
-		const manifest = JSON.parse(content);
-		return manifest.version ?? null;
-	} catch {
-		return null;
-	}
+  const depManifestPath = `${pcdPath}/deps/${repoName}/pcd.json`;
+  try {
+    const content = await Deno.readTextFile(depManifestPath);
+    const manifest = JSON.parse(content);
+    return manifest.version ?? null;
+  } catch {
+    return null;
+  }
 }
 
 /**
  * Update a dependency to a new version using fetch + checkout
  */
 async function updateDependency(depPath: string, version: string): Promise<void> {
-	await fetchTags(depPath);
-	await checkout(depPath, version);
+  await fetchTags(depPath);
+  await checkout(depPath, version);
 }
 
 /**
  * Process all dependencies for a PCD (initial clone)
  * Called when linking a new database
  */
-export async function processDependencies(
-	pcdPath: string,
-	personalAccessToken?: string
-): Promise<void> {
-	const manifest = await loadManifest(pcdPath);
+export async function processDependencies(pcdPath: string, personalAccessToken?: string): Promise<void> {
+  const manifest = await loadManifest(pcdPath);
 
-	if (!manifest.dependencies || Object.keys(manifest.dependencies).length === 0) {
-		return;
-	}
+  if (!manifest.dependencies || Object.keys(manifest.dependencies).length === 0) {
+    return;
+  }
 
-	// Create deps directory
-	const depsDir = `${pcdPath}/deps`;
-	await Deno.mkdir(depsDir, { recursive: true });
+  // Create deps directory
+  const depsDir = `${pcdPath}/deps`;
+  await Deno.mkdir(depsDir, { recursive: true });
 
-	for (const [repoUrl, version] of Object.entries(manifest.dependencies)) {
-		const repoName = getRepoName(repoUrl);
-		const depPath = getDependencyPath(pcdPath, repoName);
+  for (const [repoUrl, version] of Object.entries(manifest.dependencies)) {
+    const repoName = getRepoName(repoUrl);
+    const depPath = getDependencyPath(pcdPath, repoName);
 
-		// Clone and checkout the dependency
-		await cloneDependency(pcdPath, repoUrl, version, personalAccessToken);
+    // Clone and checkout the dependency
+    await cloneDependency(pcdPath, repoUrl, version, personalAccessToken);
 
-		// Validate the dependency's manifest
-		await loadManifest(depPath);
+    // Validate the dependency's manifest
+    await loadManifest(depPath);
 
-		await logger.debug(`Installed dependency ${repoName}@${version}`, {
-			source: 'PCDDependencies',
-			meta: { pcdPath, repoName, version }
-		});
-	}
+    await logger.debug(`Installed dependency ${repoName}@${version}`, {
+      source: 'PCDDependencies',
+      meta: { pcdPath, repoName, version },
+    });
+  }
 }
 
 /**
@@ -127,118 +124,115 @@ export async function processDependencies(
  * Uses fetch + checkout instead of re-cloning
  */
 export async function syncDependencies(pcdPath: string, personalAccessToken?: string): Promise<void> {
-	const manifest = await loadManifest(pcdPath);
+  const manifest = await loadManifest(pcdPath);
 
-	if (!manifest.dependencies || Object.keys(manifest.dependencies).length === 0) {
-		return;
-	}
+  if (!manifest.dependencies || Object.keys(manifest.dependencies).length === 0) {
+    return;
+  }
 
-	const depsDir = `${pcdPath}/deps`;
-	await Deno.mkdir(depsDir, { recursive: true });
+  const depsDir = `${pcdPath}/deps`;
+  await Deno.mkdir(depsDir, { recursive: true });
 
-	for (const [repoUrl, requiredVersion] of Object.entries(manifest.dependencies)) {
-		const repoName = getRepoName(repoUrl);
-		const depPath = getDependencyPath(pcdPath, repoName);
-		const installedVersion = await getInstalledVersion(pcdPath, repoName);
+  for (const [repoUrl, requiredVersion] of Object.entries(manifest.dependencies)) {
+    const repoName = getRepoName(repoUrl);
+    const depPath = getDependencyPath(pcdPath, repoName);
+    const installedVersion = await getInstalledVersion(pcdPath, repoName);
 
-		// Already at correct version
-		if (installedVersion === requiredVersion) {
-			continue;
-		}
+    // Already at correct version
+    if (installedVersion === requiredVersion) {
+      continue;
+    }
 
-		// Check if dependency exists with .git folder
-		const hasGitFolder = await dirExists(`${depPath}/.git`);
+    // Check if dependency exists with .git folder
+    const hasGitFolder = await dirExists(`${depPath}/.git`);
 
-		if (hasGitFolder) {
-			// Fetch tags and checkout new version
-			await updateDependency(depPath, requiredVersion);
-			await logger.info(`Updated dependency ${repoName}: ${installedVersion} -> ${requiredVersion}`, {
-				source: 'PCDDependencies',
-				meta: { pcdPath, repoName, from: installedVersion, to: requiredVersion }
-			});
-		} else {
-			// No .git folder (legacy or corrupted) - re-clone
-			try {
-				await Deno.remove(depPath, { recursive: true });
-			} catch {
-				// Didn't exist
-			}
-			await cloneDependency(pcdPath, repoUrl, requiredVersion, personalAccessToken);
-			await logger.info(`Re-cloned dependency ${repoName}@${requiredVersion}`, {
-				source: 'PCDDependencies',
-				meta: { pcdPath, repoName, version: requiredVersion }
-			});
-		}
+    if (hasGitFolder) {
+      // Fetch tags and checkout new version
+      await updateDependency(depPath, requiredVersion);
+      await logger.info(`Updated dependency ${repoName}: ${installedVersion} -> ${requiredVersion}`, {
+        source: 'PCDDependencies',
+        meta: { pcdPath, repoName, from: installedVersion, to: requiredVersion },
+      });
+    } else {
+      // No .git folder (legacy or corrupted) - re-clone
+      try {
+        await Deno.remove(depPath, { recursive: true });
+      } catch {
+        // Didn't exist
+      }
+      await cloneDependency(pcdPath, repoUrl, requiredVersion, personalAccessToken);
+      await logger.info(`Re-cloned dependency ${repoName}@${requiredVersion}`, {
+        source: 'PCDDependencies',
+        meta: { pcdPath, repoName, version: requiredVersion },
+      });
+    }
 
-		// Validate the dependency's manifest
-		await loadManifest(depPath);
-	}
+    // Validate the dependency's manifest
+    await loadManifest(depPath);
+  }
 }
 
 /**
  * Validate and fix dependencies on startup
  * Ensures all deps exist and are at the correct version
  */
-export async function validateDependencies(
-	pcdPath: string,
-	personalAccessToken?: string
-): Promise<boolean> {
-	try {
-		const manifest = await loadManifest(pcdPath);
+export async function validateDependencies(pcdPath: string, personalAccessToken?: string): Promise<boolean> {
+  try {
+    const manifest = await loadManifest(pcdPath);
 
-		if (!manifest.dependencies || Object.keys(manifest.dependencies).length === 0) {
-			return true;
-		}
+    if (!manifest.dependencies || Object.keys(manifest.dependencies).length === 0) {
+      return true;
+    }
 
-		let allValid = true;
+    let allValid = true;
 
-		for (const [repoUrl, requiredVersion] of Object.entries(manifest.dependencies)) {
-			const repoName = getRepoName(repoUrl);
-			const depPath = getDependencyPath(pcdPath, repoName);
+    for (const [repoUrl, requiredVersion] of Object.entries(manifest.dependencies)) {
+      const repoName = getRepoName(repoUrl);
+      const depPath = getDependencyPath(pcdPath, repoName);
 
-			// Check if dependency exists
-			if (!(await dirExists(depPath))) {
-				await logger.warn(`Missing dependency ${repoName}, will install`, {
-					source: 'PCDDependencies',
-					meta: { pcdPath, repoName }
-				});
-				allValid = false;
-				continue;
-			}
+      // Check if dependency exists
+      if (!(await dirExists(depPath))) {
+        await logger.warn(`Missing dependency ${repoName}, will install`, {
+          source: 'PCDDependencies',
+          meta: { pcdPath, repoName },
+        });
+        allValid = false;
+        continue;
+      }
 
-			// Check version
-			const installedVersion = await getInstalledVersion(pcdPath, repoName);
-			if (installedVersion !== requiredVersion) {
-				await logger.warn(`Dependency ${repoName} version mismatch: ${installedVersion} != ${requiredVersion}`, {
-					source: 'PCDDependencies',
-					meta: { pcdPath, repoName, installed: installedVersion, required: requiredVersion }
-				});
-				allValid = false;
-			}
+      // Check version
+      const installedVersion = await getInstalledVersion(pcdPath, repoName);
+      if (installedVersion !== requiredVersion) {
+        await logger.warn(`Dependency ${repoName} version mismatch: ${installedVersion} != ${requiredVersion}`, {
+          source: 'PCDDependencies',
+          meta: { pcdPath, repoName, installed: installedVersion, required: requiredVersion },
+        });
+        allValid = false;
+      }
 
-			// Validate manifest
-			try {
-				await loadManifest(depPath);
-			} catch {
-				await logger.warn(`Dependency ${repoName} has invalid manifest`, {
-					source: 'PCDDependencies',
-					meta: { pcdPath, repoName }
-				});
-				allValid = false;
-			}
-		}
+      // Validate manifest
+      try {
+        await loadManifest(depPath);
+      } catch {
+        await logger.warn(`Dependency ${repoName} has invalid manifest`, {
+          source: 'PCDDependencies',
+          meta: { pcdPath, repoName },
+        });
+        allValid = false;
+      }
+    }
 
-		// If any issues found, run sync to fix them
-		if (!allValid) {
-			await syncDependencies(pcdPath, personalAccessToken);
-		}
+    // If any issues found, run sync to fix them
+    if (!allValid) {
+      await syncDependencies(pcdPath, personalAccessToken);
+    }
 
-		return true;
-	} catch (error) {
-		await logger.error('Failed to validate dependencies', {
-			source: 'PCDDependencies',
-			meta: { pcdPath, error: String(error) }
-		});
-		return false;
-	}
+    return true;
+  } catch (error) {
+    await logger.error('Failed to validate dependencies', {
+      source: 'PCDDependencies',
+      meta: { pcdPath, error: String(error) },
+    });
+    return false;
+  }
 }

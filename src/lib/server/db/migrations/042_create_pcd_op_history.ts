@@ -7,10 +7,10 @@ import type { Migration } from '../migrations.ts';
  */
 
 export const migration: Migration = {
-	version: 42,
-	name: 'Create pcd_op_history table',
+  version: 42,
+  name: 'Create pcd_op_history table',
 
-	up: `
+  up: `
 		CREATE TABLE pcd_op_history (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
 			op_id INTEGER NOT NULL,
@@ -35,9 +35,9 @@ export const migration: Migration = {
 			ON pcd_op_history(op_id, applied_at);
 	`,
 
-	down: `
+  down: `
 		DROP INDEX IF EXISTS idx_pcd_op_history_op;
 		DROP INDEX IF EXISTS idx_pcd_op_history_status;
 		DROP TABLE IF EXISTS pcd_op_history;
-	`
+	`,
 };

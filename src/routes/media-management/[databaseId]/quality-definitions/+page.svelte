@@ -8,9 +8,12 @@
 	import CardView from './views/CardView.svelte';
 	import { createDataPageStore } from '$lib/client/stores/dataPage';
 	import { goto } from '$app/navigation';
+	import { resolve } from '$app/paths';
 	import { alertStore } from '$alerts/store';
 	import { Plus } from 'lucide-svelte';
 	import type { EntityType } from '$shared/pcd/portable.ts';
+	import { getArrAppMetadata, isArrAppType, type ArrAppType } from '$shared/arr/capabilities.ts';
+	import { validateQualityDefinitionsActionInput } from './validation.ts';
 	import type { PageData } from './$types';
 
 	export let data: PageData;
@@ -18,19 +21,62 @@
 	let cloneModalOpen = false;
 	let cloneSourceName = '';
 	let cloneEntityType: EntityType = 'radarr_quality_definitions';
+	let cloneArrType: ArrAppType | null = null;
+
+	$: cloneExistingNames = cloneArrType
+		? data.qualityDefinitionsConfigs.filter((config) => config.arr_type === cloneArrType).map((config) => config.name)
+		: [];
+	$: hasMissingQualityMappings = data.qualityDefinitionsConfigs.some((config) => config.quality_count === 0);
+
+	function formatType(type: string): string {
+		if (!type) {
+			return 'Unknown';
+		}
+
+		return type.charAt(0).toUpperCase() + type.slice(1);
+	}
+
+	function resolveQualityTypeLabel(arrType: string): string {
+		if (!isArrAppType(arrType)) {
+			return formatType(arrType);
+		}
+
+		return getArrAppMetadata(arrType).label;
+	}
 
 	function handleClone(event: CustomEvent<{ name: string; arr_type: string }>) {
-		cloneSourceName = event.detail.name;
-		cloneEntityType = `${event.detail.arr_type}_quality_definitions` as EntityType;
+		const validation = validateQualityDefinitionsActionInput({
+			name: event.detail.name,
+			arrType: event.detail.arr_type,
+			arrTypeLabel: resolveQualityTypeLabel(event.detail.arr_type)
+		});
+		if (!validation.ok) {
+			alertStore.add('error', validation.error);
+			return;
+		}
+
+		cloneSourceName = validation.name;
+		cloneEntityType = validation.entityType;
+		cloneArrType = validation.arrType;
 		cloneModalOpen = true;
 	}
 
 	async function handleExport(event: CustomEvent<{ name: string; arr_type: string }>) {
-		const { name, arr_type } = event.detail;
+		const validation = validateQualityDefinitionsActionInput({
+			name: event.detail.name,
+			arrType: event.detail.arr_type,
+			arrTypeLabel: resolveQualityTypeLabel(event.detail.arr_type)
+		});
+		if (!validation.ok) {
+			alertStore.add('error', validation.error);
+			return;
+		}
+
+		const { name, entityType } = validation;
 		try {
 			const params = new URLSearchParams({
 				databaseId: String(data.currentDatabase.id),
-				entityType: `${arr_type}_quality_definitions`,
+				entityType,
 				name
 			});
 			const res = await fetch(`/api/v1/pcd/export?${params}`);
@@ -62,13 +108,26 @@
 	<SearchAction searchStore={search} placeholder="Search quality definitions..." responsive />
 	<ActionButton
 		icon={Plus}
-		on:click={() => goto(`/media-management/${data.currentDatabase.id}/quality-definitions/new`)}
+		on:click={() =>
+			goto(
+				resolve('/media-management/[databaseId]/quality-definitions/new', {
+					databaseId: data.currentDatabase.id.toString()
+				})
+			)}
 	/>
 	<ViewToggle bind:value={$view} />
 </ActionsBar>
 
 <!-- Quality Definitions Content -->
 <div class="mt-6">
+	{#if hasMissingQualityMappings}
+		<div
+			class="mb-4 rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200"
+		>
+			Some quality definitions are missing API mappings and are shown as "No mapped qualities".
+		</div>
+	{/if}
+
 	{#if data.qualityDefinitionsConfigs.length === 0}
 		<div
 			class="rounded-lg border border-neutral-200 bg-white p-8 text-center dark:border-neutral-800 dark:bg-neutral-900"
@@ -97,6 +156,6 @@
 	databaseId={data.currentDatabase.id}
 	entityType={cloneEntityType}
 	sourceName={cloneSourceName}
-	existingNames={data.qualityDefinitionsConfigs.map((c) => c.name)}
+	existingNames={cloneExistingNames}
 	canWriteToBase={data.canWriteToBase}
 />

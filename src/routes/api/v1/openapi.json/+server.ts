@@ -6,11 +6,11 @@ import { parse } from 'yaml';
 let cachedSpec: unknown = null;
 
 export const GET: RequestHandler = async () => {
-	if (!cachedSpec) {
-		// Read and parse the OpenAPI spec
-		const yamlContent = await Deno.readTextFile('docs/api/v1/openapi.yaml');
-		cachedSpec = parse(yamlContent);
-	}
+  if (!cachedSpec) {
+    // Read and parse the OpenAPI spec
+    const yamlContent = await Deno.readTextFile('docs/api/v1/openapi.yaml');
+    cachedSpec = parse(yamlContent);
+  }
 
-	return json(cachedSpec);
+  return json(cachedSpec);
 };

@@ -13,19 +13,14 @@ import { TEST_REPO_URL, TEST_PAT, TEST_GIT_NAME, TEST_GIT_EMAIL } from '../env';
 import { linkPcd } from '../helpers/linkPcd';
 import { unlinkPcdByName } from '../helpers/unlinkPcd';
 import { pullChanges, exportAndPush } from '../helpers/sync';
-import {
-  goToConflicts,
-  expectConflict,
-  overrideConflict,
-  alignConflict
-} from '../helpers/conflicts';
+import { goToConflicts, expectConflict, overrideConflict, alignConflict } from '../helpers/conflicts';
 import {
   goToCustomFormatConditions,
   updateConditionTypeByName,
   updateConditionValueByName,
   getConditionTypeByName,
   getConditionValueByName,
-  saveConditionChanges
+  saveConditionChanges,
 } from '../helpers/entity';
 import { getHead, resetToCommit } from '../helpers/reset';
 
@@ -55,7 +50,7 @@ test.describe('1.14 CF condition type + value conflict', () => {
       repoUrl: TEST_REPO_URL,
       pat: TEST_PAT,
       gitName: TEST_GIT_NAME,
-      gitEmail: TEST_GIT_EMAIL
+      gitEmail: TEST_GIT_EMAIL,
     });
 
     devHead = getHead(devId);
@@ -69,7 +64,7 @@ test.describe('1.14 CF condition type + value conflict', () => {
       syncStrategy: 'Manual (no auto-sync)',
       autoPull: false,
       localOpsEnabled: true,
-      conflictStrategy: 'Ask every time'
+      conflictStrategy: 'Ask every time',
     });
 
     await page.close();

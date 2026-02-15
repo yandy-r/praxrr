@@ -1,7 +1,7 @@
 -- Profilarr Database Schema
 -- This file documents the current database schema after all migrations
 -- DO NOT execute this file directly - use migrations instead
--- Last updated: 2026-01-28
+-- Last updated: 2026-02-15
 
 -- ==============================================================================
 -- TABLE: migrations
@@ -308,7 +308,7 @@ CREATE TABLE upgrade_configs (
 -- ==============================================================================
 -- TABLE: pcd_ops
 -- Purpose: Store PCD operations (base + user) in the local database
--- Migration: 041_create_pcd_ops.ts
+-- Migration: 041_create_pcd_ops.ts, 20260215_add_lidarr_media_management_entities.ts
 -- ==============================================================================
 
 CREATE TABLE pcd_ops (
@@ -459,12 +459,12 @@ CREATE TABLE arr_sync_delay_profiles_config (
 
 CREATE TABLE arr_sync_media_management (
     instance_id INTEGER PRIMARY KEY,
-    naming_database_id INTEGER,                 -- Database to use for naming settings
-    naming_config_name TEXT,                    -- Name of the naming config to sync (Migration 038)
-    quality_definitions_database_id INTEGER,    -- Database to use for quality definitions
-    quality_definitions_config_name TEXT,       -- Name of the quality definitions config to sync (Migration 038)
-    media_settings_database_id INTEGER,         -- Database to use for media settings
-    media_settings_config_name TEXT,            -- Name of the media settings config to sync (Migration 038)
+    naming_database_id INTEGER,                 -- Database to use for naming settings; query helpers keep this paired with naming_config_name
+    naming_config_name TEXT,                    -- Name of the naming config to sync (Migration 038); null only when naming_database_id is null
+    quality_definitions_database_id INTEGER,    -- Database to use for quality definitions; query helpers keep this paired with quality_definitions_config_name
+    quality_definitions_config_name TEXT,       -- Name of the quality definitions config to sync (Migration 038); null only when quality_definitions_database_id is null
+    media_settings_database_id INTEGER,         -- Database to use for media settings; query helpers keep this paired with media_settings_config_name
+    media_settings_config_name TEXT,            -- Name of the media settings config to sync (Migration 038); null only when media_settings_database_id is null
     trigger TEXT NOT NULL DEFAULT 'none',       -- 'none', 'manual', 'on_pull', 'on_change', 'schedule'
     cron TEXT,                                  -- Cron expression for schedule trigger
     should_sync INTEGER NOT NULL DEFAULT 0,     -- Flag for pending sync (Migration 016) - deprecated

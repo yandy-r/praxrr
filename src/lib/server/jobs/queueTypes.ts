@@ -1,14 +1,14 @@
 export type JobType =
-	| 'arr.upgrade'
-	| 'arr.rename'
-	| 'arr.sync'
-	| 'arr.sync.qualityProfiles'
-	| 'arr.sync.delayProfiles'
-	| 'arr.sync.mediaManagement'
-	| 'pcd.sync'
-	| 'backup.create'
-	| 'backup.cleanup'
-	| 'logs.cleanup';
+  | 'arr.upgrade'
+  | 'arr.rename'
+  | 'arr.sync'
+  | 'arr.sync.qualityProfiles'
+  | 'arr.sync.delayProfiles'
+  | 'arr.sync.mediaManagement'
+  | 'pcd.sync'
+  | 'backup.create'
+  | 'backup.cleanup'
+  | 'logs.cleanup';
 
 export type JobStatus = 'queued' | 'running' | 'success' | 'failed' | 'cancelled';
 
@@ -17,39 +17,39 @@ export type JobSource = 'schedule' | 'manual' | 'system';
 export type JobRunStatus = 'success' | 'failure' | 'skipped' | 'cancelled';
 
 export interface JobQueueRecord {
-	id: number;
-	jobType: JobType;
-	status: JobStatus;
-	runAt: string;
-	payload: Record<string, unknown>;
-	source: JobSource;
-	dedupeKey: string | null;
-	cooldownUntil: string | null;
-	attempts: number;
-	startedAt: string | null;
-	finishedAt: string | null;
-	createdAt: string;
-	updatedAt: string;
+  id: number;
+  jobType: JobType;
+  status: JobStatus;
+  runAt: string;
+  payload: Record<string, unknown>;
+  source: JobSource;
+  dedupeKey: string | null;
+  cooldownUntil: string | null;
+  attempts: number;
+  startedAt: string | null;
+  finishedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface JobRunHistoryRecord {
-	id: number;
-	queueId: number | null;
-	jobType: JobType;
-	status: JobRunStatus;
-	startedAt: string;
-	finishedAt: string;
-	durationMs: number;
-	error: string | null;
-	output: string | null;
-	createdAt: string;
+  id: number;
+  queueId: number | null;
+  jobType: JobType;
+  status: JobRunStatus;
+  startedAt: string;
+  finishedAt: string;
+  durationMs: number;
+  error: string | null;
+  output: string | null;
+  createdAt: string;
 }
 
 export interface JobHandlerResult {
-	status: JobRunStatus;
-	output?: string;
-	error?: string;
-	rescheduleAt?: string | null;
+  status: JobRunStatus;
+  output?: string;
+  error?: string;
+  rescheduleAt?: string | null;
 }
 
 export type JobHandler = (job: JobQueueRecord) => Promise<JobHandlerResult>;

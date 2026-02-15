@@ -16,13 +16,13 @@ import type { ArrType } from '$arr/types.ts';
 import { logger } from '$logger/logger.ts';
 import { upsertScheduledJob } from '$lib/server/jobs/queueService.ts';
 import type {
-	SyncResult,
-	SectionType,
-	SectionHandler,
-	ProcessSyncsResult,
-	InstanceSyncResult,
-	SyncTriggerEvent,
-	TriggerContext
+  SyncResult,
+  SectionType,
+  SectionHandler,
+  ProcessSyncsResult,
+  InstanceSyncResult,
+  SyncTriggerEvent,
+  TriggerContext,
 } from './types.ts';
 // Import handlers to trigger registration
 import './qualityProfiles/handler.ts';
@@ -43,11 +43,11 @@ export type { ProcessSyncsResult, InstanceSyncResult, SyncTriggerEvent, TriggerC
  * - current time >= nextRunAt
  */
 function shouldTrigger(nextRunAt: string | null): boolean {
-	// Bootstrap case: no next_run_at set yet, trigger immediately
-	if (!nextRunAt) return true;
-	const now = new Date();
-	const nextRun = new Date(nextRunAt);
-	return now >= nextRun;
+  // Bootstrap case: no next_run_at set yet, trigger immediately
+  if (!nextRunAt) return true;
+  const now = new Date();
+  const nextRun = new Date(nextRunAt);
+  return now >= nextRun;
 }
 
 /**
@@ -55,46 +55,44 @@ function shouldTrigger(nextRunAt: string | null): boolean {
  * Uses the section registry to reduce code duplication
  */
 async function evaluateScheduledSyncs(): Promise<void> {
-	const sections = getAllSections();
-	let totalScheduled = 0;
-	let marked = 0;
+  const sections = getAllSections();
+  let totalScheduled = 0;
+  let marked = 0;
 
-	// Gather all scheduled configs
-	const scheduledBySection = new Map<SectionType, ReturnType<SectionHandler['getScheduledConfigs']>>();
-	for (const handler of sections) {
-		const configs = handler.getScheduledConfigs();
-		scheduledBySection.set(handler.type, configs);
-		totalScheduled += configs.length;
-	}
+  // Gather all scheduled configs
+  const scheduledBySection = new Map<SectionType, ReturnType<SectionHandler['getScheduledConfigs']>>();
+  for (const handler of sections) {
+    const configs = handler.getScheduledConfigs();
+    scheduledBySection.set(handler.type, configs);
+    totalScheduled += configs.length;
+  }
 
-	if (totalScheduled === 0) return;
+  if (totalScheduled === 0) return;
 
-	await logger.debug(`Evaluating ${totalScheduled} scheduled config(s)`, {
-		source: 'SyncProcessor',
-		meta: Object.fromEntries(
-			[...scheduledBySection.entries()].map(([type, configs]) => [type, configs.length])
-		)
-	});
+  await logger.debug(`Evaluating ${totalScheduled} scheduled config(s)`, {
+    source: 'SyncProcessor',
+    meta: Object.fromEntries([...scheduledBySection.entries()].map(([type, configs]) => [type, configs.length])),
+  });
 
-	// Process each section's scheduled configs
-	for (const handler of sections) {
-		const configs = scheduledBySection.get(handler.type) ?? [];
-		for (const config of configs) {
-			if (shouldTrigger(config.nextRunAt)) {
-				// Use setStatusPending which sets both should_sync and sync_status
-				handler.setStatusPending(config.instanceId);
-				const nextRun = calculateNextRun(config.cron);
-				handler.setNextRunAt(config.instanceId, nextRun);
-				marked++;
-			}
-		}
-	}
+  // Process each section's scheduled configs
+  for (const handler of sections) {
+    const configs = scheduledBySection.get(handler.type) ?? [];
+    for (const config of configs) {
+      if (shouldTrigger(config.nextRunAt)) {
+        // Use setStatusPending which sets both should_sync and sync_status
+        handler.setStatusPending(config.instanceId);
+        const nextRun = calculateNextRun(config.cron);
+        handler.setNextRunAt(config.instanceId, nextRun);
+        marked++;
+      }
+    }
+  }
 
-	if (marked > 0) {
-		await logger.debug(`Marked ${marked} config(s) for sync based on schedule`, {
-			source: 'SyncProcessor'
-		});
-	}
+  if (marked > 0) {
+    await logger.debug(`Marked ${marked} config(s) for sync based on schedule`, {
+      source: 'SyncProcessor',
+    });
+  }
 }
 
 /**
@@ -102,19 +100,19 @@ async function evaluateScheduledSyncs(): Promise<void> {
  * Returns a map of instanceId -> list of section types that need syncing
  */
 function getPendingSyncsByInstance(): Map<number, SectionType[]> {
-	const result = new Map<number, SectionType[]>();
+  const result = new Map<number, SectionType[]>();
 
-	for (const handler of getAllSections()) {
-		const instanceIds = handler.getPendingInstanceIds();
-		for (const instanceId of instanceIds) {
-			if (!result.has(instanceId)) {
-				result.set(instanceId, []);
-			}
-			result.get(instanceId)!.push(handler.type);
-		}
-	}
+  for (const handler of getAllSections()) {
+    const instanceIds = handler.getPendingInstanceIds();
+    for (const instanceId of instanceIds) {
+      if (!result.has(instanceId)) {
+        result.set(instanceId, []);
+      }
+      result.get(instanceId)!.push(handler.type);
+    }
+  }
 
-	return result;
+  return result;
 }
 
 /**
@@ -122,73 +120,69 @@ function getPendingSyncsByInstance(): Map<number, SectionType[]> {
  * Sections are processed sequentially within an instance (dependency order matters)
  */
 async function processInstanceSections(
-	instance: ArrInstance,
-	sectionTypes: SectionType[]
+  instance: ArrInstance,
+  sectionTypes: SectionType[]
 ): Promise<InstanceSyncResult> {
-	const instanceResult: InstanceSyncResult = {
-		instanceId: instance.id,
-		instanceName: instance.name
-	};
+  const instanceResult: InstanceSyncResult = {
+    instanceId: instance.id,
+    instanceName: instance.name,
+  };
 
-	const client = createArrClient(instance.type as ArrType, instance.url, instance.api_key);
+  const client = createArrClient(instance.type as ArrType, instance.url, instance.api_key);
 
-	// Process sections sequentially (quality profiles depend on custom formats being synced first)
-	for (const sectionType of sectionTypes) {
-		const handler = getSection(sectionType);
+  // Process sections sequentially (quality profiles depend on custom formats being synced first)
+  for (const sectionType of sectionTypes) {
+    const handler = getSection(sectionType);
 
-		// Atomically claim the sync (prevents double-processing)
-		if (!handler.claimSync(instance.id)) {
-			await logger.debug(`Sync for ${sectionType} already claimed, skipping`, {
-				source: 'SyncProcessor',
-				meta: { instanceId: instance.id, section: sectionType }
-			});
-			continue;
-		}
+    // Atomically claim the sync (prevents double-processing)
+    if (!handler.claimSync(instance.id)) {
+      await logger.debug(`Sync for ${sectionType} already claimed, skipping`, {
+        source: 'SyncProcessor',
+        meta: { instanceId: instance.id, section: sectionType },
+      });
+      continue;
+    }
 
-		try {
-			const syncer = handler.createSyncer(client, instance);
-			const syncResult = await syncer.sync();
+    try {
+      const syncer = handler.createSyncer(client, instance);
+      const syncResult = await syncer.sync();
 
-			// Store result on the instance result object
-			instanceResult[sectionType] = syncResult;
+      // Store result on the instance result object
+      instanceResult[sectionType] = syncResult;
 
-			// Mark as complete or failed based on result
-			if (syncResult.success) {
-				handler.completeSync(instance.id);
-			} else {
-				handler.failSync(instance.id, syncResult.error ?? 'Unknown error');
-			}
-		} catch (error) {
-			const errorMsg = error instanceof Error ? error.message : 'Unknown error';
-			handler.failSync(instance.id, errorMsg);
-			await logger.error(`Failed to sync ${sectionType} for "${instance.name}"`, {
-				source: 'SyncProcessor',
-				meta: { instanceId: instance.id, section: sectionType, error: errorMsg }
-			});
-			instanceResult[sectionType] = { success: false, itemsSynced: 0, error: errorMsg };
-		}
-	}
+      // Mark as complete or failed based on result
+      if (syncResult.success) {
+        handler.completeSync(instance.id);
+      } else {
+        handler.failSync(instance.id, syncResult.error ?? 'Unknown error');
+      }
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+      handler.failSync(instance.id, errorMsg);
+      await logger.error(`Failed to sync ${sectionType} for "${instance.name}"`, {
+        source: 'SyncProcessor',
+        meta: { instanceId: instance.id, section: sectionType, error: errorMsg },
+      });
+      instanceResult[sectionType] = { success: false, itemsSynced: 0, error: errorMsg };
+    }
+  }
 
-	return instanceResult;
+  return instanceResult;
 }
 
 /**
  * Process items in batches with concurrency limit
  */
-async function processBatches<T, R>(
-	items: T[],
-	processor: (item: T) => Promise<R>,
-	concurrency: number
-): Promise<R[]> {
-	const results: R[] = [];
+async function processBatches<T, R>(items: T[], processor: (item: T) => Promise<R>, concurrency: number): Promise<R[]> {
+  const results: R[] = [];
 
-	for (let i = 0; i < items.length; i += concurrency) {
-		const batch = items.slice(i, i + concurrency);
-		const batchResults = await Promise.all(batch.map(processor));
-		results.push(...batchResults);
-	}
+  for (let i = 0; i < items.length; i += concurrency) {
+    const batch = items.slice(i, i + concurrency);
+    const batchResults = await Promise.all(batch.map(processor));
+    results.push(...batchResults);
+  }
 
-	return results;
+  return results;
 }
 
 /**
@@ -196,71 +190,71 @@ async function processBatches<T, R>(
  * Called by the sync job and directly via triggerSyncs()
  */
 export async function processPendingSyncs(): Promise<ProcessSyncsResult> {
-	// Evaluate scheduled configs and mark them for sync if cron matches
-	await evaluateScheduledSyncs();
+  // Evaluate scheduled configs and mark them for sync if cron matches
+  await evaluateScheduledSyncs();
 
-	const pendingByInstance = getPendingSyncsByInstance();
+  const pendingByInstance = getPendingSyncsByInstance();
 
-	if (pendingByInstance.size === 0) {
-		await logger.debug('No pending syncs', { source: 'SyncProcessor' });
-		return { totalSynced: 0, results: [] };
-	}
+  if (pendingByInstance.size === 0) {
+    await logger.debug('No pending syncs', { source: 'SyncProcessor' });
+    return { totalSynced: 0, results: [] };
+  }
 
-	// Log pending counts
-	const pendingCounts: Record<string, number> = {};
-	for (const handler of getAllSections()) {
-		pendingCounts[handler.type] = handler.getPendingInstanceIds().length;
-	}
+  // Log pending counts
+  const pendingCounts: Record<string, number> = {};
+  for (const handler of getAllSections()) {
+    pendingCounts[handler.type] = handler.getPendingInstanceIds().length;
+  }
 
-	await logger.info(`Processing syncs for ${pendingByInstance.size} instance(s)`, {
-		source: 'SyncProcessor',
-		meta: pendingCounts
-	});
+  await logger.info(`Processing syncs for ${pendingByInstance.size} instance(s)`, {
+    source: 'SyncProcessor',
+    meta: pendingCounts,
+  });
 
-	// Prepare instance processing tasks
-	const instanceTasks: Array<{ instance: ArrInstance; sectionTypes: SectionType[] }> = [];
+  // Prepare instance processing tasks
+  const instanceTasks: Array<{ instance: ArrInstance; sectionTypes: SectionType[] }> = [];
 
-	for (const [instanceId, sectionTypes] of pendingByInstance) {
-		const instance = arrInstancesQueries.getById(instanceId);
+  for (const [instanceId, sectionTypes] of pendingByInstance) {
+    const instance = arrInstancesQueries.getById(instanceId);
 
-		if (!instance) {
-			await logger.warn(`Instance ${instanceId} not found, skipping sync`, {
-				source: 'SyncProcessor'
-			});
-			continue;
-		}
+    if (!instance) {
+      await logger.warn(`Instance ${instanceId} not found, skipping sync`, {
+        source: 'SyncProcessor',
+      });
+      continue;
+    }
 
-		if (!instance.enabled) {
-			await logger.debug(`Instance "${instance.name}" is disabled, skipping sync`, {
-				source: 'SyncProcessor'
-			});
-			continue;
-		}
+    if (!instance.enabled) {
+      await logger.debug(`Instance "${instance.name}" is disabled, skipping sync`, {
+        source: 'SyncProcessor',
+      });
+      continue;
+    }
 
-		instanceTasks.push({ instance, sectionTypes });
-	}
+    instanceTasks.push({ instance, sectionTypes });
+  }
 
-	// Process instances in parallel with concurrency limit
-	const results = await processBatches(
-		instanceTasks,
-		({ instance, sectionTypes }) => processInstanceSections(instance, sectionTypes),
-		CONCURRENCY_LIMIT
-	);
+  // Process instances in parallel with concurrency limit
+  const results = await processBatches(
+    instanceTasks,
+    ({ instance, sectionTypes }) => processInstanceSections(instance, sectionTypes),
+    CONCURRENCY_LIMIT
+  );
 
-	// Calculate total synced
-	let totalSynced = 0;
-	for (const result of results) {
-		if (result.qualityProfiles?.itemsSynced) totalSynced += result.qualityProfiles.itemsSynced;
-		if (result.delayProfiles?.itemsSynced) totalSynced += result.delayProfiles.itemsSynced;
-		if (result.mediaManagement?.itemsSynced) totalSynced += result.mediaManagement.itemsSynced;
-	}
+  // Calculate total synced
+  let totalSynced = 0;
+  for (const result of results) {
+    if (result.qualityProfiles?.itemsSynced) totalSynced += result.qualityProfiles.itemsSynced;
+    if (result.delayProfiles?.itemsSynced) totalSynced += result.delayProfiles.itemsSynced;
+    if (result.mediaManagement?.itemsSynced) totalSynced += result.mediaManagement.itemsSynced;
+  }
 
-	await logger.info(`Sync processing complete`, {
-		source: 'SyncProcessor',
-		meta: { totalSynced, instanceCount: results.length }
-	});
+  await logger.info(`Sync processing complete`, {
+    source: 'SyncProcessor',
+    meta: { totalSynced, instanceCount: results.length },
+  });
 
-	return { totalSynced, results };
+  return { totalSynced, results };
 }
 
 /**
@@ -268,32 +262,32 @@ export async function processPendingSyncs(): Promise<ProcessSyncsResult> {
  * Syncs all configured sections regardless of should_sync flag
  */
 export async function syncInstance(instanceId: number): Promise<InstanceSyncResult> {
-	const instance = arrInstancesQueries.getById(instanceId);
+  const instance = arrInstancesQueries.getById(instanceId);
 
-	if (!instance) {
-		throw new Error(`Instance ${instanceId} not found`);
-	}
+  if (!instance) {
+    throw new Error(`Instance ${instanceId} not found`);
+  }
 
-	await logger.info(`Manual sync triggered for "${instance.name}"`, {
-		source: 'SyncProcessor',
-		meta: { instanceId }
-	});
+  await logger.info(`Manual sync triggered for "${instance.name}"`, {
+    source: 'SyncProcessor',
+    meta: { instanceId },
+  });
 
-	const client = createArrClient(instance.type as ArrType, instance.url, instance.api_key);
-	const result: InstanceSyncResult = {
-		instanceId,
-		instanceName: instance.name
-	};
+  const client = createArrClient(instance.type as ArrType, instance.url, instance.api_key);
+  const result: InstanceSyncResult = {
+    instanceId,
+    instanceName: instance.name,
+  };
 
-	// Sync all sections that have configuration
-	for (const handler of getAllSections()) {
-		if (handler.hasConfig(instanceId)) {
-			const syncer = handler.createSyncer(client, instance);
-			result[handler.type] = await syncer.sync();
-		}
-	}
+  // Sync all sections that have configuration
+  for (const handler of getAllSections()) {
+    if (handler.hasConfig(instanceId)) {
+      const syncer = handler.createSyncer(client, instance);
+      result[handler.type] = await syncer.sync();
+    }
+  }
 
-	return result;
+  return result;
 }
 
 // =============================================================================
@@ -305,46 +299,46 @@ export async function syncInstance(instanceId: number): Promise<InstanceSyncResu
  * Called directly from pcd.ts (on_pull) and cache.ts (on_change)
  */
 export async function triggerSyncs(context: TriggerContext): Promise<void> {
-	await logger.debug(`Sync trigger: ${context.event}`, {
-		source: 'SyncProcessor',
-		meta: { databaseId: context.databaseId }
-	});
+  await logger.debug(`Sync trigger: ${context.event}`, {
+    source: 'SyncProcessor',
+    meta: { databaseId: context.databaseId },
+  });
 
-	const triggers = context.event === 'on_change' ? ['on_pull', 'on_change'] : [context.event];
-	const instanceIds = arrSyncQueries.getInstanceIdsForTrigger(context.event);
+  const triggers = context.event === 'on_change' ? ['on_pull', 'on_change'] : [context.event];
+  const instanceIds = arrSyncQueries.getInstanceIdsForTrigger(context.event);
 
-	for (const instanceId of instanceIds) {
-		const status = arrSyncQueries.getSyncConfigStatus(instanceId);
+  for (const instanceId of instanceIds) {
+    const status = arrSyncQueries.getSyncConfigStatus(instanceId);
 
-		if (triggers.includes(status.qualityProfiles.trigger)) {
-			arrSyncQueries.setQualityProfilesStatusPending(instanceId);
-			upsertScheduledJob({
-				jobType: 'arr.sync.qualityProfiles',
-				runAt: new Date().toISOString(),
-				payload: { instanceId },
-				source: 'system',
-				dedupeKey: `arr.sync.qualityProfiles:event:${instanceId}`
-			});
-		}
-		if (triggers.includes(status.delayProfiles.trigger)) {
-			arrSyncQueries.setDelayProfilesStatusPending(instanceId);
-			upsertScheduledJob({
-				jobType: 'arr.sync.delayProfiles',
-				runAt: new Date().toISOString(),
-				payload: { instanceId },
-				source: 'system',
-				dedupeKey: `arr.sync.delayProfiles:event:${instanceId}`
-			});
-		}
-		if (triggers.includes(status.mediaManagement.trigger)) {
-			arrSyncQueries.setMediaManagementStatusPending(instanceId);
-			upsertScheduledJob({
-				jobType: 'arr.sync.mediaManagement',
-				runAt: new Date().toISOString(),
-				payload: { instanceId },
-				source: 'system',
-				dedupeKey: `arr.sync.mediaManagement:event:${instanceId}`
-			});
-		}
-	}
+    if (triggers.includes(status.qualityProfiles.trigger)) {
+      arrSyncQueries.setQualityProfilesStatusPending(instanceId);
+      upsertScheduledJob({
+        jobType: 'arr.sync.qualityProfiles',
+        runAt: new Date().toISOString(),
+        payload: { instanceId },
+        source: 'system',
+        dedupeKey: `arr.sync.qualityProfiles:event:${instanceId}`,
+      });
+    }
+    if (triggers.includes(status.delayProfiles.trigger)) {
+      arrSyncQueries.setDelayProfilesStatusPending(instanceId);
+      upsertScheduledJob({
+        jobType: 'arr.sync.delayProfiles',
+        runAt: new Date().toISOString(),
+        payload: { instanceId },
+        source: 'system',
+        dedupeKey: `arr.sync.delayProfiles:event:${instanceId}`,
+      });
+    }
+    if (triggers.includes(status.mediaManagement.trigger)) {
+      arrSyncQueries.setMediaManagementStatusPending(instanceId);
+      upsertScheduledJob({
+        jobType: 'arr.sync.mediaManagement',
+        runAt: new Date().toISOString(),
+        payload: { instanceId },
+        source: 'system',
+        dedupeKey: `arr.sync.mediaManagement:event:${instanceId}`,
+      });
+    }
+  }
 }

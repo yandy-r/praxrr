@@ -7,14 +7,14 @@ import type { Migration } from '../migrations.ts';
  */
 
 export const migration: Migration = {
-	version: 2,
-	name: 'Remove sync_profile column from arr_instances',
+  version: 2,
+  name: 'Remove sync_profile column from arr_instances',
 
-	up: `
+  up: `
 		ALTER TABLE arr_instances DROP COLUMN sync_profile;
 	`,
 
-	down: `
+  down: `
 		ALTER TABLE arr_instances ADD COLUMN sync_profile TEXT;
-	`
+	`,
 };

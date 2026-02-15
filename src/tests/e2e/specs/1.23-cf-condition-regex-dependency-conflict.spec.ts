@@ -18,7 +18,7 @@ import {
   getConditionRequiredByName,
   saveConditionChanges,
   goToRegex,
-  updateRegexPattern
+  updateRegexPattern,
 } from '../helpers/entity';
 import { fillMarkdownInput } from '../helpers/markdown';
 import { getHead, resetToCommit } from '../helpers/reset';
@@ -45,7 +45,7 @@ async function createRegex(
   await fillMarkdownInput(page, 'description', `Pattern for ${name}`);
   await page.getByRole('button', { name: 'Create' }).click();
   await page.waitForURL(/\/regular-expressions\/\d+/, {
-    timeout: 15_000
+    timeout: 15_000,
   });
   await page.waitForLoadState('networkidle');
 }
@@ -73,7 +73,7 @@ test.describe('1.23 CF regex dependency change', () => {
       repoUrl: TEST_REPO_URL,
       pat: TEST_PAT,
       gitName: TEST_GIT_NAME,
-      gitEmail: TEST_GIT_EMAIL
+      gitEmail: TEST_GIT_EMAIL,
     });
 
     devHead = getHead(devId);
@@ -87,7 +87,7 @@ test.describe('1.23 CF regex dependency change', () => {
       syncStrategy: 'Manual (no auto-sync)',
       autoPull: false,
       localOpsEnabled: true,
-      conflictStrategy: 'Ask every time'
+      conflictStrategy: 'Ask every time',
     });
 
     await page.close();
@@ -121,7 +121,7 @@ test.describe('1.23 CF regex dependency change', () => {
     await addPatternCondition(page, {
       name: conditionName,
       typeLabel: 'Release Title',
-      patternLabel: regexName
+      patternLabel: regexName,
     });
     await saveConditionChanges(page);
     await exportAndPush(page, devId, 'e2e: 1.23 seed condition');

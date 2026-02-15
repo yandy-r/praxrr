@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
+	import { page } from '$app/stores';
 	import { tick } from 'svelte';
+	import { get } from 'svelte/store';
 	import StickyCard from '$ui/card/StickyCard.svelte';
 	import Button from '$ui/button/Button.svelte';
 	import Modal from '$ui/modal/Modal.svelte';
@@ -11,6 +13,8 @@
 	import { Save, Trash2, Info } from 'lucide-svelte';
 	import { current, isDirty, initEdit, initCreate, update } from '$lib/client/stores/dirty';
 	import type { SonarrNamingRow } from '$shared/pcd/display.ts';
+	import { getArrAppMetadata } from '$shared/arr/capabilities.ts';
+	import type { ArrAppType } from '$shared/pcd/types.ts';
 	import { SONARR_COLON_REPLACEMENT_OPTIONS, MULTI_EPISODE_STYLE_OPTIONS, type SonarrColonReplacementFormat, type MultiEpisodeStyle } from '$shared/pcd/mediaManagement.ts';
 	import { resolveSonarrFormat, getSonarrTokenCategories } from '$shared/pcd/namingTokens.ts';
 	import NamingPreview from './NamingPreview.svelte';
@@ -37,6 +41,22 @@
 	export let canWriteToBase: boolean = false;
 	export let actionUrl: string = '';
 	export let initialData: SonarrNamingRow | null;
+
+	const inferArrTypeFromRoute = (): ArrAppType => {
+		const pathname = get(page).url.pathname;
+		if (pathname.includes('/naming/lidarr/')) {
+			return 'lidarr';
+		}
+		if (pathname.includes('/naming/sonarr/')) {
+			return 'sonarr';
+		}
+		if (pathname.includes('/naming/radarr/')) {
+			return 'radarr';
+		}
+		return 'sonarr';
+	};
+
+	export let arrType: ArrAppType = inferArrTypeFromRoute();
 
 	const defaults: SonarrNamingFormData = {
 		name: '',
@@ -84,19 +104,57 @@
 	let selectedLayer: 'user' | 'base' = canWriteToBase ? 'base' : 'user';
 	let mainFormElement: HTMLFormElement;
 	let deleteFormElement: HTMLFormElement;
+	let appLabel = 'Sonarr';
 	let standardEpisodeFormatInput: HTMLInputElement | HTMLTextAreaElement | null = null;
 	let dailyEpisodeFormatInput: HTMLInputElement | HTMLTextAreaElement | null = null;
 	let animeEpisodeFormatInput: HTMLInputElement | HTMLTextAreaElement | null = null;
 	let seriesFolderFormatInput: HTMLInputElement | HTMLTextAreaElement | null = null;
 	let seasonFolderFormatInput: HTMLInputElement | HTMLTextAreaElement | null = null;
 
+	const getErrorMessage = (data: unknown, fallback: string): string => {
+		if (!data || typeof data !== 'object') {
+			return fallback;
+		}
+
+		const payload = data as Record<string, unknown>;
+		if (typeof payload.error === 'string' && payload.error.trim()) {
+			return payload.error.trim();
+		}
+
+		if (typeof payload.message === 'string' && payload.message.trim()) {
+			return payload.message.trim();
+		}
+
+		const validationErrors = payload.errors;
+		if (Array.isArray(validationErrors)) {
+			const messages = validationErrors
+				.filter((entry): entry is string => typeof entry === 'string' && entry.trim().length > 0)
+				.map((entry) => entry.trim());
+			if (messages.length > 0) {
+				return messages.join(', ');
+			}
+		}
+
+		if (validationErrors && typeof validationErrors === 'object') {
+			const messages = Object.values(validationErrors)
+				.filter((entry): entry is string => typeof entry === 'string' && entry.trim().length > 0)
+				.map((entry) => entry.trim());
+			if (messages.length > 0) {
+				return messages.join(', ');
+			}
+		}
+
+		return fallback;
+	};
+
 	const sonarrTokenCategories = getSonarrTokenCategories();
 
-	$: title = mode === 'create' ? 'New Sonarr Naming Config' : 'Edit Sonarr Naming Config';
+	$: appLabel = getArrAppMetadata(arrType).label;
+	$: title = mode === 'create' ? `New ${appLabel} Naming Config` : `Edit ${appLabel} Naming Config`;
 	$: description =
 		mode === 'create'
-			? `Create a new Sonarr naming configuration for ${databaseName}`
-			: `Update Sonarr naming configuration`;
+			? `Create a new ${appLabel.toLowerCase()} naming configuration for ${databaseName}`
+			: `Update ${appLabel.toLowerCase()} naming configuration`;
 	$: isValid = formData.name.trim() !== '';
 	$: showCustomColonInput = formData.colonReplacementFormat === 'custom';
 
@@ -265,7 +323,7 @@
 			<div class="space-y-4">
 				<h2 class="text-base font-semibold text-neutral-900 dark:text-neutral-100">Multi-Episode Style</h2>
 				<div class="grid gap-2">
-					{#each MULTI_EPISODE_STYLE_OPTIONS as option}
+					{#each MULTI_EPISODE_STYLE_OPTIONS as option (option.value)}
 						<Toggle
 							checked={formData.multiEpisodeStyle === option.value}
 							label={option.label}
@@ -303,7 +361,7 @@
 							Colon Replacement
 						</span>
 						<div class="mt-2 grid gap-2">
-							{#each SONARR_COLON_REPLACEMENT_OPTIONS as option}
+							{#each SONARR_COLON_REPLACEMENT_OPTIONS as option (option.value)}
 								<Toggle
 									checked={formData.colonReplacementFormat === option.value}
 									label={option.label}
@@ -342,7 +400,7 @@
 		saving = true;
 		return async ({ result, update: formUpdate }) => {
 			if (result.type === 'failure' && result.data) {
-				alertStore.add('error', (result.data as { error?: string }).error || 'Operation failed');
+				alertStore.add('error', getErrorMessage(result.data, 'Operation failed'));
 			} else if (result.type === 'redirect') {
 				alertStore.add(
 					'success',
@@ -355,7 +413,7 @@
 		};
 	}}
 >
-	<input type="hidden" name="arrType" value="sonarr" />
+	<input type="hidden" name="arrType" value={arrType} />
 	<input type="hidden" name="name" value={formData.name} />
 	<input type="hidden" name="rename" value={formData.rename} />
 	<input type="hidden" name="standardEpisodeFormat" value={formData.standardEpisodeFormat} />
@@ -381,10 +439,7 @@
 			deleting = true;
 			return async ({ result, update: formUpdate }) => {
 				if (result.type === 'failure' && result.data) {
-					alertStore.add(
-						'error',
-						(result.data as { error?: string }).error || 'Failed to delete'
-					);
+					alertStore.add('error', getErrorMessage(result.data, 'Failed to delete'));
 				} else if (result.type === 'redirect') {
 					alertStore.add('success', 'Naming config deleted');
 				}
@@ -399,7 +454,7 @@
 
 <Modal
 	open={showDeleteModal}
-	header="Delete Sonarr naming config"
+	header={`Delete ${appLabel} naming config`}
 	bodyMessage="This will remove the naming config and write a delete op. You can recreate it later if needed."
 	confirmText="Delete"
 	cancelText="Cancel"
@@ -410,16 +465,16 @@
 	on:cancel={handleDeleteCancel}
 />
 
-<InfoModal bind:open={showInfoModal} header="Sonarr Naming Configuration">
+<InfoModal bind:open={showInfoModal} header={`${appLabel} Naming Configuration`}>
 	<div class="space-y-4 text-sm text-neutral-600 dark:text-neutral-400">
 		<div>
 			<div class="font-medium text-neutral-900 dark:text-neutral-100">Format Strings</div>
 			<p class="mt-1">
-				Format strings control how Sonarr names episode files and folders. Use tokens like
+				Format strings control how {appLabel.toLowerCase()} names episode files and folders. Use tokens like
 				<code class="rounded bg-neutral-100 px-1 py-0.5 font-mono text-xs dark:bg-neutral-800">{'{Series Title}'}</code>
 				and
 				<code class="rounded bg-neutral-100 px-1 py-0.5 font-mono text-xs dark:bg-neutral-800">{'{Episode Title}'}</code>
-				to build your naming pattern. Sonarr has separate formats for standard, daily, and anime episodes.
+				to build your naming pattern. {appLabel} has separate formats for standard, daily, and anime episodes.
 			</p>
 		</div>
 		<div>
@@ -444,7 +499,7 @@
 		<div>
 			<div class="font-medium text-neutral-900 dark:text-neutral-100">Character Replacement</div>
 			<p class="mt-1">
-				When enabled, illegal filesystem characters are replaced automatically. The colon replacement option controls how colons specifically are handled. Sonarr also supports a custom replacement string.
+				When enabled, illegal filesystem characters are replaced automatically. The colon replacement option controls how colons specifically are handled. {appLabel} also supports a custom replacement string.
 			</p>
 		</div>
 	</div>

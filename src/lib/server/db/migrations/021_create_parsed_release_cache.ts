@@ -1,9 +1,9 @@
 import type { Migration } from '../migrations.ts';
 
 export const migration: Migration = {
-	version: 21,
-	name: 'create_parsed_release_cache',
-	up: `
+  version: 21,
+  name: 'create_parsed_release_cache',
+  up: `
 		-- Cache for parsed release titles
 		-- Stores parser microservice responses to avoid redundant HTTP calls
 		-- Used by both custom format testing and quality profile entity testing
@@ -20,9 +20,9 @@ export const migration: Migration = {
 		-- Index for potential cleanup queries by age
 		CREATE INDEX idx_parsed_release_cache_created_at ON parsed_release_cache(created_at);
 	`,
-	down: `
+  down: `
 		DROP INDEX IF EXISTS idx_parsed_release_cache_created_at;
 		DROP INDEX IF EXISTS idx_parsed_release_cache_version;
 		DROP TABLE IF EXISTS parsed_release_cache;
-	`
+	`,
 };

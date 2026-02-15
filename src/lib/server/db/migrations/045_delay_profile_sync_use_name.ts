@@ -13,10 +13,10 @@ import type { Migration } from '../migrations.ts';
  */
 
 export const migration: Migration = {
-	version: 45,
-	name: 'Change delay profile sync to use profile_name',
+  version: 45,
+  name: 'Change delay profile sync to use profile_name',
 
-	up: `
+  up: `
 		CREATE TABLE arr_sync_delay_profiles_config_new (
 			instance_id INTEGER PRIMARY KEY,
 			trigger TEXT NOT NULL DEFAULT 'none',
@@ -43,5 +43,5 @@ export const migration: Migration = {
 
 		DROP TABLE arr_sync_delay_profiles_config;
 		ALTER TABLE arr_sync_delay_profiles_config_new RENAME TO arr_sync_delay_profiles_config;
-	`
+	`,
 };

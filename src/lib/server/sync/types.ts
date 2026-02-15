@@ -14,28 +14,28 @@ import type { ArrInstance } from '$db/queries/arrInstances.ts';
  * Result of a single sync operation
  */
 export interface SyncResult {
-	success: boolean;
-	itemsSynced: number;
-	error?: string;
+  success: boolean;
+  itemsSynced: number;
+  error?: string;
 }
 
 /**
  * Result of processing all pending syncs
  */
 export interface ProcessSyncsResult {
-	totalSynced: number;
-	results: InstanceSyncResult[];
+  totalSynced: number;
+  results: InstanceSyncResult[];
 }
 
 /**
  * Sync results for a single arr instance
  */
 export interface InstanceSyncResult {
-	instanceId: number;
-	instanceName: string;
-	qualityProfiles?: SyncResult;
-	delayProfiles?: SyncResult;
-	mediaManagement?: SyncResult;
+  instanceId: number;
+  instanceName: string;
+  qualityProfiles?: SyncResult;
+  delayProfiles?: SyncResult;
+  mediaManagement?: SyncResult;
 }
 
 // =============================================================================
@@ -51,9 +51,9 @@ export type SectionType = 'qualityProfiles' | 'delayProfiles' | 'mediaManagement
  * Scheduled sync configuration
  */
 export interface ScheduledConfig {
-	instanceId: number;
-	cron: string | null;
-	nextRunAt: string | null;
+  instanceId: number;
+  cron: string | null;
+  nextRunAt: string | null;
 }
 
 /**
@@ -61,27 +61,27 @@ export interface ScheduledConfig {
  * Each section type implements this to provide section-specific operations
  */
 export interface SectionHandler {
-	readonly type: SectionType;
+  readonly type: SectionType;
 
-	// Flag operations (legacy - uses should_sync)
-	setShouldSync(instanceId: number, value: boolean): void;
-	setNextRunAt(instanceId: number, nextRunAt: string | null): void;
+  // Flag operations (legacy - uses should_sync)
+  setShouldSync(instanceId: number, value: boolean): void;
+  setNextRunAt(instanceId: number, nextRunAt: string | null): void;
 
-	// Status operations (new - uses sync_status)
-	claimSync(instanceId: number): boolean;
-	completeSync(instanceId: number): void;
-	failSync(instanceId: number, error: string): void;
-	setStatusPending(instanceId: number): void;
+  // Status operations (new - uses sync_status)
+  claimSync(instanceId: number): boolean;
+  completeSync(instanceId: number): void;
+  failSync(instanceId: number, error: string): void;
+  setStatusPending(instanceId: number): void;
 
-	// Query operations
-	getPendingInstanceIds(): number[];
-	getScheduledConfigs(): ScheduledConfig[];
+  // Query operations
+  getPendingInstanceIds(): number[];
+  getScheduledConfigs(): ScheduledConfig[];
 
-	// Syncer factory
-	createSyncer(client: BaseArrClient, instance: ArrInstance): BaseSyncer;
+  // Syncer factory
+  createSyncer(client: BaseArrClient, instance: ArrInstance): BaseSyncer;
 
-	// Config check - returns true if this section has something to sync for the instance
-	hasConfig(instanceId: number): boolean;
+  // Config check - returns true if this section has something to sync for the instance
+  hasConfig(instanceId: number): boolean;
 }
 
 // =============================================================================
@@ -97,8 +97,8 @@ export type SyncTriggerEvent = 'on_pull' | 'on_change';
  * Context for a sync trigger
  */
 export interface TriggerContext {
-	event: SyncTriggerEvent;
-	databaseId?: number;
+  event: SyncTriggerEvent;
+  databaseId?: number;
 }
 
 // =============================================================================
@@ -110,5 +110,5 @@ export interface TriggerContext {
  * Actual implementation is in base.ts
  */
 export interface BaseSyncer {
-	sync(): Promise<SyncResult>;
+  sync(): Promise<SyncResult>;
 }

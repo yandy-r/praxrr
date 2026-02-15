@@ -11,177 +11,177 @@ import { calculateNextRunFromMinutes, calculateNextRunFromSchedule } from './sch
 import { jobDispatcher } from './dispatcher.ts';
 
 function notify(runAt: string | null): void {
-	if (!runAt) return;
-	jobDispatcher.notifyJobEnqueued(runAt);
+  if (!runAt) return;
+  jobDispatcher.notifyJobEnqueued(runAt);
 }
 
 export function scheduleArrSyncForInstance(instanceId: number): void {
-	const status = arrSyncQueries.getSyncConfigStatus(instanceId);
+  const status = arrSyncQueries.getSyncConfigStatus(instanceId);
 
-	const schedules = [
-		{ key: 'qualityProfiles', config: status.qualityProfiles, jobType: 'arr.sync.qualityProfiles' },
-		{ key: 'delayProfiles', config: status.delayProfiles, jobType: 'arr.sync.delayProfiles' },
-		{ key: 'mediaManagement', config: status.mediaManagement, jobType: 'arr.sync.mediaManagement' }
-	] as const;
+  const schedules = [
+    { key: 'qualityProfiles', config: status.qualityProfiles, jobType: 'arr.sync.qualityProfiles' },
+    { key: 'delayProfiles', config: status.delayProfiles, jobType: 'arr.sync.delayProfiles' },
+    { key: 'mediaManagement', config: status.mediaManagement, jobType: 'arr.sync.mediaManagement' },
+  ] as const;
 
-	// Remove legacy combined scheduled jobs
-	jobQueueQueries.unscheduleByDedupeKey(`arr.sync:${instanceId}`);
+  // Remove legacy combined scheduled jobs
+  jobQueueQueries.unscheduleByDedupeKey(`arr.sync:${instanceId}`);
 
-	for (const schedule of schedules) {
-		const dedupeKey = `${schedule.jobType}:${instanceId}`;
-		if (schedule.config.trigger !== 'schedule') {
-			jobQueueQueries.unscheduleByDedupeKey(dedupeKey);
-			continue;
-		}
+  for (const schedule of schedules) {
+    const dedupeKey = `${schedule.jobType}:${instanceId}`;
+    if (schedule.config.trigger !== 'schedule') {
+      jobQueueQueries.unscheduleByDedupeKey(dedupeKey);
+      continue;
+    }
 
-		let nextRun = schedule.config.nextRunAt;
-		if (!nextRun && schedule.config.cron) {
-			nextRun = calculateNextRun(schedule.config.cron) ?? null;
-		}
+    let nextRun = schedule.config.nextRunAt;
+    if (!nextRun && schedule.config.cron) {
+      nextRun = calculateNextRun(schedule.config.cron) ?? null;
+    }
 
-		if (!nextRun) {
-			jobQueueQueries.unscheduleByDedupeKey(dedupeKey);
-			continue;
-		}
+    if (!nextRun) {
+      jobQueueQueries.unscheduleByDedupeKey(dedupeKey);
+      continue;
+    }
 
-		const job = jobQueueQueries.upsertScheduled({
-			jobType: schedule.jobType,
-			runAt: nextRun,
-			payload: { instanceId },
-			source: 'schedule',
-			dedupeKey
-		});
+    const job = jobQueueQueries.upsertScheduled({
+      jobType: schedule.jobType,
+      runAt: nextRun,
+      payload: { instanceId },
+      source: 'schedule',
+      dedupeKey,
+    });
 
-		notify(job.runAt);
-	}
+    notify(job.runAt);
+  }
 }
 
 export function scheduleUpgradeForInstance(instanceId: number): void {
-	const config = upgradeConfigsQueries.getByArrInstanceId(instanceId);
-	if (!config || !config.enabled) {
-		jobQueueQueries.cancelByDedupeKey(`arr.upgrade:${instanceId}`);
-		return;
-	}
+  const config = upgradeConfigsQueries.getByArrInstanceId(instanceId);
+  if (!config || !config.enabled) {
+    jobQueueQueries.cancelByDedupeKey(`arr.upgrade:${instanceId}`);
+    return;
+  }
 
-	const baseRunAt = config.lastRunAt ?? new Date().toISOString();
-	const runAt = calculateNextRunFromMinutes(baseRunAt, config.schedule);
+  const baseRunAt = config.lastRunAt ?? new Date().toISOString();
+  const runAt = calculateNextRunFromMinutes(baseRunAt, config.schedule);
 
-	const job = jobQueueQueries.upsertScheduled({
-		jobType: 'arr.upgrade',
-		runAt,
-		payload: { instanceId },
-		source: 'schedule',
-		dedupeKey: `arr.upgrade:${instanceId}`
-	});
+  const job = jobQueueQueries.upsertScheduled({
+    jobType: 'arr.upgrade',
+    runAt,
+    payload: { instanceId },
+    source: 'schedule',
+    dedupeKey: `arr.upgrade:${instanceId}`,
+  });
 
-	notify(job.runAt);
+  notify(job.runAt);
 }
 
 export function scheduleRenameForInstance(instanceId: number): void {
-	const settings = arrRenameSettingsQueries.getByInstanceId(instanceId);
-	if (!settings || !settings.enabled) {
-		jobQueueQueries.cancelByDedupeKey(`arr.rename:${instanceId}`);
-		return;
-	}
+  const settings = arrRenameSettingsQueries.getByInstanceId(instanceId);
+  if (!settings || !settings.enabled) {
+    jobQueueQueries.cancelByDedupeKey(`arr.rename:${instanceId}`);
+    return;
+  }
 
-	const baseRunAt = settings.lastRunAt ?? new Date().toISOString();
-	const runAt = calculateNextRunFromMinutes(baseRunAt, settings.schedule);
+  const baseRunAt = settings.lastRunAt ?? new Date().toISOString();
+  const runAt = calculateNextRunFromMinutes(baseRunAt, settings.schedule);
 
-	const job = jobQueueQueries.upsertScheduled({
-		jobType: 'arr.rename',
-		runAt,
-		payload: { instanceId },
-		source: 'schedule',
-		dedupeKey: `arr.rename:${instanceId}`
-	});
+  const job = jobQueueQueries.upsertScheduled({
+    jobType: 'arr.rename',
+    runAt,
+    payload: { instanceId },
+    source: 'schedule',
+    dedupeKey: `arr.rename:${instanceId}`,
+  });
 
-	notify(job.runAt);
+  notify(job.runAt);
 }
 
 export function schedulePcdSyncForDatabase(databaseId: number): void {
-	const instance = databaseInstancesQueries.getById(databaseId);
-	if (!instance || instance.enabled === 0 || instance.sync_strategy <= 0) {
-		jobQueueQueries.unscheduleByDedupeKey(`pcd.sync:${databaseId}`);
-		return;
-	}
+  const instance = databaseInstancesQueries.getById(databaseId);
+  if (!instance || instance.enabled === 0 || instance.sync_strategy <= 0) {
+    jobQueueQueries.unscheduleByDedupeKey(`pcd.sync:${databaseId}`);
+    return;
+  }
 
-	const baseRunAt = instance.last_synced_at ?? new Date().toISOString();
-	const runAt = calculateNextRunFromMinutes(baseRunAt, instance.sync_strategy);
+  const baseRunAt = instance.last_synced_at ?? new Date().toISOString();
+  const runAt = calculateNextRunFromMinutes(baseRunAt, instance.sync_strategy);
 
-	const job = jobQueueQueries.upsertScheduled({
-		jobType: 'pcd.sync',
-		runAt,
-		payload: { databaseId },
-		source: 'schedule',
-		dedupeKey: `pcd.sync:${databaseId}`
-	});
+  const job = jobQueueQueries.upsertScheduled({
+    jobType: 'pcd.sync',
+    runAt,
+    payload: { databaseId },
+    source: 'schedule',
+    dedupeKey: `pcd.sync:${databaseId}`,
+  });
 
-	notify(job.runAt);
+  notify(job.runAt);
 }
 
 export function scheduleBackupJobs(): void {
-	const settings = backupSettingsQueries.get();
-	if (!settings || settings.enabled !== 1) {
-		jobQueueQueries.cancelByDedupeKey('backup.create');
-		jobQueueQueries.cancelByDedupeKey('backup.cleanup');
-		return;
-	}
+  const settings = backupSettingsQueries.get();
+  if (!settings || settings.enabled !== 1) {
+    jobQueueQueries.cancelByDedupeKey('backup.create');
+    jobQueueQueries.cancelByDedupeKey('backup.cleanup');
+    return;
+  }
 
-	const backupRunAt = calculateNextRunFromSchedule(settings.schedule);
-	const cleanupRunAt = calculateNextRunFromSchedule('daily');
+  const backupRunAt = calculateNextRunFromSchedule(settings.schedule);
+  const cleanupRunAt = calculateNextRunFromSchedule('daily');
 
-	const backupJob = jobQueueQueries.upsertScheduled({
-		jobType: 'backup.create',
-		runAt: backupRunAt,
-		payload: {},
-		source: 'schedule',
-		dedupeKey: 'backup.create'
-	});
+  const backupJob = jobQueueQueries.upsertScheduled({
+    jobType: 'backup.create',
+    runAt: backupRunAt,
+    payload: {},
+    source: 'schedule',
+    dedupeKey: 'backup.create',
+  });
 
-	const cleanupJob = jobQueueQueries.upsertScheduled({
-		jobType: 'backup.cleanup',
-		runAt: cleanupRunAt,
-		payload: {},
-		source: 'schedule',
-		dedupeKey: 'backup.cleanup'
-	});
+  const cleanupJob = jobQueueQueries.upsertScheduled({
+    jobType: 'backup.cleanup',
+    runAt: cleanupRunAt,
+    payload: {},
+    source: 'schedule',
+    dedupeKey: 'backup.cleanup',
+  });
 
-	notify(backupJob.runAt);
-	notify(cleanupJob.runAt);
+  notify(backupJob.runAt);
+  notify(cleanupJob.runAt);
 }
 
 export function scheduleLogCleanup(): void {
-	const settings = logSettingsQueries.get();
-	if (!settings || settings.file_logging !== 1) {
-		jobQueueQueries.cancelByDedupeKey('logs.cleanup');
-		return;
-	}
+  const settings = logSettingsQueries.get();
+  if (!settings || settings.file_logging !== 1) {
+    jobQueueQueries.cancelByDedupeKey('logs.cleanup');
+    return;
+  }
 
-	const runAt = calculateNextRunFromSchedule('daily');
-	const job = jobQueueQueries.upsertScheduled({
-		jobType: 'logs.cleanup',
-		runAt,
-		payload: {},
-		source: 'schedule',
-		dedupeKey: 'logs.cleanup'
-	});
+  const runAt = calculateNextRunFromSchedule('daily');
+  const job = jobQueueQueries.upsertScheduled({
+    jobType: 'logs.cleanup',
+    runAt,
+    payload: {},
+    source: 'schedule',
+    dedupeKey: 'logs.cleanup',
+  });
 
-	notify(job.runAt);
+  notify(job.runAt);
 }
 
 export function scheduleAllJobs(): void {
-	const arrInstances = arrInstancesQueries.getAll();
-	for (const instance of arrInstances) {
-		scheduleArrSyncForInstance(instance.id);
-		scheduleUpgradeForInstance(instance.id);
-		scheduleRenameForInstance(instance.id);
-	}
+  const arrInstances = arrInstancesQueries.getAll();
+  for (const instance of arrInstances) {
+    scheduleArrSyncForInstance(instance.id);
+    scheduleUpgradeForInstance(instance.id);
+    scheduleRenameForInstance(instance.id);
+  }
 
-	const databases = databaseInstancesQueries.getAll();
-	for (const database of databases) {
-		schedulePcdSyncForDatabase(database.id);
-	}
+  const databases = databaseInstancesQueries.getAll();
+  for (const database of databases) {
+    schedulePcdSyncForDatabase(database.id);
+  }
 
-	scheduleBackupJobs();
-	scheduleLogCleanup();
+  scheduleBackupJobs();
+  scheduleLogCleanup();
 }

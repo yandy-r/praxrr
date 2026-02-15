@@ -3,19 +3,19 @@ import type { ServerLoad } from '@sveltejs/kit';
 import { databaseInstancesQueries } from '$db/queries/databaseInstances.ts';
 
 export const load: ServerLoad = ({ params }) => {
-	const id = parseInt(params.id || '', 10);
+  const id = parseInt(params.id || '', 10);
 
-	if (isNaN(id)) {
-		error(400, 'Invalid database ID');
-	}
+  if (isNaN(id)) {
+    error(400, 'Invalid database ID');
+  }
 
-	const database = databaseInstancesQueries.getById(id);
+  const database = databaseInstancesQueries.getById(id);
 
-	if (!database) {
-		error(404, 'Database not found');
-	}
+  if (!database) {
+    error(404, 'Database not found');
+  }
 
-	return {
-		database
-	};
+  return {
+    database,
+  };
 };

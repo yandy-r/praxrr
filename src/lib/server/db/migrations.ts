@@ -51,216 +51,215 @@ import { migration as migration046 } from './migrations/046_quality_profile_sync
 import { migration as migration047 } from './migrations/047_create_arr_database_namespaces.ts';
 import { migration as migration048 } from './migrations/048_fix_sync_database_foreign_keys.ts';
 import { migration as migration049 } from './migrations/049_create_job_queue.ts';
+import { migration as migration20260215 } from './migrations/20260215_add_lidarr_media_management_entities.ts';
+import { migration as migration20260216 } from './migrations/20260216_enforce_native_lidarr_quality_mappings.ts';
+import { migration as migration20260217 } from './migrations/20260217_set_lidarr_naming_defaults.ts';
 
 export interface Migration {
-	version: number;
-	name: string;
-	up: string;
-	down?: string;
-	afterUp?: () => void; // Optional callback for data migrations
+  version: number;
+  name: string;
+  up: string;
+  down?: string;
+  afterUp?: () => void; // Optional callback for data migrations
 }
 
 /**
  * Migration runner for database schema management
  */
 class MigrationRunner {
-	private migrationsTable = 'migrations';
+  private migrationsTable = 'migrations';
 
-	/**
-	 * Initialize the migrations table
-	 */
-	initialize(): void {
-		const sql = `
+  /**
+   * Initialize the migrations table
+   */
+  initialize(): void {
+    const sql = `
 			CREATE TABLE IF NOT EXISTS ${this.migrationsTable} (
 				version INTEGER PRIMARY KEY,
 				name TEXT NOT NULL,
 				applied_at DATETIME DEFAULT CURRENT_TIMESTAMP
 			)
 		`;
-		db.exec(sql);
-	}
+    db.exec(sql);
+  }
 
-	/**
-	 * Get the current migration version
-	 */
-	getCurrentVersion(): number {
-		const result = db.queryFirst<{ version: number }>(
-			`SELECT MAX(version) as version FROM ${this.migrationsTable}`
-		);
-		return result?.version ?? 0;
-	}
+  /**
+   * Get the current migration version
+   */
+  getCurrentVersion(): number {
+    const result = db.queryFirst<{ version: number }>(`SELECT MAX(version) as version FROM ${this.migrationsTable}`);
+    return result?.version ?? 0;
+  }
 
-	/**
-	 * Check if a migration has been applied
-	 */
-	isApplied(version: number): boolean {
-		const result = db.queryFirst<{ count: number }>(
-			`SELECT COUNT(*) as count FROM ${this.migrationsTable} WHERE version = ?`,
-			version
-		);
-		return (result?.count ?? 0) > 0;
-	}
+  /**
+   * Check if a migration has been applied
+   */
+  isApplied(version: number): boolean {
+    const result = db.queryFirst<{ count: number }>(
+      `SELECT COUNT(*) as count FROM ${this.migrationsTable} WHERE version = ?`,
+      version
+    );
+    return (result?.count ?? 0) > 0;
+  }
 
-	/**
-	 * Apply a single migration
-	 */
-	private async applyMigration(migration: Migration): Promise<void> {
-		try {
-			await db.transaction(async () => {
-				// Execute the migration
-				db.exec(migration.up);
+  /**
+   * Apply a single migration
+   */
+  private async applyMigration(migration: Migration): Promise<void> {
+    try {
+      await db.transaction(async () => {
+        // Execute the migration
+        db.exec(migration.up);
 
-				// Record the migration
-				db.execute(
-					`INSERT INTO ${this.migrationsTable} (version, name) VALUES (?, ?)`,
-					migration.version,
-					migration.name
-				);
-			});
+        // Record the migration
+        db.execute(
+          `INSERT INTO ${this.migrationsTable} (version, name) VALUES (?, ?)`,
+          migration.version,
+          migration.name
+        );
+      });
 
-			// Run data migration callback if present (outside transaction)
-			if (migration.afterUp) {
-				migration.afterUp();
-			}
-		} catch (error) {
-			await logger.error(`Failed to apply migration ${migration.version}: ${migration.name}`, {
-				source: 'DatabaseMigrations',
-				meta: error
-			});
-			throw error;
-		}
-	}
+      // Run data migration callback if present (outside transaction)
+      if (migration.afterUp) {
+        migration.afterUp();
+      }
+    } catch (error) {
+      await logger.error(`Failed to apply migration ${migration.version}: ${migration.name}`, {
+        source: 'DatabaseMigrations',
+        meta: error,
+      });
+      throw error;
+    }
+  }
 
-	/**
-	 * Rollback a single migration
-	 */
-	private async rollbackMigration(migration: Migration): Promise<void> {
-		if (!migration.down) {
-			throw new Error(`Migration ${migration.version} does not support rollback`);
-		}
+  /**
+   * Rollback a single migration
+   */
+  private async rollbackMigration(migration: Migration): Promise<void> {
+    if (!migration.down) {
+      throw new Error(`Migration ${migration.version} does not support rollback`);
+    }
 
-		try {
-			await db.transaction(async () => {
-				// Execute the rollback
-				db.exec(migration.down!);
+    try {
+      await db.transaction(async () => {
+        // Execute the rollback
+        db.exec(migration.down!);
 
-				// Remove the migration record
-				db.execute(`DELETE FROM ${this.migrationsTable} WHERE version = ?`, migration.version);
-			});
-		} catch (error) {
-			await logger.error(`Failed to rollback migration ${migration.version}: ${migration.name}`, {
-				source: 'DatabaseMigrations',
-				meta: error
-			});
-			throw error;
-		}
-	}
+        // Remove the migration record
+        db.execute(`DELETE FROM ${this.migrationsTable} WHERE version = ?`, migration.version);
+      });
+    } catch (error) {
+      await logger.error(`Failed to rollback migration ${migration.version}: ${migration.name}`, {
+        source: 'DatabaseMigrations',
+        meta: error,
+      });
+      throw error;
+    }
+  }
 
-	/**
-	 * Run all pending migrations
-	 */
-	async up(migrations: Migration[]): Promise<void> {
-		this.initialize();
+  /**
+   * Run all pending migrations
+   */
+  async up(migrations: Migration[]): Promise<void> {
+    this.initialize();
 
-		// Sort migrations by version
-		const sortedMigrations = [...migrations].sort((a, b) => a.version - b.version);
+    // Sort migrations by version
+    const sortedMigrations = [...migrations].sort((a, b) => a.version - b.version);
 
-		const applied: Array<{ version: number; name: string }> = [];
-		for (const migration of sortedMigrations) {
-			if (this.isApplied(migration.version)) {
-				continue;
-			}
+    const applied: Array<{ version: number; name: string }> = [];
+    for (const migration of sortedMigrations) {
+      if (this.isApplied(migration.version)) {
+        continue;
+      }
 
-			await this.applyMigration(migration);
-			applied.push({ version: migration.version, name: migration.name });
-		}
+      await this.applyMigration(migration);
+      applied.push({ version: migration.version, name: migration.name });
+    }
 
-		if (applied.length === 0) {
-			await logger.debug('Database up to date', {
-				source: 'DatabaseMigrations'
-			});
-		} else {
-			await logger.info(`Applied ${applied.length} migration(s)`, {
-				source: 'DatabaseMigrations',
-				meta: { migrations: applied }
-			});
-		}
-	}
+    if (applied.length === 0) {
+      await logger.debug('Database up to date', {
+        source: 'DatabaseMigrations',
+      });
+    } else {
+      await logger.info(`Applied ${applied.length} migration(s)`, {
+        source: 'DatabaseMigrations',
+        meta: { migrations: applied },
+      });
+    }
+  }
 
-	/**
-	 * Rollback to a specific version
-	 */
-	async down(migrations: Migration[], targetVersion = 0): Promise<void> {
-		this.initialize();
+  /**
+   * Rollback to a specific version
+   */
+  async down(migrations: Migration[], targetVersion = 0): Promise<void> {
+    this.initialize();
 
-		const currentVersion = this.getCurrentVersion();
-		if (currentVersion <= targetVersion) {
-			await logger.debug('Already at target version or below', {
-				source: 'DatabaseMigrations'
-			});
-			return;
-		}
+    const currentVersion = this.getCurrentVersion();
+    if (currentVersion <= targetVersion) {
+      await logger.debug('Already at target version or below', {
+        source: 'DatabaseMigrations',
+      });
+      return;
+    }
 
-		// Sort migrations by version in descending order
-		const sortedMigrations = [...migrations]
-			.filter((m) => m.version > targetVersion && m.version <= currentVersion)
-			.sort((a, b) => b.version - a.version);
+    // Sort migrations by version in descending order
+    const sortedMigrations = [...migrations]
+      .filter((m) => m.version > targetVersion && m.version <= currentVersion)
+      .sort((a, b) => b.version - a.version);
 
-		const rolledBack: Array<{ version: number; name: string }> = [];
-		for (const migration of sortedMigrations) {
-			if (!this.isApplied(migration.version)) {
-				continue;
-			}
+    const rolledBack: Array<{ version: number; name: string }> = [];
+    for (const migration of sortedMigrations) {
+      if (!this.isApplied(migration.version)) {
+        continue;
+      }
 
-			await this.rollbackMigration(migration);
-			rolledBack.push({ version: migration.version, name: migration.name });
-		}
+      await this.rollbackMigration(migration);
+      rolledBack.push({ version: migration.version, name: migration.name });
+    }
 
-		if (rolledBack.length > 0) {
-			await logger.info(`Rolled back ${rolledBack.length} migration(s)`, {
-				source: 'DatabaseMigrations',
-				meta: { migrations: rolledBack }
-			});
-		}
-	}
+    if (rolledBack.length > 0) {
+      await logger.info(`Rolled back ${rolledBack.length} migration(s)`, {
+        source: 'DatabaseMigrations',
+        meta: { migrations: rolledBack },
+      });
+    }
+  }
 
-	/**
-	 * Get list of applied migrations
-	 */
-	getAppliedMigrations(): Array<{ version: number; name: string; applied_at: string }> {
-		return db.query(
-			`SELECT version, name, applied_at FROM ${this.migrationsTable} ORDER BY version`
-		);
-	}
+  /**
+   * Get list of applied migrations
+   */
+  getAppliedMigrations(): Array<{ version: number; name: string; applied_at: string }> {
+    return db.query(`SELECT version, name, applied_at FROM ${this.migrationsTable} ORDER BY version`);
+  }
 
-	/**
-	 * Get list of pending migrations
-	 */
-	getPendingMigrations(migrations: Migration[]): Migration[] {
-		const pending: Migration[] = [];
-		for (const migration of migrations) {
-			if (!this.isApplied(migration.version)) {
-				pending.push(migration);
-			}
-		}
-		return pending.sort((a, b) => a.version - b.version);
-	}
+  /**
+   * Get list of pending migrations
+   */
+  getPendingMigrations(migrations: Migration[]): Migration[] {
+    const pending: Migration[] = [];
+    for (const migration of migrations) {
+      if (!this.isApplied(migration.version)) {
+        pending.push(migration);
+      }
+    }
+    return pending.sort((a, b) => a.version - b.version);
+  }
 
-	/**
-	 * Reset the database (rollback all migrations)
-	 */
-	async reset(migrations: Migration[]): Promise<void> {
-		await this.down(migrations, 0);
-	}
+  /**
+   * Reset the database (rollback all migrations)
+   */
+  async reset(migrations: Migration[]): Promise<void> {
+    await this.down(migrations, 0);
+  }
 
-	/**
-	 * Fresh migration (reset and reapply all)
-	 */
-	async fresh(migrations: Migration[]): Promise<void> {
-		await logger.warn('Resetting database', { source: 'DatabaseMigrations' });
-		await this.reset(migrations);
-		await this.up(migrations);
-	}
+  /**
+   * Fresh migration (reset and reapply all)
+   */
+  async fresh(migrations: Migration[]): Promise<void> {
+    await logger.warn('Resetting database', { source: 'DatabaseMigrations' });
+    await this.reset(migrations);
+    await this.up(migrations);
+  }
 }
 
 // Export singleton instance
@@ -271,66 +270,69 @@ export const migrationRunner = new MigrationRunner();
  * Returns all statically imported migrations
  */
 export function loadMigrations(): Migration[] {
-	const migrations: Migration[] = [
-		migration001,
-		migration002,
-		migration003,
-		migration004,
-		migration005,
-		migration006,
-		migration007,
-		migration008,
-		migration009,
-		migration010,
-		migration011,
-		migration012,
-		migration013,
-		migration014,
-		migration015,
-		migration016,
-		migration017,
-		migration018,
-		migration019,
-		migration020,
-		migration021,
-		migration022,
-		migration023,
-		migration024,
-		migration025,
-		migration026,
-		migration027,
-		migration028,
-		migration029,
-		migration030,
-		migration031,
-		migration032,
-		migration033,
-		migration034,
-		migration035,
-		migration036,
-		migration037,
-		migration038,
-		migration039,
-		migration040,
-		migration041,
-		migration042,
-		migration043,
-		migration044,
-		migration045,
-		migration046,
-		migration047,
-		migration048,
-		migration049
-	];
+  const migrations: Migration[] = [
+    migration001,
+    migration002,
+    migration003,
+    migration004,
+    migration005,
+    migration006,
+    migration007,
+    migration008,
+    migration009,
+    migration010,
+    migration011,
+    migration012,
+    migration013,
+    migration014,
+    migration015,
+    migration016,
+    migration017,
+    migration018,
+    migration019,
+    migration020,
+    migration021,
+    migration022,
+    migration023,
+    migration024,
+    migration025,
+    migration026,
+    migration027,
+    migration028,
+    migration029,
+    migration030,
+    migration031,
+    migration032,
+    migration033,
+    migration034,
+    migration035,
+    migration036,
+    migration037,
+    migration038,
+    migration039,
+    migration040,
+    migration041,
+    migration042,
+    migration043,
+    migration044,
+    migration045,
+    migration046,
+    migration047,
+    migration048,
+    migration049,
+    migration20260215,
+    migration20260216,
+    migration20260217,
+  ];
 
-	// Sort by version number
-	return migrations.sort((a, b) => a.version - b.version);
+  // Sort by version number
+  return migrations.sort((a, b) => a.version - b.version);
 }
 
 /**
  * Run migrations
  */
 export async function runMigrations(migrations?: Migration[]): Promise<void> {
-	const migrationsToRun = migrations ?? loadMigrations();
-	await migrationRunner.up(migrationsToRun);
+  const migrationsToRun = migrations ?? loadMigrations();
+  await migrationRunner.up(migrationsToRun);
 }

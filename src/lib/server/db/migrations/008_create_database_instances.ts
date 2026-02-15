@@ -21,10 +21,10 @@ import type { Migration } from '../migrations.ts';
  */
 
 export const migration: Migration = {
-	version: 8,
-	name: 'Create database_instances table',
+  version: 8,
+  name: 'Create database_instances table',
 
-	up: `
+  up: `
 		CREATE TABLE database_instances (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
 
@@ -55,8 +55,8 @@ export const migration: Migration = {
 		CREATE INDEX idx_database_instances_uuid ON database_instances(uuid);
 	`,
 
-	down: `
+  down: `
 		DROP INDEX IF EXISTS idx_database_instances_uuid;
 		DROP TABLE IF EXISTS database_instances;
-	`
+	`,
 };

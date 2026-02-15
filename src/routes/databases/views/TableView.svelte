@@ -93,9 +93,11 @@
 
 	<svelte:fragment slot="actions" let:row>
 		<div class="relative z-10 flex items-center justify-end gap-1">
-			<button type="button" on:click={(e) => handleExternalClick(e, row.repository_url)}>
-				<TableActionButton icon={ExternalLink} title="View on GitHub" />
-			</button>
+			<TableActionButton
+				icon={ExternalLink}
+				title="View on GitHub"
+				on:click={(e) => handleExternalClick(e, row.repository_url)}
+			/>
 			<TableActionButton
 				icon={Unlink}
 				title="Unlink database"

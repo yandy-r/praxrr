@@ -12,9 +12,6 @@ export default defineConfig({
     port: 6969,
     host: true,
     allowedHosts: ['localhost', 'ubsrv'],
-    hmr: {
-      host: 'localhost',
-    },
     watch: {
       usePolling: true,
       interval: 1000,

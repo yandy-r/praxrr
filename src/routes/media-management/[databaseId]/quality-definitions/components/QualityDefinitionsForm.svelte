@@ -59,6 +59,14 @@
 	export let availableQualities: string[] = [];
 	export let initialData: QualityDefinitionsConfig | null;
 
+	function normalizeQualityName(value: string): string {
+		return value.trim().toLowerCase();
+	}
+
+	function isQualityMapped(value: string, availableSet: Set<string>): boolean {
+		return availableSet.has(normalizeQualityName(value));
+	}
+
 	// Form state
 	let configName = initialData?.name ?? '';
 	let entries: QualityDefinitionEntry[] = initialData?.entries ?? [];
@@ -105,13 +113,38 @@
 	let mainFormElement: HTMLFormElement;
 	let deleteFormElement: HTMLFormElement;
 
-	$: arrLabel = arrType === 'radarr' ? 'Radarr' : 'Sonarr';
+	$: arrLabel =
+		arrType === 'radarr' ? 'Radarr' : arrType === 'sonarr' ? 'Sonarr' : 'Lidarr';
+	$: availableQualityNames = new Set(
+		availableQualities.map((quality) => normalizeQualityName(quality)).filter((quality) => quality.length > 0)
+	);
+	$: unmappedQualityNames = (() => {
+		const seen = new Set<string>();
+		const unmapped: string[] = [];
+
+		for (const entry of entries) {
+			const normalized = normalizeQualityName(entry.quality_name);
+			if (normalized.length === 0) {
+				continue;
+			}
+
+			if (!isQualityMapped(entry.quality_name, availableQualityNames) && !seen.has(normalized)) {
+				seen.add(normalized);
+				unmapped.push(entry.quality_name);
+			}
+		}
+
+		return unmapped.sort((a, b) => a.localeCompare(b));
+	})();
+
+	$: hasUnmappedQualities = unmappedQualityNames.length > 0;
 	$: title = mode === 'create' ? `New ${arrLabel} Quality Definitions` : `Edit ${arrLabel} Quality Definitions`;
 	$: description =
 		mode === 'create'
 			? `Create a new ${arrLabel} quality definitions configuration for ${databaseName}`
 			: `Update ${arrLabel} quality definitions configuration`;
-	$: isValid = configName.trim() !== '' && entries.length > 0;
+	$: isValid =
+		configName.trim() !== '' && entries.length > 0 && !hasUnmappedQualities;
 
 	// Max scale value based on arr type (in base unit MB/min)
 	$: baseScaleMax = arrType === 'radarr' ? 2000 : 1000;
@@ -246,6 +279,7 @@
 
 	async function handleSaveClick() {
 		if (saving) return;
+		if (!isValid) return;
 		saving = true;
 		selectedLayer = canWriteToBase ? 'base' : 'user';
 		await tick();
@@ -290,10 +324,10 @@
 				/>
 			</button>
 
-			{#if showUnitDropdown}
-				<Dropdown position="left" minWidth="12rem">
-					{#each unitOptions as unit}
-						<DropdownItem
+				{#if showUnitDropdown}
+					<Dropdown position="left" minWidth="12rem">
+						{#each unitOptions as unit}
+							<DropdownItem
 							label="{unit.label} ({unit.short})"
 							selected={selectedUnitId === unit.id}
 							on:click={() => {
@@ -301,15 +335,21 @@
 								showUnitDropdown = false;
 							}}
 						/>
-					{/each}
-				</Dropdown>
-			{/if}
-		</div>
+						{/each}
+					</Dropdown>
+				{/if}
+			</div>
 
-		{#if mode === 'edit'}
-			<Button
-				text={deleting ? 'Deleting...' : 'Delete'}
-				icon={Trash2}
+			{#if hasUnmappedQualities}
+				<p class="mt-1 text-xs text-amber-700 dark:text-amber-300">
+					Some quality names are missing API mappings for {arrLabel}: {unmappedQualityNames.join(', ')}. Save is disabled until mappings are available.
+				</p>
+			{/if}
+
+			{#if mode === 'edit'}
+				<Button
+					text={deleting ? 'Deleting...' : 'Delete'}
+					icon={Trash2}
 				iconColor="text-red-600 dark:text-red-400"
 				disabled={deleting || saving}
 				on:click={handleDeleteClick}
@@ -375,21 +415,31 @@
 
 			<svelte:fragment slot="expanded" let:row>
 				<div class="divide-y divide-neutral-200 dark:divide-neutral-700">
-					{#each row.entries as entry (entry.quality_name)}
-						{@const markers = markersMap[entry.quality_name] || createMarkers(entry)}
-						<div class="flex flex-col gap-3 bg-white px-4 py-4 md:flex-row md:items-center md:gap-3 md:pt-5 md:pr-4 md:pb-8 md:pl-8 dark:bg-neutral-900">
-							<!-- Quality Name -->
-							<div class="text-sm font-medium text-neutral-900 md:w-32 md:shrink-0 dark:text-neutral-100">
-								{entry.quality_name}
-							</div>
+						{#each row.entries as entry (entry.quality_name)}
+							{@const markers = markersMap[entry.quality_name] || createMarkers(entry)}
+							{@const isMapped = isQualityMapped(entry.quality_name, availableQualityNames)}
+							<div class="flex flex-col gap-3 bg-white px-4 py-4 md:flex-row md:items-center md:gap-3 md:pt-5 md:pr-4 md:pb-8 md:pl-8 dark:bg-neutral-900">
+								<!-- Quality Name -->
+								<div class="text-sm font-medium text-neutral-900 md:w-32 md:shrink-0 dark:text-neutral-100">
+									{entry.quality_name}
+									{#if !isMapped}
+										<p class="mt-1 text-xs text-amber-600 dark:text-amber-400">
+											Unmapped quality; save is blocked until this mapping exists.
+										</p>
+									{/if}
+								</div>
 
-							<!-- Range Scale (hidden on mobile) -->
-							<div class="hidden min-w-0 flex-1 pt-4 pr-16 pl-2 md:block">
-								<RangeScale
-									orientation="horizontal"
-									direction="start"
-									min={0}
-									max={baseScaleMax}
+								<!-- Range Scale (hidden on mobile) -->
+								<div
+									class="hidden min-w-0 flex-1 pt-4 pr-16 pl-2 md:block"
+									class:pointer-events-none={!isMapped}
+									class:opacity-60={!isMapped}
+								>
+									<RangeScale
+										orientation="horizontal"
+										direction="start"
+										min={0}
+										max={baseScaleMax}
 									step={1}
 									minSeparation={5}
 									unit={selectedUnit.short}
@@ -402,53 +452,56 @@
 
 							<!-- Number Inputs -->
 							<div class="flex gap-2 md:contents">
-								<div class="flex-1 md:w-24 md:flex-none md:shrink-0">
-									<div class="mb-1 flex items-center gap-1 text-xs font-medium text-blue-600 dark:text-blue-400">
-										Min <span class="text-neutral-400 dark:text-neutral-500">(MB/m)</span>
+									<div class="flex-1 md:w-24 md:flex-none md:shrink-0">
+										<div class="mb-1 flex items-center gap-1 text-xs font-medium text-blue-600 dark:text-blue-400">
+											Min <span class="text-neutral-400 dark:text-neutral-500">({selectedUnit.short})</span>
+										</div>
+										<NumberInput
+											id="min-{entry.quality_name}"
+											name="min-{entry.quality_name}"
+											bind:value={markers[0].value}
+											min={0}
+											max={markers[1].value}
+											step={1}
+											responsive
+											onchange={() => syncToEntry(entry.quality_name)}
+											disabled={!isMapped}
+										/>
 									</div>
-									<NumberInput
-										id="min-{entry.quality_name}"
-										name="min-{entry.quality_name}"
-										bind:value={markers[0].value}
-										min={0}
-										max={markers[1].value}
-										step={1}
-										responsive
-										onchange={() => syncToEntry(entry.quality_name)}
-									/>
-								</div>
 
-								<div class="flex-1 md:w-24 md:flex-none md:shrink-0">
-									<div class="mb-1 flex items-center gap-1 text-xs font-medium text-green-600 dark:text-green-400">
-										Pref <span class="text-neutral-400 dark:text-neutral-500">(MB/m)</span>
+									<div class="flex-1 md:w-24 md:flex-none md:shrink-0">
+										<div class="mb-1 flex items-center gap-1 text-xs font-medium text-green-600 dark:text-green-400">
+											Pref <span class="text-neutral-400 dark:text-neutral-500">({selectedUnit.short})</span>
+										</div>
+										<NumberInput
+											id="preferred-{entry.quality_name}"
+											name="preferred-{entry.quality_name}"
+											bind:value={markers[1].value}
+											min={markers[0].value}
+											max={markers[2].value}
+											step={1}
+											responsive
+											onchange={() => syncToEntry(entry.quality_name)}
+											disabled={!isMapped}
+										/>
 									</div>
-									<NumberInput
-										id="preferred-{entry.quality_name}"
-										name="preferred-{entry.quality_name}"
-										bind:value={markers[1].value}
-										min={markers[0].value}
-										max={markers[2].value}
-										step={1}
-										responsive
-										onchange={() => syncToEntry(entry.quality_name)}
-									/>
-								</div>
 
-								<div class="flex-1 md:w-24 md:flex-none md:shrink-0">
-									<div class="mb-1 flex items-center gap-1 text-xs font-medium text-orange-600 dark:text-orange-400">
-										Max <span class="text-neutral-400 dark:text-neutral-500">(MB/m)</span>
+									<div class="flex-1 md:w-24 md:flex-none md:shrink-0">
+										<div class="mb-1 flex items-center gap-1 text-xs font-medium text-orange-600 dark:text-orange-400">
+											Max <span class="text-neutral-400 dark:text-neutral-500">({selectedUnit.short})</span>
+										</div>
+										<NumberInput
+											id="max-{entry.quality_name}"
+											name="max-{entry.quality_name}"
+											bind:value={markers[2].value}
+											min={markers[1].value}
+											step={1}
+											responsive
+											onchange={() => syncToEntry(entry.quality_name)}
+											disabled={!isMapped}
+										/>
 									</div>
-									<NumberInput
-										id="max-{entry.quality_name}"
-										name="max-{entry.quality_name}"
-										bind:value={markers[2].value}
-										min={markers[1].value}
-										step={1}
-										responsive
-										onchange={() => syncToEntry(entry.quality_name)}
-									/>
 								</div>
-							</div>
 						</div>
 					{/each}
 				</div>

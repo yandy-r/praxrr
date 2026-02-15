@@ -25,15 +25,19 @@
 
 	export let data: PageData;
 
-	$: appType = isArrAppType(data.instance.type) ? data.instance.type : null;
-	$: appMetadata = appType ? getArrAppMetadata(appType) : null;
+	$: instance = data?.instance;
+	$: instanceId = instance?.id ?? null;
+	$: instanceType = instance?.type ?? '';
+	$: instanceName = instance?.name ?? 'Arr';
+	$: instanceUrl = instance?.url?.replace(/\/$/, '') ?? '';
+	$: appType = instanceType && isArrAppType(instanceType) ? instanceType : null;
 	$: supportsLibraryWorkflow = appType ? supportsArrWorkflow(appType, 'library') : false;
-	$: isRadarr = data.instance.type === 'radarr';
-	$: isSonarr = data.instance.type === 'sonarr';
-	$: isLidarr = data.instance.type === 'lidarr';
+	$: isRadarr = instanceType === 'radarr';
+	$: isSonarr = instanceType === 'sonarr';
+	$: isLidarr = instanceType === 'lidarr';
 
 	let searchStore: SearchStore;
-	$: searchStore = getPersistentSearchStore(`arrLibrarySearch:${data.instance.id}`, {
+	$: searchStore = getPersistentSearchStore(`arrLibrarySearch:${instanceId ?? 'unknown'}`, {
 		debounceMs: 150
 	});
 
@@ -43,21 +47,75 @@
 
 	let library: RadarrLibraryItem[] | SonarrLibraryItem[] | LidarrLibraryItem[] = [];
 	let libraryError: string | null = null;
+	let libraryCapabilityError: string | null = null;
 	let profilesByDatabase: { databaseId: number; databaseName: string; profiles: string[] }[] = [];
 	let loading = true;
 	let refreshing = false;
 
+	function getLibraryUnsupportedMessage(instanceType: string): string {
+		if (isArrAppType(instanceType)) {
+			return `${getArrAppMetadata(instanceType).label} library view is not available in this version yet.`;
+		}
+
+		return 'This instance type does not support library view in this version.';
+	}
+
+	async function getLibraryErrorMessage(response: Response): Promise<string> {
+		try {
+			const payload = await response.json();
+			if (payload && typeof payload.error === 'string' && payload.error.trim().length > 0) {
+				return payload.error;
+			}
+		} catch {
+			// Fall back to status-based messaging when the error body is not JSON.
+		}
+
+		if (response.statusText) {
+			return `Failed to fetch library: ${response.statusText}`;
+		}
+
+		return `Failed to fetch library (${response.status})`;
+	}
+
+	function isUnsupportedLibraryError(status: number, message: string): boolean {
+		if (status < 400 || status >= 500) {
+			return false;
+		}
+
+		const normalizedMessage = message.toLowerCase();
+		return (
+			normalizedMessage.includes('unsupported instance type') ||
+			(normalizedMessage.includes('library') && normalizedMessage.includes('not supported'))
+		);
+	}
+
+	$: defaultUnsupportedLibraryMessage = getLibraryUnsupportedMessage(instanceType);
+	$: libraryUnavailableMessage = !supportsLibraryWorkflow
+		? defaultUnsupportedLibraryMessage
+		: libraryCapabilityError;
+
 	async function fetchLibrary(force = false) {
-		if (!supportsLibraryWorkflow) {
+		if (!instanceId) {
 			library = [];
 			profilesByDatabase = [];
 			libraryError = null;
+			libraryCapabilityError = null;
 			loading = false;
 			refreshing = false;
 			return;
 		}
 
-		const instanceId = data.instance.id;
+		if (!supportsLibraryWorkflow) {
+			library = [];
+			profilesByDatabase = [];
+			libraryError = null;
+			libraryCapabilityError = null;
+			loading = false;
+			refreshing = false;
+			return;
+		}
+
+		libraryCapabilityError = null;
 
 		// Check client cache first (unless forcing refresh)
 		if (!force && libraryCache.has(instanceId)) {
@@ -78,18 +136,28 @@
 
 			const response = await fetch(`/api/v1/arr/library?instanceId=${instanceId}`);
 			if (!response.ok) {
-				throw new Error(`Failed to fetch library: ${response.statusText}`);
+				const message = await getLibraryErrorMessage(response);
+				if (isUnsupportedLibraryError(response.status, message)) {
+					library = [];
+					profilesByDatabase = [];
+					libraryError = null;
+					libraryCapabilityError = defaultUnsupportedLibraryMessage;
+					return;
+				}
+				throw new Error(message);
 			}
 
 			const result = await response.json();
 			library = result.items;
 			libraryError = null;
+			libraryCapabilityError = null;
 			profilesByDatabase = result.profilesByDatabase;
 
 			// Cache the result
 			libraryCache.set(instanceId, result.items, result.profilesByDatabase);
 		} catch (err) {
 			libraryError = err instanceof Error ? err.message : 'Failed to fetch library';
+			libraryCapabilityError = null;
 		} finally {
 			loading = false;
 			refreshing = false;
@@ -97,8 +165,12 @@
 	}
 
 	async function handleRefresh() {
+		if (!instanceId) {
+			return;
+		}
+
 		refreshing = true;
-		libraryCache.invalidate(data.instance.id);
+		libraryCache.invalidate(instanceId);
 		// Clear episode cache on refresh too
 		if (isSonarr) {
 			episodeCache = new Map();
@@ -108,20 +180,23 @@
 	}
 
 	function handleOpen() {
-		const baseUrl = data.instance.url.replace(/\/$/, '');
-		window.open(baseUrl, '_blank', 'noopener,noreferrer');
+		if (!instanceUrl) {
+			return;
+		}
+
+		window.open(instanceUrl, '_blank', 'noopener,noreferrer');
 	}
 
 	let currentInstanceId: number | null = null;
 
 	onMount(() => {
-		currentInstanceId = data.instance.id;
+		currentInstanceId = instanceId;
 		fetchLibrary();
 	});
 
 	// Refetch if instance changes (navigation between instances)
-	$: if (browser && data.instance.id && data.instance.id !== currentInstanceId) {
-		currentInstanceId = data.instance.id;
+	$: if (browser && instanceId && instanceId !== currentInstanceId) {
+		currentInstanceId = instanceId;
 		loading = true;
 		episodeCache = new Map();
 		episodeLoadingSet = new Set();
@@ -360,7 +435,7 @@
 	// Radarr Data & Columns
 	// ==========================================================================
 
-	$: baseUrl = data.instance.url.replace(/\/$/, '');
+	$: baseUrl = instanceUrl;
 	$: debouncedQuery = $searchStore.query;
 
 	// Radarr
@@ -629,15 +704,14 @@
 	let episodeLoadingSet: Set<number> = new Set();
 
 	async function loadEpisodes(seriesId: number) {
+		if (!instanceId) return;
 		if (episodeCache.has(seriesId) || episodeLoadingSet.has(seriesId)) return;
 
 		episodeLoadingSet.add(seriesId);
 		episodeLoadingSet = episodeLoadingSet;
 
 		try {
-			const response = await fetch(
-				`/api/v1/arr/library/episodes?instanceId=${data.instance.id}&seriesId=${seriesId}`
-			);
+			const response = await fetch(`/api/v1/arr/library/episodes?instanceId=${instanceId}&seriesId=${seriesId}`);
 			if (!response.ok) throw new Error('Failed to fetch episodes');
 			const result = await response.json();
 			episodeCache.set(seriesId, result.episodes);
@@ -677,11 +751,11 @@
 </script>
 
 <svelte:head>
-	<title>{data.instance.name} - Library - Profilarr</title>
+	<title>{instanceName} - Library - Profilarr</title>
 </svelte:head>
 
 <div class="mt-6 space-y-6">
-	{#if !supportsLibraryWorkflow}
+	{#if libraryUnavailableMessage}
 		<div
 			class="rounded-lg border border-neutral-200 bg-white p-6 dark:border-neutral-800 dark:bg-neutral-900"
 		>
@@ -692,11 +766,7 @@
 						Library view not available
 					</h3>
 					<p class="mt-1 text-sm text-neutral-600 dark:text-neutral-400">
-						{#if appMetadata}
-							{appMetadata.label} library view is not available in this version yet.
-						{:else}
-							This instance type does not support library view in this version.
-						{/if}
+						{libraryUnavailableMessage}
 					</p>
 				</div>
 			</div>
@@ -726,7 +796,7 @@
 			onToggleFilter={toggleFilter}
 			onRefresh={handleRefresh}
 			onOpen={handleOpen}
-			instanceType={data.instance.type}
+			instanceType={instanceType}
 		/>
 
 		{#if isRadarr}

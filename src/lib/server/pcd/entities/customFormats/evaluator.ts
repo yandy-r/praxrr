@@ -5,18 +5,18 @@
 
 import type { ParseResult } from '$lib/server/utils/arr/parser/types.ts';
 import {
-	QualitySource,
-	QualityModifier,
-	Resolution,
-	ReleaseType,
-	Language
+  QualitySource,
+  QualityModifier,
+  Resolution,
+  ReleaseType,
+  Language,
 } from '$lib/server/utils/arr/parser/types.ts';
 import type {
-	ConditionData,
-	ConditionResult,
-	EvaluationResult,
-	ParsedInfo,
-	CustomFormatWithConditions
+  ConditionData,
+  ConditionResult,
+  EvaluationResult,
+  ParsedInfo,
+  CustomFormatWithConditions,
 } from '$shared/pcd/display.ts';
 
 /**
@@ -24,374 +24,371 @@ import type {
  * These are patterns that need to be matched against release titles
  */
 export function extractAllPatterns(customFormats: CustomFormatWithConditions[]): string[] {
-	const patterns = new Set<string>();
+  const patterns = new Set<string>();
 
-	for (const cf of customFormats) {
-		for (const condition of cf.conditions) {
-			// Pattern-based conditions: release_title, edition, release_group
-			if (condition.patterns) {
-				for (const p of condition.patterns) {
-					if (p.pattern) {
-						patterns.add(p.pattern);
-					}
-				}
-			}
-		}
-	}
+  for (const cf of customFormats) {
+    for (const condition of cf.conditions) {
+      // Pattern-based conditions: release_title, edition, release_group
+      if (condition.patterns) {
+        for (const p of condition.patterns) {
+          if (p.pattern) {
+            patterns.add(p.pattern);
+          }
+        }
+      }
+    }
+  }
 
-	return Array.from(patterns);
+  return Array.from(patterns);
 }
 
 /**
  * Normalize a value for comparison by removing hyphens, spaces, underscores, and lowercasing
  */
 function normalize(value: string): string {
-	return value.toLowerCase().replace(/[-_\s]/g, '');
+  return value.toLowerCase().replace(/[-_\s]/g, '');
 }
 
 // Canonical value mappings (matches src/lib/shared/conditions.ts)
 const sourceNames: Record<QualitySource, string> = {
-	[QualitySource.Unknown]: 'unknown',
-	[QualitySource.Cam]: 'cam',
-	[QualitySource.Telesync]: 'telesync',
-	[QualitySource.Telecine]: 'telecine',
-	[QualitySource.Workprint]: 'workprint',
-	[QualitySource.DVD]: 'dvd',
-	[QualitySource.TV]: 'television',
-	[QualitySource.WebDL]: 'webdl',
-	[QualitySource.WebRip]: 'webrip',
-	[QualitySource.Bluray]: 'bluray'
+  [QualitySource.Unknown]: 'unknown',
+  [QualitySource.Cam]: 'cam',
+  [QualitySource.Telesync]: 'telesync',
+  [QualitySource.Telecine]: 'telecine',
+  [QualitySource.Workprint]: 'workprint',
+  [QualitySource.DVD]: 'dvd',
+  [QualitySource.TV]: 'television',
+  [QualitySource.WebDL]: 'webdl',
+  [QualitySource.WebRip]: 'webrip',
+  [QualitySource.Bluray]: 'bluray',
 };
 
 const resolutionNames: Record<Resolution, string> = {
-	[Resolution.Unknown]: 'unknown',
-	[Resolution.R360p]: '360p',
-	[Resolution.R480p]: '480p',
-	[Resolution.R540p]: '540p',
-	[Resolution.R576p]: '576p',
-	[Resolution.R720p]: '720p',
-	[Resolution.R1080p]: '1080p',
-	[Resolution.R2160p]: '2160p'
+  [Resolution.Unknown]: 'unknown',
+  [Resolution.R360p]: '360p',
+  [Resolution.R480p]: '480p',
+  [Resolution.R540p]: '540p',
+  [Resolution.R576p]: '576p',
+  [Resolution.R720p]: '720p',
+  [Resolution.R1080p]: '1080p',
+  [Resolution.R2160p]: '2160p',
 };
 
 const modifierNames: Record<QualityModifier, string> = {
-	[QualityModifier.None]: 'none',
-	[QualityModifier.Regional]: 'regional',
-	[QualityModifier.Screener]: 'screener',
-	[QualityModifier.RawHD]: 'rawhd',
-	[QualityModifier.BRDisk]: 'brdisk',
-	[QualityModifier.Remux]: 'remux'
+  [QualityModifier.None]: 'none',
+  [QualityModifier.Regional]: 'regional',
+  [QualityModifier.Screener]: 'screener',
+  [QualityModifier.RawHD]: 'rawhd',
+  [QualityModifier.BRDisk]: 'brdisk',
+  [QualityModifier.Remux]: 'remux',
 };
 
 const releaseTypeNames: Record<ReleaseType, string> = {
-	[ReleaseType.Unknown]: 'unknown',
-	[ReleaseType.SingleEpisode]: 'single_episode',
-	[ReleaseType.MultiEpisode]: 'multi_episode',
-	[ReleaseType.SeasonPack]: 'season_pack'
+  [ReleaseType.Unknown]: 'unknown',
+  [ReleaseType.SingleEpisode]: 'single_episode',
+  [ReleaseType.MultiEpisode]: 'multi_episode',
+  [ReleaseType.SeasonPack]: 'season_pack',
 };
 
 const languageNames: Record<Language, string> = {
-	[Language.Unknown]: 'Unknown',
-	[Language.English]: 'English',
-	[Language.French]: 'French',
-	[Language.Spanish]: 'Spanish',
-	[Language.German]: 'German',
-	[Language.Italian]: 'Italian',
-	[Language.Danish]: 'Danish',
-	[Language.Dutch]: 'Dutch',
-	[Language.Japanese]: 'Japanese',
-	[Language.Icelandic]: 'Icelandic',
-	[Language.Chinese]: 'Chinese',
-	[Language.Russian]: 'Russian',
-	[Language.Polish]: 'Polish',
-	[Language.Vietnamese]: 'Vietnamese',
-	[Language.Swedish]: 'Swedish',
-	[Language.Norwegian]: 'Norwegian',
-	[Language.Finnish]: 'Finnish',
-	[Language.Turkish]: 'Turkish',
-	[Language.Portuguese]: 'Portuguese',
-	[Language.Flemish]: 'Flemish',
-	[Language.Greek]: 'Greek',
-	[Language.Korean]: 'Korean',
-	[Language.Hungarian]: 'Hungarian',
-	[Language.Hebrew]: 'Hebrew',
-	[Language.Lithuanian]: 'Lithuanian',
-	[Language.Czech]: 'Czech',
-	[Language.Hindi]: 'Hindi',
-	[Language.Romanian]: 'Romanian',
-	[Language.Thai]: 'Thai',
-	[Language.Bulgarian]: 'Bulgarian',
-	[Language.PortugueseBR]: 'Portuguese (BR)',
-	[Language.Arabic]: 'Arabic',
-	[Language.Ukrainian]: 'Ukrainian',
-	[Language.Persian]: 'Persian',
-	[Language.Bengali]: 'Bengali',
-	[Language.Slovak]: 'Slovak',
-	[Language.Latvian]: 'Latvian',
-	[Language.SpanishLatino]: 'Spanish (Latino)',
-	[Language.Catalan]: 'Catalan',
-	[Language.Croatian]: 'Croatian',
-	[Language.Serbian]: 'Serbian',
-	[Language.Bosnian]: 'Bosnian',
-	[Language.Estonian]: 'Estonian',
-	[Language.Tamil]: 'Tamil',
-	[Language.Indonesian]: 'Indonesian',
-	[Language.Telugu]: 'Telugu',
-	[Language.Macedonian]: 'Macedonian',
-	[Language.Slovenian]: 'Slovenian',
-	[Language.Malayalam]: 'Malayalam',
-	[Language.Kannada]: 'Kannada',
-	[Language.Albanian]: 'Albanian',
-	[Language.Afrikaans]: 'Afrikaans',
-	[Language.Marathi]: 'Marathi',
-	[Language.Tagalog]: 'Tagalog',
-	[Language.Urdu]: 'Urdu',
-	[Language.Romansh]: 'Romansh',
-	[Language.Mongolian]: 'Mongolian',
-	[Language.Georgian]: 'Georgian',
-	[Language.Original]: 'Original'
+  [Language.Unknown]: 'Unknown',
+  [Language.English]: 'English',
+  [Language.French]: 'French',
+  [Language.Spanish]: 'Spanish',
+  [Language.German]: 'German',
+  [Language.Italian]: 'Italian',
+  [Language.Danish]: 'Danish',
+  [Language.Dutch]: 'Dutch',
+  [Language.Japanese]: 'Japanese',
+  [Language.Icelandic]: 'Icelandic',
+  [Language.Chinese]: 'Chinese',
+  [Language.Russian]: 'Russian',
+  [Language.Polish]: 'Polish',
+  [Language.Vietnamese]: 'Vietnamese',
+  [Language.Swedish]: 'Swedish',
+  [Language.Norwegian]: 'Norwegian',
+  [Language.Finnish]: 'Finnish',
+  [Language.Turkish]: 'Turkish',
+  [Language.Portuguese]: 'Portuguese',
+  [Language.Flemish]: 'Flemish',
+  [Language.Greek]: 'Greek',
+  [Language.Korean]: 'Korean',
+  [Language.Hungarian]: 'Hungarian',
+  [Language.Hebrew]: 'Hebrew',
+  [Language.Lithuanian]: 'Lithuanian',
+  [Language.Czech]: 'Czech',
+  [Language.Hindi]: 'Hindi',
+  [Language.Romanian]: 'Romanian',
+  [Language.Thai]: 'Thai',
+  [Language.Bulgarian]: 'Bulgarian',
+  [Language.PortugueseBR]: 'Portuguese (BR)',
+  [Language.Arabic]: 'Arabic',
+  [Language.Ukrainian]: 'Ukrainian',
+  [Language.Persian]: 'Persian',
+  [Language.Bengali]: 'Bengali',
+  [Language.Slovak]: 'Slovak',
+  [Language.Latvian]: 'Latvian',
+  [Language.SpanishLatino]: 'Spanish (Latino)',
+  [Language.Catalan]: 'Catalan',
+  [Language.Croatian]: 'Croatian',
+  [Language.Serbian]: 'Serbian',
+  [Language.Bosnian]: 'Bosnian',
+  [Language.Estonian]: 'Estonian',
+  [Language.Tamil]: 'Tamil',
+  [Language.Indonesian]: 'Indonesian',
+  [Language.Telugu]: 'Telugu',
+  [Language.Macedonian]: 'Macedonian',
+  [Language.Slovenian]: 'Slovenian',
+  [Language.Malayalam]: 'Malayalam',
+  [Language.Kannada]: 'Kannada',
+  [Language.Albanian]: 'Albanian',
+  [Language.Afrikaans]: 'Afrikaans',
+  [Language.Marathi]: 'Marathi',
+  [Language.Tagalog]: 'Tagalog',
+  [Language.Urdu]: 'Urdu',
+  [Language.Romansh]: 'Romansh',
+  [Language.Mongolian]: 'Mongolian',
+  [Language.Georgian]: 'Georgian',
+  [Language.Original]: 'Original',
 };
 
 /**
  * Get serializable parsed info for frontend display
  */
 export function getParsedInfo(parsed: ParseResult): ParsedInfo {
-	return {
-		source: sourceNames[parsed.source] || 'Unknown',
-		resolution: resolutionNames[parsed.resolution] || 'Unknown',
-		modifier: modifierNames[parsed.modifier] || 'None',
-		languages: parsed.languages.map((l) => languageNames[l] || 'Unknown'),
-		releaseGroup: parsed.releaseGroup,
-		year: parsed.year,
-		edition: parsed.edition,
-		releaseType: parsed.episode ? releaseTypeNames[parsed.episode.releaseType] || 'Unknown' : null
-	};
+  return {
+    source: sourceNames[parsed.source] || 'Unknown',
+    resolution: resolutionNames[parsed.resolution] || 'Unknown',
+    modifier: modifierNames[parsed.modifier] || 'None',
+    languages: parsed.languages.map((l) => languageNames[l] || 'Unknown'),
+    releaseGroup: parsed.releaseGroup,
+    year: parsed.year,
+    edition: parsed.edition,
+    releaseType: parsed.episode ? releaseTypeNames[parsed.episode.releaseType] || 'Unknown' : null,
+  };
 }
 
 interface ConditionEvalResult {
-	matched: boolean;
-	expected: string;
-	actual: string;
+  matched: boolean;
+  expected: string;
+  actual: string;
 }
 
 /**
  * Evaluate a single condition against parsed result
  */
 function evaluateCondition(
-	condition: ConditionData,
-	parsed: ParseResult,
-	title: string,
-	patternMatches?: Map<string, boolean>
+  condition: ConditionData,
+  parsed: ParseResult,
+  title: string,
+  patternMatches?: Map<string, boolean>
 ): ConditionEvalResult {
-	switch (condition.type) {
-		case 'release_title':
-			return evaluatePattern(condition, title, patternMatches);
+  switch (condition.type) {
+    case 'release_title':
+      return evaluatePattern(condition, title, patternMatches);
 
-		case 'language':
-			return evaluateLanguage(condition, parsed);
+    case 'language':
+      return evaluateLanguage(condition, parsed);
 
-		case 'source':
-			return evaluateSource(condition, parsed);
+    case 'source':
+      return evaluateSource(condition, parsed);
 
-		case 'resolution':
-			return evaluateResolution(condition, parsed);
+    case 'resolution':
+      return evaluateResolution(condition, parsed);
 
-		case 'quality_modifier':
-			return evaluateQualityModifier(condition, parsed);
+    case 'quality_modifier':
+      return evaluateQualityModifier(condition, parsed);
 
-		case 'release_type':
-			return evaluateReleaseType(condition, parsed);
+    case 'release_type':
+      return evaluateReleaseType(condition, parsed);
 
-		case 'year':
-			return evaluateYear(condition, parsed);
+    case 'year':
+      return evaluateYear(condition, parsed);
 
-		case 'edition':
-			return evaluateEdition(condition, parsed);
+    case 'edition':
+      return evaluateEdition(condition, parsed);
 
-		case 'release_group':
-			return evaluateReleaseGroup(condition, parsed);
+    case 'release_group':
+      return evaluateReleaseGroup(condition, parsed);
 
-		// These require additional data we don't have
-		case 'indexer_flag':
-			return { matched: false, expected: 'Indexer flags', actual: 'N/A (no indexer data)' };
-		case 'size':
-			return { matched: false, expected: 'File size range', actual: 'N/A (no file data)' };
+    // These require additional data we don't have
+    case 'indexer_flag':
+      return { matched: false, expected: 'Indexer flags', actual: 'N/A (no indexer data)' };
+    case 'size':
+      return { matched: false, expected: 'File size range', actual: 'N/A (no file data)' };
 
-		default:
-			return { matched: false, expected: 'Unknown', actual: 'Unknown' };
-	}
+    default:
+      return { matched: false, expected: 'Unknown', actual: 'Unknown' };
+  }
 }
 
 /**
  * Evaluate regex pattern against title using pre-computed pattern matches
  */
 function evaluatePattern(
-	condition: ConditionData,
-	title: string,
-	patternMatches?: Map<string, boolean>
+  condition: ConditionData,
+  title: string,
+  patternMatches?: Map<string, boolean>
 ): ConditionEvalResult {
-	if (!condition.patterns || condition.patterns.length === 0) {
-		return { matched: false, expected: 'No patterns defined', actual: title };
-	}
+  if (!condition.patterns || condition.patterns.length === 0) {
+    return { matched: false, expected: 'No patterns defined', actual: title };
+  }
 
-	const patternStrs = condition.patterns.map((p) => p.pattern);
-	const expected = patternStrs.join(' OR ');
+  const patternStrs = condition.patterns.map((p) => p.pattern);
+  const expected = patternStrs.join(' OR ');
 
-	for (const pattern of condition.patterns) {
-		// Use pre-computed pattern matches if available
-		if (patternMatches) {
-			const matched = patternMatches.get(pattern.pattern);
-			if (matched) {
-				return { matched: true, expected, actual: `Matched: ${pattern.pattern}` };
-			}
-		} else {
-			// Fallback to JS regex (may not work for .NET-specific patterns)
-			try {
-				const regex = new RegExp(pattern.pattern, 'i');
-				if (regex.test(title)) {
-					return { matched: true, expected, actual: `Matched: ${pattern.pattern}` };
-				}
-			} catch {
-				// Invalid JS regex - skip this pattern
-			}
-		}
-	}
-	return { matched: false, expected, actual: 'No match' };
+  for (const pattern of condition.patterns) {
+    // Use pre-computed pattern matches if available
+    if (patternMatches) {
+      const matched = patternMatches.get(pattern.pattern);
+      if (matched) {
+        return { matched: true, expected, actual: `Matched: ${pattern.pattern}` };
+      }
+    } else {
+      // Fallback to JS regex (may not work for .NET-specific patterns)
+      try {
+        const regex = new RegExp(pattern.pattern, 'i');
+        if (regex.test(title)) {
+          return { matched: true, expected, actual: `Matched: ${pattern.pattern}` };
+        }
+      } catch {
+        // Invalid JS regex - skip this pattern
+      }
+    }
+  }
+  return { matched: false, expected, actual: 'No match' };
 }
 
 /**
  * Evaluate language condition
  */
 function evaluateLanguage(condition: ConditionData, parsed: ParseResult): ConditionEvalResult {
-	if (!condition.languages || condition.languages.length === 0) {
-		return { matched: false, expected: 'No languages defined', actual: 'N/A' };
-	}
+  if (!condition.languages || condition.languages.length === 0) {
+    return { matched: false, expected: 'No languages defined', actual: 'N/A' };
+  }
 
-	const parsedLangNames = parsed.languages.map((l) => languageNames[l] || 'Unknown');
-	const actual = parsedLangNames.length > 0 ? parsedLangNames.join(', ') : 'None detected';
+  const parsedLangNames = parsed.languages.map((l) => languageNames[l] || 'Unknown');
+  const actual = parsedLangNames.length > 0 ? parsedLangNames.join(', ') : 'None detected';
 
-	const expectedParts: string[] = [];
-	for (const lang of condition.languages) {
-		if (lang.except) {
-			expectedParts.push(`NOT ${lang.name}`);
-		} else {
-			expectedParts.push(lang.name);
-		}
-	}
-	const expected = expectedParts.join(' OR ');
+  const expectedParts: string[] = [];
+  for (const lang of condition.languages) {
+    if (lang.except) {
+      expectedParts.push(`NOT ${lang.name}`);
+    } else {
+      expectedParts.push(lang.name);
+    }
+  }
+  const expected = expectedParts.join(' OR ');
 
-	for (const lang of condition.languages) {
-		const langEnum = Language[lang.name as keyof typeof Language];
-		if (langEnum === undefined) continue;
+  for (const lang of condition.languages) {
+    const langEnum = Language[lang.name as keyof typeof Language];
+    if (langEnum === undefined) continue;
 
-		const hasLanguage = parsed.languages.includes(langEnum);
+    const hasLanguage = parsed.languages.includes(langEnum);
 
-		if (lang.except) {
-			if (hasLanguage) return { matched: false, expected, actual };
-		} else {
-			if (hasLanguage) return { matched: true, expected, actual };
-		}
-	}
+    if (lang.except) {
+      if (hasLanguage) return { matched: false, expected, actual };
+    } else {
+      if (hasLanguage) return { matched: true, expected, actual };
+    }
+  }
 
-	const onlyExcepts = condition.languages.every((l) => l.except);
-	if (onlyExcepts) return { matched: true, expected, actual };
+  const onlyExcepts = condition.languages.every((l) => l.except);
+  if (onlyExcepts) return { matched: true, expected, actual };
 
-	return { matched: false, expected, actual };
+  return { matched: false, expected, actual };
 }
 
 /**
  * Evaluate source condition (Bluray, WebDL, etc.)
  */
 function evaluateSource(condition: ConditionData, parsed: ParseResult): ConditionEvalResult {
-	if (!condition.sources || condition.sources.length === 0) {
-		return { matched: false, expected: 'No sources defined', actual: 'N/A' };
-	}
+  if (!condition.sources || condition.sources.length === 0) {
+    return { matched: false, expected: 'No sources defined', actual: 'N/A' };
+  }
 
-	const actual = sourceNames[parsed.source] || 'unknown';
-	const expected = condition.sources.join(' OR ');
-	const matched = condition.sources.some((s) => normalize(s) === normalize(actual));
+  const actual = sourceNames[parsed.source] || 'unknown';
+  const expected = condition.sources.join(' OR ');
+  const matched = condition.sources.some((s) => normalize(s) === normalize(actual));
 
-	return { matched, expected, actual };
+  return { matched, expected, actual };
 }
 
 /**
  * Evaluate resolution condition
  */
 function evaluateResolution(condition: ConditionData, parsed: ParseResult): ConditionEvalResult {
-	if (!condition.resolutions || condition.resolutions.length === 0) {
-		return { matched: false, expected: 'No resolutions defined', actual: 'N/A' };
-	}
+  if (!condition.resolutions || condition.resolutions.length === 0) {
+    return { matched: false, expected: 'No resolutions defined', actual: 'N/A' };
+  }
 
-	const actual = resolutionNames[parsed.resolution] || 'unknown';
-	const expected = condition.resolutions.join(' OR ');
-	const matched = condition.resolutions.some((r) => normalize(r) === normalize(actual));
+  const actual = resolutionNames[parsed.resolution] || 'unknown';
+  const expected = condition.resolutions.join(' OR ');
+  const matched = condition.resolutions.some((r) => normalize(r) === normalize(actual));
 
-	return { matched, expected, actual };
+  return { matched, expected, actual };
 }
 
 /**
  * Evaluate quality modifier condition (Remux, etc.)
  */
-function evaluateQualityModifier(
-	condition: ConditionData,
-	parsed: ParseResult
-): ConditionEvalResult {
-	if (!condition.qualityModifiers || condition.qualityModifiers.length === 0) {
-		return { matched: false, expected: 'No modifiers defined', actual: 'N/A' };
-	}
+function evaluateQualityModifier(condition: ConditionData, parsed: ParseResult): ConditionEvalResult {
+  if (!condition.qualityModifiers || condition.qualityModifiers.length === 0) {
+    return { matched: false, expected: 'No modifiers defined', actual: 'N/A' };
+  }
 
-	const actual = modifierNames[parsed.modifier] || 'none';
-	const expected = condition.qualityModifiers.join(' OR ');
-	const matched = condition.qualityModifiers.some((m) => normalize(m) === normalize(actual));
+  const actual = modifierNames[parsed.modifier] || 'none';
+  const expected = condition.qualityModifiers.join(' OR ');
+  const matched = condition.qualityModifiers.some((m) => normalize(m) === normalize(actual));
 
-	return { matched, expected, actual };
+  return { matched, expected, actual };
 }
 
 /**
  * Evaluate release type condition (single_episode, season_pack, etc.)
  */
 function evaluateReleaseType(condition: ConditionData, parsed: ParseResult): ConditionEvalResult {
-	if (!condition.releaseTypes || condition.releaseTypes.length === 0) {
-		return { matched: false, expected: 'No release types defined', actual: 'N/A' };
-	}
+  if (!condition.releaseTypes || condition.releaseTypes.length === 0) {
+    return { matched: false, expected: 'No release types defined', actual: 'N/A' };
+  }
 
-	const expected = condition.releaseTypes.join(' OR ');
+  const expected = condition.releaseTypes.join(' OR ');
 
-	if (!parsed.episode) {
-		return { matched: false, expected, actual: 'N/A (not a series)' };
-	}
+  if (!parsed.episode) {
+    return { matched: false, expected, actual: 'N/A (not a series)' };
+  }
 
-	const actual = releaseTypeNames[parsed.episode.releaseType] || 'unknown';
-	const matched = condition.releaseTypes.some((t) => normalize(t) === normalize(actual));
+  const actual = releaseTypeNames[parsed.episode.releaseType] || 'unknown';
+  const matched = condition.releaseTypes.some((t) => normalize(t) === normalize(actual));
 
-	return { matched, expected, actual };
+  return { matched, expected, actual };
 }
 
 /**
  * Evaluate year condition
  */
 function evaluateYear(condition: ConditionData, parsed: ParseResult): ConditionEvalResult {
-	if (!condition.years) {
-		return { matched: false, expected: 'No year range defined', actual: 'N/A' };
-	}
+  if (!condition.years) {
+    return { matched: false, expected: 'No year range defined', actual: 'N/A' };
+  }
 
-	const { minYear, maxYear } = condition.years;
-	const expectedParts: string[] = [];
-	if (minYear !== null) expectedParts.push(`>= ${minYear}`);
-	if (maxYear !== null) expectedParts.push(`<= ${maxYear}`);
-	const expected = expectedParts.join(' AND ') || 'Any year';
+  const { minYear, maxYear } = condition.years;
+  const expectedParts: string[] = [];
+  if (minYear !== null) expectedParts.push(`>= ${minYear}`);
+  if (maxYear !== null) expectedParts.push(`<= ${maxYear}`);
+  const expected = expectedParts.join(' AND ') || 'Any year';
 
-	const year = parsed.year;
-	if (!year || year === 0) {
-		return { matched: false, expected, actual: 'No year detected' };
-	}
+  const year = parsed.year;
+  if (!year || year === 0) {
+    return { matched: false, expected, actual: 'No year detected' };
+  }
 
-	const actual = String(year);
+  const actual = String(year);
 
-	if (minYear !== null && year < minYear) return { matched: false, expected, actual };
-	if (maxYear !== null && year > maxYear) return { matched: false, expected, actual };
+  if (minYear !== null && year < minYear) return { matched: false, expected, actual };
+  if (maxYear !== null && year > maxYear) return { matched: false, expected, actual };
 
-	return { matched: true, expected, actual };
+  return { matched: true, expected, actual };
 }
 
 /**
@@ -399,31 +396,31 @@ function evaluateYear(condition: ConditionData, parsed: ParseResult): ConditionE
  * Matches patterns against the PARSED edition only (not full title)
  */
 function evaluateEdition(condition: ConditionData, parsed: ParseResult): ConditionEvalResult {
-	if (!condition.patterns || condition.patterns.length === 0) {
-		return { matched: false, expected: 'No patterns defined', actual: 'N/A' };
-	}
+  if (!condition.patterns || condition.patterns.length === 0) {
+    return { matched: false, expected: 'No patterns defined', actual: 'N/A' };
+  }
 
-	const actual = parsed.edition || 'None detected';
-	const patternStrs = condition.patterns.map((p) => p.pattern);
-	const expected = patternStrs.join(' OR ');
+  const actual = parsed.edition || 'None detected';
+  const patternStrs = condition.patterns.map((p) => p.pattern);
+  const expected = patternStrs.join(' OR ');
 
-	// If no edition was parsed, can't match
-	if (!parsed.edition) {
-		return { matched: false, expected, actual };
-	}
+  // If no edition was parsed, can't match
+  if (!parsed.edition) {
+    return { matched: false, expected, actual };
+  }
 
-	// Match patterns against parsed edition only
-	for (const pattern of condition.patterns) {
-		try {
-			const regex = new RegExp(pattern.pattern, 'i');
-			if (regex.test(parsed.edition)) {
-				return { matched: true, expected, actual };
-			}
-		} catch {
-			// Invalid regex - skip
-		}
-	}
-	return { matched: false, expected, actual };
+  // Match patterns against parsed edition only
+  for (const pattern of condition.patterns) {
+    try {
+      const regex = new RegExp(pattern.pattern, 'i');
+      if (regex.test(parsed.edition)) {
+        return { matched: true, expected, actual };
+      }
+    } catch {
+      // Invalid regex - skip
+    }
+  }
+  return { matched: false, expected, actual };
 }
 
 /**
@@ -431,31 +428,31 @@ function evaluateEdition(condition: ConditionData, parsed: ParseResult): Conditi
  * Matches patterns against the PARSED release group only (not full title)
  */
 function evaluateReleaseGroup(condition: ConditionData, parsed: ParseResult): ConditionEvalResult {
-	if (!condition.patterns || condition.patterns.length === 0) {
-		return { matched: false, expected: 'No patterns defined', actual: 'N/A' };
-	}
+  if (!condition.patterns || condition.patterns.length === 0) {
+    return { matched: false, expected: 'No patterns defined', actual: 'N/A' };
+  }
 
-	const actual = parsed.releaseGroup || 'None detected';
-	const patternStrs = condition.patterns.map((p) => p.pattern);
-	const expected = patternStrs.join(' OR ');
+  const actual = parsed.releaseGroup || 'None detected';
+  const patternStrs = condition.patterns.map((p) => p.pattern);
+  const expected = patternStrs.join(' OR ');
 
-	// If no release group was parsed, can't match
-	if (!parsed.releaseGroup) {
-		return { matched: false, expected, actual };
-	}
+  // If no release group was parsed, can't match
+  if (!parsed.releaseGroup) {
+    return { matched: false, expected, actual };
+  }
 
-	// Match patterns against parsed release group only
-	for (const pattern of condition.patterns) {
-		try {
-			const regex = new RegExp(pattern.pattern, 'i');
-			if (regex.test(parsed.releaseGroup)) {
-				return { matched: true, expected, actual };
-			}
-		} catch {
-			// Invalid regex - skip
-		}
-	}
-	return { matched: false, expected, actual };
+  // Match patterns against parsed release group only
+  for (const pattern of condition.patterns) {
+    try {
+      const regex = new RegExp(pattern.pattern, 'i');
+      if (regex.test(parsed.releaseGroup)) {
+        return { matched: true, expected, actual };
+      }
+    } catch {
+      // Invalid regex - skip
+    }
+  }
+  return { matched: false, expected, actual };
 }
 
 /**
@@ -474,65 +471,65 @@ function evaluateReleaseGroup(condition: ConditionData, parsed: ParseResult): Co
  * @param patternMatches - Pre-computed pattern matches from .NET regex (optional)
  */
 export function evaluateCustomFormat(
-	conditions: ConditionData[],
-	parsed: ParseResult,
-	title: string,
-	patternMatches?: Map<string, boolean>
+  conditions: ConditionData[],
+  parsed: ParseResult,
+  title: string,
+  patternMatches?: Map<string, boolean>
 ): EvaluationResult {
-	const results: ConditionResult[] = [];
+  const results: ConditionResult[] = [];
 
-	for (const condition of conditions) {
-		const evalResult = evaluateCondition(condition, parsed, title, patternMatches);
-		const passes = condition.negate ? !evalResult.matched : evalResult.matched;
+  for (const condition of conditions) {
+    const evalResult = evaluateCondition(condition, parsed, title, patternMatches);
+    const passes = condition.negate ? !evalResult.matched : evalResult.matched;
 
-		results.push({
-			conditionName: condition.name,
-			conditionType: condition.type,
-			matched: evalResult.matched,
-			required: condition.required,
-			negate: condition.negate,
-			passes,
-			expected: evalResult.expected,
-			actual: evalResult.actual
-		});
-	}
+    results.push({
+      conditionName: condition.name,
+      conditionType: condition.type,
+      matched: evalResult.matched,
+      required: condition.required,
+      negate: condition.negate,
+      passes,
+      expected: evalResult.expected,
+      actual: evalResult.actual,
+    });
+  }
 
-	// Group results by condition type
-	const typeGroups = new Map<string, ConditionResult[]>();
-	for (const result of results) {
-		if (!typeGroups.has(result.conditionType)) {
-			typeGroups.set(result.conditionType, []);
-		}
-		typeGroups.get(result.conditionType)!.push(result);
-	}
+  // Group results by condition type
+  const typeGroups = new Map<string, ConditionResult[]>();
+  for (const result of results) {
+    if (!typeGroups.has(result.conditionType)) {
+      typeGroups.set(result.conditionType, []);
+    }
+    typeGroups.get(result.conditionType)!.push(result);
+  }
 
-	// Evaluate each type group
-	// Between types → AND: every type must pass
-	// Within a type:
-	//   - If any condition is required: ALL required must pass (AND), optional ignored
-	//   - If no conditions are required: at least ONE must pass (OR)
-	let allTypesPass = true;
+  // Evaluate each type group
+  // Between types → AND: every type must pass
+  // Within a type:
+  //   - If any condition is required: ALL required must pass (AND), optional ignored
+  //   - If no conditions are required: at least ONE must pass (OR)
+  let allTypesPass = true;
 
-	for (const [, groupResults] of typeGroups) {
-		const requiredInGroup = groupResults.filter((r) => r.required);
+  for (const [, groupResults] of typeGroups) {
+    const requiredInGroup = groupResults.filter((r) => r.required);
 
-		let typeGroupPasses: boolean;
-		if (requiredInGroup.length > 0) {
-			// AND logic: all required conditions must pass
-			typeGroupPasses = requiredInGroup.every((r) => r.passes);
-		} else {
-			// OR logic: at least one condition must pass
-			typeGroupPasses = groupResults.some((r) => r.passes);
-		}
+    let typeGroupPasses: boolean;
+    if (requiredInGroup.length > 0) {
+      // AND logic: all required conditions must pass
+      typeGroupPasses = requiredInGroup.every((r) => r.passes);
+    } else {
+      // OR logic: at least one condition must pass
+      typeGroupPasses = groupResults.some((r) => r.passes);
+    }
 
-		if (!typeGroupPasses) {
-			allTypesPass = false;
-			break;
-		}
-	}
+    if (!typeGroupPasses) {
+      allTypesPass = false;
+      break;
+    }
+  }
 
-	return {
-		matches: allTypesPass,
-		conditions: results
-	};
+  return {
+    matches: allTypesPass,
+    conditions: results,
+  };
 }

@@ -5,5 +5,5 @@ import { BaseArrClient } from '../base.ts';
  * Extends BaseArrClient with Chaptarr-specific API methods
  */
 export class ChaptarrClient extends BaseArrClient {
-	// Specific API methods will be implemented here as needed
+  // Specific API methods will be implemented here as needed
 }

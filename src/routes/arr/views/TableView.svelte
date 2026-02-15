@@ -141,9 +141,11 @@
 
 	<svelte:fragment slot="actions" let:row>
 		<div class="relative z-10 flex items-center justify-end gap-1">
-			<button type="button" on:click={(e) => handleExternalClick(e, row.url)}>
-				<TableActionButton icon={ExternalLink} title="Open in {getAppLabel(row.type)}" />
-			</button>
+			<TableActionButton
+				icon={ExternalLink}
+				title="Open in {getAppLabel(row.type)}"
+				on:click={(e) => handleExternalClick(e, row.url)}
+			/>
 			<TableActionButton
 				icon={Trash2}
 				title="Delete instance"

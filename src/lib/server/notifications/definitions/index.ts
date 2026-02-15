@@ -17,7 +17,7 @@ import { rename } from './rename.ts';
 import { upgrade } from './upgrade.ts';
 
 export const notifications = {
-	test,
-	rename,
-	upgrade
+  test,
+  rename,
+  upgrade,
 };

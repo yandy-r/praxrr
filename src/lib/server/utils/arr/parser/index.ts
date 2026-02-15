@@ -5,14 +5,14 @@
 
 export * from './types.ts';
 export {
-	parse,
-	parseQuality,
-	isParserHealthy,
-	getParserVersion,
-	clearParserVersionCache,
-	parseWithCache,
-	parseWithCacheBatch,
-	cleanupOldCacheEntries,
-	matchPatterns,
-	matchPatternsBatch
+  parse,
+  parseQuality,
+  isParserHealthy,
+  getParserVersion,
+  clearParserVersionCache,
+  parseWithCache,
+  parseWithCacheBatch,
+  cleanupOldCacheEntries,
+  matchPatterns,
+  matchPatternsBatch,
 } from './client.ts';

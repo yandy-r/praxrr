@@ -98,8 +98,8 @@ const profiles = await radarr.getQualityProfiles();
 
 // Add movie
 await radarr.addMovie({
-	title: 'Inception',
-	tmdbId: 27205,
-	qualityProfileId: 1
+  title: 'Inception',
+  tmdbId: 27205,
+  qualityProfileId: 1,
 });
 ```

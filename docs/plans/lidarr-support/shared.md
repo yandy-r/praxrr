@@ -1,63 +1,60 @@
+> [!WARNING]
+> Superseded on 2026-02-15 by the first-class Lidarr initiative plan in `docs/plans/enhance-lidarr-support/parallel-plan.md` (tracked by GitHub issue #130 and umbrella #13).
+>
+> This document captures the legacy Sonarr-reuse rollout model and is retained for historical context only. Do not use it for current implementation planning.
+
 # Lidarr Support
 
-Profilarr already models Arr instances as typed records, instantiates app-specific clients through a shared factory, and executes configuration sync through section-based jobs. Lidarr support should extend that same pipeline by adding `lidarr` parity across onboarding validation, OpenAPI/shared enums, and runtime branch points in library and release routes. The core integration path is `arr_instances` -> `createArrClient` -> route/sync handlers -> Lidarr API v1 while preserving existing error envelopes, caching, and job history behavior. Current rename/upgrades and several UI controls are still dual-app assumptions, so this feature must either implement or explicitly capability-gate those surfaces for Lidarr.
+Lidarr support for media-management is partially wired: the shared arr types and sync stack already recognize `lidarr`, but the UI CRUD routes and entity readers/writers for naming, media settings, and quality definitions still branch only on `radarr` and `sonarr`. The media-management route tree under `/src/routes/media-management/[databaseId]/...` drives listing and form actions, while actual data access lives in `/src/lib/server/pcd/entities/mediaManagement/...` against PCD cache tables. Sync behavior in `/src/lib/server/sync/mediaManagement/syncer.ts` already applies Lidarr by reusing Sonarr-backed entities with capability gating, which creates a mismatch between sync capability and UI/config creation capability. Finalizing this feature means extending route/action validation, table/query selection, and portable entity handling so Lidarr presets can be viewed, created, edited, exported, and imported consistently.
 
 ## Relevant Files
 
-- `src/routes/arr/new/+page.server.ts`: Instance creation validation and allowed Arr types.
-- `src/routes/arr/test/+server.ts`: Connection test API and type allowlist.
-- `src/routes/arr/components/InstanceForm.svelte`: Arr type selector and onboarding UX flow.
-- `src/lib/server/db/queries/arrInstances.ts`: Persistence and retrieval for instance credentials and type.
-- `src/lib/server/utils/arr/factory.ts`: Central client instantiation by Arr type.
-- `src/lib/server/utils/arr/clients/lidarr.ts`: Lidarr-specific client methods and API version wiring.
-- `src/routes/api/v1/arr/library/+server.ts`: Library aggregation path with per-type branching and cache use.
-- `src/routes/api/v1/arr/releases/+server.ts`: Release search path with per-type branching.
-- `src/lib/server/jobs/handlers/arrSync.ts`: Section-based sync job orchestration entry point.
-- `src/lib/server/sync/mappings.ts`: Sync Arr type mappings and section constants.
-- `src/lib/shared/pcd/types.ts`: Shared Arr/PCD type unions used by server and UI.
-- `docs/api/v1/schemas/arr.yaml`: OpenAPI source for `ArrType` and Arr route contracts.
-- `docs/api/v1/schemas/pcd.yaml`: OpenAPI source for PCD entity enums and schema alignment.
-- `src/lib/api/v1.d.ts`: Generated API types that must stay schema-aligned.
-- `src/routes/custom-formats/[databaseId]/[id]/conditions/components/ConditionCard.svelte`: Existing dual-app UI pattern needing generalization.
-- `src/lib/server/jobs/handlers/arrRename.ts`: Rename handler currently constrained to Radarr/Sonarr.
-- `src/routes/arr/[id]/upgrades/+page.server.ts`: Upgrades page capability constraints for non-Radarr types.
+- /src/routes/media-management/[databaseId]/naming/+page.server.ts: Naming list loader; currently reads only Radarr/Sonarr-backed entries.
+- /src/routes/media-management/[databaseId]/quality-definitions/+page.server.ts: Quality definitions list loader; omits Lidarr rows.
+- /src/routes/media-management/[databaseId]/media-settings/+page.server.ts: Media settings list loader; same arr-type limitation.
+- /src/routes/media-management/[databaseId]/naming/new/+page.server.ts: Create action validates only `radarr`/`sonarr` arr types.
+- /src/routes/media-management/[databaseId]/quality-definitions/new/+page.server.ts: New quality definition action excludes Lidarr creation.
+- /src/routes/media-management/[databaseId]/media-settings/new/+page.server.ts: New media settings action excludes Lidarr creation.
+- /src/lib/server/pcd/entities/mediaManagement/naming/read.ts: Naming readers combine Radarr/Sonarr tables into list output.
+- /src/lib/server/pcd/entities/mediaManagement/media-settings/read.ts: Media settings readers currently branch by Radarr/Sonarr.
+- /src/lib/server/pcd/entities/mediaManagement/quality-definitions/read.ts: Quality definition list/read path missing Lidarr handling.
+- /src/lib/server/pcd/entities/mediaManagement/naming/create.ts: Naming write path has no Lidarr create branch.
+- /src/lib/server/pcd/entities/mediaManagement/media-settings/create.ts: Media settings write path has no Lidarr branch.
+- /src/lib/server/pcd/entities/mediaManagement/quality-definitions/create.ts: Quality definition writes are limited to Radarr/Sonarr.
+- /src/lib/server/sync/mediaManagement/syncer.ts: Lidarr sync reuse/capability-gating behavior to align with UI.
+- /src/lib/server/db/queries/arrSync.ts: Sync config persistence impacted by config-name/arr-type updates.
+- /src/lib/shared/pcd/types.ts: Arr type unions and PCD table typing context.
+- /src/lib/shared/arr/capabilities.ts: Arr app capability metadata including Lidarr support signals.
 
 ## Relevant Tables
 
-- `arr_instances`: Stores Arr instance type, URL, API key, and enablement state.
-- `pcd_ops`: Source of portable config operations consumed by sync/cache layers.
-- `arr_sync_quality_profiles_config`: Per-instance quality profile sync configuration.
-- `arr_sync_delay_profiles_config`: Per-instance delay profile sync configuration.
-- `arr_sync_media_management`: Per-instance media management sync configuration.
-- `jobs`: Job definitions for scheduled/manual sync and related workflows.
-- `job_runs`: Execution history and statuses for sync/operation jobs.
+- radarr_naming: Existing naming presets used by current naming UI/actions.
+- sonarr_naming: Existing naming presets currently reused for Lidarr sync behavior.
+- radarr_media_settings: Current media settings source for Radarr configs.
+- sonarr_media_settings: Current media settings source for Sonarr and Lidarr reuse path.
+- radarr_quality_definitions: Current quality definition rows for Radarr.
+- sonarr_quality_definitions: Current quality definition rows for Sonarr and Lidarr reuse path.
+- quality_api_mappings: Quality name to API mapping by `arr_type`; missing Lidarr mappings blocks full support.
+- arr_sync_media_management: Selected config names/databases for sync per instance.
+- arr_instances: Arr instance type (`radarr`/`sonarr`/`lidarr`) and credentials.
+- database_instances: Source PCD repositories backing media-management data.
 
 ## Relevant Patterns
 
-**Arr-Type Branching**: Resolve instance type once, then execute type-specific logic with a normalized response contract. Example: [`src/routes/api/v1/arr/library/+server.ts`](src/routes/api/v1/arr/library/+server.ts).
+**Arr-Type Validation in Route Actions**: Actions fail fast on unsupported `arrType` values before dispatching writes. See [/src/routes/media-management/[databaseId]/media-settings/new/+page.server.ts](/src/routes/media-management/[databaseId]/media-settings/new/+page.server.ts).
 
-**Client Factory + Base Client**: Keep transport/auth common in base client and route type differences through factory-selected subclasses. Example: [`src/lib/server/utils/arr/factory.ts`](src/lib/server/utils/arr/factory.ts).
+**Entity-Scoped CRUD Modules**: Each media-management surface keeps read/create/update/delete per entity folder and arr-specific branches inside operations. See [/src/lib/server/pcd/entities/mediaManagement/quality-definitions/create.ts](/src/lib/server/pcd/entities/mediaManagement/quality-definitions/create.ts).
 
-**Section-Based Sync Orchestration**: Run sync by reusable sections and mappings instead of app-specific pipelines. Example: [`src/lib/server/jobs/handlers/arrSync.ts`](src/lib/server/jobs/handlers/arrSync.ts).
+**Lidarr Capability-Gated Reuse**: Lidarr sync currently reuses Sonarr entities and logs unsupported-field skips instead of separate tables. See [/src/lib/server/sync/mediaManagement/syncer.ts](/src/lib/server/sync/mediaManagement/syncer.ts).
 
-**Contract-First Type Alignment**: Update OpenAPI schemas first, then regenerate and align shared/server unions to prevent drift. Example: [`docs/api/v1/schemas/arr.yaml`](docs/api/v1/schemas/arr.yaml).
-
-**Capability-Gated UX**: Explicitly show unsupported surfaces where parity is not implemented yet. Example: [`src/routes/arr/[id]/upgrades/+page.server.ts`](src/routes/arr/[id]/upgrades/+page.server.ts).
+**Portable Entity Type Gating**: Import/export accepts only declared entity types, so Lidarr support requires extending portable type sets. See [/docs/api/v1/schemas/pcd.yaml](/docs/api/v1/schemas/pcd.yaml).
 
 ## Relevant Docs
 
-**`docs/plans/lidarr-support/feature-spec.md`**: You _must_ read this when working on scope, acceptance criteria, and rollout boundaries.
+**/docs/ARCHITECTURE.md**: You _must_ read this when working on media-management route/entity boundaries.
 
-**`docs/plans/lidarr-support/research-technical.md`**: You _must_ read this when modifying architecture seams, types, or sync paths.
+**/docs/api/v1/schemas/pcd.yaml**: You _must_ read this when working on import/export and portable Lidarr entity strategy.
 
-**`docs/plans/lidarr-support/research-external.md`**: You _must_ read this when implementing Lidarr API endpoints and auth behavior.
+**/docs/api/v1/schemas/arr.yaml**: You _must_ read this when working on current Lidarr API payload expectations.
 
-**`docs/plans/lidarr-support/research-business.md`**: You _must_ read this when prioritizing parity decisions and user-facing rules.
-
-**`docs/plans/lidarr-support/research-ux.md`**: You _must_ read this when changing Arr UI controls and unsupported-state messaging.
-
-**`docs/plans/lidarr-support/github-issue-drafts.md`**: You _must_ read this when mapping plan tasks to issue IDs `#1`-`#5` under `#6`.
-
-**`docs/api/v1/schemas/arr.yaml`**: You _must_ read this when changing Arr API contracts and `ArrType` enums.
-
-**`docs/api/v1/schemas/pcd.yaml`**: You _must_ read this when deciding Lidarr media-management entity strategy.
+**/README.md**: You _must_ read this when working on project-level Lidarr branch context and constraints.

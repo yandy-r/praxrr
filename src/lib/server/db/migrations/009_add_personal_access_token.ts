@@ -9,15 +9,15 @@ import type { Migration } from '../migrations.ts';
  */
 
 export const migration: Migration = {
-	version: 9,
-	name: 'Add personal_access_token to database_instances',
+  version: 9,
+  name: 'Add personal_access_token to database_instances',
 
-	up: `
+  up: `
 		ALTER TABLE database_instances
 		ADD COLUMN personal_access_token TEXT;
 	`,
 
-	down: `
+  down: `
 		-- SQLite doesn't support DROP COLUMN easily, so we recreate the table
 		CREATE TABLE database_instances_backup (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -43,5 +43,5 @@ export const migration: Migration = {
 		ALTER TABLE database_instances_backup RENAME TO database_instances;
 
 		CREATE INDEX idx_database_instances_uuid ON database_instances(uuid);
-	`
+	`,
 };

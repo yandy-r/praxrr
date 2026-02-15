@@ -15,10 +15,10 @@ import type { Migration } from '../migrations.ts';
  */
 
 export const migration: Migration = {
-	version: 5,
-	name: 'Create backup_settings table',
+  version: 5,
+  name: 'Create backup_settings table',
 
-	up: `
+  up: `
 		CREATE TABLE backup_settings (
 			id INTEGER PRIMARY KEY CHECK (id = 1),
 
@@ -38,7 +38,7 @@ export const migration: Migration = {
 		INSERT INTO backup_settings (id) VALUES (1);
 	`,
 
-	down: `
+  down: `
 		DROP TABLE IF EXISTS backup_settings;
-	`
+	`,
 };

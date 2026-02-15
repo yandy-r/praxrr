@@ -3,20 +3,17 @@ EntityType:
   description: |
     Portable PCD entity identifiers used by import/export endpoints.
 
-    v1 Lidarr media-management strategy: reuse existing entities.
-    Lidarr maps to `radarr_media_settings` / `sonarr_media_settings` and
-    `radarr_quality_definitions` / `sonarr_quality_definitions` rather than
-    introducing dedicated `lidarr_*` entity types in this phase. Downstream
-    sync resolves the Lidarr arr_type against these shared shapes and
-    capability-gates any Lidarr-only fields (e.g. naming formats, music-
-    specific media-info fields) so behavior is deterministic: unsupported
-    fields are explicitly skipped with logged reasons, never silently
-    written or partially applied.
+    Lidarr media-management entities are first-class portable contract members:
+    - `lidarr_naming`
+    - `lidarr_media_settings`
+    - `lidarr_quality_definitions`
 
-    No new enum values are added for Lidarr here. The `lidarr` arr_type
-    is expressed in per-row `arr_type` columns (e.g. quality_profile_custom_formats,
-    custom_format_conditions, quality_api_mappings) and in the
-    PortableCustomFormatScore.arrType enum, not as a distinct entity family.
+    Runtime validation is deterministic and fail-fast for Lidarr payloads:
+    payloads are rejected when required fields are missing, when unsupported
+    fields are present, or when cross-family fields are mixed into the payload
+    (for example Radarr naming fields with `lidarr_naming`).
+
+    Clients must emit `lidarr_*` entity types for Lidarr entities.
   enum:
     - delay_profile
     - regular_expression
@@ -28,6 +25,9 @@ EntityType:
     - sonarr_media_settings
     - radarr_quality_definitions
     - sonarr_quality_definitions
+    - lidarr_naming
+    - lidarr_media_settings
+    - lidarr_quality_definitions
 
 ExportResponse:
   type: object
@@ -46,17 +46,16 @@ ExportResponse:
         - `quality_profile` → PortableQualityProfile (contains PortableCustomFormatScore with lidarr-aware arrType)
         - `radarr_naming` → PortableRadarrNaming
         - `sonarr_naming` → PortableSonarrNaming
-        - `radarr_media_settings` → PortableMediaSettings (reused for Lidarr in v1)
-        - `sonarr_media_settings` → PortableMediaSettings (reused for Lidarr in v1)
-        - `radarr_quality_definitions` → PortableQualityDefinitions (reused for Lidarr in v1)
-        - `sonarr_quality_definitions` → PortableQualityDefinitions (reused for Lidarr in v1)
+        - `lidarr_naming` → PortableLidarrNaming
+        - `radarr_media_settings` → PortableMediaSettings
+        - `sonarr_media_settings` → PortableMediaSettings
+        - `lidarr_media_settings` → PortableLidarrMediaSettings
+        - `radarr_quality_definitions` → PortableQualityDefinitions
+        - `sonarr_quality_definitions` → PortableQualityDefinitions
+        - `lidarr_quality_definitions` → PortableLidarrQualityDefinitions
 
-        v1 Lidarr reuse strategy:
-        Lidarr media-management sync maps to existing `radarr_*`/`sonarr_*` entity
-        shapes. No `lidarr_*` entity types exist in this phase. Unsupported Lidarr-only
-        fields (e.g. music-specific naming tokens, artist/album media-info fields) are
-        capability-gated: the sync layer explicitly skips them with deterministic,
-        logged outcomes rather than silently writing partial data.
+        `lidarr_*` payloads are validated against strict allowlists so mixed
+        cross-family payloads fail fast during import.
       oneOf:
         - $ref: '#/PortableDelayProfile'
         - $ref: '#/PortableRegularExpression'
@@ -64,8 +63,11 @@ ExportResponse:
         - $ref: '#/PortableQualityProfile'
         - $ref: '#/PortableRadarrNaming'
         - $ref: '#/PortableSonarrNaming'
+        - $ref: '#/PortableLidarrNaming'
         - $ref: '#/PortableMediaSettings'
+        - $ref: '#/PortableLidarrMediaSettings'
         - $ref: '#/PortableQualityDefinitions'
+        - $ref: '#/PortableLidarrQualityDefinitions'
 
 ImportRequest:
   type: object
@@ -85,7 +87,10 @@ ImportRequest:
     entityType:
       $ref: '#/EntityType'
     data:
-      description: The portable entity payload (same shape as ExportResponse.data)
+      description: |
+        The portable entity payload (same shape as ExportResponse.data).
+        For `lidarr_*` entity types, runtime validation rejects mixed
+        cross-family payload fields and unknown fields.
       oneOf:
         - $ref: '#/PortableDelayProfile'
         - $ref: '#/PortableRegularExpression'
@@ -93,8 +98,11 @@ ImportRequest:
         - $ref: '#/PortableQualityProfile'
         - $ref: '#/PortableRadarrNaming'
         - $ref: '#/PortableSonarrNaming'
+        - $ref: '#/PortableLidarrNaming'
         - $ref: '#/PortableMediaSettings'
+        - $ref: '#/PortableLidarrMediaSettings'
         - $ref: '#/PortableQualityDefinitions'
+        - $ref: '#/PortableLidarrQualityDefinitions'
 
 ImportResponse:
   type: object
@@ -228,12 +236,13 @@ PortableCustomFormatScore:
       type: string
       enum: [radarr, sonarr, lidarr, all]
       description: |
-        Arr target for this score mapping. `lidarr` is a valid value for v1
-        parity so quality profile custom-format scores can be scoped to Lidarr
-        instances. `all` applies the score to every arr type. Unsupported
-        Lidarr-only sync behavior (e.g. naming, music-specific media fields)
-        remains capability-gated in the sync layer; this enum only governs
-        score applicability, not full feature support.
+        Arr target for this score mapping. `lidarr` is a first-class value
+        so quality profile custom-format scores can be scoped to Lidarr
+        instances. `all` applies the score to every arr type.
+
+        Non-regression contract: existing `radarr`, `sonarr`, and `all`
+        enum semantics are unchanged; `lidarr` is an explicit additional arr
+        target value and does not introduce fallback alias behavior.
     score:
       type: integer
 
@@ -302,6 +311,8 @@ PortableRadarrNaming:
       type: string
 
 PortableSonarrNaming:
+  description: |
+    Portable naming payload for Sonarr entities.
   type: object
   required:
     - name
@@ -340,17 +351,19 @@ PortableSonarrNaming:
     multiEpisodeStyle:
       type: string
 
+PortableLidarrNaming:
+  description: |
+    Portable naming payload for `lidarr_naming`.
+    The wire shape matches `PortableSonarrNaming` (shared column structure).
+    Field semantics are Lidarr-native (artist/album/track tokens).
+  allOf:
+    - $ref: '#/PortableSonarrNaming'
+
 PortableMediaSettings:
   type: object
   description: |
-    Shared media-management settings payload for Radarr, Sonarr, and (in v1)
-    Lidarr entity families. Lidarr reuses this shape rather than introducing
-    `lidarr_media_settings` entities; the sync layer maps Lidarr instances to
-    the applicable `radarr_media_settings` or `sonarr_media_settings` entity
-    type and capability-gates any Lidarr-only fields not present here (e.g.
-    music-specific media-info flags). Unsupported fields are explicitly
-    skipped with logged reasons so sync outcomes are deterministic and
-    testable.
+    Shared media-management settings payload shape used by Radarr, Sonarr, and
+    Lidarr entity families.
   required:
     - name
     - propersRepacks
@@ -363,17 +376,18 @@ PortableMediaSettings:
     enableMediaInfo:
       type: boolean
 
+PortableLidarrMediaSettings:
+  description: |
+    Portable payload for `lidarr_media_settings`.
+    The shape matches `PortableMediaSettings`.
+  allOf:
+    - $ref: '#/PortableMediaSettings'
+
 PortableQualityDefinitions:
   type: object
   description: |
-    Shared quality-definition payload for Radarr, Sonarr, and (in v1) Lidarr
-    entity families. Lidarr reuses this shape rather than introducing
-    `lidarr_quality_definitions` entities; the sync layer maps Lidarr
-    instances to the applicable `radarr_quality_definitions` or
-    `sonarr_quality_definitions` entity type and capability-gates any
-    Lidarr-only fields not present here. Unsupported fields are explicitly
-    skipped with logged reasons so sync outcomes are deterministic and
-    testable.
+    Shared quality-definition payload shape used by Radarr, Sonarr, and Lidarr
+    entity families.
   required:
     - name
     - entries
@@ -385,3 +399,10 @@ PortableQualityDefinitions:
       items:
         type: object
         description: Quality definition entry with min/max/preferred sizes
+
+PortableLidarrQualityDefinitions:
+  description: |
+    Portable payload for `lidarr_quality_definitions`.
+    The shape matches `PortableQualityDefinitions`.
+  allOf:
+    - $ref: '#/PortableQualityDefinitions'

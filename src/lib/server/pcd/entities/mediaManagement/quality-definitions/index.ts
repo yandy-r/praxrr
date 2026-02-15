@@ -3,13 +3,25 @@
  */
 
 // Read
-export { list, getRadarrByName, getSonarrByName, getAvailableQualities } from './read.ts';
+export { list, getRadarrByName, getSonarrByName, getLidarrByName, getAvailableQualities } from './read.ts';
 
 // Create
-export { createRadarrQualityDefinitions, createSonarrQualityDefinitions } from './create.ts';
+export {
+  createRadarrQualityDefinitions,
+  createSonarrQualityDefinitions,
+  createLidarrQualityDefinitions,
+} from './create.ts';
 
 // Update
-export { updateRadarrQualityDefinitions, updateSonarrQualityDefinitions } from './update.ts';
+export {
+  updateRadarrQualityDefinitions,
+  updateSonarrQualityDefinitions,
+  updateLidarrQualityDefinitions,
+} from './update.ts';
 
 // Delete
-export { removeRadarrQualityDefinitions, removeSonarrQualityDefinitions } from './delete.ts';
+export {
+  removeRadarrQualityDefinitions,
+  removeSonarrQualityDefinitions,
+  removeLidarrQualityDefinitions,
+} from './delete.ts';

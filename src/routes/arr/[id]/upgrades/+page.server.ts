@@ -32,6 +32,16 @@ function cancelQueuedUpgrades(instanceId: number): void {
   jobQueueQueries.cancelByDedupeKey(`arr.upgrade.manual:${instanceId}`);
 }
 
+function getUpgradeUnsupportedErrorAndCancel(instanceId: number, instanceType: string): string | null {
+  const unsupportedError = getUpgradeUnsupportedError(instanceType);
+  if (!unsupportedError) {
+    return null;
+  }
+
+  cancelQueuedUpgrades(instanceId);
+  return unsupportedError;
+}
+
 export const load: ServerLoad = ({ params }) => {
   const id = parseInt(params.id || '', 10);
 
@@ -70,9 +80,8 @@ export const actions: Actions = {
       return fail(404, { error: 'Instance not found' });
     }
 
-    const unsupportedError = getUpgradeUnsupportedError(instance.type);
+    const unsupportedError = getUpgradeUnsupportedErrorAndCancel(id, instance.type);
     if (unsupportedError) {
-      cancelQueuedUpgrades(id);
       return fail(400, { error: unsupportedError });
     }
 
@@ -156,9 +165,8 @@ export const actions: Actions = {
       return fail(404, { error: 'Instance not found' });
     }
 
-    const unsupportedError = getUpgradeUnsupportedError(instance.type);
+    const unsupportedError = getUpgradeUnsupportedErrorAndCancel(id, instance.type);
     if (unsupportedError) {
-      cancelQueuedUpgrades(id);
       return fail(400, { error: unsupportedError });
     }
 
@@ -233,6 +241,13 @@ export const actions: Actions = {
     }
 
     const instance = arrInstancesQueries.getById(id);
+    if (instance) {
+      const unsupportedError = getUpgradeUnsupportedErrorAndCancel(id, instance.type);
+      if (unsupportedError) {
+        return fail(400, { error: unsupportedError });
+      }
+    }
+
     const instanceName = instance?.name ?? `Instance ${id}`;
 
     const clearedIds = clearDryRunExclusions(id);

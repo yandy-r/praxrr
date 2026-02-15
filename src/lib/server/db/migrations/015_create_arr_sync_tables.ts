@@ -12,10 +12,10 @@ import type { Migration } from '../migrations.ts';
  */
 
 export const migration: Migration = {
-	version: 15,
-	name: 'Create arr sync tables',
+  version: 15,
+  name: 'Create arr sync tables',
 
-	up: `
+  up: `
 		-- Quality profile selections (many-to-many)
 		CREATE TABLE arr_sync_quality_profiles (
 			instance_id INTEGER NOT NULL,
@@ -66,7 +66,7 @@ export const migration: Migration = {
 		CREATE INDEX idx_arr_sync_delay_profiles_instance ON arr_sync_delay_profiles(instance_id);
 	`,
 
-	down: `
+  down: `
 		DROP INDEX IF EXISTS idx_arr_sync_delay_profiles_instance;
 		DROP INDEX IF EXISTS idx_arr_sync_quality_profiles_instance;
 		DROP TABLE IF EXISTS arr_sync_media_management;
@@ -74,5 +74,5 @@ export const migration: Migration = {
 		DROP TABLE IF EXISTS arr_sync_delay_profiles;
 		DROP TABLE IF EXISTS arr_sync_quality_profiles_config;
 		DROP TABLE IF EXISTS arr_sync_quality_profiles;
-	`
+	`,
 };

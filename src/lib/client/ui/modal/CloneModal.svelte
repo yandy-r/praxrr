@@ -102,10 +102,10 @@
 			{/if}
 
 			{#if canWriteToBase}
-				<div class="space-y-2">
-					<label class="block text-sm font-medium text-neutral-900 dark:text-neutral-100">
+				<fieldset class="space-y-2">
+					<legend class="block text-sm font-medium text-neutral-900 dark:text-neutral-100">
 						Layer
-					</label>
+					</legend>
 					<div class="flex gap-3">
 						<label class="flex items-center gap-2 text-sm text-neutral-700 dark:text-neutral-300">
 							<input type="radio" bind:group={selectedLayer} value="base" />
@@ -116,7 +116,7 @@
 							User
 						</label>
 					</div>
-				</div>
+				</fieldset>
 			{/if}
 		</div>
 	</div>

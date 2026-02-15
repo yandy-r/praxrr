@@ -8,6 +8,7 @@
 
 	$: instanceId = $page.params.id;
 	$: currentPath = $page.url.pathname;
+	$: instanceName = data?.instance?.name ?? 'Instance';
 
 	$: tabs = [
 		{
@@ -53,7 +54,7 @@
 			label: 'Instances',
 			href: '/arr'
 		},
-		current: data.instance.name
+		current: instanceName
 	};
 </script>
 

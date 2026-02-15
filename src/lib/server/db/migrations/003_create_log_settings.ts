@@ -17,10 +17,10 @@ import type { Migration } from '../migrations.ts';
  */
 
 export const migration: Migration = {
-	version: 3,
-	name: 'Create log_settings table',
+  version: 3,
+  name: 'Create log_settings table',
 
-	up: `
+  up: `
 		CREATE TABLE log_settings (
 			id INTEGER PRIMARY KEY CHECK (id = 1),
 
@@ -46,7 +46,7 @@ export const migration: Migration = {
 		INSERT INTO log_settings (id) VALUES (1);
 	`,
 
-	down: `
+  down: `
 		DROP TABLE IF EXISTS log_settings;
-	`
+	`,
 };

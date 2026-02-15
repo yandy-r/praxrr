@@ -8,36 +8,36 @@ import { browser } from '$app/environment';
 export type NavIconStyle = 'emoji' | 'lucide';
 
 function createNavIconStore() {
-	let initialStyle: NavIconStyle = 'lucide';
-	if (browser) {
-		const stored = localStorage.getItem('navIconStyle') as NavIconStyle | null;
-		if (stored && (stored === 'emoji' || stored === 'lucide')) {
-			initialStyle = stored;
-		}
-	}
+  let initialStyle: NavIconStyle = 'lucide';
+  if (browser) {
+    const stored = localStorage.getItem('navIconStyle') as NavIconStyle | null;
+    if (stored && (stored === 'emoji' || stored === 'lucide')) {
+      initialStyle = stored;
+    }
+  }
 
-	const { subscribe, set } = writable<NavIconStyle>(initialStyle);
+  const { subscribe, set } = writable<NavIconStyle>(initialStyle);
 
-	function setStyle(style: NavIconStyle) {
-		set(style);
-		if (browser) {
-			localStorage.setItem('navIconStyle', style);
-		}
-	}
+  function setStyle(style: NavIconStyle) {
+    set(style);
+    if (browser) {
+      localStorage.setItem('navIconStyle', style);
+    }
+  }
 
-	function toggle() {
-		if (browser) {
-			const current = localStorage.getItem('navIconStyle') as NavIconStyle | null;
-			const newStyle = current === 'emoji' ? 'lucide' : 'emoji';
-			setStyle(newStyle);
-		}
-	}
+  function toggle() {
+    if (browser) {
+      const current = localStorage.getItem('navIconStyle') as NavIconStyle | null;
+      const newStyle = current === 'emoji' ? 'lucide' : 'emoji';
+      setStyle(newStyle);
+    }
+  }
 
-	return {
-		subscribe,
-		setStyle,
-		toggle
-	};
+  return {
+    subscribe,
+    setStyle,
+    toggle,
+  };
 }
 
 export const navIconStore = createNavIconStore();

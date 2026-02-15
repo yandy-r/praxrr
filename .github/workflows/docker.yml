@@ -4,12 +4,13 @@ on:
   push:
     branches:
       - v2
+      - v2-lidarr
     tags:
       - 'v*'
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_BASE: ghcr.io/dictionarry-hub
+  IMAGE_BASE: ghcr.io/yandy-r
 
 jobs:
   build:
@@ -42,13 +43,17 @@ jobs:
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GHCR_TOKEN || secrets.GITHUB_TOKEN }}
 
       - name: Determine channel
         id: channel
         run: |
           if [[ "${{ github.ref }}" == "refs/heads/v2" ]]; then
+            echo "value=develop" >> $GITHUB_OUTPUT
+          elif [[ "${{ github.ref }}" == "refs/heads/v2-lidarr" ]]; then
+            echo "value=develop" >> $GITHUB_OUTPUT
+          elif [[ "${{ github.ref }}" == refs/tags/v2-lidarr.* ]]; then
             echo "value=develop" >> $GITHUB_OUTPUT
           elif [[ "${{ github.ref }}" == refs/tags/v*-beta* ]]; then
             echo "value=beta" >> $GITHUB_OUTPUT
@@ -63,17 +68,24 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: ${{ env.IMAGE_BASE }}/${{ matrix.image }}
+          flavor: |
+            latest=false
           labels: |
             org.opencontainers.image.licenses=AGPL-3.0
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
           tags: |
-            # Branch push -> develop
+            # Branch pushes
             type=raw,value=develop,enable=${{ github.ref == 'refs/heads/v2' }}
+            type=raw,value=v2-lidarr,enable=${{ github.ref == 'refs/heads/v2-lidarr' }}
+            # Lidarr tag -> v2-lidarr + exact tag
+            type=raw,value=v2-lidarr,enable=${{ startsWith(github.ref, 'refs/tags/v2-lidarr.') }}
+            type=ref,event=tag,enable=${{ startsWith(github.ref, 'refs/tags/v2-lidarr.') }}
             # Beta tag -> beta + version
-            type=raw,value=beta,enable=${{ startsWith(github.ref, 'refs/tags/v') && contains(github.ref, '-beta') }}
-            type=semver,pattern={{version}},enable=${{ startsWith(github.ref, 'refs/tags/v') && contains(github.ref, '-beta') }}
+            type=raw,value=beta,enable=${{ startsWith(github.ref, 'refs/tags/v') && contains(github.ref, '-beta') && !startsWith(github.ref, 'refs/tags/v2-lidarr.') }}
+            type=semver,pattern={{version}},enable=${{ startsWith(github.ref, 'refs/tags/v') && contains(github.ref, '-beta') && !startsWith(github.ref, 'refs/tags/v2-lidarr.') }}
             # Stable tag -> latest + version
-            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') && !contains(github.ref, '-beta') }}
-            type=semver,pattern={{version}},enable=${{ startsWith(github.ref, 'refs/tags/v') && !contains(github.ref, '-beta') }}
+            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') && !contains(github.ref, '-beta') && !startsWith(github.ref, 'refs/tags/v2-lidarr.') }}
+            type=semver,pattern={{version}},enable=${{ startsWith(github.ref, 'refs/tags/v') && !contains(github.ref, '-beta') && !startsWith(github.ref, 'refs/tags/v2-lidarr.') }}
 
       - name: Build and push
         id: push

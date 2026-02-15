@@ -25,8 +25,34 @@ jobs:
           deno-version: '2.5.6'
 
       - name: Bundle API spec
-        run: deno task bundle:api
+        run: deno run -A scripts/bundle-api.ts
+
+      - name: Verify generated files are the only changes
+        run: |
+          set -euo pipefail
+
+          status_output="$(git status --porcelain)"
+          if [ -z "$status_output" ]; then
+            echo "Working tree is clean after bundling."
+            exit 0
+          fi
+
+          unexpected_changes="$(
+            printf '%s\n' "$status_output" \
+              | sed 's/^...//' \
+              | grep -Ev '^packages/profilarr-api/(openapi\.json|types\.ts)$' || true
+          )"
+
+          if [ -n "$unexpected_changes" ]; then
+            echo "Unexpected changes found after API bundling:"
+            printf '%s\n' "$unexpected_changes"
+            echo
+            git status --short
+            exit 1
+          fi
+
+          echo "Only expected generated API files changed."
 
       - name: Publish to JSR
         working-directory: packages/profilarr-api
-        run: deno publish
+        run: deno publish --allow-dirty

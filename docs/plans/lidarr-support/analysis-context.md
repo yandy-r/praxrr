@@ -1,66 +1,68 @@
-# Analysis: Context Synthesis (lidarr-support)
+> [!WARNING]
+> Superseded on 2026-02-15 by the first-class Lidarr initiative plan in `docs/plans/enhance-lidarr-support/parallel-plan.md` (tracked by GitHub issue #130 and umbrella #13).
+>
+> This document captures the legacy Sonarr-reuse rollout model and is retained for historical context only. Do not use it for current implementation planning.
 
-## Executive Summary
+### Executive Summary
 
-Profilarr should treat `lidarr` as a first-class Arr type by extending existing seams rather than creating a new pipeline. The feature should follow the current instance onboarding/validation, client factory, and section-based sync orchestration, while closing gaps in schemas, route branches, and UI capability messaging. A phased rollout is recommended: type/schema and onboarding parity first, then core library/releases and sync, then operational parity (rename/upgrades) with explicit gating when needed.
+Lidarr support for media-management naming, media settings, and quality definitions requires extending existing Radarr/Sonarr route actions, entity helpers, and portable import/export metadata so `arr_type = 'lidarr'` can be listed, created, edited, and synced. The UI routes under `/src/routes/media-management/[databaseId]/{naming,quality-definitions,media-settings}` and backend PCD entity modules currently branch only on Radarr/Sonarr. The plan should add Lidarr across those layers while preserving the existing Lidarr syncer strategy that reuses Sonarr-backed entities with capability gating.
 
-## Architecture Context
+### Architecture Context
 
-- System Structure: `arr_instances` persistence -> `createArrClient` factory -> type-specific route handlers (`/api/v1/arr/library`, `/api/v1/arr/releases`) and section-based sync jobs (`arrSync`) with shared client behavior.
-- Data Flow: Creation/test paths validate Arr type and connectivity, persist instance credentials, then routes/jobs use the factory-selected client to call Lidarr API v1 endpoints.
-- Integration Points: Onboarding routes/components, OpenAPI schemas and generated typings, shared PCD types, route branches, sync mappings, and capability-aware UI surfaces.
+- System Structure: Media-management UI routes delegate to `src/lib/server/pcd/entities/mediaManagement/{...}` helpers that wrap `writeOperation` and PCD cache access; those helpers currently have explicit Radarr/Sonarr branches.
+- Data Flow: Route loaders call `pcdManager.getCache(databaseId)` and read `radarr_*`/`sonarr_*` tables; form actions validate `arrType`, dispatch to `createRadarr*`/`createSonarr*`, then update sync metadata via `arrSyncQueries`.
+- Integration Points: Extend route loaders/actions, entity `read/create/update/delete` paths, shared arr types/capabilities, portable entity types/schema, `quality_api_mappings`, and sync metadata integration.
 
-## Critical Files Reference
+### Critical Files Reference
 
-- `src/routes/arr/new/+page.server.ts`: onboarding validation and create path; currently blocks `lidarr`.
-- `src/routes/arr/test/+server.ts`: test endpoint allowlist and client connectivity checks.
-- `src/routes/arr/components/InstanceForm.svelte`: app selector/copy and onboarding UX assumptions.
-- `src/lib/server/utils/arr/factory.ts`: central client factory that already includes Lidarr branch.
-- `src/lib/server/utils/arr/clients/lidarr.ts`: Lidarr API v1 client methods required by routes/sync.
-- `src/routes/api/v1/arr/library/+server.ts`: per-type library branch + caching contract.
-- `src/routes/api/v1/arr/releases/+server.ts`: per-type release search branch + error envelope.
-- `src/lib/server/jobs/handlers/arrSync.ts`: section orchestration and sync execution model.
-- `src/lib/server/sync/mappings.ts`: sync type mappings and section registration strategy.
-- `docs/api/v1/schemas/arr.yaml`: source of `ArrType` in contract layer.
-- `docs/api/v1/schemas/pcd.yaml`: source of PCD entity enums affected by Lidarr media-management support.
-- `src/lib/api/v1.d.ts`: generated types that must be regenerated after schema changes.
-- `src/lib/shared/pcd/types.ts`: shared Arr/PCD unions used by server and UI.
-- `src/lib/server/jobs/handlers/arrRename.ts`: current rename type constraints.
-- `src/routes/arr/[id]/upgrades/+page.server.ts`: current upgrades type constraints.
+- `/docs/plans/lidarr-support/shared.md`: baseline feature scope and affected files/tables.
+- `/src/routes/media-management/[databaseId]/naming/+page.server.ts`: naming list/load integration point.
+- `/src/routes/media-management/[databaseId]/naming/new/+page.server.ts`: naming create action arr-type validation point.
+- `/src/routes/media-management/[databaseId]/quality-definitions/+page.server.ts`: quality definitions list integration point.
+- `/src/routes/media-management/[databaseId]/quality-definitions/new/+page.server.ts`: quality definitions create action arr-type validation point.
+- `/src/routes/media-management/[databaseId]/media-settings/+page.server.ts`: media settings list integration point.
+- `/src/routes/media-management/[databaseId]/media-settings/new/+page.server.ts`: media settings create action arr-type validation point.
+- `/src/lib/server/pcd/entities/mediaManagement/naming/read.ts`: naming read/list logic.
+- `/src/lib/server/pcd/entities/mediaManagement/naming/create.ts`: naming create logic.
+- `/src/lib/server/pcd/entities/mediaManagement/media-settings/read.ts`: media settings read/list logic.
+- `/src/lib/server/pcd/entities/mediaManagement/media-settings/create.ts`: media settings create logic.
+- `/src/lib/server/pcd/entities/mediaManagement/quality-definitions/read.ts`: quality definitions read/list logic.
+- `/src/lib/server/pcd/entities/mediaManagement/quality-definitions/create.ts`: quality definitions create logic.
+- `/src/lib/server/sync/mediaManagement/syncer.ts`: existing Lidarr capability-gated reuse behavior.
+- `/src/lib/server/db/queries/arrSync.ts`: sync metadata updates impacted by config changes.
+- `/src/lib/shared/pcd/types.ts`: arr type unions and PCD typing.
+- `/src/lib/shared/arr/capabilities.ts`: arr capabilities metadata.
+- `/src/lib/shared/pcd/portable.ts`: portable entity type gates for import/export.
+- `/docs/api/v1/schemas/pcd.yaml`: portable entity schema documentation.
 
-## Patterns to Follow
+### Patterns to Follow
 
-- Arr-Type Branching: Resolve `ArrType` once and branch to app-specific logic with normalized response contracts.
-- Client Factory + Base Client: Keep transport/auth shared and implement app differences in subclasses selected by `createArrClient`.
-- Section-Based Sync Orchestration: Reuse existing section handlers and registry; do not create a Lidarr-only sync path.
-- Contract-First Type Alignment: Update OpenAPI schemas first, regenerate types, then align shared/runtime unions.
-- Capability-Gated UX: Render explicit unsupported states for unimplemented Lidarr operations.
+- Pattern: Arr-type validation in actions; allow `lidarr` while preserving existing fail-fast checks and dispatch style. Example: `/src/routes/media-management/[databaseId]/media-settings/new/+page.server.ts`.
+- Pattern: Per-entity CRUD modules under `mediaManagement/<entity>/{read,create,update,delete}.ts` with explicit arr branches. Example: `/src/lib/server/pcd/entities/mediaManagement/quality-definitions/create.ts`.
+- Pattern: Lidarr capability-gated reuse in sync path; UI and writes must stay consistent with what syncer can apply. Example: `/src/lib/server/sync/mediaManagement/syncer.ts`.
+- Pattern: Portable entity type gating in import/export contract; extend types in lockstep with route/entity support. Example: `/src/lib/shared/pcd/portable.ts`.
 
-## Cross-Cutting Concerns
+### Cross-Cutting Concerns
 
-- Security: Keep API keys write-only in forms/logs and preserve existing error envelope discipline.
-- Performance: Preserve current caching and avoid regressions in route latency for existing Arr types.
-- Testing: Pair schema/type changes with typecheck and targeted regressions to ensure Radarr/Sonarr behavior remains stable.
+- Security: Preserve `canWriteToBase`, strict arr-type validation, and explicit error responses in route actions.
+- Performance: Keep reads/writes on shared PCD cache/Kysely paths; avoid redundant queries.
+- Testing: Add Lidarr coverage for loaders/actions, entity helpers, portable import/export, and sync interactions.
 
-## Parallelization Opportunities
+### Parallelization Opportunities
 
-- Independent work areas:
-  - OpenAPI/shared/generated type alignment.
-  - UI metadata/capability message generalization.
-  - Lidarr client + library/releases branching (after type foundation).
-- Coordination hotspots:
-  - `docs/api/v1/schemas/*` and `src/lib/api/v1.d.ts` regeneration sequencing.
-  - Capability map consistency between backend routes and UI controls.
-  - Issue mapping requirement for `#1`-`#5` under umbrella `#6`.
+- Independent area: route action/list changes for `naming`, `quality-definitions`, and `media-settings` can proceed in parallel once helper contracts are clear.
+- Independent area: portable type/schema updates and clone/export adjustments can run in parallel with route work.
+- Coordination hotspot: `quality_api_mappings` and sync behavior must align with UI options to avoid silent sync skips.
 
-## Implementation Constraints
+### Implementation Constraints
 
-- Technical: `ArrType` must stay aligned across schemas, generated types, shared types, and runtime checks.
-- Business: Unsupported features (rename/upgrades) must be explicit; no silent backend-only failures.
-- Operational: Existing Radarr/Sonarr behavior cannot regress during Lidarr rollout.
+- Use exact arr type string `lidarr` everywhere.
+- Maintain current v1 strategy: Lidarr reuses existing Sonarr/Radarr media-management shapes until dedicated tables are introduced.
+- Ensure import/export entity-type validation supports Lidarr strategy without breaking existing Radarr/Sonarr flows.
+- Seed/confirm `quality_api_mappings` for `arr_type = 'lidarr'` so quality definitions are usable.
 
-## Planning Recommendations
+### Planning Recommendations
 
-- Phase 1 (Issue #1): onboarding + schema/type parity + base capability metadata.
-- Phase 2 (Issues #2 and #3): core route/client/sync support with endpoint and job validation.
-- Phase 3 (Issues #4 and #5): UI control generalization + rename/upgrades decision + regression/E2E hardening.
+- Organize work in phased order: foundation (types/schema/mappings) -> feature flows (routes/entities) -> integration verification (sync/import/export/tests).
+- Keep tasks narrow (1-3 files each) to maximize safe parallel execution.
+- Explicitly annotate each task dependency to avoid sequencing ambiguity across naming/media-settings/quality-definitions workstreams.

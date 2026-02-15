@@ -21,10 +21,10 @@ import type { Migration } from '../migrations.ts';
  */
 
 export const migration: Migration = {
-	version: 24,
-	name: 'Create arr_rename_settings table',
+  version: 24,
+  name: 'Create arr_rename_settings table',
 
-	up: `
+  up: `
 		CREATE TABLE arr_rename_settings (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
 
@@ -51,8 +51,8 @@ export const migration: Migration = {
 		CREATE INDEX idx_arr_rename_settings_arr_instance ON arr_rename_settings(arr_instance_id);
 	`,
 
-	down: `
+  down: `
 		DROP INDEX IF EXISTS idx_arr_rename_settings_arr_instance;
 		DROP TABLE IF EXISTS arr_rename_settings;
-	`
+	`,
 };

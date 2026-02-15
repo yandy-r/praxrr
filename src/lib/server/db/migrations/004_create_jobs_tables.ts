@@ -9,10 +9,10 @@ import type { Migration } from '../migrations.ts';
  */
 
 export const migration: Migration = {
-	version: 4,
-	name: 'Create jobs and job_runs tables',
+  version: 4,
+  name: 'Create jobs and job_runs tables',
 
-	up: `
+  up: `
 		-- Jobs table (job definitions)
 		CREATE TABLE jobs (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -63,12 +63,12 @@ export const migration: Migration = {
 		CREATE INDEX idx_job_runs_started_at ON job_runs(started_at);
 	`,
 
-	down: `
+  down: `
 		DROP INDEX IF EXISTS idx_job_runs_started_at;
 		DROP INDEX IF EXISTS idx_job_runs_job_id;
 		DROP INDEX IF EXISTS idx_jobs_next_run;
 		DROP INDEX IF EXISTS idx_jobs_enabled;
 		DROP TABLE IF EXISTS job_runs;
 		DROP TABLE IF EXISTS jobs;
-	`
+	`,
 };

@@ -11,90 +11,90 @@ import { analyzeLoginFailure, formatLoginFailure } from '$auth/loginAnalysis.ts'
 import { logger } from '$logger/logger.ts';
 
 export const load: ServerLoad = () => {
-	// OIDC mode - just show the OIDC button, no setup needed
-	if (config.authMode === 'oidc') {
-		return { authMode: 'oidc' };
-	}
+  // OIDC mode - just show the OIDC button, no setup needed
+  if (config.authMode === 'oidc') {
+    return { authMode: 'oidc' };
+  }
 
-	// If no local users exist, redirect to setup
-	// (OIDC users don't count - they can't login with password)
-	if (!usersQueries.existsLocal()) {
-		throw redirect(303, '/auth/setup');
-	}
+  // If no local users exist, redirect to setup
+  // (OIDC users don't count - they can't login with password)
+  if (!usersQueries.existsLocal()) {
+    throw redirect(303, '/auth/setup');
+  }
 
-	return { authMode: config.authMode };
+  return { authMode: config.authMode };
 };
 
 export const actions: Actions = {
-	default: async (event) => {
-		const { request, cookies } = event;
-		const formData = await request.formData();
-		const username = (formData.get('username') as string)?.trim();
-		const password = formData.get('password') as string;
+  default: async (event) => {
+    const { request, cookies } = event;
+    const formData = await request.formData();
+    const username = (formData.get('username') as string)?.trim();
+    const password = formData.get('password') as string;
 
-		// Validation
-		if (!username || !password) {
-			return fail(400, { error: 'Username and password are required', username });
-		}
+    // Validation
+    if (!username || !password) {
+      return fail(400, { error: 'Username and password are required', username });
+    }
 
-		// Find user
-		const user = usersQueries.getByUsername(username);
-		if (!user) {
-			const ip = getClientIp(event);
-			const allUsernames = usersQueries.getAllUsernames();
-			const analysis = analyzeLoginFailure(username, allUsernames, false);
+    // Find user
+    const user = usersQueries.getByUsername(username);
+    if (!user) {
+      const ip = getClientIp(event);
+      const allUsernames = usersQueries.getAllUsernames();
+      const analysis = analyzeLoginFailure(username, allUsernames, false);
 
-			await logger.warn(`Login failed for '${username}': ${formatLoginFailure(analysis)}`, {
-				source: 'Auth:Login',
-				meta: { username, ip, ...analysis }
-			});
-			return fail(400, { error: 'Invalid username or password', username });
-		}
+      await logger.warn(`Login failed for '${username}': ${formatLoginFailure(analysis)}`, {
+        source: 'Auth:Login',
+        meta: { username, ip, ...analysis },
+      });
+      return fail(400, { error: 'Invalid username or password', username });
+    }
 
-		// Verify password
-		const valid = await verifyPassword(password, user.password_hash);
-		if (!valid) {
-			const ip = getClientIp(event);
-			const analysis = analyzeLoginFailure(username, [], true);
+    // Verify password
+    const valid = await verifyPassword(password, user.password_hash);
+    if (!valid) {
+      const ip = getClientIp(event);
+      const analysis = analyzeLoginFailure(username, [], true);
 
-			await logger.warn(`Login failed for '${username}': ${formatLoginFailure(analysis)}`, {
-				source: 'Auth:Login',
-				meta: { username, ip, ...analysis }
-			});
-			return fail(400, { error: 'Invalid username or password', username });
-		}
+      await logger.warn(`Login failed for '${username}': ${formatLoginFailure(analysis)}`, {
+        source: 'Auth:Login',
+        meta: { username, ip, ...analysis },
+      });
+      return fail(400, { error: 'Invalid username or password', username });
+    }
 
-		// Capture session metadata
-		const ipAddress = getClientIp(event);
-		const userAgent = request.headers.get('user-agent') ?? '';
-		const parsed = parseUserAgent(userAgent);
+    // Capture session metadata
+    const ipAddress = getClientIp(event);
+    const userAgent = request.headers.get('user-agent') ?? '';
+    const parsed = parseUserAgent(userAgent);
 
-		// Create session with metadata
-		const durationHours = authSettingsQueries.getSessionDurationHours();
-		const sessionId = sessionsQueries.create(user.id, durationHours, {
-			ipAddress,
-			userAgent,
-			browser: parsed.browser,
-			os: parsed.os,
-			deviceType: parsed.deviceType
-		});
+    // Create session with metadata
+    const durationHours = authSettingsQueries.getSessionDurationHours();
+    const sessionId = sessionsQueries.create(user.id, durationHours, {
+      ipAddress,
+      userAgent,
+      browser: parsed.browser,
+      os: parsed.os,
+      deviceType: parsed.deviceType,
+    });
 
-		await logger.info(`Login successful for '${username}'`, {
-			source: 'Auth:Login',
-			meta: { username, ip: ipAddress, browser: parsed.browser, device: parsed.deviceType }
-		});
+    await logger.info(`Login successful for '${username}'`, {
+      source: 'Auth:Login',
+      meta: { username, ip: ipAddress, browser: parsed.browser, device: parsed.deviceType },
+    });
 
-		// Set session cookie
-		const expires = new Date(Date.now() + durationHours * 60 * 60 * 1000);
-		cookies.set('session', sessionId, {
-			path: '/',
-			httpOnly: true,
-			sameSite: 'lax',
-			secure: false,
-			expires
-		});
+    // Set session cookie
+    const expires = new Date(Date.now() + durationHours * 60 * 60 * 1000);
+    cookies.set('session', sessionId, {
+      path: '/',
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: false,
+      expires,
+    });
 
-		// Redirect to home
-		throw redirect(303, '/');
-	}
+    // Redirect to home
+    throw redirect(303, '/');
+  },
 };

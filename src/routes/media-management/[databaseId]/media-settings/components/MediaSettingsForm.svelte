@@ -57,7 +57,48 @@
 	let mainFormElement: HTMLFormElement;
 	let deleteFormElement: HTMLFormElement;
 
-	$: arrLabel = arrType === 'radarr' ? 'Radarr' : 'Sonarr';
+	const arrTypeLabelMap: Record<ArrType, string> = {
+		radarr: 'Radarr',
+		sonarr: 'Sonarr',
+		lidarr: 'Lidarr',
+		all: 'All Apps'
+	};
+
+	function getResultError(data: unknown): string {
+		if (!data || typeof data !== 'object') {
+			return 'Operation failed';
+		}
+
+		const details = data as { error?: unknown; message?: unknown; errors?: unknown };
+		if (typeof details.error === 'string' && details.error.trim()) {
+			return details.error;
+		}
+
+		if (typeof details.message === 'string' && details.message.trim()) {
+			return details.message;
+		}
+
+		if (Array.isArray(details.errors)) {
+			const messages = details.errors
+				.filter((entry): entry is string => typeof entry === 'string' && entry.trim().length > 0)
+				.map((entry) => entry.trim());
+			if (messages.length > 0) {
+				return messages.join(', ');
+			}
+		}
+
+		if (details.errors && typeof details.errors === 'object') {
+			const messages = Object.values(details.errors)
+				.filter((entry): entry is string => typeof entry === 'string' && entry.trim().length > 0)
+				.map((entry) => entry.trim());
+			if (messages.length > 0) {
+				return messages.join(', ');
+			}
+		}
+		return 'Operation failed';
+	}
+
+	$: arrLabel = arrTypeLabelMap[arrType];
 	$: title = mode === 'create' ? `New ${arrLabel} Media Settings` : `Edit ${arrLabel} Media Settings`;
 	$: description =
 		mode === 'create'
@@ -138,7 +179,7 @@
 		<div class="space-y-4">
 			<h2 class="text-base font-semibold text-neutral-900 dark:text-neutral-100">Propers and Repacks</h2>
 			<div class="grid gap-2">
-				{#each PROPERS_REPACKS_OPTIONS as option}
+				{#each PROPERS_REPACKS_OPTIONS as option (option.value)}
 					<div>
 						<Toggle
 							label={option.label}
@@ -181,8 +222,8 @@
 	use:enhance={() => {
 		saving = true;
 		return async ({ result, update: formUpdate }) => {
-			if (result.type === 'failure' && result.data) {
-				alertStore.add('error', (result.data as { error?: string }).error || 'Operation failed');
+			if (result.type === 'failure') {
+				alertStore.add('error', getResultError(result.data));
 			} else if (result.type === 'redirect') {
 				alertStore.add(
 					'success',
@@ -212,10 +253,10 @@
 		use:enhance={() => {
 			deleting = true;
 			return async ({ result, update: formUpdate }) => {
-				if (result.type === 'failure' && result.data) {
+				if (result.type === 'failure') {
 					alertStore.add(
 						'error',
-						(result.data as { error?: string }).error || 'Failed to delete'
+						getResultError(result.data)
 					);
 				} else if (result.type === 'redirect') {
 					alertStore.add('success', 'Media settings deleted');
@@ -232,7 +273,7 @@
 <Modal
 	open={showDeleteModal}
 	header={`Delete ${arrLabel} media settings`}
-	bodyMessage="This will remove the media settings config and write a delete op. You can recreate it later if needed."
+	bodyMessage={`This will remove this ${arrLabel.toLowerCase()} media settings configuration and write a delete op. You can recreate it later if needed.`}
 	confirmText="Delete"
 	cancelText="Cancel"
 	confirmDanger={true}
