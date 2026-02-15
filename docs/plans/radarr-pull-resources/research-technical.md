@@ -11,8 +11,9 @@ The architecture remains preview -> execute, but execute must support optional `
   - `POST /api/v1/arr/pull/preview`
   - `POST /api/v1/arr/pull/execute`
 - Execute behavior:
-  - with `selections`: honor explicit choices
-  - without `selections`: import-all from preview snapshot
+  - with `selections` present and non-empty: honor explicit choices
+  - with `selections` present but empty array: execute as an explicit "import none" (no changes applied)
+  - with `selections` omitted: import-all from preview snapshot (server-side default plan)
 - Reuse existing Arr client factory and PCD writer pipeline.
 
 ## Data Model Implications
