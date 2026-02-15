@@ -191,6 +191,12 @@ Checklist (required for Arr-touching changes):
 - For scoped rename propagation tests, verify exact `instance_id` targets in addition to update counts.
 - For transitional shared-table contracts (for example Sonarr-backed Lidarr entities), define table identifiers once in a shared constants module and reuse across read/create/update/delete paths to prevent silent contract drift between files.
 
+### Arr Cutover Guardrails (Required)
+
+- After promoting an Arr entity family to first-class tables, remove legacy sibling-app fallback paths immediately in route/read/write/sync resolution.
+- When introducing built-in PCD base-op migrations, also register them in `src/lib/server/pcd/ops/seedBuiltInBaseOps.ts` so newly initialized databases receive them without rerunning migrations.
+- For Arr-specific default templates, update both runtime form defaults and migration/backfill ops in the same change to avoid mixed legacy/native defaults.
+
 ## Environment Variables
 
 Key variables for development: `APP_BASE_PATH` (default `./dist/dev` in dev), `PORT` (default 6969 in dev, 6868 in prod), `AUTH` (`on`|`local`|`off`|`oidc`), `PARSER_HOST`/`PARSER_PORT` (parser service location).
