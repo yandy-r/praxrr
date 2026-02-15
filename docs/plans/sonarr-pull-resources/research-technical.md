@@ -55,7 +55,7 @@ Request (explicit mode):
   "selections": {
     "customFormats": [{ "name": "x265 (HD)", "action": "import" }],
     "qualityProfiles": [{ "name": "HD-1080p", "action": "import" }],
-    "delayProfiles": [{ "sonarrId": 1, "pcdName": "Imported - Prefer Usenet", "action": "import" }],
+    "delayProfiles": [{ "arrId": 1, "pcdName": "Imported - Prefer Usenet", "action": "import" }],
     "qualityDefinitions": [{ "pcdConfigName": "Imported QD", "action": "import" }]
   }
 }
