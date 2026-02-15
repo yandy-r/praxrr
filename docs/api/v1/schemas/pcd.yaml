@@ -352,34 +352,11 @@ PortableSonarrNaming:
 
 PortableLidarrNaming:
   description: |
-    First-class portable naming payload for `lidarr_naming`.
-    Runtime import validation rejects unsupported cross-family fields from
-    both Radarr and Sonarr naming models.
-  type: object
-  required:
-    - name
-    - renameTracks
-    - standardTrackFormat
-    - multiDiscTrackFormat
-    - artistFolderFormat
-    - replaceIllegalCharacters
-    - colonReplacementFormat
-  properties:
-    name:
-      type: string
-    renameTracks:
-      type: boolean
-    standardTrackFormat:
-      type: string
-    multiDiscTrackFormat:
-      type: string
-    artistFolderFormat:
-      type: string
-    replaceIllegalCharacters:
-      type: boolean
-    colonReplacementFormat:
-      type: string
-      enum: [delete, dash, spaceDash, spaceDashSpace, smart]
+    Portable naming payload for `lidarr_naming`.
+    During first-class Lidarr table cutover, runtime import/export validation
+    currently uses the Sonarr naming wire shape.
+  allOf:
+    - $ref: '#/PortableSonarrNaming'
 
 PortableMediaSettings:
   type: object

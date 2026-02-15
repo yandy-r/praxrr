@@ -182,6 +182,13 @@ Checklist (required for Arr-touching changes):
 - [ ] Read/write/sync dispatch resolves by explicit `arr_type` (no implicit sibling fallback).
 - [ ] Migration/import/export mappings are defined per Arr app and fail-fast on ambiguity.
 
+### Portable Contract Fidelity (Required)
+
+- OpenAPI portable schemas, runtime validators, and entity payload handlers must stay in lockstep.
+- Do not document portable fields that current runtime rejects for that `arr_type`.
+- Preserve exact config-name identifiers used for sync lookup keys; reject empty values, but do not trim persisted names.
+- For scoped rename propagation tests, verify exact `instance_id` targets in addition to update counts.
+
 ## Environment Variables
 
 Key variables for development: `APP_BASE_PATH` (default `./dist/dev` in dev), `PORT` (default 6969 in dev, 6868 in prod), `AUTH` (`on`|`local`|`off`|`oidc`), `PARSER_HOST`/`PARSER_PORT` (parser service location).

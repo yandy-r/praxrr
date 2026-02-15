@@ -101,6 +101,11 @@ type MediaManagementRenameScope = {
   databaseId?: number;
 };
 
+interface NormalizedMediaManagementSelection {
+  databaseId: number | null;
+  configName: string | null;
+}
+
 const MEDIA_MANAGEMENT_SECTION_CONFIG: Record<MediaManagementSection, MediaManagementSectionConfig> = {
   naming: {
     nameColumn: 'naming_config_name',
@@ -123,6 +128,79 @@ interface ArrSyncMediaManagementMatchRow {
   instance_id: number;
   instance_type: string;
   database_id: number | null;
+}
+
+function normalizeSelectionConfigName(configName: string | null | undefined): string | null {
+  if (configName === null || configName === undefined) {
+    return null;
+  }
+
+  if (configName.trim().length === 0) {
+    return null;
+  }
+
+  // Preserve the exact persisted config name for subsequent exact-match resolution.
+  return configName;
+}
+
+function normalizeMediaManagementSelection(
+  section: MediaManagementSection,
+  databaseId: number | null,
+  configName: string | null
+): NormalizedMediaManagementSelection {
+  const sectionConfig = MEDIA_MANAGEMENT_SECTION_CONFIG[section];
+  const normalizedConfigName = normalizeSelectionConfigName(configName);
+
+  if (databaseId === null && normalizedConfigName === null) {
+    return { databaseId: null, configName: null };
+  }
+
+  if (databaseId === null || normalizedConfigName === null) {
+    throw new Error(
+      `Invalid media management selection for ${sectionConfig.label}: database_id and config_name must be set together`
+    );
+  }
+
+  return {
+    databaseId,
+    configName: normalizedConfigName,
+  };
+}
+
+function normalizeMediaManagementSyncData(data: MediaManagementSyncData): MediaManagementSyncData {
+  const naming = normalizeMediaManagementSelection('naming', data.namingDatabaseId, data.namingConfigName);
+  const qualityDefinitions = normalizeMediaManagementSelection(
+    'qualityDefinitions',
+    data.qualityDefinitionsDatabaseId,
+    data.qualityDefinitionsConfigName
+  );
+  const mediaSettings = normalizeMediaManagementSelection(
+    'mediaSettings',
+    data.mediaSettingsDatabaseId,
+    data.mediaSettingsConfigName
+  );
+
+  return {
+    namingDatabaseId: naming.databaseId,
+    namingConfigName: naming.configName,
+    qualityDefinitionsDatabaseId: qualityDefinitions.databaseId,
+    qualityDefinitionsConfigName: qualityDefinitions.configName,
+    mediaSettingsDatabaseId: mediaSettings.databaseId,
+    mediaSettingsConfigName: mediaSettings.configName,
+    trigger: data.trigger,
+    cron: data.cron,
+    nextRunAt: data.nextRunAt ?? null,
+  };
+}
+
+function validateRenameNames(oldName: string, newName: string): void {
+  if (!oldName.trim()) {
+    throw new Error('oldName is required for media management config rename propagation');
+  }
+
+  if (!newName.trim()) {
+    throw new Error('newName is required for media management config rename propagation');
+  }
 }
 
 function findMediaManagementSyncRows(
@@ -166,6 +244,11 @@ function updateMediaManagementSectionConfigName(
   newName: string,
   scope: MediaManagementRenameScope = {}
 ): number {
+  validateRenameNames(oldName, newName);
+  if (oldName === newName) {
+    return 0;
+  }
+
   const sectionConfig = MEDIA_MANAGEMENT_SECTION_CONFIG[section];
   const matches = findMediaManagementSyncRows(section, oldName, scope);
 
@@ -302,6 +385,8 @@ export const arrSyncQueries = {
   },
 
   saveMediaManagementSync(instanceId: number, data: MediaManagementSyncData): void {
+    const normalized = normalizeMediaManagementSyncData(data);
+
     db.execute(
       `INSERT INTO arr_sync_media_management
 			 (instance_id, naming_database_id, naming_config_name, quality_definitions_database_id, quality_definitions_config_name, media_settings_database_id, media_settings_config_name, trigger, cron, next_run_at)
@@ -317,24 +402,24 @@ export const arrSyncQueries = {
 			 cron = ?,
 			 next_run_at = ?`,
       instanceId,
-      data.namingDatabaseId,
-      data.namingConfigName,
-      data.qualityDefinitionsDatabaseId,
-      data.qualityDefinitionsConfigName,
-      data.mediaSettingsDatabaseId,
-      data.mediaSettingsConfigName,
-      data.trigger,
-      data.cron,
-      data.nextRunAt ?? null,
-      data.namingDatabaseId,
-      data.namingConfigName,
-      data.qualityDefinitionsDatabaseId,
-      data.qualityDefinitionsConfigName,
-      data.mediaSettingsDatabaseId,
-      data.mediaSettingsConfigName,
-      data.trigger,
-      data.cron,
-      data.nextRunAt ?? null
+      normalized.namingDatabaseId,
+      normalized.namingConfigName,
+      normalized.qualityDefinitionsDatabaseId,
+      normalized.qualityDefinitionsConfigName,
+      normalized.mediaSettingsDatabaseId,
+      normalized.mediaSettingsConfigName,
+      normalized.trigger,
+      normalized.cron,
+      normalized.nextRunAt ?? null,
+      normalized.namingDatabaseId,
+      normalized.namingConfigName,
+      normalized.qualityDefinitionsDatabaseId,
+      normalized.qualityDefinitionsConfigName,
+      normalized.mediaSettingsDatabaseId,
+      normalized.mediaSettingsConfigName,
+      normalized.trigger,
+      normalized.cron,
+      normalized.nextRunAt ?? null
     );
   },
 

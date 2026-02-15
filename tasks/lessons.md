@@ -7,3 +7,4 @@
 - When introducing first-class Arr schema tables, validate app-specific field parity before mirroring sibling schemas, and keep `docs/pcdReference/0.schema.sql` and migration SQL column contracts identical.
 - For all enhancements, features, and bug fixes touching Arr apps, validate per-app semantics (`arr_type`) explicitly and never treat Sonarr/Radarr/Lidarr data models as interchangeable by API shape alone.
 - When seeding built-in `pcd_ops` via migrations, also provide runtime seeding for newly linked `database_instances`; migration-time inserts alone do not cover future links.
+- Keep OpenAPI portable schema definitions aligned with runtime import validation and persistence behavior; do not publish Lidarr field names that runtime rejects, and never trim persisted identifier fields that must be exact-match lookup keys.

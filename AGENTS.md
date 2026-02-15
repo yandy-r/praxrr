@@ -37,6 +37,13 @@ Checklist (required for Arr-touching changes):
 - [ ] Domain model terminology is Arr-specific and correct.
 - [ ] Migration/import/export mappings are explicitly defined per Arr app.
 
+### Portable Contract Fidelity (Required)
+
+- Keep OpenAPI portable schemas aligned with runtime import/export validators and entity create/update payloads.
+- Do not publish Arr-specific portable field names unless runtime currently accepts them.
+- For persisted config names used in sync lookups, preserve exact values (no normalization that changes identifier bytes, such as trim).
+- When testing scoped rename propagation, assert targeted `instance_id` coverage, not only affected row counts.
+
 ## Testing Guidelines
 
 Place tests by domain (`src/tests/upgrades`, `src/tests/jobs`, etc.). Use `*.test.ts` for Deno tests and `*.spec.ts` for Playwright specs; keep the numeric prefix pattern for E2E files (for example `2.31-...spec.ts`). For regressions, add a test that fails before the fix and passes after it. You can run scoped suites with aliases from `scripts/test.ts`, such as `deno task test upgrades`.
