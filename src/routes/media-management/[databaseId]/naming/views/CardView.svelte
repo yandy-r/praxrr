@@ -40,12 +40,11 @@
 	}
 
 	function getConfigHref(config: NamingListItem): string {
-		const trimmedName = config.name?.trim();
-		if (!trimmedName || !isSupportedArrType(config.arr_type)) {
+		if (config.name == null || config.name === '' || !isSupportedArrType(config.arr_type)) {
 			return `/media-management/${databaseId}/naming`;
 		}
 
-		return `/media-management/${databaseId}/naming/${config.arr_type}/${encodeURIComponent(trimmedName)}`;
+		return `/media-management/${databaseId}/naming/${config.arr_type}/${encodeURIComponent(config.name)}`;
 	}
 
 	function getLogo(config: NamingListItem): string {

@@ -46,8 +46,17 @@ const QUALITY_DEFINITIONS_STORAGE: Record<ConcreteArrType, QualityDefinitionsSto
 const QUALITY_LOOKUP_MISSING_WARNING_REASON =
   'Quality entries are filtered out when quality_api_mappings reference unknown API quality names';
 
-const WARNED_UNMAPPED_QUALITY_ROWS = new Set<string>();
+const WARNED_UNMAPPED_QUALITY_ROWS_BY_CACHE = new WeakMap<PCDCache, Set<string>>();
 const WARNED_UNMAPPED_QUALITY_ROWS_MAX = 2048;
+
+function getOrCreateWarnedSet(cache: PCDCache): Set<string> {
+  let set = WARNED_UNMAPPED_QUALITY_ROWS_BY_CACHE.get(cache);
+  if (!set) {
+    set = new Set<string>();
+    WARNED_UNMAPPED_QUALITY_ROWS_BY_CACHE.set(cache, set);
+  }
+  return set;
+}
 const MAX_LOGGED_SKIPPED_QUALITY_NAMES = 10;
 
 /**
@@ -195,6 +204,7 @@ function getUnmappedQualityWarningKey(
   return `${arrType}:${configName}:${namesHash}`;
 }
 async function warnUnmappedQualityDefinitionRows(
+  cache: PCDCache,
   message: string,
   arrType: ConcreteArrType,
   configName: string,
@@ -204,16 +214,17 @@ async function warnUnmappedQualityDefinitionRows(
     return;
   }
 
+  const warnedSet = getOrCreateWarnedSet(cache);
   const sortedSkippedQualityNames = [...skippedQualityNames].sort();
   const warningKey = getUnmappedQualityWarningKey(arrType, configName, sortedSkippedQualityNames);
-  if (WARNED_UNMAPPED_QUALITY_ROWS.has(warningKey)) {
+  if (warnedSet.has(warningKey)) {
     return;
   }
 
-  if (WARNED_UNMAPPED_QUALITY_ROWS.size >= WARNED_UNMAPPED_QUALITY_ROWS_MAX) {
-    WARNED_UNMAPPED_QUALITY_ROWS.clear();
+  if (warnedSet.size >= WARNED_UNMAPPED_QUALITY_ROWS_MAX) {
+    warnedSet.clear();
   }
-  WARNED_UNMAPPED_QUALITY_ROWS.add(warningKey);
+  warnedSet.add(warningKey);
 
   const visibleSkippedQualityNames = sortedSkippedQualityNames.slice(0, MAX_LOGGED_SKIPPED_QUALITY_NAMES);
 
@@ -230,6 +241,7 @@ async function warnUnmappedQualityDefinitionRows(
 }
 
 async function pushListRows(
+  cache: PCDCache,
   rows: QualityDefinitionConfigRow[],
   arrType: ConcreteArrType,
   apiLookup: Map<string, string>,
@@ -260,6 +272,7 @@ async function pushListRows(
 
   for (const [name, data] of configs) {
     await warnUnmappedQualityDefinitionRows(
+      cache,
       'Skipping unmapped quality definition rows in quality definitions list',
       arrType,
       name,
@@ -296,9 +309,9 @@ export async function list(cache: PCDCache): Promise<QualityDefinitionListItem[]
     ['sonarr', 3],
   ]);
 
-  await pushListRows(radarrRows, 'radarr', radarrMappings.qualityToApiName, result);
-  await pushListRows(sonarrRows, 'lidarr', lidarrMappings.qualityToApiName, result);
-  await pushListRows(sonarrRows, 'sonarr', sonarrMappings.qualityToApiName, result);
+  await pushListRows(cache, radarrRows, 'radarr', radarrMappings.qualityToApiName, result);
+  await pushListRows(cache, sonarrRows, 'lidarr', lidarrMappings.qualityToApiName, result);
+  await pushListRows(cache, sonarrRows, 'sonarr', sonarrMappings.qualityToApiName, result);
 
   // Sort by updated_at desc
   result.sort((a, b) => {
@@ -388,6 +401,7 @@ export async function getLidarrByName(cache: PCDCache, name: string): Promise<Qu
   }
 
   await warnUnmappedQualityDefinitionRows(
+    cache,
     'Skipping unmapped quality definition rows in Lidarr quality definitions read',
     'lidarr',
     name,
