@@ -268,6 +268,14 @@ export interface SonarrMediaSettingsTable {
   updated_at: Generated<string>;
 }
 
+export interface LidarrMediaSettingsTable {
+  name: string;
+  propers_repacks: Generated<string>;
+  enable_media_info: Generated<number>;
+  created_at: Generated<string>;
+  updated_at: Generated<string>;
+}
+
 export interface RadarrQualityDefinitionsTable {
   name: string;
   quality_name: string;
@@ -346,6 +354,7 @@ export interface PCDDatabase {
   quality_profile_qualities: QualityProfileQualitiesTable;
   quality_profile_tags: QualityProfileTagsTable;
   quality_profiles: QualityProfilesTable;
+  lidarr_media_settings: LidarrMediaSettingsTable;
   radarr_media_settings: RadarrMediaSettingsTable;
   radarr_naming: RadarrNamingTable;
   radarr_quality_definitions: RadarrQualityDefinitionsTable;
