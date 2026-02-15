@@ -190,9 +190,12 @@ export interface CreateLidarrNamingOptions {
   input: CreateLidarrNamingInput;
 }
 
+const LIDARR_DEFAULT_ARTIST_NAME = '{Artist Name}';
+
 function normalizeLidarrNamingInput(input: CreateLidarrNamingInput) {
   const standardTrackFormat = input.standardTrackFormat ?? input.standardEpisodeFormat ?? '';
-  const artistName = input.artistName ?? input.dailyEpisodeFormat ?? '';
+  const artistName =
+    (input.artistName ?? input.dailyEpisodeFormat ?? LIDARR_DEFAULT_ARTIST_NAME).trim() || LIDARR_DEFAULT_ARTIST_NAME;
   const multiDiscTrackFormat = input.multiDiscTrackFormat ?? input.animeEpisodeFormat ?? '';
   const artistFolderFormat = input.artistFolderFormat ?? input.seriesFolderFormat ?? '';
 
@@ -222,9 +225,6 @@ export async function createLidarrNaming(options: CreateLidarrNamingOptions) {
   const normalized = normalizeLidarrNamingInput(input);
   if (!normalized.standardTrackFormat.trim()) {
     throw new Error('Standard track format is required');
-  }
-  if (!normalized.artistName.trim()) {
-    throw new Error('Artist name format is required');
   }
   if (!normalized.multiDiscTrackFormat.trim()) {
     throw new Error('Multi-disc track format is required');

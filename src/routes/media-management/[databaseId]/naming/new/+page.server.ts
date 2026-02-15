@@ -178,7 +178,6 @@ export const actions: Actions = {
 
       const requiredFields = [
         { name: 'Standard track format', value: standardTrackFormat },
-        { name: 'Artist name format', value: artistName },
         { name: 'Multi-disc track format', value: multiDiscTrackFormat },
         { name: 'Artist folder format', value: artistFolderFormat },
       ];
@@ -189,6 +188,7 @@ export const actions: Actions = {
         }
       }
 
+      const artistNameValue = (artistName as string)?.trim();
       let result;
       try {
         result = await createLidarrNaming({
@@ -199,7 +199,7 @@ export const actions: Actions = {
             name: name.trim(),
             rename,
             standardTrackFormat: standardTrackFormat.trim(),
-            artistName: artistName.trim(),
+            artistName: artistNameValue || undefined,
             multiDiscTrackFormat: multiDiscTrackFormat.trim(),
             artistFolderFormat: artistFolderFormat.trim(),
             replaceIllegalCharacters,

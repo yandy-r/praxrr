@@ -557,6 +557,56 @@ INSERT INTO lidarr_naming (
   }
 });
 
+Deno.test('lidarr naming create accepts request without artistName and defaults artist_name', async () => {
+  const harness = await createWriteHarness(ROUTE_DATABASE_ID, baseMediaManagementSchema());
+
+  try {
+    await withMutedLogger(async () => {
+      const formData = new FormData();
+      formData.set('arrType', 'lidarr');
+      formData.set('name', 'Lidarr-No-ArtistName-Field');
+      formData.set('layer', 'user');
+      formData.set('rename', 'true');
+      formData.set('standardTrackFormat', '{Artist Name} - {Album Title}');
+      formData.set('multiDiscTrackFormat', '{Artist Name} - CD{medium:00}');
+      formData.set('artistFolderFormat', '{Artist Name}');
+      formData.set('replaceIllegalCharacters', 'true');
+      formData.set('colonReplacementFormat', 'delete');
+      // omit artistName to assert server-side default
+
+      const request = new Request(`http://localhost/media-management/${ROUTE_DATABASE_ID}/naming/new`, {
+        method: 'POST',
+        body: formData,
+      });
+
+      try {
+        await namingNewActions.default({
+          request,
+          params: { databaseId: String(ROUTE_DATABASE_ID) },
+        } as unknown as Parameters<typeof namingNewActions.default>[0]);
+        throw new Error('Expected redirect response');
+      } catch (error) {
+        if (!isRedirect(error)) {
+          throw error;
+        }
+        assertEquals(error.status, 303);
+      }
+    });
+
+    const cache = getCache(ROUTE_DATABASE_ID);
+    assertExists(cache);
+    const row = await cache.kb
+      .selectFrom('lidarr_naming' as keyof PCDDatabase)
+      .select(['name', 'artist_name'])
+      .where('name', '=', 'Lidarr-No-ArtistName-Field')
+      .executeTakeFirst();
+    assertExists(row);
+    assertEquals(row.artist_name, '{Artist Name}');
+  } finally {
+    await harness.cleanup();
+  }
+});
+
 Deno.test('portable import/export for lidarr_quality_definitions resolves dedicated lidarr entity', async () => {
   const harness = await createWriteHarness(
     IMPORT_EXPORT_DATABASE_ID,

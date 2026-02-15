@@ -92,22 +92,17 @@ export async function removeLidarrQualityDefinitions(options: RemoveQualityDefin
   const { databaseId, cache, layer, current } = options;
   const db = cache.kb;
 
-  const queries = current.entries.map((entry) =>
-    db
-      .deleteFrom('lidarr_quality_definitions' as keyof PCDDatabase)
-      .where('name', '=', current.name)
-      .where('quality_name', '=', entry.quality_name)
-      .where('min_size', '=', entry.min_size)
-      .where('max_size', '=', entry.max_size)
-      .where('preferred_size', '=', entry.preferred_size)
-      .compile()
-  );
+  // Delete all rows for this config name so unmapped/orphaned rows are removed too.
+  const query = db
+    .deleteFrom('lidarr_quality_definitions' as keyof PCDDatabase)
+    .where('name', '=', current.name)
+    .compile();
 
   return writeOperation({
     databaseId,
     layer,
     description: `remove-lidarr-quality-definitions-${current.name}`,
-    queries,
+    queries: [query],
     desiredState: {
       deleted: true,
       name: current.name,

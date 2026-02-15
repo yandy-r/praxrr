@@ -24,6 +24,10 @@ interface CacheFixture {
   destroy: () => Promise<void>;
 }
 
+interface CacheFixtureWithDb extends CacheFixture {
+  db: Database;
+}
+
 interface WriteHarness {
   cache: RuntimePCDCache;
   operations: PcdOp[];
@@ -47,6 +51,26 @@ function createCacheFixture(schemaAndDataSql: string): CacheFixture {
 
   return {
     cache: { kb } as unknown as PCDCache,
+    destroy: async () => {
+      await kb.destroy();
+      db.close();
+    },
+  };
+}
+
+function createCacheFixtureWithDb(schemaAndDataSql: string): CacheFixtureWithDb {
+  const db = new Database(':memory:', { int64: true });
+  const kb = new Kysely<PCDDatabase>({
+    dialect: new DenoSqlite3Dialect({
+      database: db,
+    }),
+  });
+
+  db.exec(schemaAndDataSql);
+
+  return {
+    cache: { kb } as unknown as PCDCache,
+    db,
     destroy: async () => {
       await kb.destroy();
       db.close();
@@ -594,3 +618,54 @@ VALUES ('Config-A', 'FLAC', 64, 1024, 320);
     await fixture.destroy();
   }
 });
+
+Deno.test(
+  'Lidarr quality definitions delete by name removes all rows including unmapped so name can be reused',
+  async () => {
+    const fixture = createCacheFixtureWithDb(
+      baseQualityDefinitionsSchema(`
+INSERT INTO quality_api_mappings (quality_name, arr_type, api_name)
+VALUES ('FLAC', 'lidarr', 'FLAC');
+
+INSERT INTO lidarr_quality_definitions (name, quality_name, min_size, max_size, preferred_size)
+VALUES
+  ('Delete-Me', 'FLAC', 64, 1024, 320),
+  ('Delete-Me', 'Orphan-Q', 0, 0, 0);
+`)
+    );
+
+    try {
+      const current = await getLidarrByName(fixture.cache, 'Delete-Me');
+      assertExists(current);
+      assertEquals(current.entries.length, 1, 'getLidarrByName filters to mapped only');
+      assertEquals(current.entries[0].quality_name, 'FLAC');
+
+      fixture.db.exec("DELETE FROM lidarr_quality_definitions WHERE name = 'Delete-Me'");
+
+      const rowsAfterDelete = await fixture.cache.kb
+        .selectFrom('lidarr_quality_definitions' as keyof PCDDatabase)
+        .where('name', '=', 'Delete-Me')
+        .selectAll()
+        .execute();
+      assertEquals(rowsAfterDelete.length, 0, 'all rows for config name must be removed');
+
+      await fixture.cache.kb
+        .insertInto('lidarr_quality_definitions' as keyof PCDDatabase)
+        .values({
+          name: 'Delete-Me',
+          quality_name: 'FLAC',
+          min_size: 64,
+          max_size: 1024,
+          preferred_size: 320,
+        })
+        .execute();
+
+      const created = await getLidarrByName(fixture.cache, 'Delete-Me');
+      assertExists(created);
+      assertEquals(created.entries.length, 1);
+      assertEquals(created.entries[0].quality_name, 'FLAC');
+    } finally {
+      await fixture.destroy();
+    }
+  }
+);

@@ -85,7 +85,6 @@
 	$: isValid =
 		formData.name.trim() !== '' &&
 		formData.standardTrackFormat.trim() !== '' &&
-		formData.artistName.trim() !== '' &&
 		formData.multiDiscTrackFormat.trim() !== '' &&
 		formData.artistFolderFormat.trim() !== '';
 	$: showCustomColonInput = formData.colonReplacementFormat === 'custom';
@@ -188,14 +187,6 @@
 						'e.g., {Artist Name} - {Album Type} - {Album Title} - {(Album Disambiguation)}/...'
 					}
 					on:input={(e) => update('standardTrackFormat', e.detail)}
-				/>
-				<FormInput
-					label="Artist Name Format"
-					name="artistName"
-					required
-					value={formData.artistName}
-					placeholder={'e.g., {Artist Name}'}
-					on:input={(e) => update('artistName', e.detail)}
 				/>
 				<FormInput
 					label="Multi-Disc Track Format"
