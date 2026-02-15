@@ -10,7 +10,8 @@
       "Bash(APP_BASE_PATH=./dist/test deno test:*)",
       "Bash(python3:*)",
       "Bash(npx prettier:*)",
-      "Bash(gh issue view:*)"
+      "Bash(gh issue view:*)",
+      "Bash(grep:*)"
     ]
   }
 }
