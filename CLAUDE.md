@@ -166,6 +166,22 @@ SQLite file (`profilarr.db`) managed by `DatabaseManager` in `$db/db.ts`. Schema
 - **Formatting.** Tabs, single quotes, no trailing commas, 100 char print width (Prettier + prettier-plugin-svelte + prettier-plugin-tailwindcss).
 - **Entity names.** Case-insensitive uniqueness enforced on create/rename for all PCD entities.
 
+### Cross-Arr Semantic Validation Policy
+
+This rule applies to all future enhancements, features, and bug fixes.
+
+- Do not assume Sonarr, Radarr, Lidarr, or other Arr apps share identical domain semantics, even when API shapes look similar.
+- Validate behavior per target `arr_type` before reusing handlers, payload parsing, sync logic, or field mappings.
+- Keep domain terms, validation rules, and contracts Arr-specific; do not introduce cross-Arr naming shortcuts without parity proof.
+- Fail fast on missing, ambiguous, or inferred cross-Arr mappings during implementation, import/export, and migration paths.
+
+Checklist (required for Arr-touching changes):
+
+- [ ] API semantics verified per Arr app involved.
+- [ ] Schema/field mappings validated per Arr app involved.
+- [ ] Read/write/sync dispatch resolves by explicit `arr_type` (no implicit sibling fallback).
+- [ ] Migration/import/export mappings are defined per Arr app and fail-fast on ambiguity.
+
 ## Environment Variables
 
 Key variables for development: `APP_BASE_PATH` (default `./dist/dev` in dev), `PORT` (default 6969 in dev, 6868 in prod), `AUTH` (`on`|`local`|`off`|`oidc`), `PARSER_HOST`/`PARSER_PORT` (parser service location).

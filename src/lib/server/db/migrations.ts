@@ -51,6 +51,7 @@ import { migration as migration046 } from './migrations/046_quality_profile_sync
 import { migration as migration047 } from './migrations/047_create_arr_database_namespaces.ts';
 import { migration as migration048 } from './migrations/048_fix_sync_database_foreign_keys.ts';
 import { migration as migration049 } from './migrations/049_create_job_queue.ts';
+import { migration as migration20260215 } from './migrations/20260215_add_lidarr_media_management_entities.ts';
 
 export interface Migration {
   version: number;
@@ -317,6 +318,7 @@ export function loadMigrations(): Migration[] {
     migration047,
     migration048,
     migration049,
+    migration20260215,
   ];
 
   // Sort by version number

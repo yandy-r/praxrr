@@ -19,6 +19,24 @@
 
 Use TypeScript with strict typing and Svelte 5 conventions used by this repo (no runes). Formatting is enforced by Prettier: tabs, single quotes, no trailing commas, 100-char print width. Prefer `PascalCase.svelte` for components and `camelCase.ts` for utility modules. Reuse import aliases from `deno.json` (for example `$server/`, `$shared/`, `$alerts/`) instead of long relative paths.
 
+## Cross-Arr Semantic Validation Policy
+
+This rule applies to all future enhancements, features, and bug fixes.
+
+- Do not assume Sonarr, Radarr, and Lidarr semantics are interchangeable, even when APIs look similar.
+- Validate API behavior per Arr app (`arr_type`) before reusing handlers, payload parsing, or sync logic.
+- Validate schema fields per Arr app; do not share field mappings without explicit parity proof.
+- Use Arr-specific domain model terms in code, contracts, and docs; avoid cross-app naming shortcuts.
+- Validate migration/import/export mappings per Arr app and fail fast on missing or ambiguous mappings.
+
+Checklist (required for Arr-touching changes):
+
+- [ ] API semantics verified per Arr app involved.
+- [ ] Schema fields validated per Arr app involved.
+- [ ] Read/write/sync dispatch resolves by explicit `arr_type` (no implicit sibling fallback).
+- [ ] Domain model terminology is Arr-specific and correct.
+- [ ] Migration/import/export mappings are explicitly defined per Arr app.
+
 ## Testing Guidelines
 
 Place tests by domain (`src/tests/upgrades`, `src/tests/jobs`, etc.). Use `*.test.ts` for Deno tests and `*.spec.ts` for Playwright specs; keep the numeric prefix pattern for E2E files (for example `2.31-...spec.ts`). For regressions, add a test that fails before the fix and passes after it. You can run scoped suites with aliases from `scripts/test.ts`, such as `deno task test upgrades`.

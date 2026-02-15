@@ -22,6 +22,7 @@ import { logger } from '$logger/logger.ts';
 import { triggerSyncs } from '$sync/processor.ts';
 import type { LinkOptions, SyncResult } from './types.ts';
 import { importBaseOps } from '../ops/importBaseOps.ts';
+import { seedBuiltInBaseOps } from '../ops/seedBuiltInBaseOps.ts';
 import { cleanupJobsForDatabase } from '$lib/server/jobs/cleanup.ts';
 
 /**
@@ -81,6 +82,14 @@ class PCDManager {
         await importBaseOps(id, localPath);
       } catch (error) {
         await logger.error('Failed to import base ops after linking', {
+          source: 'PCDManager',
+          meta: { error: String(error), databaseId: id },
+        });
+      }
+      try {
+        await seedBuiltInBaseOps(id);
+      } catch (error) {
+        await logger.error('Failed to seed built-in base ops after linking', {
           source: 'PCDManager',
           meta: { error: String(error), databaseId: id },
         });
@@ -185,6 +194,14 @@ class PCDManager {
           meta: { error: String(error), databaseId: id },
         });
       }
+      try {
+        await seedBuiltInBaseOps(id);
+      } catch (error) {
+        await logger.error('Failed to seed built-in base ops after sync', {
+          source: 'PCDManager',
+          meta: { error: String(error), databaseId: id },
+        });
+      }
 
       // Update last_synced_at
       databaseInstancesQueries.updateSyncedAt(id);
@@ -260,6 +277,14 @@ class PCDManager {
         meta: { error: String(error), databaseId: id },
       });
     }
+    try {
+      await seedBuiltInBaseOps(id);
+    } catch (error) {
+      await logger.error('Failed to seed built-in base ops after branch switch', {
+        source: 'PCDManager',
+        meta: { error: String(error), databaseId: id },
+      });
+    }
     databaseInstancesQueries.updateSyncedAt(id);
   }
 
@@ -307,6 +332,19 @@ class PCDManager {
 
     const instances = databaseInstancesQueries.getAll();
     const enabledInstances = instances.filter((instance) => instance.enabled);
+
+    // Seed built-in local base ops for all databases so newly linked instances
+    // receive migration-backed scaffolding even when migrations are not rerun.
+    for (const instance of instances) {
+      try {
+        await seedBuiltInBaseOps(instance.id);
+      } catch (error) {
+        await logger.error(`Failed to seed built-in base ops for "${instance.name}"`, {
+          source: 'PCDManager',
+          meta: { error: String(error), databaseId: instance.id },
+        });
+      }
+    }
 
     // Validate dependencies for all instances first
     for (const instance of enabledInstances) {

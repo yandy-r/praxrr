@@ -20,6 +20,24 @@ This initiative replaces Sonarr-backed Lidarr media-management reuse with first-
 - /docs/ARCHITECTURE.md: Architecture constraints and media-management layering.
 - /docs/plans/enhance-lidarr-support/feature-spec.md: Accepted scope, risks, decisions, and criteria.
 
+## Arr-Semantic Guardrails (Mandatory)
+
+These guardrails are repository-wide policy and apply to all future enhancements, features, and bug fixes, not only this Lidarr initiative.
+
+- Do not blindly mirror Sonarr fields into Lidarr. Any schema/API/model reuse must be justified against Lidarr API semantics first.
+- Enforce Arr-specific semantics for schema columns, API payload contracts, code paths, and data model decisions (`sonarr`, `radarr`, `lidarr`, and future Arr apps).
+- Treat sibling Arr implementations as references, not source-of-truth contracts.
+- Reject fallback-first behavior: if Arr semantics diverge, implement explicit Arr-specific handling and fail fast on invalid cross-Arr assumptions.
+- Keep schema and migration contracts identical for each Arr family (`docs/pcdReference/0.schema.sql` vs runtime migration SQL) after semantic validation.
+
+### Semantic Validation Checkpoints (Required for Every Task in This Plan)
+
+- Schema checkpoint: confirm each added/changed field is supported by the target Arr app semantics, not inferred from another Arr app.
+- API checkpoint: confirm request/response contracts align with target Arr endpoints and validation rules before route/import/export wiring.
+- Code-path checkpoint: confirm read/write/sync dispatch resolves by target `arr_type` without implicit sibling fallback.
+- Data-model checkpoint: confirm entity/table shape and constraints represent target Arr behavior; document deliberate parity vs divergence decisions.
+- Verification checkpoint: add or update focused tests that fail on cross-Arr semantic leakage and pass with Arr-specific behavior.
+
 ## Implementation Plan
 
 ### Phase 1: Data Foundation and Contracts
@@ -43,7 +61,7 @@ Files to Modify
 - /docs/pcdReference/0.schema.sql
 - /src/lib/server/db/schema.sql
 
-Implement dedicated `lidarr_naming`, `lidarr_media_settings`, and `lidarr_quality_definitions` table definitions with indexes/constraints mirroring current family conventions. Include deterministic migration logic for legacy Sonarr-backed Lidarr rows and explicit conflict handling semantics. Add `quality_api_mappings` seed/upgrade coverage for `arr_type = 'lidarr'`. Ensure reruns are idempotent and produce stable outcomes.
+Implement dedicated `lidarr_naming`, `lidarr_media_settings`, and `lidarr_quality_definitions` table definitions with indexes/constraints aligned to validated Lidarr semantics; reuse family conventions only where explicit parity is proven. Include deterministic migration logic for legacy Sonarr-backed Lidarr rows and explicit conflict handling semantics. Add `quality_api_mappings` seed/upgrade coverage for `arr_type = 'lidarr'`. Ensure reruns are idempotent and produce stable outcomes.
 
 #### Task 1.2: Expand portable and OpenAPI contracts for first-class Lidarr entities Depends on [none]
 
@@ -250,6 +268,7 @@ Update documentation to remove v1 reuse messaging and describe first-class Lidar
 ## Advice
 
 - Keep schema and portable contracts in lockstep; partial updates create confusing import/export failures.
+- Semantic validation checkpoints above are mandatory exit criteria for each task; do not mark a task complete without passing them.
 - Prioritize deterministic migration reporting early, because route/sync behavior depends on stable config-name mappings.
 - Split entity cutover by family (`naming`, `media-settings`, `quality-definitions`) to maximize safe parallel work.
 - Do not remove reuse branches until route+sync+migration regression tests are green together.

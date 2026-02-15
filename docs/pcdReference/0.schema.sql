@@ -46,7 +46,7 @@ CREATE TABLE qualities (
 -- Uses stable key: quality_name
 CREATE TABLE quality_api_mappings (
     quality_name VARCHAR(100) NOT NULL,
-    arr_type VARCHAR(20) NOT NULL,  -- 'radarr', 'sonarr'
+    arr_type VARCHAR(20) NOT NULL,  -- 'radarr', 'sonarr', 'lidarr'
     api_name VARCHAR(100) NOT NULL,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (quality_name, arr_type),
@@ -58,7 +58,7 @@ CREATE TABLE custom_formats (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name VARCHAR(100) UNIQUE NOT NULL,
     description TEXT,
-    include_in_rename INTEGER NOT NULL DEFAULT 0,  
+    include_in_rename INTEGER NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
@@ -372,6 +372,20 @@ CREATE TABLE sonarr_quality_definitions (
     FOREIGN KEY (quality_name) REFERENCES qualities(name) ON DELETE CASCADE ON UPDATE CASCADE
 );
 
+-- Lidarr quality size definitions
+-- Uses stable key: (name, quality_name)
+CREATE TABLE lidarr_quality_definitions (
+    name VARCHAR(100) NOT NULL,
+    quality_name VARCHAR(100) NOT NULL,
+    min_size INTEGER NOT NULL DEFAULT 0,
+    max_size INTEGER NOT NULL,
+    preferred_size INTEGER NOT NULL,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (name, quality_name),
+    FOREIGN KEY (quality_name) REFERENCES qualities(name) ON DELETE CASCADE ON UPDATE CASCADE
+);
+
 -- Radarr naming configuration
 CREATE TABLE radarr_naming (
     name VARCHAR(100) NOT NULL PRIMARY KEY,
@@ -402,6 +416,21 @@ CREATE TABLE sonarr_naming (
     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Lidarr naming configuration
+CREATE TABLE lidarr_naming (
+    name VARCHAR(100) NOT NULL PRIMARY KEY,
+    rename INTEGER NOT NULL DEFAULT 1,
+    standard_track_format TEXT NOT NULL,
+    artist_name TEXT NOT NULL,
+    multi_disc_track_format TEXT NOT NULL,
+    artist_folder_format TEXT NOT NULL,
+    replace_illegal_characters INTEGER NOT NULL DEFAULT 0,
+    colon_replacement_format INTEGER NOT NULL DEFAULT 4,
+    custom_colon_replacement_format TEXT,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
 -- Radarr general media settings
 CREATE TABLE radarr_media_settings (
     name VARCHAR(100) NOT NULL PRIMARY KEY,
@@ -414,6 +443,16 @@ CREATE TABLE radarr_media_settings (
 
 -- Sonarr general media settings
 CREATE TABLE sonarr_media_settings (
+    name VARCHAR(100) NOT NULL PRIMARY KEY,
+    propers_repacks VARCHAR(50) NOT NULL DEFAULT 'doNotPrefer'
+        CHECK (propers_repacks IN ('doNotPrefer', 'preferAndUpgrade', 'doNotUpgradeAutomatically')),
+    enable_media_info INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Lidarr general media settings
+CREATE TABLE lidarr_media_settings (
     name VARCHAR(100) NOT NULL PRIMARY KEY,
     propers_repacks VARCHAR(50) NOT NULL DEFAULT 'doNotPrefer'
         CHECK (propers_repacks IN ('doNotPrefer', 'preferAndUpgrade', 'doNotUpgradeAutomatically')),

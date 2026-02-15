@@ -1,7 +1,7 @@
 -- Profilarr Database Schema
 -- This file documents the current database schema after all migrations
 -- DO NOT execute this file directly - use migrations instead
--- Last updated: 2026-01-28
+-- Last updated: 2026-02-15
 
 -- ==============================================================================
 -- TABLE: migrations
@@ -308,7 +308,7 @@ CREATE TABLE upgrade_configs (
 -- ==============================================================================
 -- TABLE: pcd_ops
 -- Purpose: Store PCD operations (base + user) in the local database
--- Migration: 041_create_pcd_ops.ts
+-- Migration: 041_create_pcd_ops.ts, 20260215_add_lidarr_media_management_entities.ts
 -- ==============================================================================
 
 CREATE TABLE pcd_ops (
