@@ -19,8 +19,6 @@ export const load: ServerLoad = async ({ params }) => {
     throw error(500, 'Database cache not available');
   }
 
-  // Mapping-backed list results include Radarr, Sonarr, and Lidarr-backed entries
-  // via quality-definition quality-api mapping filtering rules.
   const qualityDefinitionsConfigs = await list(cache);
 
   return {

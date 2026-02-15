@@ -8,10 +8,12 @@
 	import CardView from './views/CardView.svelte';
 	import { createDataPageStore } from '$lib/client/stores/dataPage';
 	import { goto } from '$app/navigation';
+	import { resolve } from '$app/paths';
 	import { alertStore } from '$alerts/store';
 	import { Plus } from 'lucide-svelte';
 	import type { EntityType } from '$shared/pcd/portable.ts';
 	import { getArrAppMetadata, isArrAppType, type ArrAppType } from '$shared/arr/capabilities.ts';
+	import { validateQualityDefinitionsActionInput } from './validation.ts';
 	import type { PageData } from './$types';
 
 	export let data: PageData;
@@ -41,51 +43,35 @@
 		return getArrAppMetadata(arrType).label;
 	}
 
-	function resolveQualityDefinitionsEntityType(arrType: string): EntityType | null {
-		if (!isArrAppType(arrType)) {
-			return null;
-		}
-
-		return `${arrType}_quality_definitions` as EntityType;
-	}
-
 	function handleClone(event: CustomEvent<{ name: string; arr_type: string }>) {
-		if (!event.detail.name?.trim()) {
-			alertStore.add('error', 'Cannot clone quality definitions without a config name');
+		const validation = validateQualityDefinitionsActionInput({
+			name: event.detail.name,
+			arrType: event.detail.arr_type,
+			arrTypeLabel: resolveQualityTypeLabel(event.detail.arr_type)
+		});
+		if (!validation.ok) {
+			alertStore.add('error', validation.error);
 			return;
 		}
 
-		const arrType = event.detail.arr_type;
-		if (!isArrAppType(arrType)) {
-			alertStore.add('error', `Unknown quality definitions type: ${resolveQualityTypeLabel(arrType)}`);
-			return;
-		}
-
-		const resolvedType = resolveQualityDefinitionsEntityType(arrType);
-		if (!resolvedType) {
-			alertStore.add('error', `Unknown quality definitions type: ${resolveQualityTypeLabel(event.detail.arr_type)}`);
-			return;
-		}
-
-		cloneSourceName = event.detail.name;
-		cloneEntityType = resolvedType;
-		cloneArrType = arrType;
+		cloneSourceName = validation.name;
+		cloneEntityType = validation.entityType;
+		cloneArrType = validation.arrType;
 		cloneModalOpen = true;
 	}
 
 	async function handleExport(event: CustomEvent<{ name: string; arr_type: string }>) {
-		if (!event.detail.name?.trim()) {
-			alertStore.add('error', 'Cannot export quality definitions without a config name');
+		const validation = validateQualityDefinitionsActionInput({
+			name: event.detail.name,
+			arrType: event.detail.arr_type,
+			arrTypeLabel: resolveQualityTypeLabel(event.detail.arr_type)
+		});
+		if (!validation.ok) {
+			alertStore.add('error', validation.error);
 			return;
 		}
 
-		const entityType = resolveQualityDefinitionsEntityType(event.detail.arr_type);
-		if (!entityType) {
-			alertStore.add('error', `Unknown quality definitions type: ${resolveQualityTypeLabel(event.detail.arr_type)}`);
-			return;
-		}
-
-		const { name } = event.detail;
+		const { name, entityType } = validation;
 		try {
 			const params = new URLSearchParams({
 				databaseId: String(data.currentDatabase.id),
@@ -121,7 +107,12 @@
 	<SearchAction searchStore={search} placeholder="Search quality definitions..." responsive />
 	<ActionButton
 		icon={Plus}
-		on:click={() => goto(`/media-management/${data.currentDatabase.id}/quality-definitions/new`)}
+		on:click={() =>
+			goto(
+				resolve('/media-management/[databaseId]/quality-definitions/new', {
+					databaseId: data.currentDatabase.id.toString()
+				})
+			)}
 	/>
 	<ViewToggle bind:value={$view} />
 </ActionsBar>

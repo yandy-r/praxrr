@@ -24,6 +24,7 @@ interface ActionFailure {
   status: number;
   data: {
     status?: number;
+    code?: string;
     message?: string;
     error: string;
   };
@@ -949,6 +950,7 @@ VALUES ('R-QD-Seed', 'FLAC', 0, 1024, 256);
 
       assertEquals(failure.status, 400);
       assertMatch(failure.data.error, /Unsupported quality names for quality definitions/);
+      assertEquals(failure.data.code, 'quality_definitions_unmapped');
       assertEquals(failure.data.message?.includes('Unmapped-Audio'), true);
 
       const { qualityDefinitionsConfigs } = await this.readQualityDefinitionsList();
@@ -965,9 +967,10 @@ VALUES ('R-QD-Seed', 'FLAC', 0, 1024, 256);
 
         const editLoadRaw = await qualityDefinitionsLidarrEditActions.update({
           request: this.createRequest(`media-management/901/quality-definitions/lidarr/Lidarr-QD-Mixed`, {
+            name: 'Lidarr-QD-Mixed',
             entries: JSON.stringify([
               {
-                quality_name: 'FLAC',
+                quality_name: 'Unmapped-Audio',
                 min_size: 0,
                 max_size: 1000,
                 preferred_size: 300,
@@ -982,6 +985,7 @@ VALUES ('R-QD-Seed', 'FLAC', 0, 1024, 256);
         const editLoad = editLoadRaw as ActionFailure;
 
         assertEquals(editLoad.status, 400);
+        assertEquals(editLoad.data.code, 'quality_definitions_unmapped');
 
         const renameCalls: Array<{ oldName: string; newName: string }> = [];
         this.patch(arrSyncQueries, 'updateQualityDefinitionsConfigName', (oldName: string, newName: string) => {
@@ -1057,7 +1061,42 @@ VALUES ('R-QD-Seed', 'FLAC', 0, 1024, 256);
       const failure = failureRaw as ActionFailure;
 
       assertEquals(failure.status, 400);
+      assertEquals(failure.data.code, 'quality_definitions_duplicate_name');
       assertMatch(failure.data.error, /already exists/i);
+    });
+
+    this.test('[QD-06] quality-definitions create duplicate quality names returns explicit 400 code', async () => {
+      await this.bootstrapFixture();
+
+      const failureRaw = await qualityDefinitionsNewActions.default({
+        request: this.createRequest('media-management/901/quality-definitions/new', {
+          arrType: 'lidarr',
+          name: 'Lidarr-QD-Duplicate-Entries',
+          layer: 'user',
+          entries: JSON.stringify([
+            {
+              quality_name: 'FLAC',
+              min_size: 1,
+              max_size: 2,
+              preferred_size: 1,
+            },
+            {
+              quality_name: 'flac',
+              min_size: 3,
+              max_size: 4,
+              preferred_size: 2,
+            },
+          ]),
+        }),
+        params: {
+          databaseId: `${LidarrMediaManagementTest.DATABASE_ID}`,
+        },
+      } as unknown as Parameters<typeof qualityDefinitionsNewActions.default>[0]);
+      const failure = failureRaw as ActionFailure;
+
+      assertEquals(failure.status, 400);
+      assertEquals(failure.data.code, 'quality_definitions_duplicate_qualities');
+      assertMatch(failure.data.error, /duplicate quality names/i);
     });
   }
 }
