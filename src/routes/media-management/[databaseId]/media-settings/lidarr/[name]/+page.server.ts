@@ -9,6 +9,19 @@ import { removeLidarrMediaSettings } from '$pcd/entities/mediaManagement/media-s
 import { arrSyncQueries } from '$db/queries/arrSync.ts';
 import type { PropersRepacks } from '$shared/pcd/mediaManagement.ts';
 
+async function resolveLidarrMediaSettingsByRouteName(cache: ReturnType<typeof pcdManager.getCache>, routeName: string) {
+  if (!cache) {
+    return null;
+  }
+
+  const decodedName = decodeURIComponent(routeName);
+  const directMatch = await getLidarrByName(cache, decodedName);
+  if (directMatch) {
+    return { config: directMatch, resolvedName: decodedName };
+  }
+  return null;
+}
+
 export const load: ServerLoad = async ({ params, parent }) => {
   const { databaseId, name } = params;
 
@@ -26,17 +39,15 @@ export const load: ServerLoad = async ({ params, parent }) => {
     throw error(500, 'Database cache not available');
   }
 
-  const decodedName = decodeURIComponent(name);
-  const mediaSettingsConfig = await getLidarrByName(cache, decodedName);
-
-  if (!mediaSettingsConfig) {
+  const resolved = await resolveLidarrMediaSettingsByRouteName(cache, name);
+  if (!resolved) {
     throw error(404, 'Media settings config not found');
   }
 
   const parentData = await parent();
 
   return {
-    mediaSettingsConfig,
+    mediaSettingsConfig: resolved.config,
     canWriteToBase: parentData.canWriteToBase,
   };
 };
@@ -59,11 +70,12 @@ export const actions: Actions = {
       return fail(500, { error: 'Database cache not available' });
     }
 
-    const decodedName = decodeURIComponent(name);
-    const current = await getLidarrByName(cache, decodedName);
-    if (!current) {
+    const resolved = await resolveLidarrMediaSettingsByRouteName(cache, name);
+    if (!resolved) {
       return fail(404, { error: 'Media settings config not found' });
     }
+    const current = resolved.config;
+    const resolvedName = resolved.resolvedName;
 
     const formData = await request.formData();
     const newName = formData.get('name') as string;
@@ -105,8 +117,8 @@ export const actions: Actions = {
       return fail(500, { error: result.error || 'Failed to update media settings config' });
     }
 
-    if (newName.trim() !== decodedName) {
-      arrSyncQueries.updateMediaSettingsConfigName(decodedName, newName.trim(), {
+    if (newName.trim() !== resolvedName) {
+      arrSyncQueries.updateMediaSettingsConfigName(resolvedName, newName.trim(), {
         arrType: 'lidarr',
         databaseId: currentDatabaseId,
       });
@@ -132,11 +144,11 @@ export const actions: Actions = {
       return fail(500, { error: 'Database cache not available' });
     }
 
-    const decodedName = decodeURIComponent(name);
-    const current = await getLidarrByName(cache, decodedName);
-    if (!current) {
+    const resolved = await resolveLidarrMediaSettingsByRouteName(cache, name);
+    if (!resolved) {
       return fail(404, { error: 'Media settings config not found' });
     }
+    const current = resolved.config;
 
     const formData = await request.formData();
     const layer = (formData.get('layer') as OperationLayer) || 'user';

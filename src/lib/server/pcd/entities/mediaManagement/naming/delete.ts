@@ -4,9 +4,9 @@
 
 import type { PCDCache } from '$pcd/index.ts';
 import { writeOperation, type OperationLayer } from '$pcd/index.ts';
-import type { RadarrNamingRow, SonarrNamingRow } from '$shared/pcd/display.ts';
+import type { LidarrNamingRow, RadarrNamingRow, SonarrNamingRow } from '$shared/pcd/display.ts';
 import { colonReplacementToDb, multiEpisodeStyleToDb } from '$shared/pcd/mediaManagement.ts';
-import { RADARR_NAMING_TABLE, SONARR_BACKED_NAMING_TABLE } from './constants.ts';
+import { LIDARR_NAMING_TABLE, RADARR_NAMING_TABLE, SONARR_BACKED_NAMING_TABLE } from './constants.ts';
 
 export interface RemoveRadarrNamingOptions {
   databaseId: number;
@@ -115,6 +115,65 @@ export async function removeSonarrNaming(options: RemoveSonarrNamingOptions) {
       changedFields: ['deleted'],
       summary: 'Delete Sonarr naming config',
       title: `Delete Sonarr naming "${current.name}"`,
+    },
+  });
+}
+
+export interface RemoveLidarrNamingOptions {
+  databaseId: number;
+  cache: PCDCache;
+  layer: OperationLayer;
+  current: LidarrNamingRow;
+}
+
+export async function removeLidarrNaming(options: RemoveLidarrNamingOptions) {
+  const { databaseId, cache, layer, current } = options;
+  const db = cache.kb;
+
+  const currentColonReplacement = colonReplacementToDb(current.colon_replacement_format);
+
+  let deleteQuery = db
+    .deleteFrom(LIDARR_NAMING_TABLE)
+    .where('name', '=', current.name)
+    .where('rename', '=', current.rename ? 1 : 0)
+    .where('standard_track_format', '=', current.standard_track_format)
+    .where('artist_name', '=', current.artist_name)
+    .where('multi_disc_track_format', '=', current.multi_disc_track_format)
+    .where('artist_folder_format', '=', current.artist_folder_format)
+    .where('replace_illegal_characters', '=', current.replace_illegal_characters ? 1 : 0)
+    .where('colon_replacement_format', '=', currentColonReplacement);
+
+  if (current.custom_colon_replacement_format === null) {
+    deleteQuery = deleteQuery.where('custom_colon_replacement_format', 'is', null);
+  } else {
+    deleteQuery = deleteQuery.where('custom_colon_replacement_format', '=', current.custom_colon_replacement_format);
+  }
+
+  return writeOperation({
+    databaseId,
+    layer,
+    description: `delete-lidarr-naming-${current.name}`,
+    queries: [deleteQuery.compile()],
+    desiredState: {
+      deleted: true,
+      name: current.name,
+      rename: current.rename,
+      standard_track_format: current.standard_track_format,
+      artist_name: current.artist_name,
+      multi_disc_track_format: current.multi_disc_track_format,
+      artist_folder_format: current.artist_folder_format,
+      replace_illegal_characters: current.replace_illegal_characters,
+      colon_replacement_format: current.colon_replacement_format,
+      custom_colon_replacement_format: current.custom_colon_replacement_format,
+    },
+    metadata: {
+      operation: 'delete',
+      entity: 'lidarr_naming',
+      name: current.name,
+      stableKey: { key: 'lidarr_naming_name', value: current.name },
+      changedFields: ['deleted'],
+      summary: 'Delete Lidarr naming config',
+      title: `Delete Lidarr naming "${current.name}"`,
     },
   });
 }

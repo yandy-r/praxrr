@@ -19,6 +19,7 @@ import {
   type PortableSonarrNaming,
 } from '$shared/pcd/portable.ts';
 import * as deserialize from '$pcd/entities/deserialize.ts';
+import { createLidarrNaming } from '$pcd/entities/mediaManagement/naming/create.ts';
 import { validatePortableData } from '$pcd/entities/validate.ts';
 
 const VALID_ENTITY_TYPES: ReadonlySet<string> = new Set(ENTITY_TYPES);
@@ -71,13 +72,9 @@ export const POST: RequestHandler = async ({ request }) => {
     return json({ error: lidarrPayloadError }, { status: 400 });
   }
 
-  const validationTarget = resolveValidationEntityType(typedEntityType);
-  const validationError = validatePortableData(validationTarget, data as Record<string, unknown>);
+  const validationError = validatePortableData(typedEntityType, data as Record<string, unknown>);
   if (validationError) {
-    if (validationTarget === typedEntityType) {
-      return json({ error: validationError }, { status: 400 });
-    }
-    return json({ error: `Unsupported payload for ${typedEntityType}: ${validationError}` }, { status: 400 });
+    return json({ error: validationError }, { status: 400 });
   }
 
   try {
@@ -123,7 +120,7 @@ async function deserializeEntity({ databaseId, cache, layer, entityType, data }:
     case 'sonarr_naming':
       return deserialize.deserializeSonarrNaming({ ...opts, portable: data as unknown as PortableSonarrNaming });
     case 'lidarr_naming':
-      return deserialize.deserializeSonarrNaming({ ...opts, portable: data as unknown as PortableLidarrNaming });
+      return createLidarrNaming({ ...opts, input: data as unknown as PortableLidarrNaming });
     case 'radarr_media_settings':
       return deserialize.deserializeRadarrMediaSettings({
         ...opts,
@@ -155,11 +152,6 @@ async function deserializeEntity({ databaseId, cache, layer, entityType, data }:
         portable: data as unknown as PortableLidarrQualityDefinitions,
       });
   }
-}
-
-function resolveValidationEntityType(entityType: EntityType): EntityType {
-  const matrixEntry = getLidarrMediaManagementPortableEntry(entityType);
-  return matrixEntry ? matrixEntry.reusableEntityType : entityType;
 }
 
 function validateLidarrPayload(entityType: EntityType, data: Record<string, unknown>): string | null {

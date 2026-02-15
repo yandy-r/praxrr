@@ -252,6 +252,20 @@ export interface SonarrNamingTable {
   updated_at: Generated<string>;
 }
 
+export interface LidarrNamingTable {
+  name: string;
+  rename: Generated<number>;
+  standard_track_format: string;
+  artist_name: string;
+  multi_disc_track_format: string;
+  artist_folder_format: string;
+  replace_illegal_characters: Generated<number>;
+  colon_replacement_format: Generated<number>;
+  custom_colon_replacement_format: string | null;
+  created_at: Generated<string>;
+  updated_at: Generated<string>;
+}
+
 export interface RadarrMediaSettingsTable {
   name: string;
   propers_repacks: Generated<string>;
@@ -345,6 +359,7 @@ export interface PCDDatabase {
   custom_formats: CustomFormatsTable;
   delay_profiles: DelayProfilesTable;
   languages: LanguagesTable;
+  lidarr_naming: LidarrNamingTable;
   qualities: QualitiesTable;
   quality_api_mappings: QualityApiMappingsTable;
   quality_group_members: QualityGroupMembersTable;
@@ -605,6 +620,20 @@ export interface SonarrNamingRow {
   colon_replacement_format: 'delete' | 'dash' | 'spaceDash' | 'spaceDashSpace' | 'smart' | 'custom';
   custom_colon_replacement_format: string | null;
   multi_episode_style: 'extend' | 'duplicate' | 'repeat' | 'scene' | 'range' | 'prefixedRange';
+  created_at: string;
+  updated_at: string;
+}
+
+export interface LidarrNamingRow {
+  name: string;
+  rename: boolean;
+  standard_track_format: string;
+  artist_name: string;
+  multi_disc_track_format: string;
+  artist_folder_format: string;
+  replace_illegal_characters: boolean;
+  colon_replacement_format: 'delete' | 'dash' | 'spaceDash' | 'spaceDashSpace' | 'smart' | 'custom';
+  custom_colon_replacement_format: string | null;
   created_at: string;
   updated_at: string;
 }

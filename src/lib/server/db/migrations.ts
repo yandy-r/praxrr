@@ -52,6 +52,8 @@ import { migration as migration047 } from './migrations/047_create_arr_database_
 import { migration as migration048 } from './migrations/048_fix_sync_database_foreign_keys.ts';
 import { migration as migration049 } from './migrations/049_create_job_queue.ts';
 import { migration as migration20260215 } from './migrations/20260215_add_lidarr_media_management_entities.ts';
+import { migration as migration20260216 } from './migrations/20260216_enforce_native_lidarr_quality_mappings.ts';
+import { migration as migration20260217 } from './migrations/20260217_set_lidarr_naming_defaults.ts';
 
 export interface Migration {
   version: number;
@@ -319,6 +321,8 @@ export function loadMigrations(): Migration[] {
     migration048,
     migration049,
     migration20260215,
+    migration20260216,
+    migration20260217,
   ];
 
   // Sort by version number

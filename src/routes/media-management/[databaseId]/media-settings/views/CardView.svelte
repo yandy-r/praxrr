@@ -8,7 +8,7 @@
 	import { Copy, Download } from 'lucide-svelte';
 	import type { MediaSettingsListItem } from '$shared/pcd/display.ts';
 	import type { ArrAppType } from '$shared/arr/capabilities.ts';
-	import { getMediaManagementDisplayName } from '$shared/arr/displayName.ts';
+	import { getMediaManagementDisplayName, getMediaManagementRouteName } from '$shared/arr/displayName.ts';
 	import radarrLogo from '$lib/client/assets/Radarr.svg';
 	import sonarrLogo from '$lib/client/assets/Sonarr.svg';
 	import lidarrLogo from '$lib/client/assets/Lidarr.png';
@@ -66,12 +66,12 @@
 	}
 
 	function getRowHref(config: MediaSettingsListItem): string {
-		const normalizedName = config.name?.trim();
-		if (!normalizedName || !isSupportedArrType(config.arr_type)) {
+		const routeName = getMediaManagementRouteName(config.name, config.arr_type).trim();
+		if (!routeName || !isSupportedArrType(config.arr_type)) {
 			return `/media-management/${databaseId}/media-settings`;
 		}
 
-		return `/media-management/${databaseId}/media-settings/${config.arr_type}/${encodeURIComponent(normalizedName)}`;
+		return `/media-management/${databaseId}/media-settings/${config.arr_type}/${encodeURIComponent(routeName)}`;
 	}
 </script>
 

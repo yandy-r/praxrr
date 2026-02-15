@@ -56,12 +56,23 @@ export const actions: Actions = {
     const propersRepacks = formData.get('propersRepacks') as PropersRepacks;
     const enableMediaInfo = formData.get('enableMediaInfo') === 'true';
 
-    const createFn =
-      arrType === 'radarr'
-        ? createRadarrMediaSettings
-        : arrType === 'sonarr'
-          ? createSonarrMediaSettings
-          : createLidarrMediaSettings;
+    let createFn:
+      | typeof createRadarrMediaSettings
+      | typeof createSonarrMediaSettings
+      | typeof createLidarrMediaSettings;
+    switch (arrType) {
+      case 'radarr':
+        createFn = createRadarrMediaSettings;
+        break;
+      case 'sonarr':
+        createFn = createSonarrMediaSettings;
+        break;
+      case 'lidarr':
+        createFn = createLidarrMediaSettings;
+        break;
+      default:
+        return fail(400, { error: 'Invalid arr type' });
+    }
 
     let result;
     try {

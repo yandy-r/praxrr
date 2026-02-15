@@ -46,7 +46,7 @@ import type { ArrType } from './types.ts';
 import type { ArrAppType, ArrConditionTargetType } from '../arr/capabilities.ts';
 
 // Naming
-export type { RadarrNamingRow, SonarrNamingRow } from './types.ts';
+export type { LidarrNamingRow, RadarrNamingRow, SonarrNamingRow } from './types.ts';
 
 export interface NamingListItem {
   name: string;

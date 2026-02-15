@@ -3,9 +3,9 @@
  */
 
 import type { PCDCache } from '$pcd/index.ts';
-import type { RadarrNamingRow, SonarrNamingRow, NamingListItem } from '$shared/pcd/display.ts';
+import type { LidarrNamingRow, NamingListItem, RadarrNamingRow, SonarrNamingRow } from '$shared/pcd/display.ts';
 import { colonReplacementFromDb, multiEpisodeStyleFromDb } from '$shared/pcd/mediaManagement.ts';
-import { RADARR_NAMING_TABLE, SONARR_BACKED_NAMING_TABLE } from './constants.ts';
+import { LIDARR_NAMING_TABLE, RADARR_NAMING_TABLE, SONARR_BACKED_NAMING_TABLE } from './constants.ts';
 
 // Note: name is PRIMARY KEY so never null, but Kysely types it as nullable
 // because the generator doesn't detect non-INTEGER primary keys
@@ -13,8 +13,9 @@ import { RADARR_NAMING_TABLE, SONARR_BACKED_NAMING_TABLE } from './constants.ts'
 export async function list(cache: PCDCache): Promise<NamingListItem[]> {
   const db = cache.kb;
 
-  const [radarrRows, sonarrRows] = await Promise.all([
+  const [radarrRows, lidarrRows, sonarrRows] = await Promise.all([
     db.selectFrom(RADARR_NAMING_TABLE).select(['name', 'rename', 'updated_at']).execute(),
+    db.selectFrom(LIDARR_NAMING_TABLE).select(['name', 'rename', 'updated_at']).execute(),
     db.selectFrom(SONARR_BACKED_NAMING_TABLE).select(['name', 'rename', 'updated_at']).execute(),
   ]);
 
@@ -29,12 +30,7 @@ export async function list(cache: PCDCache): Promise<NamingListItem[]> {
     });
   }
 
-  // Lidarr reuses the Sonarr naming table contract in phase 1 of Lidarr support.
-  // Acceptance criteria:
-  // - one shared storage row can surface as both `arr_type=sonarr` and `arr_type=lidarr`
-  // - handlers can still dispatch on arr type without adding `lidarr_naming` tables
-  // - duplicate-name collisions stay deterministic for cross-arr shared storage
-  for (const row of sonarrRows) {
+  for (const row of lidarrRows) {
     items.push({
       name: row.name!,
       arr_type: 'lidarr',
@@ -98,7 +94,24 @@ export async function getSonarrByName(cache: PCDCache, name: string): Promise<So
   };
 }
 
-export async function getLidarrByName(cache: PCDCache, name: string): Promise<SonarrNamingRow | null> {
-  // Lidarr naming reads intentionally use Sonarr-backed storage in this phase.
-  return getSonarrByName(cache, name);
+export async function getLidarrByName(cache: PCDCache, name: string): Promise<LidarrNamingRow | null> {
+  const db = cache.kb;
+
+  const row = await db.selectFrom(LIDARR_NAMING_TABLE).selectAll().where('name', '=', name).executeTakeFirst();
+
+  if (!row) return null;
+
+  return {
+    name: row.name!,
+    rename: row.rename === 1,
+    standard_track_format: row.standard_track_format,
+    artist_name: row.artist_name,
+    multi_disc_track_format: row.multi_disc_track_format,
+    artist_folder_format: row.artist_folder_format,
+    replace_illegal_characters: row.replace_illegal_characters === 1,
+    colon_replacement_format: colonReplacementFromDb(row.colon_replacement_format),
+    custom_colon_replacement_format: row.custom_colon_replacement_format,
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+  } satisfies LidarrNamingRow;
 }

@@ -11,7 +11,7 @@
 	import radarrLogo from '$lib/client/assets/Radarr.svg';
 	import sonarrLogo from '$lib/client/assets/Sonarr.svg';
 	import lidarrLogo from '$lib/client/assets/Lidarr.png';
-	import { getMediaManagementDisplayName } from '$shared/arr/displayName.ts';
+	import { getMediaManagementDisplayName, getMediaManagementRouteName } from '$shared/arr/displayName.ts';
 
 	export let configs: NamingListItem[];
 	export let databaseId: number;
@@ -40,11 +40,12 @@
 	}
 
 	function getConfigHref(config: NamingListItem): string {
-		if (config.name == null || config.name === '' || !isSupportedArrType(config.arr_type)) {
+		const routeName = getMediaManagementRouteName(config.name, config.arr_type).trim();
+		if (!routeName || !isSupportedArrType(config.arr_type)) {
 			return `/media-management/${databaseId}/naming`;
 		}
 
-		return `/media-management/${databaseId}/naming/${config.arr_type}/${encodeURIComponent(config.name)}`;
+		return `/media-management/${databaseId}/naming/${config.arr_type}/${encodeURIComponent(routeName)}`;
 	}
 
 	function getLogo(config: NamingListItem): string {

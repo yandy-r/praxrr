@@ -1,17 +1,14 @@
 /**
- * Normalize media-management config names for display only.
- *
- * Lidarr currently reuses Sonarr-backed storage for some entities, so
- * default Sonarr-named rows can appear under arr_type=lidarr.
+ * Keep media-management config names unchanged for display.
  */
 export function getMediaManagementDisplayName(name: string, arrType: string): string {
-  if (arrType !== 'lidarr') {
-    return name;
-  }
-
-  if (name.trim().toLowerCase() === 'sonarr') {
-    return 'Lidarr';
-  }
-
+  void arrType;
   return name;
+}
+
+/**
+ * Keep media-management names unchanged for route segments.
+ */
+export function getMediaManagementRouteName(name: string, arrType: string): string {
+  return getMediaManagementDisplayName(name, arrType);
 }

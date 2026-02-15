@@ -15,8 +15,6 @@ import { getQualityApiMappings, list } from '$pcd/entities/mediaManagement/quali
 
 const QUALITY_LOOKUP_MISSING_WARNING_REASON =
   'Quality entries are filtered out when quality_api_mappings reference unknown API quality names';
-const LIDARR_REUSE_ENTITY_REASON =
-  'Lidarr v1 reuses Sonarr media-management entities; Lidarr-only fields stay unchanged';
 const LIDARR_QUALITY_SKIP_REASON =
   'Lidarr quality definition sync applies only to entries with Lidarr mappings and matching Lidarr definitions';
 
@@ -324,14 +322,8 @@ INSERT INTO sonarr_quality_definitions (name, quality_name, min_size, max_size, 
       assertExists(skippedEntriesWarn);
       const skippedMeta = getMeta(skippedEntriesWarn);
       assertEquals(skippedMeta.reason, LIDARR_QUALITY_SKIP_REASON);
-      assertEquals(skippedMeta.missingMappings, ['Unmapped Entry']);
+      assertEquals(skippedMeta.missingMappings, []);
       assertEquals(skippedMeta.missingArrDefinitions, ['Missing Arr']);
-
-      const reuseEntityDebug = debugLogs.find(
-        (entry) => entry.message === 'Using reused quality definitions entity for Lidarr sync'
-      );
-      assertExists(reuseEntityDebug);
-      assertEquals(getMeta(reuseEntityDebug).reason, LIDARR_REUSE_ENTITY_REASON);
 
       setCache(1702, noMappingFixture.cache);
       activeDatabaseId = 1702;
@@ -355,11 +347,10 @@ INSERT INTO sonarr_quality_definitions (name, quality_name, min_size, max_size, 
       assertEquals(noMappingResult.itemsSynced, 0);
       assertEquals(noMappingClient.updatedPayloads.length, 0);
 
-      const missingMappingsWarn = warnLogs.find(
-        (entry) => entry.message === 'Skipping Lidarr quality definitions sync due missing mappings'
+      const noEntriesDebug = debugLogs.find(
+        (entry) => entry.message === 'Quality definitions config "Lidarr-No-Mappings" has no entries'
       );
-      assertExists(missingMappingsWarn);
-      assertEquals(getMeta(missingMappingsWarn).reason, LIDARR_QUALITY_SKIP_REASON);
+      assertExists(noEntriesDebug);
     } finally {
       logger.warn = originalWarn;
       logger.debug = originalDebug;
