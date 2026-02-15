@@ -1,4 +1,5 @@
 import { assertEquals, assertExists, assertRejects } from '@std/assert';
+import { isRedirect } from '@sveltejs/kit';
 import { Database } from '@jsr/db__sqlite';
 import { Kysely } from 'kysely';
 import { DenoSqlite3Dialect } from '@soapbox/kysely-deno-sqlite';
@@ -16,6 +17,9 @@ import {
   list as listMediaSettings,
 } from '$pcd/entities/mediaManagement/media-settings/read.ts';
 import { updateLidarrMediaSettings } from '$pcd/entities/mediaManagement/media-settings/update.ts';
+import { POST as importPortablePost } from '../../routes/api/v1/pcd/import/+server.ts';
+import { GET as exportPortableGet } from '../../routes/api/v1/pcd/export/+server.ts';
+import { actions as lidarrMediaSettingsActions } from '../../routes/media-management/[databaseId]/media-settings/lidarr/[name]/+page.server.ts';
 
 const DATABASE_ID = 2202;
 
@@ -409,5 +413,133 @@ VALUES ('Config-B', 'preferAndUpgrade', 0);
     );
   } finally {
     await fixture.destroy();
+  }
+});
+
+Deno.test('portable import for lidarr_media_settings writes to lidarr table', async () => {
+  const harness = await createWriteHarness(
+    baseMediaSettingsSchema(`
+INSERT INTO sonarr_media_settings (name, propers_repacks, enable_media_info)
+VALUES ('Portable-Import', 'doNotPrefer', 1);
+`)
+  );
+
+  try {
+    const request = new Request('http://localhost/api/v1/pcd/import', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        databaseId: DATABASE_ID,
+        layer: 'user',
+        entityType: 'lidarr_media_settings',
+        data: {
+          name: 'Portable-Import',
+          propersRepacks: 'preferAndUpgrade',
+          enableMediaInfo: true,
+        },
+      }),
+    });
+
+    const response = await importPortablePost({
+      request,
+    } as unknown as Parameters<typeof importPortablePost>[0]);
+
+    assertEquals(response.status, 200);
+    const payload = (await response.json()) as { success?: boolean };
+    assertEquals(payload.success, true);
+
+    const compiledCache = getCache(DATABASE_ID);
+    assertExists(compiledCache);
+
+    const lidarrRow = await getLidarrByName(compiledCache, 'Portable-Import');
+    assertExists(lidarrRow);
+    assertEquals(lidarrRow.propers_repacks, 'preferAndUpgrade');
+    assertEquals(lidarrRow.enable_media_info, true);
+
+    const sonarrRow = await getSonarrByName(compiledCache, 'Portable-Import');
+    assertExists(sonarrRow);
+    assertEquals(sonarrRow.propers_repacks, 'doNotPrefer');
+  } finally {
+    await harness.cleanup();
+  }
+});
+
+Deno.test('portable export for lidarr_media_settings reads from lidarr table', async () => {
+  const harness = await createWriteHarness(
+    baseMediaSettingsSchema(`
+INSERT INTO lidarr_media_settings (name, propers_repacks, enable_media_info)
+VALUES ('Portable-Export', 'preferAndUpgrade', 1);
+`)
+  );
+
+  try {
+    const url = new URL('http://localhost/api/v1/pcd/export');
+    url.searchParams.set('databaseId', String(DATABASE_ID));
+    url.searchParams.set('entityType', 'lidarr_media_settings');
+    url.searchParams.set('name', 'Portable-Export');
+
+    const response = await exportPortableGet({
+      url,
+    } as unknown as Parameters<typeof exportPortableGet>[0]);
+
+    assertEquals(response.status, 200);
+
+    const payload = (await response.json()) as {
+      entityType: string;
+      data: { name: string; propersRepacks: string; enableMediaInfo: boolean };
+    };
+
+    assertEquals(payload.entityType, 'lidarr_media_settings');
+    assertEquals(payload.data.name, 'Portable-Export');
+    assertEquals(payload.data.propersRepacks, 'preferAndUpgrade');
+    assertEquals(payload.data.enableMediaInfo, true);
+  } finally {
+    await harness.cleanup();
+  }
+});
+
+Deno.test('lidarr media-settings delete action removes row from lidarr table', async () => {
+  const harness = await createWriteHarness(
+    baseMediaSettingsSchema(`
+INSERT INTO lidarr_media_settings (name, propers_repacks, enable_media_info)
+VALUES ('Delete-Me', 'preferAndUpgrade', 1);
+`)
+  );
+
+  try {
+    const formData = new FormData();
+    formData.set('layer', 'user');
+    const request = new Request('http://localhost/media-management/2202/media-settings/lidarr/Delete-Me', {
+      method: 'POST',
+      body: formData,
+    });
+
+    let redirected = false;
+    try {
+      await lidarrMediaSettingsActions.delete({
+        request,
+        params: {
+          databaseId: String(DATABASE_ID),
+          name: 'Delete-Me',
+        },
+      } as unknown as Parameters<typeof lidarrMediaSettingsActions.delete>[0]);
+    } catch (error) {
+      if (!isRedirect(error)) {
+        throw error;
+      }
+
+      redirected = true;
+      assertEquals(error.status, 303);
+      assertEquals(error.location, `/media-management/${DATABASE_ID}/media-settings`);
+    }
+    assertEquals(redirected, true);
+
+    const compiledCache = getCache(DATABASE_ID);
+    assertExists(compiledCache);
+
+    const deletedRow = await getLidarrByName(compiledCache, 'Delete-Me');
+    assertEquals(deletedRow, null);
+  } finally {
+    await harness.cleanup();
   }
 });

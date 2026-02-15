@@ -5,7 +5,7 @@ import { canWriteToBase } from '$pcd/index.ts';
 import type { OperationLayer } from '$pcd/index.ts';
 import { getLidarrByName } from '$pcd/entities/mediaManagement/media-settings/read.ts';
 import { updateLidarrMediaSettings } from '$pcd/entities/mediaManagement/media-settings/update.ts';
-import { removeSonarrMediaSettings } from '$pcd/entities/mediaManagement/media-settings/index.ts';
+import { removeLidarrMediaSettings } from '$pcd/entities/mediaManagement/media-settings/index.ts';
 import { arrSyncQueries } from '$db/queries/arrSync.ts';
 import type { PropersRepacks } from '$shared/pcd/mediaManagement.ts';
 
@@ -145,7 +145,7 @@ export const actions: Actions = {
       return fail(403, { error: 'Cannot write to base layer without personal access token' });
     }
 
-    const result = await removeSonarrMediaSettings({
+    const result = await removeLidarrMediaSettings({
       databaseId: currentDatabaseId,
       cache,
       layer,

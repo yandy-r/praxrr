@@ -12,6 +12,7 @@ import type {
   PortableRegularExpression,
   PortableCustomFormat,
   PortableQualityProfile,
+  PortableLidarrMediaSettings,
   PortableRadarrNaming,
   PortableSonarrNaming,
   PortableMediaSettings,
@@ -217,6 +218,17 @@ export async function deserializeSonarrMediaSettings(options: DeserializeOptions
   const { databaseId, cache, layer, portable } = options;
 
   return mediaSettingsQueries.createSonarrMediaSettings({
+    databaseId,
+    cache,
+    layer,
+    input: portable,
+  });
+}
+
+export async function deserializeLidarrMediaSettings(options: DeserializeOptions<PortableLidarrMediaSettings>) {
+  const { databaseId, cache, layer, portable } = options;
+
+  return mediaSettingsQueries.createLidarrMediaSettings({
     databaseId,
     cache,
     layer,
