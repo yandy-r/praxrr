@@ -406,10 +406,10 @@ async function updateSonarrBackedNaming(options: UpdateSonarrNamingOptions, nami
   });
 }
 
-export function updateSonarrNaming(options: UpdateSonarrNamingOptions) {
+export async function updateSonarrNaming(options: UpdateSonarrNamingOptions) {
   return updateSonarrBackedNaming(options, 'sonarr');
 }
 
-export function updateLidarrNaming(options: UpdateSonarrNamingOptions) {
+export async function updateLidarrNaming(options: UpdateSonarrNamingOptions) {
   return updateSonarrBackedNaming(options, 'lidarr');
 }
