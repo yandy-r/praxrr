@@ -6,6 +6,7 @@ import { createArrClient } from '$arr/factory.ts';
 import { getDefaultDelayProfile } from '$arr/defaults.ts';
 import type { ArrType } from '$arr/types.ts';
 import { logger } from '$logger/logger.ts';
+import { parseOptionalAbsoluteHttpUrl } from '$utils/validation/url.ts';
 
 const VALID_TYPES = ['radarr', 'sonarr', 'lidarr'];
 
@@ -17,8 +18,10 @@ export const actions = {
     const type = formData.get('type')?.toString().trim();
     const url = formData.get('url')?.toString().trim();
     const apiKey = formData.get('api_key')?.toString().trim();
+    const rawExternalUrl = formData.get('external_url')?.toString();
     const tagsJson = formData.get('tags')?.toString().trim();
     const enabled = formData.get('enabled')?.toString() === '1';
+    const externalUrl = parseOptionalAbsoluteHttpUrl(rawExternalUrl);
 
     // Validation
     if (!name || !type || !url || !apiKey) {
@@ -41,6 +44,13 @@ export const actions = {
 
       return fail(400, {
         error: 'Invalid arr type',
+        values: { name, type, url },
+      });
+    }
+
+    if (!externalUrl.isValid) {
+      return fail(400, {
+        error: 'External URL must be a valid absolute http(s) URL',
         values: { name, type, url },
       });
     }
@@ -94,6 +104,7 @@ export const actions = {
         name,
         type,
         url,
+        externalUrl: externalUrl.value,
         apiKey,
         tags,
         enabled,

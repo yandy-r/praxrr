@@ -1,8 +1,8 @@
-import { error } from '@sveltejs/kit';
-import type { LayoutServerLoad } from './$types';
+import { error, type ServerLoad } from '@sveltejs/kit';
 import { arrInstancesQueries } from '$db/queries/arrInstances.ts';
+import type { ArrInstance } from '$db/queries/arrInstances.ts';
 
-export const load: LayoutServerLoad = ({ params }) => {
+export const load: ServerLoad = ({ params }) => {
   const id = parseInt(params.id || '', 10);
 
   if (isNaN(id)) {
@@ -15,7 +15,12 @@ export const load: LayoutServerLoad = ({ params }) => {
     error(404, `Instance not found: ${id}`);
   }
 
+  const typedInstance: ArrInstance = {
+    ...instance,
+    external_url: instance.external_url ?? null,
+  };
+
   return {
-    instance,
+    instance: typedInstance,
   };
 };
