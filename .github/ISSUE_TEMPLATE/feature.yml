@@ -1,8 +1,25 @@
 name: ✨ Feature Request
 description: Suggest a new feature or improvement
-type: Feature
+title: '[Feature]: '
+labels:
+  - enhancement
 
 body:
+  - type: markdown
+    attributes:
+      value: |
+        Have an idea for Profilarr? We'd love to hear it. Please check
+        [existing feature requests](https://github.com/yandy-r/profilarr/issues?q=is%3Aissue+label%3Aenhancement)
+        before filing to avoid duplicates.
+
+  - type: checkboxes
+    id: preflight
+    attributes:
+      label: Pre-submission checklist
+      options:
+        - label: I have searched existing issues and this feature has not already been requested.
+          required: true
+
   - type: textarea
     id: what
     attributes:
