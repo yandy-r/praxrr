@@ -11,6 +11,7 @@
   import { getPersistentSearchStore, type SearchStore } from '$stores/search';
   import { libraryCache } from '$stores/libraryCache';
   import { getArrAppMetadata, isArrAppType, supportsArrWorkflow } from '$shared/arr/capabilities.ts';
+  import { resolveInstanceBrowserUrl } from '$shared/arr/instanceUrl.ts';
 
   import LibraryActionBar from './components/LibraryActionBar.svelte';
   import MovieRow from './components/MovieRow.svelte';
@@ -25,7 +26,10 @@
   $: instanceId = instance?.id ?? null;
   $: instanceType = instance?.type ?? '';
   $: instanceName = instance?.name ?? 'Arr';
-  $: instanceUrl = instance?.url?.replace(/\/$/, '') ?? '';
+  $: instanceUrl = resolveInstanceBrowserUrl({
+    url: instance?.url ?? '',
+    external_url: instance?.external_url ?? null,
+  }).replace(/\/$/, '');
   $: appType = instanceType && isArrAppType(instanceType) ? instanceType : null;
   $: supportsLibraryWorkflow = appType ? supportsArrWorkflow(appType, 'library') : false;
   $: isRadarr = instanceType === 'radarr';
@@ -401,14 +405,6 @@
       episodeLoadingSet = new Set();
     }
     await fetchLibrary(true);
-  }
-
-  function handleOpen() {
-    if (!instanceUrl) {
-      return;
-    }
-
-    window.open(instanceUrl, '_blank', 'noopener,noreferrer');
   }
 
   function handlePreviousPage() {
@@ -1043,7 +1039,7 @@
       onToggleColumn={toggleColumn}
       onToggleFilter={toggleFilter}
       onRefresh={handleRefresh}
-      onOpen={handleOpen}
+      openUrl={instanceUrl}
       {page}
       {pageSize}
       {totalRecords}

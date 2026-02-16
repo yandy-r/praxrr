@@ -8,6 +8,7 @@ export interface ArrInstance {
   name: string;
   type: string;
   url: string;
+  external_url: string | null;
   api_key: string;
   tags: string | null;
   enabled: number;
@@ -20,6 +21,7 @@ export interface CreateArrInstanceInput {
   type: string;
   url: string;
   apiKey: string;
+  externalUrl?: string | null;
   tags?: string[];
   enabled?: boolean;
 }
@@ -28,9 +30,18 @@ export interface UpdateArrInstanceInput {
   name?: string;
   type?: string;
   url?: string;
+  externalUrl?: string | null;
   apiKey?: string;
   tags?: string[];
   enabled?: boolean;
+}
+
+/**
+ * Normalize optional external URL values by trimming and converting blank/whitespace
+ * input to NULL for stable DB storage.
+ */
+function normalizeExternalUrl(externalUrl: string | null | undefined): string | null {
+  return externalUrl?.trim() || null;
 }
 
 /**
@@ -43,13 +54,15 @@ export const arrInstancesQueries = {
   create(input: CreateArrInstanceInput): number {
     const tagsJson = input.tags && input.tags.length > 0 ? JSON.stringify(input.tags) : null;
     const enabled = input.enabled !== false ? 1 : 0;
+    const externalUrl = normalizeExternalUrl(input.externalUrl);
 
     db.execute(
-      `INSERT INTO arr_instances (name, type, url, api_key, tags, enabled)
-       VALUES (?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO arr_instances (name, type, url, external_url, api_key, tags, enabled)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
       input.name,
       input.type,
       input.url,
+      externalUrl,
       input.apiKey,
       tagsJson,
       enabled
@@ -106,6 +119,10 @@ export const arrInstancesQueries = {
     if (input.url !== undefined) {
       updates.push('url = ?');
       params.push(input.url);
+    }
+    if (input.externalUrl !== undefined) {
+      updates.push('external_url = ?');
+      params.push(normalizeExternalUrl(input.externalUrl));
     }
     if (input.apiKey !== undefined) {
       updates.push('api_key = ?');

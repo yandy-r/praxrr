@@ -1,7 +1,6 @@
 name: 🛠️ Engineering Task
 description: Structured implementation task for scoped, dependency-aware execution
 title: '[Task] <initiative> | <surface> | <action>'
-type: Feature
 labels:
   - enhancement
 
@@ -60,6 +59,9 @@ body:
         - Arr Integration
         - UI
         - Sync
+        - PCD / Database
+        - Auth
+        - Jobs / Notifications
         - Docs
         - Tests
     validations:

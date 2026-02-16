@@ -1,6 +1,8 @@
 name: 🪄 Tweak
 description: Small suggestions, UI tweaks, or minor improvements
-type: Tweak
+title: '[Tweak]: '
+labels:
+  - enhancement
 
 body:
   - type: textarea
@@ -29,6 +31,8 @@ body:
         - Custom Formats
         - Regex Patterns
         - Import / Export
+        - Sync
+        - Databases / PCD
         - Other
     validations:
       required: true

@@ -33,15 +33,35 @@ export class RadarrClient extends BaseArrClient {
   /**
    * Get movie files by movie IDs
    * Uses movieId params for batching (NOT movieFileIds which can error on stale IDs)
+   * Chunks requests to avoid HTTP 414 URI Too Long errors on large libraries
    */
-  getMovieFiles(movieIds: number[]): Promise<RadarrMovieFile[]> {
+  async getMovieFiles(movieIds: number[]): Promise<RadarrMovieFile[]> {
     if (movieIds.length === 0) {
-      return Promise.resolve([]);
+      return [];
     }
 
-    // Build query string with repeated movieId params
-    const queryString = movieIds.map((id) => `movieId=${id}`).join('&');
-    return this.get<RadarrMovieFile[]>(`/api/${this.apiVersion}/moviefile?${queryString}`);
+    const CHUNK_SIZE = 200;
+
+    // Single request if within limit
+    if (movieIds.length <= CHUNK_SIZE) {
+      const queryString = movieIds.map((id) => `movieId=${id}`).join('&');
+      return this.get<RadarrMovieFile[]>(`/api/${this.apiVersion}/moviefile?${queryString}`);
+    }
+
+    // Chunk into parallel requests to stay under URL length limits
+    const chunks: number[][] = [];
+    for (let i = 0; i < movieIds.length; i += CHUNK_SIZE) {
+      chunks.push(movieIds.slice(i, i + CHUNK_SIZE));
+    }
+
+    const results = await Promise.all(
+      chunks.map((chunk) => {
+        const queryString = chunk.map((id) => `movieId=${id}`).join('&');
+        return this.get<RadarrMovieFile[]>(`/api/${this.apiVersion}/moviefile?${queryString}`);
+      })
+    );
+
+    return results.flat();
   }
 
   /**

@@ -1,13 +1,38 @@
 name: 🐛 Bug Report
 description: Report something that isn't working correctly
-type: Bug
+title: '[Bug]: '
+labels:
+  - bug
 
 body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug. Please fill out the fields below so we can
+        reproduce and fix the issue quickly. Check [existing issues](https://github.com/yandy-r/profilarr/issues?q=is%3Aissue+label%3Abug)
+        before filing to avoid duplicates.
+
+  - type: checkboxes
+    id: preflight
+    attributes:
+      label: Pre-submission checklist
+      options:
+        - label: I have searched existing issues and this bug has not already been reported.
+          required: true
+
   - type: textarea
     id: what-happened
     attributes:
-      label: What happened and what did you expect?
-      placeholder: Describe the bug and what you expected to happen instead
+      label: What happened?
+      placeholder: Describe the bug clearly
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect?
+      placeholder: Describe the behavior you expected instead
     validations:
       required: true
 
@@ -60,8 +85,8 @@ body:
   - type: input
     id: arr-version
     attributes:
-      label: Radarr/Sonarr version
-      placeholder: e.g. Radarr 5.2.6
+      label: Arr version
+      placeholder: e.g. Radarr 5.2.6, Sonarr 4.0.0, Lidarr 2.1.0
 
   - type: input
     id: database

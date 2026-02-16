@@ -3,6 +3,7 @@ import type { Actions } from '@sveltejs/kit';
 import { arrInstancesQueries } from '$db/queries/arrInstances.ts';
 import { cleanupJobsForArrInstance } from '$lib/server/jobs/cleanup.ts';
 import { logger } from '$logger/logger.ts';
+import { parseOptionalAbsoluteHttpUrl } from '$utils/validation/url.ts';
 
 export const actions: Actions = {
   update: async ({ params, request }) => {
@@ -24,6 +25,8 @@ export const actions: Actions = {
     const name = formData.get('name')?.toString().trim();
     const url = formData.get('url')?.toString().trim();
     const apiKey = formData.get('api_key')?.toString().trim();
+    const rawExternalUrl = formData.get('external_url')?.toString();
+    const externalUrl = parseOptionalAbsoluteHttpUrl(rawExternalUrl);
     const tagsJson = formData.get('tags')?.toString() || '';
     const enabled = formData.get('enabled')?.toString() === '1';
 
@@ -38,6 +41,10 @@ export const actions: Actions = {
 
     if (!apiKey) {
       return fail(400, { error: 'API Key is required' });
+    }
+
+    if (!externalUrl.isValid) {
+      return fail(400, { error: 'External URL must be a valid absolute http(s) URL' });
     }
 
     // Check for duplicate name
@@ -64,6 +71,7 @@ export const actions: Actions = {
       arrInstancesQueries.update(id, {
         name,
         url,
+        externalUrl: externalUrl.value,
         apiKey,
         tags,
         enabled,
