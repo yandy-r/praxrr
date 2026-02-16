@@ -1,7 +1,7 @@
 -- Profilarr Database Schema
 -- This file documents the current database schema after all migrations
 -- DO NOT execute this file directly - use migrations instead
--- Last updated: 2026-02-15
+-- Last updated: 2026-02-16
 
 -- ==============================================================================
 -- TABLE: migrations
@@ -18,7 +18,7 @@ CREATE TABLE IF NOT EXISTS migrations (
 -- ==============================================================================
 -- TABLE: arr_instances
 -- Purpose: Store configuration for *arr application instances (Radarr, Sonarr, etc.)
--- Migration: 001_create_arr_instances.ts
+-- Migration: 001_create_arr_instances.ts, 20260216_add_arr_instance_external_url.ts
 -- ==============================================================================
 
 CREATE TABLE arr_instances (
@@ -30,6 +30,7 @@ CREATE TABLE arr_instances (
 
     -- Connection details
     url TEXT NOT NULL,                      -- Base URL (e.g., "http://localhost:7878")
+    external_url TEXT,                      -- Optional browser/Open-in URL override (e.g., "https://radarr.example.com")
     api_key TEXT NOT NULL,                  -- API key for authentication
 
     -- Configuration
