@@ -4,15 +4,16 @@
 
 import type { PCDCache } from '$pcd/index.ts';
 import type {
-  Tag,
-  QualityProfileTableRow,
-  QualityItem,
-  ProfileLanguage,
   CustomFormatCounts,
   CustomFormatCountsByArrType,
+  ProfileLanguage,
+  QualityItem,
   QualityProfileOption,
+  QualityProfileTableRow,
+  Tag,
 } from '$shared/pcd/display.ts';
-import { ARR_APP_TYPES, isArrAppType } from '$shared/arr/capabilities.ts';
+import { ARR_APP_TYPES, type ArrAppType, isArrAppType } from '$shared/arr/capabilities.ts';
+import { QUALITIES } from '$sync/mappings.ts';
 import { parseMarkdown } from '$utils/markdown/markdown.ts';
 
 function createEmptyArrTypeCounts(): CustomFormatCountsByArrType {
@@ -34,11 +35,12 @@ function createEmptyCustomFormatCounts(): Omit<CustomFormatCounts, 'total'> {
  * Get quality profiles with full data for table/card views
  * Optimized to minimize database queries
  */
-export async function list(cache: PCDCache): Promise<QualityProfileTableRow[]> {
+export async function list(cache: PCDCache, arrType?: ArrAppType): Promise<QualityProfileTableRow[]> {
   const db = cache.kb;
+  const applicableArrTypes: Array<'all' | ArrAppType> | null = arrType ? ['all', arrType] : null;
 
   // 1. Get all quality profiles
-  const profiles = await db
+  let profiles = await db
     .selectFrom('quality_profiles')
     .select([
       'id',
@@ -54,7 +56,113 @@ export async function list(cache: PCDCache): Promise<QualityProfileTableRow[]> {
 
   if (profiles.length === 0) return [];
 
-  const profileNames = profiles.map((p) => p.name);
+  if (arrType) {
+    const supportedRows = await db
+      .selectFrom('quality_api_mappings')
+      .select(['quality_name', 'api_name'])
+      .where('arr_type', '=', arrType)
+      .execute();
+
+    const supportedApiNames = new Set(Object.keys(QUALITIES[arrType]));
+    const supportedQualityNames = new Set<string>([...supportedApiNames].map((name) => name.toLowerCase()));
+
+    for (const row of supportedRows) {
+      const qualityName = row.quality_name?.trim();
+      const apiName = row.api_name?.trim();
+
+      if (!qualityName || !apiName) {
+        continue;
+      }
+
+      if (!supportedApiNames.has(apiName)) {
+        continue;
+      }
+
+      supportedQualityNames.add(qualityName.toLowerCase());
+    }
+
+    if (supportedQualityNames.size === 0) {
+      return [];
+    }
+
+    const allProfileNames = profiles.map((profile) => profile.name);
+
+    const directEnabledRows = await db
+      .selectFrom('quality_profile_qualities')
+      .select(['quality_profile_name', 'quality_name'])
+      .where('quality_profile_name', 'in', allProfileNames)
+      .where('enabled', '=', 1)
+      .where('quality_name', 'is not', null)
+      .execute();
+
+    const groupEnabledRows = await db
+      .selectFrom('quality_profile_qualities as qpq')
+      .innerJoin('quality_group_members as qgm', (join) =>
+        join
+          .onRef('qgm.quality_profile_name', '=', 'qpq.quality_profile_name')
+          .onRef('qgm.quality_group_name', '=', 'qpq.quality_group_name')
+      )
+      .select(['qpq.quality_profile_name', 'qgm.quality_name'])
+      .where('qpq.quality_profile_name', 'in', allProfileNames)
+      .where('qpq.enabled', '=', 1)
+      .where('qpq.quality_group_name', 'is not', null)
+      .execute();
+
+    const arrSpecificScoreRows = await db
+      .selectFrom('quality_profile_custom_formats')
+      .select(['quality_profile_name'])
+      .where('quality_profile_name', 'in', allProfileNames)
+      .where('arr_type', '=', arrType)
+      .execute();
+    const hasArrSpecificScores = new Set(arrSpecificScoreRows.map((row) => row.quality_profile_name));
+
+    const enabledQualityNamesByProfile = new Map<string, Set<string>>();
+    const addEnabledQualityName = (profileName: string, qualityName: string | null) => {
+      if (!qualityName) return;
+      if (!enabledQualityNamesByProfile.has(profileName)) {
+        enabledQualityNamesByProfile.set(profileName, new Set());
+      }
+      enabledQualityNamesByProfile.get(profileName)!.add(qualityName.toLowerCase());
+    };
+
+    for (const row of directEnabledRows) {
+      addEnabledQualityName(row.quality_profile_name, row.quality_name);
+    }
+    for (const row of groupEnabledRows) {
+      addEnabledQualityName(row.quality_profile_name, row.quality_name);
+    }
+
+    const compatibleProfileNames = new Set<string>();
+    for (const profile of profiles) {
+      const enabledQualityNames = enabledQualityNamesByProfile.get(profile.name);
+      if (!enabledQualityNames || enabledQualityNames.size === 0) {
+        // Fallback for profiles without enabled qualities: require explicit arr-specific score ownership.
+        if (hasArrSpecificScores.has(profile.name)) {
+          compatibleProfileNames.add(profile.name);
+        }
+        continue;
+      }
+
+      let isCompatible = true;
+      for (const qualityName of enabledQualityNames) {
+        if (!supportedQualityNames.has(qualityName)) {
+          isCompatible = false;
+          break;
+        }
+      }
+
+      if (isCompatible) {
+        compatibleProfileNames.add(profile.name);
+      }
+    }
+
+    profiles = profiles.filter((profile) => compatibleProfileNames.has(profile.name));
+    if (profiles.length === 0) {
+      return [];
+    }
+  }
+
+  const profileNames = profiles.map((profile) => profile.name);
 
   // 2. Get all tags for all profiles
   const allTags = await db
@@ -67,13 +175,18 @@ export async function list(cache: PCDCache): Promise<QualityProfileTableRow[]> {
     .execute();
 
   // 3. Get custom format counts grouped by arr_type
-  const formatCounts = await db
+  const formatCountsBaseQuery = db
     .selectFrom('quality_profile_custom_formats')
     .select(['quality_profile_name', 'arr_type'])
     .select((eb) => eb.fn.count('quality_profile_name').as('count'))
-    .where('quality_profile_name', 'in', profileNames)
-    .groupBy(['quality_profile_name', 'arr_type'])
-    .execute();
+    .where('quality_profile_name', 'in', profileNames);
+
+  const formatCounts = applicableArrTypes
+    ? await formatCountsBaseQuery
+        .where('arr_type', 'in', applicableArrTypes)
+        .groupBy(['quality_profile_name', 'arr_type'])
+        .execute()
+    : await formatCountsBaseQuery.groupBy(['quality_profile_name', 'arr_type']).execute();
 
   // 4. Get all qualities for all profiles with names
   const allQualities = await db

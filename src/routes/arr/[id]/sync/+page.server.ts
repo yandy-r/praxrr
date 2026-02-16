@@ -50,7 +50,7 @@ export const load: ServerLoad = async ({ params }) => {
 
       const [qualityProfiles, delayProfiles, allNamingConfigs, allQualityDefinitionsConfigs, allMediaSettingsConfigs] =
         await Promise.all([
-          qualityProfileQueries.list(cache),
+          qualityProfileQueries.list(cache, arrType),
           delayProfileQueries.list(cache),
           namingQueries.list(cache),
           qualityDefinitionsQueries.list(cache),
