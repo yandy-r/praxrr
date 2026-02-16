@@ -500,18 +500,33 @@ export interface components {
       type: 'radarr';
       items: components['schemas']['RadarrLibraryItem'][];
       profilesByDatabase: components['schemas']['ProfileByDatabase'][];
+      page: number;
+      pageSize: number;
+      totalRecords: number;
+      totalPages: number;
+      hasNext: boolean;
     };
     LibrarySonarrResponse: {
       /** @enum {string} */
       type: 'sonarr';
       items: components['schemas']['SonarrLibraryItem'][];
       profilesByDatabase: components['schemas']['ProfileByDatabase'][];
+      page: number;
+      pageSize: number;
+      totalRecords: number;
+      totalPages: number;
+      hasNext: boolean;
     };
     LibraryLidarrResponse: {
       /** @enum {string} */
       type: 'lidarr';
       items: components['schemas']['LidarrLibraryItem'][];
       profilesByDatabase: components['schemas']['ProfileByDatabase'][];
+      page: number;
+      pageSize: number;
+      totalRecords: number;
+      totalPages: number;
+      hasNext: boolean;
     };
     /**
      * @description Library response varies by instance type.
@@ -946,6 +961,16 @@ export interface operations {
       query: {
         /** @description Arr instance ID */
         instanceId: number;
+        /** @description Page number */
+        page?: number;
+        /** @description Page size (max 250) */
+        pageSize?: number;
+        /** @description Search query */
+        query?: string;
+        /** @description Sort key */
+        sortKey?: string;
+        /** @description Sort direction */
+        sortDirection?: 'asc' | 'desc';
       };
       header?: never;
       path?: never;

@@ -3,6 +3,9 @@ node_modules
 # .vscode
 .vscode/
 
+# Claude
+.claude/settings.local.json
+
 # Output
 .output
 .vercel
@@ -13,6 +16,7 @@ node_modules
 
 # Application
 /temp
+/temp/**
 /config
 .deno-cache/
 
