@@ -128,6 +128,11 @@
 	};
 	const defaultAppType = ARR_APP_OPTIONS[0]!.value;
 	const defaultUrlHint = `Use container name if on the same Docker network, e.g. http://${defaultAppType}:${appPorts[defaultAppType]}`;
+	const externalUrlHints: Record<ArrAppType, string> = {
+		radarr: 'https://radarr.example.com',
+		sonarr: 'https://sonarr.example.com',
+		lidarr: 'https://lidarr.example.com'
+	};
 
 	function joinLabels(labels: string[]): string {
 		if (labels.length === 0) return '';
@@ -261,6 +266,9 @@
 			? `${selectedAppLabel} does not support ${unsupportedSyncSummary} sync in Profilarr yet.${supportedSyncLabels.length > 0 ? ` You can still configure ${supportedSyncSummary}.` : ''}`
 			: '';
 	$: urlPlaceholder = selectedAppType ? `http://localhost:${appPorts[selectedAppType]}` : 'http://localhost:7878';
+	$: externalUrlPlaceholder = selectedAppType
+		? externalUrlHints[selectedAppType]
+		: 'https://{arr}.example.com';
 	$: urlDescription = selectedAppType
 		? `Use container name if on the same Docker network, e.g. http://${selectedAppType}:${appPorts[selectedAppType]}`
 		: defaultUrlHint;
@@ -378,7 +386,7 @@
 				name="external_url"
 				type="url"
 				value={externalUrl}
-				placeholder={urlPlaceholder}
+				placeholder={externalUrlPlaceholder}
 				description="Used for Open in links. API calls still use URL."
 				on:input={(e) => update('externalUrl', e.detail)}
 			/>
