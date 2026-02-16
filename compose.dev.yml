@@ -8,7 +8,7 @@ services:
       dockerfile: Dockerfile
     container_name: profilarr-dev
     ports:
-      - '6969:6969'
+      - '6969:6868'
     volumes:
       - ./config:/config
     environment:
