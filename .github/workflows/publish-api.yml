@@ -2,13 +2,10 @@ name: Publish API Spec
 
 on:
   push:
-    branches:
-      - v2-lidarr
-    paths:
-      - 'docs/api/v1/**'
-      - 'packages/profilarr-api/deno.json'
-
-  workflow_dispatch:
+    tags:
+      - 'v*.*.*'
+      - '!v*.*.*.*'
+      - '!v*-*'
 
 jobs:
   publish:
@@ -53,6 +50,10 @@ jobs:
 
           echo "Only expected generated API files changed."
 
+      - name: Dry run publish to JSR
+        working-directory: packages/profilarr-api
+        run: npx jsr publish --dry-run --allow-dirty
+
       - name: Publish to JSR
         working-directory: packages/profilarr-api
-        run: deno publish --allow-dirty
+        run: npx jsr publish --allow-dirty
