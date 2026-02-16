@@ -61,6 +61,12 @@ Place tests by domain (`src/tests/upgrades`, `src/tests/jobs`, etc.). Use `*.tes
 
 Follow Conventional Commits (`feat:`, `fix:`, `refactor:`, `docs:`, `chore:`). Keep commits and PRs focused on one logical change. PR descriptions should include behavior changes, validation steps (commands run), and linked issues when relevant. Include screenshots for UI updates and update docs when API contracts or workflows change.
 
+### GitHub Template Compliance (Required)
+
+- Every `gh issue create` must use a repository issue template from `.github/ISSUE_TEMPLATE/` (for example via `--template <template-file>`); do not create freeform issues.
+- Every `gh pr create` must use the repository PR template once it exists (default template or equivalent `--body-file` derived from it); do not create freeform PR bodies.
+- If a matching issue/PR template is missing or unclear, stop and ask for direction before creating the issue or PR.
+
 ### GitHub CLI PR Editing Reliability
 
 - When creating or updating PR bodies via shell commands, prefer `--body-file` over inline `--body` strings.
