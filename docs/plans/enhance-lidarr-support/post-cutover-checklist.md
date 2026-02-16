@@ -13,6 +13,7 @@ media-management cutover is complete and correct.
 - [ ] Migration reruns produce identical outcomes (idempotency)
 
 **Test coverage:**
+
 - `src/tests/arr/lidarrFirstClassMigration.test.ts` -- migration idempotency and conflict handling
 - `src/tests/arr/lidarrBuiltInBaseOpsSeed.test.ts` -- seed registration for new databases
 
@@ -26,6 +27,7 @@ media-management cutover is complete and correct.
 - [ ] No Lidarr rows appear in Sonarr entity listings
 
 **Test coverage:**
+
 - `src/tests/arr/lidarrMediaManagement.test.ts` -- end-to-end CRUD operations
 - `src/tests/arr/lidarrMediaSettingsEntityOperations.test.ts` -- media settings entity ops
 - `src/tests/arr/lidarrQualityDefinitionsEntityOperations.test.ts` -- quality definitions entity ops
@@ -38,6 +40,7 @@ media-management cutover is complete and correct.
 - [ ] Rename propagation updates only Lidarr-targeted sync assignments
 
 **Test coverage:**
+
 - `src/tests/arr/lidarrFirstClassRouteAndSyncCutover.test.ts` -- route dispatch and sync resolution
 - `src/tests/jobs/arrSyncLidarrConfigPropagation.test.ts` -- config name propagation
 
@@ -49,6 +52,7 @@ media-management cutover is complete and correct.
 - [ ] Round-trip import/export produces identical payloads
 
 **Test coverage:**
+
 - `src/tests/arr/lidarrFirstClassRouteAndSyncCutover.test.ts` -- import/export contract parity
 - `src/tests/base/lidarrApiParity.test.ts` -- API contract compliance
 
@@ -60,6 +64,7 @@ media-management cutover is complete and correct.
 - [ ] No "experimental", "reuse", or "backed by Sonarr" annotations remain in API docs
 
 **Test coverage:**
+
 - `src/tests/base/lidarrApiParity.test.ts` -- portable contract parity validation
 
 ## Quality Mappings
@@ -70,6 +75,7 @@ media-management cutover is complete and correct.
 - [ ] Unmapped quality names produce explicit errors, not silent fallback
 
 **Test coverage:**
+
 - `src/tests/arr/lidarrQualityMappingPrereqs.test.ts` -- mapping prerequisite validation
 
 ## Legacy Cleanup

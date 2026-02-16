@@ -18,10 +18,7 @@ import type {
   SonarrLibraryItem,
   SonarrRelease,
 } from '../../lib/server/utils/arr/types.ts';
-import {
-  LIDARR_MEDIA_MANAGEMENT_PORTABLE_ENTITIES,
-  ENTITY_TYPES,
-} from '../../lib/shared/pcd/portable.ts';
+import { LIDARR_MEDIA_MANAGEMENT_PORTABLE_ENTITIES, ENTITY_TYPES } from '../../lib/shared/pcd/portable.ts';
 
 type Restore = () => void;
 
@@ -551,9 +548,7 @@ class LidarrApiParityTest extends BaseTest {
 
       // Verify export endpoint rejects unknown entity types
       const response = await exportGet({
-        url: this.createUrl(
-          '/api/v1/pcd/export?databaseId=1&entityType=not_a_real_type&name=test'
-        ),
+        url: this.createUrl('/api/v1/pcd/export?databaseId=1&entityType=not_a_real_type&name=test'),
       } as Parameters<typeof exportGet>[0]);
 
       assertEquals(response.status, 400);
@@ -567,9 +562,7 @@ class LidarrApiParityTest extends BaseTest {
       this.patch(pcdManager, 'getCache', getCacheMock);
 
       const response = await exportGet({
-        url: this.createUrl(
-          '/api/v1/pcd/export?databaseId=999&entityType=lidarr_naming&name=TestNaming'
-        ),
+        url: this.createUrl('/api/v1/pcd/export?databaseId=999&entityType=lidarr_naming&name=TestNaming'),
       } as Parameters<typeof exportGet>[0]);
 
       // We expect 500 (cache not available) rather than 400 (invalid entity type)
@@ -580,8 +573,7 @@ class LidarrApiParityTest extends BaseTest {
     });
 
     this.test('import rejects mixed Lidarr payload with Radarr fields', async () => {
-      const getCacheMock: typeof pcdManager.getCache = () =>
-        ({ kb: {} } as unknown as PCDCacheType);
+      const getCacheMock: typeof pcdManager.getCache = () => ({ kb: {} }) as unknown as PCDCacheType;
       this.patch(pcdManager, 'getCache', getCacheMock);
 
       const response = await importPost({
@@ -613,15 +605,11 @@ class LidarrApiParityTest extends BaseTest {
 
       assertEquals(response.status, 400);
       const body = (await response.json()) as ErrorEnvelope;
-      assertEquals(
-        body.error.includes('Mixed payload for lidarr_naming'),
-        true
-      );
+      assertEquals(body.error.includes('Mixed payload for lidarr_naming'), true);
     });
 
     this.test('import accepts first-class lidarr_media_settings entity type', async () => {
-      const getCacheMock: typeof pcdManager.getCache = () =>
-        ({ kb: {} } as unknown as PCDCacheType);
+      const getCacheMock: typeof pcdManager.getCache = () => ({ kb: {} }) as unknown as PCDCacheType;
       this.patch(pcdManager, 'getCache', getCacheMock);
 
       // Submit a valid lidarr_media_settings payload
@@ -649,10 +637,7 @@ class LidarrApiParityTest extends BaseTest {
       // The key assertion: it must NOT be a 400 with "Invalid entityType".
       const body = (await response.json()) as Record<string, unknown>;
       if (response.status === 400) {
-        assertEquals(
-          (body.error as string).includes('Invalid entityType'),
-          false
-        );
+        assertEquals((body.error as string).includes('Invalid entityType'), false);
       }
     });
 

@@ -45,11 +45,7 @@ async function resolveName(
   const resolved = followRenameChain(databaseId, entityType, candidates[0]);
 
   if (resolved !== candidates[0]) {
-    const row = await cache.kb
-      .selectFrom(tableName)
-      .select('name')
-      .where('name', '=', resolved)
-      .executeTakeFirst();
+    const row = await cache.kb.selectFrom(tableName).select('name').where('name', '=', resolved).executeTakeFirst();
     if (row) return row.name ?? null;
   }
 
