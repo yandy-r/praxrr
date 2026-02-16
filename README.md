@@ -48,6 +48,14 @@ I'm not a developer, though I just know enough to tinker and use lidarr. Don't p
   the first RSS item that qualifies. Profilarr triggers intelligent searches
   based on filters and selectors
 
+### Release Notes
+
+- **Arr "Open in" links now support dual URL mode.** `url` remains the canonical
+  backend API endpoint for Profilarr internal calls. Add `External URL` in Arr
+  instance settings to set browser-facing link targets (for Docker/reverse-proxy
+  deployments) without affecting API connectivity. Clear it to revert to canonical
+  URL behavior.
+
 ### For Developers
 
 - **Unified Architecture** - One configuration language that compiles to

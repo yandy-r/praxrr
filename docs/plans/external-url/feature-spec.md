@@ -91,11 +91,12 @@ Profilarr currently uses one Arr instance URL for both backend API communication
 
 ### Success Criteria
 
-- [ ] Existing instances without `external_url` behave unchanged.
-- [ ] All in-scope "Open in" links use `external_url` when provided.
-- [ ] Arr API clients and jobs still use only canonical `url`.
-- [ ] Users can add/edit/clear External URL from existing instance settings.
-- [ ] Regression tests cover fallback behavior and non-impact on backend connectivity.
+- [x] Existing instances without `external_url` behave unchanged.
+- [x] All in-scope "Open in" links use `external_url` when provided.
+- [x] Arr API clients and jobs still use only canonical `url`.
+- [x] Users can add/edit/clear External URL from existing instance settings.
+- [x] Regression tests cover fallback behavior and non-impact on backend connectivity.
+- [x] Regression tests cover add/update/clear External URL outcomes in CI-required flow coverage.
 
 ## Technical Specifications
 
