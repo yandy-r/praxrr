@@ -1,0 +1,38 @@
+name: 🪄 Tweak
+description: Small suggestions, UI tweaks, or minor improvements
+title: '[Tweak]: '
+labels:
+  - enhancement
+
+body:
+  - type: textarea
+    id: feedback
+    attributes:
+      label: What's the suggestion?
+      placeholder: Describe the change or improvement
+    validations:
+      required: true
+
+  - type: textarea
+    id: screenshot
+    attributes:
+      label: Screenshot
+      description: Optional - attach a screenshot if it helps explain
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - UI / Layout
+        - UX / Workflow
+        - Settings
+        - Quality Profiles
+        - Custom Formats
+        - Regex Patterns
+        - Import / Export
+        - Sync
+        - Databases / PCD
+        - Other
+    validations:
+      required: true
