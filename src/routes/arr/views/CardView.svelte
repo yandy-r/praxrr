@@ -6,6 +6,7 @@
 	import type { ArrInstance } from '$db/queries/arrInstances.ts';
 	import type { ArrIconKey } from '$shared/arr/capabilities.ts';
 	import { ARR_APP_TYPES, getArrAppMetadata, isArrAppType } from '$shared/arr/capabilities.ts';
+	import { resolveInstanceBrowserUrl } from '$shared/arr/instanceUrl.ts';
 	import radarrLogo from '$lib/client/assets/Radarr.svg';
 	import sonarrLogo from '$lib/client/assets/Sonarr.svg';
 	import { createEventDispatcher } from 'svelte';
@@ -71,10 +72,10 @@
 	}
 
 	// Handle external link click
-	function handleExternalClick(e: MouseEvent, url: string) {
+	function handleExternalClick(e: MouseEvent, instance: ArrInstance) {
 		e.stopPropagation();
 		e.preventDefault();
-		window.open(url, '_blank');
+		window.open(resolveInstanceBrowserUrl(instance), '_blank');
 	}
 </script>
 
@@ -132,7 +133,7 @@
 			<div class="relative z-10 flex flex-shrink-0 items-center gap-1">
 				<button
 					type="button"
-					on:click={(e) => handleExternalClick(e, instance.url)}
+					on:click={(e) => handleExternalClick(e, instance)}
 					class="rounded-md p-1.5 text-neutral-400 transition-colors hover:text-neutral-600 dark:text-neutral-500 dark:hover:text-neutral-300"
 				>
 					<ExternalLink size={16} />

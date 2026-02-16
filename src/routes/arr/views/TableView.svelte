@@ -9,6 +9,7 @@
 	import type { ArrInstance } from '$db/queries/arrInstances.ts';
 	import type { ArrIconKey } from '$shared/arr/capabilities.ts';
 	import { ARR_APP_TYPES, getArrAppMetadata, isArrAppType } from '$shared/arr/capabilities.ts';
+	import { resolveInstanceBrowserUrl } from '$shared/arr/instanceUrl.ts';
 	import radarrLogo from '$lib/client/assets/Radarr.svg';
 	import sonarrLogo from '$lib/client/assets/Sonarr.svg';
 	import { createEventDispatcher } from 'svelte';
@@ -78,10 +79,10 @@
 	}
 
 	// Handle external link click
-	function handleExternalClick(e: Event, url: string) {
+	function handleExternalClick(e: Event, instance: ArrInstance) {
 		e.stopPropagation();
 		e.preventDefault();
-		window.open(url, '_blank');
+		window.open(resolveInstanceBrowserUrl(instance), '_blank');
 	}
 
 	// Define table columns
@@ -144,7 +145,7 @@
 			<TableActionButton
 				icon={ExternalLink}
 				title="Open in {getAppLabel(row.type)}"
-				on:click={(e) => handleExternalClick(e, row.url)}
+				on:click={(e) => handleExternalClick(e, row)}
 			/>
 			<TableActionButton
 				icon={Trash2}

@@ -5,6 +5,7 @@
 	import CleanupModal from './CleanupModal.svelte';
 	import { alertStore } from '$alerts/store';
 	import { isDirty, initEdit, update, current, clear } from '$lib/client/stores/dirty';
+	import { isValidExternalUrl } from '$lib/client/validation/arrUrls.ts';
 	import type { ArrInstance } from '$db/queries/arrInstances.ts';
 	import FormInput from '$ui/form/FormInput.svelte';
 	import DropdownSelect from '$ui/dropdown/DropdownSelect.svelte';
@@ -47,6 +48,7 @@
 				name: instance.name,
 				type: instance.type,
 				url: instance.url,
+				externalUrl: instance.external_url ?? '',
 				apiKey: '', // Never pre-populate for security
 				enabled: instance.enabled ? 'true' : 'false',
 				tags: JSON.stringify(parseTags(instance.tags))
@@ -58,6 +60,7 @@
 				name: '',
 				type: initialType,
 				url: '',
+				externalUrl: '',
 				apiKey: '',
 				enabled: 'true',
 				tags: '[]'
@@ -70,9 +73,13 @@
 	$: name = ($current.name ?? '') as string;
 	$: type = ($current.type ?? '') as string;
 	$: url = ($current.url ?? '') as string;
+	$: externalUrl = ($current.externalUrl ?? '') as string;
 	$: apiKey = ($current.apiKey ?? '') as string;
 	$: enabled = ($current.enabled ?? 'true') as string;
 	$: tags = JSON.parse(($current.tags ?? '[]') as string) as string[];
+	$: externalUrlValidationError = isValidExternalUrl(externalUrl)
+		? ''
+		: 'External URL must be a valid http(s) URL.';
 
 	// UI state
 	let saving = false;
@@ -205,6 +212,7 @@
 				name,
 				type,
 				url,
+				externalUrl: externalUrl.trim(),
 				apiKey: '',
 				enabled,
 				tags: JSON.stringify(tags)
@@ -364,6 +372,20 @@
 			required
 			on:input={(e) => update('url', e.detail)}
 		/>
+		<div class="space-y-2">
+			<FormInput
+				label="External URL (optional)"
+				name="external_url"
+				type="url"
+				value={externalUrl}
+				placeholder={urlPlaceholder}
+				description="Used for Open in links. API calls still use URL."
+				on:input={(e) => update('externalUrl', e.detail)}
+			/>
+			{#if externalUrlValidationError}
+				<p class="text-xs text-red-600 dark:text-red-400" role="status">{externalUrlValidationError}</p>
+			{/if}
+		</div>
 		<!-- API Key + Test Connection Row -->
 		<div class="flex flex-col gap-4 md:flex-row md:items-end">
 			<div class="flex-1">
@@ -423,6 +445,7 @@
 	<input type="hidden" name="name" value={name} />
 	<input type="hidden" name="type" value={type} />
 	<input type="hidden" name="url" value={url} />
+	<input type="hidden" name="external_url" value={externalUrl.trim()} />
 	<input type="hidden" name="api_key" value={apiKey} />
 	<input type="hidden" name="enabled" value={enabled === 'true' ? '1' : '0'} />
 	<input type="hidden" name="tags" value={JSON.stringify(tags)} />

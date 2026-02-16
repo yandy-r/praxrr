@@ -43,7 +43,7 @@
 		label: string
 	) => void;
 	export let onRefresh: () => void;
-	export let onOpen: () => void;
+	export let onOpen: () => void = () => {};
 	export let instanceType: string = 'radarr';
 	export let page: number = 1;
 	export let pageSize: number = 100;
@@ -51,6 +51,7 @@
 	export let totalPages: number = 0;
 	export let hasNext: boolean = false;
 	export let isPaginationLoading: boolean = false;
+	export let openUrl = '';
 	export let onPreviousPage: () => void = () => {};
 	export let onNextPage: () => void = () => {};
 	export let onChangePageSize: (nextSize: number) => void = () => {};
@@ -85,6 +86,15 @@
 	function onPageSizeInput(value: number) {
 		if (value <= 0) return;
 		onChangePageSize(value);
+	}
+
+	function handleOpen() {
+		if (openUrl) {
+			window.open(openUrl, '_blank', 'noopener,noreferrer');
+			return;
+		}
+
+		onOpen();
 	}
 </script>
 
@@ -214,7 +224,7 @@
 			<Dropdown position={dropdownPosition} minWidth="10rem">
 				<button
 					type="button"
-					on:click={onOpen}
+					on:click={handleOpen}
 					class="w-full rounded-lg px-4 py-2 text-left text-sm text-neutral-700 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-700"
 				>
 					{openLabel}
