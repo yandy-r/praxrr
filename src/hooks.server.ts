@@ -37,9 +37,9 @@ await pcdManager.initialize();
 if (!setupStateQueries.isDefaultDatabaseLinked()) {
   try {
     await pcdManager.link({
-      name: 'Dictionarry',
+      name: 'Profilarr-DB',
       repositoryUrl: 'https://github.com/yandy-r/profilarr-db',
-      branch: 'v2-lidarr',
+      branch: 'v2',
       syncStrategy: 60,
       autoPull: true,
       personalAccessToken: undefined,

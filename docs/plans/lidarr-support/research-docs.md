@@ -21,7 +21,7 @@
 
 ## README Files
 
-- `/README.md`: Frames this fork as a Lidarr-support branch, warns that “v2-lidarr” is under heavy development, and points to `dictionarry.dev` for “complete installation, usage, and API documentation.” There’s no mention of how to configure Lidarr media-management naming/quality presets or how the UI surfaces Lidarr configs in those sections.
+- `/README.md`: Frames this fork as a Lidarr-support branch, warns that “v2” is under heavy development, and points to `dictionarry.dev` for “complete installation, usage, and API documentation.” There’s no mention of how to configure Lidarr media-management naming/quality presets or how the UI surfaces Lidarr configs in those sections.
 - `src/lib/server/utils/arr/README.md`: Explains the arr client hierarchy and enumerates Radarr/Sonarr/Lidarr/Chaptarr clients with their directory layout. It’s useful for developers needing to see where `LidarrClient` lives, but it doesn’t cover media-management naming/quality settings or how Lidarr-specific behaviors differ from its peers.
 
 ## Must-Read Documents

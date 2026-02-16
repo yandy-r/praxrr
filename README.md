@@ -21,9 +21,9 @@ I'm not a developer, though I just know enough to tinker and use lidarr. Don't p
 <p>Manage quality profiles, custom formats, and media management settings across your Radarr, Sonarr, and Lidarr instances. Define your profiles once with a Git-backed configuration database, then sync them to any number of *arr instances.</p>
 
 > [!WARNING]
-> v2-lidarr is under heavy development and is _NOT_ ready for production use. Use
+> v2 is under heavy development and is _NOT_ ready for production use. Use
 > [Profilarr V1](https://github.com/Dictionarry-Hub/profilarr/tree/main) until
-> v2-lidarr is ready.
+> v2 is ready.
 
 ## Features
 

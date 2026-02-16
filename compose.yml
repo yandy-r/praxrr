@@ -1,6 +1,6 @@
 services:
   profilarr:
-    image: ghcr.io/yandy-r/profilarr:v2-lidarr
+    image: ghcr.io/yandy-r/profilarr:testing
     container_name: profilarr-prod
     restart: unless-stopped
     ports:
@@ -22,7 +22,7 @@ services:
 
   # Optional - only needed for CF/QP testing features
   parser:
-    image: ghcr.io/yandy-r/profilarr-parser:v2-lidarr
+    image: ghcr.io/yandy-r/profilarr-parser:testing
     container_name: profilarr-parser
     restart: unless-stopped
     expose:
