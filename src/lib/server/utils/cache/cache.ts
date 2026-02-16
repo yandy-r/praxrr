@@ -7,6 +7,20 @@ interface CacheEntry<T> {
   expiresAt: number;
 }
 
+export interface ArrLibraryCacheKey {
+  instanceId: number;
+}
+
+export const LIBRARY_CACHE_KEY_PREFIX = 'library';
+
+export function buildArrLibraryCacheKey({ instanceId }: ArrLibraryCacheKey): string {
+  return `${LIBRARY_CACHE_KEY_PREFIX}:${instanceId}:`;
+}
+
+export function getArrLibraryCachePrefix(instanceId: number): string {
+  return `${LIBRARY_CACHE_KEY_PREFIX}:${instanceId}:`;
+}
+
 class Cache {
   private store = new Map<string, CacheEntry<unknown>>();
 

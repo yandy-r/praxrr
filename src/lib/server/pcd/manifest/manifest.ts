@@ -79,7 +79,7 @@ export function validateManifest(manifest: unknown): asserts manifest is Manifes
     // Validate dependencies includes schema (only check for non-empty dependencies)
     const deps = m.dependencies as Record<string, unknown>;
     if (Object.keys(deps).length > 0) {
-      const hasSchema = Object.keys(deps).some((url) => url.includes('/schema'));
+      const hasSchema = Object.keys(deps).some((url) => url.includes('schema'));
       if (!hasSchema) {
         throw new ManifestValidationError('Manifest dependencies must include schema repository');
       }

@@ -18,10 +18,7 @@ import type {
   SonarrLibraryItem,
   SonarrRelease,
 } from '../../lib/server/utils/arr/types.ts';
-import {
-  LIDARR_MEDIA_MANAGEMENT_PORTABLE_ENTITIES,
-  ENTITY_TYPES,
-} from '../../lib/shared/pcd/portable.ts';
+import { LIDARR_MEDIA_MANAGEMENT_PORTABLE_ENTITIES, ENTITY_TYPES } from '../../lib/shared/pcd/portable.ts';
 
 type Restore = () => void;
 
@@ -37,6 +34,11 @@ interface LibraryEnvelope {
     databaseName: string;
     profiles: string[];
   }>;
+  page: number;
+  pageSize: number;
+  totalRecords: number;
+  totalPages: number;
+  hasNext: boolean;
 }
 
 interface ReleasesEnvelope {
@@ -73,6 +75,17 @@ const RADARR_LIBRARY_ITEM: RadarrLibraryItem = {
   isProfilarrProfile: false,
 };
 
+const PAGINATED_RADARR_LIBRARY_ITEMS: RadarrLibraryItem[] = [
+  RADARR_LIBRARY_ITEM,
+  {
+    ...RADARR_LIBRARY_ITEM,
+    id: 6,
+    tmdbId: 202,
+    title: 'Radarr Fixture Two',
+    year: 2024,
+  },
+];
+
 const SONARR_LIBRARY_ITEM: SonarrLibraryItem = {
   id: 2,
   tvdbId: 202,
@@ -103,6 +116,17 @@ const SONARR_LIBRARY_ITEM: SonarrLibraryItem = {
   isProfilarrProfile: false,
 };
 
+const PAGINATED_SONARR_LIBRARY_ITEMS: SonarrLibraryItem[] = [
+  SONARR_LIBRARY_ITEM,
+  {
+    ...SONARR_LIBRARY_ITEM,
+    id: 7,
+    tvdbId: 303,
+    title: 'Sonarr Fixture Two',
+    year: 2024,
+  },
+];
+
 const LIDARR_LIBRARY_ITEM: LidarrLibraryItem = {
   id: 3,
   artistId: 303,
@@ -123,6 +147,18 @@ const LIDARR_LIBRARY_ITEM: LidarrLibraryItem = {
   qualityProfileName: 'Lidarr Profile',
   isProfilarrProfile: false,
 };
+
+const PAGINATED_LIDARR_LIBRARY_ITEMS: LidarrLibraryItem[] = [
+  LIDARR_LIBRARY_ITEM,
+  {
+    ...LIDARR_LIBRARY_ITEM,
+    id: 8,
+    artistId: 404,
+    artistName: 'Lidarr Artist Two',
+    title: 'Lidarr Album Two',
+    year: 2024,
+  },
+];
 
 function buildInstance(id: number, type: string): ArrInstance {
   return {
@@ -287,6 +323,71 @@ class LidarrApiParityTest extends BaseTest {
       });
     });
 
+    this.test('library validates pagination params and defaults', async () => {
+      const getAllDatabasesMock: typeof pcdManager.getAll = () => [];
+      const getByIdMock: typeof arrInstancesQueries.getById = () => buildInstance(11, 'lidarr');
+      const getLibraryMock: typeof LidarrClient.prototype.getLibrary = () => Promise.resolve(PAGINATED_LIDARR_LIBRARY_ITEMS);
+
+      this.patch(pcdManager, 'getAll', getAllDatabasesMock);
+      this.patch(arrInstancesQueries, 'getById', getByIdMock);
+      this.patch(LidarrClient.prototype, 'getLibrary', getLibraryMock);
+
+      const defaultPagination = await libraryGet({
+        url: this.createUrl('/api/v1/arr/library?instanceId=11'),
+      } as Parameters<typeof libraryGet>[0]);
+      const defaultPayload = (await defaultPagination.json()) as LibraryEnvelope;
+
+      assertEquals(defaultPagination.status, 200);
+      assertEquals(defaultPayload.page, 1);
+      assertEquals(defaultPayload.pageSize, 100);
+      assertEquals(defaultPayload.totalRecords, PAGINATED_LIDARR_LIBRARY_ITEMS.length);
+      assertEquals(defaultPayload.totalPages, 1);
+      assertEquals(defaultPayload.hasNext, false);
+      assertEquals(defaultPayload.items.length, 2);
+
+      const invalidPage = await libraryGet({
+        url: this.createUrl('/api/v1/arr/library?instanceId=11&page=bad'),
+      } as Parameters<typeof libraryGet>[0]);
+
+      assertEquals(invalidPage.status, 400);
+      assertEquals((await invalidPage.json()) as ErrorEnvelope, {
+        error: 'Invalid page',
+      });
+
+      const invalidPageSize = await libraryGet({
+        url: this.createUrl('/api/v1/arr/library?instanceId=11&pageSize=0'),
+      } as Parameters<typeof libraryGet>[0]);
+
+      assertEquals(invalidPageSize.status, 400);
+      assertEquals((await invalidPageSize.json()) as ErrorEnvelope, {
+        error: 'Invalid pageSize',
+      });
+
+      const boundedPageSize = await libraryGet({
+        url: this.createUrl('/api/v1/arr/library?instanceId=11&page=1&pageSize=500'),
+      } as Parameters<typeof libraryGet>[0]);
+      const boundedPayload = (await boundedPageSize.json()) as LibraryEnvelope;
+
+      assertEquals(boundedPageSize.status, 200);
+      assertEquals(boundedPayload.page, 1);
+      assertEquals(boundedPayload.pageSize, 250);
+      assertEquals(boundedPayload.totalPages, 1);
+      assertEquals(boundedPayload.items.length, 2);
+
+      const outOfRangePage = await libraryGet({
+        url: this.createUrl('/api/v1/arr/library?instanceId=11&page=99&pageSize=1'),
+      } as Parameters<typeof libraryGet>[0]);
+      const outOfRangePayload = (await outOfRangePage.json()) as LibraryEnvelope;
+
+      assertEquals(outOfRangePage.status, 200);
+      assertEquals(outOfRangePayload.page, 99);
+      assertEquals(outOfRangePayload.pageSize, 1);
+      assertEquals(outOfRangePayload.totalRecords, PAGINATED_LIDARR_LIBRARY_ITEMS.length);
+      assertEquals(outOfRangePayload.totalPages, 2);
+      assertEquals(outOfRangePayload.hasNext, false);
+      assertEquals(outOfRangePayload.items.length, 0);
+    });
+
     this.test('library keeps lidarr and existing arr type parity', async () => {
       let lidarrProfileNamesArg: Set<string> | undefined;
 
@@ -303,13 +404,13 @@ class LidarrApiParityTest extends BaseTest {
 
       const lidarrLibraryMock: typeof LidarrClient.prototype.getLibrary = async (profilarrProfileNames) => {
         lidarrProfileNamesArg = profilarrProfileNames;
-        return [LIDARR_LIBRARY_ITEM];
+        return PAGINATED_LIDARR_LIBRARY_ITEMS;
       };
       const radarrLibraryMock: typeof RadarrClient.prototype.getLibrary = async () => {
-        return [RADARR_LIBRARY_ITEM];
+        return PAGINATED_RADARR_LIBRARY_ITEMS;
       };
       const sonarrLibraryMock: typeof SonarrClient.prototype.getLibrary = async () => {
-        return [SONARR_LIBRARY_ITEM];
+        return PAGINATED_SONARR_LIBRARY_ITEMS;
       };
 
       this.patch(LidarrClient.prototype, 'getLibrary', lidarrLibraryMock);
@@ -317,13 +418,13 @@ class LidarrApiParityTest extends BaseTest {
       this.patch(SonarrClient.prototype, 'getLibrary', sonarrLibraryMock);
 
       const lidarrResponse = await libraryGet({
-        url: this.createUrl('/api/v1/arr/library?instanceId=11'),
+        url: this.createUrl('/api/v1/arr/library?instanceId=11&page=1&pageSize=1'),
       } as Parameters<typeof libraryGet>[0]);
       const radarrResponse = await libraryGet({
-        url: this.createUrl('/api/v1/arr/library?instanceId=12'),
+        url: this.createUrl('/api/v1/arr/library?instanceId=12&page=1&pageSize=1'),
       } as Parameters<typeof libraryGet>[0]);
       const sonarrResponse = await libraryGet({
-        url: this.createUrl('/api/v1/arr/library?instanceId=13'),
+        url: this.createUrl('/api/v1/arr/library?instanceId=13&page=1&pageSize=1'),
       } as Parameters<typeof libraryGet>[0]);
 
       const lidarrPayload = (await lidarrResponse.json()) as LibraryEnvelope;
@@ -348,6 +449,30 @@ class LidarrApiParityTest extends BaseTest {
 
       assertEquals(lidarrProfileNamesArg instanceof Set, true);
       assertEquals(lidarrProfileNamesArg?.size, 0);
+
+      assertEquals(lidarrPayload.page, 1);
+      assertEquals(radarrPayload.page, 1);
+      assertEquals(sonarrPayload.page, 1);
+      assertEquals(lidarrPayload.pageSize, 1);
+      assertEquals(radarrPayload.pageSize, 1);
+      assertEquals(sonarrPayload.pageSize, 1);
+      assertEquals(lidarrPayload.totalRecords, 2);
+      assertEquals(radarrPayload.totalRecords, 2);
+      assertEquals(sonarrPayload.totalRecords, 2);
+      assertEquals(lidarrPayload.totalPages, 2);
+      assertEquals(radarrPayload.totalPages, 2);
+      assertEquals(sonarrPayload.totalPages, 2);
+      assertEquals(lidarrPayload.hasNext, true);
+      assertEquals(radarrPayload.hasNext, true);
+      assertEquals(sonarrPayload.hasNext, true);
+
+      const lidarrItem = lidarrPayload.items[0] as LidarrLibraryItem;
+      const radarrItem = radarrPayload.items[0] as RadarrLibraryItem;
+      const sonarrItem = sonarrPayload.items[0] as SonarrLibraryItem;
+
+      assertEquals(lidarrItem.artistId, 303);
+      assertEquals(radarrItem.tmdbId, 101);
+      assertEquals(sonarrItem.tvdbId, 202);
     });
 
     this.test('library keeps lidarr 500 envelope on client failures', async () => {
@@ -551,9 +676,7 @@ class LidarrApiParityTest extends BaseTest {
 
       // Verify export endpoint rejects unknown entity types
       const response = await exportGet({
-        url: this.createUrl(
-          '/api/v1/pcd/export?databaseId=1&entityType=not_a_real_type&name=test'
-        ),
+        url: this.createUrl('/api/v1/pcd/export?databaseId=1&entityType=not_a_real_type&name=test'),
       } as Parameters<typeof exportGet>[0]);
 
       assertEquals(response.status, 400);
@@ -567,9 +690,7 @@ class LidarrApiParityTest extends BaseTest {
       this.patch(pcdManager, 'getCache', getCacheMock);
 
       const response = await exportGet({
-        url: this.createUrl(
-          '/api/v1/pcd/export?databaseId=999&entityType=lidarr_naming&name=TestNaming'
-        ),
+        url: this.createUrl('/api/v1/pcd/export?databaseId=999&entityType=lidarr_naming&name=TestNaming'),
       } as Parameters<typeof exportGet>[0]);
 
       // We expect 500 (cache not available) rather than 400 (invalid entity type)
@@ -580,8 +701,7 @@ class LidarrApiParityTest extends BaseTest {
     });
 
     this.test('import rejects mixed Lidarr payload with Radarr fields', async () => {
-      const getCacheMock: typeof pcdManager.getCache = () =>
-        ({ kb: {} } as unknown as PCDCacheType);
+      const getCacheMock: typeof pcdManager.getCache = () => ({ kb: {} }) as unknown as PCDCacheType;
       this.patch(pcdManager, 'getCache', getCacheMock);
 
       const response = await importPost({
@@ -613,15 +733,11 @@ class LidarrApiParityTest extends BaseTest {
 
       assertEquals(response.status, 400);
       const body = (await response.json()) as ErrorEnvelope;
-      assertEquals(
-        body.error.includes('Mixed payload for lidarr_naming'),
-        true
-      );
+      assertEquals(body.error.includes('Mixed payload for lidarr_naming'), true);
     });
 
     this.test('import accepts first-class lidarr_media_settings entity type', async () => {
-      const getCacheMock: typeof pcdManager.getCache = () =>
-        ({ kb: {} } as unknown as PCDCacheType);
+      const getCacheMock: typeof pcdManager.getCache = () => ({ kb: {} }) as unknown as PCDCacheType;
       this.patch(pcdManager, 'getCache', getCacheMock);
 
       // Submit a valid lidarr_media_settings payload
@@ -649,10 +765,7 @@ class LidarrApiParityTest extends BaseTest {
       // The key assertion: it must NOT be a 400 with "Invalid entityType".
       const body = (await response.json()) as Record<string, unknown>;
       if (response.status === 400) {
-        assertEquals(
-          (body.error as string).includes('Invalid entityType'),
-          false
-        );
+        assertEquals((body.error as string).includes('Invalid entityType'), false);
       }
     });
 

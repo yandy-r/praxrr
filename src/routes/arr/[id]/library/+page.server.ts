@@ -1,7 +1,7 @@
 import { redirect } from '@sveltejs/kit';
 import type { Actions } from '@sveltejs/kit';
 import { arrInstancesQueries } from '$db/queries/arrInstances.ts';
-import { cache } from '$cache/cache.ts';
+import { cache, getArrLibraryCachePrefix } from '$cache/cache.ts';
 import { cleanupJobsForArrInstance } from '$lib/server/jobs/cleanup.ts';
 
 export const actions: Actions = {
@@ -10,7 +10,7 @@ export const actions: Actions = {
     if (!isNaN(id)) {
       cleanupJobsForArrInstance(id);
       arrInstancesQueries.delete(id);
-      cache.delete(`library:${id}`);
+      cache.deleteByPrefix(getArrLibraryCachePrefix(id));
     }
     redirect(303, '/arr');
   },

@@ -29,6 +29,25 @@ function loadDbOps(databaseId: number, origin: 'base' | 'user', states: PcdOpSta
 }
 
 /**
+ * Resolve the schema dependency ops path.
+ * Supports both "deps/schema" (upstream) and "deps/profilarr-schema" (fork) layouts.
+ */
+async function resolveSchemaOpsPath(pcdPath: string): Promise<string> {
+  const depsPath = `${pcdPath}/deps`;
+  try {
+    for await (const entry of Deno.readDir(depsPath)) {
+      if (entry.isDirectory && entry.name.includes('schema')) {
+        return `${depsPath}/${entry.name}/ops`;
+      }
+    }
+  } catch {
+    // deps directory doesn't exist
+  }
+  // Fallback to original hardcoded path
+  return `${pcdPath}/deps/schema/ops`;
+}
+
+/**
  * Load all operations for a PCD in layer order:
  * 1. Schema layer (from dependency)
  * 2. Base layer (published, then drafts)
@@ -39,7 +58,7 @@ export async function loadAllOperations(pcdPath: string, databaseInstanceId: num
   const allOperations: Operation[] = [];
 
   // 1. Load schema layer from dependency (files)
-  const schemaPath = `${pcdPath}/deps/schema/ops`;
+  const schemaPath = await resolveSchemaOpsPath(pcdPath);
   const schemaOps = await loadOperationsFromDir(schemaPath, 'schema');
   allOperations.push(...schemaOps);
 

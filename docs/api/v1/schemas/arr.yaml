@@ -315,12 +315,18 @@ SonarrEpisodeItem:
       description: Whether the cutoff score has been met
 
 # Library response wrappers
+
 LibraryRadarrResponse:
   type: object
   required:
     - type
     - items
     - profilesByDatabase
+    - page
+    - pageSize
+    - totalRecords
+    - totalPages
+    - hasNext
   properties:
     type:
       type: string
@@ -334,6 +340,21 @@ LibraryRadarrResponse:
       type: array
       items:
         $ref: '#/ProfileByDatabase'
+    page:
+      type: integer
+      description: Current page number
+    pageSize:
+      type: integer
+      description: Current items per page
+    totalRecords:
+      type: integer
+      description: Total number of records after search/filtering before pagination
+    totalPages:
+      type: integer
+      description: Total page count derived from totalRecords and pageSize
+    hasNext:
+      type: boolean
+      description: Indicates whether additional pages are available
 
 LibrarySonarrResponse:
   type: object
@@ -341,6 +362,11 @@ LibrarySonarrResponse:
     - type
     - items
     - profilesByDatabase
+    - page
+    - pageSize
+    - totalRecords
+    - totalPages
+    - hasNext
   properties:
     type:
       type: string
@@ -354,6 +380,21 @@ LibrarySonarrResponse:
       type: array
       items:
         $ref: '#/ProfileByDatabase'
+    page:
+      type: integer
+      description: Current page number
+    pageSize:
+      type: integer
+      description: Current items per page
+    totalRecords:
+      type: integer
+      description: Total number of records after search/filtering before pagination
+    totalPages:
+      type: integer
+      description: Total page count derived from totalRecords and pageSize
+    hasNext:
+      type: boolean
+      description: Indicates whether additional pages are available
 
 LibraryLidarrResponse:
   type: object
@@ -361,6 +402,11 @@ LibraryLidarrResponse:
     - type
     - items
     - profilesByDatabase
+    - page
+    - pageSize
+    - totalRecords
+    - totalPages
+    - hasNext
   properties:
     type:
       type: string
@@ -374,6 +420,21 @@ LibraryLidarrResponse:
       type: array
       items:
         $ref: '#/ProfileByDatabase'
+    page:
+      type: integer
+      description: Current page number
+    pageSize:
+      type: integer
+      description: Current items per page
+    totalRecords:
+      type: integer
+      description: Total number of records after search/filtering before pagination
+    totalPages:
+      type: integer
+      description: Total page count derived from totalRecords and pageSize
+    hasNext:
+      type: boolean
+      description: Indicates whether additional pages are available
 
 LibraryResponse:
   oneOf:

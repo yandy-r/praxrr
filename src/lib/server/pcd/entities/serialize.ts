@@ -12,6 +12,7 @@ import type {
   PortableCustomFormat,
   PortableQualityProfile,
   PortableLidarrMediaSettings,
+  PortableLidarrQualityDefinitions,
   PortableRadarrNaming,
   PortableSonarrNaming,
   PortableMediaSettings,
@@ -271,6 +272,19 @@ export async function serializeSonarrQualityDefinitions(
 ): Promise<PortableQualityDefinitions> {
   const config = await qualityDefsQueries.getSonarrByName(cache, name);
   if (!config) throw new Error(`Sonarr quality definitions "${name}" not found`);
+
+  return {
+    name: config.name,
+    entries: config.entries,
+  };
+}
+
+export async function serializeLidarrQualityDefinitions(
+  cache: PCDCache,
+  name: string
+): Promise<PortableLidarrQualityDefinitions> {
+  const config = await qualityDefsQueries.getLidarrByName(cache, name);
+  if (!config) throw new Error(`Lidarr quality definitions "${name}" not found`);
 
   return {
     name: config.name,

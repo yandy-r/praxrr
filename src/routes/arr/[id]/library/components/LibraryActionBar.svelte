@@ -4,13 +4,17 @@
 		SlidersHorizontal,
 		TableProperties,
 		RefreshCw,
-		ExternalLink
+		ExternalLink,
+		ChevronLeft,
+		ChevronRight,
+		Rows3
 	} from 'lucide-svelte';
 	import ActionsBar from '$ui/actions/ActionsBar.svelte';
 	import SearchAction from '$ui/actions/SearchAction.svelte';
 	import ActionButton from '$ui/actions/ActionButton.svelte';
 	import Dropdown from '$ui/dropdown/Dropdown.svelte';
 	import IconCheckbox from '$ui/form/IconCheckbox.svelte';
+	import NumberInput from '$ui/form/NumberInput.svelte';
 	import { type SearchStore } from '$stores/search';
 
 	type FilterOperator = 'eq' | 'neq';
@@ -41,6 +45,24 @@
 	export let onRefresh: () => void;
 	export let onOpen: () => void;
 	export let instanceType: string = 'radarr';
+	export let page: number = 1;
+	export let pageSize: number = 100;
+	export let totalRecords: number = 0;
+	export let totalPages: number = 0;
+	export let hasNext: boolean = false;
+	export let isPaginationLoading: boolean = false;
+	export let onPreviousPage: () => void = () => {};
+	export let onNextPage: () => void = () => {};
+	export let onChangePageSize: (nextSize: number) => void = () => {};
+	export let disablePaginationControls: boolean = false;
+
+	$: displayStart = totalRecords > 0 ? (page - 1) * pageSize + 1 : 0;
+	$: displayEnd = totalRecords > 0 ? Math.min(page * pageSize, totalRecords) : 0;
+	$: isFirstPage = page <= 1;
+	$: hasVisibleNext = page < totalPages || hasNext;
+	$: isPreviousDisabled = disablePaginationControls || isPaginationLoading || isFirstPage;
+	$: isNextDisabled = disablePaginationControls || isPaginationLoading || !hasVisibleNext;
+	$: displayTotalPages = Math.max(1, totalPages);
 
 	$: isRadarr = instanceType === 'radarr';
 	$: isLidarr = instanceType === 'lidarr';
@@ -59,6 +81,11 @@
 		: isLidarr
 			? 'Filter albums by profile'
 			: 'Filter series by profile';
+
+	function onPageSizeInput(value: number) {
+		if (value <= 0) return;
+		onChangePageSize(value);
+	}
 </script>
 
 <ActionsBar>
@@ -77,10 +104,10 @@
 						<div class="border-b border-neutral-100 dark:border-neutral-700">
 							<div class="bg-neutral-50 px-3 py-2 dark:bg-neutral-800">
 								<span
-									class="text-xs font-medium tracking-wider text-neutral-500 uppercase dark:text-neutral-400"
-									>Quality</span
-								>
-							</div>
+								class="text-xs font-medium tracking-wider text-neutral-500 uppercase dark:text-neutral-400"
+								>Quality</span
+							>
+						</div>
 							{#each uniqueQualities as quality}
 								<button
 									type="button"
@@ -152,7 +179,7 @@
 							on:click={() => onToggleColumn(colKey)}
 							class="flex w-full items-center justify-between gap-3 px-4 py-2 text-sm transition-colors hover:bg-neutral-100 dark:hover:bg-neutral-700 {visibleColumns.has(
 								colKey
-							)
+						)
 								? 'bg-neutral-50 dark:bg-neutral-700'
 								: ''}"
 						>
@@ -195,4 +222,68 @@
 			</Dropdown>
 		</svelte:fragment>
 	</ActionButton>
+	<ActionButton
+		icon={Rows3}
+		hasDropdown={true}
+		dropdownPosition="right"
+		disabled={disablePaginationControls || isPaginationLoading}
+	>
+		<svelte:fragment slot="dropdown" let:dropdownPosition>
+			<Dropdown position={dropdownPosition} minWidth="10rem">
+				<div class="p-3">
+					<label
+						for="libraryPageSize"
+						class="mb-2 block text-xs font-medium text-neutral-600 dark:text-neutral-400"
+					>
+						Rows per page
+					</label>
+					<NumberInput
+						name="libraryPageSize"
+						id="libraryPageSize"
+						bind:value={pageSize}
+						min={10}
+						max={250}
+						step={10}
+						onchange={onPageSizeInput}
+						disabled={disablePaginationControls || isPaginationLoading}
+					/>
+				</div>
+			</Dropdown>
+		</svelte:fragment>
+	</ActionButton>
 </ActionsBar>
+
+<div class="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+	<p
+		role="status"
+		aria-live="polite"
+		aria-atomic="true"
+		class="text-sm text-neutral-600 dark:text-neutral-400"
+	>
+		Showing {displayStart}-{displayEnd} of {totalRecords} records
+	</p>
+	<nav
+		aria-label="Library pagination"
+		class="flex items-center gap-2 text-sm text-neutral-600 dark:text-neutral-400"
+	>
+		<button
+			type="button"
+			aria-label="Previous page"
+			disabled={isPreviousDisabled}
+			on:click={onPreviousPage}
+			class="rounded p-1 transition-colors hover:bg-neutral-200 disabled:cursor-not-allowed disabled:opacity-50 dark:hover:bg-neutral-700"
+		>
+			<ChevronLeft size={20} />
+		</button>
+		<span>Page {page} of {displayTotalPages}</span>
+		<button
+			type="button"
+			aria-label="Next page"
+			disabled={isNextDisabled}
+			on:click={onNextPage}
+			class="rounded p-1 transition-colors hover:bg-neutral-200 disabled:cursor-not-allowed disabled:opacity-50 dark:hover:bg-neutral-700"
+		>
+			<ChevronRight size={20} />
+		</button>
+	</nav>
+</div>

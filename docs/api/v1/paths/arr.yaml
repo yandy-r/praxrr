@@ -12,6 +12,7 @@ library:
 
       Results include Profilarr profile matching to indicate which items use managed profiles.
       Responses are cached server-side for 5 minutes.
+      Supports server-side filtering, sorting, and pagination.
     tags:
       - Arr
     parameters:
@@ -21,6 +22,48 @@ library:
         schema:
           type: integer
         description: Arr instance ID
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+          default: 1
+        description: Pagination page number (1-based)
+      - name: pageSize
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 250
+          default: 100
+        description: |
+          Maximum number of items per page. Values above 250 are capped at 250.
+      - name: sortKey
+        in: query
+        required: false
+        schema:
+          type: string
+        description: |
+          Optional sort field. Must be valid for the target Arr type
+          (radarr, sonarr, or lidarr) or request will be rejected.
+      - name: sortDirection
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+            - asc
+            - desc
+          default: asc
+        description: Sort order for the sortKey field.
+      - name: query
+        in: query
+        required: false
+        schema:
+          type: string
+        description: Optional case-insensitive text filter applied before sorting and pagination.
     responses:
       '200':
         description: Library items with quality and score data
@@ -29,7 +72,7 @@ library:
             schema:
               $ref: '../schemas/arr.yaml#/LibraryResponse'
       '400':
-        description: Invalid or missing instanceId
+        description: Invalid instanceId, page, or sort/query parameters
         content:
           application/json:
             schema:
