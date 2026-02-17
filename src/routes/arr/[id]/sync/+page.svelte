@@ -236,7 +236,7 @@
 </script>
 
 <svelte:head>
-	<title>{data.instance.name} - Sync - Profilarr</title>
+	<title>{data.instance.name} - Sync - Praxrr</title>
 </svelte:head>
 
 <div class="mt-6 space-y-6 pb-32">

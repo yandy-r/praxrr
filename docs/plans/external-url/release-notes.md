@@ -16,10 +16,10 @@ connection tests, and internal service calls).
 
 ## Docker / Reverse-Proxy Guidance
 
-When Profilarr runs inside Docker and Arr is accessed externally via a different
+When Praxrr runs inside Docker and Arr is accessed externally via a different
 hostname or scheme, set `External URL` on each Arr instance to the browser-reachable
 address (for example `https://arr.example.com` or a reverse-proxy path).
-Keep `url` on the internal Docker name if that is what Profilarr uses for API access.
+Keep `url` on the internal Docker name if that is what Praxrr uses for API access.
 
 ## Operations
 

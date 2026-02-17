@@ -48,7 +48,7 @@ export class DiscordNotifier {
       }
 
       const payload = {
-        username: this.config.username || 'Profilarr',
+        username: this.config.username || 'Praxrr',
         avatar_url: this.config.avatar_url,
         content: i === 0 && this.config.enable_mentions ? '@here' : undefined,
         embeds: chunks[i],
@@ -76,7 +76,7 @@ export class DiscordNotifier {
           description: notification.generic.message,
           color,
           timestamp: new Date().toISOString(),
-          footer: { text: 'Profilarr' },
+          footer: { text: 'Praxrr' },
         },
       ];
     }
@@ -88,7 +88,7 @@ export class DiscordNotifier {
         description: 'No content provided',
         color: Colors.INFO,
         timestamp: new Date().toISOString(),
-        footer: { text: 'Profilarr' },
+        footer: { text: 'Praxrr' },
       },
     ];
   }

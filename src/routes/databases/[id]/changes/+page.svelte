@@ -645,7 +645,7 @@
 </script>
 
 <svelte:head>
-	<title>Changes - {data.database.name} - Profilarr</title>
+	<title>Changes - {data.database.name} - Praxrr</title>
 </svelte:head>
 
 <div class="space-y-6">

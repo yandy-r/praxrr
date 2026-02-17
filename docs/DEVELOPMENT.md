@@ -2,7 +2,7 @@
 
 ## Branching Strategy
 
-Profilarr uses **GitHub Flow** with **Release Channels**.
+Praxrr uses **GitHub Flow** with **Release Channels**.
 
 - All development happens on `main`
 - Feature branches for isolated work

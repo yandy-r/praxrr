@@ -1,6 +1,6 @@
 ## Executive Summary
 
-- Profilarr currently reuses the `arr_instances.url` column both for the API clients that talk to Radarr/Sonarr/Lidarr and for every "Open in" link that points users at `/arr/{id}/library` resources. In docker/internal-network deployments this URL is often an internal hostname (e.g. `http://lidarr:8686`) that can’t be reached from the browser, so the UI links break.
+- Praxrr currently reuses the `arr_instances.url` column both for the API clients that talk to Radarr/Sonarr/Lidarr and for every "Open in" link that points users at `/arr/{id}/library` resources. In docker/internal-network deployments this URL is often an internal hostname (e.g. `http://lidarr:8686`) that can’t be reached from the browser, so the UI links break.
 - Introduce an optional `external_url` that mirrors the existing `url` semantics but is only used by the UI surfaces that open browser tabs. All internal API clients continue to use `url`, while the UI prefers `external_url` when available and falls back to `url` otherwise, ensuring existing deployments keep working.
 
 ## Architecture Approach

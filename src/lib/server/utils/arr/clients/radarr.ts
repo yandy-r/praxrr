@@ -67,9 +67,9 @@ export class RadarrClient extends BaseArrClient {
   /**
    * Fetch and compute library data with all joined information
    * Makes 3 API calls: movies, quality profiles, and movie files (batched)
-   * @param profilarrProfileNames - Set of profile names from Profilarr databases
+   * @param praxrrProfileNames - Set of profile names from Praxrr databases
    */
-  async getLibrary(profilarrProfileNames?: Set<string>): Promise<RadarrLibraryItem[]> {
+  async getLibrary(praxrrProfileNames?: Set<string>): Promise<RadarrLibraryItem[]> {
     // Fetch movies and profiles in parallel
     const [movies, profiles] = await Promise.all([this.getMovies(), this.getQualityProfiles()]);
 
@@ -122,7 +122,7 @@ export class RadarrClient extends BaseArrClient {
         minScore,
         progress,
         cutoffMet: customFormatScore >= cutoffScore,
-        isProfilarrProfile: profilarrProfileNames?.has(profileName) ?? false,
+        isPraxrrProfile: praxrrProfileNames?.has(profileName) ?? false,
       };
     });
 

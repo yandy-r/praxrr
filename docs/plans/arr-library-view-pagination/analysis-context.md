@@ -44,7 +44,7 @@ The feature adds server-driven fixed pagination to `/arr/{id}/library` while pre
 
 ## Implementation Constraints
 
-- Upstream Arr library APIs are unpaginated; pagination must be applied in Profilarr after retrieval/filter/sort.
+- Upstream Arr library APIs are unpaginated; pagination must be applied in Praxrr after retrieval/filter/sort.
 - No new DB tables are required for baseline pagination.
 - OpenAPI/runtime contract fidelity must remain aligned.
 - Existing search/filter/column persistence must not regress.

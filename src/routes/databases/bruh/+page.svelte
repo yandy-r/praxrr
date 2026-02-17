@@ -23,7 +23,7 @@
 </script>
 
 <svelte:head>
-	<title>Bruh - Profilarr</title>
+	<title>Bruh - Praxrr</title>
 </svelte:head>
 
 <div class="flex min-h-screen items-center bg-white p-8 dark:bg-neutral-950">

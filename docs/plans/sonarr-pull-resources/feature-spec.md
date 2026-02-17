@@ -41,7 +41,7 @@ This feature adds optional resource selection between pull preview and commit fo
 
 ### User Stories
 
-- As a Sonarr user, I want to import my existing resources into Profilarr without rebuilding them manually.
+- As a Sonarr user, I want to import my existing resources into Praxrr without rebuilding them manually.
 - As a user, I want optional selection by category/item before commit.
 - As a user, if I do not make selection changes, I want all pulled resources imported by default.
 - As a user, I want current dedup/conflict logic to continue unchanged.

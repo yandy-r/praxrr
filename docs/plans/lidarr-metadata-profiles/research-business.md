@@ -2,17 +2,17 @@
 
 ## Executive Summary
 
-Lidarr metadata profiles control which album release types (primary types, secondary types) and release statuses an artist's library should monitor. Adding metadata profile management to Profilarr enables centralized, templated control over what music content Lidarr considers for download -- a critical filtering mechanism that currently has no Profilarr equivalent and must be configured manually per-artist or per-instance. This feature follows the established PCD entity pattern used by quality profiles, delay profiles, and media management entities, and would become a new Lidarr-only sync section.
+Lidarr metadata profiles control which album release types (primary types, secondary types) and release statuses an artist's library should monitor. Adding metadata profile management to Praxrr enables centralized, templated control over what music content Lidarr considers for download -- a critical filtering mechanism that currently has no Praxrr equivalent and must be configured manually per-artist or per-instance. This feature follows the established PCD entity pattern used by quality profiles, delay profiles, and media management entities, and would become a new Lidarr-only sync section.
 
 ## User Stories
 
-### Primary User: Profilarr Administrator Managing Music Libraries
+### Primary User: Praxrr Administrator Managing Music Libraries
 
-- As a Profilarr user, I want to define metadata profiles in my PCD database so that I can curate which album types (Albums, EPs, Singles, etc.) and release statuses (Official, Bootleg, etc.) Lidarr monitors across all my instances.
-- As a Profilarr user, I want to sync metadata profiles to my Lidarr instances so that new artists automatically inherit the correct monitoring filters without manual configuration.
-- As a Profilarr user, I want to manage multiple metadata profiles (e.g., "Discography" for completists vs. "Studio Albums Only" for casual listening) so I can assign different profiles to different instances or use cases.
-- As a Profilarr user, I want metadata profiles to participate in the PCD system (base ops + user ops, import/export, clone) so they are portable and version-controlled like all other Profilarr entities.
-- As a Profilarr user managing multiple Lidarr instances, I want changes to a metadata profile to propagate to all synced instances so I do not have to reconfigure each instance individually.
+- As a Praxrr user, I want to define metadata profiles in my PCD database so that I can curate which album types (Albums, EPs, Singles, etc.) and release statuses (Official, Bootleg, etc.) Lidarr monitors across all my instances.
+- As a Praxrr user, I want to sync metadata profiles to my Lidarr instances so that new artists automatically inherit the correct monitoring filters without manual configuration.
+- As a Praxrr user, I want to manage multiple metadata profiles (e.g., "Discography" for completists vs. "Studio Albums Only" for casual listening) so I can assign different profiles to different instances or use cases.
+- As a Praxrr user, I want metadata profiles to participate in the PCD system (base ops + user ops, import/export, clone) so they are portable and version-controlled like all other Praxrr entities.
+- As a Praxrr user managing multiple Lidarr instances, I want changes to a metadata profile to propagate to all synced instances so I do not have to reconfigure each instance individually.
 
 ### Secondary User: PCD Database Author
 
@@ -56,15 +56,15 @@ Lidarr metadata profiles control which album release types (primary types, secon
 
 6. **Name Uniqueness**: Metadata profile names must be case-insensitively unique within a PCD database, following the existing convention enforced on all PCD entity create/rename paths (see `src/lib/server/pcd/entities/validate.ts`).
 
-7. **Default Profile Handling**: Lidarr instances always have at least one metadata profile. When syncing, Profilarr should create/update profiles by name match (the same pattern used for quality profiles). Profilarr does NOT manage the "default" assignment to artists -- that is done in Lidarr itself. Profilarr only ensures the profile definition exists and is up to date.
+7. **Default Profile Handling**: Lidarr instances always have at least one metadata profile. When syncing, Praxrr should create/update profiles by name match (the same pattern used for quality profiles). Praxrr does NOT manage the "default" assignment to artists -- that is done in Lidarr itself. Praxrr only ensures the profile definition exists and is up to date.
 
 8. **Profile-in-Use Protection**: Metadata profiles assigned to artists in Lidarr cannot be deleted via the Lidarr API (the API returns an error). The sync pipeline should handle this gracefully: sync creates and updates, but does not delete metadata profiles from Lidarr instances.
 
 ### Edge Cases
 
-- **New Type Added Upstream**: If a future Lidarr version adds a new primary/secondary type or release status, existing PCD metadata profiles will not include it. The sync should include all types currently known to Profilarr. Unknown types returned by the Lidarr API should be preserved (pass-through) during updates, similar to how `applyConfigUpdates` works in the media management syncer.
+- **New Type Added Upstream**: If a future Lidarr version adds a new primary/secondary type or release status, existing PCD metadata profiles will not include it. The sync should include all types currently known to Praxrr. Unknown types returned by the Lidarr API should be preserved (pass-through) during updates, similar to how `applyConfigUpdates` works in the media management syncer.
 - **Empty Profile (All Disallowed)**: A metadata profile where all types are `allowed: false` is technically valid but would cause Lidarr to monitor nothing. Validation should warn but not reject this configuration.
-- **Artist-Level Override**: Lidarr allows changing a metadata profile per-artist. Profilarr's sync only manages the profile definition, not the artist-to-profile assignment. This is consistent with how quality profiles work -- Profilarr syncs the profile, but does not assign it to movies/series/artists.
+- **Artist-Level Override**: Lidarr allows changing a metadata profile per-artist. Praxrr's sync only manages the profile definition, not the artist-to-profile assignment. This is consistent with how quality profiles work -- Praxrr syncs the profile, but does not assign it to movies/series/artists.
 - **Multiple Databases**: When multiple PCD databases are synced to the same Lidarr instance, namespace suffixes apply (same as quality profiles). Metadata profile names would need the same invisible namespace suffix treatment.
 
 ## Workflows
@@ -159,7 +159,7 @@ Lidarr metadata profiles control which album release types (primary types, secon
 
 ### Artist Relationship
 
-In Lidarr, each artist has a `metadataProfileId` field. When an artist is added to Lidarr, it gets assigned a metadata profile. The profile controls which albums are fetched from MusicBrainz and monitored. Profilarr does not manage artist assignments -- it only ensures the profile definitions exist in Lidarr. Artists reference profiles by ID (assigned at the Lidarr level).
+In Lidarr, each artist has a `metadataProfileId` field. When an artist is added to Lidarr, it gets assigned a metadata profile. The profile controls which albums are fetched from MusicBrainz and monitored. Praxrr does not manage artist assignments -- it only ensures the profile definitions exist in Lidarr. Artists reference profiles by ID (assigned at the Lidarr level).
 
 ### State Transitions and Lifecycle
 
@@ -318,7 +318,7 @@ CREATE TABLE arr_sync_metadata_profiles_config (
 
 2. **Schema Normalization**: Should the primary type, secondary type, and release status IDs be stored in reference tables (like `qualities` for quality profiles) or as inline integer IDs? The values are fixed by MusicBrainz/Lidarr and unlikely to change. **Recommendation**: Inline integer IDs with a constants file mapping IDs to names (simpler, matches the fixed enumeration nature).
 
-3. **Default Profile Seeding**: Should Profilarr include a built-in default metadata profile (e.g., "Standard - Albums + Official") as a base op seed? **Recommendation**: Yes, seed a sensible default in `seedBuiltInBaseOps.ts` so newly initialized databases have a usable metadata profile out of the box.
+3. **Default Profile Seeding**: Should Praxrr include a built-in default metadata profile (e.g., "Standard - Albums + Official") as a base op seed? **Recommendation**: Yes, seed a sensible default in `seedBuiltInBaseOps.ts` so newly initialized databases have a usable metadata profile out of the box.
 
 4. **Delete Behavior on Sync**: When a metadata profile is deleted from PCD, should the sync actively delete it from Lidarr? Lidarr prevents deleting profiles in use by artists. **Recommendation**: Do NOT delete on sync. Only create and update. Document this as a conscious design choice.
 

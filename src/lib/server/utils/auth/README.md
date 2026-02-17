@@ -1,6 +1,6 @@
 # Auth Module
 
-Authentication and session management for Profilarr.
+Authentication and session management for Praxrr.
 
 ## Auth Modes
 
@@ -22,7 +22,7 @@ Controlled by the `AUTH` environment variable:
 ```mermaid
 sequenceDiagram
     participant U as User
-    participant P as Profilarr
+    participant P as Praxrr
 
     U->>P: GET /
     P->>P: Check: user exists? No
@@ -39,7 +39,7 @@ sequenceDiagram
 ```mermaid
 sequenceDiagram
     participant U as User
-    participant P as Profilarr
+    participant P as Praxrr
 
     U->>P: GET /
     P->>P: Check: has session? No
@@ -56,7 +56,7 @@ sequenceDiagram
 ```mermaid
 sequenceDiagram
     participant U as User
-    participant P as Profilarr
+    participant P as Praxrr
 
     U->>P: GET / (with session cookie)
     P->>P: Validate session
@@ -71,7 +71,7 @@ sequenceDiagram
 ```mermaid
 sequenceDiagram
     participant U as User (192.168.x.x)
-    participant P as Profilarr
+    participant P as Praxrr
 
     U->>P: GET /
     P->>P: Check: AUTH=local + local IP? Yes
@@ -83,7 +83,7 @@ sequenceDiagram
 ```mermaid
 sequenceDiagram
     participant U as User (external)
-    participant P as Profilarr
+    participant P as Praxrr
 
     U->>P: GET /
     P->>P: Check: AUTH=local + local IP? No
@@ -97,7 +97,7 @@ sequenceDiagram
 ```mermaid
 sequenceDiagram
     participant U as User
-    participant P as Profilarr
+    participant P as Praxrr
     participant IDP as OIDC Provider
 
     U->>P: GET /
@@ -123,7 +123,7 @@ sequenceDiagram
 ```mermaid
 sequenceDiagram
     participant U as User
-    participant P as Profilarr
+    participant P as Praxrr
 
     U->>P: GET /
     P->>P: Check: AUTH=off? Yes
@@ -196,7 +196,7 @@ AUTH=on                    # on, local, off, oidc
 
 # OIDC (only when AUTH=oidc)
 OIDC_DISCOVERY_URL=https://auth.example.com/.well-known/openid-configuration
-OIDC_CLIENT_ID=profilarr
+OIDC_CLIENT_ID=praxrr
 OIDC_CLIENT_SECRET=your-secret
 ```
 

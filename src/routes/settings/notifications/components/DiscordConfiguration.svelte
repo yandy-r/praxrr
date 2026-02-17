@@ -61,7 +61,7 @@
 				id="username"
 				name="username"
 				bind:value={username}
-				placeholder="Profilarr"
+				placeholder="Praxrr"
 				class="mt-1 block w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-900 placeholder-neutral-400 focus:border-neutral-400 focus:ring-1 focus:ring-neutral-400 focus:outline-none dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100 dark:placeholder-neutral-500 dark:focus:border-neutral-500 dark:focus:ring-neutral-500"
 			/>
 			<p class="mt-1 text-xs text-neutral-500 dark:text-neutral-400">

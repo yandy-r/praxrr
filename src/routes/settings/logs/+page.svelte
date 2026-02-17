@@ -110,7 +110,7 @@
 		const url = URL.createObjectURL(dataBlob);
 		const link = document.createElement('a');
 		link.href = url;
-		link.download = `profilarr-logs-${new Date().toISOString()}.json`;
+		link.download = `praxrr-logs-${new Date().toISOString()}.json`;
 		link.click();
 		URL.revokeObjectURL(url);
 	}

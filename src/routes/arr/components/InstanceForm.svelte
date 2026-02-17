@@ -253,11 +253,11 @@
   $: supportedSyncSummary = joinLabels(supportedSyncLabels);
   $: unsupportedWorkflowMessage =
     selectedAppType && unsupportedWorkflowLabels.length > 0
-      ? `${selectedAppLabel} does not support ${unsupportedWorkflowSummary} in Profilarr yet.${supportedWorkflowLabels.length > 0 ? ` You can still use ${supportedWorkflowSummary}.` : ''}`
+      ? `${selectedAppLabel} does not support ${unsupportedWorkflowSummary} in Praxrr yet.${supportedWorkflowLabels.length > 0 ? ` You can still use ${supportedWorkflowSummary}.` : ''}`
       : '';
   $: unsupportedSyncMessage =
     selectedAppType && unsupportedSyncLabels.length > 0
-      ? `${selectedAppLabel} does not support ${unsupportedSyncSummary} sync in Profilarr yet.${supportedSyncLabels.length > 0 ? ` You can still configure ${supportedSyncSummary}.` : ''}`
+      ? `${selectedAppLabel} does not support ${unsupportedSyncSummary} sync in Praxrr yet.${supportedSyncLabels.length > 0 ? ` You can still configure ${supportedSyncSummary}.` : ''}`
       : '';
   $: urlPlaceholder = selectedAppType ? `http://localhost:${appPorts[selectedAppType]}` : 'http://localhost:7878';
   $: externalUrlPlaceholder = selectedAppType ? externalUrlHints[selectedAppType] : 'https://{arr}.example.com';

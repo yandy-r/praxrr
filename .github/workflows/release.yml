@@ -85,7 +85,7 @@ jobs:
             --allow-net --allow-read --allow-write \
             --allow-env --allow-ffi --allow-run --allow-sys \
             --target ${{ matrix.deno_target }} \
-            --output dist/staging/profilarr${{ matrix.binary_ext }} \
+            --output dist/staging/praxrr${{ matrix.binary_ext }} \
             dist/build/mod.ts
           cp dist/build/server.js dist/staging/server.js
           cp -r dist/build/static dist/staging/static
@@ -104,12 +104,12 @@ jobs:
       - name: Stage parser binary
         run: |
           cp dist/parser-out/Parser${{ matrix.binary_ext }} \
-             dist/staging/profilarr-parser${{ matrix.binary_ext }}
+             dist/staging/praxrr-parser${{ matrix.binary_ext }}
 
       - name: Create archive
         run: |
           cd dist/staging
-          ARCHIVE_NAME="profilarr-${{ steps.version.outputs.value }}-${{ matrix.platform }}"
+          ARCHIVE_NAME="praxrr-${{ steps.version.outputs.value }}-${{ matrix.platform }}"
           if [ "${{ matrix.archive_ext }}" = "tar.gz" ]; then
             tar -czf "../${ARCHIVE_NAME}.tar.gz" *
           else
@@ -119,8 +119,8 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: profilarr-${{ matrix.platform }}
-          path: dist/profilarr-*.${{ matrix.archive_ext }}
+          name: praxrr-${{ matrix.platform }}
+          path: dist/praxrr-*.${{ matrix.archive_ext }}
 
   release:
     needs: build

@@ -10,7 +10,7 @@
 </script>
 
 <svelte:head>
-	<title>Add Instance - Profilarr</title>
+	<title>Add Instance - Praxrr</title>
 </svelte:head>
 
 <div class="p-8">

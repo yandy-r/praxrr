@@ -145,7 +145,7 @@ async function validateRepository(repositoryUrl: string, personalAccessToken?: s
   const headers: Record<string, string> = {
     Accept: 'application/vnd.github+json',
     'X-GitHub-Api-Version': '2022-11-28',
-    'User-Agent': 'Profilarr',
+    'User-Agent': 'Praxrr',
   };
 
   // If we have a PAT, use it directly to avoid burning unauthenticated rate limit

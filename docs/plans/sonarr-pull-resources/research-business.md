@@ -8,7 +8,7 @@ This feature extends pull into a user-controlled import flow: users fetch Sonarr
 
 ### Primary
 
-- As a Sonarr user, I want to import existing custom formats, quality profiles, delay profiles, and quality definitions into Profilarr.
+- As a Sonarr user, I want to import existing custom formats, quality profiles, delay profiles, and quality definitions into Praxrr.
 - As a migrating user, I want to review pulled resources before writing so I can avoid accidental collisions.
 - As a power user, I want optional per-category/per-item selection before commit.
 
@@ -53,7 +53,7 @@ This feature extends pull into a user-controlled import flow: users fetch Sonarr
 ## Domain Concepts
 
 - Pull Session: preview result set + chosen/default execution plan.
-- Resource Status: `new`, `identical`, `conflict`, `profilarr_managed`.
+- Resource Status: `new`, `identical`, `conflict`, `praxrr_managed`.
 - Selection Mode:
   - explicit mode (user selections provided)
   - implicit mode (default import-all)

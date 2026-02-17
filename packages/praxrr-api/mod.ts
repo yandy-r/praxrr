@@ -1,10 +1,10 @@
 /**
  * @module
- * OpenAPI specification and TypeScript types for the Profilarr API.
+ * OpenAPI specification and TypeScript types for the Praxrr API.
  *
  * ```ts
- * import { spec } from "@yandy-r/profilarr-api";
- * import type { components } from "@yandy-r/profilarr-api";
+ * import { spec } from "@yandy-r/praxrr-api";
+ * import type { components } from "@yandy-r/praxrr-api";
  *
  * // Access the bundled OpenAPI spec
  * console.log(spec.info.title);

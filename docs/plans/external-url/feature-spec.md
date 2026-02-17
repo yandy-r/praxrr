@@ -2,7 +2,7 @@
 
 ## Executive Summary
 
-Profilarr currently uses one Arr instance URL for both backend API communication and frontend "Open in" links. In Docker and internal-network deployments, that URL is often an internal hostname such as `http://lidarr:8686`, which works for server-to-server traffic but fails in user browsers. This feature adds an optional `external_url` field per Arr instance and updates link rendering so browser navigation uses `external_url` when present, otherwise falls back to the existing `url`. The backend must continue to use `url` for all Arr API calls, sync jobs, and tests. The change should apply to existing records without migration backfills, so links update automatically as soon as users set or clear `external_url`.
+Praxrr currently uses one Arr instance URL for both backend API communication and frontend "Open in" links. In Docker and internal-network deployments, that URL is often an internal hostname such as `http://lidarr:8686`, which works for server-to-server traffic but fails in user browsers. This feature adds an optional `external_url` field per Arr instance and updates link rendering so browser navigation uses `external_url` when present, otherwise falls back to the existing `url`. The backend must continue to use `url` for all Arr API calls, sync jobs, and tests. The change should apply to existing records without migration backfills, so links update automatically as soon as users set or clear `external_url`.
 
 ## External Dependencies
 
@@ -66,7 +66,7 @@ Profilarr currently uses one Arr instance URL for both backend API communication
 - As a deployment operator, I want to configure an optional browser-facing URL so "Open in" links work even when canonical Arr URLs are internal hostnames.
 - As a deployment operator, I want links to switch automatically after saving External URL so I do not have to recreate instances.
 
-**Secondary User: Profilarr Administrator**
+**Secondary User: Praxrr Administrator**
 
 - As an admin, I want backend jobs and tests to keep using canonical `url` so existing Docker/internal communication remains stable.
 - As an admin, I want clearing External URL to immediately revert links to canonical `url`.

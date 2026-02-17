@@ -95,7 +95,7 @@ export interface paths {
      *     - For Sonarr: Returns series with season summaries and episode statistics
      *     - For Lidarr: Returns artists/albums (capability-gated; detailed payload fields deferred to later phases)
      *
-     *     Results include Profilarr profile matching to indicate which items use managed profiles.
+     *     Results include Praxrr profile matching to indicate which items use managed profiles.
      *     Responses are cached server-side for 5 minutes.
      */
     get: operations['getLibrary'];
@@ -347,9 +347,9 @@ export interface components {
       score: number;
     };
     ProfileByDatabase: {
-      /** @description Profilarr database ID */
+      /** @description Praxrr database ID */
       databaseId: number;
-      /** @description Profilarr database name */
+      /** @description Praxrr database name */
       databaseName: string;
       /** @description Quality profile names in this database */
       profiles: string[];
@@ -398,8 +398,8 @@ export interface components {
       progress: number;
       /** @description Whether the cutoff score has been met */
       cutoffMet: boolean;
-      /** @description Whether the profile is managed by Profilarr */
-      isProfilarrProfile: boolean;
+      /** @description Whether the profile is managed by Praxrr */
+      isPraxrrProfile: boolean;
     };
     SonarrSeasonItem: {
       /** @description Season number (0 = specials) */
@@ -453,8 +453,8 @@ export interface components {
       dateAdded?: string;
       /** @description Season-level statistics */
       seasons: components['schemas']['SonarrSeasonItem'][];
-      /** @description Whether the profile is managed by Profilarr */
-      isProfilarrProfile: boolean;
+      /** @description Whether the profile is managed by Praxrr */
+      isPraxrrProfile: boolean;
     };
     /**
      * @description Placeholder contract for Lidarr library payload items.

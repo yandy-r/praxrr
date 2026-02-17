@@ -125,7 +125,7 @@ ${extraInserts}
 }
 
 async function createWriteHarness(schemaSql: string): Promise<WriteHarness> {
-  const tempPath = `/tmp/profilarr-tests/lidarr-quality-definitions-entity-${crypto.randomUUID()}`;
+  const tempPath = `/tmp/praxrr-tests/lidarr-quality-definitions-entity-${crypto.randomUUID()}`;
   await Deno.mkdir(`${tempPath}/deps/schema/ops`, { recursive: true });
   await Deno.writeTextFile(`${tempPath}/deps/schema/ops/0.schema.sql`, schemaSql);
 

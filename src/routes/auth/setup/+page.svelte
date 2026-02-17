@@ -22,7 +22,7 @@
 </script>
 
 <svelte:head>
-	<title>Setup - Profilarr</title>
+	<title>Setup - Praxrr</title>
 </svelte:head>
 
 <div class="flex min-h-screen items-center justify-center bg-neutral-100 p-4 dark:bg-neutral-900">
@@ -30,9 +30,9 @@
 		<!-- Header - always first -->
 		<div class="flex flex-col space-y-6 md:flex-1">
 			<div class="flex items-center gap-4">
-				<img src={logo} alt="Profilarr logo" class="h-12 w-12" />
+				<img src={logo} alt="Praxrr logo" class="h-12 w-12" />
 				<div>
-					<h1 class="text-xl font-bold text-neutral-900 dark:text-neutral-50">Welcome to Profilarr</h1>
+					<h1 class="text-xl font-bold text-neutral-900 dark:text-neutral-50">Welcome to Praxrr</h1>
 					<p class="text-sm text-neutral-600 dark:text-neutral-400">
 						Create your admin account to get started.
 					</p>

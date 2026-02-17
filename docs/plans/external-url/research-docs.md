@@ -2,7 +2,7 @@
 
 ## Architecture Docs
 
-- `docs/ARCHITECTURE.md`: outlines how Profilarr wires PCD databases into Arr instances, maps the server/client/shared directories, and calls out `src/lib/server/sync/` and the `arr.sync`/`arr.rename`/`arr.upgrade` jobs that run per `arr_instances` row. Section 4 (“Data Stores” + the App DB overview) explains that the SQLite app DB holds linked Arr credentials, jobs, and PCD ops, so `arr_instances` is the root of every sync, library fetch, and settings edit.
+- `docs/ARCHITECTURE.md`: outlines how Praxrr wires PCD databases into Arr instances, maps the server/client/shared directories, and calls out `src/lib/server/sync/` and the `arr.sync`/`arr.rename`/`arr.upgrade` jobs that run per `arr_instances` row. Section 4 (“Data Stores” + the App DB overview) explains that the SQLite app DB holds linked Arr credentials, jobs, and PCD ops, so `arr_instances` is the root of every sync, library fetch, and settings edit.
 - `src/lib/server/db/schema.sql`: the code-commented arr_instances definition documents `name`, `type`, `url`, `api_key`, `tags`, and timestamps plus the “Purpose: Store configuration for \*arr application instances (Radarr, Sonarr, etc.)” banner; every downstream table (jobs, sync caches, PCD relationships) references `arr_instances(id)`. Adding `external_url` will therefore propagate through these FK-rich tables, and the comment block is the canonical schema reference for the data-model change.
 - `docs/plans/external-url/research-external.md`: captures why Arr APIs do not expose a ready-made “external URL” field, explains the dual-URL model (`external_url ?? url` fallback), and documents that `arrInstancesQueries.getById` already feeds every layout/page with the same row, so a single column addition immediately affects library, release, and card renders.
 
@@ -19,7 +19,7 @@
 
 ## README Files
 
-- `README.md`: describes the core capability of “Bridge — Add your Radarr, Sonarr, and Lidarr instances by URL and API key” and flags Profilarr v2 as a Git-backed configuration tool that syncs to Arr instances. It sets the stage for why Arr link behavior matters (users expect to open those instances from the UI) and points developers toward `docs/CONTRIBUTING.md`/`docs/DEVELOPMENT.md` for setup.
+- `README.md`: describes the core capability of “Bridge — Add your Radarr, Sonarr, and Lidarr instances by URL and API key” and flags Praxrr v2 as a Git-backed configuration tool that syncs to Arr instances. It sets the stage for why Arr link behavior matters (users expect to open those instances from the UI) and points developers toward `docs/CONTRIBUTING.md`/`docs/DEVELOPMENT.md` for setup.
 
 ## Must-Read Documents
 

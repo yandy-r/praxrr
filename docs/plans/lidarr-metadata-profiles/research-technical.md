@@ -137,7 +137,7 @@ These values come directly from [Lidarr source code](https://github.com/Lidarr/L
 | 2   | Bootleg        |
 | 3   | Pseudo-Release |
 
-### New App DB Table (profilarr.db)
+### New App DB Table (praxrr.db)
 
 #### arr_sync_metadata_profiles_config
 
@@ -164,7 +164,7 @@ Follows the same pattern as `arr_sync_delay_profiles_config` (single profile sel
 
 This migration serves two purposes:
 
-1. Creates the `arr_sync_metadata_profiles_config` table in the app DB (profilarr.db).
+1. Creates the `arr_sync_metadata_profiles_config` table in the app DB (praxrr.db).
 2. Inserts a built-in base PCD op that creates the four PCD cache tables (`lidarr_metadata_profiles`, `lidarr_metadata_profile_primary_types`, `lidarr_metadata_profile_secondary_types`, `lidarr_metadata_profile_release_statuses`).
 
 The PCD schema SQL is embedded as a constant in the migration file (same pattern as `/src/lib/server/db/migrations/20260215_add_lidarr_media_management_entities.ts`, lines 1-100+).
@@ -611,7 +611,7 @@ arrSyncQueries.getSyncConfigStatus() // extend to include .metadataProfiles
 
 1. **Default profile sync behavior**: When syncing a metadata profile to Lidarr, should it create a new profile or update a specific existing one? Delay profiles update `id=1` (the default). Metadata profiles do not have a guaranteed default ID. The syncer may need to match by name (like quality profiles) or target a configurable profile ID. **Recommendation**: Match by name, create if not found, update if found -- same as quality profile sync semantics.
 
-2. **Metadata profile assignment to artists**: Lidarr artists carry a `metadataProfileId`. Should Profilarr support bulk-assigning a synced metadata profile to all artists? This is a follow-up feature beyond the initial sync, but worth noting as a future enhancement.
+2. **Metadata profile assignment to artists**: Lidarr artists carry a `metadataProfileId`. Should Praxrr support bulk-assigning a synced metadata profile to all artists? This is a follow-up feature beyond the initial sync, but worth noting as a future enhancement.
 
 3. **Schema endpoint usage**: Lidarr provides `GET /api/v1/metadataprofile/schema` which returns all types with `allowed: false`. Should the syncer call this to discover types dynamically, or hardcode the known types? **Recommendation**: Hardcode for the initial implementation (the types come from MusicBrainz and change extremely rarely -- last addition was years ago). Add a TODO to validate against the schema endpoint as a future enhancement.
 

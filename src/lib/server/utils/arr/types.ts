@@ -610,7 +610,7 @@ export type LidarrProfileLookup = ReadonlyMap<number, LidarrProfileLookupItem>;
 export interface LidarrProfileJoinResult {
   qualityProfileId: number;
   qualityProfileName: string;
-  isProfilarrProfile: boolean;
+  isPraxrrProfile: boolean;
 }
 
 /**
@@ -640,7 +640,7 @@ export interface RadarrLibraryItem {
   minScore: number;
   progress: number; // customFormatScore / cutoffFormatScore (0-1, can exceed 1)
   cutoffMet: boolean;
-  isProfilarrProfile: boolean; // true if profile name matches a Profilarr database profile
+  isPraxrrProfile: boolean; // true if profile name matches a Praxrr database profile
 }
 
 /**
@@ -697,7 +697,7 @@ export interface SonarrLibraryItem {
   percentOfEpisodes: number;
   dateAdded?: string;
   seasons: SonarrSeasonItem[];
-  isProfilarrProfile: boolean;
+  isPraxrrProfile: boolean;
 }
 
 /**

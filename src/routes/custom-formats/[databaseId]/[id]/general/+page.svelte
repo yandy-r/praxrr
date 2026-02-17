@@ -14,7 +14,7 @@
 </script>
 
 <svelte:head>
-	<title>{data.format.name} - General - Profilarr</title>
+	<title>{data.format.name} - General - Praxrr</title>
 </svelte:head>
 
 <GeneralForm

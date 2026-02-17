@@ -1,4 +1,4 @@
-# Contributing to Profilarr
+# Contributing to Praxrr
 
 This file is intentionally lightweight. The full system encyclopedia lives in
 `docs/ARCHITECTURE.md`.
@@ -12,8 +12,8 @@ This file is intentionally lightweight. The full system encyclopedia lives in
 - .NET SDK 8+ (optional, only for the parser service)
 
 ```bash
-git clone https://github.com/yandy-r/profilarr.git
-cd profilarr
+git clone https://github.com/yandy-r/praxrr.git
+cd praxrr
 deno task dev
 ```
 

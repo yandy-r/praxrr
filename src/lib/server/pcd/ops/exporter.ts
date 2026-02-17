@@ -521,7 +521,7 @@ export async function exportDraftOps(
   }
 
   try {
-    const tempDir = await Deno.makeTempDir({ prefix: 'profilarr-export-' });
+    const tempDir = await Deno.makeTempDir({ prefix: 'praxrr-export-' });
     const repoDir = `${tempDir}/repo`;
     const authUrl = buildRemoteUrl(database.repository_url, database.personal_access_token);
     let sourcePath = database.local_path;

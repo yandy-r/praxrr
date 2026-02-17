@@ -1,5 +1,5 @@
 {
-  "workspace": ["packages/profilarr-api"],
+  "workspace": ["packages/praxrr-api"],
   "imports": {
     "$lib/": "./src/lib/",
     "$api/": "./src/lib/api/",
@@ -33,14 +33,14 @@
   "tasks": {
     "dev": "deno run -A scripts/dev.ts",
     "dev:noauth": "AUTH=off deno run -A scripts/dev.ts",
-    "dev:oidc": "AUTH=oidc OIDC_DISCOVERY_URL=http://localhost:8080/realms/profilarr/.well-known/openid-configuration OIDC_CLIENT_ID=profilarr OIDC_CLIENT_SECRET=secret deno run -A scripts/dev.ts",
+    "dev:oidc": "AUTH=oidc OIDC_DISCOVERY_URL=http://localhost:8080/realms/praxrr/.well-known/openid-configuration OIDC_CLIENT_ID=praxrr OIDC_CLIENT_SECRET=secret deno run -A scripts/dev.ts",
     "dev:server": "DENO_ENV=development PORT=6969 HOST=0.0.0.0 APP_BASE_PATH=./dist/dev PARSER_HOST=localhost PARSER_PORT=5000 VITE_PLATFORM=linux-amd64 VITE_CHANNEL=dev deno run -A npm:vite dev",
     "dev:parser": "cd src/services/parser && dotnet watch run --urls http://localhost:5000",
-    "build": "APP_BASE_PATH=./dist/build deno run -A npm:vite build && deno compile --no-check --allow-net --allow-read --allow-write --allow-env --allow-ffi --allow-run --allow-sys --target x86_64-unknown-linux-gnu --output dist/build/profilarr dist/build/mod.ts",
-    "build:windows": "APP_BASE_PATH=./dist/build deno run -A npm:vite build && deno compile --no-check --allow-net --allow-read --allow-write --allow-env --allow-ffi --allow-run --allow-sys --target x86_64-pc-windows-msvc --output dist/windows/profilarr.exe dist/build/mod.ts",
-    "build:standalone": "APP_BASE_PATH=./dist/build VITE_CHANNEL=stable deno run -A npm:vite build && deno compile --no-check --allow-net --allow-read --allow-write --allow-env --allow-ffi --allow-run --allow-sys --target x86_64-unknown-linux-gnu --output dist/release/profilarr dist/build/mod.ts && cp dist/build/server.js dist/release/server.js && cp -r dist/build/static dist/release/static && rm -f src/services/parser/Directory.Build.props && dotnet publish src/services/parser/Parser.csproj -c Release -r linux-x64 --self-contained -p:PublishSingleFile=true -o dist/parser-out/ && mv dist/parser-out/Parser dist/release/profilarr-parser && git checkout src/services/parser/Directory.Build.props",
-    "build:standalone:windows": "APP_BASE_PATH=./dist/build VITE_PLATFORM=windows-amd64 VITE_CHANNEL=stable deno run -A npm:vite build && deno compile --no-check --allow-net --allow-read --allow-write --allow-env --allow-ffi --allow-run --allow-sys --target x86_64-pc-windows-msvc --output dist/release-win/profilarr.exe dist/build/mod.ts && cp dist/build/server.js dist/release-win/server.js && cp -r dist/build/static dist/release-win/static && rm -f src/services/parser/Directory.Build.props && dotnet publish src/services/parser/Parser.csproj -c Release -r win-x64 --self-contained -p:PublishSingleFile=true -o dist/parser-out-win/ && mv dist/parser-out-win/Parser.exe dist/release-win/profilarr-parser.exe && git checkout src/services/parser/Directory.Build.props",
-    "preview": "PORT=6869 HOST=0.0.0.0 APP_BASE_PATH=./dist/dev PARSER_HOST=localhost PARSER_PORT=5000 ./dist/build/profilarr",
+    "build": "APP_BASE_PATH=./dist/build deno run -A npm:vite build && deno compile --no-check --allow-net --allow-read --allow-write --allow-env --allow-ffi --allow-run --allow-sys --target x86_64-unknown-linux-gnu --output dist/build/praxrr dist/build/mod.ts",
+    "build:windows": "APP_BASE_PATH=./dist/build deno run -A npm:vite build && deno compile --no-check --allow-net --allow-read --allow-write --allow-env --allow-ffi --allow-run --allow-sys --target x86_64-pc-windows-msvc --output dist/windows/praxrr.exe dist/build/mod.ts",
+    "build:standalone": "APP_BASE_PATH=./dist/build VITE_CHANNEL=stable deno run -A npm:vite build && deno compile --no-check --allow-net --allow-read --allow-write --allow-env --allow-ffi --allow-run --allow-sys --target x86_64-unknown-linux-gnu --output dist/release/praxrr dist/build/mod.ts && cp dist/build/server.js dist/release/server.js && cp -r dist/build/static dist/release/static && rm -f src/services/parser/Directory.Build.props && dotnet publish src/services/parser/Parser.csproj -c Release -r linux-x64 --self-contained -p:PublishSingleFile=true -o dist/parser-out/ && mv dist/parser-out/Parser dist/release/praxrr-parser && git checkout src/services/parser/Directory.Build.props",
+    "build:standalone:windows": "APP_BASE_PATH=./dist/build VITE_PLATFORM=windows-amd64 VITE_CHANNEL=stable deno run -A npm:vite build && deno compile --no-check --allow-net --allow-read --allow-write --allow-env --allow-ffi --allow-run --allow-sys --target x86_64-pc-windows-msvc --output dist/release-win/praxrr.exe dist/build/mod.ts && cp dist/build/server.js dist/release-win/server.js && cp -r dist/build/static dist/release-win/static && rm -f src/services/parser/Directory.Build.props && dotnet publish src/services/parser/Parser.csproj -c Release -r win-x64 --self-contained -p:PublishSingleFile=true -o dist/parser-out-win/ && mv dist/parser-out-win/Parser.exe dist/release-win/praxrr-parser.exe && git checkout src/services/parser/Directory.Build.props",
+    "preview": "PORT=6869 HOST=0.0.0.0 APP_BASE_PATH=./dist/dev PARSER_HOST=localhost PARSER_PORT=5000 ./dist/build/praxrr",
     "clean:dev": "rm -rf dist/dev",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
@@ -70,7 +70,7 @@
     "test:e2e:reset": "deno run -A scripts/e2e-reset.ts",
     "stats": "bash scripts/stats.sh",
     "bundle:api": "deno run -A scripts/bundle-api.ts",
-    "publish:api": "deno task bundle:api && cd packages/profilarr-api && deno publish"
+    "publish:api": "deno task bundle:api && cd packages/praxrr-api && deno publish"
   },
   "compilerOptions": {
     "lib": ["deno.window", "dom"],

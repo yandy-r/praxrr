@@ -8,8 +8,8 @@ body:
   - type: markdown
     attributes:
       value: |
-        Have an idea for Profilarr? We'd love to hear it. Please check
-        [existing feature requests](https://github.com/yandy-r/profilarr/issues?q=is%3Aissue+label%3Aenhancement)
+        Have an idea for Praxrr? We'd love to hear it. Please check
+        [existing feature requests](https://github.com/yandy-r/praxrr/issues?q=is%3Aissue+label%3Aenhancement)
         before filing to avoid duplicates.
 
   - type: checkboxes

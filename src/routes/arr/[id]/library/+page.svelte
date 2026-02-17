@@ -475,7 +475,7 @@
   // Column Visibility (Radarr)
   // ==========================================================================
 
-  const RADARR_STORAGE_KEY = 'profilarr-library-columns';
+  const RADARR_STORAGE_KEY = 'praxrr-library-columns';
   const RADARR_TOGGLEABLE_COLUMNS = [
     'qualityName',
     'customFormatScore',
@@ -527,7 +527,7 @@
   // Column Visibility (Sonarr)
   // ==========================================================================
 
-  const SONARR_STORAGE_KEY = 'profilarr-library-sonarr-columns';
+  const SONARR_STORAGE_KEY = 'praxrr-library-sonarr-columns';
   const SONARR_TOGGLEABLE_COLUMNS = ['episodes', 'sizeOnDisk', 'dateAdded'] as const;
   type SonarrToggleableColumn = (typeof SONARR_TOGGLEABLE_COLUMNS)[number];
 
@@ -571,7 +571,7 @@
   // Column Visibility (Lidarr)
   // ==========================================================================
 
-  const LIDARR_STORAGE_KEY = 'profilarr-library-lidarr-columns';
+  const LIDARR_STORAGE_KEY = 'praxrr-library-lidarr-columns';
   const LIDARR_TOGGLEABLE_COLUMNS = ['tracks', 'progress', 'sizeOnDisk', 'dateAdded'] as const;
   type LidarrToggleableColumn = (typeof LIDARR_TOGGLEABLE_COLUMNS)[number];
 
@@ -766,7 +766,7 @@
     hasFile: true,
     qualityProfileId: 0,
     qualityProfileName: '',
-    isProfilarrProfile: false,
+    isPraxrrProfile: false,
     qualityName: null,
     customFormatScore: 0,
     cutoffScore: 0,
@@ -845,7 +845,7 @@
     percentOfEpisodes: 0,
     dateAdded: '',
     seasons: [],
-    isProfilarrProfile: false,
+    isPraxrrProfile: false,
   })) as unknown as SonarrLibraryItem[];
 
   // ==========================================================================
@@ -915,7 +915,7 @@
     title: '',
     qualityProfileId: 0,
     qualityProfileName: '',
-    isProfilarrProfile: false,
+    isPraxrrProfile: false,
     monitored: true,
     trackFileCount: 0,
     trackCount: 0,
@@ -1001,7 +1001,7 @@
 </script>
 
 <svelte:head>
-  <title>{instanceName} - Library - Profilarr</title>
+  <title>{instanceName} - Library - Praxrr</title>
 </svelte:head>
 
 <div class="mt-6 space-y-6">
@@ -1251,17 +1251,17 @@
               {:else if column.key === 'qualityProfileName'}
                 <div class="group relative inline-flex">
                   <Badge
-                    variant={row.isProfilarrProfile ? 'accent' : 'warning'}
-                    icon={row.isProfilarrProfile ? null : CircleAlert}
+                    variant={row.isPraxrrProfile ? 'accent' : 'warning'}
+                    icon={row.isPraxrrProfile ? null : CircleAlert}
                     mono
                   >
                     {row.qualityProfileName}
                   </Badge>
-                  {#if !row.isProfilarrProfile}
+                  {#if !row.isPraxrrProfile}
                     <div
                       class="pointer-events-none absolute bottom-full left-1/2 z-10 mb-1 -translate-x-1/2 rounded bg-neutral-800 px-2 py-1 text-xs whitespace-nowrap text-white opacity-0 group-hover:opacity-100 dark:bg-neutral-700"
                     >
-                      Not managed by Profilarr
+                      Not managed by Praxrr
                     </div>
                   {/if}
                 </div>

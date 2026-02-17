@@ -13,7 +13,7 @@
 </script>
 
 <svelte:head>
-	<title>New Test - {data.format.name} - Profilarr</title>
+	<title>New Test - {data.format.name} - Praxrr</title>
 </svelte:head>
 
 <TestForm

@@ -250,7 +250,7 @@ Deno.test({
   sanitizeResources: false,
   fn: async () => {
     const originalBasePath = config.paths.base;
-    const tempBasePath = `/tmp/profilarr-tests/lidarr-metadata-profiles-sync-lifecycle-${crypto.randomUUID()}`;
+    const tempBasePath = `/tmp/praxrr-tests/lidarr-metadata-profiles-sync-lifecycle-${crypto.randomUUID()}`;
 
     await Deno.mkdir(tempBasePath, { recursive: true });
 
@@ -311,7 +311,7 @@ Deno.test({
     assertExists(handler);
 
     const originalBasePath = config.paths.base;
-    const tempBasePath = `/tmp/profilarr-tests/lidarr-metadata-profiles-sync-reporter-${crypto.randomUUID()}`;
+    const tempBasePath = `/tmp/praxrr-tests/lidarr-metadata-profiles-sync-reporter-${crypto.randomUUID()}`;
 
     await Deno.mkdir(tempBasePath, { recursive: true });
 

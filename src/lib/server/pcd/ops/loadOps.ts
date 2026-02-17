@@ -30,7 +30,7 @@ function loadDbOps(databaseId: number, origin: 'base' | 'user', states: PcdOpSta
 
 /**
  * Resolve the schema dependency ops path.
- * Supports both "deps/schema" (upstream) and "deps/profilarr-schema" (fork) layouts.
+ * Supports both "deps/schema" (upstream) and "deps/praxrr-schema" (fork) layouts.
  */
 async function resolveSchemaOpsPath(pcdPath: string): Promise<string> {
   const depsPath = `${pcdPath}/deps`;

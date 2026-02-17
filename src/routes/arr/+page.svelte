@@ -41,7 +41,7 @@
 </script>
 
 <svelte:head>
-	<title>Arr Instances - Profilarr</title>
+	<title>Arr Instances - Praxrr</title>
 </svelte:head>
 
 {#if data.instances.length === 0}
@@ -130,7 +130,7 @@
 		<div>
 			<div class="font-medium text-neutral-900 dark:text-neutral-100">What are Arr Instances?</div>
 			<div class="mt-1">
-				Arr instances are your Radarr and Sonarr applications. Profilarr connects to these instances
+				Arr instances are your Radarr and Sonarr applications. Praxrr connects to these instances
 				to sync quality profiles, custom formats, and other configurations.
 			</div>
 		</div>

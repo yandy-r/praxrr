@@ -118,7 +118,7 @@ class NotificationBuilder {
  *       .field('Mode', 'Live', true)
  *       .color(Colors.SUCCESS)
  *       .timestamp()
- *       .footer('Profilarr')
+ *       .footer('Praxrr')
  *     )
  *   )
  *   .send();

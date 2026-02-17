@@ -60,9 +60,9 @@
         {
           key: 'docs',
           label: 'Repo',
-          value: 'https://github.com/yandy-r/profilarr',
+          value: 'https://github.com/yandy-r/praxrr',
           type: 'link',
-          href: 'https://github.com/yandy-r/profilarr',
+          href: 'https://github.com/yandy-r/praxrr',
         },
         {
           key: 'github',
@@ -106,7 +106,7 @@
     {
       name: 'yandy-r',
       remark: 'No gatekeeping allowed',
-      tags: ['UnOfficial Profilarr Developer', 'Database Hater'],
+      tags: ['UnOfficial Praxrr Developer', 'Database Hater'],
     },
     {
       name: 'Seraphys',
@@ -140,7 +140,7 @@
 </script>
 
 <div class="p-4 md:p-8">
-  <h1 class="mb-6 text-3xl font-bold text-neutral-900 dark:text-neutral-50">About Profilarr</h1>
+  <h1 class="mb-6 text-3xl font-bold text-neutral-900 dark:text-neutral-50">About Praxrr</h1>
 
   <div class="space-y-6">
     <div class="space-y-2">

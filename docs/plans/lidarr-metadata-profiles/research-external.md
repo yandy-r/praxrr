@@ -186,7 +186,7 @@ Key behaviors:
 
 ### No TypeScript/JavaScript Library Available
 
-There is no published TypeScript or JavaScript client library for the Lidarr API on npm. The Profilarr project already has its own `LidarrClient` class extending `BaseArrClient`, so adding metadata profile methods directly to this existing client is the recommended approach.
+There is no published TypeScript or JavaScript client library for the Lidarr API on npm. The Praxrr project already has its own `LidarrClient` class extending `BaseArrClient`, so adding metadata profile methods directly to this existing client is the recommended approach.
 
 **Confidence**: High -- searched npm and major package registries; no TS/JS Lidarr client package exists.
 
@@ -218,7 +218,7 @@ There is no published TypeScript or JavaScript client library for the Lidarr API
 
 ## Integration Patterns
 
-### Recommended Approach for Profilarr
+### Recommended Approach for Praxrr
 
 #### 1. Extend LidarrClient with Metadata Profile Methods
 
@@ -377,8 +377,8 @@ const SUPPORTED_SYNC_SECTIONS: Record<SyncArrType, readonly SectionType[]> = {
 
 ### Authentication Flow
 
-1. User configures Lidarr instance in Profilarr with URL + API key
-2. Profilarr stores API key in the `arr_instances` database table
+1. User configures Lidarr instance in Praxrr with URL + API key
+2. Praxrr stores API key in the `arr_instances` database table
 3. `LidarrClient` is instantiated via `createArrClient('lidarr', url, apiKey)`
 4. All requests include `X-Api-Key` header (handled by `BaseArrClient` constructor)
 5. No OAuth, no token refresh, no session management needed
@@ -403,7 +403,7 @@ The sync flow for metadata profiles should follow the existing pattern used for 
 ### 1. "None" is a Reserved Profile Name
 
 **Impact**: Creating or updating a profile with the name "None" will fail with a validation error.
-**Workaround**: Validate profile names client-side before sending to the API. This is already consistent with Profilarr's case-insensitive uniqueness enforcement.
+**Workaround**: Validate profile names client-side before sending to the API. This is already consistent with Praxrr's case-insensitive uniqueness enforcement.
 
 **Confidence**: High -- confirmed from controller source code.
 
@@ -612,7 +612,7 @@ Lidarr's type system is derived from MusicBrainz but is not identical:
 
 ---
 
-## Existing Profilarr Architecture Context
+## Existing Praxrr Architecture Context
 
 ### Current LidarrClient Location
 
@@ -641,13 +641,13 @@ Lidarr's type system is derived from MusicBrainz but is not identical:
 
 1. **PCD Entity Design**: Should metadata profiles be a new top-level PCD entity type (like quality profiles and custom formats), or should they be nested under media management? Quality profiles already have their own entity category; metadata profiles feel analogous enough to warrant the same treatment.
 
-2. **Default Profile Contents**: What should the Profilarr default metadata profile include? The Lidarr default is conservative (Album + Studio + Official). Should Profilarr provide multiple presets (e.g., "Standard", "Comprehensive", "Singles + EPs")?
+2. **Default Profile Contents**: What should the Praxrr default metadata profile include? The Lidarr default is conservative (Album + Studio + Official). Should Praxrr provide multiple presets (e.g., "Standard", "Comprehensive", "Singles + EPs")?
 
 3. **Schema Endpoint vs. Hardcoded Constants**: Should the sync pipeline call the schema endpoint on each Lidarr instance to discover available types, or rely on hardcoded constants from the source code? The schema endpoint is more future-proof but adds an API call. Hardcoded constants are faster but need updating if Lidarr adds new types.
 
-4. **Delete Protection**: Should Profilarr protect the default "None" profile or any profile with assigned artists from deletion? The API validates this server-side, but client-side guards would provide better UX.
+4. **Delete Protection**: Should Praxrr protect the default "None" profile or any profile with assigned artists from deletion? The API validates this server-side, but client-side guards would provide better UX.
 
-5. **Rename Propagation**: If a metadata profile is renamed in Profilarr, should the rename propagate to all synced Lidarr instances? This is consistent with quality profile rename behavior but needs explicit implementation.
+5. **Rename Propagation**: If a metadata profile is renamed in Praxrr, should the rename propagate to all synced Lidarr instances? This is consistent with quality profile rename behavior but needs explicit implementation.
 
 6. **Library View Impact**: Should the Lidarr library view (`/arr/[id]/library`) display metadata profile information alongside quality profile data? This could help users understand why certain albums appear or are missing for an artist.
 

@@ -42,10 +42,10 @@ ProfileByDatabase:
   properties:
     databaseId:
       type: integer
-      description: Profilarr database ID
+      description: Praxrr database ID
     databaseName:
       type: string
-      description: Profilarr database name
+      description: Praxrr database name
     profiles:
       type: array
       items:
@@ -61,7 +61,7 @@ RadarrLibraryItem:
     - hasFile
     - qualityProfileId
     - qualityProfileName
-    - isProfilarrProfile
+    - isPraxrrProfile
     - customFormatScore
     - cutoffScore
     - minScore
@@ -131,9 +131,9 @@ RadarrLibraryItem:
     cutoffMet:
       type: boolean
       description: Whether the cutoff score has been met
-    isProfilarrProfile:
+    isPraxrrProfile:
       type: boolean
-      description: Whether the profile is managed by Profilarr
+      description: Whether the profile is managed by Praxrr
 
 # Library endpoint types - Sonarr
 SonarrSeasonItem:
@@ -184,7 +184,7 @@ SonarrLibraryItem:
     - sizeOnDisk
     - percentOfEpisodes
     - seasons
-    - isProfilarrProfile
+    - isPraxrrProfile
   properties:
     id:
       type: integer
@@ -237,9 +237,9 @@ SonarrLibraryItem:
       items:
         $ref: '#/SonarrSeasonItem'
       description: Season-level statistics
-    isProfilarrProfile:
+    isPraxrrProfile:
       type: boolean
-      description: Whether the profile is managed by Profilarr
+      description: Whether the profile is managed by Praxrr
 
 LidarrLibraryItem:
   type: object

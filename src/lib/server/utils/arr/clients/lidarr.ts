@@ -67,9 +67,9 @@ export class LidarrClient extends BaseArrClient {
    * Fetch and compute Lidarr library data (album-level)
    * Joins albums with artists and quality profiles to provide a normalized route contract.
    * Makes 3 API calls: artists, quality profiles, and albums
-   * @param profilarrProfileNames - Set of profile names from Profilarr databases
+   * @param praxrrProfileNames - Set of profile names from Praxrr databases
    */
-  async getLibrary(profilarrProfileNames?: Set<string>): Promise<LidarrLibraryItem[]> {
+  async getLibrary(praxrrProfileNames?: Set<string>): Promise<LidarrLibraryItem[]> {
     const [artists, profiles] = await Promise.all([this.getArtists(), this.getQualityProfiles()]);
 
     const profileLookupEntries: Array<[number, LidarrProfileLookupItem]> = profiles.map((profile) => [
@@ -87,7 +87,7 @@ export class LidarrClient extends BaseArrClient {
     return albums.map((album) => {
       const artist = artistLookup.get(album.artistId);
       const qualityProfileId = this.resolveQualityProfileId(album, artist);
-      const profileJoin = this.resolveProfileJoin(qualityProfileId, profileLookup, profilarrProfileNames);
+      const profileJoin = this.resolveProfileJoin(qualityProfileId, profileLookup, praxrrProfileNames);
       const releaseDate = album.releaseDate ?? undefined;
       const year = this.getReleaseYear(releaseDate);
       const stats = album.statistics;
@@ -201,18 +201,18 @@ export class LidarrClient extends BaseArrClient {
   }
 
   /**
-   * Join a resolved profile ID against the profile lookup and Profilarr names
+   * Join a resolved profile ID against the profile lookup and Praxrr names
    */
   private resolveProfileJoin(
     qualityProfileId: number,
     profileLookup: LidarrProfileLookup,
-    profilarrProfileNames?: Set<string>
+    praxrrProfileNames?: Set<string>
   ): LidarrProfileJoinResult {
     const qualityProfileName = profileLookup.get(qualityProfileId)?.name ?? 'Unknown';
     return {
       qualityProfileId,
       qualityProfileName,
-      isProfilarrProfile: profilarrProfileNames?.has(qualityProfileName) ?? false,
+      isPraxrrProfile: praxrrProfileNames?.has(qualityProfileName) ?? false,
     };
   }
 

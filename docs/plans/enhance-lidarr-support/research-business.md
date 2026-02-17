@@ -61,4 +61,4 @@ The core business requirement is domain correctness: Lidarr must no longer behav
 - `src/lib/server/sync/mediaManagement/syncer.ts`
 - `src/lib/server/db/queries/arrSync.ts`
 - `docs/api/v1/schemas/pcd.yaml`
-- <https://github.com/yandy-r/profilarr/issues/130>
+- <https://github.com/yandy-r/praxrr/issues/130>

@@ -148,7 +148,7 @@
 </script>
 
 <svelte:head>
-	<title>{data.instance.name} - Logs - Profilarr</title>
+	<title>{data.instance.name} - Logs - Praxrr</title>
 </svelte:head>
 
 <div class="mt-6">

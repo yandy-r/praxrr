@@ -6,7 +6,7 @@ import { getCachedReleases, type GitHubRelease } from '$lib/server/utils/github/
 type VersionStatus = 'up-to-date' | 'out-of-date' | 'dev-build';
 
 async function fetchGitHubReleases(): Promise<GitHubRelease[]> {
-  return getCachedReleases('yandy-r', 'profilarr');
+  return getCachedReleases('yandy-r', 'praxrr');
 }
 
 function compareVersions(v1: string, v2: string): number {

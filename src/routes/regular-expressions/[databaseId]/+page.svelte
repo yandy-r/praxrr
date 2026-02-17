@@ -141,7 +141,7 @@
 </script>
 
 <svelte:head>
-	<title>Regular Expressions - {data.currentDatabase.name} - Profilarr</title>
+	<title>Regular Expressions - {data.currentDatabase.name} - Praxrr</title>
 </svelte:head>
 
 <div class="space-y-6 px-4 pt-4 pb-8 md:px-8">
@@ -205,12 +205,12 @@
 		<section>
 			<h3 class="mb-2 font-semibold text-neutral-900 dark:text-neutral-100">How It Works</h3>
 			<p>
-				Regular expressions in Profilarr are separated from custom formats to make them reusable.
+				Regular expressions in Praxrr are separated from custom formats to make them reusable.
 				When multiple custom formats share the same pattern, you only need to update it in one
 				place.
 			</p>
 			<p class="mt-2">
-				When custom formats are synced to your Arr instances, Profilarr compiles the referenced
+				When custom formats are synced to your Arr instances, Praxrr compiles the referenced
 				patterns into the format each Arr expects. The regular expressions themselves are
 				<strong>not</strong> synced directly—only the compiled custom formats are.
 			</p>

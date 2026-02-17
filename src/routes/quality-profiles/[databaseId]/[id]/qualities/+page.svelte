@@ -543,7 +543,7 @@
 </script>
 
 <svelte:head>
-	<title>Qualities - Profilarr</title>
+	<title>Qualities - Praxrr</title>
 </svelte:head>
 
 <StickyCard position="top">

@@ -20,7 +20,7 @@
 </script>
 
 <svelte:head>
-	<title>New Quality Profile - {data.currentDatabase.name} - Profilarr</title>
+	<title>New Quality Profile - {data.currentDatabase.name} - Praxrr</title>
 </svelte:head>
 
 <div class="p-8">

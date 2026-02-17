@@ -13,13 +13,13 @@ interface TestNotificationParams {
  */
 export const test = ({ config }: TestNotificationParams) =>
   notify('test')
-    .generic('Test Notification', 'This is a test notification from Profilarr.')
+    .generic('Test Notification', 'This is a test notification from Praxrr.')
     .discord((d) =>
       d.embed(
         createEmbed()
-          .author(config.username || 'Profilarr', config.avatar_url)
+          .author(config.username || 'Praxrr', config.avatar_url)
           .description(
-            'This is a test notification from Profilarr. If you received this, your notification service is working correctly!'
+            'This is a test notification from Praxrr. If you received this, your notification service is working correctly!'
           )
           .color(Colors.INFO)
           .timestamp()

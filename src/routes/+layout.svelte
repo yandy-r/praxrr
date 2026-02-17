@@ -15,7 +15,7 @@
 
 <svelte:head>
 	<link rel="icon" href={logo} />
-	<title>Profilarr</title>
+	<title>Praxrr</title>
 </svelte:head>
 
 {#if !isAuthPage}

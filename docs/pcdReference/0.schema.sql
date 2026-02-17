@@ -41,7 +41,7 @@ CREATE TABLE qualities (
     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
--- Maps Profilarr canonical qualities to arr-specific API names
+-- Maps Praxrr canonical qualities to arr-specific API names
 -- Absence of a row means the quality doesn't exist for that arr
 -- Uses stable key: quality_name
 CREATE TABLE quality_api_mappings (

@@ -140,7 +140,7 @@ function startNewEmbed(
   manual: boolean
 ): EmbedBuilder {
   const embed = createEmbed()
-    .author(config.username || 'Profilarr', config.avatar_url)
+    .author(config.username || 'Praxrr', config.avatar_url)
     .title(`${getTitle(log, manual)} - ${log.instanceName}`)
     .color(Colors.INFO)
     .timestamp()
@@ -200,7 +200,7 @@ export const upgrade = ({ log, config, manual = false }: UpgradeNotificationPara
   // If no items searched, single embed with just stats
   if (log.selection.items.length === 0) {
     const embed = createEmbed()
-      .author(config.username || 'Profilarr', config.avatar_url)
+      .author(config.username || 'Praxrr', config.avatar_url)
       .title(`${getTitle(log, manual)} - ${log.instanceName}`)
       .color(Colors.INFO)
       .field('Filter', log.filter.name || 'Unknown', true)

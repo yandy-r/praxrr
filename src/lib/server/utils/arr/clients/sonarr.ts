@@ -67,9 +67,9 @@ export class SonarrClient extends BaseArrClient {
   /**
    * Fetch and compute library data (series-level, no episode details)
    * Makes 2 API calls: series and quality profiles
-   * @param profilarrProfileNames - Set of profile names from Profilarr databases
+   * @param praxrrProfileNames - Set of profile names from Praxrr databases
    */
-  async getLibrary(profilarrProfileNames?: Set<string>): Promise<SonarrLibraryItem[]> {
+  async getLibrary(praxrrProfileNames?: Set<string>): Promise<SonarrLibraryItem[]> {
     const [allSeries, profiles] = await Promise.all([this.getAllSeries(), this.getQualityProfiles()]);
 
     const profileMap = new Map(profiles.map((p) => [p.id, p]));
@@ -103,7 +103,7 @@ export class SonarrClient extends BaseArrClient {
           sizeOnDisk: s.statistics.sizeOnDisk,
           percentOfEpisodes: s.statistics.percentOfEpisodes,
         })),
-        isProfilarrProfile: profilarrProfileNames?.has(profileName) ?? false,
+        isPraxrrProfile: praxrrProfileNames?.has(profileName) ?? false,
       };
     });
   }

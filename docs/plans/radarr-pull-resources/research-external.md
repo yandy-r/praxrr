@@ -56,7 +56,7 @@ Optional reference SDKs only (not required for implementation):
   - validate connectivity with `GET /api/v3/system/status`
   - call selected resource endpoints with existing Arr client
 - Pull pattern:
-  - preview: fetch + classify (`new`/`identical`/`conflict`/`profilarr_managed`)
+  - preview: fetch + classify (`new`/`identical`/`conflict`/`praxrr_managed`)
   - execute: commit selected entities OR default to all previewed entities when `selections` is omitted/empty
 - Error handling:
   - robust non-2xx handling (`401/403/404/5xx`)

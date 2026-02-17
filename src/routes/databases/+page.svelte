@@ -42,14 +42,14 @@
 </script>
 
 <svelte:head>
-	<title>Databases - Profilarr</title>
+	<title>Databases - Praxrr</title>
 </svelte:head>
 
 {#if data.databases.length === 0}
 	<EmptyState
 		icon={Database}
 		title="No Databases Linked"
-		description="Link a Profilarr Compliant Database to get started with profile management."
+		description="Link a Praxrr Compliant Database to get started with profile management."
 		buttonText="Link Database"
 		buttonHref="/databases/new"
 		buttonIcon={Plus}
@@ -134,7 +134,7 @@
 		<div>
 			<div class="font-medium text-neutral-900 dark:text-neutral-100">What are Databases?</div>
 			<div class="mt-1">
-				Databases are Profilarr Compliant Database (PCD) repositories containing quality profiles,
+				Databases are Praxrr Compliant Database (PCD) repositories containing quality profiles,
 				custom formats, and other configurations. Link a database to import and sync configurations
 				to your Arr instances.
 			</div>
@@ -152,7 +152,7 @@
 		<div>
 			<div class="font-medium text-neutral-900 dark:text-neutral-100">Sync Strategy</div>
 			<div class="mt-1">
-				Controls how often Profilarr checks for updates from the remote repository. Set to "Manual"
+				Controls how often Praxrr checks for updates from the remote repository. Set to "Manual"
 				to only sync when you explicitly trigger it, or choose an interval for automatic updates.
 			</div>
 		</div>

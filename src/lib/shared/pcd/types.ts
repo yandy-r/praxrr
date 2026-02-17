@@ -3,7 +3,7 @@
  *
  * AUTO-GENERATED - DO NOT EDIT MANUALLY
  *
- * Generated from: https://github.com/yandy-r/profilarr-schema/blob/1.0.0/ops/0.schema.sql
+ * Generated from: https://github.com/yandy-r/praxrr-schema/blob/1.0.0/ops/0.schema.sql
  * Generated at: 2026-01-27T13:04:08.653Z
  *
  * To regenerate: deno task generate:pcd-types --version=1.0.0

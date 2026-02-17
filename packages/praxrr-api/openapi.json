@@ -1,8 +1,8 @@
 {
   "openapi": "3.1.0",
   "info": {
-    "title": "Profilarr API",
-    "description": "API for Profilarr - Profile management and sync for *arr applications",
+    "title": "Praxrr API",
+    "description": "API for Praxrr - Profile management and sync for *arr applications",
     "version": "1.0.0",
     "license": {
       "name": "MIT",
@@ -125,7 +125,7 @@
       "get": {
         "operationId": "getLibrary",
         "summary": "Get Arr instance library",
-        "description": "Fetches the full library from an Arr instance with quality profile,\nscore, and progress information.\n\n- For Radarr: Returns movies with file quality, custom format scores, and cutoff progress\n- For Sonarr: Returns series with season summaries and episode statistics\n- For Lidarr: Returns artists/albums (capability-gated; detailed payload fields deferred to later phases)\n\nResults include Profilarr profile matching to indicate which items use managed profiles.\nResponses are cached server-side for 5 minutes.\n",
+        "description": "Fetches the full library from an Arr instance with quality profile,\nscore, and progress information.\n\n- For Radarr: Returns movies with file quality, custom format scores, and cutoff progress\n- For Sonarr: Returns series with season summaries and episode statistics\n- For Lidarr: Returns artists/albums (capability-gated; detailed payload fields deferred to later phases)\n\nResults include Praxrr profile matching to indicate which items use managed profiles.\nResponses are cached server-side for 5 minutes.\n",
         "tags": ["Arr"],
         "parameters": [
           {
@@ -943,11 +943,11 @@
         "properties": {
           "databaseId": {
             "type": "integer",
-            "description": "Profilarr database ID"
+            "description": "Praxrr database ID"
           },
           "databaseName": {
             "type": "string",
-            "description": "Profilarr database name"
+            "description": "Praxrr database name"
           },
           "profiles": {
             "type": "array",
@@ -966,7 +966,7 @@
           "hasFile",
           "qualityProfileId",
           "qualityProfileName",
-          "isProfilarrProfile",
+          "isPraxrrProfile",
           "customFormatScore",
           "cutoffScore",
           "minScore",
@@ -1057,9 +1057,9 @@
             "type": "boolean",
             "description": "Whether the cutoff score has been met"
           },
-          "isProfilarrProfile": {
+          "isPraxrrProfile": {
             "type": "boolean",
-            "description": "Whether the profile is managed by Profilarr"
+            "description": "Whether the profile is managed by Praxrr"
           }
         }
       },
@@ -1120,7 +1120,7 @@
           "sizeOnDisk",
           "percentOfEpisodes",
           "seasons",
-          "isProfilarrProfile"
+          "isPraxrrProfile"
         ],
         "properties": {
           "id": {
@@ -1191,9 +1191,9 @@
             },
             "description": "Season-level statistics"
           },
-          "isProfilarrProfile": {
+          "isPraxrrProfile": {
             "type": "boolean",
-            "description": "Whether the profile is managed by Profilarr"
+            "description": "Whether the profile is managed by Praxrr"
           }
         }
       },

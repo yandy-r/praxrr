@@ -103,7 +103,7 @@ export const GET: RequestHandler = async ({ params, fetch }) => {
     const response = await fetch(url, {
       headers: {
         Accept: 'application/json',
-        'User-Agent': 'Profilarr/1.0',
+        'User-Agent': 'Praxrr/1.0',
       },
     });
 

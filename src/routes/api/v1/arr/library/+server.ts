@@ -241,9 +241,9 @@ function applyLibraryQueryAndPagination<T extends LibraryItem>(
 }
 
 /**
- * Get all quality profile names from all enabled Profilarr databases
+ * Get all quality profile names from all enabled Praxrr databases
  */
-async function getProfilarrProfileNames(): Promise<Set<string>> {
+async function getPraxrrProfileNames(): Promise<Set<string>> {
   const profileNames = new Set<string>();
   const databases = pcdManager.getAll().filter((db) => db.enabled);
 
@@ -352,10 +352,10 @@ export const GET: RequestHandler = async ({ url }) => {
         } satisfies LibraryResponse);
       }
 
-      const profilarrProfileNames = await getProfilarrProfileNames();
+      const praxrrProfileNames = await getPraxrrProfileNames();
       const client = new RadarrClient(instance.url, instance.api_key);
       try {
-        const items = await client.getLibrary(profilarrProfileNames);
+        const items = await client.getLibrary(praxrrProfileNames);
         cache.set(cacheKey, items, LIBRARY_CACHE_TTL);
         const paginated = applyLibraryQueryAndPagination(items, libraryQuery, LIBRARY_SORT_KEYS_BY_TYPE.radarr);
 
@@ -399,10 +399,10 @@ export const GET: RequestHandler = async ({ url }) => {
         } satisfies LibraryResponse);
       }
 
-      const profilarrProfileNames = await getProfilarrProfileNames();
+      const praxrrProfileNames = await getPraxrrProfileNames();
       const client = new SonarrClient(instance.url, instance.api_key);
       try {
-        const items = await client.getLibrary(profilarrProfileNames);
+        const items = await client.getLibrary(praxrrProfileNames);
         cache.set(cacheKey, items, LIBRARY_CACHE_TTL);
         const paginated = applyLibraryQueryAndPagination(items, libraryQuery, LIBRARY_SORT_KEYS_BY_TYPE.sonarr);
 
@@ -451,10 +451,10 @@ export const GET: RequestHandler = async ({ url }) => {
         } satisfies LibraryResponse);
       }
 
-      const profilarrProfileNames = await getProfilarrProfileNames();
+      const praxrrProfileNames = await getPraxrrProfileNames();
       const client = new LidarrClient(instance.url, instance.api_key);
       try {
-        const items = await client.getLibrary(profilarrProfileNames);
+        const items = await client.getLibrary(praxrrProfileNames);
         cache.set(cacheKey, items, LIBRARY_CACHE_TTL);
         const paginated = applyLibraryQueryAndPagination<RuntimeLidarrLibraryItem>(
           items,

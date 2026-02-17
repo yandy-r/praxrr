@@ -63,7 +63,7 @@
 </script>
 
 <svelte:head>
-	<title>{data.instance.name} - Rename - Profilarr</title>
+	<title>{data.instance.name} - Rename - Praxrr</title>
 </svelte:head>
 
 <StickyCard position="top">

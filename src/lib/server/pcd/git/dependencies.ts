@@ -9,7 +9,7 @@ import { logger } from '$logger/logger.ts';
 
 /**
  * Extract repository name from GitHub URL
- * https://github.com/yandy-r/profilarr-schema -> schema
+ * https://github.com/yandy-r/praxrr-schema -> schema
  */
 function getRepoName(repoUrl: string): string {
   const parts = repoUrl.split('/');

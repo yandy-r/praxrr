@@ -66,7 +66,7 @@ export async function linkPcd(page: Page, opts: LinkPcdOpts): Promise<number> {
   await page.getByRole('button', { name: 'Save' }).click();
   await page.waitForURL('**/databases', { timeout: 30_000 });
 
-  // Look up the ID from profilarr.db
+  // Look up the ID from praxrr.db
   const db = getDatabaseByName(opts.name);
   if (!db) {
     throw new Error(`Database "${opts.name}" not found after linking`);

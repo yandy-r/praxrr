@@ -1,0 +1,6 @@
+{
+  "name": "@yandy-r/praxrr-api",
+  "version": "0.3.0",
+  "description": "OpenAPI spec and TypeScript types for the Praxrr API",
+  "exports": "./mod.ts"
+}

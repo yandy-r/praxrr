@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Profilarr manages quality profiles, custom formats, and release profiles for Radarr/Sonarr. It syncs curated configuration databases (PCDs) into Arr instances. V2 is under active development (not production-ready).
+Praxrr manages quality profiles, custom formats, and release profiles for Radarr/Sonarr. It syncs curated configuration databases (PCDs) into Arr instances. V2 is under active development (not production-ready).
 
 ## Tech Stack
 
@@ -135,7 +135,7 @@ Defined in `svelte.config.js` and mirrored in `deno.json`:
 
 ## Key Concepts
 
-### PCD (Profilarr Config Database)
+### PCD (Praxrr Config Database)
 
 Configuration is stored as append-only **ops** (SQL operations) in `pcd_ops`. Ops are replayed into an in-memory SQLite cache on each compile. Two layers exist:
 
@@ -148,7 +148,7 @@ Updates/deletes use **value guards** (old-value checks) to detect upstream chang
 
 ### App Database
 
-SQLite file (`profilarr.db`) managed by `DatabaseManager` in `$db/db.ts`. Schema changes are done via migrations in `src/lib/server/db/migrations/*.ts` (not the reference `schema.sql`). WAL mode, foreign keys enforced.
+SQLite file (`praxrr.db`) managed by `DatabaseManager` in `$db/db.ts`. Schema changes are done via migrations in `src/lib/server/db/migrations/*.ts` (not the reference `schema.sql`). WAL mode, foreign keys enforced.
 
 ### Startup Sequence
 

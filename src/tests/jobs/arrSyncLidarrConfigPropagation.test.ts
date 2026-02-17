@@ -200,7 +200,7 @@ Deno.test({
   sanitizeResources: false,
   fn: async (t) => {
     const originalBasePath = config.paths.base;
-    const tempBasePath = `/tmp/profilarr-tests/arr-sync-lidarr-${crypto.randomUUID()}`;
+    const tempBasePath = `/tmp/praxrr-tests/arr-sync-lidarr-${crypto.randomUUID()}`;
 
     await Deno.mkdir(tempBasePath, { recursive: true });
 

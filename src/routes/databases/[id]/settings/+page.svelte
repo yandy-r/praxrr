@@ -7,7 +7,7 @@
 </script>
 
 <svelte:head>
-	<title>{data.database.name} - Settings - Profilarr</title>
+	<title>{data.database.name} - Settings - Praxrr</title>
 </svelte:head>
 
 <InstanceForm mode="edit" {form} instance={data.database} />
