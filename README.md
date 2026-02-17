@@ -4,7 +4,7 @@
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="src/lib/client/assets/banner-light.svg">
     <source media="(prefers-color-scheme: light)" srcset="src/lib/client/assets/banner-dark.svg">
-    <img alt="Profilarr" src="src/lib/client/assets/banner-dark.svg" width="500">
+    <img alt="Praxrr" src="src/lib/client/assets/banner-dark.svg" width="500">
   </picture>
 </p>
 
@@ -12,61 +12,58 @@
 
 # Introduction
 
-This is a fork of the [Official Dictionarry Profilarr](https://github.com/Dictionarry-Hub/profilarr) with Lidarr support. I don't plan to merge this back into the main repository, but I will keep it updated with the latest changes from the main repository.
+This is a fork of the [Official Dictionarry profilarr](https://github.com/Dictionarry-Hub/profilarr)
+with Lidarr support. I don't plan to merge this back into the main repository, but I will keep it
+updated with the latest changes from the main repository.
 
-For day to day use, I recommend using the [Official Dictionarry Profilarr](https://github.com/Dictionarry-Hub/profilarr) with Lidarr support.
+For day to day use, I recommend using the
+[Official Dictionarry profilarr](https://github.com/Dictionarry-Hub/profilarr) with Lidarr support.
 
-I'm not a developer, though I just know enough to tinker and use lidarr. Don't plan to insult anyone by trying to merge this back into the main repository.
+I'm not a developer, though I just know enough to tinker and use lidarr. Don't plan to insult anyone
+by trying to merge this back into the main repository.
 
 <p>Manage quality profiles, custom formats, and media management settings across your Radarr, Sonarr, and Lidarr instances. Define your profiles once with a Git-backed configuration database, then sync them to any number of *arr instances.</p>
 
-> [!WARNING]
-> v2 is under heavy development and is _NOT_ ready for production use. Use
-> [Profilarr V1](https://github.com/Dictionarry-Hub/profilarr/tree/main) until
-> v2 is ready.
+> [!WARNING] v2 is under heavy development and is _NOT_ ready for production use. Use
+> [Praxrr V1](https://github.com/Dictionarry-Hub/profilarr/tree/main) until v2 is ready.
 
 ## Features
 
 ### Core
 
 - **Link** - Connect to configuration databases like the
-  [Profilarr database](https://github.com/yandy-r/profilarr-db) or any Profilarr
-  Compliant Database (PCD)
+  [Praxrr database](https://github.com/yandy-r/praxrr-db) or any Praxrr Compliant Database (PCD)
 - **Bridge** - Add your Radarr, Sonarr, and Lidarr instances by URL and API key
-- **Sync** - Push configurations to your instances. Profilarr compiles
-  everything to the right format automatically
+- **Sync** - Push configurations to your instances. Praxrr compiles everything to the right format
+  automatically
 
 ### For Users
 
-- **Ready-to-Use Configurations** - Stop spending hours piecing together
-  settings from forum posts. Get complete, tested quality profiles, custom
-  formats, and media settings designed around specific goals
-- **Stay Updated** - Make local tweaks that persist across upstream updates.
-  View changelogs, diffs, and revert changes when needed. Merge conflicts are
-  handled transparently
-- **Automated Upgrades** - The arrs don't search for the best release, they grab
-  the first RSS item that qualifies. Profilarr triggers intelligent searches
-  based on filters and selectors
+- **Ready-to-Use Configurations** - Stop spending hours piecing together settings from forum posts.
+  Get complete, tested quality profiles, custom formats, and media settings designed around specific
+  goals
+- **Stay Updated** - Make local tweaks that persist across upstream updates. View changelogs, diffs,
+  and revert changes when needed. Merge conflicts are handled transparently
+- **Automated Upgrades** - The arrs don't search for the best release, they grab the first RSS item
+  that qualifies. Praxrr triggers intelligent searches based on filters and selectors
 
 ### Release Notes
 
-- **Arr "Open in" links now support dual URL mode.** `url` remains the canonical
-  backend API endpoint for Profilarr internal calls. Add `External URL` in Arr
-  instance settings to set browser-facing link targets (for Docker/reverse-proxy
-  deployments) without affecting API connectivity. Clear it to revert to canonical
-  URL behavior.
+- **Arr "Open in" links now support dual URL mode.** `url` remains the canonical backend API
+  endpoint for Praxrr internal calls. Add `External URL` in Arr instance settings to set
+  browser-facing link targets (for Docker/reverse-proxy deployments) without affecting API
+  connectivity. Clear it to revert to canonical URL behavior.
 
 ### For Developers
 
 - **Unified Architecture** - One configuration language that compiles to
-  Radarr/Sonarr/Lidarr-specific formats on sync. No more maintaining separate
-  configs for each app
-- **Reusable Components** - Regular expressions are separate entities shared
-  across custom formats. Change once, update everywhere
-- **OSQL** - Configurations stored as append-only SQL operations. Readable,
-  auditable, diffable. Git-native version control with complete history
-- **Testing** - Validate regex patterns, custom format conditions, and quality
-  profile behavior before syncing
+  Radarr/Sonarr/Lidarr-specific formats on sync. No more maintaining separate configs for each app
+- **Reusable Components** - Regular expressions are separate entities shared across custom formats.
+  Change once, update everywhere
+- **OSQL** - Configurations stored as append-only SQL operations. Readable, auditable, diffable.
+  Git-native version control with complete history
+- **Testing** - Validate regex patterns, custom format conditions, and quality profile behavior
+  before syncing
 
 ### Authentication
 
@@ -80,10 +77,10 @@ API access via `X-Api-Key` header or `?apikey=` query param. See
 
 ## Discord
 
-We're most active on [Discord](https://discord.gg/2A89tXZMgA), where we post
-announcements, help people troubleshoot their setups, and have the kind of
-conversations that don't fit neatly into GitHub issues. If you've got questions
-or want to follow along with development, that's where to find us.
+We're most active on [Discord](https://discord.gg/2A89tXZMgA), where we post announcements, help
+people troubleshoot their setups, and have the kind of conversations that don't fit neatly into
+GitHub issues. If you've got questions or want to follow along with development, that's where to
+find us.
 
 ## Documentation
 
@@ -93,9 +90,9 @@ or want to follow along with development, that's where to find us.
 
 ```yaml
 services:
-  profilarr:
-    image: ghcr.io/yandy-r/profilarr:develop
-    container_name: profilarr
+  praxrr:
+    image: ghcr.io/yandy-r/praxrr:develop
+    container_name: praxrr
     ports:
       - '6868:6868'
     volumes:
@@ -112,16 +109,15 @@ services:
 
   # Optional - only needed for CF/QP testing
   parser:
-    image: ghcr.io/yandy-r/profilarr-parser:develop
-    container_name: profilarr-parser
+    image: ghcr.io/yandy-r/praxrr-parser:develop
+    container_name: praxrr-parser
     expose:
       - '5000'
 ```
 
-> [!NOTE]
-> The parser service is only required for custom format and quality profile
-> testing. Linking, syncing, and all other features work without it. Remove the
-> `parser` service and related environment variables if you don't need it.
+> [!NOTE] The parser service is only required for custom format and quality profile testing.
+> Linking, syncing, and all other features work without it. Remove the `parser` service and related
+> environment variables if you don't need it.
 
 ### Development
 
@@ -132,8 +128,8 @@ services:
 - [.NET SDK](https://dotnet.microsoft.com/) 8.0+ (optional, for parser)
 
 ```bash
-git clone https://github.com/yandy-r/profilarr.git
-cd profilarr
+git clone https://github.com/yandy-r/praxrr.git
+cd praxrr
 deno task dev
 ```
 
@@ -159,6 +155,5 @@ This runs the parser service and Vite dev server concurrently. See
 
 [AGPL-3.0](LICENSE)
 
-Profilarr is free and open source. You do not need to pay anyone to use it. If
-someone is charging you for access to Profilarr, they are violating the spirit
-of this project.
+Praxrr is free and open source. You do not need to pay anyone to use it. If someone is charging you
+for access to Praxrr, they are violating the spirit of this project.

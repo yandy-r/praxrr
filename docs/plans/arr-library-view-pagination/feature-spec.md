@@ -2,7 +2,7 @@
 
 ## Executive Summary
 
-This feature adds scalable pagination to `/arr/{id}/library` so large Radarr, Sonarr, and Lidarr libraries stay responsive. Today the route and API load full library arrays, then filter and sort client-side, which is expensive for large datasets. The recommended implementation is server-driven fixed pagination with default `pageSize=100`, configurable page size, and URL-backed state for page, size, filters, and query. This keeps behavior deterministic, aligns with existing logs pagination patterns, and allows optional lazy page loading later without making infinite scroll the default. The main constraint is that Arr upstream library endpoints are unpaged, so Profilarr must own pagination semantics.
+This feature adds scalable pagination to `/arr/{id}/library` so large Radarr, Sonarr, and Lidarr libraries stay responsive. Today the route and API load full library arrays, then filter and sort client-side, which is expensive for large datasets. The recommended implementation is server-driven fixed pagination with default `pageSize=100`, configurable page size, and URL-backed state for page, size, filters, and query. This keeps behavior deterministic, aligns with existing logs pagination patterns, and allows optional lazy page loading later without making infinite scroll the default. The main constraint is that Arr upstream library endpoints are unpaged, so Praxrr must own pagination semantics.
 
 ## External Dependencies
 

@@ -113,7 +113,7 @@
 </script>
 
 <svelte:head>
-	<title>How Upgrades Work - Profilarr</title>
+	<title>How Upgrades Work - Praxrr</title>
 </svelte:head>
 
 <div class="p-8">

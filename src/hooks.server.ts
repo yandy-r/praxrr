@@ -37,8 +37,8 @@ await pcdManager.initialize();
 if (!setupStateQueries.isDefaultDatabaseLinked()) {
   try {
     await pcdManager.link({
-      name: 'Profilarr-DB',
-      repositoryUrl: 'https://github.com/yandy-r/profilarr-db',
+      name: 'Praxrr-DB',
+      repositoryUrl: 'https://github.com/yandy-r/praxrr-db',
       branch: 'v2',
       syncStrategy: 60,
       autoPull: true,

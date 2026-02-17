@@ -4,7 +4,7 @@ This runbook documents the operator steps for the Lidarr first-class media-manag
 
 ## Overview
 
-Profilarr previously stored Lidarr media-management configurations (naming, media settings, quality definitions) in Sonarr-backed tables. This migration introduces dedicated `lidarr_naming`, `lidarr_media_settings`, and `lidarr_quality_definitions` tables and removes all Sonarr fallback behavior.
+Praxrr previously stored Lidarr media-management configurations (naming, media settings, quality definitions) in Sonarr-backed tables. This migration introduces dedicated `lidarr_naming`, `lidarr_media_settings`, and `lidarr_quality_definitions` tables and removes all Sonarr fallback behavior.
 
 Migration is executed automatically via three ordered PCD base-op migrations that run during application startup:
 
@@ -21,10 +21,10 @@ Before upgrading to this version, verify the following:
 ### 1. Back Up the Application Database
 
 ```bash
-cp profilarr.db profilarr.db.backup-$(date +%Y%m%d)
+cp praxrr.db praxrr.db.backup-$(date +%Y%m%d)
 ```
 
-The PCD database is an in-memory SQLite cache rebuilt from `pcd_ops` on every compile. The important state to back up is the app database (`profilarr.db`) which stores `pcd_ops`, `arr_instances`, `arr_sync_media_management`, and `database_instances`.
+The PCD database is an in-memory SQLite cache rebuilt from `pcd_ops` on every compile. The important state to back up is the app database (`praxrr.db`) which stores `pcd_ops`, `arr_instances`, `arr_sync_media_management`, and `database_instances`.
 
 ### 2. Note Current Lidarr Sync Assignments
 
@@ -115,14 +115,14 @@ Open the default Lidarr naming config and confirm that field values use Lidarr-n
 If the migration produces unexpected data but the application is otherwise functional:
 
 1. Stop the application
-2. Restore the backup: `cp profilarr.db.backup-YYYYMMDD profilarr.db`
+2. Restore the backup: `cp praxrr.db.backup-YYYYMMDD praxrr.db`
 3. Downgrade to the previous application version
 4. Restart the application
 
 ### Scenario: Application Fails to Start After Migration
 
 1. Stop the application
-2. Restore the backup: `cp profilarr.db.backup-YYYYMMDD profilarr.db`
+2. Restore the backup: `cp praxrr.db.backup-YYYYMMDD praxrr.db`
 3. Downgrade to the previous application version
 4. Report the startup error with full logs
 

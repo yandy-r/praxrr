@@ -37,7 +37,7 @@ jobs:
           unexpected_changes="$(
             printf '%s\n' "$status_output" \
               | sed 's/^...//' \
-              | grep -Ev '^packages/profilarr-api/(openapi\.json|types\.ts)$' || true
+              | grep -Ev '^packages/praxrr-api/(openapi\.json|types\.ts)$' || true
           )"
 
           if [ -n "$unexpected_changes" ]; then
@@ -51,9 +51,9 @@ jobs:
           echo "Only expected generated API files changed."
 
       - name: Dry run publish to JSR
-        working-directory: packages/profilarr-api
+        working-directory: packages/praxrr-api
         run: npx jsr publish --dry-run --allow-dirty
 
       - name: Publish to JSR
-        working-directory: packages/profilarr-api
+        working-directory: packages/praxrr-api
         run: npx jsr publish --allow-dirty

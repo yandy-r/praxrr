@@ -33,7 +33,7 @@ This feature removes the current Sonarr-backed reuse strategy for Lidarr media-m
 
 ### External Documentation
 
-- [Issue 130](https://github.com/yandy-r/profilarr/issues/130): scope, acceptance criteria, migration requirements
+- [Issue 130](https://github.com/yandy-r/praxrr/issues/130): scope, acceptance criteria, migration requirements
 - [Lidarr OpenAPI](https://raw.githubusercontent.com/Lidarr/Lidarr/develop/src/Lidarr.Api.V1/openapi.json): authoritative endpoint contract
 
 ## Business Requirements

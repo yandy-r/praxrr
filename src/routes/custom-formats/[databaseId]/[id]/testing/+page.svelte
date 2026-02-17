@@ -101,7 +101,7 @@
 </script>
 
 <svelte:head>
-	<title>{data.format.name} - Testing - Profilarr</title>
+	<title>{data.format.name} - Testing - Praxrr</title>
 </svelte:head>
 
 <div class="space-y-6">

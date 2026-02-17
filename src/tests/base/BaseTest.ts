@@ -60,7 +60,7 @@ export abstract class BaseTest {
     const counter = BaseTest.testCounter++;
     const timestamp = Date.now();
     const sanitizedName = testName.replace(/[^a-zA-Z0-9]/g, '_');
-    const tempDir = `/tmp/profilarr-tests/${sanitizedName}_${timestamp}_${counter}`;
+    const tempDir = `/tmp/praxrr-tests/${sanitizedName}_${timestamp}_${counter}`;
     await Deno.mkdir(tempDir, { recursive: true });
     return tempDir;
   }

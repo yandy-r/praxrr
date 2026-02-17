@@ -33,7 +33,7 @@ function getHeaders(pat?: string | null): Record<string, string> {
   const headers: Record<string, string> = {
     Accept: 'application/vnd.github+json',
     'X-GitHub-Api-Version': '2022-11-28',
-    'User-Agent': 'Profilarr',
+    'User-Agent': 'Praxrr',
   };
 
   if (pat) {

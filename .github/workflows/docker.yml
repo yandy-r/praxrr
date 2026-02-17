@@ -24,9 +24,9 @@ jobs:
     strategy:
       matrix:
         include:
-          - image: profilarr
+          - image: praxrr
             dockerfile: Dockerfile
-          - image: profilarr-parser
+          - image: praxrr-parser
             dockerfile: Dockerfile.parser
 
     steps:

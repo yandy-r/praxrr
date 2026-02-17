@@ -68,7 +68,7 @@
 </script>
 
 <svelte:head>
-	<title>{data.instance.name} - Upgrades - Profilarr</title>
+	<title>{data.instance.name} - Upgrades - Praxrr</title>
 </svelte:head>
 
 <StickyCard position="top">

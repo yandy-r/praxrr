@@ -12,7 +12,7 @@
 </script>
 
 <svelte:head>
-	<title>New Metadata Profile - {data.currentDatabase.name} - Profilarr</title>
+	<title>New Metadata Profile - {data.currentDatabase.name} - Praxrr</title>
 </svelte:head>
 
 <div class="p-4 md:p-8">

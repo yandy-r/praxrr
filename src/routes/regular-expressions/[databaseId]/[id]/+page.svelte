@@ -21,7 +21,7 @@
 </script>
 
 <svelte:head>
-	<title>{data.regularExpression.name} - Regular Expressions - Profilarr</title>
+	<title>{data.regularExpression.name} - Regular Expressions - Praxrr</title>
 </svelte:head>
 
 <div class="p-4 md:p-8">

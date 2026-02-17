@@ -10,7 +10,7 @@ library:
       - For Sonarr: Returns series with season summaries and episode statistics
       - For Lidarr: Returns artists/albums (capability-gated; detailed payload fields deferred to later phases)
 
-      Results include Profilarr profile matching to indicate which items use managed profiles.
+      Results include Praxrr profile matching to indicate which items use managed profiles.
       Responses are cached server-side for 5 minutes.
       Supports server-side filtering, sorting, and pagination.
     tags:

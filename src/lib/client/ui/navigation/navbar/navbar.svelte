@@ -24,8 +24,8 @@
 			>
 				<Menu size={20} />
 			</button>
-			<img src={logo} alt="Profilarr logo" class="hidden h-5 w-5 translate-y-[2px] md:ml-4 md:block" />
-			<div class="hidden text-xl font-bold text-neutral-900 md:block dark:text-neutral-100">profilarr</div>
+			<img src={logo} alt="Praxrr logo" class="hidden h-5 w-5 translate-y-[2px] md:ml-4 md:block" />
+			<div class="hidden text-xl font-bold text-neutral-900 md:block dark:text-neutral-100">praxrr</div>
 		</div>
 
 		<!-- Center: Mobile alerts -->

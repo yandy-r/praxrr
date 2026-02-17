@@ -23,7 +23,7 @@
 </script>
 
 <svelte:head>
-	<title>{data.delayProfile.name} - Delay Profiles - Profilarr</title>
+	<title>{data.delayProfile.name} - Delay Profiles - Praxrr</title>
 </svelte:head>
 
 <div class="p-4 md:p-8">

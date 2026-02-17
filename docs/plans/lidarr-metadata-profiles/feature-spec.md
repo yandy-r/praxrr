@@ -2,7 +2,7 @@
 
 ## Executive Summary
 
-Lidarr metadata profiles are a Lidarr-exclusive entity that controls which MusicBrainz album types (primary and secondary) and release statuses are monitored per-artist -- a critical filtering mechanism with no Radarr/Sonarr equivalent. Adding metadata profile management to Profilarr enables centralized, templated control over what music content Lidarr considers for download, synced to instances via the existing PCD ops pipeline. The implementation follows the quality-profile entity pattern (parent table + three child junction tables), adds a new `metadataProfiles` sync section gated exclusively to `arr_type = 'lidarr'`, and extends the `LidarrClient` with CRUD methods against `/api/v1/metadataprofile`. The primary risk is ensuring strict Cross-Arr Semantic Validation Policy compliance since this entity family has zero cross-Arr overlap; the primary challenge is the moderate surface area (~35-50 tasks across PCD schema, entity CRUD, sync pipeline, API routes, and UI).
+Lidarr metadata profiles are a Lidarr-exclusive entity that controls which MusicBrainz album types (primary and secondary) and release statuses are monitored per-artist -- a critical filtering mechanism with no Radarr/Sonarr equivalent. Adding metadata profile management to Praxrr enables centralized, templated control over what music content Lidarr considers for download, synced to instances via the existing PCD ops pipeline. The implementation follows the quality-profile entity pattern (parent table + three child junction tables), adds a new `metadataProfiles` sync section gated exclusively to `arr_type = 'lidarr'`, and extends the `LidarrClient` with CRUD methods against `/api/v1/metadataprofile`. The primary risk is ensuring strict Cross-Arr Semantic Validation Policy compliance since this entity family has zero cross-Arr overlap; the primary challenge is the moderate surface area (~35-50 tasks across PCD schema, entity CRUD, sync pipeline, API routes, and UI).
 
 ## External Dependencies
 
@@ -46,12 +46,12 @@ No TypeScript/JavaScript Lidarr client library exists on npm. The project's exis
 
 ### User Stories
 
-**Primary User: Profilarr Administrator**
+**Primary User: Praxrr Administrator**
 
-- As a Profilarr user, I want to define metadata profiles in my PCD database so that I can curate which album types and release statuses Lidarr monitors across all my instances.
-- As a Profilarr user, I want to sync metadata profiles to my Lidarr instances so that new artists automatically inherit correct monitoring filters without manual per-instance configuration.
-- As a Profilarr user, I want to manage multiple metadata profiles (e.g., "Discography" vs "Studio Albums Only") to assign different filtering strategies to different instances.
-- As a Profilarr user, I want metadata profiles to participate in the PCD system (base ops, user ops, import/export, clone) so they are portable and version-controlled like all other entities.
+- As a Praxrr user, I want to define metadata profiles in my PCD database so that I can curate which album types and release statuses Lidarr monitors across all my instances.
+- As a Praxrr user, I want to sync metadata profiles to my Lidarr instances so that new artists automatically inherit correct monitoring filters without manual per-instance configuration.
+- As a Praxrr user, I want to manage multiple metadata profiles (e.g., "Discography" vs "Studio Albums Only") to assign different filtering strategies to different instances.
+- As a Praxrr user, I want metadata profiles to participate in the PCD system (base ops, user ops, import/export, clone) so they are portable and version-controlled like all other entities.
 
 **Secondary User: PCD Database Author**
 
@@ -110,7 +110,7 @@ No TypeScript/JavaScript Lidarr client library exists on npm. The project's exis
 
 9. **Profile-in-Use Protection**: Lidarr prevents deleting profiles assigned to artists. Sync should NOT delete profiles from Lidarr -- only create and update.
 
-10. **Artist Assignment**: Profilarr manages profile definitions only. Artist-to-profile assignment is done in Lidarr itself (via `metadataProfileId` on artist resource).
+10. **Artist Assignment**: Praxrr manages profile definitions only. Artist-to-profile assignment is done in Lidarr itself (via `metadataProfileId` on artist resource).
 
 ### Edge Cases
 
@@ -120,7 +120,7 @@ No TypeScript/JavaScript Lidarr client library exists on npm. The project's exis
 | All types disallowed                          | Valid but useless -- Lidarr monitors nothing                            | Warn user, don't reject                      |
 | Profile deleted from PCD while synced         | Do NOT delete from Lidarr (may be in use by artists)                    | Sync only creates/updates                    |
 | Multiple PCD databases syncing to same Lidarr | Namespace suffixes applied to profile names                             | Same pattern as quality profiles             |
-| Metadata profile renamed in Profilarr         | Rename propagates to synced instances                                   | Consistent with QP rename behavior           |
+| Metadata profile renamed in Praxrr         | Rename propagates to synced instances                                   | Consistent with QP rename behavior           |
 
 ### Success Criteria
 
@@ -253,7 +253,7 @@ CREATE TABLE IF NOT EXISTS lidarr_metadata_profile_release_statuses (
 );
 ```
 
-#### App DB Table (profilarr.db)
+#### App DB Table (praxrr.db)
 
 ##### arr_sync_metadata_profiles_config
 
@@ -454,7 +454,7 @@ interface LidarrMetadataProfile {
 [StickyCard: "Edit Metadata Profile" | Delete | Save]
 
 [Name Input]
-[Description Input] (optional, Profilarr-only, not synced)
+[Description Input] (optional, Praxrr-only, not synced)
 
 [Primary Album Types]     "1 of 5 allowed"  [Toggle All]
   [ ] Album  [x] EP  [ ] Single  [ ] Broadcast  [ ] Other
@@ -520,7 +520,7 @@ Display an informational note near checkbox groups: "Enabling many types for pro
 
 - **Profile Templates**: Pre-built profiles seeded as base ops ("Albums Only", "Everything", "Albums + EPs")
 - **Import from Lidarr**: Pull existing profiles from a running instance into PCD
-- **Artist Assignment**: Expose per-artist metadata profile assignment from Profilarr
+- **Artist Assignment**: Expose per-artist metadata profile assignment from Praxrr
 - **Profile Comparison**: Side-by-side diff view for comparing profiles
 - **Library View Integration**: Display metadata profile info alongside quality profile in Lidarr library view
 

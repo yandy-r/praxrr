@@ -1,11 +1,11 @@
 # =============================================================================
-# Profilarr Parser Dockerfile
+# Praxrr Parser Dockerfile
 # =============================================================================
 # .NET 8.0 microservice for parsing release titles
 # This service is OPTIONAL - only needed for custom format/quality profile testing
 #
-# Build:  docker build -f Dockerfile.parser -t profilarr-parser .
-# Run:    docker run -p 5000:5000 profilarr-parser
+# Build:  docker build -f Dockerfile.parser -t praxrr-parser .
+# Run:    docker run -p 5000:5000 praxrr-parser
 
 # -----------------------------------------------------------------------------
 # Stage 1: Build
@@ -29,9 +29,9 @@ RUN rm -f Directory.Build.props && dotnet publish -c Release -o /app --no-restor
 FROM mcr.microsoft.com/dotnet/aspnet:8.0-alpine
 
 # Labels for container metadata
-LABEL org.opencontainers.image.title="Profilarr Parser"
-LABEL org.opencontainers.image.description="Release title parser for Profilarr (optional)"
-LABEL org.opencontainers.image.source="https://github.com/yandy-r/profilarr"
+LABEL org.opencontainers.image.title="Praxrr Parser"
+LABEL org.opencontainers.image.description="Release title parser for Praxrr (optional)"
+LABEL org.opencontainers.image.source="https://github.com/yandy-r/praxrr"
 LABEL org.opencontainers.image.licenses="AGPL-3.0"
 
 WORKDIR /app

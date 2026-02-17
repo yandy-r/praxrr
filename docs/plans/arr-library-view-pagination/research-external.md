@@ -2,7 +2,7 @@
 
 ### Executive Summary
 
-Arr core library endpoints for Radarr, Sonarr, and Lidarr are not natively paginated, while queue and history endpoints are paginated. That means Profilarr must implement server-side pagination over aggregated Arr datasets if we want deterministic browser performance for large libraries. The strongest default UX is fixed pagination with configurable page size (default 100), with optional lazy page loading on scroll as a secondary mode.
+Arr core library endpoints for Radarr, Sonarr, and Lidarr are not natively paginated, while queue and history endpoints are paginated. That means Praxrr must implement server-side pagination over aggregated Arr datasets if we want deterministic browser performance for large libraries. The strongest default UX is fixed pagination with configurable page size (default 100), with optional lazy page loading on scroll as a secondary mode.
 
 ### Candidate APIs and Services
 
@@ -55,12 +55,12 @@ Validation note (2026-02-16): endpoint query-parameter checks were verified agai
 
 - Recommended auth flow:
   - Keep Arr credentials server-side only.
-  - Continue proxying all Arr access through Profilarr API routes.
+  - Continue proxying all Arr access through Praxrr API routes.
 - Sync/event strategy:
   - Keep explicit manual refresh for operators.
   - Optionally add polling or webhook invalidation later; not required for v1 pagination.
 - Pagination/error handling:
-  - Introduce server-driven `page` and `pageSize` on Profilarr `/api/v1/arr/library`.
+  - Introduce server-driven `page` and `pageSize` on Praxrr `/api/v1/arr/library`.
   - Return stable pagination metadata (`totalRecords`, `page`, `pageSize`, `totalPages`, `hasNext`).
   - Validate and clamp page size, return 400 for invalid pagination inputs.
 

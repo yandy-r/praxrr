@@ -48,7 +48,7 @@ export interface FilterConfig {
   selector: string;
   count: number;
   cutoff: number;
-  // Cooldown is handled via filter-level tags (profilarr-{filterId})
+  // Cooldown is handled via filter-level tags (praxrr-{filterId})
   // Future: cooldownMode?: 'basic' | 'advanced' for adaptive backoff
 }
 

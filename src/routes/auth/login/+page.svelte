@@ -21,13 +21,13 @@
 </script>
 
 <svelte:head>
-	<title>Login - Profilarr</title>
+	<title>Login - Praxrr</title>
 </svelte:head>
 
 <div class="flex min-h-screen items-center justify-center bg-neutral-100 p-4 dark:bg-neutral-900">
 	<div class="w-full max-w-sm">
 		<div class="mb-8 flex items-center gap-4">
-			<img src={logo} alt="Profilarr logo" class="h-12 w-12" />
+			<img src={logo} alt="Praxrr logo" class="h-12 w-12" />
 			<div>
 				<h1 class="text-xl font-bold text-neutral-900 dark:text-neutral-50">Welcome back</h1>
 				<p class="text-sm text-neutral-600 dark:text-neutral-400">

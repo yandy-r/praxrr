@@ -53,7 +53,7 @@ Current library loading is a single bulk fetch on both server and client, then i
 
 ### System Constraints
 
-- Arr upstream library endpoints are unpaged (`movie`, `series`, `artist/album/track`), so pagination in Profilarr may still start from full upstream fetches unless further endpoint-level optimization is introduced.
+- Arr upstream library endpoints are unpaged (`movie`, `series`, `artist/album/track`), so pagination in Praxrr may still start from full upstream fetches unless further endpoint-level optimization is introduced.
 - Lidarr remains highest-risk for memory/render time; expanded detail rendering should stay lazy and bounded.
 - Keep strict app-specific handling (`arr_type`) to avoid semantic drift between Sonarr/Radarr/Lidarr.
 

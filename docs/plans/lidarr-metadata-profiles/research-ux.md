@@ -2,9 +2,9 @@
 
 ## Executive Summary
 
-Lidarr metadata profiles are Lidarr-exclusive filters that control which types of music releases (albums, singles, EPs, etc.) are discovered and monitored for artists. They comprise three checkbox groups: Primary Album Types (5 options), Secondary Album Types (12 options), and Release Statuses (4 options). Profilarr should model this feature after its existing quality profile management patterns -- card/table list views, route-based editing with StickyCard headers, dirty tracking, and base/user layer writes -- while introducing a checkbox group component purpose-built for the allow/disallow toggle pattern that metadata profiles require. The feature is Lidarr-only and must not leak into Sonarr/Radarr code paths.
+Lidarr metadata profiles are Lidarr-exclusive filters that control which types of music releases (albums, singles, EPs, etc.) are discovered and monitored for artists. They comprise three checkbox groups: Primary Album Types (5 options), Secondary Album Types (12 options), and Release Statuses (4 options). Praxrr should model this feature after its existing quality profile management patterns -- card/table list views, route-based editing with StickyCard headers, dirty tracking, and base/user layer writes -- while introducing a checkbox group component purpose-built for the allow/disallow toggle pattern that metadata profiles require. The feature is Lidarr-only and must not leak into Sonarr/Radarr code paths.
 
-**Confidence**: High -- sourced from Lidarr's official API schema, MusicBrainz type definitions, Lidarr source code, Servarr wiki documentation, and the existing Profilarr codebase.
+**Confidence**: High -- sourced from Lidarr's official API schema, MusicBrainz type definitions, Lidarr source code, Servarr wiki documentation, and the existing Praxrr codebase.
 
 ## Lidarr Metadata Profile Data Model
 
@@ -206,7 +206,7 @@ Each of the three checkbox groups (Primary Types, Secondary Types, Release Statu
 +--------------------------------------------------+
 ```
 
-- **Section headers** use the existing Profilarr heading style (`text-neutral-900 dark:text-neutral-100`, `font-medium`).
+- **Section headers** use the existing Praxrr heading style (`text-neutral-900 dark:text-neutral-100`, `font-medium`).
 - **Toggle All** uses a tri-state checkbox:
   - All checked: filled checkbox
   - Some checked: indeterminate state (dash icon)
@@ -274,7 +274,7 @@ Use a single-page form layout (no tabs needed -- metadata profiles are simpler t
 +--------------------------------------------------+
 
 [Name Input]
-[Description Input] (optional, for Profilarr-internal notes)
+[Description Input] (optional, for Praxrr-internal notes)
 
 [Primary Album Types]
   Section header with toggle all
@@ -294,8 +294,8 @@ Use a single-page form layout (no tabs needed -- metadata profiles are simpler t
 #### Form Fields
 
 1. **Name** -- Required text input. Reuse `FormInput` component. Case-insensitive uniqueness validation.
-2. **Description** -- Optional markdown input. Reuse `MarkdownInput` component. For Profilarr-internal notes (not synced to Lidarr, since Lidarr's API has no description field for metadata profiles).
-3. **Tags** -- Optional tag input. Reuse `TagInput` component. For organizing profiles in Profilarr.
+2. **Description** -- Optional markdown input. Reuse `MarkdownInput` component. For Praxrr-internal notes (not synced to Lidarr, since Lidarr's API has no description field for metadata profiles).
+3. **Tags** -- Optional tag input. Reuse `TagInput` component. For organizing profiles in Praxrr.
 4. **Primary Album Types** -- Checkbox group (5 items).
 5. **Secondary Album Types** -- Checkbox group (12 items).
 6. **Release Statuses** -- Checkbox group (4 items).
@@ -327,7 +327,7 @@ Use a single-page form layout (no tabs needed -- metadata profiles are simpler t
 4. **At least one release status**: At least one release status must be allowed.
 5. **Secondary types optional**: It is valid to have no secondary types allowed (this means only primary-type-only releases match).
 
-**Confidence**: Medium -- rules 1-2 follow Profilarr conventions. Rules 3-5 are inferred from Lidarr behavior (a profile with no primary types or no release statuses would match nothing). Verify against Lidarr's own validation by testing `POST /api/v1/metadataprofile` with empty arrays.
+**Confidence**: Medium -- rules 1-2 follow Praxrr conventions. Rules 3-5 are inferred from Lidarr behavior (a profile with no primary types or no release statuses would match nothing). Verify against Lidarr's own validation by testing `POST /api/v1/metadataprofile` with empty arrays.
 
 ### Error States
 
@@ -410,9 +410,9 @@ Use a single-page form layout (no tabs needed -- metadata profiles are simpler t
 
 **Confidence**: High -- sourced from Configarr documentation at https://configarr.de/docs/configuration/experimental-support/.
 
-### Existing Profilarr Quality Profile UI (Baseline)
+### Existing Praxrr Quality Profile UI (Baseline)
 
-Based on analysis of the actual Profilarr codebase (`src/routes/quality-profiles/`):
+Based on analysis of the actual Praxrr codebase (`src/routes/quality-profiles/`):
 
 - **Patterns to reuse**:
   - `CardView.svelte` / `TableView.svelte` dual-view pattern with `ViewToggle`.
@@ -439,7 +439,7 @@ Based on analysis of the actual Profilarr codebase (`src/routes/quality-profiles
 
 ---
 
-## Profilarr-Specific Architecture Considerations
+## Praxrr-Specific Architecture Considerations
 
 ### PCD Integration
 
@@ -504,7 +504,7 @@ Single-page edit (no tab layout needed), following the pattern of simpler entiti
 
 1. **Performance warning**: Show an informational note near Primary/Secondary Types: "Enabling many types for prolific artists can significantly increase loading times in Lidarr."
 2. **Reusable CheckboxGroup component**: Build a generic `CheckboxGroup.svelte` that can be reused for future similar features.
-3. **Description/tags fields**: Allow users to annotate profiles with notes and tags (Profilarr-only, not synced to Lidarr).
+3. **Description/tags fields**: Allow users to annotate profiles with notes and tags (Praxrr-only, not synced to Lidarr).
 4. **Export/import support**: Follow the existing quality profile export pattern for metadata profiles.
 5. **Default profile templates**: When creating a new metadata profile, offer preset templates ("Standard Albums", "Everything", "Albums + EPs") to reduce configuration effort.
 
@@ -526,13 +526,13 @@ Single-page edit (no tab layout needed), following the pattern of simpler entiti
 
 2. **Should secondary types be mandatory?** Is it valid to have zero secondary types allowed? If yes, what does that mean in Lidarr (releases with NO secondary type only, or all releases regardless of secondary type)?
 
-3. **Schema endpoint usage**: Should Profilarr fetch the available types from `GET /api/v1/metadataprofile/schema` at sync time to ensure compatibility with the Lidarr instance's version? Or should the types be hardcoded based on MusicBrainz definitions?
+3. **Schema endpoint usage**: Should Praxrr fetch the available types from `GET /api/v1/metadataprofile/schema` at sync time to ensure compatibility with the Lidarr instance's version? Or should the types be hardcoded based on MusicBrainz definitions?
 
-4. **"None" profile handling**: Should Profilarr have a concept of a "None" profile that means "allow everything"? Or should users explicitly check all boxes?
+4. **"None" profile handling**: Should Praxrr have a concept of a "None" profile that means "allow everything"? Or should users explicitly check all boxes?
 
-5. **Profile assignment to artists**: In Lidarr, metadata profiles are assigned per-artist. Should Profilarr's sync overwrite per-artist assignments, or only manage the profile definitions (leaving assignment to the user in Lidarr)? Recommendation: manage definitions only -- assignment is an artist-level concern.
+5. **Profile assignment to artists**: In Lidarr, metadata profiles are assigned per-artist. Should Praxrr's sync overwrite per-artist assignments, or only manage the profile definitions (leaving assignment to the user in Lidarr)? Recommendation: manage definitions only -- assignment is an artist-level concern.
 
-6. **Audio drama type**: MusicBrainz has an "Audio drama" secondary type that Lidarr may or may not expose. Should Profilarr include it? Verify against a current Lidarr instance's schema endpoint.
+6. **Audio drama type**: MusicBrainz has an "Audio drama" secondary type that Lidarr may or may not expose. Should Praxrr include it? Verify against a current Lidarr instance's schema endpoint.
 
 ---
 

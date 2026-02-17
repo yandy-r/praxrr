@@ -2,7 +2,7 @@
 
 ## Executive Summary
 
-The feature should make browser navigation reliable in split-network setups without changing existing server connectivity behavior. Users need a clear mental model: `URL` is for Profilarr-to-Arr API communication, while optional `External URL` is for all user-facing "Open in" links. The fallback rule must be simple and visible: use `External URL` when present, otherwise use `URL`. Existing instances should adopt this behavior automatically after save, with no extra migration steps in the UI.
+The feature should make browser navigation reliable in split-network setups without changing existing server connectivity behavior. Users need a clear mental model: `URL` is for Praxrr-to-Arr API communication, while optional `External URL` is for all user-facing "Open in" links. The fallback rule must be simple and visible: use `External URL` when present, otherwise use `URL`. Existing instances should adopt this behavior automatically after save, with no extra migration steps in the UI.
 
 ### Core User Workflows
 

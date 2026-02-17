@@ -2,11 +2,11 @@
 # Usage: docker compose -f compose.dev.yml up --build
 
 services:
-  profilarr:
+  praxrr:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: profilarr-dev
+    container_name: praxrr-dev
     ports:
       - '6969:6868'
     volumes:
@@ -28,6 +28,6 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.parser
-    container_name: profilarr-parser-dev
+    container_name: praxrr-parser-dev
     expose:
       - '5000'

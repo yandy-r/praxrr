@@ -26,14 +26,14 @@
 </script>
 
 <svelte:head>
-	<title>Entity Testing - Profilarr</title>
+	<title>Entity Testing - Praxrr</title>
 </svelte:head>
 
 {#if data.databases.length === 0}
 	<EmptyState
 		icon={Database}
 		title="No Databases Linked"
-		description="Link a Profilarr Compliant Database to test quality profiles."
+		description="Link a Praxrr Compliant Database to test quality profiles."
 		buttonText="Link Database"
 		buttonHref="/databases/new"
 		buttonIcon={Plus}

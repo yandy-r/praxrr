@@ -40,8 +40,8 @@
 	<!-- Mobile header with logo and close button -->
 	<div class="flex items-center justify-between border-b border-neutral-200 py-4 pl-8 pr-4 md:hidden dark:border-neutral-800">
 		<div class="flex items-center gap-2">
-			<img src={logo} alt="Profilarr logo" class="h-5 w-5" />
-			<span class="text-xl font-bold text-neutral-900 dark:text-neutral-100">profilarr</span>
+			<img src={logo} alt="Praxrr logo" class="h-5 w-5" />
+			<span class="text-xl font-bold text-neutral-900 dark:text-neutral-100">praxrr</span>
 		</div>
 		<button
 			type="button"

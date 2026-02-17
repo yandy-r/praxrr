@@ -69,7 +69,7 @@
 </script>
 
 <svelte:head>
-	<title>Quality Profiles - {data.currentDatabase.name} - Profilarr</title>
+	<title>Quality Profiles - {data.currentDatabase.name} - Praxrr</title>
 </svelte:head>
 
 <div class="space-y-6 px-4 pt-4 pb-8 md:px-8">

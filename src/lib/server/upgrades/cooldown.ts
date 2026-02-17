@@ -2,7 +2,7 @@
  * Tag-based cooldown tracking for upgrade searches
  *
  * Basic mode (current implementation):
- * - Uses filter-level tags: profilarr-filter-{filterId}
+ * - Uses filter-level tags: praxrr-filter-{filterId}
  * - Items are tagged when searched
  * - Tagged items are skipped on subsequent runs
  * - When filter is exhausted (no untagged items), all tags are cleared to reset
@@ -13,7 +13,7 @@
 import type { RadarrTag, RadarrMovie } from '$lib/server/utils/arr/types.ts';
 import type { RadarrClient } from '$lib/server/utils/arr/clients/radarr.ts';
 
-const FILTER_TAG_PREFIX = 'profilarr-';
+const FILTER_TAG_PREFIX = 'praxrr-';
 
 /**
  * Slugify a filter name for use in tags
@@ -36,7 +36,7 @@ export function getFilterTagLabel(filterName: string): string {
 }
 
 /**
- * Check if a tag label is a profilarr filter tag
+ * Check if a tag label is a praxrr filter tag
  */
 export function isFilterTag(label: string): boolean {
   return label.startsWith(FILTER_TAG_PREFIX);

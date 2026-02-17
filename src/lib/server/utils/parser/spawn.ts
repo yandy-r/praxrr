@@ -30,7 +30,7 @@ function findParserBinary(): string | null {
   const lastSlash = Math.max(execPath.lastIndexOf('/'), execPath.lastIndexOf('\\'));
   const dir = lastSlash > 0 ? execPath.substring(0, lastSlash) : '.';
 
-  const candidates = [`${dir}/profilarr-parser`, `${dir}/profilarr-parser.exe`];
+  const candidates = [`${dir}/praxrr-parser`, `${dir}/praxrr-parser.exe`];
 
   for (const path of candidates) {
     try {

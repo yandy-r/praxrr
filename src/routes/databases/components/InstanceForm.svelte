@@ -154,7 +154,7 @@
 	$: title = mode === 'create' ? 'Link Database' : 'Settings';
 	$: description =
 		mode === 'create'
-			? 'Link a Profilarr Compliant Database from a Git repository.'
+			? 'Link a Praxrr Compliant Database from a Git repository.'
 			: `Configure settings for ${instance?.name || 'this database'}.`;
 </script>
 

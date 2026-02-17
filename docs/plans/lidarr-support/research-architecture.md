@@ -7,7 +7,7 @@
 
 ## System Overview
 
-Profilarr is a SvelteKit/Deno application whose front-end routes (e.g., `src/routes/media-management/…`) orchestrate requests and server-side `load` logic, while all data manipulation flows through the `pcdManager`/PCD cache layer (`src/lib/server/pcd/*`). The `pcdManager` is initialized in `src/hooks.server.ts` on every server start and exposes caches (`pcdCache` → `cache.kb`/Kysely) plus write helpers, so each media-management page can read/write against the compiled database schema without CSV/REST latencies. Above that, arr metadata (available apps, supported surfaces, arr types) lives in `src/lib/shared/arr/capabilities.ts` and `src/lib/shared/pcd/types.ts`, making lidarr a first-class arr type in the type system even though the media-management entities currently only query Radarr/Sonarr tables.
+Praxrr is a SvelteKit/Deno application whose front-end routes (e.g., `src/routes/media-management/…`) orchestrate requests and server-side `load` logic, while all data manipulation flows through the `pcdManager`/PCD cache layer (`src/lib/server/pcd/*`). The `pcdManager` is initialized in `src/hooks.server.ts` on every server start and exposes caches (`pcdCache` → `cache.kb`/Kysely) plus write helpers, so each media-management page can read/write against the compiled database schema without CSV/REST latencies. Above that, arr metadata (available apps, supported surfaces, arr types) lives in `src/lib/shared/arr/capabilities.ts` and `src/lib/shared/pcd/types.ts`, making lidarr a first-class arr type in the type system even though the media-management entities currently only query Radarr/Sonarr tables.
 
 ## Relevant Components
 
@@ -31,7 +31,7 @@ Lidarr support needs to be wired into every layer that currently splits Radarr/S
 ## Key Dependencies
 
 - **SvelteKit/Deno runtime** (`src/routes/**`, `src/hooks.server.ts`, `deno.json`): handles routing, server loads/actions, and startup sequence (hooks initialize DB and `pcdManager`).
-- **PCD layer** (`src/lib/server/pcd/*`): `pcdManager`, `PCDCache`, operation writers, and manifest/dependency helpers manage cloning/syncing Profilarr-compliant DBs and expose caches used by media-management routes.
+- **PCD layer** (`src/lib/server/pcd/*`): `pcdManager`, `PCDCache`, operation writers, and manifest/dependency helpers manage cloning/syncing Praxrr-compliant DBs and expose caches used by media-management routes.
 - **Kysely + SQLite** (`src/lib/server/pcd/database/cache.ts` uses `Kysely<PCDDatabase>` with `DenoSqlite3Dialect`): the in-memory cache that media-management entity helpers query for arr tables.
 - **ARR metadata/types** (`src/lib/shared/arr/capabilities.ts`, `src/lib/shared/pcd/types.ts`, `src/lib/shared/pcd/display.ts`): define arr type enums, arr app capabilities (including Lidarr), and result shapes used by UI/logic.
 - **Sync helpers** (`src/lib/server/db/queries/arrSync.ts` and job handlers under `src/lib/server/jobs/*`): consumed when arr config names change so `arr_sync_media_management` stays accurate for downstream sync pipelines.

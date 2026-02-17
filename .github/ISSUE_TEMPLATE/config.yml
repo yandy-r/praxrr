@@ -2,13 +2,13 @@ blank_issues_enabled: false
 
 contact_links:
   - name: 💬 Support Question
-    url: https://github.com/yandy-r/profilarr/discussions/new?category=q-a
+    url: https://github.com/yandy-r/praxrr/discussions/new?category=q-a
     about: Ask questions and get help from the community
 
   - name: 📚 Check the Docs
-    url: https://github.com/yandy-r/profilarr
+    url: https://github.com/yandy-r/praxrr
     about: Read the documentation before opening an issue
 
   - name: 🔒 Report a Security Vulnerability
-    url: https://github.com/yandy-r/profilarr/security/advisories/new
+    url: https://github.com/yandy-r/praxrr/security/advisories/new
     about: Privately report a security issue

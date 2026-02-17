@@ -44,7 +44,7 @@ The current library experience loads all items at once, which causes browser sta
 ### Success Criteria
 
 - Browser remains responsive on large Lidarr libraries with default settings.
-- Page navigation requests only fetch needed page slices from Profilarr API contract.
+- Page navigation requests only fetch needed page slices from Praxrr API contract.
 - Users can change page size without losing search/filter/column settings.
 - Refresh path invalidates stale cache and reloads cleanly.
 - Accessibility and usability are not worse than current logs pagination behavior.

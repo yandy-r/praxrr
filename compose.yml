@@ -1,7 +1,7 @@
 services:
-  profilarr:
-    image: ghcr.io/yandy-r/profilarr:v2
-    container_name: profilarr-prod
+  praxrr:
+    image: ghcr.io/yandy-r/praxrr:v2
+    container_name: praxrr-prod
     restart: unless-stopped
     ports:
       - '6969:6868'
@@ -22,8 +22,8 @@ services:
 
   # Optional - only needed for CF/QP testing features
   parser:
-    image: ghcr.io/yandy-r/profilarr-parser:v2
-    container_name: profilarr-parser
+    image: ghcr.io/yandy-r/praxrr-parser:v2
+    container_name: praxrr-parser
     restart: unless-stopped
     expose:
       - '5000'

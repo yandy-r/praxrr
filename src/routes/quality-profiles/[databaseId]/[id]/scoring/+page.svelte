@@ -568,7 +568,7 @@
 </script>
 
 <svelte:head>
-  <title>Scoring - Profilarr</title>
+  <title>Scoring - Praxrr</title>
 </svelte:head>
 
 {#if scoring}

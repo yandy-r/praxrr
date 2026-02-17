@@ -7,7 +7,7 @@
 </script>
 
 <svelte:head>
-	<title>Link Database - Profilarr</title>
+	<title>Link Database - Praxrr</title>
 </svelte:head>
 
 <div class="p-4 md:p-8">

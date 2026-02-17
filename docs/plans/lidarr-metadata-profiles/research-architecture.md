@@ -2,7 +2,7 @@
 
 ## System Overview
 
-Profilarr is organized around PCD-backed entities, sync section handlers, and Arr-specific clients; Lidarr metadata profiles fit naturally as another entity + sync section combination. The feature will extend the existing flow where UI/API writes create PCD operations, cache compilation materializes entity rows, and sync jobs push transformed state to Arr instances. The architecture already supports Arr-specific behavior gates, so metadata profiles should be added as a Lidarr-only path without sibling fallbacks.
+Praxrr is organized around PCD-backed entities, sync section handlers, and Arr-specific clients; Lidarr metadata profiles fit naturally as another entity + sync section combination. The feature will extend the existing flow where UI/API writes create PCD operations, cache compilation materializes entity rows, and sync jobs push transformed state to Arr instances. The architecture already supports Arr-specific behavior gates, so metadata profiles should be added as a Lidarr-only path without sibling fallbacks.
 
 ## Relevant Components
 

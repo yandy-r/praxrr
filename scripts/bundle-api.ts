@@ -9,7 +9,7 @@ import { parse } from '@std/yaml';
 import { join, dirname } from 'jsr:@std/path@^1';
 
 const SPEC_DIR = 'docs/api/v1';
-const OUT_DIR = 'packages/profilarr-api';
+const OUT_DIR = 'packages/praxrr-api';
 
 // ── Helpers ──
 

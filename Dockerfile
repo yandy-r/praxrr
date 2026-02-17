@@ -1,10 +1,10 @@
 # =============================================================================
-# Profilarr Dockerfile
+# Praxrr Dockerfile
 # =============================================================================
 # Multi-stage build for minimal final image size
 #
-# Build:  docker build -t profilarr .
-# Run:    docker run -v ./config:/config -p 6868:6868 profilarr
+# Build:  docker build -t praxrr .
+# Run:    docker run -v ./config:/config -p 6868:6868 praxrr
 
 # -----------------------------------------------------------------------------
 # Stage 1: Build
@@ -45,7 +45,7 @@ RUN deno compile \
     --allow-run \
     --allow-sys \
     --target x86_64-unknown-linux-gnu \
-    --output dist/build/profilarr \
+    --output dist/build/praxrr \
     dist/build/mod.ts
 
 # -----------------------------------------------------------------------------
@@ -54,9 +54,9 @@ RUN deno compile \
 FROM debian:12-slim
 
 # Labels for container metadata
-LABEL org.opencontainers.image.title="Profilarr"
+LABEL org.opencontainers.image.title="Praxrr"
 LABEL org.opencontainers.image.description="Configuration management for Radarr and Sonarr"
-LABEL org.opencontainers.image.source="https://github.com/yandy-r/profilarr"
+LABEL org.opencontainers.image.source="https://github.com/yandy-r/praxrr"
 LABEL org.opencontainers.image.licenses="AGPL-3.0"
 
 # Install runtime dependencies
@@ -78,7 +78,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /app
 
 # Copy built application from builder stage
-COPY --from=builder /build/dist/build/profilarr /app/profilarr
+COPY --from=builder /build/dist/build/praxrr /app/praxrr
 COPY --from=builder /build/dist/build/server.js /app/server.js
 COPY --from=builder /build/dist/build/static /app/static
 

@@ -23,14 +23,14 @@ try {
   // No .env file — that's fine, use env vars directly
 }
 
-/** Base URL of the running Profilarr dev server */
+/** Base URL of the running Praxrr dev server */
 export const BASE_URL = process.env.BASE_URL || 'http://localhost:6969';
 
-/** Path to the main Profilarr SQLite database */
-export const DB_PATH = path.resolve(process.env.DB_PATH || 'dist/dev/data/profilarr.db');
+/** Path to the main Praxrr SQLite database */
+export const DB_PATH = path.resolve(process.env.DB_PATH || 'dist/dev/data/praxrr.db');
 
 /** Git repo URL used for both local and dev database instances */
-export const TEST_REPO_URL = process.env.TEST_REPO_URL || 'https://github.com/yandy-r/profilarr-db-v2-testing';
+export const TEST_REPO_URL = process.env.TEST_REPO_URL || 'https://github.com/yandy-r/praxrr-db-v2-testing';
 
 /** Personal access token for the dev (write) database */
 export const TEST_PAT = process.env.TEST_PAT || '';

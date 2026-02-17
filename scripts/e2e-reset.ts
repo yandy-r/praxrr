@@ -61,8 +61,8 @@ function printHelp(): void {
   console.log('  deno task test:e2e:reset -- --database-name "<name>" --commit <sha> [--push]');
   console.log('');
   console.log('Flags:');
-  console.log('  --database-id <id>       Database instance id from profilarr.db');
-  console.log('  --database-name <name>   Database instance name from profilarr.db');
+  console.log('  --database-id <id>       Database instance id from praxrr.db');
+  console.log('  --database-name <name>   Database instance name from praxrr.db');
   console.log('  --head                   Print current HEAD commit and exit');
   console.log('  --commit <sha>           Reset local clone to this commit');
   console.log('  --push                   Force-push after reset');
@@ -191,7 +191,7 @@ async function runGit(args: string[], cwd: string): Promise<string> {
 
 loadDotEnv();
 const options = parseArgs(Deno.args);
-const dbPath = path.resolve(Deno.env.get('DB_PATH') || 'dist/dev/data/profilarr.db');
+const dbPath = path.resolve(Deno.env.get('DB_PATH') || 'dist/dev/data/praxrr.db');
 const dbRow = getDatabaseRow(dbPath, options);
 
 if (options.headOnly) {

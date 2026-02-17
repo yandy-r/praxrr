@@ -26,14 +26,14 @@
 </script>
 
 <svelte:head>
-	<title>Regular Expressions - Profilarr</title>
+	<title>Regular Expressions - Praxrr</title>
 </svelte:head>
 
 {#if data.databases.length === 0}
 	<EmptyState
 		icon={Database}
 		title="No Databases Linked"
-		description="Link a Profilarr Compliant Database to manage regular expressions."
+		description="Link a Praxrr Compliant Database to manage regular expressions."
 		buttonText="Link Database"
 		buttonHref="/databases/new"
 		buttonIcon={Plus}

@@ -1,8 +1,8 @@
-# Profilarr Architecture
+# Praxrr Architecture
 
 ## 1) Purpose & Audience
 
-Profilarr manages configuration for Radarr, Sonarr, and Lidarr by syncing
+Praxrr manages configuration for Radarr, Sonarr, and Lidarr by syncing
 curated configuration databases (PCDs) into Arr instances. It targets two
 audiences:
 
@@ -27,8 +27,8 @@ exported when publishing.
 
 ## 2) Glossary
 
-- **Arr** — Radarr/Sonarr/Lidarr instances managed by Profilarr.
-- **PCD** — “Profilarr Config Database”: the configuration dataset (custom
+- **Arr** — Radarr/Sonarr/Lidarr instances managed by Praxrr.
+- **PCD** — “Praxrr Config Database”: the configuration dataset (custom
   formats, profiles, media settings) stored as ops.
 - **Op** — An append‑only SQL operation (create/update/delete) applied to build
   the final configuration state.
@@ -92,7 +92,7 @@ Top‑level layout and where each subsystem lives.
 
 ## 4) Data Stores
 
-### App DB (profilarr.db)
+### App DB (praxrr.db)
 
 The main SQLite database stores application state and all PCD ops. This
 includes:
@@ -121,11 +121,11 @@ Parser/evaluation results are cached in SQLite to avoid re‑parsing release
 titles and re‑evaluating conditions. Cache keys include parser version and
 pattern hash.
 
-## 5) App DB (profilarr.db)
+## 5) App DB (praxrr.db)
 
 ### Location & Initialization
 
-The app DB is a SQLite file (`profilarr.db`) managed by `DatabaseManager`
+The app DB is a SQLite file (`praxrr.db`) managed by `DatabaseManager`
 (`src/lib/server/db/db.ts`). On server startup (`src/hooks.server.ts`):
 
 1. `config.init()` creates required paths.
@@ -176,7 +176,7 @@ There is no active plan to migrate; it would be a scale or deployment decision.
 
 ## 6) PCD System (DB‑first)
 
-Profilarr stores configuration changes as **ops** in the app DB and replays them
+Praxrr stores configuration changes as **ops** in the app DB and replays them
 into an in‑memory cache. Repo files are imported into the DB; exporting back to
 Git is a planned step.
 
@@ -249,34 +249,34 @@ reference snapshot at `docs/0.schema.sql`, and the canonical schema repo lives
 at:
 
 ```
-https://github.com/yandy-r/profilarr-schema
+https://github.com/yandy-r/praxrr-schema
 ```
 
 Every PCD repo includes a `pcd.json` manifest in its root. Key fields:
 
 - `name`, `version`, `description`
 - `dependencies` (must include `schema`)
-- `profilarr.minimum_version`
+- `praxrr.minimum_version`
 - Optional: `arr_types`, `authors`, `license`, `repository`, `tags`, `links`
 
 Example:
 
 ```json
 {
-  "name": "profilarr-db",
+  "name": "praxrr-db",
   "version": "2.1.35",
   "description": "Seraphys' OCD Playground",
   "arr_types": ["radarr", "sonarr", "whisparr"],
   "dependencies": { "schema": "^1.1.0" },
   "authors": [{ "name": "Yandy-R", "email": "yandy-r@yandy-r.github.io" }],
   "license": "MIT",
-  "repository": "https://github.com/yandy-r/profilarr-db",
+  "repository": "https://github.com/yandy-r/praxrr-db",
   "tags": ["4k", "hdr", "remux", "quality", "archival"],
   "links": {
-    "homepage": "https://github.com/yandy-r/profilarr-db",
-    "issues": "https://github.com/yandy-r/profilarr-db/issues"
+    "homepage": "https://github.com/yandy-r/praxrr-db",
+    "issues": "https://github.com/yandy-r/praxrr-db/issues"
   },
-  "profilarr": { "minimum_version": "2.0.0" }
+  "praxrr": { "minimum_version": "2.0.0" }
 }
 ```
 
@@ -303,7 +303,7 @@ schema-pcd/
 
 ## 7) Sync System
 
-Profilarr syncs compiled configuration into Arr instances. The sync pipeline:
+Praxrr syncs compiled configuration into Arr instances. The sync pipeline:
 
 1. **Read compiled state** from the PCD cache.
 2. **Transform** into Arr API payloads.
@@ -350,7 +350,7 @@ isolated from Radarr/Sonarr runtime paths:
 
 ## 8) Parser Service
 
-Profilarr uses a C# parser microservice to extract structured metadata from
+Praxrr uses a C# parser microservice to extract structured metadata from
 release titles (resolution, source, flags, languages, release group, etc.). This
 powers custom format matching and quality profile testing.
 
@@ -718,7 +718,7 @@ driven by the per‑instance settings.
 
 ## 16) Jobs
 
-Profilarr uses an event‑driven **job queue** for background tasks (syncing,
+Praxrr uses an event‑driven **job queue** for background tasks (syncing,
 renames, upgrades, log cleanup, backups). Jobs are queued when configuration
 changes or events occur. Scheduled jobs are represented by a single queue row
 that reschedules itself after each run.
@@ -773,7 +773,7 @@ Manual upgrades remain dry‑run only and respect cooldowns.
 
 ## 17) Notifications
 
-Profilarr ships a **pluggable notification system** with a central manager,
+Praxrr ships a **pluggable notification system** with a central manager,
 service definitions, and delivery history.
 
 **UI routes:** `src/routes/settings/notifications/**`
@@ -868,7 +868,7 @@ Core logic lives in `src/lib/server/upgrades/processor.ts`:
 
 ### 18.3 Cooldown & Dry‑Run
 
-- **Cooldown:** items are tagged with `profilarr-{filter}` so filters only
+- **Cooldown:** items are tagged with `praxrr-{filter}` so filters only
   re‑search after the pool is exhausted (tags reset).
 - **Dry‑run cache:** prevents repeated dry‑run selections within a TTL.
 
@@ -883,7 +883,7 @@ Upgrade runs emit notifications (success/partial/failed) when enabled.
 
 ## 19) Auth & Security
 
-Profilarr supports local auth, OIDC, API keys, and session management. The
+Praxrr supports local auth, OIDC, API keys, and session management. The
 primary flow is enforced in `src/hooks.server.ts` via the auth middleware.
 
 **Auth module:** `src/lib/server/utils/auth/`

@@ -26,14 +26,14 @@
 </script>
 
 <svelte:head>
-	<title>Delay Profiles - Profilarr</title>
+	<title>Delay Profiles - Praxrr</title>
 </svelte:head>
 
 {#if data.databases.length === 0}
 	<EmptyState
 		icon={Database}
 		title="No Databases Linked"
-		description="Link a Profilarr Compliant Database to manage delay profiles."
+		description="Link a Praxrr Compliant Database to manage delay profiles."
 		buttonText="Link Database"
 		buttonHref="/databases/new"
 		buttonIcon={Plus}

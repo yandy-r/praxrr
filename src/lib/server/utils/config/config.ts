@@ -100,7 +100,7 @@ class Config {
       return `${config.basePath}/data`;
     },
     get database(): string {
-      return `${config.basePath}/data/profilarr.db`;
+      return `${config.basePath}/data/praxrr.db`;
     },
     get databases(): string {
       return `${config.basePath}/data/databases`;

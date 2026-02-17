@@ -112,7 +112,7 @@ Model the implementation after the quality profile entity pattern, which is the 
 ### Related Features
 
 - **Profile Templates**: Pre-built metadata profiles (e.g., "Albums Only", "Everything", "Albums + EPs + Singles") could be seeded as base ops, similar to how quality profiles have default templates.
-- **Artist-level Override**: The Lidarr API assigns metadata profiles at the artist level (via `metadataProfileId` on the Artist resource). A future enhancement could expose per-artist metadata profile assignment from within Profilarr.
+- **Artist-level Override**: The Lidarr API assigns metadata profiles at the artist level (via `metadataProfileId` on the Artist resource). A future enhancement could expose per-artist metadata profile assignment from within Praxrr.
 - **Profile Comparison**: Side-by-side diff view for metadata profiles would help users understand what each profile includes/excludes before syncing.
 - **Bulk Operations**: Apply a metadata profile change across multiple Lidarr instances simultaneously.
 
@@ -181,7 +181,7 @@ Per Arr Cutover Guardrails:
   - Consistent UX with all other managed entities
 - **Cons**:
   - Most complex implementation (~60-80 files touched)
-  - Requires PCD schema update (new tables in the `profilarr-schema` repo)
+  - Requires PCD schema update (new tables in the `praxrr-schema` repo)
   - Longer time to first working feature
 
 ### Option B: Lightweight Direct API Management
@@ -312,7 +312,7 @@ Per Arr Cutover Guardrails:
 
 ## Key Decisions Needed
 
-1. **PCD Schema Repo Update**: The PCD schema is sourced from `profilarr-schema` (referenced in type generation header). Metadata profile tables need to be added there first, or handled via built-in base ops like the Lidarr media management migration. Built-in base ops are recommended for the initial implementation to avoid blocking on schema repo changes.
+1. **PCD Schema Repo Update**: The PCD schema is sourced from `praxrr-schema` (referenced in type generation header). Metadata profile tables need to be added there first, or handled via built-in base ops like the Lidarr media management migration. Built-in base ops are recommended for the initial implementation to avoid blocking on schema repo changes.
 
 2. **Default Metadata Profiles**: What default profiles should be seeded via base ops? Lidarr ships with a "Standard" profile (Albums only). Options: seed a "Standard" profile matching Lidarr defaults, or leave PCD empty and let users create their own.
 

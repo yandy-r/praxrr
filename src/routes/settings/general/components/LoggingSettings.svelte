@@ -36,7 +36,7 @@
 			Logging Configuration
 		</h2>
 		<p class="mt-1 text-sm text-neutral-600 dark:text-neutral-400">
-			Configure how Profilarr handles application logs, rotation, and retention
+			Configure how Praxrr handles application logs, rotation, and retention
 		</p>
 	</div>
 

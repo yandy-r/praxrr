@@ -21,7 +21,7 @@
 </script>
 
 <svelte:head>
-	<title>New Regular Expression - {data.currentDatabase.name} - Profilarr</title>
+	<title>New Regular Expression - {data.currentDatabase.name} - Praxrr</title>
 </svelte:head>
 
 <div class="p-4 md:p-8">

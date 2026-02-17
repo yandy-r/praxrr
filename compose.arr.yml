@@ -4,7 +4,7 @@
 
 services:
   radarr:
-    container_name: profilarr-radarr
+    container_name: praxrr-radarr
     image: lscr.io/linuxserver/radarr:latest
     restart: unless-stopped
     ports:
@@ -18,7 +18,7 @@ services:
       - ./.arr/radarr/data:/data
 
   sonarr:
-    container_name: profilarr-sonarr
+    container_name: praxrr-sonarr
     image: lscr.io/linuxserver/sonarr:latest
     restart: unless-stopped
     ports:
@@ -32,7 +32,7 @@ services:
       - ./.arr/sonarr/data:/data
 
   lidarr:
-    container_name: profilarr-lidarr
+    container_name: praxrr-lidarr
     image: lscr.io/linuxserver/lidarr:latest
     restart: unless-stopped
     ports:

@@ -26,7 +26,7 @@ import { seedBuiltInBaseOps } from '../ops/seedBuiltInBaseOps.ts';
 import { cleanupJobsForDatabase } from '$lib/server/jobs/cleanup.ts';
 
 /**
- * PCD Manager - Manages the lifecycle of Profilarr Compliant Databases
+ * PCD Manager - Manages the lifecycle of Praxrr Compliant Databases
  */
 class PCDManager {
   /**

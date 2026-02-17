@@ -190,7 +190,7 @@ ${extraInserts}
 }
 
 async function createWriteHarness(databaseId: number, schemaSql: string): Promise<WriteHarness> {
-  const tempPath = `/tmp/profilarr-tests/lidarr-route-sync-cutover-${databaseId}-${crypto.randomUUID()}`;
+  const tempPath = `/tmp/praxrr-tests/lidarr-route-sync-cutover-${databaseId}-${crypto.randomUUID()}`;
   await Deno.mkdir(`${tempPath}/deps/schema/ops`, { recursive: true });
   await Deno.writeTextFile(`${tempPath}/deps/schema/ops/0.schema.sql`, schemaSql);
 

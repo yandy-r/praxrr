@@ -238,7 +238,7 @@
 </script>
 
 <svelte:head>
-	<title>Conflicts - {data.database.name} - Profilarr</title>
+	<title>Conflicts - {data.database.name} - Praxrr</title>
 </svelte:head>
 
 <ActionsBar className="justify-end mt-6">

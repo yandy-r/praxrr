@@ -1,5 +1,5 @@
 /**
- * Direct SQLite access to profilarr.db for verifying state in tests.
+ * Direct SQLite access to praxrr.db for verifying state in tests.
  * Uses better-sqlite3 (synchronous) so assertions are straightforward.
  */
 import Database from 'better-sqlite3';

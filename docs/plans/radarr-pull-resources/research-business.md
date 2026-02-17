@@ -2,24 +2,32 @@
 
 ## Executive Summary
 
-This feature extends pull into a user-controlled import flow for Radarr resources: users fetch resources, optionally select by category/item, then commit into PCD as user-layer operations. The second-pass rule is explicit: if users do not adjust selections, the system imports all previewed resources and relies on existing dedup/conflict behavior for final outcomes. The business value is faster migration from existing Radarr setups without manual recreation.
+This feature extends pull into a user-controlled import flow for Radarr resources: users fetch
+resources, optionally select by category/item, then commit into PCD as user-layer operations. The
+second-pass rule is explicit: if users do not adjust selections, the system imports all previewed
+resources and relies on existing dedup/conflict behavior for final outcomes. The business value is
+faster migration from existing Radarr setups without manual recreation.
 
 ## User Stories
 
 ### Primary
 
-- As a Radarr user, I want to import existing custom formats, quality profiles, delay profiles, and quality definitions into Profilarr.
-- As a migrating user, I want to review pulled resources before writing so I can avoid accidental collisions.
+- As a Radarr user, I want to import existing custom formats, quality profiles, delay profiles, and
+  quality definitions into Praxrr.
+- As a migrating user, I want to review pulled resources before writing so I can avoid accidental
+  collisions.
 - As a power user, I want optional per-category/per-item selection before commit.
 
 ### Secondary
 
 - As a user who wants speed, I want to skip manual selection and import everything from preview.
-- As a multi-instance user, I want predictable conflict handling and clear summaries for what was imported or skipped.
+- As a multi-instance user, I want predictable conflict handling and clear summaries for what was
+  imported or skipped.
 
 ## Business Rules
 
-1. Pulled data writes to `user` layer only (`origin=user`, `state=published`) via existing write pipeline.
+1. Pulled data writes to `user` layer only (`origin=user`, `state=published`) via existing write
+   pipeline.
 2. Preview never writes data.
 3. Execute accepts optional selections:
 
@@ -32,7 +40,8 @@ This feature extends pull into a user-controlled import flow for Radarr resource
 7. Dependency ordering remains required (CF before QP scoring references).
 8. Radarr quality modifier conditions must preserve `arr_type='radarr'`.
 9. Radarr quality profile `language` must be preserved in the target representation.
-10. Radarr-specific resources route to Radarr tables (`radarr_quality_definitions`, `radarr_naming`, `radarr_media_settings`).
+10. Radarr-specific resources route to Radarr tables (`radarr_quality_definitions`, `radarr_naming`,
+    `radarr_media_settings`).
 
 ## Workflows
 
@@ -56,12 +65,13 @@ This feature extends pull into a user-controlled import flow for Radarr resource
 ## Domain Concepts
 
 - Pull Session: preview result set + chosen/default execution plan.
-- Resource Status: `new`, `identical`, `conflict`, `profilarr_managed`.
+- Resource Status: `new`, `identical`, `conflict`, `praxrr_managed`.
 - Selection Mode:
   - explicit mode (user selections provided)
   - implicit mode (default import-all)
 - Execution Outcomes: imported, skipped, overwritten, failed.
-- Radarr-specific fields: quality profile language, quality modifier conditions, and Radarr naming/media settings resources.
+- Radarr-specific fields: quality profile language, quality modifier conditions, and Radarr
+  naming/media settings resources.
 
 ## Success Criteria
 
@@ -84,4 +94,5 @@ This feature extends pull into a user-controlled import flow for Radarr resource
 2. Removed ambiguity where selective pull was treated as future scope.
 3. Aligned workflow text so no-selection path is first-class and not error-prone.
 4. Kept dedup/conflict behavior unchanged per requirement.
-5. Folded Radarr-only behaviors into core rules instead of isolating them in sprawling side sections.
+5. Folded Radarr-only behaviors into core rules instead of isolating them in sprawling side
+   sections.

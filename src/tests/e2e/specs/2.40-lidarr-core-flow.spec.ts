@@ -13,7 +13,7 @@
  */
 import { expect, test } from '@playwright/test';
 
-const LIDARR_UNSUPPORTED_WORKFLOW_MESSAGE = 'Lidarr does not support Rename and Upgrades in Profilarr yet.';
+const LIDARR_UNSUPPORTED_WORKFLOW_MESSAGE = 'Lidarr does not support Rename and Upgrades in Praxrr yet.';
 const LIDARR_SUPPORTED_WORKFLOW_MESSAGE = 'You can still use Library and Releases.';
 
 const CONNECTION_SUCCESS_MESSAGE = 'Connection successful!';
@@ -68,27 +68,27 @@ function parseArrInstanceId(url: string): number {
 async function clearWindowOpenCaptures(page: import('@playwright/test').Page): Promise<void> {
   await page.evaluate(() => {
     const windowState = globalThis as {
-      __profilarrOpenUrls?: string[];
+      __praxrrOpenUrls?: string[];
     };
-    windowState.__profilarrOpenUrls = [];
+    windowState.__praxrrOpenUrls = [];
   });
 }
 
 async function setupWindowOpenCapture(page: import('@playwright/test').Page): Promise<void> {
   await page.addInitScript(() => {
     const windowState = globalThis as {
-      __profilarrOpenUrls?: string[];
+      __praxrrOpenUrls?: string[];
     };
 
-    windowState.__profilarrOpenUrls = [];
+    windowState.__praxrrOpenUrls = [];
     window.open = ((url: string | URL | null) => {
       if (url === null) {
         return null;
       }
 
       const resolvedUrl = typeof url === 'string' ? url : url.toString();
-      windowState.__profilarrOpenUrls = windowState.__profilarrOpenUrls ?? [];
-      windowState.__profilarrOpenUrls.push(resolvedUrl);
+      windowState.__praxrrOpenUrls = windowState.__praxrrOpenUrls ?? [];
+      windowState.__praxrrOpenUrls.push(resolvedUrl);
       return null;
     }) as typeof window.open;
   });
@@ -97,14 +97,14 @@ async function setupWindowOpenCapture(page: import('@playwright/test').Page): Pr
 async function getLatestWindowOpenUrl(page: import('@playwright/test').Page): Promise<string | null> {
   return page.evaluate(() => {
     const windowState = globalThis as {
-      __profilarrOpenUrls?: string[];
+      __praxrrOpenUrls?: string[];
     };
 
-    if (!windowState.__profilarrOpenUrls || windowState.__profilarrOpenUrls.length === 0) {
+    if (!windowState.__praxrrOpenUrls || windowState.__praxrrOpenUrls.length === 0) {
       return null;
     }
 
-    return windowState.__profilarrOpenUrls.at(-1) ?? null;
+    return windowState.__praxrrOpenUrls.at(-1) ?? null;
   });
 }
 
@@ -267,7 +267,7 @@ function buildLidarrLibraryItems(query: string | null) {
       dateAdded: `2025-01-${String((albumIndex % 28) + 1).padStart(2, '0')}T00:00:00.000Z`,
       qualityProfileId: isPrimaryProfile ? 77 : 78,
       qualityProfileName: isPrimaryProfile ? LIDARR_LIBRARY_PROFILE : LIDARR_LIBRARY_ALT_PROFILE,
-      isProfilarrProfile: isPrimaryProfile,
+      isPraxrrProfile: isPrimaryProfile,
     };
   });
 

@@ -34,14 +34,14 @@
 </script>
 
 <svelte:head>
-	<title>Media Management - Profilarr</title>
+	<title>Media Management - Praxrr</title>
 </svelte:head>
 
 {#if data.databases.length === 0}
 	<EmptyState
 		icon={Database}
 		title="No Databases Linked"
-		description="Link a Profilarr Compliant Database to manage media settings."
+		description="Link a Praxrr Compliant Database to manage media settings."
 		buttonText="Link Database"
 		buttonHref="/databases/new"
 		buttonIcon={Plus}

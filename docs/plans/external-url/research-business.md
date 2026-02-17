@@ -7,7 +7,7 @@ Current Arr instances share a single `URL` value for both API traffic and the va
 ### User Stories
 
 - Primary: As a deployment operator, I want the "Open in" actions to open a browser-accessible address even when the canonical Arr URL is an internal container hostname, so I can inspect the upstream UI without proxying.
-- Primary: As a Profilarr administrator, I want to keep the existing `URL` field as the single source of truth for API calls, tests, and background jobs, while optionally supplying a separate `External URL` for user-facing links.
+- Primary: As a Praxrr administrator, I want to keep the existing `URL` field as the single source of truth for API calls, tests, and background jobs, while optionally supplying a separate `External URL` for user-facing links.
 - Secondary: As someone managing existing Arr instances, I want the new External URL to be optional and to start being used as soon as I enter it—no re-adding or re-syncing the instance.
 - Secondary: As a support engineer, I want consistent behavior across the list view, cards, and library so every "Open in" button can be relied upon regardless of deployment topology.
 
@@ -35,10 +35,10 @@ Current Arr instances share a single `URL` value for both API traffic and the va
 
 ### Domain Concepts
 
-- **Arr Instance**: A Radarr/Sonarr/Lidarr/etc. server configured in Profilarr with credentials, tags, and its canonical connection URL.
-- **Canonical URL**: The existing `URL` field that Profilarr trusts for API calls, jobs, syncs, and connection validation.
+- **Arr Instance**: A Radarr/Sonarr/Lidarr/etc. server configured in Praxrr with credentials, tags, and its canonical connection URL.
+- **Canonical URL**: The existing `URL` field that Praxrr trusts for API calls, jobs, syncs, and connection validation.
 - **External URL**: The new optional address that points to the same Arr UI but is reachable from the browser; it is used exclusively for navigation actions.
-- **Open in Action**: Any button or link that opens the Arr UI from Profilarr (library action bar, row-level buttons, list view cards/tables).
+- **Open in Action**: Any button or link that opens the Arr UI from Praxrr (library action bar, row-level buttons, list view cards/tables).
 - **Resolution Logic**: The shared decision of whether to use `External URL` or fall back to the canonical URL when rendering an "Open in" link.
 
 ### Success Criteria

@@ -5,7 +5,7 @@
 </script>
 
 <svelte:head>
-	<title>Tweaks - {data.database.name} - Profilarr</title>
+	<title>Tweaks - {data.database.name} - Praxrr</title>
 </svelte:head>
 
 <div class="mt-6">

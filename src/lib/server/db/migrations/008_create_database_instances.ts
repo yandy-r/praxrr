@@ -3,7 +3,7 @@ import type { Migration } from '../migrations.ts';
 /**
  * Migration 008: Create database_instances table
  *
- * Creates the table for storing linked Profilarr Compliant Database (PCD) repositories.
+ * Creates the table for storing linked Praxrr Compliant Database (PCD) repositories.
  * These databases contain configuration profiles that can be synced to arr instances.
  *
  * Fields:

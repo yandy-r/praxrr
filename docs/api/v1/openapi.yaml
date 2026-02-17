@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
-  title: Profilarr API
-  description: API for Profilarr - Profile management and sync for *arr applications
+  title: Praxrr API
+  description: API for Praxrr - Profile management and sync for *arr applications
   version: 1.0.0
   license:
     name: MIT
@@ -467,7 +467,7 @@ components:
         description:
           type: string
           nullable: true
-          description: Optional Profilarr-only description for local documentation.
+          description: Optional Praxrr-only description for local documentation.
         updated_at:
           type: string
           description: Last profile update timestamp in the PCD cache
@@ -505,7 +505,7 @@ components:
         description:
           type: string
           nullable: true
-          description: Optional Profilarr-only description for local documentation.
+          description: Optional Praxrr-only description for local documentation.
         updated_at:
           type: string
           description: Last profile update timestamp in the PCD cache

@@ -99,7 +99,7 @@
 </script>
 
 <svelte:head>
-	<title>Commits - {data.database.name} - Profilarr</title>
+	<title>Commits - {data.database.name} - Praxrr</title>
 </svelte:head>
 
 <div class="mt-6 space-y-6">

@@ -87,52 +87,52 @@ class CooldownTest extends BaseTest {
 
     this.test('getFilterTagLabel: simple name', () => {
       const label = getFilterTagLabel('My Filter');
-      assertEquals(label, 'profilarr-my-filter');
+      assertEquals(label, 'praxrr-my-filter');
     });
 
     this.test('getFilterTagLabel: name with apostrophe', () => {
       const label = getFilterTagLabel("Things I Don't Want");
-      assertEquals(label, 'profilarr-things-i-dont-want');
+      assertEquals(label, 'praxrr-things-i-dont-want');
     });
 
     this.test('getFilterTagLabel: name with special characters', () => {
       const label = getFilterTagLabel('4K HDR (Dolby Vision)');
-      assertEquals(label, 'profilarr-4k-hdr-dolby-vision');
+      assertEquals(label, 'praxrr-4k-hdr-dolby-vision');
     });
 
     this.test('getFilterTagLabel: name with multiple spaces', () => {
       const label = getFilterTagLabel('Filter   With   Spaces');
-      assertEquals(label, 'profilarr-filter-with-spaces');
+      assertEquals(label, 'praxrr-filter-with-spaces');
     });
 
     this.test('getFilterTagLabel: already lowercase', () => {
       const label = getFilterTagLabel('already-lowercase');
-      assertEquals(label, 'profilarr-already-lowercase');
+      assertEquals(label, 'praxrr-already-lowercase');
     });
 
     this.test('getFilterTagLabel: numbers preserved', () => {
       const label = getFilterTagLabel('Filter 123');
-      assertEquals(label, 'profilarr-filter-123');
+      assertEquals(label, 'praxrr-filter-123');
     });
 
     this.test('getFilterTagLabel: long name truncated to 50 chars', () => {
       const longName = 'This is a very long filter name that should be truncated to fifty characters';
       const label = getFilterTagLabel(longName);
-      // profilarr- prefix (10 chars) + 50 char max slug = 60 max
+      // praxrr- prefix (10 chars) + 50 char max slug = 60 max
       assertEquals(label.length <= 60, true);
-      assertEquals(label.startsWith('profilarr-'), true);
-      assertEquals(label, 'profilarr-this-is-a-very-long-filter-name-that-should-be-tru');
+      assertEquals(label.startsWith('praxrr-'), true);
+      assertEquals(label, 'praxrr-this-is-a-very-long-filter-name-that-should-be-tru');
     });
 
     // =====================
     // isFilterTag
     // =====================
 
-    this.test('isFilterTag: matches profilarr tag', () => {
-      assertEquals(isFilterTag('profilarr-my-filter'), true);
+    this.test('isFilterTag: matches praxrr tag', () => {
+      assertEquals(isFilterTag('praxrr-my-filter'), true);
     });
 
-    this.test('isFilterTag: rejects non-profilarr tag', () => {
+    this.test('isFilterTag: rejects non-praxrr tag', () => {
       assertEquals(isFilterTag('some-other-tag'), false);
     });
 
@@ -146,7 +146,7 @@ class CooldownTest extends BaseTest {
 
     this.test('hasFilterTag: finds matching tag', () => {
       const allTags: RadarrTag[] = [
-        { id: 1, label: 'profilarr-my-filter' },
+        { id: 1, label: 'praxrr-my-filter' },
         { id: 2, label: 'other-tag' },
       ];
       const itemTagIds = [1, 2];
@@ -155,7 +155,7 @@ class CooldownTest extends BaseTest {
 
     this.test('hasFilterTag: returns false when tag not present', () => {
       const allTags: RadarrTag[] = [
-        { id: 1, label: 'profilarr-other-filter' },
+        { id: 1, label: 'praxrr-other-filter' },
         { id: 2, label: 'other-tag' },
       ];
       const itemTagIds = [1, 2];
@@ -163,15 +163,15 @@ class CooldownTest extends BaseTest {
     });
 
     this.test('hasFilterTag: returns false when item has no tags', () => {
-      const allTags: RadarrTag[] = [{ id: 1, label: 'profilarr-my-filter' }];
+      const allTags: RadarrTag[] = [{ id: 1, label: 'praxrr-my-filter' }];
       const itemTagIds: number[] = [];
       assertEquals(hasFilterTag(itemTagIds, allTags, 'My Filter'), false);
     });
 
     this.test('hasFilterTag: handles case-insensitive filter name', () => {
-      const allTags: RadarrTag[] = [{ id: 1, label: 'profilarr-my-filter' }];
+      const allTags: RadarrTag[] = [{ id: 1, label: 'praxrr-my-filter' }];
       const itemTagIds = [1];
-      // getFilterTagLabel lowercases, so "MY FILTER" -> "profilarr-my-filter"
+      // getFilterTagLabel lowercases, so "MY FILTER" -> "praxrr-my-filter"
       assertEquals(hasFilterTag(itemTagIds, allTags, 'MY FILTER'), true);
     });
 
@@ -180,7 +180,7 @@ class CooldownTest extends BaseTest {
     // =====================
 
     this.test('filterByFilterTag: filters out tagged items', () => {
-      const allTags: RadarrTag[] = [{ id: 1, label: 'profilarr-my-filter' }];
+      const allTags: RadarrTag[] = [{ id: 1, label: 'praxrr-my-filter' }];
       const items = [
         { id: 1, title: 'Tagged Movie', _tags: [1] },
         { id: 2, title: 'Untagged Movie', _tags: [] },
@@ -194,7 +194,7 @@ class CooldownTest extends BaseTest {
     });
 
     this.test('filterByFilterTag: returns all items when none tagged', () => {
-      const allTags: RadarrTag[] = [{ id: 1, label: 'profilarr-other-filter' }];
+      const allTags: RadarrTag[] = [{ id: 1, label: 'praxrr-other-filter' }];
       const items = [
         { id: 1, title: 'Movie 1', _tags: [] },
         { id: 2, title: 'Movie 2', _tags: [1] },
@@ -205,7 +205,7 @@ class CooldownTest extends BaseTest {
     });
 
     this.test('filterByFilterTag: returns empty when all tagged', () => {
-      const allTags: RadarrTag[] = [{ id: 1, label: 'profilarr-my-filter' }];
+      const allTags: RadarrTag[] = [{ id: 1, label: 'praxrr-my-filter' }];
       const items = [
         { id: 1, title: 'Movie 1', _tags: [1] },
         { id: 2, title: 'Movie 2', _tags: [1] },
@@ -220,7 +220,7 @@ class CooldownTest extends BaseTest {
     // =====================
 
     this.test('isFilterExhausted: true when all items tagged', () => {
-      const allTags: RadarrTag[] = [{ id: 1, label: 'profilarr-my-filter' }];
+      const allTags: RadarrTag[] = [{ id: 1, label: 'praxrr-my-filter' }];
       const items = [
         { id: 1, _tags: [1] },
         { id: 2, _tags: [1] },
@@ -230,7 +230,7 @@ class CooldownTest extends BaseTest {
     });
 
     this.test('isFilterExhausted: false when some items untagged', () => {
-      const allTags: RadarrTag[] = [{ id: 1, label: 'profilarr-my-filter' }];
+      const allTags: RadarrTag[] = [{ id: 1, label: 'praxrr-my-filter' }];
       const items = [
         { id: 1, _tags: [1] },
         { id: 2, _tags: [] },
@@ -240,7 +240,7 @@ class CooldownTest extends BaseTest {
     });
 
     this.test('isFilterExhausted: false when no items matched', () => {
-      const allTags: RadarrTag[] = [{ id: 1, label: 'profilarr-my-filter' }];
+      const allTags: RadarrTag[] = [{ id: 1, label: 'praxrr-my-filter' }];
       const items: { id: number; _tags: number[] }[] = [];
 
       assertEquals(isFilterExhausted(items, allTags, 'My Filter'), false);
@@ -248,7 +248,7 @@ class CooldownTest extends BaseTest {
 
     this.test('isFilterExhausted: true triggers reset cycle', () => {
       // Simulates: matched 3 items, all 3 tagged = exhausted = reset
-      const allTags: RadarrTag[] = [{ id: 1, label: 'profilarr-upgrade-filter' }];
+      const allTags: RadarrTag[] = [{ id: 1, label: 'praxrr-upgrade-filter' }];
       const matchedItems = [
         { id: 100, _tags: [1] },
         { id: 200, _tags: [1] },
@@ -384,7 +384,7 @@ class CooldownTest extends BaseTest {
         { id: 3, title: 'Movie C', tags: [99] }, // Already has another tag
       ]);
 
-      const filterTag = await client.getOrCreateTag('profilarr-test-filter');
+      const filterTag = await client.getOrCreateTag('praxrr-test-filter');
       const movies = await client.getMovies();
 
       const result = await applyFilterTagToMovies(client as unknown as RadarrClient, movies, filterTag.id);
@@ -406,7 +406,7 @@ class CooldownTest extends BaseTest {
         { id: 1, title: 'Movie A', tags: [1] }, // Already has the filter tag
         { id: 2, title: 'Movie B', tags: [] },
       ]);
-      client.tags = [{ id: 1, label: 'profilarr-test-filter' }];
+      client.tags = [{ id: 1, label: 'praxrr-test-filter' }];
 
       const movies = await client.getMovies();
 

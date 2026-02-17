@@ -1,6 +1,6 @@
 ## Executive Summary
 
-As of February 16, 2026, Radarr/Sonarr/Lidarr expose host configuration fields (`urlBase`, `applicationUrl`) and API-key auth, but there is no dedicated upstream contract that maps directly to Profilarr's "Open in" link behavior. For this feature, the low-risk pattern is a dual-URL model: keep `url` for server-to-Arr API communication and add optional `external_url` for browser links. If link resolution is computed as `external_url ?? url` at render time, already-configured instances will automatically pick up External URL when it is added later.
+As of February 16, 2026, Radarr/Sonarr/Lidarr expose host configuration fields (`urlBase`, `applicationUrl`) and API-key auth, but there is no dedicated upstream contract that maps directly to Praxrr's "Open in" link behavior. For this feature, the low-risk pattern is a dual-URL model: keep `url` for server-to-Arr API communication and add optional `external_url` for browser links. If link resolution is computed as `external_url ?? url` at render time, already-configured instances will automatically pick up External URL when it is added later.
 
 ### Candidate APIs and Services
 
@@ -100,5 +100,5 @@ As of February 16, 2026, Radarr/Sonarr/Lidarr expose host configuration fields (
 - Should `external_url` be restricted to `http`/`https` only, or allow custom schemes?
 - Should the UI behavior stay implicit (`external_url` blank => fallback to `url`) or expose an explicit toggle?
 - Should save-time validation be syntax-only, or also include optional reachability checks from browser/server contexts?
-- Should Profilarr offer a one-click "seed from Arr HostConfig applicationUrl" action?
+- Should Praxrr offer a one-click "seed from Arr HostConfig applicationUrl" action?
 - Should `external_url` be included immediately in import/export/backups and API contracts, or staged after UI behavior ships?

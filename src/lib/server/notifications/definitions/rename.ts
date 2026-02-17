@@ -204,7 +204,7 @@ function startNewEmbed(
   page: number
 ): EmbedBuilder {
   const embed = createEmbed()
-    .author(config.username || 'Profilarr', config.avatar_url)
+    .author(config.username || 'Praxrr', config.avatar_url)
     .title(`${getTitle(log)} - ${log.instanceName}`)
     .color(Colors.INFO)
     .timestamp()
@@ -233,7 +233,7 @@ function startNewEmbed(
  */
 function buildSummaryNotification(log: RenameJobLog, config: { username?: string; avatar_url?: string }) {
   const embed = createEmbed()
-    .author(config.username || 'Profilarr', config.avatar_url)
+    .author(config.username || 'Praxrr', config.avatar_url)
     .title(`${getTitle(log)} - ${log.instanceName}`)
     .color(Colors.INFO)
     .timestamp()
@@ -346,7 +346,7 @@ export const rename = ({ log, config, summaryNotifications = true }: RenameNotif
   // If no files to rename, always use a simple notification
   if (log.renamedItems.length === 0) {
     const embed = createEmbed()
-      .author(config.username || 'Profilarr', config.avatar_url)
+      .author(config.username || 'Praxrr', config.avatar_url)
       .title(`${getTitle(log)} - ${log.instanceName}`)
       .color(Colors.INFO)
       .field('Status', 'No files needed renaming', false)

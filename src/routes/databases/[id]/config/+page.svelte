@@ -46,11 +46,11 @@
 		dirtyUpdate('manifest', manifest);
 	}
 
-	function updateProfilarr(key: 'minimum_version', value: string) {
+	function updatePraxrr(key: 'minimum_version', value: string) {
 		if (!manifest) return;
 		manifest = {
 			...manifest,
-			profilarr: { ...manifest.profilarr, [key]: value }
+			praxrr: { ...manifest.praxrr, [key]: value }
 		};
 		dirtyUpdate('manifest', manifest);
 	}
@@ -73,12 +73,12 @@
 
 	$: [vMajor, vMinor, vPatch] = manifest ? parseVersion(manifest.version) : [0, 0, 0];
 	$: [pvMajor, pvMinor, pvPatch] = manifest
-		? parseVersion(manifest.profilarr.minimum_version)
+		? parseVersion(manifest.praxrr.minimum_version)
 		: [0, 0, 0];
 </script>
 
 <svelte:head>
-	<title>Config - {data.database.name} - Profilarr</title>
+	<title>Config - {data.database.name} - Praxrr</title>
 </svelte:head>
 
 <form
@@ -193,55 +193,55 @@
 					</div>
 				</div>
 
-				<!-- Minimum Profilarr Version -->
+				<!-- Minimum Praxrr Version -->
 				<div class="space-y-1">
 					<span class="block text-sm font-medium text-neutral-700 dark:text-neutral-300">
-						Minimum Profilarr Version <span class="text-red-500">*</span>
+						Minimum Praxrr Version <span class="text-red-500">*</span>
 					</span>
 					<p class="text-xs text-neutral-500 dark:text-neutral-400">
-						Minimum Profilarr version required to use this database
+						Minimum Praxrr version required to use this database
 					</p>
 					<div class="mt-1 flex items-center gap-1">
 						<div class="w-20">
 							<NumberInput
-								name="profilarr-version-major"
+								name="praxrr-version-major"
 								value={pvMajor}
 								min={2}
 								font="mono"
 								onchange={(v) =>
-									updateProfilarr(
+									updatePraxrr(
 										'minimum_version',
-										updateVersionPart(manifest!.profilarr.minimum_version, 0, v)
+										updateVersionPart(manifest!.praxrr.minimum_version, 0, v)
 									)}
 								onMinBlocked={() =>
-									alertStore.add('warning', 'Minimum Profilarr version must be at least 2.0.0')}
+									alertStore.add('warning', 'Minimum Praxrr version must be at least 2.0.0')}
 							/>
 						</div>
 						<span class="text-lg font-medium text-neutral-400 dark:text-neutral-500">.</span>
 						<div class="w-20">
 							<NumberInput
-								name="profilarr-version-minor"
+								name="praxrr-version-minor"
 								value={pvMinor}
 								min={0}
 								font="mono"
 								onchange={(v) =>
-									updateProfilarr(
+									updatePraxrr(
 										'minimum_version',
-										updateVersionPart(manifest!.profilarr.minimum_version, 1, v)
+										updateVersionPart(manifest!.praxrr.minimum_version, 1, v)
 									)}
 							/>
 						</div>
 						<span class="text-lg font-medium text-neutral-400 dark:text-neutral-500">.</span>
 						<div class="w-20">
 							<NumberInput
-								name="profilarr-version-patch"
+								name="praxrr-version-patch"
 								value={pvPatch}
 								min={0}
 								font="mono"
 								onchange={(v) =>
-									updateProfilarr(
+									updatePraxrr(
 										'minimum_version',
-										updateVersionPart(manifest!.profilarr.minimum_version, 2, v)
+										updateVersionPart(manifest!.praxrr.minimum_version, 2, v)
 									)}
 							/>
 						</div>
@@ -313,7 +313,7 @@
 					value={manifest.dependencies ?? {}}
 					onchange={(v) => updateManifest('dependencies', v)}
 					lockedFirst={{
-						key: 'https://github.com/yandy-r/profilarr-schema',
+						key: 'https://github.com/yandy-r/praxrr-schema',
 						value: '1.0.0',
 						minMajor: 1
 					}}

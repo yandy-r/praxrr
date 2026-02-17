@@ -212,7 +212,7 @@
 </script>
 
 <svelte:head>
-	<title>{data.format.name} - Conditions - Profilarr</title>
+	<title>{data.format.name} - Conditions - Praxrr</title>
 </svelte:head>
 
 <form

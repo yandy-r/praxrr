@@ -2,7 +2,7 @@
 
 ## System Overview
 
-The Arr library view currently uses a single page-level Svelte route to fetch and render a full library payload per instance. Backend orchestration for that payload lives in `src/routes/api/v1/arr/library/+server.ts`, which resolves Arr instance metadata, enriches response data with Profilarr profile information, and caches results. Pagination will fit between existing server-side aggregation and the current table rendering pipeline by introducing page-aware query params and metadata while preserving Arr-specific response envelopes.
+The Arr library view currently uses a single page-level Svelte route to fetch and render a full library payload per instance. Backend orchestration for that payload lives in `src/routes/api/v1/arr/library/+server.ts`, which resolves Arr instance metadata, enriches response data with Praxrr profile information, and caches results. Pagination will fit between existing server-side aggregation and the current table rendering pipeline by introducing page-aware query params and metadata while preserving Arr-specific response envelopes.
 
 ## Relevant Components
 
@@ -20,7 +20,7 @@ The Arr library view currently uses a single page-level Svelte route to fetch an
 
 ## Data Flow
 
-The page route fetches `/api/v1/arr/library` and currently receives full app-specific item arrays plus profile metadata, then applies UI state and renders through table components. The API route validates `instanceId`, loads Arr instance connection details, fetches upstream entities via Arr clients, enriches with Profilarr-managed profile names, caches results, and responds. Pagination introduces query-driven slicing and metadata at the API layer, then propagates page navigation state through client cache, URL/search state, and table inputs without changing app-specific row rendering components.
+The page route fetches `/api/v1/arr/library` and currently receives full app-specific item arrays plus profile metadata, then applies UI state and renders through table components. The API route validates `instanceId`, loads Arr instance connection details, fetches upstream entities via Arr clients, enriches with Praxrr-managed profile names, caches results, and responds. Pagination introduces query-driven slicing and metadata at the API layer, then propagates page navigation state through client cache, URL/search state, and table inputs without changing app-specific row rendering components.
 
 ## Integration Points
 

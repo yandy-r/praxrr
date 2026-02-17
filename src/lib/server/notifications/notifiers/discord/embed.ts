@@ -93,7 +93,7 @@ export interface DiscordEmbed {
  *   .field('Mode', 'Live', true)
  *   .color(Colors.SUCCESS)
  *   .timestamp()
- *   .footer('Profilarr')
+ *   .footer('Praxrr')
  *   .build();
  */
 export class EmbedBuilder {

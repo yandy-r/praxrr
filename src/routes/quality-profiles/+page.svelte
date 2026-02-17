@@ -26,14 +26,14 @@
 </script>
 
 <svelte:head>
-	<title>Quality Profiles - Profilarr</title>
+	<title>Quality Profiles - Praxrr</title>
 </svelte:head>
 
 {#if data.databases.length === 0}
 	<EmptyState
 		icon={Database}
 		title="No Databases Linked"
-		description="Link a Profilarr Compliant Database to manage quality profiles."
+		description="Link a Praxrr Compliant Database to manage quality profiles."
 		buttonText="Link Database"
 		buttonHref="/databases/new"
 		buttonIcon={Plus}

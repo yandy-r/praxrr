@@ -1,4 +1,4 @@
--- Profilarr Database Schema
+-- Praxrr Database Schema
 -- This file documents the current database schema after all migrations
 -- DO NOT execute this file directly - use migrations instead
 -- Last updated: 2026-02-16
@@ -236,7 +236,7 @@ CREATE TABLE notification_history (
 
 -- ==============================================================================
 -- TABLE: database_instances
--- Purpose: Store linked Profilarr Compliant Database (PCD) repositories
+-- Purpose: Store linked Praxrr Compliant Database (PCD) repositories
 -- Migration: 008_create_database_instances.ts, 009_add_personal_access_token.ts, 010_add_is_private.ts, 040_add_local_ops_enabled.ts, 043_add_git_identity_to_database_instances.ts, 044_add_conflict_strategy_to_database_instances.ts
 -- ==============================================================================
 

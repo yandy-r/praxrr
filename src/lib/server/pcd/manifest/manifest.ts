@@ -21,7 +21,7 @@ export interface Manifest {
     documentation?: string;
     issues?: string;
   };
-  profilarr: {
+  praxrr: {
     minimum_version: string;
   };
 }
@@ -86,14 +86,14 @@ export function validateManifest(manifest: unknown): asserts manifest is Manifes
     }
   }
 
-  // Validate profilarr section
-  if (!m.profilarr || typeof m.profilarr !== 'object') {
-    throw new ManifestValidationError('Manifest missing required field: profilarr');
+  // Validate praxrr section
+  if (!m.praxrr || typeof m.praxrr !== 'object') {
+    throw new ManifestValidationError('Manifest missing required field: praxrr');
   }
 
-  const profilarr = m.profilarr as Record<string, unknown>;
-  if (typeof profilarr.minimum_version !== 'string' || !profilarr.minimum_version) {
-    throw new ManifestValidationError('Manifest missing required field: profilarr.minimum_version');
+  const praxrr = m.praxrr as Record<string, unknown>;
+  if (typeof praxrr.minimum_version !== 'string' || !praxrr.minimum_version) {
+    throw new ManifestValidationError('Manifest missing required field: praxrr.minimum_version');
   }
 
   // Optional fields validation

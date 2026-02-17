@@ -72,7 +72,7 @@ const RADARR_LIBRARY_ITEM: RadarrLibraryItem = {
   minScore: 0,
   progress: 0,
   cutoffMet: false,
-  isProfilarrProfile: false,
+  isPraxrrProfile: false,
 };
 
 const PAGINATED_RADARR_LIBRARY_ITEMS: RadarrLibraryItem[] = [
@@ -113,7 +113,7 @@ const SONARR_LIBRARY_ITEM: SonarrLibraryItem = {
       percentOfEpisodes: 100,
     },
   ],
-  isProfilarrProfile: false,
+  isPraxrrProfile: false,
 };
 
 const PAGINATED_SONARR_LIBRARY_ITEMS: SonarrLibraryItem[] = [
@@ -145,7 +145,7 @@ const LIDARR_LIBRARY_ITEM: LidarrLibraryItem = {
   dateAdded: '2025-01-01T00:00:00.000Z',
   qualityProfileId: 33,
   qualityProfileName: 'Lidarr Profile',
-  isProfilarrProfile: false,
+  isPraxrrProfile: false,
 };
 
 const PAGINATED_LIDARR_LIBRARY_ITEMS: LidarrLibraryItem[] = [
@@ -403,8 +403,8 @@ class LidarrApiParityTest extends BaseTest {
       const getByIdMock: typeof arrInstancesQueries.getById = (id) => instances.get(id);
       this.patch(arrInstancesQueries, 'getById', getByIdMock);
 
-      const lidarrLibraryMock: typeof LidarrClient.prototype.getLibrary = async (profilarrProfileNames) => {
-        lidarrProfileNamesArg = profilarrProfileNames;
+      const lidarrLibraryMock: typeof LidarrClient.prototype.getLibrary = async (praxrrProfileNames) => {
+        lidarrProfileNamesArg = praxrrProfileNames;
         return PAGINATED_LIDARR_LIBRARY_ITEMS;
       };
       const radarrLibraryMock: typeof RadarrClient.prototype.getLibrary = async () => {

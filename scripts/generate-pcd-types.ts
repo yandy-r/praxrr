@@ -16,7 +16,7 @@ import { Database } from '@jsr/db__sqlite';
 // CONFIGURATION
 // ============================================================================
 
-const SCHEMA_REPO = 'yandy-r/profilarr-schema';
+const SCHEMA_REPO = 'yandy-r/praxrr-schema';
 
 /**
  * Manual type overrides for columns that store integers in the DB

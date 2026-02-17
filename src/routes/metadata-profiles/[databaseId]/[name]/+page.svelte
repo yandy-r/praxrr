@@ -12,7 +12,7 @@
 </script>
 
 <svelte:head>
-	<title>{data.currentProfile.name} - Metadata Profile - Profilarr</title>
+	<title>{data.currentProfile.name} - Metadata Profile - Praxrr</title>
 </svelte:head>
 
 <div class="p-4 md:p-8">

@@ -60,7 +60,7 @@
 			Settings
 		</h1>
 		<p class="mt-2 text-sm text-neutral-600 dark:text-neutral-400 md:text-base">
-			Configure and manage your Profilarr application
+			Configure and manage your Praxrr application
 		</p>
 	</div>
 
