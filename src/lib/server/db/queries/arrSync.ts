@@ -4,6 +4,15 @@ import type { ArrType } from '$shared/pcd/types.ts';
 // Types
 export type SyncTrigger = 'manual' | 'on_pull' | 'on_change' | 'schedule';
 
+const VALID_TRIGGERS: ReadonlySet<string> = new Set<SyncTrigger>(['manual', 'on_pull', 'on_change', 'schedule']);
+
+function normalizeTrigger(raw: string | undefined | null): SyncTrigger {
+  if (raw && VALID_TRIGGERS.has(raw)) {
+    return raw as SyncTrigger;
+  }
+  return 'manual';
+}
+
 export interface ProfileSelection {
   databaseId: number;
   profileName: string;
@@ -196,9 +205,7 @@ function normalizeMetadataProfileSelection(
   }
 
   if (databaseId === null || normalizedProfileName === null) {
-    throw new Error(
-      'Invalid metadata profile selection: database_id and profile_name must be set together'
-    );
+    throw new Error('Invalid metadata profile selection: database_id and profile_name must be set together');
   }
 
   return {
@@ -331,7 +338,7 @@ function updateMetadataProfileConfigName(
     return 0;
   }
 
-  const effectiveScope = { arrType: 'lidarr' as const, ...scope };
+  const effectiveScope = { ...scope, arrType: 'lidarr' as const };
   const matches = findMetadataProfileSyncRows(oldName, effectiveScope);
 
   if (matches.length === 0) {
@@ -435,7 +442,7 @@ export const arrSyncQueries = {
         profileName: row.profile_name,
       })),
       config: {
-        trigger: (configRow?.trigger as SyncTrigger) ?? 'manual',
+        trigger: normalizeTrigger(configRow?.trigger),
         cron: configRow?.cron ?? null,
       },
     };
@@ -481,7 +488,7 @@ export const arrSyncQueries = {
     return {
       databaseId: row?.database_id ?? null,
       profileName: row?.profile_name ?? null,
-      trigger: (row?.trigger as SyncTrigger) ?? 'manual',
+      trigger: normalizeTrigger(row?.trigger),
       cron: row?.cron ?? null,
     };
   },
@@ -525,7 +532,7 @@ export const arrSyncQueries = {
     return {
       databaseId: row?.database_id ?? null,
       profileName: row?.profile_name ?? null,
-      trigger: (row?.trigger as SyncTrigger) ?? 'manual',
+      trigger: normalizeTrigger(row?.trigger),
       cron: row?.cron ?? null,
     };
   },
@@ -573,7 +580,7 @@ export const arrSyncQueries = {
       qualityDefinitionsConfigName: row?.quality_definitions_config_name ?? null,
       mediaSettingsDatabaseId: row?.media_settings_database_id ?? null,
       mediaSettingsConfigName: row?.media_settings_config_name ?? null,
-      trigger: (row?.trigger as SyncTrigger) ?? 'manual',
+      trigger: normalizeTrigger(row?.trigger),
       cron: row?.cron ?? null,
     };
   },
@@ -1113,10 +1120,10 @@ export const arrSyncQueries = {
       "UPDATE arr_sync_media_management SET sync_status = 'pending' WHERE sync_status = 'in_progress'"
     );
     count += db.execute(
-      `UPDATE arr_sync_metadata_profiles_config mp
+      `UPDATE arr_sync_metadata_profiles_config
 			 SET sync_status = 'pending'
-			 WHERE mp.sync_status = 'in_progress'
-			 AND mp.instance_id IN (SELECT id FROM arr_instances WHERE type = 'lidarr')`
+			 WHERE sync_status = 'in_progress'
+			 AND instance_id IN (SELECT id FROM arr_instances WHERE type = 'lidarr')`
     );
     return count;
   },
@@ -1171,25 +1178,25 @@ export const arrSyncQueries = {
 
     return {
       qualityProfiles: {
-        trigger: (qp?.trigger as SyncTrigger) ?? 'manual',
+        trigger: normalizeTrigger(qp?.trigger),
         cron: qp?.cron ?? null,
         nextRunAt: qp?.next_run_at ?? null,
         syncStatus: qp?.sync_status ?? 'idle',
       },
       delayProfiles: {
-        trigger: (dp?.trigger as SyncTrigger) ?? 'manual',
+        trigger: normalizeTrigger(dp?.trigger),
         cron: dp?.cron ?? null,
         nextRunAt: dp?.next_run_at ?? null,
         syncStatus: dp?.sync_status ?? 'idle',
       },
       mediaManagement: {
-        trigger: (mm?.trigger as SyncTrigger) ?? 'manual',
+        trigger: normalizeTrigger(mm?.trigger),
         cron: mm?.cron ?? null,
         nextRunAt: mm?.next_run_at ?? null,
         syncStatus: mm?.sync_status ?? 'idle',
       },
       metadataProfiles: {
-        trigger: (mp?.trigger as SyncTrigger) ?? 'manual',
+        trigger: normalizeTrigger(mp?.trigger),
         cron: mp?.cron ?? null,
         nextRunAt: mp?.next_run_at ?? null,
         syncStatus: mp?.sync_status ?? 'idle',
