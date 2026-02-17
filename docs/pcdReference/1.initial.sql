@@ -924,14 +924,14 @@ VALUES ('1080p Efficient', '1080p Efficient targets high quality x265 Bluray and
 - Average TV Sizes ~ 2 to 3gb per Episode
 - TV Quality Ranking ~ 6/10', 1, 20000, 888888, 1);
 INSERT INTO quality_profiles (name, description, upgrades_allowed, minimum_custom_format_score, upgrade_until_score, upgrade_score_increment)
-VALUES ('1080p Quality', '1080p Quality utilizes the [**Golden Popcorn Performance Index**](https://dictionarry.dev/wiki/gppi) to target **Transparent** x264 1080p Encodes.
+VALUES ('1080p Quality', '1080p Quality utilizes the **Golden Popcorn Performance Index** to target **Transparent** x264 1080p Encodes.
 
 - Average Movie Sizes ~ 10 to 15gb per Movie
 - Movie Quality Ranking ~ 8/10
 - Average TV Sizes ~ 4 to 8gb per Episode
 - TV Quality Ranking ~ 8/10', 1, 20000, 888888, 1);
 INSERT INTO quality_profiles (name, description, upgrades_allowed, minimum_custom_format_score, upgrade_until_score, upgrade_score_increment)
-VALUES ('1080p Quality HDR', '1080p Quality HDR utilizes the [**Golden Popcorn Performance Index**](https://dictionarry.dev/wiki/gppi) to target **Transparent x265 HDR** 1080p Encodes.
+VALUES ('1080p Quality HDR', '1080p Quality HDR utilizes the **Golden Popcorn Performance Index** to target **Transparent x265 HDR** 1080p Encodes.
 
 - Average Movie Sizes ~ 10 to 20gb per Movie
 - Movie Quality Ranking ~ 9/10
@@ -959,7 +959,7 @@ VALUES ('2160p Efficient', '2160p Efficient targets consistent & immutable 2160p
 - Average TV Sizes ~ 4 to 12gb per Episode
 - TV Ranking ~ 6/10', 1, 20000, 888888, 1);
 INSERT INTO quality_profiles (name, description, upgrades_allowed, minimum_custom_format_score, upgrade_until_score, upgrade_score_increment)
-VALUES ('2160p Quality', '2160p Quality utilizes the [**Encode Efficiency Index**](https://dictionarry.dev/wiki/eei) metric at a 60% target ratio to prioritize **Transparent** x265 4K Encodes
+VALUES ('2160p Quality', '2160p Quality utilizes the **Encode Efficiency Index** metric at a 60% target ratio to prioritize **Transparent** x265 4K Encodes
 
 - Average Movie Sizes ~ 30 to 50gb per Movie
 - Movie Quality Ranking ~ 9/10
@@ -973,7 +973,7 @@ VALUES ('2160p Remux', '2160p Remux utilizes **Video / Audio Formats** to priori
 - Average TV Sizes ~ 15 to 30gb per Episode
 - TV Quality Ranking ~ 10/10', 1, 20000, 888888, 1);
 INSERT INTO quality_profiles (name, description, upgrades_allowed, minimum_custom_format_score, upgrade_until_score, upgrade_score_increment)
-VALUES ('720p Quality', '720p Quality utilizes the [**Golden Popcorn Performance Index**](https://dictionarry.dev/wiki/gppi) to target **Transparent** x264 720p Encodes.
+VALUES ('720p Quality', '720p Quality utilizes the **Golden Popcorn Performance Index** to target **Transparent** x264 720p Encodes.
 
 - Average Movie Sizes ~ 4 to 8gb per Movie
 - Movie Quality Ranking ~ 5/10
