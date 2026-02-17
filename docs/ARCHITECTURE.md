@@ -249,7 +249,7 @@ reference snapshot at `docs/0.schema.sql`, and the canonical schema repo lives
 at:
 
 ```
-https://github.com/Dictionarry-Hub/schema
+https://github.com/yandy-r/profilarr-schema
 ```
 
 Every PCD repo includes a `pcd.json` manifest in its root. Key fields:

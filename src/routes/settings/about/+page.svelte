@@ -67,9 +67,9 @@
 				{
 					key: 'github',
 					label: 'GitHub',
-					value: 'https://github.com/Dictionarry-Hub',
+					value: 'https://github.com/yandy-r',
 					type: 'link',
-					href: 'https://github.com/Dictionarry-Hub'
+					href: 'https://github.com/yandy-r'
 				},
 				{
 					key: 'discord',
@@ -87,9 +87,9 @@
 				{
 					key: 'sponsors',
 					label: 'GitHub Sponsors',
-					value: 'https://github.com/sponsors/Dictionarry-Hub',
+					value: 'https://github.com/sponsors/yandy-r',
 					type: 'link',
-					href: 'https://github.com/sponsors/Dictionarry-Hub'
+					href: 'https://github.com/sponsors/yandy-r'
 				},
 				{
 					key: 'coffee',

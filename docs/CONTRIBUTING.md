@@ -12,7 +12,7 @@ This file is intentionally lightweight. The full system encyclopedia lives in
 - .NET SDK 8+ (optional, only for the parser service)
 
 ```bash
-git clone https://github.com/Dictionarry-Hub/profilarr.git
+git clone https://github.com/yandy-r/profilarr.git
 cd profilarr
 deno task dev
 ```
