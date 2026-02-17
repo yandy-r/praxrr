@@ -91,6 +91,14 @@ export const AUTO_ALIGN_ENTITIES = new Map<string, AutoAlignEntity>([
       ],
     },
   ],
+  [
+    'metadata_profile',
+    {
+      table: 'lidarr_metadata_profiles',
+      keyColumn: 'name',
+      fields: ['name', 'description'],
+    },
+  ],
   ['radarr_naming', { table: 'radarr_naming', keyColumn: 'name', fields: NAMING_FIELDS }],
   ['sonarr_naming', { table: 'sonarr_naming', keyColumn: 'name', fields: SONARR_NAMING_FIELDS }],
   ['radarr_media_settings', { table: 'radarr_media_settings', keyColumn: 'name', fields: MEDIA_SETTINGS_FIELDS }],

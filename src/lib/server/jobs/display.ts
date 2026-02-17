@@ -19,6 +19,8 @@ export function formatJobTypeLabel(jobType: JobType): string {
       return 'Arr Sync (Delay Profiles)';
     case 'arr.sync.mediaManagement':
       return 'Arr Sync (Media Management)';
+    case 'arr.sync.metadataProfiles':
+      return 'Arr Sync (Metadata Profiles)';
     case 'arr.rename':
       return 'Arr Rename';
     case 'arr.upgrade':

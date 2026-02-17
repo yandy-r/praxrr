@@ -6,6 +6,7 @@ import { pcdManager } from '$pcd/index.ts';
 import { logger } from '$logger/logger.ts';
 import * as qualityProfileQueries from '$pcd/entities/qualityProfiles/index.ts';
 import * as delayProfileQueries from '$pcd/entities/delayProfiles/index.ts';
+import * as metadataProfileQueries from '$pcd/entities/metadataProfiles/index.ts';
 import * as namingQueries from '$pcd/entities/mediaManagement/naming/index.ts';
 import * as qualityDefinitionsQueries from '$pcd/entities/mediaManagement/quality-definitions/index.ts';
 import * as mediaSettingsQueries from '$pcd/entities/mediaManagement/media-settings/index.ts';
@@ -13,7 +14,23 @@ import { calculateNextRun } from '$lib/server/sync/utils.ts';
 import { scheduleArrSyncForInstance } from '$lib/server/jobs/init.ts';
 import { enqueueJob } from '$lib/server/jobs/queueService.ts';
 import { buildJobDisplayName } from '$lib/server/jobs/display.ts';
-import type { ArrAppType } from '$shared/arr/capabilities.ts';
+import { isSyncSectionSupported } from '$lib/server/sync/mappings.ts';
+import { isArrAppType, supportsArrSyncSurface, type ArrSyncSurface } from '$shared/arr/capabilities.ts';
+
+const METADATA_PROFILES_SURFACE: ArrSyncSurface = 'metadata_profiles';
+const METADATA_PROFILES_SECTION = 'metadataProfiles';
+const METADATA_PROFILE_UNSUPPORTED_ERROR = 'Metadata profile sync is supported only for Lidarr instances';
+
+function supportsMetadataProfiles(instanceType: string): boolean {
+  if (!isArrAppType(instanceType)) {
+    return false;
+  }
+
+  return (
+    supportsArrSyncSurface(instanceType, METADATA_PROFILES_SURFACE) &&
+    isSyncSectionSupported(instanceType, METADATA_PROFILES_SECTION)
+  );
+}
 
 export const load: ServerLoad = async ({ params }) => {
   const id = parseInt(params.id || '', 10);
@@ -30,7 +47,9 @@ export const load: ServerLoad = async ({ params }) => {
 
   // Get all databases
   const databases = pcdManager.getAll();
-  const arrType = instance.type as ArrAppType;
+  const arrType = instance.type;
+  const typedArrType = isArrAppType(arrType) ? arrType : null;
+  const canLoadMetadataProfiles = supportsMetadataProfiles(arrType);
 
   // Fetch profiles and configs from each database
   const databasesWithProfiles = await Promise.all(
@@ -45,17 +64,20 @@ export const load: ServerLoad = async ({ params }) => {
           namingConfigs: [],
           qualityDefinitionsConfigs: [],
           mediaSettingsConfigs: [],
+          metadataProfiles: [],
         };
       }
 
       const [qualityProfiles, delayProfiles, allNamingConfigs, allQualityDefinitionsConfigs, allMediaSettingsConfigs] =
         await Promise.all([
-          qualityProfileQueries.list(cache, arrType),
+          qualityProfileQueries.list(cache, typedArrType ?? undefined),
           delayProfileQueries.list(cache),
           namingQueries.list(cache),
           qualityDefinitionsQueries.list(cache),
           mediaSettingsQueries.list(cache),
         ]);
+
+      const metadataProfiles = canLoadMetadataProfiles ? await metadataProfileQueries.list(cache) : [];
 
       // Filter configs by arr type - only show configs for the instance's arr type
       const namingConfigs = allNamingConfigs.filter((c) => c.arr_type === arrType).map((c) => ({ name: c.name }));
@@ -74,6 +96,7 @@ export const load: ServerLoad = async ({ params }) => {
         namingConfigs,
         qualityDefinitionsConfigs,
         mediaSettingsConfigs,
+        metadataProfiles: metadataProfiles.map((profile) => ({ name: profile.name })),
       };
     })
   );
@@ -85,6 +108,7 @@ export const load: ServerLoad = async ({ params }) => {
     instance,
     databases: databasesWithProfiles,
     syncData,
+    metadataProfilesSupported: canLoadMetadataProfiles,
   };
 };
 
@@ -218,6 +242,56 @@ export const actions: Actions = {
     }
   },
 
+  saveMetadataProfiles: async ({ params, request }) => {
+    const id = parseInt(params.id || '', 10);
+    if (isNaN(id)) {
+      return fail(400, { error: 'Invalid instance ID' });
+    }
+
+    const instance = arrInstancesQueries.getById(id);
+    if (!instance) {
+      return fail(404, { error: 'Instance not found' });
+    }
+    if (!supportsMetadataProfiles(instance.type)) {
+      return fail(400, { error: METADATA_PROFILE_UNSUPPORTED_ERROR });
+    }
+
+    const formData = await request.formData();
+    const databaseId = formData.get('databaseId') as string | null;
+    const profileName = formData.get('profileName') as string | null;
+    const trigger = formData.get('trigger') as SyncTrigger;
+    const cron = formData.get('cron') as string | null;
+
+    try {
+      const effectiveTrigger = trigger || 'manual';
+      const effectiveCron = cron || null;
+      arrSyncQueries.saveMetadataProfilesSync(id, {
+        databaseId: databaseId ? parseInt(databaseId, 10) : null,
+        profileName: profileName || null,
+        trigger: effectiveTrigger,
+        cron: effectiveCron,
+        nextRunAt: effectiveTrigger === 'schedule' ? calculateNextRun(effectiveCron) : null,
+      });
+
+      await logger.info(`Metadata profiles sync config saved for "${instance?.name}"`, {
+        source: 'sync',
+        meta: { instanceId: id, databaseId, profileName, trigger },
+      });
+
+      scheduleArrSyncForInstance(id);
+
+      return { success: true };
+    } catch (e) {
+      const errorMsg = e instanceof Error ? e.message : 'Unknown error';
+      await logger.error('Failed to save metadata profiles sync config', {
+        source: 'sync',
+        meta: { instanceId: id, error: errorMsg },
+      });
+
+      return fail(500, { error: `Failed to save metadata profiles sync config: ${errorMsg}` });
+    }
+  },
+
   syncDelayProfiles: async ({ params }) => {
     const id = parseInt(params.id || '', 10);
     if (isNaN(id)) {
@@ -337,6 +411,53 @@ export const actions: Actions = {
         source: 'sync',
         meta: { instanceId: id, error: errorMsg },
       });
+      return fail(500, { error: `Sync failed: ${errorMsg}` });
+    }
+  },
+
+  syncMetadataProfiles: async ({ params }) => {
+    const id = parseInt(params.id || '', 10);
+    if (isNaN(id)) {
+      return fail(400, { error: 'Invalid instance ID' });
+    }
+
+    const instance = arrInstancesQueries.getById(id);
+    if (!instance) {
+      return fail(404, { error: 'Instance not found' });
+    }
+    if (!supportsMetadataProfiles(instance.type)) {
+      return fail(400, { error: METADATA_PROFILE_UNSUPPORTED_ERROR });
+    }
+
+    try {
+      const jobType = 'arr.sync.metadataProfiles';
+
+      arrSyncQueries.setMetadataProfilesStatusPending(id);
+      const queued = enqueueJob({
+        jobType,
+        runAt: new Date().toISOString(),
+        payload: { instanceId: id },
+        source: 'manual',
+      });
+
+      await logger.info(`Queued metadata profiles sync for "${instance.name}"`, {
+        source: 'sync',
+        meta: {
+          jobId: queued.id,
+          instanceId: id,
+          instanceName: instance.name,
+          displayName: buildJobDisplayName(jobType, { instanceId: id }),
+        },
+      });
+
+      return { success: true, message: 'Metadata profiles sync queued' };
+    } catch (e) {
+      const errorMsg = e instanceof Error ? e.message : 'Unknown error';
+      await logger.error(`Metadata profiles sync enqueue failed for "${instance.name}"`, {
+        source: 'sync',
+        meta: { instanceId: id, error: errorMsg },
+      });
+
       return fail(500, { error: `Sync failed: ${errorMsg}` });
     }
   },

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import Group from './group.svelte';
+		import Group from './group.svelte';
 	import GroupItem from './groupItem.svelte';
 	import Version from './version.svelte';
 	import { FolderTree, Link, Sliders, Palette, Microscope, Tag, Clock, Settings, X, Wrench } from 'lucide-svelte';
@@ -118,6 +118,13 @@
 			label={useEmoji ? '⏳ Delay Profiles' : 'Delay Profiles'}
 			href="/delay-profiles"
 			icon={useEmoji ? undefined : Clock}
+			initialOpen={false}
+		/>
+
+		<Group
+			label={useEmoji ? '🏷️ Metadata Profiles' : 'Metadata Profiles'}
+			href="/metadata-profiles"
+			icon={useEmoji ? undefined : Tag}
 			initialOpen={false}
 		/>
 

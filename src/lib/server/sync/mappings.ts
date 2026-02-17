@@ -10,11 +10,17 @@ import type { SectionType } from './types.ts';
 // Sync runtime supports all concrete Arr instance types.
 export type SyncArrType = Exclude<ArrType, 'all'>;
 
-export const SYNC_SECTION_ORDER: SectionType[] = ['qualityProfiles', 'delayProfiles', 'mediaManagement'];
+const BASE_SYNC_SECTION_ORDER: Exclude<SectionType, 'metadataProfiles'>[] = [
+  'qualityProfiles',
+  'delayProfiles',
+  'mediaManagement',
+];
+
+export const SYNC_SECTION_ORDER: SectionType[] = [...BASE_SYNC_SECTION_ORDER, 'metadataProfiles'];
 
 const SUPPORTED_SYNC_SECTIONS: Record<SyncArrType, readonly SectionType[]> = {
-  radarr: SYNC_SECTION_ORDER,
-  sonarr: SYNC_SECTION_ORDER,
+  radarr: BASE_SYNC_SECTION_ORDER,
+  sonarr: BASE_SYNC_SECTION_ORDER,
   lidarr: SYNC_SECTION_ORDER,
 };
 

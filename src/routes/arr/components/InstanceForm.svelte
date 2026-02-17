@@ -112,6 +112,7 @@
     quality_profiles: 'Quality Profiles',
     custom_formats: 'Custom Formats',
     delay_profiles: 'Delay Profiles',
+    metadata_profiles: 'Metadata Profiles',
     media_management: 'Media Management',
   };
   const appPorts: Record<ArrAppType, number> = {

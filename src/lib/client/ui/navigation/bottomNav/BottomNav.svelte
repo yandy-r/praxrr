@@ -29,7 +29,8 @@
 		{ href: '/settings', label: 'Settings', icon: Settings, emoji: '⚙️', priority: 'always' },
 		{ href: '/regular-expressions', label: 'Regex', icon: Microscope, emoji: '🔬', priority: 'medium' },
 		{ href: '/media-management', label: 'Media', icon: Tag, emoji: '🏷️', priority: 'low' },
-		{ href: '/delay-profiles', label: 'Delay', icon: Clock, emoji: '⏳', priority: 'low' }
+		{ href: '/delay-profiles', label: 'Delay', icon: Clock, emoji: '⏳', priority: 'low' },
+		{ href: '/metadata-profiles', label: 'Metadata', icon: Tag, emoji: '🏷️', priority: 'low' }
 	];
 
 	$: useEmoji = $navIconStore === 'emoji';

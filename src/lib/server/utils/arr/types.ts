@@ -517,6 +517,69 @@ export interface LidarrRelease {
 }
 
 // =============================================================================
+// Lidarr Metadata Profile Types
+// =============================================================================
+
+export interface LidarrProfilePrimaryAlbumTypeValue {
+  id: number;
+  name: string;
+}
+
+export interface LidarrProfileSecondaryAlbumTypeValue {
+  id: number;
+  name: string;
+}
+
+export interface LidarrReleaseStatusValue {
+  id: number;
+  name: string;
+}
+
+export interface LidarrProfilePrimaryAlbumTypeItem {
+  albumType: LidarrProfilePrimaryAlbumTypeValue;
+  allowed: boolean;
+}
+
+export interface LidarrProfileSecondaryAlbumTypeItem {
+  albumType: LidarrProfileSecondaryAlbumTypeValue;
+  allowed: boolean;
+}
+
+export interface LidarrProfileReleaseStatusItem {
+  releaseStatus: LidarrReleaseStatusValue;
+  allowed: boolean;
+}
+
+export interface LidarrMetadataProfile {
+  id: number;
+  name: string;
+  primaryAlbumTypes: LidarrProfilePrimaryAlbumTypeItem[];
+  secondaryAlbumTypes: LidarrProfileSecondaryAlbumTypeItem[];
+  releaseStatuses: LidarrProfileReleaseStatusItem[];
+}
+
+export interface LidarrMetadataProfileGetResponse extends LidarrMetadataProfile {}
+
+export type LidarrMetadataProfileListResponse = ReadonlyArray<LidarrMetadataProfileGetResponse>;
+
+export interface LidarrMetadataProfileCreatePayload {
+  name: string;
+  primaryAlbumTypes: LidarrProfilePrimaryAlbumTypeItem[];
+  secondaryAlbumTypes: LidarrProfileSecondaryAlbumTypeItem[];
+  releaseStatuses: LidarrProfileReleaseStatusItem[];
+}
+
+export interface LidarrMetadataProfileUpdatePayload extends LidarrMetadataProfileCreatePayload {
+  id: number;
+}
+
+export interface LidarrMetadataProfileSchemaResponse extends Omit<LidarrMetadataProfile, 'id'> {}
+
+export interface LidarrMetadataProfileSchema extends LidarrMetadataProfileSchemaResponse {
+  id?: number;
+}
+
+// =============================================================================
 // Library View Types (computed/joined data)
 // =============================================================================
 

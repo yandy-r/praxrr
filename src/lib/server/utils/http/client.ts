@@ -74,14 +74,29 @@ export class BaseHttpClient {
           // Parse response based on responseType
           const text = await response.text();
           const responseType = options?.responseType ?? 'json';
-          const data = responseType === 'text' ? text : text ? JSON.parse(text) : null;
+          let data: unknown = null;
+          if (responseType === 'text') {
+            data = text;
+          } else if (text) {
+            try {
+              data = JSON.parse(text);
+            } catch {
+              data = text;
+            }
+          }
 
           // Check for HTTP errors
           if (!response.ok) {
+            const details = typeof data === 'string' ? data : data === null ? '' : JSON.stringify(data);
+            const errorMessage =
+              details.length > 0
+                ? `HTTP ${response.status}: ${response.statusText} | ${details}`
+                : `HTTP ${response.status}: ${response.statusText}`;
+
             const error = new HttpError(
-              `HTTP ${response.status}: ${response.statusText}`,
+              errorMessage,
               response.status,
-              responseType === 'json' ? data : text
+              data
             );
 
             // Retry on specific status codes

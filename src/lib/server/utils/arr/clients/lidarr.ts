@@ -7,6 +7,11 @@ import type {
   LidarrProfileLookup,
   LidarrProfileLookupItem,
   LidarrRelease,
+  LidarrMetadataProfileGetResponse,
+  LidarrMetadataProfileCreatePayload,
+  LidarrMetadataProfileListResponse,
+  LidarrMetadataProfileSchema,
+  LidarrMetadataProfileUpdatePayload,
 } from '../types.ts';
 
 /**
@@ -119,6 +124,55 @@ export class LidarrClient extends BaseArrClient {
    */
   getReleases(albumId: number): Promise<LidarrRelease[]> {
     return this.get<LidarrRelease[]>(`/api/${this.apiVersion}/release?albumId=${albumId}`);
+  }
+
+  // =========================================================================
+  // Metadata Profile Methods
+  // =========================================================================
+
+  /**
+   * Get all metadata profiles
+   */
+  getMetadataProfiles(): Promise<LidarrMetadataProfileListResponse> {
+    return this.get<LidarrMetadataProfileListResponse>(`/api/${this.apiVersion}/metadataprofile`);
+  }
+
+  /**
+   * Get a metadata profile by ID
+   */
+  getMetadataProfile(id: number): Promise<LidarrMetadataProfileGetResponse> {
+    return this.get<LidarrMetadataProfileGetResponse>(`/api/${this.apiVersion}/metadataprofile/${id}`);
+  }
+
+  /**
+   * Get metadata profile schema defaults
+   */
+  getMetadataProfileSchema(): Promise<LidarrMetadataProfileSchema> {
+    return this.get<LidarrMetadataProfileSchema>(`/api/${this.apiVersion}/metadataprofile/schema`);
+  }
+
+  /**
+   * Create a metadata profile
+   */
+  createMetadataProfile(profile: LidarrMetadataProfileCreatePayload): Promise<LidarrMetadataProfileGetResponse> {
+    return this.post<LidarrMetadataProfileGetResponse>(`/api/${this.apiVersion}/metadataprofile`, profile);
+  }
+
+  /**
+   * Update a metadata profile
+   */
+  updateMetadataProfile(id: number, profile: LidarrMetadataProfileUpdatePayload): Promise<LidarrMetadataProfileGetResponse> {
+    return this.put<LidarrMetadataProfileGetResponse>(`/api/${this.apiVersion}/metadataprofile/${id}`, {
+      ...profile,
+      id,
+    });
+  }
+
+  /**
+   * Delete a metadata profile
+   */
+  deleteMetadataProfile(id: number): Promise<void> {
+    return this.delete(`/api/${this.apiVersion}/metadataprofile/${id}`);
   }
 
   // =========================================================================

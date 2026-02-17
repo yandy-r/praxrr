@@ -18,6 +18,18 @@ import {
   LIDARR_NAMING_DEFAULTS_OP_SQL,
   LIDARR_NAMING_DEFAULTS_OP_VERSION,
 } from '$db/migrations/20260217_set_lidarr_naming_defaults.ts';
+import {
+  LIDARR_METADATA_PROFILES_OP_FILENAME,
+  LIDARR_METADATA_PROFILES_OP_METADATA,
+  LIDARR_METADATA_PROFILES_OP_SQL,
+  LIDARR_METADATA_PROFILES_OP_VERSION,
+} from '$db/migrations/20260218_add_lidarr_metadata_profiles.ts';
+import {
+  LIDARR_DEFAULT_METADATA_PROFILE_OP_FILENAME,
+  LIDARR_DEFAULT_METADATA_PROFILE_OP_METADATA,
+  LIDARR_DEFAULT_METADATA_PROFILE_OP_SQL,
+  LIDARR_DEFAULT_METADATA_PROFILE_OP_VERSION,
+} from '$db/migrations/20260219_seed_default_lidarr_metadata_profile.ts';
 
 export interface SeedBuiltInBaseOpsResult {
   created: number;
@@ -46,6 +58,20 @@ export async function seedBuiltInBaseOps(databaseId: number): Promise<SeedBuiltI
       sequence: LIDARR_NAMING_DEFAULTS_OP_VERSION,
       sql: LIDARR_NAMING_DEFAULTS_OP_SQL,
       metadata: LIDARR_NAMING_DEFAULTS_OP_METADATA,
+    },
+    {
+      filename: LIDARR_METADATA_PROFILES_OP_FILENAME,
+      opNumber: LIDARR_METADATA_PROFILES_OP_VERSION,
+      sequence: LIDARR_METADATA_PROFILES_OP_VERSION,
+      sql: LIDARR_METADATA_PROFILES_OP_SQL,
+      metadata: LIDARR_METADATA_PROFILES_OP_METADATA,
+    },
+    {
+      filename: LIDARR_DEFAULT_METADATA_PROFILE_OP_FILENAME,
+      opNumber: LIDARR_DEFAULT_METADATA_PROFILE_OP_VERSION,
+      sequence: LIDARR_DEFAULT_METADATA_PROFILE_OP_VERSION,
+      sql: LIDARR_DEFAULT_METADATA_PROFILE_OP_SQL,
+      metadata: LIDARR_DEFAULT_METADATA_PROFILE_OP_METADATA,
     },
   ] as const;
 

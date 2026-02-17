@@ -17,6 +17,7 @@ import {
   type PortableQualityDefinitions,
   type PortableRadarrNaming,
   type PortableSonarrNaming,
+  type PortableLidarrMetadataProfile,
 } from '$shared/pcd/portable.ts';
 import * as deserialize from '$pcd/entities/deserialize.ts';
 import { createLidarrNaming } from '$pcd/entities/mediaManagement/naming/create.ts';
@@ -58,11 +59,6 @@ export const POST: RequestHandler = async ({ request }) => {
     return json({ error: 'Cannot write to base layer' }, { status: 403 });
   }
 
-  const cache = pcdManager.getCache(databaseId as number);
-  if (!cache) {
-    return json({ error: 'Database cache not available' }, { status: 500 });
-  }
-
   if (typeof data !== 'object' || data === null || Array.isArray(data)) {
     return json({ error: 'Invalid portable payload: data must be an object' }, { status: 400 });
   }
@@ -75,6 +71,11 @@ export const POST: RequestHandler = async ({ request }) => {
   const validationError = validatePortableData(typedEntityType, data as Record<string, unknown>);
   if (validationError) {
     return json({ error: validationError }, { status: 400 });
+  }
+
+  const cache = pcdManager.getCache(databaseId as number);
+  if (!cache) {
+    return json({ error: 'Database cache not available' }, { status: 500 });
   }
 
   try {
@@ -151,10 +152,30 @@ async function deserializeEntity({ databaseId, cache, layer, entityType, data }:
         ...opts,
         portable: data as unknown as PortableLidarrQualityDefinitions,
       });
+    case 'lidarr_metadata_profile':
+      return deserialize.deserializeLidarrMetadataProfile({
+        ...opts,
+        portable: data as unknown as PortableLidarrMetadataProfile,
+      });
   }
 }
 
 function validateLidarrPayload(entityType: EntityType, data: Record<string, unknown>): string | null {
+  if (entityType === 'lidarr_metadata_profile') {
+    const requiredFields = ['name', 'description', 'primaryTypes', 'secondaryTypes', 'releaseStatuses'];
+    const missingRequiredFields = requiredFields.filter((field) => !Object.hasOwn(data, field));
+    if (missingRequiredFields.length > 0) {
+      return `Unsupported payload for lidarr_metadata_profile: missing required fields: ${missingRequiredFields.join(', ')}`;
+    }
+
+    const unsupportedFields = Object.keys(data)
+      .filter((field) => !requiredFields.includes(field))
+      .sort((a, b) => a.localeCompare(b));
+    if (unsupportedFields.length > 0) {
+      return `Unsupported payload for lidarr_metadata_profile: unsupported fields: ${unsupportedFields.join(', ')}`;
+    }
+  }
+
   const matrixEntry = getLidarrMediaManagementPortableEntry(entityType);
   if (!matrixEntry) {
     return null;

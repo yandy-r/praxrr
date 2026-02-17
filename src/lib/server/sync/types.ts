@@ -36,6 +36,7 @@ export interface InstanceSyncResult {
   qualityProfiles?: SyncResult;
   delayProfiles?: SyncResult;
   mediaManagement?: SyncResult;
+  metadataProfiles?: SyncResult;
 }
 
 // =============================================================================
@@ -45,7 +46,7 @@ export interface InstanceSyncResult {
 /**
  * Supported sync section types
  */
-export type SectionType = 'qualityProfiles' | 'delayProfiles' | 'mediaManagement';
+export type SectionType = 'qualityProfiles' | 'delayProfiles' | 'mediaManagement' | 'metadataProfiles';
 
 /**
  * Scheduled sync configuration

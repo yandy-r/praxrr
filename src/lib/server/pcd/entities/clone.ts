@@ -7,7 +7,7 @@
 
 import type { PCDCache } from '$pcd/index.ts';
 import type { OperationLayer } from '$pcd/index.ts';
-import type { EntityType } from '$shared/pcd/portable.ts';
+import type { EntityType, PortableLidarrMetadataProfile } from '$shared/pcd/portable.ts';
 import * as serialize from './serialize.ts';
 import * as deserialize from './deserialize.ts';
 
@@ -20,6 +20,14 @@ interface CloneOptions {
   sourceName: string;
   /** Name for the cloned entity */
   newName: string;
+}
+
+interface LidarrMetadataProfileTypeRow {
+  id?: number;
+  typeId?: number;
+  statusId?: number;
+  name: string;
+  allowed: boolean;
 }
 
 export async function clone(options: CloneOptions) {
@@ -97,5 +105,49 @@ export async function clone(options: CloneOptions) {
       portable.name = newName;
       return deserialize.deserializeLidarrQualityDefinitions({ databaseId, cache, layer, portable });
     }
+
+    case 'lidarr_metadata_profile': {
+      const portable = await serialize.serializeLidarrMetadataProfile(cache, sourceName);
+      const sortedPortable = normalizeLidarrMetadataProfile(portable);
+      sortedPortable.name = newName;
+      return deserialize.deserializeLidarrMetadataProfile({ databaseId, cache, layer, portable: sortedPortable });
+    }
   }
+}
+
+function normalizeLidarrMetadataProfile(portable: PortableLidarrMetadataProfile): PortableLidarrMetadataProfile {
+  return {
+    ...portable,
+    primaryTypes: normalizeLidarrMetadataProfileRows('primary', portable.primaryTypes),
+    secondaryTypes: normalizeLidarrMetadataProfileRows('secondary', portable.secondaryTypes),
+    releaseStatuses: normalizeLidarrMetadataProfileRows('release_status', portable.releaseStatuses),
+  };
+}
+
+function normalizeLidarrMetadataProfileRows(
+  section: 'primary' | 'secondary' | 'release_status',
+  rows: readonly LidarrMetadataProfileTypeRow[]
+): Array<{ id: number; name: string; allowed: boolean }> {
+  return rows
+    .slice()
+    .map((row) => ({
+      id: resolveLidarrMetadataProfileTypeId(section, row),
+      name: row.name,
+      allowed: row.allowed,
+    }))
+    .sort((a, b) => a.id - b.id);
+}
+
+function resolveLidarrMetadataProfileTypeId(
+  section: 'primary' | 'secondary' | 'release_status',
+  row: LidarrMetadataProfileTypeRow
+): number {
+  const id =
+    row.id ?? (section === 'release_status' ? row.statusId : row.typeId);
+
+  if (typeof id !== 'number' || !Number.isInteger(id)) {
+    throw new Error(`metadata profile ${section} row id must be a valid integer`);
+  }
+
+  return id;
 }

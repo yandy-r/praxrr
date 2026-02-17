@@ -55,6 +55,8 @@ import { migration as migration20260215 } from './migrations/20260215_add_lidarr
 import { migration as migration20260216ArrInstanceExternalUrl } from './migrations/20260216_add_arr_instance_external_url.ts';
 import { migration as migration20260216 } from './migrations/20260216_enforce_native_lidarr_quality_mappings.ts';
 import { migration as migration20260217 } from './migrations/20260217_set_lidarr_naming_defaults.ts';
+import { migration as migration20260218 } from './migrations/20260218_add_lidarr_metadata_profiles.ts';
+import { migration as migration20260219 } from './migrations/20260219_seed_default_lidarr_metadata_profile.ts';
 
 export interface Migration {
   version: number;
@@ -325,6 +327,8 @@ export function loadMigrations(): Migration[] {
     migration20260216ArrInstanceExternalUrl,
     migration20260216,
     migration20260217,
+    migration20260218,
+    migration20260219,
   ];
 
   // Sort by version number

@@ -28,7 +28,12 @@ export type ArrConditionTargetCheckboxColor = 'accent' | `var(--arr-${ArrAppType
 export type ArrWorkflowSurface = 'instances' | 'library' | 'releases' | 'rename' | 'upgrades';
 
 /** Feature surfaces driven by sync pipeline support */
-export type ArrSyncSurface = 'quality_profiles' | 'custom_formats' | 'delay_profiles' | 'media_management';
+export type ArrSyncSurface =
+  | 'quality_profiles'
+  | 'custom_formats'
+  | 'delay_profiles'
+  | 'media_management'
+  | 'metadata_profiles';
 
 /** Ordered list of declared workflow surfaces */
 export const ARR_WORKFLOW_SURFACES = [
@@ -45,6 +50,7 @@ export const ARR_SYNC_SURFACES = [
   'custom_formats',
   'delay_profiles',
   'media_management',
+  'metadata_profiles',
 ] as const satisfies readonly ArrSyncSurface[];
 
 // Non-regression acceptance checks: capability surface keys stay stable.
@@ -53,7 +59,13 @@ const ARR_CAPABILITY_KEY_NON_REGRESSION_CHECK = {
   sync: ARR_SYNC_SURFACES,
 } as const satisfies {
   workflows: readonly ['instances', 'library', 'releases', 'rename', 'upgrades'];
-  sync: readonly ['quality_profiles', 'custom_formats', 'delay_profiles', 'media_management'];
+  sync: readonly [
+    'quality_profiles',
+    'custom_formats',
+    'delay_profiles',
+    'media_management',
+    'metadata_profiles',
+  ];
 };
 void ARR_CAPABILITY_KEY_NON_REGRESSION_CHECK;
 
@@ -96,6 +108,7 @@ const RADARR_CAPABILITIES = {
     custom_formats: true,
     delay_profiles: true,
     media_management: true,
+    metadata_profiles: false,
   },
 } as const satisfies ArrCapabilities;
 
@@ -112,6 +125,7 @@ const SONARR_CAPABILITIES = {
     custom_formats: true,
     delay_profiles: true,
     media_management: true,
+    metadata_profiles: false,
   },
 } as const satisfies ArrCapabilities;
 
@@ -128,6 +142,7 @@ const LIDARR_CAPABILITIES = {
     custom_formats: true,
     delay_profiles: true,
     media_management: true,
+    metadata_profiles: true,
   },
 } as const satisfies ArrCapabilities;
 
@@ -177,6 +192,7 @@ const ARR_CAPABILITY_NON_REGRESSION_CHECK = {
       custom_formats: true;
       delay_profiles: true;
       media_management: true;
+      metadata_profiles: false;
     };
   };
   sonarr: {
@@ -192,6 +208,7 @@ const ARR_CAPABILITY_NON_REGRESSION_CHECK = {
       custom_formats: true;
       delay_profiles: true;
       media_management: true;
+      metadata_profiles: false;
     };
   };
 };
@@ -216,8 +233,18 @@ const ARR_MEDIA_MANAGEMENT_SYNC_CAPABILITY_NON_REGRESSION_CHECK = {
   sonarr: true;
   lidarr: true;
 };
+const ARR_METADATA_PROFILES_SYNC_CAPABILITY_NON_REGRESSION_CHECK = {
+  radarr: ARR_APPS.radarr.capabilities.sync.metadata_profiles,
+  sonarr: ARR_APPS.sonarr.capabilities.sync.metadata_profiles,
+  lidarr: ARR_APPS.lidarr.capabilities.sync.metadata_profiles,
+} as const satisfies {
+  radarr: false;
+  sonarr: false;
+  lidarr: true;
+};
 void ARR_APP_KEY_NON_REGRESSION_CHECK;
 void ARR_MEDIA_MANAGEMENT_SYNC_CAPABILITY_NON_REGRESSION_CHECK;
+void ARR_METADATA_PROFILES_SYNC_CAPABILITY_NON_REGRESSION_CHECK;
 
 // ============================================================================
 // DERIVED CONSTANTS

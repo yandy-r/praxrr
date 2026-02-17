@@ -327,7 +327,7 @@ export class PCDCache {
   }
 
   /**
-   * Register SQL helper functions (qp, cf, dp, tag)
+   * Register SQL helper functions (qp, cf, dp, mp, tag)
    */
   private registerHelperFunctions(): void {
     if (!this.db) return;
@@ -361,6 +361,17 @@ export class PCDCache {
         | undefined;
       if (!result) {
         throw new Error(`Delay profile not found: ${name}`);
+      }
+      return result.id;
+    });
+
+    // mp(name) - Lidarr metadata profile lookup by name
+    this.db.function('mp', (name: string) => {
+      const result = this.db!.prepare('SELECT id FROM lidarr_metadata_profiles WHERE name = ?').get(name) as
+        | { id: number }
+        | undefined;
+      if (!result) {
+        throw new Error(`Lidarr metadata profile not found: ${name}`);
       }
       return result.id;
     });

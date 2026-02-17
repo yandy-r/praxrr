@@ -26,6 +26,7 @@ function createInstance(id: number, type: ArrInstance['type']): ArrInstance {
     id,
     name: `${type}-${id}`,
     type,
+    external_url: null,
     url: 'http://127.0.0.1:8989',
     api_key: `${type}-key`,
     tags: null,
@@ -124,6 +125,7 @@ Deno.test('supportsArrSyncSurface: lidarr sync capabilities match expected', () 
   assertEquals(supportsArrSyncSurface('lidarr', 'custom_formats'), true);
   assertEquals(supportsArrSyncSurface('lidarr', 'delay_profiles'), true);
   assertEquals(supportsArrSyncSurface('lidarr', 'media_management'), true);
+  assertEquals(supportsArrSyncSurface('lidarr', 'metadata_profiles'), true);
 });
 
 Deno.test('supportsArrSyncSurface: radarr and sonarr support all sync surfaces', () => {
@@ -132,6 +134,7 @@ Deno.test('supportsArrSyncSurface: radarr and sonarr support all sync surfaces',
     assertEquals(supportsArrSyncSurface(arrType, 'custom_formats'), true, `${arrType} custom_formats`);
     assertEquals(supportsArrSyncSurface(arrType, 'delay_profiles'), true, `${arrType} delay_profiles`);
     assertEquals(supportsArrSyncSurface(arrType, 'media_management'), true, `${arrType} media_management`);
+    assertEquals(supportsArrSyncSurface(arrType, 'metadata_profiles'), false, `${arrType} metadata_profiles`);
   }
 });
 
@@ -142,6 +145,9 @@ Deno.test('supportsFeature: generic predicate covers workflow and sync surfaces'
   assertEquals(supportsFeature('lidarr', 'custom_formats'), true);
   assertEquals(supportsFeature('lidarr', 'delay_profiles'), true);
   assertEquals(supportsFeature('lidarr', 'media_management'), true);
+  assertEquals(supportsFeature('lidarr', 'metadata_profiles'), true);
+  assertEquals(supportsFeature('radarr', 'metadata_profiles'), false);
+  assertEquals(supportsFeature('sonarr', 'metadata_profiles'), false);
   assertEquals(supportsFeature('lidarr', 'nonexistent_feature'), false);
 });
 
@@ -168,6 +174,13 @@ Deno.test('ARR_APPS: lidarr metadata has correct label and capability flags', ()
   assertEquals(lidarr.capabilities.sync.custom_formats, true);
   assertEquals(lidarr.capabilities.sync.delay_profiles, true);
   assertEquals(lidarr.capabilities.sync.media_management, true);
+  assertEquals(lidarr.capabilities.sync.metadata_profiles, true);
+
+  const radarr = ARR_APPS.radarr;
+  const sonarr = ARR_APPS.sonarr;
+
+  assertEquals(radarr.capabilities.sync.metadata_profiles, false);
+  assertEquals(sonarr.capabilities.sync.metadata_profiles, false);
 });
 
 // =============================================================================

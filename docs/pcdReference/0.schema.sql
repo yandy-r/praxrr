@@ -461,6 +461,42 @@ CREATE TABLE lidarr_media_settings (
     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Lidarr metadata profiles
+CREATE TABLE lidarr_metadata_profiles (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name VARCHAR(100) NOT NULL UNIQUE,
+    description TEXT,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE lidarr_metadata_profile_primary_types (
+    metadata_profile_name VARCHAR(100) NOT NULL,
+    type_id INTEGER NOT NULL,
+    name VARCHAR(100) NOT NULL,
+    allowed INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (metadata_profile_name, type_id),
+    FOREIGN KEY (metadata_profile_name) REFERENCES lidarr_metadata_profiles(name) ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+CREATE TABLE lidarr_metadata_profile_secondary_types (
+    metadata_profile_name VARCHAR(100) NOT NULL,
+    type_id INTEGER NOT NULL,
+    name VARCHAR(100) NOT NULL,
+    allowed INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (metadata_profile_name, type_id),
+    FOREIGN KEY (metadata_profile_name) REFERENCES lidarr_metadata_profiles(name) ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+CREATE TABLE lidarr_metadata_profile_release_statuses (
+    metadata_profile_name VARCHAR(100) NOT NULL,
+    status_id INTEGER NOT NULL,
+    name VARCHAR(100) NOT NULL,
+    allowed INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (metadata_profile_name, status_id),
+    FOREIGN KEY (metadata_profile_name) REFERENCES lidarr_metadata_profiles(name) ON DELETE CASCADE ON UPDATE CASCADE
+);
+
 -- ============================================================================
 -- DELAY PROFILES
 -- ============================================================================

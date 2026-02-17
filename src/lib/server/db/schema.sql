@@ -453,6 +453,27 @@ CREATE TABLE arr_sync_delay_profiles_config (
 );
 
 -- ==============================================================================
+-- TABLE: arr_sync_metadata_profiles_config
+-- Purpose: Store metadata profile sync configuration (one per instance, single profile)
+-- Migration: 20260218_add_lidarr_metadata_profiles.ts
+-- ==============================================================================
+
+CREATE TABLE arr_sync_metadata_profiles_config (
+    instance_id INTEGER PRIMARY KEY,
+    trigger TEXT NOT NULL DEFAULT 'none',       -- 'none', 'manual', 'on_pull', 'on_change', 'schedule'
+    cron TEXT,                                  -- Cron expression for schedule trigger
+    should_sync INTEGER NOT NULL DEFAULT 0,      -- Flag for pending sync (Migration 016) - deprecated
+    next_run_at TEXT,                           -- Next scheduled run timestamp (Migration 022)
+    database_id INTEGER,                        -- Single database reference
+    profile_name TEXT,                          -- Single profile reference by stable name
+    sync_status TEXT NOT NULL DEFAULT 'idle',    -- Status: idle, pending, in_progress, failed (Migration 034)
+    last_error TEXT,                            -- Last sync error message (Migration 034)
+    last_synced_at TEXT,                        -- Last successful sync timestamp (Migration 034)
+    FOREIGN KEY (instance_id) REFERENCES arr_instances(id) ON DELETE CASCADE,
+    FOREIGN KEY (database_id) REFERENCES database_instances(id) ON DELETE SET NULL
+);
+
+-- ==============================================================================
 -- TABLE: arr_sync_media_management
 -- Purpose: Store media management sync configuration (one per instance)
 -- Migration: 015_create_arr_sync_tables.ts, 016_add_should_sync_flags.ts, 029_add_database_id_foreign_keys.ts, 034_add_sync_status.ts, 038_add_media_management_config_names.ts

@@ -22,6 +22,7 @@ export function scheduleArrSyncForInstance(instanceId: number): void {
     { key: 'qualityProfiles', config: status.qualityProfiles, jobType: 'arr.sync.qualityProfiles' },
     { key: 'delayProfiles', config: status.delayProfiles, jobType: 'arr.sync.delayProfiles' },
     { key: 'mediaManagement', config: status.mediaManagement, jobType: 'arr.sync.mediaManagement' },
+    { key: 'metadataProfiles', config: status.metadataProfiles, jobType: 'arr.sync.metadataProfiles' },
   ] as const;
 
   // Remove legacy combined scheduled jobs
