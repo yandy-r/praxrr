@@ -13,8 +13,11 @@
 	import type { LidarrMetadataProfileListItem } from '$shared/pcd/display.ts';
 	import CardGrid from '$ui/card/CardGrid.svelte';
 	import Card from '$ui/card/Card.svelte';
-	import { Tag, CheckCircle2, CalendarClock, Plus } from 'lucide-svelte';
+	import { Tag, CheckCircle2, CalendarClock, Plus, Copy, Download } from 'lucide-svelte';
 	import type { PageData } from './$types';
+	import { alertStore } from '$alerts/store';
+	import Button from '$ui/button/Button.svelte';
+	import CloneModal from '$ui/modal/CloneModal.svelte';
 
 	export let data: PageData;
 
@@ -36,8 +39,39 @@
 		localStorage.setItem('metadataProfilesDatabase', String(data.currentDatabase.id));
 	}
 
+	let cloneModalOpen = false;
+	let cloneSourceName = '';
+
 	function getRowHref(row: LidarrMetadataProfileListItem): string {
 		return `/metadata-profiles/${data.currentDatabase.id}/${encodeURIComponent(row.name)}`;
+	}
+
+	function handleClone(name: string) {
+		cloneSourceName = name;
+		cloneModalOpen = true;
+	}
+
+	async function handleExport(name: string) {
+		try {
+			const params = new URLSearchParams({
+				databaseId: String(data.currentDatabase.id),
+				entityType: 'lidarr_metadata_profile',
+				name
+			});
+
+			const res = await fetch(`/api/v1/pcd/export?${params}`);
+			const json = await res.json();
+
+			if (!res.ok) {
+				alertStore.add('error', json.error || 'Export failed');
+				return;
+			}
+
+			await navigator.clipboard.writeText(JSON.stringify(json, null, 2));
+			alertStore.add('success', `Copied "${name}" to clipboard`);
+		} catch {
+			alertStore.add('error', 'Export failed');
+		}
 	}
 
 	const columns: Column<LidarrMetadataProfileListItem>[] = [
@@ -94,7 +128,7 @@
 			cell: (row: LidarrMetadataProfileListItem) => ({
 				html: `<span class="text-xs text-neutral-500 dark:text-neutral-400">${row.updated_at || 'Never'}</span>`,
 			}),
-		},
+		}
 	];
 </script>
 
@@ -126,13 +160,58 @@
 				<p class="text-neutral-600 dark:text-neutral-400">No metadata profiles match your search</p>
 			</div>
 		{:else if $view === 'table'}
-			<Table data={$filtered} {columns} emptyMessage="No metadata profiles found" rowHref={getRowHref} compact={false} hoverable={true} />
+			<Table
+				data={$filtered}
+				{columns}
+				emptyMessage="No metadata profiles found"
+				rowHref={getRowHref}
+				compact={false}
+				hoverable={true}
+			>
+				<svelte:fragment slot="actions" let:row>
+					<div class="flex items-center justify-end gap-0.5" on:click|stopPropagation>
+						<Button
+							icon={Download}
+							size="xs"
+							variant="ghost"
+							tooltip="Export"
+							on:click={() => handleExport(row.name)}
+						/>
+						<Button
+							icon={Copy}
+							size="xs"
+							variant="ghost"
+							tooltip="Clone"
+							on:click={() => handleClone(row.name)}
+						/>
+					</div>
+				</svelte:fragment>
+			</Table>
 		{:else}
 			<CardGrid flush>
 				{#each $filtered as profile (profile.id)}
 					<Card href={getRowHref(profile)} hoverable>
 						<svelte:fragment slot="header">
-							<h3 class="text-sm font-semibold text-neutral-900 dark:text-neutral-100">{profile.name}</h3>
+							<!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
+							<div class="flex items-center justify-between gap-2">
+								<h3 class="text-sm font-semibold text-neutral-900 dark:text-neutral-100">{profile.name}</h3>
+								<div class="flex items-center gap-0.5" on:click|stopPropagation|preventDefault>
+									<Button
+										icon={Download}
+										size="xs"
+										variant="ghost"
+										tooltip="Export"
+										on:click={() => handleExport(profile.name)}
+									/>
+									<Button
+										icon={Copy}
+										size="xs"
+										variant="ghost"
+										tooltip="Clone"
+										on:click={() => handleClone(profile.name)}
+									/>
+								</div>
+							</div>
 						</svelte:fragment>
 
 						<div class="space-y-3 text-xs">
@@ -159,3 +238,12 @@
 		{/if}
 	</div>
 </div>
+
+<CloneModal
+	bind:open={cloneModalOpen}
+	databaseId={data.currentDatabase.id}
+	entityType="lidarr_metadata_profile"
+	sourceName={cloneSourceName}
+	existingNames={data.metadataProfiles.map((profile) => profile.name)}
+	canWriteToBase={data.canWriteToBase}
+/>

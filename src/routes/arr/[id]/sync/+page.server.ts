@@ -18,6 +18,7 @@ import { isSyncSectionSupported } from '$lib/server/sync/mappings.ts';
 import { isArrAppType, supportsArrSyncSurface, type ArrSyncSurface } from '$shared/arr/capabilities.ts';
 
 const METADATA_PROFILES_SURFACE: ArrSyncSurface = 'metadata_profiles';
+const METADATA_PROFILES_SECTION = 'metadataProfiles';
 const METADATA_PROFILE_UNSUPPORTED_ERROR = 'Metadata profile sync is supported only for Lidarr instances';
 
 function supportsMetadataProfiles(instanceType: string): boolean {
@@ -27,7 +28,7 @@ function supportsMetadataProfiles(instanceType: string): boolean {
 
   return (
     supportsArrSyncSurface(instanceType, METADATA_PROFILES_SURFACE) &&
-    isSyncSectionSupported(instanceType, 'metadataProfiles')
+    isSyncSectionSupported(instanceType, METADATA_PROFILES_SECTION)
   );
 }
 
@@ -107,6 +108,7 @@ export const load: ServerLoad = async ({ params }) => {
     instance,
     databases: databasesWithProfiles,
     syncData,
+    metadataProfilesSupported: canLoadMetadataProfiles,
   };
 };
 

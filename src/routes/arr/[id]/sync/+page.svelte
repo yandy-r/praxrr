@@ -12,7 +12,6 @@
 	import SyncFooter from './components/SyncFooter.svelte';
 	import Toggle from '$ui/toggle/Toggle.svelte';
 	import { alertStore } from '$alerts/store.ts';
-	import { isArrAppType, supportsArrSyncSurface, type ArrSyncSurface } from '$shared/arr/capabilities.ts';
 	import type { SyncTrigger } from '$db/queries/arrSync.ts';
 	import { initEdit, update, clear } from '$lib/client/stores/dirty';
 
@@ -20,7 +19,7 @@
 
 	let showInfoModal = false;
 
-	const metadataProfilesSurface: ArrSyncSurface = 'metadata_profiles';
+	const metadataProfilesSupported = data.metadataProfilesSupported;
 
 	// Initialize state from loaded sync data
 	function buildProfileState(
@@ -78,10 +77,6 @@
 		trigger: metadataProfileTrigger,
 		cronExpression: metadataProfileCron
 	});
-
-	let metadataProfilesSupported = isArrAppType(data.instance.type)
-		? supportsArrSyncSurface(data.instance.type, metadataProfilesSurface)
-		: false;
 
 	// Initialize dirty tracking on mount
 	onMount(() => {
