@@ -49,7 +49,7 @@ if (!setupStateQueries.isDefaultDatabaseLinked()) {
 
     await logger.info('Default database auto-linked', {
       source: 'Setup',
-      meta: { database: 'Dictionarry' },
+      meta: { database: 'yandy-r' },
     });
   } catch (error) {
     // Don't fail startup, but mark as attempted so we don't retry every startup

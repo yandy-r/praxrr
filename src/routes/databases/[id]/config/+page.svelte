@@ -313,7 +313,7 @@
 					value={manifest.dependencies ?? {}}
 					onchange={(v) => updateManifest('dependencies', v)}
 					lockedFirst={{
-						key: 'https://github.com/Dictionarry-Hub/schema',
+						key: 'https://github.com/yandy-r/profilarr-schema',
 						value: '1.0.0',
 						minMajor: 1
 					}}
