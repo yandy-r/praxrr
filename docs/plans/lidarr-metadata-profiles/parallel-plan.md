@@ -392,21 +392,22 @@ Files to Modify
 
 #### Task 3.5: Execution evidence (Issue 160)
 
-- [x] `deno task check` run captured (fail at current head):
-  - `src/routes/arr/components/InstanceForm.svelte:111` — `metadata_profiles` key missing from `Record<ArrSyncSurface, string>`.
-  - Execution result: failure (1 svelte-check error, 0 warnings)
+- [x] `deno task check` run captured:
+  - `deno task check` completed successfully.
+  - Svelte diagnostics: 0 errors and 2 warnings in `src/routes/metadata-profiles/[databaseId]/+page.svelte` (accessibility warnings).
 - [x] Targeted arr entity operations test suite run captured:
-  - `deno test -A --no-check src/tests/arr/lidarrMetadataProfilesEntityOperations.test.ts` (pass, `12 passed`).
+  - `deno test -A --no-check src/tests/arr/lidarrMetadataProfilesEntityOperations.test.ts` (pass, `14 passed`).
 - [x] Targeted metadata-profile sync suite run captured:
   - `deno test -A --no-check src/tests/jobs/lidarrMetadataProfilesSync.test.ts` (pass, `3 passed`).
 - [x] Capability gate suite run captured:
   - `deno test -A --no-check src/tests/upgrades/lidarrCapabilityGates.test.ts` (pass, `14 passed`).
 - [x] Route contracts, sync support matrix, and portable import/export validation capture:
   - Entity suite covers API route payload validation and error paths for metadata profile list/create/update/delete endpoints.
+  - Entity suite also covers portable import/export assertions for lidarr metadata profiles.
   - Sync suite covers lidarr-only section support and pending/claimed/complete/fail lifecycle behavior.
   - Capability suite covers `metadata_profiles` capability surface behavior.
-- Portable import/export behavior is **not directly covered** by the required commands above; dedicated import/export regression remains a gap.
-- [ ] Readiness: **Not ready** for production release due to blocking shared `deno task check` failure unrelated to this feature path.
+- [ ] Readiness: **Ready with one unresolved risk** for this task.
+  - Non-blocking environment risk: repeated `EACCES` warnings writing to `/home/yandy/.config/dotfiles/.venv/bin/logs/2026-02-17.log` during tests.
 
 ## Advice
 

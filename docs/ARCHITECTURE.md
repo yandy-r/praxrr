@@ -339,9 +339,14 @@ isolated from Radarr/Sonarr runtime paths:
 - Sync section config and PCD read/write helpers must treat metadata profiles as a
   single-name contract (`metadataProfileName`) and keep API payload fields strictly
   on the Lidarr surface (`primaryTypes`, `secondaryTypes`, `releaseStatuses`).
+- Write requests for child rows use write-time `id` keys for portable rows;
+  read/detail responses map these rows to cache keys (`type_id`, `status_id`) to
+  avoid schema drift across payload and storage layers.
 - OpenAPI documentation in `docs/api/v1/openapi.yaml` must mirror the runtime
   payload contract for list/detail/listing and create/update/delete flows, including
   Lidarr-only field names.
+- Sync helpers must fail fast if a non-Lidarr instance is selected for
+  `metadataProfiles`; no implicit sibling capability fallback is supported.
 
 ## 8) Parser Service
 

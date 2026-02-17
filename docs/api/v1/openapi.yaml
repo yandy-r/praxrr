@@ -49,6 +49,8 @@ paths:
 
         Metadata profiles are a Lidarr-only entity family and are not available
         for Radarr or Sonarr entities.
+
+        Read payloads are list DTOs that expose counts, not full type payloads.
       tags:
         - PCD
       parameters:
@@ -95,6 +97,7 @@ paths:
         - case-insensitive unique profile name
         - reserved name `None` is rejected
         - all source categories include explicit `allowed` booleans
+        - type/status rows in write payloads use `id`, `name`, and `allowed`.
       tags:
         - PCD
       parameters:
@@ -191,6 +194,9 @@ paths:
 
         Partial updates are supported for edit flows.
         Updates remain Lidarr-only and validate value-guard constraints.
+
+        At least one mutable field must be provided.
+        Updates use stable-name/value-guard semantics for concurrency safety.
       tags:
         - PCD
       parameters:
@@ -245,6 +251,7 @@ paths:
         Deletes are rejected if runtime guard checks detect in-use rows or stale
         value guards.
         This endpoint must only be invoked for Lidarr-backed databases.
+        Delete payloads must include the current row name for value-guard safety.
       tags:
         - PCD
       parameters:
@@ -384,7 +391,9 @@ components:
       properties:
         id:
           type: integer
-          description: Lidarr album type id
+          description: |
+            Lidarr identifier for an album or release-status entry used by write
+            operations.
         name:
           type: string
           description: Lidarr album type name
@@ -400,7 +409,7 @@ components:
       properties:
         type_id:
           type: integer
-          description: Lidarr album type id
+          description: Lidarr primary/secondary album type id in read models
         name:
           type: string
           description: Lidarr album type name
@@ -432,7 +441,7 @@ components:
       properties:
         status_id:
           type: integer
-          description: Lidarr release status id
+          description: Lidarr release status id in read models
         name:
           type: string
           description: Lidarr release status name
@@ -444,6 +453,7 @@ components:
       required:
         - id
         - name
+        - description
         - updated_at
         - primaryTypes
         - secondaryTypes
@@ -527,6 +537,7 @@ components:
       properties:
         name:
           type: string
+          minLength: 1
         description:
           type: string
           nullable: true
@@ -562,6 +573,7 @@ components:
       properties:
         name:
           type: string
+          minLength: 1
         description:
           type: string
           nullable: true
@@ -602,6 +614,7 @@ components:
           description: Write target for the operation. Defaults to user.
         name:
           type: string
+          minLength: 1
           description: |
             Current row name used by value guards for concurrency detection.
     LidarrMetadataProfileMutationResponse:
