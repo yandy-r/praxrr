@@ -14,11 +14,13 @@ import { logger } from '$logger/logger.ts';
 import '$lib/server/sync/qualityProfiles/handler.ts';
 import '$lib/server/sync/delayProfiles/handler.ts';
 import '$lib/server/sync/mediaManagement/handler.ts';
+import '$lib/server/sync/metadataProfiles/handler.ts';
 
 const jobTypeToSection = new Map<JobType, SectionType>([
   ['arr.sync.qualityProfiles', 'qualityProfiles'],
   ['arr.sync.delayProfiles', 'delayProfiles'],
   ['arr.sync.mediaManagement', 'mediaManagement'],
+  ['arr.sync.metadataProfiles', 'metadataProfiles'],
 ]);
 
 function parseLegacySections(payload: Record<string, unknown>): SectionType[] | null {
@@ -26,13 +28,21 @@ function parseLegacySections(payload: Record<string, unknown>): SectionType[] | 
   if (Array.isArray(raw)) {
     const sections = raw.filter(
       (value): value is SectionType =>
-        value === 'qualityProfiles' || value === 'delayProfiles' || value === 'mediaManagement'
+        value === 'qualityProfiles' ||
+        value === 'delayProfiles' ||
+        value === 'mediaManagement' ||
+        value === 'metadataProfiles'
     );
     return sections.length > 0 ? sections : null;
   }
 
   if (typeof raw === 'string') {
-    if (raw === 'qualityProfiles' || raw === 'delayProfiles' || raw === 'mediaManagement') {
+    if (
+      raw === 'qualityProfiles' ||
+      raw === 'delayProfiles' ||
+      raw === 'mediaManagement' ||
+      raw === 'metadataProfiles'
+    ) {
       return [raw];
     }
   }
@@ -175,3 +185,4 @@ jobQueueRegistry.register('arr.sync', arrSyncHandler);
 jobQueueRegistry.register('arr.sync.qualityProfiles', arrSyncHandler);
 jobQueueRegistry.register('arr.sync.delayProfiles', arrSyncHandler);
 jobQueueRegistry.register('arr.sync.mediaManagement', arrSyncHandler);
+jobQueueRegistry.register('arr.sync.metadataProfiles', arrSyncHandler);

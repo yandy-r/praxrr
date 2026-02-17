@@ -5,6 +5,7 @@ export type JobType =
   | 'arr.sync.qualityProfiles'
   | 'arr.sync.delayProfiles'
   | 'arr.sync.mediaManagement'
+  | 'arr.sync.metadataProfiles'
   | 'pcd.sync'
   | 'backup.create'
   | 'backup.cleanup'

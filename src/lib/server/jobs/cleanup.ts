@@ -22,6 +22,7 @@ export function cleanupJobsForArrInstance(instanceId: number): number {
     'arr.sync.qualityProfiles',
     'arr.sync.delayProfiles',
     'arr.sync.mediaManagement',
+    'arr.sync.metadataProfiles',
   ];
 
   const jobs = jobQueueQueries.listByJobTypes(jobTypes);
