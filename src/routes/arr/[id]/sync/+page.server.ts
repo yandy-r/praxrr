@@ -6,6 +6,7 @@ import { pcdManager } from '$pcd/index.ts';
 import { logger } from '$logger/logger.ts';
 import * as qualityProfileQueries from '$pcd/entities/qualityProfiles/index.ts';
 import * as delayProfileQueries from '$pcd/entities/delayProfiles/index.ts';
+import * as metadataProfileQueries from '$pcd/entities/metadataProfiles/index.ts';
 import * as namingQueries from '$pcd/entities/mediaManagement/naming/index.ts';
 import * as qualityDefinitionsQueries from '$pcd/entities/mediaManagement/quality-definitions/index.ts';
 import * as mediaSettingsQueries from '$pcd/entities/mediaManagement/media-settings/index.ts';
@@ -13,7 +14,23 @@ import { calculateNextRun } from '$lib/server/sync/utils.ts';
 import { scheduleArrSyncForInstance } from '$lib/server/jobs/init.ts';
 import { enqueueJob } from '$lib/server/jobs/queueService.ts';
 import { buildJobDisplayName } from '$lib/server/jobs/display.ts';
-import type { ArrAppType } from '$shared/arr/capabilities.ts';
+import { isSyncSectionSupported } from '$lib/server/sync/mappings.ts';
+import { supportsArrSyncSurface, type ArrAppType, type ArrSyncSurface } from '$shared/arr/capabilities.ts';
+
+const METADATA_PROFILES_SURFACE: ArrSyncSurface = 'metadata_profiles';
+
+function supportsMetadataProfiles(instanceType: ArrAppType): boolean {
+  return (
+    supportsArrSyncSurface(instanceType, METADATA_PROFILES_SURFACE) &&
+    isSyncSectionSupported(instanceType, 'metadataProfiles')
+  );
+}
+
+function ensureMetadataProfileSyncSupported(instanceType: ArrAppType): void {
+  if (!supportsMetadataProfiles(instanceType)) {
+    throw new Error('Metadata profile sync is supported only for lidarr instances');
+  }
+}
 
 export const load: ServerLoad = async ({ params }) => {
   const id = parseInt(params.id || '', 10);
@@ -31,6 +48,7 @@ export const load: ServerLoad = async ({ params }) => {
   // Get all databases
   const databases = pcdManager.getAll();
   const arrType = instance.type as ArrAppType;
+  const canLoadMetadataProfiles = supportsMetadataProfiles(arrType);
 
   // Fetch profiles and configs from each database
   const databasesWithProfiles = await Promise.all(
@@ -45,6 +63,7 @@ export const load: ServerLoad = async ({ params }) => {
           namingConfigs: [],
           qualityDefinitionsConfigs: [],
           mediaSettingsConfigs: [],
+          metadataProfiles: [],
         };
       }
 
@@ -56,6 +75,8 @@ export const load: ServerLoad = async ({ params }) => {
           qualityDefinitionsQueries.list(cache),
           mediaSettingsQueries.list(cache),
         ]);
+
+      const metadataProfiles = canLoadMetadataProfiles ? await metadataProfileQueries.list(cache) : [];
 
       // Filter configs by arr type - only show configs for the instance's arr type
       const namingConfigs = allNamingConfigs.filter((c) => c.arr_type === arrType).map((c) => ({ name: c.name }));
@@ -74,6 +95,7 @@ export const load: ServerLoad = async ({ params }) => {
         namingConfigs,
         qualityDefinitionsConfigs,
         mediaSettingsConfigs,
+        metadataProfiles: metadataProfiles.map((profile) => ({ name: profile.name })),
       };
     })
   );
@@ -218,6 +240,60 @@ export const actions: Actions = {
     }
   },
 
+  saveMetadataProfiles: async ({ params, request }) => {
+    const id = parseInt(params.id || '', 10);
+    if (isNaN(id)) {
+      return fail(400, { error: 'Invalid instance ID' });
+    }
+
+    const instance = arrInstancesQueries.getById(id);
+    if (!instance) {
+      return fail(404, { error: 'Instance not found' });
+    }
+
+    const formData = await request.formData();
+    const databaseId = formData.get('databaseId') as string | null;
+    const profileName = formData.get('profileName') as string | null;
+    const trigger = formData.get('trigger') as SyncTrigger;
+    const cron = formData.get('cron') as string | null;
+
+    try {
+      const instanceType = instance.type as ArrAppType;
+      ensureMetadataProfileSyncSupported(instanceType);
+
+      const effectiveTrigger = trigger || 'manual';
+      const effectiveCron = cron || null;
+      arrSyncQueries.saveMetadataProfilesSync(id, {
+        databaseId: databaseId ? parseInt(databaseId, 10) : null,
+        profileName: profileName || null,
+        trigger: effectiveTrigger,
+        cron: effectiveCron,
+        nextRunAt: effectiveTrigger === 'schedule' ? calculateNextRun(effectiveCron) : null,
+      });
+
+      await logger.info(`Metadata profiles sync config saved for "${instance?.name}"`, {
+        source: 'sync',
+        meta: { instanceId: id, databaseId, profileName, trigger },
+      });
+
+      scheduleArrSyncForInstance(id);
+
+      return { success: true };
+    } catch (e) {
+      const errorMsg = e instanceof Error ? e.message : 'Unknown error';
+      await logger.error('Failed to save metadata profiles sync config', {
+        source: 'sync',
+        meta: { instanceId: id, error: errorMsg },
+      });
+
+      if (errorMsg.includes('supported only for lidarr instances')) {
+        return fail(400, { error: errorMsg });
+      }
+
+      return fail(500, { error: `Failed to save metadata profiles sync config: ${errorMsg}` });
+    }
+  },
+
   syncDelayProfiles: async ({ params }) => {
     const id = parseInt(params.id || '', 10);
     if (isNaN(id)) {
@@ -337,6 +413,56 @@ export const actions: Actions = {
         source: 'sync',
         meta: { instanceId: id, error: errorMsg },
       });
+      return fail(500, { error: `Sync failed: ${errorMsg}` });
+    }
+  },
+
+  syncMetadataProfiles: async ({ params }) => {
+    const id = parseInt(params.id || '', 10);
+    if (isNaN(id)) {
+      return fail(400, { error: 'Invalid instance ID' });
+    }
+
+    const instance = arrInstancesQueries.getById(id);
+    if (!instance) {
+      return fail(404, { error: 'Instance not found' });
+    }
+
+    try {
+      const instanceType = instance.type as ArrAppType;
+      ensureMetadataProfileSyncSupported(instanceType);
+      const jobType = 'arr.sync.metadataProfiles' as Parameters<typeof enqueueJob>[0]['jobType'];
+
+      arrSyncQueries.setMetadataProfilesStatusPending(id);
+      const queued = enqueueJob({
+        jobType,
+        runAt: new Date().toISOString(),
+        payload: { instanceId: id },
+        source: 'manual',
+      });
+
+      await logger.info(`Queued metadata profiles sync for "${instance.name}"`, {
+        source: 'sync',
+        meta: {
+          jobId: queued.id,
+          instanceId: id,
+          instanceName: instance.name,
+          displayName: buildJobDisplayName(jobType as never, { instanceId: id }),
+        },
+      });
+
+      return { success: true, message: 'Metadata profiles sync queued' };
+    } catch (e) {
+      const errorMsg = e instanceof Error ? e.message : 'Unknown error';
+      await logger.error(`Metadata profiles sync enqueue failed for "${instance.name}"`, {
+        source: 'sync',
+        meta: { instanceId: id, error: errorMsg },
+      });
+
+      if (errorMsg.includes('supported only for lidarr instances')) {
+        return fail(400, { error: errorMsg });
+      }
+
       return fail(500, { error: `Sync failed: ${errorMsg}` });
     }
   },

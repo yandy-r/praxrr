@@ -9,12 +9,18 @@
 	import QualityProfiles from './components/QualityProfiles.svelte';
 	import DelayProfiles from './components/DelayProfiles.svelte';
 	import MediaManagement from './components/MediaManagement.svelte';
+	import SyncFooter from './components/SyncFooter.svelte';
+	import Toggle from '$ui/toggle/Toggle.svelte';
+	import { alertStore } from '$alerts/store.ts';
+	import { isArrAppType, supportsArrSyncSurface, type ArrSyncSurface } from '$shared/arr/capabilities.ts';
 	import type { SyncTrigger } from '$db/queries/arrSync.ts';
 	import { initEdit, update, clear } from '$lib/client/stores/dirty';
 
 	export let data: PageData;
 
 	let showInfoModal = false;
+
+	const metadataProfilesSurface: ArrSyncSurface = 'metadata_profiles';
 
 	// Initialize state from loaded sync data
 	function buildProfileState(
@@ -52,10 +58,30 @@
 	let mediaManagementTrigger: SyncTrigger = data.syncData.mediaManagement.trigger;
 	let mediaManagementCron: string = data.syncData.mediaManagement.cron || '0 * * * *';
 
+	let metadataProfileState = {
+		databaseId: data.syncData.metadataProfiles.databaseId,
+		profileName: data.syncData.metadataProfiles.profileName
+	};
+	let metadataProfileTrigger: SyncTrigger = data.syncData.metadataProfiles.trigger;
+	let metadataProfileCron: string = data.syncData.metadataProfiles.cron || '0 * * * *';
+
 	// Track dirty state from each component
 	let qualityProfilesDirty = false;
 	let delayProfilesDirty = false;
 	let mediaManagementDirty = false;
+	let metadataProfilesDirty = false;
+
+	let metadataProfileSaving = false;
+	let metadataProfileSyncing = false;
+	let metadataProfileSavedState = JSON.stringify({
+		state: metadataProfileState,
+		trigger: metadataProfileTrigger,
+		cronExpression: metadataProfileCron
+	});
+
+	let metadataProfilesSupported = isArrAppType(data.instance.type)
+		? supportsArrSyncSurface(data.instance.type, metadataProfilesSurface)
+		: false;
 
 	// Initialize dirty tracking on mount
 	onMount(() => {
@@ -64,8 +90,20 @@
 	});
 
 	// Sync combined dirty state to global dirty store for DirtyModal
-	$: anyDirty = qualityProfilesDirty || delayProfilesDirty || mediaManagementDirty;
+	$: anyDirty =
+		qualityProfilesDirty || delayProfilesDirty || mediaManagementDirty || metadataProfilesDirty;
 	$: update('anyDirty', anyDirty);
+
+	$: metadataProfileSelectionKey =
+		metadataProfileState.databaseId !== null && metadataProfileState.profileName
+			? `${metadataProfileState.databaseId}-${metadataProfileState.profileName}`
+			: null;
+	$: metadataProfileCurrentState = JSON.stringify({
+		state: metadataProfileState,
+		trigger: metadataProfileTrigger,
+		cronExpression: metadataProfileCron
+	});
+	$: metadataProfilesDirty = metadataProfilesSupported && metadataProfileCurrentState !== metadataProfileSavedState;
 
 	// Validation: Quality profiles require both media management AND delay profiles (saved, not dirty)
 	$: hasQualityProfilesSelected = Object.values(qualityProfileState).some((db) =>
@@ -88,6 +126,21 @@
 		!hasQualityProfilesSelected ||
 		(hasMediaManagement && !mediaManagementDirty && hasDelayProfile && !delayProfilesDirty);
 
+	function isMetadataProfileSelected(databaseId: number, profileName: string): boolean {
+		return metadataProfileSelectionKey === `${databaseId}-${profileName}`;
+	}
+
+	function setMetadataProfile(databaseId: number, profileName: string, checked: boolean) {
+		if (checked) {
+			metadataProfileState = { databaseId, profileName };
+			return;
+		}
+
+		if (isMetadataProfileSelected(databaseId, profileName)) {
+			metadataProfileState = { databaseId: null, profileName: null };
+		}
+	}
+
 	// Build warning message showing all missing requirements
 	$: qualityProfilesWarning = (() => {
 		if (!hasQualityProfilesSelected) return null;
@@ -109,6 +162,58 @@
 		if (issues.length === 0) return null;
 		return `Quality profiles require ${issues.join(' and ')}.`;
 	})();
+
+	async function handleMetadataProfileSave() {
+		metadataProfileSaving = true;
+		try {
+			const formData = new FormData();
+			formData.set('databaseId', metadataProfileState.databaseId?.toString() ?? '');
+			formData.set('profileName', metadataProfileState.profileName ?? '');
+			formData.set('trigger', metadataProfileTrigger);
+			formData.set('cron', metadataProfileCron);
+
+			const response = await fetch('?/saveMetadataProfiles', {
+				method: 'POST',
+				body: formData
+			});
+
+			if (response.ok) {
+				alertStore.add('success', 'Metadata profiles sync config saved');
+				metadataProfileSavedState = JSON.stringify({
+					state: metadataProfileState,
+					trigger: metadataProfileTrigger,
+					cronExpression: metadataProfileCron
+				});
+			} else {
+				alertStore.add('error', 'Failed to save metadata profiles sync config');
+			}
+		} catch {
+			alertStore.add('error', 'Failed to save metadata profiles sync config');
+		} finally {
+			metadataProfileSaving = false;
+		}
+	}
+
+	async function handleMetadataProfileSync() {
+		metadataProfileSyncing = true;
+		try {
+			const response = await fetch('?/syncMetadataProfiles', {
+				method: 'POST',
+				body: new FormData()
+			});
+
+			if (response.ok) {
+				const data = await response.json();
+				alertStore.add('success', data?.message ?? 'Sync queued');
+			} else {
+				alertStore.add('error', 'Sync failed');
+			}
+		} catch {
+			alertStore.add('error', 'Sync failed');
+		} finally {
+			metadataProfileSyncing = false;
+		}
+	}
 </script>
 
 <svelte:head>
@@ -156,6 +261,62 @@
 		bind:cronExpression={delayProfileCron}
 		bind:isDirty={delayProfilesDirty}
 	/>
+
+	{#if metadataProfilesSupported}
+		<div
+			class="rounded-lg border border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900"
+		>
+			<div class="border-b border-neutral-200 px-6 py-4 dark:border-neutral-800">
+				<h2 class="text-xl font-semibold text-neutral-900 dark:text-neutral-50">Metadata Profiles</h2>
+				<p class="mt-1 text-sm text-neutral-600 dark:text-neutral-400">
+					Select metadata profiles to sync to this instance
+				</p>
+			</div>
+
+			<div class="p-6">
+				{#if data.databases.length === 0}
+					<p class="text-sm text-neutral-500 dark:text-neutral-400">No databases configured</p>
+				{:else}
+					<div class="space-y-6">
+						{#each data.databases as database}
+							<div class="space-y-3">
+								<h3 class="text-sm font-semibold text-neutral-900 dark:text-neutral-50">
+									{database.name}
+								</h3>
+
+								{#if database.metadataProfiles.length === 0}
+									<p class="text-sm text-neutral-500 dark:text-neutral-400">
+										No metadata profiles
+									</p>
+								{:else}
+									<div class="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-5">
+										{#each database.metadataProfiles as profile}
+											<Toggle
+												checked={isMetadataProfileSelected(database.id, profile.name)}
+												label={profile.name}
+												ariaLabel={`Toggle metadata profile ${profile.name} from ${database.name}`}
+												on:change={(e) => setMetadataProfile(database.id, profile.name, e.detail)}
+											/>
+										{/each}
+									</div>
+								{/if}
+							</div>
+						{/each}
+					</div>
+				{/if}
+			</div>
+
+			<SyncFooter
+				bind:syncTrigger={metadataProfileTrigger}
+				bind:cronExpression={metadataProfileCron}
+				saving={metadataProfileSaving}
+				syncing={metadataProfileSyncing}
+				isDirty={metadataProfilesDirty}
+				on:save={handleMetadataProfileSave}
+				on:sync={handleMetadataProfileSync}
+			/>
+		</div>
+	{/if}
 </div>
 
 <InfoModal bind:open={showInfoModal} header="How Sync Works">
