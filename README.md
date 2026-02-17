@@ -10,7 +10,7 @@
 
 <br>
 
-# Introduction
+# The Fork
 
 This is a fork of the [Official Dictionarry profilarr](https://github.com/Dictionarry-Hub/profilarr)
 with Lidarr support. I don't plan to merge this back into the main repository, but I will keep it
@@ -24,8 +24,14 @@ by trying to merge this back into the main repository.
 
 <p>Manage quality profiles, custom formats, and media management settings across your Radarr, Sonarr, and Lidarr instances. Define your profiles once with a Git-backed configuration database, then sync them to any number of *arr instances.</p>
 
-> [!WARNING] v2 is under heavy development and is _NOT_ ready for production use. Use
-> [Praxrr V1](https://github.com/Dictionarry-Hub/profilarr/tree/main) until v2 is ready.
+## What I'm Doing
+
+<p align="center"><em>Media automation, perfected in practice.</em></p>
+
+Praxrr is a management and automation platform for the \*arr ecosystem. Configure quality profiles,
+custom formats, and media settings once in a Git-backed configuration database, then sync them
+across any number of Radarr, Sonarr, and Lidarr instances — with intelligent upgrade automation and
+more on the way.
 
 ## Features
 
