@@ -59,11 +59,6 @@ export const POST: RequestHandler = async ({ request }) => {
     return json({ error: 'Cannot write to base layer' }, { status: 403 });
   }
 
-  const cache = pcdManager.getCache(databaseId as number);
-  if (!cache) {
-    return json({ error: 'Database cache not available' }, { status: 500 });
-  }
-
   if (typeof data !== 'object' || data === null || Array.isArray(data)) {
     return json({ error: 'Invalid portable payload: data must be an object' }, { status: 400 });
   }
@@ -76,6 +71,11 @@ export const POST: RequestHandler = async ({ request }) => {
   const validationError = validatePortableData(typedEntityType, data as Record<string, unknown>);
   if (validationError) {
     return json({ error: validationError }, { status: 400 });
+  }
+
+  const cache = pcdManager.getCache(databaseId as number);
+  if (!cache) {
+    return json({ error: 'Database cache not available' }, { status: 500 });
   }
 
   try {

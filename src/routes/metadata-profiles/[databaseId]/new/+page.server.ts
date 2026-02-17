@@ -17,6 +17,35 @@ interface MetadataProfileFormData {
 	releaseStatuses: MetadataProfileFormType[];
 }
 
+const DEFAULT_PRIMARY_TYPES: MetadataProfileFormType[] = [
+	{ id: 0, name: 'Album', allowed: true },
+	{ id: 1, name: 'EP', allowed: false },
+	{ id: 2, name: 'Single', allowed: false },
+	{ id: 3, name: 'Broadcast', allowed: false },
+	{ id: 4, name: 'Other', allowed: false }
+];
+
+const DEFAULT_SECONDARY_TYPES: MetadataProfileFormType[] = [
+	{ id: 0, name: 'Studio', allowed: true },
+	{ id: 1, name: 'Compilation', allowed: false },
+	{ id: 2, name: 'Soundtrack', allowed: false },
+	{ id: 3, name: 'Spokenword', allowed: false },
+	{ id: 4, name: 'Interview', allowed: false },
+	{ id: 6, name: 'Live', allowed: false },
+	{ id: 7, name: 'Remix', allowed: false },
+	{ id: 8, name: 'DJ-mix', allowed: false },
+	{ id: 9, name: 'Mixtape/Street', allowed: false },
+	{ id: 10, name: 'Demo', allowed: false },
+	{ id: 11, name: 'Audio drama', allowed: false }
+];
+
+const DEFAULT_RELEASE_STATUSES: MetadataProfileFormType[] = [
+	{ id: 0, name: 'Official', allowed: true },
+	{ id: 1, name: 'Promotion', allowed: false },
+	{ id: 2, name: 'Bootleg', allowed: false },
+	{ id: 3, name: 'Pseudo-Release', allowed: false }
+];
+
 function mergeById<T extends MetadataProfileFormType>(rows: T[]): T[] {
 	const map = new Map<number, T>();
 
@@ -41,6 +70,41 @@ function ensureAtLeastOneAllowed<T extends MetadataProfileFormType>(rows: T[]): 
 	}
 
 	return rows.map((row, index) => ({ ...row, allowed: index === 0 }));
+}
+
+function fallbackSectionRows(
+	rows: MetadataProfileFormType[],
+	defaultRows: MetadataProfileFormType[]
+): MetadataProfileFormType[] {
+	const rowsById = new Map<number, MetadataProfileFormType>();
+	const defaultIds = new Set<number>(defaultRows.map((row) => row.id));
+
+	for (const row of rows) {
+		if (!rowsById.has(row.id)) {
+			rowsById.set(row.id, row);
+		}
+	}
+
+	const merged = defaultRows.map((defaultRow) => {
+		const existingRow = rowsById.get(defaultRow.id);
+		if (!existingRow) {
+			return defaultRow;
+		}
+
+		return {
+			id: existingRow.id,
+			name: existingRow.name.trim() ? existingRow.name : defaultRow.name,
+			allowed: existingRow.allowed
+		};
+	});
+
+	for (const row of rowsById.values()) {
+		if (!defaultIds.has(row.id)) {
+			merged.push(row);
+		}
+	}
+
+	return merged.sort((a, b) => a.id - b.id);
 }
 
 function toResponseError(errorValue: unknown): string {
@@ -124,36 +188,45 @@ export const load: ServerLoad = async ({ params }) => {
 		name: '',
 		description: '',
 		primaryTypes: ensureAtLeastOneAllowed(
-			mergeById(
-				profiles.flatMap((profile) =>
-					profile.primaryAlbumTypes.map((entry) => ({
-						id: entry.typeId,
-						name: entry.name,
-						allowed: entry.allowed
-					}))
-				)
+			fallbackSectionRows(
+				mergeById(
+					profiles.flatMap((profile) =>
+						profile.primaryAlbumTypes.map((entry) => ({
+							id: entry.typeId,
+							name: entry.name,
+							allowed: entry.allowed
+						}))
+					)
+				),
+				DEFAULT_PRIMARY_TYPES
 			)
 		),
 		secondaryTypes: ensureAtLeastOneAllowed(
-			mergeById(
-				profiles.flatMap((profile) =>
-					profile.secondaryAlbumTypes.map((entry) => ({
-						id: entry.typeId,
-						name: entry.name,
-						allowed: entry.allowed
-					}))
-				)
+			fallbackSectionRows(
+				mergeById(
+					profiles.flatMap((profile) =>
+						profile.secondaryAlbumTypes.map((entry) => ({
+							id: entry.typeId,
+							name: entry.name,
+							allowed: entry.allowed
+						}))
+					)
+				),
+				DEFAULT_SECONDARY_TYPES
 			)
 		),
 		releaseStatuses: ensureAtLeastOneAllowed(
-			mergeById(
-				profiles.flatMap((profile) =>
-					profile.releaseStatuses.map((entry) => ({
-						id: entry.statusId,
-						name: entry.name,
-						allowed: entry.allowed
-					}))
-				)
+			fallbackSectionRows(
+				mergeById(
+					profiles.flatMap((profile) =>
+						profile.releaseStatuses.map((entry) => ({
+							id: entry.statusId,
+							name: entry.name,
+							allowed: entry.allowed
+						}))
+					)
+				),
+				DEFAULT_RELEASE_STATUSES
 			)
 		)
 	};

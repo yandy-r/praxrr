@@ -7,7 +7,7 @@
 
 import type { PCDCache } from '$pcd/index.ts';
 import type { OperationLayer } from '$pcd/index.ts';
-import type { EntityType } from '$shared/pcd/portable.ts';
+import type { EntityType, PortableLidarrMetadataProfile } from '$shared/pcd/portable.ts';
 import * as serialize from './serialize.ts';
 import * as deserialize from './deserialize.ts';
 
@@ -100,8 +100,24 @@ export async function clone(options: CloneOptions) {
 
     case 'lidarr_metadata_profile': {
       const portable = await serialize.serializeLidarrMetadataProfile(cache, sourceName);
-      portable.name = newName;
-      return deserialize.deserializeLidarrMetadataProfile({ databaseId, cache, layer, portable });
+      const sortedPortable = normalizeLidarrMetadataProfile(portable);
+      sortedPortable.name = newName;
+      return deserialize.deserializeLidarrMetadataProfile({ databaseId, cache, layer, portable: sortedPortable });
     }
   }
+}
+
+function normalizeLidarrMetadataProfile(portable: PortableLidarrMetadataProfile): PortableLidarrMetadataProfile {
+  return {
+    ...portable,
+    primaryTypes: portable.primaryTypes
+      .slice()
+      .sort((a, b) => (a.id ?? 0) - (b.id ?? 0)),
+    secondaryTypes: portable.secondaryTypes
+      .slice()
+      .sort((a, b) => (a.id ?? 0) - (b.id ?? 0)),
+    releaseStatuses: portable.releaseStatuses
+      .slice()
+      .sort((a, b) => (a.id ?? 0) - (b.id ?? 0)),
+  };
 }

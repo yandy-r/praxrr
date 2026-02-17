@@ -134,6 +134,7 @@ export async function update(options: UpdateMetadataProfileOptions) {
     const existing = await db
       .selectFrom('lidarr_metadata_profiles')
       .where((eb) => eb(eb.fn('lower', [eb.ref('name')]), '=', nextName.toLowerCase()))
+      .where('id', '!=', current.id)
       .select('name')
       .executeTakeFirst();
 

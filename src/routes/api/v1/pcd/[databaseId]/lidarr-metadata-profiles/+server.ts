@@ -1,11 +1,6 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from '@sveltejs/kit';
-import {
-  canWriteToBase,
-  pcdManager,
-  type OperationLayer,
-  type PCDCache,
-} from '$pcd/index.ts';
+import { canWriteToBase, pcdManager, type OperationLayer, type PCDCache } from '$pcd/index.ts';
 import type { LidarrMetadataProfileListItem } from '$shared/pcd/display.ts';
 import type { PortableMetadataProfileType } from '$shared/pcd/portable.ts';
 import * as metadataProfiles from '$pcd/entities/metadataProfiles/index.ts';
@@ -26,13 +21,19 @@ interface CreateMetadataProfileRequest {
 }
 
 const VALID_LAYERS: ReadonlySet<OperationLayer> = new Set(['user', 'base']);
+const POSITIVE_INTEGER_ID = /^\d+$/;
+const RESERVED_METADATA_PROFILE_NAME = 'none';
 
 function parseDatabaseId(rawId: string | undefined): { value: number } | { error: string } {
   if (!rawId) {
     return { error: 'Missing databaseId' };
   }
 
-  const databaseId = Number(rawId);
+  if (!POSITIVE_INTEGER_ID.test(rawId)) {
+    return { error: 'Invalid databaseId' };
+  }
+
+  const databaseId = Number.parseInt(rawId, 10);
   if (!Number.isInteger(databaseId) || databaseId <= 0) {
     return { error: 'Invalid databaseId' };
   }
@@ -104,11 +105,13 @@ function parsePortableMetadataTypeArray(
   return { value: rows };
 }
 
-function validateCreatePayload(body: unknown): {
-  value: CreateMetadataProfileRequest;
-} | {
-  error: string;
-} {
+function validateCreatePayload(body: unknown):
+  | {
+      value: CreateMetadataProfileRequest;
+    }
+  | {
+      error: string;
+    } {
   if (!body || typeof body !== 'object' || Array.isArray(body)) {
     return { error: 'Invalid request body' };
   }
@@ -119,12 +122,16 @@ function validateCreatePayload(body: unknown): {
     return { error: 'Profile name is required' };
   }
 
+  if (name.toLowerCase() === RESERVED_METADATA_PROFILE_NAME) {
+    return { error: `'None' is a reserved profile name` };
+  }
+
   const description =
     root.description === undefined || root.description === null
       ? null
       : typeof root.description === 'string'
-      ? root.description.trim()
-      : null;
+        ? root.description.trim()
+        : null;
   if (root.description !== undefined && root.description !== null && typeof root.description !== 'string') {
     return { error: 'Description must be a string or null' };
   }
@@ -244,7 +251,11 @@ export const GET: RequestHandler = async ({ params }) => {
     const profileRows = await database.value.kb
       .selectFrom('lidarr_metadata_profiles')
       .select(['id', 'updated_at'])
-      .where('id', 'in', profiles.map((profile) => profile.id))
+      .where(
+        'id',
+        'in',
+        profiles.map((profile) => profile.id)
+      )
       .execute();
 
     const metadataById = new Map(profileRows.map((row) => [row.id, row.updated_at]));

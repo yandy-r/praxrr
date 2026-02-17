@@ -274,22 +274,42 @@ function validateLidarrMetadataProfileData(data: Record<string, unknown>): strin
     return `Unsupported payload for lidarr_metadata_profile: unsupported fields: ${unsupportedFields.join(', ')}`;
   }
 
-  const primaryError = validateLidarrMetadataProfileTypeRows('data.primaryTypes', data.primaryTypes);
+  const primaryError = validateLidarrMetadataProfileTypeRows(
+    'data.primaryTypes',
+    data.primaryTypes,
+    ['id', 'typeId']
+  );
   if (primaryError) return primaryError;
 
-  const secondaryError = validateLidarrMetadataProfileTypeRows('data.secondaryTypes', data.secondaryTypes);
+  const secondaryError = validateLidarrMetadataProfileTypeRows(
+    'data.secondaryTypes',
+    data.secondaryTypes,
+    ['id', 'typeId']
+  );
   if (secondaryError) return secondaryError;
 
-  const statusError = validateLidarrMetadataProfileTypeRows('data.releaseStatuses', data.releaseStatuses);
+  const statusError = validateLidarrMetadataProfileTypeRows(
+    'data.releaseStatuses',
+    data.releaseStatuses,
+    ['id', 'statusId']
+  );
   if (statusError) return statusError;
 
   return null;
 }
 
-function validateLidarrMetadataProfileTypeRows(path: string, rows: unknown): string | null {
+function validateLidarrMetadataProfileTypeRows(
+  path: string,
+  rows: unknown,
+  allowedIdentifierFields: readonly string[]
+): string | null {
   if (!Array.isArray(rows)) {
     return `${path} must be an array`;
   }
+
+  const allowedFields = [...allowedIdentifierFields, 'name', 'allowed'];
+  const identifiers = new Set<number>();
+  let hasAllowed = false;
 
   for (let index = 0; index < rows.length; index += 1) {
     const row = rows[index];
@@ -298,17 +318,52 @@ function validateLidarrMetadataProfileTypeRows(path: string, rows: unknown): str
     }
 
     const typedRow = row as Record<string, unknown>;
-    if (typeof typedRow.id !== 'number' || !Number.isInteger(typedRow.id)) {
-      return `${path}[${index}].id must be an integer`;
+    const identifierValues = allowedIdentifierFields
+      .map((field) => getIntegerMetadataProfileId(typedRow[field]))
+      .filter((value) => value !== null);
+
+    if (identifierValues.length === 0) {
+      return `${path}[${index}] requires an integer identifier`;
     }
+
+    if (identifierValues.length > 1) {
+      return `${path}[${index}] must use only one identifier field`;
+    }
+
+    const unsupportedFields = Object.keys(typedRow).filter((field) => !allowedFields.includes(field));
+    if (unsupportedFields.length > 0) {
+      return `${path}[${index}] has unsupported fields: ${unsupportedFields.sort((a, b) => a.localeCompare(b)).join(', ')}`;
+    }
+
     if (typeof typedRow.name !== 'string') {
       return `${path}[${index}].name must be a string`;
     }
     if (typeof typedRow.allowed !== 'boolean') {
       return `${path}[${index}].allowed must be a boolean`;
     }
+
+    const normalizedId = identifierValues[0];
+    if (identifiers.has(normalizedId)) {
+      return `${path}[${index}] has duplicate identifier ${normalizedId}`;
+    }
+    identifiers.add(normalizedId);
+
+    if (typedRow.allowed === true) {
+      hasAllowed = true;
+    }
   }
 
+  if (!hasAllowed) {
+    return `${path} must have at least one allowed entry`;
+  }
+
+  return null;
+}
+
+function getIntegerMetadataProfileId(value: unknown): number | null {
+  if (typeof value === 'number' && Number.isInteger(value)) {
+    return value;
+  }
   return null;
 }
 

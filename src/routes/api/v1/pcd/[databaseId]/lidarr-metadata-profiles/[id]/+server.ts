@@ -1,11 +1,6 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from '@sveltejs/kit';
-import {
-  canWriteToBase,
-  pcdManager,
-  type OperationLayer,
-  type PCDCache,
-} from '$pcd/index.ts';
+import { canWriteToBase, pcdManager, type OperationLayer, type PCDCache } from '$pcd/index.ts';
 import type { LidarrMetadataProfileDetail } from '$shared/pcd/display.ts';
 import * as metadataProfiles from '$pcd/entities/metadataProfiles/index.ts';
 
@@ -39,13 +34,19 @@ interface DeleteMetadataProfileRequest {
 }
 
 const VALID_LAYERS: ReadonlySet<OperationLayer> = new Set(['user', 'base']);
+const POSITIVE_INTEGER_ID = /^\d+$/;
+const RESERVED_METADATA_PROFILE_NAME = 'none';
 
 function parseDatabaseId(rawId: string | undefined, fieldName: string): { value: number } | { error: string } {
   if (!rawId) {
     return { error: `Missing ${fieldName}` };
   }
 
-  const id = Number(rawId);
+  if (!POSITIVE_INTEGER_ID.test(rawId)) {
+    return { error: `Invalid ${fieldName}` };
+  }
+
+  const id = Number.parseInt(rawId, 10);
   if (!Number.isInteger(id) || id <= 0) {
     return { error: `Invalid ${fieldName}` };
   }
@@ -133,6 +134,9 @@ function parseUpdatePayload(
     if (!name) {
       return { error: 'Profile name cannot be empty' };
     }
+    if (name.toLowerCase() === RESERVED_METADATA_PROFILE_NAME) {
+      return { error: `'None' is a reserved profile name` };
+    }
     parsed.name = name;
   }
 
@@ -186,24 +190,24 @@ function parseUpdatePayload(
 
   const nextPrimaryTypes = parsed.primaryTypes
     ? parsed.primaryTypes.map((type) => ({
-      typeId: type.id,
-      name: type.name,
-      allowed: type.allowed,
-    }))
+        typeId: type.id,
+        name: type.name,
+        allowed: type.allowed,
+      }))
     : current.primaryAlbumTypes;
   const nextSecondaryTypes = parsed.secondaryTypes
     ? parsed.secondaryTypes.map((type) => ({
-      typeId: type.id,
-      name: type.name,
-      allowed: type.allowed,
-    }))
+        typeId: type.id,
+        name: type.name,
+        allowed: type.allowed,
+      }))
     : current.secondaryAlbumTypes;
   const nextReleaseStatuses = parsed.releaseStatuses
     ? parsed.releaseStatuses.map((type) => ({
-      statusId: type.id,
-      name: type.name,
-      allowed: type.allowed,
-    }))
+        statusId: type.id,
+        name: type.name,
+        allowed: type.allowed,
+      }))
     : current.releaseStatuses;
 
   const hasPrimaryAllowed = nextPrimaryTypes.some((entry) => entry.allowed);
@@ -361,26 +365,26 @@ export const PUT: RequestHandler = async ({ params, request }) => {
 
     const primaryInput = payloadResult.value.primaryTypes
       ? payloadResult.value.primaryTypes.map((entry) => ({
-        typeId: entry.id,
-        name: entry.name,
-        allowed: entry.allowed,
-      }))
+          typeId: entry.id,
+          name: entry.name,
+          allowed: entry.allowed,
+        }))
       : undefined;
 
     const secondaryInput = payloadResult.value.secondaryTypes
       ? payloadResult.value.secondaryTypes.map((entry) => ({
-        typeId: entry.id,
-        name: entry.name,
-        allowed: entry.allowed,
-      }))
+          typeId: entry.id,
+          name: entry.name,
+          allowed: entry.allowed,
+        }))
       : undefined;
 
     const releaseInput = payloadResult.value.releaseStatuses
       ? payloadResult.value.releaseStatuses.map((entry) => ({
-        statusId: entry.id,
-        name: entry.name,
-        allowed: entry.allowed,
-      }))
+          statusId: entry.id,
+          name: entry.name,
+          allowed: entry.allowed,
+        }))
       : undefined;
 
     const result = await metadataProfiles.update({

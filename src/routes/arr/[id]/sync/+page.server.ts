@@ -15,18 +15,22 @@ import { scheduleArrSyncForInstance } from '$lib/server/jobs/init.ts';
 import { enqueueJob } from '$lib/server/jobs/queueService.ts';
 import { buildJobDisplayName } from '$lib/server/jobs/display.ts';
 import { isSyncSectionSupported } from '$lib/server/sync/mappings.ts';
-import { supportsArrSyncSurface, type ArrAppType, type ArrSyncSurface } from '$shared/arr/capabilities.ts';
+import { isArrAppType, supportsArrSyncSurface, type ArrSyncSurface } from '$shared/arr/capabilities.ts';
 
 const METADATA_PROFILES_SURFACE: ArrSyncSurface = 'metadata_profiles';
 
-function supportsMetadataProfiles(instanceType: ArrAppType): boolean {
+function supportsMetadataProfiles(instanceType: string): boolean {
+  if (!isArrAppType(instanceType)) {
+    return false;
+  }
+
   return (
     supportsArrSyncSurface(instanceType, METADATA_PROFILES_SURFACE) &&
     isSyncSectionSupported(instanceType, 'metadataProfiles')
   );
 }
 
-function ensureMetadataProfileSyncSupported(instanceType: ArrAppType): void {
+function ensureMetadataProfileSyncSupported(instanceType: string): void {
   if (!supportsMetadataProfiles(instanceType)) {
     throw new Error('Metadata profile sync is supported only for lidarr instances');
   }
@@ -47,7 +51,8 @@ export const load: ServerLoad = async ({ params }) => {
 
   // Get all databases
   const databases = pcdManager.getAll();
-  const arrType = instance.type as ArrAppType;
+  const arrType = instance.type;
+  const typedArrType = isArrAppType(arrType) ? arrType : null;
   const canLoadMetadataProfiles = supportsMetadataProfiles(arrType);
 
   // Fetch profiles and configs from each database
@@ -69,7 +74,7 @@ export const load: ServerLoad = async ({ params }) => {
 
       const [qualityProfiles, delayProfiles, allNamingConfigs, allQualityDefinitionsConfigs, allMediaSettingsConfigs] =
         await Promise.all([
-          qualityProfileQueries.list(cache, arrType),
+          qualityProfileQueries.list(cache, typedArrType ?? undefined),
           delayProfileQueries.list(cache),
           namingQueries.list(cache),
           qualityDefinitionsQueries.list(cache),
@@ -258,8 +263,7 @@ export const actions: Actions = {
     const cron = formData.get('cron') as string | null;
 
     try {
-      const instanceType = instance.type as ArrAppType;
-      ensureMetadataProfileSyncSupported(instanceType);
+      ensureMetadataProfileSyncSupported(instance.type);
 
       const effectiveTrigger = trigger || 'manual';
       const effectiveCron = cron || null;
@@ -429,9 +433,8 @@ export const actions: Actions = {
     }
 
     try {
-      const instanceType = instance.type as ArrAppType;
-      ensureMetadataProfileSyncSupported(instanceType);
-      const jobType = 'arr.sync.metadataProfiles' as Parameters<typeof enqueueJob>[0]['jobType'];
+      ensureMetadataProfileSyncSupported(instance.type);
+      const jobType = 'arr.sync.metadataProfiles';
 
       arrSyncQueries.setMetadataProfilesStatusPending(id);
       const queued = enqueueJob({
@@ -447,7 +450,7 @@ export const actions: Actions = {
           jobId: queued.id,
           instanceId: id,
           instanceName: instance.name,
-          displayName: buildJobDisplayName(jobType as never, { instanceId: id }),
+          displayName: buildJobDisplayName(jobType, { instanceId: id }),
         },
       });
 

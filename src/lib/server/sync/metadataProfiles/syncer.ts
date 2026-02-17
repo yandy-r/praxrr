@@ -6,6 +6,7 @@
 
 import { BaseSyncer, type SyncResult } from '../base.ts';
 import { arrSyncQueries } from '$db/queries/arrSync.ts';
+import { arrNamespaceQueries } from '$db/queries/arrNamespaces.ts';
 import { getCache } from '$pcd/index.ts';
 import type {
   LidarrMetadataProfile as PcdMetadataProfile,
@@ -14,12 +15,44 @@ import type {
 } from '$pcd/entities/metadataProfiles/read.ts';
 import type {
   LidarrMetadataProfileCreatePayload,
+  LidarrMetadataProfileSchema,
   LidarrProfilePrimaryAlbumTypeItem,
   LidarrProfileReleaseStatusItem,
   LidarrProfileSecondaryAlbumTypeItem,
 } from '$arr/types.ts';
 import { LidarrClient } from '$arr/clients/lidarr.ts';
+import { getNamespaceSuffix } from '../namespace.ts';
 import { logger } from '$logger/logger.ts';
+import { HttpError } from '$http/types.ts';
+
+const METADATA_PROFILE_SCHEMA_FALLBACK: Omit<LidarrMetadataProfileSchema, 'id' | 'name'> = {
+  primaryAlbumTypes: [
+    { albumType: { id: 0, name: 'Album' }, allowed: false },
+    { albumType: { id: 1, name: 'EP' }, allowed: false },
+    { albumType: { id: 2, name: 'Single' }, allowed: false },
+    { albumType: { id: 3, name: 'Broadcast' }, allowed: false },
+    { albumType: { id: 4, name: 'Other' }, allowed: false },
+  ],
+  secondaryAlbumTypes: [
+    { albumType: { id: 0, name: 'Studio' }, allowed: false },
+    { albumType: { id: 1, name: 'Compilation' }, allowed: false },
+    { albumType: { id: 2, name: 'Soundtrack' }, allowed: false },
+    { albumType: { id: 3, name: 'Spokenword' }, allowed: false },
+    { albumType: { id: 4, name: 'Interview' }, allowed: false },
+    { albumType: { id: 6, name: 'Live' }, allowed: false },
+    { albumType: { id: 7, name: 'Remix' }, allowed: false },
+    { albumType: { id: 8, name: 'DJ-mix' }, allowed: false },
+    { albumType: { id: 9, name: 'Mixtape/Street' }, allowed: false },
+    { albumType: { id: 10, name: 'Demo' }, allowed: false },
+    { albumType: { id: 11, name: 'Audio drama' }, allowed: false },
+  ],
+  releaseStatuses: [
+    { releaseStatus: { id: 0, name: 'Official' }, allowed: false },
+    { releaseStatus: { id: 1, name: 'Promotion' }, allowed: false },
+    { releaseStatus: { id: 2, name: 'Bootleg' }, allowed: false },
+    { releaseStatus: { id: 3, name: 'Pseudo-Release' }, allowed: false },
+  ],
+};
 
 function toPrimaryAlbumTypeItem(toggle: MetadataProfileAlbumTypeToggle): LidarrProfilePrimaryAlbumTypeItem {
   return {
@@ -51,6 +84,57 @@ function toReleaseStatusItem(toggle: MetadataProfileReleaseStatusToggle): Lidarr
   };
 }
 
+function normalizePrimaryAlbumTypes(
+  profile: PcdMetadataProfile,
+  schema: LidarrMetadataProfileSchema
+): LidarrProfilePrimaryAlbumTypeItem[] {
+  const allowedByTypeId = new Map<number, boolean>(
+    profile.primaryAlbumTypes.map((entry) => [entry.typeId, entry.allowed])
+  );
+
+  return schema.primaryAlbumTypes.map((item) => ({
+    albumType: {
+      id: item.albumType.id,
+      name: item.albumType.name,
+    },
+    allowed: allowedByTypeId.get(item.albumType.id) ?? false,
+  }));
+}
+
+function normalizeSecondaryAlbumTypes(
+  profile: PcdMetadataProfile,
+  schema: LidarrMetadataProfileSchema
+): LidarrProfileSecondaryAlbumTypeItem[] {
+  const allowedByTypeId = new Map<number, boolean>(
+    profile.secondaryAlbumTypes.map((entry) => [entry.typeId, entry.allowed])
+  );
+
+  return schema.secondaryAlbumTypes.map((item) => ({
+    albumType: {
+      id: item.albumType.id,
+      name: item.albumType.name,
+    },
+    allowed: allowedByTypeId.get(item.albumType.id) ?? false,
+  }));
+}
+
+function normalizeReleaseStatuses(
+  profile: PcdMetadataProfile,
+  schema: LidarrMetadataProfileSchema
+): LidarrProfileReleaseStatusItem[] {
+  const allowedByStatusId = new Map<number, boolean>(
+    profile.releaseStatuses.map((entry) => [entry.statusId, entry.allowed])
+  );
+
+  return schema.releaseStatuses.map((item) => ({
+    releaseStatus: {
+      id: item.releaseStatus.id,
+      name: item.releaseStatus.name,
+    },
+    allowed: allowedByStatusId.get(item.releaseStatus.id) ?? false,
+  }));
+}
+
 function transform(profile: PcdMetadataProfile): LidarrMetadataProfileCreatePayload {
   return {
     name: profile.name,
@@ -58,6 +142,59 @@ function transform(profile: PcdMetadataProfile): LidarrMetadataProfileCreatePayl
     secondaryAlbumTypes: profile.secondaryAlbumTypes.map(toSecondaryAlbumTypeItem),
     releaseStatuses: profile.releaseStatuses.map(toReleaseStatusItem),
   };
+}
+
+function buildPayload(profile: PcdMetadataProfile, schema?: LidarrMetadataProfileSchema | null): LidarrMetadataProfileCreatePayload {
+  if (!schema) {
+    return transform(profile);
+  }
+
+  return {
+    name: profile.name,
+    primaryAlbumTypes: normalizePrimaryAlbumTypes(profile, schema),
+    secondaryAlbumTypes: normalizeSecondaryAlbumTypes(profile, schema),
+    releaseStatuses: normalizeReleaseStatuses(profile, schema),
+  };
+}
+
+function normalizeSchema(
+  schema: LidarrMetadataProfileSchema | null | undefined
+): LidarrMetadataProfileSchema {
+  if (!schema) {
+    return {
+      id: 0,
+      name: '',
+      ...METADATA_PROFILE_SCHEMA_FALLBACK,
+    };
+  }
+
+  return {
+    id: schema.id ?? 0,
+    name: schema.name,
+    primaryAlbumTypes: Array.isArray(schema.primaryAlbumTypes) && schema.primaryAlbumTypes.length > 0
+      ? schema.primaryAlbumTypes
+      : METADATA_PROFILE_SCHEMA_FALLBACK.primaryAlbumTypes,
+    secondaryAlbumTypes: Array.isArray(schema.secondaryAlbumTypes) && schema.secondaryAlbumTypes.length > 0
+      ? schema.secondaryAlbumTypes
+      : METADATA_PROFILE_SCHEMA_FALLBACK.secondaryAlbumTypes,
+    releaseStatuses: Array.isArray(schema.releaseStatuses) && schema.releaseStatuses.length > 0
+      ? schema.releaseStatuses
+      : METADATA_PROFILE_SCHEMA_FALLBACK.releaseStatuses,
+  };
+}
+
+function readErrorDetails(error: unknown): { message: string; response?: unknown } {
+  if (error instanceof Error) {
+    if (error instanceof HttpError) {
+      return {
+        message: error.message,
+        response: error.response,
+      };
+    }
+    return { message: error.message };
+  }
+
+  return { message: 'Unknown error' };
 }
 
 function findMatchingRemoteProfile(profileName: string, remoteProfiles: Array<{ id: number; name: string }>): { id: number; name: string } | undefined {
@@ -151,18 +288,45 @@ export class MetadataProfileSyncer extends BaseSyncer {
       return { success: false, itemsSynced: 0, error: 'Profile not found in PCD cache' };
     }
 
+    const namespaceIndex = arrNamespaceQueries.getOrCreate(this.instanceId, syncConfig.databaseId);
+    const namespaceSuffix = getNamespaceSuffix(namespaceIndex);
+    const suffixedProfileName = `${profile.name}${namespaceSuffix}`;
+
     const lidarrClient = this.client as LidarrClient;
-    const payload = transform(profile);
+    let metadataSchema: LidarrMetadataProfileSchema | null = null;
+    try {
+      metadataSchema = await lidarrClient.getMetadataProfileSchema();
+      if (!metadataSchema) {
+        metadataSchema = null;
+      }
+    } catch (error) {
+      const { message, response } = readErrorDetails(error);
+      await logger.warn('Failed to load Lidarr metadata profile schema; using local values', {
+        source: 'Sync:MetadataProfile',
+        meta: {
+          instanceId: this.instanceId,
+          error: message,
+          response,
+        },
+      });
+    }
+
+    const normalizedSchema = normalizeSchema(metadataSchema);
+
+    const normalizedPayload = buildPayload(
+      {
+        ...profile,
+        name: suffixedProfileName,
+      },
+      normalizedSchema
+    );
 
     try {
       const remoteProfiles = await lidarrClient.getMetadataProfiles();
-      const existingProfile = findMatchingRemoteProfile(profile.name, remoteProfiles);
+      const existingProfile = findMatchingRemoteProfile(suffixedProfileName, remoteProfiles);
 
       if (existingProfile) {
-        await lidarrClient.updateMetadataProfile(existingProfile.id, {
-          ...payload,
-          id: existingProfile.id,
-        });
+        await lidarrClient.updateMetadataProfile(existingProfile.id, { ...normalizedPayload, id: existingProfile.id });
 
         await logger.info(`Updated metadata profile "${profile.name}" on "${this.instanceName}"`, {
           source: 'Sync:MetadataProfile',
@@ -172,18 +336,18 @@ export class MetadataProfileSyncer extends BaseSyncer {
           },
         });
       } else {
-        await lidarrClient.createMetadataProfile(payload);
+        await lidarrClient.createMetadataProfile(normalizedPayload);
 
         await logger.info(`Created metadata profile "${profile.name}" on "${this.instanceName}"`, {
           source: 'Sync:MetadataProfile',
-          meta: { instanceId: this.instanceId },
+          meta: { instanceId: this.instanceId, remoteName: suffixedProfileName },
         });
       }
     } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+      const { message: errorMsg, response } = readErrorDetails(error);
       await logger.error(`Failed to sync metadata profile "${profile.name}"`, {
         source: 'Sync:MetadataProfile',
-        meta: { instanceId: this.instanceId, error: errorMsg },
+        meta: { instanceId: this.instanceId, error: errorMsg, response },
       });
       return { success: false, itemsSynced: 0, error: errorMsg };
     }

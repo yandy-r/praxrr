@@ -29,6 +29,14 @@ import * as mediaSettingsQueries from './mediaManagement/media-settings/index.ts
 import * as qualityDefsQueries from './mediaManagement/quality-definitions/index.ts';
 import * as metadataProfilesQueries from './metadataProfiles/index.ts';
 
+interface LidarrMetadataProfileTypeRow {
+  id?: number;
+  typeId?: number;
+  statusId?: number;
+  name?: string;
+  allowed?: boolean;
+}
+
 // ============================================================================
 // COMMON OPTIONS
 // ============================================================================
@@ -281,29 +289,57 @@ export async function deserializeLidarrQualityDefinitions(
 // LIDARR METADATA PROFILES
 // ============================================================================
 
+function getMetadataProfileTypeId(typeRow: LidarrMetadataProfileTypeRow, kind: 'album' | 'status'): number {
+  if (typeof typeRow.id === 'number' && Number.isInteger(typeRow.id)) {
+    return typeRow.id;
+  }
+
+  if (kind === 'status' && typeof typeRow.statusId === 'number' && Number.isInteger(typeRow.statusId)) {
+    return typeRow.statusId;
+  }
+
+  if (kind === 'album' && typeof typeRow.typeId === 'number' && Number.isInteger(typeRow.typeId)) {
+    return typeRow.typeId;
+  }
+
+  throw new Error(
+    kind === 'status'
+      ? 'Metadata profile status identifier must be an integer id, statusId, or typeId'
+      : 'Metadata profile type identifier must be an integer id or typeId'
+  );
+}
+
 function normalizeLidarrMetadataProfileTypeRows(
-  typeRows: Array<{ id: number; name: string; allowed: boolean }>,
+  typeRows: readonly LidarrMetadataProfileTypeRow[],
 ): Array<{ typeId: number; name: string; allowed: boolean }> {
   return typeRows
     .slice()
-    .sort((a, b) => a.id - b.id)
+    .sort((a, b) => {
+      const aId = getMetadataProfileTypeId(a, 'album');
+      const bId = getMetadataProfileTypeId(b, 'album');
+      return aId - bId;
+    })
     .map((type) => ({
-      typeId: type.id,
-      name: type.name,
-      allowed: type.allowed,
+      typeId: getMetadataProfileTypeId(type, 'album'),
+      name: type.name ?? '',
+      allowed: !!type.allowed,
     }));
 }
 
 function normalizeLidarrMetadataProfileReleaseStatusRows(
-  rows: Array<{ id: number; name: string; allowed: boolean }>
+  rows: readonly LidarrMetadataProfileTypeRow[]
 ): Array<{ statusId: number; name: string; allowed: boolean }> {
   return rows
     .slice()
-    .sort((a, b) => a.id - b.id)
+    .sort((a, b) => {
+      const aId = getMetadataProfileTypeId(a, 'status');
+      const bId = getMetadataProfileTypeId(b, 'status');
+      return aId - bId;
+    })
     .map((status) => ({
-      statusId: status.id,
-      name: status.name,
-      allowed: status.allowed,
+      statusId: getMetadataProfileTypeId(status, 'status'),
+      name: status.name ?? '',
+      allowed: !!status.allowed,
     }));
 }
 

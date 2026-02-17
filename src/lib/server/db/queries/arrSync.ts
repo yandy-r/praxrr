@@ -903,7 +903,8 @@ export const arrSyncQueries = {
     db.execute(
       `UPDATE arr_sync_metadata_profiles_config
 			 SET next_run_at = ?
-			 WHERE instance_id = ?`,
+			 WHERE instance_id = ?
+			 AND instance_id IN (SELECT id FROM arr_instances WHERE type = 'lidarr')`,
       nextRunAt,
       instanceId
     );
@@ -941,7 +942,11 @@ export const arrSyncQueries = {
 
   claimMetadataProfilesSync(instanceId: number): boolean {
     const result = db.execute(
-      "UPDATE arr_sync_metadata_profiles_config SET sync_status = 'in_progress' WHERE instance_id = ? AND sync_status = 'pending' AND instance_id IN (SELECT id FROM arr_instances WHERE type = 'lidarr')",
+      `UPDATE arr_sync_metadata_profiles_config
+			 SET sync_status = 'in_progress'
+			 WHERE instance_id = ?
+			 AND sync_status = 'pending'
+			 AND instance_id IN (SELECT id FROM arr_instances WHERE type = 'lidarr')`,
       instanceId
     );
     return result > 0;
@@ -978,7 +983,8 @@ export const arrSyncQueries = {
     db.execute(
       `UPDATE arr_sync_metadata_profiles_config
 			 SET sync_status = 'idle', should_sync = 0, last_error = NULL, last_synced_at = ?
-			 WHERE instance_id = ?`,
+			 WHERE instance_id = ?
+			 AND instance_id IN (SELECT id FROM arr_instances WHERE type = 'lidarr')`,
       new Date().toISOString(),
       instanceId
     );
@@ -1013,7 +1019,10 @@ export const arrSyncQueries = {
 
   failMetadataProfilesSync(instanceId: number, error: string): void {
     db.execute(
-      "UPDATE arr_sync_metadata_profiles_config SET sync_status = 'failed', should_sync = 0, last_error = ? WHERE instance_id = ?",
+      `UPDATE arr_sync_metadata_profiles_config
+			 SET sync_status = 'failed', should_sync = 0, last_error = ?
+			 WHERE instance_id = ?
+			 AND instance_id IN (SELECT id FROM arr_instances WHERE type = 'lidarr')`,
       error,
       instanceId
     );
@@ -1045,7 +1054,10 @@ export const arrSyncQueries = {
 
   setMetadataProfilesStatusPending(instanceId: number): void {
     db.execute(
-      "UPDATE arr_sync_metadata_profiles_config SET sync_status = 'pending', should_sync = 1 WHERE instance_id = ?",
+      `UPDATE arr_sync_metadata_profiles_config
+			 SET sync_status = 'pending', should_sync = 1
+			 WHERE instance_id = ?
+			 AND instance_id IN (SELECT id FROM arr_instances WHERE type = 'lidarr')`,
       instanceId
     );
   },
