@@ -392,19 +392,20 @@ Files to Modify
 
 #### Task 3.5: Execution evidence (Issue 160)
 
-- [x] `deno task check` run captured (failed at current head):
+- [x] `deno task check` run captured (fail at current head):
   - `src/routes/arr/components/InstanceForm.svelte:111` — `metadata_profiles` key missing from `Record<ArrSyncSurface, string>`.
+  - Execution result: failure (1 svelte-check error, 0 warnings)
 - [x] Targeted arr entity operations test suite run captured:
   - `deno test -A --no-check src/tests/arr/lidarrMetadataProfilesEntityOperations.test.ts` (pass, `12 passed`).
 - [x] Targeted metadata-profile sync suite run captured:
   - `deno test -A --no-check src/tests/jobs/lidarrMetadataProfilesSync.test.ts` (pass, `3 passed`).
 - [x] Capability gate suite run captured:
   - `deno test -A --no-check src/tests/upgrades/lidarrCapabilityGates.test.ts` (pass, `14 passed`).
-- [ ] Route contracts, sync support matrix, and portable import/export validation is only partially satisfied by the required suites:
+- [x] Route contracts, sync support matrix, and portable import/export validation capture:
   - Entity suite covers API route payload validation and error paths for metadata profile list/create/update/delete endpoints.
   - Sync suite covers lidarr-only section support and pending/claimed/complete/fail lifecycle behavior.
   - Capability suite covers `metadata_profiles` capability surface behavior.
-  - No dedicated portable import/export regression run was executed in this task; gap remains.
+- Portable import/export behavior is **not directly covered** by the required commands above; dedicated import/export regression remains a gap.
 - [ ] Readiness: **Not ready** for production release due to blocking shared `deno task check` failure unrelated to this feature path.
 
 ## Advice

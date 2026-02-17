@@ -332,9 +332,13 @@ isolated from Radarr/Sonarr runtime paths:
   before any API call is made to avoid cross-arr execution.
 - Portable/import/export payload contracts must not include mixed-family entities;
   Lidarr metadata profile shapes are accepted only on Lidarr metadata paths.
-- Runtime path for metadata profile sync must continue to avoid using generic
-  `arr_type = 'all'` fallbacks, so Sonarr/Radarr naming or profile payloads are
-  never interpreted as Lidarr metadata profiles.
+- Runtime sync paths must never use `arr_type = 'all'` fallbacks. All
+  selection/config/writes for metadata profiles must check `arr_instances.type ===
+  'lidarr'` before executing, so Sonarr/Radarr entities never enter metadata
+  sync pipelines.
+- Sync section config and PCD read/write helpers must treat metadata profiles as a
+  single-name contract (`metadataProfileName`) and keep API payload fields strictly
+  on the Lidarr surface (`primaryTypes`, `secondaryTypes`, `releaseStatuses`).
 
 ## 8) Parser Service
 

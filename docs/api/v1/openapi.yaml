@@ -139,7 +139,11 @@ paths:
     get:
       operationId: getLidarrMetadataProfile
       summary: Get one Lidarr metadata profile
-      description: Returns a single Lidarr metadata profile by local profile id.
+      description: |
+        Returns a single Lidarr metadata profile by local profile id.
+
+        Payloads are the PCD contract used by runtime sync and portable
+        operations, not the Lidarr API payload shape.
       tags:
         - PCD
       parameters:
@@ -186,6 +190,7 @@ paths:
         Updates selected fields of an existing Lidarr metadata profile.
 
         Partial updates are supported for edit flows.
+        Updates remain Lidarr-only and validate value-guard constraints.
       tags:
         - PCD
       parameters:
@@ -239,6 +244,7 @@ paths:
 
         Deletes are rejected if runtime guard checks detect in-use rows or stale
         value guards.
+        This endpoint must only be invoked for Lidarr-backed databases.
       tags:
         - PCD
       parameters:
