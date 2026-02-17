@@ -25,6 +25,8 @@ import {
   DELETE as deleteMetadataProfile,
   PUT as updateMetadataProfile,
 } from '../../routes/api/v1/pcd/[databaseId]/lidarr-metadata-profiles/[id]/+server.ts';
+import { POST as importPortablePost } from '../../routes/api/v1/pcd/import/+server.ts';
+import { GET as exportPortableGet } from '../../routes/api/v1/pcd/export/+server.ts';
 
 const DATABASE_ID = 2401;
 
@@ -791,9 +793,116 @@ Deno.test('metadata profile API rejects reserved name "None" on create', async (
       }),
     } as unknown as Parameters<typeof createMetadataProfilesPost>[0]);
 
-    assertEquals(response.status, 500);
+    assertEquals(response.status, 400);
     const payload = await response.json() as { error: string };
     assertEquals(payload.error, "'None' is a reserved profile name");
+  } finally {
+    await harness.cleanup();
+  }
+});
+
+Deno.test('portable import for lidarr_metadata_profiles writes to lidarr metadata tables', async () => {
+  const harness = await createWriteHarness(
+    baseMetadataProfilesSchema()
+  );
+
+  try {
+    const response = await importPortablePost({
+      request: new Request('http://localhost/api/v1/pcd/import', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          databaseId: DATABASE_ID,
+          layer: 'user',
+          entityType: 'lidarr_metadata_profile',
+          data: {
+            name: 'Portable-Import',
+            description: 'Imported portable metadata profile',
+            primaryTypes: [
+              { id: 1, name: 'Album', allowed: true },
+              { id: 2, name: 'EP', allowed: false },
+            ],
+            secondaryTypes: [
+              { id: 10, name: 'Compilation', allowed: true },
+              { id: 11, name: 'Studio', allowed: false },
+            ],
+            releaseStatuses: [
+              { id: 100, name: 'Official', allowed: true },
+            ],
+          },
+        }),
+      }),
+    } as unknown as Parameters<typeof importPortablePost>[0]);
+
+    assertEquals(response.status, 200);
+    const payload = (await response.json()) as { success?: boolean };
+    assertEquals(payload.success, true);
+
+    const imported = await getProfileByName(getFreshCache(), 'Portable-Import');
+    assertExists(imported);
+    assertEquals(imported.primaryAlbumTypes.length, 2);
+    assertEquals(imported.secondaryAlbumTypes.length, 2);
+    assertEquals(imported.releaseStatuses.length, 1);
+  } finally {
+    await harness.cleanup();
+  }
+});
+
+Deno.test('portable export for lidarr_metadata_profiles reads from lidarr metadata tables', async () => {
+  const harness = await createWriteHarness(
+    baseMetadataProfilesSchema(`
+INSERT INTO lidarr_metadata_profiles (id, name, description)
+VALUES (9901, 'Portable-Export', 'Export verification profile');
+
+INSERT INTO lidarr_metadata_profile_primary_types (metadata_profile_name, type_id, name, allowed)
+VALUES ('Portable-Export', 1, 'Album', 1),
+       ('Portable-Export', 2, 'EP', 0);
+
+INSERT INTO lidarr_metadata_profile_secondary_types (metadata_profile_name, type_id, name, allowed)
+VALUES ('Portable-Export', 10, 'Compilation', 1);
+
+INSERT INTO lidarr_metadata_profile_release_statuses (metadata_profile_name, status_id, name, allowed)
+VALUES ('Portable-Export', 100, 'Official', 1),
+       ('Portable-Export', 200, 'Unconfirmed', 0);
+`)
+  );
+
+  try {
+    const url = new URL('http://localhost/api/v1/pcd/export');
+    url.searchParams.set('databaseId', String(DATABASE_ID));
+    url.searchParams.set('entityType', 'lidarr_metadata_profile');
+    url.searchParams.set('name', 'Portable-Export');
+
+    const response = await exportPortableGet({
+      url,
+    } as unknown as Parameters<typeof exportPortableGet>[0]);
+
+    assertEquals(response.status, 200);
+    const payload = (await response.json()) as {
+      entityType: string;
+      data: {
+        name: string;
+        description: string | null;
+        primaryTypes: Array<{ id: number; name: string; allowed: boolean }>;
+        secondaryTypes: Array<{ id: number; name: string; allowed: boolean }>;
+        releaseStatuses: Array<{ id: number; name: string; allowed: boolean }>;
+      };
+    };
+
+    assertEquals(payload.entityType, 'lidarr_metadata_profile');
+    assertEquals(payload.data.name, 'Portable-Export');
+    assertEquals(payload.data.description, 'Export verification profile');
+    assertEquals(payload.data.primaryTypes, [
+      { id: 1, name: 'Album', allowed: true },
+      { id: 2, name: 'EP', allowed: false },
+    ]);
+    assertEquals(payload.data.secondaryTypes, [{ id: 10, name: 'Compilation', allowed: true }]);
+    assertEquals(payload.data.releaseStatuses, [
+      { id: 100, name: 'Official', allowed: true },
+      { id: 200, name: 'Unconfirmed', allowed: false },
+    ]);
   } finally {
     await harness.cleanup();
   }
