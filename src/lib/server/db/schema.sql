@@ -245,7 +245,7 @@ CREATE TABLE database_instances (
 
     -- Instance identification
     uuid TEXT NOT NULL UNIQUE,                  -- UUID for filesystem storage path
-    name TEXT NOT NULL UNIQUE,                  -- User-friendly name (e.g., "Dictionarry DB")
+    name TEXT NOT NULL UNIQUE,                  -- User-friendly name (e.g., "yandy-r DB")
 
     -- Repository connection
     repository_url TEXT NOT NULL,               -- Git repository URL
