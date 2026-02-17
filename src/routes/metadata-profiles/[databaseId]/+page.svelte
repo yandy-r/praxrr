@@ -14,7 +14,6 @@
 	import CardGrid from '$ui/card/CardGrid.svelte';
 	import Card from '$ui/card/Card.svelte';
 	import { Tag, CheckCircle2, CalendarClock, Plus } from 'lucide-svelte';
-	import Label from '$ui/label/Label.svelte';
 	import type { PageData } from './$types';
 
 	export let data: PageData;
@@ -130,7 +129,7 @@
 			<Table data={$filtered} {columns} emptyMessage="No metadata profiles found" rowHref={getRowHref} compact={false} hoverable={true} />
 		{:else}
 			<CardGrid flush>
-				{#each $filtered as profile}
+				{#each $filtered as profile (profile.id)}
 					<Card href={getRowHref(profile)} hoverable>
 						<svelte:fragment slot="header">
 							<h3 class="text-sm font-semibold text-neutral-900 dark:text-neutral-100">{profile.name}</h3>

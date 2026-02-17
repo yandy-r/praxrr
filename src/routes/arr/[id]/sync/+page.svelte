@@ -164,6 +164,11 @@
 	})();
 
 	async function handleMetadataProfileSave() {
+		if (!metadataProfilesSupported) {
+			alertStore.add('error', 'Metadata profile sync is only available for Lidarr instances');
+			return;
+		}
+
 		metadataProfileSaving = true;
 		try {
 			const formData = new FormData();
@@ -195,6 +200,11 @@
 	}
 
 	async function handleMetadataProfileSync() {
+		if (!metadataProfilesSupported) {
+			alertStore.add('error', 'Metadata profile sync is only available for Lidarr instances');
+			return;
+		}
+
 		metadataProfileSyncing = true;
 		try {
 			const response = await fetch('?/syncMetadataProfiles', {

@@ -245,9 +245,9 @@
 						{#if primaryTypes.length === 0}
 							<p class="text-xs text-neutral-500 dark:text-neutral-400">No primary types available.</p>
 						{:else}
-							{#each primaryTypes as typeEntry, index}
+							{#each primaryTypes as typeEntry, index (typeEntry.id)}
 								<Toggle
-									label={`${typeEntry.name} (${typeEntry.id})`}
+									label={typeEntry.name}
 									checked={typeEntry.allowed}
 									on:change={(event: CustomEvent<boolean>) =>
 										updateType('primaryTypes', index, event.detail)
@@ -269,9 +269,9 @@
 						{#if secondaryTypes.length === 0}
 							<p class="text-xs text-neutral-500 dark:text-neutral-400">No secondary types available.</p>
 						{:else}
-							{#each secondaryTypes as typeEntry, index}
+							{#each secondaryTypes as typeEntry, index (typeEntry.id)}
 								<Toggle
-									label={`${typeEntry.name} (${typeEntry.id})`}
+									label={typeEntry.name}
 									checked={typeEntry.allowed}
 									on:change={(event: CustomEvent<boolean>) =>
 										updateType('secondaryTypes', index, event.detail)
@@ -293,9 +293,9 @@
 						{#if releaseStatuses.length === 0}
 							<p class="text-xs text-neutral-500 dark:text-neutral-400">No release statuses available.</p>
 						{:else}
-							{#each releaseStatuses as typeEntry, index}
+							{#each releaseStatuses as typeEntry, index (typeEntry.id)}
 								<Toggle
-									label={`${typeEntry.name} (${typeEntry.id})`}
+									label={typeEntry.name}
 									checked={typeEntry.allowed}
 									on:change={(event: CustomEvent<boolean>) =>
 										updateType('releaseStatuses', index, event.detail)
