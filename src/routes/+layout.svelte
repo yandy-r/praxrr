@@ -1,30 +1,30 @@
 <script lang="ts">
-	import '../app.css';
-	import logo from '$assets/logo-512.png';
-	import Navbar from '$ui/navigation/navbar/navbar.svelte';
-	import PageNav from '$ui/navigation/pageNav/pageNav.svelte';
-	import BottomNav from '$ui/navigation/bottomNav/BottomNav.svelte';
-	import AlertContainer from '$alerts/AlertContainer.svelte';
-	import { page } from '$app/stores';
+  import '../app.css';
+  import logo from '$assets/logo.svg';
+  import Navbar from '$ui/navigation/navbar/navbar.svelte';
+  import PageNav from '$ui/navigation/pageNav/pageNav.svelte';
+  import BottomNav from '$ui/navigation/bottomNav/BottomNav.svelte';
+  import AlertContainer from '$alerts/AlertContainer.svelte';
+  import { page } from '$app/stores';
 
-	export let data;
+  export let data;
 
-	// Hide navigation on auth pages (login, setup, etc.)
-	$: isAuthPage = $page.url.pathname.startsWith('/auth/');
+  // Hide navigation on auth pages (login, setup, etc.)
+  $: isAuthPage = $page.url.pathname.startsWith('/auth/');
 </script>
 
 <svelte:head>
-	<link rel="icon" href={logo} />
-	<title>Praxrr</title>
+  <link rel="icon" href={logo} />
+  <title>Praxrr</title>
 </svelte:head>
 
 {#if !isAuthPage}
-	<Navbar />
-	<PageNav version={data.version} />
-	<BottomNav />
+  <Navbar />
+  <PageNav version={data.version} />
+  <BottomNav />
 {/if}
 <AlertContainer />
 
 <main class={isAuthPage ? '' : 'pt-16 pb-16 md:pb-0 md:pt-0 md:pl-80'}>
-	<slot />
+  <slot />
 </main>

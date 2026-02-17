@@ -1,6 +1,6 @@
 <script lang="ts">
   import { getPlatformLabel, getChannelLabel, shouldShowVersion } from '$shared/utils/version.ts';
-  import logo from '$assets/logo-512.png';
+  import logo from '$assets/logo.svg';
 
   export let version: string = '';
 
