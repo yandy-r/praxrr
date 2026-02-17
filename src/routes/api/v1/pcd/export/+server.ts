@@ -77,6 +77,8 @@ async function serializeEntity(cache: PCDCache, entityType: EntityType, name: st
       return serialize.serializeSonarrQualityDefinitions(cache, name);
     case 'lidarr_quality_definitions':
       return serializeLidarrQualityDefinitions(cache, name);
+    case 'lidarr_metadata_profile':
+      return serialize.serializeLidarrMetadataProfile(cache, name);
   }
 }
 
