@@ -13,6 +13,7 @@ import {
 import type { SectionType } from '$lib/server/sync/types.ts';
 
 import '$jobs/handlers/arrSync.ts';
+import '$sync/metadataProfiles/handler.ts';
 
 function createInstance(id: number, type: ArrInstance['type']): ArrInstance {
   const now = new Date().toISOString();
@@ -20,6 +21,7 @@ function createInstance(id: number, type: ArrInstance['type']): ArrInstance {
     id,
     name: `${type}-${id}`,
     type,
+    external_url: null,
     url: 'http://127.0.0.1:8989',
     api_key: `${type}-key`,
     tags: null,
@@ -51,6 +53,12 @@ function createSyncJob(instanceId: number, source: JobSource, section?: SectionT
   };
 }
 
+function createAllSectionsSyncJob(instanceId: number, source: JobSource): JobQueueRecord {
+  const job = createSyncJob(instanceId, source);
+  delete job.payload.section;
+  return job;
+}
+
 // =============================================================================
 // Sync mapping unit tests (pure functions, no handler mocking needed)
 // =============================================================================
@@ -67,16 +75,27 @@ Deno.test('isSyncSectionSupported: lidarr supports qualityProfiles', () => {
   assertEquals(isSyncSectionSupported('lidarr', 'qualityProfiles'), true);
 });
 
-Deno.test('isSyncSectionSupported: radarr supports all sections', () => {
-  for (const section of SYNC_SECTION_ORDER) {
+Deno.test('isSyncSectionSupported: lidarr supports metadataProfiles', () => {
+  assertEquals(isSyncSectionSupported('lidarr', 'metadataProfiles'), true);
+});
+
+const BASE_SECTION_ORDER: SectionType[] = ['qualityProfiles', 'delayProfiles', 'mediaManagement'];
+
+Deno.test('isSyncSectionSupported: radarr supports base sections', () => {
+  for (const section of BASE_SECTION_ORDER) {
     assertEquals(isSyncSectionSupported('radarr', section), true);
   }
 });
 
-Deno.test('isSyncSectionSupported: sonarr supports all sections', () => {
-  for (const section of SYNC_SECTION_ORDER) {
+Deno.test('isSyncSectionSupported: sonarr supports base sections', () => {
+  for (const section of BASE_SECTION_ORDER) {
     assertEquals(isSyncSectionSupported('sonarr', section), true);
   }
+});
+
+Deno.test('isSyncSectionSupported: radarr and sonarr do not support metadataProfiles', () => {
+  assertEquals(isSyncSectionSupported('radarr', 'metadataProfiles'), false);
+  assertEquals(isSyncSectionSupported('sonarr', 'metadataProfiles'), false);
 });
 
 Deno.test('getUnsupportedSyncSectionReason: returns null for supported sections', () => {
@@ -90,18 +109,36 @@ Deno.test('getUnsupportedSyncSectionReason: returns null for supported sections'
     ['lidarr', 'qualityProfiles'],
     ['lidarr', 'delayProfiles'],
     ['lidarr', 'mediaManagement'],
+    ['lidarr', 'metadataProfiles'],
   ];
+
   for (const [arrType, section] of supportedCases) {
-    assertEquals(getUnsupportedSyncSectionReason(arrType, section), null, `${arrType}/${section} should be null`);
+    const reason = getUnsupportedSyncSectionReason(arrType, section);
+    assertEquals(reason, null, `${arrType}/${section} should be null`);
   }
+});
+
+Deno.test('getUnsupportedSyncSectionReason: lidarr metadataProfiles has no unsupported reason', () => {
+  assertEquals(getUnsupportedSyncSectionReason('lidarr', 'metadataProfiles'), null);
+});
+
+Deno.test('getUnsupportedSyncSectionReason: explicit unsupported metadataProfiles reason for radarr/sonarr', () => {
+  assertEquals(
+    getUnsupportedSyncSectionReason('radarr', 'metadataProfiles'),
+    'Section metadataProfiles is not supported for radarr'
+  );
+  assertEquals(
+    getUnsupportedSyncSectionReason('sonarr', 'metadataProfiles'),
+    'Section metadataProfiles is not supported for sonarr'
+  );
 });
 
 Deno.test('getUnsupportedSyncSectionReason: lidarr qualityProfiles has no unsupported reason', () => {
   assertEquals(getUnsupportedSyncSectionReason('lidarr', 'qualityProfiles'), null);
 });
 
-Deno.test('SYNC_SECTION_ORDER: contains all three sections in expected order', () => {
-  assertEquals(SYNC_SECTION_ORDER, ['qualityProfiles', 'delayProfiles', 'mediaManagement']);
+Deno.test('SYNC_SECTION_ORDER: includes metadataProfiles as fourth section', () => {
+  assertEquals(SYNC_SECTION_ORDER, ['qualityProfiles', 'delayProfiles', 'mediaManagement', 'metadataProfiles']);
 });
 
 // =============================================================================
@@ -146,6 +183,12 @@ Deno.test({
         nextRunAt: null,
         syncStatus: 'idle',
       },
+      metadataProfiles: {
+        trigger: 'manual',
+        cron: null,
+        nextRunAt: null,
+        syncStatus: 'idle',
+      },
     });
     arrSyncQueries.getQualityProfilesSync = () => ({
       selections: [],
@@ -170,6 +213,110 @@ Deno.test({
       arrInstancesQueries.getById = originalGetById;
       arrSyncQueries.getSyncConfigStatus = originalGetSyncConfigStatus;
       arrSyncQueries.getQualityProfilesSync = originalGetQualityProfilesSync;
+      arrSyncQueries.getNextScheduledRunAt = originalGetNextScheduledRunAt;
+    }
+  },
+});
+
+Deno.test({
+  name: 'arr.sync: metadataProfiles is skipped with explicit unsupported reason for non-lidarr instances',
+  sanitizeResources: false,
+  fn: async () => {
+    const handler = jobQueueRegistry.get('arr.sync');
+    assertExists(handler);
+
+    const instances = new Map<number, ArrInstance>([
+      [102, createInstance(102, 'radarr')],
+      [103, createInstance(103, 'sonarr')],
+    ]);
+
+    const originalGetById = arrInstancesQueries.getById;
+    const originalGetSyncConfigStatus = arrSyncQueries.getSyncConfigStatus;
+    const originalGetQualityProfilesSync = arrSyncQueries.getQualityProfilesSync;
+    const originalGetDelayProfilesSync = arrSyncQueries.getDelayProfilesSync;
+    const originalGetMediaManagementSync = arrSyncQueries.getMediaManagementSync;
+    const originalGetMetadataProfilesSync = arrSyncQueries.getMetadataProfilesSync;
+    const originalGetNextScheduledRunAt = arrSyncQueries.getNextScheduledRunAt;
+
+    arrInstancesQueries.getById = (id: number) => instances.get(id);
+    arrSyncQueries.getSyncConfigStatus = () => ({
+      qualityProfiles: {
+        trigger: 'manual',
+        cron: null,
+        nextRunAt: null,
+        syncStatus: 'idle',
+      },
+      delayProfiles: {
+        trigger: 'manual',
+        cron: null,
+        nextRunAt: null,
+        syncStatus: 'idle',
+      },
+      mediaManagement: {
+        trigger: 'manual',
+        cron: null,
+        nextRunAt: null,
+        syncStatus: 'idle',
+      },
+      metadataProfiles: {
+        trigger: 'manual',
+        cron: null,
+        nextRunAt: null,
+        syncStatus: 'idle',
+      },
+    });
+    arrSyncQueries.getQualityProfilesSync = () => ({
+      selections: [],
+      config: {
+        trigger: 'manual',
+        cron: null,
+      },
+    });
+    arrSyncQueries.getDelayProfilesSync = () => ({
+      databaseId: null,
+      profileName: null,
+      trigger: 'manual',
+      cron: null,
+    });
+    arrSyncQueries.getMediaManagementSync = () => ({
+      namingDatabaseId: null,
+      namingConfigName: null,
+      qualityDefinitionsDatabaseId: null,
+      qualityDefinitionsConfigName: null,
+      mediaSettingsDatabaseId: null,
+      mediaSettingsConfigName: null,
+      trigger: 'manual',
+      cron: null,
+    });
+    arrSyncQueries.getMetadataProfilesSync = () => ({
+      databaseId: null,
+      profileName: null,
+      trigger: 'manual',
+      cron: null,
+    });
+    arrSyncQueries.getNextScheduledRunAt = () => null;
+
+    try {
+      const radarrResult = await handler(createAllSectionsSyncJob(102, 'manual'));
+      assertEquals(
+        radarrResult.output,
+        'qualityProfiles: skipped, delayProfiles: skipped, mediaManagement: skipped, metadataProfiles: skipped (Section metadataProfiles is not supported for radarr)'
+      );
+      assertEquals(radarrResult.status, 'skipped');
+
+      const sonarrResult = await handler(createAllSectionsSyncJob(103, 'manual'));
+      assertEquals(
+        sonarrResult.output,
+        'qualityProfiles: skipped, delayProfiles: skipped, mediaManagement: skipped, metadataProfiles: skipped (Section metadataProfiles is not supported for sonarr)'
+      );
+      assertEquals(sonarrResult.status, 'skipped');
+    } finally {
+      arrInstancesQueries.getById = originalGetById;
+      arrSyncQueries.getSyncConfigStatus = originalGetSyncConfigStatus;
+      arrSyncQueries.getQualityProfilesSync = originalGetQualityProfilesSync;
+      arrSyncQueries.getDelayProfilesSync = originalGetDelayProfilesSync;
+      arrSyncQueries.getMediaManagementSync = originalGetMediaManagementSync;
+      arrSyncQueries.getMetadataProfilesSync = originalGetMetadataProfilesSync;
       arrSyncQueries.getNextScheduledRunAt = originalGetNextScheduledRunAt;
     }
   },
