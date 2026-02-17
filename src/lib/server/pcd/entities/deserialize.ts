@@ -13,6 +13,7 @@ import type {
   PortableCustomFormat,
   PortableQualityProfile,
   PortableLidarrMediaSettings,
+  PortableLidarrMetadataProfile,
   PortableRadarrNaming,
   PortableSonarrNaming,
   PortableMediaSettings,
@@ -26,6 +27,7 @@ import * as qpQueries from './qualityProfiles/index.ts';
 import * as namingQueries from './mediaManagement/naming/index.ts';
 import * as mediaSettingsQueries from './mediaManagement/media-settings/index.ts';
 import * as qualityDefsQueries from './mediaManagement/quality-definitions/index.ts';
+import * as metadataProfilesQueries from './metadataProfiles/index.ts';
 
 // ============================================================================
 // COMMON OPTIONS
@@ -272,5 +274,54 @@ export async function deserializeLidarrQualityDefinitions(
     cache,
     layer,
     input: portable,
+  });
+}
+
+// ============================================================================
+// LIDARR METADATA PROFILES
+// ============================================================================
+
+function normalizeLidarrMetadataProfileTypeRows(
+  typeRows: Array<{ id: number; name: string; allowed: boolean }>,
+): Array<{ typeId: number; name: string; allowed: boolean }> {
+  return typeRows
+    .slice()
+    .sort((a, b) => a.id - b.id)
+    .map((type) => ({
+      typeId: type.id,
+      name: type.name,
+      allowed: type.allowed,
+    }));
+}
+
+function normalizeLidarrMetadataProfileReleaseStatusRows(
+  rows: Array<{ id: number; name: string; allowed: boolean }>
+): Array<{ statusId: number; name: string; allowed: boolean }> {
+  return rows
+    .slice()
+    .sort((a, b) => a.id - b.id)
+    .map((status) => ({
+      statusId: status.id,
+      name: status.name,
+      allowed: status.allowed,
+    }));
+}
+
+export async function deserializeLidarrMetadataProfile(
+  options: DeserializeOptions<PortableLidarrMetadataProfile>
+) {
+  const { databaseId, cache, layer, portable } = options;
+
+  return metadataProfilesQueries.create({
+    databaseId,
+    cache,
+    layer,
+    input: {
+      name: portable.name,
+      description: portable.description,
+      primaryAlbumTypes: normalizeLidarrMetadataProfileTypeRows(portable.primaryTypes),
+      secondaryAlbumTypes: normalizeLidarrMetadataProfileTypeRows(portable.secondaryTypes),
+      releaseStatuses: normalizeLidarrMetadataProfileReleaseStatusRows(portable.releaseStatuses),
+    },
   });
 }

@@ -17,6 +17,7 @@ import type {
   PortableSonarrNaming,
   PortableMediaSettings,
   PortableQualityDefinitions,
+  PortableLidarrMetadataProfile,
 } from '$shared/pcd/portable.ts';
 import * as delayProfileQueries from './delayProfiles/index.ts';
 import * as cfQueries from './customFormats/index.ts';
@@ -289,5 +290,65 @@ export async function serializeLidarrQualityDefinitions(
   return {
     name: config.name,
     entries: config.entries,
+  };
+}
+
+// ============================================================================
+// LIDARR METADATA PROFILES
+// ============================================================================
+
+export async function serializeLidarrMetadataProfile(
+  cache: PCDCache,
+  name: string
+): Promise<PortableLidarrMetadataProfile> {
+  const db = cache.kb;
+
+  const profile = await db
+    .selectFrom('lidarr_metadata_profiles')
+    .select(['name', 'description'])
+    .where('name', '=', name)
+    .executeTakeFirst();
+
+  if (!profile) throw new Error(`Lidarr metadata profile "${name}" not found`);
+
+  const [primaryRows, secondaryRows, statusRows] = await Promise.all([
+    db
+      .selectFrom('lidarr_metadata_profile_primary_types')
+      .select(['type_id', 'name', 'allowed'])
+      .where('metadata_profile_name', '=', name)
+      .orderBy('type_id')
+      .execute(),
+    db
+      .selectFrom('lidarr_metadata_profile_secondary_types')
+      .select(['type_id', 'name', 'allowed'])
+      .where('metadata_profile_name', '=', name)
+      .orderBy('type_id')
+      .execute(),
+    db
+      .selectFrom('lidarr_metadata_profile_release_statuses')
+      .select(['status_id', 'name', 'allowed'])
+      .where('metadata_profile_name', '=', name)
+      .orderBy('status_id')
+      .execute(),
+  ]);
+
+  return {
+    name: profile.name,
+    description: profile.description,
+    primaryTypes: primaryRows.map((row) => ({
+      id: row.type_id,
+      name: row.name,
+      allowed: row.allowed === 1,
+    })),
+    secondaryTypes: secondaryRows.map((row) => ({
+      id: row.type_id,
+      name: row.name,
+      allowed: row.allowed === 1,
+    })),
+    releaseStatuses: statusRows.map((row) => ({
+      id: row.status_id,
+      name: row.name,
+      allowed: row.allowed === 1,
+    })),
   };
 }

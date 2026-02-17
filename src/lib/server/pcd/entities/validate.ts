@@ -37,6 +37,8 @@ export function validatePortableData(entityType: EntityType, data: Record<string
       return validateMediaSettings(data);
     case 'lidarr_media_settings':
       return validateLidarrPortableData('lidarr_media_settings', data, validateMediaSettings);
+    case 'lidarr_metadata_profile':
+      return validateLidarrMetadataProfileData(data);
     case 'radarr_quality_definitions':
     case 'sonarr_quality_definitions':
       return validateQualityDefinitions(data);
@@ -246,6 +248,67 @@ function validateMediaSettings(data: Record<string, unknown>): string | null {
   if (typeof data.enableMediaInfo !== 'boolean') {
     return 'data.enableMediaInfo must be a boolean';
   }
+  return null;
+}
+
+function validateLidarrMetadataProfileData(data: Record<string, unknown>): string | null {
+  const nameError = requireName(data);
+  if (nameError) return nameError;
+
+  if (data.description !== null && typeof data.description !== 'string') {
+    return 'data.description must be a string or null';
+  }
+
+  const missingRequiredFields = ['primaryTypes', 'secondaryTypes', 'releaseStatuses'].filter(
+    (field) => !Object.hasOwn(data, field)
+  );
+  if (missingRequiredFields.length > 0) {
+    return `Unsupported payload for lidarr_metadata_profile: missing required fields: ${missingRequiredFields.join(', ')}`;
+  }
+
+  const allowedFields = new Set(['name', 'description', 'primaryTypes', 'secondaryTypes', 'releaseStatuses']);
+  const unsupportedFields = Object.keys(data)
+    .filter((field) => !allowedFields.has(field))
+    .sort((a, b) => a.localeCompare(b));
+  if (unsupportedFields.length > 0) {
+    return `Unsupported payload for lidarr_metadata_profile: unsupported fields: ${unsupportedFields.join(', ')}`;
+  }
+
+  const primaryError = validateLidarrMetadataProfileTypeRows('data.primaryTypes', data.primaryTypes);
+  if (primaryError) return primaryError;
+
+  const secondaryError = validateLidarrMetadataProfileTypeRows('data.secondaryTypes', data.secondaryTypes);
+  if (secondaryError) return secondaryError;
+
+  const statusError = validateLidarrMetadataProfileTypeRows('data.releaseStatuses', data.releaseStatuses);
+  if (statusError) return statusError;
+
+  return null;
+}
+
+function validateLidarrMetadataProfileTypeRows(path: string, rows: unknown): string | null {
+  if (!Array.isArray(rows)) {
+    return `${path} must be an array`;
+  }
+
+  for (let index = 0; index < rows.length; index += 1) {
+    const row = rows[index];
+    if (!row || typeof row !== 'object' || Array.isArray(row)) {
+      return `${path}[${index}] must be an object`;
+    }
+
+    const typedRow = row as Record<string, unknown>;
+    if (typeof typedRow.id !== 'number' || !Number.isInteger(typedRow.id)) {
+      return `${path}[${index}].id must be an integer`;
+    }
+    if (typeof typedRow.name !== 'string') {
+      return `${path}[${index}].name must be a string`;
+    }
+    if (typeof typedRow.allowed !== 'boolean') {
+      return `${path}[${index}].allowed must be a boolean`;
+    }
+  }
+
   return null;
 }
 

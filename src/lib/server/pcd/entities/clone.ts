@@ -97,5 +97,11 @@ export async function clone(options: CloneOptions) {
       portable.name = newName;
       return deserialize.deserializeLidarrQualityDefinitions({ databaseId, cache, layer, portable });
     }
+
+    case 'lidarr_metadata_profile': {
+      const portable = await serialize.serializeLidarrMetadataProfile(cache, sourceName);
+      portable.name = newName;
+      return deserialize.deserializeLidarrMetadataProfile({ databaseId, cache, layer, portable });
+    }
   }
 }
