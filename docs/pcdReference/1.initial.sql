@@ -117,7 +117,7 @@ INSERT INTO regular_expressions (name, pattern, description) VALUES ('BBC iPlaye
 INSERT INTO regular_expressions (name, pattern, description) VALUES ('beAst', '(?<=^|[\s.-])beAst\b', '');
 INSERT INTO regular_expressions (name, pattern, description) VALUES ('BeiTai', '(?<=^|[\s.-])BeiTai\b', '');
 INSERT INTO regular_expressions (name, pattern, description) VALUES ('BEN THE MEN', '\b(BEN[ ._-]THE[ ._-]MEN)\b', '');
-INSERT INTO regular_expressions (name, pattern, description) VALUES ('Better Theatricals', '^\b(terminator.?2|alien[^s].*?1979|star.wars.*?(4k|19)(77)|.*?\bempire.strikes.back|.*?\breturn.of.the.jedi|apocalypse.now|the.exorcist.*?1973|donnie.darko|amadeus|payback.*?1999|payback.straight.up.*?2006|almost.famous)\b', 'Matches movies where the `Theatrical` cut is considered the better version. Subjectively chosen, based on Dictionarry''s personal preferences and major opinion. Needed to override the default special edition preference. Matches:
+INSERT INTO regular_expressions (name, pattern, description) VALUES ('Better Theatricals', '^\b(terminator.?2|alien[^s].*?1979|star.wars.*?(4k|19)(77)|.*?\bempire.strikes.back|.*?\breturn.of.the.jedi|apocalypse.now|the.exorcist.*?1973|donnie.darko|amadeus|payback.*?1999|payback.straight.up.*?2006|almost.famous)\b', 'Matches movies where the `Theatrical` cut is considered the better version. Subjectively chosen, based on yandy-r''s personal preferences and major opinion. Needed to override the default special edition preference. Matches:
 - Terminator 2: Judgement Day (1991)
 - Alien (1979)
 - Star Wars OT (1977-1983)
@@ -726,7 +726,7 @@ INSERT INTO custom_formats (name, description) VALUES ('Banned UHD Bluray', 'Mat
 INSERT INTO custom_formats (name, description) VALUES ('Banned WEBRip', 'Matches WEBRip releases that are not from a quality tier');
 INSERT INTO custom_formats (name, description) VALUES ('Banned WEBRip (Efficient)', 'Matches WEBRip releases that are not from a quality tier');
 INSERT INTO custom_formats (name, description) VALUES ('BCORE', 'Matches ''Bravia Core'' WEB-DLs. Negates any encodes.');
-INSERT INTO custom_formats (name, description) VALUES ('Better Theatricals', 'Matches movies where the `Theatrical` cut is considered the better version. Subjectively chosen, based on Dictionarry''s personal preferences and major opinion. Needed to override the default special edition preference. Matches:
+INSERT INTO custom_formats (name, description) VALUES ('Better Theatricals', 'Matches movies where the `Theatrical` cut is considered the better version. Subjectively chosen, based on yandy-r''s personal preferences and major opinion. Needed to override the default special edition preference. Matches:
 - Terminator 2: Judgement Day (1991)
 - Alien (1979)
 - Star Wars OT (1977-1983)
@@ -788,7 +788,7 @@ INSERT INTO custom_formats (name, description) VALUES ('MUBI', 'Matches ''Mubi''
 INSERT INTO custom_formats (name, description) VALUES ('NF', 'Matches ''Netflix'' WEB-DLs. Negates any encodes.');
 INSERT INTO custom_formats (name, description) VALUES ('Not English', 'Matches releases that don''t include an English language track. Dual audio is allowed.');
 INSERT INTO custom_formats (name, description) VALUES ('Not Only English', 'Matches releases that don''t include an English language track. Dual audio is NOT allowed.');
-INSERT INTO custom_formats (name, description) VALUES ('Not Only English (Missing)', 'Attempts to matches releases with mutliple audio tracks but are not parsed as "Multi Langauge". Instead, attempts to find regular expressions which imply the release has dual audio. 
+INSERT INTO custom_formats (name, description) VALUES ('Not Only English (Missing)', 'Attempts to matches releases with mutliple audio tracks but are not parsed as "Multi Langauge". Instead, attempts to find regular expressions which imply the release has dual audio.
  ');
 INSERT INTO custom_formats (name, description) VALUES ('NOW', 'Matches ''Now'' WEB-DLs. Negates any encodes.');
 INSERT INTO custom_formats (name, description) VALUES ('Opus', 'Matches ''Opus'' Regex Pattern and negates any other audio types that might conflict.');
@@ -910,7 +910,7 @@ VALUES ('1080p Balanced', '1080p Balanced targets consistent & immutable 1080p *
 - Average TV Sizes ~ 2 to 4gb per Episode
 - TV Quality Ranking ~ 7/10', 1, 20000, 888888, 1);
 INSERT INTO quality_profiles (name, description, upgrades_allowed, minimum_custom_format_score, upgrade_until_score, upgrade_score_increment)
-VALUES ('1080p Compact', '1080p Compact targets low to medium quality x265 Bluray and WEB Encodes. 
+VALUES ('1080p Compact', '1080p Compact targets low to medium quality x265 Bluray and WEB Encodes.
 
 - Average Movie Sizes ~ 3 to 6gb per Movie
 - Movie Quality Ranking ~ 4/10
@@ -924,14 +924,14 @@ VALUES ('1080p Efficient', '1080p Efficient targets high quality x265 Bluray and
 - Average TV Sizes ~ 2 to 3gb per Episode
 - TV Quality Ranking ~ 6/10', 1, 20000, 888888, 1);
 INSERT INTO quality_profiles (name, description, upgrades_allowed, minimum_custom_format_score, upgrade_until_score, upgrade_score_increment)
-VALUES ('1080p Quality', '1080p Quality utilizes the [**Golden Popcorn Performance Index**](https://dictionarry.dev/wiki/gppi) to target **Transparent** x264 1080p Encodes. 
+VALUES ('1080p Quality', '1080p Quality utilizes the [**Golden Popcorn Performance Index**](https://dictionarry.dev/wiki/gppi) to target **Transparent** x264 1080p Encodes.
 
 - Average Movie Sizes ~ 10 to 15gb per Movie
 - Movie Quality Ranking ~ 8/10
 - Average TV Sizes ~ 4 to 8gb per Episode
 - TV Quality Ranking ~ 8/10', 1, 20000, 888888, 1);
 INSERT INTO quality_profiles (name, description, upgrades_allowed, minimum_custom_format_score, upgrade_until_score, upgrade_score_increment)
-VALUES ('1080p Quality HDR', '1080p Quality HDR utilizes the [**Golden Popcorn Performance Index**](https://dictionarry.dev/wiki/gppi) to target **Transparent x265 HDR** 1080p Encodes. 
+VALUES ('1080p Quality HDR', '1080p Quality HDR utilizes the [**Golden Popcorn Performance Index**](https://dictionarry.dev/wiki/gppi) to target **Transparent x265 HDR** 1080p Encodes.
 
 - Average Movie Sizes ~ 10 to 20gb per Movie
 - Movie Quality Ranking ~ 9/10
@@ -945,7 +945,7 @@ VALUES ('1080p Remux', '1080p Remux utilizes **Audio Formats** to prioritise hig
 - Average TV Sizes ~ 6 to 12gb per Episode
 - TV Quality Ranking ~ 10/10', 1, 20000, 888888, 1);
 INSERT INTO quality_profiles (name, description, upgrades_allowed, minimum_custom_format_score, upgrade_until_score, upgrade_score_increment)
-VALUES ('2160p Balanced', '2160p Balanced targets consistent & immutable 2160p **WEB-DLs w/ Lossy Audio**. 
+VALUES ('2160p Balanced', '2160p Balanced targets consistent & immutable 2160p **WEB-DLs w/ Lossy Audio**.
 
 - Average Movie Sizes ~ 15 to 30gb per Movie
 - Movie Quality Ranking ~ 8/10
@@ -973,7 +973,7 @@ VALUES ('2160p Remux', '2160p Remux utilizes **Video / Audio Formats** to priori
 - Average TV Sizes ~ 15 to 30gb per Episode
 - TV Quality Ranking ~ 10/10', 1, 20000, 888888, 1);
 INSERT INTO quality_profiles (name, description, upgrades_allowed, minimum_custom_format_score, upgrade_until_score, upgrade_score_increment)
-VALUES ('720p Quality', '720p Quality utilizes the [**Golden Popcorn Performance Index**](https://dictionarry.dev/wiki/gppi) to target **Transparent** x264 720p Encodes. 
+VALUES ('720p Quality', '720p Quality utilizes the [**Golden Popcorn Performance Index**](https://dictionarry.dev/wiki/gppi) to target **Transparent** x264 720p Encodes.
 
 - Average Movie Sizes ~ 4 to 8gb per Movie
 - Movie Quality Ranking ~ 5/10
