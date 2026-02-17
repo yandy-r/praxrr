@@ -334,11 +334,14 @@ isolated from Radarr/Sonarr runtime paths:
   Lidarr metadata profile shapes are accepted only on Lidarr metadata paths.
 - Runtime sync paths must never use `arr_type = 'all'` fallbacks. All
   selection/config/writes for metadata profiles must check `arr_instances.type ===
-  'lidarr'` before executing, so Sonarr/Radarr entities never enter metadata
+'lidarr'` before executing, so Sonarr/Radarr entities never enter metadata
   sync pipelines.
 - Sync section config and PCD read/write helpers must treat metadata profiles as a
   single-name contract (`metadataProfileName`) and keep API payload fields strictly
   on the Lidarr surface (`primaryTypes`, `secondaryTypes`, `releaseStatuses`).
+- OpenAPI documentation in `docs/api/v1/openapi.yaml` must mirror the runtime
+  payload contract for list/detail/listing and create/update/delete flows, including
+  Lidarr-only field names.
 
 ## 8) Parser Service
 

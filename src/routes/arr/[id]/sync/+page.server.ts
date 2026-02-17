@@ -18,6 +18,7 @@ import { isSyncSectionSupported } from '$lib/server/sync/mappings.ts';
 import { isArrAppType, supportsArrSyncSurface, type ArrSyncSurface } from '$shared/arr/capabilities.ts';
 
 const METADATA_PROFILES_SURFACE: ArrSyncSurface = 'metadata_profiles';
+const METADATA_PROFILE_UNSUPPORTED_ERROR = 'Metadata profile sync is supported only for Lidarr instances';
 
 function supportsMetadataProfiles(instanceType: string): boolean {
   if (!isArrAppType(instanceType)) {
@@ -28,12 +29,6 @@ function supportsMetadataProfiles(instanceType: string): boolean {
     supportsArrSyncSurface(instanceType, METADATA_PROFILES_SURFACE) &&
     isSyncSectionSupported(instanceType, 'metadataProfiles')
   );
-}
-
-function ensureMetadataProfileSyncSupported(instanceType: string): void {
-  if (!supportsMetadataProfiles(instanceType)) {
-    throw new Error('Metadata profile sync is supported only for lidarr instances');
-  }
 }
 
 export const load: ServerLoad = async ({ params }) => {
@@ -255,6 +250,9 @@ export const actions: Actions = {
     if (!instance) {
       return fail(404, { error: 'Instance not found' });
     }
+    if (!supportsMetadataProfiles(instance.type)) {
+      return fail(400, { error: METADATA_PROFILE_UNSUPPORTED_ERROR });
+    }
 
     const formData = await request.formData();
     const databaseId = formData.get('databaseId') as string | null;
@@ -263,8 +261,6 @@ export const actions: Actions = {
     const cron = formData.get('cron') as string | null;
 
     try {
-      ensureMetadataProfileSyncSupported(instance.type);
-
       const effectiveTrigger = trigger || 'manual';
       const effectiveCron = cron || null;
       arrSyncQueries.saveMetadataProfilesSync(id, {
@@ -289,10 +285,6 @@ export const actions: Actions = {
         source: 'sync',
         meta: { instanceId: id, error: errorMsg },
       });
-
-      if (errorMsg.includes('supported only for lidarr instances')) {
-        return fail(400, { error: errorMsg });
-      }
 
       return fail(500, { error: `Failed to save metadata profiles sync config: ${errorMsg}` });
     }
@@ -431,9 +423,11 @@ export const actions: Actions = {
     if (!instance) {
       return fail(404, { error: 'Instance not found' });
     }
+    if (!supportsMetadataProfiles(instance.type)) {
+      return fail(400, { error: METADATA_PROFILE_UNSUPPORTED_ERROR });
+    }
 
     try {
-      ensureMetadataProfileSyncSupported(instance.type);
       const jobType = 'arr.sync.metadataProfiles';
 
       arrSyncQueries.setMetadataProfilesStatusPending(id);
@@ -461,10 +455,6 @@ export const actions: Actions = {
         source: 'sync',
         meta: { instanceId: id, error: errorMsg },
       });
-
-      if (errorMsg.includes('supported only for lidarr instances')) {
-        return fail(400, { error: errorMsg });
-      }
 
       return fail(500, { error: `Sync failed: ${errorMsg}` });
     }

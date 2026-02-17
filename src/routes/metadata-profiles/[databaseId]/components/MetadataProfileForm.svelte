@@ -77,6 +77,16 @@
 	$: hasSecondaryAllowed = secondaryTypes.some((entry) => entry.allowed);
 	$: hasReleaseAllowed = releaseStatuses.some((entry) => entry.allowed);
 
+	$: primaryAllowedCount = primaryTypes.filter((entry) => entry.allowed).length;
+	$: secondaryAllowedCount = secondaryTypes.filter((entry) => entry.allowed).length;
+	$: releaseAllowedCount = releaseStatuses.filter((entry) => entry.allowed).length;
+
+	$: primaryAllAllowed = primaryTypes.length > 0 && primaryAllowedCount === primaryTypes.length;
+	$: secondaryAllAllowed =
+		secondaryTypes.length > 0 && secondaryAllowedCount === secondaryTypes.length;
+	$: releaseAllAllowed =
+		releaseStatuses.length > 0 && releaseAllowedCount === releaseStatuses.length;
+
 	$: canSave =
 		name.length > 0 &&
 		hasPrimaryAllowed &&
@@ -99,6 +109,25 @@
 				itemIndex === index ? { ...entry, allowed: checked } : entry
 			);
 			update('releaseStatuses', next);
+		}
+	}
+
+	function setAllTypes(section: 'primaryTypes' | 'secondaryTypes' | 'releaseStatuses', enabled: boolean) {
+		if (section === 'primaryTypes') {
+			update(
+				'primaryTypes',
+				primaryTypes.map((entry) => ({ ...entry, allowed: enabled }))
+			);
+		} else if (section === 'secondaryTypes') {
+			update(
+				'secondaryTypes',
+				secondaryTypes.map((entry) => ({ ...entry, allowed: enabled }))
+			);
+		} else {
+			update(
+				'releaseStatuses',
+				releaseStatuses.map((entry) => ({ ...entry, allowed: enabled }))
+			);
 		}
 	}
 
@@ -234,77 +263,107 @@
 					/>
 				</div>
 
-				<div class="space-y-2">
-					<div class="flex items-center justify-between">
-						<h3 class="text-sm font-semibold text-neutral-900 dark:text-neutral-100">Primary Types</h3>
-						<p class="text-xs {toggleErrorMessage(primaryValidation)}">
-							{primaryValidation ?? 'At least one primary type must be allowed'}
-						</p>
-					</div>
-					<div class="grid gap-2">
-						{#if primaryTypes.length === 0}
-							<p class="text-xs text-neutral-500 dark:text-neutral-400">No primary types available.</p>
-						{:else}
-							{#each primaryTypes as typeEntry, index (typeEntry.id)}
+					<div class="space-y-2">
+						<div class="flex items-center justify-between gap-3">
+							<h3 class="text-sm font-semibold text-neutral-900 dark:text-neutral-100">Primary Types</h3>
+							<div class="flex flex-col items-end gap-1">
+								<p class="text-xs {toggleErrorMessage(primaryValidation)}">
+									{primaryValidation ?? `${primaryAllowedCount}/${primaryTypes.length} allowed`}
+								</p>
 								<Toggle
-									label={typeEntry.name}
-									checked={typeEntry.allowed}
+									label="Select all primary types"
+									disabled={primaryTypes.length === 0}
+									checked={primaryAllAllowed}
 									on:change={(event: CustomEvent<boolean>) =>
-										updateType('primaryTypes', index, event.detail)
+										setAllTypes('primaryTypes', event.detail)
 									}
 								/>
-							{/each}
-						{/if}
+							</div>
+						</div>
+						<div class="grid gap-2">
+							{#if primaryTypes.length === 0}
+								<p class="text-xs text-neutral-500 dark:text-neutral-400">No primary types available.</p>
+							{:else}
+								{#each primaryTypes as typeEntry, index (typeEntry.id)}
+									<Toggle
+										label={typeEntry.name}
+										checked={typeEntry.allowed}
+										on:change={(event: CustomEvent<boolean>) =>
+											updateType('primaryTypes', index, event.detail)
+										}
+									/>
+								{/each}
+							{/if}
+						</div>
 					</div>
-				</div>
 
-				<div class="space-y-2">
-					<div class="flex items-center justify-between">
-						<h3 class="text-sm font-semibold text-neutral-900 dark:text-neutral-100">Secondary Types</h3>
-						<p class="text-xs {toggleErrorMessage(secondaryValidation)}">
-							{secondaryValidation ?? 'At least one secondary type must be allowed'}
-						</p>
-					</div>
-					<div class="grid gap-2">
-						{#if secondaryTypes.length === 0}
-							<p class="text-xs text-neutral-500 dark:text-neutral-400">No secondary types available.</p>
-						{:else}
-							{#each secondaryTypes as typeEntry, index (typeEntry.id)}
+					<div class="space-y-2">
+						<div class="flex items-center justify-between gap-3">
+							<h3 class="text-sm font-semibold text-neutral-900 dark:text-neutral-100">Secondary Types</h3>
+							<div class="flex flex-col items-end gap-1">
+								<p class="text-xs {toggleErrorMessage(secondaryValidation)}">
+									{secondaryValidation ?? `${secondaryAllowedCount}/${secondaryTypes.length} allowed`}
+								</p>
 								<Toggle
-									label={typeEntry.name}
-									checked={typeEntry.allowed}
+									label="Select all secondary types"
+									disabled={secondaryTypes.length === 0}
+									checked={secondaryAllAllowed}
 									on:change={(event: CustomEvent<boolean>) =>
-										updateType('secondaryTypes', index, event.detail)
+										setAllTypes('secondaryTypes', event.detail)
 									}
 								/>
-							{/each}
-						{/if}
+							</div>
+						</div>
+						<div class="grid gap-2">
+							{#if secondaryTypes.length === 0}
+								<p class="text-xs text-neutral-500 dark:text-neutral-400">No secondary types available.</p>
+							{:else}
+								{#each secondaryTypes as typeEntry, index (typeEntry.id)}
+									<Toggle
+										label={typeEntry.name}
+										checked={typeEntry.allowed}
+										on:change={(event: CustomEvent<boolean>) =>
+											updateType('secondaryTypes', index, event.detail)
+										}
+									/>
+								{/each}
+							{/if}
+						</div>
 					</div>
-				</div>
 
-				<div class="space-y-2">
-					<div class="flex items-center justify-between">
-						<h3 class="text-sm font-semibold text-neutral-900 dark:text-neutral-100">Release Statuses</h3>
-						<p class="text-xs {toggleErrorMessage(releaseValidation)}">
-							{releaseValidation ?? 'At least one release status must be allowed'}
-						</p>
-					</div>
-					<div class="grid gap-2">
-						{#if releaseStatuses.length === 0}
-							<p class="text-xs text-neutral-500 dark:text-neutral-400">No release statuses available.</p>
-						{:else}
-							{#each releaseStatuses as typeEntry, index (typeEntry.id)}
+					<div class="space-y-2">
+						<div class="flex items-center justify-between gap-3">
+							<h3 class="text-sm font-semibold text-neutral-900 dark:text-neutral-100">Release Statuses</h3>
+							<div class="flex flex-col items-end gap-1">
+								<p class="text-xs {toggleErrorMessage(releaseValidation)}">
+									{releaseValidation ?? `${releaseAllowedCount}/${releaseStatuses.length} allowed`}
+								</p>
 								<Toggle
-									label={typeEntry.name}
-									checked={typeEntry.allowed}
+									label="Select all release statuses"
+									disabled={releaseStatuses.length === 0}
+									checked={releaseAllAllowed}
 									on:change={(event: CustomEvent<boolean>) =>
-										updateType('releaseStatuses', index, event.detail)
+										setAllTypes('releaseStatuses', event.detail)
 									}
 								/>
-							{/each}
-						{/if}
+							</div>
+						</div>
+						<div class="grid gap-2">
+							{#if releaseStatuses.length === 0}
+								<p class="text-xs text-neutral-500 dark:text-neutral-400">No release statuses available.</p>
+							{:else}
+								{#each releaseStatuses as typeEntry, index (typeEntry.id)}
+									<Toggle
+										label={typeEntry.name}
+										checked={typeEntry.allowed}
+										on:change={(event: CustomEvent<boolean>) =>
+											updateType('releaseStatuses', index, event.detail)
+										}
+									/>
+								{/each}
+							{/if}
+						</div>
 					</div>
-				</div>
 			</div>
 		</Card>
 	</form>

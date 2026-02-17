@@ -160,6 +160,19 @@ function parseMetadataTypes(raw: string | null, fieldName: string): MetadataProf
 	});
 }
 
+const RESERVED_METADATA_PROFILE_NAME = 'none';
+
+function validateSectionSelection(
+	rows: MetadataProfileFormType[],
+	sectionName: string
+): string | null {
+	if (!rows.some((entry) => entry.allowed)) {
+		return `At least one ${sectionName} option must be allowed`;
+	}
+
+	return null;
+}
+
 export const load: ServerLoad = async ({ params }) => {
 	const { databaseId } = params;
 
@@ -282,6 +295,25 @@ export const actions: Actions = {
 			releaseStatuses = parseMetadataTypes(formData.get('releaseStatuses') as string | null, 'releaseStatuses');
 		} catch (err) {
 			return fail(400, { error: err instanceof Error ? err.message : 'Invalid profile section data' });
+		}
+
+		const primaryValidation = validateSectionSelection(primaryTypes, 'primary');
+		if (primaryValidation) {
+			return fail(400, { error: primaryValidation });
+		}
+
+		const secondaryValidation = validateSectionSelection(secondaryTypes, 'secondary');
+		if (secondaryValidation) {
+			return fail(400, { error: secondaryValidation });
+		}
+
+		const releaseValidation = validateSectionSelection(releaseStatuses, 'release status');
+		if (releaseValidation) {
+			return fail(400, { error: releaseValidation });
+		}
+
+		if (name.toLowerCase() === RESERVED_METADATA_PROFILE_NAME) {
+			return fail(400, { error: `'None' is a reserved profile name` });
 		}
 
 		if (layer === 'base' && !canWriteToBase(currentDatabaseId)) {

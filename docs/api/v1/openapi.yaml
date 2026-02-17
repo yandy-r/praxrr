@@ -66,7 +66,7 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/LidarrMetadataProfile'
+                  $ref: '#/components/schemas/LidarrMetadataProfileListItem'
         '400':
           description: Missing or invalid databaseId
           content:
@@ -375,14 +375,14 @@ components:
       $ref: './schemas/pcd.yaml#/ImportRequest'
     ImportResponse:
       $ref: './schemas/pcd.yaml#/ImportResponse'
-    LidarrMetadataProfileAlbumTypeItem:
+    LidarrMetadataProfileTypeToggle:
       type: object
       required:
-        - typeId
+        - id
         - name
         - allowed
       properties:
-        typeId:
+        id:
           type: integer
           description: Lidarr album type id
         name:
@@ -391,14 +391,46 @@ components:
         allowed:
           type: boolean
           description: Whether the type is selected
-    LidarrMetadataProfileReleaseStatusItem:
+    LidarrMetadataProfileAlbumType:
       type: object
       required:
-        - statusId
+        - type_id
         - name
         - allowed
       properties:
-        statusId:
+        type_id:
+          type: integer
+          description: Lidarr album type id
+        name:
+          type: string
+          description: Lidarr album type name
+        allowed:
+          type: boolean
+          description: Whether the type is selected
+    LidarrMetadataProfileReleaseStatusToggle:
+      type: object
+      required:
+        - id
+        - name
+        - allowed
+      properties:
+        id:
+          type: integer
+          description: Lidarr release status id
+        name:
+          type: string
+          description: Lidarr release status name
+        allowed:
+          type: boolean
+          description: Whether the status is selected
+    LidarrMetadataProfileReleaseStatus:
+      type: object
+      required:
+        - status_id
+        - name
+        - allowed
+      properties:
+        status_id:
           type: integer
           description: Lidarr release status id
         name:
@@ -412,8 +444,9 @@ components:
       required:
         - id
         - name
-        - primaryAlbumTypes
-        - secondaryAlbumTypes
+        - updated_at
+        - primaryTypes
+        - secondaryTypes
         - releaseStatuses
       properties:
         id:
@@ -424,26 +457,72 @@ components:
         description:
           type: string
           nullable: true
-          description: |
-            Optional Profilarr-only description for local documentation.
-        primaryAlbumTypes:
+          description: Optional Profilarr-only description for local documentation.
+        updated_at:
+          type: string
+          description: Last profile update timestamp in the PCD cache
+        primaryTypes:
           type: array
           items:
-            $ref: '#/components/schemas/LidarrMetadataProfileAlbumTypeItem'
-        secondaryAlbumTypes:
+            $ref: '#/components/schemas/LidarrMetadataProfileAlbumType'
+        secondaryTypes:
           type: array
           items:
-            $ref: '#/components/schemas/LidarrMetadataProfileAlbumTypeItem'
+            $ref: '#/components/schemas/LidarrMetadataProfileAlbumType'
         releaseStatuses:
           type: array
           items:
-            $ref: '#/components/schemas/LidarrMetadataProfileReleaseStatusItem'
+            $ref: '#/components/schemas/LidarrMetadataProfileReleaseStatus'
+    LidarrMetadataProfileListItem:
+      type: object
+      required:
+        - id
+        - name
+        - description
+        - updated_at
+        - primaryTypeCount
+        - secondaryTypeCount
+        - releaseStatusCount
+        - primaryAllowedCount
+        - secondaryAllowedCount
+        - releaseStatusAllowedCount
+      properties:
+        id:
+          type: integer
+          description: Local profile id in PCD cache
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+          description: Optional Profilarr-only description for local documentation.
+        updated_at:
+          type: string
+          description: Last profile update timestamp in the PCD cache
+        primaryTypeCount:
+          type: integer
+          description: Total number of primary types represented in the profile
+        secondaryTypeCount:
+          type: integer
+          description: Total number of secondary types represented in the profile
+        releaseStatusCount:
+          type: integer
+          description: Total number of release statuses represented in the profile
+        primaryAllowedCount:
+          type: integer
+          description: Number of allowed primary types
+        secondaryAllowedCount:
+          type: integer
+          description: Number of allowed secondary types
+        releaseStatusAllowedCount:
+          type: integer
+          description: Number of allowed release statuses
     LidarrMetadataProfileCreateRequest:
       type: object
       required:
         - name
-        - primaryAlbumTypes
-        - secondaryAlbumTypes
+        - primaryTypes
+        - secondaryTypes
         - releaseStatuses
       properties:
         name:
@@ -451,18 +530,25 @@ components:
         description:
           type: string
           nullable: true
-        primaryAlbumTypes:
+        layer:
+          type: string
+          enum:
+            - user
+            - base
+          default: user
+          description: Write target for the operation. Defaults to user.
+        primaryTypes:
           type: array
           items:
-            $ref: '#/components/schemas/LidarrMetadataProfileAlbumTypeItem'
-        secondaryAlbumTypes:
+            $ref: '#/components/schemas/LidarrMetadataProfileTypeToggle'
+        secondaryTypes:
           type: array
           items:
-            $ref: '#/components/schemas/LidarrMetadataProfileAlbumTypeItem'
+            $ref: '#/components/schemas/LidarrMetadataProfileTypeToggle'
         releaseStatuses:
           type: array
           items:
-            $ref: '#/components/schemas/LidarrMetadataProfileReleaseStatusItem'
+            $ref: '#/components/schemas/LidarrMetadataProfileReleaseStatusToggle'
       description: |
         Create payload for Lidarr metadata profile entities.
 
@@ -479,18 +565,25 @@ components:
         description:
           type: string
           nullable: true
-        primaryAlbumTypes:
+        layer:
+          type: string
+          enum:
+            - user
+            - base
+          default: user
+          description: Write target for the operation. Defaults to user.
+        primaryTypes:
           type: array
           items:
-            $ref: '#/components/schemas/LidarrMetadataProfileAlbumTypeItem'
-        secondaryAlbumTypes:
+            $ref: '#/components/schemas/LidarrMetadataProfileTypeToggle'
+        secondaryTypes:
           type: array
           items:
-            $ref: '#/components/schemas/LidarrMetadataProfileAlbumTypeItem'
+            $ref: '#/components/schemas/LidarrMetadataProfileTypeToggle'
         releaseStatuses:
           type: array
           items:
-            $ref: '#/components/schemas/LidarrMetadataProfileReleaseStatusItem'
+            $ref: '#/components/schemas/LidarrMetadataProfileReleaseStatusToggle'
       description: |
         Partial update payload for Lidarr metadata profile entities.
 
@@ -500,6 +593,13 @@ components:
       required:
         - name
       properties:
+        layer:
+          type: string
+          enum:
+            - user
+            - base
+          default: user
+          description: Write target for the operation. Defaults to user.
         name:
           type: string
           description: |

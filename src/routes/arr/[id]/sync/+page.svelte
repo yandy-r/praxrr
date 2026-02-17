@@ -190,13 +190,26 @@
 					cronExpression: metadataProfileCron
 				});
 			} else {
-				alertStore.add('error', 'Failed to save metadata profiles sync config');
+				const payload = await extractFormError(response, 'Failed to save metadata profiles sync config');
+				alertStore.add('error', payload);
 			}
 		} catch {
 			alertStore.add('error', 'Failed to save metadata profiles sync config');
 		} finally {
 			metadataProfileSaving = false;
 		}
+	}
+
+	async function extractFormError(response: Response, fallback: string): Promise<string> {
+		try {
+			const body = (await response.json()) as { error?: unknown } | null;
+			if (body && typeof body === 'object' && typeof body.error === 'string') {
+				return body.error;
+			}
+		} catch {
+			// fall through to fallback
+		}
+		return fallback;
 	}
 
 	async function handleMetadataProfileSync() {
@@ -216,7 +229,8 @@
 				const data = await response.json();
 				alertStore.add('success', data?.message ?? 'Sync queued');
 			} else {
-				alertStore.add('error', 'Sync failed');
+				const payload = await extractFormError(response, 'Sync failed');
+				alertStore.add('error', payload);
 			}
 		} catch {
 			alertStore.add('error', 'Sync failed');

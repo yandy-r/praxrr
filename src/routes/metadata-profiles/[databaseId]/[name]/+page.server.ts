@@ -26,6 +26,8 @@ interface ParsedPayloadError {
 	status: number;
 }
 
+const RESERVED_METADATA_PROFILE_NAME = 'none';
+
 function parseMetadataTypes(raw: string | null, fieldName: string): MetadataProfileFormType[] {
 	if (!raw) {
 		throw new Error(`Missing ${fieldName}`);
@@ -68,6 +70,17 @@ function parseMetadataTypes(raw: string | null, fieldName: string): MetadataProf
 	});
 }
 
+function validateSectionSelection(
+	rows: MetadataProfileFormType[],
+	sectionName: string
+): string | null {
+	if (!rows.some((entry) => entry.allowed)) {
+		return `At least one ${sectionName} option must be allowed`;
+	}
+
+	return null;
+}
+
 function parsePayload(formData: FormData): { payload: ParsedPayload } | ParsedPayloadError {
 	const name = (formData.get('name') as string | null)?.trim() ?? '';
 	const description = (formData.get('description') as string | null)?.trim() ?? null;
@@ -75,6 +88,10 @@ function parsePayload(formData: FormData): { payload: ParsedPayload } | ParsedPa
 
 	if (!name) {
 		return { error: 'Profile name is required', status: 400 };
+	}
+
+	if (name.toLowerCase() === RESERVED_METADATA_PROFILE_NAME) {
+		return { error: `'None' is a reserved profile name`, status: 400 };
 	}
 
 	let primaryTypes: MetadataProfileFormType[];
@@ -90,6 +107,21 @@ function parsePayload(formData: FormData): { payload: ParsedPayload } | ParsedPa
 			error: err instanceof Error ? err.message : 'Invalid profile section data',
 			status: 400
 		} as const;
+	}
+
+	const primaryValidation = validateSectionSelection(primaryTypes, 'primary');
+	if (primaryValidation) {
+		return { error: primaryValidation, status: 400 };
+	}
+
+	const secondaryValidation = validateSectionSelection(secondaryTypes, 'secondary');
+	if (secondaryValidation) {
+		return { error: secondaryValidation, status: 400 };
+	}
+
+	const releaseValidation = validateSectionSelection(releaseStatuses, 'release status');
+	if (releaseValidation) {
+		return { error: releaseValidation, status: 400 };
 	}
 
 	return {
