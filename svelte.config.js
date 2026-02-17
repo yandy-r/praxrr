@@ -7,7 +7,7 @@ const config = {
 
   kit: {
     csrf: {
-      checkOrigin: false,
+      trustedOrigins: ['*'],
     },
     adapter: adapter({
       usage: 'deno-compile',

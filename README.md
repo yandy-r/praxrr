@@ -75,6 +75,12 @@ by trying to merge this back into the main repository.
 API access via `X-Api-Key` header or `?apikey=` query param. See
 [auth docs](src/lib/server/utils/auth/README.md) for details.
 
+> [!NOTE] CSRF origin checks are currently configured with a wildcard
+> (`kit.csrf.trustedOrigins = ['*']`) to avoid proxy-origin mismatches during active development
+> (for example when running behind Traefik or other reverse proxies with TLS termination). This is a
+> temporary dev tradeoff and should be tightened to explicit trusted origin URLs before production
+> deployment.
+
 ## Discord
 
 We're most active on [Discord](https://discord.gg/2A89tXZMgA), where we post announcements, help
