@@ -28,6 +28,7 @@ import type {
 import './qualityProfiles/handler.ts';
 import './delayProfiles/handler.ts';
 import './mediaManagement/handler.ts';
+import './metadataProfiles/handler.ts';
 
 import { getAllSections, getSection } from './registry.ts';
 
@@ -247,6 +248,7 @@ export async function processPendingSyncs(): Promise<ProcessSyncsResult> {
     if (result.qualityProfiles?.itemsSynced) totalSynced += result.qualityProfiles.itemsSynced;
     if (result.delayProfiles?.itemsSynced) totalSynced += result.delayProfiles.itemsSynced;
     if (result.mediaManagement?.itemsSynced) totalSynced += result.mediaManagement.itemsSynced;
+    if (result.metadataProfiles?.itemsSynced) totalSynced += result.metadataProfiles.itemsSynced;
   }
 
   await logger.info(`Sync processing complete`, {
@@ -338,6 +340,16 @@ export async function triggerSyncs(context: TriggerContext): Promise<void> {
         payload: { instanceId },
         source: 'system',
         dedupeKey: `arr.sync.mediaManagement:event:${instanceId}`,
+      });
+    }
+    if (status.metadataProfiles && triggers.includes(status.metadataProfiles.trigger)) {
+      arrSyncQueries.setMetadataProfilesStatusPending(instanceId);
+      upsertScheduledJob({
+        jobType: 'arr.sync',
+        runAt: new Date().toISOString(),
+        payload: { instanceId },
+        source: 'system',
+        dedupeKey: `arr.sync.metadataProfiles:event:${instanceId}`,
       });
     }
   }
