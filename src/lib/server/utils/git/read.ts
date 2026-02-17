@@ -11,7 +11,7 @@ function normalizeAuthorName(name: string): string {
   const normalized = trimmed.toLowerCase().replace(/\s+/g, ' ');
   if (normalized === 'xshatterx') return 'Seraphys';
   if (normalized === 'sam chau' || normalized === 'samuel chau') {
-    return 'santiagosayshey';
+    return 'yandy-r';
   }
   return trimmed;
 }

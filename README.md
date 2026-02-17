@@ -30,7 +30,7 @@ I'm not a developer, though I just know enough to tinker and use lidarr. Don't p
 ### Core
 
 - **Link** - Connect to configuration databases like the
-  [Dictionarry database](https://github.com/Dictionarry-Hub/db) or any Profilarr
+  [Profilarr database](https://github.com/yandy-r/profilarr-db) or any Profilarr
   Compliant Database (PCD)
 - **Bridge** - Add your Radarr, Sonarr, and Lidarr instances by URL and API key
 - **Sync** - Push configurations to your instances. Profilarr compiles
@@ -87,9 +87,6 @@ or want to follow along with development, that's where to find us.
 
 ## Documentation
 
-See **[dictionarry.dev](https://dictionarry.dev/)** for complete installation,
-usage, and API documenation.
-
 ## Getting Started
 
 ### Production
@@ -97,7 +94,7 @@ usage, and API documenation.
 ```yaml
 services:
   profilarr:
-    image: ghcr.io/dictionarry-hub/profilarr:latest
+    image: ghcr.io/yandy-r/profilarr:develop
     container_name: profilarr
     ports:
       - '6868:6868'
@@ -115,7 +112,7 @@ services:
 
   # Optional - only needed for CF/QP testing
   parser:
-    image: ghcr.io/dictionarry-hub/profilarr-parser:latest
+    image: ghcr.io/yandy-r/profilarr-parser:develop
     container_name: profilarr-parser
     expose:
       - '5000'
@@ -135,7 +132,7 @@ services:
 - [.NET SDK](https://dotnet.microsoft.com/) 8.0+ (optional, for parser)
 
 ```bash
-git clone https://github.com/Dictionarry-Hub/profilarr.git
+git clone https://github.com/yandy-r/profilarr.git
 cd profilarr
 deno task dev
 ```
