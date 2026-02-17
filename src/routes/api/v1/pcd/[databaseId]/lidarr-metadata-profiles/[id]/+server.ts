@@ -36,6 +36,14 @@ interface DeleteMetadataProfileRequest {
 const VALID_LAYERS: ReadonlySet<OperationLayer> = new Set(['user', 'base']);
 const POSITIVE_INTEGER_ID = /^\d+$/;
 const RESERVED_METADATA_PROFILE_NAME = 'none';
+const LIDARR_METADATA_PROFILE_SCHEMA_ERROR = 'This database does not expose Lidarr metadata profile tables';
+
+const LIDARR_TABLE_QUERY_ERRORS = [
+  'no such table: lidarr_metadata_profiles',
+  'no such table: lidarr_metadata_profile_primary_types',
+  'no such table: lidarr_metadata_profile_secondary_types',
+  'no such table: lidarr_metadata_profile_release_statuses',
+];
 
 function parseDatabaseId(rawId: string | undefined, fieldName: string): { value: number } | { error: string } {
   if (!rawId) {
@@ -78,6 +86,46 @@ function getDatabase(databaseId: number): { value: PCDCache } | { error: string;
   }
 
   return { value: cache };
+}
+
+function isLidarrMetadataProfileSchemaError(message: string): boolean {
+  return LIDARR_TABLE_QUERY_ERRORS.some((fragment) => message.includes(fragment));
+}
+
+async function validateLidarrMetadataProfileSupport(cache: PCDCache): Promise<boolean> {
+  try {
+    await cache.kb
+      .selectFrom('lidarr_metadata_profiles')
+      .select('id')
+      .limit(1)
+      .executeTakeFirst();
+
+    await cache.kb
+      .selectFrom('lidarr_metadata_profile_primary_types')
+      .select('metadata_profile_name')
+      .limit(1)
+      .executeTakeFirst();
+
+    await cache.kb
+      .selectFrom('lidarr_metadata_profile_secondary_types')
+      .select('metadata_profile_name')
+      .limit(1)
+      .executeTakeFirst();
+
+    await cache.kb
+      .selectFrom('lidarr_metadata_profile_release_statuses')
+      .select('metadata_profile_name')
+      .limit(1)
+      .executeTakeFirst();
+
+    return true;
+  } catch (error) {
+    if (error instanceof Error && isLidarrMetadataProfileSchemaError(error.message)) {
+      return false;
+    }
+
+    throw error;
+  }
 }
 
 function parsePortableMetadataTypeArray(
@@ -265,6 +313,10 @@ function toDetail(current: CurrentMetadataProfile, updatedAt: string): LidarrMet
 }
 
 function getWriteErrorStatus(message: string): number {
+  if (isLidarrMetadataProfileSchemaError(message)) {
+    return 400;
+  }
+
   if (message.includes('Database instance not found') || message.includes('not found')) {
     return 404;
   }
@@ -279,8 +331,20 @@ function getWriteErrorStatus(message: string): number {
     return 400;
   }
 
-  if (message.includes('Base layer requires')) {
+  if (message.includes('Base layer requires') || message.includes('Cannot write to base layer')) {
     return 403;
+  }
+
+  return 500;
+}
+
+function getReadErrorStatus(message: string): number {
+  if (message.includes('not found')) {
+    return 404;
+  }
+
+  if (isLidarrMetadataProfileSchemaError(message)) {
+    return 400;
   }
 
   return 500;
@@ -303,6 +367,11 @@ export const GET: RequestHandler = async ({ params }) => {
   }
 
   try {
+    const isSupported = await validateLidarrMetadataProfileSupport(database.value);
+    if (!isSupported) {
+      return json({ error: LIDARR_METADATA_PROFILE_SCHEMA_ERROR }, { status: 400 });
+    }
+
     const current = await metadataProfiles.get(database.value, profileIdResult.value);
     if (!current) {
       return json({ error: 'Metadata profile not found' }, { status: 404 });
@@ -321,7 +390,7 @@ export const GET: RequestHandler = async ({ params }) => {
     return json(toDetail(current, profileRow.updated_at));
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to fetch metadata profile';
-    return json({ error: message }, { status: message.includes('not found') ? 404 : 500 });
+    return json({ error: message }, { status: getReadErrorStatus(message) });
   }
 };
 
@@ -341,17 +410,22 @@ export const PUT: RequestHandler = async ({ params, request }) => {
     return json({ error: database.error }, { status: database.status });
   }
 
-  let body: unknown;
   try {
-    body = await request.json();
-  } catch {
-    return json({ error: 'Invalid JSON body' }, { status: 400 });
-  }
+    const isSupported = await validateLidarrMetadataProfileSupport(database.value);
+    if (!isSupported) {
+      return json({ error: LIDARR_METADATA_PROFILE_SCHEMA_ERROR }, { status: 400 });
+    }
 
-  try {
     const current = await metadataProfiles.get(database.value, profileIdResult.value);
     if (!current) {
       return json({ error: 'Metadata profile not found' }, { status: 404 });
+    }
+
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return json({ error: 'Invalid JSON body' }, { status: 400 });
     }
 
     const payloadResult = parseUpdatePayload(body, current);
@@ -409,7 +483,7 @@ export const PUT: RequestHandler = async ({ params, request }) => {
     return json({ success: true });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to update metadata profile';
-    return json({ error: message }, { status: message.includes('not found') ? 404 : 500 });
+    return json({ error: message }, { status: getWriteErrorStatus(message) });
   }
 };
 
@@ -429,23 +503,28 @@ export const DELETE: RequestHandler = async ({ params, request }) => {
     return json({ error: database.error }, { status: database.status });
   }
 
-  let body: unknown;
   try {
-    body = await request.json();
-  } catch {
-    return json({ error: 'Invalid JSON body' }, { status: 400 });
-  }
+    const isSupported = await validateLidarrMetadataProfileSupport(database.value);
+    if (!isSupported) {
+      return json({ error: LIDARR_METADATA_PROFILE_SCHEMA_ERROR }, { status: 400 });
+    }
 
-  const payloadResult = parseDeletePayload(body);
-  if ('error' in payloadResult) {
-    return json({ error: payloadResult.error }, { status: 400 });
-  }
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return json({ error: 'Invalid JSON body' }, { status: 400 });
+    }
 
-  if (payloadResult.value.layer === 'base' && !canWriteToBase(databaseIdResult.value)) {
-    return json({ error: 'Cannot write to base layer without personal access token' }, { status: 403 });
-  }
+    const payloadResult = parseDeletePayload(body);
+    if ('error' in payloadResult) {
+      return json({ error: payloadResult.error }, { status: 400 });
+    }
 
-  try {
+    if (payloadResult.value.layer === 'base' && !canWriteToBase(databaseIdResult.value)) {
+      return json({ error: 'Cannot write to base layer without personal access token' }, { status: 403 });
+    }
+
     const current = await metadataProfiles.get(database.value, profileIdResult.value);
     if (!current) {
       return json({ error: 'Metadata profile not found' }, { status: 404 });
@@ -470,6 +549,6 @@ export const DELETE: RequestHandler = async ({ params, request }) => {
     return json({ success: true });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to delete metadata profile';
-    return json({ error: message }, { status: message.includes('not found') ? 404 : 500 });
+    return json({ error: message }, { status: getWriteErrorStatus(message) });
   }
 };

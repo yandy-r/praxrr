@@ -37,6 +37,8 @@ interface LidarrMetadataProfileTypeRow {
   allowed?: boolean;
 }
 
+type MetadataProfileSectionKind = 'primary' | 'secondary' | 'status';
+
 // ============================================================================
 // COMMON OPTIONS
 // ============================================================================
@@ -304,23 +306,24 @@ function getMetadataProfileTypeId(typeRow: LidarrMetadataProfileTypeRow, kind: '
 
   throw new Error(
     kind === 'status'
-      ? 'Metadata profile status identifier must be an integer id, statusId, or typeId'
+      ? 'Metadata profile status identifier must be an integer id or statusId'
       : 'Metadata profile type identifier must be an integer id or typeId'
   );
 }
 
 function normalizeLidarrMetadataProfileTypeRows(
+  section: MetadataProfileSectionKind,
   typeRows: readonly LidarrMetadataProfileTypeRow[],
 ): Array<{ typeId: number; name: string; allowed: boolean }> {
   return typeRows
     .slice()
     .sort((a, b) => {
-      const aId = getMetadataProfileTypeId(a, 'album');
-      const bId = getMetadataProfileTypeId(b, 'album');
+      const aId = getMetadataProfileTypeId(a, section === 'status' ? 'status' : 'album');
+      const bId = getMetadataProfileTypeId(b, section === 'status' ? 'status' : 'album');
       return aId - bId;
     })
     .map((type) => ({
-      typeId: getMetadataProfileTypeId(type, 'album'),
+      typeId: getMetadataProfileTypeId(type, section === 'status' ? 'status' : 'album'),
       name: type.name ?? '',
       allowed: !!type.allowed,
     }));
@@ -329,18 +332,11 @@ function normalizeLidarrMetadataProfileTypeRows(
 function normalizeLidarrMetadataProfileReleaseStatusRows(
   rows: readonly LidarrMetadataProfileTypeRow[]
 ): Array<{ statusId: number; name: string; allowed: boolean }> {
-  return rows
-    .slice()
-    .sort((a, b) => {
-      const aId = getMetadataProfileTypeId(a, 'status');
-      const bId = getMetadataProfileTypeId(b, 'status');
-      return aId - bId;
-    })
-    .map((status) => ({
-      statusId: getMetadataProfileTypeId(status, 'status'),
-      name: status.name ?? '',
-      allowed: !!status.allowed,
-    }));
+  return normalizeLidarrMetadataProfileTypeRows('status', rows).map((row) => ({
+    statusId: row.typeId,
+    name: row.name,
+    allowed: row.allowed,
+  }));
 }
 
 export async function deserializeLidarrMetadataProfile(
@@ -355,8 +351,8 @@ export async function deserializeLidarrMetadataProfile(
     input: {
       name: portable.name,
       description: portable.description,
-      primaryAlbumTypes: normalizeLidarrMetadataProfileTypeRows(portable.primaryTypes),
-      secondaryAlbumTypes: normalizeLidarrMetadataProfileTypeRows(portable.secondaryTypes),
+      primaryAlbumTypes: normalizeLidarrMetadataProfileTypeRows('primary', portable.primaryTypes),
+      secondaryAlbumTypes: normalizeLidarrMetadataProfileTypeRows('secondary', portable.secondaryTypes),
       releaseStatuses: normalizeLidarrMetadataProfileReleaseStatusRows(portable.releaseStatuses),
     },
   });

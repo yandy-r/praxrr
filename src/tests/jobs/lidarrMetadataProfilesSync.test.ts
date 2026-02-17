@@ -218,21 +218,21 @@ Deno.test({
       assertEquals(lidarrResult.status, 'skipped');
       assertEquals(
         lidarrResult.output,
-        'qualityProfiles: skipped, delayProfiles: skipped, mediaManagement: skipped, metadataProfiles: skipped'
+        'metadataProfiles: skipped'
       );
 
       const radarrResult = await handler(createMetadataSyncJob(302, 'manual'));
       assertEquals(radarrResult.status, 'skipped');
       assertEquals(
         radarrResult.output,
-        'qualityProfiles: skipped, delayProfiles: skipped, mediaManagement: skipped, metadataProfiles: skipped (Section metadataProfiles is not supported for radarr)'
+        'metadataProfiles: skipped (Section metadataProfiles is not supported for radarr)'
       );
 
       const sonarrResult = await handler(createMetadataSyncJob(303, 'manual'));
       assertEquals(sonarrResult.status, 'skipped');
       assertEquals(
         sonarrResult.output,
-        'qualityProfiles: skipped, delayProfiles: skipped, mediaManagement: skipped, metadataProfiles: skipped (Section metadataProfiles is not supported for sonarr)'
+        'metadataProfiles: skipped (Section metadataProfiles is not supported for sonarr)'
       );
     } finally {
       arrInstancesQueries.getById = originalGetById;
@@ -383,7 +383,7 @@ Deno.test({
         assertEquals(successResult.status, 'success');
         assertEquals(
           successResult.output,
-          'qualityProfiles: skipped, delayProfiles: skipped, mediaManagement: skipped, metadataProfiles: 7 item(s)'
+          'metadataProfiles: 7 item(s)'
         );
         assertEquals(getMetadataProfileRow(501).sync_status, 'idle');
         assertEquals(getMetadataProfileRow(501).should_sync, 0);
@@ -401,7 +401,7 @@ Deno.test({
         assertEquals(failResult.status, 'failure');
         assertEquals(
           failResult.output,
-          'qualityProfiles: skipped, delayProfiles: skipped, mediaManagement: skipped, metadataProfiles: failed'
+          'metadataProfiles: failed'
         );
 
         const failedRow = getMetadataProfileRow(501);

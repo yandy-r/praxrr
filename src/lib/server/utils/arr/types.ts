@@ -558,11 +558,24 @@ export interface LidarrMetadataProfile {
   releaseStatuses: LidarrProfileReleaseStatusItem[];
 }
 
-export interface LidarrMetadataProfileCreatePayload extends Omit<LidarrMetadataProfile, 'id'> {}
+export interface LidarrMetadataProfileGetResponse extends LidarrMetadataProfile {}
 
-export interface LidarrMetadataProfileUpdatePayload extends LidarrMetadataProfile {}
+export type LidarrMetadataProfileListResponse = ReadonlyArray<LidarrMetadataProfileGetResponse>;
 
-export interface LidarrMetadataProfileSchema extends Omit<LidarrMetadataProfile, 'id'> {
+export interface LidarrMetadataProfileCreatePayload {
+  name: string;
+  primaryAlbumTypes: LidarrProfilePrimaryAlbumTypeItem[];
+  secondaryAlbumTypes: LidarrProfileSecondaryAlbumTypeItem[];
+  releaseStatuses: LidarrProfileReleaseStatusItem[];
+}
+
+export interface LidarrMetadataProfileUpdatePayload extends LidarrMetadataProfileCreatePayload {
+  id: number;
+}
+
+export interface LidarrMetadataProfileSchemaResponse extends Omit<LidarrMetadataProfile, 'id'> {}
+
+export interface LidarrMetadataProfileSchema extends LidarrMetadataProfileSchemaResponse {
   id?: number;
 }
 

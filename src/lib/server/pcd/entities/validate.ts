@@ -298,11 +298,11 @@ function validateLidarrMetadataProfileData(data: Record<string, unknown>): strin
   return null;
 }
 
-function validateLidarrMetadataProfileTypeRows(
-  path: string,
-  rows: unknown,
-  allowedIdentifierFields: readonly string[]
-): string | null {
+  function validateLidarrMetadataProfileTypeRows(
+    path: string,
+    rows: unknown,
+    allowedIdentifierFields: readonly string[]
+  ): string | null {
   if (!Array.isArray(rows)) {
     return `${path} must be an array`;
   }
@@ -335,8 +335,8 @@ function validateLidarrMetadataProfileTypeRows(
       return `${path}[${index}] has unsupported fields: ${unsupportedFields.sort((a, b) => a.localeCompare(b)).join(', ')}`;
     }
 
-    if (typeof typedRow.name !== 'string') {
-      return `${path}[${index}].name must be a string`;
+    if (typeof typedRow.name !== 'string' || !typedRow.name.trim()) {
+      return `${path}[${index}].name must be a non-empty string`;
     }
     if (typeof typedRow.allowed !== 'boolean') {
       return `${path}[${index}].allowed must be a boolean`;

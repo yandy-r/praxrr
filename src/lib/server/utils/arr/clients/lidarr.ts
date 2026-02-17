@@ -7,8 +7,9 @@ import type {
   LidarrProfileLookup,
   LidarrProfileLookupItem,
   LidarrRelease,
-  LidarrMetadataProfile,
+  LidarrMetadataProfileGetResponse,
   LidarrMetadataProfileCreatePayload,
+  LidarrMetadataProfileListResponse,
   LidarrMetadataProfileSchema,
   LidarrMetadataProfileUpdatePayload,
 } from '../types.ts';
@@ -132,15 +133,15 @@ export class LidarrClient extends BaseArrClient {
   /**
    * Get all metadata profiles
    */
-  getMetadataProfiles(): Promise<LidarrMetadataProfile[]> {
-    return this.get<LidarrMetadataProfile[]>(`/api/${this.apiVersion}/metadataprofile`);
+  getMetadataProfiles(): Promise<LidarrMetadataProfileListResponse> {
+    return this.get<LidarrMetadataProfileListResponse>(`/api/${this.apiVersion}/metadataprofile`);
   }
 
   /**
    * Get a metadata profile by ID
    */
-  getMetadataProfile(id: number): Promise<LidarrMetadataProfile> {
-    return this.get<LidarrMetadataProfile>(`/api/${this.apiVersion}/metadataprofile/${id}`);
+  getMetadataProfile(id: number): Promise<LidarrMetadataProfileGetResponse> {
+    return this.get<LidarrMetadataProfileGetResponse>(`/api/${this.apiVersion}/metadataprofile/${id}`);
   }
 
   /**
@@ -153,15 +154,15 @@ export class LidarrClient extends BaseArrClient {
   /**
    * Create a metadata profile
    */
-  createMetadataProfile(profile: LidarrMetadataProfileCreatePayload): Promise<LidarrMetadataProfile> {
-    return this.post<LidarrMetadataProfile>(`/api/${this.apiVersion}/metadataprofile`, profile);
+  createMetadataProfile(profile: LidarrMetadataProfileCreatePayload): Promise<LidarrMetadataProfileGetResponse> {
+    return this.post<LidarrMetadataProfileGetResponse>(`/api/${this.apiVersion}/metadataprofile`, profile);
   }
 
   /**
    * Update a metadata profile
    */
-  updateMetadataProfile(id: number, profile: LidarrMetadataProfileUpdatePayload): Promise<LidarrMetadataProfile> {
-    return this.put<LidarrMetadataProfile>(`/api/${this.apiVersion}/metadataprofile/${id}`, {
+  updateMetadataProfile(id: number, profile: LidarrMetadataProfileUpdatePayload): Promise<LidarrMetadataProfileGetResponse> {
+    return this.put<LidarrMetadataProfileGetResponse>(`/api/${this.apiVersion}/metadataprofile/${id}`, {
       ...profile,
       id,
     });

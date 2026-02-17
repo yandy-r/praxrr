@@ -697,7 +697,10 @@ export const arrSyncQueries = {
       databaseId
     );
     db.execute(
-      'UPDATE arr_sync_metadata_profiles_config SET database_id = NULL, profile_name = NULL WHERE database_id = ?',
+      `UPDATE arr_sync_metadata_profiles_config
+			 SET database_id = NULL, profile_name = NULL
+			 WHERE database_id = ?
+			 AND instance_id IN (SELECT id FROM arr_instances WHERE type = 'lidarr')`,
       databaseId
     );
   },

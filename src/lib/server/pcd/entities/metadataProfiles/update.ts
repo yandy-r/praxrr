@@ -41,19 +41,65 @@ function normalizeDescription(value: string | null): string | null {
 }
 
 function normalizeAlbumTypeRows(rows: MetadataProfileAlbumTypeToggle[]): AlbumToggleArray {
-  return rows.map((row) => ({
-    typeId: row.typeId,
-    name: row.name,
-    allowed: !!row.allowed,
-  }));
+  const seen = new Set<number>();
+  const normalized: AlbumToggleArray = [];
+
+  for (const row of rows) {
+    if (!Number.isInteger(row.typeId)) {
+      throw new Error('Each metadata profile primary/secondary type id must be an integer');
+    }
+
+    const name = row.name.trim();
+    if (!name) {
+      throw new Error('Metadata profile type names are required');
+    }
+
+    if (seen.has(row.typeId)) {
+      throw new Error(`Duplicate metadata profile type id "${row.typeId}"`);
+    }
+    seen.add(row.typeId);
+
+    const normalizedRow: MetadataProfileAlbumTypeToggle = {
+      typeId: row.typeId,
+      name,
+      allowed: !!row.allowed,
+    };
+
+    normalized.push(normalizedRow);
+  }
+
+  return normalized;
 }
 
 function normalizeReleaseStatusRows(rows: MetadataProfileReleaseStatusToggle[]): ReleaseToggleArray {
-  return rows.map((row) => ({
-    statusId: row.statusId,
-    name: row.name,
-    allowed: !!row.allowed,
-  }));
+  const seen = new Set<number>();
+  const normalized: ReleaseToggleArray = [];
+
+  for (const row of rows) {
+    if (!Number.isInteger(row.statusId)) {
+      throw new Error('Each metadata profile release status id must be an integer');
+    }
+
+    const name = row.name.trim();
+    if (!name) {
+      throw new Error('Metadata profile release status names are required');
+    }
+
+    if (seen.has(row.statusId)) {
+      throw new Error(`Duplicate metadata profile release status id "${row.statusId}"`);
+    }
+    seen.add(row.statusId);
+
+    const normalizedRow: MetadataProfileReleaseStatusToggle = {
+      statusId: row.statusId,
+      name,
+      allowed: !!row.allowed,
+    };
+
+    normalized.push(normalizedRow);
+  }
+
+  return normalized;
 }
 
 function hasSameAlbumTypes(a: AlbumToggleArray, b: AlbumToggleArray): boolean {
@@ -104,6 +150,8 @@ export async function update(options: UpdateMetadataProfileOptions) {
     throw new Error('Metadata profile name is required');
   }
 
+  const nameChanged = current.name !== nextName;
+
   if (nextName.toLowerCase() === RESERVED_NAME) {
     await logger.warn(`Reserved metadata profile name "${nextName}"`, {
       source: 'LidarrMetadataProfile',
@@ -111,24 +159,6 @@ export async function update(options: UpdateMetadataProfileOptions) {
     });
     throw new Error("'None' is a reserved profile name");
   }
-
-  const nextPrimaryAlbumTypes = input.primaryAlbumTypes
-    ? normalizeAlbumTypeRows(input.primaryAlbumTypes)
-    : current.primaryAlbumTypes;
-  const nextSecondaryAlbumTypes = input.secondaryAlbumTypes
-    ? normalizeAlbumTypeRows(input.secondaryAlbumTypes)
-    : current.secondaryAlbumTypes;
-  const nextReleaseStatuses = input.releaseStatuses
-    ? normalizeReleaseStatusRows(input.releaseStatuses)
-    : current.releaseStatuses;
-
-  const nameChanged = current.name !== nextName;
-  const descriptionChanged = input.description !== undefined && current.description !== nextDescription;
-  const primaryChanged = input.primaryAlbumTypes !== undefined && !hasSameAlbumTypes(current.primaryAlbumTypes, nextPrimaryAlbumTypes);
-  const secondaryChanged =
-    input.secondaryAlbumTypes !== undefined && !hasSameAlbumTypes(current.secondaryAlbumTypes, nextSecondaryAlbumTypes);
-  const releaseStatusesChanged =
-    input.releaseStatuses !== undefined && !hasSameReleaseStatuses(current.releaseStatuses, nextReleaseStatuses);
 
   if (nameChanged) {
     const existing = await db
@@ -146,6 +176,23 @@ export async function update(options: UpdateMetadataProfileOptions) {
       throw new Error(`A Lidarr metadata profile with name "${nextName}" already exists`);
     }
   }
+
+  const nextPrimaryAlbumTypes = input.primaryAlbumTypes
+    ? normalizeAlbumTypeRows(input.primaryAlbumTypes)
+    : current.primaryAlbumTypes;
+  const nextSecondaryAlbumTypes = input.secondaryAlbumTypes
+    ? normalizeAlbumTypeRows(input.secondaryAlbumTypes)
+    : current.secondaryAlbumTypes;
+  const nextReleaseStatuses = input.releaseStatuses
+    ? normalizeReleaseStatusRows(input.releaseStatuses)
+    : current.releaseStatuses;
+
+  const descriptionChanged = input.description !== undefined && current.description !== nextDescription;
+  const primaryChanged = input.primaryAlbumTypes !== undefined && !hasSameAlbumTypes(current.primaryAlbumTypes, nextPrimaryAlbumTypes);
+  const secondaryChanged =
+    input.secondaryAlbumTypes !== undefined && !hasSameAlbumTypes(current.secondaryAlbumTypes, nextSecondaryAlbumTypes);
+  const releaseStatusesChanged =
+    input.releaseStatuses !== undefined && !hasSameReleaseStatuses(current.releaseStatuses, nextReleaseStatuses);
 
   if (!nameChanged && !descriptionChanged && !primaryChanged && !secondaryChanged && !releaseStatusesChanged) {
     return { success: true };

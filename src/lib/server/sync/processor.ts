@@ -345,7 +345,7 @@ export async function triggerSyncs(context: TriggerContext): Promise<void> {
     if (status.metadataProfiles && triggers.includes(status.metadataProfiles.trigger)) {
       arrSyncQueries.setMetadataProfilesStatusPending(instanceId);
       upsertScheduledJob({
-        jobType: 'arr.sync',
+        jobType: 'arr.sync.metadataProfiles',
         runAt: new Date().toISOString(),
         payload: { instanceId },
         source: 'system',

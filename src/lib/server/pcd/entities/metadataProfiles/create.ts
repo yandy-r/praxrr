@@ -23,6 +23,7 @@ interface CreateMetadataProfileOptions {
 }
 
 const RESERVED_NAME = 'none';
+const REQUIRED_ALLOWED_ERROR = 'Each metadata profile section must include at least one allowed entry';
 
 function normalizeName(name: string): string {
   return name.trim();
@@ -32,20 +33,88 @@ function normalizeDescription(value: string | null): string | null {
   return value === null ? null : value.trim();
 }
 
-function normalizeAlbumTypeRows(rows: MetadataProfileAlbumTypeToggle[]) {
-  return rows.map((row) => ({
-    typeId: row.typeId,
-    name: row.name,
-    allowed: !!row.allowed,
-  }));
+type NormalizedAlbumType = MetadataProfileAlbumTypeToggle;
+
+function normalizeAlbumTypeRows(rows: MetadataProfileAlbumTypeToggle[]): NormalizedAlbumType[] {
+  const seen = new Set<number>();
+  const normalized: NormalizedAlbumType[] = [];
+  let hasAllowed = false;
+
+  for (const row of rows) {
+    if (!Number.isInteger(row.typeId)) {
+      throw new Error('Each metadata profile primary/secondary type id must be an integer');
+    }
+
+    const name = row.name.trim();
+    if (!name) {
+      throw new Error('Metadata profile type names are required');
+    }
+
+    if (seen.has(row.typeId)) {
+      throw new Error(`Duplicate metadata profile type id "${row.typeId}"`);
+    }
+    seen.add(row.typeId);
+
+    const normalizedRow: NormalizedAlbumType = {
+      typeId: row.typeId,
+      name,
+      allowed: !!row.allowed,
+    };
+
+    if (normalizedRow.allowed) {
+      hasAllowed = true;
+    }
+
+    normalized.push(normalizedRow);
+  }
+
+  if (!hasAllowed) {
+    throw new Error(REQUIRED_ALLOWED_ERROR);
+  }
+
+  return normalized;
 }
 
-function normalizeReleaseStatusRows(rows: MetadataProfileReleaseStatusToggle[]) {
-  return rows.map((row) => ({
-    statusId: row.statusId,
-    name: row.name,
-    allowed: !!row.allowed,
-  }));
+type NormalizedReleaseStatus = MetadataProfileReleaseStatusToggle;
+
+function normalizeReleaseStatusRows(rows: MetadataProfileReleaseStatusToggle[]): NormalizedReleaseStatus[] {
+  const seen = new Set<number>();
+  const normalized: NormalizedReleaseStatus[] = [];
+  let hasAllowed = false;
+
+  for (const row of rows) {
+    if (!Number.isInteger(row.statusId)) {
+      throw new Error('Each metadata profile release status id must be an integer');
+    }
+
+    const name = row.name.trim();
+    if (!name) {
+      throw new Error('Metadata profile release status names are required');
+    }
+
+    if (seen.has(row.statusId)) {
+      throw new Error(`Duplicate metadata profile release status id "${row.statusId}"`);
+    }
+    seen.add(row.statusId);
+
+    const normalizedRow: NormalizedReleaseStatus = {
+      statusId: row.statusId,
+      name,
+      allowed: !!row.allowed,
+    };
+
+    if (normalizedRow.allowed) {
+      hasAllowed = true;
+    }
+
+    normalized.push(normalizedRow);
+  }
+
+  if (!hasAllowed) {
+    throw new Error(REQUIRED_ALLOWED_ERROR);
+  }
+
+  return normalized;
 }
 
 /**
@@ -57,9 +126,6 @@ export async function create(options: CreateMetadataProfileOptions) {
 
   const name = normalizeName(input.name);
   const description = normalizeDescription(input.description);
-  const primaryAlbumTypes = normalizeAlbumTypeRows(input.primaryAlbumTypes);
-  const secondaryAlbumTypes = normalizeAlbumTypeRows(input.secondaryAlbumTypes);
-  const releaseStatuses = normalizeReleaseStatusRows(input.releaseStatuses);
 
   if (name.toLowerCase() === RESERVED_NAME) {
     await logger.warn(`Reserved metadata profile name "${name}"`, {
@@ -86,6 +152,10 @@ export async function create(options: CreateMetadataProfileOptions) {
     });
     throw new Error(`A Lidarr metadata profile with name "${name}" already exists`);
   }
+
+  const primaryAlbumTypes = normalizeAlbumTypeRows(input.primaryAlbumTypes);
+  const secondaryAlbumTypes = normalizeAlbumTypeRows(input.secondaryAlbumTypes);
+  const releaseStatuses = normalizeReleaseStatusRows(input.releaseStatuses);
 
   const queries = [
     db

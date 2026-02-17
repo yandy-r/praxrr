@@ -197,7 +197,10 @@ function readErrorDetails(error: unknown): { message: string; response?: unknown
   return { message: 'Unknown error' };
 }
 
-function findMatchingRemoteProfile(profileName: string, remoteProfiles: Array<{ id: number; name: string }>): { id: number; name: string } | undefined {
+function findMatchingRemoteProfile(
+  profileName: string,
+  remoteProfiles: ReadonlyArray<{ id: number; name: string }>
+): { id: number; name: string } | undefined {
   return remoteProfiles.find((profile) => profile.name === profileName);
 }
 

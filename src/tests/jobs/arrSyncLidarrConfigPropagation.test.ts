@@ -519,6 +519,57 @@ Deno.test({
         );
       });
 
+      await t.step('metadata profile cleanup is lidarr-scoped and validation failures are fail-fast', () => {
+        insertInstance(11, 'lidarr');
+        insertInstance(12, 'radarr');
+
+        arrSyncQueries.saveMetadataProfilesSync(11, {
+          databaseId: 1101,
+          profileName: 'Scoped Metadata',
+          trigger: 'manual',
+          cron: null,
+        });
+
+        db.execute(
+          `INSERT INTO arr_sync_metadata_profiles_config
+            (instance_id, trigger, cron, should_sync, next_run_at, database_id, profile_name, sync_status, last_error, last_synced_at)
+            VALUES (12, 'manual', null, 0, null, 1101, 'Radarr Metadata', 'idle', null, null)`
+        );
+
+        const before = getMetadataProfilesRow(11);
+        assertEquals(before.database_id, 1101);
+        assertEquals(before.profile_name, 'Scoped Metadata');
+
+        assertThrows(
+          () =>
+            saveMetadataProfiles(11, {
+              databaseId: 1101,
+              profileName: '   ',
+              trigger: 'manual',
+              cron: null,
+            }),
+          Error,
+          'Invalid metadata profile selection: database_id and profile_name must be set together'
+        );
+
+        const afterFail = getMetadataProfilesRow(11);
+        assertEquals(afterFail.database_id, 1101);
+        assertEquals(afterFail.profile_name, 'Scoped Metadata');
+
+        arrSyncQueries.removeDatabaseReferences(1101);
+        const cleanedLidarr = getMetadataProfilesRow(11);
+        assertEquals(cleanedLidarr.database_id, null);
+        assertEquals(cleanedLidarr.profile_name, null);
+
+        const cleanedRadarr = db.queryFirst<{ database_id: number | null; profile_name: string | null }>(
+          'SELECT database_id, profile_name FROM arr_sync_metadata_profiles_config WHERE instance_id = ?',
+          12
+        );
+        assertExists(cleanedRadarr);
+        assertEquals(cleanedRadarr.database_id, 1101);
+        assertEquals(cleanedRadarr.profile_name, 'Radarr Metadata');
+      });
+
       await t.step('metadata profile aggregate selectors and lifecycle helpers stay lidarr-scoped', () => {
         insertInstance(9, 'lidarr');
         insertInstance(10, 'radarr');
