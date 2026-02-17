@@ -40,6 +40,250 @@ paths:
     $ref: './paths/pcd.yaml#/export'
   /pcd/import:
     $ref: './paths/pcd.yaml#/import'
+  /pcd/{databaseId}/lidarr-metadata-profiles:
+    get:
+      operationId: listLidarrMetadataProfiles
+      summary: List Lidarr metadata profiles
+      description: |
+        Reads Lidarr metadata profiles from a PCD database.
+
+        Metadata profiles are a Lidarr-only entity family and are not available
+        for Radarr or Sonarr entities.
+      tags:
+        - PCD
+      parameters:
+        - name: databaseId
+          in: path
+          required: true
+          description: PCD database ID
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Metadata profile list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/LidarrMetadataProfile'
+        '400':
+          description: Missing or invalid databaseId
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PcdErrorResponse'
+        '404':
+          description: Database not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PcdErrorResponse'
+        '500':
+          description: Failed to read cache
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PcdErrorResponse'
+    post:
+      operationId: createLidarrMetadataProfile
+      summary: Create a Lidarr metadata profile
+      description: |
+        Creates a Lidarr metadata profile in the selected PCD database.
+
+        Runtime validation enforces Lidarr-specific rules including:
+        - case-insensitive unique profile name
+        - reserved name `None` is rejected
+        - all source categories include explicit `allowed` booleans
+      tags:
+        - PCD
+      parameters:
+        - name: databaseId
+          in: path
+          required: true
+          description: PCD database ID
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LidarrMetadataProfileCreateRequest'
+      responses:
+        '200':
+          description: Metadata profile created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LidarrMetadataProfileMutationResponse'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PcdErrorResponse'
+        '403':
+          description: Base layer write is not allowed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PcdErrorResponse'
+        '500':
+          description: Write failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PcdErrorResponse'
+  /pcd/{databaseId}/lidarr-metadata-profiles/{id}:
+    get:
+      operationId: getLidarrMetadataProfile
+      summary: Get one Lidarr metadata profile
+      description: Returns a single Lidarr metadata profile by local profile id.
+      tags:
+        - PCD
+      parameters:
+        - name: databaseId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: id
+          in: path
+          required: true
+          description: Local metadata profile id
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Metadata profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LidarrMetadataProfile'
+        '400':
+          description: Missing or invalid parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PcdErrorResponse'
+        '404':
+          description: Database or profile not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PcdErrorResponse'
+        '500':
+          description: Failed to read profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PcdErrorResponse'
+    put:
+      operationId: updateLidarrMetadataProfile
+      summary: Update a Lidarr metadata profile
+      description: |
+        Updates selected fields of an existing Lidarr metadata profile.
+
+        Partial updates are supported for edit flows.
+      tags:
+        - PCD
+      parameters:
+        - name: databaseId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: id
+          in: path
+          required: true
+          description: Local metadata profile id
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LidarrMetadataProfileUpdateRequest'
+      responses:
+        '200':
+          description: Metadata profile updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LidarrMetadataProfileMutationResponse'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PcdErrorResponse'
+        '404':
+          description: Database or profile not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PcdErrorResponse'
+        '500':
+          description: Update failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PcdErrorResponse'
+    delete:
+      operationId: deleteLidarrMetadataProfile
+      summary: Delete a Lidarr metadata profile
+      description: |
+        Deletes a Lidarr metadata profile by id.
+
+        Deletes are rejected if runtime guard checks detect in-use rows or stale
+        value guards.
+      tags:
+        - PCD
+      parameters:
+        - name: databaseId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: id
+          in: path
+          required: true
+          description: Local metadata profile id
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LidarrMetadataProfileDeleteRequest'
+      responses:
+        '200':
+          description: Metadata profile deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LidarrMetadataProfileMutationResponse'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PcdErrorResponse'
+        '404':
+          description: Database or profile not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PcdErrorResponse'
+        '500':
+          description: Delete failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PcdErrorResponse'
 
 components:
   schemas:
@@ -125,3 +369,142 @@ components:
       $ref: './schemas/pcd.yaml#/ImportRequest'
     ImportResponse:
       $ref: './schemas/pcd.yaml#/ImportResponse'
+    LidarrMetadataProfileAlbumTypeItem:
+      type: object
+      required:
+        - typeId
+        - name
+        - allowed
+      properties:
+        typeId:
+          type: integer
+          description: Lidarr album type id
+        name:
+          type: string
+          description: Lidarr album type name
+        allowed:
+          type: boolean
+          description: Whether the type is selected
+    LidarrMetadataProfileReleaseStatusItem:
+      type: object
+      required:
+        - statusId
+        - name
+        - allowed
+      properties:
+        statusId:
+          type: integer
+          description: Lidarr release status id
+        name:
+          type: string
+          description: Lidarr release status name
+        allowed:
+          type: boolean
+          description: Whether the status is selected
+    LidarrMetadataProfile:
+      type: object
+      required:
+        - id
+        - name
+        - primaryAlbumTypes
+        - secondaryAlbumTypes
+        - releaseStatuses
+      properties:
+        id:
+          type: integer
+          description: Local profile id in PCD cache
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+          description: |
+            Optional Profilarr-only description for local documentation.
+        primaryAlbumTypes:
+          type: array
+          items:
+            $ref: '#/components/schemas/LidarrMetadataProfileAlbumTypeItem'
+        secondaryAlbumTypes:
+          type: array
+          items:
+            $ref: '#/components/schemas/LidarrMetadataProfileAlbumTypeItem'
+        releaseStatuses:
+          type: array
+          items:
+            $ref: '#/components/schemas/LidarrMetadataProfileReleaseStatusItem'
+    LidarrMetadataProfileCreateRequest:
+      type: object
+      required:
+        - name
+        - primaryAlbumTypes
+        - secondaryAlbumTypes
+        - releaseStatuses
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+        primaryAlbumTypes:
+          type: array
+          items:
+            $ref: '#/components/schemas/LidarrMetadataProfileAlbumTypeItem'
+        secondaryAlbumTypes:
+          type: array
+          items:
+            $ref: '#/components/schemas/LidarrMetadataProfileAlbumTypeItem'
+        releaseStatuses:
+          type: array
+          items:
+            $ref: '#/components/schemas/LidarrMetadataProfileReleaseStatusItem'
+      description: |
+        Create payload for Lidarr metadata profile entities.
+
+        Full arrays are expected for each section group; runtime validation enforces:
+        - all known types/statuses are represented with explicit `allowed` flags
+        - at least one enabled primary, one enabled secondary, one enabled status
+        - reserved profile name `None` is rejected
+        - case-insensitive name uniqueness in the target PCD database
+    LidarrMetadataProfileUpdateRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+        primaryAlbumTypes:
+          type: array
+          items:
+            $ref: '#/components/schemas/LidarrMetadataProfileAlbumTypeItem'
+        secondaryAlbumTypes:
+          type: array
+          items:
+            $ref: '#/components/schemas/LidarrMetadataProfileAlbumTypeItem'
+        releaseStatuses:
+          type: array
+          items:
+            $ref: '#/components/schemas/LidarrMetadataProfileReleaseStatusItem'
+      description: |
+        Partial update payload for Lidarr metadata profile entities.
+
+        Omitted fields are preserved by the write layer.
+    LidarrMetadataProfileDeleteRequest:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          description: |
+            Current row name used by value guards for concurrency detection.
+    LidarrMetadataProfileMutationResponse:
+      type: object
+      required:
+        - success
+      properties:
+        success:
+          type: boolean
+        error:
+          type: string
+          nullable: true

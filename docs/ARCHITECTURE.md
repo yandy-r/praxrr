@@ -319,6 +319,23 @@ Key files:
 Sync strategies include manual and scheduled runs. Dependencies (e.g., custom
 formats referenced by profiles) are synced first.
 
+### 7.1) Lidarr Metadata Profile Guardrails
+
+Metadata profiles are introduced as a Lidarr-only contract and must remain
+isolated from Radarr/Sonarr runtime paths:
+
+- Profile tables are explicitly Lidarr-prefixed (`lidarr_metadata_profiles`,
+  child tables for primary types, secondary types, and release statuses).
+- Capability and section registration must advertise this surface only when
+  `arr_instances.type === 'lidarr'`.
+- Sync selection, config writes, and publish/update logic must check for Lidarr scope
+  before any API call is made to avoid cross-arr execution.
+- Portable/import/export payload contracts must not include mixed-family entities;
+  Lidarr metadata profile shapes are accepted only on Lidarr metadata paths.
+- Runtime path for metadata profile sync must continue to avoid using generic
+  `arr_type = 'all'` fallbacks, so Sonarr/Radarr naming or profile payloads are
+  never interpreted as Lidarr metadata profiles.
+
 ## 8) Parser Service
 
 Profilarr uses a C# parser microservice to extract structured metadata from

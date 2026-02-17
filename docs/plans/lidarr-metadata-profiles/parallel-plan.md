@@ -390,6 +390,23 @@ Files to Modify
 - Record unresolved risks/gaps and finalize readiness notes in the workflow tracking section.
 - Mark plan tasks complete only after evidence-backed verification is captured.
 
+#### Task 3.5: Execution evidence (Issue 160)
+
+- [x] `deno task check` run captured (failed at current head):
+  - `src/routes/arr/components/InstanceForm.svelte:111` — `metadata_profiles` key missing from `Record<ArrSyncSurface, string>`.
+- [x] Targeted arr entity operations test suite run captured:
+  - `deno test -A --no-check src/tests/arr/lidarrMetadataProfilesEntityOperations.test.ts` (pass, `12 passed`).
+- [x] Targeted metadata-profile sync suite run captured:
+  - `deno test -A --no-check src/tests/jobs/lidarrMetadataProfilesSync.test.ts` (pass, `3 passed`).
+- [x] Capability gate suite run captured:
+  - `deno test -A --no-check src/tests/upgrades/lidarrCapabilityGates.test.ts` (pass, `14 passed`).
+- [ ] Route contracts, sync support matrix, and portable import/export validation is only partially satisfied by the required suites:
+  - Entity suite covers API route payload validation and error paths for metadata profile list/create/update/delete endpoints.
+  - Sync suite covers lidarr-only section support and pending/claimed/complete/fail lifecycle behavior.
+  - Capability suite covers `metadata_profiles` capability surface behavior.
+  - No dedicated portable import/export regression run was executed in this task; gap remains.
+- [ ] Readiness: **Not ready** for production release due to blocking shared `deno task check` failure unrelated to this feature path.
+
 ## Advice
 
 - Keep migration SQL, `0.schema.sql`, and generated/shared type contracts synchronized in the same change set to avoid silent runtime drift.
