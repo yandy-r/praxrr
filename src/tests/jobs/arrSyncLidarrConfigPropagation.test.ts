@@ -1,7 +1,11 @@
 import { assertEquals, assertExists, assertThrows } from '@std/assert';
 import { config } from '$config';
 import { db } from '$db/db.ts';
-import { arrSyncQueries, type MediaManagementSyncData } from '$db/queries/arrSync.ts';
+import {
+  arrSyncQueries,
+  type MediaManagementSyncData,
+  type MetadataProfilesSyncData,
+} from '$db/queries/arrSync.ts';
 
 type ArrSyncMediaManagementRow = {
   instance_id: number;
@@ -11,6 +15,12 @@ type ArrSyncMediaManagementRow = {
   quality_definitions_config_name: string | null;
   media_settings_database_id: number | null;
   media_settings_config_name: string | null;
+};
+
+type ArrSyncMetadataProfilesRow = {
+  instance_id: number;
+  database_id: number | null;
+  profile_name: string | null;
 };
 
 type MediaManagementConfigNameColumn =
@@ -41,6 +51,19 @@ function bootstrapSchema(): void {
       last_error TEXT,
       last_synced_at TEXT
     );
+
+    CREATE TABLE arr_sync_metadata_profiles_config (
+      instance_id INTEGER PRIMARY KEY,
+      trigger TEXT NOT NULL DEFAULT 'manual',
+      cron TEXT,
+      should_sync INTEGER NOT NULL DEFAULT 0,
+      next_run_at TEXT,
+      database_id INTEGER,
+      profile_name TEXT,
+      sync_status TEXT NOT NULL DEFAULT 'idle',
+      last_error TEXT,
+      last_synced_at TEXT
+    );
   `);
 }
 
@@ -50,6 +73,10 @@ function insertInstance(id: number, type: string): void {
 
 function saveMediaManagement(instanceId: number, data: MediaManagementSyncData): void {
   arrSyncQueries.saveMediaManagementSync(instanceId, data);
+}
+
+function saveMetadataProfiles(instanceId: number, data: MetadataProfilesSyncData): void {
+  arrSyncQueries.saveMetadataProfilesSync(instanceId, data);
 }
 
 function getMediaManagementRow(instanceId: number): ArrSyncMediaManagementRow {
@@ -71,6 +98,29 @@ function getMediaManagementRow(instanceId: number): ArrSyncMediaManagementRow {
   return row;
 }
 
+function getMetadataProfilesRow(instanceId: number): ArrSyncMetadataProfilesRow {
+  const row = db.queryFirst<ArrSyncMetadataProfilesRow>(
+    `SELECT
+      instance_id,
+      database_id,
+      profile_name
+      FROM arr_sync_metadata_profiles_config
+      WHERE instance_id = ?`,
+    instanceId
+  );
+
+  assertExists(row);
+  return row;
+}
+
+function getMetadataProfileInstanceIds(profileName: string): number[] {
+  return db
+    .query<{
+      instance_id: number;
+    }>('SELECT instance_id FROM arr_sync_metadata_profiles_config WHERE profile_name = ? ORDER BY instance_id', profileName)
+    .map((row) => row.instance_id);
+}
+
 function getInstanceIdsByConfigName(column: MediaManagementConfigNameColumn, configName: string): number[] {
   return db
     .query<{
@@ -87,6 +137,15 @@ function createValidSyncData(): MediaManagementSyncData {
     qualityDefinitionsConfigName: 'Lidarr Quality',
     mediaSettingsDatabaseId: 13,
     mediaSettingsConfigName: 'Lidarr Media',
+    trigger: 'manual',
+    cron: null,
+  };
+}
+
+function createMetadataSyncData(databaseId = 11, profileName = 'Lidarr Metadata'): MetadataProfilesSyncData {
+  return {
+    databaseId,
+    profileName,
     trigger: 'manual',
     cron: null,
   };
@@ -276,6 +335,143 @@ Deno.test({
             databaseId: 301,
           }),
           0
+        );
+      });
+
+      await t.step('metadata profile helpers enforce lidarr-only scope and paired selection validation', () => {
+        insertInstance(6, 'lidarr');
+        insertInstance(7, 'radarr');
+        insertInstance(8, 'lidarr');
+
+        arrSyncQueries.saveMetadataProfilesSync(6, {
+          databaseId: 501,
+          profileName: '  Shared Metadata  ',
+          trigger: 'manual',
+          cron: null,
+        });
+
+        const savedMetadata = arrSyncQueries.getMetadataProfilesSync(6);
+        assertEquals(savedMetadata.databaseId, 501);
+        assertEquals(savedMetadata.profileName, '  Shared Metadata  ');
+        assertEquals(savedMetadata.trigger, 'manual');
+        assertEquals(savedMetadata.cron, null);
+
+        const metadataProfileRow = getMetadataProfilesRow(6);
+        assertEquals(metadataProfileRow.database_id, 501);
+        assertEquals(metadataProfileRow.profile_name, '  Shared Metadata  ');
+
+        const radarrMetadata = arrSyncQueries.getMetadataProfilesSync(7);
+        assertEquals(radarrMetadata.databaseId, null);
+        assertEquals(radarrMetadata.profileName, null);
+
+        assertThrows(
+          () =>
+            saveMetadataProfiles(7, {
+              databaseId: 701,
+              profileName: 'Radarr Metadata',
+              trigger: 'manual',
+              cron: null,
+            }),
+          Error,
+          'metadata profile sync is supported only for lidarr instances'
+        );
+
+        assertThrows(
+          () =>
+            saveMetadataProfiles(6, {
+              ...createMetadataSyncData(401),
+              profileName: null,
+            }),
+          Error,
+          'Invalid metadata profile selection: database_id and profile_name must be set together'
+        );
+
+        assertThrows(
+          () =>
+            saveMetadataProfiles(6, {
+              databaseId: null,
+              profileName: 'orphan',
+              trigger: 'manual',
+              cron: null,
+            }),
+          Error,
+          'Invalid metadata profile selection: database_id and profile_name must be set together'
+        );
+
+        assertThrows(
+          () =>
+            saveMetadataProfiles(6, {
+              databaseId: 501,
+              profileName: '   ',
+              trigger: 'manual',
+              cron: null,
+            }),
+          Error,
+          'Invalid metadata profile selection: database_id and profile_name must be set together'
+        );
+
+        arrSyncQueries.saveMetadataProfilesSync(8, {
+          ...createMetadataSyncData(501, 'Shared Metadata'),
+          trigger: 'manual',
+        });
+
+        assertEquals(
+          arrSyncQueries.updateMetadataProfileName('Shared Metadata', 'Renamed Metadata', {
+            arrType: 'lidarr',
+            databaseId: 501,
+          }),
+          1
+        );
+        assertEquals(getMetadataProfileInstanceIds('Renamed Metadata'), [8]);
+
+        assertEquals(
+          getMetadataProfileInstanceIds('Shared Metadata'),
+          []
+        );
+
+        assertEquals(
+          getMetadataProfileInstanceIds('  Shared Metadata  '),
+          [6]
+        );
+
+        assertEquals(
+          arrSyncQueries.updateMetadataProfileName('Renamed Metadata', 'Renamed Metadata', {
+            arrType: 'lidarr',
+            databaseId: 501,
+          }),
+          0
+        );
+
+        assertThrows(
+          () =>
+            arrSyncQueries.updateMetadataProfileName('   ', 'Fallback Metadata', {
+              arrType: 'lidarr',
+              databaseId: 501,
+            }),
+          Error,
+          'oldName is required'
+        );
+
+        assertThrows(
+          () =>
+            arrSyncQueries.updateMetadataProfileName('Shared Metadata', '   ', {
+              arrType: 'lidarr',
+              databaseId: 501,
+            }),
+          Error,
+          'newName is required'
+        );
+
+        assertEquals(
+          arrSyncQueries.updateMetadataProfileName('Renamed Metadata', 'Final Metadata', {
+            arrType: 'radarr',
+          }),
+          0
+        );
+
+        assertEquals(
+          getMetadataProfileInstanceIds('Final Metadata'),
+          []
         );
       });
     } finally {
