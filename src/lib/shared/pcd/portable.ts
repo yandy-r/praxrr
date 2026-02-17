@@ -88,6 +88,10 @@ export function getLidarrMediaManagementPortableEntry(entityType: EntityType) {
   return LIDARR_MEDIA_MANAGEMENT_PORTABLE_MATRIX[entityType];
 }
 
+export const LIDARR_METADATA_PROFILE_PORTABLE_ENTITIES = ['lidarr_metadata_profile'] as const;
+export type LidarrMetadataProfilePortableEntityType =
+  (typeof LIDARR_METADATA_PROFILE_PORTABLE_ENTITIES)[number];
+
 // ============================================================================
 // ENTITY TYPE ENUM
 // ============================================================================
@@ -103,6 +107,7 @@ export const ENTITY_TYPES = [
   'sonarr_media_settings',
   'radarr_quality_definitions',
   'sonarr_quality_definitions',
+  ...LIDARR_METADATA_PROFILE_PORTABLE_ENTITIES,
   ...LIDARR_MEDIA_MANAGEMENT_PORTABLE_ENTITIES,
 ] as const;
 
@@ -170,6 +175,20 @@ export interface PortableQualityProfile {
   upgradeUntilScore: number;
   upgradeScoreIncrement: number;
   customFormatScores: PortableCustomFormatScore[];
+}
+
+export interface PortableMetadataProfileType {
+  id: number;
+  name: string;
+  allowed: boolean;
+}
+
+export interface PortableLidarrMetadataProfile {
+  name: string;
+  description: string | null;
+  primaryTypes: PortableMetadataProfileType[];
+  secondaryTypes: PortableMetadataProfileType[];
+  releaseStatuses: PortableMetadataProfileType[];
 }
 
 // ============================================================================

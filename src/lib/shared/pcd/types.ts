@@ -223,6 +223,37 @@ export interface DelayProfilesTable {
   updated_at: Generated<string>;
 }
 
+// LIDARR METADATA PROFILES
+
+export interface LidarrMetadataProfilesTable {
+  id: Generated<number>;
+  name: string;
+  description: string | null;
+  created_at: Generated<string>;
+  updated_at: Generated<string>;
+}
+
+export interface LidarrMetadataProfilePrimaryTypesTable {
+  metadata_profile_name: string;
+  type_id: number;
+  name: string;
+  allowed: Generated<number>;
+}
+
+export interface LidarrMetadataProfileSecondaryTypesTable {
+  metadata_profile_name: string;
+  type_id: number;
+  name: string;
+  allowed: Generated<number>;
+}
+
+export interface LidarrMetadataProfileReleaseStatusesTable {
+  metadata_profile_name: string;
+  status_id: number;
+  name: string;
+  allowed: Generated<number>;
+}
+
 // MEDIA MANAGEMENT
 
 export interface RadarrNamingTable {
@@ -373,6 +404,10 @@ export interface PCDDatabase {
   radarr_media_settings: RadarrMediaSettingsTable;
   radarr_naming: RadarrNamingTable;
   radarr_quality_definitions: RadarrQualityDefinitionsTable;
+  lidarr_metadata_profile_primary_types: LidarrMetadataProfilePrimaryTypesTable;
+  lidarr_metadata_profile_release_statuses: LidarrMetadataProfileReleaseStatusesTable;
+  lidarr_metadata_profile_secondary_types: LidarrMetadataProfileSecondaryTypesTable;
+  lidarr_metadata_profiles: LidarrMetadataProfilesTable;
   regular_expression_tags: RegularExpressionTagsTable;
   regular_expressions: RegularExpressionsTable;
   sonarr_media_settings: SonarrMediaSettingsTable;
@@ -593,6 +628,37 @@ export interface DelayProfilesRow {
   minimum_custom_format_score: number | null;
   created_at: string;
   updated_at: string;
+}
+
+// LIDARR METADATA PROFILES
+
+export interface LidarrMetadataProfilesRow {
+  id: number;
+  name: string;
+  description: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface LidarrMetadataProfilePrimaryTypesRow {
+  metadata_profile_name: string;
+  type_id: number;
+  name: string;
+  allowed: boolean;
+}
+
+export interface LidarrMetadataProfileSecondaryTypesRow {
+  metadata_profile_name: string;
+  type_id: number;
+  name: string;
+  allowed: boolean;
+}
+
+export interface LidarrMetadataProfileReleaseStatusesRow {
+  metadata_profile_name: string;
+  status_id: number;
+  name: string;
+  allowed: boolean;
 }
 
 // MEDIA MANAGEMENT

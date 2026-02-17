@@ -517,6 +517,61 @@ export interface LidarrRelease {
 }
 
 // =============================================================================
+// Lidarr Metadata Profile Types
+// =============================================================================
+
+export interface LidarrProfilePrimaryAlbumTypeValue {
+  id: number;
+  name: string;
+}
+
+export interface LidarrProfileSecondaryAlbumTypeValue {
+  id: number;
+  name: string;
+}
+
+export interface LidarrReleaseStatusValue {
+  id: number;
+  name: string;
+}
+
+export interface LidarrProfilePrimaryAlbumTypeItem {
+  albumType: LidarrProfilePrimaryAlbumTypeValue;
+  allowed: boolean;
+}
+
+export interface LidarrProfileSecondaryAlbumTypeItem {
+  albumType: LidarrProfileSecondaryAlbumTypeValue;
+  allowed: boolean;
+}
+
+export interface LidarrProfileReleaseStatusItem {
+  releaseStatus: LidarrReleaseStatusValue;
+  allowed: boolean;
+}
+
+export interface LidarrMetadataProfileCreatePayload {
+  name: string;
+  primaryAlbumTypes: LidarrProfilePrimaryAlbumTypeItem[];
+  secondaryAlbumTypes: LidarrProfileSecondaryAlbumTypeItem[];
+  releaseStatuses: LidarrProfileReleaseStatusItem[];
+}
+
+export interface LidarrMetadataProfileUpdatePayload extends LidarrMetadataProfileCreatePayload {
+  id: number;
+}
+
+export interface LidarrMetadataProfileSchema extends LidarrMetadataProfileCreatePayload {
+  id?: number;
+}
+
+export interface LidarrMetadataProfile extends LidarrMetadataProfilePayload {
+  id: number;
+}
+
+export type LidarrMetadataProfilePayload = LidarrMetadataProfileCreatePayload;
+
+// =============================================================================
 // Library View Types (computed/joined data)
 // =============================================================================
 
