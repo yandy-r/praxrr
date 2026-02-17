@@ -3,14 +3,10 @@
  * Persists library data across navigations to avoid refetching on every page load
  */
 
-import { get, writable } from "svelte/store";
-import type {
-  LidarrLibraryItem,
-  RadarrLibraryItem,
-  SonarrLibraryItem,
-} from "$utils/arr/types.ts";
+import { get, writable } from 'svelte/store';
+import type { LidarrLibraryItem, RadarrLibraryItem, SonarrLibraryItem } from '$utils/arr/types.ts';
 
-type LibraryCacheSortDirection = "asc" | "desc";
+type LibraryCacheSortDirection = 'asc' | 'desc';
 
 interface LibraryCacheRequest {
   page: number;
@@ -20,10 +16,7 @@ interface LibraryCacheRequest {
   sortDirection?: LibraryCacheSortDirection;
 }
 
-type LibraryData =
-  | RadarrLibraryItem[]
-  | SonarrLibraryItem[]
-  | LidarrLibraryItem[];
+type LibraryData = RadarrLibraryItem[] | SonarrLibraryItem[] | LidarrLibraryItem[];
 
 interface LibraryCacheEntry {
   data: LibraryData;
@@ -46,48 +39,43 @@ interface LibraryCacheState {
 const DEFAULT_LIBRARY_CACHE_REQUEST: LibraryCacheRequest = {
   page: 1,
   pageSize: 100,
-  sortDirection: "asc",
+  sortDirection: 'asc',
 };
 
-function normalizeLibraryCacheQuery(
-  query?: LibraryCacheRequest,
-): LibraryCacheRequest {
+function normalizeLibraryCacheQuery(query?: LibraryCacheRequest): LibraryCacheRequest {
   const normalized = {
     ...DEFAULT_LIBRARY_CACHE_REQUEST,
     ...query,
   };
 
   return {
-    page: Number.isInteger(normalized.page) && normalized.page > 0
-      ? normalized.page
-      : DEFAULT_LIBRARY_CACHE_REQUEST.page,
-    pageSize: Number.isInteger(normalized.pageSize) && normalized.pageSize > 0
-      ? normalized.pageSize
-      : DEFAULT_LIBRARY_CACHE_REQUEST.pageSize,
+    page:
+      Number.isInteger(normalized.page) && normalized.page > 0 ? normalized.page : DEFAULT_LIBRARY_CACHE_REQUEST.page,
+    pageSize:
+      Number.isInteger(normalized.pageSize) && normalized.pageSize > 0
+        ? normalized.pageSize
+        : DEFAULT_LIBRARY_CACHE_REQUEST.pageSize,
     query: normalized.query?.trim() || undefined,
     sortKey: normalized.sortKey?.trim() || undefined,
-    sortDirection: normalized.sortDirection === "desc" ? "desc" : "asc",
+    sortDirection: normalized.sortDirection === 'desc' ? 'desc' : 'asc',
   };
 }
 
-function buildLibraryCacheKey(
-  instanceId: number,
-  request: LibraryCacheRequest,
-): string {
+function buildLibraryCacheKey(instanceId: number, request: LibraryCacheRequest): string {
   const params = new URLSearchParams();
-  params.set("page", String(request.page));
-  params.set("pageSize", String(request.pageSize));
+  params.set('page', String(request.page));
+  params.set('pageSize', String(request.pageSize));
 
   if (request.query) {
-    params.set("query", request.query);
+    params.set('query', request.query);
   }
 
   if (request.sortKey) {
-    params.set("sortKey", request.sortKey);
+    params.set('sortKey', request.sortKey);
   }
 
   if (request.sortDirection) {
-    params.set("sortDirection", request.sortDirection);
+    params.set('sortDirection', request.sortDirection);
   }
 
   return `${instanceId}|${params.toString()}`;
@@ -95,7 +83,7 @@ function buildLibraryCacheKey(
 
 function getInstanceEntries(
   entries: Map<string, LibraryCacheEntry>,
-  instanceId: number,
+  instanceId: number
 ): [string, LibraryCacheEntry][] {
   const prefix = `${instanceId}|`;
   const matching: [string, LibraryCacheEntry][] = [];
@@ -109,10 +97,7 @@ function getInstanceEntries(
   return matching;
 }
 
-function getLatestEntry(
-  entries: Map<string, LibraryCacheEntry>,
-  instanceId: number,
-): LibraryCacheEntry | undefined {
+function getLatestEntry(entries: Map<string, LibraryCacheEntry>, instanceId: number): LibraryCacheEntry | undefined {
   let latestEntry: LibraryCacheEntry | undefined;
 
   for (const [, entry] of getInstanceEntries(entries, instanceId)) {
@@ -135,10 +120,7 @@ function createLibraryCacheStore() {
     /**
      * Get cached library data
      */
-    get(
-      instanceId: number,
-      request?: LibraryCacheRequest,
-    ): LibraryCacheEntry | undefined {
+    get(instanceId: number, request?: LibraryCacheRequest): LibraryCacheEntry | undefined {
       const state = get({ subscribe });
 
       if (request) {
@@ -171,7 +153,7 @@ function createLibraryCacheStore() {
     set(
       instanceId: number,
       data: LibraryData,
-      profilesByDatabase: LibraryCacheEntry["profilesByDatabase"],
+      profilesByDatabase: LibraryCacheEntry['profilesByDatabase'],
       request: LibraryCacheRequest,
       metadata: {
         totalRecords: number;
@@ -181,7 +163,7 @@ function createLibraryCacheStore() {
         totalRecords: 0,
         totalPages: 0,
         hasNext: false,
-      },
+      }
     ): void {
       const normalizedRequest = normalizeLibraryCacheQuery(request);
       update((state) => {

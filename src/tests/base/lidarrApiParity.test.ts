@@ -326,7 +326,8 @@ class LidarrApiParityTest extends BaseTest {
     this.test('library validates pagination params and defaults', async () => {
       const getAllDatabasesMock: typeof pcdManager.getAll = () => [];
       const getByIdMock: typeof arrInstancesQueries.getById = () => buildInstance(11, 'lidarr');
-      const getLibraryMock: typeof LidarrClient.prototype.getLibrary = () => Promise.resolve(PAGINATED_LIDARR_LIBRARY_ITEMS);
+      const getLibraryMock: typeof LidarrClient.prototype.getLibrary = () =>
+        Promise.resolve(PAGINATED_LIDARR_LIBRARY_ITEMS);
 
       this.patch(pcdManager, 'getAll', getAllDatabasesMock);
       this.patch(arrInstancesQueries, 'getById', getByIdMock);

@@ -29,6 +29,7 @@
 <!-- Check the labels that apply. Reviewer should apply them to the PR. -->
 
 **Area:**
+
 - [ ] `area:api`
 - [ ] `area:arr`
 - [ ] `area:sync`
@@ -36,6 +37,7 @@
 - [ ] `area:auth`
 
 **Priority:**
+
 - [ ] `priority:critical`
 - [ ] `priority:high`
 - [ ] `priority:medium`
