@@ -3,7 +3,7 @@ import { arrInstancesQueries } from '../../lib/server/db/queries/arrInstances.ts
 import { load as arrLayoutLoad } from '../../routes/arr/[id]/+layout.server.ts';
 import { actions as settingsActions } from '../../routes/arr/[id]/settings/+page.server.ts';
 import type { ArrInstance, UpdateArrInstanceInput } from '../../lib/server/db/queries/arrInstances.ts';
-import { resolveNavShell } from '../../lib/server/navigation/resolver.ts';
+import { resolveRootLayoutData } from '../../lib/server/navigation/layoutData.ts';
 import type { User } from '../../lib/server/db/queries/users.ts';
 import { logger } from '$logger/logger.ts';
 
@@ -40,7 +40,7 @@ function createSettingsRequest(id: number, fields: Record<string, string>): Requ
   });
 }
 
-Deno.test('auth routes and unauthenticated sessions omit navShell in layout payload', () => {
+Deno.test('auth routes omit navShell while auth-bypass sessions keep navShell in layout payload', () => {
   const shellUser = {
     id: 1,
     username: 'test-user',
@@ -49,20 +49,42 @@ Deno.test('auth routes and unauthenticated sessions omit navShell in layout payl
     updated_at: '2025-01-01T00:00:00.000Z',
   } as User;
 
-  const shouldReturnNavShell = (pathname: string, user: User | null) => {
-    if (!user || pathname.startsWith('/auth/')) {
-      return { version: '1.2.3' };
-    }
+  const authLogin = resolveRootLayoutData({
+    version: '1.2.3',
+    pathname: '/auth/login',
+    user: shellUser,
+    authBypass: false,
+  });
+  const authSetup = resolveRootLayoutData({
+    version: '1.2.3',
+    pathname: '/auth/setup',
+    user: shellUser,
+    authBypass: false,
+  });
+  const unauthenticated = resolveRootLayoutData({
+    version: '1.2.3',
+    pathname: '/arr',
+    user: null,
+    authBypass: false,
+  });
+  const authBypassSession = resolveRootLayoutData({
+    version: '1.2.3',
+    pathname: '/arr',
+    user: null,
+    authBypass: true,
+  });
+  const authenticated = resolveRootLayoutData({
+    version: '1.2.3',
+    pathname: '/arr',
+    user: shellUser,
+    authBypass: false,
+  });
 
-    return {
-      version: '1.2.3',
-      navShell: resolveNavShell({ user }),
-    };
-  };
-
-  assertEquals('navShell' in shouldReturnNavShell('/auth/login', shellUser), false);
-  assertEquals('navShell' in shouldReturnNavShell('/auth/setup', shellUser), false);
-  assertEquals('navShell' in shouldReturnNavShell('/arr', null), false);
+  assertEquals('navShell' in authLogin, false);
+  assertEquals('navShell' in authSetup, false);
+  assertEquals('navShell' in unauthenticated, false);
+  assertEquals('navShell' in authBypassSession, true);
+  assertEquals('navShell' in authenticated, true);
 });
 
 Deno.test('arr layout load reflects updated external_url after settings action rerun', async () => {

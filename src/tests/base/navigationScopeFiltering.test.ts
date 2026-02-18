@@ -25,7 +25,7 @@ function resolveScopeEntries(scope: ArrType, shell: NavShell): ScopedResult {
   const scopedItems: ScopedItem[] = [];
 
   for (const group of shell.groups) {
-    for (const item of group.items as (typeof group.items[number] & { requiredFeature?: string })[]) {
+    for (const item of group.items as ((typeof group.items)[number] & { requiredFeature?: string })[]) {
       const requiredFeature = item.requiredFeature;
 
       if (scope === 'all' || !requiredFeature) {
@@ -62,7 +62,15 @@ function resolveScopeEntries(scope: ArrType, shell: NavShell): ScopedResult {
   return { visible, disabled };
 }
 
-function buildBottomNavOrder(shell: NavShell): string[] {
+function isScopedItemVisible(scope: ArrType, requiredFeature: string | undefined): boolean {
+  if (scope === 'all' || !requiredFeature) {
+    return true;
+  }
+
+  return supportsFeature(scope, requiredFeature);
+}
+
+function buildBottomNavOrder(shell: NavShell, scope: ArrType): string[] {
   const flattened: Array<{ href: string; priority: 'always' | 'medium' | 'low'; sourceIndex: number }> = [];
   const priorityOrder = {
     always: 0,
@@ -72,7 +80,11 @@ function buildBottomNavOrder(shell: NavShell): string[] {
   let sourceIndex = 0;
 
   for (const group of shell.groups) {
-    for (const item of group.items) {
+    for (const item of group.items as ((typeof group.items)[number] & { requiredFeature?: string })[]) {
+      if (!isScopedItemVisible(scope, item.requiredFeature)) {
+        continue;
+      }
+
       flattened.push({
         href: item.href,
         priority: item.mobilePriority,
@@ -183,18 +195,20 @@ Deno.test('bottom nav ordering is deterministic by priority and sidebar traversa
     '/settings',
   ]);
 
+  assertEquals(buildBottomNavOrder({ ...shell, groups: shellWithoutDev }, 'all'), [
+    '/databases',
+    '/arr',
+    '/quality-profiles',
+    '/custom-formats',
+    '/settings',
+    '/regular-expressions',
+    '/media-management',
+    '/delay-profiles',
+    '/metadata-profiles',
+  ]);
+
   assertEquals(
-    buildBottomNavOrder({ ...shell, groups: shellWithoutDev }),
-    [
-      '/databases',
-      '/arr',
-      '/quality-profiles',
-      '/custom-formats',
-      '/settings',
-      '/regular-expressions',
-      '/media-management',
-      '/delay-profiles',
-      '/metadata-profiles',
-    ]
+    buildBottomNavOrder({ ...shell, groups: shellWithoutDev }, 'radarr').includes('/metadata-profiles'),
+    false
   );
 });

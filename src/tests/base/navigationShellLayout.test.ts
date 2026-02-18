@@ -40,6 +40,7 @@ Deno.test('app layout shell is stable and deep-link hrefs remain unchanged', () 
     '/databases',
     '/arr',
     '/quality-profiles',
+    '/quality-profiles/entity-testing',
     '/custom-formats',
     '/regular-expressions',
     '/media-management',
