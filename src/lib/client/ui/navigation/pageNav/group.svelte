@@ -1,13 +1,15 @@
 <script lang="ts">
-	import GroupHeader from './groupHeader.svelte';
-	import type { ComponentType } from 'svelte';
-	import { slide } from 'svelte/transition';
+ import GroupHeader from './groupHeader.svelte';
+ import SectionHeader from './sectionHeader.svelte';
+ import type { ComponentType } from 'svelte';
+  import { slide } from 'svelte/transition';
 
-	export let label: string;
-	export let href: string;
-	export let icon: ComponentType | undefined = undefined;
-	export let initialOpen: boolean = true;
-	export let hasItems: boolean = false;
+ export let label: string;
+ export let href: string;
+ export let icon: ComponentType | undefined = undefined;
+ export let initialOpen: boolean = true;
+ export let hasItems: boolean = false;
+	export let sectionLabel: string | undefined = undefined;
 
 	let isOpen = initialOpen;
 
@@ -17,6 +19,10 @@
 </script>
 
 <div class="mb-4">
+	{#if sectionLabel}
+		<SectionHeader label={sectionLabel} />
+	{/if}
+
 	<GroupHeader {label} {href} {icon} {isOpen} {hasItems} onToggle={toggleOpen} />
 
 	{#if isOpen && hasItems}

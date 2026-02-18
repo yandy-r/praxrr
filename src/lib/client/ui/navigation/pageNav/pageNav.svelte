@@ -3,9 +3,10 @@
   import GroupItem from './groupItem.svelte';
   import Version from './version.svelte';
   import { X } from 'lucide-svelte';
-  import { resolveNavIcon } from '$lib/client/navigation/iconMap';
+	import { resolveNavIcon } from '$lib/client/navigation/iconMap';
   import { navIconStore } from '$stores/navIcons';
   import { mobileNavOpen } from '$stores/mobileNav';
+  import { NAV_GROUP_ID } from '$shared/navigation/constants.ts';
   import { page } from '$app/stores';
   import logo from '$assets/logo.svg';
   import type { NavShell } from '$shared/navigation/types.ts';
@@ -15,6 +16,10 @@
 
   $: useEmoji = $navIconStore === 'emoji';
   $: groups = navShell?.groups ?? [];
+  const collapsedGroupIds = new Set([NAV_GROUP_ID.settings, NAV_GROUP_ID.dev]);
+  const collapsedItemIds = new Set(['policies.media_management']);
+  const isInitiallyOpen = (groupId: string, itemId: string): boolean =>
+    !collapsedGroupIds.has(groupId) && !collapsedItemIds.has(itemId);
 
   // Close mobile nav when page changes
   $: ($page.url.pathname, mobileNavOpen.close());
@@ -61,15 +66,15 @@
 
   <div class="flex-1 overflow-y-auto p-4">
     {#each groups as group (group.id)}
-      {#each group.items as item (item.id)}
-        {@const label = useEmoji && item.emoji ? `${item.emoji} ${item.label}` : item.label}
-        {@const icon = useEmoji ? undefined : resolveNavIcon(item.iconKey)}
-        <Group
-          {label}
-          href={item.href}
-          {icon}
-          hasItems={item.hasChildren}
-        >
+      {#each group.items as item, index (item.id)}
+		<Group
+			label={useEmoji && item.emoji ? `${item.emoji} ${item.label}` : item.label}
+			href={item.href}
+			icon={useEmoji ? undefined : resolveNavIcon(item.iconKey)}
+			sectionLabel={index === 0 ? group.label : undefined}
+			initialOpen={isInitiallyOpen(group.id, item.id)}
+			hasItems={item.hasChildren}
+		>
           {#if item.hasChildren}
             {#each item.children as child (child.id)}
               <GroupItem label={child.label} href={child.href} activePattern={child.activePattern} />
