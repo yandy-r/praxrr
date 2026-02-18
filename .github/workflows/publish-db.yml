@@ -1,0 +1,165 @@
+name: Publish DB Mirror
+
+on:
+  push:
+    tags:
+      - 'db/v*'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Publish to a temporary dry-run branch instead of main.
+        required: false
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: publish-db-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Determine publish target
+        id: publish
+        run: |
+          set -euo pipefail
+
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" && "${{ github.event.inputs.dry_run }}" == "true" ]]; then
+            echo "dry_run=true" >> "$GITHUB_OUTPUT"
+            echo "target_branch=dry-run/db/${{ github.run_id }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "dry_run=false" >> "$GITHUB_OUTPUT"
+            echo "target_branch=main" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Split package subtree and mirror publish
+        id: mirror
+        env:
+          MIRROR_PAT: ${{ secrets.MIRROR_PAT }}
+          TARGET_BRANCH: ${{ steps.publish.outputs.target_branch }}
+          MIRROR_REPO: yandy-r/praxrr-db
+        run: |
+          set -euo pipefail
+
+          if [ -z "${MIRROR_PAT:-}" ]; then
+            echo "MIRROR_PAT secret is required." >&2
+            exit 1
+          fi
+
+          split_sha="$(git subtree split --prefix=packages/praxrr-db)"
+          if [ -z "$split_sha" ]; then
+            echo "Unable to split packages/praxrr-db subtree." >&2
+            exit 1
+          fi
+
+          remote_url="https://x-access-token:${MIRROR_PAT}@github.com/${MIRROR_REPO}.git"
+          git remote remove mirror || true
+          git remote add mirror "$remote_url"
+
+          attempt_push() {
+            local source_sha="$1"
+            local destination="$2"
+            local attempts=3
+            local delay=1
+            local attempt=1
+
+            while [ "$attempt" -le "$attempts" ]; do
+              local log_file
+              log_file="$(mktemp)"
+
+              if git push mirror --force "${source_sha}:refs/heads/${destination}" >"$log_file" 2>&1; then
+                rm -f "$log_file"
+                echo "Published subtree to ${destination}."
+                return 0
+              fi
+
+              if [ "$attempt" -lt "$attempts" ]; then
+                rm -f "$log_file"
+                echo "Push attempt ${attempt}/${attempts} failed; retrying in ${delay}s."
+                sleep "$delay"
+                delay=$((delay * 2))
+                attempt=$((attempt + 1))
+                continue
+              fi
+
+              echo "Push to ${destination} failed after ${attempts} attempts."
+              echo "Push failure log:"
+              cat "$log_file"
+              rm -f "$log_file"
+              return 1
+            done
+          }
+
+          attempt_push "$split_sha" "$TARGET_BRANCH"
+
+      - name: Cleanup stale dry-run db branches
+        if: always()
+        env:
+          MIRROR_PAT: ${{ secrets.MIRROR_PAT }}
+          CURRENT_BRANCH: ${{ steps.publish.outputs.target_branch }}
+          MIRROR_REPO: yandy-r/praxrr-db
+        run: |
+          set +e
+
+          if [ -z "${MIRROR_PAT:-}" ]; then
+            echo "warning: MIRROR_PAT is not set; skipping cleanup."
+            exit 0
+          fi
+
+          auth_header="Authorization: token ${MIRROR_PAT}"
+          cutoff_epoch="$(date -u -d '7 days ago' +%s)"
+          page=1
+
+          while true; do
+            branches_json="$(curl -fsSL -H "${auth_header}" "https://api.github.com/repos/${MIRROR_REPO}/branches?per_page=100&page=${page}")"
+            branch_count="$(echo "$branches_json" | jq 'length')"
+
+            if [ -z "$branch_count" ] || [ "$branch_count" -eq 0 ]; then
+              break
+            fi
+
+            while IFS=$'\t' read -r branch_name branch_sha; do
+              if [[ "$branch_name" != dry-run/db/* ]]; then
+                continue
+              fi
+
+              if [ "$branch_name" = "$CURRENT_BRANCH" ]; then
+                continue
+              fi
+
+              commit_json="$(curl -fsSL -H "${auth_header}" "https://api.github.com/repos/${MIRROR_REPO}/commits/${branch_sha}")"
+              commit_date="$(echo "$commit_json" | jq -r '.commit.author.date // .commit.committer.date // empty')"
+
+              if [ -z "$commit_date" ]; then
+                echo "warning: Unable to read commit date for ${branch_name}; skipping."
+                continue
+              fi
+
+              commit_epoch="$(date -u -d "$commit_date" +%s)"
+              if [ "$commit_epoch" -ge "$cutoff_epoch" ]; then
+                continue
+              fi
+
+              encoded_branch="${branch_name//\//%2F}"
+              if curl -fsSL -X DELETE -H "${auth_header}" "https://api.github.com/repos/${MIRROR_REPO}/git/refs/heads/${encoded_branch}"; then
+                echo "Deleted stale dry-run branch ${branch_name}."
+              else
+                echo "warning: Failed to delete stale dry-run branch ${branch_name}."
+              fi
+            done < <(echo "$branches_json" | jq -r '.[] | select(.name | startswith("dry-run/db/")) | .name + "\t" + .commit.sha')
+
+            if [ "$branch_count" -lt 100 ]; then
+              break
+            fi
+            page=$((page + 1))
+          done

@@ -1,0 +1,21 @@
+{
+  "release-type": "simple",
+  "separate-pull-requests": true,
+  "packages": {
+    ".": {
+      "component": "app",
+      "release-type": "simple",
+      "include-component-in-tag": true
+    },
+    "packages/praxrr-db": {
+      "component": "db",
+      "release-type": "simple",
+      "include-component-in-tag": true
+    },
+    "packages/praxrr-schema": {
+      "component": "schema",
+      "release-type": "simple",
+      "include-component-in-tag": true
+    }
+  }
+}

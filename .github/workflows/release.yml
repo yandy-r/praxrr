@@ -3,14 +3,32 @@ name: Release
 on:
   push:
     tags:
-      - 'v[0-9]+.[0-9]+.[0-9]+'
+      - 'app/v*'
 
 env:
   DENO_VERSION: '2.5.6'
   DOTNET_VERSION: '8.0.x'
 
 jobs:
+  compatibility-gate:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: ${{ env.DENO_VERSION }}
+
+      - name: Run compatibility check
+        run: deno task compat:check
+
   build:
+    needs: compatibility-gate
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -65,7 +83,9 @@ jobs:
 
       - name: Extract version
         id: version
-        run: echo "value=${GITHUB_REF_NAME#v}" >> $GITHUB_OUTPUT
+        run: |
+          VERSION="${GITHUB_REF_NAME#app/v}"
+          echo "value=$VERSION" >> $GITHUB_OUTPUT
 
       - name: Install dependencies
         run: deno install --node-modules-dir
@@ -123,7 +143,7 @@ jobs:
           path: dist/praxrr-*.${{ matrix.archive_ext }}
 
   release:
-    needs: build
+    needs: [build, compatibility-gate]
     runs-on: ubuntu-latest
     permissions:
       contents: write
