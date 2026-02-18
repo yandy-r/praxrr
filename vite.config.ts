@@ -2,9 +2,11 @@ import tailwindcss from '@tailwindcss/vite';
 import { sveltekit } from '@sveltejs/kit/vite';
 import { defineConfig } from 'vite';
 import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import deno from '@deno/vite-plugin';
 
 const packageJson = JSON.parse(readFileSync('./package.json', 'utf-8'));
+const appSrcDir = resolve(process.cwd(), 'packages/praxrr-app/src');
 
 export default defineConfig({
   plugins: [deno(), tailwindcss(), sveltekit()],
@@ -17,6 +19,9 @@ export default defineConfig({
       interval: 1000,
       // Ignore temporary files created by editors
       ignored: ['**/*.tmp.*', '**/*~', '**/.#*'],
+    },
+    fs: {
+      allow: [appSrcDir],
     },
   },
   define: {

@@ -70,8 +70,8 @@ deno task arr              # Run local Radarr/Sonarr for testing
 ### Code Generation
 
 ```bash
-deno task generate:api-types   # OpenAPI -> TypeScript types (src/lib/api/v1.d.ts)
-deno task generate:pcd-types   # PCD schema -> TypeScript types (src/lib/shared/pcd/types.ts)
+deno task generate:api-types   # OpenAPI -> TypeScript types (packages/praxrr-app/src/lib/api/v1.d.ts)
+deno task generate:pcd-types   # PCD schema -> TypeScript types (packages/praxrr-app/src/lib/shared/pcd/types.ts)
 ```
 
 ## Architecture
@@ -82,52 +82,52 @@ Defined in `svelte.config.js` and mirrored in `deno.json`:
 
 | Alias             | Path                                    |
 | ----------------- | --------------------------------------- |
-| `$lib/`           | `src/lib/`                              |
-| `$api/`           | `src/lib/api/`                          |
-| `$config`         | `src/lib/server/utils/config/config.ts` |
-| `$logger/`        | `src/lib/server/utils/logger/`          |
-| `$shared/`        | `src/lib/shared/`                       |
-| `$stores/`        | `src/lib/client/stores/`                |
-| `$ui/`            | `src/lib/client/ui/`                    |
-| `$db/`            | `src/lib/server/db/`                    |
-| `$pcd/`           | `src/lib/server/pcd/`                   |
-| `$jobs/`          | `src/lib/server/jobs/`                  |
-| `$arr/`           | `src/lib/server/utils/arr/`             |
-| `$sync/`          | `src/lib/server/sync/`                  |
-| `$auth/`          | `src/lib/server/utils/auth/`            |
-| `$notifications/` | `src/lib/server/notifications/`         |
-| `$cache/`         | `src/lib/server/utils/cache/`           |
-| `$http/`          | `src/lib/server/utils/http/`            |
-| `$utils/`         | `src/lib/server/utils/`                 |
+| `$lib/`           | `packages/praxrr-app/src/lib/`                              |
+| `$api/`           | `packages/praxrr-app/src/lib/api/`                          |
+| `$config`         | `packages/praxrr-app/src/lib/server/utils/config/config.ts` |
+| `$logger/`        | `packages/praxrr-app/src/lib/server/utils/logger/`          |
+| `$shared/`        | `packages/praxrr-app/src/lib/shared/`                       |
+| `$stores/`        | `packages/praxrr-app/src/lib/client/stores/`                |
+| `$ui/`            | `packages/praxrr-app/src/lib/client/ui/`                    |
+| `$db/`            | `packages/praxrr-app/src/lib/server/db/`                    |
+| `$pcd/`           | `packages/praxrr-app/src/lib/server/pcd/`                   |
+| `$jobs/`          | `packages/praxrr-app/src/lib/server/jobs/`                  |
+| `$arr/`           | `packages/praxrr-app/src/lib/server/utils/arr/`             |
+| `$sync/`          | `packages/praxrr-app/src/lib/server/sync/`                  |
+| `$auth/`          | `packages/praxrr-app/src/lib/server/utils/auth/`            |
+| `$notifications/` | `packages/praxrr-app/src/lib/server/notifications/`         |
+| `$cache/`         | `packages/praxrr-app/src/lib/server/utils/cache/`           |
+| `$http/`          | `packages/praxrr-app/src/lib/server/utils/http/`            |
+| `$utils/`         | `packages/praxrr-app/src/lib/server/utils/`                 |
 
 ### Server-Side Layout
 
-- `src/lib/server/pcd/` - PCD system: ops compiler, cache, writer, entity CRUD
-- `src/lib/server/db/` - App DB: schema, migrations, queries
-- `src/lib/server/sync/` - Sync pipeline to Arr instances
-- `src/lib/server/jobs/` - Job queue, dispatcher, handlers
-- `src/lib/server/upgrades/` - Upgrade engine for automated searches
-- `src/lib/server/rename/` - Rename processor
-- `src/lib/server/notifications/` - Notification manager + notifiers
-- `src/lib/server/utils/` - HTTP client, Arr clients, auth, config, logger, git, TMDB
+- `packages/praxrr-app/src/lib/server/pcd/` - PCD system: ops compiler, cache, writer, entity CRUD
+- `packages/praxrr-app/src/lib/server/db/` - App DB: schema, migrations, queries
+- `packages/praxrr-app/src/lib/server/sync/` - Sync pipeline to Arr instances
+- `packages/praxrr-app/src/lib/server/jobs/` - Job queue, dispatcher, handlers
+- `packages/praxrr-app/src/lib/server/upgrades/` - Upgrade engine for automated searches
+- `packages/praxrr-app/src/lib/server/rename/` - Rename processor
+- `packages/praxrr-app/src/lib/server/notifications/` - Notification manager + notifiers
+- `packages/praxrr-app/src/lib/server/utils/` - HTTP client, Arr clients, auth, config, logger, git, TMDB
 
 ### Client-Side Layout
 
-- `src/lib/client/ui/` - Reusable Svelte components (buttons, forms, tables, modals, navigation)
-- `src/lib/client/stores/` - Svelte stores
-- `src/lib/client/alerts/` - Global alert system
-- `src/lib/client/utils/` - Client helpers
+- `packages/praxrr-app/src/lib/client/ui/` - Reusable Svelte components (buttons, forms, tables, modals, navigation)
+- `packages/praxrr-app/src/lib/client/stores/` - Svelte stores
+- `packages/praxrr-app/src/lib/client/alerts/` - Global alert system
+- `packages/praxrr-app/src/lib/client/utils/` - Client helpers
 
 ### Shared
 
-- `src/lib/shared/` - Types and utilities shared between server and client
+- `packages/praxrr-app/src/lib/shared/` - Types and utilities shared between server and client
 
 ### Routes
 
-- `src/routes/api/v1/**` - API v1 endpoints (all new API work goes here)
-- `src/routes/{feature}/**` - Feature pages (custom-formats, quality-profiles, databases, etc.)
-- `src/routes/auth/**` - Authentication routes
-- `src/routes/settings/**` - Settings pages
+- `packages/praxrr-app/src/routes/api/v1/**` - API v1 endpoints (all new API work goes here)
+- `packages/praxrr-app/src/routes/{feature}/**` - Feature pages (custom-formats, quality-profiles, databases, etc.)
+- `packages/praxrr-app/src/routes/auth/**` - Authentication routes
+- `packages/praxrr-app/src/routes/settings/**` - Settings pages
 
 ### Services
 
@@ -148,11 +148,11 @@ Updates/deletes use **value guards** (old-value checks) to detect upstream chang
 
 ### App Database
 
-SQLite file (`praxrr.db`) managed by `DatabaseManager` in `$db/db.ts`. Schema changes are done via migrations in `src/lib/server/db/migrations/*.ts` (not the reference `schema.sql`). WAL mode, foreign keys enforced.
+SQLite file (`praxrr.db`) managed by `DatabaseManager` in `$db/db.ts`. Schema changes are done via migrations in `packages/praxrr-app/src/lib/server/db/migrations/*.ts` (not the reference `schema.sql`). WAL mode, foreign keys enforced.
 
 ### Startup Sequence
 
-`src/hooks.server.ts`: config.init() -> db.initialize() -> runMigrations() -> logSettings.load() -> pcdManager.initialize() -> initializeJobs() -> auth middleware.
+`packages/praxrr-app/src/hooks.server.ts`: config.init() -> db.initialize() -> runMigrations() -> logSettings.load() -> pcdManager.initialize() -> initializeJobs() -> auth middleware.
 
 ## Conventions
 
@@ -196,7 +196,7 @@ Checklist (required for Arr-touching changes):
 ### Arr Cutover Guardrails (Required)
 
 - After promoting an Arr entity family to first-class tables, remove legacy sibling-app fallback paths immediately in route/read/write/sync resolution.
-- When introducing built-in PCD base-op migrations, also register them in `src/lib/server/pcd/ops/seedBuiltInBaseOps.ts` so newly initialized databases receive them without rerunning migrations.
+- When introducing built-in PCD base-op migrations, also register them in `packages/praxrr-app/src/lib/server/pcd/ops/seedBuiltInBaseOps.ts` so newly initialized databases receive them without rerunning migrations.
 - For Arr-specific default templates, update both runtime form defaults and migration/backfill ops in the same change to avoid mixed legacy/native defaults.
 - For Arr-scoped quality profile UI filtering, do not rely on `quality_profile_custom_formats.arr_type` alone because legacy or shared `arr_type='all'` scores can make incompatible profiles appear valid; enforce app compatibility from enabled quality names mapped via `quality_api_mappings` for the target `arr_type`.
 - For Arr-scoped quality profile compatibility, do not require `enabled=1` quality rows; profiles with all qualities disabled (or transitional defaults) must still be considered against app-compatible quality names, otherwise valid profiles can disappear from sync selection UI.
@@ -204,3 +204,44 @@ Checklist (required for Arr-touching changes):
 ## Environment Variables
 
 Key variables for development: `APP_BASE_PATH` (default `./dist/dev` in dev), `PORT` (default 6969 in dev, 6868 in prod), `AUTH` (`on`|`local`|`off`|`oidc`), `PARSER_HOST`/`PARSER_PORT` (parser service location).
+
+### Monorepo and PCD Contract Notes
+
+Praxrr now runs as a monorepo workspace with app runtime in `packages/praxrr-app/` plus package members:
+
+- `packages/praxrr-api`
+- `packages/praxrr-db`
+- `packages/praxrr-schema`
+
+Runtime Arr sync and PCD compilation stay in the root app; `praxrr-db`/`praxrr-schema` provide local package artifacts
+and mirrored external distribution.
+
+### Environment Variables
+
+- [ ] `PRAXRR_DEFAULT_DB_URL` configures the default PCD repository used for first-run auto-link.
+- [ ] Unset default resolves to `https://github.com/yandy-r/praxrr-db`.
+- [ ] Explicitly set to empty string to disable default auto-linking.
+- [ ] `PRAXRR_DEFAULT_DB_BRANCH` defaults to `v2`.
+- [ ] `PRAXRR_DEFAULT_DB_NAME` defaults to `Praxrr-DB`.
+- [ ] `PRAXRR_DEFAULT_DB_TOKEN`, `PRAXRR_DEFAULT_DB_GIT_USERNAME`, and `PRAXRR_DEFAULT_DB_GIT_EMAIL` remain supported.
+
+### Empty URL Behavior
+
+- [ ] `PRAXRR_DEFAULT_DB_URL=""` disables startup auto-link by design.
+- [ ] Empty value is treated as an intentional opt-out; do not replace with fallback URLs in runtime logic.
+- [ ] Startup flow should continue to mark setup state without auto-retry as part of existing behavior.
+
+### Schema Source Precedence
+
+- [ ] `generate:pcd-types` resolves schema via `scripts/generate-pcd-types.ts` with strict local-first precedence:
+- [ ] Explicit `--local=<path>` path first.
+- [ ] Default local path `packages/praxrr-schema/ops/0.schema.sql` second.
+- [ ] Remote fetch only when `--remote` mode is explicitly requested.
+- [ ] Missing local schema should fail hard and block generation.
+
+### Mirror Governance
+
+- [ ] `packages/praxrr-db` and `packages/praxrr-schema` are mirrored to their respective repos via subtree publish workflows.
+- [ ] Cross-repo pushes target `yandy-r/praxrr-db` and `yandy-r/praxrr-schema` only; contributors should treat these as mirrors of monorepo source.
+- [ ] For package/API/PCD contract changes, update all affected workspace members in the same change set and document schema/operator compatibility implications.
+- [ ] Run contract compatibility checks and type generation before publish-related follow-ups.

@@ -11,7 +11,6 @@ export class BaseHttpClient {
   protected retries: number;
   protected retryDelay: number;
   protected retryStatusCodes: number[];
-  protected httpClient: Deno.HttpClient;
 
   constructor(baseUrl: string, options?: HttpClientOptions) {
     // Ensure baseUrl doesn't have trailing slash
@@ -24,12 +23,6 @@ export class BaseHttpClient {
       'Content-Type': 'application/json',
       ...options?.headers,
     };
-
-    // Create HTTP client with connection pooling
-    this.httpClient = Deno.createHttpClient({
-      poolMaxIdlePerHost: options?.poolMaxIdlePerHost ?? 5,
-      poolIdleTimeout: options?.poolIdleTimeout ?? 30000,
-    });
   }
 
   /**
@@ -66,7 +59,6 @@ export class BaseHttpClient {
             headers,
             body: options?.body ? JSON.stringify(options.body) : undefined,
             signal: options?.signal ?? controller.signal,
-            client: this.httpClient,
           });
 
           clearTimeout(timeoutId);
@@ -181,6 +173,6 @@ export class BaseHttpClient {
    * Close the HTTP client and cleanup resources
    */
   close(): void {
-    this.httpClient.close();
+    // Retained for backwards compatibility with existing lifecycle hooks.
   }
 }

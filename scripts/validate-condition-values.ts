@@ -13,7 +13,7 @@ import {
   RELEASE_TYPE_VALUES,
   INDEXER_FLAG_VALUES,
   CONDITION_TYPES,
-} from '../src/lib/shared/conditionTypes.ts';
+} from '../packages/praxrr-app/src/lib/shared/conditionTypes.ts';
 
 // Build sets of valid values
 const VALID_VALUES: Record<string, Set<string>> = {

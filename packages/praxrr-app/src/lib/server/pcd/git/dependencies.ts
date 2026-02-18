@@ -4,7 +4,7 @@
  */
 
 import { checkout, clone, fetchTags } from '$utils/git/index.ts';
-import { loadManifest } from '../manifest/manifest.ts';
+import { loadManifest, resolveSchemaDependencyUrl } from '../manifest/manifest.ts';
 import { logger } from '$logger/logger.ts';
 
 /**
@@ -12,8 +12,15 @@ import { logger } from '$logger/logger.ts';
  * https://github.com/yandy-r/praxrr-schema -> schema
  */
 function getRepoName(repoUrl: string): string {
-  const parts = repoUrl.split('/');
-  return parts[parts.length - 1];
+  const trimmed = repoUrl.trim().replace(/\/+$/, '').replace(/\.git$/i, '');
+  try {
+    const parsed = new URL(trimmed);
+    const parts = parsed.pathname.split('/').filter(Boolean);
+    return parts[parts.length - 1] ?? '';
+  } catch {
+    const parts = trimmed.split('/').filter(Boolean);
+    return parts[parts.length - 1] ?? '';
+  }
 }
 
 /**
@@ -93,6 +100,7 @@ async function updateDependency(depPath: string, version: string): Promise<void>
  */
 export async function processDependencies(pcdPath: string, personalAccessToken?: string): Promise<void> {
   const manifest = await loadManifest(pcdPath);
+  resolveSchemaDependencyUrl(manifest.dependencies);
 
   if (!manifest.dependencies || Object.keys(manifest.dependencies).length === 0) {
     return;
@@ -125,6 +133,7 @@ export async function processDependencies(pcdPath: string, personalAccessToken?:
  */
 export async function syncDependencies(pcdPath: string, personalAccessToken?: string): Promise<void> {
   const manifest = await loadManifest(pcdPath);
+  resolveSchemaDependencyUrl(manifest.dependencies);
 
   if (!manifest.dependencies || Object.keys(manifest.dependencies).length === 0) {
     return;
@@ -179,6 +188,7 @@ export async function syncDependencies(pcdPath: string, personalAccessToken?: st
 export async function validateDependencies(pcdPath: string, personalAccessToken?: string): Promise<boolean> {
   try {
     const manifest = await loadManifest(pcdPath);
+    resolveSchemaDependencyUrl(manifest.dependencies);
 
     if (!manifest.dependencies || Object.keys(manifest.dependencies).length === 0) {
       return true;

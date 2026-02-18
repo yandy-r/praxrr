@@ -1,3 +1,5 @@
+/// <reference path="../../../../deno.d.ts" />
+
 /**
  * Password hashing utilities using bcrypt via @felix/bcrypt
  * Uses Rust bcrypt via Deno FFI

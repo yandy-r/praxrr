@@ -169,20 +169,26 @@
 				hoverable={true}
 			>
 				<svelte:fragment slot="actions" let:row>
-					<div class="flex items-center justify-end gap-0.5" on:click|stopPropagation>
+					<div class="flex items-center justify-end gap-0.5">
 						<Button
 							icon={Download}
 							size="xs"
 							variant="ghost"
 							tooltip="Export"
-							on:click={() => handleExport(row.name)}
+							on:click={(event) => {
+								event.stopPropagation();
+								handleExport(row.name);
+							}}
 						/>
 						<Button
 							icon={Copy}
 							size="xs"
 							variant="ghost"
 							tooltip="Clone"
-							on:click={() => handleClone(row.name)}
+							on:click={(event) => {
+								event.stopPropagation();
+								handleClone(row.name);
+							}}
 						/>
 					</div>
 				</svelte:fragment>

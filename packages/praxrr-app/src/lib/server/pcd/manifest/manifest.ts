@@ -6,6 +6,10 @@
 import { logger } from '$logger/logger.ts';
 import { ManifestValidationError } from '../core/errors.ts';
 
+export const SCHEMA_DEPENDENCY_URL = 'https://github.com/yandy-r/praxrr-schema';
+const SCHEMA_DEPENDENCY_CODE = 'SCHEMA_DEPENDENCY_RESOLUTION_ERROR';
+const SCHEMA_DEPENDENCY_PATTERN = /^https:\/\/github\.com\/[^/]+\/praxrr-schema$/;
+
 export interface Manifest {
   name: string;
   version: string;
@@ -24,6 +28,54 @@ export interface Manifest {
   praxrr: {
     minimum_version: string;
   };
+}
+
+function normalizeDependencyUrlForSchemaMatch(repoUrl: string): string {
+	const trimmed = repoUrl.trim().replace(/\/+$/, '').replace(/\.git$/i, '');
+	try {
+		const parsed = new URL(trimmed);
+		const pathname = parsed.pathname.toLowerCase().replace(/\/+$/, '');
+		return `${parsed.protocol.toLowerCase()}//${parsed.hostname.toLowerCase()}${pathname}`;
+	} catch {
+		return trimmed.toLowerCase().replace(/\/+$/, '');
+	}
+}
+
+function isSchemaDependencyUrl(repoUrl: string): boolean {
+	return SCHEMA_DEPENDENCY_PATTERN.test(normalizeDependencyUrlForSchemaMatch(repoUrl));
+}
+
+export function resolveSchemaDependencyUrl(
+	dependencies: Record<string, string> | undefined
+): string {
+	if (!dependencies || Object.keys(dependencies).length === 0) {
+		return SCHEMA_DEPENDENCY_URL;
+	}
+
+	const exactMatch = Object.keys(dependencies).find((dependency) => dependency === SCHEMA_DEPENDENCY_URL);
+	if (exactMatch) {
+		return exactMatch;
+	}
+
+	const schemaDependencies = Object.keys(dependencies).filter(isSchemaDependencyUrl);
+	if (schemaDependencies.length > 1) {
+		const resolved = schemaDependencies
+			.map((dependency) => `"${dependency}"`)
+			.join(', ');
+		const error = new ManifestValidationError(
+			`SCHEMA_DEPENDENCY_RESOLUTION_ERROR: found ${schemaDependencies.length} schema-like dependencies: ${resolved}`
+		);
+		Object.assign(error, {
+			code: SCHEMA_DEPENDENCY_CODE,
+		});
+		throw error;
+	}
+
+	if (schemaDependencies.length === 1) {
+		return schemaDependencies[0]!;
+	}
+
+	throw new ManifestValidationError('Manifest dependencies must include schema repository');
 }
 
 /**
@@ -79,10 +131,7 @@ export function validateManifest(manifest: unknown): asserts manifest is Manifes
     // Validate dependencies includes schema (only check for non-empty dependencies)
     const deps = m.dependencies as Record<string, unknown>;
     if (Object.keys(deps).length > 0) {
-      const hasSchema = Object.keys(deps).some((url) => url.includes('schema'));
-      if (!hasSchema) {
-        throw new ManifestValidationError('Manifest dependencies must include schema repository');
-      }
+      resolveSchemaDependencyUrl(deps as Record<string, string>);
     }
   }
 

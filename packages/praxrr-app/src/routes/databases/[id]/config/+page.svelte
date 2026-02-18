@@ -25,11 +25,86 @@
 	let manifest = data.manifest;
 	let readme = data.readmeRaw ?? '';
 	let saving = false;
+	let schemaDependencyError: string | null = null;
+
+	const SCHEMA_DEPENDENCY_URL = 'https://github.com/yandy-r/praxrr-schema';
+	const SCHEMA_DEPENDENCY_PATTERN = /^https:\/\/github\.com\/[^/]+\/praxrr-schema$/;
+	const SCHEMA_DEPENDENCY_ERROR_PREFIX = 'SCHEMA_DEPENDENCY_RESOLUTION_ERROR';
+
+	let resolvedSchemaDependency = SCHEMA_DEPENDENCY_URL;
+
+	function normalizeDependencyUrl(url: string): string {
+		const trimmed = url.trim().replace(/\/+$/, '').replace(/\.git$/i, '');
+		try {
+			const parsed = new URL(trimmed);
+			const pathname = parsed.pathname.toLowerCase().replace(/\/+$/, '');
+			return `${parsed.protocol.toLowerCase()}//${parsed.hostname.toLowerCase()}${pathname}`;
+		} catch {
+			return trimmed.toLowerCase();
+		}
+	}
+
+	function isSchemaLikeDependency(url: string): boolean {
+		return SCHEMA_DEPENDENCY_PATTERN.test(normalizeDependencyUrl(url));
+	}
+
+	function getResolvedSchemaDependency(dependencies?: Record<string, string> | null): string {
+		const dependencyEntries = Object.keys(dependencies ?? {});
+
+		if (dependencyEntries.length === 0) {
+			return SCHEMA_DEPENDENCY_URL;
+		}
+
+		const exactMatch = dependencyEntries.find((dependency) => dependency === SCHEMA_DEPENDENCY_URL);
+		if (exactMatch) {
+			return exactMatch;
+		}
+
+		const schemaLikeDependencies = dependencyEntries.filter(isSchemaLikeDependency);
+		if (schemaLikeDependencies.length > 1) {
+			throw new Error(
+				`${SCHEMA_DEPENDENCY_ERROR_PREFIX}: multiple schema-like dependencies found: ${schemaLikeDependencies.join(', ')}`
+			);
+		}
+		if (schemaLikeDependencies.length === 1) {
+			return schemaLikeDependencies[0]!;
+		}
+
+		throw new Error('Manifest dependencies must include schema repository');
+	}
+
+	function updateSchemaDependencyState(nextManifest: typeof manifest) {
+		if (!nextManifest) {
+			schemaDependencyError = null;
+			resolvedSchemaDependency = SCHEMA_DEPENDENCY_URL;
+			return;
+		}
+
+		try {
+			schemaDependencyError = null;
+			resolvedSchemaDependency = getResolvedSchemaDependency(nextManifest.dependencies);
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			schemaDependencyError = message;
+			resolvedSchemaDependency = SCHEMA_DEPENDENCY_URL;
+		}
+	}
+
+	function setManifest(nextManifest: typeof manifest) {
+		manifest = nextManifest;
+		updateSchemaDependencyState(nextManifest);
+		dirtyUpdate('manifest', manifest);
+	}
+
+	$: if (manifest) {
+		updateSchemaDependencyState(manifest);
+	}
 
 	// Initialize dirty tracking
 	onMount(() => {
 		if (manifest) {
 			initEdit({ manifest, readme });
+			updateSchemaDependencyState(manifest);
 		}
 	});
 
@@ -42,8 +117,7 @@
 		value: NonNullable<typeof manifest>[K]
 	) {
 		if (!manifest) return;
-		manifest = { ...manifest, [key]: value };
-		dirtyUpdate('manifest', manifest);
+		setManifest({ ...manifest, [key]: value });
 	}
 
 	function updatePraxrr(key: 'minimum_version', value: string) {
@@ -52,12 +126,16 @@
 			...manifest,
 			praxrr: { ...manifest.praxrr, [key]: value }
 		};
-		dirtyUpdate('manifest', manifest);
+		setManifest(manifest);
 	}
 
 	function updateReadme(value: string) {
 		readme = value;
 		dirtyUpdate('readme', readme);
+	}
+
+	$: if (!manifest) {
+		resolvedSchemaDependency = SCHEMA_DEPENDENCY_URL;
 	}
 
 	function parseVersion(v: string): [number, number, number] {
@@ -116,7 +194,7 @@
 						text={saving ? 'Saving...' : 'Save'}
 						icon={Save}
 						iconColor="text-blue-600 dark:text-blue-400"
-						disabled={saving || !$isDirty}
+						disabled={saving || !$isDirty || !!schemaDependencyError}
 						type="submit"
 					/>
 				</svelte:fragment>
@@ -312,11 +390,15 @@
 					versionMinMajor={1}
 					value={manifest.dependencies ?? {}}
 					onchange={(v) => updateManifest('dependencies', v)}
-					lockedFirst={{
-						key: 'https://github.com/yandy-r/praxrr-schema',
-						value: '1.0.0',
-						minMajor: 1
-					}}
+					lockedFirst={
+						schemaDependencyError
+							? undefined
+							: {
+									key: resolvedSchemaDependency,
+									value: manifest.dependencies?.[resolvedSchemaDependency] ?? '1.0.0',
+									minMajor: 1
+							  }
+					}
 					onLockedEditAttempt={() =>
 						alertStore.add('warning', 'The schema package URL cannot be changed')}
 					onLockedDeleteAttempt={() =>
@@ -330,6 +412,12 @@
 							'Additional dependencies are not available yet. Coming in a future version.'
 						)}
 				/>
+				{#if schemaDependencyError}
+					<div class="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900/50 dark:bg-red-900/20 dark:text-red-300">
+						<div class="font-medium">Schema dependency configuration is invalid.</div>
+						<div>{schemaDependencyError}</div>
+					</div>
+				{/if}
 
 				<!-- README -->
 				<div class="space-y-1">

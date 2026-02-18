@@ -17,6 +17,7 @@ import { Database } from '@jsr/db__sqlite';
 // ============================================================================
 
 const SCHEMA_REPO = 'yandy-r/praxrr-schema';
+const DEFAULT_LOCAL_SCHEMA_PATH = 'packages/praxrr-schema/ops/0.schema.sql';
 const SCHEMA_TOKEN_ENV_VARS = ['PRAXRR_SCHEMA_TOKEN', 'GITHUB_TOKEN', 'GH_TOKEN'] as const;
 
 /**
@@ -26,7 +27,7 @@ const SCHEMA_TOKEN_ENV_VARS = ['PRAXRR_SCHEMA_TOKEN', 'GITHUB_TOKEN', 'GH_TOKEN'
  * Columns with CHECK constraints don't need overrides - the generator
  * parses those automatically. These are for Sonarr's integer enums.
  *
- * Runtime conversion functions are in: src/lib/shared/pcd/conversions.ts
+ * Runtime conversion functions are in: packages/praxrr-app/src/lib/shared/pcd/conversions.ts
  */
 const COLUMN_TYPE_OVERRIDES: Record<string, string> = {
   // Sonarr stores these as integers (0-5) but we want semantic strings in TS
@@ -35,7 +36,7 @@ const COLUMN_TYPE_OVERRIDES: Record<string, string> = {
 };
 const DEFAULT_VERSION = '1.0.0'; // Schema versions are branch names (e.g., 1.0.0, 1.1.0)
 const SCHEMA_PATH = 'ops/0.schema.sql';
-const OUTPUT_DIR = './src/lib/shared/pcd';
+const OUTPUT_DIR = './packages/praxrr-app/src/lib/shared/pcd';
 const OUTPUT_PATH = `${OUTPUT_DIR}/types.ts`;
 
 // ============================================================================
@@ -45,12 +46,14 @@ const OUTPUT_PATH = `${OUTPUT_DIR}/types.ts`;
 interface CliArgs {
   version: string;
   localPath?: string;
+  remote: boolean;
   help: boolean;
 }
 
 function parseArgs(): CliArgs {
   const args: CliArgs = {
     version: DEFAULT_VERSION,
+    remote: false,
     help: false,
   };
 
@@ -61,6 +64,12 @@ function parseArgs(): CliArgs {
       args.version = arg.slice('--version='.length);
     } else if (arg.startsWith('--local=')) {
       args.localPath = arg.slice('--local='.length);
+    } else if (arg === '--remote') {
+      args.remote = true;
+    } else if (arg === '--remote=true') {
+      args.remote = true;
+    } else if (arg === '--remote=false') {
+      args.remote = false;
     }
   }
 
@@ -79,12 +88,15 @@ USAGE:
 OPTIONS:
   --version=<ver>    Use specific schema version/branch (default: ${DEFAULT_VERSION})
   --local=<path>     Use local schema file instead of fetching from GitHub
+  --remote           Force remote GitHub fetch (default: local-first)
   --help, -h         Show this help message
 
 EXAMPLES:
-  deno task generate:pcd-types                      # Fetch version ${DEFAULT_VERSION}
-  deno task generate:pcd-types --version=1.1.0      # Fetch version 1.1.0
-  deno task generate:pcd-types --local=./schema.sql # Use local file
+  deno task generate:pcd-types                      # Use local schema (packages/praxrr-schema/ops/0.schema.sql)
+  deno task generate:pcd-types --version=1.1.0      # Use local schema (version is used only for --remote)
+  deno task generate:pcd-types --local=./schema.sql # Use explicit local file
+  deno task generate:pcd-types --remote             # Fetch version ${DEFAULT_VERSION}
+  deno task generate:pcd-types --remote --version=1.1.0 # Fetch version 1.1.0
 
 OUTPUT:
   ${OUTPUT_PATH}
@@ -132,6 +144,18 @@ async function fetchSchemaFromGitHub(version: string): Promise<string> {
 }
 
 async function loadSchemaFromFile(path: string): Promise<string> {
+  try {
+    await Deno.stat(path);
+  } catch (error) {
+    if (error instanceof Deno.errors.NotFound) {
+      throw new Error(
+        `Local schema file not found: ${path}\n` +
+          'Pass --remote to fetch from GitHub instead, or correct the --local path.'
+      );
+    }
+    throw new Error(`Unable to access local schema file ${path}: ${error}`);
+  }
+
   console.log(`Loading schema from: ${path}`);
   return await Deno.readTextFile(path);
 }
@@ -646,12 +670,15 @@ async function main(): Promise<void> {
     // Load schema
     let schemaSql: string;
     let sourceVersion = args.version;
+    const localPath = args.localPath ?? DEFAULT_LOCAL_SCHEMA_PATH;
 
-    if (args.localPath) {
-      schemaSql = await loadSchemaFromFile(args.localPath);
-      sourceVersion = 'local';
-    } else {
+    const shouldFetchRemote = args.remote && args.localPath === undefined;
+
+    if (shouldFetchRemote) {
       schemaSql = await fetchSchemaFromGitHub(args.version);
+    } else {
+      schemaSql = await loadSchemaFromFile(localPath);
+      sourceVersion = 'local';
     }
 
     console.log(`Schema loaded (${schemaSql.length} bytes)`);

@@ -1,6 +1,6 @@
 import { migrationRunner } from '$db/migrations.ts';
 import { config } from '$config';
-import packageJson from '../../../../package.json' with { type: 'json' };
+import packageJson from '../../../../../../package.json' with { type: 'json' };
 import { getCachedReleases, type GitHubRelease } from '$lib/server/utils/github/cache.ts';
 
 type VersionStatus = 'up-to-date' | 'out-of-date' | 'dev-build';
