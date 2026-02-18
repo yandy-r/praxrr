@@ -313,7 +313,7 @@ function getMetadataProfileTypeId(typeRow: LidarrMetadataProfileTypeRow, kind: '
 
 function normalizeLidarrMetadataProfileTypeRows(
   section: MetadataProfileSectionKind,
-  typeRows: readonly LidarrMetadataProfileTypeRow[],
+  typeRows: readonly LidarrMetadataProfileTypeRow[]
 ): Array<{ typeId: number; name: string; allowed: boolean }> {
   return typeRows
     .slice()
@@ -339,9 +339,7 @@ function normalizeLidarrMetadataProfileReleaseStatusRows(
   }));
 }
 
-export async function deserializeLidarrMetadataProfile(
-  options: DeserializeOptions<PortableLidarrMetadataProfile>
-) {
+export async function deserializeLidarrMetadataProfile(options: DeserializeOptions<PortableLidarrMetadataProfile>) {
   const { databaseId, cache, layer, portable } = options;
 
   return metadataProfilesQueries.create({

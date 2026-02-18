@@ -89,8 +89,7 @@ export function getLidarrMediaManagementPortableEntry(entityType: EntityType) {
 }
 
 export const LIDARR_METADATA_PROFILE_PORTABLE_ENTITIES = ['lidarr_metadata_profile'] as const;
-export type LidarrMetadataProfilePortableEntityType =
-  (typeof LIDARR_METADATA_PROFILE_PORTABLE_ENTITIES)[number];
+export type LidarrMetadataProfilePortableEntityType = (typeof LIDARR_METADATA_PROFILE_PORTABLE_ENTITIES)[number];
 
 // ============================================================================
 // ENTITY TYPE ENUM

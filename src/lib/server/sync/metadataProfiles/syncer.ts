@@ -144,7 +144,10 @@ function transform(profile: PcdMetadataProfile): LidarrMetadataProfileCreatePayl
   };
 }
 
-function buildPayload(profile: PcdMetadataProfile, schema?: LidarrMetadataProfileSchema | null): LidarrMetadataProfileCreatePayload {
+function buildPayload(
+  profile: PcdMetadataProfile,
+  schema?: LidarrMetadataProfileSchema | null
+): LidarrMetadataProfileCreatePayload {
   if (!schema) {
     return transform(profile);
   }
@@ -157,9 +160,7 @@ function buildPayload(profile: PcdMetadataProfile, schema?: LidarrMetadataProfil
   };
 }
 
-function normalizeSchema(
-  schema: LidarrMetadataProfileSchema | null | undefined
-): LidarrMetadataProfileSchema {
+function normalizeSchema(schema: LidarrMetadataProfileSchema | null | undefined): LidarrMetadataProfileSchema {
   if (!schema) {
     return {
       id: 0,
@@ -171,15 +172,18 @@ function normalizeSchema(
   return {
     id: schema.id ?? 0,
     name: schema.name,
-    primaryAlbumTypes: Array.isArray(schema.primaryAlbumTypes) && schema.primaryAlbumTypes.length > 0
-      ? schema.primaryAlbumTypes
-      : METADATA_PROFILE_SCHEMA_FALLBACK.primaryAlbumTypes,
-    secondaryAlbumTypes: Array.isArray(schema.secondaryAlbumTypes) && schema.secondaryAlbumTypes.length > 0
-      ? schema.secondaryAlbumTypes
-      : METADATA_PROFILE_SCHEMA_FALLBACK.secondaryAlbumTypes,
-    releaseStatuses: Array.isArray(schema.releaseStatuses) && schema.releaseStatuses.length > 0
-      ? schema.releaseStatuses
-      : METADATA_PROFILE_SCHEMA_FALLBACK.releaseStatuses,
+    primaryAlbumTypes:
+      Array.isArray(schema.primaryAlbumTypes) && schema.primaryAlbumTypes.length > 0
+        ? schema.primaryAlbumTypes
+        : METADATA_PROFILE_SCHEMA_FALLBACK.primaryAlbumTypes,
+    secondaryAlbumTypes:
+      Array.isArray(schema.secondaryAlbumTypes) && schema.secondaryAlbumTypes.length > 0
+        ? schema.secondaryAlbumTypes
+        : METADATA_PROFILE_SCHEMA_FALLBACK.secondaryAlbumTypes,
+    releaseStatuses:
+      Array.isArray(schema.releaseStatuses) && schema.releaseStatuses.length > 0
+        ? schema.releaseStatuses
+        : METADATA_PROFILE_SCHEMA_FALLBACK.releaseStatuses,
   };
 }
 
@@ -277,17 +281,14 @@ export class MetadataProfileSyncer extends BaseSyncer {
 
     const profile = await getMetadataProfileFromCache(syncConfig.databaseId, syncConfig.profileName);
     if (!profile) {
-      await logger.warn(
-        `Metadata profile "${syncConfig.profileName}" not found in database ${syncConfig.databaseId}`,
-        {
-          source: 'Sync:MetadataProfile',
-          meta: {
-            instanceId: this.instanceId,
-            databaseId: syncConfig.databaseId,
-            profileName: syncConfig.profileName,
-          },
-        }
-      );
+      await logger.warn(`Metadata profile "${syncConfig.profileName}" not found in database ${syncConfig.databaseId}`, {
+        source: 'Sync:MetadataProfile',
+        meta: {
+          instanceId: this.instanceId,
+          databaseId: syncConfig.databaseId,
+          profileName: syncConfig.profileName,
+        },
+      });
       return { success: false, itemsSynced: 0, error: 'Profile not found in PCD cache' };
     }
 

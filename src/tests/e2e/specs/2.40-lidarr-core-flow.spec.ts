@@ -249,8 +249,7 @@ function buildLidarrLibraryItems(query: string | null) {
   const allItems = Array.from({ length: 120 }, (_, index) => {
     const albumIndex = index + 1;
     const isPrimaryProfile = albumIndex % 2 === 0;
-    const foreignArtistId =
-      albumIndex === 1 ? LIDARR_LIBRARY_FOREIGN_ARTIST_ID : `e2e-mbid-artist-${albumIndex}`;
+    const foreignArtistId = albumIndex === 1 ? LIDARR_LIBRARY_FOREIGN_ARTIST_ID : `e2e-mbid-artist-${albumIndex}`;
 
     return {
       id: 9000 + albumIndex,

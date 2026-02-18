@@ -94,11 +94,7 @@ function isLidarrMetadataProfileSchemaError(message: string): boolean {
 
 async function validateLidarrMetadataProfileSupport(cache: PCDCache): Promise<boolean> {
   try {
-    await cache.kb
-      .selectFrom('lidarr_metadata_profiles')
-      .select('id')
-      .limit(1)
-      .executeTakeFirst();
+    await cache.kb.selectFrom('lidarr_metadata_profiles').select('id').limit(1).executeTakeFirst();
 
     await cache.kb
       .selectFrom('lidarr_metadata_profile_primary_types')

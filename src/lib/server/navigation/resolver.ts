@@ -1,9 +1,5 @@
 import type { User } from '$db/queries/users.ts';
-import {
-  ARR_APP_TYPES,
-  supportsFeature,
-  type ArrFeature,
-} from '$shared/arr/capabilities.ts';
+import { ARR_APP_TYPES, supportsFeature, type ArrFeature } from '$shared/arr/capabilities.ts';
 import { ARR_TARGET_ORDER } from '$shared/arr/capabilities.ts';
 import type { NavItemDef, NavShell, ResolvedNavGroup, ResolvedNavItem } from '$shared/navigation/types.ts';
 import { NAV_GROUPS, NAV_REGISTRY } from './registry.ts';

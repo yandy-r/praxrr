@@ -163,7 +163,10 @@ export class LidarrClient extends BaseArrClient {
   /**
    * Update a metadata profile
    */
-  updateMetadataProfile(id: number, profile: LidarrMetadataProfileUpdatePayload): Promise<LidarrMetadataProfileGetResponse> {
+  updateMetadataProfile(
+    id: number,
+    profile: LidarrMetadataProfileUpdatePayload
+  ): Promise<LidarrMetadataProfileGetResponse> {
     return this.put<LidarrMetadataProfileGetResponse>(`/api/${this.apiVersion}/metadataprofile/${id}`, {
       ...profile,
       id,

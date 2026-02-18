@@ -102,14 +102,7 @@ export const NAV_REGISTRY: ArrCapabilityAwareNavItem[] = [
     emoji: '⚡',
     hasChildren: true,
     requiredFeature: 'quality_profiles',
-    children: [
-      buildChild(
-        'policies.quality_profiles.testing',
-        'Testing',
-        '/quality-profiles/entity-testing',
-        0
-      ),
-    ],
+    children: [buildChild('policies.quality_profiles.testing', 'Testing', '/quality-profiles/entity-testing', 0)],
   },
   {
     id: 'policies.custom_formats',

@@ -1,7 +1,6 @@
 import type { Migration } from '../migrations.ts';
 
-export const LIDARR_DEFAULT_METADATA_PROFILE_OP_FILENAME =
-  '20260219_seed_default_lidarr_metadata_profiles.sql';
+export const LIDARR_DEFAULT_METADATA_PROFILE_OP_FILENAME = '20260219_seed_default_lidarr_metadata_profiles.sql';
 export const LIDARR_DEFAULT_METADATA_PROFILE_OP_VERSION = 20260219;
 export const LIDARR_DEFAULT_METADATA_PROFILE_OP_METADATA =
   '{"operation":"seed","entity":"lidarr_metadata_profiles","conflict_policy":"preserve_existing_lidarr_metadata_profiles"}';
@@ -69,14 +68,13 @@ VALUES
 ON CONFLICT(metadata_profile_name, status_id) DO NOTHING;
 `;
 
-const LIDARR_DEFAULT_METADATA_PROFILE_OP_SQL_ESCAPED =
-  LIDARR_DEFAULT_METADATA_PROFILE_OP_SQL.replaceAll("'", "''");
+const LIDARR_DEFAULT_METADATA_PROFILE_OP_SQL_ESCAPED = LIDARR_DEFAULT_METADATA_PROFILE_OP_SQL.replaceAll("'", "''");
 
 export const migration: Migration = {
-	version: LIDARR_DEFAULT_METADATA_PROFILE_OP_VERSION,
-	name: 'Seed default Lidarr metadata profile',
+  version: LIDARR_DEFAULT_METADATA_PROFILE_OP_VERSION,
+  name: 'Seed default Lidarr metadata profile',
 
-	up: `
+  up: `
 	INSERT INTO pcd_ops (
 		database_id,
 		origin,
@@ -108,7 +106,7 @@ export const migration: Migration = {
 	);
 	`,
 
-	down: `
+  down: `
 		DELETE FROM pcd_ops
 		WHERE origin = 'base'
 			AND source = 'local'

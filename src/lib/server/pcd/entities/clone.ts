@@ -142,8 +142,7 @@ function resolveLidarrMetadataProfileTypeId(
   section: 'primary' | 'secondary' | 'release_status',
   row: LidarrMetadataProfileTypeRow
 ): number {
-  const id =
-    row.id ?? (section === 'release_status' ? row.statusId : row.typeId);
+  const id = row.id ?? (section === 'release_status' ? row.statusId : row.typeId);
 
   if (typeof id !== 'number' || !Number.isInteger(id)) {
     throw new Error(`metadata profile ${section} row id must be a valid integer`);

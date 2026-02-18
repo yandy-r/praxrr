@@ -93,11 +93,7 @@ export class BaseHttpClient {
                 ? `HTTP ${response.status}: ${response.statusText} | ${details}`
                 : `HTTP ${response.status}: ${response.statusText}`;
 
-            const error = new HttpError(
-              errorMessage,
-              response.status,
-              data
-            );
+            const error = new HttpError(errorMessage, response.status, data);
 
             // Retry on specific status codes
             if (this.retryStatusCodes.includes(response.status) && attempt < this.retries) {

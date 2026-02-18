@@ -10,11 +10,7 @@ import { databaseInstancesQueries } from '$db/queries/databaseInstances.ts';
 import { pcdOpsQueries, type PcdOp } from '$db/queries/pcdOps.ts';
 import { pcdOpHistoryQueries } from '$db/queries/pcdOpHistory.ts';
 import { create as createLidarrMetadataProfile } from '$pcd/entities/metadataProfiles/create.ts';
-import {
-  get,
-  list,
-  type LidarrMetadataProfile,
-} from '$pcd/entities/metadataProfiles/read.ts';
+import { get, list, type LidarrMetadataProfile } from '$pcd/entities/metadataProfiles/read.ts';
 import { update as updateLidarrMetadataProfile } from '$pcd/entities/metadataProfiles/update.ts';
 import { remove as removeLidarrMetadataProfile } from '$pcd/entities/metadataProfiles/delete.ts';
 import {
@@ -279,8 +275,8 @@ INSERT INTO lidarr_metadata_profile_release_statuses (metadata_profile_name, sta
 VALUES
   ('Lidarr-Mixed', 100, 'Official', 1),
   ('Lidarr-Mixed', 200, 'Unconfirmed', 0);
-  `),
-);
+  `)
+  );
 
   try {
     const profiles = await list(fixture.cache);
@@ -306,9 +302,7 @@ VALUES
 });
 
 Deno.test('createLidarrMetadataProfile writes parent rows, child toggles, and operation metadata', async () => {
-  const harness = await createWriteHarness(
-    baseMetadataProfilesSchema()
-  );
+  const harness = await createWriteHarness(baseMetadataProfilesSchema());
 
   try {
     const result = await createLidarrMetadataProfile({
@@ -404,9 +398,7 @@ VALUES ('Duplicate-Name', 'Existing profile');
 });
 
 Deno.test('createLidarrMetadataProfile reserved name "None" is rejected', async () => {
-  const harness = await createWriteHarness(
-    baseMetadataProfilesSchema()
-  );
+  const harness = await createWriteHarness(baseMetadataProfilesSchema());
 
   try {
     await assertRejects(
@@ -464,7 +456,7 @@ VALUES ('Original', 2, 'Compilation', 0);
 INSERT INTO lidarr_metadata_profile_release_statuses (metadata_profile_name, status_id, name, allowed)
 VALUES ('Original', 100, 'Official', 1);
 `)
-);
+  );
 
   try {
     const current = await getProfileByName(harness.cache, 'Original');
@@ -612,7 +604,7 @@ VALUES ('Delete-Me', 10, 'Compilation', 1);
 INSERT INTO lidarr_metadata_profile_release_statuses (metadata_profile_name, status_id, name, allowed)
 VALUES ('Delete-Me', 100, 'Official', 1);
 `)
-);
+  );
 
   try {
     const current = await getProfileByName(harness.cache, 'Delete-Me');
@@ -659,7 +651,7 @@ VALUES ('Route-Profile', 10, 'Compilation', 0);
 INSERT INTO lidarr_metadata_profile_release_statuses (metadata_profile_name, status_id, name, allowed)
 VALUES ('Route-Profile', 100, 'Official', 1);
 `)
-);
+  );
 
   try {
     const response = await listMetadataProfilesGet({
@@ -669,7 +661,7 @@ VALUES ('Route-Profile', 100, 'Official', 1);
     } as unknown as Parameters<typeof listMetadataProfilesGet>[0]);
 
     assertEquals(response.status, 200);
-    const payload = await response.json() as Array<{
+    const payload = (await response.json()) as Array<{
       id: number;
       name: string;
       primaryTypeCount: number;
@@ -693,9 +685,7 @@ VALUES ('Route-Profile', 100, 'Official', 1);
 });
 
 Deno.test('metadata profile API rejects section selections with no allowed entries on create', async () => {
-  const harness = await createWriteHarness(
-    baseMetadataProfilesSchema()
-  );
+  const harness = await createWriteHarness(baseMetadataProfilesSchema());
 
   try {
     const response = await createMetadataProfilesPost({
@@ -742,7 +732,7 @@ Deno.test('metadata profile API rejects section selections with no allowed entri
     } as unknown as Parameters<typeof createMetadataProfilesPost>[0]);
 
     assertEquals(response.status, 400);
-    const payload = await response.json() as { error: string };
+    const payload = (await response.json()) as { error: string };
     assertEquals(payload.error, 'Each metadata profile section must include at least one allowed entry');
   } finally {
     await harness.cleanup();
@@ -750,9 +740,7 @@ Deno.test('metadata profile API rejects section selections with no allowed entri
 });
 
 Deno.test('metadata profile API rejects reserved name "None" on create', async () => {
-  const harness = await createWriteHarness(
-    baseMetadataProfilesSchema()
-  );
+  const harness = await createWriteHarness(baseMetadataProfilesSchema());
 
   try {
     const response = await createMetadataProfilesPost({
@@ -794,7 +782,7 @@ Deno.test('metadata profile API rejects reserved name "None" on create', async (
     } as unknown as Parameters<typeof createMetadataProfilesPost>[0]);
 
     assertEquals(response.status, 400);
-    const payload = await response.json() as { error: string };
+    const payload = (await response.json()) as { error: string };
     assertEquals(payload.error, "'None' is a reserved profile name");
   } finally {
     await harness.cleanup();
@@ -802,9 +790,7 @@ Deno.test('metadata profile API rejects reserved name "None" on create', async (
 });
 
 Deno.test('portable import for lidarr_metadata_profiles writes to lidarr metadata tables', async () => {
-  const harness = await createWriteHarness(
-    baseMetadataProfilesSchema()
-  );
+  const harness = await createWriteHarness(baseMetadataProfilesSchema());
 
   try {
     const response = await importPortablePost({
@@ -828,9 +814,7 @@ Deno.test('portable import for lidarr_metadata_profiles writes to lidarr metadat
               { id: 10, name: 'Compilation', allowed: true },
               { id: 11, name: 'Studio', allowed: false },
             ],
-            releaseStatuses: [
-              { id: 100, name: 'Official', allowed: true },
-            ],
+            releaseStatuses: [{ id: 100, name: 'Official', allowed: true }],
           },
         }),
       }),
@@ -924,7 +908,7 @@ VALUES ('Route-Update', 10, 'Compilation', 1);
 INSERT INTO lidarr_metadata_profile_release_statuses (metadata_profile_name, status_id, name, allowed)
 VALUES ('Route-Update', 100, 'Official', 1);
 `)
-);
+  );
 
   try {
     const current = await getProfileByName(harness.cache, 'Route-Update');
@@ -974,7 +958,7 @@ VALUES ('Route-Update', 100, 'Official', 1);
     } as unknown as Parameters<typeof updateMetadataProfile>[0]);
 
     assertEquals(response.status, 400);
-    const payload = await response.json() as { error: string };
+    const payload = (await response.json()) as { error: string };
     assertEquals(payload.error, 'Each metadata profile section must include at least one allowed entry');
   } finally {
     await harness.cleanup();
@@ -987,7 +971,7 @@ Deno.test('metadata profile API enforces delete body profile match when removing
 INSERT INTO lidarr_metadata_profiles (id, name, description)
 VALUES (99, 'Route-Delete', 'To delete');
 `)
-);
+  );
 
   try {
     const profile = await getProfileByName(harness.cache, 'Route-Delete');
@@ -1011,7 +995,7 @@ VALUES (99, 'Route-Delete', 'To delete');
     } as unknown as Parameters<typeof deleteMetadataProfile>[0]);
 
     assertEquals(response.status, 400);
-    const payload = await response.json() as { error: string };
+    const payload = (await response.json()) as { error: string };
     assertEquals(payload.error, 'Profile name does not match the selected profile');
   } finally {
     await harness.cleanup();
