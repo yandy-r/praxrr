@@ -5,6 +5,7 @@
 import { execGit, execGitSafe } from './exec.ts';
 import type { RepoInfo } from './types.ts';
 import { getCachedRepoInfo } from '../github/cache.ts';
+import { logger } from '$logger/logger.ts';
 
 type GitHubApiError = {
   message: string;
@@ -193,6 +194,10 @@ export async function clone(
     if (!message.includes('rate limit')) {
       throw error;
     }
+    await logger.warn('GitHub API validation rate-limited; continuing with git clone fallback', {
+      source: 'Git',
+      meta: { repositoryUrl, hasPersonalAccessToken: !!personalAccessToken },
+    });
   }
 
   const args = ['clone'];
