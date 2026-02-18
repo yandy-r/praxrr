@@ -2,6 +2,14 @@
 # Usage: docker compose -f compose.arr.yml up -d
 #        deno task arr
 
+# Optional app-runtime env examples (not used by this compose stack unless you add app services):
+# AUTH=off
+# PRAXRR_DEFAULT_DB_URL=https://github.com/your-org/praxrr-db
+# PRAXRR_DEFAULT_DB_BRANCH=main
+# PRAXRR_DEFAULT_DB_NAME=praxrr-db
+# PRAXRR_DEFAULT_DB_GIT_USER_NAME=praxrr-bot
+# PRAXRR_DEFAULT_DB_GIT_EMAIL=you@example.com
+
 services:
   radarr:
     container_name: praxrr-radarr
