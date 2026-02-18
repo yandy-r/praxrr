@@ -10,6 +10,7 @@ declare global {
     interface Locals {
       user: User | null;
       session: Session | null;
+      authBypass: boolean;
     }
     interface PageData {
       navShell?: NavShell;
