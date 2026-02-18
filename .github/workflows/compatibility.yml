@@ -1,0 +1,73 @@
+name: Compatibility Gates
+
+on:
+  pull_request:
+    paths:
+      - 'packages/praxrr-app/**'
+      - 'packages/praxrr-schema/**'
+      - 'packages/praxrr-db/**'
+      - 'scripts/compat-check.ts'
+      - 'deno.json'
+      - '.github/workflows/release.yml'
+      - '.github/workflows/docker.yml'
+      - 'release-please-config.json'
+      - '.release-please-manifest.json'
+
+env:
+  DENO_VERSION: '2.5.6'
+
+jobs:
+  detect-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      contracts_paths: ${{ steps.path-changes.outputs.contracts_paths }}
+      app_paths: ${{ steps.path-changes.outputs.app_paths }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Detect workflow and contract/app changes
+        id: path-changes
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            contracts_paths:
+              - 'packages/praxrr-schema/**'
+              - 'packages/praxrr-db/**'
+              - 'scripts/compat-check.ts'
+            app_paths:
+              - 'packages/praxrr-app/src/**'
+              - 'scripts/generate-pcd-types.ts'
+              - 'deno.json'
+
+  compatibility:
+    needs: detect-changes
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - check: contracts
+          - check: app-check
+    runs-on: ubuntu-latest
+    name: ${{ matrix.check }}
+    if: |
+      ${{ (matrix.check == 'contracts' && needs.detect-changes.outputs.contracts_paths == 'true')
+      || (matrix.check == 'app-check' && needs.detect-changes.outputs.app_paths == 'true') }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: ${{ env.DENO_VERSION }}
+
+      - name: Run contract compatibility checks
+        if: matrix.check == 'contracts'
+        run: deno run -A scripts/compat-check.ts
+
+      - name: Run app checks
+        if: matrix.check == 'app-check'
+        run: |
+          deno install --node-modules-dir
+          deno task check
