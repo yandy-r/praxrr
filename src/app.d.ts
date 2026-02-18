@@ -2,6 +2,7 @@
 // for information about these interfaces
 import type { User } from '$db/queries/users.ts';
 import type { Session } from '$db/queries/sessions.ts';
+import type { NavShell } from '$shared/navigation/types.ts';
 
 declare global {
   namespace App {
@@ -10,7 +11,9 @@ declare global {
       user: User | null;
       session: Session | null;
     }
-    // interface PageData {}
+    interface PageData {
+      navShell?: NavShell;
+    }
     // interface PageState {}
     // interface Platform {}
   }
