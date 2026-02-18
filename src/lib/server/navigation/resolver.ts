@@ -1,4 +1,9 @@
 import type { User } from '$db/queries/users.ts';
+import {
+  ARR_APP_TYPES,
+  supportsFeature,
+  type ArrFeature,
+} from '$shared/arr/capabilities.ts';
 import { ARR_TARGET_ORDER } from '$shared/arr/capabilities.ts';
 import type { NavItemDef, NavShell, ResolvedNavGroup, ResolvedNavItem } from '$shared/navigation/types.ts';
 import { NAV_GROUPS, NAV_REGISTRY } from './registry.ts';
@@ -6,6 +11,11 @@ import { NAV_GROUPS, NAV_REGISTRY } from './registry.ts';
 interface ResolveNavShellInput {
   user: User | null;
 }
+
+type ArrCapabilityAwareNavItem = NavItemDef & { requiredFeature?: ArrFeature };
+
+type ResolvedNavItemWithFeature = ResolvedNavItem & { requiredFeature?: ArrFeature };
+type ResolvedNavGroupWithFeature = ResolvedNavGroup & { items: ResolvedNavItemWithFeature[] };
 
 const isServerDev = (import.meta as { env?: { DEV?: boolean } }).env?.DEV ?? false;
 
@@ -21,7 +31,15 @@ function resolvePattern(pattern: string | RegExp | undefined): string | undefine
   return pattern.source;
 }
 
-function canRenderNavItem(item: NavItemDef, user: User | null): boolean {
+function hasSupportedFeature(feature: ArrFeature | undefined): boolean {
+  if (!feature) {
+    return true;
+  }
+
+  return ARR_APP_TYPES.some((type) => supportsFeature(type, feature));
+}
+
+function canRenderNavItem(item: ArrCapabilityAwareNavItem, user: User | null): boolean {
   if (item.devOnly && !isServerDev) {
     return false;
   }
@@ -31,6 +49,10 @@ function canRenderNavItem(item: NavItemDef, user: User | null): boolean {
   }
 
   if (item.permission && !user) {
+    return false;
+  }
+
+  if (!hasSupportedFeature(item.requiredFeature)) {
     return false;
   }
 
@@ -57,7 +79,7 @@ function resolveChildItems(item: NavItemDef): ResolvedNavItem['children'] {
     }));
 }
 
-function resolveNavItem(item: NavItemDef): ResolvedNavItem {
+function resolveNavItem(item: ArrCapabilityAwareNavItem): ResolvedNavItemWithFeature {
   const children = resolveChildItems(item);
 
   return {
@@ -69,6 +91,7 @@ function resolveNavItem(item: NavItemDef): ResolvedNavItem {
     activePattern: resolvePattern(item.activePattern),
     iconKey: item.iconKey,
     emoji: item.emoji,
+    requiredFeature: item.requiredFeature,
     children,
   };
 }
@@ -90,7 +113,7 @@ export function resolveNavShell({ user }: ResolveNavShellInput): NavShell {
 
   const groups = NAV_GROUPS.slice()
     .sort((left, right) => left.order - right.order)
-    .map((group): ResolvedNavGroup | undefined => {
+    .map((group): ResolvedNavGroupWithFeature | undefined => {
       const items = visibleItems
         .filter((item) => item.groupId === group.id)
         .slice()

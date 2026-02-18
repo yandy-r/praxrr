@@ -1002,6 +1002,35 @@ component‑local class composition.
 - `bottomNav/BottomNav.svelte` — mobile nav bar.
 - `tabs/Tabs.svelte` — tabs + breadcrumbs/back button.
 
+### 20.2 Navigation Shell Contract (runtime)
+
+The navigation shell now uses a single server-produced payload to keep desktop and mobile
+surfaces consistent:
+
+- `src/routes/+layout.server.ts` resolves `navShell` once per request via
+  `resolveNavShell({ user })` and passes it through `App.PageData`.
+- Authenticated non-`/auth/*` requests receive `{ version, navShell }`.
+  Auth pages and unauthenticated users keep the legacy `{ version }` shape.
+- `src/routes/+layout.svelte` passes `data.navShell` into `PageNav` and `BottomNav`.
+- `resolveNavShell` in `src/lib/server/navigation/resolver.ts` evaluates
+  static visibility rules, orders groups/items deterministically, and returns JSON-safe
+  resolved rows (`activePattern` serialized to strings).
+- `NavShell` is consumed directly by:
+  - `src/lib/client/ui/navigation/pageNav/pageNav.svelte` for grouped sidebar rendering.
+  - `src/lib/client/ui/navigation/bottomNav/BottomNav.svelte` for flattened mobile items.
+
+Preserved constraints that must not regress:
+
+- Route canonicalization is preserved: navigation items use existing hrefs and do not
+  rename existing paths.
+- Mobile visibility keeps existing priority semantics:
+  `always` items always render,
+  `medium` items hide below `sm` breakpoints,
+  `low` items remain hidden by default.
+- Arr capability filtering is handled via Arr capability metadata in
+  `src/shared/arr/capabilities.ts`; unsupported leaf entries are hidden in the
+  active scope.
+
 **State (`ui/state/`)**
 
 - `EmptyState.svelte` — empty list CTA template.

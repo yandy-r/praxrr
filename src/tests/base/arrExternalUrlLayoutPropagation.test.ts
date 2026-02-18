@@ -3,6 +3,8 @@ import { arrInstancesQueries } from '../../lib/server/db/queries/arrInstances.ts
 import { load as arrLayoutLoad } from '../../routes/arr/[id]/+layout.server.ts';
 import { actions as settingsActions } from '../../routes/arr/[id]/settings/+page.server.ts';
 import type { ArrInstance, UpdateArrInstanceInput } from '../../lib/server/db/queries/arrInstances.ts';
+import { resolveNavShell } from '../../lib/server/navigation/resolver.ts';
+import type { User } from '../../lib/server/db/queries/users.ts';
 import { logger } from '$logger/logger.ts';
 
 type Restore = () => void;
@@ -37,6 +39,31 @@ function createSettingsRequest(id: number, fields: Record<string, string>): Requ
     body: formData,
   });
 }
+
+Deno.test('auth routes and unauthenticated sessions omit navShell in layout payload', () => {
+  const shellUser = {
+    id: 1,
+    username: 'test-user',
+    password_hash: 'hash',
+    created_at: '2025-01-01T00:00:00.000Z',
+    updated_at: '2025-01-01T00:00:00.000Z',
+  } as User;
+
+  const shouldReturnNavShell = (pathname: string, user: User | null) => {
+    if (!user || pathname.startsWith('/auth/')) {
+      return { version: '1.2.3' };
+    }
+
+    return {
+      version: '1.2.3',
+      navShell: resolveNavShell({ user }),
+    };
+  };
+
+  assertEquals('navShell' in shouldReturnNavShell('/auth/login', shellUser), false);
+  assertEquals('navShell' in shouldReturnNavShell('/auth/setup', shellUser), false);
+  assertEquals('navShell' in shouldReturnNavShell('/arr', null), false);
+});
 
 Deno.test('arr layout load reflects updated external_url after settings action rerun', async () => {
   const restores: Restore[] = [];

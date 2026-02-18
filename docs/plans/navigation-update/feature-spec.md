@@ -72,8 +72,8 @@ No external API dependencies are required for the initial implementation. The na
 2. **Single data source**: Sidebar and bottom bar must render from the same nav registry. No more dual hard-coded arrays.
    - Validation: `pageNav.svelte` and `BottomNav.svelte` both import from `registry.ts`.
 
-3. **Arr capability gating**: Nav items linked to Arr surfaces must declare their `arrScope` and be filterable by the active scope using `supportsArrSyncSurface()` / `supportsArrWorkflow()` from `capabilities.ts`.
-   - Validation: Metadata Profiles hidden/disabled when Radarr selected; Upgrades hidden/disabled when Lidarr selected.
+3. **Arr capability gating**: Nav items linked to Arr surfaces must declare the required capability and be filterable by the active scope using `supportsFeature()` (and underlying workflow/sync capability maps) from `capabilities.ts`.
+   - Validation: Metadata Profiles hidden/disabled when Radarr is selected; unsupported non-`all` surfaces remain discoverable with scope-aware behavior.
 
 4. **Database redirect preservation**: Six PCD entity routes use localStorage-based last-database-ID redirects. Nav must not change `href` values for these routes.
    - Validation: Clicking any policy nav item lands on the existing redirect flow.
@@ -100,6 +100,44 @@ No external API dependencies are required for the initial implementation. The na
 - [ ] Mobile drawer exposes full grouped navigation (not just bottom bar subset)
 - [ ] Dead code removed: `sidebar.ts` deleted, `groupItem.svelte` normalized
 
+> Preserved Deep-link Constraint: `NavShell` only changes composition and visibility, not href values.
+
+## Task 3.4: Implemented Runtime Contract
+
+### NavShell Contract
+
+- `NavShell` is the shared transport object `{ variant, arrScopeOptions, groups }`.
+- `src/routes/+layout.server.ts` now returns `{ version }` for auth routes and `{ version, navShell }` for authenticated non-`/auth/*` requests.
+- `src/app.d.ts` includes `App.PageData.navShell?: NavShell`.
+- `+layout.svelte` passes the same `navShell` payload to both:
+  - `PageNav`
+  - `BottomNav`
+
+### Registry / Resolver / Shell Flow
+
+```text
++layout.server.ts
+   -> resolveNavShell({ user })
+   -> reads NAV_GROUPS + NAV_REGISTRY
+   -> applies server-side gates:
+      - devOnly (dev builds only)
+      - permission requirement
+      - capability gating
+   -> resolves `RegExp` patterns to strings (JSON-safe)
+   -> sorts groups/items/children deterministically
+   -> returns NavShell
+```
+
+### Scope and Priority Rules (Implemented)
+
+- `arrScopeOptions` is derived from `ARR_TARGET_ORDER` (`all`, `radarr`, `sonarr`, `lidarr`) and is fed into the selector UI.
+- Scope filtering is applied in `PageNav`:
+  - `all` renders entries unchanged
+  - unsupported leaf items are hidden
+  - unsupported parent entries are shown in disabled/annotated state
+- Bottom nav uses deterministic flatten + sort by `mobilePriority` (`always` -> `medium` -> `low`) with stable source-index tie-break.
+- Route preservation remains strict: no nav item rename; canonical hrefs are reused.
+
 ## Technical Specifications
 
 ### Architecture Overview
@@ -107,10 +145,10 @@ No external API dependencies are required for the initial implementation. The na
 ```text
 +layout.server.ts
     |
-    | resolveNavShell({ user, session })
+    | resolveNavShell({ user })
     |   - reads NAV_REGISTRY (NavItemDef[])
-    |   - evaluates featureFlag per item
-    |   - maps icon -> iconKey (JSON-safe)
+    |   - applies server-only gates
+    |   - resolves children and patterns for JSON-safe output
     |   - returns NavShell
     v
 +layout.svelte
@@ -139,8 +177,11 @@ No external API dependencies are required for the initial implementation. The na
 ```typescript
 // src/lib/shared/navigation/types.ts
 
+import type { ArrFeature } from '$shared/arr/capabilities.ts';
+import type { ArrType } from '$shared/pcd/types.ts';
+
 export type NavVariant = 'legacy' | 'nav_v2';
-export type NavGroupId = 'data' | 'apps' | 'policies' | 'operations' | 'settings' | 'dev';
+export type NavGroupId = 'overview' | 'apps' | 'policies' | 'operations' | 'settings' | 'dev';
 export type NavMobilePriority = 'always' | 'medium' | 'low';
 
 export interface NavItemDef {
@@ -160,6 +201,10 @@ export interface NavItemDef {
   permission?: string; // Future: role-based filtering
   devOnly?: boolean;
 }
+
+// `requiredFeature` is applied in the resolver (`resolveNavShell`) via an
+// internal extension type for scope gating.
+type ArrCapabilityAwareNavItem = NavItemDef & { requiredFeature?: ArrFeature };
 
 export interface NavChildDef {
   id: string;
@@ -215,19 +260,18 @@ export function resolveIcon(key: string): ComponentType | undefined {
 
 #### Layout Load Contract (Modified `+layout.server.ts`)
 
-**Current**: Returns `{ version }`.
-**Proposed**: Returns `{ version, navShell }`.
+**Runtime contract**: Auth routes return `{ version }`; authenticated non-auth routes return `{ version, navShell }`.
 
 ```typescript
 export const load: LayoutServerLoad = async ({ locals }) => {
   return {
     version: appInfoQueries.getVersion(),
-    navShell: resolveNavShell({ user: locals.user, session: locals.session }),
+    navShell: resolveNavShell({ user: locals.user }),
   };
 };
 ```
 
-The `resolveNavShell` function reads the static registry, evaluates feature flags, maps icons to serializable keys, and returns a pure JSON `NavShell`.
+The `resolveNavShell` function reads the static registry and returns a pure JSON `NavShell`.
 
 #### Telemetry Endpoint (Phase 3, Deferred)
 
@@ -283,7 +327,7 @@ The `resolveNavShell` function reads the static registry, evaluates feature flag
 #### Primary: Cross-App Scope Switch (Phase 2)
 
 1. **Select scope** -- User picks "Lidarr" from scope selector in top bar / sidebar.
-2. **Nav filters** -- Metadata Profiles becomes visible; Upgrades becomes disabled with tooltip.
+2. **Nav filters** -- Metadata Profiles becomes available or unavailable based on active scope, with explanatory text on unsupported parent groups.
 3. **Navigate** -- User clicks Metadata Profiles, lands on familiar route.
 4. **Error case**: If current page is unsupported in new scope, show inline banner with nearest valid destination.
 
@@ -300,7 +344,7 @@ The `resolveNavShell` function reads the static registry, evaluates feature flag
 | Sidebar         | Grouped with section headers      | Preserves existing `Group`/`GroupItem` components    |
 | Section headers | Uppercase labels with separator   | "DATA SOURCES", "POLICIES", "OPERATIONS", "SETTINGS" |
 | Scope selector  | Dropdown in sidebar or top bar    | Follows PatternFly/AWS placement conventions         |
-| Disabled items  | Grayed + tooltip (not hidden)     | "Not available for Radarr"                           |
+| Disabled items  | Grayed + inline note (not hidden)     | "Not available for Radarr"                           |
 | Command palette | Bits UI Command.Dialog            | `Cmd+K` trigger, grouped results, Svelte 5 native    |
 | Mobile          | Bottom bar + drawer for full tree | Same taxonomy, different container                   |
 

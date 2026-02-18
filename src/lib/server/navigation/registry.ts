@@ -1,4 +1,5 @@
 import { NAV_GROUP_IDS } from '$shared/navigation/constants.ts';
+import type { ArrFeature } from '$shared/arr/capabilities.ts';
 import type { ArrType } from '$shared/pcd/types.ts';
 import type { NavChildDef, NavGroupId, NavItemDef } from '$shared/navigation/types.ts';
 
@@ -54,6 +55,8 @@ const ensureGroupId = (id: string): NavGroupId => {
 
 const scopeAll: ArrType = 'all';
 
+type ArrCapabilityAwareNavItem = NavItemDef & { requiredFeature?: ArrFeature };
+
 const buildChild = (id: string, label: string, href: string, order: number, activePattern?: string): NavChildDef => ({
   id,
   label,
@@ -62,7 +65,7 @@ const buildChild = (id: string, label: string, href: string, order: number, acti
   activePattern,
 });
 
-export const NAV_REGISTRY: NavItemDef[] = [
+export const NAV_REGISTRY: ArrCapabilityAwareNavItem[] = [
   {
     id: 'overview.databases',
     label: 'Databases',
@@ -98,6 +101,7 @@ export const NAV_REGISTRY: NavItemDef[] = [
     iconKey: 'Sliders',
     emoji: '⚡',
     hasChildren: false,
+    requiredFeature: 'quality_profiles',
   },
   {
     id: 'policies.custom_formats',
@@ -110,6 +114,7 @@ export const NAV_REGISTRY: NavItemDef[] = [
     iconKey: 'Palette',
     emoji: '🎨',
     hasChildren: false,
+    requiredFeature: 'custom_formats',
   },
   {
     id: 'policies.regular_expressions',
@@ -134,6 +139,7 @@ export const NAV_REGISTRY: NavItemDef[] = [
     iconKey: 'Tag',
     emoji: '🏷️',
     hasChildren: true,
+    requiredFeature: 'media_management',
     children: [
       buildChild(
         'policies.media_management.naming',
@@ -169,6 +175,7 @@ export const NAV_REGISTRY: NavItemDef[] = [
     iconKey: 'Clock',
     emoji: '⏳',
     hasChildren: false,
+    requiredFeature: 'delay_profiles',
   },
   {
     id: 'policies.metadata_profiles',
@@ -181,6 +188,7 @@ export const NAV_REGISTRY: NavItemDef[] = [
     iconKey: 'Tag',
     emoji: '🏷️',
     hasChildren: false,
+    requiredFeature: 'metadata_profiles',
   },
   {
     id: 'settings.settings',
