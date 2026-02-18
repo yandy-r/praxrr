@@ -1,16 +1,13 @@
 <script lang="ts">
 	import { page } from '$app/stores';
 
-	interface Props {
-		label: string;
-		href: string;
-		/** Optional pattern to match against pathname for active state (supports string includes or regex) */
-		activePattern?: string | RegExp;
-	}
+	export let label: string;
+	export let href: string;
 
-	let { label, href, activePattern }: Props = $props();
+	/** Optional pattern to match against pathname for active state (supports string includes or regex) */
+	export let activePattern: string | RegExp | undefined = undefined;
 
-	const isActive = $derived.by(() => {
+	$: isActive = (() => {
 		const pathname = $page.url.pathname;
 
 		// Use custom pattern if provided
@@ -18,12 +15,13 @@
 			if (typeof activePattern === 'string') {
 				return pathname.includes(activePattern);
 			}
+
 			return activePattern.test(pathname);
 		}
 
 		// Default behavior
 		return pathname === href || pathname.startsWith(href + '/');
-	});
+	})();
 </script>
 
 <a

@@ -120,7 +120,7 @@ No TypeScript/JavaScript Lidarr client library exists on npm. The project's exis
 | All types disallowed                          | Valid but useless -- Lidarr monitors nothing                            | Warn user, don't reject                      |
 | Profile deleted from PCD while synced         | Do NOT delete from Lidarr (may be in use by artists)                    | Sync only creates/updates                    |
 | Multiple PCD databases syncing to same Lidarr | Namespace suffixes applied to profile names                             | Same pattern as quality profiles             |
-| Metadata profile renamed in Praxrr         | Rename propagates to synced instances                                   | Consistent with QP rename behavior           |
+| Metadata profile renamed in Praxrr            | Rename propagates to synced instances                                   | Consistent with QP rename behavior           |
 
 ### Success Criteria
 

@@ -1,0 +1,237 @@
+import { NAV_GROUP_IDS } from '$shared/navigation/constants.ts';
+import type { ArrFeature } from '$shared/arr/capabilities.ts';
+import type { ArrType } from '$shared/pcd/types.ts';
+import type { NavChildDef, NavGroupId, NavItemDef } from '$shared/navigation/types.ts';
+
+export interface NavGroupDef {
+  id: NavGroupId;
+  label: string;
+  order: number;
+}
+
+export const NAV_GROUPS: NavGroupDef[] = [
+  {
+    id: 'overview',
+    label: 'Overview',
+    order: 0,
+  },
+  {
+    id: 'apps',
+    label: 'Apps',
+    order: 1,
+  },
+  {
+    id: 'policies',
+    label: 'Policies',
+    order: 2,
+  },
+  {
+    id: 'operations',
+    label: 'Operations',
+    order: 3,
+  },
+  {
+    id: 'settings',
+    label: 'Settings',
+    order: 4,
+  },
+  {
+    id: 'dev',
+    label: 'Dev',
+    order: 5,
+  },
+] as const;
+
+const isKnownGroupId = (value: string): value is NavGroupId => {
+  return (NAV_GROUP_IDS as readonly string[]).includes(value);
+};
+
+const ensureGroupId = (id: string): NavGroupId => {
+  if (!isKnownGroupId(id)) {
+    throw new Error(`Unknown nav group id: ${id}`);
+  }
+  return id;
+};
+
+const scopeAll: ArrType = 'all';
+
+type ArrCapabilityAwareNavItem = NavItemDef & { requiredFeature?: ArrFeature };
+
+const buildChild = (id: string, label: string, href: string, order: number, activePattern?: string): NavChildDef => ({
+  id,
+  label,
+  href,
+  order,
+  activePattern,
+});
+
+export const NAV_REGISTRY: ArrCapabilityAwareNavItem[] = [
+  {
+    id: 'overview.databases',
+    label: 'Databases',
+    href: '/databases',
+    groupId: ensureGroupId('overview'),
+    order: 0,
+    arrScope: scopeAll,
+    mobilePriority: 'always',
+    iconKey: 'FolderTree',
+    emoji: '📦',
+    hasChildren: false,
+  },
+  {
+    id: 'apps.arrs',
+    label: 'Arrs',
+    href: '/arr',
+    groupId: ensureGroupId('apps'),
+    order: 0,
+    arrScope: scopeAll,
+    mobilePriority: 'always',
+    iconKey: 'Link',
+    emoji: '🔗',
+    hasChildren: false,
+  },
+  {
+    id: 'policies.quality_profiles',
+    label: 'Quality Profiles',
+    href: '/quality-profiles',
+    groupId: ensureGroupId('policies'),
+    order: 0,
+    arrScope: scopeAll,
+    mobilePriority: 'always',
+    iconKey: 'Sliders',
+    emoji: '⚡',
+    hasChildren: true,
+    requiredFeature: 'quality_profiles',
+    children: [
+      buildChild(
+        'policies.quality_profiles.testing',
+        'Testing',
+        '/quality-profiles/entity-testing',
+        0
+      ),
+    ],
+  },
+  {
+    id: 'policies.custom_formats',
+    label: 'Custom Formats',
+    href: '/custom-formats',
+    groupId: ensureGroupId('policies'),
+    order: 1,
+    arrScope: scopeAll,
+    mobilePriority: 'always',
+    iconKey: 'Palette',
+    emoji: '🎨',
+    hasChildren: false,
+    requiredFeature: 'custom_formats',
+  },
+  {
+    id: 'policies.regular_expressions',
+    label: 'Regular Expressions',
+    href: '/regular-expressions',
+    groupId: ensureGroupId('policies'),
+    order: 2,
+    arrScope: scopeAll,
+    mobilePriority: 'medium',
+    iconKey: 'Microscope',
+    emoji: '🔬',
+    hasChildren: false,
+  },
+  {
+    id: 'policies.media_management',
+    label: 'Media Management',
+    href: '/media-management',
+    groupId: ensureGroupId('policies'),
+    order: 3,
+    arrScope: scopeAll,
+    mobilePriority: 'low',
+    iconKey: 'Tag',
+    emoji: '🏷️',
+    hasChildren: true,
+    requiredFeature: 'media_management',
+    children: [
+      buildChild(
+        'policies.media_management.naming',
+        'Naming Settings',
+        '/media-management?section=naming',
+        0,
+        '/naming'
+      ),
+      buildChild(
+        'policies.media_management.quality_definitions',
+        'Quality Definitions',
+        '/media-management?section=quality-definitions',
+        1,
+        '/quality-definitions'
+      ),
+      buildChild(
+        'policies.media_management.media_settings',
+        'Media Settings',
+        '/media-management?section=media-settings',
+        2,
+        '/media-settings'
+      ),
+    ],
+  },
+  {
+    id: 'policies.delay_profiles',
+    label: 'Delay Profiles',
+    href: '/delay-profiles',
+    groupId: ensureGroupId('policies'),
+    order: 4,
+    arrScope: scopeAll,
+    mobilePriority: 'low',
+    iconKey: 'Clock',
+    emoji: '⏳',
+    hasChildren: false,
+    requiredFeature: 'delay_profiles',
+  },
+  {
+    id: 'policies.metadata_profiles',
+    label: 'Metadata Profiles',
+    href: '/metadata-profiles',
+    groupId: ensureGroupId('policies'),
+    order: 5,
+    arrScope: scopeAll,
+    mobilePriority: 'low',
+    iconKey: 'Tag',
+    emoji: '🏷️',
+    hasChildren: false,
+    requiredFeature: 'metadata_profiles',
+  },
+  {
+    id: 'settings.settings',
+    label: 'Settings',
+    href: '/settings',
+    groupId: ensureGroupId('settings'),
+    order: 0,
+    arrScope: scopeAll,
+    mobilePriority: 'always',
+    iconKey: 'Settings',
+    emoji: '⚙️',
+    hasChildren: true,
+    children: [
+      buildChild('settings.general', 'General', '/settings/general', 0),
+      buildChild('settings.jobs', 'Jobs', '/settings/jobs', 1),
+      buildChild('settings.logs', 'Logs', '/settings/logs', 2),
+      buildChild('settings.backups', 'Backups', '/settings/backups', 3),
+      buildChild('settings.notifications', 'Notifications', '/settings/notifications', 4),
+      buildChild('settings.security', 'Security', '/settings/security', 5),
+      buildChild('settings.about', 'About', '/settings/about', 6),
+      buildChild('settings.logout', 'Log Out', '/auth/logout', 7),
+    ],
+  },
+  {
+    id: 'dev.dev',
+    label: 'Dev',
+    href: '/dev',
+    groupId: ensureGroupId('dev'),
+    order: 0,
+    arrScope: scopeAll,
+    mobilePriority: 'low',
+    iconKey: 'Wrench',
+    emoji: '🛠️',
+    hasChildren: true,
+    devOnly: true,
+    children: [buildChild('dev.components', 'Components', '/dev/components', 0)],
+  },
+];

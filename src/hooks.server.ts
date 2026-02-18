@@ -89,6 +89,9 @@ printBanner();
  */
 export const handle: Handle = async ({ event, resolve }) => {
   const auth = getAuthState(event);
+  event.locals.user = auth.user;
+  event.locals.session = auth.session;
+  event.locals.authBypass = auth.skipAuth;
 
   // First-run setup flow (applies to all auth modes except AUTH=off)
   if (auth.needsSetup) {
@@ -135,8 +138,5 @@ export const handle: Handle = async ({ event, resolve }) => {
   }
 
   // Authenticated - attach user to locals for use in routes
-  event.locals.user = auth.user;
-  event.locals.session = auth.session;
-
   return resolve(event);
 };
