@@ -216,10 +216,7 @@ Deno.test({
     try {
       const lidarrResult = await handler(createMetadataSyncJob(301, 'manual'));
       assertEquals(lidarrResult.status, 'skipped');
-      assertEquals(
-        lidarrResult.output,
-        'metadataProfiles: skipped'
-      );
+      assertEquals(lidarrResult.output, 'metadataProfiles: skipped');
 
       const radarrResult = await handler(createMetadataSyncJob(302, 'manual'));
       assertEquals(radarrResult.status, 'skipped');
@@ -381,10 +378,7 @@ Deno.test({
         arrSyncQueries.setMetadataProfilesStatusPending(501);
         const successResult = await handler(createMetadataSyncJob(501, 'manual'));
         assertEquals(successResult.status, 'success');
-        assertEquals(
-          successResult.output,
-          'metadataProfiles: 7 item(s)'
-        );
+        assertEquals(successResult.output, 'metadataProfiles: 7 item(s)');
         assertEquals(getMetadataProfileRow(501).sync_status, 'idle');
         assertEquals(getMetadataProfileRow(501).should_sync, 0);
 
@@ -399,10 +393,7 @@ Deno.test({
         arrSyncQueries.setMetadataProfilesStatusPending(501);
         const failResult = await handler(createMetadataSyncJob(501, 'manual'));
         assertEquals(failResult.status, 'failure');
-        assertEquals(
-          failResult.output,
-          'metadataProfiles: failed'
-        );
+        assertEquals(failResult.output, 'metadataProfiles: failed');
 
         const failedRow = getMetadataProfileRow(501);
         assertEquals(failedRow.sync_status, 'failed');

@@ -1,11 +1,7 @@
 import { assertEquals, assertExists, assertThrows } from '@std/assert';
 import { config } from '$config';
 import { db } from '$db/db.ts';
-import {
-  arrSyncQueries,
-  type MediaManagementSyncData,
-  type MetadataProfilesSyncData,
-} from '$db/queries/arrSync.ts';
+import { arrSyncQueries, type MediaManagementSyncData, type MetadataProfilesSyncData } from '$db/queries/arrSync.ts';
 
 type ArrSyncMediaManagementRow = {
   instance_id: number;
@@ -161,7 +157,10 @@ function getMetadataProfileInstanceIds(profileName: string): number[] {
   return db
     .query<{
       instance_id: number;
-    }>('SELECT instance_id FROM arr_sync_metadata_profiles_config WHERE profile_name = ? ORDER BY instance_id', profileName)
+    }>(
+      'SELECT instance_id FROM arr_sync_metadata_profiles_config WHERE profile_name = ? ORDER BY instance_id',
+      profileName
+    )
     .map((row) => row.instance_id);
 }
 
@@ -468,15 +467,9 @@ Deno.test({
         );
         assertEquals(getMetadataProfileInstanceIds('Renamed Metadata'), [8]);
 
-        assertEquals(
-          getMetadataProfileInstanceIds('Shared Metadata'),
-          []
-        );
+        assertEquals(getMetadataProfileInstanceIds('Shared Metadata'), []);
 
-        assertEquals(
-          getMetadataProfileInstanceIds('  Shared Metadata  '),
-          [6]
-        );
+        assertEquals(getMetadataProfileInstanceIds('  Shared Metadata  '), [6]);
 
         assertEquals(
           arrSyncQueries.updateMetadataProfileName('Renamed Metadata', 'Renamed Metadata', {
@@ -513,10 +506,7 @@ Deno.test({
           0
         );
 
-        assertEquals(
-          getMetadataProfileInstanceIds('Final Metadata'),
-          []
-        );
+        assertEquals(getMetadataProfileInstanceIds('Final Metadata'), []);
       });
 
       await t.step('metadata profile cleanup is lidarr-scoped and validation failures are fail-fast', () => {
@@ -593,7 +583,9 @@ Deno.test({
         assertEquals(pendingBefore.includes(9), true);
         assertEquals(pendingBefore.includes(10), false);
 
-        db.execute("UPDATE arr_sync_metadata_profiles_config SET sync_status = 'pending', should_sync = 1 WHERE instance_id IN (9, 10)");
+        db.execute(
+          "UPDATE arr_sync_metadata_profiles_config SET sync_status = 'pending', should_sync = 1 WHERE instance_id IN (9, 10)"
+        );
         const pendingByStatus = [...arrSyncQueries.getPendingSyncsByStatus().metadataProfiles].sort((a, b) => a - b);
         assertEquals(pendingByStatus.includes(9), true);
         assertEquals(pendingByStatus.includes(10), false);
@@ -601,8 +593,9 @@ Deno.test({
         db.execute(
           "UPDATE arr_sync_metadata_profiles_config SET trigger = 'schedule', should_sync = 0, sync_status = 'idle', next_run_at = '2026-02-18T00:00:00.000Z' WHERE instance_id IN (9, 10)"
         );
-        const scheduled = arrSyncQueries.getScheduledConfigs().metadataProfiles
-          .map((row) => row.instanceId)
+        const scheduled = arrSyncQueries
+          .getScheduledConfigs()
+          .metadataProfiles.map((row) => row.instanceId)
           .sort((a, b) => a - b);
         assertEquals(scheduled.includes(9), true);
         assertEquals(scheduled.includes(10), false);

@@ -5,7 +5,11 @@
 import type { PCDCache } from '$pcd/index.ts';
 import { logger } from '$logger/logger.ts';
 import { writeOperation, type OperationLayer } from '$pcd/index.ts';
-import type { LidarrMetadataProfile, MetadataProfileAlbumTypeToggle, MetadataProfileReleaseStatusToggle } from './read.ts';
+import type {
+  LidarrMetadataProfile,
+  MetadataProfileAlbumTypeToggle,
+  MetadataProfileReleaseStatusToggle,
+} from './read.ts';
 
 interface CreateMetadataProfileInput {
   name: string;

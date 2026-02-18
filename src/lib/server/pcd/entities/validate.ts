@@ -274,35 +274,29 @@ function validateLidarrMetadataProfileData(data: Record<string, unknown>): strin
     return `Unsupported payload for lidarr_metadata_profile: unsupported fields: ${unsupportedFields.join(', ')}`;
   }
 
-  const primaryError = validateLidarrMetadataProfileTypeRows(
-    'data.primaryTypes',
-    data.primaryTypes,
-    ['id', 'typeId']
-  );
+  const primaryError = validateLidarrMetadataProfileTypeRows('data.primaryTypes', data.primaryTypes, ['id', 'typeId']);
   if (primaryError) return primaryError;
 
-  const secondaryError = validateLidarrMetadataProfileTypeRows(
-    'data.secondaryTypes',
-    data.secondaryTypes,
-    ['id', 'typeId']
-  );
+  const secondaryError = validateLidarrMetadataProfileTypeRows('data.secondaryTypes', data.secondaryTypes, [
+    'id',
+    'typeId',
+  ]);
   if (secondaryError) return secondaryError;
 
-  const statusError = validateLidarrMetadataProfileTypeRows(
-    'data.releaseStatuses',
-    data.releaseStatuses,
-    ['id', 'statusId']
-  );
+  const statusError = validateLidarrMetadataProfileTypeRows('data.releaseStatuses', data.releaseStatuses, [
+    'id',
+    'statusId',
+  ]);
   if (statusError) return statusError;
 
   return null;
 }
 
-  function validateLidarrMetadataProfileTypeRows(
-    path: string,
-    rows: unknown,
-    allowedIdentifierFields: readonly string[]
-  ): string | null {
+function validateLidarrMetadataProfileTypeRows(
+  path: string,
+  rows: unknown,
+  allowedIdentifierFields: readonly string[]
+): string | null {
   if (!Array.isArray(rows)) {
     return `${path} must be an array`;
   }

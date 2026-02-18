@@ -344,7 +344,7 @@ The `resolveNavShell` function reads the static registry and returns a pure JSON
 | Sidebar         | Grouped with section headers      | Preserves existing `Group`/`GroupItem` components    |
 | Section headers | Uppercase labels with separator   | "DATA SOURCES", "POLICIES", "OPERATIONS", "SETTINGS" |
 | Scope selector  | Dropdown in sidebar or top bar    | Follows PatternFly/AWS placement conventions         |
-| Disabled items  | Grayed + inline note (not hidden)     | "Not available for Radarr"                           |
+| Disabled items  | Grayed + inline note (not hidden) | "Not available for Radarr"                           |
 | Command palette | Bits UI Command.Dialog            | `Cmd+K` trigger, grouped results, Svelte 5 native    |
 | Mobile          | Bottom bar + drawer for full tree | Same taxonomy, different container                   |
 

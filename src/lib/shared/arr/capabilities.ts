@@ -59,13 +59,7 @@ const ARR_CAPABILITY_KEY_NON_REGRESSION_CHECK = {
   sync: ARR_SYNC_SURFACES,
 } as const satisfies {
   workflows: readonly ['instances', 'library', 'releases', 'rename', 'upgrades'];
-  sync: readonly [
-    'quality_profiles',
-    'custom_formats',
-    'delay_profiles',
-    'media_management',
-    'metadata_profiles',
-  ];
+  sync: readonly ['quality_profiles', 'custom_formats', 'delay_profiles', 'media_management', 'metadata_profiles'];
 };
 void ARR_CAPABILITY_KEY_NON_REGRESSION_CHECK;
 

@@ -144,7 +144,8 @@ export async function update(options: UpdateMetadataProfileOptions) {
   const db = cache.kb;
 
   const nextName = input.name !== undefined ? normalizeName(input.name) : current.name;
-  const nextDescription = input.description === undefined ? current.description : normalizeDescription(input.description);
+  const nextDescription =
+    input.description === undefined ? current.description : normalizeDescription(input.description);
 
   if (!nextName) {
     throw new Error('Metadata profile name is required');
@@ -188,7 +189,8 @@ export async function update(options: UpdateMetadataProfileOptions) {
     : current.releaseStatuses;
 
   const descriptionChanged = input.description !== undefined && current.description !== nextDescription;
-  const primaryChanged = input.primaryAlbumTypes !== undefined && !hasSameAlbumTypes(current.primaryAlbumTypes, nextPrimaryAlbumTypes);
+  const primaryChanged =
+    input.primaryAlbumTypes !== undefined && !hasSameAlbumTypes(current.primaryAlbumTypes, nextPrimaryAlbumTypes);
   const secondaryChanged =
     input.secondaryAlbumTypes !== undefined && !hasSameAlbumTypes(current.secondaryAlbumTypes, nextSecondaryAlbumTypes);
   const releaseStatusesChanged =
@@ -328,10 +330,7 @@ export async function update(options: UpdateMetadataProfileOptions) {
       };
     }
 
-    let updateProfile = db
-      .updateTable('lidarr_metadata_profiles')
-      .set(setValues)
-      .where('name', '=', current.name);
+    let updateProfile = db.updateTable('lidarr_metadata_profiles').set(setValues).where('name', '=', current.name);
 
     if (current.description === null) {
       updateProfile = updateProfile.where('description', 'is', null);

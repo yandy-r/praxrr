@@ -91,10 +91,12 @@ export class LidarrClient extends BaseArrClient {
       const releaseDate = album.releaseDate ?? undefined;
       const year = this.getReleaseYear(releaseDate);
       const stats = album.statistics;
+      const foreignArtistId = artist?.foreignArtistId ?? album.artist?.foreignArtistId ?? undefined;
 
       return {
         id: album.id,
         artistId: album.artistId,
+        foreignArtistId,
         artistName: artist?.artistName ?? album.artist?.artistName ?? 'Unknown Artist',
         title: album.title ?? 'Unknown Album',
         year,
@@ -161,7 +163,10 @@ export class LidarrClient extends BaseArrClient {
   /**
    * Update a metadata profile
    */
-  updateMetadataProfile(id: number, profile: LidarrMetadataProfileUpdatePayload): Promise<LidarrMetadataProfileGetResponse> {
+  updateMetadataProfile(
+    id: number,
+    profile: LidarrMetadataProfileUpdatePayload
+  ): Promise<LidarrMetadataProfileGetResponse> {
     return this.put<LidarrMetadataProfileGetResponse>(`/api/${this.apiVersion}/metadataprofile/${id}`, {
       ...profile,
       id,

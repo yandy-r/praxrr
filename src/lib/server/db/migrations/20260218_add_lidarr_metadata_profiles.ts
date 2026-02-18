@@ -46,10 +46,10 @@ CREATE TABLE IF NOT EXISTS lidarr_metadata_profile_release_statuses (
 const LIDARR_METADATA_PROFILES_OP_SQL_ESCAPED = LIDARR_METADATA_PROFILES_OP_SQL.replaceAll("'", "''");
 
 export const migration: Migration = {
-	version: LIDARR_METADATA_PROFILES_OP_VERSION,
-	name: 'Add Lidarr metadata profiles',
+  version: LIDARR_METADATA_PROFILES_OP_VERSION,
+  name: 'Add Lidarr metadata profiles',
 
-	up: `
+  up: `
 		CREATE TABLE arr_sync_metadata_profiles_config (
 			instance_id INTEGER PRIMARY KEY,
 			trigger TEXT NOT NULL DEFAULT 'none',
@@ -96,7 +96,7 @@ export const migration: Migration = {
 		);
 	`,
 
-	down: `
+  down: `
 		DROP TABLE IF EXISTS arr_sync_metadata_profiles_config;
 		DELETE FROM pcd_ops
 			WHERE origin = 'base'

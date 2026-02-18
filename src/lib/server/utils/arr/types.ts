@@ -424,6 +424,7 @@ export interface LidarrArtistStatistics {
 export interface LidarrArtist {
   id: number;
   artistName?: string | null;
+  foreignArtistId?: string | null;
   qualityProfileId: number;
   monitored: boolean;
   status?: string;
@@ -448,6 +449,7 @@ export interface LidarrAlbumStatistics {
 export interface LidarrAlbumArtistRef {
   id: number;
   artistName?: string | null;
+  foreignArtistId?: string | null;
   qualityProfileId?: number;
 }
 
@@ -706,6 +708,7 @@ export interface SonarrLibraryItem {
 export interface LidarrLibraryItem extends LidarrProfileJoinResult {
   id: number; // albumId
   artistId: number;
+  foreignArtistId?: string | null;
   artistName: string;
   title: string;
   year?: number;

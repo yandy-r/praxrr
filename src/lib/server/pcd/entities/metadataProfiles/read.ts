@@ -39,7 +39,9 @@ interface ReleaseStatusRow {
   allowed: number;
 }
 
-function toAlbumTypeToggle(rows: Pick<PrimaryTypeRow, 'type_id' | 'name' | 'allowed'>[]): MetadataProfileAlbumTypeToggle[] {
+function toAlbumTypeToggle(
+  rows: Pick<PrimaryTypeRow, 'type_id' | 'name' | 'allowed'>[]
+): MetadataProfileAlbumTypeToggle[] {
   return rows.map((row) => ({
     typeId: row.type_id,
     name: row.name,
@@ -47,7 +49,9 @@ function toAlbumTypeToggle(rows: Pick<PrimaryTypeRow, 'type_id' | 'name' | 'allo
   }));
 }
 
-function toReleaseStatusToggle(rows: Pick<ReleaseStatusRow, 'status_id' | 'name' | 'allowed'>[]): MetadataProfileReleaseStatusToggle[] {
+function toReleaseStatusToggle(
+  rows: Pick<ReleaseStatusRow, 'status_id' | 'name' | 'allowed'>[]
+): MetadataProfileReleaseStatusToggle[] {
   return rows.map((row) => ({
     statusId: row.status_id,
     name: row.name,
