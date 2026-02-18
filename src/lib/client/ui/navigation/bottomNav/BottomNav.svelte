@@ -1,37 +1,29 @@
 <script lang="ts">
 	import { page } from '$app/stores';
+	import { resolveNavIcon } from '$lib/client/navigation/iconMap';
 	import { navIconStore } from '$stores/navIcons';
-	import {
-		FolderTree,
-		Link,
-		Sliders,
-		Palette,
-		Settings,
-		Microscope,
-		Tag,
-		Clock
-	} from 'lucide-svelte';
+	import type { NavShell, ResolvedNavItem } from '$shared/navigation/types.ts';
 
-	type NavItem = {
-		href: string;
-		label: string;
-		shortLabel?: string;
-		icon: typeof FolderTree;
-		emoji: string;
-		priority: 'always' | 'medium' | 'low';
+	type FlattenedNavItem = ResolvedNavItem & {
+		sourceIndex: number;
+	};
+	const priorityOrder: Record<ResolvedNavItem['mobilePriority'], number> = {
+		always: 0,
+		medium: 1,
+		low: 2,
+	};
+	const shortLabelByHref: Record<string, string> = {
+		'/quality-profiles': 'Profiles',
+		'/custom-formats': 'Formats',
+		'/regular-expressions': 'Regex',
+		'/media-management': 'Media',
+		'/metadata-profiles': 'Metadata',
+		'/delay-profiles': 'Delay',
 	};
 
-	const items: NavItem[] = [
-		{ href: '/databases', label: 'Databases', icon: FolderTree, emoji: '📦', priority: 'always' },
-		{ href: '/arr', label: 'Arrs', icon: Link, emoji: '🔗', priority: 'always' },
-		{ href: '/quality-profiles', label: 'Profiles', icon: Sliders, emoji: '⚡', priority: 'always' },
-		{ href: '/custom-formats', label: 'Formats', icon: Palette, emoji: '🎨', priority: 'always' },
-		{ href: '/settings', label: 'Settings', icon: Settings, emoji: '⚙️', priority: 'always' },
-		{ href: '/regular-expressions', label: 'Regex', icon: Microscope, emoji: '🔬', priority: 'medium' },
-		{ href: '/media-management', label: 'Media', icon: Tag, emoji: '🏷️', priority: 'low' },
-		{ href: '/delay-profiles', label: 'Delay', icon: Clock, emoji: '⏳', priority: 'low' },
-		{ href: '/metadata-profiles', label: 'Metadata', icon: Tag, emoji: '🏷️', priority: 'low' }
-	];
+	export let navShell: NavShell | undefined = undefined;
+
+	$: flattenedItems = buildBottomNavItems(navShell);
 
 	$: useEmoji = $navIconStore === 'emoji';
 	$: pathname = $page.url.pathname;
@@ -40,19 +32,47 @@
 		if (href === '/') return currentPath === '/';
 		return currentPath.startsWith(href);
 	}
+
+	function shortLabel(item: FlattenedNavItem): string {
+		return shortLabelByHref[item.href] ?? item.label;
+	}
+
+	function buildBottomNavItems(shell: NavShell | undefined): FlattenedNavItem[] {
+		const flattened: FlattenedNavItem[] = [];
+		let sourceIndex = 0;
+
+		for (const group of shell?.groups ?? []) {
+			for (const item of group.items) {
+				flattened.push({
+					...item,
+					sourceIndex: sourceIndex++,
+				});
+			}
+		}
+
+		return flattened.sort((left, right) => {
+			const priorityDiff = priorityOrder[left.mobilePriority] - priorityOrder[right.mobilePriority];
+			if (priorityDiff !== 0) {
+				return priorityDiff;
+			}
+
+			return left.sourceIndex - right.sourceIndex;
+		});
+	}
 </script>
 
 <nav
 	class="fixed bottom-0 left-0 right-0 z-50 border-t border-neutral-200 bg-neutral-50 pb-[env(safe-area-inset-bottom)] md:hidden dark:border-neutral-800 dark:bg-neutral-900"
 >
 	<div class="flex items-center justify-around px-1">
-		{#each items as item}
+		{#each flattenedItems as item (item.id)}
 			{@const active = isActive(item.href, pathname)}
+			{@const icon = useEmoji ? undefined : resolveNavIcon(item.iconKey)}
 			<a
 				href={item.href}
 				class="flex flex-col items-center justify-center py-2 transition-colors
-					{item.priority === 'medium' ? 'hidden sm:flex' : ''}
-					{item.priority === 'low' ? 'hidden' : ''}
+					{item.mobilePriority === 'medium' ? 'hidden sm:flex' : ''}
+					{item.mobilePriority === 'low' ? 'hidden' : ''}
 					{active
 					? 'text-accent-600 dark:text-accent-400'
 					: 'text-neutral-500 hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-neutral-200'}"
@@ -60,9 +80,11 @@
 				{#if useEmoji}
 					<span class="text-xl">{item.emoji}</span>
 				{:else}
-					<svelte:component this={item.icon} size={20} strokeWidth={active ? 2.5 : 2} />
+					{#if icon}
+						<svelte:component this={icon} size={20} strokeWidth={active ? 2.5 : 2} />
+					{/if}
 				{/if}
-				<span class="mt-0.5 text-[10px] font-medium">{item.shortLabel ?? item.label}</span>
+				<span class="mt-0.5 text-[10px] font-medium">{shortLabel(item)}</span>
 			</a>
 		{/each}
 	</div>

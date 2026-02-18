@@ -2,15 +2,19 @@
   import Group from './group.svelte';
   import GroupItem from './groupItem.svelte';
   import Version from './version.svelte';
-  import { FolderTree, Link, Sliders, Palette, Microscope, Tag, Clock, Settings, X, Wrench } from 'lucide-svelte';
+  import { X } from 'lucide-svelte';
+  import { resolveNavIcon } from '$lib/client/navigation/iconMap';
   import { navIconStore } from '$stores/navIcons';
   import { mobileNavOpen } from '$stores/mobileNav';
   import { page } from '$app/stores';
   import logo from '$assets/logo.svg';
+  import type { NavShell } from '$shared/navigation/types.ts';
 
   export let version: string = '';
+  export let navShell: NavShell | undefined = undefined;
 
   $: useEmoji = $navIconStore === 'emoji';
+  $: groups = navShell?.groups ?? [];
 
   // Close mobile nav when page changes
   $: ($page.url.pathname, mobileNavOpen.close());
@@ -56,96 +60,24 @@
   </div>
 
   <div class="flex-1 overflow-y-auto p-4">
-    {#if import.meta.env.DEV}
-      <Group
-        label={useEmoji ? '🛠️ Dev' : 'Dev'}
-        href="/dev"
-        icon={useEmoji ? undefined : Wrench}
-        initialOpen={true}
-        hasItems={true}
-      >
-        <GroupItem label="Components" href="/dev/components" />
-      </Group>
-    {/if}
-
-    <Group label={useEmoji ? '📦 Databases' : 'Databases'} href="/databases" icon={useEmoji ? undefined : FolderTree} />
-
-    <Group label={useEmoji ? '🔗 Arrs' : 'Arrs'} href="/arr" icon={useEmoji ? undefined : Link} />
-
-    <Group
-      label={useEmoji ? '⚡ Quality Profiles' : 'Quality Profiles'}
-      href="/quality-profiles"
-      icon={useEmoji ? undefined : Sliders}
-      initialOpen={true}
-      hasItems={true}
-    >
-      <GroupItem label="Testing" href="/quality-profiles/entity-testing" />
-    </Group>
-
-    <Group
-      label={useEmoji ? '🎨 Custom Formats' : 'Custom Formats'}
-      href="/custom-formats"
-      icon={useEmoji ? undefined : Palette}
-      initialOpen={false}
-    />
-
-    <Group
-      label={useEmoji ? '🔬 Regular Expressions' : 'Regular Expressions'}
-      href="/regular-expressions"
-      icon={useEmoji ? undefined : Microscope}
-      initialOpen={false}
-    />
-
-    <Group
-      label={useEmoji ? '🏷️ Media Management' : 'Media Management'}
-      href="/media-management"
-      icon={useEmoji ? undefined : Tag}
-      initialOpen={true}
-      hasItems={true}
-    >
-      <GroupItem label="Naming Settings" href="/media-management?section=naming" activePattern="/naming" />
-      <GroupItem
-        label="Quality Definitions"
-        href="/media-management?section=quality-definitions"
-        activePattern="/quality-definitions"
-      />
-      <GroupItem
-        label="Media Settings"
-        href="/media-management?section=media-settings"
-        activePattern="/media-settings"
-      />
-    </Group>
-
-    <Group
-      label={useEmoji ? '⏳ Delay Profiles' : 'Delay Profiles'}
-      href="/delay-profiles"
-      icon={useEmoji ? undefined : Clock}
-      initialOpen={false}
-    />
-
-    <Group
-      label={useEmoji ? '🏷️ Metadata Profiles' : 'Metadata Profiles'}
-      href="/metadata-profiles"
-      icon={useEmoji ? undefined : Tag}
-      initialOpen={false}
-    />
-
-    <Group
-      label={useEmoji ? '⚙️ Settings' : 'Settings'}
-      href="/settings"
-      icon={useEmoji ? undefined : Settings}
-      initialOpen={true}
-      hasItems={true}
-    >
-      <GroupItem label="General" href="/settings/general" />
-      <GroupItem label="Jobs" href="/settings/jobs" />
-      <GroupItem label="Logs" href="/settings/logs" />
-      <GroupItem label="Backups" href="/settings/backups" />
-      <GroupItem label="Notifications" href="/settings/notifications" />
-      <GroupItem label="Security" href="/settings/security" />
-      <GroupItem label="About" href="/settings/about" />
-      <GroupItem label="Log Out" href="/auth/logout" />
-    </Group>
+    {#each groups as group (group.id)}
+      {#each group.items as item (item.id)}
+        {@const label = useEmoji && item.emoji ? `${item.emoji} ${item.label}` : item.label}
+        {@const icon = useEmoji ? undefined : resolveNavIcon(item.iconKey)}
+        <Group
+          {label}
+          href={item.href}
+          {icon}
+          hasItems={item.hasChildren}
+        >
+          {#if item.hasChildren}
+            {#each item.children as child (child.id)}
+              <GroupItem label={child.label} href={child.href} activePattern={child.activePattern} />
+            {/each}
+          {/if}
+        </Group>
+      {/each}
+    {/each}
 
     <!-- Version scrolls with content on mobile -->
     <div class="mt-2 md:hidden">

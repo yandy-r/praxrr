@@ -8,8 +8,11 @@
 	export let isOpen: boolean;
 	export let hasItems: boolean;
 	export let onToggle: () => void;
+	export let activePattern: string | undefined = undefined;
 
-	$: isActive = $page.url.pathname === href || $page.url.pathname.startsWith(href + '/');
+	$: isActive = activePattern
+		? $page.url.pathname.includes(activePattern)
+		: $page.url.pathname === href || $page.url.pathname.startsWith(href + '/');
 </script>
 
 <div class="group/header flex items-center">

@@ -20,8 +20,8 @@
 
 {#if !isAuthPage}
   <Navbar />
-  <PageNav version={data.version} />
-  <BottomNav />
+  <PageNav version={data.version} navShell={data.navShell} />
+  <BottomNav navShell={data.navShell} />
 {/if}
 <AlertContainer />
 
