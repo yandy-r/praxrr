@@ -73,13 +73,6 @@ API access via `X-Api-Key` header or `?apikey=` query param. See
 > temporary dev tradeoff and should be tightened to explicit trusted origin URLs before production
 > deployment.
 
-## Discord
-
-We're most active on [Discord](https://discord.gg/2A89tXZMgA), where we post announcements, help
-people troubleshoot their setups, and have the kind of conversations that don't fit neatly into
-GitHub issues. If you've got questions or want to follow along with development, that's where to
-find us.
-
 ## Documentation
 
 ## Getting Started
