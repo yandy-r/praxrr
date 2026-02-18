@@ -17,6 +17,7 @@ import { Database } from '@jsr/db__sqlite';
 // ============================================================================
 
 const SCHEMA_REPO = 'yandy-r/praxrr-schema';
+const SCHEMA_TOKEN_ENV_VARS = ['PRAXRR_SCHEMA_TOKEN', 'GITHUB_TOKEN', 'GH_TOKEN'] as const;
 
 /**
  * Manual type overrides for columns that store integers in the DB
@@ -87,6 +88,10 @@ EXAMPLES:
 
 OUTPUT:
   ${OUTPUT_PATH}
+
+AUTHENTICATION:
+  For private schema repositories, set one of:
+  PRAXRR_SCHEMA_TOKEN, GITHUB_TOKEN, or GH_TOKEN
 `);
 }
 
@@ -94,12 +99,32 @@ OUTPUT:
 // SCHEMA FETCHING
 // ============================================================================
 
+function getGitHubHeaders(): HeadersInit {
+  for (const envName of SCHEMA_TOKEN_ENV_VARS) {
+    const token = Deno.env.get(envName)?.trim();
+    if (token) {
+      return {
+        Authorization: `Bearer ${token}`,
+        Accept: 'application/vnd.github.raw',
+      };
+    }
+  }
+
+  return {};
+}
+
 async function fetchSchemaFromGitHub(version: string): Promise<string> {
   const url = `https://raw.githubusercontent.com/${SCHEMA_REPO}/${version}/${SCHEMA_PATH}`;
   console.log(`Fetching schema from: ${url}`);
 
-  const response = await fetch(url);
+  const response = await fetch(url, { headers: getGitHubHeaders() });
   if (!response.ok) {
+    if (response.status === 401 || response.status === 403 || response.status === 404) {
+      throw new Error(
+        `Failed to fetch schema: ${response.status} ${response.statusText}. ` +
+          'If the repository is private, set PRAXRR_SCHEMA_TOKEN (or GITHUB_TOKEN/GH_TOKEN).'
+      );
+    }
     throw new Error(`Failed to fetch schema: ${response.status} ${response.statusText}`);
   }
 

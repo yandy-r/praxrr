@@ -69,9 +69,10 @@ export const actions: Actions = {
         values: { name },
       });
     }
-    if (personalAccessToken && (!gitUserName || !gitUserEmail)) {
+    const requiresGitIdentity = !!personalAccessToken && !localOpsEnabled;
+    if (requiresGitIdentity && (!gitUserName || !gitUserEmail)) {
       return fail(400, {
-        error: 'Git author name and email are required when a personal access token is set',
+        error: 'Git author name and email are required when PAT is set and Local Ops Only is disabled',
         values: { name },
       });
     }

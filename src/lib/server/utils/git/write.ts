@@ -33,12 +33,10 @@ async function parseGitHubErrorResponse(response: Response): Promise<{
   const resetAtRaw = response.headers.get('x-ratelimit-reset');
   const resetAtEpoch = resetAtRaw ? Number.parseInt(resetAtRaw, 10) : null;
   const remaining = response.headers.get('x-ratelimit-remaining');
+  const hasRateLimitMessage = messageLower.includes('rate limit') || messageLower.includes('secondary rate limit');
 
   const rateLimited =
-    response.status === 429 ||
-    remaining === '0' ||
-    messageLower.includes('rate limit') ||
-    messageLower.includes('secondary rate limit');
+    response.status === 429 || (response.status === 403 && (remaining === '0' || hasRateLimitMessage));
 
   return {
     message: apiMessage,
@@ -73,6 +71,14 @@ async function classifyGitHubResponseError(
 ): Promise<GitHubApiError> {
   const parsed = await parseGitHubErrorResponse(response);
 
+  // Prioritize explicit auth failures so invalid/expired tokens are not mislabeled as rate limits.
+  if (context === 'authenticated' && response.status === 401) {
+    return {
+      message: 'Unable to access repository. Please check your Personal Access Token.',
+      rateLimited: false,
+    };
+  }
+
   if (parsed.rateLimited) {
     return {
       message: formatRateLimitMessage(context, parsed.retryAfterSeconds, parsed.resetAtEpoch),
@@ -81,13 +87,6 @@ async function classifyGitHubResponseError(
   }
 
   if (context === 'authenticated') {
-    if (response.status === 401) {
-      return {
-        message: 'Unable to access repository. Please check your Personal Access Token.',
-        rateLimited: false,
-      };
-    }
-
     if (response.status === 404) {
       return {
         message:
@@ -185,7 +184,16 @@ export async function clone(
   branch?: string,
   personalAccessToken?: string
 ): Promise<boolean> {
-  const isPrivate = await validateRepository(repositoryUrl, personalAccessToken);
+  let isPrivate = !!personalAccessToken;
+  try {
+    isPrivate = await validateRepository(repositoryUrl, personalAccessToken);
+  } catch (error) {
+    const message = error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
+    // GitHub API rate limits should not block clone attempts; git clone is authoritative.
+    if (!message.includes('rate limit')) {
+      throw error;
+    }
+  }
 
   const args = ['clone'];
   if (branch) args.push('--branch', branch);

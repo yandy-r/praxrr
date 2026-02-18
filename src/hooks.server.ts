@@ -35,6 +35,19 @@ await pcdManager.initialize();
 
 // Auto-link default database on first startup (only once)
 if (!setupStateQueries.isDefaultDatabaseLinked()) {
+  const defaultDatabaseToken = Deno.env.get('PRAXRR_DEFAULT_DB_TOKEN')?.trim() || undefined;
+  const defaultDatabaseGitUserName = Deno.env.get('PRAXRR_DEFAULT_DB_GIT_USER_NAME')?.trim() || undefined;
+  const defaultDatabaseGitUserEmail = Deno.env.get('PRAXRR_DEFAULT_DB_GIT_USER_EMAIL')?.trim() || undefined;
+  const hasCompleteGitIdentity = !!defaultDatabaseGitUserName && !!defaultDatabaseGitUserEmail;
+  const hasPartialGitIdentity =
+    (!!defaultDatabaseGitUserName || !!defaultDatabaseGitUserEmail) && !hasCompleteGitIdentity;
+
+  if (hasPartialGitIdentity) {
+    await logger.warn('Default database git identity is incomplete; skipping git author configuration', {
+      source: 'Setup',
+    });
+  }
+
   try {
     await pcdManager.link({
       name: 'Praxrr-DB',
@@ -42,7 +55,9 @@ if (!setupStateQueries.isDefaultDatabaseLinked()) {
       branch: 'v2',
       syncStrategy: 60,
       autoPull: true,
-      personalAccessToken: undefined,
+      personalAccessToken: defaultDatabaseToken,
+      gitUserName: hasCompleteGitIdentity ? defaultDatabaseGitUserName : undefined,
+      gitUserEmail: hasCompleteGitIdentity ? defaultDatabaseGitUserEmail : undefined,
     });
 
     setupStateQueries.markDefaultDatabaseLinked();
