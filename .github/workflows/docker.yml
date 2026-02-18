@@ -99,6 +99,7 @@ jobs:
           cache-to: type=registry,ref=${{ env.IMAGE_BASE }}/${{ matrix.image }}:buildcache,mode=max
 
       - name: Generate attestation
+        if: ${{ !github.event.repository.private }}
         uses: actions/attest-build-provenance@v2
         with:
           subject-name: ${{ env.IMAGE_BASE }}/${{ matrix.image }}
