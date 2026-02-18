@@ -10,20 +10,6 @@
 
 <br>
 
-# The Fork
-
-This is a fork of the [Official Dictionarry profilarr](https://github.com/Dictionarry-Hub/profilarr)
-with Lidarr support. I don't plan to merge this back into the main repository, but I will keep it
-updated with the latest changes from the main repository.
-
-For day to day use, I recommend using the
-[Official Dictionarry profilarr](https://github.com/Dictionarry-Hub/profilarr) with Lidarr support.
-
-I'm not a developer, though I just know enough to tinker and use lidarr. Don't plan to insult anyone
-by trying to merge this back into the main repository.
-
-<p>Manage quality profiles, custom formats, and media management settings across your Radarr, Sonarr, and Lidarr instances. Define your profiles once with a Git-backed configuration database, then sync them to any number of *arr instances.</p>
-
 ## What I'm Doing
 
 <p align="center"><em>Media automation, perfected in practice.</em></p>

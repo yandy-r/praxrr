@@ -2,15 +2,6 @@
 
 OpenAPI specification and TypeScript types for the [Praxrr](https://github.com/yandy-r/praxrr) API.
 
-## Introduction
-
-This is a fork of the [Official Praxrr API](https://github.com/Dictionarry-Hub/profilarr-api) with
-Lidarr support. I don't plan to merge this back into the main repository, but I will keep it updated
-with the latest changes from the main repository.
-
-I'm not a developer, though I just know enough to tinker and use lidarr. Don't plan to insult anyone
-by trying to merge this back into the main repository.
-
 ## Usage
 
 ```ts
