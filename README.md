@@ -129,18 +129,21 @@ This runs the parser service and Vite dev server concurrently. See
 
 ### Environment Variables
 
-| Variable        | Default     | Description                             |
-| --------------- | ----------- | --------------------------------------- |
-| `PUID`          | `1000`      | User ID for file permissions            |
-| `PGID`          | `1000`      | Group ID for file permissions           |
-| `UMASK`         | `022`       | File creation mask                      |
-| `TZ`            | `Etc/UTC`   | Timezone for scheduling                 |
-| `PORT`          | `6868`      | Web UI port                             |
-| `HOST`          | `0.0.0.0`   | Bind address                            |
-| `APP_BASE_PATH` | `/config`   | Base path for data, logs, backups       |
-| `AUTH`          | `on`        | Auth mode: `on`, `local`, `off`, `oidc` |
-| `PARSER_HOST`   | `localhost` | Parser service host                     |
-| `PARSER_PORT`   | `5000`      | Parser service port                     |
+| Variable                         | Default         | Description                             |
+| -------------------------------- | --------------- | --------------------------------------- |
+| `PUID`                           | `1000`          | User ID for file permissions            |
+| `PGID`                           | `1000`          | Group ID for file permissions           |
+| `UMASK`                          | `022`           | File creation mask                      |
+| `TZ`                             | `Etc/UTC`       | Timezone for scheduling                 |
+| `PORT`                           | `6868`          | Web UI port                             |
+| `HOST`                           | `0.0.0.0`       | Bind address                            |
+| `APP_BASE_PATH`                  | `/config`       | Base path for data, logs, backups       |
+| `AUTH`                           | `on`            | Auth mode: `on`, `local`, `off`, `oidc` |
+| `PARSER_HOST`                    | `localhost`     | Parser service host                     |
+| `PARSER_PORT`                    | `5000`          | Parser service port                     |
+| `PRAXRR_DEFAULT_DB_TOKEN`        | `your_token`    | Default database token                  |
+| `PRAXRR_DEFAULT_DB_GIT_USERNAME` | `your_username` | Default database Git username           |
+| `PRAXRR_DEFAULT_DB_GIT_EMAIL`    | `your_email`    | Default database Git email              |
 
 ## License
 
