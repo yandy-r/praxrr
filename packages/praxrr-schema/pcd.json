@@ -1,0 +1,25 @@
+{
+  "name": "schema",
+  "version": "1.0.0",
+  "description": "Base schema for all Praxrr Compliant Databases - defines the structural foundation that all PCDs build upon",
+  "arr_types": ["radarr", "sonarr", "lidarr"],
+
+  "authors": [
+    {
+      "name": "yandy-r"
+    }
+  ],
+
+  "license": "MIT",
+  "repository": "https://github.com/yandy-r/praxrr-schema",
+
+  "tags": ["schema", "foundation", "base"],
+
+  "links": {
+    "homepage": "https://github.com/yandy-r/praxrr-schema",
+    "issues": "https://github.com/yandy-r/praxrr-schema/issues"
+  },
+  "praxrr": {
+    "minimum_version": "2.0.0"
+  }
+}
