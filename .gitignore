@@ -65,6 +65,5 @@ artifacts/
 coverage/
 
 # Research repos
-research/
 tasks/todo.md
 .claude/settings.local.json
