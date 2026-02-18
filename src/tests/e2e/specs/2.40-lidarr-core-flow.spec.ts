@@ -24,6 +24,7 @@ const LIDARR_UPGRADES_UNSUPPORTED_ERROR = 'Upgrades are not supported for Lidarr
 
 const LIDARR_LIBRARY_TITLE = 'E2E Lidarr Album';
 const LIDARR_LIBRARY_ARTIST = 'E2E Lidarr Artist';
+const LIDARR_LIBRARY_FOREIGN_ARTIST_ID = 'e2e-mbid-artist-1';
 const LIDARR_LIBRARY_PROFILE = 'E2E Lidarr Profile';
 const LIDARR_LIBRARY_ALT_PROFILE = 'E2E Lidarr Secondary Profile';
 const LIDARR_URL = 'http://lidarr.local';
@@ -109,9 +110,9 @@ async function getLatestWindowOpenUrl(page: import('@playwright/test').Page): Pr
 }
 
 function expectLibraryOpenRowLink(pageUrl: string, expectedBrowserUrl: string): void {
-  const basePrefix = `${expectedBrowserUrl}/artist/`;
-  if (!pageUrl.startsWith(basePrefix)) {
-    throw new Error(`Expected Lidarr row open link to start with ${basePrefix}, got ${pageUrl}`);
+  const expectedUrl = `${expectedBrowserUrl}/artist/${LIDARR_LIBRARY_FOREIGN_ARTIST_ID}`;
+  if (pageUrl !== expectedUrl) {
+    throw new Error(`Expected Lidarr row open link to be ${expectedUrl}, got ${pageUrl}`);
   }
 }
 
@@ -248,10 +249,13 @@ function buildLidarrLibraryItems(query: string | null) {
   const allItems = Array.from({ length: 120 }, (_, index) => {
     const albumIndex = index + 1;
     const isPrimaryProfile = albumIndex % 2 === 0;
+    const foreignArtistId =
+      albumIndex === 1 ? LIDARR_LIBRARY_FOREIGN_ARTIST_ID : `e2e-mbid-artist-${albumIndex}`;
 
     return {
       id: 9000 + albumIndex,
       artistId: 501 + (albumIndex % 3),
+      foreignArtistId,
       artistName: `${LIDARR_LIBRARY_ARTIST} ${albumIndex % 4}`,
       title: `${LIDARR_LIBRARY_TITLE} ${albumIndex}`,
       year: 2020 + (albumIndex % 5),

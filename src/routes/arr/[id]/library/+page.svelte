@@ -1297,9 +1297,9 @@
             </svelte:fragment>
 
             <svelte:fragment slot="actions" let:row>
-              {#if !loading}
+              {#if !loading && row.foreignArtistId}
                 <a
-                  href="{baseUrl}/artist/{row.artistName.toLowerCase().replace(/[^a-z0-9]+/g, '-')}"
+                  href="{baseUrl}/artist/{row.foreignArtistId}"
                   target="_blank"
                   rel="noopener noreferrer"
                   class="inline-flex h-7 w-7 items-center justify-center rounded border border-neutral-300 bg-white text-neutral-700 transition-colors hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-700"

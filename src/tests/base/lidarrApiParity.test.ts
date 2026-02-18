@@ -130,6 +130,7 @@ const PAGINATED_SONARR_LIBRARY_ITEMS: SonarrLibraryItem[] = [
 const LIDARR_LIBRARY_ITEM: LidarrLibraryItem = {
   id: 3,
   artistId: 303,
+  foreignArtistId: 'f59c5520-5f46-4d2c-b2c4-822eabf53419',
   artistName: 'Lidarr Artist',
   title: 'Lidarr Album',
   year: 2025,
