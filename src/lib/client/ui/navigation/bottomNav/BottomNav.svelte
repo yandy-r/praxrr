@@ -2,11 +2,17 @@
 	import { page } from '$app/stores';
 	import { resolveNavIcon } from '$lib/client/navigation/iconMap';
 	import { navIconStore } from '$stores/navIcons';
+	import { navScope } from '$stores/navScope.ts';
+	import { supportsFeature, type ArrFeature } from '$shared/arr/capabilities.ts';
+	import type { ArrType } from '$shared/pcd/types.ts';
 	import type { NavShell, ResolvedNavItem } from '$shared/navigation/types.ts';
 
 	type FlattenedNavItem = ResolvedNavItem & {
 		sourceIndex: number;
 	};
+
+	type ScopeAwareNavItem = ResolvedNavItem & { requiredFeature?: ArrFeature };
+
 	const priorityOrder: Record<ResolvedNavItem['mobilePriority'], number> = {
 		always: 0,
 		medium: 1,
@@ -23,7 +29,7 @@
 
 	export let navShell: NavShell | undefined = undefined;
 
-	$: flattenedItems = buildBottomNavItems(navShell);
+	$: flattenedItems = buildBottomNavItems(navShell, $navScope);
 
 	$: useEmoji = $navIconStore === 'emoji';
 	$: pathname = $page.url.pathname;
@@ -37,12 +43,24 @@
 		return shortLabelByHref[item.href] ?? item.label;
 	}
 
-	function buildBottomNavItems(shell: NavShell | undefined): FlattenedNavItem[] {
+	function isScopedItemVisible(item: ScopeAwareNavItem, scope: ArrType): boolean {
+		if (scope === 'all' || !item.requiredFeature) {
+			return true;
+		}
+
+		return supportsFeature(scope, item.requiredFeature);
+	}
+
+	function buildBottomNavItems(shell: NavShell | undefined, scope: ArrType): FlattenedNavItem[] {
 		const flattened: FlattenedNavItem[] = [];
 		let sourceIndex = 0;
 
 		for (const group of shell?.groups ?? []) {
-			for (const item of group.items) {
+			for (const item of group.items as ScopeAwareNavItem[]) {
+				if (!isScopedItemVisible(item, scope)) {
+					continue;
+				}
+
 				flattened.push({
 					...item,
 					sourceIndex: sourceIndex++,

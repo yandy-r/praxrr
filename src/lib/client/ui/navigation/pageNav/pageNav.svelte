@@ -100,9 +100,18 @@
 	};
 
 	$: filteredGroups = resolveScopeEntries($navScope, groups);
+	$: currentPath = $page.url.pathname;
 
 	const isInitiallyOpen = (groupId: string, itemId: string): boolean =>
 		!collapsedGroupIds.has(groupId) && !collapsedItemIds.has(itemId);
+
+	const isItemActive = (item: ScopeAwareNavItem): boolean =>
+		item.activePattern
+			? currentPath.includes(item.activePattern)
+			: currentPath === item.href || currentPath.startsWith(`${item.href}/`);
+
+	const shouldOpenItem = (groupId: string, itemId: string, item: ScopeAwareNavItem): boolean =>
+		isInitiallyOpen(groupId, itemId) || isItemActive(item);
 
 	// Close mobile nav when page changes
 	$: if ($page.url.pathname) {
@@ -160,7 +169,7 @@
 						href={entry.item.href}
 						icon={useEmoji ? undefined : resolveNavIcon(entry.item.iconKey)}
 						sectionLabel={index === 0 ? group.label : undefined}
-						initialOpen={isInitiallyOpen(group.id, entry.item.id)}
+						initialOpen={shouldOpenItem(group.id, entry.item.id, entry.item)}
 						hasItems={entry.item.hasChildren}
 					>
 						{#if entry.item.hasChildren}
