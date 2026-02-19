@@ -59,7 +59,9 @@ jobs:
           deno-version: ${{ env.DENO_VERSION }}
 
       - name: Run contract compatibility checks
-        run: deno run -A scripts/compat-check.ts
+        run: |
+          deno install --node-modules-dir
+          deno run -A scripts/compat-check.ts
 
   compatibility-app-check:
     needs: detect-changes
@@ -78,4 +80,5 @@ jobs:
       - name: Run app checks
         run: |
           deno install --node-modules-dir
+          npx svelte-kit sync
           deno task check
