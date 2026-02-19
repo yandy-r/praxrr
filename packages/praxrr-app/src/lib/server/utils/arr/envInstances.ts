@@ -1,11 +1,9 @@
-import { createArrClient } from '$arr/factory.ts';
-import { getDefaultDelayProfile } from '$arr/defaults.ts';
 import { config } from '$config';
+import { createArrClient } from '$arr/factory.ts';
 import { logger } from '$logger/logger.ts';
 import { parseOptionalAbsoluteHttpUrl } from '$utils/validation/url.ts';
 import { db } from '$db/db.ts';
 import { arrInstancesQueries } from '$db/queries/arrInstances.ts';
-import { generalSettingsQueries } from '$db/queries/generalSettings.ts';
 import { ARR_APP_TYPES, type ArrAppType } from '$shared/pcd/types.ts';
 
 const APP_TYPE_KEYS = ARR_APP_TYPES;
@@ -55,9 +53,6 @@ export interface ReconcileEnvInstancesResult {
 
 const ARR_TEST_TIMEOUT_MS = 3000;
 const ARR_TEST_RETRIES = 0;
-const DEFAULT_DELAY_PROFILE_ID = 1;
-const DEFAULT_DELAY_PROFILE_ORDER = 2147483647;
-
 function isSupportedArrAppType(value: string): value is ArrAppType {
   return (APP_TYPE_KEYS as readonly string[]).includes(value);
 }
@@ -116,10 +111,6 @@ export function parseExternalUrlFromEnv(value?: string | null): string | null {
   return parsed.value;
 }
 
-function shouldApplyDefaultDelayProfile(type: ArrAppType): type is 'radarr' | 'sonarr' {
-  return type === 'radarr' || type === 'sonarr';
-}
-
 async function validateInstanceConnection(descriptor: ParsedEnvInstanceDescriptor): Promise<boolean> {
   const client = createArrClient(descriptor.type, descriptor.url, descriptor.apiKey, {
     timeout: ARR_TEST_TIMEOUT_MS,
@@ -128,29 +119,6 @@ async function validateInstanceConnection(descriptor: ParsedEnvInstanceDescripto
 
   try {
     return await client.testConnection();
-  } finally {
-    client.close();
-  }
-}
-
-async function applyDefaultDelayProfile(descriptor: ParsedEnvInstanceDescriptor): Promise<void> {
-  if (!shouldApplyDefaultDelayProfile(descriptor.type)) {
-    return;
-  }
-
-  if (!generalSettingsQueries.shouldApplyDefaultDelayProfiles()) {
-    return;
-  }
-
-  const client = createArrClient(descriptor.type, descriptor.url, descriptor.apiKey);
-  const defaultProfile = getDefaultDelayProfile(descriptor.type);
-
-  try {
-    await client.updateDelayProfile(DEFAULT_DELAY_PROFILE_ID, {
-      ...defaultProfile,
-      id: DEFAULT_DELAY_PROFILE_ID,
-      order: DEFAULT_DELAY_PROFILE_ORDER,
-    });
   } finally {
     client.close();
   }
@@ -389,7 +357,6 @@ export async function reconcileEnvInstances(): Promise<ReconcileEnvInstancesResu
     activeApiKeys.add(descriptor.apiKey);
 
     const savepoint = `env_reconcile_${savepointIndex++}`;
-    let createdInstanceId: number | undefined;
     try {
       if (config.validateInstances) {
         try {
@@ -461,13 +428,8 @@ export async function reconcileEnvInstances(): Promise<ReconcileEnvInstancesResu
           throw new Error('Failed to create env instance');
         }
 
-        createdInstanceId = id;
         metrics.created += 1;
       });
-
-      if (createdInstanceId !== undefined) {
-        await applyDefaultDelayProfile(descriptor);
-      }
     } catch {
       metrics.errors += 1;
     }

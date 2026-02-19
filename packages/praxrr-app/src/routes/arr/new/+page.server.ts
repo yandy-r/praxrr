@@ -1,10 +1,6 @@
 import { fail, redirect } from '@sveltejs/kit';
 import type { Actions } from '@sveltejs/kit';
 import { arrInstancesQueries } from '$db/queries/arrInstances.ts';
-import { generalSettingsQueries } from '$db/queries/generalSettings.ts';
-import { createArrClient } from '$arr/factory.ts';
-import { getDefaultDelayProfile } from '$arr/defaults.ts';
-import type { ArrType } from '$arr/types.ts';
 import { logger } from '$logger/logger.ts';
 import { parseOptionalAbsoluteHttpUrl } from '$utils/validation/url.ts';
 
@@ -115,31 +111,6 @@ export const actions = {
         meta: { id, name, type, url },
       });
 
-      // Apply default delay profile if enabled
-      if ((type === 'radarr' || type === 'sonarr') && generalSettingsQueries.shouldApplyDefaultDelayProfiles()) {
-        try {
-          const client = createArrClient(type as ArrType, url, apiKey);
-          const defaultProfile = getDefaultDelayProfile(type);
-
-          // Update the default delay profile (id=1)
-          await client.updateDelayProfile(1, {
-            ...defaultProfile,
-            id: 1,
-            order: 2147483647, // Default profile order
-          });
-
-          await logger.info(`Applied default delay profile to ${name}`, {
-            source: 'arr/new',
-            meta: { id, type, profile: defaultProfile },
-          });
-        } catch (error) {
-          // Log but don't fail - the instance was created successfully
-          await logger.warn(`Failed to apply default delay profile to ${name}`, {
-            source: 'arr/new',
-            meta: { id, type, error: error instanceof Error ? error.message : error },
-          });
-        }
-      }
     } catch (error) {
       await logger.error('Failed to create arr instance', {
         source: 'arr/new',

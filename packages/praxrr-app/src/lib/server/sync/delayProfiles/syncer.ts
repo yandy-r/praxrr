@@ -1,8 +1,9 @@
 /**
  * Delay profile syncer
  *
- * Syncs a single delay profile from PCD to the arr instance's default profile (id=1).
- * Only one delay profile can be synced per arr - it overwrites the default.
+ * Syncs a single delay profile from PCD to the arr instance's default profile.
+ * For Sonarr/Radarr this is id=1. For Lidarr we resolve the active default at runtime
+ * (untagged, lowest order).
  */
 
 import { BaseSyncer, type SyncResult } from '../base.ts';
@@ -11,6 +12,7 @@ import { getCache } from '$pcd/index.ts';
 import { getByName as getDelayProfileByName } from '$pcd/entities/delayProfiles/index.ts';
 import type { DelayProfilesRow } from '$shared/pcd/display.ts';
 import type { ArrDelayProfile } from '$arr/types.ts';
+import { LidarrClient } from '$arr/clients/lidarr.ts';
 import { logger } from '$logger/logger.ts';
 
 export class DelayProfileSyncer extends BaseSyncer {
@@ -50,20 +52,61 @@ export class DelayProfileSyncer extends BaseSyncer {
       return { success: false, itemsSynced: 0, error: 'Profile not found in PCD' };
     }
 
-    await logger.debug(`Syncing "${profile.name}" to default profile (id=1)`, {
+    const targetProfile = await this.resolveTargetDelayProfile();
+    const profileId = targetProfile?.id ?? 1;
+    const transformed = this.transform(profile);
+    await logger.debug(`Syncing "${profile.name}" delay profile`, {
       source: 'Sync:DelayProfile',
-      meta: { instanceId: this.instanceId, profileName: profile.name },
+      meta: { instanceId: this.instanceId, profileName: profile.name, targetProfileId: profileId },
     });
 
-    const transformed = this.transform(profile);
-    await this.client.updateDelayProfile(1, transformed);
+    const existingProfile = this.client instanceof LidarrClient ? targetProfile : null;
+
+    const payload = existingProfile
+      ? {
+          ...existingProfile,
+          ...transformed,
+          id: existingProfile.id,
+          order: existingProfile.order,
+          tags: Array.isArray(existingProfile.tags) ? existingProfile.tags : [],
+        }
+      : transformed;
+
+    await this.client.updateDelayProfile(profileId, payload);
 
     await logger.info(`Synced delay profile "${profile.name}" to "${this.instanceName}"`, {
       source: 'Sync:DelayProfile',
-      meta: { instanceId: this.instanceId },
+      meta: { instanceId: this.instanceId, remoteId: profileId },
     });
 
     return { success: true, itemsSynced: 1 };
+  }
+
+  /**
+   * Lidarr can expose delay profiles with different default IDs over time.
+   * Use the default (untagged, lowest order) profile when syncing, falling
+   * back to id 1 when we cannot resolve it.
+   */
+  private async resolveTargetDelayProfile(): Promise<ArrDelayProfile | null> {
+    if (!(this.client instanceof LidarrClient)) {
+      return null;
+    }
+
+    const profiles = await this.client.getDelayProfiles();
+    if (profiles.length === 0) {
+      return null;
+    }
+
+    const untaggedProfiles = profiles.filter(
+      (profile) => !Array.isArray(profile.tags) || profile.tags.length === 0
+    );
+    const candidates = untaggedProfiles.length > 0 ? untaggedProfiles : profiles;
+
+    const defaultProfile = candidates.reduce((winner, current) =>
+      current.order < winner.order ? current : winner
+    );
+
+    return defaultProfile;
   }
 
   private transform(profile: DelayProfilesRow): ArrDelayProfile {
