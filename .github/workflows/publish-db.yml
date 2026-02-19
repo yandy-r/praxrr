@@ -62,6 +62,11 @@ jobs:
             exit 1
           fi
 
+          if ! curl -fsSL -H "Authorization: token ${MIRROR_PAT}" "https://api.github.com/repos/${MIRROR_REPO}" > /dev/null; then
+            echo "Unable to access ${MIRROR_REPO}. Ensure MIRROR_PAT is valid and has repository write access." >&2
+            exit 1
+          fi
+
           split_sha="$(git subtree split --prefix=packages/praxrr-db)"
           if [ -z "$split_sha" ]; then
             echo "Unable to split packages/praxrr-db subtree." >&2

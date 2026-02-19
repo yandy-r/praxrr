@@ -36,6 +36,7 @@ jobs:
         env:
           MIRROR_PAT: ${{ secrets.MIRROR_PAT }}
           DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run || false }}
+          MIRROR_REPO: yandy-r/praxrr-schema
         run: |
           set -euo pipefail
 
@@ -52,6 +53,11 @@ jobs:
             exit 1
           fi
 
+          if ! curl -fsSL -H "Authorization: token ${MIRROR_PAT}" "https://api.github.com/repos/${MIRROR_REPO}" > /dev/null; then
+            echo "::error::Unable to access ${MIRROR_REPO}. Ensure MIRROR_PAT is valid and has repository write access."
+            exit 1
+          fi
+
           echo "Mirroring packages/praxrr-schema subtree to ${TARGET_BRANCH}."
           SUBTREE_SHA="$(git subtree split --prefix=packages/praxrr-schema "${GITHUB_SHA}")"
           echo "Subtree commit: ${SUBTREE_SHA}"
@@ -65,7 +71,7 @@ jobs:
 
             set +e
             git push --force \
-              "https://x-access-token:${MIRROR_PAT}@github.com/yandy-r/praxrr-schema" \
+              "https://x-access-token:${MIRROR_PAT}@github.com/${MIRROR_REPO}" \
               "${SUBTREE_SHA}:refs/heads/${TARGET_BRANCH}" \
               >"${log_file}" 2>&1
             push_status=$?
