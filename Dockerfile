@@ -34,7 +34,7 @@ ENV VITE_PLATFORM=docker-${TARGETARCH}
 ENV VITE_CHANNEL=${VITE_CHANNEL}
 
 ENV APP_BASE_PATH=/build/dist/build
-RUN deno run -A npm:vite build
+RUN cd packages/praxrr-app && deno run -A npm:vite build
 RUN deno compile \
     --no-check \
     --allow-net \
