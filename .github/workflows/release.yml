@@ -3,15 +3,39 @@ name: Release
 on:
   push:
     tags:
-      - 'v[0-9]+.[0-9]+.[0-9]+'
+      - 'app/v*'
 
 env:
   DENO_VERSION: '2.5.6'
   DOTNET_VERSION: '8.0.x'
+  PARSER_PROJECT_DIR: 'packages/praxrr-parser'
 
 jobs:
-  build:
+  compatibility-gate:
     runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/app/v')
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: ${{ env.DENO_VERSION }}
+
+      - name: Install dependencies
+        run: deno install --node-modules-dir
+
+      - name: Run compatibility check
+        run: deno task compat:check
+
+  build:
+    needs: compatibility-gate
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/app/v')
     permissions:
       contents: read
 
@@ -65,15 +89,17 @@ jobs:
 
       - name: Extract version
         id: version
-        run: echo "value=${GITHUB_REF_NAME#v}" >> $GITHUB_OUTPUT
+        run: |
+          VERSION="${GITHUB_REF_NAME#app/v}"
+          echo "value=$VERSION" >> $GITHUB_OUTPUT
 
       - name: Install dependencies
         run: deno install --node-modules-dir
 
       - name: Build SvelteKit
-        run: deno run -A npm:vite build
+        run: cd packages/praxrr-app && deno run -A npm:vite build
         env:
-          APP_BASE_PATH: ./dist/build
+          APP_BASE_PATH: ../../dist/build
           VITE_PLATFORM: ${{ matrix.vite_platform }}
           VITE_CHANNEL: stable
 
@@ -92,8 +118,8 @@ jobs:
 
       - name: Build parser
         run: |
-          rm -f src/services/parser/Directory.Build.props
-          dotnet publish src/services/parser/Parser.csproj \
+          rm -f "${PARSER_PROJECT_DIR}/Directory.Build.props"
+          dotnet publish "${PARSER_PROJECT_DIR}/Parser.csproj" \
             -c Release \
             -r ${{ matrix.dotnet_rid }} \
             --self-contained \
@@ -123,10 +149,12 @@ jobs:
           path: dist/praxrr-*.${{ matrix.archive_ext }}
 
   release:
-    needs: build
+    needs: [build, compatibility-gate]
     runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/app/v')
     permissions:
       contents: write
+      pull-requests: read
 
     steps:
       - name: Download all artifacts
@@ -135,10 +163,27 @@ jobs:
           path: artifacts
           merge-multiple: true
 
+      - name: Normalize release version
+        id: release-version
+        run: |
+          VERSION="${GITHUB_REF_NAME#app/v}"
+          echo "value=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Generate curated release notes
+        uses: release-drafter/release-drafter@v6
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        id: release-notes
+        with:
+          config-name: release-drafter.yml
+          publish: false
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ github.ref_name }}
+          name: ${{ steps.release-version.outputs.value }}
+          body: ${{ steps.release-notes.outputs.body }}
           files: artifacts/*
-          generate_release_notes: true
           draft: false
           prerelease: false

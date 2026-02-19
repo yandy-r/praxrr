@@ -1,0 +1,103 @@
+name: Compatibility Gates
+
+on:
+  pull_request:
+    paths:
+      - 'packages/praxrr-app/**'
+      - 'packages/praxrr-schema/**'
+      - 'packages/praxrr-db/**'
+      - 'packages/praxrr-parser/**'
+      - 'package.json'
+      - 'Dockerfile'
+      - 'Dockerfile.parser'
+      - 'deno.json'
+      - 'scripts/compat-check.ts'
+      - 'scripts/dev.ts'
+      - 'scripts/e2e.ts'
+      - 'scripts/test.ts'
+      - 'scripts/stats.sh'
+      - 'packages/praxrr-app/src/tests/**'
+      - '.github/workflows/release.yml'
+      - '.github/workflows/docker.yml'
+      - 'release-please-config.json'
+      - '.release-please-manifest.json'
+
+permissions:
+  contents: read
+  pull-requests: read
+
+env:
+  DENO_VERSION: '2.5.6'
+
+jobs:
+  detect-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      contracts_paths: ${{ steps.path-changes.outputs.contracts_paths }}
+      app_paths: ${{ steps.path-changes.outputs.app_paths }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Detect workflow and contract/app changes
+        id: path-changes
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            contracts_paths:
+              - 'packages/praxrr-schema/**'
+              - 'packages/praxrr-db/**'
+              - 'scripts/compat-check.ts'
+            app_paths:
+              - 'packages/praxrr-app/**'
+              - 'packages/praxrr-parser/**'
+              - 'package.json'
+              - 'Dockerfile'
+              - 'Dockerfile.parser'
+              - 'scripts/dev.ts'
+              - 'scripts/test.ts'
+              - 'scripts/e2e.ts'
+              - 'scripts/stats.sh'
+              - 'scripts/generate-pcd-types.ts'
+              - 'deno.json'
+
+  compatibility-contracts:
+    needs: detect-changes
+    runs-on: ubuntu-latest
+    name: contracts
+    if: ${{ needs.detect-changes.outputs.contracts_paths == 'true' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: ${{ env.DENO_VERSION }}
+
+      - name: Run contract compatibility checks
+        run: |
+          deno install --node-modules-dir
+          deno run -A scripts/compat-check.ts
+
+  compatibility-app-check:
+    needs: detect-changes
+    runs-on: ubuntu-latest
+    name: app-check
+    if: ${{ needs.detect-changes.outputs.app_paths == 'true' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: ${{ env.DENO_VERSION }}
+
+      - name: Run app checks
+        run: |
+          deno install --node-modules-dir
+          cd packages/praxrr-app
+          npx svelte-kit sync
+          cd ../..
+          deno task check

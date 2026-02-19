@@ -1,0 +1,28 @@
+{
+  "name": "Praxrr Database",
+  "version": "2.0.0",
+  "description": "Unofficial Praxrr Database",
+  "arr_types": ["radarr", "sonarr", "lidarr"],
+
+  "dependencies": {
+    "https://github.com/yandy-r/praxrr-schema": "1.0.0"
+  },
+
+  "authors": [
+    {
+      "name": "Yandy R"
+    }
+  ],
+
+  "license": "MIT",
+  "repository": "https://github.com/yandy-r/praxrr-db",
+
+  "links": {
+    "homepage": "https://github.com/yandy-r/praxrr-db",
+    "issues": "https://github.com/yandy-r/praxrr-db/issues"
+  },
+
+  "praxrr": {
+    "minimum_version": "2.1.0"
+  }
+}

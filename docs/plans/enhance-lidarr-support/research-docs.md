@@ -22,7 +22,7 @@
 ## README Files
 
 - `README.md`: project context and current focus areas.
-- `src/lib/server/utils/arr/README.md`: Arr client architecture and usage.
+- `packages/praxrr-app/src/lib/server/utils/arr/README.md`: Arr client architecture and usage.
 
 ## Must-Read Documents
 

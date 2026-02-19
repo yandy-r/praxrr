@@ -4,9 +4,9 @@ The navigation-update effort replaces the dual hard-coded sidebar/bottom-bar arr
 
 ### Architecture Context
 
-- **System Structure:** The root layout (`+layout.server.ts`/`+layout.svelte`) becomes the canonical integration point that calls `resolveNavShell`, returns `navShell` plus `version`, and renders `Navbar`, `PageNav`, and `BottomNav` only for non-auth routes. The nav registry lives under `src/lib/shared/navigation` and `src/lib/server/navigation`, while icon resolution and scope stores sit under `src/lib/client/navigation` and `src/lib/client/stores`.
+- **System Structure:** The root layout (`+layout.server.ts`/`+layout.svelte`) becomes the canonical integration point that calls `resolveNavShell`, returns `navShell` plus `version`, and renders `Navbar`, `PageNav`, and `BottomNav` only for non-auth routes. The nav registry lives under `packages/praxrr-app/src/lib/shared/navigation` and `packages/praxrr-app/src/lib/server/navigation`, while icon resolution and scope stores sit under `packages/praxrr-app/src/lib/client/navigation` and `packages/praxrr-app/src/lib/client/stores`.
 - **Data Flow:** Requests populate `locals.user` in `hooks.server.ts`; `+layout.server.ts` resolves the static registry (`NavItemDef[]`), evaluates feature/permission gating, serializes icons to keys, and returns a `NavShell` consumed by both nav components. Client stores (`navIcons.ts`, `navScope.ts`, `mobileNav.ts`) filter the resolved shell without re-running server logic.
-- **Integration Points:** The registry references `src/lib/shared/arr/capabilities.ts` for Arr capability metadata and `src/lib/shared/pcd/types.ts` for `ArrType`; consumers include `PageNav`/`BottomNav` (driving `Group`/`GroupItem`), `Navbar` (scope indicator if needed), and `iconMap.ts` (key -> Lucide component resolution).
+- **Integration Points:** The registry references `packages/praxrr-app/src/lib/shared/arr/capabilities.ts` for Arr capability metadata and `packages/praxrr-app/src/lib/shared/pcd/types.ts` for `ArrType`; consumers include `PageNav`/`BottomNav` (driving `Group`/`GroupItem`), `Navbar` (scope indicator if needed), and `iconMap.ts` (key -> Lucide component resolution).
 
 ### Critical Files Reference
 
@@ -23,7 +23,7 @@ The navigation-update effort replaces the dual hard-coded sidebar/bottom-bar arr
 
 ### Cross-Cutting Concerns
 
-- **Security:** Capability gating must still derive from `src/lib/shared/arr/capabilities.ts`; nav visibility remains purely UI-facing while backend auth stays enforced via `hooks.server.ts`.
+- **Security:** Capability gating must still derive from `packages/praxrr-app/src/lib/shared/arr/capabilities.ts`; nav visibility remains purely UI-facing while backend auth stays enforced via `hooks.server.ts`.
 - **Performance:** Keep `NavShell` static and SSR-safe to avoid hydration mismatches; caching the resolved shell in layout data while filtering client-side avoids duplicate work when scope changes.
 - **Testing:** Validate mobile drawer escape/route-close interactions, bottom nav priority classes, and that all registered `href`s still hit existing routes (deep links must survive). Section headers and scope filtering should also have regression coverage.
 
@@ -31,7 +31,7 @@ The navigation-update effort replaces the dual hard-coded sidebar/bottom-bar arr
 
 - Independent work streams: registry/types/resolver creation (`shared/navigation/types.ts`, `server/navigation/registry.ts`/`resolver.ts`) can proceed alongside icon map and scope store scaffolding (`iconMap.ts`, `navScope.ts` once scoped filtering is delayed).
 - Sidebar vs. mobile: refactoring `PageNav.svelte` to loop over `navShell.groups` and `BottomNav.svelte` to flatten that shell can happen in parallel once the resolver exists.
-- Coordination hotspots: `+layout.server.ts`/`+layout.svelte` must land before consumers rely on `navShell`, and cleanup (e.g., deleting `src/lib/client/stores/sidebar.ts`, normalizing `groupItem.svelte`) should be synchronized to avoid temporary broken imports.
+- Coordination hotspots: `+layout.server.ts`/`+layout.svelte` must land before consumers rely on `navShell`, and cleanup (e.g., deleting `packages/praxrr-app/src/lib/client/stores/sidebar.ts`, normalizing `groupItem.svelte`) should be synchronized to avoid temporary broken imports.
 
 ### Implementation Constraints
 

@@ -16,20 +16,20 @@ clone = serialize → swap name → deserialize
 
 | File                                         | Purpose                                               |
 | -------------------------------------------- | ----------------------------------------------------- |
-| `src/lib/shared/pcd/portable.ts`             | Portable type definitions (shared client+server)      |
-| `src/lib/server/pcd/entities/serialize.ts`   | All serialize functions (cache → portable)            |
-| `src/lib/server/pcd/entities/deserialize.ts` | All deserialize functions (portable → PCD ops)        |
-| `src/lib/server/pcd/entities/clone.ts`       | Clone orchestrator (serialize → rename → deserialize) |
-| `src/lib/client/ui/modal/CloneModal.svelte`  | Reusable clone name prompt modal                      |
+| `packages/praxrr-app/src/lib/shared/pcd/portable.ts`             | Portable type definitions (shared client+server)      |
+| `packages/praxrr-app/src/lib/server/pcd/entities/serialize.ts`   | All serialize functions (cache → portable)            |
+| `packages/praxrr-app/src/lib/server/pcd/entities/deserialize.ts` | All deserialize functions (portable → PCD ops)        |
+| `packages/praxrr-app/src/lib/server/pcd/entities/clone.ts`       | Clone orchestrator (serialize → rename → deserialize) |
+| `packages/praxrr-app/src/lib/client/ui/modal/CloneModal.svelte`  | Reusable clone name prompt modal                      |
 
 ### Modified files (per entity type)
 
 | File                                                      | Change                                                |
 | --------------------------------------------------------- | ----------------------------------------------------- |
-| `src/routes/[entity]/[databaseId]/+page.server.ts`        | Add `canWriteToBase` to load, add `clone` form action |
-| `src/routes/[entity]/[databaseId]/+page.svelte`           | Add clone state + CloneModal                          |
-| `src/routes/[entity]/[databaseId]/views/CardView.svelte`  | Add clone button (Copy icon in card footer)           |
-| `src/routes/[entity]/[databaseId]/views/TableView.svelte` | Add clone button via Table `actions` slot             |
+| `packages/praxrr-app/src/routes/[entity]/[databaseId]/+page.server.ts`        | Add `canWriteToBase` to load, add `clone` form action |
+| `packages/praxrr-app/src/routes/[entity]/[databaseId]/+page.svelte`           | Add clone state + CloneModal                          |
+| `packages/praxrr-app/src/routes/[entity]/[databaseId]/views/CardView.svelte`  | Add clone button (Copy icon in card footer)           |
+| `packages/praxrr-app/src/routes/[entity]/[databaseId]/views/TableView.svelte` | Add clone button via Table `actions` slot             |
 
 ---
 
@@ -43,7 +43,7 @@ clone = serialize → swap name → deserialize
 
 ## Phase 1: Portable Types
 
-**File: `src/lib/shared/pcd/portable.ts`** (done)
+**File: `packages/praxrr-app/src/lib/shared/pcd/portable.ts`** (done)
 
 Define all portable types upfront. These strip `id`, `created_at`, `updated_at` and use camelCase to match existing create input interfaces. Reuse `ConditionData` and `OrderedItem` from `display.ts` directly — they're already JSON-friendly.
 
@@ -64,7 +64,7 @@ Types to define:
 
 ## Phase 2: Serialize Functions
 
-**File: `src/lib/server/pcd/entities/serialize.ts`**
+**File: `packages/praxrr-app/src/lib/server/pcd/entities/serialize.ts`**
 
 Each function reads from cache using existing read functions, strips DB fields, maps to portable format.
 
@@ -87,7 +87,7 @@ Each function reads from cache using existing read functions, strips DB fields, 
 
 ## Phase 3: Deserialize Functions
 
-**File: `src/lib/server/pcd/entities/deserialize.ts`**
+**File: `packages/praxrr-app/src/lib/server/pcd/entities/deserialize.ts`**
 
 Each function accepts `{ databaseId, cache, layer, portable }` and calls existing create/update functions.
 
@@ -124,7 +124,7 @@ Refresh cache between steps. The create→updateQualities sequence generates ext
 
 ## Phase 4: Clone Orchestrator
 
-**File: `src/lib/server/pcd/entities/clone.ts`** (done for delay_profile)
+**File: `packages/praxrr-app/src/lib/server/pcd/entities/clone.ts`** (done for delay_profile)
 
 ```typescript
 interface CloneOptions {
@@ -144,7 +144,7 @@ Switches on `entityType`, calls the matching serialize → sets `portable.name =
 
 ## Phase 5: Clone UI
 
-### 5a. CloneModal (`src/lib/client/ui/modal/CloneModal.svelte`) (done)
+### 5a. CloneModal (`packages/praxrr-app/src/lib/client/ui/modal/CloneModal.svelte`) (done)
 
 Built on existing `Modal.svelte`. Contains:
 
@@ -182,15 +182,15 @@ Each `+page.server.ts` adds:
 
 ### Batch 1: Foundation + Delay Profiles (vertical slice) — DONE
 
-1. `src/lib/shared/pcd/portable.ts` — all portable types
-2. `src/lib/server/pcd/entities/serialize.ts` — `serializeDelayProfile`
-3. `src/lib/server/pcd/entities/deserialize.ts` — `deserializeDelayProfile`
-4. `src/lib/server/pcd/entities/clone.ts` — `clone()` with `delay_profile` case
-5. `src/lib/client/ui/modal/CloneModal.svelte`
-6. `src/routes/delay-profiles/[databaseId]/+page.server.ts` — add `canWriteToBase` + `clone` action
-7. `src/routes/delay-profiles/[databaseId]/+page.svelte` — add clone state + modal
-8. `src/routes/delay-profiles/[databaseId]/views/CardView.svelte` — clone button
-9. `src/routes/delay-profiles/[databaseId]/views/TableView.svelte` — clone button
+1. `packages/praxrr-app/src/lib/shared/pcd/portable.ts` — all portable types
+2. `packages/praxrr-app/src/lib/server/pcd/entities/serialize.ts` — `serializeDelayProfile`
+3. `packages/praxrr-app/src/lib/server/pcd/entities/deserialize.ts` — `deserializeDelayProfile`
+4. `packages/praxrr-app/src/lib/server/pcd/entities/clone.ts` — `clone()` with `delay_profile` case
+5. `packages/praxrr-app/src/lib/client/ui/modal/CloneModal.svelte`
+6. `packages/praxrr-app/src/routes/delay-profiles/[databaseId]/+page.server.ts` — add `canWriteToBase` + `clone` action
+7. `packages/praxrr-app/src/routes/delay-profiles/[databaseId]/+page.svelte` — add clone state + modal
+8. `packages/praxrr-app/src/routes/delay-profiles/[databaseId]/views/CardView.svelte` — clone button
+9. `packages/praxrr-app/src/routes/delay-profiles/[databaseId]/views/TableView.svelte` — clone button
 
 ### Batch 2: Simple + Tagged entities
 

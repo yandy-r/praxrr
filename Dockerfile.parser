@@ -13,13 +13,15 @@
 FROM mcr.microsoft.com/dotnet/sdk:8.0-alpine AS builder
 
 WORKDIR /build
+# Keep parser source path explicit for the migration state.
+ARG PARSER_PROJECT_DIR=packages/praxrr-parser
 
 # Copy project file first for better layer caching
-COPY src/services/parser/Parser.csproj ./
+COPY ${PARSER_PROJECT_DIR}/Parser.csproj ./
 RUN dotnet restore
 
 # Copy source and build
-COPY src/services/parser/ ./
+COPY ${PARSER_PROJECT_DIR}/ ./
 # Remove local build config (uses paths that don't exist in container)
 RUN rm -f Directory.Build.props && dotnet publish -c Release -o /app --no-restore
 

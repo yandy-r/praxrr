@@ -1,0 +1,212 @@
+name: Publish Schema Mirror
+
+on:
+  push:
+    branches:
+      - dev
+      - v2
+    tags:
+      - 'schema/v*'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Publish to a dry-run branch instead of main.
+        required: false
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+
+concurrency: publish-schema-${{ github.ref }}
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    outputs:
+      published_branch: ${{ steps.publish.outputs.published_branch }}
+      dry_run: ${{ steps.publish.outputs.dry_run }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Mirror schema subtree to downstream repository
+        id: publish
+        env:
+          MIRROR_PAT: ${{ secrets.MIRROR_PAT }}
+          DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run || false }}
+          MIRROR_REPO: yandy-r/praxrr-schema
+        run: |
+          set -euo pipefail
+
+          if [ "${DRY_RUN}" = "true" ]; then
+            TARGET_BRANCH="dry-run/schema/${GITHUB_RUN_ID}"
+            TARGET_REF="refs/heads/${TARGET_BRANCH}"
+          elif [[ "${GITHUB_REF}" == refs/heads/* ]]; then
+            TARGET_BRANCH="${GITHUB_REF#refs/heads/}"
+            TARGET_REF="${GITHUB_REF}"
+          elif [[ "${GITHUB_REF}" == refs/tags/* ]]; then
+            TARGET_BRANCH=""
+            TARGET_REF="${GITHUB_REF}"
+          else
+            echo "::error::Unsupported ref for publish: ${GITHUB_REF}"
+            exit 1
+          fi
+
+          if [ -z "${MIRROR_PAT}" ]; then
+            echo "::error::MIRROR_PAT secret is not configured."
+            exit 1
+          fi
+
+          echo "Mirroring packages/praxrr-schema subtree to ${TARGET_REF}."
+          SUBTREE_SHA="$(git subtree split --prefix=packages/praxrr-schema "${GITHUB_SHA}")"
+          echo "Subtree commit: ${SUBTREE_SHA}"
+
+          attempts=1
+          max_attempts=3
+          delay_seconds=5
+
+          while [ "${attempts}" -le "${max_attempts}" ]; do
+            log_file="$(mktemp)"
+
+            set +e
+            git push --force \
+              "https://x-access-token:${MIRROR_PAT}@github.com/${MIRROR_REPO}.git" \
+              "${SUBTREE_SHA}:${TARGET_REF}" \
+              >"${log_file}" 2>&1
+            push_status=$?
+            set -e
+
+            if [ "${push_status}" -eq 0 ]; then
+              echo "Schema mirror publish succeeded on attempt ${attempts}."
+              rm -f "${log_file}"
+              break
+            fi
+
+            echo "::error::Schema mirror publish attempt ${attempts}/${max_attempts} failed."
+            echo "::error::Exit code: ${push_status}"
+            echo "::error::Output:"
+            cat "${log_file}"
+            rm -f "${log_file}"
+
+            if [ "${attempts}" -lt "${max_attempts}" ]; then
+              echo "Retrying publish in ${delay_seconds}s (exponential backoff)."
+              sleep "${delay_seconds}"
+              delay_seconds=$((delay_seconds * 2))
+              attempts=$((attempts + 1))
+              continue
+            fi
+
+            echo "::error::Schema mirror publish failed after ${max_attempts} attempts."
+            exit "${push_status}"
+          done
+
+          echo "published_branch=${TARGET_BRANCH}" >> "${GITHUB_OUTPUT}"
+          echo "dry_run=${DRY_RUN}" >> "${GITHUB_OUTPUT}"
+
+  cleanup:
+    needs: publish
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Cleanup stale dry-run schema branches in mirror repository
+        env:
+          MIRROR_PAT: ${{ secrets.MIRROR_PAT }}
+          DRY_RUN: ${{ needs.publish.outputs.dry_run }}
+          CURRENT_BRANCH: ${{ needs.publish.outputs.published_branch }}
+        run: |
+          set -euo pipefail
+
+          if [ "${DRY_RUN}" != "true" ]; then
+            echo "No dry-run branch was created; cleanup skipped."
+            exit 0
+          fi
+
+          if [ -z "${CURRENT_BRANCH}" ]; then
+            echo "Published branch was not detected; cleanup skipped."
+            exit 0
+          fi
+
+          if [ -z "${MIRROR_PAT}" ]; then
+            echo "::warning::MIRROR_PAT secret is not configured; cleanup skipped."
+            exit 0
+          fi
+
+          now_epoch="$(date -u +%s)"
+          retention_seconds=$((7 * 24 * 60 * 60))
+          warning_count=0
+          branches_file="$(mktemp)"
+
+          if ! curl -fsSL -H "Authorization: token ${MIRROR_PAT}" \
+            "https://api.github.com/repos/yandy-r/praxrr-schema/branches?per_page=100" \
+            > "${branches_file}"; then
+            echo "::warning::Unable to list mirror branches; cleanup skipped."
+            rm -f "${branches_file}"
+            exit 0
+          fi
+
+          while IFS= read -r branch_name; do
+            if [ -z "${branch_name}" ]; then
+              continue
+            fi
+
+            if [[ "${branch_name}" != dry-run/schema/* ]]; then
+              continue
+            fi
+
+            if [ "${branch_name}" = "${CURRENT_BRANCH}" ]; then
+              echo "Skipping current run branch: ${branch_name}"
+              continue
+            fi
+
+            commit_api_url="$(jq -r --arg name "${branch_name}" '.[] | select(.name == $name) | .commit.url' "${branches_file}")"
+            if [ -z "${commit_api_url}" ] || [ "${commit_api_url}" = "null" ]; then
+              echo "::warning::Missing commit API URL for ${branch_name}; skipping."
+              warning_count=$((warning_count + 1))
+              continue
+            fi
+
+            commit_file="$(mktemp)"
+            if ! curl -fsSL -H "Authorization: token ${MIRROR_PAT}" \
+              "${commit_api_url}" > "${commit_file}"; then
+              echo "::warning::Failed to load commit metadata for ${branch_name}; skipping."
+              warning_count=$((warning_count + 1))
+              rm -f "${commit_file}"
+              continue
+            fi
+
+            commit_date="$(jq -r '.author.date // .committer.date // empty' "${commit_file}")"
+            rm -f "${commit_file}"
+            if [ -z "${commit_date}" ] || [ "${commit_date}" = "null" ]; then
+              echo "::warning::Unable to parse commit date for ${branch_name}; skipping."
+              warning_count=$((warning_count + 1))
+              continue
+            fi
+
+            commit_epoch="$(date -d "${commit_date}" +%s)"
+            age_seconds=$((now_epoch - commit_epoch))
+            if [ "${age_seconds}" -lt "${retention_seconds}" ]; then
+              echo "Keeping recent dry-run branch ${branch_name}; age ${age_seconds}s."
+              continue
+            fi
+
+            encoded_branch="$(printf '%s' "${branch_name}" | sed 's#/#%2F#g')"
+            if ! curl -fsSL -X DELETE \
+              -H "Authorization: token ${MIRROR_PAT}" \
+              "https://api.github.com/repos/yandy-r/praxrr-schema/git/refs/heads/${encoded_branch}"; then
+              echo "::warning::Failed to delete ${branch_name}; check API permissions."
+              warning_count=$((warning_count + 1))
+              continue
+            fi
+
+            echo "Deleted stale dry-run branch ${branch_name}"
+          done < <(jq -r '.[] | .name' "${branches_file}")
+
+          if [ "${warning_count}" -gt 0 ]; then
+            echo "::warning::Cleanup finished with ${warning_count} warning(s)."
+          fi
+
+          rm -f "${branches_file}"
+          exit 0

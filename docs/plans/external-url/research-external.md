@@ -64,7 +64,7 @@ As of February 16, 2026, Radarr/Sonarr/Lidarr expose host configuration fields (
     - https://docs.deno.com/api/web/~/URL
     - https://developer.mozilla.org/en-US/docs/Web/API/URL/URL
 - TypeScript/Deno (Arr integration): continue using existing in-repo Arr client layer.
-  - Recommended package: existing internal modules (`src/lib/server/utils/arr/base.ts`, `src/lib/server/utils/arr/factory.ts`), no external SDK required.
+  - Recommended package: existing internal modules (`packages/praxrr-app/src/lib/server/utils/arr/base.ts`, `packages/praxrr-app/src/lib/server/utils/arr/factory.ts`), no external SDK required.
   - Rationale: already implements API-key auth, retries, timeouts, and Arr-type dispatch used across the codebase.
 
 ## Integration Patterns
@@ -76,21 +76,21 @@ As of February 16, 2026, Radarr/Sonarr/Lidarr expose host configuration fields (
 - sync/event/webhook strategy
   - No Arr webhook integration is required for this feature.
   - Persist optional `external_url` on `arr_instances` and resolve open-link base at read/render time: `openBaseUrl = external_url ?? url`.
-  - Apply this precedence for all "Open in" entry points in `src/routes/arr/[id]/library/+page.svelte` (table row links and top action open button).
+  - Apply this precedence for all "Open in" entry points in `packages/praxrr-app/src/routes/arr/[id]/library/+page.svelte` (table row links and top action open button).
   - This read-time precedence satisfies the requirement that already-configured instances immediately switch once External URL is added later.
 - pagination/error handling approach
   - Pagination is unaffected (feature is link-target selection only).
-  - Validate `external_url` as absolute `http`/`https` during create/update server actions (`src/routes/arr/new/+page.server.ts`, `src/routes/arr/[id]/settings/+page.server.ts`) and return `400` for invalid values.
+  - Validate `external_url` as absolute `http`/`https` during create/update server actions (`packages/praxrr-app/src/routes/arr/new/+page.server.ts`, `packages/praxrr-app/src/routes/arr/[id]/settings/+page.server.ts`) and return `400` for invalid values.
   - Build destination links with URL-aware composition instead of raw string concatenation when adding entity path segments.
 
 ## Constraints and Gotchas
 
 - Existing schema and query types only model `url` today:
-  - `src/lib/server/db/migrations/001_create_arr_instances.ts`
-  - `src/lib/server/db/schema.sql`
-  - `src/lib/server/db/queries/arrInstances.ts`
+  - `packages/praxrr-app/src/lib/server/db/migrations/001_create_arr_instances.ts`
+  - `packages/praxrr-app/src/lib/server/db/schema.sql`
+  - `packages/praxrr-app/src/lib/server/db/queries/arrInstances.ts`
 - Current library page derives link base from `instance.url` only, so all "Open in" links currently point to the API URL:
-  - `src/routes/arr/[id]/library/+page.svelte`
+  - `packages/praxrr-app/src/routes/arr/[id]/library/+page.svelte`
 - URL-base/subpath handling is implementation-impacting: Servarr docs explicitly support reverse-proxy subpaths (`/radarr`, `/sonarr`, `/lidarr`). Link building must preserve configured path prefixes.
 - URL-constructor behavior caveat: absolute paths reset pathname. For example, joining with a leading `/` can drop an existing base path segment; relative joins with normalized trailing slash are safer.
 - Inference note: Arr HostConfig `applicationUrl` could be used as an optional autofill source, but this is not required by current feature scope.

@@ -4,17 +4,17 @@
 
 **Thin Route + Entity Module Pattern**: Route `load/actions` validate request inputs and delegate persistence to entity helpers.
 
-- Example: `src/routes/media-management/[databaseId]/media-settings/new/+page.server.ts`
-- Example: `src/lib/server/pcd/entities/mediaManagement/media-settings/create.ts`
+- Example: `packages/praxrr-app/src/routes/media-management/[databaseId]/media-settings/new/+page.server.ts`
+- Example: `packages/praxrr-app/src/lib/server/pcd/entities/mediaManagement/media-settings/create.ts`
 
 **Entity Family Module Pattern**: Each media-management family is split into `read/create/update/delete/override` modules.
 
-- Example: `src/lib/server/pcd/entities/mediaManagement/naming/*`
-- Example: `src/lib/server/pcd/entities/mediaManagement/quality-definitions/*`
+- Example: `packages/praxrr-app/src/lib/server/pcd/entities/mediaManagement/naming/*`
+- Example: `packages/praxrr-app/src/lib/server/pcd/entities/mediaManagement/quality-definitions/*`
 
 **Sync Resolver Pattern**: syncer chooses source config and pushes to Arr client with mapping/capability checks.
 
-- Example: `src/lib/server/sync/mediaManagement/syncer.ts`
+- Example: `packages/praxrr-app/src/lib/server/sync/mediaManagement/syncer.ts`
 
 ## Code Conventions
 
@@ -32,7 +32,7 @@
 
 ## Testing Approach
 
-- Place feature tests under `src/tests/arr/`, `src/tests/base/`, and relevant sync/job test domains.
+- Place feature tests under `packages/praxrr-app/src/tests/arr/`, `packages/praxrr-app/src/tests/base/`, and relevant sync/job test domains.
 - Cover both positive and failure paths (duplicates, mapping gaps, unsupported payloads).
 - Verify logs/diagnostics for sync skip/warning behavior where relevant.
 - Add migration idempotency tests (rerun behavior and conflict handling).

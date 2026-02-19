@@ -2,9 +2,9 @@
 
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="src/lib/client/assets/banner-light.svg">
-    <source media="(prefers-color-scheme: light)" srcset="src/lib/client/assets/banner-dark.svg">
-    <img alt="Praxrr" src="src/lib/client/assets/banner-dark.svg" width="500">
+    <source media="(prefers-color-scheme: dark)" srcset="packages/praxrr-app/src/lib/client/assets/banner-light.svg">
+    <source media="(prefers-color-scheme: light)" srcset="packages/praxrr-app/src/lib/client/assets/banner-dark.svg">
+    <img alt="Praxrr" src="packages/praxrr-app/src/lib/client/assets/banner-dark.svg" width="500">
   </picture>
 </p>
 
@@ -65,7 +65,7 @@ more on the way.
 - `AUTH=off` - No authentication (use with external auth like Authentik/Authelia)
 
 API access via `X-Api-Key` header or `?apikey=` query param. See
-[auth docs](src/lib/server/utils/auth/README.md) for details.
+[auth docs](packages/praxrr-app/src/lib/server/utils/auth/README.md) for details.
 
 > [!NOTE] CSRF origin checks are currently configured with a wildcard
 > (`kit.csrf.trustedOrigins = ['*']`) to avoid proxy-origin mismatches during active development
@@ -129,18 +129,70 @@ This runs the parser service and Vite dev server concurrently. See
 
 ### Environment Variables
 
-| Variable        | Default     | Description                             |
-| --------------- | ----------- | --------------------------------------- |
-| `PUID`          | `1000`      | User ID for file permissions            |
-| `PGID`          | `1000`      | Group ID for file permissions           |
-| `UMASK`         | `022`       | File creation mask                      |
-| `TZ`            | `Etc/UTC`   | Timezone for scheduling                 |
-| `PORT`          | `6868`      | Web UI port                             |
-| `HOST`          | `0.0.0.0`   | Bind address                            |
-| `APP_BASE_PATH` | `/config`   | Base path for data, logs, backups       |
-| `AUTH`          | `on`        | Auth mode: `on`, `local`, `off`, `oidc` |
-| `PARSER_HOST`   | `localhost` | Parser service host                     |
-| `PARSER_PORT`   | `5000`      | Parser service port                     |
+| Variable                         | Default                                | Description                                                               |
+| -------------------------------- | -------------------------------------- | ------------------------------------------------------------------------- |
+| `PUID`                           | `1000`                                 | User ID for file permissions                                              |
+| `PGID`                           | `1000`                                 | Group ID for file permissions                                             |
+| `UMASK`                          | `022`                                  | File creation mask                                                        |
+| `TZ`                             | `Etc/UTC`                              | Timezone for scheduling                                                   |
+| `PORT`                           | `6868`                                 | Web UI port                                                               |
+| `HOST`                           | `0.0.0.0`                              | Bind address                                                              |
+| `APP_BASE_PATH`                  | `/config`                              | Base path for data, logs, backups                                         |
+| `AUTH`                           | `on`                                   | Auth mode: `on`, `local`, `off`, `oidc`                                   |
+| `PARSER_HOST`                    | `localhost`                            | Parser service host                                                       |
+| `PARSER_PORT`                    | `5000`                                 | Parser service port                                                       |
+| `PRAXRR_DEFAULT_DB_TOKEN`        | `your_token`                           | Default database token                                                    |
+| `PRAXRR_DEFAULT_DB_GIT_USERNAME` | `your_username`                        | Default database Git username                                             |
+| `PRAXRR_DEFAULT_DB_GIT_EMAIL`    | `your_email`                           | Default database Git email                                                |
+| `PRAXRR_DEFAULT_DB_URL`          | `https://github.com/yandy-r/praxrr-db` | Default PCD auto-link repository URL                                      |
+| `PRAXRR_DEFAULT_DB_BRANCH`       | `v2`                                   | Default PCD auto-link branch                                              |
+| `PRAXRR_DEFAULT_DB_NAME`         | `Praxrr-DB`                            | Default PCD display name                                                  |
+| `PRAXRR_SCHEMA_REF`              | manifest value                         | Override schema dependency ref (tag or branch, e.g. `v2`, `dev`, `1.0.0`) |
+
+## Monorepo Workspace Layout
+
+Praxrr now uses a Deno workspace with its runtime application code (routes, lib, hooks, and UI) in `packages/praxrr-app/src/` and these package members:
+
+- `packages/praxrr-api` (legacy package surface)
+- `packages/praxrr-db` (pcd_ops and base ops)
+- `packages/praxrr-schema` (PCD schema SQL and manifest)
+
+Runtime behavior, Arr sync workflows, and API surfaces now live under `packages/praxrr-app/src/`, while the package members above
+are consumed through workspace references and mirror publishes.
+
+## Contract Checklist
+
+### Environment Variables
+
+- [ ] `PRAXRR_DEFAULT_DB_URL` defaults to `https://github.com/yandy-r/praxrr-db` when unset.
+- [ ] `PRAXRR_DEFAULT_DB_BRANCH` defaults to `v2` when unset.
+- [ ] `PRAXRR_DEFAULT_DB_NAME` defaults to `Praxrr-DB` when unset.
+- [ ] `PRAXRR_SCHEMA_REF` optionally overrides the schema dependency ref (`tag` or `branch`) at runtime.
+- [ ] `PRAXRR_DEFAULT_DB_TOKEN`, `PRAXRR_DEFAULT_DB_GIT_USERNAME`, and
+      `PRAXRR_DEFAULT_DB_GIT_EMAIL` remain supported for git push/auth flows.
+- [ ] Any custom DB fork used by default-link must be Arr/PCD schema-compatible and PCD manifest-valid.
+
+### Empty URL Behavior
+
+- [ ] `PRAXRR_DEFAULT_DB_URL=""` (empty string) disables startup auto-link.
+- [ ] Empty URL behaves differently from unset/undefined: it is an intentional explicit opt-out, not a fallback.
+- [ ] Auto-link state is still persisted as attempted/not-linked according to existing startup flow to avoid retries.
+
+### Schema Source Precedence
+
+- [ ] `scripts/generate-pcd-types.ts` resolves schema SQL using local-first precedence:
+- [ ] `--local=<path>` (highest priority) takes absolute or repo-relative path from CLI.
+- [ ] `packages/praxrr-schema/ops/0.schema.sql` is the implicit local default.
+- [ ] `--remote` is only used when explicitly requested after local resolution.
+- [ ] Missing local schema path fails fast with non-zero exit and clear error message.
+
+### Mirror Governance
+
+- [ ] `packages/praxrr-db` publishes to `yandy-r/praxrr-db` via subtree mirrors.
+- [ ] `packages/praxrr-schema` publishes to `yandy-r/praxrr-schema` via subtree mirrors.
+- [ ] Mirror repos are publish consumers only; the monorepo is the source of truth for cross-package changes.
+- [ ] Changes touching PCD contracts should update workspace package inputs and root runtime together in one PR.
+- [ ] Validate local compatibility before merge so DB/schema changes are compatible with existing sync and type-generation paths.
 
 ## License
 

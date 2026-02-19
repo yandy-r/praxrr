@@ -52,19 +52,18 @@ obj/
 bruno/environments/
 
 # OIDC testing (local Keycloak config)
-src/tests/oidc/
+packages/praxrr-app/src/tests/oidc/
 
 # Playwright
 test-results/
 playwright-report/
-src/tests/e2e/test-results/
-src/tests/e2e/playwright-report/
+packages/praxrr-app/src/tests/e2e/test-results/
+packages/praxrr-app/src/tests/e2e/playwright-report/
 
 # Release / build artifacts
 artifacts/
 coverage/
 
 # Research repos
-research/
 tasks/todo.md
 .claude/settings.local.json

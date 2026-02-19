@@ -145,7 +145,7 @@ Deno.writeTextFileSync(specPath, JSON.stringify(bundled, null, 2) + '\n');
 console.log(`Wrote bundled spec to ${specPath}`);
 
 // 6. Copy generated types and inject JSDoc on exported symbols
-const typesSource = 'src/lib/api/v1.d.ts';
+const typesSource = 'packages/praxrr-app/src/lib/api/v1.d.ts';
 const typesDest = join(OUT_DIR, 'types.ts');
 let typesContent = Deno.readTextFileSync(typesSource);
 

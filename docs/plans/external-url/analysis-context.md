@@ -10,13 +10,13 @@ leaving backend clients (tests, sync jobs, library fetches) strictly bound to th
 
 ## Architecture Context
 
-The Arr instance row in `src/lib/server/db/schema.sql` seeds every route and job;
+The Arr instance row in `packages/praxrr-app/src/lib/server/db/schema.sql` seeds every route and job;
 `arrInstancesQueries` exposes `ArrInstance` rows, `CreateArrInstanceInput`, and
-`UpdateArrInstanceInput`, and `src/routes/arr/[id]/+layout.server.ts` feeds the instance to every
+`UpdateArrInstanceInput`, and `packages/praxrr-app/src/routes/arr/[id]/+layout.server.ts` feeds the instance to every
 `library`, `settings`, and job-heavy child. The library page
-(`src/routes/arr/[id]/library/+page.svelte`) and its helper `LibraryActionBar` consume this
+(`packages/praxrr-app/src/routes/arr/[id]/library/+page.svelte`) and its helper `LibraryActionBar` consume this
 layout-provided data to build Open-in links, and the server-side
-`src/routes/api/v1/arr/library/+server.ts` always talks to the canonical `instance.url`. Adding
+`packages/praxrr-app/src/routes/api/v1/arr/library/+server.ts` always talks to the canonical `instance.url`. Adding
 `external_url` simply extends the row so those shared loaders immediately expose the resolved
 browser target while all backend flows continue to rely on `instance.url`.
 
@@ -28,42 +28,42 @@ browser target while all backend flows continue to rely on `instance.url`.
   guidance, and explicit admonitions to keep backend clients on `url`.
 - `docs/plans/external-url/research-patterns.md`: recommended query-layer single-source-of-truth and
   the shared SvelteKit action funnel for validation.
-- `src/lib/server/db/queries/arrInstances.ts`: centralizes persistence for `arr_instances`, so it
+- `packages/praxrr-app/src/lib/server/db/queries/arrInstances.ts`: centralizes persistence for `arr_instances`, so it
   must expose and normalize `external_url` with the rest of the input types.
-- `src/routes/arr/components/InstanceForm.svelte`: the form that must seed, display, and submit the
+- `packages/praxrr-app/src/routes/arr/components/InstanceForm.svelte`: the form that must seed, display, and submit the
   optional field alongside the hidden `<form>` that drives `/arr/new` and `/arr/[id]/settings`
   actions.
-- `src/routes/arr/[id]/library/+page.svelte` and
-  `src/routes/arr/[id]/library/components/LibraryActionBar.svelte`: runtime link builders that need
+- `packages/praxrr-app/src/routes/arr/[id]/library/+page.svelte` and
+  `packages/praxrr-app/src/routes/arr/[id]/library/components/LibraryActionBar.svelte`: runtime link builders that need
   the shared resolver to keep every toolbar and row link in sync.
 
 ## Patterns to Follow
 
 - **Query-layer single source**: keep
   `ArrInstance`/`CreateArrInstanceInput`/`UpdateArrInstanceInput` in
-  `src/lib/server/db/queries/arrInstances.ts` as the sole contract for the new `external_url`
+  `packages/praxrr-app/src/lib/server/db/queries/arrInstances.ts` as the sole contract for the new `external_url`
   metadata.
 - **SvelteKit action funnel**: continue the `FormData` parsing → validation (`fail`) →
   `arrInstancesQueries.create/update` → `redirect(303, …)` flow in
-  `src/routes/arr/new/+page.server.ts` and `src/routes/arr/[id]/settings/+page.server.ts`, treating
+  `packages/praxrr-app/src/routes/arr/new/+page.server.ts` and `packages/praxrr-app/src/routes/arr/[id]/settings/+page.server.ts`, treating
   `external_url` as optional and normalizing blanks to `null`.
-- **Layout-propagated context**: rely on `src/routes/arr/[id]/+layout.server.ts` to refresh
+- **Layout-propagated context**: rely on `packages/praxrr-app/src/routes/arr/[id]/+layout.server.ts` to refresh
   `instance` after saves so every child route gets the updated field without extra fetch logic.
 - **Shared Open-in resolver**: compute
   `const openUrl = instance.external_url?.trim() || instance.url` once and use it in
-  `src/routes/arr/[id]/library/+page.svelte`, `LibraryActionBar.svelte`, `CardView.svelte`, and
+  `packages/praxrr-app/src/routes/arr/[id]/library/+page.svelte`, `LibraryActionBar.svelte`, `CardView.svelte`, and
   `TableView.svelte` so the “Open in” destinations never drift.
 
 ## Cross-Cutting Concerns
 
-- Maintain the canonical API URL: `src/lib/server/utils/arr/factory.ts`, all sync job processors
-  under `src/lib/server/jobs`, and the connection test `src/routes/arr/test/+server.ts` must
+- Maintain the canonical API URL: `packages/praxrr-app/src/lib/server/utils/arr/factory.ts`, all sync job processors
+  under `packages/praxrr-app/src/lib/server/jobs`, and the connection test `packages/praxrr-app/src/routes/arr/test/+server.ts` must
   continue to use `instance.url` and ignore `external_url` even after the UI adds the new field.
 - Keep validation & UX aligned: `docs/plans/external-url/research-ux.md` signals that `External URL`
   is optional, uses helper copy like “Used for Open in links. API calls still use URL,” and surfaces
   inline errors (e.g., “must be a valid http(s) URL”) without triggering tests.
-- Normalize state: migration `src/lib/server/db/migrations/0XX_add_arr_instances_external_url.ts`
-  plus `src/lib/server/db/migrations.ts` must register the column so existing rows default to
+- Normalize state: migration `packages/praxrr-app/src/lib/server/db/migrations/0XX_add_arr_instances_external_url.ts`
+  plus `packages/praxrr-app/src/lib/server/db/migrations.ts` must register the column so existing rows default to
   `NULL`, and `InstanceForm.svelte`/actions must trim whitespace so clearing the field immediately
   falls back to `instance.url`.
 - Document behavior: `docs/plans/external-url/research-docs.md` highlights that
@@ -73,17 +73,17 @@ browser target while all backend flows continue to rely on `instance.url`.
 ## Parallelization Opportunities
 
 - **Data contract & queries**: add the migration and extend
-  `src/lib/server/db/queries/arrInstances.ts` to expose `external_url`, allowing backend schemas to
+  `packages/praxrr-app/src/lib/server/db/queries/arrInstances.ts` to expose `external_url`, allowing backend schemas to
   deploy independently of UI work (`docs/plans/external-url/research-technical.md`).
 - **Settings surface**: update `InstanceForm.svelte` and the `/arr/new` plus `/arr/[id]/settings`
   actions to surface, validate, and persist the field concurrent with the new column
   (`docs/plans/external-url/research-patterns.md`).
 - **Library links**: once the model exposes `external_url`, derive the resolved browser URL in
-  `src/routes/arr/[id]/library/+page.svelte`/`LibraryActionBar.svelte` and refresh cached links in
+  `packages/praxrr-app/src/routes/arr/[id]/library/+page.svelte`/`LibraryActionBar.svelte` and refresh cached links in
   `libraryCache` without waiting for list-view parity
   (`docs/plans/external-url/research-recommendations.md`).
-- **List view parity**: follow up by refactoring `src/routes/arr/views/CardView.svelte` and
-  `src/routes/arr/views/TableView.svelte` to consume the same helper, ensuring all Open-in buttons
+- **List view parity**: follow up by refactoring `packages/praxrr-app/src/routes/arr/views/CardView.svelte` and
+  `packages/praxrr-app/src/routes/arr/views/TableView.svelte` to consume the same helper, ensuring all Open-in buttons
   consolidate the resolver (`docs/plans/external-url/research-recommendations.md`).
 - **Regression testing**: add focused unit/E2E tests tracking create/update actions and fallback
   behavior for library links once the resolver helper exists
@@ -94,16 +94,16 @@ browser target while all backend flows continue to rely on `instance.url`.
 - **Backend dependency**: no backend client (Arr jobs, releases, library fetches, cleanup, log
   viewer) may consume `external_url`; they must continue calling
   `createArrClient(instance.url, instance.api_key)`
-  (`docs/plans/external-url/research-technical.md`, `src/lib/server/jobs/handlers`).
+  (`docs/plans/external-url/research-technical.md`, `packages/praxrr-app/src/lib/server/jobs/handlers`).
 - **UI fallback**: every “Open in” surface must resolve its target via the shared expression, so
-  cached payloads (e.g., `src/lib/client/stores/libraryCache.ts` /
-  `src/routes/api/v1/arr/library/+server.ts`) refresh after saves and no stale links remain
+  cached payloads (e.g., `packages/praxrr-app/src/lib/client/stores/libraryCache.ts` /
+  `packages/praxrr-app/src/routes/api/v1/arr/library/+server.ts`) refresh after saves and no stale links remain
   (`docs/plans/external-url/research-docs.md`).
 - **Validation regime**: `InstanceForm.svelte`/actions must treat `external_url` as optional, trim
   whitespace, validate absolute `http(s)` syntax when present, and persist `NULL` when empty to
   satisfy `docs/plans/external-url/feature-spec.md` success criteria.
 - **Migration footprint**: keep the new column nullable, document it in `schema.sql`, and register
-  the migration in `src/lib/server/db/migrations.ts` so there is no backward-incompatible step for
+  the migration in `packages/praxrr-app/src/lib/server/db/migrations.ts` so there is no backward-incompatible step for
   existing deployments (`docs/plans/external-url/research-patterns.md`).
 - **User communication**: UX guidance (`docs/plans/external-url/research-ux.md`) requires clear
   helper copy, inline validation, and consistent resolver messaging so operators understand the dual

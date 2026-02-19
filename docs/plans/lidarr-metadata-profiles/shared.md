@@ -4,28 +4,28 @@ Lidarr metadata profiles should be implemented as a new Lidarr-only PCD entity f
 
 ## Relevant Files
 
-- /src/lib/server/pcd/entities/delayProfiles/create.ts: Canonical small-entity create pattern with `writeOperation` metadata.
-- /src/lib/server/pcd/entities/delayProfiles/update.ts: Value-guard update and rename-safe operation metadata pattern.
-- /src/lib/server/pcd/entities/qualityProfiles/index.ts: Pattern for multi-module entity composition and exports.
-- /src/lib/server/pcd/entities/registry.ts: Auto-align registration and stable-key/table metadata map.
-- /src/lib/server/pcd/ops/writer.ts: Shared PCD operation writer used by all entity writes.
-- /src/lib/server/db/queries/arrSync.ts: Section config persistence + pending/claim/complete/fail lifecycle helpers.
-- /src/lib/server/sync/types.ts: `SectionType`/`SectionHandler` contracts and instance sync result shape.
-- /src/lib/server/sync/mappings.ts: Section order and Arr support matrix (`SUPPORTED_SYNC_SECTIONS`).
-- /src/lib/server/sync/processor.ts: Trigger/schedule execution and per-instance section orchestration.
-- /src/lib/server/sync/qualityProfiles/handler.ts: Reference section handler wiring to `arrSyncQueries`.
-- /src/lib/server/sync/delayProfiles/handler.ts: Closest single-selection sync section pattern.
-- /src/lib/server/sync/qualityProfiles/syncer.ts: Reference for name-based reconciliation and remote updates.
-- /src/lib/server/utils/arr/clients/lidarr.ts: Lidarr v1 client that should own metadata-profile API methods.
-- /src/lib/server/utils/arr/types.ts: Arr payload/response type contracts to extend.
-- /src/lib/shared/arr/capabilities.ts: Arr sync surface declarations and predicate gates.
-- /src/lib/shared/pcd/types.ts: PCD table typing and Arr-type unions.
-- /src/lib/shared/pcd/portable.ts: Portable entity contracts for import/export/clone.
-- /src/lib/shared/pcd/display.ts: Shared display row types used in UI/server contracts.
-- /src/routes/arr/[id]/sync/+page.server.ts: Existing sync settings load/actions integration point.
-- /src/routes/delay-profiles/[databaseId]/new/+page.server.ts: Route action validation + error mapping pattern.
-- /src/routes/api/v1/pcd/export/+server.ts: Existing PCD API route structure reference.
-- /src/routes/api/v1/pcd/import/+server.ts: Existing PCD API route structure reference.
+- /packages/praxrr-app/src/lib/server/pcd/entities/delayProfiles/create.ts: Canonical small-entity create pattern with `writeOperation` metadata.
+- /packages/praxrr-app/src/lib/server/pcd/entities/delayProfiles/update.ts: Value-guard update and rename-safe operation metadata pattern.
+- /packages/praxrr-app/src/lib/server/pcd/entities/qualityProfiles/index.ts: Pattern for multi-module entity composition and exports.
+- /packages/praxrr-app/src/lib/server/pcd/entities/registry.ts: Auto-align registration and stable-key/table metadata map.
+- /packages/praxrr-app/src/lib/server/pcd/ops/writer.ts: Shared PCD operation writer used by all entity writes.
+- /packages/praxrr-app/src/lib/server/db/queries/arrSync.ts: Section config persistence + pending/claim/complete/fail lifecycle helpers.
+- /packages/praxrr-app/src/lib/server/sync/types.ts: `SectionType`/`SectionHandler` contracts and instance sync result shape.
+- /packages/praxrr-app/src/lib/server/sync/mappings.ts: Section order and Arr support matrix (`SUPPORTED_SYNC_SECTIONS`).
+- /packages/praxrr-app/src/lib/server/sync/processor.ts: Trigger/schedule execution and per-instance section orchestration.
+- /packages/praxrr-app/src/lib/server/sync/qualityProfiles/handler.ts: Reference section handler wiring to `arrSyncQueries`.
+- /packages/praxrr-app/src/lib/server/sync/delayProfiles/handler.ts: Closest single-selection sync section pattern.
+- /packages/praxrr-app/src/lib/server/sync/qualityProfiles/syncer.ts: Reference for name-based reconciliation and remote updates.
+- /packages/praxrr-app/src/lib/server/utils/arr/clients/lidarr.ts: Lidarr v1 client that should own metadata-profile API methods.
+- /packages/praxrr-app/src/lib/server/utils/arr/types.ts: Arr payload/response type contracts to extend.
+- /packages/praxrr-app/src/lib/shared/arr/capabilities.ts: Arr sync surface declarations and predicate gates.
+- /packages/praxrr-app/src/lib/shared/pcd/types.ts: PCD table typing and Arr-type unions.
+- /packages/praxrr-app/src/lib/shared/pcd/portable.ts: Portable entity contracts for import/export/clone.
+- /packages/praxrr-app/src/lib/shared/pcd/display.ts: Shared display row types used in UI/server contracts.
+- /packages/praxrr-app/src/routes/arr/[id]/sync/+page.server.ts: Existing sync settings load/actions integration point.
+- /packages/praxrr-app/src/routes/delay-profiles/[databaseId]/new/+page.server.ts: Route action validation + error mapping pattern.
+- /packages/praxrr-app/src/routes/api/v1/pcd/export/+server.ts: Existing PCD API route structure reference.
+- /packages/praxrr-app/src/routes/api/v1/pcd/import/+server.ts: Existing PCD API route structure reference.
 
 ## Relevant Tables
 
@@ -44,15 +44,15 @@ Lidarr metadata profiles should be implemented as a new Lidarr-only PCD entity f
 
 ## Relevant Patterns
 
-**Entity WriteOperation Metadata Pattern**: All entity writes include deterministic operation metadata and stable keys for conflict handling. See [/src/lib/server/pcd/entities/delayProfiles/create.ts](/src/lib/server/pcd/entities/delayProfiles/create.ts).
+**Entity WriteOperation Metadata Pattern**: All entity writes include deterministic operation metadata and stable keys for conflict handling. See [/packages/praxrr-app/src/lib/server/pcd/entities/delayProfiles/create.ts](/packages/praxrr-app/src/lib/server/pcd/entities/delayProfiles/create.ts).
 
-**Value-Guard Update Pattern**: Updates include current-value predicates to detect drift and prevent blind overwrites. See [/src/lib/server/pcd/entities/delayProfiles/update.ts](/src/lib/server/pcd/entities/delayProfiles/update.ts).
+**Value-Guard Update Pattern**: Updates include current-value predicates to detect drift and prevent blind overwrites. See [/packages/praxrr-app/src/lib/server/pcd/entities/delayProfiles/update.ts](/packages/praxrr-app/src/lib/server/pcd/entities/delayProfiles/update.ts).
 
-**Section Handler Registry Pattern**: Sync sections implement `SectionHandler` and self-register through the registry for processor discovery. See [/src/lib/server/sync/delayProfiles/handler.ts](/src/lib/server/sync/delayProfiles/handler.ts).
+**Section Handler Registry Pattern**: Sync sections implement `SectionHandler` and self-register through the registry for processor discovery. See [/packages/praxrr-app/src/lib/server/sync/delayProfiles/handler.ts](/packages/praxrr-app/src/lib/server/sync/delayProfiles/handler.ts).
 
-**Arr Support Matrix Pattern**: Section support is explicit in `SUPPORTED_SYNC_SECTIONS` and must remain Arr-specific. See [/src/lib/server/sync/mappings.ts](/src/lib/server/sync/mappings.ts).
+**Arr Support Matrix Pattern**: Section support is explicit in `SUPPORTED_SYNC_SECTIONS` and must remain Arr-specific. See [/packages/praxrr-app/src/lib/server/sync/mappings.ts](/packages/praxrr-app/src/lib/server/sync/mappings.ts).
 
-**Capability Surface Gate Pattern**: UI/server feature access is controlled via `ArrSyncSurface` and helper predicates. See [/src/lib/shared/arr/capabilities.ts](/src/lib/shared/arr/capabilities.ts).
+**Capability Surface Gate Pattern**: UI/server feature access is controlled via `ArrSyncSurface` and helper predicates. See [/packages/praxrr-app/src/lib/shared/arr/capabilities.ts](/packages/praxrr-app/src/lib/shared/arr/capabilities.ts).
 
 ## Relevant Docs
 

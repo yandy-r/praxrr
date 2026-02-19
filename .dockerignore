@@ -20,8 +20,8 @@ dist/
 # -----------------------------------------------------------------------------
 # .NET build artifacts
 # -----------------------------------------------------------------------------
-src/services/parser/bin/
-src/services/parser/obj/
+packages/praxrr-parser/bin/
+packages/praxrr-parser/obj/
 
 # -----------------------------------------------------------------------------
 # Git (not needed in image)

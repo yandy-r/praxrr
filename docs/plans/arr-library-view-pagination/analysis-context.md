@@ -2,22 +2,22 @@
 
 ## Executive Summary
 
-The feature adds server-driven fixed pagination to `/arr/{id}/library` while preserving existing Arr-specific response semantics and UI behavior. Core work spans `src/routes/api/v1/arr/library/+server.ts` (query validation, metadata, slicing), `src/routes/arr/[id]/library/+page.svelte` (page state + controls), and both cache layers (server + client) so refresh, search, filters, and navigation remain coherent. Existing feature docs already define acceptance criteria and UX constraints; implementation should follow those artifacts directly.
+The feature adds server-driven fixed pagination to `/arr/{id}/library` while preserving existing Arr-specific response semantics and UI behavior. Core work spans `packages/praxrr-app/src/routes/api/v1/arr/library/+server.ts` (query validation, metadata, slicing), `packages/praxrr-app/src/routes/arr/[id]/library/+page.svelte` (page state + controls), and both cache layers (server + client) so refresh, search, filters, and navigation remain coherent. Existing feature docs already define acceptance criteria and UX constraints; implementation should follow those artifacts directly.
 
 ## Architecture Context
 
 - **System Structure**: Route-level Svelte page orchestrates state and renders through shared table/action components; API handler orchestrates Arr-instance lookup, Arr-client fetch, profile enrichment, and caching.
 - **Data Flow**: UI requests library data by instance; API dispatches by Arr type, enriches response, caches payload, and returns typed envelopes; UI persists search/filter/column state and renders table rows.
-- **Integration Points**: API handler pagination/query logic, client pagination/URL state, and page-aware cache keying for `src/lib/server/utils/cache/cache.ts` and `src/lib/client/stores/libraryCache.ts`.
+- **Integration Points**: API handler pagination/query logic, client pagination/URL state, and page-aware cache keying for `packages/praxrr-app/src/lib/server/utils/cache/cache.ts` and `packages/praxrr-app/src/lib/client/stores/libraryCache.ts`.
 
 ## Critical Files Reference
 
-- `/src/routes/api/v1/arr/library/+server.ts`: Add `page`/`pageSize`/query validation, slicing, and metadata.
-- `/src/routes/arr/[id]/library/+page.svelte`: Add pagination state, controls, URL sync, and API request params.
-- `/src/lib/client/stores/libraryCache.ts`: Expand keying strategy for page/query combinations.
-- `/src/lib/server/utils/cache/cache.ts`: Expand keying/invalidation strategy for paginated responses.
-- `/src/lib/server/db/queries/arrInstances.ts`: Preserve Arr instance resolution before fetch dispatch.
-- `/src/lib/server/pcd/entities/qualityProfiles/index.ts`: Preserve profile enrichment behavior across pages.
+- `/packages/praxrr-app/src/routes/api/v1/arr/library/+server.ts`: Add `page`/`pageSize`/query validation, slicing, and metadata.
+- `/packages/praxrr-app/src/routes/arr/[id]/library/+page.svelte`: Add pagination state, controls, URL sync, and API request params.
+- `/packages/praxrr-app/src/lib/client/stores/libraryCache.ts`: Expand keying strategy for page/query combinations.
+- `/packages/praxrr-app/src/lib/server/utils/cache/cache.ts`: Expand keying/invalidation strategy for paginated responses.
+- `/packages/praxrr-app/src/lib/server/db/queries/arrInstances.ts`: Preserve Arr instance resolution before fetch dispatch.
+- `/packages/praxrr-app/src/lib/server/pcd/entities/qualityProfiles/index.ts`: Preserve profile enrichment behavior across pages.
 - `/docs/api/v1/paths/arr.yaml`: Update endpoint query contract.
 - `/docs/api/v1/schemas/arr.yaml`: Update response schema with pagination metadata.
 

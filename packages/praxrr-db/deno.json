@@ -1,0 +1,5 @@
+{
+  "name": "@yandy-r/praxrr-db",
+  "exports": "./mod.ts",
+  "version": "2.0.0"
+}

@@ -2,53 +2,53 @@
 
 ## Executive Summary
 
-The current navigation is entirely hard-coded across three Svelte components (`Navbar`, `PageNav`, `BottomNav`) assembled in `src/routes/+layout.svelte` behind a simple `isAuthPage` guard. `PageNav` declares nine top-level `Group`/`GroupItem` entries inline, `BottomNav` duplicates a parallel `NavItem[]` array with its own priority system, and neither component receives any data from the server -- the root `+layout.server.ts` only returns `{ version }`. This means every IA change requires touching two independent hard-coded arrays in two different files, and there is no mechanism for permission gating, feature flags, or app-scope filtering at the navigation level. The plan below specifies a config-driven registry with concrete TypeScript interfaces, a revised layout-load contract, SSR-safe hydration patterns, and the precise file-by-file change list needed to ship the hybrid IA shell described in `research-recommendations.md`.
+The current navigation is entirely hard-coded across three Svelte components (`Navbar`, `PageNav`, `BottomNav`) assembled in `packages/praxrr-app/src/routes/+layout.svelte` behind a simple `isAuthPage` guard. `PageNav` declares nine top-level `Group`/`GroupItem` entries inline, `BottomNav` duplicates a parallel `NavItem[]` array with its own priority system, and neither component receives any data from the server -- the root `+layout.server.ts` only returns `{ version }`. This means every IA change requires touching two independent hard-coded arrays in two different files, and there is no mechanism for permission gating, feature flags, or app-scope filtering at the navigation level. The plan below specifies a config-driven registry with concrete TypeScript interfaces, a revised layout-load contract, SSR-safe hydration patterns, and the precise file-by-file change list needed to ship the hybrid IA shell described in `research-recommendations.md`.
 
 ## Relevant Files
 
 ### Navigation Components (current)
 
-- `/src/routes/+layout.svelte`: Root layout. Hides nav on auth pages. Passes `data.version` to `PageNav`. Fixed `pt-16 pb-16 md:pb-0 md:pt-0 md:pl-80` padding on `<main>`.
-- `/src/routes/+layout.server.ts`: Returns only `{ version: appInfoQueries.getVersion() }`.
-- `/src/lib/client/ui/navigation/navbar/navbar.svelte`: Top bar with hamburger toggle, brand, AccentPicker, ThemeToggle. Fixed `z-50` mobile / `z-[80]` desktop. Width `w-full` mobile / `w-80` desktop.
-- `/src/lib/client/ui/navigation/pageNav/pageNav.svelte`: Sidebar drawer. Hard-codes all groups inline using `Group` + `GroupItem`. DEV-only group gated by `import.meta.env.DEV`. Width `w-[90vw]` mobile / `w-80` desktop. `z-[70]`.
-- `/src/lib/client/ui/navigation/pageNav/group.svelte`: Expandable group container. Props: `label`, `href`, `icon`, `initialOpen`, `hasItems`. Uses `slide` transition. Renders `GroupHeader` + `<slot>` children.
-- `/src/lib/client/ui/navigation/pageNav/groupItem.svelte`: Leaf nav item. Uses Svelte 5 `$props()` and `$derived`. Supports `activePattern` (string includes or RegExp) for URL-based highlighting.
-- `/src/lib/client/ui/navigation/pageNav/groupHeader.svelte`: Group link + optional chevron toggle. Uses `$page.url.pathname` for active state. Svelte 4 style (`export let` props).
-- `/src/lib/client/ui/navigation/pageNav/version.svelte`: Platform/channel/version badge at sidebar bottom.
-- `/src/lib/client/ui/navigation/bottomNav/BottomNav.svelte`: Mobile footer bar. Declares its own `NavItem[]` (9 items) with `priority: 'always' | 'medium' | 'low'` for responsive visibility. Independent from `PageNav` data.
-- `/src/lib/client/ui/navigation/tabs/Tabs.svelte`: Secondary tab bar used by feature routes (`/arr/[id]`, `/media-management/[databaseId]`, etc.). Supports `tabs`, `backButton`, `breadcrumb`, `responsive` props. Mobile dropdown mode.
+- `/packages/praxrr-app/src/routes/+layout.svelte`: Root layout. Hides nav on auth pages. Passes `data.version` to `PageNav`. Fixed `pt-16 pb-16 md:pb-0 md:pt-0 md:pl-80` padding on `<main>`.
+- `/packages/praxrr-app/src/routes/+layout.server.ts`: Returns only `{ version: appInfoQueries.getVersion() }`.
+- `/packages/praxrr-app/src/lib/client/ui/navigation/navbar/navbar.svelte`: Top bar with hamburger toggle, brand, AccentPicker, ThemeToggle. Fixed `z-50` mobile / `z-[80]` desktop. Width `w-full` mobile / `w-80` desktop.
+- `/packages/praxrr-app/src/lib/client/ui/navigation/pageNav/pageNav.svelte`: Sidebar drawer. Hard-codes all groups inline using `Group` + `GroupItem`. DEV-only group gated by `import.meta.env.DEV`. Width `w-[90vw]` mobile / `w-80` desktop. `z-[70]`.
+- `/packages/praxrr-app/src/lib/client/ui/navigation/pageNav/group.svelte`: Expandable group container. Props: `label`, `href`, `icon`, `initialOpen`, `hasItems`. Uses `slide` transition. Renders `GroupHeader` + `<slot>` children.
+- `/packages/praxrr-app/src/lib/client/ui/navigation/pageNav/groupItem.svelte`: Leaf nav item. Uses Svelte 5 `$props()` and `$derived`. Supports `activePattern` (string includes or RegExp) for URL-based highlighting.
+- `/packages/praxrr-app/src/lib/client/ui/navigation/pageNav/groupHeader.svelte`: Group link + optional chevron toggle. Uses `$page.url.pathname` for active state. Svelte 4 style (`export let` props).
+- `/packages/praxrr-app/src/lib/client/ui/navigation/pageNav/version.svelte`: Platform/channel/version badge at sidebar bottom.
+- `/packages/praxrr-app/src/lib/client/ui/navigation/bottomNav/BottomNav.svelte`: Mobile footer bar. Declares its own `NavItem[]` (9 items) with `priority: 'always' | 'medium' | 'low'` for responsive visibility. Independent from `PageNav` data.
+- `/packages/praxrr-app/src/lib/client/ui/navigation/tabs/Tabs.svelte`: Secondary tab bar used by feature routes (`/arr/[id]`, `/media-management/[databaseId]`, etc.). Supports `tabs`, `backButton`, `breadcrumb`, `responsive` props. Mobile dropdown mode.
 
 ### Stores
 
-- `/src/lib/client/stores/mobileNav.ts`: Boolean writable (`open`/`close`/`toggle`).
-- `/src/lib/client/stores/navIcons.ts`: `NavIconStyle` ('emoji' | 'lucide'), persisted to localStorage. Guarded with `browser` import.
-- `/src/lib/client/stores/sidebar.ts`: `sidebar-collapsed` boolean, persisted to localStorage.
-- `/src/lib/client/stores/theme.ts`: Theme toggle store.
-- `/src/lib/client/stores/accent.ts`: Accent color store with CSS custom-property application.
+- `/packages/praxrr-app/src/lib/client/stores/mobileNav.ts`: Boolean writable (`open`/`close`/`toggle`).
+- `/packages/praxrr-app/src/lib/client/stores/navIcons.ts`: `NavIconStyle` ('emoji' | 'lucide'), persisted to localStorage. Guarded with `browser` import.
+- `/packages/praxrr-app/src/lib/client/stores/sidebar.ts`: `sidebar-collapsed` boolean, persisted to localStorage.
+- `/packages/praxrr-app/src/lib/client/stores/theme.ts`: Theme toggle store.
+- `/packages/praxrr-app/src/lib/client/stores/accent.ts`: Accent color store with CSS custom-property application.
 
 ### Type Foundations
 
-- `/src/lib/shared/pcd/types.ts`: Defines `ArrAppType` ('radarr' | 'sonarr' | 'lidarr'), `ArrType` (includes 'all'), `ARR_APP_TYPES`, `ARR_TYPES`, `isArrType()`.
-- `/src/lib/shared/arr/capabilities.ts`: Defines `ArrFeature`, `ArrWorkflowSurface`, `ArrSyncSurface`, `ArrCapabilities`, `ArrAppMetadata`, `ARR_APPS` registry, `supportsFeature()`, `supportsArrWorkflow()`, `supportsArrSyncSurface()`.
-- `/src/app.d.ts`: `App.Locals` has `user: User | null` and `session: Session | null`.
+- `/packages/praxrr-app/src/lib/shared/pcd/types.ts`: Defines `ArrAppType` ('radarr' | 'sonarr' | 'lidarr'), `ArrType` (includes 'all'), `ARR_APP_TYPES`, `ARR_TYPES`, `isArrType()`.
+- `/packages/praxrr-app/src/lib/shared/arr/capabilities.ts`: Defines `ArrFeature`, `ArrWorkflowSurface`, `ArrSyncSurface`, `ArrCapabilities`, `ArrAppMetadata`, `ARR_APPS` registry, `supportsFeature()`, `supportsArrWorkflow()`, `supportsArrSyncSurface()`.
+- `/packages/praxrr-app/src/app.d.ts`: `App.Locals` has `user: User | null` and `session: Session | null`.
 
 ### Startup and Auth
 
-- `/src/hooks.server.ts`: Startup sequence (config, db, migrations, PCD, jobs). Auth middleware populates `event.locals.user` and `event.locals.session`.
+- `/packages/praxrr-app/src/hooks.server.ts`: Startup sequence (config, db, migrations, PCD, jobs). Auth middleware populates `event.locals.user` and `event.locals.session`.
 
 ### Route Structure (top-level destinations)
 
-- `/src/routes/databases/` -- Databases list and detail
-- `/src/routes/arr/` -- Arr instances and per-instance tabs (sync, upgrades, rename, library, logs, settings)
-- `/src/routes/quality-profiles/` -- Quality profiles (per-database, entity-testing)
-- `/src/routes/custom-formats/` -- Custom formats (per-database)
-- `/src/routes/regular-expressions/` -- Regular expressions (per-database)
-- `/src/routes/media-management/` -- Media management (per-database, sub-sections: naming, quality-definitions, media-settings)
-- `/src/routes/delay-profiles/` -- Delay profiles (per-database)
-- `/src/routes/metadata-profiles/` -- Metadata profiles (per-database)
-- `/src/routes/settings/` -- Settings hub (general, security, notifications, jobs, logs, backups, about)
-- `/src/routes/dev/` -- Dev-only component playground (compile-time gated)
+- `/packages/praxrr-app/src/routes/databases/` -- Databases list and detail
+- `/packages/praxrr-app/src/routes/arr/` -- Arr instances and per-instance tabs (sync, upgrades, rename, library, logs, settings)
+- `/packages/praxrr-app/src/routes/quality-profiles/` -- Quality profiles (per-database, entity-testing)
+- `/packages/praxrr-app/src/routes/custom-formats/` -- Custom formats (per-database)
+- `/packages/praxrr-app/src/routes/regular-expressions/` -- Regular expressions (per-database)
+- `/packages/praxrr-app/src/routes/media-management/` -- Media management (per-database, sub-sections: naming, quality-definitions, media-settings)
+- `/packages/praxrr-app/src/routes/delay-profiles/` -- Delay profiles (per-database)
+- `/packages/praxrr-app/src/routes/metadata-profiles/` -- Metadata profiles (per-database)
+- `/packages/praxrr-app/src/routes/settings/` -- Settings hub (general, security, notifications, jobs, logs, backups, about)
+- `/packages/praxrr-app/src/routes/dev/` -- Dev-only component playground (compile-time gated)
 
 ## Architecture Design
 
@@ -71,10 +71,10 @@ The current navigation is entirely hard-coded across three Svelte components (`N
 
 ## Data Models -- TypeScript Interfaces
 
-The following interfaces define the navigation registry. These live in `src/lib/shared/navigation/types.ts` (new file) and are importable on both server and client.
+The following interfaces define the navigation registry. These live in `packages/praxrr-app/src/lib/shared/navigation/types.ts` (new file) and are importable on both server and client.
 
 ```typescript
-// src/lib/shared/navigation/types.ts
+// packages/praxrr-app/src/lib/shared/navigation/types.ts
 
 import type { ComponentType } from 'svelte';
 import type { ArrType, ArrAppType } from '$shared/pcd/types.ts';
@@ -244,7 +244,7 @@ export interface NavTelemetryEvent {
 ### Current Contract
 
 ```typescript
-// src/routes/+layout.server.ts (current)
+// packages/praxrr-app/src/routes/+layout.server.ts (current)
 export const load: LayoutServerLoad = async () => {
   return { version: appInfoQueries.getVersion() };
 };
@@ -253,7 +253,7 @@ export const load: LayoutServerLoad = async () => {
 ### Proposed Contract
 
 ```typescript
-// src/routes/+layout.server.ts (proposed)
+// packages/praxrr-app/src/routes/+layout.server.ts (proposed)
 import type { LayoutServerLoad } from './$types';
 import type { NavShell } from '$shared/navigation/types.ts';
 import { appInfoQueries } from '$db/queries/appInfo.ts';
@@ -284,7 +284,7 @@ The `resolveNavShell` function:
 ### Layout Consumption
 
 ```svelte
-<!-- src/routes/+layout.svelte (proposed shape) -->
+<!-- packages/praxrr-app/src/routes/+layout.svelte (proposed shape) -->
 <script lang="ts">
   import Navbar from '$ui/navigation/navbar/navbar.svelte';
   import PageNav from '$ui/navigation/pageNav/pageNav.svelte';
@@ -330,7 +330,7 @@ The key change: `navShell` is passed as a prop, so both `PageNav` and `BottomNav
 - **Solution**: The registry defines `iconKey: string` (e.g., `'FolderTree'`, `'Link'`, `'Sliders'`). A client-side `iconMap` resolves keys to component references. `PageNav` and `BottomNav` use this map at render time. The `emoji` field is already a string and serializes fine.
 
 ```typescript
-// src/lib/client/navigation/iconMap.ts
+// packages/praxrr-app/src/lib/client/navigation/iconMap.ts
 import { FolderTree, Link, Sliders, Palette, Microscope, Tag, Clock, Settings, Wrench } from 'lucide-svelte';
 import type { ComponentType } from 'svelte';
 
@@ -471,36 +471,36 @@ graph LR
 
 | File                                                           | Purpose                                                                                                                                                               |
 | -------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `src/lib/shared/navigation/types.ts`                           | Shared TypeScript interfaces (`NavItemDef`, `NavShell`, `NavVariant`, `NavGroupDef`, `NavChildDef`, `ResolvedNavItem`, `ResolvedNavGroup`, `NavTelemetryEvent`, etc.) |
-| `src/lib/server/navigation/registry.ts`                        | Static `NAV_REGISTRY: NavItemDef[]` constant defining all nav entries. Also exports `NAV_GROUPS: NavGroupDef[]` for group ordering/metadata.                          |
-| `src/lib/server/navigation/resolver.ts`                        | `resolveNavShell()` function: reads registry, evaluates flags/permissions, maps icons to keys, returns `NavShell`.                                                    |
-| `src/lib/client/navigation/iconMap.ts`                         | `NAV_ICON_MAP` record and `resolveIcon(key)` helper for runtime icon resolution from serialized `iconKey`.                                                            |
-| `src/lib/client/stores/navScope.ts`                            | `navScopeStore` writable store for active Arr scope. Persisted to localStorage. Follows `navIcons.ts` pattern.                                                        |
-| `src/lib/client/ui/navigation/pageNav/navScopeSelector.svelte` | Scope selector dropdown (All Apps / Radarr / Sonarr / Lidarr). Reads `navShell.arrScopeOptions`, writes to `navScopeStore`.                                           |
-| `src/routes/api/v1/navigation/events/+server.ts`               | Telemetry ingestion endpoint. Accepts `NavTelemetryEvent`, logs via server logger. Rate-limited.                                                                      |
-| `src/lib/client/navigation/telemetry.ts`                       | Client-side telemetry helper. Batches events and sends via `navigator.sendBeacon` or `fetch`.                                                                         |
+| `packages/praxrr-app/src/lib/shared/navigation/types.ts`                           | Shared TypeScript interfaces (`NavItemDef`, `NavShell`, `NavVariant`, `NavGroupDef`, `NavChildDef`, `ResolvedNavItem`, `ResolvedNavGroup`, `NavTelemetryEvent`, etc.) |
+| `packages/praxrr-app/src/lib/server/navigation/registry.ts`                        | Static `NAV_REGISTRY: NavItemDef[]` constant defining all nav entries. Also exports `NAV_GROUPS: NavGroupDef[]` for group ordering/metadata.                          |
+| `packages/praxrr-app/src/lib/server/navigation/resolver.ts`                        | `resolveNavShell()` function: reads registry, evaluates flags/permissions, maps icons to keys, returns `NavShell`.                                                    |
+| `packages/praxrr-app/src/lib/client/navigation/iconMap.ts`                         | `NAV_ICON_MAP` record and `resolveIcon(key)` helper for runtime icon resolution from serialized `iconKey`.                                                            |
+| `packages/praxrr-app/src/lib/client/stores/navScope.ts`                            | `navScopeStore` writable store for active Arr scope. Persisted to localStorage. Follows `navIcons.ts` pattern.                                                        |
+| `packages/praxrr-app/src/lib/client/ui/navigation/pageNav/navScopeSelector.svelte` | Scope selector dropdown (All Apps / Radarr / Sonarr / Lidarr). Reads `navShell.arrScopeOptions`, writes to `navScopeStore`.                                           |
+| `packages/praxrr-app/src/routes/api/v1/navigation/events/+server.ts`               | Telemetry ingestion endpoint. Accepts `NavTelemetryEvent`, logs via server logger. Rate-limited.                                                                      |
+| `packages/praxrr-app/src/lib/client/navigation/telemetry.ts`                       | Client-side telemetry helper. Batches events and sends via `navigator.sendBeacon` or `fetch`.                                                                         |
 
 ### Files to Modify
 
 | File                                                      | Change                                                                                                                                                                                                                                                                                             |
 | --------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `src/routes/+layout.server.ts`                            | Import and call `resolveNavShell({ user: locals.user, session: locals.session })`. Return `navShell` alongside `version`.                                                                                                                                                                          |
-| `src/routes/+layout.svelte`                               | Pass `data.navShell` as prop to `PageNav` and `BottomNav`. No other structural changes.                                                                                                                                                                                                            |
-| `src/lib/client/ui/navigation/pageNav/pageNav.svelte`     | Accept `navShell: NavShell` prop. Replace hard-coded `Group`/`GroupItem` markup with `{#each navShell.groups}` loop. Use `resolveIcon()` from `iconMap.ts`. Insert `NavScopeSelector`. Filter items by active scope from `navScopeStore`. Keep escape-key handler, mobile drawer, version display. |
-| `src/lib/client/ui/navigation/bottomNav/BottomNav.svelte` | Accept `navShell: NavShell` prop. Flatten groups into items array. Replace hard-coded `items` constant. Continue using `mobilePriority` for responsive classes. Use `resolveIcon()` for icon rendering.                                                                                            |
-| `src/lib/client/ui/navigation/pageNav/group.svelte`       | No changes needed. Continues to receive `label`, `href`, `icon`, `initialOpen`, `hasItems` from parent.                                                                                                                                                                                            |
-| `src/lib/client/ui/navigation/pageNav/groupItem.svelte`   | No changes needed. Continues to receive `label`, `href`, `activePattern` from parent.                                                                                                                                                                                                              |
-| `src/lib/client/ui/navigation/pageNav/groupHeader.svelte` | No changes needed.                                                                                                                                                                                                                                                                                 |
-| `src/lib/client/ui/navigation/tabs/Tabs.svelte`           | Optional: add telemetry hook on tab click. No structural changes. Tabs remain route-driven.                                                                                                                                                                                                        |
-| `src/app.d.ts`                                            | Extend `App.PageData` to include `navShell?: NavShell` for type safety in layout data.                                                                                                                                                                                                             |
-| `svelte.config.js`                                        | Add `$nav` alias: `'$nav': './src/lib/shared/navigation'` for clean imports.                                                                                                                                                                                                                       |
+| `packages/praxrr-app/src/routes/+layout.server.ts`                            | Import and call `resolveNavShell({ user: locals.user, session: locals.session })`. Return `navShell` alongside `version`.                                                                                                                                                                          |
+| `packages/praxrr-app/src/routes/+layout.svelte`                               | Pass `data.navShell` as prop to `PageNav` and `BottomNav`. No other structural changes.                                                                                                                                                                                                            |
+| `packages/praxrr-app/src/lib/client/ui/navigation/pageNav/pageNav.svelte`     | Accept `navShell: NavShell` prop. Replace hard-coded `Group`/`GroupItem` markup with `{#each navShell.groups}` loop. Use `resolveIcon()` from `iconMap.ts`. Insert `NavScopeSelector`. Filter items by active scope from `navScopeStore`. Keep escape-key handler, mobile drawer, version display. |
+| `packages/praxrr-app/src/lib/client/ui/navigation/bottomNav/BottomNav.svelte` | Accept `navShell: NavShell` prop. Flatten groups into items array. Replace hard-coded `items` constant. Continue using `mobilePriority` for responsive classes. Use `resolveIcon()` for icon rendering.                                                                                            |
+| `packages/praxrr-app/src/lib/client/ui/navigation/pageNav/group.svelte`       | No changes needed. Continues to receive `label`, `href`, `icon`, `initialOpen`, `hasItems` from parent.                                                                                                                                                                                            |
+| `packages/praxrr-app/src/lib/client/ui/navigation/pageNav/groupItem.svelte`   | No changes needed. Continues to receive `label`, `href`, `activePattern` from parent.                                                                                                                                                                                                              |
+| `packages/praxrr-app/src/lib/client/ui/navigation/pageNav/groupHeader.svelte` | No changes needed.                                                                                                                                                                                                                                                                                 |
+| `packages/praxrr-app/src/lib/client/ui/navigation/tabs/Tabs.svelte`           | Optional: add telemetry hook on tab click. No structural changes. Tabs remain route-driven.                                                                                                                                                                                                        |
+| `packages/praxrr-app/src/app.d.ts`                                            | Extend `App.PageData` to include `navShell?: NavShell` for type safety in layout data.                                                                                                                                                                                                             |
+| `svelte.config.js`                                        | Add `$nav` alias: `'$nav': './packages/praxrr-app/src/lib/shared/navigation'` for clean imports.                                                                                                                                                                                                                       |
 
 ### Files Unchanged (explicitly noted)
 
-- `src/lib/shared/arr/capabilities.ts` -- No changes. Nav registry imports from it.
-- `src/lib/shared/pcd/types.ts` -- No changes. Nav types import `ArrType` and `ArrAppType` from it.
-- `src/hooks.server.ts` -- No changes. Already populates `locals.user` which the layout loader uses.
-- All existing route files under `src/routes/*` -- No changes. Canonical paths preserved.
+- `packages/praxrr-app/src/lib/shared/arr/capabilities.ts` -- No changes. Nav registry imports from it.
+- `packages/praxrr-app/src/lib/shared/pcd/types.ts` -- No changes. Nav types import `ArrType` and `ArrAppType` from it.
+- `packages/praxrr-app/src/hooks.server.ts` -- No changes. Already populates `locals.user` which the layout loader uses.
+- All existing route files under `packages/praxrr-app/src/routes/*` -- No changes. Canonical paths preserved.
 
 ## Edge Cases and Gotchas
 

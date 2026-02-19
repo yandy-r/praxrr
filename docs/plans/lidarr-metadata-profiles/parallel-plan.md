@@ -4,28 +4,28 @@ Lidarr metadata profiles should be added as a first-class Lidarr-only entity fam
 
 ## Critically Relevant Files and Documentation
 
-- /src/lib/server/db/migrations.ts: Registers migration files that must include new metadata-profile migration.
-- /src/lib/server/db/schema.sql: App DB schema source for `arr_sync_*` config/status tables.
+- /packages/praxrr-app/src/lib/server/db/migrations.ts: Registers migration files that must include new metadata-profile migration.
+- /packages/praxrr-app/src/lib/server/db/schema.sql: App DB schema source for `arr_sync_*` config/status tables.
 - /docs/pcdReference/0.schema.sql: PCD reference schema source for generated `types.ts` contracts.
-- /src/lib/server/pcd/ops/seedBuiltInBaseOps.ts: Built-in base-op registration for newly initialized databases.
-- /src/lib/shared/pcd/types.ts: Generated PCD table interfaces and DB type map.
-- /src/lib/shared/pcd/portable.ts: Portable entity model catalog and import/export entity typing.
-- /src/lib/shared/pcd/display.ts: Shared row/view display contracts consumed by routes/UI.
-- /src/lib/server/pcd/entities/registry.ts: Auto-align entity registration with stable-key metadata.
-- /src/lib/server/pcd/entities/serialize.ts: Portable export serialization dispatch.
-- /src/lib/server/pcd/entities/deserialize.ts: Portable import deserialization dispatch.
-- /src/lib/server/pcd/entities/clone.ts: Clone behavior for portable entities.
-- /src/lib/server/pcd/entities/validate.ts: Shared validation rules for portable/entity payloads.
-- /src/lib/server/db/queries/arrSync.ts: Per-section sync config persistence and lifecycle operations.
-- /src/lib/server/sync/types.ts: Section type unions and per-instance sync result fields.
-- /src/lib/server/sync/mappings.ts: Sync section order and Arr support matrix.
-- /src/lib/server/sync/processor.ts: Trigger, pending claim, execution, and completion/failure orchestration.
-- /src/lib/server/utils/arr/types.ts: Shared Arr API contracts used by clients/syncers.
-- /src/lib/server/utils/arr/clients/lidarr.ts: Lidarr v1 client methods for metadata profile CRUD.
-- /src/lib/shared/arr/capabilities.ts: Sync surface capabilities and Arr gating predicates.
-- /src/routes/arr/[id]/sync/+page.server.ts: Instance sync configuration load/actions.
-- /src/routes/api/v1/pcd/import/+server.ts: Portable import API flow.
-- /src/routes/api/v1/pcd/export/+server.ts: Portable export API flow.
+- /packages/praxrr-app/src/lib/server/pcd/ops/seedBuiltInBaseOps.ts: Built-in base-op registration for newly initialized databases.
+- /packages/praxrr-app/src/lib/shared/pcd/types.ts: Generated PCD table interfaces and DB type map.
+- /packages/praxrr-app/src/lib/shared/pcd/portable.ts: Portable entity model catalog and import/export entity typing.
+- /packages/praxrr-app/src/lib/shared/pcd/display.ts: Shared row/view display contracts consumed by routes/UI.
+- /packages/praxrr-app/src/lib/server/pcd/entities/registry.ts: Auto-align entity registration with stable-key metadata.
+- /packages/praxrr-app/src/lib/server/pcd/entities/serialize.ts: Portable export serialization dispatch.
+- /packages/praxrr-app/src/lib/server/pcd/entities/deserialize.ts: Portable import deserialization dispatch.
+- /packages/praxrr-app/src/lib/server/pcd/entities/clone.ts: Clone behavior for portable entities.
+- /packages/praxrr-app/src/lib/server/pcd/entities/validate.ts: Shared validation rules for portable/entity payloads.
+- /packages/praxrr-app/src/lib/server/db/queries/arrSync.ts: Per-section sync config persistence and lifecycle operations.
+- /packages/praxrr-app/src/lib/server/sync/types.ts: Section type unions and per-instance sync result fields.
+- /packages/praxrr-app/src/lib/server/sync/mappings.ts: Sync section order and Arr support matrix.
+- /packages/praxrr-app/src/lib/server/sync/processor.ts: Trigger, pending claim, execution, and completion/failure orchestration.
+- /packages/praxrr-app/src/lib/server/utils/arr/types.ts: Shared Arr API contracts used by clients/syncers.
+- /packages/praxrr-app/src/lib/server/utils/arr/clients/lidarr.ts: Lidarr v1 client methods for metadata profile CRUD.
+- /packages/praxrr-app/src/lib/shared/arr/capabilities.ts: Sync surface capabilities and Arr gating predicates.
+- /packages/praxrr-app/src/routes/arr/[id]/sync/+page.server.ts: Instance sync configuration load/actions.
+- /packages/praxrr-app/src/routes/api/v1/pcd/import/+server.ts: Portable import API flow.
+- /packages/praxrr-app/src/routes/api/v1/pcd/export/+server.ts: Portable export API flow.
 - /docs/plans/lidarr-metadata-profiles/feature-spec.md: Scope, acceptance criteria, and file targets.
 - /docs/plans/lidarr-metadata-profiles/shared.md: Consolidated architectural context and required patterns.
 
@@ -37,24 +37,24 @@ Lidarr metadata profiles should be added as a first-class Lidarr-only entity fam
 
 **READ THESE BEFORE TASK**
 
-- /src/lib/server/db/schema.sql
+- /packages/praxrr-app/src/lib/server/db/schema.sql
 - /docs/pcdReference/0.schema.sql
-- /src/lib/server/db/migrations.ts
-- /src/lib/server/pcd/ops/seedBuiltInBaseOps.ts
+- /packages/praxrr-app/src/lib/server/db/migrations.ts
+- /packages/praxrr-app/src/lib/server/pcd/ops/seedBuiltInBaseOps.ts
 - /docs/plans/lidarr-metadata-profiles/feature-spec.md
 
 **Instructions**
 
 Files to Create
 
-- /src/lib/server/db/migrations/YYYYMMDD_add_lidarr_metadata_profiles.ts
+- /packages/praxrr-app/src/lib/server/db/migrations/YYYYMMDD_add_lidarr_metadata_profiles.ts
 
 Files to Modify
 
-- /src/lib/server/db/schema.sql
+- /packages/praxrr-app/src/lib/server/db/schema.sql
 - /docs/pcdReference/0.schema.sql
-- /src/lib/server/db/migrations.ts
-- /src/lib/server/pcd/ops/seedBuiltInBaseOps.ts
+- /packages/praxrr-app/src/lib/server/db/migrations.ts
+- /packages/praxrr-app/src/lib/server/pcd/ops/seedBuiltInBaseOps.ts
 
 - Create the migration that adds `arr_sync_metadata_profiles_config` with trigger/schedule/status fields mirroring existing section tables.
 - Include built-in schema/base-op SQL for `lidarr_metadata_profiles` and its three child tables, then register that base op in seed logic.
@@ -65,11 +65,11 @@ Files to Modify
 
 **READ THESE BEFORE TASK**
 
-- /src/lib/shared/pcd/types.ts
-- /src/lib/shared/pcd/portable.ts
-- /src/lib/shared/pcd/display.ts
-- /src/lib/shared/arr/capabilities.ts
-- /src/lib/server/utils/arr/types.ts
+- /packages/praxrr-app/src/lib/shared/pcd/types.ts
+- /packages/praxrr-app/src/lib/shared/pcd/portable.ts
+- /packages/praxrr-app/src/lib/shared/pcd/display.ts
+- /packages/praxrr-app/src/lib/shared/arr/capabilities.ts
+- /packages/praxrr-app/src/lib/server/utils/arr/types.ts
 
 **Instructions**
 
@@ -79,11 +79,11 @@ Files to Create
 
 Files to Modify
 
-- /src/lib/shared/pcd/types.ts
-- /src/lib/shared/pcd/portable.ts
-- /src/lib/shared/pcd/display.ts
-- /src/lib/shared/arr/capabilities.ts
-- /src/lib/server/utils/arr/types.ts
+- /packages/praxrr-app/src/lib/shared/pcd/types.ts
+- /packages/praxrr-app/src/lib/shared/pcd/portable.ts
+- /packages/praxrr-app/src/lib/shared/pcd/display.ts
+- /packages/praxrr-app/src/lib/shared/arr/capabilities.ts
+- /packages/praxrr-app/src/lib/server/utils/arr/types.ts
 
 - Add strict types for metadata profile parent/child tables and register them in `PCDDatabase`.
 - Define `PortableLidarrMetadataProfile` and include it in portable entity unions/catalogs.
@@ -95,10 +95,10 @@ Files to Modify
 
 **READ THESE BEFORE TASK**
 
-- /src/lib/server/db/queries/arrSync.ts
-- /src/lib/server/db/schema.sql
-- /src/lib/server/sync/delayProfiles/handler.ts
-- /src/tests/jobs/arrSyncLidarrConfigPropagation.test.ts
+- /packages/praxrr-app/src/lib/server/db/queries/arrSync.ts
+- /packages/praxrr-app/src/lib/server/db/schema.sql
+- /packages/praxrr-app/src/lib/server/sync/delayProfiles/handler.ts
+- /packages/praxrr-app/src/tests/jobs/arrSyncLidarrConfigPropagation.test.ts
 
 **Instructions**
 
@@ -108,8 +108,8 @@ Files to Create
 
 Files to Modify
 
-- /src/lib/server/db/queries/arrSync.ts
-- /src/tests/jobs/arrSyncLidarrConfigPropagation.test.ts
+- /packages/praxrr-app/src/lib/server/db/queries/arrSync.ts
+- /packages/praxrr-app/src/tests/jobs/arrSyncLidarrConfigPropagation.test.ts
 
 - Add metadata-profile query helpers for config read/write, pending/scheduled lookups, status transitions, and claim/complete/fail lifecycle.
 - Extend aggregate helpers (`getPendingSyncs`, `getScheduledConfigs`, `getSyncConfigStatus`, trigger selectors) to include metadata profiles.
@@ -124,26 +124,26 @@ Files to Modify
 
 **READ THESE BEFORE TASK**
 
-- /src/lib/server/pcd/entities/delayProfiles/create.ts
-- /src/lib/server/pcd/entities/delayProfiles/update.ts
-- /src/lib/server/pcd/entities/registry.ts
-- /src/lib/server/pcd/ops/writer.ts
-- /src/lib/server/pcd/database/cache.ts
+- /packages/praxrr-app/src/lib/server/pcd/entities/delayProfiles/create.ts
+- /packages/praxrr-app/src/lib/server/pcd/entities/delayProfiles/update.ts
+- /packages/praxrr-app/src/lib/server/pcd/entities/registry.ts
+- /packages/praxrr-app/src/lib/server/pcd/ops/writer.ts
+- /packages/praxrr-app/src/lib/server/pcd/database/cache.ts
 
 **Instructions**
 
 Files to Create
 
-- /src/lib/server/pcd/entities/metadataProfiles/create.ts
-- /src/lib/server/pcd/entities/metadataProfiles/read.ts
-- /src/lib/server/pcd/entities/metadataProfiles/update.ts
-- /src/lib/server/pcd/entities/metadataProfiles/delete.ts
-- /src/lib/server/pcd/entities/metadataProfiles/index.ts
+- /packages/praxrr-app/src/lib/server/pcd/entities/metadataProfiles/create.ts
+- /packages/praxrr-app/src/lib/server/pcd/entities/metadataProfiles/read.ts
+- /packages/praxrr-app/src/lib/server/pcd/entities/metadataProfiles/update.ts
+- /packages/praxrr-app/src/lib/server/pcd/entities/metadataProfiles/delete.ts
+- /packages/praxrr-app/src/lib/server/pcd/entities/metadataProfiles/index.ts
 
 Files to Modify
 
-- /src/lib/server/pcd/entities/registry.ts
-- /src/lib/server/pcd/database/cache.ts
+- /packages/praxrr-app/src/lib/server/pcd/entities/registry.ts
+- /packages/praxrr-app/src/lib/server/pcd/database/cache.ts
 
 - Build metadata profile CRUD with stable-key write metadata, value-guard updates, and strict duplicate-name/reserved-name validation.
 - Implement read/list utilities returning parent plus child toggles for primary/secondary/release status dimensions.
@@ -154,12 +154,12 @@ Files to Modify
 
 **READ THESE BEFORE TASK**
 
-- /src/lib/server/pcd/entities/serialize.ts
-- /src/lib/server/pcd/entities/deserialize.ts
-- /src/lib/server/pcd/entities/clone.ts
-- /src/lib/server/pcd/entities/validate.ts
-- /src/routes/api/v1/pcd/import/+server.ts
-- /src/routes/api/v1/pcd/export/+server.ts
+- /packages/praxrr-app/src/lib/server/pcd/entities/serialize.ts
+- /packages/praxrr-app/src/lib/server/pcd/entities/deserialize.ts
+- /packages/praxrr-app/src/lib/server/pcd/entities/clone.ts
+- /packages/praxrr-app/src/lib/server/pcd/entities/validate.ts
+- /packages/praxrr-app/src/routes/api/v1/pcd/import/+server.ts
+- /packages/praxrr-app/src/routes/api/v1/pcd/export/+server.ts
 
 **Instructions**
 
@@ -169,12 +169,12 @@ Files to Create
 
 Files to Modify
 
-- /src/lib/server/pcd/entities/serialize.ts
-- /src/lib/server/pcd/entities/deserialize.ts
-- /src/lib/server/pcd/entities/clone.ts
-- /src/lib/server/pcd/entities/validate.ts
-- /src/routes/api/v1/pcd/import/+server.ts
-- /src/routes/api/v1/pcd/export/+server.ts
+- /packages/praxrr-app/src/lib/server/pcd/entities/serialize.ts
+- /packages/praxrr-app/src/lib/server/pcd/entities/deserialize.ts
+- /packages/praxrr-app/src/lib/server/pcd/entities/clone.ts
+- /packages/praxrr-app/src/lib/server/pcd/entities/validate.ts
+- /packages/praxrr-app/src/routes/api/v1/pcd/import/+server.ts
+- /packages/praxrr-app/src/routes/api/v1/pcd/export/+server.ts
 
 - Add metadata profile portable import/export paths using the new shared portable type.
 - Ensure clone behavior duplicates all child toggle rows and maintains deterministic naming conventions.
@@ -185,8 +185,8 @@ Files to Modify
 
 **READ THESE BEFORE TASK**
 
-- /src/lib/server/utils/arr/clients/lidarr.ts
-- /src/lib/server/utils/arr/types.ts
+- /packages/praxrr-app/src/lib/server/utils/arr/clients/lidarr.ts
+- /packages/praxrr-app/src/lib/server/utils/arr/types.ts
 - /docs/plans/lidarr-metadata-profiles/research-external.md
 
 **Instructions**
@@ -197,8 +197,8 @@ Files to Create
 
 Files to Modify
 
-- /src/lib/server/utils/arr/clients/lidarr.ts
-- /src/lib/server/utils/arr/types.ts
+- /packages/praxrr-app/src/lib/server/utils/arr/clients/lidarr.ts
+- /packages/praxrr-app/src/lib/server/utils/arr/types.ts
 
 - Add typed methods for list/get/schema/create/update/delete metadata profiles using /api/v1/metadataprofile endpoints.
 - Keep method signatures and payload contracts explicit and Lidarr-scoped only.
@@ -208,26 +208,26 @@ Files to Modify
 
 **READ THESE BEFORE TASK**
 
-- /src/lib/server/sync/types.ts
-- /src/lib/server/sync/mappings.ts
-- /src/lib/server/sync/processor.ts
-- /src/lib/server/sync/qualityProfiles/handler.ts
-- /src/lib/server/sync/qualityProfiles/syncer.ts
-- /src/lib/server/sync/delayProfiles/handler.ts
+- /packages/praxrr-app/src/lib/server/sync/types.ts
+- /packages/praxrr-app/src/lib/server/sync/mappings.ts
+- /packages/praxrr-app/src/lib/server/sync/processor.ts
+- /packages/praxrr-app/src/lib/server/sync/qualityProfiles/handler.ts
+- /packages/praxrr-app/src/lib/server/sync/qualityProfiles/syncer.ts
+- /packages/praxrr-app/src/lib/server/sync/delayProfiles/handler.ts
 
 **Instructions**
 
 Files to Create
 
-- /src/lib/server/sync/metadataProfiles/handler.ts
-- /src/lib/server/sync/metadataProfiles/syncer.ts
-- /src/lib/server/sync/metadataProfiles/index.ts
+- /packages/praxrr-app/src/lib/server/sync/metadataProfiles/handler.ts
+- /packages/praxrr-app/src/lib/server/sync/metadataProfiles/syncer.ts
+- /packages/praxrr-app/src/lib/server/sync/metadataProfiles/index.ts
 
 Files to Modify
 
-- /src/lib/server/sync/types.ts
-- /src/lib/server/sync/mappings.ts
-- /src/lib/server/sync/processor.ts
+- /packages/praxrr-app/src/lib/server/sync/types.ts
+- /packages/praxrr-app/src/lib/server/sync/mappings.ts
+- /packages/praxrr-app/src/lib/server/sync/processor.ts
 
 - Add `metadataProfiles` to section unions/result types and register its handler.
 - Extend support matrix/order so metadata profiles are available only for Lidarr instances.
@@ -238,17 +238,17 @@ Files to Modify
 
 **READ THESE BEFORE TASK**
 
-- /src/routes/api/v1/pcd/export/+server.ts
-- /src/routes/api/v1/pcd/import/+server.ts
-- /src/routes/delay-profiles/[databaseId]/new/+page.server.ts
-- /src/lib/server/pcd/entities/metadataProfiles/index.ts
+- /packages/praxrr-app/src/routes/api/v1/pcd/export/+server.ts
+- /packages/praxrr-app/src/routes/api/v1/pcd/import/+server.ts
+- /packages/praxrr-app/src/routes/delay-profiles/[databaseId]/new/+page.server.ts
+- /packages/praxrr-app/src/lib/server/pcd/entities/metadataProfiles/index.ts
 
 **Instructions**
 
 Files to Create
 
-- /src/routes/api/v1/pcd/[databaseId]/lidarr-metadata-profiles/+server.ts
-- /src/routes/api/v1/pcd/[databaseId]/lidarr-metadata-profiles/[id]/+server.ts
+- /packages/praxrr-app/src/routes/api/v1/pcd/[databaseId]/lidarr-metadata-profiles/+server.ts
+- /packages/praxrr-app/src/routes/api/v1/pcd/[databaseId]/lidarr-metadata-profiles/[id]/+server.ts
 
 Files to Modify
 
@@ -264,9 +264,9 @@ Files to Modify
 
 **READ THESE BEFORE TASK**
 
-- /src/routes/arr/[id]/sync/+page.server.ts
-- /src/lib/server/db/queries/arrSync.ts
-- /src/lib/shared/arr/capabilities.ts
+- /packages/praxrr-app/src/routes/arr/[id]/sync/+page.server.ts
+- /packages/praxrr-app/src/lib/server/db/queries/arrSync.ts
+- /packages/praxrr-app/src/lib/shared/arr/capabilities.ts
 
 **Instructions**
 
@@ -276,8 +276,8 @@ Files to Create
 
 Files to Modify
 
-- /src/routes/arr/[id]/sync/+page.server.ts
-- /src/routes/arr/[id]/sync/+page.svelte
+- /packages/praxrr-app/src/routes/arr/[id]/sync/+page.server.ts
+- /packages/praxrr-app/src/routes/arr/[id]/sync/+page.svelte
 
 - Load metadata profile options per database for Lidarr instances.
 - Add save/sync actions for metadata profile config and manual trigger enqueueing.
@@ -289,27 +289,27 @@ Files to Modify
 
 **READ THESE BEFORE TASK**
 
-- /src/routes/delay-profiles/[databaseId]/+page.server.ts
-- /src/routes/delay-profiles/[databaseId]/+page.svelte
-- /src/routes/quality-profiles/[databaseId]/+page.svelte
-- /src/lib/client/ui/card/StickyCard.svelte
+- /packages/praxrr-app/src/routes/delay-profiles/[databaseId]/+page.server.ts
+- /packages/praxrr-app/src/routes/delay-profiles/[databaseId]/+page.svelte
+- /packages/praxrr-app/src/routes/quality-profiles/[databaseId]/+page.svelte
+- /packages/praxrr-app/src/lib/client/ui/card/StickyCard.svelte
 
 **Instructions**
 
 Files to Create
 
-- /src/routes/metadata-profiles/+page.server.ts
-- /src/routes/metadata-profiles/+page.svelte
-- /src/routes/metadata-profiles/[databaseId]/+page.server.ts
-- /src/routes/metadata-profiles/[databaseId]/+page.svelte
-- /src/routes/metadata-profiles/[databaseId]/new/+page.server.ts
-- /src/routes/metadata-profiles/[databaseId]/new/+page.svelte
-- /src/routes/metadata-profiles/[databaseId]/[name]/+page.server.ts
-- /src/routes/metadata-profiles/[databaseId]/[name]/+page.svelte
+- /packages/praxrr-app/src/routes/metadata-profiles/+page.server.ts
+- /packages/praxrr-app/src/routes/metadata-profiles/+page.svelte
+- /packages/praxrr-app/src/routes/metadata-profiles/[databaseId]/+page.server.ts
+- /packages/praxrr-app/src/routes/metadata-profiles/[databaseId]/+page.svelte
+- /packages/praxrr-app/src/routes/metadata-profiles/[databaseId]/new/+page.server.ts
+- /packages/praxrr-app/src/routes/metadata-profiles/[databaseId]/new/+page.svelte
+- /packages/praxrr-app/src/routes/metadata-profiles/[databaseId]/[name]/+page.server.ts
+- /packages/praxrr-app/src/routes/metadata-profiles/[databaseId]/[name]/+page.svelte
 
 Files to Modify
 
-- /src/routes/+layout.svelte
+- /packages/praxrr-app/src/routes/+layout.svelte
 
 - Implement list/create/edit flows with grouped toggles for primary/secondary/release statuses.
 - Reuse existing card/form patterns and dirty-state/error alert behavior from current entity pages.
@@ -320,22 +320,22 @@ Files to Modify
 
 **READ THESE BEFORE TASK**
 
-- /src/tests/arr/lidarrQualityDefinitionsEntityOperations.test.ts
-- /src/tests/jobs/lidarrSync.test.ts
-- /src/tests/jobs/arrSyncLidarrConfigPropagation.test.ts
-- /src/tests/upgrades/lidarrCapabilityGates.test.ts
+- /packages/praxrr-app/src/tests/arr/lidarrQualityDefinitionsEntityOperations.test.ts
+- /packages/praxrr-app/src/tests/jobs/lidarrSync.test.ts
+- /packages/praxrr-app/src/tests/jobs/arrSyncLidarrConfigPropagation.test.ts
+- /packages/praxrr-app/src/tests/upgrades/lidarrCapabilityGates.test.ts
 
 **Instructions**
 
 Files to Create
 
-- /src/tests/arr/lidarrMetadataProfilesEntityOperations.test.ts
-- /src/tests/jobs/lidarrMetadataProfilesSync.test.ts
+- /packages/praxrr-app/src/tests/arr/lidarrMetadataProfilesEntityOperations.test.ts
+- /packages/praxrr-app/src/tests/jobs/lidarrMetadataProfilesSync.test.ts
 
 Files to Modify
 
-- /src/tests/jobs/lidarrSync.test.ts
-- /src/tests/upgrades/lidarrCapabilityGates.test.ts
+- /packages/praxrr-app/src/tests/jobs/lidarrSync.test.ts
+- /packages/praxrr-app/src/tests/upgrades/lidarrCapabilityGates.test.ts
 
 - Add entity operation tests for create/read/update/delete behavior and reserved-name/selection validation rules.
 - Add sync section tests for supported-section gating, pending lifecycle behavior, and successful/failed sync reporting.
@@ -386,7 +386,7 @@ Files to Modify
 
 - Run targeted type/test checks for changed areas and capture pass/fail details.
 - Validate sync section support matrix, route contracts, and portable import/export behavior.
-- Run explicit suites at minimum: `deno task check`, targeted arr tests (`src/tests/arr/lidarrMetadataProfilesEntityOperations.test.ts`), targeted sync tests (`src/tests/jobs/lidarrMetadataProfilesSync.test.ts`), and capability gate tests (`src/tests/upgrades/lidarrCapabilityGates.test.ts`).
+- Run explicit suites at minimum: `deno task check`, targeted arr tests (`packages/praxrr-app/src/tests/arr/lidarrMetadataProfilesEntityOperations.test.ts`), targeted sync tests (`packages/praxrr-app/src/tests/jobs/lidarrMetadataProfilesSync.test.ts`), and capability gate tests (`packages/praxrr-app/src/tests/upgrades/lidarrCapabilityGates.test.ts`).
 - Record unresolved risks/gaps and finalize readiness notes in the workflow tracking section.
 - Mark plan tasks complete only after evidence-backed verification is captured.
 
@@ -394,13 +394,13 @@ Files to Modify
 
 - [x] `deno task check` run captured:
   - `deno task check` completed successfully.
-  - Svelte diagnostics: 0 errors and 2 warnings in `src/routes/metadata-profiles/[databaseId]/+page.svelte` (accessibility warnings).
+  - Svelte diagnostics: 0 errors and 2 warnings in `packages/praxrr-app/src/routes/metadata-profiles/[databaseId]/+page.svelte` (accessibility warnings).
 - [x] Targeted arr entity operations test suite run captured:
-  - `deno test -A --no-check src/tests/arr/lidarrMetadataProfilesEntityOperations.test.ts` (pass, `14 passed`).
+  - `deno test -A --no-check packages/praxrr-app/src/tests/arr/lidarrMetadataProfilesEntityOperations.test.ts` (pass, `14 passed`).
 - [x] Targeted metadata-profile sync suite run captured:
-  - `deno test -A --no-check src/tests/jobs/lidarrMetadataProfilesSync.test.ts` (pass, `3 passed`).
+  - `deno test -A --no-check packages/praxrr-app/src/tests/jobs/lidarrMetadataProfilesSync.test.ts` (pass, `3 passed`).
 - [x] Capability gate suite run captured:
-  - `deno test -A --no-check src/tests/upgrades/lidarrCapabilityGates.test.ts` (pass, `14 passed`).
+  - `deno test -A --no-check packages/praxrr-app/src/tests/upgrades/lidarrCapabilityGates.test.ts` (pass, `14 passed`).
 - [x] Route contracts, sync support matrix, and portable import/export validation capture:
   - Entity suite covers API route payload validation and error paths for metadata profile list/create/update/delete endpoints.
   - Entity suite also covers portable import/export assertions for lidarr metadata profiles.

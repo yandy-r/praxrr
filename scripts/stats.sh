@@ -22,39 +22,39 @@ SCC_ARGS=(
 )
 
 MODULES=(
-  "server/pcd|src/lib/server/pcd"
-  "server/sync|src/lib/server/sync"
-  "server/db|src/lib/server/db"
-  "server/jobs|src/lib/server/jobs"
-  "server/notifications|src/lib/server/notifications"
-  "server/upgrades|src/lib/server/upgrades"
-  "server/rename|src/lib/server/rename"
-  "server/utils|src/lib/server/utils"
-  "client/ui|src/lib/client/ui"
-  "client/alerts|src/lib/client/alerts"
-  "client/stores|src/lib/client/stores"
-  "client/utils|src/lib/client/utils"
-  "shared/pcd|src/lib/shared/pcd"
-  "shared/utils|src/lib/shared/utils"
-  "shared/notifications|src/lib/shared/notifications"
-  "shared/upgrades|src/lib/shared/upgrades"
-  "routes/custom-formats|src/routes/custom-formats"
-  "routes/quality-profiles|src/routes/quality-profiles"
-  "routes/regular-expressions|src/routes/regular-expressions"
-  "routes/delay-profiles|src/routes/delay-profiles"
-  "routes/media-management|src/routes/media-management"
-  "routes/databases|src/routes/databases"
-  "routes/arr|src/routes/arr"
-  "routes/settings|src/routes/settings"
-  "routes/auth|src/routes/auth"
-  "routes/api-v1|src/routes/api/v1"
-  "services/parser|src/services/parser"
-  "tests/base|src/tests/base"
-  "tests/jobs|src/tests/jobs"
-  "tests/logger|src/tests/logger"
-  "tests/upgrades|src/tests/upgrades"
-  "app-shell|src/app.css,src/app.d.ts,src/app.html,src/hooks.server.ts"
-  "schema-reference|src/lib/server/db/schema.sql,docs/pcdReference/0.schema.sql"
+  "server/pcd|packages/praxrr-app/src/lib/server/pcd"
+  "server/sync|packages/praxrr-app/src/lib/server/sync"
+  "server/db|packages/praxrr-app/src/lib/server/db"
+  "server/jobs|packages/praxrr-app/src/lib/server/jobs"
+  "server/notifications|packages/praxrr-app/src/lib/server/notifications"
+  "server/upgrades|packages/praxrr-app/src/lib/server/upgrades"
+  "server/rename|packages/praxrr-app/src/lib/server/rename"
+  "server/utils|packages/praxrr-app/src/lib/server/utils"
+  "client/ui|packages/praxrr-app/src/lib/client/ui"
+  "client/alerts|packages/praxrr-app/src/lib/client/alerts"
+  "client/stores|packages/praxrr-app/src/lib/client/stores"
+  "client/utils|packages/praxrr-app/src/lib/client/utils"
+  "shared/pcd|packages/praxrr-app/src/lib/shared/pcd"
+  "shared/utils|packages/praxrr-app/src/lib/shared/utils"
+  "shared/notifications|packages/praxrr-app/src/lib/shared/notifications"
+  "shared/upgrades|packages/praxrr-app/src/lib/shared/upgrades"
+  "routes/custom-formats|packages/praxrr-app/src/routes/custom-formats"
+  "routes/quality-profiles|packages/praxrr-app/src/routes/quality-profiles"
+  "routes/regular-expressions|packages/praxrr-app/src/routes/regular-expressions"
+  "routes/delay-profiles|packages/praxrr-app/src/routes/delay-profiles"
+  "routes/media-management|packages/praxrr-app/src/routes/media-management"
+  "routes/databases|packages/praxrr-app/src/routes/databases"
+  "routes/arr|packages/praxrr-app/src/routes/arr"
+  "routes/settings|packages/praxrr-app/src/routes/settings"
+  "routes/auth|packages/praxrr-app/src/routes/auth"
+  "routes/api-v1|packages/praxrr-app/src/routes/api/v1"
+  "services/parser|packages/praxrr-parser"
+  "tests/base|packages/praxrr-app/src/tests/base"
+  "tests/jobs|packages/praxrr-app/src/tests/jobs"
+  "tests/logger|packages/praxrr-app/src/tests/logger"
+  "tests/upgrades|packages/praxrr-app/src/tests/upgrades"
+  "app-shell|packages/praxrr-app/src/app.css,packages/praxrr-app/src/app.d.ts,packages/praxrr-app/src/app.html,packages/praxrr-app/src/hooks.server.ts"
+  "schema-reference|packages/praxrr-app/src/lib/server/db/schema.sql,docs/pcdReference/0.schema.sql"
 )
 
 # Parse JSON safely, returning "0,0,0,0,0,0" on failure
@@ -108,7 +108,7 @@ echo "==========================================================================
 printf "%-20s %8s %10s %10s %8s\n" "Language" "Files" "Code" "Lines" "% Code"
 printf "%-20s %8s %10s %10s %8s\n" "--------" "-----" "----" "-----" "------"
 
-# Collect language data from the whole src/ tree (not per-module)
+# Collect language data from the app package source tree (not per-module)
 lang_total_code=0
 declare -A lang_files lang_code lang_lines
 
@@ -117,7 +117,7 @@ while IFS=$'\t' read -r name files code lines; do
   lang_code["$name"]=$code
   lang_lines["$name"]=$lines
   lang_total_code=$((lang_total_code + code))
-done < <(scc_languages "${ROOT}/src")
+done < <(scc_languages "${ROOT}/packages/praxrr-app/src")
 
 # Also include docs schema reference
 while IFS=$'\t' read -r name files code lines; do

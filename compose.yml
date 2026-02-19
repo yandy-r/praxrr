@@ -16,6 +16,14 @@ services:
       # - HOST=0.0.0.0
       - PARSER_HOST=parser
       - PARSER_PORT=5000
+      # - AUTH=off
+      - PRAXRR_DEFAULT_DB_URL=https://github.com/${PRAXRR_DEFAULT_DB_GIT_USERNAME}/praxrr-db
+      - PRAXRR_DEFAULT_DB_BRANCH=dev
+      - PRAXRR_DEFAULT_DB_NAME=Praxrr-db
+      - PRAXRR_DEFAULT_DB_TOKEN=${PRAXRR_DEFAULT_DB_TOKEN}
+      - PRAXRR_DEFAULT_DB_GIT_USERNAME=${PRAXRR_DEFAULT_DB_GIT_USERNAME}
+      - PRAXRR_DEFAULT_DB_GIT_EMAIL=${PRAXRR_DEFAULT_DB_GIT_EMAIL}
+      - PRAXRR_SCHEMA_REF=v2
     depends_on:
       parser:
         condition: service_healthy

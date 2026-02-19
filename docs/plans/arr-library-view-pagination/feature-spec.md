@@ -219,9 +219,9 @@ Arr Library UI (/arr/{id}/library)
 
 #### Files to Modify
 
-- `src/routes/api/v1/arr/library/+server.ts`: pagination query parsing, response envelope, page-aware caching.
-- `src/routes/arr/[id]/library/+page.svelte`: URL-backed page state, controls, page fetch lifecycle.
-- `src/lib/client/stores/libraryCache.ts`: keying strategy to include page/query state.
+- `packages/praxrr-app/src/routes/api/v1/arr/library/+server.ts`: pagination query parsing, response envelope, page-aware caching.
+- `packages/praxrr-app/src/routes/arr/[id]/library/+page.svelte`: URL-backed page state, controls, page fetch lifecycle.
+- `packages/praxrr-app/src/lib/client/stores/libraryCache.ts`: keying strategy to include page/query state.
 - `docs/api/v1/schemas/arr.yaml`: paginated response schema updates.
 - `docs/api/v1/paths/arr.yaml`: query parameter and response contract updates.
 

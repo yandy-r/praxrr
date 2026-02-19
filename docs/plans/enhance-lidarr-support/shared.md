@@ -4,19 +4,19 @@ Media-management in this codebase flows from SvelteKit route handlers into PCD e
 
 ## Relevant Files
 
-- /src/lib/server/pcd/index.ts: Cache manager and write orchestration entrypoint.
-- /src/lib/server/pcd/entities/mediaManagement/naming/read.ts: Naming reads and arr-type shaping.
-- /src/lib/server/pcd/entities/mediaManagement/media-settings/create.ts: Media settings write path pattern.
-- /src/lib/server/pcd/entities/mediaManagement/quality-definitions/read.ts: Quality mapping-aware reads.
-- /src/lib/server/sync/mediaManagement/syncer.ts: Arr sync resolution and apply pipeline.
-- /src/lib/server/db/queries/arrSync.ts: Sync config storage and rename propagation.
-- /src/routes/media-management/[databaseId]/media-settings/new/+page.server.ts: Route action validation and dispatch.
-- /src/routes/api/v1/pcd/import/+server.ts: Import validation and deserialization entrypoint.
-- /src/routes/api/v1/pcd/export/+server.ts: Export serialization and response contract.
-- /src/lib/shared/pcd/portable.ts: Portable entity types and Lidarr matrix rules.
-- /src/lib/shared/arr/capabilities.ts: Feature gating and arr-type capability definitions.
+- /packages/praxrr-app/src/lib/server/pcd/index.ts: Cache manager and write orchestration entrypoint.
+- /packages/praxrr-app/src/lib/server/pcd/entities/mediaManagement/naming/read.ts: Naming reads and arr-type shaping.
+- /packages/praxrr-app/src/lib/server/pcd/entities/mediaManagement/media-settings/create.ts: Media settings write path pattern.
+- /packages/praxrr-app/src/lib/server/pcd/entities/mediaManagement/quality-definitions/read.ts: Quality mapping-aware reads.
+- /packages/praxrr-app/src/lib/server/sync/mediaManagement/syncer.ts: Arr sync resolution and apply pipeline.
+- /packages/praxrr-app/src/lib/server/db/queries/arrSync.ts: Sync config storage and rename propagation.
+- /packages/praxrr-app/src/routes/media-management/[databaseId]/media-settings/new/+page.server.ts: Route action validation and dispatch.
+- /packages/praxrr-app/src/routes/api/v1/pcd/import/+server.ts: Import validation and deserialization entrypoint.
+- /packages/praxrr-app/src/routes/api/v1/pcd/export/+server.ts: Export serialization and response contract.
+- /packages/praxrr-app/src/lib/shared/pcd/portable.ts: Portable entity types and Lidarr matrix rules.
+- /packages/praxrr-app/src/lib/shared/arr/capabilities.ts: Feature gating and arr-type capability definitions.
 - /docs/pcdReference/0.schema.sql: PCD schema reference for media-management entities.
-- /src/lib/server/db/schema.sql: Runtime DB schema for instances and sync config.
+- /packages/praxrr-app/src/lib/server/db/schema.sql: Runtime DB schema for instances and sync config.
 
 ## Relevant Tables
 
@@ -33,13 +33,13 @@ Media-management in this codebase flows from SvelteKit route handlers into PCD e
 
 ## Relevant Patterns
 
-**Thin Route + Entity Helper**: Route handlers validate/dispatch while entity modules own persistence logic. Example: [`src/routes/media-management/[databaseId]/media-settings/new/+page.server.ts`](src/routes/media-management/[databaseId]/media-settings/new/+page.server.ts).
+**Thin Route + Entity Helper**: Route handlers validate/dispatch while entity modules own persistence logic. Example: [`packages/praxrr-app/src/routes/media-management/[databaseId]/media-settings/new/+page.server.ts`](packages/praxrr-app/src/routes/media-management/[databaseId]/media-settings/new/+page.server.ts).
 
-**Entity Family Module Split**: Each media-management family uses `read/create/update/delete` module separation. Example: [`src/lib/server/pcd/entities/mediaManagement/media-settings/create.ts`](src/lib/server/pcd/entities/mediaManagement/media-settings/create.ts).
+**Entity Family Module Split**: Each media-management family uses `read/create/update/delete` module separation. Example: [`packages/praxrr-app/src/lib/server/pcd/entities/mediaManagement/media-settings/create.ts`](packages/praxrr-app/src/lib/server/pcd/entities/mediaManagement/media-settings/create.ts).
 
-**Deterministic Write Metadata**: Mutations flow through operation-layer-aware `writeOperation` metadata for traceability. Example: [`src/lib/server/pcd/index.ts`](src/lib/server/pcd/index.ts).
+**Deterministic Write Metadata**: Mutations flow through operation-layer-aware `writeOperation` metadata for traceability. Example: [`packages/praxrr-app/src/lib/server/pcd/index.ts`](packages/praxrr-app/src/lib/server/pcd/index.ts).
 
-**Sync Resolver Mapping**: Sync logic resolves config source by arr type and applies mapped updates. Example: [`src/lib/server/sync/mediaManagement/syncer.ts`](src/lib/server/sync/mediaManagement/syncer.ts).
+**Sync Resolver Mapping**: Sync logic resolves config source by arr type and applies mapped updates. Example: [`packages/praxrr-app/src/lib/server/sync/mediaManagement/syncer.ts`](packages/praxrr-app/src/lib/server/sync/mediaManagement/syncer.ts).
 
 ## Relevant Docs
 

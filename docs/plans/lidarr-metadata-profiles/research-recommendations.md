@@ -15,7 +15,7 @@ Lidarr metadata profiles are a Lidarr-exclusive concept (not present in Radarr o
 - `DELETE /api/v1/metadataprofile/{id}` - delete a metadata profile
 - `GET /api/v1/metadataprofile/schema` - get the metadata profile schema (with all type/status options)
 
-Note: Lidarr uses API v1, not v3 like Radarr/Sonarr (see `/src/lib/server/utils/arr/clients/lidarr.ts` line 18).
+Note: Lidarr uses API v1, not v3 like Radarr/Sonarr (see `/packages/praxrr-app/src/lib/server/utils/arr/clients/lidarr.ts` line 18).
 
 ### Data Shape (from Lidarr API)
 
@@ -76,21 +76,21 @@ Model the implementation after the quality profile entity pattern, which is the 
 
 1. **Phase 1 - PCD Foundation** (schema, types, ops, cache)
    - Add PCD schema tables for metadata profiles via built-in base ops (migration pattern from `20260215_add_lidarr_media_management_entities.ts`)
-   - Add Kysely table interfaces to `src/lib/shared/pcd/types.ts`
-   - Register entity in `src/lib/server/pcd/entities/registry.ts` AUTO_ALIGN_ENTITIES
+   - Add Kysely table interfaces to `packages/praxrr-app/src/lib/shared/pcd/types.ts`
+   - Register entity in `packages/praxrr-app/src/lib/server/pcd/entities/registry.ts` AUTO_ALIGN_ENTITIES
    - Add serialization/deserialization support
-   - Add portable types to `src/lib/shared/pcd/portable.ts`
+   - Add portable types to `packages/praxrr-app/src/lib/shared/pcd/portable.ts`
 
 2. **Phase 2 - API Layer** (CRUD endpoints, entity operations)
-   - Create PCD entity directory at `src/lib/server/pcd/entities/metadataProfiles/`
+   - Create PCD entity directory at `packages/praxrr-app/src/lib/server/pcd/entities/metadataProfiles/`
    - Implement `create.ts`, `list.ts`, `delete.ts`, `index.ts` following quality profile pattern
-   - Add API routes under `src/routes/api/v1/pcd/[databaseId]/lidarr-metadata-profiles/`
+   - Add API routes under `packages/praxrr-app/src/routes/api/v1/pcd/[databaseId]/lidarr-metadata-profiles/`
    - Update OpenAPI spec with new endpoints
 
 3. **Phase 3 - Sync Pipeline** (Lidarr sync integration)
-   - Add `LidarrMetadataProfile` types to `src/lib/server/utils/arr/types.ts`
+   - Add `LidarrMetadataProfile` types to `packages/praxrr-app/src/lib/server/utils/arr/types.ts`
    - Add metadata profile methods to `LidarrClient` (not BaseArrClient)
-   - Create `src/lib/server/sync/metadataProfiles/` directory with handler, syncer, transformer
+   - Create `packages/praxrr-app/src/lib/server/sync/metadataProfiles/` directory with handler, syncer, transformer
    - Register new `SectionType = 'metadataProfiles'` in sync types and registry
    - Add `arr_sync_metadata_profiles` and `arr_sync_metadata_profiles_config` tables via migration
    - Add trigger wiring in `processor.ts`
@@ -99,13 +99,13 @@ Model the implementation after the quality profile entity pattern, which is the 
    - Add `/metadata-profiles` route with list page
    - Add `[databaseId]/[name]` detail/edit page
    - Add metadata profile selection to Lidarr instance sync settings
-   - Add display types to `src/lib/shared/pcd/display.ts`
+   - Add display types to `packages/praxrr-app/src/lib/shared/pcd/display.ts`
 
 ### Quick Wins
 
 - **Lidarr client methods**: Adding `getMetadataProfiles()` / `getMetadataProfile(id)` / `createMetadataProfile()` / `updateMetadataProfile()` / `deleteMetadataProfile()` to `LidarrClient` is low-risk and immediately useful for manual testing.
-- **Type definitions**: Adding `LidarrMetadataProfile` and related types to `src/lib/server/utils/arr/types.ts` establishes the contract with zero runtime risk.
-- **Capability surface**: Adding `'metadata_profiles'` to `ArrSyncSurface` and `LIDARR_CAPABILITIES` in `src/lib/shared/arr/capabilities.ts` is a small, low-risk change that enables gated feature access.
+- **Type definitions**: Adding `LidarrMetadataProfile` and related types to `packages/praxrr-app/src/lib/server/utils/arr/types.ts` establishes the contract with zero runtime risk.
+- **Capability surface**: Adding `'metadata_profiles'` to `ArrSyncSurface` and `LIDARR_CAPABILITIES` in `packages/praxrr-app/src/lib/shared/arr/capabilities.ts` is a small, low-risk change that enables gated feature access.
 
 ## Improvement Ideas
 
@@ -229,14 +229,14 @@ Per Arr Cutover Guardrails:
   - Create `lidarr_metadata_profile_primary_types` child table (FK to parent by name)
   - Create `lidarr_metadata_profile_secondary_types` child table
   - Create `lidarr_metadata_profile_release_statuses` child table
-  - Add Kysely table interfaces to `src/lib/shared/pcd/types.ts` (auto-generated, but need manual additions to `PCDDatabase` interface)
-  - Register entity in `AUTO_ALIGN_ENTITIES` in `src/lib/server/pcd/entities/registry.ts`
+  - Add Kysely table interfaces to `packages/praxrr-app/src/lib/shared/pcd/types.ts` (auto-generated, but need manual additions to `PCDDatabase` interface)
+  - Register entity in `AUTO_ALIGN_ENTITIES` in `packages/praxrr-app/src/lib/server/pcd/entities/registry.ts`
 
 - **Types and Contracts** (can be parallelized):
-  - Add `LidarrMetadataProfile` API type to `src/lib/server/utils/arr/types.ts`
-  - Add portable type `PortableLidarrMetadataProfile` to `src/lib/shared/pcd/portable.ts`
-  - Add display types to `src/lib/shared/pcd/display.ts`
-  - Add `'metadata_profiles'` to `ArrSyncSurface` in `src/lib/shared/arr/capabilities.ts`
+  - Add `LidarrMetadataProfile` API type to `packages/praxrr-app/src/lib/server/utils/arr/types.ts`
+  - Add portable type `PortableLidarrMetadataProfile` to `packages/praxrr-app/src/lib/shared/pcd/portable.ts`
+  - Add display types to `packages/praxrr-app/src/lib/shared/pcd/display.ts`
+  - Add `'metadata_profiles'` to `ArrSyncSurface` in `packages/praxrr-app/src/lib/shared/arr/capabilities.ts`
 
 - **Base Ops and Migration**:
   - Create built-in base ops migration for schema tables (following `20260215_add_lidarr_media_management_entities.ts` pattern)
@@ -247,18 +247,18 @@ Per Arr Cutover Guardrails:
 
 **Focus**: Entity operations, API routes, and sync pipeline.
 
-- **PCD Entity Operations** (`src/lib/server/pcd/entities/metadataProfiles/`):
+- **PCD Entity Operations** (`packages/praxrr-app/src/lib/server/pcd/entities/metadataProfiles/`):
   - `index.ts` - query functions (getByName, list)
   - `create.ts` - create operation with ops writer
   - `delete.ts` - delete operation with ops writer
   - Update `serialize.ts` and `deserialize.ts` for metadata profiles
   - Update `clone.ts` for metadata profiles
 
-- **API Routes** (`src/routes/api/v1/pcd/[databaseId]/lidarr-metadata-profiles/`):
+- **API Routes** (`packages/praxrr-app/src/routes/api/v1/pcd/[databaseId]/lidarr-metadata-profiles/`):
   - `+server.ts` - GET (list) and POST (create)
   - `[name]/+server.ts` - GET (detail), PUT (update), DELETE
 
-- **Lidarr Client Methods** (`src/lib/server/utils/arr/clients/lidarr.ts`):
+- **Lidarr Client Methods** (`packages/praxrr-app/src/lib/server/utils/arr/clients/lidarr.ts`):
   - `getMetadataProfiles()`
   - `getMetadataProfile(id)`
   - `getMetadataProfileSchema()`
@@ -266,15 +266,15 @@ Per Arr Cutover Guardrails:
   - `updateMetadataProfile(id, profile)`
   - `deleteMetadataProfile(id)`
 
-- **Sync Pipeline** (`src/lib/server/sync/metadataProfiles/`):
+- **Sync Pipeline** (`packages/praxrr-app/src/lib/server/sync/metadataProfiles/`):
   - `transformer.ts` - Transform PCD metadata profile to Lidarr API payload
   - `syncer.ts` - `MetadataProfileSyncer` extending `BaseSyncer`
   - `handler.ts` - `SectionHandler` implementation + register on import
   - `index.ts` - module exports
-  - Update `src/lib/server/sync/types.ts` - add `'metadataProfiles'` to `SectionType`, add `metadataProfiles?: SyncResult` to `InstanceSyncResult`
-  - Update `src/lib/server/sync/mappings.ts` - add `'metadataProfiles'` to `SYNC_SECTION_ORDER` and `SUPPORTED_SYNC_SECTIONS` (lidarr only)
-  - Update `src/lib/server/sync/processor.ts` - import handler, add trigger wiring, update totalSynced calculation
-  - Update `src/lib/server/db/queries/arrSync.ts` - add metadata profile sync queries
+  - Update `packages/praxrr-app/src/lib/server/sync/types.ts` - add `'metadataProfiles'` to `SectionType`, add `metadataProfiles?: SyncResult` to `InstanceSyncResult`
+  - Update `packages/praxrr-app/src/lib/server/sync/mappings.ts` - add `'metadataProfiles'` to `SYNC_SECTION_ORDER` and `SUPPORTED_SYNC_SECTIONS` (lidarr only)
+  - Update `packages/praxrr-app/src/lib/server/sync/processor.ts` - import handler, add trigger wiring, update totalSynced calculation
+  - Update `packages/praxrr-app/src/lib/server/db/queries/arrSync.ts` - add metadata profile sync queries
 
 ### Phase 3: UI and Integration (~10-15 tasks)
 
@@ -332,33 +332,33 @@ Per Arr Cutover Guardrails:
 
 ### Closest Pattern to Follow (Quality Profiles)
 
-- `/src/lib/server/pcd/entities/qualityProfiles/create.ts`: Entity creation with ops writer
-- `/src/lib/server/pcd/entities/qualityProfiles/list.ts`: Entity listing with arr-type filtering
-- `/src/lib/server/pcd/entities/qualityProfiles/delete.ts`: Entity deletion with ops writer
-- `/src/lib/server/sync/qualityProfiles/syncer.ts`: Quality profile sync implementation
-- `/src/lib/server/sync/qualityProfiles/handler.ts`: Section handler registration pattern
-- `/src/lib/server/sync/qualityProfiles/transformer.ts`: PCD -> Arr API transformation
+- `/packages/praxrr-app/src/lib/server/pcd/entities/qualityProfiles/create.ts`: Entity creation with ops writer
+- `/packages/praxrr-app/src/lib/server/pcd/entities/qualityProfiles/list.ts`: Entity listing with arr-type filtering
+- `/packages/praxrr-app/src/lib/server/pcd/entities/qualityProfiles/delete.ts`: Entity deletion with ops writer
+- `/packages/praxrr-app/src/lib/server/sync/qualityProfiles/syncer.ts`: Quality profile sync implementation
+- `/packages/praxrr-app/src/lib/server/sync/qualityProfiles/handler.ts`: Section handler registration pattern
+- `/packages/praxrr-app/src/lib/server/sync/qualityProfiles/transformer.ts`: PCD -> Arr API transformation
 
 ### Key Infrastructure Files to Modify
 
-- `/src/lib/shared/pcd/types.ts`: Add Kysely table interfaces for metadata profile tables + update `PCDDatabase` interface
-- `/src/lib/shared/arr/capabilities.ts`: Add `'metadata_profiles'` to sync surfaces and `LIDARR_CAPABILITIES`
-- `/src/lib/server/utils/arr/types.ts`: Add `LidarrMetadataProfile` API types
-- `/src/lib/server/utils/arr/clients/lidarr.ts`: Add metadata profile client methods
-- `/src/lib/server/pcd/entities/registry.ts`: Register metadata profile entity for auto-align
-- `/src/lib/server/pcd/entities/serialize.ts`: Add metadata profile serialization
-- `/src/lib/server/pcd/entities/deserialize.ts`: Add metadata profile deserialization
-- `/src/lib/server/sync/types.ts`: Add `'metadataProfiles'` to `SectionType` union and `InstanceSyncResult`
-- `/src/lib/server/sync/mappings.ts`: Update `SYNC_SECTION_ORDER`, `SUPPORTED_SYNC_SECTIONS`
-- `/src/lib/server/sync/processor.ts`: Import handler, add trigger wiring
-- `/src/lib/server/db/queries/arrSync.ts`: Add metadata profile sync queries
-- `/src/lib/server/pcd/ops/seedBuiltInBaseOps.ts`: Register built-in base ops for metadata profile schema
+- `/packages/praxrr-app/src/lib/shared/pcd/types.ts`: Add Kysely table interfaces for metadata profile tables + update `PCDDatabase` interface
+- `/packages/praxrr-app/src/lib/shared/arr/capabilities.ts`: Add `'metadata_profiles'` to sync surfaces and `LIDARR_CAPABILITIES`
+- `/packages/praxrr-app/src/lib/server/utils/arr/types.ts`: Add `LidarrMetadataProfile` API types
+- `/packages/praxrr-app/src/lib/server/utils/arr/clients/lidarr.ts`: Add metadata profile client methods
+- `/packages/praxrr-app/src/lib/server/pcd/entities/registry.ts`: Register metadata profile entity for auto-align
+- `/packages/praxrr-app/src/lib/server/pcd/entities/serialize.ts`: Add metadata profile serialization
+- `/packages/praxrr-app/src/lib/server/pcd/entities/deserialize.ts`: Add metadata profile deserialization
+- `/packages/praxrr-app/src/lib/server/sync/types.ts`: Add `'metadataProfiles'` to `SectionType` union and `InstanceSyncResult`
+- `/packages/praxrr-app/src/lib/server/sync/mappings.ts`: Update `SYNC_SECTION_ORDER`, `SUPPORTED_SYNC_SECTIONS`
+- `/packages/praxrr-app/src/lib/server/sync/processor.ts`: Import handler, add trigger wiring
+- `/packages/praxrr-app/src/lib/server/db/queries/arrSync.ts`: Add metadata profile sync queries
+- `/packages/praxrr-app/src/lib/server/pcd/ops/seedBuiltInBaseOps.ts`: Register built-in base ops for metadata profile schema
 
 ### Migration Pattern References
 
-- `/src/lib/server/db/migrations/20260215_add_lidarr_media_management_entities.ts`: Pattern for adding Lidarr-specific PCD schema tables via base-op seeded migration
-- `/src/lib/server/db/migrations/015_create_arr_sync_tables.ts`: Pattern for app DB sync tables
-- `/src/lib/server/pcd/ops/seedBuiltInBaseOps.ts`: Pattern for registering built-in base ops for newly initialized databases
+- `/packages/praxrr-app/src/lib/server/db/migrations/20260215_add_lidarr_media_management_entities.ts`: Pattern for adding Lidarr-specific PCD schema tables via base-op seeded migration
+- `/packages/praxrr-app/src/lib/server/db/migrations/015_create_arr_sync_tables.ts`: Pattern for app DB sync tables
+- `/packages/praxrr-app/src/lib/server/pcd/ops/seedBuiltInBaseOps.ts`: Pattern for registering built-in base ops for newly initialized databases
 
 ## Other Docs
 

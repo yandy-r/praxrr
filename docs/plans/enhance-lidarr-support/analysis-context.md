@@ -6,22 +6,22 @@ The feature replaces Sonarr-backed Lidarr media-management reuse with first-clas
 
 ## Architecture Context
 
-- **System Structure**: Thin route handlers under `src/routes/media-management/[databaseId]/**` dispatch to PCD media-management entity modules.
+- **System Structure**: Thin route handlers under `packages/praxrr-app/src/routes/media-management/[databaseId]/**` dispatch to PCD media-management entity modules.
 - **Data Flow**: UI/API actions validate inputs, run entity operations through `writeOperation`, update sync configs, then syncer applies settings to Arr clients.
 - **Integration Points**: schema + entity operations + portable contracts + sync resolver + route wiring + migration tests/docs.
 
 ## Critical Files Reference
 
 - `/docs/pcdReference/0.schema.sql`: media-management table reference and required `lidarr_*` additions.
-- `/src/lib/server/db/schema.sql`: runtime DB schema alignment.
-- `/src/lib/server/pcd/entities/mediaManagement/naming/read.ts`: current naming read behavior.
-- `/src/lib/server/pcd/entities/mediaManagement/media-settings/create.ts`: write path pattern.
-- `/src/lib/server/pcd/entities/mediaManagement/quality-definitions/read.ts`: quality-mapping dependent reads.
-- `/src/lib/server/sync/mediaManagement/syncer.ts`: sync source resolution and apply behavior.
-- `/src/lib/server/db/queries/arrSync.ts`: sync config persistence and rename propagation.
-- `/src/lib/shared/pcd/portable.ts`: portable entity types and validation matrix.
-- `/src/routes/api/v1/pcd/import/+server.ts`: import validation/deserialize entry.
-- `/src/routes/api/v1/pcd/export/+server.ts`: export serialize entry.
+- `/packages/praxrr-app/src/lib/server/db/schema.sql`: runtime DB schema alignment.
+- `/packages/praxrr-app/src/lib/server/pcd/entities/mediaManagement/naming/read.ts`: current naming read behavior.
+- `/packages/praxrr-app/src/lib/server/pcd/entities/mediaManagement/media-settings/create.ts`: write path pattern.
+- `/packages/praxrr-app/src/lib/server/pcd/entities/mediaManagement/quality-definitions/read.ts`: quality-mapping dependent reads.
+- `/packages/praxrr-app/src/lib/server/sync/mediaManagement/syncer.ts`: sync source resolution and apply behavior.
+- `/packages/praxrr-app/src/lib/server/db/queries/arrSync.ts`: sync config persistence and rename propagation.
+- `/packages/praxrr-app/src/lib/shared/pcd/portable.ts`: portable entity types and validation matrix.
+- `/packages/praxrr-app/src/routes/api/v1/pcd/import/+server.ts`: import validation/deserialize entry.
+- `/packages/praxrr-app/src/routes/api/v1/pcd/export/+server.ts`: export serialize entry.
 
 ## Patterns to Follow
 

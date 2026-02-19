@@ -4,14 +4,14 @@
 
 ### Existing Related Endpoints
 
-- `src/routes/media-management/[databaseId]/naming/+page.server.ts`: naming list page loader.
-- `src/routes/media-management/[databaseId]/naming/new/+page.server.ts`: naming create action.
-- `src/routes/media-management/[databaseId]/media-settings/+page.server.ts`: media settings list loader.
-- `src/routes/media-management/[databaseId]/media-settings/new/+page.server.ts`: media settings create action.
-- `src/routes/media-management/[databaseId]/quality-definitions/+page.server.ts`: quality definitions list loader.
-- `src/routes/media-management/[databaseId]/quality-definitions/new/+page.server.ts`: quality definitions create action.
-- `src/routes/api/v1/pcd/import/+server.ts`: portable import.
-- `src/routes/api/v1/pcd/export/+server.ts`: portable export.
+- `packages/praxrr-app/src/routes/media-management/[databaseId]/naming/+page.server.ts`: naming list page loader.
+- `packages/praxrr-app/src/routes/media-management/[databaseId]/naming/new/+page.server.ts`: naming create action.
+- `packages/praxrr-app/src/routes/media-management/[databaseId]/media-settings/+page.server.ts`: media settings list loader.
+- `packages/praxrr-app/src/routes/media-management/[databaseId]/media-settings/new/+page.server.ts`: media settings create action.
+- `packages/praxrr-app/src/routes/media-management/[databaseId]/quality-definitions/+page.server.ts`: quality definitions list loader.
+- `packages/praxrr-app/src/routes/media-management/[databaseId]/quality-definitions/new/+page.server.ts`: quality definitions create action.
+- `packages/praxrr-app/src/routes/api/v1/pcd/import/+server.ts`: portable import.
+- `packages/praxrr-app/src/routes/api/v1/pcd/export/+server.ts`: portable export.
 
 ### Route Organization
 
@@ -35,17 +35,17 @@ Current schema and behavior indicate Lidarr media-management reuse of Sonarr-bac
 
 ## External Services
 
-- `src/lib/server/utils/arr/base.ts`: common Arr API client operations.
-- `src/lib/server/utils/arr/clients/lidarr.ts`: Lidarr-specific client behavior.
-- `src/lib/server/utils/arr/factory.ts`: instance-type-driven client selection.
+- `packages/praxrr-app/src/lib/server/utils/arr/base.ts`: common Arr API client operations.
+- `packages/praxrr-app/src/lib/server/utils/arr/clients/lidarr.ts`: Lidarr-specific client behavior.
+- `packages/praxrr-app/src/lib/server/utils/arr/factory.ts`: instance-type-driven client selection.
 
 ## Internal Services
 
-- `src/lib/server/pcd/index.ts`: cache manager and write operation execution.
-- `src/lib/server/pcd/entities/mediaManagement/*`: CRUD/read/list/get logic.
-- `src/lib/server/sync/mediaManagement/syncer.ts`: sync resolution and apply pipeline.
-- `src/lib/server/db/queries/arrSync.ts`: sync config CRUD + rename propagation.
-- `src/lib/shared/pcd/portable.ts`: portable entity type matrix and metadata.
+- `packages/praxrr-app/src/lib/server/pcd/index.ts`: cache manager and write operation execution.
+- `packages/praxrr-app/src/lib/server/pcd/entities/mediaManagement/*`: CRUD/read/list/get logic.
+- `packages/praxrr-app/src/lib/server/sync/mediaManagement/syncer.ts`: sync resolution and apply pipeline.
+- `packages/praxrr-app/src/lib/server/db/queries/arrSync.ts`: sync config CRUD + rename propagation.
+- `packages/praxrr-app/src/lib/shared/pcd/portable.ts`: portable entity type matrix and metadata.
 
 ## Configuration
 

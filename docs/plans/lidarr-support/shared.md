@@ -1,60 +1,90 @@
-> [!WARNING]
-> Superseded on 2026-02-15 by the first-class Lidarr initiative plan in `docs/plans/enhance-lidarr-support/parallel-plan.md` (tracked by GitHub issue #130 and umbrella #13).
->
-> This document captures the legacy Sonarr-reuse rollout model and is retained for historical context only. Do not use it for current implementation planning.
-
 # Lidarr Support
 
-Lidarr support for media-management is partially wired: the shared arr types and sync stack already recognize `lidarr`, but the UI CRUD routes and entity readers/writers for naming, media settings, and quality definitions still branch only on `radarr` and `sonarr`. The media-management route tree under `/src/routes/media-management/[databaseId]/...` drives listing and form actions, while actual data access lives in `/src/lib/server/pcd/entities/mediaManagement/...` against PCD cache tables. Sync behavior in `/src/lib/server/sync/mediaManagement/syncer.ts` already applies Lidarr by reusing Sonarr-backed entities with capability gating, which creates a mismatch between sync capability and UI/config creation capability. Finalizing this feature means extending route/action validation, table/query selection, and portable entity handling so Lidarr presets can be viewed, created, edited, exported, and imported consistently.
+Lidarr support in this repository is a SQL-first extension of existing Praxrr database publication
+patterns: add `lidarr` as an arr type, then seed compatible rows with idempotent ops. The core
+integration boundary is unchanged: `praxrr-db` publishes arr-scoped data and `yandy-r/praxrr`
+consumes it to drive Arr API interactions, so rollout safety depends on consumer readiness before
+data publication. Existing Radarr/Sonarr conventions (ordered ops files, `arr_type` discriminators,
+guarded inserts/updates) are the primary implementation model for v1. Schema choices for
+Lidarr-specific entities remain constrained by the external dependency declared in `pcd.json`, so
+shared-table extension is the preferred initial path unless schema validation requires dedicated
+`lidarr_*` structures.
 
 ## Relevant Files
 
-- /src/routes/media-management/[databaseId]/naming/+page.server.ts: Naming list loader; currently reads only Radarr/Sonarr-backed entries.
-- /src/routes/media-management/[databaseId]/quality-definitions/+page.server.ts: Quality definitions list loader; omits Lidarr rows.
-- /src/routes/media-management/[databaseId]/media-settings/+page.server.ts: Media settings list loader; same arr-type limitation.
-- /src/routes/media-management/[databaseId]/naming/new/+page.server.ts: Create action validates only `radarr`/`sonarr` arr types.
-- /src/routes/media-management/[databaseId]/quality-definitions/new/+page.server.ts: New quality definition action excludes Lidarr creation.
-- /src/routes/media-management/[databaseId]/media-settings/new/+page.server.ts: New media settings action excludes Lidarr creation.
-- /src/lib/server/pcd/entities/mediaManagement/naming/read.ts: Naming readers combine Radarr/Sonarr tables into list output.
-- /src/lib/server/pcd/entities/mediaManagement/media-settings/read.ts: Media settings readers currently branch by Radarr/Sonarr.
-- /src/lib/server/pcd/entities/mediaManagement/quality-definitions/read.ts: Quality definition list/read path missing Lidarr handling.
-- /src/lib/server/pcd/entities/mediaManagement/naming/create.ts: Naming write path has no Lidarr create branch.
-- /src/lib/server/pcd/entities/mediaManagement/media-settings/create.ts: Media settings write path has no Lidarr branch.
-- /src/lib/server/pcd/entities/mediaManagement/quality-definitions/create.ts: Quality definition writes are limited to Radarr/Sonarr.
-- /src/lib/server/sync/mediaManagement/syncer.ts: Lidarr sync reuse/capability-gating behavior to align with UI.
-- /src/lib/server/db/queries/arrSync.ts: Sync config persistence impacted by config-name/arr-type updates.
-- /src/lib/shared/pcd/types.ts: Arr type unions and PCD table typing context.
-- /src/lib/shared/arr/capabilities.ts: Arr app capability metadata including Lidarr support signals.
+- /pcd.json: Source of supported `arr_types` and `praxrr.minimum_version` release gate.
+- /README.md: Public support-surface documentation to update when Lidarr support is published.
+- /docs/plans/lidarr-support/feature-spec.md: Canonical scope, constraints, architecture, and
+  decision points.
+- /docs/plans/lidarr-support/research-technical.md: Technical model and file-level impact guidance
+  for Lidarr rollout.
+- /docs/plans/lidarr-support/research-business.md: Business rules and acceptance criteria for
+  compatibility-first delivery.
+- /docs/plans/lidarr-support/research-external.md: External API and integration contract references
+  for Lidarr.
+- /docs/plans/lidarr-support/research-recommendations.md: Phased rollout and risk-mitigation
+  strategy.
+- /docs/plans/lidarr-support/research-ux.md: Workflow and error-recovery expectations that shape
+  release readiness.
+- /ops/0.rosettarr.sql: Baseline seeded entities and app-specific table families referenced by
+  technical research.
+- /ops/24.1080p-balanced-score-refactor-add-hdtv-fallbacks.sql: Concrete idempotent insert pattern
+  with `arr_type` guards.
+- /ops/30.fix-720p-web-dl-scoring.sql: Mixed update/insert pattern over
+  `quality_profile_custom_formats` by arr type.
+- /ops/34.add-remux-negation-to-release-group-missing.sql: `custom_format_conditions` insert pattern
+  using explicit arr typing.
 
 ## Relevant Tables
 
-- radarr_naming: Existing naming presets used by current naming UI/actions.
-- sonarr_naming: Existing naming presets currently reused for Lidarr sync behavior.
-- radarr_media_settings: Current media settings source for Radarr configs.
-- sonarr_media_settings: Current media settings source for Sonarr and Lidarr reuse path.
-- radarr_quality_definitions: Current quality definition rows for Radarr.
-- sonarr_quality_definitions: Current quality definition rows for Sonarr and Lidarr reuse path.
-- quality_api_mappings: Quality name to API mapping by `arr_type`; missing Lidarr mappings blocks full support.
-- arr_sync_media_management: Selected config names/databases for sync per instance.
-- arr_instances: Arr instance type (`radarr`/`sonarr`/`lidarr`) and credentials.
-- database_instances: Source PCD repositories backing media-management data.
+- `quality_profile_custom_formats`: Core arr-scoped profile-to-custom-format scoring table to extend
+  with `lidarr` rows.
+- `custom_format_conditions`: Condition-level arr-scoped behavior that may need Lidarr-compatible
+  entries.
+- `custom_formats`: Base custom-format definitions referenced by profile mappings.
+- `radarr_media_settings`: Existing app-specific media settings baseline used to evaluate Lidarr
+  modeling strategy.
+- `sonarr_media_settings`: Existing app-specific media settings baseline used to evaluate Lidarr
+  modeling strategy.
+- `radarr_quality_definitions`: Existing quality-definition structure that informs Lidarr mapping
+  parity decisions.
+- `sonarr_quality_definitions`: Existing quality-definition structure that informs Lidarr mapping
+  parity decisions.
 
 ## Relevant Patterns
 
-**Arr-Type Validation in Route Actions**: Actions fail fast on unsupported `arrType` values before dispatching writes. See [/src/routes/media-management/[databaseId]/media-settings/new/+page.server.ts](/src/routes/media-management/[databaseId]/media-settings/new/+page.server.ts).
+**Idempotent Arr-Type Seeding**: Use additive SQL operations with restrictive predicates and
+`NOT EXISTS` checks so replays converge safely without duplicate rows. Example:
+[`ops/24.1080p-balanced-score-refactor-add-hdtv-fallbacks.sql`](ops/24.1080p-balanced-score-refactor-add-hdtv-fallbacks.sql).
 
-**Entity-Scoped CRUD Modules**: Each media-management surface keeps read/create/update/delete per entity folder and arr-specific branches inside operations. See [/src/lib/server/pcd/entities/mediaManagement/quality-definitions/create.ts](/src/lib/server/pcd/entities/mediaManagement/quality-definitions/create.ts).
+**Arr-Type Discriminator Expansion**: Extend existing shared-table behavior by adding new `arr_type`
+rows (instead of changing query shape), coupled with manifest metadata updates. Examples:
+[`pcd.json`](pcd.json), [`ops/30.fix-720p-web-dl-scoring.sql`](ops/30.fix-720p-web-dl-scoring.sql).
 
-**Lidarr Capability-Gated Reuse**: Lidarr sync currently reuses Sonarr entities and logs unsupported-field skips instead of separate tables. See [/src/lib/server/sync/mediaManagement/syncer.ts](/src/lib/server/sync/mediaManagement/syncer.ts).
+**Ordered Operation Evolution**: Introduce changes via next-numbered `ops/*.sql` files and keep
+operation blocks explicit and reviewable. Example:
+[`ops/34.add-remux-negation-to-release-group-missing.sql`](ops/34.add-remux-negation-to-release-group-missing.sql).
 
-**Portable Entity Type Gating**: Import/export accepts only declared entity types, so Lidarr support requires extending portable type sets. See [/docs/api/v1/schemas/pcd.yaml](/docs/api/v1/schemas/pcd.yaml).
+**Compatibility-Gated Rollout**: Gate publication of new arr-type data behind documented consumer
+compatibility and minimum-version enforcement. Examples: [`pcd.json`](pcd.json),
+[`docs/plans/lidarr-support/research-recommendations.md`](docs/plans/lidarr-support/research-recommendations.md).
 
 ## Relevant Docs
 
-**/docs/ARCHITECTURE.md**: You _must_ read this when working on media-management route/entity boundaries.
+**`docs/plans/lidarr-support/feature-spec.md`**: You _must_ read this when working on Lidarr scope,
+architecture, release-gate decisions, and success criteria.
 
-**/docs/api/v1/schemas/pcd.yaml**: You _must_ read this when working on import/export and portable Lidarr entity strategy.
+**`docs/plans/lidarr-support/research-technical.md`**: You _must_ read this when designing SQL/table
+strategy and deciding shared vs dedicated Lidarr entities.
 
-**/docs/api/v1/schemas/arr.yaml**: You _must_ read this when working on current Lidarr API payload expectations.
+**`docs/plans/lidarr-support/research-business.md`**: You _must_ read this when validating business
+rules, user stories, and compatibility acceptance criteria.
 
-**/README.md**: You _must_ read this when working on project-level Lidarr branch context and constraints.
+**`docs/plans/lidarr-support/research-external.md`**: You _must_ read this when mapping Lidarr API
+concepts to seeded database data.
+
+**`docs/plans/lidarr-support/research-recommendations.md`**: You _must_ read this when sequencing
+rollout phases and risk mitigations.
+
+**`AGENTS.md`**: You _must_ read this when authoring ops files, numbering operations, and running
+repository-standard validation commands.

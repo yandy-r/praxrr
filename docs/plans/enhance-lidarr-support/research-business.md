@@ -55,10 +55,10 @@ The core business requirement is domain correctness: Lidarr must no longer behav
 
 ## Evidence (Code + Issue)
 
-- `src/lib/server/pcd/entities/mediaManagement/naming/read.ts`
-- `src/lib/server/pcd/entities/mediaManagement/media-settings/read.ts`
-- `src/lib/server/pcd/entities/mediaManagement/quality-definitions/read.ts`
-- `src/lib/server/sync/mediaManagement/syncer.ts`
-- `src/lib/server/db/queries/arrSync.ts`
+- `packages/praxrr-app/src/lib/server/pcd/entities/mediaManagement/naming/read.ts`
+- `packages/praxrr-app/src/lib/server/pcd/entities/mediaManagement/media-settings/read.ts`
+- `packages/praxrr-app/src/lib/server/pcd/entities/mediaManagement/quality-definitions/read.ts`
+- `packages/praxrr-app/src/lib/server/sync/mediaManagement/syncer.ts`
+- `packages/praxrr-app/src/lib/server/db/queries/arrSync.ts`
 - `docs/api/v1/schemas/pcd.yaml`
 - <https://github.com/yandy-r/praxrr/issues/130>
