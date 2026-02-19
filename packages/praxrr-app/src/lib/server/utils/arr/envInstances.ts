@@ -1,6 +1,7 @@
 import { createArrClient } from '$arr/factory.ts';
 import { getDefaultDelayProfile } from '$arr/defaults.ts';
 import { config } from '$config';
+import { logger } from '$logger/logger.ts';
 import { parseOptionalAbsoluteHttpUrl } from '$utils/validation/url.ts';
 import { db } from '$db/db.ts';
 import { arrInstancesQueries } from '$db/queries/arrInstances.ts';
@@ -265,6 +266,35 @@ function defaultName(type: ArrAppType, index: number): string {
 	return index === 1 ? APP_LABELS[type] : `${APP_LABELS[type]} ${index}`;
 }
 
+type ArrInstanceEnvKeys = {
+	all: string[];
+	unsupported: string[];
+};
+
+function inspectArrInstanceEnvKeys(): ArrInstanceEnvKeys {
+	const all: string[] = [];
+	const unsupported: string[] = [];
+
+	for (const [key] of Object.entries(Deno.env.toObject())) {
+		const match = key.match(APP_INSTANCE_ENV_KEY_RE);
+		if (!match) {
+			continue;
+		}
+
+		all.push(key);
+		const [, rawType] = match;
+		const loweredType = rawType.toLowerCase();
+		if (!isSupportedArrAppTypePrefix(loweredType)) {
+			unsupported.push(key);
+		}
+	}
+
+	all.sort((left, right) => left.localeCompare(right));
+	unsupported.sort((left, right) => left.localeCompare(right));
+
+	return { all, unsupported };
+}
+
 function withSavepoint<T>(savepoint: string, fn: () => T): T {
 	db.execute(`SAVEPOINT ${savepoint}`);
 
@@ -279,6 +309,23 @@ function withSavepoint<T>(savepoint: string, fn: () => T): T {
 }
 
 export async function reconcileEnvInstances(): Promise<ReconcileEnvInstancesResult> {
+	const envKeys = inspectArrInstanceEnvKeys();
+	await logger.debug('Discovered environment instance variables', {
+		source: 'Setup',
+		meta: {
+			allEnvInstanceKeys: envKeys.all,
+			unsupportedArrAppTypeKeys: envKeys.unsupported,
+			count: envKeys.all.length,
+		},
+	});
+
+	if (envKeys.unsupported.length > 0) {
+		await logger.warn('Unsupported Arr app type detected in environment instance variables', {
+			source: 'Setup',
+			meta: { unsupportedArrAppTypeKeys: envKeys.unsupported },
+		});
+	}
+
 	const metrics: ReconcileEnvInstancesResult = {
 		created: 0,
 		updated: 0,
@@ -291,6 +338,28 @@ export async function reconcileEnvInstances(): Promise<ReconcileEnvInstancesResu
 	};
 
 	const parsed = parseArrInstanceEnvVars();
+	if (envKeys.all.length > 0 && parsed.length === 0) {
+		await logger.warn('No environment instances parsed from env variables; check required URL+API_KEY pairs', {
+			source: 'Setup',
+			meta: { envInstanceKeys: envKeys.all },
+		});
+	}
+
+	await logger.debug('Parsed environment instances for reconciliation', {
+		source: 'Setup',
+		meta: {
+			count: parsed.length,
+			instances: parsed.map((instance) => ({
+				type: instance.type,
+				index: instance.index,
+				name: instance.name,
+				url: instance.url,
+				enabled: instance.enabled,
+				tagCount: instance.tags.length,
+			})),
+		},
+	});
+
 	const seenApiKeys = new Set<string>();
 	const activeApiKeys = new Set<string>();
 
