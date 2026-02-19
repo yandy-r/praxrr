@@ -2,6 +2,9 @@ name: Publish Schema Mirror
 
 on:
   push:
+    branches:
+      - dev
+      - v2
     tags:
       - 'schema/v*'
   workflow_dispatch:
@@ -36,10 +39,12 @@ jobs:
         run: |
           set -euo pipefail
 
-          if [ "${DRY_RUN}" != "true" ]; then
-            TARGET_BRANCH="main"
-          else
+          if [ "${DRY_RUN}" = "true" ]; then
             TARGET_BRANCH="dry-run/schema/${GITHUB_RUN_ID}"
+          elif [[ "${GITHUB_REF}" == refs/heads/* ]]; then
+            TARGET_BRANCH="${GITHUB_REF#refs/heads/}"
+          else
+            TARGET_BRANCH="main"
           fi
 
           if [ -z "${MIRROR_PAT}" ]; then

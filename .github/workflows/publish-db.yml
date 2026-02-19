@@ -2,6 +2,9 @@ name: Publish DB Mirror
 
 on:
   push:
+    branches:
+      - dev
+      - v2
     tags:
       - 'db/v*'
   workflow_dispatch:
@@ -37,6 +40,9 @@ jobs:
           if [[ "${{ github.event_name }}" == "workflow_dispatch" && "${{ github.event.inputs.dry_run }}" == "true" ]]; then
             echo "dry_run=true" >> "$GITHUB_OUTPUT"
             echo "target_branch=dry-run/db/${{ github.run_id }}" >> "$GITHUB_OUTPUT"
+          elif [[ "${GITHUB_REF}" == refs/heads/* ]]; then
+            echo "dry_run=false" >> "$GITHUB_OUTPUT"
+            echo "target_branch=${GITHUB_REF#refs/heads/}" >> "$GITHUB_OUTPUT"
           else
             echo "dry_run=false" >> "$GITHUB_OUTPUT"
             echo "target_branch=main" >> "$GITHUB_OUTPUT"
