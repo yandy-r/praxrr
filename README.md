@@ -147,6 +147,7 @@ This runs the parser service and Vite dev server concurrently. See
 | `PRAXRR_DEFAULT_DB_URL`          | `https://github.com/yandy-r/praxrr-db` | Default PCD auto-link repository URL |
 | `PRAXRR_DEFAULT_DB_BRANCH`       | `v2`            | Default PCD auto-link branch            |
 | `PRAXRR_DEFAULT_DB_NAME`         | `Praxrr-DB`     | Default PCD display name                |
+| `PRAXRR_SCHEMA_REF`              | manifest value  | Override schema dependency ref (tag or branch, e.g. `v2`, `dev`, `1.0.0`) |
 
 ## Monorepo Workspace Layout
 
@@ -166,6 +167,7 @@ are consumed through workspace references and mirror publishes.
 - [ ] `PRAXRR_DEFAULT_DB_URL` defaults to `https://github.com/yandy-r/praxrr-db` when unset.
 - [ ] `PRAXRR_DEFAULT_DB_BRANCH` defaults to `v2` when unset.
 - [ ] `PRAXRR_DEFAULT_DB_NAME` defaults to `Praxrr-DB` when unset.
+- [ ] `PRAXRR_SCHEMA_REF` optionally overrides the schema dependency ref (`tag` or `branch`) at runtime.
 - [ ] `PRAXRR_DEFAULT_DB_TOKEN`, `PRAXRR_DEFAULT_DB_GIT_USERNAME`, and
   `PRAXRR_DEFAULT_DB_GIT_EMAIL` remain supported for git push/auth flows.
 - [ ] Any custom DB fork used by default-link must be Arr/PCD schema-compatible and PCD manifest-valid.
