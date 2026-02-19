@@ -83,7 +83,7 @@ jobs:
           fi
           rm -f /tmp/mirror-repo-info.json
 
-          remote_url="https://x-access-token:${MIRROR_PAT}@github.com/${MIRROR_REPO}"
+          remote_url="https://x-access-token:${MIRROR_PAT}@github.com/${MIRROR_REPO}.git"
           echo "Publishing to ${MIRROR_REPO} using explicit URL."
           echo "${remote_url}" | sed 's#://x-access-token:.*@#://x-access-token:***@#'
 
