@@ -367,6 +367,70 @@ CREATE TABLE lidarr_quality_definitions (
     FOREIGN KEY (quality_name) REFERENCES qualities(name) ON DELETE CASCADE ON UPDATE CASCADE
 );
 
+-- Lidarr naming configuration
+CREATE TABLE lidarr_naming (
+    name VARCHAR(100) NOT NULL PRIMARY KEY,
+    rename INTEGER NOT NULL DEFAULT 1,
+    standard_track_format TEXT NOT NULL,
+    artist_name TEXT NOT NULL,
+    multi_disc_track_format TEXT NOT NULL,
+    artist_folder_format TEXT NOT NULL,
+    replace_illegal_characters INTEGER NOT NULL DEFAULT 0,
+    colon_replacement_format INTEGER NOT NULL DEFAULT 4,
+    custom_colon_replacement_format TEXT,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Lidarr general media settings
+CREATE TABLE lidarr_media_settings (
+    name VARCHAR(100) NOT NULL PRIMARY KEY,
+    propers_repacks VARCHAR(50) NOT NULL DEFAULT 'doNotPrefer'
+        CHECK (propers_repacks IN ('doNotPrefer', 'preferAndUpgrade', 'doNotUpgradeAutomatically')),
+    enable_media_info INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Lidarr metadata profiles
+CREATE TABLE lidarr_metadata_profiles (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name VARCHAR(100) NOT NULL UNIQUE,
+    description TEXT,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Lidarr metadata profile primary types
+CREATE TABLE lidarr_metadata_profile_primary_types (
+    metadata_profile_name VARCHAR(100) NOT NULL,
+    type_id INTEGER NOT NULL,
+    name VARCHAR(100) NOT NULL,
+    allowed INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (metadata_profile_name, type_id),
+    FOREIGN KEY (metadata_profile_name) REFERENCES lidarr_metadata_profiles(name) ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- Lidarr metadata profile secondary types
+CREATE TABLE lidarr_metadata_profile_secondary_types (
+    metadata_profile_name VARCHAR(100) NOT NULL,
+    type_id INTEGER NOT NULL,
+    name VARCHAR(100) NOT NULL,
+    allowed INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (metadata_profile_name, type_id),
+    FOREIGN KEY (metadata_profile_name) REFERENCES lidarr_metadata_profiles(name) ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- Lidarr metadata profile release statuses
+CREATE TABLE lidarr_metadata_profile_release_statuses (
+    metadata_profile_name VARCHAR(100) NOT NULL,
+    status_id INTEGER NOT NULL,
+    name VARCHAR(100) NOT NULL,
+    allowed INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (metadata_profile_name, status_id),
+    FOREIGN KEY (metadata_profile_name) REFERENCES lidarr_metadata_profiles(name) ON DELETE CASCADE ON UPDATE CASCADE
+);
+
 -- Radarr naming configuration
 CREATE TABLE radarr_naming (
     name VARCHAR(100) NOT NULL PRIMARY KEY,

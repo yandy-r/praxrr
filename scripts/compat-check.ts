@@ -16,7 +16,7 @@ type CompatibilityError = {
 
 type FailureStage = 'schema_apply' | 'ops_layering' | 'types_drift' | 'ops_missing';
 
-const SCHEMA_SQL_PATH = 'packages/praxrr-schema/ops/0.schema.sql';
+const SCHEMA_OPS_DIR_PATH = 'packages/praxrr-schema/ops';
 const DB_OPS_DIR_PATH = 'packages/praxrr-db/ops';
 const TYPES_FILE_PATH = 'packages/praxrr-app/src/lib/shared/pcd/types.ts';
 const GENERATOR_SCRIPT_PATH = 'scripts/generate-pcd-types.ts';
@@ -59,7 +59,22 @@ async function ensureOpsFiles(opsDir: string): Promise<string[]> {
     fail('ops_missing', `No .sql files found in DB ops directory: ${opsDir}`);
   }
 
-  return sqlFiles.sort();
+  return sqlFiles.sort((a, b) => {
+    const orderA = extractOrderFromFilename(a);
+    const orderB = extractOrderFromFilename(b);
+    if (orderA !== orderB) {
+      return orderA - orderB;
+    }
+    return a.localeCompare(b);
+  });
+}
+
+function extractOrderFromFilename(filename: string): number {
+  const match = filename.match(/^(\d+)\./);
+  if (!match) {
+    return Number.POSITIVE_INFINITY;
+  }
+  return Number(match[1]);
 }
 
 async function applySqlFile(database: Database, source: string): Promise<void> {
@@ -98,7 +113,8 @@ async function runGitDiffCheck(filePath: string, cwd: string): Promise<void> {
 
 async function main(): Promise<void> {
   const repoRoot = Deno.cwd();
-  const schemaPath = path.join(repoRoot, SCHEMA_SQL_PATH);
+  const schemaDir = path.join(repoRoot, SCHEMA_OPS_DIR_PATH);
+  const schemaFiles = await ensureOpsFiles(schemaDir);
   const opsDir = path.join(repoRoot, DB_OPS_DIR_PATH);
   const generatorPath = path.join(repoRoot, GENERATOR_SCRIPT_PATH);
 
@@ -109,9 +125,11 @@ async function main(): Promise<void> {
   try {
     database = new Database(tempDbPath);
     try {
-      await applySqlFile(database, schemaPath);
+      for (const schemaFileName of schemaFiles) {
+        await applySqlFile(database, path.join(schemaDir, schemaFileName));
+      }
     } catch (error) {
-      fail('schema_apply', `Failed to apply schema SQL from ${SCHEMA_SQL_PATH}`, error);
+      fail('schema_apply', 'Failed to apply schema SQL files', error);
     }
 
     const opFiles = await ensureOpsFiles(opsDir);
