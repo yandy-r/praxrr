@@ -40,20 +40,26 @@ jobs:
 
           if [[ "${{ github.event_name }}" == "workflow_dispatch" && "${{ github.event.inputs.dry_run }}" == "true" ]]; then
             echo "dry_run=true" >> "$GITHUB_OUTPUT"
+            echo "target_ref=refs/heads/dry-run/db/${{ github.run_id }}" >> "$GITHUB_OUTPUT"
             echo "target_branch=dry-run/db/${{ github.run_id }}" >> "$GITHUB_OUTPUT"
           elif [[ "${GITHUB_REF}" == refs/heads/* ]]; then
             echo "dry_run=false" >> "$GITHUB_OUTPUT"
+            echo "target_ref=${GITHUB_REF}" >> "$GITHUB_OUTPUT"
             echo "target_branch=${GITHUB_REF#refs/heads/}" >> "$GITHUB_OUTPUT"
-          else
+          elif [[ "${GITHUB_REF}" == refs/tags/* ]]; then
             echo "dry_run=false" >> "$GITHUB_OUTPUT"
-            echo "target_branch=main" >> "$GITHUB_OUTPUT"
+            echo "target_ref=${GITHUB_REF}" >> "$GITHUB_OUTPUT"
+            echo "target_branch=" >> "$GITHUB_OUTPUT"
+          else
+            echo "Unsupported ref for publish: ${GITHUB_REF}" >&2
+            exit 1
           fi
 
       - name: Split package subtree and mirror publish
         id: mirror
         env:
           MIRROR_PAT: ${{ secrets.MIRROR_PAT }}
-          TARGET_BRANCH: ${{ steps.publish.outputs.target_branch }}
+          TARGET_REF: ${{ steps.publish.outputs.target_ref }}
           MIRROR_REPO: yandy-r/praxrr-db
         run: |
           set -euo pipefail
@@ -63,32 +69,11 @@ jobs:
             exit 1
           fi
 
-          split_sha="$(git subtree split --prefix=packages/praxrr-db)"
+          split_sha="$(git subtree split --prefix=packages/praxrr-db "${GITHUB_SHA}")"
           if [ -z "$split_sha" ]; then
             echo "Unable to split packages/praxrr-db subtree." >&2
             exit 1
           fi
-
-          api_status="$(curl -sS -w '%{http_code}' \
-            -H "Authorization: token ${MIRROR_PAT}" \
-            "https://api.github.com/repos/${MIRROR_REPO}" \
-            -o /tmp/mirror-repo-info.json)"
-          if [ "$api_status" != "200" ]; then
-            if [ "$api_status" = "401" ] || [ "$api_status" = "403" ]; then
-              echo "MIRROR_PAT is invalid, unauthorized, or SSO-restricted. HTTP ${api_status}. Update the secret and retry."
-            elif [ "$api_status" = "404" ]; then
-              echo "MIRROR_REPO was not found or token lacks visibility. HTTP ${api_status} for ${MIRROR_REPO}."
-            else
-              echo "Unable to validate ${MIRROR_REPO}. HTTP ${api_status}."
-            fi
-            exit 1
-          fi
-          if [ "$(jq -r '.permissions.push // false' /tmp/mirror-repo-info.json)" != "true" ]; then
-            echo "MIRROR_PAT does not have push permission for ${MIRROR_REPO}."
-            rm -f /tmp/mirror-repo-info.json
-            exit 1
-          fi
-          rm -f /tmp/mirror-repo-info.json
 
           remote_url="https://x-access-token:${MIRROR_PAT}@github.com/${MIRROR_REPO}.git"
           echo "Publishing to ${MIRROR_REPO} using explicit URL."
@@ -96,7 +81,7 @@ jobs:
 
           attempt_push() {
             local source_sha="$1"
-            local destination="$2"
+            local destination_ref="$2"
             local attempts=3
             local delay=1
             local attempt=1
@@ -105,9 +90,9 @@ jobs:
               local log_file
               log_file="$(mktemp)"
 
-              if git push --force "${remote_url}" "${source_sha}:refs/heads/${destination}" >"$log_file" 2>&1; then
+              if git push --force "${remote_url}" "${source_sha}:${destination_ref}" >"$log_file" 2>&1; then
                 rm -f "$log_file"
-                echo "Published subtree to ${destination}."
+                echo "Published subtree to ${destination_ref}."
                 return 0
               fi
 
@@ -120,7 +105,7 @@ jobs:
                 continue
               fi
 
-              echo "Push to ${destination} failed after ${attempts} attempts."
+              echo "Push to ${destination_ref} failed after ${attempts} attempts."
               echo "Push failure log:"
               cat "$log_file"
               rm -f "$log_file"
@@ -128,7 +113,7 @@ jobs:
             done
           }
 
-          attempt_push "$split_sha" "$TARGET_BRANCH"
+          attempt_push "$split_sha" "$TARGET_REF"
 
       - name: Cleanup stale dry-run db branches
         if: always()

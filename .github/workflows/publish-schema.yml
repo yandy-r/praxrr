@@ -43,10 +43,16 @@ jobs:
 
           if [ "${DRY_RUN}" = "true" ]; then
             TARGET_BRANCH="dry-run/schema/${GITHUB_RUN_ID}"
+            TARGET_REF="refs/heads/${TARGET_BRANCH}"
           elif [[ "${GITHUB_REF}" == refs/heads/* ]]; then
             TARGET_BRANCH="${GITHUB_REF#refs/heads/}"
+            TARGET_REF="${GITHUB_REF}"
+          elif [[ "${GITHUB_REF}" == refs/tags/* ]]; then
+            TARGET_BRANCH=""
+            TARGET_REF="${GITHUB_REF}"
           else
-            TARGET_BRANCH="main"
+            echo "::error::Unsupported ref for publish: ${GITHUB_REF}"
+            exit 1
           fi
 
           if [ -z "${MIRROR_PAT}" ]; then
@@ -54,27 +60,7 @@ jobs:
             exit 1
           fi
 
-          status_code="$(curl -sS -o /tmp/mirror-repo-info-schema.json -w '%{http_code}' \
-            -H "Authorization: token ${MIRROR_PAT}" \
-            "https://api.github.com/repos/${MIRROR_REPO}")"
-          if [ "$status_code" != "200" ]; then
-            if [ "$status_code" = "401" ] || [ "$status_code" = "403" ]; then
-              echo "::error::MIRROR_PAT is invalid, unauthorized, or SSO-restricted. HTTP ${status_code}. Update the secret and retry."
-            elif [ "$status_code" = "404" ]; then
-              echo "::error::MIRROR_REPO was not found or token lacks visibility. HTTP ${status_code} for ${MIRROR_REPO}."
-            else
-              echo "::error::Unable to validate ${MIRROR_REPO}. HTTP ${status_code}."
-            fi
-            exit 1
-          fi
-          if [ "$(jq -r '.permissions.push // false' /tmp/mirror-repo-info-schema.json)" != "true" ]; then
-            echo "::error::MIRROR_PAT does not have push permission for ${MIRROR_REPO}."
-            rm -f /tmp/mirror-repo-info-schema.json
-            exit 1
-          fi
-          rm -f /tmp/mirror-repo-info-schema.json
-
-          echo "Mirroring packages/praxrr-schema subtree to ${TARGET_BRANCH}."
+          echo "Mirroring packages/praxrr-schema subtree to ${TARGET_REF}."
           SUBTREE_SHA="$(git subtree split --prefix=packages/praxrr-schema "${GITHUB_SHA}")"
           echo "Subtree commit: ${SUBTREE_SHA}"
 
@@ -88,7 +74,7 @@ jobs:
             set +e
             git push --force \
               "https://x-access-token:${MIRROR_PAT}@github.com/${MIRROR_REPO}.git" \
-              "${SUBTREE_SHA}:refs/heads/${TARGET_BRANCH}" \
+              "${SUBTREE_SHA}:${TARGET_REF}" \
               >"${log_file}" 2>&1
             push_status=$?
             set -e
