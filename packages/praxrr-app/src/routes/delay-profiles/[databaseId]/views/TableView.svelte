@@ -35,10 +35,7 @@
 	function formatDelay(minutes: number | null): string {
 		if (minutes === null) return '-';
 		if (minutes === 0) return 'No delay';
-		if (minutes < 60) return `${minutes}m`;
-		const hours = Math.floor(minutes / 60);
-		const mins = minutes % 60;
-		return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
+		return `${minutes}m`;
 	}
 
 	const columns: Column<DelayProfilesRow>[] = [
