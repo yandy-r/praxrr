@@ -40,19 +40,11 @@ jobs:
               - 'scripts/generate-pcd-types.ts'
               - 'deno.json'
 
-  compatibility:
+  compatibility-contracts:
     needs: detect-changes
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - check: contracts
-          - check: app-check
     runs-on: ubuntu-latest
-    name: ${{ matrix.check }}
-    if: |
-      ${{ (matrix.check == 'contracts' && needs.detect-changes.outputs.contracts_paths == 'true')
-      || (matrix.check == 'app-check' && needs.detect-changes.outputs.app_paths == 'true') }}
+    name: contracts
+    if: ${{ needs.detect-changes.outputs.contracts_paths == 'true' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -63,11 +55,23 @@ jobs:
           deno-version: ${{ env.DENO_VERSION }}
 
       - name: Run contract compatibility checks
-        if: matrix.check == 'contracts'
         run: deno run -A scripts/compat-check.ts
 
+  compatibility-app-check:
+    needs: detect-changes
+    runs-on: ubuntu-latest
+    name: app-check
+    if: ${{ needs.detect-changes.outputs.app_paths == 'true' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: ${{ env.DENO_VERSION }}
+
       - name: Run app checks
-        if: matrix.check == 'app-check'
         run: |
           deno install --node-modules-dir
           deno task check

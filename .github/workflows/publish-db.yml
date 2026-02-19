@@ -68,7 +68,7 @@ jobs:
             exit 1
           fi
 
-          remote_url="https://x-access-token:${MIRROR_PAT}@github.com/${MIRROR_REPO}.git"
+          remote_url="https://x-access-token:${MIRROR_PAT}@github.com/${MIRROR_REPO}"
           git remote remove mirror || true
           git remote add mirror "$remote_url"
 

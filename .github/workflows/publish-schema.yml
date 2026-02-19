@@ -65,7 +65,7 @@ jobs:
 
             set +e
             git push --force \
-              "https://x-access-token:${MIRROR_PAT}@github.com/yandy-r/praxrr-schema.git" \
+              "https://x-access-token:${MIRROR_PAT}@github.com/yandy-r/praxrr-schema" \
               "${SUBTREE_SHA}:refs/heads/${TARGET_BRANCH}" \
               >"${log_file}" 2>&1
             push_status=$?
