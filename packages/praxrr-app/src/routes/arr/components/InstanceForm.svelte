@@ -86,7 +86,7 @@
     !!url &&
     (lockCoreFields || !!apiKey) &&
     (mode === 'edit' || !!type) &&
-    (!lockCoreFields ? !externalUrlValidationError : true);
+    !externalUrlValidationError;
 
   // UI state
   let saving = false;
@@ -304,7 +304,7 @@
           text="Delete"
           icon={Trash2}
           iconColor="text-red-600 dark:text-red-400"
-          disabled={saving || deleting}
+          disabled={saving || deleting || !canEditCoreConnectionFields}
           on:click={() => (showDeleteModal = true)}
         />
         <Button
@@ -393,10 +393,9 @@
         value={externalUrl}
         placeholder={externalUrlPlaceholder}
         description="Used for Open in links. API calls still use URL."
-        disabled={lockCoreFields}
         on:input={(e) => update('externalUrl', e.detail)}
       />
-      {#if externalUrlValidationError && !lockCoreFields}
+      {#if externalUrlValidationError}
         <p class="text-xs text-red-600 dark:text-red-400" role="status">{externalUrlValidationError}</p>
       {/if}
     </div>

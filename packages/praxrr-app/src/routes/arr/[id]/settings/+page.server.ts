@@ -7,23 +7,23 @@ import { logger } from '$logger/logger.ts';
 import { parseOptionalAbsoluteHttpUrl } from '$utils/validation/url.ts';
 
 export const load: ServerLoad = async ({ parent }) => {
-	const parentData = await parent();
-	const rawInstance = parentData.instance;
+  const parentData = await parent();
+  const rawInstance = parentData.instance;
 
-	if (!rawInstance) {
-		error(404, 'Instance not found');
-	}
+  if (!rawInstance) {
+    error(404, 'Instance not found');
+  }
 
-	const instance = rawInstance as ArrInstance;
-	const source: ArrInstanceSource = instance.source ?? 'ui';
+  const instance = rawInstance as ArrInstance;
+  const source: ArrInstanceSource = instance.source ?? 'ui';
 
-	return {
-		instance: {
-			...instance,
-			source,
-		},
-		canEditCoreConnectionFields: source === 'ui',
-	};
+  return {
+    instance: {
+      ...instance,
+      source,
+    },
+    canEditCoreConnectionFields: source === 'ui',
+  };
 };
 
 export const actions: Actions = {
@@ -42,10 +42,12 @@ export const actions: Actions = {
       return fail(404, { error: 'Instance not found' });
     }
 
+    const isEnvManaged = (instance.source ?? 'ui') === 'env';
+
     const formData = await request.formData();
-    const name = formData.get('name')?.toString().trim();
-    const url = formData.get('url')?.toString().trim();
-    const apiKey = formData.get('api_key')?.toString().trim();
+    const name = isEnvManaged ? instance.name : formData.get('name')?.toString().trim();
+    const url = isEnvManaged ? instance.url : formData.get('url')?.toString().trim();
+    const apiKey = isEnvManaged ? instance.api_key : formData.get('api_key')?.toString().trim();
     const rawExternalUrl = formData.get('external_url')?.toString();
     const externalUrl = parseOptionalAbsoluteHttpUrl(rawExternalUrl);
     const tagsJson = formData.get('tags')?.toString() || '';
@@ -135,6 +137,12 @@ export const actions: Actions = {
         meta: { id },
       });
       return fail(404, { error: 'Instance not found' });
+    }
+
+    if ((instance.source ?? 'ui') === 'env') {
+      return fail(403, {
+        error: 'Environment-managed instances cannot be deleted. Remove the environment variables and restart.',
+      });
     }
 
     cleanupJobsForArrInstance(id);

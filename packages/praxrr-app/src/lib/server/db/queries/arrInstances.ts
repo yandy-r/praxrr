@@ -188,6 +188,61 @@ export const arrInstancesQueries = {
   },
 
   /**
+   * Update an env-sourced arr instance by ID
+   */
+  updateEnvInstanceById(id: number, patch: UpdateArrInstanceInput): boolean {
+    const updates: string[] = [];
+    const params: (string | number | null)[] = [];
+
+    if (patch.name !== undefined) {
+      updates.push('name = ?');
+      params.push(patch.name);
+    }
+    if (patch.type !== undefined) {
+      updates.push('type = ?');
+      params.push(patch.type);
+    }
+    if (patch.url !== undefined) {
+      updates.push('url = ?');
+      params.push(patch.url);
+    }
+    if (patch.externalUrl !== undefined) {
+      updates.push('external_url = ?');
+      params.push(normalizeExternalUrl(patch.externalUrl));
+    }
+    if (patch.apiKey !== undefined) {
+      updates.push('api_key = ?');
+      params.push(patch.apiKey);
+    }
+    if (patch.tags !== undefined) {
+      updates.push('tags = ?');
+      params.push(patch.tags.length > 0 ? JSON.stringify(patch.tags) : null);
+    }
+    if (patch.enabled !== undefined) {
+      updates.push('enabled = ?');
+      params.push(patch.enabled ? 1 : 0);
+    }
+    if (patch.source !== undefined) {
+      updates.push('source = ?');
+      params.push(patch.source);
+    }
+
+    if (updates.length === 0) {
+      return false;
+    }
+
+    updates.push('updated_at = CURRENT_TIMESTAMP');
+    params.push(id);
+
+    const affected = db.execute(
+      `UPDATE arr_instances SET ${updates.join(', ')} WHERE id = ? AND source = 'env'`,
+      ...params
+    );
+
+    return affected > 0;
+  },
+
+  /**
    * Disable env-sourced arr instances that are not active
    */
   disableEnvInstancesMissingApiKeys(activeApiKeys: string[]): number {
