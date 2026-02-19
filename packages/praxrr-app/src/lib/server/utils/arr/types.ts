@@ -743,7 +743,7 @@ export interface ArrDelayProfile {
   bypassIfAboveCustomFormatScore: boolean;
   minimumCustomFormatScore: number;
   order: number;
-  tags: number[];
+  tags: number[] | null;
 }
 
 /**
