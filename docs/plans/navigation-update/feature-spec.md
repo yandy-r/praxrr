@@ -281,8 +281,8 @@ The `resolveNavShell` function reads the static registry and returns a pure JSON
 
 #### Files to Create
 
-| File                                                           | Purpose                                   |
-| -------------------------------------------------------------- | ----------------------------------------- |
+| File                                                                               | Purpose                                   |
+| ---------------------------------------------------------------------------------- | ----------------------------------------- |
 | `packages/praxrr-app/src/lib/shared/navigation/types.ts`                           | Shared TypeScript interfaces              |
 | `packages/praxrr-app/src/lib/server/navigation/registry.ts`                        | Static `NAV_REGISTRY` constant            |
 | `packages/praxrr-app/src/lib/server/navigation/resolver.ts`                        | `resolveNavShell()` -- filter + serialize |
@@ -293,8 +293,8 @@ The `resolveNavShell` function reads the static registry and returns a pure JSON
 
 #### Files to Modify
 
-| File                                                      | Change                                                          |
-| --------------------------------------------------------- | --------------------------------------------------------------- |
+| File                                                                          | Change                                                          |
+| ----------------------------------------------------------------------------- | --------------------------------------------------------------- |
 | `packages/praxrr-app/src/routes/+layout.server.ts`                            | Add `resolveNavShell()` call, return `navShell`                 |
 | `packages/praxrr-app/src/routes/+layout.svelte`                               | Pass `data.navShell` to `PageNav` and `BottomNav`               |
 | `packages/praxrr-app/src/lib/client/ui/navigation/pageNav/pageNav.svelte`     | Replace hard-coded groups with registry-driven `{#each}` loop   |
@@ -303,8 +303,8 @@ The `resolveNavShell` function reads the static registry and returns a pure JSON
 
 #### Files to Delete
 
-| File                               | Reason                                            |
-| ---------------------------------- | ------------------------------------------------- |
+| File                                                   | Reason                                            |
+| ------------------------------------------------------ | ------------------------------------------------- |
 | `packages/praxrr-app/src/lib/client/stores/sidebar.ts` | Dead code -- `sidebarCollapsed` is never imported |
 
 #### Files Unchanged

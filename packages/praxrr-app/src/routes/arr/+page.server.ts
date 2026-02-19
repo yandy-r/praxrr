@@ -1,11 +1,24 @@
 import { fail, redirect } from '@sveltejs/kit';
 import type { Actions, ServerLoad } from '@sveltejs/kit';
-import { arrInstancesQueries } from '$db/queries/arrInstances.ts';
+import { arrInstancesQueries, type ArrInstance, type ArrInstanceSource } from '$db/queries/arrInstances.ts';
 import { cleanupJobsForArrInstance } from '$lib/server/jobs/cleanup.ts';
 import { logger } from '$logger/logger.ts';
 
+type ArrInstanceListItem = ArrInstance & {
+	source: ArrInstanceSource;
+	isEnvManaged: boolean;
+};
+
 export const load: ServerLoad = () => {
-  const instances = arrInstancesQueries.getAll();
+  const instances: ArrInstanceListItem[] = arrInstancesQueries.getAll().map((instance) => {
+    const source: ArrInstanceSource = instance.source ?? 'ui';
+
+    return {
+      ...instance,
+      source,
+      isEnvManaged: source === 'env',
+    };
+  });
 
   return {
     instances,

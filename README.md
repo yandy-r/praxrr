@@ -129,36 +129,96 @@ This runs the parser service and Vite dev server concurrently. See
 
 ### Environment Variables
 
-| Variable                         | Default                                | Description                                                               |
-| -------------------------------- | -------------------------------------- | ------------------------------------------------------------------------- |
-| `PUID`                           | `1000`                                 | User ID for file permissions                                              |
-| `PGID`                           | `1000`                                 | Group ID for file permissions                                             |
-| `UMASK`                          | `022`                                  | File creation mask                                                        |
-| `TZ`                             | `Etc/UTC`                              | Timezone for scheduling                                                   |
-| `PORT`                           | `6868`                                 | Web UI port                                                               |
-| `HOST`                           | `0.0.0.0`                              | Bind address                                                              |
-| `APP_BASE_PATH`                  | `/config`                              | Base path for data, logs, backups                                         |
-| `AUTH`                           | `on`                                   | Auth mode: `on`, `local`, `off`, `oidc`                                   |
-| `PARSER_HOST`                    | `localhost`                            | Parser service host                                                       |
-| `PARSER_PORT`                    | `5000`                                 | Parser service port                                                       |
-| `PRAXRR_DEFAULT_DB_TOKEN`        | `your_token`                           | Default database token                                                    |
-| `PRAXRR_DEFAULT_DB_GIT_USERNAME` | `your_username`                        | Default database Git username                                             |
-| `PRAXRR_DEFAULT_DB_GIT_EMAIL`    | `your_email`                           | Default database Git email                                                |
-| `PRAXRR_DEFAULT_DB_URL`          | `https://github.com/yandy-r/praxrr-db` | Default PCD auto-link repository URL                                      |
-| `PRAXRR_DEFAULT_DB_BRANCH`       | `v2`                                   | Default PCD auto-link branch                                              |
-| `PRAXRR_DEFAULT_DB_NAME`         | `Praxrr-DB`                            | Default PCD display name                                                  |
-| `PRAXRR_SCHEMA_REF`              | manifest value                         | Override schema dependency ref (tag or branch, e.g. `v2`, `dev`, `1.0.0`) |
+| Variable                           | Default                                | Description                                                                 |
+| ---------------------------------- | -------------------------------------- | --------------------------------------------------------------------------- |
+| `PUID`                             | `1000`                                 | User ID for file permissions                                                |
+| `PGID`                             | `1000`                                 | Group ID for file permissions                                               |
+| `UMASK`                            | `022`                                  | File creation mask                                                          |
+| `TZ`                               | `Etc/UTC`                              | Timezone for scheduling                                                     |
+| `PORT`                             | `6868`                                 | Web UI port                                                                 |
+| `HOST`                             | `0.0.0.0`                              | Bind address                                                                |
+| `APP_BASE_PATH`                    | `/config`                              | Base path for data, logs, backups                                           |
+| `AUTH`                             | `on`                                   | Auth mode: `on`, `local`, `off`, `oidc`                                     |
+| `PARSER_HOST`                      | `localhost`                            | Parser service host                                                         |
+| `PARSER_PORT`                      | `5000`                                 | Parser service port                                                         |
+| `PRAXRR_DEFAULT_DB_TOKEN`          | `your_token`                           | Default database token                                                      |
+| `PRAXRR_DEFAULT_DB_GIT_USERNAME`   | `your_username`                        | Default database Git username                                               |
+| `PRAXRR_DEFAULT_DB_GIT_EMAIL`      | `your_email`                           | Default database Git email                                                  |
+| `PRAXRR_DEFAULT_DB_URL`            | `https://github.com/yandy-r/praxrr-db` | Default PCD auto-link repository URL                                        |
+| `PRAXRR_DEFAULT_DB_BRANCH`         | `v2`                                   | Default PCD auto-link branch                                                |
+| `PRAXRR_DEFAULT_DB_NAME`           | `Praxrr-DB`                            | Default PCD display name                                                    |
+| `PRAXRR_SCHEMA_REF`                | manifest value                         | Override schema dependency ref (tag or branch, e.g. `v2`, `dev`, `1.0.0`)   |
+| `PRAXRR_VALIDATE_INSTANCES`        | `false`                                | Validate env-managed instances against Arr API during startup (optional).   |
+| `RADARR_INSTANCE_URL_<N>`          | _unset_                                | `http://radarr:7878` (required with matching `RADARR_INSTANCE_API_KEY_<N>`) |
+| `RADARR_INSTANCE_API_KEY_<N>`      | _unset_                                | API key (required with matching `RADARR_INSTANCE_URL_<N>`)                  |
+| `RADARR_INSTANCE_NAME_<N>`         | `Radarr`, `Radarr 2`...                | Optional display name                                                       |
+| `RADARR_INSTANCE_EXTERNAL_URL_<N>` | _unset_                                | Optional browser URL override                                               |
+| `RADARR_INSTANCE_TAGS_<N>`         | _unset_                                | Optional comma-separated tags                                               |
+| `RADARR_INSTANCE_ENABLED_<N>`      | `true`                                 | Optional, `true` or `false`                                                 |
+| `SONARR_INSTANCE_URL_<N>`          | _unset_                                | `http://sonarr:8989` (required with matching `SONARR_INSTANCE_API_KEY_<N>`) |
+| `SONARR_INSTANCE_API_KEY_<N>`      | _unset_                                | API key (required with matching `SONARR_INSTANCE_URL_<N>`)                  |
+| `SONARR_INSTANCE_NAME_<N>`         | _unset_                                | Optional display name                                                       |
+| `SONARR_INSTANCE_EXTERNAL_URL_<N>` | _unset_                                | Optional browser URL override                                               |
+| `SONARR_INSTANCE_TAGS_<N>`         | _unset_                                | Optional comma-separated tags                                               |
+| `SONARR_INSTANCE_ENABLED_<N>`      | `true`                                 | Optional, `true` or `false`                                                 |
+| `LIDARR_INSTANCE_URL_<N>`          | _unset_                                | `http://lidarr:8686` (required with matching `LIDARR_INSTANCE_API_KEY_<N>`) |
+| `LIDARR_INSTANCE_API_KEY_<N>`      | _unset_                                | API key (required with matching `LIDARR_INSTANCE_URL_<N>`)                  |
+| `LIDARR_INSTANCE_NAME_<N>`         | _unset_                                | Optional display name                                                       |
+| `LIDARR_INSTANCE_EXTERNAL_URL_<N>` | _unset_                                | Optional browser URL override                                               |
+| `LIDARR_INSTANCE_TAGS_<N>`         | _unset_                                | Optional comma-separated tags                                               |
+| `LIDARR_INSTANCE_ENABLED_<N>`      | `true`                                 | Optional, `true` or `false`                                                 |
+
+### Arr environment-managed instance examples
+
+Use indexed env vars to create instances automatically at startup:
+
+```env
+RADARR_INSTANCE_URL_1=http://radarr:7878
+RADARR_INSTANCE_API_KEY_1=REDACTED
+RADARR_INSTANCE_NAME_1=Movies
+RADARR_INSTANCE_TAGS_1=primary,4k
+
+SONARR_INSTANCE_URL_1=http://sonarr:8989
+SONARR_INSTANCE_API_KEY_1=REDACTED
+SONARR_INSTANCE_NAME_1=TV
+SONARR_INSTANCE_ENABLED_1=false
+
+LIDARR_INSTANCE_URL_1=http://lidarr:8686
+LIDARR_INSTANCE_API_KEY_1=REDACTED
+PRAXRR_VALIDATE_INSTANCES=true
+```
+
+### Compose sample with env-managed instances
+
+```yaml
+services:
+  praxrr:
+    environment:
+      - RADARR_INSTANCE_URL_1=http://radarr:7878
+      - RADARR_INSTANCE_API_KEY_1=REDACTED
+      - RADARR_INSTANCE_NAME_1=Movies
+      - RADARR_INSTANCE_TAGS_1=4k,primary
+      - SONARR_INSTANCE_URL_1=http://sonarr:8989
+      - SONARR_INSTANCE_API_KEY_1=REDACTED
+      - SONARR_INSTANCE_NAME_1=TV
+      - SONARR_INSTANCE_ENABLED_1=true
+      - LIDARR_INSTANCE_URL_1=http://lidarr:8686
+      - LIDARR_INSTANCE_API_KEY_1=REDACTED
+      - LIDARR_INSTANCE_NAME_1=Music
+      - PRAXRR_VALIDATE_INSTANCES=false
+```
 
 ## Monorepo Workspace Layout
 
-Praxrr now uses a Deno workspace with its runtime application code (routes, lib, hooks, and UI) in `packages/praxrr-app/src/` and these package members:
+Praxrr now uses a Deno workspace with its runtime application code (routes, lib, hooks, and UI) in
+`packages/praxrr-app/src/` and these package members:
 
 - `packages/praxrr-api` (legacy package surface)
 - `packages/praxrr-db` (pcd_ops and base ops)
 - `packages/praxrr-schema` (PCD schema SQL and manifest)
 
-Runtime behavior, Arr sync workflows, and API surfaces now live under `packages/praxrr-app/src/`, while the package members above
-are consumed through workspace references and mirror publishes.
+Runtime behavior, Arr sync workflows, and API surfaces now live under `packages/praxrr-app/src/`,
+while the package members above are consumed through workspace references and mirror publishes.
 
 ## Contract Checklist
 
@@ -167,16 +227,20 @@ are consumed through workspace references and mirror publishes.
 - [ ] `PRAXRR_DEFAULT_DB_URL` defaults to `https://github.com/yandy-r/praxrr-db` when unset.
 - [ ] `PRAXRR_DEFAULT_DB_BRANCH` defaults to `v2` when unset.
 - [ ] `PRAXRR_DEFAULT_DB_NAME` defaults to `Praxrr-DB` when unset.
-- [ ] `PRAXRR_SCHEMA_REF` optionally overrides the schema dependency ref (`tag` or `branch`) at runtime.
-- [ ] `PRAXRR_DEFAULT_DB_TOKEN`, `PRAXRR_DEFAULT_DB_GIT_USERNAME`, and
-      `PRAXRR_DEFAULT_DB_GIT_EMAIL` remain supported for git push/auth flows.
-- [ ] Any custom DB fork used by default-link must be Arr/PCD schema-compatible and PCD manifest-valid.
+- [ ] `PRAXRR_SCHEMA_REF` optionally overrides the schema dependency ref (`tag` or `branch`) at
+      runtime.
+- [ ] `PRAXRR_DEFAULT_DB_TOKEN`, `PRAXRR_DEFAULT_DB_GIT_USERNAME`, and `PRAXRR_DEFAULT_DB_GIT_EMAIL`
+      remain supported for git push/auth flows.
+- [ ] Any custom DB fork used by default-link must be Arr/PCD schema-compatible and PCD
+      manifest-valid.
 
 ### Empty URL Behavior
 
 - [ ] `PRAXRR_DEFAULT_DB_URL=""` (empty string) disables startup auto-link.
-- [ ] Empty URL behaves differently from unset/undefined: it is an intentional explicit opt-out, not a fallback.
-- [ ] Auto-link state is still persisted as attempted/not-linked according to existing startup flow to avoid retries.
+- [ ] Empty URL behaves differently from unset/undefined: it is an intentional explicit opt-out, not
+      a fallback.
+- [ ] Auto-link state is still persisted as attempted/not-linked according to existing startup flow
+      to avoid retries.
 
 ### Schema Source Precedence
 
@@ -190,9 +254,12 @@ are consumed through workspace references and mirror publishes.
 
 - [ ] `packages/praxrr-db` publishes to `yandy-r/praxrr-db` via subtree mirrors.
 - [ ] `packages/praxrr-schema` publishes to `yandy-r/praxrr-schema` via subtree mirrors.
-- [ ] Mirror repos are publish consumers only; the monorepo is the source of truth for cross-package changes.
-- [ ] Changes touching PCD contracts should update workspace package inputs and root runtime together in one PR.
-- [ ] Validate local compatibility before merge so DB/schema changes are compatible with existing sync and type-generation paths.
+- [ ] Mirror repos are publish consumers only; the monorepo is the source of truth for cross-package
+      changes.
+- [ ] Changes touching PCD contracts should update workspace package inputs and root runtime
+      together in one PR.
+- [ ] Validate local compatibility before merge so DB/schema changes are compatible with existing
+      sync and type-generation paths.
 
 ## License
 

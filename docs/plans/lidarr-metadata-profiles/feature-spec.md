@@ -352,8 +352,8 @@ interface LidarrMetadataProfile {
 
 #### Files to Create
 
-| Path                                                                          | Purpose                              |
-| ----------------------------------------------------------------------------- | ------------------------------------ |
+| Path                                                                                              | Purpose                              |
+| ------------------------------------------------------------------------------------------------- | ------------------------------------ |
 | `packages/praxrr-app/src/lib/server/pcd/entities/metadataProfiles/create.ts`                      | PCD create operation                 |
 | `packages/praxrr-app/src/lib/server/pcd/entities/metadataProfiles/read.ts`                        | Read/list from PCD cache             |
 | `packages/praxrr-app/src/lib/server/pcd/entities/metadataProfiles/update.ts`                      | PCD update operation                 |
@@ -368,8 +368,8 @@ interface LidarrMetadataProfile {
 
 #### Files to Modify
 
-| Path                                           | Changes                                                         |
-| ---------------------------------------------- | --------------------------------------------------------------- |
+| Path                                                               | Changes                                                         |
+| ------------------------------------------------------------------ | --------------------------------------------------------------- |
 | `packages/praxrr-app/src/lib/shared/pcd/types.ts`                  | 4 Kysely table interfaces + 4 Row types + PCDDatabase additions |
 | `packages/praxrr-app/src/lib/shared/pcd/display.ts`                | Display types for list/detail views                             |
 | `packages/praxrr-app/src/lib/shared/pcd/portable.ts`               | `PortableLidarrMetadataProfile` + ENTITY_TYPES                  |

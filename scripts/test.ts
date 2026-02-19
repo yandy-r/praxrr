@@ -13,6 +13,7 @@ const aliases: Record<string, string> = {
   filters: 'packages/praxrr-app/src/tests/upgrades/filters.test.ts',
   normalize: 'packages/praxrr-app/src/tests/upgrades/normalize.test.ts',
   selectors: 'packages/praxrr-app/src/tests/upgrades/selectors.test.ts',
+  'env-instances': 'packages/praxrr-app/src/tests/base/envInstances.test.ts',
   backup: 'packages/praxrr-app/src/tests/jobs/createBackup.test.ts',
   cleanup: 'packages/praxrr-app/src/tests/logger/cleanupLogs.test.ts',
 

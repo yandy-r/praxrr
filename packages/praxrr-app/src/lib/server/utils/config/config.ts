@@ -11,6 +11,7 @@ class Config {
   public readonly port: number;
   public readonly host: string;
   public readonly authMode: AuthMode;
+  public readonly validateInstances: boolean;
   public readonly oidc: {
     discoveryUrl: string | null;
     clientId: string | null;
@@ -48,6 +49,9 @@ class Config {
     // Auth mode: 'on' (default), 'local', 'off', 'oidc'
     const auth = (Deno.env.get('AUTH') || 'on').toLowerCase();
     this.authMode = ['on', 'local', 'off', 'oidc'].includes(auth) ? (auth as AuthMode) : 'on';
+
+    const rawValidateInstances = Deno.env.get('PRAXRR_VALIDATE_INSTANCES')?.trim().toLowerCase();
+    this.validateInstances = ['1', 'true', 'yes', 'on'].includes(rawValidateInstances || '');
 
     // OIDC configuration (only used when AUTH=oidc)
     this.oidc = {

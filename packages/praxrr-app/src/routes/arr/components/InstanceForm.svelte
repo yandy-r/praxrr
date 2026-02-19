@@ -28,17 +28,43 @@
   export let mode: 'create' | 'edit';
   export let instance: ArrInstance | undefined = undefined;
   export let initialType: string = '';
+  export let canEditCoreConnectionFields = true;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   export let form: any = undefined;
 
-  // Parse tags from JSON string
-  const parseTags = (tagsJson: string | null): string[] => {
-    if (!tagsJson) return [];
-    try {
-      return JSON.parse(tagsJson);
-    } catch {
+  // Parse persisted tag values from either JSON array payloads or legacy comma-separated strings.
+  const parseTags = (tagsValue: string | string[] | null | undefined): string[] => {
+    if (!tagsValue) return [];
+    if (Array.isArray(tagsValue)) {
+      return tagsValue
+        .filter((tag): tag is string => typeof tag === 'string')
+        .map((tag) => tag.trim())
+        .filter((tag) => tag.length > 0);
+    }
+
+    if (typeof tagsValue !== 'string') {
       return [];
     }
+
+    const trimmed = tagsValue.trim();
+    if (!trimmed) return [];
+
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (Array.isArray(parsed)) {
+        return parsed
+          .filter((tag): tag is string => typeof tag === 'string')
+          .map((tag) => tag.trim())
+          .filter((tag) => tag.length > 0);
+      }
+    } catch {
+      // Fall back to legacy comma-separated representation.
+    }
+
+    return trimmed
+      .split(',')
+      .map((tag) => tag.trim())
+      .filter((tag) => tag.length > 0);
   };
 
   // Initialize dirty tracking on mount
@@ -78,6 +104,14 @@
   $: enabled = ($current.enabled ?? 'true') as string;
   $: tags = JSON.parse(($current.tags ?? '[]') as string) as string[];
   $: externalUrlValidationError = isValidExternalUrl(externalUrl) ? '' : 'External URL must be a valid http(s) URL.';
+  $: lockCoreFields = mode === 'edit' && !canEditCoreConnectionFields;
+  $: canSubmit =
+    $isDirty &&
+    !!name &&
+    !!url &&
+    (lockCoreFields || !!apiKey) &&
+    (mode === 'edit' || !!type) &&
+    !externalUrlValidationError;
 
   // UI state
   let saving = false;
@@ -136,6 +170,10 @@
 
   // Manual test connection
   async function testConnection() {
+    if (!canEditCoreConnectionFields) {
+      return;
+    }
+
     if (!type || !url || !apiKey) {
       alertStore.add('error', 'Please fill in Type, URL, and API Key');
       return;
@@ -166,6 +204,15 @@
 
   // Test connection and submit if successful
   async function handleSave() {
+    if (mode === 'edit' && !canEditCoreConnectionFields) {
+      saving = true;
+      const saveForm = document.getElementById('save-form');
+      if (saveForm instanceof HTMLFormElement) {
+        saveForm.requestSubmit();
+      }
+      return;
+    }
+
     if (!type || !url || !apiKey) {
       alertStore.add('error', 'Please fill in Type, URL, and API Key');
       return;
@@ -197,8 +244,6 @@
       alertStore.add('error', errorMessage);
     }
   }
-
-  $: canSubmit = $isDirty && !!name && !!url && !!apiKey && (mode === 'edit' || !!type) && !externalUrlValidationError;
 
   // Handle form response
   let lastFormId: unknown = null;
@@ -284,7 +329,7 @@
           text="Delete"
           icon={Trash2}
           iconColor="text-red-600 dark:text-red-400"
-          disabled={saving || deleting}
+          disabled={saving || deleting || !canEditCoreConnectionFields}
           on:click={() => (showDeleteModal = true)}
         />
         <Button
@@ -318,7 +363,7 @@
         value={type}
         options={typeOptions}
         placeholder="Select type..."
-        disabled={mode === 'edit'}
+        disabled={mode === 'edit' || lockCoreFields}
         on:change={(e) => update('type', e.detail)}
       />
       {#if unsupportedWorkflowMessage}
@@ -341,6 +386,7 @@
           value={name}
           placeholder="e.g., Movies, TV, Music"
           required
+          disabled={lockCoreFields}
           on:input={(e) => update('name', e.detail)}
         />
       </div>
@@ -361,6 +407,7 @@
       placeholder={urlPlaceholder}
       description={urlDescription}
       required
+      disabled={lockCoreFields}
       on:input={(e) => update('url', e.detail)}
     />
     <div class="space-y-2">
@@ -385,16 +432,21 @@
           name="api_key"
           value={apiKey}
           placeholder="Enter API key"
-          description={mode === 'edit' ? 'Re-enter API key to save changes' : ''}
+          description={mode === 'edit'
+            ? canEditCoreConnectionFields
+              ? 'Re-enter API key to save changes'
+              : 'API key is managed by environment variables and cannot be edited'
+            : ''}
           required
           private_
+          disabled={lockCoreFields}
           on:input={(e) => update('apiKey', e.detail)}
         />
       </div>
       <Button
         text={testing ? 'Testing...' : 'Test Connection'}
         icon={testing ? Loader2 : Wifi}
-        disabled={testing || !apiKey || !url || (mode === 'create' && !type)}
+        disabled={testing || lockCoreFields || !apiKey || !url || (mode === 'create' && !type)}
         on:click={testConnection}
       />
     </div>
@@ -402,7 +454,7 @@
     <div class="space-y-2">
       <span class="block text-sm font-medium text-neutral-900 dark:text-neutral-100"> Tags </span>
       <p class="text-xs text-neutral-500 dark:text-neutral-400">Press Enter to add a tag, Backspace to remove</p>
-      <TagInput {tags} on:change={(e) => update('tags', JSON.stringify(e.detail))} />
+      <TagInput {tags} onchange={(newTags) => update('tags', JSON.stringify(newTags))} />
     </div>
   </div>
 </div>
@@ -430,7 +482,11 @@
   <input type="hidden" name="type" value={type} />
   <input type="hidden" name="url" value={url} />
   <input type="hidden" name="external_url" value={externalUrl.trim()} />
-  <input type="hidden" name="api_key" value={apiKey} />
+  <input
+    type="hidden"
+    name="api_key"
+    value={lockCoreFields ? instance?.api_key ?? '' : apiKey}
+  />
   <input type="hidden" name="enabled" value={enabled === 'true' ? '1' : '0'} />
   <input type="hidden" name="tags" value={JSON.stringify(tags)} />
 </form>

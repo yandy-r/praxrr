@@ -1,7 +1,7 @@
 -- Praxrr Database Schema
 -- This file documents the current database schema after all migrations
 -- DO NOT execute this file directly - use migrations instead
--- Last updated: 2026-02-16
+-- Last updated: 2026-02-20
 
 -- ==============================================================================
 -- TABLE: migrations
@@ -18,7 +18,7 @@ CREATE TABLE IF NOT EXISTS migrations (
 -- ==============================================================================
 -- TABLE: arr_instances
 -- Purpose: Store configuration for *arr application instances (Radarr, Sonarr, etc.)
--- Migration: 001_create_arr_instances.ts, 20260216_add_arr_instance_external_url.ts
+-- Migration: 001_create_arr_instances.ts, 20260216_add_arr_instance_external_url.ts, 20260220_add_arr_instance_source.ts
 -- ==============================================================================
 
 CREATE TABLE arr_instances (
@@ -36,6 +36,7 @@ CREATE TABLE arr_instances (
     -- Configuration
     tags TEXT,                              -- JSON array of tags (e.g., '["movies","4k"]')
     enabled INTEGER NOT NULL DEFAULT 1,     -- 1=enabled, 0=disabled
+    source TEXT NOT NULL DEFAULT 'ui',      -- Provenance: ui or env
 
     -- Metadata
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,

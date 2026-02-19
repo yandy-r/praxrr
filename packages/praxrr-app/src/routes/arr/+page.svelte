@@ -19,13 +19,19 @@
 	export let data: PageData;
 
 	// Initialize data page store
-	const { search, view, filtered, setItems } = createDataPageStore(data.instances, {
+	const buildDisplayInstances = (instances: typeof data.instances) =>
+		instances.map((instance) => ({
+			...instance,
+			name: instance.isEnvManaged ? `${instance.name} (ENV)` : instance.name,
+		}));
+
+	const { search, view, filtered, setItems } = createDataPageStore(buildDisplayInstances(data.instances), {
 		storageKey: 'arrInstancesView',
 		searchKeys: ['name', 'url', 'type']
 	});
 
 	// Update items when data changes
-	$: setItems(data.instances);
+	$: setItems(buildDisplayInstances(data.instances));
 
 	// Modal state
 	let showDeleteModal = false;

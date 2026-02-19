@@ -83,11 +83,11 @@ The implementation should be split into contract-first phases so UI integration 
 
 ### Files to Modify
 
-| File                                                              | Suggested Task                                       | Phase | Dependencies |
-| ----------------------------------------------------------------- | ---------------------------------------------------- | ----- | ------------ |
+| File                                                                                  | Suggested Task                                       | Phase | Dependencies |
+| ------------------------------------------------------------------------------------- | ---------------------------------------------------- | ----- | ------------ |
 | `/packages/praxrr-app/src/routes/api/v1/arr/library/+server.ts`                       | Add pagination query parsing, slicing, metadata      | 1     | none         |
-| `/docs/api/v1/paths/arr.yaml`                                     | Add pagination query contract docs                   | 1     | none         |
-| `/docs/api/v1/schemas/arr.yaml`                                   | Add response metadata schema fields                  | 1     | none         |
+| `/docs/api/v1/paths/arr.yaml`                                                         | Add pagination query contract docs                   | 1     | none         |
+| `/docs/api/v1/schemas/arr.yaml`                                                       | Add response metadata schema fields                  | 1     | none         |
 | `/packages/praxrr-app/src/routes/arr/[id]/library/+page.svelte`                       | Add page/pageSize state, URL sync, metadata handling | 2     | Phase 1      |
 | `/packages/praxrr-app/src/routes/arr/[id]/library/components/LibraryActionBar.svelte` | Add/adjust pagination controls integration           | 2     | Phase 1      |
 | `/packages/praxrr-app/src/lib/client/stores/libraryCache.ts`                          | Add page/query-aware keying                          | 2     | none         |

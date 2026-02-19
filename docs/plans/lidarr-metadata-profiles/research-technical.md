@@ -537,8 +537,8 @@ arrSyncQueries.getSyncConfigStatus() // extend to include .metadataProfiles
 
 ### Files to Create
 
-| Path                                                                          | Purpose                                          |
-| ----------------------------------------------------------------------------- | ------------------------------------------------ |
+| Path                                                                                              | Purpose                                          |
+| ------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
 | `packages/praxrr-app/src/lib/server/pcd/entities/metadataProfiles/create.ts`                      | Create metadata profile PCD operation            |
 | `packages/praxrr-app/src/lib/server/pcd/entities/metadataProfiles/read.ts`                        | Read/list metadata profiles from PCD cache       |
 | `packages/praxrr-app/src/lib/server/pcd/entities/metadataProfiles/update.ts`                      | Update metadata profile PCD operation            |
@@ -553,8 +553,8 @@ arrSyncQueries.getSyncConfigStatus() // extend to include .metadataProfiles
 
 ### Files to Modify
 
-| Path                                           | Changes                                                                                                                                        |
-| ---------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| Path                                                               | Changes                                                                                                                                        |
+| ------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------- |
 | `packages/praxrr-app/src/lib/shared/pcd/types.ts`                  | Add 4 Kysely table interfaces, 4 Row types, add tables to `PCDDatabase` interface                                                              |
 | `packages/praxrr-app/src/lib/shared/pcd/display.ts`                | Add display types for metadata profile list/detail views                                                                                       |
 | `packages/praxrr-app/src/lib/shared/pcd/portable.ts`               | Add `PortableLidarrMetadataProfile`, add to `ENTITY_TYPES`                                                                                     |

@@ -794,8 +794,8 @@ Replace .NET build steps with Go build steps:
 
 ### Files to Create
 
-| File                                            | Description                      |
-| ----------------------------------------------- | -------------------------------- |
+| File                                               | Description                      |
+| -------------------------------------------------- | -------------------------------- |
 | `packages/praxrr-parser-go/go.mod`                 | Go module definition             |
 | `packages/praxrr-parser-go/go.sum`                 | Go dependency checksums          |
 | `packages/praxrr-parser-go/main.go`                | Entry point                      |
@@ -819,24 +819,24 @@ Replace .NET build steps with Go build steps:
 
 ### Files to Modify
 
-| File                                    | Change                                                                                                  |
-| --------------------------------------- | ------------------------------------------------------------------------------------------------------- |
-| `/Dockerfile.parser`                    | Replace .NET build with Go build (or point to `packages/praxrr-parser-go/Dockerfile`)                      |
-| `/.github/workflows/release.yml`        | Replace `setup-dotnet` with `setup-go`; replace `dotnet publish` with `go build`; update matrix columns |
-| `/.github/workflows/docker.yml`         | Update `Dockerfile.parser` path if moved                                                                |
-| `/deno.json`                            | Update `dev:parser`, `build:standalone`, `build:standalone:windows` tasks                               |
-| `/scripts/dev.ts`                       | Change `isDotnetAvailable()` to check for Go toolchain; update `runParser()` to use `go run`            |
+| File                                                        | Change                                                                                                  |
+| ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| `/Dockerfile.parser`                                        | Replace .NET build with Go build (or point to `packages/praxrr-parser-go/Dockerfile`)                   |
+| `/.github/workflows/release.yml`                            | Replace `setup-dotnet` with `setup-go`; replace `dotnet publish` with `go build`; update matrix columns |
+| `/.github/workflows/docker.yml`                             | Update `Dockerfile.parser` path if moved                                                                |
+| `/deno.json`                                                | Update `dev:parser`, `build:standalone`, `build:standalone:windows` tasks                               |
+| `/scripts/dev.ts`                                           | Change `isDotnetAvailable()` to check for Go toolchain; update `runParser()` to use `go run`            |
 | `/packages/praxrr-app/src/lib/server/utils/parser/spawn.ts` | No changes needed (looks for `praxrr-parser` binary by name, which stays the same)                      |
-| `/compose.dev.yml`                      | No changes needed (uses `Dockerfile.parser`)                                                            |
-| `/compose.yml`                          | No changes needed (uses image from GHCR)                                                                |
+| `/compose.dev.yml`                                          | No changes needed (uses `Dockerfile.parser`)                                                            |
+| `/compose.yml`                                              | No changes needed (uses image from GHCR)                                                                |
 
 ### Files to Remove (after Go parser is validated)
 
-| File                                        | Reason                                |
-| ------------------------------------------- | ------------------------------------- |
+| File                                           | Reason                                   |
+| ---------------------------------------------- | ---------------------------------------- |
 | `packages/praxrr-parser/` (entire directory)   | Replaced by `packages/praxrr-parser-go/` |
-| `packages/praxrr-parser/Directory.Build.props` | .NET-specific                         |
-| `packages/praxrr-parser/Parser.csproj`         | .NET-specific                         |
+| `packages/praxrr-parser/Directory.Build.props` | .NET-specific                            |
+| `packages/praxrr-parser/Parser.csproj`         | .NET-specific                            |
 
 **Note:** Keep the .NET parser directory during the transition period. Both parsers can coexist: the TypeScript client does not care which binary responds on port 5000.
 

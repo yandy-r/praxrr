@@ -12,9 +12,12 @@ export interface ArrInstance {
   api_key: string;
   tags: string | null;
   enabled: number;
+  source?: ArrInstanceSource;
   created_at: string;
   updated_at: string;
 }
+
+export type ArrInstanceSource = 'ui' | 'env';
 
 export interface CreateArrInstanceInput {
   name: string;
@@ -24,6 +27,7 @@ export interface CreateArrInstanceInput {
   externalUrl?: string | null;
   tags?: string[];
   enabled?: boolean;
+  source?: ArrInstanceSource;
 }
 
 export interface UpdateArrInstanceInput {
@@ -34,6 +38,7 @@ export interface UpdateArrInstanceInput {
   apiKey?: string;
   tags?: string[];
   enabled?: boolean;
+  source?: ArrInstanceSource;
 }
 
 /**
@@ -55,17 +60,19 @@ export const arrInstancesQueries = {
     const tagsJson = input.tags && input.tags.length > 0 ? JSON.stringify(input.tags) : null;
     const enabled = input.enabled !== false ? 1 : 0;
     const externalUrl = normalizeExternalUrl(input.externalUrl);
+    const source = input.source ?? 'ui';
 
     db.execute(
-      `INSERT INTO arr_instances (name, type, url, external_url, api_key, tags, enabled)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO arr_instances (name, type, url, external_url, api_key, tags, enabled, source)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       input.name,
       input.type,
       input.url,
       externalUrl,
       input.apiKey,
       tagsJson,
-      enabled
+      enabled,
+      source
     );
 
     // Get the last inserted ID
@@ -92,6 +99,162 @@ export const arrInstancesQueries = {
    */
   getByType(type: string): ArrInstance[] {
     return db.query<ArrInstance>('SELECT * FROM arr_instances WHERE type = ? ORDER BY name', type);
+  },
+
+  /**
+   * Get arr instances by source
+   */
+  getBySource(source: ArrInstanceSource): ArrInstance[] {
+    return db.query<ArrInstance>('SELECT * FROM arr_instances WHERE source = ? ORDER BY id', source);
+  },
+
+  /**
+   * Get an arr instance by source and exact name
+   */
+  getBySourceAndName(source: ArrInstanceSource, name: string): ArrInstance | undefined {
+    return db.queryFirst<ArrInstance>(
+      'SELECT * FROM arr_instances WHERE source = ? AND name = ? ORDER BY id LIMIT 1',
+      source,
+      name
+    );
+  },
+
+  /**
+   * Get an arr instance by API key
+   */
+  getByApiKey(apiKey: string): ArrInstance | undefined {
+    return db.queryFirst<ArrInstance>('SELECT * FROM arr_instances WHERE api_key = ? ORDER BY id LIMIT 1', apiKey);
+  },
+
+  /**
+   * Update an env-sourced arr instance by API key
+   */
+  updateEnvInstanceByApiKey(apiKey: string, patch: UpdateArrInstanceInput): boolean {
+    const updates: string[] = [];
+    const params: (string | number | null)[] = [];
+
+    if (patch.name !== undefined) {
+      updates.push('name = ?');
+      params.push(patch.name);
+    }
+    if (patch.type !== undefined) {
+      updates.push('type = ?');
+      params.push(patch.type);
+    }
+    if (patch.url !== undefined) {
+      updates.push('url = ?');
+      params.push(patch.url);
+    }
+    if (patch.externalUrl !== undefined) {
+      updates.push('external_url = ?');
+      params.push(normalizeExternalUrl(patch.externalUrl));
+    }
+    if (patch.apiKey !== undefined) {
+      updates.push('api_key = ?');
+      params.push(patch.apiKey);
+    }
+    if (patch.tags !== undefined) {
+      updates.push('tags = ?');
+      params.push(patch.tags.length > 0 ? JSON.stringify(patch.tags) : null);
+    }
+    if (patch.enabled !== undefined) {
+      updates.push('enabled = ?');
+      params.push(patch.enabled ? 1 : 0);
+    }
+    if (patch.source !== undefined) {
+      updates.push('source = ?');
+      params.push(patch.source);
+    }
+
+    if (updates.length === 0) {
+      return false;
+    }
+
+    const envInstance = db.queryFirst<{ id: number }>(
+      "SELECT id FROM arr_instances WHERE api_key = ? AND source = 'env' ORDER BY id LIMIT 1",
+      apiKey
+    );
+
+    if (!envInstance) {
+      return false;
+    }
+
+    updates.push('updated_at = CURRENT_TIMESTAMP');
+    params.push(envInstance.id);
+
+    const affected = db.execute(`UPDATE arr_instances SET ${updates.join(', ')} WHERE id = ?`, ...params);
+
+    return affected > 0;
+  },
+
+  /**
+   * Update an env-sourced arr instance by ID
+   */
+  updateEnvInstanceById(id: number, patch: UpdateArrInstanceInput): boolean {
+    const updates: string[] = [];
+    const params: (string | number | null)[] = [];
+
+    if (patch.name !== undefined) {
+      updates.push('name = ?');
+      params.push(patch.name);
+    }
+    if (patch.type !== undefined) {
+      updates.push('type = ?');
+      params.push(patch.type);
+    }
+    if (patch.url !== undefined) {
+      updates.push('url = ?');
+      params.push(patch.url);
+    }
+    if (patch.externalUrl !== undefined) {
+      updates.push('external_url = ?');
+      params.push(normalizeExternalUrl(patch.externalUrl));
+    }
+    if (patch.apiKey !== undefined) {
+      updates.push('api_key = ?');
+      params.push(patch.apiKey);
+    }
+    if (patch.tags !== undefined) {
+      updates.push('tags = ?');
+      params.push(patch.tags.length > 0 ? JSON.stringify(patch.tags) : null);
+    }
+    if (patch.enabled !== undefined) {
+      updates.push('enabled = ?');
+      params.push(patch.enabled ? 1 : 0);
+    }
+    if (patch.source !== undefined) {
+      updates.push('source = ?');
+      params.push(patch.source);
+    }
+
+    if (updates.length === 0) {
+      return false;
+    }
+
+    updates.push('updated_at = CURRENT_TIMESTAMP');
+    params.push(id);
+
+    const affected = db.execute(
+      `UPDATE arr_instances SET ${updates.join(', ')} WHERE id = ? AND source = 'env'`,
+      ...params
+    );
+
+    return affected > 0;
+  },
+
+  /**
+   * Disable env-sourced arr instances that are not active
+   */
+  disableEnvInstancesMissingApiKeys(activeApiKeys: string[]): number {
+    if (activeApiKeys.length === 0) {
+      return db.execute("UPDATE arr_instances SET enabled = 0, updated_at = CURRENT_TIMESTAMP WHERE source = 'env'");
+    }
+
+    const placeholders = activeApiKeys.map(() => '?').join(', ');
+    return db.execute(
+      `UPDATE arr_instances SET enabled = 0, updated_at = CURRENT_TIMESTAMP WHERE source = 'env' AND api_key NOT IN (${placeholders})`,
+      ...activeApiKeys
+    );
   },
 
   /**

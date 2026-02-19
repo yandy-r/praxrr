@@ -83,8 +83,8 @@ Lidarr metadata profiles introduce a Lidarr-only PCD entity with four new cache 
 
 ### Files to Create
 
-| File                                                                          | Task                                                                                                                                                              |
-| ----------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| File                                                                                              | Task                                                                                                                                                              |
+| ------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `packages/praxrr-app/src/lib/server/db/migrations/YYYYMMDD_add_lidarr_metadata_profiles.ts`       | Create the app DB `arr_sync_metadata_profiles_config` table and embed the PCD schema for the four `lidarr_metadata_profile` tables plus register the built-in op. |
 | `packages/praxrr-app/src/lib/server/pcd/entities/metadataProfiles/create.ts`                      | Persist parent profile rows plus all primary/secondary/release rows using `writeOperation` metadata.                                                              |
 | `packages/praxrr-app/src/lib/server/pcd/entities/metadataProfiles/read.ts`                        | Load metadata profile summary/detail data from the cache, including all child rows for sync/UI.                                                                   |
@@ -99,8 +99,8 @@ Lidarr metadata profiles introduce a Lidarr-only PCD entity with four new cache 
 
 ### Files to Modify
 
-| File                                         | Task                                                                                                                                       |
-| -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| File                                                             | Task                                                                                                                                       |
+| ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
 | `packages/praxrr-app/src/lib/shared/pcd/types.ts`                | Add four table interfaces and row types for the `lidarr_metadata_profile*` tables and register them on `PCDDatabase`.                      |
 | `packages/praxrr-app/src/lib/shared/pcd/display.ts`              | Export metadata profile display rows and the aggregated view type used by list/detail UI.                                                  |
 | `packages/praxrr-app/src/lib/shared/pcd/portable.ts`             | Add `PortableLidarrMetadataProfile` and register the entity in `ENTITY_TYPES` for import/export/clone paths.                               |

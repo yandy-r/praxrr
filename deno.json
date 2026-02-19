@@ -58,7 +58,7 @@
     "arr": "docker compose -f compose.arr.yml up -d",
     "arr:down": "docker compose -f compose.arr.yml down",
     "dev:with-arr": "WITH_ARR=1 deno run -A scripts/dev.ts",
-    "dev:noauth-with-arr": "AUTH=off WITH_ARR=1 deno run -A scripts/dev.ts",
+    "dev:noauth-with-arr": "PRAXRR_VALIDATE_INSTANCES=false AUTH=off WITH_ARR=1 deno run -A scripts/dev.ts",
     "docker:build": "docker compose -f compose.dev.yml build --no-cache",
     "docker:up": "docker compose -f compose.dev.yml up --build -d",
     "docker:up-with-arr": "docker compose -f compose.dev.yml up --build -d && deno task arr",
