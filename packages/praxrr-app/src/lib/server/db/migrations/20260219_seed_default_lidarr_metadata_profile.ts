@@ -5,7 +5,7 @@ export const LIDARR_DEFAULT_METADATA_PROFILE_OP_VERSION = 20260219;
 export const LIDARR_DEFAULT_METADATA_PROFILE_OP_METADATA =
   '{"operation":"seed","entity":"lidarr_metadata_profiles","conflict_policy":"preserve_existing_lidarr_metadata_profiles"}';
 
-const DEFAULT_PROFILE_NAME = 'Lidarr';
+const DEFAULT_PROFILE_NAME = 'Lidarr (Praxrr)';
 const DEFAULT_PROFILE_DESCRIPTION = 'Default Lidarr metadata profile';
 
 function toSqlStringLiteral(value: string): string {
@@ -28,8 +28,8 @@ INSERT INTO lidarr_metadata_profile_primary_types (
 )
 VALUES
 	(${DEFAULT_PROFILE_NAME_SQL}, 0, 'Album', 1),
-	(${DEFAULT_PROFILE_NAME_SQL}, 1, 'EP', 0),
-	(${DEFAULT_PROFILE_NAME_SQL}, 2, 'Single', 0),
+	(${DEFAULT_PROFILE_NAME_SQL}, 1, 'EP', 1),
+	(${DEFAULT_PROFILE_NAME_SQL}, 2, 'Single', 1),
 	(${DEFAULT_PROFILE_NAME_SQL}, 3, 'Broadcast', 0),
 	(${DEFAULT_PROFILE_NAME_SQL}, 4, 'Other', 0)
 ON CONFLICT(metadata_profile_name, type_id) DO NOTHING;
@@ -42,12 +42,12 @@ INSERT INTO lidarr_metadata_profile_secondary_types (
 )
 VALUES
 	(${DEFAULT_PROFILE_NAME_SQL}, 0, 'Studio', 1),
-	(${DEFAULT_PROFILE_NAME_SQL}, 1, 'Compilation', 0),
+	(${DEFAULT_PROFILE_NAME_SQL}, 1, 'Compilation', 1),
 	(${DEFAULT_PROFILE_NAME_SQL}, 2, 'Soundtrack', 0),
 	(${DEFAULT_PROFILE_NAME_SQL}, 3, 'Spokenword', 0),
 	(${DEFAULT_PROFILE_NAME_SQL}, 4, 'Interview', 0),
 	(${DEFAULT_PROFILE_NAME_SQL}, 6, 'Live', 0),
-	(${DEFAULT_PROFILE_NAME_SQL}, 7, 'Remix', 0),
+	(${DEFAULT_PROFILE_NAME_SQL}, 7, 'Remix', 1),
 	(${DEFAULT_PROFILE_NAME_SQL}, 8, 'DJ-mix', 0),
 	(${DEFAULT_PROFILE_NAME_SQL}, 9, 'Mixtape/Street', 0),
 	(${DEFAULT_PROFILE_NAME_SQL}, 10, 'Demo', 0),
