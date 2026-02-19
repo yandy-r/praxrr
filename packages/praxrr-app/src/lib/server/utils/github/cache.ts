@@ -58,6 +58,9 @@ function parseGitHubUrl(repositoryUrl: string): { owner: string; repo: string } 
   return { owner: match[1], repo: match[2] };
 }
 
+/** Fetch function type compatible with globalThis.fetch */
+type FetchFn = typeof globalThis.fetch;
+
 /**
  * Get cached repo info or fetch from GitHub API
  */
@@ -122,11 +125,15 @@ export async function getCachedRepoInfo(repositoryUrl: string, pat?: string | nu
 /**
  * Fetch avatar from GitHub and cache it
  */
-async function fetchAndCacheAvatar(owner: string, cacheKey: string): Promise<string | null> {
+async function fetchAndCacheAvatar(
+  owner: string,
+  cacheKey: string,
+  fetchFn: FetchFn = globalThis.fetch
+): Promise<string | null> {
   const avatarUrl = `https://github.com/${owner}.png?size=80`;
 
   try {
-    const response = await globalThis.fetch(avatarUrl);
+    const response = await fetchFn(avatarUrl);
 
     if (!response.ok) {
       return null;
@@ -154,8 +161,11 @@ async function fetchAndCacheAvatar(owner: string, cacheKey: string): Promise<str
  * Get cached avatar with stale-while-revalidate
  * Always returns cached data if available, refreshes in background when stale
  * Returns base64 encoded image data
+ *
+ * @param owner - GitHub username/org
+ * @param fetchFn - Optional fetch function (pass event.fetch from SvelteKit handlers to avoid SSR warnings)
  */
-export async function getCachedAvatar(owner: string): Promise<string | null> {
+export async function getCachedAvatar(owner: string, fetchFn: FetchFn = globalThis.fetch): Promise<string | null> {
   const cacheKey = `avatar:${owner}`;
 
   // Check for any cached data (even if expired)
@@ -171,7 +181,7 @@ export async function getCachedAvatar(owner: string): Promise<string | null> {
         meta: { owner },
       });
       // Trigger background refresh (don't await)
-      fetchAndCacheAvatar(owner, cacheKey).catch(() => {
+      fetchAndCacheAvatar(owner, cacheKey, fetchFn).catch(() => {
         // Silently ignore background refresh errors
       });
     }
@@ -185,13 +195,17 @@ export async function getCachedAvatar(owner: string): Promise<string | null> {
   });
 
   // No cached data at all - fetch synchronously
-  return fetchAndCacheAvatar(owner, cacheKey);
+  return fetchAndCacheAvatar(owner, cacheKey, fetchFn);
 }
 
 /**
  * Get cached releases or fetch from GitHub API
  */
-export async function getCachedReleases(owner: string, repo: string): Promise<GitHubRelease[]> {
+export async function getCachedReleases(
+  owner: string,
+  repo: string,
+  fetchFn: FetchFn = globalThis.fetch
+): Promise<GitHubRelease[]> {
   const cacheKey = `releases:${owner}/${repo}`;
 
   // Check cache
@@ -210,7 +224,7 @@ export async function getCachedReleases(owner: string, repo: string): Promise<Gi
   const headers = getHeaders();
 
   try {
-    const response = await globalThis.fetch(apiUrl, { headers });
+    const response = await fetchFn(apiUrl, { headers });
 
     if (!response.ok) {
       return [];

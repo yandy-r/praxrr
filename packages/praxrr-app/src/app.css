@@ -1,5 +1,3 @@
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&display=swap');
-@import url('https://fonts.googleapis.com/css2?family=Geist+Mono:wght@100..900&display=swap');
 @import 'tailwindcss';
 
 /* Highlight.js: atom-one-light for light mode */
@@ -374,11 +372,24 @@
 
   /* Fallback transitions for browsers without View Transitions API */
   @media (prefers-reduced-motion: no-preference) {
-    html {
-      transition: background-color 0.3s ease-in-out;
-    }
-
-    * {
+    html,
+    body,
+    main,
+    nav,
+    aside,
+    header,
+    footer,
+    section,
+    div,
+    button,
+    a,
+    input,
+    select,
+    textarea,
+    th,
+    td,
+    pre,
+    code {
       transition:
         background-color 0.3s ease-in-out,
         border-color 0.3s ease-in-out,

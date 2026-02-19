@@ -7,7 +7,7 @@ async function hashBytes(bytes: Uint8Array): Promise<string> {
   return hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
 }
 
-export const GET: RequestHandler = async ({ params, request }) => {
+export const GET: RequestHandler = async ({ params, request, fetch }) => {
   const { owner } = params;
 
   if (!owner) {
@@ -17,7 +17,7 @@ export const GET: RequestHandler = async ({ params, request }) => {
     });
   }
 
-  const dataUrl = await getCachedAvatar(owner);
+  const dataUrl = await getCachedAvatar(owner, fetch);
 
   if (!dataUrl) {
     return new Response('Avatar not found', {

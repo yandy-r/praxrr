@@ -5,8 +5,8 @@ import { getCachedReleases, type GitHubRelease } from '$lib/server/utils/github/
 
 type VersionStatus = 'up-to-date' | 'out-of-date' | 'dev-build';
 
-async function fetchGitHubReleases(): Promise<GitHubRelease[]> {
-  return getCachedReleases('yandy-r', 'praxrr');
+async function fetchGitHubReleases(fetchFn: typeof globalThis.fetch): Promise<GitHubRelease[]> {
+  return getCachedReleases('yandy-r', 'praxrr', fetchFn);
 }
 
 function compareVersions(v1: string, v2: string): number {
@@ -53,7 +53,7 @@ function getVersionStatus(currentVersion: string, latestVersion: string | undefi
   }
 }
 
-export const load = () => {
+export const load = ({ fetch }) => {
   const currentMigrationVersion = migrationRunner.getCurrentVersion();
   const appliedMigrations = migrationRunner.getAppliedMigrations();
 
@@ -64,7 +64,7 @@ export const load = () => {
   }));
 
   // Return synchronous data immediately, defer releases fetch
-  const releasesPromise = fetchGitHubReleases().then((releases) => {
+  const releasesPromise = fetchGitHubReleases(fetch).then((releases) => {
     const latestRelease = releases.find((r) => !r.prerelease);
     const versionStatus = getVersionStatus(appVersion, latestRelease?.tag_name);
 

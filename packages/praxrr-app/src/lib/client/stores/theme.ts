@@ -11,10 +11,14 @@ function createThemeStore() {
   // Initialize theme from localStorage or system preference
   let initialTheme: Theme = 'dark';
   if (browser) {
-    const stored = localStorage.getItem('theme') as Theme | null;
-    if (stored) {
-      initialTheme = stored;
-    } else {
+    try {
+      const stored = localStorage.getItem('theme');
+      if (stored === 'light' || stored === 'dark') {
+        initialTheme = stored;
+      } else {
+        initialTheme = globalThis.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      }
+    } catch {
       initialTheme = globalThis.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
     }
   }
@@ -47,7 +51,11 @@ function createThemeStore() {
       const newTheme = current === 'light' ? 'dark' : 'light';
       applyTheme(newTheme);
       if (browser) {
-        localStorage.setItem('theme', newTheme);
+        try {
+          localStorage.setItem('theme', newTheme);
+        } catch {
+          // localStorage unavailable (private browsing, storage full, etc.)
+        }
       }
       return newTheme;
     });
