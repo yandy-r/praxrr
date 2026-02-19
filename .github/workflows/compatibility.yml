@@ -7,8 +7,6 @@ on:
       - 'packages/praxrr-schema/**'
       - 'packages/praxrr-db/**'
       - 'packages/praxrr-parser/**'
-      - 'svelte.config.js'
-      - 'vite.config.ts'
       - 'package.json'
       - 'Dockerfile'
       - 'Dockerfile.parser'
@@ -53,8 +51,6 @@ jobs:
             app_paths:
               - 'packages/praxrr-app/**'
               - 'packages/praxrr-parser/**'
-              - 'svelte.config.js'
-              - 'vite.config.ts'
               - 'package.json'
               - 'Dockerfile'
               - 'Dockerfile.parser'

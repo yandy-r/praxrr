@@ -78,7 +78,7 @@ deno task generate:pcd-types   # PCD schema -> TypeScript types (packages/praxrr
 
 ### Path Aliases
 
-Defined in `svelte.config.js` and mirrored in `deno.json`:
+Defined in `packages/praxrr-app/svelte.config.js` and mirrored in `deno.json`:
 
 | Alias             | Path                                                        |
 | ----------------- | ----------------------------------------------------------- |
