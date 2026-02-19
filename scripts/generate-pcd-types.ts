@@ -33,6 +33,8 @@ const COLUMN_TYPE_OVERRIDES: Record<string, string> = {
   // Sonarr stores these as integers (0-5) but we want semantic strings in TS
   'sonarr_naming.colon_replacement_format': "'delete' | 'dash' | 'spaceDash' | 'spaceDashSpace' | 'smart' | 'custom'",
   'sonarr_naming.multi_episode_style': "'extend' | 'duplicate' | 'repeat' | 'scene' | 'range' | 'prefixedRange'",
+  // Lidarr stores colon_replacement_format as integer, same semantic mapping as Sonarr
+  'lidarr_naming.colon_replacement_format': "'delete' | 'dash' | 'spaceDash' | 'spaceDashSpace' | 'smart' | 'custom'",
 };
 const DEFAULT_VERSION = Deno.env.get('PRAXRR_SCHEMA_REF')?.trim() || 'v2';
 const SCHEMA_PATH = 'ops/0.schema.sql';
@@ -254,7 +256,7 @@ function isBooleanColumn(columnName: string, columnType: string): boolean {
   }
 
   // Exact matches
-  const booleanExactNames = ['negate', 'required', 'enabled', 'rename', 'should_match', 'upgrades_allowed'];
+  const booleanExactNames = ['negate', 'required', 'enabled', 'allowed', 'rename', 'should_match', 'upgrades_allowed'];
   if (booleanExactNames.includes(name)) {
     return true;
   }
@@ -411,9 +413,9 @@ function generateTableInterface(table: TableInfo): string {
     if (generated) {
       // Wrap in Generated<T> for auto-generated columns
       const baseType = nullable ? tsType.replace(' | null', '') : tsType;
-      lines.push(`\t${column.name}: Generated<${baseType}>${nullable ? ' | null' : ''};`);
+      lines.push(`  ${column.name}: Generated<${baseType}>${nullable ? ' | null' : ''};`);
     } else {
-      lines.push(`\t${column.name}: ${tsType};`);
+      lines.push(`  ${column.name}: ${tsType};`);
     }
   }
 
@@ -432,7 +434,7 @@ function generateDatabaseInterface(tables: TableInfo[]): string {
 
   for (const table of tables) {
     const interfaceName = `${toPascalCase(table.name)}Table`;
-    lines.push(`\t${table.name}: ${interfaceName};`);
+    lines.push(`  ${table.name}: ${interfaceName};`);
   }
 
   lines.push('}');
@@ -453,7 +455,7 @@ function generateRowType(table: TableInfo): string {
   for (const column of table.columns) {
     const nullable = isNullable(column);
     const tsType = getSemanticType(table.name, column, table.checkConstraints, nullable);
-    lines.push(`\t${column.name}: ${tsType};`);
+    lines.push(`  ${column.name}: ${tsType};`);
   }
 
   lines.push('}');
@@ -474,9 +476,8 @@ function generateTypesFile(tables: TableInfo[], version: string): string {
  * AUTO-GENERATED - DO NOT EDIT MANUALLY
  *
  * Generated from: https://github.com/${SCHEMA_REPO}/blob/${version}/${SCHEMA_PATH}
- * Generated at: ${new Date().toISOString()}
  *
- * To regenerate: deno task generate:pcd-types --version=${version}
+ * To regenerate: deno task generate:pcd-types
  */
 
 import type { Generated } from 'kysely';
@@ -507,16 +508,25 @@ import type { Generated } from 'kysely';
 
   const delayProfileTables = ['delay_profiles', 'delay_profile_tags'];
 
+  const lidarrMetadataProfileTables = [
+    'lidarr_metadata_profiles',
+    'lidarr_metadata_profile_primary_types',
+    'lidarr_metadata_profile_secondary_types',
+    'lidarr_metadata_profile_release_statuses',
+  ];
+
   const mediaManagementTables = [
     'radarr_naming',
     'sonarr_naming',
+    'lidarr_naming',
     'radarr_media_settings',
     'sonarr_media_settings',
+    'lidarr_media_settings',
     'radarr_quality_definitions',
     'sonarr_quality_definitions',
   ];
 
-  const coreTables = ['tags', 'languages', 'qualities', 'quality_api_mappings'];
+  const coreTables = ['tags', 'languages', 'qualities', 'quality_api_mappings', 'lidarr_quality_definitions'];
 
   // Categories in display order
   const categories = [
@@ -524,6 +534,7 @@ import type { Generated } from 'kysely';
     'CUSTOM FORMATS',
     'REGULAR EXPRESSIONS',
     'DELAY PROFILES',
+    'LIDARR METADATA PROFILES',
     'MEDIA MANAGEMENT',
     'CORE',
   ] as const;
@@ -542,6 +553,8 @@ import type { Generated } from 'kysely';
       categorized.get('REGULAR EXPRESSIONS')!.push(table);
     } else if (delayProfileTables.includes(table.name)) {
       categorized.get('DELAY PROFILES')!.push(table);
+    } else if (lidarrMetadataProfileTables.includes(table.name)) {
+      categorized.get('LIDARR METADATA PROFILES')!.push(table);
     } else if (mediaManagementTables.includes(table.name)) {
       categorized.get('MEDIA MANAGEMENT')!.push(table);
     } else if (coreTables.includes(table.name)) {
@@ -571,6 +584,10 @@ import type { Generated } from 'kysely';
   categorized.set('CUSTOM FORMATS', sortByOrder(categorized.get('CUSTOM FORMATS')!, customFormatTables));
   categorized.set('REGULAR EXPRESSIONS', sortByOrder(categorized.get('REGULAR EXPRESSIONS')!, regexTables));
   categorized.set('DELAY PROFILES', sortByOrder(categorized.get('DELAY PROFILES')!, delayProfileTables));
+  categorized.set(
+    'LIDARR METADATA PROFILES',
+    sortByOrder(categorized.get('LIDARR METADATA PROFILES')!, lidarrMetadataProfileTables),
+  );
   categorized.set('MEDIA MANAGEMENT', sortByOrder(categorized.get('MEDIA MANAGEMENT')!, mediaManagementTables));
   categorized.set('CORE', sortByOrder(categorized.get('CORE')!, coreTables));
 
@@ -625,8 +642,36 @@ import type { Generated } from 'kysely';
   lines.push('// COMMON TYPES');
   lines.push('// ============================================================================');
   lines.push('');
+  lines.push('/** Concrete Arr application types (no meta type) */');
+  lines.push("export const ARR_APP_TYPES = ['radarr', 'sonarr', 'lidarr'] as const;");
+  lines.push('export type ArrAppType = (typeof ARR_APP_TYPES)[number];');
+  lines.push('');
+  lines.push('/** Runtime enum source for ArrType validation (includes condition-target wildcard) */');
+  lines.push("export const ARR_TYPES = [...ARR_APP_TYPES, 'all'] as const;");
+  lines.push('');
   lines.push('/** Which arr application the data applies to */');
-  lines.push("export type ArrType = 'radarr' | 'sonarr' | 'all';");
+  lines.push('export type ArrType = (typeof ARR_TYPES)[number];');
+  lines.push('');
+  lines.push('// Non-regression acceptance checks:');
+  lines.push('// - Radarr/Sonarr legacy targets remain valid.');
+  lines.push('// - Lidarr is an explicit, intentional Arr app type addition (no string fallback).');
+  lines.push(
+    "const ARR_APP_TYPE_NON_REGRESSION_CHECK = ['radarr', 'sonarr'] as const satisfies readonly ArrAppType[];",
+  );
+  lines.push(
+    "const ARR_APP_TYPE_WITH_LIDARR_CHECK = ['radarr', 'sonarr', 'lidarr'] as const satisfies readonly ArrAppType[];",
+  );
+  lines.push(
+    "const ARR_TYPE_NON_REGRESSION_CHECK = ['radarr', 'sonarr', 'all'] as const satisfies readonly ArrType[];",
+  );
+  lines.push('void ARR_APP_TYPE_NON_REGRESSION_CHECK;');
+  lines.push('void ARR_APP_TYPE_WITH_LIDARR_CHECK;');
+  lines.push('void ARR_TYPE_NON_REGRESSION_CHECK;');
+  lines.push('');
+  lines.push('/** Runtime guard for untrusted arr type values */');
+  lines.push('export function isArrType(value: string): value is ArrType {');
+  lines.push('  return (ARR_TYPES as readonly string[]).includes(value);');
+  lines.push('}');
   lines.push('');
 
   // Generate helper types
@@ -636,20 +681,20 @@ import type { Generated } from 'kysely';
   lines.push('');
   lines.push('/** Extract insertable type from a table (Generated fields become optional) */');
   lines.push('export type Insertable<T> = {');
-  lines.push('\t[K in keyof T]: T[K] extends Generated<infer U>');
-  lines.push('\t\t? U | undefined');
-  lines.push('\t\t: T[K] extends Generated<infer U> | null');
-  lines.push('\t\t\t? U | null | undefined');
-  lines.push('\t\t\t: T[K];');
+  lines.push('  [K in keyof T]: T[K] extends Generated<infer U>');
+  lines.push('    ? U | undefined');
+  lines.push('    : T[K] extends Generated<infer U> | null');
+  lines.push('      ? U | null | undefined');
+  lines.push('      : T[K];');
   lines.push('};');
   lines.push('');
   lines.push('/** Extract selectable type from a table (Generated<T> becomes T) */');
-  lines.push('export type Selectable<T> = {');
-  lines.push('\t[K in keyof T]: T[K] extends Generated<infer U>');
-  lines.push('\t\t? U');
-  lines.push('\t\t: T[K] extends Generated<infer U> | null');
-  lines.push('\t\t\t? U | null');
-  lines.push('\t\t\t: T[K];');
+  lines.push(
+    'export type Selectable<T> = {',
+  );
+  lines.push(
+    '  [K in keyof T]: T[K] extends Generated<infer U> ? U : T[K] extends Generated<infer U> | null ? U | null : T[K];',
+  );
   lines.push('};');
   lines.push('');
 

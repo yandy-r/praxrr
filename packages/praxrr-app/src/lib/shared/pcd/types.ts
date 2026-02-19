@@ -3,10 +3,9 @@
  *
  * AUTO-GENERATED - DO NOT EDIT MANUALLY
  *
- * Generated from: https://github.com/yandy-r/praxrr-schema/blob/1.0.0/ops/0.schema.sql
- * Generated at: 2026-01-27T13:04:08.653Z
+ * Generated from: https://github.com/yandy-r/praxrr-schema/blob/local/ops/0.schema.sql
  *
- * To regenerate: deno task generate:pcd-types --version=1.0.0
+ * To regenerate: deno task generate:pcd-types
  */
 
 import type { Generated } from 'kysely';
@@ -370,6 +369,16 @@ export interface QualityApiMappingsTable {
   created_at: Generated<string>;
 }
 
+export interface LidarrQualityDefinitionsTable {
+  name: string;
+  quality_name: string;
+  min_size: Generated<number>;
+  max_size: number;
+  preferred_size: number;
+  created_at: Generated<string>;
+  updated_at: Generated<string>;
+}
+
 // ============================================================================
 // DATABASE INTERFACE
 // ============================================================================
@@ -390,7 +399,13 @@ export interface PCDDatabase {
   custom_formats: CustomFormatsTable;
   delay_profiles: DelayProfilesTable;
   languages: LanguagesTable;
+  lidarr_media_settings: LidarrMediaSettingsTable;
+  lidarr_metadata_profile_primary_types: LidarrMetadataProfilePrimaryTypesTable;
+  lidarr_metadata_profile_release_statuses: LidarrMetadataProfileReleaseStatusesTable;
+  lidarr_metadata_profile_secondary_types: LidarrMetadataProfileSecondaryTypesTable;
+  lidarr_metadata_profiles: LidarrMetadataProfilesTable;
   lidarr_naming: LidarrNamingTable;
+  lidarr_quality_definitions: LidarrQualityDefinitionsTable;
   qualities: QualitiesTable;
   quality_api_mappings: QualityApiMappingsTable;
   quality_group_members: QualityGroupMembersTable;
@@ -400,14 +415,9 @@ export interface PCDDatabase {
   quality_profile_qualities: QualityProfileQualitiesTable;
   quality_profile_tags: QualityProfileTagsTable;
   quality_profiles: QualityProfilesTable;
-  lidarr_media_settings: LidarrMediaSettingsTable;
   radarr_media_settings: RadarrMediaSettingsTable;
   radarr_naming: RadarrNamingTable;
   radarr_quality_definitions: RadarrQualityDefinitionsTable;
-  lidarr_metadata_profile_primary_types: LidarrMetadataProfilePrimaryTypesTable;
-  lidarr_metadata_profile_release_statuses: LidarrMetadataProfileReleaseStatusesTable;
-  lidarr_metadata_profile_secondary_types: LidarrMetadataProfileSecondaryTypesTable;
-  lidarr_metadata_profiles: LidarrMetadataProfilesTable;
   regular_expression_tags: RegularExpressionTagsTable;
   regular_expressions: RegularExpressionsTable;
   sonarr_media_settings: SonarrMediaSettingsTable;
@@ -775,6 +785,16 @@ export interface QualityApiMappingsRow {
   arr_type: string;
   api_name: string;
   created_at: string;
+}
+
+export interface LidarrQualityDefinitionsRow {
+  name: string;
+  quality_name: string;
+  min_size: number;
+  max_size: number;
+  preferred_size: number;
+  created_at: string;
+  updated_at: string;
 }
 
 // ============================================================================

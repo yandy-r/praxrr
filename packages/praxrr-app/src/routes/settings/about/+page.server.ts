@@ -1,6 +1,6 @@
 import { migrationRunner } from '$db/migrations.ts';
 import { config } from '$config';
-import packageJson from '../../../../../../package.json' with { type: 'json' };
+const appVersion: string = __APP_VERSION__;
 import { getCachedReleases, type GitHubRelease } from '$lib/server/utils/github/cache.ts';
 
 type VersionStatus = 'up-to-date' | 'out-of-date' | 'dev-build';
@@ -66,7 +66,7 @@ export const load = () => {
   // Return synchronous data immediately, defer releases fetch
   const releasesPromise = fetchGitHubReleases().then((releases) => {
     const latestRelease = releases.find((r) => !r.prerelease);
-    const versionStatus = getVersionStatus(packageJson.version, latestRelease?.tag_name);
+    const versionStatus = getVersionStatus(appVersion, latestRelease?.tag_name);
 
     return {
       releases: releases.slice(0, 10),
@@ -75,7 +75,7 @@ export const load = () => {
   });
 
   return {
-    version: packageJson.version,
+    version: appVersion,
     versionStatus: 'dev-build' as VersionStatus, // Default until releases load
     timezone: config.timezone,
     paths: {
