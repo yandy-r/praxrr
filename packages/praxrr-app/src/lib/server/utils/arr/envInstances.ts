@@ -1,0 +1,204 @@
+import { parseOptionalAbsoluteHttpUrl } from '$utils/validation/url.ts';
+import { ARR_APP_TYPES, type ArrAppType } from '$shared/pcd/types.ts';
+
+const APP_TYPE_KEYS = ARR_APP_TYPES;
+const APP_LABELS: Record<ArrAppType, string> = {
+	radarr: 'Radarr',
+	sonarr: 'Sonarr',
+	lidarr: 'Lidarr',
+};
+
+const APP_INSTANCE_ENV_KEY_RE = /^([A-Z]+)_INSTANCE_(URL|API_KEY|NAME|EXTERNAL_URL|TAGS|ENABLED)_(\d+)$/;
+
+interface ParsedEnvInstanceRaw {
+	index: number;
+	type: ArrAppType;
+	url?: string;
+	apiKey?: string;
+	name?: string;
+	externalUrl?: string;
+	tags?: string;
+	enabled?: string;
+}
+
+/**
+ * Parsed descriptor used by env reconciliation.
+ */
+export interface ParsedEnvInstanceDescriptor {
+	type: ArrAppType;
+	index: number;
+	url: string;
+	apiKey: string;
+	name: string;
+	externalUrl: string | null;
+	tags: string[];
+	enabled: boolean;
+}
+
+function isSupportedArrAppType(value: string): value is ArrAppType {
+	return (APP_TYPE_KEYS as readonly string[]).includes(value);
+}
+
+function isSupportedArrAppTypePrefix(value: string): value is ArrAppType {
+	return isSupportedArrAppType(value);
+}
+
+/**
+ * Coerce optional `enabled` values from env variables. Defaults to `true`.
+ */
+export function parseEnabledFromEnv(value?: string | null): boolean {
+	if (!value) {
+		return true;
+	}
+
+	const normalized = value.trim().toLowerCase();
+	if (!normalized) {
+		return true;
+	}
+
+	if (['0', 'false', 'no', 'off'].includes(normalized)) {
+		return false;
+	}
+
+	if (['1', 'true', 'yes', 'on'].includes(normalized)) {
+		return true;
+	}
+
+	return true;
+}
+
+/**
+ * Coerce optional comma-separated tags into a deterministic string list.
+ */
+export function parseTagsFromEnv(value?: string | null): string[] {
+	if (!value) {
+		return [];
+	}
+
+	return value
+		.split(',')
+		.map((tag) => tag.trim())
+		.filter((tag) => tag.length > 0);
+}
+
+/**
+ * Coerce optional external URL and clear invalid/empty values to NULL.
+ */
+export function parseExternalUrlFromEnv(value?: string | null): string | null {
+	const parsed = parseOptionalAbsoluteHttpUrl(value?.trim());
+	if (!parsed.isValid) {
+		return null;
+	}
+
+	return parsed.value;
+}
+
+/**
+ * Parse app-prefixed env groups into reconciliation-ready descriptors.
+ * Supported names:
+ *   RADARR_INSTANCE_URL_<N>
+ *   RADARR_INSTANCE_API_KEY_<N>
+ *   RADARR_INSTANCE_NAME_<N>
+ *   RADARR_INSTANCE_EXTERNAL_URL_<N>
+ *   RADARR_INSTANCE_TAGS_<N>
+ *   RADARR_INSTANCE_ENABLED_<N>
+ *
+ * where app is RADARR | SONARR | LIDARR and N is a positive integer.
+ */
+export function parseArrInstanceEnvVars(): ParsedEnvInstanceDescriptor[] {
+	const grouped: Map<ArrAppType, Map<number, ParsedEnvInstanceRaw>> = new Map(
+		APP_TYPE_KEYS.map((type) => [type, new Map<number, ParsedEnvInstanceRaw>()])
+	);
+
+	const entries = Object.entries(Deno.env.toObject()).sort((left, right) => left[0].localeCompare(right[0]));
+
+	for (const [rawKey, rawValue] of entries) {
+		const match = rawKey.match(APP_INSTANCE_ENV_KEY_RE);
+		if (!match) {
+			continue;
+		}
+
+		const [, rawType, prop, rawIndex] = match;
+		const loweredType = rawType.toLowerCase();
+		if (!isSupportedArrAppTypePrefix(loweredType)) {
+			throw new Error(`Unsupported arr app type in env var key: ${rawType}`);
+		}
+
+		const index = Number.parseInt(rawIndex, 10);
+		if (Number.isNaN(index) || index < 1) {
+			continue;
+		}
+
+		const byIndex = grouped.get(loweredType);
+		if (!byIndex) {
+			continue;
+		}
+
+		const existing = byIndex.get(index) ?? { index, type: loweredType };
+		switch (prop) {
+			case 'URL':
+				existing.url = rawValue?.trim();
+				break;
+			case 'API_KEY':
+				existing.apiKey = rawValue?.trim();
+				break;
+			case 'NAME':
+				existing.name = rawValue?.trim();
+				break;
+			case 'EXTERNAL_URL':
+				existing.externalUrl = rawValue?.trim();
+				break;
+			case 'TAGS':
+				existing.tags = rawValue;
+				break;
+			case 'ENABLED':
+				existing.enabled = rawValue?.trim();
+				break;
+		}
+
+		byIndex.set(index, existing);
+	}
+
+	const descriptors: ParsedEnvInstanceDescriptor[] = [];
+	for (const type of APP_TYPE_KEYS) {
+		const byIndex = grouped.get(type);
+		if (!byIndex) {
+			continue;
+		}
+
+		const sortedIndices = [...byIndex.keys()].sort((a, b) => a - b);
+		for (const index of sortedIndices) {
+			const item = byIndex.get(index);
+			if (!item) {
+				continue;
+			}
+
+			const urlResult = parseOptionalAbsoluteHttpUrl(item.url);
+			if (!item.url || item.url.length === 0 || !urlResult.isValid || !urlResult.value) {
+				continue;
+			}
+
+			if (!item.apiKey || item.apiKey.length === 0) {
+				continue;
+			}
+
+			const name = item.name && item.name.length > 0 ? item.name : defaultName(type, index);
+			descriptors.push({
+				type,
+				index,
+				url: urlResult.value,
+				apiKey: item.apiKey,
+				name,
+				externalUrl: parseExternalUrlFromEnv(item.externalUrl),
+				tags: parseTagsFromEnv(item.tags),
+				enabled: parseEnabledFromEnv(item.enabled),
+			});
+		}
+	}
+
+	return descriptors;
+}
+
+function defaultName(type: ArrAppType, index: number): string {
+	return index === 1 ? APP_LABELS[type] : `${APP_LABELS[type]} ${index}`;
+}
