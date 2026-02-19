@@ -12,6 +12,7 @@ env:
 jobs:
   compatibility-gate:
     runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/app/v')
     permissions:
       contents: read
 
@@ -33,6 +34,7 @@ jobs:
   build:
     needs: compatibility-gate
     runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/app/v')
     permissions:
       contents: read
 
@@ -148,8 +150,10 @@ jobs:
   release:
     needs: [build, compatibility-gate]
     runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/app/v')
     permissions:
       contents: write
+      pull-requests: read
 
     steps:
       - name: Download all artifacts
@@ -158,10 +162,27 @@ jobs:
           path: artifacts
           merge-multiple: true
 
+      - name: Normalize release version
+        id: release-version
+        run: |
+          VERSION="${GITHUB_REF_NAME#app/v}"
+          echo "value=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Generate curated release notes
+        uses: release-drafter/release-drafter@v6
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        id: release-notes
+        with:
+          config-name: release-drafter.yml
+          publish: false
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ github.ref_name }}
+          name: ${{ steps.release-version.outputs.value }}
+          body: ${{ steps.release-notes.outputs.body }}
           files: artifacts/*
-          generate_release_notes: true
           draft: false
           prerelease: false
