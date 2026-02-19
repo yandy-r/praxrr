@@ -1,59 +1,63 @@
-> [!WARNING]
-> Superseded on 2026-02-15 by the first-class Lidarr initiative plan in `docs/plans/enhance-lidarr-support/parallel-plan.md` (tracked by GitHub issue #130 and umbrella #13).
->
-> This document captures the legacy Sonarr-reuse rollout model and is retained for historical context only. Do not use it for current implementation planning.
+# Analysis: Task Structure
 
-### Executive Summary
+## Executive Summary
 
-Use a three-phase plan: establish shared type/schema/mapping readiness, implement Lidarr support across media-management CRUD paths, then align sync/import-export and validate with focused tests. This ordering minimizes risk by resolving contract-level dependencies before route/entity changes. It also enables meaningful parallelism by splitting naming, quality-definitions, and media-settings streams while keeping shared dependency tasks explicit.
+The plan should optimize for safe parallelism while preserving a strict compatibility-first
+sequence. Consumer-readiness and release-gate decisions come first, then SQL publication, then
+rollout verification/documentation. Tasks should stay small (1-3 files) and explicit about
+dependencies.
 
-### Recommended Phase Structure
+## Recommended Phase Structure
 
-#### Phase 1: Foundation Contracts
+### Phase 1: Compatibility Foundation
 
-- purpose: Ensure Lidarr is accepted in shared arr metadata, portable schemas, and mapping data needed by downstream flows.
-- suggested tasks: update shared arr type/capability references, portable entity contracts, and Lidarr quality mapping availability.
-- parallelization notes: contract/documentation updates and mapping updates can run concurrently.
+- Purpose: verify consumer handling of `arr_type='lidarr'` and define release gate criteria.
+- Suggested tasks: compatibility audit, mixed-arr test coverage, gate/version policy definition.
+- Parallelization: documentation and test scaffolding can run in parallel; final gate decision is a
+  merge point.
 
-#### Phase 2: CRUD and Route Enablement
+### Phase 2: Database Publication
 
-- purpose: Enable Lidarr visibility and creation in naming, quality-definitions, and media-settings.
-- suggested tasks: extend route loaders/actions and entity read/create/update/delete logic for Lidarr behavior in each section.
-- dependencies: depends on Phase 1 contract/mapping readiness.
+- Purpose: introduce Lidarr metadata and idempotent SQL seeds.
+- Suggested tasks: `pcd.json` update, new ops for mappings/conditions/definitions, replay
+  validation.
+- Dependencies: requires Phase 1 gate and compatibility confirmation.
 
-#### Phase 3: Integration Verification
+### Phase 3: Rollout Hardening
 
-- purpose: Reconcile sync behavior, portable import/export, and test coverage.
-- suggested tasks: align syncer expectations, validate import/export entity handling, and add/update tests for Lidarr paths.
-- integration focus: confirm no mismatch between UI capabilities and sync capability-gating.
+- Purpose: validate end-to-end readiness and publish support boundaries.
+- Suggested tasks: integration verification, README/release updates, follow-up backlog definition.
+- Integration focus: coordinate version matrix and rollout timing with consumer repo.
 
-### Task Granularity Guidance
+## Task Granularity Guidance
 
-- appropriate task sizes: 1-3 files per task, single layer per task.
-- tasks to split: separate naming, quality-definitions, and media-settings into independent tasks.
-- tasks to combine: couple portable schema updates with internal entity-type validation updates.
+- Appropriate size: one logical change per task, 1-3 files.
+- Split: large SQL bodies by semantic concern/table area.
+- Combine: short documentation updates that share the same release context.
 
-### Dependency Analysis
+## Dependency Analysis
 
-#### Independent Tasks
+### Independent Tasks
 
-- shared arr metadata/capability updates.
-- quality API mapping updates for Lidarr.
-- docs/schema clarifications for portable Lidarr strategy.
+- README/release drafting once scope is fixed.
+- SQL seeds for distinct table areas after gate approval.
+- Risk/decision documentation updates.
 
-#### Sequential Tasks
+### Sequential Tasks
 
-- foundation contracts -> entity helper updates -> route action updates.
-- route/entity enablement -> sync/import-export reconciliation -> regression testing.
+- Gate and compatibility tasks before DB publication.
+- DB publication before rollout validation.
+- Final readiness checks after SQL/data shape is fixed.
 
-#### Potential Bottlenecks
+### Potential Bottlenecks
 
-- shared files touched by all streams: `/src/lib/shared/pcd/types.ts`, `/src/lib/shared/pcd/portable.ts`.
-- sync metadata dependencies: `/src/lib/server/db/queries/arrSync.ts`.
-- mapping dependencies: `quality_api_mappings` usage in quality-definition and sync paths.
+- `pcd.json` as shared gate and arr-type source of truth.
+- Operation numbering and migration ordering in `ops/`.
+- Cross-repo dependency on Praxrr compatibility timeline.
 
-### Suggested Task Template
+## Suggested Task Template
 
-- title format: `lidarr-support | <surface> | <action>`.
-- dependency annotation format: `Depends on [T#]`.
-- instruction completeness checklist: arrType validation, entity coverage, sync/import alignment, tests.
+- Title format: `Task X.Y: <specific objective>`
+- Dependency annotation: `Depends on [none|X.Y,...]`
+- Instruction checklist: pre-read files, create/modify targets, implementation details, validation
+  steps, expected outcome.

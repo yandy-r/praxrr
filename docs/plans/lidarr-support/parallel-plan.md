@@ -1,535 +1,385 @@
-> [!WARNING]
-> Superseded on 2026-02-15 by the first-class Lidarr initiative plan in `docs/plans/enhance-lidarr-support/parallel-plan.md` (tracked by GitHub issue #130 and umbrella #13).
->
-> This document captures the legacy Sonarr-reuse rollout model and is retained for historical context only. Do not use it for current implementation planning.
-
 # Lidarr Support Implementation Plan
 
-Lidarr support is partially available in sync flows but blocked in media-management CRUD surfaces because route handlers and entity modules still branch on Radarr/Sonarr only. The safest strategy is to align contracts first (arr types, portable entities, validators, quality mappings), then enable Lidarr per surface (naming, media-settings, quality-definitions) across server and UI layers in parallel. Final integration work reconciles sync metadata and verifies behavior through focused Lidarr regression tests. This plan keeps tasks narrowly scoped (1-3 files) while preserving explicit dependencies where shared contracts or mapping data are required.
-
-## Supersession Mapping (2026-02-15)
-
-The active issue decomposition for this initiative moved to first-class Lidarr tracking:
-
-- Critical parent: `#130`
-- Active umbrella: `#13`
-- Active task issues: `#132`-`#141`
-
-Legacy issues from this plan were explicitly superseded and closed:
-
-- `#30` -> superseded by `#135` and `#138`
-- `#31` -> superseded by `#136` and `#138`
-- `#32` -> superseded by `#137` and `#138`
-- `#33` -> superseded by `#138` and `#139`
-- `#34` -> superseded by `#140`
-- `#35` -> superseded by `#140` and `#141`
+This implementation introduces first-class `lidarr` coverage in a SQL-first repository by extending
+arr-scoped seed data and gating rollout through manifest metadata. The safest strategy is
+compatibility-first: define explicit scope and release criteria, then add idempotent Lidarr
+operations that mirror proven Radarr/Sonarr patterns. Work is organized to maximize parallel
+authoring of independent SQL seeds while keeping dependency-sensitive junctions (mapping joins,
+release gate, and final docs) serialized. The plan keeps scope constrained to planning-approved
+artifacts and shared-table extension first, with follow-up depth deferred until compatibility and
+mapping completeness are verified.
 
 ## Critically Relevant Files and Documentation
 
-- /src/lib/shared/pcd/types.ts: shared arr type and PCD typing contracts.
-- /src/lib/shared/arr/capabilities.ts: arr capability metadata consumed across routes/UI.
-- /src/lib/shared/pcd/portable.ts: portable entity-type source used by import/export.
-- /src/lib/server/pcd/entities/validate.ts: portable/entity validation gates.
-- /src/routes/api/v1/pcd/export/+server.ts: export endpoint using portable entity types.
-- /src/routes/api/v1/pcd/import/+server.ts: import endpoint validating portable entity payloads.
-- /src/lib/server/pcd/entities/mediaManagement/naming/read.ts: naming list/read logic.
-- /src/lib/server/pcd/entities/mediaManagement/naming/create.ts: naming write logic.
-- /src/lib/server/pcd/entities/mediaManagement/media-settings/read.ts: media-settings list/read logic.
-- /src/lib/server/pcd/entities/mediaManagement/media-settings/create.ts: media-settings write logic.
-- /src/lib/server/pcd/entities/mediaManagement/quality-definitions/read.ts: quality list/read plus mapping lookup.
-- /src/lib/server/pcd/entities/mediaManagement/quality-definitions/create.ts: quality write logic.
-- /src/routes/media-management/[databaseId]/naming/new/+page.server.ts: naming action validation/dispatch.
-- /src/routes/media-management/[databaseId]/media-settings/new/+page.server.ts: media-settings action validation/dispatch.
-- /src/routes/media-management/[databaseId]/quality-definitions/new/+page.server.ts: quality action validation/dispatch.
-- /src/routes/media-management/[databaseId]/naming/new/+page.svelte: naming UI arr-type selection.
-- /src/routes/media-management/[databaseId]/media-settings/new/+page.svelte: media-settings UI arr-type selection.
-- /src/routes/media-management/[databaseId]/quality-definitions/new/+page.svelte: quality UI arr-type selection.
-- /src/routes/media-management/[databaseId]/naming/components/SonarrNamingForm.svelte: naming form behavior that requires Lidarr parity.
-- /src/routes/media-management/[databaseId]/media-settings/components/MediaSettingsForm.svelte: media-settings form labels/payload behavior.
-- /src/routes/media-management/[databaseId]/quality-definitions/components/QualityDefinitionsForm.svelte: quality form mapping/label behavior.
-- /src/routes/media-management/[databaseId]/naming/views/CardView.svelte: naming list card rendering by arr type.
-- /src/routes/media-management/[databaseId]/media-settings/views/CardView.svelte: media-settings list card rendering by arr type.
-- /src/routes/media-management/[databaseId]/quality-definitions/views/CardView.svelte: quality-definitions list card rendering by arr type.
-- /src/lib/server/sync/mediaManagement/syncer.ts: Lidarr capability-gated sync behavior.
-- /src/lib/server/db/queries/arrSync.ts: sync metadata update/query layer.
-- /docs/api/v1/schemas/pcd.yaml: public portable schema and Lidarr reuse contract.
+- `docs/plans/lidarr-support/shared.md`: canonical shared context for architecture, tables,
+  patterns, and must-read docs.
+- `docs/plans/lidarr-support/analysis-context.md`: condensed context synthesis used for
+  phase/dependency shaping.
+- `docs/plans/lidarr-support/analysis-code.md`: concrete operation and manifest patterns to copy.
+- `docs/plans/lidarr-support/analysis-tasks.md`: parallelization and bottleneck analysis baseline.
+- `docs/plans/lidarr-support/feature-spec.md`: source of scope constraints, edge cases, and success
+  criteria.
+- `docs/plans/lidarr-support/research-technical.md`: schema and table implications, idempotency
+  constraints.
+- `docs/plans/lidarr-support/research-business.md`: business rules including arr-type isolation and
+  minimum complete set.
+- `docs/plans/lidarr-support/research-external.md`: Lidarr API concepts that influence mapping and
+  seed coverage.
+- `pcd.json`: arr type declaration and `praxrr.minimum_version` release gate.
+- `README.md`: public support-surface documentation.
+- `ops/24.1080p-balanced-score-refactor-add-hdtv-fallbacks.sql`: idempotent insert pattern.
+- `ops/30.fix-720p-web-dl-scoring.sql`: arr-type-scoped update/insert pattern.
+- `ops/34.add-remux-negation-to-release-group-missing.sql`: custom-format condition insertion
+  pattern.
+- `AGENTS.md`: repository conventions for op naming, ordering, and verification commands.
 
 ## Implementation Plan
 
-### Phase 1: Contract and Mapping Foundation
+### Phase 1: Scope and Gate Foundation
 
-#### Task 1.1: Align Shared Arr-Type Contracts and Docs Depends on [none]
+#### Task 1.1: Define Lidarr v1 Support Contract Depends on [none]
 
 **READ THESE BEFORE TASK**
 
-- /src/lib/shared/pcd/types.ts
-- /src/lib/shared/arr/capabilities.ts
-- /docs/api/v1/schemas/pcd.yaml
+- `docs/plans/lidarr-support/feature-spec.md`
+- `docs/plans/lidarr-support/research-business.md`
+- `docs/plans/lidarr-support/research-recommendations.md`
 
 **Instructions**
 
 Files to Create
 
-- None
+- `docs/plans/lidarr-support/requirements.md`
 
 Files to Modify
 
-- /src/lib/shared/pcd/types.ts
-- /src/lib/shared/arr/capabilities.ts
-- /docs/api/v1/schemas/pcd.yaml
+- `docs/plans/lidarr-support/feature-spec.md`
 
-Normalize `lidarr` handling in shared type unions/capabilities and ensure schema docs describe the same runtime behavior (Lidarr reuses existing media-management entities). Explicitly target arr-type union definitions, capability metadata keys, and schema enum/description nodes so the contract diff is unambiguous. Preserve strict typing and avoid introducing fallback arr-type paths. Add non-regression acceptance checks for unchanged Radarr/Sonarr behavior in unions, capabilities, and schema enums. Expected outcome: downstream tasks can rely on one authoritative arr-type contract.
+Capture a precise v1 support boundary for Lidarr (what is in scope, explicitly out of scope, and
+what blocks release). Document the minimum complete data set required for publication and map each
+requirement to a measurable verification step. Keep this contract implementation-oriented so later
+SQL tasks can be validated without reinterpretation.
 
-#### Task 1.2: Extend Portable Entity Handling for Lidarr Media-Management Depends on [1.1]
+#### Task 1.2: Build Lidarr Seed Inventory and Mapping Checklist Depends on [1.1]
 
 **READ THESE BEFORE TASK**
 
-- /src/lib/shared/pcd/portable.ts
-- /src/routes/api/v1/pcd/export/+server.ts
-- /src/routes/api/v1/pcd/import/+server.ts
+- `docs/plans/lidarr-support/research-technical.md`
+- `docs/plans/lidarr-support/research-external.md`
+- `ops/0.rosettarr.sql`
 
 **Instructions**
 
 Files to Create
 
-- None
+- `docs/plans/lidarr-support/lidarr-seed-inventory.md`
 
 Files to Modify
 
-- /src/lib/shared/pcd/portable.ts
-- /src/routes/api/v1/pcd/export/+server.ts
-- /src/routes/api/v1/pcd/import/+server.ts
+- `docs/plans/lidarr-support/research-technical.md`
 
-Update entity-type catalogs and import/export handler branching to accept Lidarr media-management payloads while retaining current Radarr/Sonarr compatibility. Enumerate the accepted Lidarr portable entity matrix explicitly (naming, media-settings, quality-definitions under reused entity model), and define deterministic error messages for unsupported/mixed payloads. Expected outcome: import/export supports Lidarr media-management presets end-to-end with explicit contract/error behavior.
+Produce a concrete inventory of Lidarr seed targets (profiles, custom formats, conditions, quality
+definitions, and mapping joins). Use a strict row shape for every item: `entity`, `source`,
+`target_table`, `unique_key_tuple`, `arr_type_scope`, `status`, and `evidence_link`. For each
+target, include source rationale, arr-type scope, and idempotency guard expectations to remove
+ambiguity before SQL work begins. Record unresolved schema decisions that could force dedicated
+`lidarr_*` entities.
 
-#### Task 1.3: Update PCD Validation Gates for Lidarr Portable Types Depends on [1.2]
+#### Task 1.3: Finalize Schema Gate for Phase 2 Depends on [1.2]
 
 **READ THESE BEFORE TASK**
 
-- /src/lib/server/pcd/entities/validate.ts
-- /src/lib/shared/pcd/portable.ts
+- `docs/plans/lidarr-support/lidarr-seed-inventory.md`
+- `docs/plans/lidarr-support/research-technical.md`
+- `pcd.json`
 
 **Instructions**
 
 Files to Create
 
-- None
+- `docs/plans/lidarr-support/lidarr-schema-gate.md`
 
 Files to Modify
 
-- /src/lib/server/pcd/entities/validate.ts
+- `docs/plans/lidarr-support/lidarr-seed-inventory.md`
 
-Ensure validation logic accepts the Lidarr portable media-management variants introduced in Task 1.2 and still fails fast on unsupported combinations. Task boundary: 1.2 owns portable catalogs/import/export branching, while 1.3 owns validation-only behavior and invalid-combination assertions. Keep validation messages explicit so import/export and route-level error handling remain actionable. Expected outcome: portable Lidarr inputs pass validation when valid and fail predictably when invalid.
+Lock one schema path for this implementation wave (`shared-table extension` or
+`dedicated Lidarr entities`) and define a hard stop condition for any conflicting assumptions
+discovered later. Record concrete Phase 2 table/key contracts in `lidarr-schema-gate.md` using
+explicit fields: `custom_formats_target`, `custom_formats_unique_key`, `quality_profiles_target`,
+`quality_profiles_unique_key`, `quality_definitions_target`, `quality_definitions_unique_key`,
+`profile_format_target`, and `conditions_target`. Phase 2 tasks must not start until this gate is
+approved.
 
-#### Task 1.4: Prepare Lidarr Quality-Mapping Prerequisites Depends on [none]
+### Phase 2: Lidarr SQL Publication
+
+Parallel execution note: if Task 1.3 approves the shared-table path, Tasks 2.1, 2.2, and 2.3 can run
+concurrently, and Task 2.5 starts after Task 2.1. If Task 1.3 selects dedicated entities, stop Phase
+2 SQL work and re-plan before implementation.
+
+#### Task 2.1: Seed Lidarr Custom Formats Depends on [1.3]
 
 **READ THESE BEFORE TASK**
 
-- /src/lib/server/pcd/entities/mediaManagement/quality-definitions/read.ts
-- /src/lib/server/sync/mediaManagement/syncer.ts
+- `docs/plans/lidarr-support/lidarr-seed-inventory.md`
+- `ops/24.1080p-balanced-score-refactor-add-hdtv-fallbacks.sql`
+- `ops/34.add-remux-negation-to-release-group-missing.sql`
 
 **Instructions**
 
 Files to Create
 
-- None
+- `ops/50.seed-lidarr-custom-formats.sql`
 
 Files to Modify
 
-- /src/lib/server/pcd/entities/mediaManagement/quality-definitions/read.ts
-- /src/lib/server/sync/mediaManagement/syncer.ts
+- None.
 
-Define and wire explicit `arr_type = 'lidarr'` quality-mapping expectations so quality lookups and sync updates are deterministic. Scope this task to mapping primitives/guards only (lookup behavior and sync-side handling), not CRUD branch implementation. Policy matrix for this task: read/list skips unmapped entries with warning metadata, and sync skips unmapped entries with logged reason. Create/update rejection rules are implemented in Task 2.7. Add concrete done criteria in code-level assertions/guards: Lidarr mapping lookup returns expected API names, read/sync policy behavior is enforced, and sync logging still reflects capability-gated behavior. Align mapping names against `/docs/api/v1/schemas/arr.yaml` to avoid API-name drift. Mapping-row population is treated as an external data dependency (seed/migration/ops-owned); code must handle absent rows with deterministic fallback behavior rather than assuming inline data writes in this task. Expected outcome: quality-definition tasks can rely on stable Lidarr mapping behavior without ambiguous schema-side assumptions.
+Precondition: shared-table schema path is approved in Task 1.3. Add Lidarr custom format base rows
+in the exact `custom_formats_target` table using the `custom_formats_unique_key` tuple defined in
+`docs/plans/lidarr-support/lidarr-schema-gate.md`. Every row inserted in this task must be
+explicitly scoped to `arr_type='lidarr'` where schema supports arr typing; if any shared/global row
+is required, document the exact exception and justification in a SQL comment. Keep guard predicates
+deterministic (`NOT EXISTS` keyed by unique identity) so replays remain no-op safe.
 
-### Phase 2: Media-Management Surface Enablement
-
-#### Task 2.1: Add Lidarr Branching to Naming Entity Operations Depends on [1.1]
+#### Task 2.2: Seed Lidarr Quality Profiles Depends on [1.3]
 
 **READ THESE BEFORE TASK**
 
-- /src/lib/server/pcd/entities/mediaManagement/naming/read.ts
-- /src/lib/server/pcd/entities/mediaManagement/naming/create.ts
-- /src/lib/server/pcd/entities/mediaManagement/naming/update.ts
+- `docs/plans/lidarr-support/lidarr-seed-inventory.md`
+- `ops/30.fix-720p-web-dl-scoring.sql`
+- `docs/plans/lidarr-support/research-technical.md`
 
 **Instructions**
 
 Files to Create
 
-- None
+- `ops/51.seed-lidarr-quality-profiles.sql`
 
 Files to Modify
 
-- /src/lib/server/pcd/entities/mediaManagement/naming/read.ts
-- /src/lib/server/pcd/entities/mediaManagement/naming/create.ts
-- /src/lib/server/pcd/entities/mediaManagement/naming/update.ts
+- None.
 
-Enable naming list/read/write operations for Lidarr using existing duplicate-check and `writeOperation` patterns. Keep route-facing function contracts consistent so handlers can dispatch by arr type without custom branching duplication. Explicitly require Lidarr naming read/write paths to reuse Sonarr-backed table contracts (not new `lidarr_*` tables) while preserving arr-type identity in duplicate checks. Add acceptance criteria for duplicate-name behavior across arr types under shared-table reuse. Expected outcome: naming entity layer can process Lidarr config operations with deterministic duplicate handling.
+Precondition: shared-table schema path is approved in Task 1.3. Introduce Lidarr quality profile
+rows aligned with the documented v1 contract using `quality_profiles_target` and
+`quality_profiles_unique_key` from `docs/plans/lidarr-support/lidarr-schema-gate.md`, with
+`arr_type='lidarr'` and `NOT EXISTS` guards. If Task 1.3 selected dedicated entities, do not execute
+this task and re-plan the dedicated track first.
 
-#### Task 2.2: Enable Lidarr in Naming Server Routes Depends on [2.1]
+#### Task 2.3: Seed Lidarr Quality Definitions Depends on [1.3]
 
 **READ THESE BEFORE TASK**
 
-- /src/routes/media-management/[databaseId]/naming/+page.server.ts
-- /src/routes/media-management/[databaseId]/naming/new/+page.server.ts
-- /src/routes/media-management/[databaseId]/naming/radarr/[name]/+page.server.ts
-- /src/routes/media-management/[databaseId]/naming/sonarr/[name]/+page.server.ts
+- `docs/plans/lidarr-support/lidarr-seed-inventory.md`
+- `docs/plans/lidarr-support/research-external.md`
+- `ops/0.rosettarr.sql`
 
 **Instructions**
 
 Files to Create
 
-- /src/routes/media-management/[databaseId]/naming/lidarr/[name]/+page.server.ts
+- `ops/52.seed-lidarr-quality-definitions.sql`
 
 Files to Modify
 
-- /src/routes/media-management/[databaseId]/naming/+page.server.ts
-- /src/routes/media-management/[databaseId]/naming/new/+page.server.ts
+- None.
 
-Expand server-side arr-type validation, loading, and action dispatch for Lidarr naming configs. Preserve permission checks (`canWriteToBase`) and sync-name update semantics used by existing arr types. Add pass/fail acceptance criteria for invalid `arrType`, missing config name, permission denial, and successful rename propagation to sync metadata. Expected outcome: naming server handlers support Lidarr list/create/edit workflows with deterministic error behavior.
+Precondition: shared-table schema path is approved in Task 1.3. Shared-path outcome: insert quality
+definitions into the exact `quality_definitions_target` table and `quality_definitions_unique_key`
+tuple defined in `docs/plans/lidarr-support/lidarr-schema-gate.md`, with idempotent guards and
+`arr_type='lidarr'` scoping as applicable. Dedicated-path outcome: do not execute this task; create
+`docs/plans/lidarr-support/lidarr-dedicated-entities-plan.md`, record deferred definitions in that
+document, and re-run planning for the dedicated-entity track.
 
-#### Task 2.3: Enable Lidarr in Naming UI Pages Depends on [2.2]
+#### Task 2.4: Seed Lidarr Profile-to-Format Score Mappings Depends on [2.1, 2.2]
 
 **READ THESE BEFORE TASK**
 
-- /src/routes/media-management/[databaseId]/naming/+page.svelte
-- /src/routes/media-management/[databaseId]/naming/new/+page.svelte
-- /src/routes/media-management/[databaseId]/naming/radarr/[name]/+page.svelte
-- /src/routes/media-management/[databaseId]/naming/sonarr/[name]/+page.svelte
+- `ops/50.seed-lidarr-custom-formats.sql`
+- `ops/51.seed-lidarr-quality-profiles.sql`
+- `ops/30.fix-720p-web-dl-scoring.sql`
 
 **Instructions**
 
 Files to Create
 
-- /src/routes/media-management/[databaseId]/naming/lidarr/[name]/+page.svelte
+- `ops/53.seed-lidarr-profile-format-scores.sql`
 
 Files to Modify
 
-- /src/routes/media-management/[databaseId]/naming/+page.svelte
+- None.
 
-Expose Lidarr in naming page-level routing and edit-page navigation flows while keeping page wiring aligned with updated server handlers. Follow existing Radarr/Sonarr UX patterns so Lidarr appears first-class without introducing UI-only logic branches that bypass server validation. Add explicit acceptance criteria for `lidarr/[name]` deep-link loads, unknown-arr-type handling parity, and missing-name error UX. Expected outcome: users can navigate to and load Lidarr naming pages from UI routes.
+Create join-table mappings between Lidarr profiles and custom formats, including score values that
+reflect the agreed v1 behavior. Use strict duplicate-prevention predicates and maintain
+deterministic ordering so replay and diff reviews remain readable. Validate that all referenced
+profiles and custom formats already exist. Write mappings into `quality_profile_custom_formats`
+using uniqueness tuple `(quality_profile_name, custom_format_name, arr_type)` with
+`arr_type='lidarr'` and `NOT EXISTS` guards. Pull score values only from `lidarr-seed-inventory.md`,
+and record one traceability reference per inserted mapping.
 
-#### Task 2.4: Add Lidarr Branching to Media-Settings Entity Operations Depends on [1.1]
+#### Task 2.5: Seed Lidarr Custom Format Conditions Depends on [1.3, 2.1]
 
 **READ THESE BEFORE TASK**
 
-- /src/lib/server/pcd/entities/mediaManagement/media-settings/read.ts
-- /src/lib/server/pcd/entities/mediaManagement/media-settings/create.ts
-- /src/lib/server/pcd/entities/mediaManagement/media-settings/update.ts
+- `ops/50.seed-lidarr-custom-formats.sql`
+- `ops/34.add-remux-negation-to-release-group-missing.sql`
+- `docs/plans/lidarr-support/lidarr-seed-inventory.md`
 
 **Instructions**
 
 Files to Create
 
-- None
+- `ops/54.seed-lidarr-custom-format-conditions.sql`
+- `docs/plans/lidarr-support/lidarr-condition-evidence.md`
 
 Files to Modify
 
-- /src/lib/server/pcd/entities/mediaManagement/media-settings/read.ts
-- /src/lib/server/pcd/entities/mediaManagement/media-settings/create.ts
-- /src/lib/server/pcd/entities/mediaManagement/media-settings/update.ts
+- None.
 
-Add Lidarr media-settings read/write behavior while preserving current validation and capability-gated assumptions used by syncer logic. Keep helper signatures consistent with existing routes and avoid hidden fallback behavior. Explicitly require Sonarr-backed storage/query reuse for Lidarr media-settings and define collision-key behavior for same-name cross-arr configs. Add acceptance criteria for duplicate/collision behavior across arr types in shared storage paths. Expected outcome: media-settings entity layer supports Lidarr operations with predictable identity rules.
+Add condition rows needed for Lidarr custom formats with explicit arr-type scoping and deterministic
+predicates. Keep condition semantics music-appropriate and avoid reusing video-specific assumptions
+unless explicitly documented as shared behavior. Ensure every condition introduced is traceable to
+the seed inventory. Insert into `custom_format_conditions` with uniqueness keyed by
+`(custom_format_name, name, type, arr_type)` plus deterministic guard predicates. For each condition
+family, capture one expected-match and one expected-non-match example in
+`docs/plans/lidarr-support/lidarr-condition-evidence.md` so Task 2.6 can publish them in the final
+results artifact.
 
-#### Task 2.5: Enable Lidarr in Media-Settings Server Routes Depends on [2.4]
+#### Task 2.6: Reconcile Seed Inventory with Implemented SQL Depends on [2.1, 2.2, 2.3, 2.4, 2.5]
 
 **READ THESE BEFORE TASK**
 
-- /src/routes/media-management/[databaseId]/media-settings/+page.server.ts
-- /src/routes/media-management/[databaseId]/media-settings/new/+page.server.ts
-- /src/routes/media-management/[databaseId]/media-settings/radarr/[name]/+page.server.ts
-- /src/routes/media-management/[databaseId]/media-settings/sonarr/[name]/+page.server.ts
+- `docs/plans/lidarr-support/lidarr-seed-inventory.md`
+- `ops/50.seed-lidarr-custom-formats.sql`
+- `ops/54.seed-lidarr-custom-format-conditions.sql`
+- `docs/plans/lidarr-support/lidarr-condition-evidence.md`
 
 **Instructions**
 
 Files to Create
 
-- /src/routes/media-management/[databaseId]/media-settings/lidarr/[name]/+page.server.ts
+- `docs/plans/lidarr-support/lidarr-seed-results.md`
 
 Files to Modify
 
-- /src/routes/media-management/[databaseId]/media-settings/+page.server.ts
-- /src/routes/media-management/[databaseId]/media-settings/new/+page.server.ts
+- `docs/plans/lidarr-support/lidarr-seed-inventory.md`
 
-Enable Lidarr media-settings list/create/edit server behavior with the same permission and error patterns used today. Ensure route handlers call entity helpers rather than embedding business rules. Add pass/fail acceptance criteria for invalid `arrType`, missing config name, permission denial, and successful sync-name metadata updates on rename. Expected outcome: media-settings server routes fully support Lidarr workflows with deterministic failure semantics.
+Consolidate all SQL outputs into one authoritative inventory update to avoid parallel edit
+conflicts. Mark each planned item as implemented, deferred, or dropped with rationale and direct
+file references to the final ops scripts. Publish condition-level match/non-match examples from
+`docs/plans/lidarr-support/lidarr-condition-evidence.md` into `lidarr-seed-results.md`. This task is
+the single writer for seed inventory state after Phase 2.
 
-#### Task 2.6: Enable Lidarr in Media-Settings UI Pages Depends on [2.5]
+### Phase 3: Validation and Release Surface
+
+#### Task 3.1: Produce SQL Verification Evidence Depends on [1.1, 2.6]
 
 **READ THESE BEFORE TASK**
 
-- /src/routes/media-management/[databaseId]/media-settings/+page.svelte
-- /src/routes/media-management/[databaseId]/media-settings/new/+page.svelte
-- /src/routes/media-management/[databaseId]/media-settings/radarr/[name]/+page.svelte
-- /src/routes/media-management/[databaseId]/media-settings/sonarr/[name]/+page.svelte
+- `AGENTS.md`
+- `docs/plans/lidarr-support/requirements.md`
+- `docs/plans/lidarr-support/feature-spec.md`
 
 **Instructions**
 
 Files to Create
 
-- /src/routes/media-management/[databaseId]/media-settings/lidarr/[name]/+page.svelte
+- `docs/plans/lidarr-support/lidarr-validation.md`
 
 Files to Modify
 
-- /src/routes/media-management/[databaseId]/media-settings/+page.svelte
+- `docs/plans/lidarr-support/feature-spec.md`
 
-Add Lidarr to media-settings page-level routing and edit-page navigation, keeping route composition aligned with Task 2.5 handlers. Reuse existing page composition patterns to avoid divergent UI behavior by arr type. Add explicit acceptance criteria for `lidarr/[name]` deep-link loads, unknown-arr-type handling parity, and missing-name error UX. Expected outcome: media-settings UI routes support Lidarr navigation and page loading.
+Run and document verification with explicit commands and pass criteria: `ls ops/*.sql | sort -V`
+(new Lidarr ops in correct order, no numbering conflicts), `git diff -- ops/` (diff limited to
+intended Lidarr operations), and a replay procedure that applies the new Lidarr ops twice against
+the same staging dataset. Add table-level assertion queries in `lidarr-validation.md` and require
+zero-row results for duplicate checks over `(quality_profile_name, custom_format_name, arr_type)` in
+`quality_profile_custom_formats`, `(custom_format_name, name, type, arr_type)` in
+`custom_format_conditions`, and `(name, arr_type)` in `quality_profiles`. Include a
+requirement-to-evidence table that maps each item from `requirements.md` to concrete proof and
+pass/fail status.
 
-#### Task 2.7: Add Lidarr Branching to Quality-Definitions Entity Operations Depends on [1.1, 1.4]
+#### Task 3.2: Apply Manifest Release Gate Depends on [1.1, 3.1]
 
 **READ THESE BEFORE TASK**
 
-- /src/lib/server/pcd/entities/mediaManagement/quality-definitions/read.ts
-- /src/lib/server/pcd/entities/mediaManagement/quality-definitions/create.ts
-- /src/lib/server/pcd/entities/mediaManagement/quality-definitions/update.ts
+- `pcd.json`
+- `docs/plans/lidarr-support/requirements.md`
+- `docs/plans/lidarr-support/lidarr-validation.md`
 
 **Instructions**
 
 Files to Create
 
-- None
+- `docs/plans/lidarr-support/lidarr-rollout-checklist.md`
 
 Files to Modify
 
-- /src/lib/server/pcd/entities/mediaManagement/quality-definitions/read.ts
-- /src/lib/server/pcd/entities/mediaManagement/quality-definitions/create.ts
-- /src/lib/server/pcd/entities/mediaManagement/quality-definitions/update.ts
+- `pcd.json`
 
-Implement Lidarr quality-definition read/write behavior coupled to prepared mapping logic, with clear handling for unsupported or unmapped qualities. Preserve existing update semantics and duplicate constraints, and define explicit cross-arr duplicate/identity expectations for shared mappings. Explicitly require Sonarr-backed storage/query reuse and enforce entity-side policy: create/update rejects unmapped qualities with deterministic `400` responses and stable error messages. Expected outcome: quality-definition entity layer supports Lidarr-backed config operations with clear collision and mapping rules.
+Add `lidarr` to `arr_types` and set `praxrr.minimum_version` to the exact semver value recorded in
+`requirements.md` compatibility policy. In the rollout checklist, capture exact pre-release checks
+and cross-repo coordination points so publication cannot bypass readiness conditions. Ensure
+manifest changes are synchronized with validation evidence and include a semver-format sanity check
+before commit.
 
-#### Task 2.8: Enable Lidarr in Quality-Definitions Server Routes Depends on [2.7]
+#### Task 3.3: Publish Support and Compatibility Documentation Depends on [1.1, 3.1, 3.2]
 
 **READ THESE BEFORE TASK**
 
-- /src/routes/media-management/[databaseId]/quality-definitions/+page.server.ts
-- /src/routes/media-management/[databaseId]/quality-definitions/new/+page.server.ts
-- /src/routes/media-management/[databaseId]/quality-definitions/radarr/[name]/+page.server.ts
-- /src/routes/media-management/[databaseId]/quality-definitions/sonarr/[name]/+page.server.ts
+- `README.md`
+- `docs/plans/lidarr-support/requirements.md`
+- `docs/plans/lidarr-support/lidarr-validation.md`
 
 **Instructions**
 
 Files to Create
 
-- /src/routes/media-management/[databaseId]/quality-definitions/lidarr/[name]/+page.server.ts
+- `docs/plans/lidarr-support/lidarr-compatibility-matrix.md`
 
 Files to Modify
 
-- /src/routes/media-management/[databaseId]/quality-definitions/+page.server.ts
-- /src/routes/media-management/[databaseId]/quality-definitions/new/+page.server.ts
+- `README.md`
 
-Enable Lidarr quality-definition list/create/edit handlers with consistent validation and sync-name update behavior. Ensure server routes consume mapping-backed entity results and expose clear errors for unsupported cases. Add explicit status/message contract for unmapped or unsupported quality submissions. Expected outcome: quality-definition server handlers support Lidarr workflows with testable mapping-error behavior.
+Document what Lidarr capabilities are supported in v1, what remains out of scope, and which Praxrr
+versions are required. Do not modify `requirements.md` in this task; treat it as immutable baseline
+input after Task 1.1. Required README sections: `Lidarr Support Scope`, `Compatibility Gate`, and
+`Known Limitations`. Required matrix sections: `DB Version`, `Minimum Praxrr Version`,
+`Supported Lidarr Features`, and `Unsupported Features`. Add a claim-to-evidence map linking each
+published statement back to `requirements.md` and `lidarr-validation.md`.
 
-#### Task 2.9: Enable Lidarr in Quality-Definitions UI Pages Depends on [2.8]
+#### Task 3.4: Final Rollout Signoff Depends on [3.1, 3.2, 3.3]
 
 **READ THESE BEFORE TASK**
 
-- /src/routes/media-management/[databaseId]/quality-definitions/+page.svelte
-- /src/routes/media-management/[databaseId]/quality-definitions/new/+page.svelte
-- /src/routes/media-management/[databaseId]/quality-definitions/radarr/[name]/+page.svelte
-- /src/routes/media-management/[databaseId]/quality-definitions/sonarr/[name]/+page.svelte
+- `docs/plans/lidarr-support/lidarr-rollout-checklist.md`
+- `docs/plans/lidarr-support/lidarr-compatibility-matrix.md`
+- `docs/plans/lidarr-support/lidarr-validation.md`
 
 **Instructions**
 
 Files to Create
 
-- /src/routes/media-management/[databaseId]/quality-definitions/lidarr/[name]/+page.svelte
+- `docs/plans/lidarr-support/lidarr-signoff.md`
 
 Files to Modify
 
-- /src/routes/media-management/[databaseId]/quality-definitions/+page.svelte
-
-Expose Lidarr in quality-definition page-level routing and edit-page navigation and align page behavior with Task 2.8 handlers. Keep UX behavior consistent with existing arr surfaces while communicating mapping-based limitations where needed. Add explicit acceptance criteria for `lidarr/[name]` deep-link loads, unknown-arr-type handling parity, and missing-name error UX. Expected outcome: quality-definition UI routes support Lidarr page discovery and edit navigation.
-
-#### Task 2.10: Add Lidarr Rendering to Naming List Views Depends on [2.3]
-
-**READ THESE BEFORE TASK**
-
-- /src/routes/media-management/[databaseId]/naming/+page.svelte
-- /src/routes/media-management/[databaseId]/naming/views/CardView.svelte
-- /src/routes/media-management/[databaseId]/naming/views/TableView.svelte
-
-**Instructions**
-
-Files to Create
-
-- None
-
-Files to Modify
-
-- /src/routes/media-management/[databaseId]/naming/+page.svelte
-- /src/routes/media-management/[databaseId]/naming/views/CardView.svelte
-- /src/routes/media-management/[databaseId]/naming/views/TableView.svelte
-
-Add explicit Lidarr rendering and navigation behavior in naming list views so Lidarr entries are visible and route correctly to edit pages. Keep row/card behavior consistent with existing Radarr/Sonarr conventions. Add edge-case acceptance criteria for empty-state rendering, filter inclusion, and deep-link fallback behavior on unknown arr type/name. Expected outcome: naming list pages display Lidarr configs correctly in both card and table modes.
-
-#### Task 2.11: Add Lidarr Rendering to Media-Settings List Views Depends on [2.6]
-
-**READ THESE BEFORE TASK**
-
-- /src/routes/media-management/[databaseId]/media-settings/+page.svelte
-- /src/routes/media-management/[databaseId]/media-settings/views/CardView.svelte
-- /src/routes/media-management/[databaseId]/media-settings/views/TableView.svelte
-
-**Instructions**
-
-Files to Create
-
-- None
-
-Files to Modify
-
-- /src/routes/media-management/[databaseId]/media-settings/+page.svelte
-- /src/routes/media-management/[databaseId]/media-settings/views/CardView.svelte
-- /src/routes/media-management/[databaseId]/media-settings/views/TableView.svelte
-
-Add Lidarr rendering and edit-link behavior in media-settings card/table views, ensuring filters and labels behave identically to existing arr types. Add edge-case acceptance criteria for sort/filter parity and invalid route-name handling from list interactions. Expected outcome: media-settings list pages expose Lidarr entries consistently across view modes.
-
-#### Task 2.12: Add Lidarr Rendering to Quality-Definitions List Views Depends on [2.9]
-
-**READ THESE BEFORE TASK**
-
-- /src/routes/media-management/[databaseId]/quality-definitions/+page.svelte
-- /src/routes/media-management/[databaseId]/quality-definitions/views/CardView.svelte
-- /src/routes/media-management/[databaseId]/quality-definitions/views/TableView.svelte
-
-**Instructions**
-
-Files to Create
-
-- None
-
-Files to Modify
-
-- /src/routes/media-management/[databaseId]/quality-definitions/+page.svelte
-- /src/routes/media-management/[databaseId]/quality-definitions/views/CardView.svelte
-- /src/routes/media-management/[databaseId]/quality-definitions/views/TableView.svelte
-
-Add Lidarr support in quality-definition list rendering and navigation, including mapping-aware labels where applicable. Define fallback label/error presentation for missing mappings and include deep-link fallback behavior in acceptance criteria. Expected outcome: quality-definition list pages show and route Lidarr entries in both card and table layouts with deterministic fallback UI.
-
-#### Task 2.13: Add Lidarr Support to Naming Form Components Depends on [2.3]
-
-**READ THESE BEFORE TASK**
-
-- /src/routes/media-management/[databaseId]/naming/new/+page.svelte
-- /src/routes/media-management/[databaseId]/naming/components/SonarrNamingForm.svelte
-
-**Instructions**
-
-Files to Create
-
-- None
-
-Files to Modify
-
-- /src/routes/media-management/[databaseId]/naming/new/+page.svelte
-- /src/routes/media-management/[databaseId]/naming/components/SonarrNamingForm.svelte
-
-Parameterize naming form behavior for `lidarr` so labels, hidden inputs, and submission payloads follow Sonarr-compatible semantics while remaining explicit about Lidarr context. Add acceptance criteria for hidden `arrType` correctness, create/edit payload parity, and validation-error rendering from server responses. Expected outcome: naming forms submit valid Lidarr payloads without relying on implicit Sonarr-only assumptions.
-
-#### Task 2.14: Add Lidarr Support to Media-Settings Form Component Depends on [2.6]
-
-**READ THESE BEFORE TASK**
-
-- /src/routes/media-management/[databaseId]/media-settings/new/+page.svelte
-- /src/routes/media-management/[databaseId]/media-settings/components/MediaSettingsForm.svelte
-
-**Instructions**
-
-Files to Create
-
-- None
-
-Files to Modify
-
-- /src/routes/media-management/[databaseId]/media-settings/new/+page.svelte
-- /src/routes/media-management/[databaseId]/media-settings/components/MediaSettingsForm.svelte
-
-Update form-level labels, modal text, and payload shape so Lidarr media-settings behavior is explicit and Sonarr-parity compliant. Add acceptance criteria for duplicate/collision submission handling, modal copy parity, and deterministic error display behavior. Expected outcome: media-settings form component handles Lidarr correctly across create/edit flows.
-
-#### Task 2.15: Add Lidarr Support to Quality-Definitions Form Component Depends on [2.9]
-
-**READ THESE BEFORE TASK**
-
-- /src/routes/media-management/[databaseId]/quality-definitions/new/+page.svelte
-- /src/routes/media-management/[databaseId]/quality-definitions/components/QualityDefinitionsForm.svelte
-
-**Instructions**
-
-Files to Create
-
-- None
-
-Files to Modify
-
-- /src/routes/media-management/[databaseId]/quality-definitions/new/+page.svelte
-- /src/routes/media-management/[databaseId]/quality-definitions/components/QualityDefinitionsForm.svelte
-
-Add Lidarr-aware form behavior for quality labels, unit display, and mapping-limited states so user input remains aligned with server-side validation. Use one canonical UX path: disable unmapped quality options, show inline explanatory text beneath the selector, and block submit if an unmapped value is somehow present in form state. Keep behavior consistent across create/edit flows. Expected outcome: quality-definitions form supports Lidarr with clear mapping-aware UX.
-
-### Phase 3: Integration Hardening and Verification
-
-#### Task 3.1: Reconcile Sync Metadata with Lidarr Media-Management Flows Depends on [1.3, 1.4, 2.2, 2.5, 2.7, 2.8]
-
-**READ THESE BEFORE TASK**
-
-- /src/lib/server/sync/mediaManagement/syncer.ts
-- /src/lib/server/db/queries/arrSync.ts
-
-**Instructions**
-
-Files to Create
-
-- None
-
-Files to Modify
-
-- /src/lib/server/sync/mediaManagement/syncer.ts
-- /src/lib/server/db/queries/arrSync.ts
-
-Verify sync metadata reads/writes and update flows consume newly supported Lidarr presets across naming, media-settings, and quality-definitions. Implement concrete changes in `arrSync` query/update paths for Lidarr config-name linkage and in syncer config-resolution branches so Lidarr selections resolve deterministically per section. Preserve existing capability-gated logging and maintain Radarr/Sonarr behavior parity. Add strict update-safety constraints: updates are scoped by instance + arr type, rename collisions are detected before write, and cross-instance metadata must remain isolated. Pass criteria: Lidarr config selection persists in sync metadata, rename/update flows keep metadata aligned, collision handling is deterministic, and sync execution logs expected Lidarr mapping/skip reasons.
-
-#### Task 3.2: Add Lidarr Create/List/Edit Regression Coverage Depends on [2.10, 2.11, 2.12, 2.13, 2.14, 2.15]
-
-**READ THESE BEFORE TASK**
-
-- /src/routes/media-management/[databaseId]/quality-definitions/new/+page.server.ts
-- /src/routes/media-management/[databaseId]/media-settings/new/+page.server.ts
-- /src/routes/media-management/[databaseId]/naming/new/+page.server.ts
-
-**Instructions**
-
-Files to Create
-
-- /src/tests/arr/lidarrMediaManagement.test.ts
-
-Files to Modify
-
-- /src/tests/base/lidarrApiParity.test.ts
-
-Add targeted create/list/edit regression coverage for Lidarr naming/media-settings/quality-definition flows, including negative cases for mapping-gated quality inputs. Include an explicit assertion matrix with stable case IDs in fixtures/comments per surface: naming (NM-01..04), media-settings (MS-01..04), quality-definitions (QD-01..05). Each case must assert status/result, error/message content where applicable, and persisted-state expectations. Verify with concrete commands: `deno test -A src/tests/arr/lidarrMediaManagement.test.ts` and `deno test -A src/tests/base/lidarrApiParity.test.ts`. Expected outcome: automated tests detect Lidarr route/entity regressions with clear per-surface failure signals.
-
-#### Task 3.3: Add Lidarr Sync Metadata and Mapping Regression Coverage Depends on [3.1, 3.2]
-
-**READ THESE BEFORE TASK**
-
-- /src/tests/jobs/lidarrSync.test.ts
-- /src/lib/server/sync/mediaManagement/syncer.ts
-- /src/lib/server/db/queries/arrSync.ts
-
-**Instructions**
-
-Files to Create
-
-- None
-
-Files to Modify
-
-- /src/tests/jobs/lidarrSync.test.ts
-
-Add explicit sync regression cases for Lidarr config-selection persistence, rename propagation to sync metadata, and mapping-missing skip behavior with expected log/reason assertions. Verify with command: `deno test -A src/tests/jobs/lidarrSync.test.ts`. Expected outcome: sync-path regressions for Lidarr media-management are caught deterministically.
+- `docs/plans/lidarr-support/lidarr-rollout-checklist.md`
+
+Finalize release signoff with explicit pass/fail status for every gate item and capture any approved
+deferrals. Ensure unresolved risks are tagged with owners and follow-up milestones before declaring
+readiness. This task closes the plan by producing an auditable decision record.
 
 ## Advice
 
-- Land Phase 1 early to reduce merge conflicts: `/src/lib/shared/pcd/portable.ts` and `/src/lib/server/pcd/entities/validate.ts` are shared choke points.
-- Run entity tasks (`2.1`, `2.4`, `2.7`) in parallel once dependencies are met; then run each surface stream in parallel: server -> form/edit UI -> list views.
-- Treat quality-definition mapping readiness as a hard gate; missing Lidarr mappings can look like UI bugs but originate in lookup/sync constraints.
-- Keep route handlers thin and push arr-type-specific behavior into entity helpers and validators to avoid drift.
-- Preserve Lidarr capability-gating semantics in syncer logs so unsupported-field behavior remains auditable after UI expansion.
+- Keep SQL tasks independent by table concern, but reserve one integration checkpoint before
+  manifest changes to avoid publishing partial data.
+- Treat `pcd.json` as the final gate artifact, not the first change, so versioning reflects
+  validated compatibility rather than intent.
+- Use the seed inventory as a live source-of-truth; if a row is not in the inventory, it should not
+  be seeded.
+- Preserve established idempotent SQL style exactly; subtle predicate drift is the fastest path to
+  replay regressions.
+- Coordinate early with the Praxrr consumer maintainers on the minimum supported version because
+  that single value controls rollout safety.
