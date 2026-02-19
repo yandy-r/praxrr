@@ -53,10 +53,20 @@ jobs:
             exit 1
           fi
 
-          if ! curl -fsSL -H "Authorization: token ${MIRROR_PAT}" "https://api.github.com/repos/${MIRROR_REPO}" > /dev/null; then
-            echo "::error::Unable to access ${MIRROR_REPO}. Ensure MIRROR_PAT is valid and has repository write access."
+          status_code="$(curl -sS -o /tmp/mirror-repo-info-schema.json -w '%{http_code}' \
+            -H \"Authorization: token ${MIRROR_PAT}\" \
+            \"https://api.github.com/repos/${MIRROR_REPO}\")"
+          if [ "$status_code" != "200" ]; then
+            if [ "$status_code" = "401" ]; then
+              echo "::error::MIRROR_PAT is invalid or not authorized. HTTP ${status_code}. Update the secret and retry."
+            elif [ "$status_code" = "404" ]; then
+              echo "::error::MIRROR_REPO was not found or token lacks visibility. HTTP ${status_code} for ${MIRROR_REPO}."
+            else
+              echo "::error::Unable to validate ${MIRROR_REPO}. HTTP ${status_code}."
+            fi
             exit 1
           fi
+          rm -f /tmp/mirror-repo-info-schema.json
 
           echo "Mirroring packages/praxrr-schema subtree to ${TARGET_BRANCH}."
           SUBTREE_SHA="$(git subtree split --prefix=packages/praxrr-schema "${GITHUB_SHA}")"
