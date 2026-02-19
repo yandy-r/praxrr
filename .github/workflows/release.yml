@@ -24,6 +24,9 @@ jobs:
         with:
           deno-version: ${{ env.DENO_VERSION }}
 
+      - name: Install dependencies
+        run: deno install --node-modules-dir
+
       - name: Run compatibility check
         run: deno task compat:check
 
