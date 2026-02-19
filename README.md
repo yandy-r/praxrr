@@ -151,13 +151,13 @@ This runs the parser service and Vite dev server concurrently. See
 
 ## Monorepo Workspace Layout
 
-Praxrr now uses a Deno workspace with runtime code in `packages/praxrr-app` and two package members:
+Praxrr now uses a Deno workspace with its runtime application code (routes, lib, hooks, and UI) in `packages/praxrr-app/src/` and these package members:
 
 - `packages/praxrr-api` (legacy package surface)
 - `packages/praxrr-db` (pcd_ops and base ops)
 - `packages/praxrr-schema` (PCD schema SQL and manifest)
 
-Runtime behavior, Arr sync workflows, and API surfaces remain in `src/` at the root, while package members
+Runtime behavior, Arr sync workflows, and API surfaces now live under `packages/praxrr-app/src/`, while the package members above
 are consumed through workspace references and mirror publishes.
 
 ## Contract Checklist
