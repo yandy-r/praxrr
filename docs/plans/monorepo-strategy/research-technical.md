@@ -317,8 +317,8 @@ New environment variables for the default database auto-link (in `hooks.server.t
 | `PRAXRR_DEFAULT_DB_NAME`           | Display name for auto-linked database         | `Praxrr-DB`                            |
 | `PRAXRR_DEFAULT_DB_SYNC_STRATEGY`  | Sync interval in minutes                      | `60`                                   |
 | `PRAXRR_DEFAULT_DB_TOKEN`          | PAT for private repos (already exists)        | (none)                                 |
-| `PRAXRR_DEFAULT_DB_GIT_USER_NAME`  | Git author name (already exists)              | (none)                                 |
-| `PRAXRR_DEFAULT_DB_GIT_USER_EMAIL` | Git author email (already exists)             | (none)                                 |
+| `PRAXRR_DEFAULT_DB_GIT_USERNAME`  | Git author name (already exists)              | (none)                                 |
+| `PRAXRR_DEFAULT_DB_GIT_EMAIL` | Git author email (already exists)             | (none)                                 |
 
 Implementation in `hooks.server.ts`:
 

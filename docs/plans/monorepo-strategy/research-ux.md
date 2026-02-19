@@ -2,9 +2,20 @@
 
 ## Executive Summary
 
-The monorepo transition is primarily a developer/maintainer experience change. The critical DX wins are atomic cross-package commits (eliminating the three-PR coordination dance), local type generation from schema (removing the GitHub API dependency), and single-clone onboarding. Deno 2.x native workspace support provides the foundational tooling without requiring Nx/Turborepo overhead. The key UX risks are CI feedback clarity for cross-package failures, contributor disorientation during the transition period, and maintaining the external PCD consumer workflow through mirror publishing. The recommended approach is to keep the SvelteKit app at the repository root (not nested in `packages/`), add `packages/praxrr-db` and `packages/praxrr-schema` as workspace members alongside the existing `packages/praxrr-api`, and use path-filtered GitHub Actions with an aggregation job for CI gating.
+The monorepo transition is primarily a developer/maintainer experience change. The critical DX wins
+are atomic cross-package commits (eliminating the three-PR coordination dance), local type
+generation from schema (removing the GitHub API dependency), and single-clone onboarding. Deno 2.x
+native workspace support provides the foundational tooling without requiring Nx/Turborepo overhead.
+The key UX risks are CI feedback clarity for cross-package failures, contributor disorientation
+during the transition period, and maintaining the external PCD consumer workflow through mirror
+publishing. The recommended approach is to keep the SvelteKit app at the repository root (not nested
+in `packages/`), add `packages/praxrr-db` and `packages/praxrr-schema` as workspace members
+alongside the existing `packages/praxrr-api`, and use path-filtered GitHub Actions with an
+aggregation job for CI gating.
 
-**Confidence**: High -- based on Deno workspace documentation, real-world monorepo patterns from Graphite/Apollo/Svelte/deno-std, and GitHub Actions monorepo CI patterns from multiple authoritative sources.
+**Confidence**: High -- based on Deno workspace documentation, real-world monorepo patterns from
+Graphite/Apollo/Svelte/deno-std, and GitHub Actions monorepo CI patterns from multiple authoritative
+sources.
 
 ## User Workflows
 
@@ -16,32 +27,50 @@ The monorepo transition is primarily a developer/maintainer experience change. T
 
 **Best Practice**: One-command setup that builds everything from a single clone.
 
-The monorepo should support `git clone` followed by a single `deno task dev` to boot the full development environment. This is Graphite's "north star" pattern: one command boots everything ([source](https://graphite.com/blog/how-we-organize-our-monorepo-to-ship-fast)). Since Deno workspaces automatically resolve inter-package imports via bare specifiers (`@scope/package`), no separate install or link step is needed for workspace members ([source](https://docs.deno.com/runtime/fundamentals/workspaces/)).
+The monorepo should support `git clone` followed by a single `deno task dev` to boot the full
+development environment. This is Graphite's "north star" pattern: one command boots everything
+([source](https://graphite.com/blog/how-we-organize-our-monorepo-to-ship-fast)). Since Deno
+workspaces automatically resolve inter-package imports via bare specifiers (`@scope/package`), no
+separate install or link step is needed for workspace members
+([source](https://docs.deno.com/runtime/fundamentals/workspaces/)).
 
-**Confidence**: High -- Deno workspace documentation confirms automatic import resolution across members.
+**Confidence**: High -- Deno workspace documentation confirms automatic import resolution across
+members.
 
 **Praxrr-specific considerations**:
 
-- Contributors currently need to clone only `praxrr` for the app, but schema changes require separate clone of `praxrr-schema` and manual type generation. After the transition, the single clone gives access to everything.
-- The existing `deno task dev` (which starts both parser and Vite dev server) should continue working unchanged if the app stays at the repository root.
-- No new package manager or build orchestrator is needed. Deno's native workspace support handles dependency resolution, task running, and type checking across members.
+- Contributors currently need to clone only `praxrr` for the app, but schema changes require
+  separate clone of `praxrr-schema` and manual type generation. After the transition, the single
+  clone gives access to everything.
+- The existing `deno task dev` (which starts both parser and Vite dev server) should continue
+  working unchanged if the app stays at the repository root.
+- No new package manager or build orchestrator is needed. Deno's native workspace support handles
+  dependency resolution, task running, and type checking across members.
 
 #### 2. Navigate
 
 **Best Practice**: IDE-native navigation with minimal configuration overhead.
 
-Deno's language server (since v1.45) automatically detects `deno.json` files in subdirectories and creates separate scopes for type checking and module resolution per workspace member ([source](https://deno.com/blog/v1.45)). This means VSCode with the Deno extension already provides:
+Deno's language server (since v1.45) automatically detects `deno.json` files in subdirectories and
+creates separate scopes for type checking and module resolution per workspace member
+([source](https://deno.com/blog/v1.45)). This means VSCode with the Deno extension already provides:
 
 - Correct import resolution across workspace members
 - Per-member type checking environments
 - Go-to-definition across package boundaries
 
-**Confidence**: High -- confirmed by Deno workspace documentation and VSCode Deno extension behavior.
+**Confidence**: High -- confirmed by Deno workspace documentation and VSCode Deno extension
+behavior.
 
 **Additional navigation aids**:
 
-- A `.vscode/settings.json` committed to the repo should enable `deno.enable: true` for the workspace, and extension recommendations via `.vscode/extensions.json` should include the Deno extension ([source](https://medium.com/rewrite-tech/visual-studio-code-tips-for-monorepo-development-with-multi-root-workspaces-and-extension-6b69420ecd12)).
-- Package READMEs serve as in-IDE documentation when a developer opens a package directory. Each `packages/*/README.md` should include: purpose, owned files, key exports, and how to run tests ([source](https://www.tweag.io/blog/2023-04-04-python-monorepo-1/)).
+- A `.vscode/settings.json` committed to the repo should enable `deno.enable: true` for the
+  workspace, and extension recommendations via `.vscode/extensions.json` should include the Deno
+  extension
+  ([source](https://medium.com/rewrite-tech/visual-studio-code-tips-for-monorepo-development-with-multi-root-workspaces-and-extension-6b69420ecd12)).
+- Package READMEs serve as in-IDE documentation when a developer opens a package directory. Each
+  `packages/*/README.md` should include: purpose, owned files, key exports, and how to run tests
+  ([source](https://www.tweag.io/blog/2023-04-04-python-monorepo-1/)).
 
 #### 3. Develop
 
@@ -49,19 +78,28 @@ Deno's language server (since v1.45) automatically detects `deno.json` files in 
 
 The key workflow improvement is making schema-to-app changes atomic:
 
-**Before (current)**: Edit schema in `praxrr-schema` repo -> push -> run `deno task generate:pcd-types --version=tag` -> edit app code -> commit app changes. Three repos, three PRs, version coordination required.
+**Before (current)**: Edit schema in `praxrr-schema` repo -> push -> run
+`deno task generate:pcd-types --version=tag` -> edit app code -> commit app changes. Three repos,
+three PRs, version coordination required.
 
-**After (proposed)**: Edit `packages/praxrr-schema/ops/0.schema.sql` -> run `deno task generate:pcd-types --local` -> edit app code -> commit everything in one PR. Single repo, single PR, atomic guarantee.
+**After (proposed)**: Edit `packages/praxrr-schema/ops/0.schema.sql` -> run
+`deno task generate:pcd-types --local` -> edit app code -> commit everything in one PR. Single repo,
+single PR, atomic guarantee.
 
-Deno workspace members can reference each other via bare specifiers. For example, if `packages/praxrr-schema` defines `"name": "@praxrr/schema"` in its `deno.json`, the app code and `packages/praxrr-db` can import from `@praxrr/schema` without file paths ([source](https://docs.deno.com/runtime/fundamentals/workspaces/)).
+Deno workspace members can reference each other via bare specifiers. For example, if
+`packages/praxrr-schema` defines `"name": "@praxrr/schema"` in its `deno.json`, the app code and
+`packages/praxrr-db` can import from `@praxrr/schema` without file paths
+([source](https://docs.deno.com/runtime/fundamentals/workspaces/)).
 
-**Confidence**: High -- the `--local` flag for type generation already exists in the codebase per the business research document.
+**Confidence**: High -- the `--local` flag for type generation already exists in the codebase per
+the business research document.
 
 #### 4. Test
 
 **Best Practice**: Run only affected tests, with a way to run everything.
 
-Deno workspace commands automatically respect member boundaries ([source](https://docs.deno.com/runtime/fundamentals/workspaces/)):
+Deno workspace commands automatically respect member boundaries
+([source](https://docs.deno.com/runtime/fundamentals/workspaces/)):
 
 | Command                                    | Scope                                                   |
 | ------------------------------------------ | ------------------------------------------------------- |
@@ -70,15 +108,19 @@ Deno workspace commands automatically respect member boundaries ([source](https:
 | `deno test packages/praxrr-db/`            | Runs tests scoped to a directory                        |
 | `deno task test` (existing)                | Continues to run app tests via the root task definition |
 
-The existing test aliases (`deno task test filters`, `deno task test upgrades`, etc.) should continue working since they are defined in the root `deno.json` and operate on app-level test paths.
+The existing test aliases (`deno task test filters`, `deno task test upgrades`, etc.) should
+continue working since they are defined in the root `deno.json` and operate on app-level test paths.
 
-**Confidence**: High -- Deno workspace task filtering is documented with `--filter` and `--recursive` flags.
+**Confidence**: High -- Deno workspace task filtering is documented with `--filter` and
+`--recursive` flags.
 
 #### 5. Commit
 
 **Best Practice**: Conventional commits with package scopes.
 
-The project already uses conventional commits (`feat:`, `fix:`, `docs:`, `refactor:`, `chore:`). For monorepo changes, the scope should indicate which package is affected ([source](https://www.adaltas.com/en/2021/02/02/js-monorepos-commits-changelog/)):
+The project already uses conventional commits (`feat:`, `fix:`, `docs:`, `refactor:`, `chore:`). For
+monorepo changes, the scope should indicate which package is affected
+([source](https://www.adaltas.com/en/2021/02/02/js-monorepos-commits-changelog/)):
 
 | Change Type          | Commit Example                                                         |
 | -------------------- | ---------------------------------------------------------------------- |
@@ -87,15 +129,20 @@ The project already uses conventional commits (`feat:`, `fix:`, `docs:`, `refact
 | DB ops change        | `feat(db): add default Lidarr metadata profile ops`                    |
 | Cross-package change | `feat: add Lidarr metadata profile support` (no scope = cross-cutting) |
 
-The Angular convention (widely adopted for monorepos) recommends that scopes match package names ([source](https://www.conventionalcommits.org/en/about/)). When a commit touches multiple packages, either omit the scope or use the primary affected package.
+The Angular convention (widely adopted for monorepos) recommends that scopes match package names
+([source](https://www.conventionalcommits.org/en/about/)). When a commit touches multiple packages,
+either omit the scope or use the primary affected package.
 
-**Confidence**: Medium -- this is a convention choice, not a tooling requirement. The pattern is well-established but the exact scope names (`app`/`schema`/`db` vs full package names) are a project-level decision.
+**Confidence**: Medium -- this is a convention choice, not a tooling requirement. The pattern is
+well-established but the exact scope names (`app`/`schema`/`db` vs full package names) are a
+project-level decision.
 
 ### Alternative Flows
 
 #### Single-Package Change
 
-The simplest case. A developer edits files within one package directory, runs that package's tests, and commits with the appropriate scope. No cross-package validation needed beyond CI.
+The simplest case. A developer edits files within one package directory, runs that package's tests,
+and commits with the appropriate scope. No cross-package validation needed beyond CI.
 
 Example: Adding a new base op to `packages/praxrr-db/ops/`:
 
@@ -106,7 +153,8 @@ Example: Adding a new base op to `packages/praxrr-db/ops/`:
 
 #### Cross-Package Atomic Change
 
-The primary workflow improvement. Example: Adding a new PCD table that requires schema DDL, base ops, and app code changes.
+The primary workflow improvement. Example: Adding a new PCD table that requires schema DDL, base
+ops, and app code changes.
 
 1. Edit `packages/praxrr-schema/ops/0.schema.sql` -- add the new table DDL
 2. Run `deno task generate:pcd-types --local` -- regenerate TypeScript types from local schema
@@ -116,7 +164,8 @@ The primary workflow improvement. Example: Adding a new PCD table that requires 
 6. Commit: `feat: add support for delay profiles`
 7. CI validates all three packages together in a single PR
 
-**Confidence**: High -- this is the primary motivation for the monorepo transition, and the workflow maps directly to the existing `--local` type generation capability.
+**Confidence**: High -- this is the primary motivation for the monorepo transition, and the workflow
+maps directly to the existing `--local` type generation capability.
 
 ## Contributor Onboarding
 
@@ -124,7 +173,10 @@ The primary workflow improvement. Example: Adding a new PCD table that requires 
 
 #### Root README
 
-The root README should serve as the entry point for all contributors. Best practice from the deno-std and Svelte monorepos: the root README provides a high-level project overview, quick-start commands, and a directory map pointing to each package ([source](https://www.aviator.co/blog/monorepo-a-hands-on-guide-for-managing-repositories-and-microservices/)).
+The root README should serve as the entry point for all contributors. Best practice from the
+deno-std and Svelte monorepos: the root README provides a high-level project overview, quick-start
+commands, and a directory map pointing to each package
+([source](https://www.aviator.co/blog/monorepo-a-hands-on-guide-for-managing-repositories-and-microservices/)).
 
 **Recommended root README additions**:
 
@@ -144,11 +196,14 @@ src/               # Main SvelteKit application
   services/        # Parser microservice (C#)
 ```
 
-**Confidence**: High -- this pattern is standard across all surveyed monorepos (deno-std, Svelte, Graphite).
+**Confidence**: High -- this pattern is standard across all surveyed monorepos (deno-std, Svelte,
+Graphite).
 
 #### Per-Package READMEs
 
-Each package directory should contain a README that answers ([source](https://www.tweag.io/blog/2023-04-04-python-monorepo-1/), [source](https://www.aviator.co/blog/monorepo-a-hands-on-guide-for-managing-repositories-and-microservices/)):
+Each package directory should contain a README that answers
+([source](https://www.tweag.io/blog/2023-04-04-python-monorepo-1/),
+[source](https://www.aviator.co/blog/monorepo-a-hands-on-guide-for-managing-repositories-and-microservices/)):
 
 1. **What is this?** -- One-paragraph purpose statement
 2. **Who owns this?** -- Maintainer contacts or CODEOWNERS reference
@@ -185,18 +240,25 @@ Version tags: `schema-v*.*.*`
 
 The existing CONTRIBUTING.md (or creation of one) should address monorepo-specific guidance:
 
-- **Which package should I change?** -- Decision tree for where to put schema changes, op changes, and app code changes.
-- **How do I make cross-package changes?** -- Step-by-step guide matching the "Cross-Package Atomic Change" flow above.
+- **Which package should I change?** -- Decision tree for where to put schema changes, op changes,
+  and app code changes.
+- **How do I make cross-package changes?** -- Step-by-step guide matching the "Cross-Package Atomic
+  Change" flow above.
 - **How do I test my changes?** -- Package-scoped and full test commands.
 - **Commit conventions** -- Scope naming per package.
 
-**Confidence**: Medium -- the project does not appear to have a CONTRIBUTING.md yet, so this is a new document rather than an update.
+**Confidence**: Medium -- the project does not appear to have a CONTRIBUTING.md yet, so this is a
+new document rather than an update.
 
 #### Architecture Decision Records
 
-For the monorepo transition itself, an ADR documenting the "why" is valuable for future contributors who encounter the structure and wonder about the rationale. The business research document (`research-business.md`) already captures this context. Converting it to a concise ADR format (Context -> Decision -> Consequences) in `docs/` would serve this purpose.
+For the monorepo transition itself, an ADR documenting the "why" is valuable for future contributors
+who encounter the structure and wonder about the rationale. The business research document
+(`research-business.md`) already captures this context. Converting it to a concise ADR format
+(Context -> Decision -> Consequences) in `docs/` would serve this purpose.
 
-**Confidence**: Medium -- ADRs are a best practice but not universally adopted. The existing `docs/plans/` structure may serve a similar role.
+**Confidence**: Medium -- ADRs are a best practice but not universally adopted. The existing
+`docs/plans/` structure may serve a similar role.
 
 ### Navigation Aids
 
@@ -229,7 +291,11 @@ For the monorepo transition itself, an ADR documenting the "why" is valuable for
 
 #### Current UX
 
-On first startup, the app automatically links `https://github.com/yandy-r/praxrr-db` at branch `v2` as the default PCD database. The URL and branch are hardcoded in `src/hooks.server.ts`. Three env vars exist for optional git credentials (`PRAXRR_DEFAULT_DB_TOKEN`, `PRAXRR_DEFAULT_DB_GIT_USER_NAME`, `PRAXRR_DEFAULT_DB_GIT_USER_EMAIL`), but URL and branch are not configurable.
+On first startup, the app automatically links `https://github.com/yandy-r/praxrr-db` at branch `v2`
+as the default PCD database. The URL and branch are hardcoded in `src/hooks.server.ts`. Three env
+vars exist for optional git credentials (`PRAXRR_DEFAULT_DB_TOKEN`,
+`PRAXRR_DEFAULT_DB_GIT_USERNAME`, `PRAXRR_DEFAULT_DB_GIT_EMAIL`), but URL and branch are not
+configurable.
 
 #### Proposed UX
 
@@ -240,22 +306,36 @@ Add two new environment variables that follow the existing naming convention:
 | `PRAXRR_DEFAULT_DB_URL`    | `https://github.com/yandy-r/praxrr-db` | Git URL for the default auto-linked PCD database |
 | `PRAXRR_DEFAULT_DB_BRANCH` | `v2`                                   | Branch/tag to checkout for the default database  |
 
-This follows the "sensible defaults with override" pattern used across frameworks like Spring Boot, ASP.NET Core, and FastAPI ([source](https://learn.microsoft.com/en-us/aspnet/core/fundamentals/configuration/?view=aspnetcore-7.0), [source](https://fastapi.tiangolo.com/advanced/settings/)):
+This follows the "sensible defaults with override" pattern used across frameworks like Spring Boot,
+ASP.NET Core, and FastAPI
+([source](https://learn.microsoft.com/en-us/aspnet/core/fundamentals/configuration/?view=aspnetcore-7.0),
+[source](https://fastapi.tiangolo.com/advanced/settings/)):
 
-1. **Default works out of the box** -- Users who install Praxrr get the canonical database automatically, identical to current behavior.
-2. **Override via env var** -- Users who want a fork, mirror, or custom default database set the env var. No code change needed.
-3. **Full customization via UI** -- Users can always add additional databases via the `/databases/new` UI route, regardless of the default.
+1. **Default works out of the box** -- Users who install Praxrr get the canonical database
+   automatically, identical to current behavior.
+2. **Override via env var** -- Users who want a fork, mirror, or custom default database set the env
+   var. No code change needed.
+3. **Full customization via UI** -- Users can always add additional databases via the
+   `/databases/new` UI route, regardless of the default.
 
-**Confidence**: High -- the naming convention matches existing `PRAXRR_DEFAULT_DB_*` env vars, and the pattern is a well-established industry standard.
+**Confidence**: High -- the naming convention matches existing `PRAXRR_DEFAULT_DB_*` env vars, and
+the pattern is a well-established industry standard.
 
 #### Env Variable Design Principles
 
-Based on industry patterns for configuration UX ([source](https://algocademy.com/blog/how-to-use-environment-variables-and-configuration-files-in-software-development/)):
+Based on industry patterns for configuration UX
+([source](https://algocademy.com/blog/how-to-use-environment-variables-and-configuration-files-in-software-development/)):
 
-1. **Prefix consistency**: All Praxrr-specific env vars use the `PRAXRR_` prefix. The new vars (`PRAXRR_DEFAULT_DB_URL`, `PRAXRR_DEFAULT_DB_BRANCH`) follow the existing `PRAXRR_DEFAULT_DB_*` pattern.
-2. **Self-documenting names**: `URL` and `BRANCH` are unambiguous. Avoid abbreviations like `REPO` (could mean repository name vs URL).
-3. **No env var for "disable auto-link"**: If a user does not want any default database, they can set `PRAXRR_DEFAULT_DB_URL` to an empty string. The auto-link code should check for non-empty value before proceeding.
-4. **Docker and docker-compose friendly**: Env vars are the standard mechanism for container configuration. Document them in the Dockerfile, docker-compose.yml, and README.
+1. **Prefix consistency**: All Praxrr-specific env vars use the `PRAXRR_` prefix. The new vars
+   (`PRAXRR_DEFAULT_DB_URL`, `PRAXRR_DEFAULT_DB_BRANCH`) follow the existing `PRAXRR_DEFAULT_DB_*`
+   pattern.
+2. **Self-documenting names**: `URL` and `BRANCH` are unambiguous. Avoid abbreviations like `REPO`
+   (could mean repository name vs URL).
+3. **No env var for "disable auto-link"**: If a user does not want any default database, they can
+   set `PRAXRR_DEFAULT_DB_URL` to an empty string. The auto-link code should check for non-empty
+   value before proceeding.
+4. **Docker and docker-compose friendly**: Env vars are the standard mechanism for container
+   configuration. Document them in the Dockerfile, docker-compose.yml, and README.
 
 ### Best Practices from Industry
 
@@ -275,17 +355,25 @@ Based on industry patterns for configuration UX ([source](https://algocademy.com
 
 ### Cross-Package Compatibility
 
-The critical CI gate for the monorepo is validating that the app, schema, and DB ops are compatible with each other on every PR. This is what eliminates the cross-repo version coordination problem.
+The critical CI gate for the monorepo is validating that the app, schema, and DB ops are compatible
+with each other on every PR. This is what eliminates the cross-repo version coordination problem.
 
 #### Status Checks Strategy
 
-**Recommended approach**: Path-filtered workflows with an aggregation job ([source](https://github.com/orgs/community/discussions/26251), [source](https://oneuptime.com/blog/post/2026-01-26-monorepos-github-actions/view)).
+**Recommended approach**: Path-filtered workflows with an aggregation job
+([source](https://github.com/orgs/community/discussions/26251),
+[source](https://oneuptime.com/blog/post/2026-01-26-monorepos-github-actions/view)).
 
-The challenge with GitHub Actions in monorepos is that required status checks must correspond to specific job names, but path-filtered workflows may not run at all if their paths are not touched. The solution involves:
+The challenge with GitHub Actions in monorepos is that required status checks must correspond to
+specific job names, but path-filtered workflows may not run at all if their paths are not touched.
+The solution involves:
 
-1. **A detection job** that uses `dorny/paths-filter` to determine which packages changed ([source](https://github.com/dorny/paths-filter)).
+1. **A detection job** that uses `dorny/paths-filter` to determine which packages changed
+   ([source](https://github.com/dorny/paths-filter)).
 2. **Conditional package jobs** that run only when their package (or a dependency) is modified.
-3. **An aggregation job** that always runs and reports a single pass/fail status. This is the only required status check in branch protection ([source](https://github.com/orgs/community/discussions/26251)).
+3. **An aggregation job** that always runs and reports a single pass/fail status. This is the only
+   required status check in branch protection
+   ([source](https://github.com/orgs/community/discussions/26251)).
 
 Example workflow structure:
 
@@ -330,14 +418,17 @@ jobs:
     # Aggregation job: checks all needed jobs passed or were skipped
 ```
 
-**Confidence**: High -- this pattern is documented across multiple GitHub community discussions and CI guides as the standard approach for monorepo required checks.
+**Confidence**: High -- this pattern is documented across multiple GitHub community discussions and
+CI guides as the standard approach for monorepo required checks.
 
 #### Error Messages: Making Failures Actionable
 
 When a cross-package compatibility check fails, the developer needs to know:
 
-1. **Which package broke** -- The job name should include the package (e.g., `test-app`, `validate-pcd-compat`)
-2. **What specifically failed** -- The test output should identify the incompatibility (e.g., "Column `lidarr_metadata_profiles.name` referenced in base op but not defined in schema")
+1. **Which package broke** -- The job name should include the package (e.g., `test-app`,
+   `validate-pcd-compat`)
+2. **What specifically failed** -- The test output should identify the incompatibility (e.g.,
+   "Column `lidarr_metadata_profiles.name` referenced in base op but not defined in schema")
 3. **What to do about it** -- Link to the cross-package development workflow documentation
 
 **Recommended job naming convention**:
@@ -365,7 +456,8 @@ For Praxrr specifically, the hybrid approach works well because:
 - `validate-pcd-compat` needs schema and db to be available but can run in parallel with `test-app`
 - `ci-gate` aggregates all results
 
-**Confidence**: High -- the hybrid approach is the most commonly recommended pattern for small-to-medium monorepos.
+**Confidence**: High -- the hybrid approach is the most commonly recommended pattern for
+small-to-medium monorepos.
 
 ### PR Feedback Patterns
 
@@ -385,19 +477,26 @@ For Praxrr specifically, the hybrid approach works well because:
 
 #### Pre-Migration Announcement
 
-Before beginning the migration, communicate the plan to existing contributors ([source](https://graphite.com/guides/migrating-to-monorepo-a-step-by-step-guide)):
+Before beginning the migration, communicate the plan to existing contributors
+([source](https://graphite.com/guides/migrating-to-monorepo-a-step-by-step-guide)):
 
-1. **GitHub Discussion or Issue**: Create an issue from a template (per project conventions) explaining what is changing, why, and the timeline. Link to the business research document for detailed rationale.
-2. **README banner**: Add a temporary note to `praxrr-db` and `praxrr-schema` READMEs: "This repository is being consolidated into the [praxrr monorepo](link). See [issue #N] for details."
-3. **Timing**: Execute the migration when there are no open PRs against the affected repos ([source](https://graphite.com/guides/migrating-to-monorepo-a-step-by-step-guide)).
+1. **GitHub Discussion or Issue**: Create an issue from a template (per project conventions)
+   explaining what is changing, why, and the timeline. Link to the business research document for
+   detailed rationale.
+2. **README banner**: Add a temporary note to `praxrr-db` and `praxrr-schema` READMEs: "This
+   repository is being consolidated into the [praxrr monorepo](link). See [issue #N] for details."
+3. **Timing**: Execute the migration when there are no open PRs against the affected repos
+   ([source](https://graphite.com/guides/migrating-to-monorepo-a-step-by-step-guide)).
 
-**Confidence**: High -- timing around open PRs is a universally recommended practice for repo restructuring.
+**Confidence**: High -- timing around open PRs is a universally recommended practice for repo
+restructuring.
 
 #### During Migration
 
 1. **Merge all in-flight PRs** or communicate a freeze window.
 2. **Execute the structural change** in a single PR to the monorepo.
-3. **Archive external repos** immediately after the merge, with README pointers to the new locations.
+3. **Archive external repos** immediately after the merge, with README pointers to the new
+   locations.
 
 #### Post-Migration Announcement
 
@@ -416,17 +515,21 @@ Before beginning the migration, communicate the plan to existing contributors ([
    ```
 
 2. **Release notes**: Include the monorepo transition in the next app release changelog.
-3. **Discord/community**: If there is a community channel, post about the change with a link to the migration guide.
+3. **Discord/community**: If there is a community channel, post about the change with a link to the
+   migration guide.
 
-**Confidence**: High -- archiving repos with redirect READMEs is a standard, low-risk communication strategy.
+**Confidence**: High -- archiving repos with redirect READMEs is a standard, low-risk communication
+strategy.
 
 ### Migration Guide
 
-A migration guide should be published alongside the structural change. Target audience: existing contributors who have local clones of the separate repos.
+A migration guide should be published alongside the structural change. Target audience: existing
+contributors who have local clones of the separate repos.
 
 **Contents**:
 
-1. **What changed**: `praxrr-db` and `praxrr-schema` now live inside `packages/` in the main `praxrr` repo.
+1. **What changed**: `praxrr-db` and `praxrr-schema` now live inside `packages/` in the main
+   `praxrr` repo.
 2. **What you need to do**:
    - `git pull` on your existing `praxrr` clone to get the new structure.
    - Delete your local clones of `praxrr-db` and `praxrr-schema` (they are now inside the monorepo).
@@ -454,9 +557,13 @@ Schema and DB packages now live in packages/ within the main repository.
 Mirror publishing to yandy-r/praxrr-db and yandy-r/praxrr-schema continues.
 ```
 
-For ongoing changelog generation, conventional commits with package scopes naturally produce grouped changelogs. Tools like Changesets ([source](https://github.com/changesets/changesets)) can generate per-package changelogs, but given the small number of packages (3-4), manual changelog entries in release notes are likely sufficient.
+For ongoing changelog generation, conventional commits with package scopes naturally produce grouped
+changelogs. Tools like Changesets ([source](https://github.com/changesets/changesets)) can generate
+per-package changelogs, but given the small number of packages (3-4), manual changelog entries in
+release notes are likely sufficient.
 
-**Confidence**: Medium -- changelog tooling is a nice-to-have, not a requirement for this size monorepo.
+**Confidence**: Medium -- changelog tooling is a nice-to-have, not a requirement for this size
+monorepo.
 
 ### Minimizing Disruption
 
@@ -468,7 +575,8 @@ For ongoing changelog generation, conventional commits with package scopes natur
 | **No breaking changes to pcd.json** | The manifest contract stays the same                                                                               | Custom PCD repos continue working                                           |
 | **Run both workflows temporarily**  | During transition, keep the existing CI and add new monorepo CI                                                    | Can compare results before removing the old pipeline                        |
 
-**Confidence**: High -- phased migration is the lowest-risk approach and is recommended by all migration guides surveyed.
+**Confidence**: High -- phased migration is the lowest-risk approach and is recommended by all
+migration guides surveyed.
 
 ## Competitive Analysis
 
@@ -476,7 +584,11 @@ For ongoing changelog generation, conventional commits with package scopes natur
 
 **Repository**: [github.com/denoland/std](https://github.com/denoland/std)
 
-**Approach**: 44+ workspace members in a single `deno.json` with a flat package structure (`./assert`, `./async`, `./bytes`, etc.). Root `deno.json` defines strict shared compiler options (`strict: true`, `exactOptionalPropertyTypes: true`), shared imports, and comprehensive tasks (`test`, `lint`, `ok`). Each package has its own `deno.json` with `name` and `version` for independent publishing to JSR.
+**Approach**: 44+ workspace members in a single `deno.json` with a flat package structure
+(`./assert`, `./async`, `./bytes`, etc.). Root `deno.json` defines strict shared compiler options
+(`strict: true`, `exactOptionalPropertyTypes: true`), shared imports, and comprehensive tasks
+(`test`, `lint`, `ok`). Each package has its own `deno.json` with `name` and `version` for
+independent publishing to JSR.
 
 **Strengths**:
 
@@ -487,17 +599,22 @@ For ongoing changelog generation, conventional commits with package scopes natur
 
 **Relevant patterns for Praxrr**:
 
-- Use `workspace: ["packages/*"]` glob pattern instead of listing each member explicitly, matching deno-std's approach to scalability.
+- Use `workspace: ["packages/*"]` glob pattern instead of listing each member explicitly, matching
+  deno-std's approach to scalability.
 - Define strict compiler options in the root `deno.json` that all packages inherit.
 - Create a comprehensive validation task (like deno-std's `ok` task) that runs all checks.
 
-**Confidence**: High -- deno-std is the canonical Deno workspace example, maintained by the Deno team.
+**Confidence**: High -- deno-std is the canonical Deno workspace example, maintained by the Deno
+team.
 
 ### Svelte Framework Monorepo
 
 **Repository**: [github.com/sveltejs/svelte](https://github.com/sveltejs/svelte)
 
-**Approach**: pnpm workspace with a deliberately minimal structure. The `packages/svelte/` directory contains the sole published package. `playgrounds/sandbox/` provides a local development environment. Root coordinates builds via pnpm's `-r` (recursive) and `--filter` flags ([source](https://deepwiki.com/sveltejs/svelte/1.1-project-structure)).
+**Approach**: pnpm workspace with a deliberately minimal structure. The `packages/svelte/` directory
+contains the sole published package. `playgrounds/sandbox/` provides a local development
+environment. Root coordinates builds via pnpm's `-r` (recursive) and `--filter` flags
+([source](https://deepwiki.com/sveltejs/svelte/1.1-project-structure)).
 
 **Strengths**:
 
@@ -510,15 +627,19 @@ For ongoing changelog generation, conventional commits with package scopes natur
 
 - Keep the package count small (app root + 3 packages is similar to Svelte's focused approach).
 - The "playground" concept could map to Praxrr's E2E test environment.
-- Use workspace protocol for inter-package dependencies (Deno's equivalent: bare specifier imports via `name` field).
+- Use workspace protocol for inter-package dependencies (Deno's equivalent: bare specifier imports
+  via `name` field).
 
 **Confidence**: High -- Svelte is a well-documented monorepo in the same ecosystem (Vite/SvelteKit).
 
 ### Graphite
 
-**Repository**: Proprietary, but well-documented patterns ([source](https://graphite.com/blog/how-we-organize-our-monorepo-to-ship-fast))
+**Repository**: Proprietary, but well-documented patterns
+([source](https://graphite.com/blog/how-we-organize-our-monorepo-to-ship-fast))
 
-**Approach**: `libs/` (shared libraries, public and private) + `apps/` (applications). Turborepo for task orchestration. One-command setup (`yarn server-stg`). TypeScript everywhere with Zod for runtime validation.
+**Approach**: `libs/` (shared libraries, public and private) + `apps/` (applications). Turborepo for
+task orchestration. One-command setup (`yarn server-stg`). TypeScript everywhere with Zod for
+runtime validation.
 
 **Strengths**:
 
@@ -531,15 +652,20 @@ For ongoing changelog generation, conventional commits with package scopes natur
 
 - Optimize for one-command setup (`deno task dev` should work from a fresh clone).
 - Treat `packages/praxrr-schema` and `packages/praxrr-db` as data libraries, not applications.
-- The "staging database" pattern (developers work against shared data) is analogous to how Praxrr's auto-linked default database works during development.
+- The "staging database" pattern (developers work against shared data) is analogous to how Praxrr's
+  auto-linked default database works during development.
 
-**Confidence**: Medium -- Graphite's patterns are well-documented but come from a larger engineering organization than Praxrr's likely contributor base.
+**Confidence**: Medium -- Graphite's patterns are well-documented but come from a larger engineering
+organization than Praxrr's likely contributor base.
 
 ### Apollo GraphQL (Git Subtree Mirror)
 
 **Repository**: [github.com/apollographql](https://github.com/apollographql)
 
-**Approach**: Uses git subtrees to maintain monorepo development while publishing individual packages to separate repositories. GitHub Actions workflow triggers on main branch merges, splits changed subtrees, and pushes to remote repositories ([source](https://www.apollographql.com/blog/how-apollo-manages-swift-packages-in-a-monorepo-with-git-subtrees)).
+**Approach**: Uses git subtrees to maintain monorepo development while publishing individual
+packages to separate repositories. GitHub Actions workflow triggers on main branch merges, splits
+changed subtrees, and pushes to remote repositories
+([source](https://www.apollographql.com/blog/how-apollo-manages-swift-packages-in-a-monorepo-with-git-subtrees)).
 
 **Strengths**:
 
@@ -550,73 +676,112 @@ For ongoing changelog generation, conventional commits with package scopes natur
 
 **Relevant patterns for Praxrr**:
 
-- The subtree split-push pattern is directly applicable for mirroring `packages/praxrr-db` to `yandy-r/praxrr-db` and `packages/praxrr-schema` to `yandy-r/praxrr-schema`.
+- The subtree split-push pattern is directly applicable for mirroring `packages/praxrr-db` to
+  `yandy-r/praxrr-db` and `packages/praxrr-schema` to `yandy-r/praxrr-schema`.
 - Conditional push (only when changes are detected) avoids unnecessary mirror updates.
 - The pattern preserves external consumers' workflows while centralizing development.
 
-**Confidence**: High -- Apollo's pattern directly maps to Praxrr's requirement for maintaining external PCD consumer repos.
+**Confidence**: High -- Apollo's pattern directly maps to Praxrr's requirement for maintaining
+external PCD consumer repos.
 
 ## Recommendations
 
 ### Must Have
 
-1. **Keep SvelteKit app at repo root** -- Moving the app into `packages/praxrr` would require updating every path alias (20+), every CI workflow, the Dockerfile, the build scripts, and the Deno compile entry point. The risk-to-benefit ratio is unfavorable. All surveyed monorepos (Svelte, deno-std, Graphite) have either a primary app at root or very few packages. The app-at-root pattern works with the existing `packages/praxrr-api` precedent.
+1. **Keep SvelteKit app at repo root** -- Moving the app into `packages/praxrr` would require
+   updating every path alias (20+), every CI workflow, the Dockerfile, the build scripts, and the
+   Deno compile entry point. The risk-to-benefit ratio is unfavorable. All surveyed monorepos
+   (Svelte, deno-std, Graphite) have either a primary app at root or very few packages. The
+   app-at-root pattern works with the existing `packages/praxrr-api` precedent.
    - **Confidence**: High -- business research also flagged this as highest-risk phase.
 
-2. **Add `PRAXRR_DEFAULT_DB_URL` and `PRAXRR_DEFAULT_DB_BRANCH` env vars** -- Decouple the auto-link default from hardcoded values. This is independently valuable and should ship before the structural monorepo change.
+2. **Add `PRAXRR_DEFAULT_DB_URL` and `PRAXRR_DEFAULT_DB_BRANCH` env vars** -- Decouple the auto-link
+   default from hardcoded values. This is independently valuable and should ship before the
+   structural monorepo change.
    - **Confidence**: High -- minimal code change, follows existing naming convention.
 
-3. **Per-package READMEs** -- Each `packages/*/README.md` must document purpose, development commands, dependency direction, and release strategy.
+3. **Per-package READMEs** -- Each `packages/*/README.md` must document purpose, development
+   commands, dependency direction, and release strategy.
    - **Confidence**: High -- universally recommended, low effort.
 
-4. **CI aggregation job pattern** -- Use `dorny/paths-filter` for change detection and a single `ci/gate` aggregation job as the required status check. Do not require individual package job names in branch protection.
-   - **Confidence**: High -- well-documented solution to the GitHub Actions monorepo status check problem.
+4. **CI aggregation job pattern** -- Use `dorny/paths-filter` for change detection and a single
+   `ci/gate` aggregation job as the required status check. Do not require individual package job
+   names in branch protection.
+   - **Confidence**: High -- well-documented solution to the GitHub Actions monorepo status check
+     problem.
 
-5. **Mirror publishing workflow** -- Automated git subtree split-push to `yandy-r/praxrr-db` and `yandy-r/praxrr-schema` on merge to main. This preserves the external consumer workflow and the auto-link default URL.
+5. **Mirror publishing workflow** -- Automated git subtree split-push to `yandy-r/praxrr-db` and
+   `yandy-r/praxrr-schema` on merge to main. This preserves the external consumer workflow and the
+   auto-link default URL.
    - **Confidence**: High -- Apollo's proven pattern maps directly to this use case.
 
 ### Should Have
 
-6. **Cross-package PCD compatibility CI gate** -- A dedicated job that compiles the PCD cache from `packages/praxrr-schema` + `packages/praxrr-db` ops and verifies success. This catches schema-ops incompatibility before merge.
+6. **Cross-package PCD compatibility CI gate** -- A dedicated job that compiles the PCD cache from
+   `packages/praxrr-schema` + `packages/praxrr-db` ops and verifies success. This catches schema-ops
+   incompatibility before merge.
    - **Confidence**: High -- straightforward to implement using existing PCD compilation logic.
 
-7. **Generated-types freshness check** -- CI job that runs `deno task generate:pcd-types --local` and diffs against committed types. Catches stale type generation.
+7. **Generated-types freshness check** -- CI job that runs `deno task generate:pcd-types --local`
+   and diffs against committed types. Catches stale type generation.
    - **Confidence**: High -- the `--local` flag already exists.
 
-8. **Migration communication** -- GitHub issue announcement, archive external repos with redirect READMEs, update CLAUDE.md with new structure.
+8. **Migration communication** -- GitHub issue announcement, archive external repos with redirect
+   READMEs, update CLAUDE.md with new structure.
    - **Confidence**: High -- standard open-source migration practice.
 
-9. **Update root README directory map** -- Add the `packages/` directory to the repository structure documentation.
+9. **Update root README directory map** -- Add the `packages/` directory to the repository structure
+   documentation.
    - **Confidence**: High -- minimal effort, high onboarding value.
 
-10. **Conventional commit scopes per package** -- Document recommended scopes (`app`, `schema`, `db`, `api`) in CONTRIBUTING.md or CLAUDE.md.
+10. **Conventional commit scopes per package** -- Document recommended scopes (`app`, `schema`,
+    `db`, `api`) in CONTRIBUTING.md or CLAUDE.md.
     - **Confidence**: Medium -- convention rather than enforcement.
 
 ### Nice to Have
 
-11. **VSCode workspace configuration** -- `.vscode/settings.json` with Deno enabled, `.vscode/extensions.json` recommending the Deno and Svelte extensions.
+11. **VSCode workspace configuration** -- `.vscode/settings.json` with Deno enabled,
+    `.vscode/extensions.json` recommending the Deno and Svelte extensions.
     - **Confidence**: High -- low effort, improves IDE experience.
 
-12. **CODEOWNERS file** -- Map `packages/praxrr-db/**` and `packages/praxrr-schema/**` to specific reviewers.
+12. **CODEOWNERS file** -- Map `packages/praxrr-db/**` and `packages/praxrr-schema/**` to specific
+    reviewers.
     - **Confidence**: Medium -- useful if the contributor base grows.
 
-13. **PR comment with affected packages** -- GitHub Action that posts which packages were affected by a PR's changes.
+13. **PR comment with affected packages** -- GitHub Action that posts which packages were affected
+    by a PR's changes.
     - **Confidence**: Medium -- nice DX improvement but not critical for a small monorepo.
 
-14. **Comprehensive validation task** -- A root `deno task ok` (inspired by deno-std) that runs all checks: lint, format, type check, test, PCD compat, types freshness.
+14. **Comprehensive validation task** -- A root `deno task ok` (inspired by deno-std) that runs all
+    checks: lint, format, type check, test, PCD compat, types freshness.
     - **Confidence**: High -- simple to implement, high value for pre-push verification.
 
 ## Open Questions
 
-1. **App relocation**: Should the SvelteKit app ever move to `packages/praxrr`? The research strongly suggests keeping it at root for now. If the repo grows significantly (5+ packages), this decision should be revisited. The migration cost is high (20+ path aliases, all CI, Dockerfile, build scripts) and the benefit is low while package count is small.
+1. **App relocation**: Should the SvelteKit app ever move to `packages/praxrr`? The research
+   strongly suggests keeping it at root for now. If the repo grows significantly (5+ packages), this
+   decision should be revisited. The migration cost is high (20+ path aliases, all CI, Dockerfile,
+   build scripts) and the benefit is low while package count is small.
 
-2. **Workspace glob vs explicit members**: Should the root `deno.json` use `"workspace": ["packages/*"]` (glob) or `"workspace": ["packages/praxrr-api", "packages/praxrr-db", "packages/praxrr-schema"]` (explicit)? Glob is more scalable but less self-documenting. With only 3 packages, explicit listing is clearer and matches the project's preference for explicitness.
+2. **Workspace glob vs explicit members**: Should the root `deno.json` use
+   `"workspace": ["packages/*"]` (glob) or
+   `"workspace": ["packages/praxrr-api", "packages/praxrr-db", "packages/praxrr-schema"]`
+   (explicit)? Glob is more scalable but less self-documenting. With only 3 packages, explicit
+   listing is clearer and matches the project's preference for explicitness.
 
-3. **Mirror frequency**: Should mirror publishing happen on every merge to main, or only on tagged releases? On every merge keeps mirrors fresh and avoids drift. On tags only keeps mirrors stable. Recommendation: on every merge to main, since the external repos currently track the `v2` branch (not tags).
+3. **Mirror frequency**: Should mirror publishing happen on every merge to main, or only on tagged
+   releases? On every merge keeps mirrors fresh and avoids drift. On tags only keeps mirrors stable.
+   Recommendation: on every merge to main, since the external repos currently track the `v2` branch
+   (not tags).
 
-4. **Schema versioning in monorepo**: When the schema lives in-repo, should the type generator default to `--local` mode? This would be a workflow change for developers who are used to specifying `--version`. Recommendation: default to `--local` when the local file exists, with `--version` as an override for specific published versions.
+4. **Schema versioning in monorepo**: When the schema lives in-repo, should the type generator
+   default to `--local` mode? This would be a workflow change for developers who are used to
+   specifying `--version`. Recommendation: default to `--local` when the local file exists, with
+   `--version` as an override for specific published versions.
 
-5. **Commit scope enforcement**: Should a commitlint hook enforce package scopes, or should scopes be recommended but not required? For a small contributor base, recommendation over enforcement is likely sufficient to avoid friction.
+5. **Commit scope enforcement**: Should a commitlint hook enforce package scopes, or should scopes
+   be recommended but not required? For a small contributor base, recommendation over enforcement is
+   likely sufficient to avoid friction.
 
 ## Sources
 
@@ -707,12 +872,24 @@ For ongoing changelog generation, conventional commits with package scopes natur
 
 ## Uncertainties and Gaps
 
-1. **Deno workspace task orchestration maturity**: Deno's `--filter` and `--recursive` flags for task running are relatively new (introduced in Deno 1.45/2.x). Edge cases around task dependency ordering across workspace members are not well-documented yet. Testing this with the actual Praxrr setup will be needed.
+1. **Deno workspace task orchestration maturity**: Deno's `--filter` and `--recursive` flags for
+   task running are relatively new (introduced in Deno 1.45/2.x). Edge cases around task dependency
+   ordering across workspace members are not well-documented yet. Testing this with the actual
+   Praxrr setup will be needed.
 
-2. **Git subtree split performance**: For repositories with large histories, `git subtree split` can be slow. The `--rejoin` flag (used by Apollo) creates checkpoints to avoid full history traversal, but performance with Praxrr's specific history depth is unknown.
+2. **Git subtree split performance**: For repositories with large histories, `git subtree split` can
+   be slow. The `--rejoin` flag (used by Apollo) creates checkpoints to avoid full history
+   traversal, but performance with Praxrr's specific history depth is unknown.
 
-3. **Deno compile with workspace members**: The `deno compile` step in the release workflow builds a standalone binary. How workspace member resolution works during compilation (vs. runtime) needs validation. The app at repo root avoids this concern, but if any workspace member is imported by the app, the compile step must resolve it correctly.
+3. **Deno compile with workspace members**: The `deno compile` step in the release workflow builds a
+   standalone binary. How workspace member resolution works during compilation (vs. runtime) needs
+   validation. The app at repo root avoids this concern, but if any workspace member is imported by
+   the app, the compile step must resolve it correctly.
 
-4. **Mirror repository branch strategy**: The current auto-link defaults to the `v2` branch of `praxrr-db`. The mirror publishing workflow needs to push to this specific branch (not `main`). The exact git subtree push configuration for branch targeting needs testing.
+4. **Mirror repository branch strategy**: The current auto-link defaults to the `v2` branch of
+   `praxrr-db`. The mirror publishing workflow needs to push to this specific branch (not `main`).
+   The exact git subtree push configuration for branch targeting needs testing.
 
-5. **E2E test default repo**: `src/tests/e2e/env.ts` references `praxrr-db-v2-testing`, not the main `praxrr-db`. The monorepo transition should not change E2E test behavior, but the relationship between the testing repo and the monorepo packages needs clarification.
+5. **E2E test default repo**: `src/tests/e2e/env.ts` references `praxrr-db-v2-testing`, not the main
+   `praxrr-db`. The monorepo transition should not change E2E test behavior, but the relationship
+   between the testing repo and the monorepo packages needs clarification.

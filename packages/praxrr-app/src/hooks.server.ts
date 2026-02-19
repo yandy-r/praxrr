@@ -41,8 +41,8 @@ if (!setupStateQueries.isDefaultDatabaseLinked()) {
   const defaultDatabaseBranch = Deno.env.get('PRAXRR_DEFAULT_DB_BRANCH')?.trim() || 'v2';
   const defaultDatabaseName = Deno.env.get('PRAXRR_DEFAULT_DB_NAME')?.trim() || 'Praxrr-DB';
   const defaultDatabaseToken = Deno.env.get('PRAXRR_DEFAULT_DB_TOKEN')?.trim() || undefined;
-  const defaultDatabaseGitUserName = Deno.env.get('PRAXRR_DEFAULT_DB_GIT_USER_NAME')?.trim() || undefined;
-  const defaultDatabaseGitUserEmail = Deno.env.get('PRAXRR_DEFAULT_DB_GIT_USER_EMAIL')?.trim() || undefined;
+  const defaultDatabaseGitUserName = Deno.env.get('PRAXRR_DEFAULT_DB_GIT_USERNAME')?.trim() || undefined;
+  const defaultDatabaseGitUserEmail = Deno.env.get('PRAXRR_DEFAULT_DB_GIT_EMAIL')?.trim() || undefined;
   const hasCompleteGitIdentity = !!defaultDatabaseGitUserName && !!defaultDatabaseGitUserEmail;
   const hasPartialGitIdentity =
     (!!defaultDatabaseGitUserName || !!defaultDatabaseGitUserEmail) && !hasCompleteGitIdentity;
