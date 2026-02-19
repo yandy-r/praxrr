@@ -1,8 +1,3 @@
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-![SQLite](https://img.shields.io/badge/SQLite-Schema-003B57?logo=sqlite&logoColor=white)
-![CI: Validate](https://img.shields.io/github/actions/workflow/status/yandy-r/praxrr-schema/validate.yml?label=Validate&logo=github)
-![CI: Diagram](https://img.shields.io/github/actions/workflow/status/yandy-r/praxrr-schema/generate-schema-diagram.yml?label=Diagram&logo=github)
-
 # Praxrr Schema
 
 The **base SQLite schema** for all
@@ -244,8 +239,8 @@ WHERE arr_type = 'sonarr' AND quality_name != api_name;
 
 ## Schema Overview
 
-The schema contains **36 tables** organized into 7 logical groups. Each group serves a distinct
-role in the PCD architecture and has defined dependency relationships with the other groups.
+The schema contains **36 tables** organized into 7 logical groups. Each group serves a distinct role
+in the PCD architecture and has defined dependency relationships with the other groups.
 
 ```mermaid
 graph TD
@@ -522,8 +517,8 @@ CHECK (
 The condition type system implements a **type-dispatched** pattern where the parent table
 (`custom_format_conditions`) dispatches to one of nine child tables based on the value of the `type`
 column. This avoids a single sparse table with columns for every condition type, and avoids the
-downsides of an Entity-Attribute-Value pattern. Each condition type has a dedicated table with exactly
-the columns it needs, and all standard relational constraints apply.
+downsides of an Entity-Attribute-Value pattern. Each condition type has a dedicated table with
+exactly the columns it needs, and all standard relational constraints apply.
 
 ```mermaid
 flowchart TD
@@ -560,8 +555,8 @@ flowchart TD
     style LN fill:#2a2a2a,stroke:#555,color:#ddd
 ```
 
-**Invariant:** A condition row in `custom_format_conditions` must have exactly one corresponding
-row in exactly one child table. The `type` column determines which child table holds the data. This
+**Invariant:** A condition row in `custom_format_conditions` must have exactly one corresponding row
+in exactly one child table. The `type` column determines which child table holds the data. This
 invariant is enforced by application logic during recompose, not by a database constraint (SQLite
 does not support cross-table CHECK constraints).
 
@@ -660,10 +655,10 @@ flowchart TD
     style sync fill:#2a1a3a,stroke:#4a2d6f,color:#e8d0f7
 ```
 
-A single quality profile can serve all three arr types. Scoring in
-`quality_profile_custom_formats` uses the `arr_type` column (`radarr`, `sonarr`, or `all`) to allow
-per-application overrides while keeping the profile definition unified. During sync, Praxrr resolves
-the `all` scores as defaults and applies arr-specific overrides where they exist.
+A single quality profile can serve all three arr types. Scoring in `quality_profile_custom_formats`
+uses the `arr_type` column (`radarr`, `sonarr`, or `all`) to allow per-application overrides while
+keeping the profile definition unified. During sync, Praxrr resolves the `all` scores as defaults
+and applies arr-specific overrides where they exist.
 
 ---
 
@@ -712,13 +707,14 @@ WHERE quality_profile_name = '1080p Quality HDR'
   AND score = 400;  -- Value guard: expected previous value
 ```
 
-See [docs/structure.md -- Change-Driven Development](docs/structure.md#3-change-driven-development-cdd).
+See
+[docs/structure.md -- Change-Driven Development](docs/structure.md#3-change-driven-development-cdd).
 
 ### Layers
 
-PCDs execute in layers: Schema (Layer 1), Dependencies (Layer 2, reserved), Base (Layer 3),
-Tweaks (Layer 4), User Ops (Layer 5). Each layer is append-only, but later layers can override the
-effects of earlier ones.
+PCDs execute in layers: Schema (Layer 1), Dependencies (Layer 2, reserved), Base (Layer 3), Tweaks
+(Layer 4), User Ops (Layer 5). Each layer is append-only, but later layers can override the effects
+of earlier ones.
 
 See [docs/structure.md -- Layers](docs/structure.md#4-layers).
 
@@ -745,8 +741,8 @@ See [docs/structure.md -- Name-Based Foreign Keys](docs/structure.md#8-key-desig
 
 Conditions and scores can vary per arr application (`radarr`, `sonarr`, `lidarr`). A single schema
 supports all three. The `arr_type` column appears in `custom_format_conditions` (scope a condition
-to one arr), `quality_profile_custom_formats` (different scores per arr), and
-`quality_api_mappings` (different API names per arr).
+to one arr), `quality_profile_custom_formats` (different scores per arr), and `quality_api_mappings`
+(different API names per arr).
 
 ### CHECK Constraints
 

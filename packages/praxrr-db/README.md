@@ -1,12 +1,3 @@
-  </a>
-  <a href="https://www.buymeacoffee.com/yandyr">
-    <img src="https://img.shields.io/badge/Buy%20Me%20A%20Coffee-Support-blue?logo=buy-me-a-coffee" alt="Buy Me A Coffee">
-  </a>
-  <a href="https://github.com/sponsors/yandy-r">
-    <img src="https://img.shields.io/badge/GitHub%20Sponsors-Support-blue?logo=github-sponsors" alt="GitHub Sponsors">
-  </a>
-</p>
-
 ## Praxrr Database
 
 The [UnOfficial Praxrr Database](https://github.com/yandy-r/praxrr-db) serves as a
