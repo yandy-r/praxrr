@@ -9,6 +9,7 @@ import { logSettings } from '$logger/settings.ts';
 import { logger } from '$logger/logger.ts';
 import { db } from '$db/db.ts';
 import { runMigrations } from '$db/migrations.ts';
+import { reconcileEnvInstances } from '$arr/envInstances.ts';
 import { initializeJobs } from '$jobs/init.ts';
 import { pcdManager } from '$pcd/index.ts';
 import { getAuthState, isPublicPath, maybeExtendSession, cleanupExpiredSessions } from '$auth/middleware.ts';
@@ -88,6 +89,26 @@ if (!setupStateQueries.isDefaultDatabaseLinked()) {
       });
     }
   }
+}
+
+try {
+  const reconcileResult = reconcileEnvInstances();
+  await logger.info('Environment instance reconciliation completed', {
+    source: 'Setup',
+    meta: {
+      created: reconcileResult.created,
+      updated: reconcileResult.updated,
+      disabled: reconcileResult.disabled,
+      skippedConflictUi: reconcileResult.skippedConflictUi,
+      skippedDuplicateEnvKey: reconcileResult.skippedDuplicateEnvKey,
+      errors: reconcileResult.errors,
+    },
+  });
+} catch (error) {
+  await logger.warn('Environment instance reconciliation failed', {
+    source: 'Setup',
+    meta: { error: String(error) },
+  });
 }
 
 // Initialize and start job queue

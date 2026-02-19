@@ -1,4 +1,6 @@
 import { parseOptionalAbsoluteHttpUrl } from '$utils/validation/url.ts';
+import { db } from '$db/db.ts';
+import { arrInstancesQueries } from '$db/queries/arrInstances.ts';
 import { ARR_APP_TYPES, type ArrAppType } from '$shared/pcd/types.ts';
 
 const APP_TYPE_KEYS = ARR_APP_TYPES;
@@ -33,6 +35,15 @@ export interface ParsedEnvInstanceDescriptor {
 	externalUrl: string | null;
 	tags: string[];
 	enabled: boolean;
+}
+
+export interface ReconcileEnvInstancesResult {
+	created: number;
+	updated: number;
+	disabled: number;
+	skippedConflictUi: number;
+	skippedDuplicateEnvKey: number;
+	errors: number;
 }
 
 function isSupportedArrAppType(value: string): value is ArrAppType {
@@ -201,4 +212,106 @@ export function parseArrInstanceEnvVars(): ParsedEnvInstanceDescriptor[] {
 
 function defaultName(type: ArrAppType, index: number): string {
 	return index === 1 ? APP_LABELS[type] : `${APP_LABELS[type]} ${index}`;
+}
+
+function withSavepoint<T>(savepoint: string, fn: () => T): T {
+	db.execute(`SAVEPOINT ${savepoint}`);
+
+	try {
+		return fn();
+	} catch (error) {
+		db.execute(`ROLLBACK TO SAVEPOINT ${savepoint}`);
+		throw error;
+	} finally {
+		db.execute(`RELEASE SAVEPOINT ${savepoint}`);
+	}
+}
+
+export function reconcileEnvInstances(): ReconcileEnvInstancesResult {
+	const metrics: ReconcileEnvInstancesResult = {
+		created: 0,
+		updated: 0,
+		disabled: 0,
+		skippedConflictUi: 0,
+		skippedDuplicateEnvKey: 0,
+		errors: 0,
+	};
+
+	const parsed = parseArrInstanceEnvVars();
+	const seenApiKeys = new Set<string>();
+	const activeApiKeys = new Set<string>();
+
+	let savepointIndex = 0;
+
+	for (const descriptor of parsed) {
+		if (seenApiKeys.has(descriptor.apiKey)) {
+			metrics.skippedDuplicateEnvKey += 1;
+			continue;
+		}
+		seenApiKeys.add(descriptor.apiKey);
+
+		const sourceConflict = arrInstancesQueries.getBySourceAndName('ui', descriptor.name) !== undefined;
+		if (sourceConflict) {
+			metrics.skippedConflictUi += 1;
+			continue;
+		}
+
+		const existing = arrInstancesQueries.getByApiKey(descriptor.apiKey);
+		if (existing && existing.source !== 'env') {
+			metrics.skippedConflictUi += 1;
+			continue;
+		}
+
+		const savepoint = `env_reconcile_${savepointIndex++}`;
+		try {
+			withSavepoint(savepoint, () => {
+				if (existing && existing.source === 'env') {
+					const updated = arrInstancesQueries.updateEnvInstanceByApiKey(descriptor.apiKey, {
+						type: descriptor.type,
+						url: descriptor.url,
+						externalUrl: descriptor.externalUrl,
+						apiKey: descriptor.apiKey,
+						name: descriptor.name,
+						tags: descriptor.tags,
+						enabled: descriptor.enabled,
+						source: 'env',
+					});
+					if (!updated) {
+						throw new Error('No env instance found for requested API key');
+					}
+
+					metrics.updated += 1;
+					return;
+				}
+
+				const id = arrInstancesQueries.create({
+					name: descriptor.name,
+					type: descriptor.type,
+					url: descriptor.url,
+					externalUrl: descriptor.externalUrl,
+					apiKey: descriptor.apiKey,
+					tags: descriptor.tags,
+					enabled: descriptor.enabled,
+					source: 'env',
+				});
+				if (id === 0) {
+					throw new Error('Failed to create env instance');
+				}
+
+				metrics.created += 1;
+			});
+
+			activeApiKeys.add(descriptor.apiKey);
+		} catch {
+			metrics.errors += 1;
+		}
+	}
+
+	try {
+		metrics.disabled = arrInstancesQueries.disableEnvInstancesMissingApiKeys([...activeApiKeys]);
+	} catch {
+		metrics.errors += 1;
+	}
+
+	return metrics;
 }

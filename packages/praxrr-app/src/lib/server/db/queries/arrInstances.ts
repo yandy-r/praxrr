@@ -109,6 +109,17 @@ export const arrInstancesQueries = {
   },
 
   /**
+   * Get an arr instance by source and exact name
+   */
+  getBySourceAndName(source: ArrInstanceSource, name: string): ArrInstance | undefined {
+    return db.queryFirst<ArrInstance>(
+      'SELECT * FROM arr_instances WHERE source = ? AND name = ? ORDER BY id LIMIT 1',
+      source,
+      name
+    );
+  },
+
+  /**
    * Get an arr instance by API key
    */
   getByApiKey(apiKey: string): ArrInstance | undefined {
