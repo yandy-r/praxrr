@@ -116,3 +116,23 @@ git push
 git tag v2.1.1
 git push --tags
 ```
+
+## Task 3.3 Documentation Verification
+
+- Confirm env-instance semantics and verification commands are present:
+
+```bash
+rg -n "Env-instance operational model|source='env'|orphan|PRAXRR_VALIDATE_INSTANCES|Task 3.3" docs/plans/initiate-apps/feature-spec.md
+```
+
+- Confirm docs include startup and logging expectations aligned with implementation:
+
+```bash
+rg -n "reconcileEnvInstances|source: 'Setup'|enabled=0|API key|RADARR_INSTANCE_|SONARR_INSTANCE_|LIDARR_INSTANCE_" docs/plans/initiate-apps/feature-spec.md
+```
+
+- Validate the new task alias referenced by docs:
+
+```bash
+deno task test env-instances
+```

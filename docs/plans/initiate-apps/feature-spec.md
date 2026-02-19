@@ -243,6 +243,53 @@ services:
       - lidarr
 ```
 
+## Env-instance operational model (Task 3.3)
+
+Arr-instance provenance is explicit and strict per row:
+
+- `source='env'`: row was created or updated from environment variables during startup.
+- `source='ui'`: row was created from the web UI and must never be overwritten by env reconciliation.
+- Only `radarr`, `sonarr`, and `lidarr` are accepted targets (`ARR_APP_TYPES`), and no fallback to non-target apps is performed.
+
+The startup reconciler treats env inputs as authoritative for their own namespace:
+
+- Parse env vars in format `{APP}_INSTANCE_*_{N}` for `APP in RADARR|SONARR|LIDARR`.
+- Required per-index fields are `URL` and `API_KEY`; missing or blank values skip that index with a warning.
+- Match incoming instances by `api_key` against existing rows.
+- If row is `source='env'`, update `url`, `external_url`, `tags`, `name`, and `enabled`.
+- If row is `source='ui'`, skip changes and log conflict (`api_key` collision, and name collision should also skip).
+- If no row exists, create a new `source='env'` instance.
+
+Orphan policy:
+
+- Instances currently marked `source='env'` but no longer present in environment are disabled (`enabled=0`) on each startup.
+- Orphan cleanup uses disable, never delete, to preserve foreign-key-referenced sync history.
+
+Startup/logging expectations:
+
+- Reconciliation runs on every startup after DB migration/default setup and before jobs initialize.
+- Logs are emitted with `source: 'Setup'` and should be actionable but non-blocking.
+- Logs must never include cleartext API keys, full token-like strings, or file-backed secret payloads.
+- Recommended instance summary format is count-oriented (for example `env parse`, `created`, `updated`, `disabled`, `skipped`, `errors`), while field-level detail logs may redact secrets.
+
+Verification behavior:
+
+- Set `PRAXRR_VALIDATE_INSTANCES=true` for optional connectivity checks; this does not change persistence behavior and is non-blocking.
+- Reprovisioning policy is idempotent: redeploying unchanged env vars should not duplicate rows; changed values should converge on restart.
+
+Operator checks for Arr-specific behavior:
+
+```bash
+# 1) Validate source and orphan policy from DB
+sqlite3 ./praxrr.db "SELECT name, type, source, enabled FROM arr_instances ORDER BY name;"
+
+# 2) Confirm expected startup behavior in logs (example grep)
+docker logs praxrr 2>&1 | rg -n "reconcileEnvInstances|env instance|source='env'|orphan|disabled"
+
+# 3) Confirm env-managed rows are isolated by app type
+docker exec -it praxrr /bin/sh -lc "sqlite3 /data/praxrr.db \"SELECT type, source FROM arr_instances WHERE source='env';\""
+```
+
 ## UX Considerations
 
 ### User Workflows
