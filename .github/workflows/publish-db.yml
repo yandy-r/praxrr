@@ -74,8 +74,8 @@ jobs:
           fi
 
           remote_url="https://x-access-token:${MIRROR_PAT}@github.com/${MIRROR_REPO}"
-          git remote remove mirror || true
-          git remote add mirror "$remote_url"
+          echo "Publishing to ${MIRROR_REPO} using explicit URL."
+          echo "${remote_url}" | sed 's#://x-access-token:.*@#://x-access-token:***@#'
 
           attempt_push() {
             local source_sha="$1"
@@ -88,7 +88,7 @@ jobs:
               local log_file
               log_file="$(mktemp)"
 
-              if git push mirror --force "${source_sha}:refs/heads/${destination}" >"$log_file" 2>&1; then
+              if git push --force "${remote_url}" "${source_sha}:refs/heads/${destination}" >"$log_file" 2>&1; then
                 rm -f "$log_file"
                 echo "Published subtree to ${destination}."
                 return 0
