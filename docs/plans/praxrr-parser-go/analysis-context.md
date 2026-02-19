@@ -4,17 +4,17 @@ The goal is to replace the existing C#/.NET parser microservice with a Go-based 
 
 ### Architecture Context
 
-- System Structure: A standalone parser service (currently `src/services/parser/`) remains in front of caches and TypeScript clients; the Go rewrite described in `docs/plans/praxrr-parser-go/research-technical.md` keeps that service boundary but reimplements core parsing/matching logic in `src/services/parser-go/` with `regexp2`, the stdlib HTTP server, and the same binary name.
-- Data Flow: Titles enter via parser endpoints, flow through parser orchestrators (quality, title, episode, language, release-group parsers), and then feed cached results (`src/lib/server/db/queries/parsedReleaseCache.ts`/`patternMatchCache.ts`) before reaching UI workflows such as custom-format testing and regex101 evaluation, per `docs/plans/praxrr-parser-go/feature-spec.md`.
-- Integration Points: The TypeScript client (`src/lib/server/utils/arr/parser/client.ts`), spawn helper (`src/lib/server/utils/parser/spawn.ts`), config (`src/lib/server/utils/config/config.ts`), and cache invalidation in `parsedReleaseCache`/`patternMatchCache` all expect the parser to behave exactly as the current service does, which is reinforced by the architecture notes in `docs/plans/praxrr-parser-go/research-architecture.md`.
+- System Structure: A standalone parser service (currently `packages/praxrr-parser/`) remains in front of caches and TypeScript clients; the Go rewrite described in `docs/plans/praxrr-parser-go/research-technical.md` keeps that service boundary but reimplements core parsing/matching logic in `packages/praxrr-parser-go/` with `regexp2`, the stdlib HTTP server, and the same binary name.
+- Data Flow: Titles enter via parser endpoints, flow through parser orchestrators (quality, title, episode, language, release-group parsers), and then feed cached results (`packages/praxrr-app/src/lib/server/db/queries/parsedReleaseCache.ts`/`patternMatchCache.ts`) before reaching UI workflows such as custom-format testing and regex101 evaluation, per `docs/plans/praxrr-parser-go/feature-spec.md`.
+- Integration Points: The TypeScript client (`packages/praxrr-app/src/lib/server/utils/arr/parser/client.ts`), spawn helper (`packages/praxrr-app/src/lib/server/utils/parser/spawn.ts`), config (`packages/praxrr-app/src/lib/server/utils/config/config.ts`), and cache invalidation in `parsedReleaseCache`/`patternMatchCache` all expect the parser to behave exactly as the current service does, which is reinforced by the architecture notes in `docs/plans/praxrr-parser-go/research-architecture.md`.
 
 ### Critical Files Reference
 
 - `docs/plans/praxrr-parser-go/feature-spec.md`: Defines API contract fidelity, cache versioning, Docker/CI expectations, and the recommended phased task breakdown.
 - `docs/plans/praxrr-parser-go/research-technical.md`: Captures regex migration risks, Go module layout, `regexp2` dependency, Dockerfile replacement, release workflow changes, and test plan requirements.
 - `docs/plans/praxrr-parser-go/research-recommendations.md`: Presents the alternative of porting to TypeScript/Deno, the enormous benefit of removing the microservice, and the foundation for audit/test infrastructure planning.
-- `src/lib/server/utils/arr/parser/client.ts`: Central TypeScript client whose unchanged API contract must be preserved.
-- `src/lib/server/db/queries/parsedReleaseCache.ts` & `patternMatchCache.ts`: Cache layers keyed by parser version that drive many cached workflows.
+- `packages/praxrr-app/src/lib/server/utils/arr/parser/client.ts`: Central TypeScript client whose unchanged API contract must be preserved.
+- `packages/praxrr-app/src/lib/server/db/queries/parsedReleaseCache.ts` & `patternMatchCache.ts`: Cache layers keyed by parser version that drive many cached workflows.
 
 ### Patterns to Follow
 

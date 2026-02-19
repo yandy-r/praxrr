@@ -5,13 +5,13 @@ Monorepo strategy keeps the SvelteKit/Deno app at repo root while adding `packag
 ### Architecture Context
 
 - System Structure: Existing `/src` app plus workspace members under `/packages`, coordinated by root `deno.json`, shared scripts, and CI workflows.
-- Data Flow: Startup in `src/hooks.server.ts` still drives config, migrations, PCD manager, jobs, and Arr sync; compiled cache layering remains schema -> base -> tweak -> user ops.
+- Data Flow: Startup in `packages/praxrr-app/src/hooks.server.ts` still drives config, migrations, PCD manager, jobs, and Arr sync; compiled cache layering remains schema -> base -> tweak -> user ops.
 - Integration Points: `scripts/generate-pcd-types.ts`, `scripts/bundle-api.ts`, root workspace config, and GitHub workflows (`compatibility`, `publish-*`, `release`) are the primary seams.
 
 ### Critical Files Reference
 
 - `deno.json`: workspace members, shared tasks, and lockfile discipline.
-- `src/hooks.server.ts`: default database auto-link defaults and env-driven behavior.
+- `packages/praxrr-app/src/hooks.server.ts`: default database auto-link defaults and env-driven behavior.
 - `scripts/generate-pcd-types.ts`: schema source defaults and local/remote generation behavior.
 - `.github/workflows/compatibility.yml`: cross-package compatibility gate.
 - `.github/workflows/publish-db.yml`: subtree mirror publish for DB package.
@@ -21,10 +21,10 @@ Monorepo strategy keeps the SvelteKit/Deno app at repo root while adding `packag
 
 ### Patterns to Follow
 
-- Service/Manager Orchestration: keep lifecycle and cross-cutting workflow logic in manager modules (example: `src/lib/server/pcd/core/manager.ts`).
-- Query Module Boundary: keep persistence in typed query modules, not inline SQL (example: `src/lib/server/db/queries/databaseInstances.ts`).
-- Layered Ops Compilation: preserve deterministic schema -> base -> tweaks -> user order (example: `src/lib/server/pcd/ops/loadOps.ts`).
-- Job-Driven Sync: run long sync operations via queue/dispatcher rather than request inline execution (example: `src/lib/server/jobs/init.ts`).
+- Service/Manager Orchestration: keep lifecycle and cross-cutting workflow logic in manager modules (example: `packages/praxrr-app/src/lib/server/pcd/core/manager.ts`).
+- Query Module Boundary: keep persistence in typed query modules, not inline SQL (example: `packages/praxrr-app/src/lib/server/db/queries/databaseInstances.ts`).
+- Layered Ops Compilation: preserve deterministic schema -> base -> tweaks -> user order (example: `packages/praxrr-app/src/lib/server/pcd/ops/loadOps.ts`).
+- Job-Driven Sync: run long sync operations via queue/dispatcher rather than request inline execution (example: `packages/praxrr-app/src/lib/server/jobs/init.ts`).
 
 ### Cross-Cutting Concerns
 
@@ -35,7 +35,7 @@ Monorepo strategy keeps the SvelteKit/Deno app at repo root while adding `packag
 ### Parallelization Opportunities
 
 - Independent work areas: package scaffolding, runtime decoupling, CI/publish workflows.
-- Coordination hotspots: shared edits in `deno.json`, `scripts/generate-pcd-types.ts`, `src/hooks.server.ts`, and release workflows.
+- Coordination hotspots: shared edits in `deno.json`, `scripts/generate-pcd-types.ts`, `packages/praxrr-app/src/hooks.server.ts`, and release workflows.
 
 ### Implementation Constraints
 

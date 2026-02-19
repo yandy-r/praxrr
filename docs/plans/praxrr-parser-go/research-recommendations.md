@@ -20,7 +20,7 @@ Evidence supporting this recommendation:
 
 4. **The build pipeline is significantly complicated by .NET** -- `release.yml` requires `.NET 8.0.x` SDK setup, `dotnet publish` with per-platform RID targeting across 5 platforms (linux-x64, linux-arm64, macos-x64, macos-arm64, windows-x64), self-contained publish flags, and binary staging. Docker workflow builds a separate `praxrr-parser` image. The standalone build task in `deno.json` has a complex sequence including `rm -f Directory.Build.props` followed by `git checkout` to reset it.
 
-5. **TypeScript types already mirror the C# models exactly** -- `src/lib/server/utils/arr/parser/types.ts` (154 lines) contains identical enums and interfaces for `QualitySource`, `Resolution`, `QualityModifier`, `Language`, `ReleaseType`, `ParseResult`, etc.
+5. **TypeScript types already mirror the C# models exactly** -- `packages/praxrr-app/src/lib/server/utils/arr/parser/types.ts` (154 lines) contains identical enums and interfaces for `QualitySource`, `Resolution`, `QualityModifier`, `Language`, `ReleaseType`, `ParseResult`, etc.
 
 6. **.NET regex features used are limited and identifiable** -- the codebase uses `IgnoreCase`, `Compiled`, `IgnorePatternWhitespace`, named groups (`(?<name>...)`), lookbehind (`(?<!...)`), lookahead (`(?!...)`), inline modifiers (`(?-i:WEB)`, `(?i)`), and named backreferences (`\k<sep>`). JavaScript regex supports lookbehind/lookahead and named groups. The inline modifiers and `IgnorePatternWhitespace` would need minor regex string transformations during porting.
 
@@ -64,7 +64,7 @@ Evidence supporting this recommendation:
 
 There is no shared state, no database, no persistent connections -- only regex matching against input strings. The HTTP transport adds latency (~1-5ms per call), serialization overhead, and operational complexity (health checks, retries, connection pooling) for zero benefit.
 
-The evaluator in `src/lib/server/pcd/entities/customFormats/evaluator.ts` already falls back to JS regex when the parser is unavailable (lines 248-255), proving the path is viable:
+The evaluator in `packages/praxrr-app/src/lib/server/pcd/entities/customFormats/evaluator.ts` already falls back to JS regex when the parser is unavailable (lines 248-255), proving the path is viable:
 
 ```typescript
 // Fallback to JS regex (may not work for .NET-specific patterns)
@@ -85,7 +85,7 @@ If batch regex matching against many patterns is a bottleneck, consider:
 
 ### Testing Infrastructure
 
-This is the **most critical enabler** for any migration approach. The current codebase has **zero parser-specific tests** -- the test files found under `src/tests/` are all for other subsystems (lidarr operations, e2e specs, logger cleanup). Before porting, you must:
+This is the **most critical enabler** for any migration approach. The current codebase has **zero parser-specific tests** -- the test files found under `packages/praxrr-app/src/tests/` are all for other subsystems (lidarr operations, e2e specs, logger cleanup). Before porting, you must:
 
 1. Create a fixture file of release titles with expected parse results (JSON format)
 2. Run the current C# parser against all fixtures to establish the "golden" output
@@ -188,7 +188,7 @@ If .NET regex compatibility for user-authored custom format patterns becomes a h
 
 **Estimated: 3-5 days. No dependencies. Can start immediately.**
 
-- [ ] Create `src/tests/parser/` test directory
+- [ ] Create `packages/praxrr-app/src/tests/parser/` test directory
 - [ ] Build release title fixture file with 200+ titles covering movies, series, anime, daily shows, edge cases
 - [ ] Run current C# parser against all fixtures, capture golden output as JSON snapshots
 - [ ] Extract Radarr/Sonarr parser test cases from their open-source repos as additional fixtures
@@ -226,12 +226,12 @@ If .NET regex compatibility for user-authored custom format patterns becomes a h
 
 **Estimated: 2-3 days. Depends on Phase 3 being stable.**
 
-- [ ] Remove `src/services/parser/` directory
+- [ ] Remove `packages/praxrr-parser/` directory
 - [ ] Remove `Dockerfile.parser`
 - [ ] Remove `parser` service from `compose.dev.yml`
 - [ ] Remove `.NET` setup from `.github/workflows/release.yml`
 - [ ] Remove `praxrr-parser` image from `.github/workflows/docker.yml`
-- [ ] Remove `src/lib/server/utils/parser/spawn.ts`
+- [ ] Remove `packages/praxrr-app/src/lib/server/utils/parser/spawn.ts`
 - [ ] Remove `dev:parser` task from `deno.json`
 - [ ] Update `build:standalone` and `build:standalone:windows` tasks (remove dotnet publish steps)
 - [ ] Update `scripts/dev.ts` (remove dotnet detection and parser process spawning)
@@ -242,32 +242,32 @@ If .NET regex compatibility for user-authored custom format patterns becomes a h
 
 ### Parser Service (to be ported/removed)
 
-- `/src/services/parser/Program.cs`: Entry point, ASP.NET minimal API setup
-- `/src/services/parser/Endpoints/ParseEndpoints.cs`: `/parse` endpoint - main parsing orchestration
-- `/src/services/parser/Endpoints/MatchEndpoints.cs`: `/match` and `/match/batch` - regex matching with ReDoS protection
-- `/src/services/parser/Endpoints/HealthEndpoints.cs`: `/health` endpoint
-- `/src/services/parser/Parsers/QualityParser.cs`: Source, resolution, modifier, revision extraction (~295 LOC)
-- `/src/services/parser/Parsers/TitleParser.cs`: Movie title parsing with 10+ regex patterns (~423 LOC)
-- `/src/services/parser/Parsers/EpisodeParser.cs`: Series/episode parsing with 35+ regex patterns (~555 LOC)
-- `/src/services/parser/Parsers/LanguageParser.cs`: Language detection from release titles (~165 LOC)
-- `/src/services/parser/Parsers/ReleaseGroupParser.cs`: Release group extraction (~97 LOC)
-- `/src/services/parser/Parsers/Common/ParserCommon.cs`: Shared utilities (file extension removal, website cleaning)
-- `/src/services/parser/Parsers/Common/RegexReplace.cs`: Regex replace utility class
-- `/src/services/parser/Models/Types.cs`: Enums for QualitySource, Resolution, QualityModifier, Revision
-- `/src/services/parser/Models/Language.cs`: Language enum (58 values)
-- `/src/services/parser/Models/Requests.cs`: Request DTOs
-- `/src/services/parser/Models/Responses.cs`: Response DTOs
+- `/packages/praxrr-parser/Program.cs`: Entry point, ASP.NET minimal API setup
+- `/packages/praxrr-parser/Endpoints/ParseEndpoints.cs`: `/parse` endpoint - main parsing orchestration
+- `/packages/praxrr-parser/Endpoints/MatchEndpoints.cs`: `/match` and `/match/batch` - regex matching with ReDoS protection
+- `/packages/praxrr-parser/Endpoints/HealthEndpoints.cs`: `/health` endpoint
+- `/packages/praxrr-parser/Parsers/QualityParser.cs`: Source, resolution, modifier, revision extraction (~295 LOC)
+- `/packages/praxrr-parser/Parsers/TitleParser.cs`: Movie title parsing with 10+ regex patterns (~423 LOC)
+- `/packages/praxrr-parser/Parsers/EpisodeParser.cs`: Series/episode parsing with 35+ regex patterns (~555 LOC)
+- `/packages/praxrr-parser/Parsers/LanguageParser.cs`: Language detection from release titles (~165 LOC)
+- `/packages/praxrr-parser/Parsers/ReleaseGroupParser.cs`: Release group extraction (~97 LOC)
+- `/packages/praxrr-parser/Parsers/Common/ParserCommon.cs`: Shared utilities (file extension removal, website cleaning)
+- `/packages/praxrr-parser/Parsers/Common/RegexReplace.cs`: Regex replace utility class
+- `/packages/praxrr-parser/Models/Types.cs`: Enums for QualitySource, Resolution, QualityModifier, Revision
+- `/packages/praxrr-parser/Models/Language.cs`: Language enum (58 values)
+- `/packages/praxrr-parser/Models/Requests.cs`: Request DTOs
+- `/packages/praxrr-parser/Models/Responses.cs`: Response DTOs
 
 ### TypeScript Integration (to be updated)
 
-- `/src/lib/server/utils/arr/parser/client.ts`: HTTP client for parser service (505 LOC) - will become in-process calls
-- `/src/lib/server/utils/arr/parser/types.ts`: TypeScript types mirroring C# models (154 LOC) - keep as-is
-- `/src/lib/server/utils/arr/parser/index.ts`: Module exports (18 LOC)
-- `/src/lib/server/utils/parser/spawn.ts`: Auto-spawn logic for standalone builds (157 LOC) - remove entirely
-- `/src/lib/server/pcd/entities/customFormats/evaluator.ts`: CF evaluator with JS regex fallback (536 LOC)
-- `/src/routes/api/v1/entity-testing/evaluate/+server.ts`: API endpoint using parser (123 LOC)
-- `/src/lib/server/db/queries/parsedReleaseCache.ts`: Parse result cache (82 LOC) - may simplify
-- `/src/lib/server/db/queries/patternMatchCache.ts`: Pattern match cache (113 LOC) - may keep
+- `/packages/praxrr-app/src/lib/server/utils/arr/parser/client.ts`: HTTP client for parser service (505 LOC) - will become in-process calls
+- `/packages/praxrr-app/src/lib/server/utils/arr/parser/types.ts`: TypeScript types mirroring C# models (154 LOC) - keep as-is
+- `/packages/praxrr-app/src/lib/server/utils/arr/parser/index.ts`: Module exports (18 LOC)
+- `/packages/praxrr-app/src/lib/server/utils/parser/spawn.ts`: Auto-spawn logic for standalone builds (157 LOC) - remove entirely
+- `/packages/praxrr-app/src/lib/server/pcd/entities/customFormats/evaluator.ts`: CF evaluator with JS regex fallback (536 LOC)
+- `/packages/praxrr-app/src/routes/api/v1/entity-testing/evaluate/+server.ts`: API endpoint using parser (123 LOC)
+- `/packages/praxrr-app/src/lib/server/db/queries/parsedReleaseCache.ts`: Parse result cache (82 LOC) - may simplify
+- `/packages/praxrr-app/src/lib/server/db/queries/patternMatchCache.ts`: Pattern match cache (113 LOC) - may keep
 
 ### Build/Deploy (to be simplified)
 
@@ -278,7 +278,7 @@ If .NET regex compatibility for user-authored custom format patterns becomes a h
 - `/scripts/dev.ts`: Dev script running parser + server concurrently (133 LOC) - simplify
 - `/.github/workflows/release.yml`: Release workflow with .NET build matrix - remove .NET
 - `/.github/workflows/docker.yml`: Docker workflow building parser image - remove parser matrix entry
-- `/src/hooks.server.ts`: Startup sequence importing spawn.ts - remove spawn import
+- `/packages/praxrr-app/src/hooks.server.ts`: Startup sequence importing spawn.ts - remove spawn import
 
 ## Key Decisions Needed
 

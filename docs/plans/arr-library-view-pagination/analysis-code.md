@@ -8,11 +8,11 @@ The existing implementation already has clear seams for pagination: the API rout
 
 ### Related Components
 
-- `/src/routes/api/v1/arr/library/+server.ts`: GET/DELETE handler with Arr dispatch, profile enrichment, cache usage, and structured error handling.
-- `/src/routes/arr/[id]/library/+page.svelte`: Library page state manager for fetching, refresh, search/filter/column state, and table rendering.
-- `/src/routes/arr/[id]/library/components/LibraryActionBar.svelte`: Search/filter/column/refresh control surface.
-- `/src/lib/client/stores/libraryCache.ts`: Client-side library payload cache.
-- `/src/lib/server/utils/cache/cache.ts`: Server-side in-memory cache.
+- `/packages/praxrr-app/src/routes/api/v1/arr/library/+server.ts`: GET/DELETE handler with Arr dispatch, profile enrichment, cache usage, and structured error handling.
+- `/packages/praxrr-app/src/routes/arr/[id]/library/+page.svelte`: Library page state manager for fetching, refresh, search/filter/column state, and table rendering.
+- `/packages/praxrr-app/src/routes/arr/[id]/library/components/LibraryActionBar.svelte`: Search/filter/column/refresh control surface.
+- `/packages/praxrr-app/src/lib/client/stores/libraryCache.ts`: Client-side library payload cache.
+- `/packages/praxrr-app/src/lib/server/utils/cache/cache.ts`: Server-side in-memory cache.
 
 ### File Organization Pattern
 
@@ -23,19 +23,19 @@ Route files own orchestration (`+page.svelte`, `+server.ts`) while reusable cont
 ### Pattern: Arr-Type Dispatch
 
 **Description**: API handler validates instance and branches by Arr type to maintain app-specific semantics.
-**Example**: `/src/routes/api/v1/arr/library/+server.ts`
+**Example**: `/packages/praxrr-app/src/routes/api/v1/arr/library/+server.ts`
 **Apply to**: Pagination query handling, metadata population, and schema typing.
 
 ### Pattern: Dual Cache Coordination
 
 **Description**: Server cache and client cache are both used; invalidation paths must remain aligned.
-**Example**: `/src/lib/server/utils/cache/cache.ts`, `/src/lib/client/stores/libraryCache.ts`
+**Example**: `/packages/praxrr-app/src/lib/server/utils/cache/cache.ts`, `/packages/praxrr-app/src/lib/client/stores/libraryCache.ts`
 **Apply to**: Composite page/query cache keys and refresh behavior.
 
 ### Pattern: Route-Level State Orchestration
 
 **Description**: `+page.svelte` aggregates UI state and passes prepared data to component tree.
-**Example**: `/src/routes/arr/[id]/library/+page.svelte`
+**Example**: `/packages/praxrr-app/src/routes/arr/[id]/library/+page.svelte`
 **Apply to**: Pagination state, URL sync, loading/error transitions, and table input shaping.
 
 ## Integration Points
@@ -46,15 +46,15 @@ Route files own orchestration (`+page.svelte`, `+server.ts`) while reusable cont
 
 ### Files to Modify
 
-- `/src/routes/api/v1/arr/library/+server.ts`: Parse/validate pagination query params and return metadata.
-- `/src/routes/arr/[id]/library/+page.svelte`: Manage page/pageSize state and request pagination params.
-- `/src/routes/arr/[id]/library/components/LibraryActionBar.svelte`: Add/adjust page-size and pager control hooks.
-- `/src/lib/client/stores/libraryCache.ts`: Cache keying by instance + page/query dimensions.
-- `/src/lib/server/utils/cache/cache.ts`: Cache keying/invalidation updates for page-aware results.
+- `/packages/praxrr-app/src/routes/api/v1/arr/library/+server.ts`: Parse/validate pagination query params and return metadata.
+- `/packages/praxrr-app/src/routes/arr/[id]/library/+page.svelte`: Manage page/pageSize state and request pagination params.
+- `/packages/praxrr-app/src/routes/arr/[id]/library/components/LibraryActionBar.svelte`: Add/adjust page-size and pager control hooks.
+- `/packages/praxrr-app/src/lib/client/stores/libraryCache.ts`: Cache keying by instance + page/query dimensions.
+- `/packages/praxrr-app/src/lib/server/utils/cache/cache.ts`: Cache keying/invalidation updates for page-aware results.
 - `/docs/api/v1/paths/arr.yaml`: Document new query params and behavior.
 - `/docs/api/v1/schemas/arr.yaml`: Document new pagination metadata in response schemas.
-- `/src/tests/base/lidarrApiParity.test.ts`: Add backend pagination coverage.
-- `/src/tests/e2e/specs/2.40-lidarr-core-flow.spec.ts`: Extend UI contract checks for pagination.
+- `/packages/praxrr-app/src/tests/base/lidarrApiParity.test.ts`: Add backend pagination coverage.
+- `/packages/praxrr-app/src/tests/e2e/specs/2.40-lidarr-core-flow.spec.ts`: Extend UI contract checks for pagination.
 
 ## Code Conventions
 

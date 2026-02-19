@@ -4,20 +4,20 @@ Praxrr’s Arr instance model currently uses one canonical `url` for both backen
 
 ## Relevant Files
 
-- `/src/lib/server/db/schema.sql`: Canonical app schema; `arr_instances` table definition and FK ecosystem.
-- `/src/lib/server/db/queries/arrInstances.ts`: Arr instance CRUD/types; add `external_url` create/update/read handling.
-- `/src/lib/server/db/migrations.ts`: Migration registry that must include new `external_url` migration.
-- `/src/routes/arr/components/InstanceForm.svelte`: Shared new/edit form; add optional field and hidden submit plumbing.
-- `/src/routes/arr/new/+page.server.ts`: Create action validation/persistence path for new instances.
-- `/src/routes/arr/[id]/settings/+page.server.ts`: Update action for add/edit/clear external URL on existing instances.
-- `/src/routes/arr/[id]/+layout.server.ts`: Instance loader feeding all nested Arr routes with row data.
-- `/src/routes/arr/[id]/library/+page.svelte`: Library page Open-in handlers and row link base URL logic.
-- `/src/routes/arr/[id]/library/components/LibraryActionBar.svelte`: Toolbar Open-in action uses resolved browser URL.
-- `/src/routes/arr/views/TableView.svelte`: Arr list/table external-link action currently opens `instance.url`.
-- `/src/routes/arr/views/CardView.svelte`: Arr card external-link action currently opens `instance.url`.
-- `/src/routes/arr/test/+server.ts`: Connection test endpoint that must remain bound to canonical `url`.
-- `/src/routes/api/v1/arr/library/+server.ts`: Server-side library fetch path using Arr clients and instance URL.
-- `/src/lib/server/utils/arr/factory.ts`: Arr client construction from canonical instance connection fields.
+- `/packages/praxrr-app/src/lib/server/db/schema.sql`: Canonical app schema; `arr_instances` table definition and FK ecosystem.
+- `/packages/praxrr-app/src/lib/server/db/queries/arrInstances.ts`: Arr instance CRUD/types; add `external_url` create/update/read handling.
+- `/packages/praxrr-app/src/lib/server/db/migrations.ts`: Migration registry that must include new `external_url` migration.
+- `/packages/praxrr-app/src/routes/arr/components/InstanceForm.svelte`: Shared new/edit form; add optional field and hidden submit plumbing.
+- `/packages/praxrr-app/src/routes/arr/new/+page.server.ts`: Create action validation/persistence path for new instances.
+- `/packages/praxrr-app/src/routes/arr/[id]/settings/+page.server.ts`: Update action for add/edit/clear external URL on existing instances.
+- `/packages/praxrr-app/src/routes/arr/[id]/+layout.server.ts`: Instance loader feeding all nested Arr routes with row data.
+- `/packages/praxrr-app/src/routes/arr/[id]/library/+page.svelte`: Library page Open-in handlers and row link base URL logic.
+- `/packages/praxrr-app/src/routes/arr/[id]/library/components/LibraryActionBar.svelte`: Toolbar Open-in action uses resolved browser URL.
+- `/packages/praxrr-app/src/routes/arr/views/TableView.svelte`: Arr list/table external-link action currently opens `instance.url`.
+- `/packages/praxrr-app/src/routes/arr/views/CardView.svelte`: Arr card external-link action currently opens `instance.url`.
+- `/packages/praxrr-app/src/routes/arr/test/+server.ts`: Connection test endpoint that must remain bound to canonical `url`.
+- `/packages/praxrr-app/src/routes/api/v1/arr/library/+server.ts`: Server-side library fetch path using Arr clients and instance URL.
+- `/packages/praxrr-app/src/lib/server/utils/arr/factory.ts`: Arr client construction from canonical instance connection fields.
 
 ## Relevant Tables
 
@@ -29,15 +29,15 @@ Praxrr’s Arr instance model currently uses one canonical `url` for both backen
 
 ## Relevant Patterns
 
-**Query-Layer Source of Truth**: Extend Arr instance types and SQL in one place (`arrInstancesQueries`) and let route loaders consume the updated shape. Example: [`/src/lib/server/db/queries/arrInstances.ts`](/src/lib/server/db/queries/arrInstances.ts).
+**Query-Layer Source of Truth**: Extend Arr instance types and SQL in one place (`arrInstancesQueries`) and let route loaders consume the updated shape. Example: [`/packages/praxrr-app/src/lib/server/db/queries/arrInstances.ts`](/packages/praxrr-app/src/lib/server/db/queries/arrInstances.ts).
 
-**SvelteKit Action Validation + PRG**: Parse/trim form data, return `fail(...)` on validation, and `redirect(303, ...)` on success for create/update flows. Example: [`/src/routes/arr/new/+page.server.ts`](/src/routes/arr/new/+page.server.ts).
+**SvelteKit Action Validation + PRG**: Parse/trim form data, return `fail(...)` on validation, and `redirect(303, ...)` on success for create/update flows. Example: [`/packages/praxrr-app/src/routes/arr/new/+page.server.ts`](/packages/praxrr-app/src/routes/arr/new/+page.server.ts).
 
-**Layout-Propagated Instance Context**: Load instance once at `[id]` layout and reuse in child routes/components for consistent behavior updates. Example: [`/src/routes/arr/[id]/+layout.server.ts`](/src/routes/arr/[id]/+layout.server.ts).
+**Layout-Propagated Instance Context**: Load instance once at `[id]` layout and reuse in child routes/components for consistent behavior updates. Example: [`/packages/praxrr-app/src/routes/arr/[id]/+layout.server.ts`](/packages/praxrr-app/src/routes/arr/[id]/+layout.server.ts).
 
-**UI Fallback Resolver for Open Links**: Compute one browser target (`external_url || url`) and reuse for toolbar and row/card links. Example: [`/src/routes/arr/[id]/library/+page.svelte`](/src/routes/arr/[id]/library/+page.svelte).
+**UI Fallback Resolver for Open Links**: Compute one browser target (`external_url || url`) and reuse for toolbar and row/card links. Example: [`/packages/praxrr-app/src/routes/arr/[id]/library/+page.svelte`](/packages/praxrr-app/src/routes/arr/[id]/library/+page.svelte).
 
-**Canonical URL for Server Clients**: Keep backend Arr clients on `instance.url` regardless of browser override fields. Example: [`/src/lib/server/utils/arr/factory.ts`](/src/lib/server/utils/arr/factory.ts).
+**Canonical URL for Server Clients**: Keep backend Arr clients on `instance.url` regardless of browser override fields. Example: [`/packages/praxrr-app/src/lib/server/utils/arr/factory.ts`](/packages/praxrr-app/src/lib/server/utils/arr/factory.ts).
 
 ## Relevant Docs
 

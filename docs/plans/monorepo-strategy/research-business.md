@@ -49,7 +49,7 @@ pipeline, and UI dependency editor without breaking the user-facing `pcd.json` m
 ### PCD Manifest Contract
 
 The `pcd.json` manifest is the contract between the app and any PCD repository. Key rules enforced
-by `src/lib/server/pcd/manifest/manifest.ts`:
+by `packages/praxrr-app/src/lib/server/pcd/manifest/manifest.ts`:
 
 - **Required fields**: `name`, `version`, `description`, `praxrr.minimum_version`.
 - **Dependencies must include schema**: If `dependencies` is present and non-empty, at least one key
@@ -88,7 +88,7 @@ cloning. The monorepo must preserve this contract or provide a migration path.
 
 ### Auto-Link Defaults
 
-The auto-link mechanism in `src/hooks.server.ts` (lines 37-78) runs once on first startup:
+The auto-link mechanism in `packages/praxrr-app/src/hooks.server.ts` (lines 37-78) runs once on first startup:
 
 1. Checks `setup_state.default_database_linked` flag (singleton row in `setup_state` table).
 2. If not linked, calls `pcdManager.link()` with **hardcoded** values:
@@ -106,7 +106,7 @@ The auto-link mechanism in `src/hooks.server.ts` (lines 37-78) runs once on firs
 
 ### Ops Layering
 
-Ops are loaded in strict order by `src/lib/server/pcd/ops/loadOps.ts`:
+Ops are loaded in strict order by `packages/praxrr-app/src/lib/server/pcd/ops/loadOps.ts`:
 
 1. **Schema layer** -- SQL files from `deps/{schema-dir}/ops/`, loaded from filesystem
 2. **Base layer (published)** -- from `pcd_ops` table where `origin='base'` and `state='published'`
@@ -134,7 +134,7 @@ on link, sync, branch switch, and startup initialization.
 - **Schema dependency is mandatory validation**: The manifest validator enforces that `dependencies`
   must contain a key with `"schema"` in it, but does not validate the URL format or reachability.
 - **UI locks schema dependency**: The database config page
-  (`src/routes/databases/[id]/config/+page.svelte`, line 316) uses a `lockedFirst` prop that
+  (`packages/praxrr-app/src/routes/databases/[id]/config/+page.svelte`, line 316) uses a `lockedFirst` prop that
   hardcodes `https://github.com/yandy-r/praxrr-schema` as the locked dependency key.
 
 ## Workflows
@@ -244,19 +244,19 @@ praxrr-schema (schema repo)
 
 ### Coupling Points
 
-- **`src/hooks.server.ts:54`**: Hardcoded `repositoryUrl: 'https://github.com/yandy-r/praxrr-db'`
+- **`packages/praxrr-app/src/hooks.server.ts:54`**: Hardcoded `repositoryUrl: 'https://github.com/yandy-r/praxrr-db'`
   and `branch: 'v2'` for auto-link default.
 - **`scripts/generate-pcd-types.ts:19`**: Hardcoded `SCHEMA_REPO = 'yandy-r/praxrr-schema'` for type
   generation.
-- **`src/routes/databases/[id]/config/+page.svelte:316`**: Hardcoded
+- **`packages/praxrr-app/src/routes/databases/[id]/config/+page.svelte:316`**: Hardcoded
   `key: 'https://github.com/yandy-r/praxrr-schema'` as locked dependency in UI.
-- **`src/lib/server/pcd/git/dependencies.ts`**: Extracts repo name from URL for local clone path
+- **`packages/praxrr-app/src/lib/server/pcd/git/dependencies.ts`**: Extracts repo name from URL for local clone path
   (`getRepoName()`). URL-format-dependent.
-- **`src/lib/server/pcd/ops/loadOps.ts:33-47`**: Resolves schema ops path by scanning `deps/` for
+- **`packages/praxrr-app/src/lib/server/pcd/ops/loadOps.ts:33-47`**: Resolves schema ops path by scanning `deps/` for
   directories containing `"schema"`. Already flexible.
-- **`src/lib/server/pcd/manifest/manifest.ts:82-86`**: Validates that dependencies contain a key
+- **`packages/praxrr-app/src/lib/server/pcd/manifest/manifest.ts:82-86`**: Validates that dependencies contain a key
   with `"schema"` substring. Already flexible.
-- **`src/lib/shared/pcd/types.ts:6`**: Generated header references
+- **`packages/praxrr-app/src/lib/shared/pcd/types.ts:6`**: Generated header references
   `https://github.com/yandy-r/praxrr-schema`. Cosmetic only.
 
 ## Existing Codebase Integration
@@ -265,14 +265,14 @@ praxrr-schema (schema repo)
 
 | File                                            | Line         | Reference                                           | Impact                       |
 | ----------------------------------------------- | ------------ | --------------------------------------------------- | ---------------------------- |
-| `src/hooks.server.ts`                           | 54           | `'https://github.com/yandy-r/praxrr-db'`            | Auto-link default DB URL     |
-| `src/hooks.server.ts`                           | 55           | `'v2'`                                              | Auto-link default branch     |
+| `packages/praxrr-app/src/hooks.server.ts`                           | 54           | `'https://github.com/yandy-r/praxrr-db'`            | Auto-link default DB URL     |
+| `packages/praxrr-app/src/hooks.server.ts`                           | 55           | `'v2'`                                              | Auto-link default branch     |
 | `scripts/generate-pcd-types.ts`                 | 19           | `'yandy-r/praxrr-schema'`                           | GitHub raw URL for type gen  |
 | `scripts/generate-pcd-types.ts`                 | 37           | `'ops/0.schema.sql'`                                | Schema file path within repo |
-| `src/routes/databases/[id]/config/+page.svelte` | 316          | `'https://github.com/yandy-r/praxrr-schema'`        | Locked dependency key in UI  |
-| `src/tests/e2e/env.ts`                          | 33           | `'https://github.com/yandy-r/praxrr-db-v2-testing'` | E2E test default repo        |
-| `src/lib/server/pcd/git/dependencies.ts`        | 12           | Comment referencing `yandy-r/praxrr-schema`         | Documentation only           |
-| `src/lib/shared/pcd/types.ts`                   | 6            | Generated comment with schema URL                   | Cosmetic, regenerated        |
+| `packages/praxrr-app/src/routes/databases/[id]/config/+page.svelte` | 316          | `'https://github.com/yandy-r/praxrr-schema'`        | Locked dependency key in UI  |
+| `packages/praxrr-app/src/tests/e2e/env.ts`                          | 33           | `'https://github.com/yandy-r/praxrr-db-v2-testing'` | E2E test default repo        |
+| `packages/praxrr-app/src/lib/server/pcd/git/dependencies.ts`        | 12           | Comment referencing `yandy-r/praxrr-schema`         | Documentation only           |
+| `packages/praxrr-app/src/lib/shared/pcd/types.ts`                   | 6            | Generated comment with schema URL                   | Cosmetic, regenerated        |
 | `README.md`                                     | 27           | Link to `praxrr-db` repo                            | Documentation                |
 | `docs/ARCHITECTURE.md`                          | 252, 266-277 | Multiple references to both repos                   | Documentation                |
 
@@ -354,37 +354,37 @@ This provides a proven pattern for adding `packages/praxrr-db` and `packages/pra
 
 ## Relevant Files
 
-- `/home/yandy/Projects/github.com/yandy-r/praxrr/src/hooks.server.ts`: Startup sequence and
+- `/home/yandy/Projects/github.com/yandy-r/praxrr/packages/praxrr-app/src/hooks.server.ts`: Startup sequence and
   auto-link default DB logic (primary hardcoded coupling)
-- `/home/yandy/Projects/github.com/yandy-r/praxrr/src/lib/server/pcd/core/manager.ts`: PCD lifecycle
+- `/home/yandy/Projects/github.com/yandy-r/praxrr/packages/praxrr-app/src/lib/server/pcd/core/manager.ts`: PCD lifecycle
   orchestration (link, sync, unlink, initialize)
-- `/home/yandy/Projects/github.com/yandy-r/praxrr/src/lib/server/pcd/git/dependencies.ts`:
+- `/home/yandy/Projects/github.com/yandy-r/praxrr/packages/praxrr-app/src/lib/server/pcd/git/dependencies.ts`:
   Dependency clone/sync/version resolution via git
-- `/home/yandy/Projects/github.com/yandy-r/praxrr/src/lib/server/pcd/manifest/manifest.ts`: pcd.json
+- `/home/yandy/Projects/github.com/yandy-r/praxrr/packages/praxrr-app/src/lib/server/pcd/manifest/manifest.ts`: pcd.json
   read/validate/write and contract enforcement
-- `/home/yandy/Projects/github.com/yandy-r/praxrr/src/lib/server/pcd/ops/loadOps.ts`: Schema path
+- `/home/yandy/Projects/github.com/yandy-r/praxrr/packages/praxrr-app/src/lib/server/pcd/ops/loadOps.ts`: Schema path
   resolution and ops layer loading
-- `/home/yandy/Projects/github.com/yandy-r/praxrr/src/lib/server/pcd/ops/importBaseOps.ts`:
+- `/home/yandy/Projects/github.com/yandy-r/praxrr/packages/praxrr-app/src/lib/server/pcd/ops/importBaseOps.ts`:
   Repo-to-DB base ops import pipeline
-- `/home/yandy/Projects/github.com/yandy-r/praxrr/src/lib/server/pcd/ops/seedBuiltInBaseOps.ts`:
+- `/home/yandy/Projects/github.com/yandy-r/praxrr/packages/praxrr-app/src/lib/server/pcd/ops/seedBuiltInBaseOps.ts`:
   Built-in (app-level) base ops seeding
-- `/home/yandy/Projects/github.com/yandy-r/praxrr/src/lib/server/pcd/database/compiler.ts`: PCD
+- `/home/yandy/Projects/github.com/yandy-r/praxrr/packages/praxrr-app/src/lib/server/pcd/database/compiler.ts`: PCD
   cache compile/invalidate with conflict resolution
-- `/home/yandy/Projects/github.com/yandy-r/praxrr/src/lib/server/pcd/database/cache.ts`: In-memory
+- `/home/yandy/Projects/github.com/yandy-r/praxrr/packages/praxrr-app/src/lib/server/pcd/database/cache.ts`: In-memory
   SQLite cache build and query API
-- `/home/yandy/Projects/github.com/yandy-r/praxrr/src/lib/server/pcd/utils/operations.ts`: Path
+- `/home/yandy/Projects/github.com/yandy-r/praxrr/packages/praxrr-app/src/lib/server/pcd/utils/operations.ts`: Path
   helpers and operation loading from filesystem
 - `/home/yandy/Projects/github.com/yandy-r/praxrr/scripts/generate-pcd-types.ts`:
   Schema-to-TypeScript type generation (hardcoded GitHub URL)
-- `/home/yandy/Projects/github.com/yandy-r/praxrr/src/lib/server/utils/config/config.ts`: App
+- `/home/yandy/Projects/github.com/yandy-r/praxrr/packages/praxrr-app/src/lib/server/utils/config/config.ts`: App
   configuration singleton (base path, all data paths)
-- `/home/yandy/Projects/github.com/yandy-r/praxrr/src/lib/server/db/queries/setupState.ts`: Setup
+- `/home/yandy/Projects/github.com/yandy-r/praxrr/packages/praxrr-app/src/lib/server/db/queries/setupState.ts`: Setup
   state tracking (default_database_linked flag)
-- `/home/yandy/Projects/github.com/yandy-r/praxrr/src/lib/server/db/queries/databaseInstances.ts`:
+- `/home/yandy/Projects/github.com/yandy-r/praxrr/packages/praxrr-app/src/lib/server/db/queries/databaseInstances.ts`:
   Database instance CRUD (stores linked PCD metadata)
-- `/home/yandy/Projects/github.com/yandy-r/praxrr/src/routes/databases/[id]/config/+page.svelte`: DB
+- `/home/yandy/Projects/github.com/yandy-r/praxrr/packages/praxrr-app/src/routes/databases/[id]/config/+page.svelte`: DB
   config UI with hardcoded schema dependency lock
-- `/home/yandy/Projects/github.com/yandy-r/praxrr/src/routes/databases/new/+page.server.ts`: Link
+- `/home/yandy/Projects/github.com/yandy-r/praxrr/packages/praxrr-app/src/routes/databases/new/+page.server.ts`: Link
   new database server action
 - `/home/yandy/Projects/github.com/yandy-r/praxrr/deno.json`: Workspace config, path aliases, task
   definitions

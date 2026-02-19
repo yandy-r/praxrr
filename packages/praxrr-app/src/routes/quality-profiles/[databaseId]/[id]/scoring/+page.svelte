@@ -25,6 +25,8 @@
   import ActionButton from '$ui/actions/ActionButton.svelte';
   import Dropdown from '$ui/dropdown/Dropdown.svelte';
   import CustomGroupManager from '$ui/dropdown/CustomGroupManager.svelte';
+  import thanksGif from '$assets/thanks.gif';
+  import nggyuGif from '$assets/nggyu.gif';
   import ScoringTable from './components/ScoringTable.svelte';
   import { getPersistentSearchStore, type SearchStore } from '$lib/client/stores/search';
   import { onMount, tick } from 'svelte';
@@ -884,13 +886,13 @@
       <div
         class="flex items-center justify-center rounded-lg border border-neutral-200 bg-white p-8 dark:border-neutral-800 dark:bg-neutral-900"
       >
-        <img src="/src/lib/client/assets/thanks.gif" alt="Thanks!" class="max-w-full" />
+        <img src={thanksGif} alt="Thanks!" class="max-w-full" />
       </div>
     {:else if searchQuery === 'rickroll' || searchQuery === 'nevergonnagiveyouup'}
       <div
         class="flex items-center justify-center rounded-lg border border-neutral-200 bg-white p-8 dark:border-neutral-800 dark:bg-neutral-900"
       >
-        <img src="/src/lib/client/assets/nggyu.gif" alt="Never gonna give you up" class="max-w-full" />
+        <img src={nggyuGif} alt="Never gonna give you up" class="max-w-full" />
       </div>
     {:else if sortedCustomFormats.length === 0}
       <div class="overflow-x-auto rounded-lg border border-neutral-200 dark:border-neutral-800">

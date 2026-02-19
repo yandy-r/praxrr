@@ -8,7 +8,7 @@
 
 - `docs/api/v1/paths/arr.yaml`: Current `/arr/library` GET/DELETE contract and operation structure to extend with pagination params.
 - `docs/api/v1/schemas/arr.yaml`: Current Arr library response schemas that need pagination metadata fields.
-- `src/routes/api/v1/arr/library/+server.ts`: In-code API behavior and handler flow for request validation, caching, and response shaping.
+- `packages/praxrr-app/src/routes/api/v1/arr/library/+server.ts`: In-code API behavior and handler flow for request validation, caching, and response shaping.
 
 ## Development Guides
 
@@ -29,8 +29,8 @@
 - `docs/plans/arr-library-view-pagination/research-ux.md`: You _must_ read this when implementing UI controls, accessibility, and loading states.
 - `docs/api/v1/paths/arr.yaml`: You _must_ read this when changing `/api/v1/arr/library` request contract.
 - `docs/api/v1/schemas/arr.yaml`: You _must_ read this when changing library response payload shape.
-- `src/routes/api/v1/arr/library/+server.ts`: You _must_ read this when implementing server-side pagination/filtering/sorting.
-- `src/routes/arr/[id]/library/+page.svelte`: You _must_ read this when integrating pagination controls with existing search/filter/column state.
+- `packages/praxrr-app/src/routes/api/v1/arr/library/+server.ts`: You _must_ read this when implementing server-side pagination/filtering/sorting.
+- `packages/praxrr-app/src/routes/arr/[id]/library/+page.svelte`: You _must_ read this when integrating pagination controls with existing search/filter/column state.
 
 ## Documentation Gaps
 

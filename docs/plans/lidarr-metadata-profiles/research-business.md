@@ -54,7 +54,7 @@ Lidarr metadata profiles control which album release types (primary types, secon
    - `2` = Bootleg
    - `3` = Pseudo-Release
 
-6. **Name Uniqueness**: Metadata profile names must be case-insensitively unique within a PCD database, following the existing convention enforced on all PCD entity create/rename paths (see `src/lib/server/pcd/entities/validate.ts`).
+6. **Name Uniqueness**: Metadata profile names must be case-insensitively unique within a PCD database, following the existing convention enforced on all PCD entity create/rename paths (see `packages/praxrr-app/src/lib/server/pcd/entities/validate.ts`).
 
 7. **Default Profile Handling**: Lidarr instances always have at least one metadata profile. When syncing, Praxrr should create/update profiles by name match (the same pattern used for quality profiles). Praxrr does NOT manage the "default" assignment to artists -- that is done in Lidarr itself. Praxrr only ensures the profile definition exists and is up to date.
 
@@ -172,58 +172,58 @@ In Lidarr, each artist has a `metadataProfileId` field. When an artist is added 
 
 ### Related Features (Models to Follow)
 
-- `/src/lib/server/pcd/entities/delayProfiles/`: Simplest PCD entity pattern -- single table, no arr-type branching. Good starting template for the core entity.
-- `/src/lib/server/pcd/entities/mediaManagement/naming/`: Arr-type-branched entity (radarr_naming, sonarr_naming, lidarr_naming). Demonstrates the pattern for Lidarr-specific entities with create/read/update/delete/override.
-- `/src/lib/server/pcd/entities/mediaManagement/media-settings/`: Another arr-type-branched entity, simpler than naming. Good model for the entity operations.
-- `/src/lib/server/sync/qualityProfiles/syncer.ts`: Most complex syncer -- demonstrates database batching, namespace suffixes, and per-database sync. Metadata profiles would follow a similar but simpler pattern (no custom format dependency).
-- `/src/lib/server/sync/mediaManagement/syncer.ts`: Demonstrates the "GET existing, modify, PUT back" pattern for config-style sync. Metadata profiles use a different pattern (create/update by name match on a collection endpoint).
+- `/packages/praxrr-app/src/lib/server/pcd/entities/delayProfiles/`: Simplest PCD entity pattern -- single table, no arr-type branching. Good starting template for the core entity.
+- `/packages/praxrr-app/src/lib/server/pcd/entities/mediaManagement/naming/`: Arr-type-branched entity (radarr_naming, sonarr_naming, lidarr_naming). Demonstrates the pattern for Lidarr-specific entities with create/read/update/delete/override.
+- `/packages/praxrr-app/src/lib/server/pcd/entities/mediaManagement/media-settings/`: Another arr-type-branched entity, simpler than naming. Good model for the entity operations.
+- `/packages/praxrr-app/src/lib/server/sync/qualityProfiles/syncer.ts`: Most complex syncer -- demonstrates database batching, namespace suffixes, and per-database sync. Metadata profiles would follow a similar but simpler pattern (no custom format dependency).
+- `/packages/praxrr-app/src/lib/server/sync/mediaManagement/syncer.ts`: Demonstrates the "GET existing, modify, PUT back" pattern for config-style sync. Metadata profiles use a different pattern (create/update by name match on a collection endpoint).
 
 ### Patterns to Follow
 
-- **PCD Entity CRUD**: Follow the pattern in `src/lib/server/pcd/entities/mediaManagement/media-settings/` -- separate files for `create.ts`, `read.ts`, `update.ts`, `delete.ts`, `index.ts`, and `override.ts`.
-- **Entity Registry**: Register the new entity in `src/lib/server/pcd/entities/registry.ts` under `AUTO_ALIGN_ENTITIES` with the appropriate table name, key column, and fields.
-- **Portable Types**: Add `PortableLidarrMetadataProfile` to `src/lib/shared/pcd/portable.ts` and register in `ENTITY_TYPES`.
-- **Serialize/Deserialize**: Add functions in `src/lib/server/pcd/entities/serialize.ts` and `deserialize.ts`.
+- **PCD Entity CRUD**: Follow the pattern in `packages/praxrr-app/src/lib/server/pcd/entities/mediaManagement/media-settings/` -- separate files for `create.ts`, `read.ts`, `update.ts`, `delete.ts`, `index.ts`, and `override.ts`.
+- **Entity Registry**: Register the new entity in `packages/praxrr-app/src/lib/server/pcd/entities/registry.ts` under `AUTO_ALIGN_ENTITIES` with the appropriate table name, key column, and fields.
+- **Portable Types**: Add `PortableLidarrMetadataProfile` to `packages/praxrr-app/src/lib/shared/pcd/portable.ts` and register in `ENTITY_TYPES`.
+- **Serialize/Deserialize**: Add functions in `packages/praxrr-app/src/lib/server/pcd/entities/serialize.ts` and `deserialize.ts`.
 - **Sync Section**: Create a new sync section type. Currently `SectionType = 'qualityProfiles' | 'delayProfiles' | 'mediaManagement'`. Add `'metadataProfiles'`. This requires updates to:
-  - `src/lib/server/sync/types.ts` (SectionType union)
-  - `src/lib/server/sync/mappings.ts` (SYNC_SECTION_ORDER, SUPPORTED_SYNC_SECTIONS for lidarr only)
-  - New `src/lib/server/sync/metadataProfiles/` directory with handler.ts, syncer.ts, transformer.ts
-  - `src/lib/server/sync/registry.ts` (registration)
-- **Capabilities**: Update `src/lib/shared/arr/capabilities.ts` to add `metadata_profiles` to `ArrSyncSurface`. Set it to `true` for Lidarr, `false` for Radarr/Sonarr.
+  - `packages/praxrr-app/src/lib/server/sync/types.ts` (SectionType union)
+  - `packages/praxrr-app/src/lib/server/sync/mappings.ts` (SYNC_SECTION_ORDER, SUPPORTED_SYNC_SECTIONS for lidarr only)
+  - New `packages/praxrr-app/src/lib/server/sync/metadataProfiles/` directory with handler.ts, syncer.ts, transformer.ts
+  - `packages/praxrr-app/src/lib/server/sync/registry.ts` (registration)
+- **Capabilities**: Update `packages/praxrr-app/src/lib/shared/arr/capabilities.ts` to add `metadata_profiles` to `ArrSyncSurface`. Set it to `true` for Lidarr, `false` for Radarr/Sonarr.
 - **App DB Tables**: Add sync configuration tables following the pattern of `arr_sync_delay_profiles_config` (single profile selection per instance, with database_id reference).
-- **LidarrClient**: Add `getMetadataProfiles()`, `createMetadataProfile()`, `updateMetadataProfile()` methods to `src/lib/server/utils/arr/clients/lidarr.ts`. These use `/api/v1/metadataprofile`.
-- **PCD Schema**: Add tables to `docs/pcdReference/0.schema.sql` and create a migration in `src/lib/server/db/migrations/`.
+- **LidarrClient**: Add `getMetadataProfiles()`, `createMetadataProfile()`, `updateMetadataProfile()` methods to `packages/praxrr-app/src/lib/server/utils/arr/clients/lidarr.ts`. These use `/api/v1/metadataprofile`.
+- **PCD Schema**: Add tables to `docs/pcdReference/0.schema.sql` and create a migration in `packages/praxrr-app/src/lib/server/db/migrations/`.
 
 ### Components to Leverage
 
-- **WriteOperation Pipeline**: `src/lib/server/pcd/ops/writer.ts` -- all entity writes go through `writeOperation()` which handles SQL compilation, validation, and cache recompile.
+- **WriteOperation Pipeline**: `packages/praxrr-app/src/lib/server/pcd/ops/writer.ts` -- all entity writes go through `writeOperation()` which handles SQL compilation, validation, and cache recompile.
 - **Value Guards**: The PCD ops system uses value guards for updates/deletes to detect upstream changes. Metadata profile updates should use guards on the `allowed` boolean values.
-- **Conflict System**: `src/lib/server/pcd/conflicts/` handles base vs. user op conflicts and auto-alignment. Register metadata profile fields in the auto-align rules if needed.
-- **Namespace Suffixes**: `src/lib/server/sync/namespace.ts` -- invisible Unicode suffixes for multi-database coexistence. Metadata profile names need the same treatment during sync.
-- **Display Types**: Add list item and detail types to `src/lib/shared/pcd/display.ts`.
+- **Conflict System**: `packages/praxrr-app/src/lib/server/pcd/conflicts/` handles base vs. user op conflicts and auto-alignment. Register metadata profile fields in the auto-align rules if needed.
+- **Namespace Suffixes**: `packages/praxrr-app/src/lib/server/sync/namespace.ts` -- invisible Unicode suffixes for multi-database coexistence. Metadata profile names need the same treatment during sync.
+- **Display Types**: Add list item and detail types to `packages/praxrr-app/src/lib/shared/pcd/display.ts`.
 
 ### Key Files for Reference
 
-- `/src/lib/server/pcd/entities/registry.ts`: Entity auto-align registry
-- `/src/lib/shared/pcd/types.ts`: PCD database table interfaces (auto-generated from schema)
-- `/src/lib/shared/pcd/portable.ts`: Portable entity types for import/export/clone
-- `/src/lib/shared/arr/capabilities.ts`: Arr capability definitions
-- `/src/lib/server/utils/arr/clients/lidarr.ts`: Lidarr API client
-- `/src/lib/server/utils/arr/types.ts`: Arr client type definitions
-- `/src/lib/server/utils/arr/base.ts`: Base arr client with shared methods
-- `/src/lib/server/sync/types.ts`: Sync type definitions (SectionType)
-- `/src/lib/server/sync/mappings.ts`: Sync section support matrix
-- `/src/lib/server/sync/registry.ts`: Sync section registration
-- `/src/lib/server/sync/qualityProfiles/handler.ts`: Example section handler
-- `/src/lib/server/sync/qualityProfiles/syncer.ts`: Example complex syncer
-- `/src/lib/server/sync/mediaManagement/syncer.ts`: Example config syncer (Lidarr-aware)
-- `/src/lib/server/db/schema.sql`: App database schema reference
-- `/src/lib/server/db/migrations/20260215_add_lidarr_media_management_entities.ts`: Recent Lidarr migration example
-- `/src/lib/server/pcd/ops/seedBuiltInBaseOps.ts`: Built-in base ops seeding for new databases
-- `/src/lib/server/pcd/entities/serialize.ts`: Entity serialization for export/clone
-- `/src/lib/server/pcd/entities/deserialize.ts`: Entity deserialization for import/clone
-- `/src/lib/server/pcd/entities/validate.ts`: Entity validation (name uniqueness)
-- `/src/lib/server/pcd/entities/clone.ts`: Entity cloning
+- `/packages/praxrr-app/src/lib/server/pcd/entities/registry.ts`: Entity auto-align registry
+- `/packages/praxrr-app/src/lib/shared/pcd/types.ts`: PCD database table interfaces (auto-generated from schema)
+- `/packages/praxrr-app/src/lib/shared/pcd/portable.ts`: Portable entity types for import/export/clone
+- `/packages/praxrr-app/src/lib/shared/arr/capabilities.ts`: Arr capability definitions
+- `/packages/praxrr-app/src/lib/server/utils/arr/clients/lidarr.ts`: Lidarr API client
+- `/packages/praxrr-app/src/lib/server/utils/arr/types.ts`: Arr client type definitions
+- `/packages/praxrr-app/src/lib/server/utils/arr/base.ts`: Base arr client with shared methods
+- `/packages/praxrr-app/src/lib/server/sync/types.ts`: Sync type definitions (SectionType)
+- `/packages/praxrr-app/src/lib/server/sync/mappings.ts`: Sync section support matrix
+- `/packages/praxrr-app/src/lib/server/sync/registry.ts`: Sync section registration
+- `/packages/praxrr-app/src/lib/server/sync/qualityProfiles/handler.ts`: Example section handler
+- `/packages/praxrr-app/src/lib/server/sync/qualityProfiles/syncer.ts`: Example complex syncer
+- `/packages/praxrr-app/src/lib/server/sync/mediaManagement/syncer.ts`: Example config syncer (Lidarr-aware)
+- `/packages/praxrr-app/src/lib/server/db/schema.sql`: App database schema reference
+- `/packages/praxrr-app/src/lib/server/db/migrations/20260215_add_lidarr_media_management_entities.ts`: Recent Lidarr migration example
+- `/packages/praxrr-app/src/lib/server/pcd/ops/seedBuiltInBaseOps.ts`: Built-in base ops seeding for new databases
+- `/packages/praxrr-app/src/lib/server/pcd/entities/serialize.ts`: Entity serialization for export/clone
+- `/packages/praxrr-app/src/lib/server/pcd/entities/deserialize.ts`: Entity deserialization for import/clone
+- `/packages/praxrr-app/src/lib/server/pcd/entities/validate.ts`: Entity validation (name uniqueness)
+- `/packages/praxrr-app/src/lib/server/pcd/entities/clone.ts`: Entity cloning
 - `/docs/pcdReference/0.schema.sql`: PCD schema definition
 - `/docs/plans/enhance-lidarr-support/research-technical.md`: Prior Lidarr enhancement research
 - `/docs/plans/enhance-lidarr-support/research-business.md`: Prior Lidarr business research

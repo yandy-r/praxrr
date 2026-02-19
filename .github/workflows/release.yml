@@ -8,6 +8,7 @@ on:
 env:
   DENO_VERSION: '2.5.6'
   DOTNET_VERSION: '8.0.x'
+  PARSER_PROJECT_DIR: 'packages/praxrr-parser'
 
 jobs:
   compatibility-gate:
@@ -117,8 +118,8 @@ jobs:
 
       - name: Build parser
         run: |
-          rm -f src/services/parser/Directory.Build.props
-          dotnet publish src/services/parser/Parser.csproj \
+          rm -f "${PARSER_PROJECT_DIR}/Directory.Build.props"
+          dotnet publish "${PARSER_PROJECT_DIR}/Parser.csproj" \
             -c Release \
             -r ${{ matrix.dotnet_rid }} \
             --self-contained \

@@ -4,17 +4,17 @@ Arr library pages currently fetch full datasets and rely on client-side filterin
 
 ## Critically Relevant Files and Documentation
 
-- `/src/routes/api/v1/arr/library/+server.ts`: Primary API integration point for pagination query parsing, slicing, metadata, and error handling.
-- `/src/routes/arr/[id]/library/+page.svelte`: Primary UI orchestration point for page/pageSize state, request params, and render lifecycle.
-- `/src/routes/arr/[id]/library/components/LibraryActionBar.svelte`: Existing action surface where pagination controls integrate with filters/search.
-- `/src/lib/client/stores/libraryCache.ts`: Client cache abstraction to extend with page/query-aware keys.
-- `/src/lib/server/utils/cache/cache.ts`: Server cache service used by Arr library route; key strategy must support page/query variants.
-- `/src/lib/server/db/queries/arrInstances.ts`: Arr instance resolution used before dispatch and fetch.
-- `/src/lib/server/pcd/entities/qualityProfiles/index.ts`: Profile-name enrichment used in library responses and must remain intact with pagination.
+- `/packages/praxrr-app/src/routes/api/v1/arr/library/+server.ts`: Primary API integration point for pagination query parsing, slicing, metadata, and error handling.
+- `/packages/praxrr-app/src/routes/arr/[id]/library/+page.svelte`: Primary UI orchestration point for page/pageSize state, request params, and render lifecycle.
+- `/packages/praxrr-app/src/routes/arr/[id]/library/components/LibraryActionBar.svelte`: Existing action surface where pagination controls integrate with filters/search.
+- `/packages/praxrr-app/src/lib/client/stores/libraryCache.ts`: Client cache abstraction to extend with page/query-aware keys.
+- `/packages/praxrr-app/src/lib/server/utils/cache/cache.ts`: Server cache service used by Arr library route; key strategy must support page/query variants.
+- `/packages/praxrr-app/src/lib/server/db/queries/arrInstances.ts`: Arr instance resolution used before dispatch and fetch.
+- `/packages/praxrr-app/src/lib/server/pcd/entities/qualityProfiles/index.ts`: Profile-name enrichment used in library responses and must remain intact with pagination.
 - `/docs/api/v1/paths/arr.yaml`: OpenAPI path contract source for `/arr/library` query parameters and operation docs.
 - `/docs/api/v1/schemas/arr.yaml`: OpenAPI schema source for library response metadata fields.
-- `/src/tests/base/lidarrApiParity.test.ts`: Existing backend parity/error test file to extend for pagination.
-- `/src/tests/e2e/specs/2.40-lidarr-core-flow.spec.ts`: Existing E2E flow to extend with pagination UX assertions.
+- `/packages/praxrr-app/src/tests/base/lidarrApiParity.test.ts`: Existing backend parity/error test file to extend for pagination.
+- `/packages/praxrr-app/src/tests/e2e/specs/2.40-lidarr-core-flow.spec.ts`: Existing E2E flow to extend with pagination UX assertions.
 - `/docs/plans/arr-library-view-pagination/feature-spec.md`: Requirements and acceptance criteria for this feature.
 - `/docs/plans/arr-library-view-pagination/research-technical.md`: Technical guidance for API/cache/UI pagination integration.
 - `/docs/plans/arr-library-view-pagination/research-ux.md`: UX and accessibility expectations for pagination controls and status messaging.
@@ -27,12 +27,12 @@ Arr library pages currently fetch full datasets and rely on client-side filterin
 
 **READ THESE BEFORE TASK**
 
-- `/src/routes/api/v1/arr/library/+server.ts`
-- `/src/lib/server/db/queries/arrInstances.ts`
-- `/src/lib/server/pcd/entities/qualityProfiles/index.ts`
-- `/src/lib/server/utils/arr/clients/radarr.ts`
-- `/src/lib/server/utils/arr/clients/sonarr.ts`
-- `/src/lib/server/utils/arr/clients/lidarr.ts`
+- `/packages/praxrr-app/src/routes/api/v1/arr/library/+server.ts`
+- `/packages/praxrr-app/src/lib/server/db/queries/arrInstances.ts`
+- `/packages/praxrr-app/src/lib/server/pcd/entities/qualityProfiles/index.ts`
+- `/packages/praxrr-app/src/lib/server/utils/arr/clients/radarr.ts`
+- `/packages/praxrr-app/src/lib/server/utils/arr/clients/sonarr.ts`
+- `/packages/praxrr-app/src/lib/server/utils/arr/clients/lidarr.ts`
 - `/docs/ARCHITECTURE.md`
 - `/docs/plans/arr-library-view-pagination/feature-spec.md`
 
@@ -44,7 +44,7 @@ Files to Create
 
 Files to Modify
 
-- `/src/routes/api/v1/arr/library/+server.ts`
+- `/packages/praxrr-app/src/routes/api/v1/arr/library/+server.ts`
 
 - Implement query parsing/validation for `page`, `pageSize`, and any agreed filter/sort params.
 - Implement query parsing/validation for `page`, `pageSize`, and agreed filter/sort params with explicit defaults (`page=1`, `pageSize=100`) and bounded limits (`pageSize` max `250`).
@@ -56,8 +56,8 @@ Files to Modify
 
 **READ THESE BEFORE TASK**
 
-- `/src/lib/server/utils/cache/cache.ts`
-- `/src/routes/api/v1/arr/library/+server.ts`
+- `/packages/praxrr-app/src/lib/server/utils/cache/cache.ts`
+- `/packages/praxrr-app/src/routes/api/v1/arr/library/+server.ts`
 - `/docs/plans/arr-library-view-pagination/research-technical.md`
 
 **Instructions**
@@ -68,8 +68,8 @@ Files to Create
 
 Files to Modify
 
-- `/src/lib/server/utils/cache/cache.ts`
-- `/src/routes/api/v1/arr/library/+server.ts`
+- `/packages/praxrr-app/src/lib/server/utils/cache/cache.ts`
+- `/packages/praxrr-app/src/routes/api/v1/arr/library/+server.ts`
 
 - Add a deterministic composite key model for Arr library cache entries that includes instance and pagination/query dimensions.
 - Use a deterministic key format such as `library:{instanceId}:{queryHash}:{sortKey}:{sortDirection}:{page}:{pageSize}` so different query/page variants cannot collide.
@@ -105,9 +105,9 @@ Files to Modify
 
 **READ THESE BEFORE TASK**
 
-- `/src/routes/arr/[id]/library/+page.svelte`
-- `/src/lib/client/stores/search.ts`
-- `/src/lib/client/ui/table/ExpandableTable.svelte`
+- `/packages/praxrr-app/src/routes/arr/[id]/library/+page.svelte`
+- `/packages/praxrr-app/src/lib/client/stores/search.ts`
+- `/packages/praxrr-app/src/lib/client/ui/table/ExpandableTable.svelte`
 - `/docs/plans/arr-library-view-pagination/research-ux.md`
 
 **Instructions**
@@ -118,7 +118,7 @@ Files to Create
 
 Files to Modify
 
-- `/src/routes/arr/[id]/library/+page.svelte`
+- `/packages/praxrr-app/src/routes/arr/[id]/library/+page.svelte`
 
 - Add `page` and `pageSize` state that is synchronized with URL query parameters and existing search/filter state handling.
 - Update library fetch requests to pass pagination/query params and consume metadata fields from API responses.
@@ -129,8 +129,8 @@ Files to Modify
 
 **READ THESE BEFORE TASK**
 
-- `/src/routes/arr/[id]/library/components/LibraryActionBar.svelte`
-- `/src/routes/arr/[id]/library/+page.svelte`
+- `/packages/praxrr-app/src/routes/arr/[id]/library/components/LibraryActionBar.svelte`
+- `/packages/praxrr-app/src/routes/arr/[id]/library/+page.svelte`
 - `/docs/plans/arr-library-view-pagination/research-ux.md`
 
 **Instructions**
@@ -141,8 +141,8 @@ Files to Create
 
 Files to Modify
 
-- `/src/routes/arr/[id]/library/components/LibraryActionBar.svelte`
-- `/src/routes/arr/[id]/library/+page.svelte`
+- `/packages/praxrr-app/src/routes/arr/[id]/library/components/LibraryActionBar.svelte`
+- `/packages/praxrr-app/src/routes/arr/[id]/library/+page.svelte`
 
 - Add pager controls (previous/next and page summary) and rows-per-page selection integrated with route callbacks.
 - Ensure controls are disabled/enabled correctly during loading, boundary pages, and unsupported states.
@@ -152,8 +152,8 @@ Files to Modify
 
 **READ THESE BEFORE TASK**
 
-- `/src/lib/client/stores/libraryCache.ts`
-- `/src/routes/arr/[id]/library/+page.svelte`
+- `/packages/praxrr-app/src/lib/client/stores/libraryCache.ts`
+- `/packages/praxrr-app/src/routes/arr/[id]/library/+page.svelte`
 - `/docs/plans/arr-library-view-pagination/research-technical.md`
 
 **Instructions**
@@ -164,8 +164,8 @@ Files to Create
 
 Files to Modify
 
-- `/src/lib/client/stores/libraryCache.ts`
-- `/src/routes/arr/[id]/library/+page.svelte`
+- `/packages/praxrr-app/src/lib/client/stores/libraryCache.ts`
+- `/packages/praxrr-app/src/routes/arr/[id]/library/+page.svelte`
 
 - Expand client cache keys/entries to include pagination/query dimensions so page navigation does not reuse stale slices.
 - Ensure refresh and forced invalidation clear all relevant per-instance pagination cache entries (all page/query variants for that instance).
@@ -177,8 +177,8 @@ Files to Modify
 
 **READ THESE BEFORE TASK**
 
-- `/src/tests/base/lidarrApiParity.test.ts`
-- `/src/routes/api/v1/arr/library/+server.ts`
+- `/packages/praxrr-app/src/tests/base/lidarrApiParity.test.ts`
+- `/packages/praxrr-app/src/routes/api/v1/arr/library/+server.ts`
 - `/docs/api/v1/schemas/arr.yaml`
 
 **Instructions**
@@ -189,7 +189,7 @@ Files to Create
 
 Files to Modify
 
-- `/src/tests/base/lidarrApiParity.test.ts`
+- `/packages/praxrr-app/src/tests/base/lidarrApiParity.test.ts`
 
 - Add tests for pagination parameter validation (invalid/missing/bounds cases) and expected status codes/error envelopes.
 - Add success-path assertions for pagination metadata correctness and Arr-type parity in response shape.
@@ -199,9 +199,9 @@ Files to Modify
 
 **READ THESE BEFORE TASK**
 
-- `/src/tests/e2e/specs/2.40-lidarr-core-flow.spec.ts`
-- `/src/routes/arr/[id]/library/+page.svelte`
-- `/src/routes/arr/[id]/library/components/LibraryActionBar.svelte`
+- `/packages/praxrr-app/src/tests/e2e/specs/2.40-lidarr-core-flow.spec.ts`
+- `/packages/praxrr-app/src/routes/arr/[id]/library/+page.svelte`
+- `/packages/praxrr-app/src/routes/arr/[id]/library/components/LibraryActionBar.svelte`
 - `/docs/plans/arr-library-view-pagination/research-ux.md`
 
 **Instructions**
@@ -212,7 +212,7 @@ Files to Create
 
 Files to Modify
 
-- `/src/tests/e2e/specs/2.40-lidarr-core-flow.spec.ts`
+- `/packages/praxrr-app/src/tests/e2e/specs/2.40-lidarr-core-flow.spec.ts`
 
 - Add assertions for pagination control presence, state transitions, and visible page summary behavior.
 - Validate page changes request expected API params (`page`, `pageSize`, and active query/filter params) and maintain filter/search/column behavior consistency.
@@ -224,7 +224,7 @@ Files to Modify
 
 - `/docs/api/v1/paths/arr.yaml`
 - `/docs/api/v1/schemas/arr.yaml`
-- `/src/routes/api/v1/arr/library/+server.ts`
+- `/packages/praxrr-app/src/routes/api/v1/arr/library/+server.ts`
 - `/docs/plans/arr-library-view-pagination/feature-spec.md`
 
 **Instructions**
@@ -258,15 +258,15 @@ Files to Modify
 - `~/.config/dotfiles/.codex/skills/plan-workflow/scripts/validate-workflow-plan.sh docs/plans/arr-library-view-pagination/parallel-plan.md` (pass, parser warning in script line 98 does not fail checks)
 - `~/.config/dotfiles/.codex/skills/parallel-plan/scripts/check-prerequisites.sh arr-library-view-pagination` (pass)
 - `~/.config/dotfiles/.codex/skills/plan-workflow/scripts/check-state.sh arr-library-view-pagination` (pass)
-- `deno task check:server` (fails: existing unrelated type error in `src/lib/server/pcd/entities/clone.ts`)
-- `deno test --no-check --allow-read --allow-write --allow-env --allow-ffi src/tests/base/lidarrApiParity.test.ts` (pass, 12/12)
-- `deno test --no-check src/tests/base/lidarrApiParity.test.ts` (fails: expected env permission; use `--allow-env`)
+- `deno task check:server` (fails: existing unrelated type error in `packages/praxrr-app/src/lib/server/pcd/entities/clone.ts`)
+- `deno test --no-check --allow-read --allow-write --allow-env --allow-ffi packages/praxrr-app/src/tests/base/lidarrApiParity.test.ts` (pass, 12/12)
+- `deno test --no-check packages/praxrr-app/src/tests/base/lidarrApiParity.test.ts` (fails: expected env permission; use `--allow-env`)
 
 ### Findings
 
 - [x] Resolved: server cache key now uses pagination/query-aware `buildArrLibraryCacheKey(...)` in `/api/v1/arr/library` and includes `queryHash`, `sortKey`, `sortDirection`, `page`, and `pageSize`.
 - [x] Resolved: DELETE cache invalidation now clears all library variants per instance via `cache.deleteByPrefix(getArrLibraryCachePrefix(instanceId))` in both `/api/v1/arr/library` and `arr/[id]/library/+page.server.ts`.
-- [x] Resolved: `/arr/library` query schema in `src/lib/api/v1.d.ts` includes `page`, `pageSize`, `query`, `sortKey`, and `sortDirection`.
+- [x] Resolved: `/arr/library` query schema in `packages/praxrr-app/src/lib/api/v1.d.ts` includes `page`, `pageSize`, `query`, `sortKey`, and `sortDirection`.
 
 ### Final Readiness
 

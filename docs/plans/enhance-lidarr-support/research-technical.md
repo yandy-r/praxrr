@@ -43,21 +43,21 @@ The technical pivot is replacing implicit Sonarr reuse with explicit Lidarr enti
 
 - Likely schema/migrations:
   - `docs/pcdReference/0.schema.sql`
-  - `src/lib/server/db/migrations/*`
+  - `packages/praxrr-app/src/lib/server/db/migrations/*`
 - Likely entity operation changes:
-  - `src/lib/server/pcd/entities/mediaManagement/naming/*`
-  - `src/lib/server/pcd/entities/mediaManagement/media-settings/*`
-  - `src/lib/server/pcd/entities/mediaManagement/quality-definitions/*`
-  - `src/lib/server/pcd/entities/registry.ts`
-  - `src/lib/server/pcd/conflicts/override.ts`
+  - `packages/praxrr-app/src/lib/server/pcd/entities/mediaManagement/naming/*`
+  - `packages/praxrr-app/src/lib/server/pcd/entities/mediaManagement/media-settings/*`
+  - `packages/praxrr-app/src/lib/server/pcd/entities/mediaManagement/quality-definitions/*`
+  - `packages/praxrr-app/src/lib/server/pcd/entities/registry.ts`
+  - `packages/praxrr-app/src/lib/server/pcd/conflicts/override.ts`
 - Likely API/sync changes:
-  - `src/routes/api/v1/pcd/export/+server.ts`
-  - `src/routes/api/v1/pcd/import/+server.ts`
-  - `src/lib/shared/pcd/portable.ts`
+  - `packages/praxrr-app/src/routes/api/v1/pcd/export/+server.ts`
+  - `packages/praxrr-app/src/routes/api/v1/pcd/import/+server.ts`
+  - `packages/praxrr-app/src/lib/shared/pcd/portable.ts`
   - `docs/api/v1/schemas/pcd.yaml`
-  - `src/lib/server/sync/mediaManagement/syncer.ts`
+  - `packages/praxrr-app/src/lib/server/sync/mediaManagement/syncer.ts`
 - Likely UI route wiring:
-  - `src/routes/media-management/[databaseId]/**/+page.server.ts`
+  - `packages/praxrr-app/src/routes/media-management/[databaseId]/**/+page.server.ts`
 
 ## Open Technical Decisions
 

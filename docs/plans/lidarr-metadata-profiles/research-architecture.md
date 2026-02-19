@@ -6,23 +6,23 @@ Praxrr is organized around PCD-backed entities, sync section handlers, and Arr-s
 
 ## Relevant Components
 
-- `src/lib/server/pcd/entities/delayProfiles/create.ts`: Minimal single-entity create pattern using `writeOperation` and metadata.
-- `src/lib/server/pcd/entities/delayProfiles/update.ts`: Value-guard update pattern and rename-safe operation metadata.
-- `src/lib/server/pcd/entities/qualityProfiles/index.ts`: Multi-part entity entrypoint pattern for list/get/update modules.
-- `src/lib/server/pcd/entities/registry.ts`: Auto-align entity registration and table/key definitions.
-- `src/lib/server/pcd/ops/writer.ts`: Canonical PCD operation writer used by all entity writes.
-- `src/lib/server/pcd/database/cache.ts`: Cache access helpers and typed DB gateway used by entity reads.
-- `src/lib/server/sync/types.ts`: Section contract (`SectionType`, `SectionHandler`, `InstanceSyncResult`).
-- `src/lib/server/sync/registry.ts`: Section registration/discovery map used by processor.
-- `src/lib/server/sync/processor.ts`: Runtime orchestration for trigger, claim, run, and completion/failure updates.
-- `src/lib/server/sync/qualityProfiles/handler.ts`: Reference handler wiring section methods to `arrSyncQueries`.
-- `src/lib/server/sync/qualityProfiles/syncer.ts`: End-to-end syncer pattern for read/transform/push/update outcomes.
-- `src/lib/server/sync/delayProfiles/syncer.ts`: Smaller syncer pattern for single-profile-per-instance config.
-- `src/lib/server/db/queries/arrSync.ts`: Persistence for section config, pending/claim/complete/fail state.
-- `src/lib/server/utils/arr/clients/lidarr.ts`: Lidarr API v1 client where metadata profile CRUD belongs.
-- `src/lib/shared/arr/capabilities.ts`: User-facing workflow/sync surface gates per Arr app.
-- `src/routes/arr/[id]/sync/+page.server.ts`: Sync config load/actions pattern that composes PCD + arrSync queries.
-- `src/routes/delay-profiles/[databaseId]/new/+page.server.ts`: Typical server action validation/error handling flow.
+- `packages/praxrr-app/src/lib/server/pcd/entities/delayProfiles/create.ts`: Minimal single-entity create pattern using `writeOperation` and metadata.
+- `packages/praxrr-app/src/lib/server/pcd/entities/delayProfiles/update.ts`: Value-guard update pattern and rename-safe operation metadata.
+- `packages/praxrr-app/src/lib/server/pcd/entities/qualityProfiles/index.ts`: Multi-part entity entrypoint pattern for list/get/update modules.
+- `packages/praxrr-app/src/lib/server/pcd/entities/registry.ts`: Auto-align entity registration and table/key definitions.
+- `packages/praxrr-app/src/lib/server/pcd/ops/writer.ts`: Canonical PCD operation writer used by all entity writes.
+- `packages/praxrr-app/src/lib/server/pcd/database/cache.ts`: Cache access helpers and typed DB gateway used by entity reads.
+- `packages/praxrr-app/src/lib/server/sync/types.ts`: Section contract (`SectionType`, `SectionHandler`, `InstanceSyncResult`).
+- `packages/praxrr-app/src/lib/server/sync/registry.ts`: Section registration/discovery map used by processor.
+- `packages/praxrr-app/src/lib/server/sync/processor.ts`: Runtime orchestration for trigger, claim, run, and completion/failure updates.
+- `packages/praxrr-app/src/lib/server/sync/qualityProfiles/handler.ts`: Reference handler wiring section methods to `arrSyncQueries`.
+- `packages/praxrr-app/src/lib/server/sync/qualityProfiles/syncer.ts`: End-to-end syncer pattern for read/transform/push/update outcomes.
+- `packages/praxrr-app/src/lib/server/sync/delayProfiles/syncer.ts`: Smaller syncer pattern for single-profile-per-instance config.
+- `packages/praxrr-app/src/lib/server/db/queries/arrSync.ts`: Persistence for section config, pending/claim/complete/fail state.
+- `packages/praxrr-app/src/lib/server/utils/arr/clients/lidarr.ts`: Lidarr API v1 client where metadata profile CRUD belongs.
+- `packages/praxrr-app/src/lib/shared/arr/capabilities.ts`: User-facing workflow/sync surface gates per Arr app.
+- `packages/praxrr-app/src/routes/arr/[id]/sync/+page.server.ts`: Sync config load/actions pattern that composes PCD + arrSync queries.
+- `packages/praxrr-app/src/routes/delay-profiles/[databaseId]/new/+page.server.ts`: Typical server action validation/error handling flow.
 
 ## Data Flow
 
@@ -30,12 +30,12 @@ Metadata profile CRUD should follow the standard entity write path: route action
 
 ## Integration Points
 
-- Add a new PCD entity family under `src/lib/server/pcd/entities/metadataProfiles/` following delay/quality patterns.
-- Extend shared PCD contracts in `src/lib/shared/pcd/types.ts`, `src/lib/shared/pcd/portable.ts`, and `src/lib/shared/pcd/display.ts`.
-- Add a new sync section under `src/lib/server/sync/metadataProfiles/` and register it through `sync/types.ts`, `sync/mappings.ts`, `sync/registry.ts`, and `sync/processor.ts`.
-- Extend `src/lib/server/db/queries/arrSync.ts` and app schema/migration files for metadata profile sync config/status.
-- Extend `src/lib/server/utils/arr/clients/lidarr.ts` and `src/lib/server/utils/arr/types.ts` for metadata profile endpoints/payload types.
-- Add API endpoints under `src/routes/api/v1/pcd/[databaseId]/lidarr-metadata-profiles/` (new) and wire UI routes consistent with existing entity pages.
+- Add a new PCD entity family under `packages/praxrr-app/src/lib/server/pcd/entities/metadataProfiles/` following delay/quality patterns.
+- Extend shared PCD contracts in `packages/praxrr-app/src/lib/shared/pcd/types.ts`, `packages/praxrr-app/src/lib/shared/pcd/portable.ts`, and `packages/praxrr-app/src/lib/shared/pcd/display.ts`.
+- Add a new sync section under `packages/praxrr-app/src/lib/server/sync/metadataProfiles/` and register it through `sync/types.ts`, `sync/mappings.ts`, `sync/registry.ts`, and `sync/processor.ts`.
+- Extend `packages/praxrr-app/src/lib/server/db/queries/arrSync.ts` and app schema/migration files for metadata profile sync config/status.
+- Extend `packages/praxrr-app/src/lib/server/utils/arr/clients/lidarr.ts` and `packages/praxrr-app/src/lib/server/utils/arr/types.ts` for metadata profile endpoints/payload types.
+- Add API endpoints under `packages/praxrr-app/src/routes/api/v1/pcd/[databaseId]/lidarr-metadata-profiles/` (new) and wire UI routes consistent with existing entity pages.
 
 ## Key Dependencies
 

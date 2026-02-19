@@ -131,7 +131,7 @@ Defined in `svelte.config.js` and mirrored in `deno.json`:
 
 ### Services
 
-- `src/services/parser/` - C# parser microservice (release title parsing)
+- `packages/praxrr-parser/` - C# parser microservice (release title parsing)
 
 ## Key Concepts
 

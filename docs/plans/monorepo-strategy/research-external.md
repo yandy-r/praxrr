@@ -340,7 +340,7 @@ jobs:
           filters: |
             app:
               - 'packages/praxrr/**'
-              - 'src/**'
+              - 'packages/praxrr-app/src/**'
             db:
               - 'packages/praxrr-db/**'
             schema:
@@ -656,14 +656,14 @@ Netlify guide (2025) validates the end-to-end process.
 
 ### In-Place Restructuring (Moving App Code to packages/praxrr)
 
-For the existing app code that needs to move from `src/` to `packages/praxrr/src/`, there are
+For the existing app code that needs to move from `packages/praxrr-app/src/` to `packages/praxrr/src/`, there are
 two approaches:
 
 #### Approach A: Simple `git mv` (recommended)
 
 ```bash
 mkdir -p packages/praxrr
-git mv src packages/praxrr/src
+git mv packages/praxrr-app/src packages/praxrr/src
 git mv svelte.config.js packages/praxrr/
 git mv vite.config.ts packages/praxrr/
 git mv tsconfig.json packages/praxrr/
@@ -681,12 +681,12 @@ Pros:
 
 Cons:
 
-- `git log packages/praxrr/src/lib/server/db/db.ts` without `--follow` only shows post-move commits.
+- `git log packages/praxrr/packages/praxrr-app/src/lib/server/db/db.ts` without `--follow` only shows post-move commits.
 
 #### Approach B: git-filter-repo rewrite (preserve full path history)
 
 ```bash
-git filter-repo --path-rename src/:packages/praxrr/src/
+git filter-repo --path-rename packages/praxrr-app/src/:packages/praxrr/src/
 ```
 
 Pros:
@@ -994,26 +994,26 @@ unintended tasks.
 {
   "name": "@yandy-r/praxrr",
   "version": "0.2.0",
-  "exports": "./src/lib/index.ts",
+  "exports": "./packages/praxrr-app/src/lib/index.ts",
   "imports": {
     // App-specific path aliases
-    "$lib/": "./src/lib/",
-    "$api/": "./src/lib/api/",
-    "$config": "./src/lib/server/utils/config/config.ts",
-    "$logger/": "./src/lib/server/utils/logger/",
-    "$shared/": "./src/lib/shared/",
-    "$stores/": "./src/lib/client/stores/",
-    "$ui/": "./src/lib/client/ui/",
-    "$db/": "./src/lib/server/db/",
-    "$pcd/": "./src/lib/server/pcd/",
-    "$arr/": "./src/lib/server/utils/arr/",
-    "$sync/": "./src/lib/server/sync/",
-    "$jobs/": "./src/lib/server/jobs/",
-    "$http/": "./src/lib/server/utils/http/",
-    "$utils/": "./src/lib/server/utils/",
-    "$notifications/": "./src/lib/server/notifications/",
-    "$cache/": "./src/lib/server/utils/cache/",
-    "$auth/": "./src/lib/server/utils/auth/",
+    "$lib/": "./packages/praxrr-app/src/lib/",
+    "$api/": "./packages/praxrr-app/src/lib/api/",
+    "$config": "./packages/praxrr-app/src/lib/server/utils/config/config.ts",
+    "$logger/": "./packages/praxrr-app/src/lib/server/utils/logger/",
+    "$shared/": "./packages/praxrr-app/src/lib/shared/",
+    "$stores/": "./packages/praxrr-app/src/lib/client/stores/",
+    "$ui/": "./packages/praxrr-app/src/lib/client/ui/",
+    "$db/": "./packages/praxrr-app/src/lib/server/db/",
+    "$pcd/": "./packages/praxrr-app/src/lib/server/pcd/",
+    "$arr/": "./packages/praxrr-app/src/lib/server/utils/arr/",
+    "$sync/": "./packages/praxrr-app/src/lib/server/sync/",
+    "$jobs/": "./packages/praxrr-app/src/lib/server/jobs/",
+    "$http/": "./packages/praxrr-app/src/lib/server/utils/http/",
+    "$utils/": "./packages/praxrr-app/src/lib/server/utils/",
+    "$notifications/": "./packages/praxrr-app/src/lib/server/notifications/",
+    "$cache/": "./packages/praxrr-app/src/lib/server/utils/cache/",
+    "$auth/": "./packages/praxrr-app/src/lib/server/utils/auth/",
     // App-specific dependencies
     "@soapbox/kysely-deno-sqlite": "jsr:@soapbox/kysely-deno-sqlite@^2.2.0",
     "marked": "npm:marked@^15.0.6",
@@ -1023,8 +1023,8 @@ unintended tasks.
   "tasks": {
     "dev": "deno run -A scripts/dev.ts",
     "build": "deno run -A npm:vite build",
-    "test": "deno test src/tests",
-    "check": "deno check src/lib/server/**/*.ts",
+    "test": "deno test packages/praxrr-app/src/tests",
+    "check": "deno check packages/praxrr-app/src/lib/server/**/*.ts",
     "lint": "eslint .",
   },
   "compilerOptions": {
@@ -1266,8 +1266,8 @@ jobs:
    initial versions. Should `praxrr-db` and `praxrr-schema` retain their current version
    numbers from the standalone repos?
 
-6. **How should the C# parser service (`src/services/parser/`) be handled in the monorepo
-   layout?** It currently lives inside `src/` which would move under `packages/praxrr/`. Should
+6. **How should the C# parser service (`packages/praxrr-parser/`) be handled in the monorepo
+   layout?** It currently lives inside `packages/praxrr-app/src/` which would move under `packages/praxrr/`. Should
    it become its own workspace member, or stay nested under the app package?
 
 ---

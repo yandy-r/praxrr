@@ -47,7 +47,7 @@ Use Deno workspaces for the db and schema packages while keeping the main Svelte
 
 ### Contract Testing
 
-- **Automated schema drift detection**: A CI step that runs `generate-pcd-types.ts --local=packages/praxrr-schema/ops/0.schema.sql` and diffs the output against the committed `src/lib/shared/pcd/types.ts` would catch any schema changes that were not propagated to types.
+- **Automated schema drift detection**: A CI step that runs `generate-pcd-types.ts --local=packages/praxrr-schema/ops/0.schema.sql` and diffs the output against the committed `packages/praxrr-app/src/lib/shared/pcd/types.ts` would catch any schema changes that were not propagated to types.
 - **Manifest compatibility check**: Validate that the app's minimum required schema version (tracked in `pcd.json`) is satisfied by the workspace schema package version.
 - **PCD compile smoke test**: A CI step that creates an in-memory PCD cache from workspace db+schema ops and validates it compiles without errors would catch cross-package breakage.
 
@@ -62,7 +62,7 @@ Use Deno workspaces for the db and schema packages while keeping the main Svelte
 
 | Risk                                                                    | Likelihood | Impact | Mitigation                                                                                                                                                                                                                 |
 | ----------------------------------------------------------------------- | ---------- | ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| SvelteKit path resolution breaks after app move to `packages/praxrr`    | High       | High   | Do not move the app. Keep it at root. SvelteKit, Vite, svelte.config.js, tsconfig.json, and deno.json all assume root-level `src/`. Moving requires updating 20+ alias paths in 3 config files plus Dockerfile COPY paths. |
+| SvelteKit path resolution breaks after app move to `packages/praxrr`    | High       | High   | Do not move the app. Keep it at root. SvelteKit, Vite, svelte.config.js, tsconfig.json, and deno.json all assume root-level `packages/praxrr-app/src/`. Moving requires updating 20+ alias paths in 3 config files plus Dockerfile COPY paths. |
 | Docker build context breaks                                             | Medium     | High   | If the app stays at root, `Dockerfile` COPY commands remain unchanged. For db/schema packages, they are not part of the Docker image and need no changes.                                                                  |
 | `deno.lock` conflicts during workspace expansion                        | Medium     | Low    | Run `deno install --node-modules-dir` after workspace changes to regenerate cleanly. The lock file is already 2,358 lines.                                                                                                 |
 | `git subtree split` produces confusing commit history in external repos | Low        | Medium | Use `--prefix` carefully. External repos get clean linear history of their subtree. Document that contributors should never push directly to external repos.                                                               |
@@ -93,7 +93,7 @@ Keep the SvelteKit app at the repository root. Add `packages/praxrr-db` and `pac
 
 ### Option B: Full App Move to `packages/praxrr`
 
-Move the entire SvelteKit application (src/, scripts/, svelte.config.js, vite.config.ts, package.json, tsconfig.json) into `packages/praxrr/`. Root `deno.json` becomes a pure workspace coordinator.
+Move the entire SvelteKit application (packages/praxrr-app/src/, scripts/, svelte.config.js, vite.config.ts, package.json, tsconfig.json) into `packages/praxrr/`. Root `deno.json` becomes a pure workspace coordinator.
 
 - **Pros**: Clean separation of all packages under `packages/`. Consistent directory model. Matches the issue description exactly.
 - **Cons**: Very high risk. Every path alias (20+ in `svelte.config.js`, `deno.json`, `tsconfig.json`) must be rebased. The `Dockerfile` COPY commands must be rewritten. The `sveltekit-adapter-deno` output paths change. The `deno compile` command in `build` tasks changes. The dev scripts change. Vite's `server.watch` paths change. The `.prettierrc` and ESLint configs need updating. The `dist/` output location logic changes. All CI workflows must be updated. E2E test paths change.
@@ -208,22 +208,22 @@ Phases 1 and 2 are strictly sequential (phase 2 depends on packages existing). P
 ## Relevant Files
 
 - `/home/yandy/Projects/github.com/yandy-r/praxrr/deno.json`: Root workspace config; already has `"workspace": ["packages/praxrr-api"]`
-- `/home/yandy/Projects/github.com/yandy-r/praxrr/src/hooks.server.ts`: Default DB auto-link with hardcoded URL (line 54) and env var support (lines 38-40)
-- `/home/yandy/Projects/github.com/yandy-r/praxrr/src/lib/server/pcd/git/dependencies.ts`: PCD dependency clone/sync/validate system
-- `/home/yandy/Projects/github.com/yandy-r/praxrr/src/lib/server/pcd/manifest/manifest.ts`: Manifest validation including schema dependency check
-- `/home/yandy/Projects/github.com/yandy-r/praxrr/src/lib/server/pcd/ops/loadOps.ts`: Schema ops path resolution with "schema" directory heuristic
-- `/home/yandy/Projects/github.com/yandy-r/praxrr/src/lib/server/pcd/core/manager.ts`: Full PCD lifecycle orchestration
+- `/home/yandy/Projects/github.com/yandy-r/praxrr/packages/praxrr-app/src/hooks.server.ts`: Default DB auto-link with hardcoded URL (line 54) and env var support (lines 38-40)
+- `/home/yandy/Projects/github.com/yandy-r/praxrr/packages/praxrr-app/src/lib/server/pcd/git/dependencies.ts`: PCD dependency clone/sync/validate system
+- `/home/yandy/Projects/github.com/yandy-r/praxrr/packages/praxrr-app/src/lib/server/pcd/manifest/manifest.ts`: Manifest validation including schema dependency check
+- `/home/yandy/Projects/github.com/yandy-r/praxrr/packages/praxrr-app/src/lib/server/pcd/ops/loadOps.ts`: Schema ops path resolution with "schema" directory heuristic
+- `/home/yandy/Projects/github.com/yandy-r/praxrr/packages/praxrr-app/src/lib/server/pcd/core/manager.ts`: Full PCD lifecycle orchestration
 - `/home/yandy/Projects/github.com/yandy-r/praxrr/scripts/generate-pcd-types.ts`: Schema type generation with hardcoded `yandy-r/praxrr-schema` (line 19)
-- `/home/yandy/Projects/github.com/yandy-r/praxrr/svelte.config.js`: 20+ path aliases that assume root-level src/
+- `/home/yandy/Projects/github.com/yandy-r/praxrr/svelte.config.js`: 20+ path aliases that assume root-level packages/praxrr-app/src/
 - `/home/yandy/Projects/github.com/yandy-r/praxrr/vite.config.ts`: Vite config reading root package.json
 - `/home/yandy/Projects/github.com/yandy-r/praxrr/Dockerfile`: Multi-stage build with COPY from root context
 - `/home/yandy/Projects/github.com/yandy-r/praxrr/.github/workflows/docker.yml`: Docker build CI
 - `/home/yandy/Projects/github.com/yandy-r/praxrr/.github/workflows/release.yml`: Release build matrix
 - `/home/yandy/Projects/github.com/yandy-r/praxrr/.github/workflows/publish-api.yml`: Existing JSR publish pattern for praxrr-api
 - `/home/yandy/Projects/github.com/yandy-r/praxrr/packages/praxrr-api/deno.json`: Existing workspace member pattern to replicate
-- `/home/yandy/Projects/github.com/yandy-r/praxrr/src/routes/databases/[id]/config/+page.svelte`: UI with hardcoded schema URL (line 316)
-- `/home/yandy/Projects/github.com/yandy-r/praxrr/src/lib/server/pcd/ops/seedBuiltInBaseOps.ts`: Built-in base op seeding (must work post-migration)
-- `/home/yandy/Projects/github.com/yandy-r/praxrr/src/lib/server/utils/config/config.ts`: App config singleton with path management
+- `/home/yandy/Projects/github.com/yandy-r/praxrr/packages/praxrr-app/src/routes/databases/[id]/config/+page.svelte`: UI with hardcoded schema URL (line 316)
+- `/home/yandy/Projects/github.com/yandy-r/praxrr/packages/praxrr-app/src/lib/server/pcd/ops/seedBuiltInBaseOps.ts`: Built-in base op seeding (must work post-migration)
+- `/home/yandy/Projects/github.com/yandy-r/praxrr/packages/praxrr-app/src/lib/server/utils/config/config.ts`: App config singleton with path management
 
 ## Sources
 

@@ -57,34 +57,34 @@ Top‑level layout and where each subsystem lives.
 
 **Server**
 
-- `src/lib/server/pcd/` — PCD operations, compiler, cache, writer
-- `src/lib/server/db/` — App DB (instances, settings, job queue, ops tables)
-- `src/lib/server/sync/` — Sync logic to Arr instances
-- `src/lib/server/jobs/` — Job queue, dispatcher, and handlers
-- `src/lib/server/upgrades/` — Upgrade engine
-- `src/lib/server/rename/` — Rename logic
-- `src/lib/server/notifications/` — Notification delivery
-- `src/lib/server/utils/` — Shared backend utilities
+- `packages/praxrr-app/src/lib/server/pcd/` — PCD operations, compiler, cache, writer
+- `packages/praxrr-app/src/lib/server/db/` — App DB (instances, settings, job queue, ops tables)
+- `packages/praxrr-app/src/lib/server/sync/` — Sync logic to Arr instances
+- `packages/praxrr-app/src/lib/server/jobs/` — Job queue, dispatcher, and handlers
+- `packages/praxrr-app/src/lib/server/upgrades/` — Upgrade engine
+- `packages/praxrr-app/src/lib/server/rename/` — Rename logic
+- `packages/praxrr-app/src/lib/server/notifications/` — Notification delivery
+- `packages/praxrr-app/src/lib/server/utils/` — Shared backend utilities
 
 **Client**
 
-- `src/lib/client/ui/` — UI components
-- `src/lib/client/alerts/` — Global alerts
-- `src/lib/client/stores/` — Svelte stores
-- `src/lib/client/utils/` — Client helpers
+- `packages/praxrr-app/src/lib/client/ui/` — UI components
+- `packages/praxrr-app/src/lib/client/alerts/` — Global alerts
+- `packages/praxrr-app/src/lib/client/stores/` — Svelte stores
+- `packages/praxrr-app/src/lib/client/utils/` — Client helpers
 
 **Shared**
 
-- `src/lib/shared/` — Shared types and utilities
+- `packages/praxrr-app/src/lib/shared/` — Shared types and utilities
 
 **Routes**
 
-- `src/routes/**` — Feature routes
-- `src/routes/api/v1/**` — Current API surface
+- `packages/praxrr-app/src/routes/**` — Feature routes
+- `packages/praxrr-app/src/routes/api/v1/**` — Current API surface
 
 **Services**
 
-- `src/services/parser/` — C# parser microservice
+- `packages/praxrr-parser/` — C# parser microservice
 
 **Docs**
 
@@ -126,7 +126,7 @@ pattern hash.
 ### Location & Initialization
 
 The app DB is a SQLite file (`praxrr.db`) managed by `DatabaseManager`
-(`src/lib/server/db/db.ts`). On server startup (`src/hooks.server.ts`):
+(`packages/praxrr-app/src/lib/server/db/db.ts`). On server startup (`packages/praxrr-app/src/hooks.server.ts`):
 
 1. `config.init()` creates required paths.
 2. `db.initialize()` opens SQLite, enables foreign keys, and configures WAL.
@@ -140,19 +140,19 @@ Key pragmas:
 
 ### Schema & Migrations
 
-- **Source of truth:** migrations in `src/lib/server/db/migrations/*.ts`.
-- **Runner:** `src/lib/server/db/migrations.ts`.
+- **Source of truth:** migrations in `packages/praxrr-app/src/lib/server/db/migrations/*.ts`.
+- **Runner:** `packages/praxrr-app/src/lib/server/db/migrations.ts`.
 - Migrations are applied in order and recorded in the `migrations` table.
 - Each migration has `version`, `name`, `up`, optional `down`, and optional
   `afterUp`.
 
-`src/lib/server/db/schema.sql` is a **reference snapshot**, not a runtime schema
+`packages/praxrr-app/src/lib/server/db/schema.sql` is a **reference snapshot**, not a runtime schema
 source. New schema changes should be introduced via a new migration and added to
 `migrations.ts`.
 
 ### Queries
 
-Query helpers live in `src/lib/server/db/queries/`. They wrap raw SQL access for
+Query helpers live in `packages/praxrr-app/src/lib/server/db/queries/`. They wrap raw SQL access for
 app state, PCD ops, and supporting data (settings, job queue, caches, etc.).
 
 ### PCD Ops in the App DB
@@ -193,7 +193,7 @@ Ops live in `pcd_ops` with these key fields:
 
 ### 6.2 Layer Order (Loader)
 
-Ops are loaded in this order (`src/lib/server/pcd/ops/loadOps.ts`):
+Ops are loaded in this order (`packages/praxrr-app/src/lib/server/pcd/ops/loadOps.ts`):
 
 1. **Schema** (`deps/schema/ops`)
 2. **Base** (published, then drafts)
@@ -202,7 +202,7 @@ Ops are loaded in this order (`src/lib/server/pcd/ops/loadOps.ts`):
 
 ### 6.3 Writer Pipeline
 
-Write flow (`src/lib/server/pcd/ops/writer.ts`):
+Write flow (`packages/praxrr-app/src/lib/server/pcd/ops/writer.ts`):
 
 - Compile Kysely queries into SQL.
 - Validate against the current cache (constraint checks, FK checks).
@@ -214,7 +214,7 @@ entity) without emitting redundant ops.
 
 ### 6.4 Cache Build
 
-The cache (`src/lib/server/pcd/database/cache.ts`) is built in‑memory by
+The cache (`packages/praxrr-app/src/lib/server/pcd/database/cache.ts`) is built in‑memory by
 replaying all ops. It is used for:
 
 - Reads (UI views)
@@ -312,9 +312,9 @@ Praxrr syncs compiled configuration into Arr instances. The sync pipeline:
 
 Key files:
 
-- `src/lib/server/sync/**` — Sync orchestration and per‑entity syncers
-- `src/lib/server/utils/arr/**` — Arr HTTP clients + payload types
-- `src/routes/arr/**` — UI and configuration for sync strategies
+- `packages/praxrr-app/src/lib/server/sync/**` — Sync orchestration and per‑entity syncers
+- `packages/praxrr-app/src/lib/server/utils/arr/**` — Arr HTTP clients + payload types
+- `packages/praxrr-app/src/routes/arr/**` — UI and configuration for sync strategies
 
 Sync strategies include manual and scheduled runs. Dependencies (e.g., custom
 formats referenced by profiles) are synced first.
@@ -354,16 +354,16 @@ Praxrr uses a C# parser microservice to extract structured metadata from
 release titles (resolution, source, flags, languages, release group, etc.). This
 powers custom format matching and quality profile testing.
 
-**Location:** `src/services/parser/`
+**Location:** `packages/praxrr-parser/`
 
 **Key pieces:**
 
-- Parsers and models in `src/services/parser/Parsers` and `Models`
-- API endpoints in `src/services/parser/Endpoints`
+- Parsers and models in `packages/praxrr-parser/Parsers` and `Models`
+- API endpoints in `packages/praxrr-parser/Endpoints`
 
 **Client & cache:**
 
-- Client lives under `src/lib/server/utils/arr/parser/`
+- Client lives under `packages/praxrr-app/src/lib/server/utils/arr/parser/`
 - Results are cached in SQLite with keys that include parser version
 
 **Why separate service?**
@@ -380,7 +380,7 @@ Entity testing lets you validate **quality profile scoring** against real
 examples. You add a movie/series (TMDB), attach synthetic or imported releases,
 then evaluate custom‑format matches and final scores.
 
-**UI route:** `src/routes/quality-profiles/entity-testing/[databaseId]`
+**UI route:** `packages/praxrr-app/src/routes/quality-profiles/entity-testing/[databaseId]`
 
 ### 9.1 Data Model (PCD Tables)
 
@@ -395,7 +395,7 @@ Releases store JSON arrays for `languages`, `indexers`, and `flags` alongside
 ### 9.2 CRUD Ops
 
 Entity testing ops live in
-`src/lib/server/pcd/entities/qualityProfiles/entityTests/`:
+`packages/praxrr-app/src/lib/server/pcd/entities/qualityProfiles/entityTests/`:
 
 - **Create entities:** bulk insert; skips duplicates by `(type, tmdb_id)`.
 - **Delete entity:** deletes releases first, then deletes entity with value
@@ -410,7 +410,7 @@ base write access.
 ### 9.3 Evaluation Flow
 
 Evaluation is driven by the API endpoint:
-`src/routes/api/v1/entity-testing/evaluate/+server.ts`.
+`packages/praxrr-app/src/routes/api/v1/entity-testing/evaluate/+server.ts`.
 
 1. **Parse releases** in batch via the parser service (cached).
 2. **Extract patterns** from all custom format conditions.
@@ -418,7 +418,7 @@ Evaluation is driven by the API endpoint:
 4. **Evaluate CFs** per release and return match results.
 
 The UI then computes profile scores using `allCfScores()` from
-`src/lib/server/pcd/entities/qualityProfiles/scoring/read.ts`. If the parser is
+`packages/praxrr-app/src/lib/server/pcd/entities/qualityProfiles/scoring/read.ts`. If the parser is
 offline, the endpoint returns `parserAvailable: false` and skips CF matching.
 
 ### 9.4 Inputs
@@ -434,7 +434,7 @@ Entity tests are created in three ways:
 Custom formats (CFs) define **match logic** (conditions) and optional **tests**
 used for quality profile scoring and entity testing.
 
-**UI routes:** `src/routes/custom-formats/**`
+**UI routes:** `packages/praxrr-app/src/routes/custom-formats/**`
 
 ### 10.1 Data Model
 
@@ -452,7 +452,7 @@ Key tables:
 
 ### 10.2 General (Name/Description/Tags)
 
-Server logic lives under `src/lib/server/pcd/entities/customFormats/general/`:
+Server logic lives under `packages/praxrr-app/src/lib/server/pcd/entities/customFormats/general/`:
 
 - **Create:** inserts `custom_formats`, inserts tags (if missing), links tags.
 - **Update:** guarded updates on name/description/include_in_rename; handles tag
@@ -462,7 +462,7 @@ Server logic lives under `src/lib/server/pcd/entities/customFormats/general/`:
 ### 10.3 Conditions
 
 Conditions are edited as a single operation:
-`src/lib/server/pcd/entities/customFormats/conditions/update.ts`.
+`packages/praxrr-app/src/lib/server/pcd/entities/customFormats/conditions/update.ts`.
 
 Flow:
 
@@ -480,7 +480,7 @@ Read helpers (`conditions/read.ts`) support:
 
 ### 10.4 Tests & Evaluation
 
-Tests live in `src/lib/server/pcd/entities/customFormats/tests/`:
+Tests live in `packages/praxrr-app/src/lib/server/pcd/entities/customFormats/tests/`:
 
 - Create/update/delete with value guards
 - Uniqueness enforced per `(custom_format_name, title, type)` (case‑insensitive)
@@ -499,7 +499,7 @@ matches and scoring.
 Quality profiles define **quality ordering**, **upgrade rules**, and **custom
 format scores**. They’re the bridge between CF matching and final decisions.
 
-**UI routes:** `src/routes/quality-profiles/**`
+**UI routes:** `packages/praxrr-app/src/routes/quality-profiles/**`
 
 ### 11.1 Data Model
 
@@ -515,7 +515,7 @@ Core tables:
 
 ### 11.2 General (Name/Description/Tags/Language)
 
-Server logic lives under `src/lib/server/pcd/entities/qualityProfiles/general/`:
+Server logic lives under `packages/praxrr-app/src/lib/server/pcd/entities/qualityProfiles/general/`:
 
 - **Create:** inserts profile with defaults; tags; seeds all qualities as
   enabled; inserts a single “simple” language if selected.
@@ -525,7 +525,7 @@ Server logic lives under `src/lib/server/pcd/entities/qualityProfiles/general/`:
 ### 11.3 Qualities (Ordering + Groups)
 
 Qualities are edited as a single all‑or‑nothing operation:
-`src/lib/server/pcd/entities/qualityProfiles/qualities/update.ts`.
+`packages/praxrr-app/src/lib/server/pcd/entities/qualityProfiles/qualities/update.ts`.
 
 Flow:
 
@@ -565,7 +565,7 @@ dedicated tables and entity operations; there is no cross‑Arr table reuse or
 fallback behavior. Each preset is a distinct entity with its own CRUD ops and
 value guards.
 
-**UI routes:** `src/routes/media-management/**`
+**UI routes:** `packages/praxrr-app/src/routes/media-management/**`
 
 ### 12.1 Naming
 
@@ -575,7 +575,7 @@ Tables:
 - `sonarr_naming`
 - `lidarr_naming`
 
-Ops live in `src/lib/server/pcd/entities/mediaManagement/naming/`:
+Ops live in `packages/praxrr-app/src/lib/server/pcd/entities/mediaManagement/naming/`:
 
 - **Create:** insert a new named config (case‑insensitive name check).
 - **Update:** guarded update; supports rename with collision checks.
@@ -634,7 +634,7 @@ operator steps and rollback procedures.
 Regular expressions are reusable patterns referenced by custom format
 conditions. They are first‑class, tagged entities with full CRUD support.
 
-**UI routes:** `src/routes/regular-expressions/**`
+**UI routes:** `packages/praxrr-app/src/routes/regular-expressions/**`
 
 ### 13.1 Data Model
 
@@ -644,7 +644,7 @@ conditions. They are first‑class, tagged entities with full CRUD support.
 
 ### 13.2 CRUD Ops
 
-Ops live in `src/lib/server/pcd/entities/regularExpressions/`:
+Ops live in `packages/praxrr-app/src/lib/server/pcd/entities/regularExpressions/`:
 
 - **Create:** insert regex; insert tags + link; rejects duplicate names
   (case‑insensitive).
@@ -660,7 +660,7 @@ conditions, so updates can affect CF evaluation and testing.
 Delay profiles control **release delay rules** (torrent/usenet) and optional
 minimum CF score gates.
 
-**UI routes:** `src/routes/delay-profiles/**`
+**UI routes:** `packages/praxrr-app/src/routes/delay-profiles/**`
 
 ### 14.1 Data Model
 
@@ -668,7 +668,7 @@ minimum CF score gates.
 
 ### 14.2 CRUD Ops
 
-Ops live in `src/lib/server/pcd/entities/delayProfiles/`:
+Ops live in `packages/praxrr-app/src/lib/server/pcd/entities/delayProfiles/`:
 
 - **Create:** insert with protocol‑aware constraints:
   - `only_torrent` ⇒ `usenet_delay` is NULL
@@ -684,11 +684,11 @@ Name uniqueness is enforced case‑insensitively on create/rename.
 Rename is a **server‑side job** that scans Arr libraries and issues rename
 commands when files/folders don’t match the current naming config.
 
-**UI route:** `src/routes/arr/[id]/rename`
+**UI route:** `packages/praxrr-app/src/routes/arr/[id]/rename`
 
 ### 15.1 Flow
 
-Core logic lives in `src/lib/server/rename/`:
+Core logic lives in `packages/praxrr-app/src/lib/server/rename/`:
 
 - **processor.ts** orchestrates Radarr/Sonarr runs.
 - **logger.ts** records structured logs and persists runs.
@@ -725,16 +725,16 @@ that reschedules itself after each run.
 
 ### 16.1 Core Components
 
-- **Dispatcher:** `src/lib/server/jobs/dispatcher.ts` — wakes on the earliest
+- **Dispatcher:** `packages/praxrr-app/src/lib/server/jobs/dispatcher.ts` — wakes on the earliest
   due job, claims it, and executes the handler.
-- **Registry:** `src/lib/server/jobs/queueRegistry.ts` +
-  `src/lib/server/jobs/handlers/**` — maps job types to handlers.
-- **Scheduler:** `src/lib/server/jobs/schedule.ts` — creates/updates scheduled
+- **Registry:** `packages/praxrr-app/src/lib/server/jobs/queueRegistry.ts` +
+  `packages/praxrr-app/src/lib/server/jobs/handlers/**` — maps job types to handlers.
+- **Scheduler:** `packages/praxrr-app/src/lib/server/jobs/schedule.ts` — creates/updates scheduled
   queue rows from config.
-- **Queue helpers:** `src/lib/server/db/queries/jobQueue.ts`,
-  `src/lib/server/db/queries/jobRunHistory.ts`,
-  `src/lib/server/jobs/queueService.ts`.
-- **Initializer:** `src/lib/server/jobs/init.ts` — recovers running jobs,
+- **Queue helpers:** `packages/praxrr-app/src/lib/server/db/queries/jobQueue.ts`,
+  `packages/praxrr-app/src/lib/server/db/queries/jobRunHistory.ts`,
+  `packages/praxrr-app/src/lib/server/jobs/queueService.ts`.
+- **Initializer:** `packages/praxrr-app/src/lib/server/jobs/init.ts` — recovers running jobs,
   schedules all jobs, and starts the dispatcher.
 
 ### 16.2 Storage
@@ -747,8 +747,8 @@ Jobs are persisted in SQLite:
 
 `jobs` and `job_runs` are deprecated and kept for one release before removal.
 
-Queries: `src/lib/server/db/queries/jobQueue.ts`,
-`src/lib/server/db/queries/jobRunHistory.ts`.
+Queries: `packages/praxrr-app/src/lib/server/db/queries/jobQueue.ts`,
+`packages/praxrr-app/src/lib/server/db/queries/jobRunHistory.ts`.
 
 ### 16.3 Job Types
 
@@ -767,7 +767,7 @@ Queries: `src/lib/server/db/queries/jobQueue.ts`,
 
 ### 16.5 UI & Manual Triggers
 
-Jobs are managed in **Settings → Jobs** (`src/routes/settings/jobs/**`). “Run
+Jobs are managed in **Settings → Jobs** (`packages/praxrr-app/src/routes/settings/jobs/**`). “Run
 now” sets the queue row’s `run_at` to the current time and wakes the dispatcher.
 Manual upgrades remain dry‑run only and respect cooldowns.
 
@@ -776,20 +776,20 @@ Manual upgrades remain dry‑run only and respect cooldowns.
 Praxrr ships a **pluggable notification system** with a central manager,
 service definitions, and delivery history.
 
-**UI routes:** `src/routes/settings/notifications/**`
+**UI routes:** `packages/praxrr-app/src/routes/settings/notifications/**`
 
 ### 17.1 Core Components
 
-- **Manager:** `src/lib/server/notifications/NotificationManager.ts` —
+- **Manager:** `packages/praxrr-app/src/lib/server/notifications/NotificationManager.ts` —
   dispatches notifications to enabled services and records history.
-- **Builder:** `src/lib/server/notifications/builder.ts` — fluent API for
+- **Builder:** `packages/praxrr-app/src/lib/server/notifications/builder.ts` — fluent API for
   constructing notifications.
-- **Definitions:** `src/lib/server/notifications/definitions/**` — reusable
+- **Definitions:** `packages/praxrr-app/src/lib/server/notifications/definitions/**` — reusable
   notification builders (rename, upgrade, test).
 
 ### 17.2 Notifiers
 
-Notifiers live under `src/lib/server/notifications/notifiers/`:
+Notifiers live under `packages/praxrr-app/src/lib/server/notifications/notifiers/`:
 
 - **Discord** is currently implemented (webhook + embed builder).
 - The `BaseHttpNotifier` + shared webhook client (`base/webhookClient.ts`)
@@ -806,7 +806,7 @@ Queries: `notificationServicesQueries` and `notificationHistoryQueries`.
 
 ### 17.4 Types
 
-`src/lib/server/notifications/types.ts` defines:
+`packages/praxrr-app/src/lib/server/notifications/types.ts` defines:
 
 - Notification type IDs
 - Service config shape (Discord today)
@@ -841,7 +841,7 @@ The upgrade system automates **manual search + upgrade selection** for Radarr.
 It evaluates filters against library items, then triggers searches for selected
 items on a schedule.
 
-**UI route:** `src/routes/arr/[id]/upgrades`
+**UI route:** `packages/praxrr-app/src/routes/arr/[id]/upgrades`
 
 ### 18.1 Config & Scheduling
 
@@ -851,12 +851,12 @@ Upgrade configs are stored per instance in `upgrade_configs`:
 - `filter_mode` (`round_robin` or `random`)
 - `filters` JSON + `current_filter_index`
 
-Queries live in `src/lib/server/db/queries/upgradeConfigs.ts`. The job system
+Queries live in `packages/praxrr-app/src/lib/server/db/queries/upgradeConfigs.ts`. The job system
 polls for **due configs** (based on `last_run_at` + schedule).
 
 ### 18.2 Processing Pipeline
 
-Core logic lives in `src/lib/server/upgrades/processor.ts`:
+Core logic lives in `packages/praxrr-app/src/lib/server/upgrades/processor.ts`:
 
 1. Fetch Radarr library + profiles + movie files.
 2. Normalize items for filter evaluation (`normalize.ts`).
@@ -884,9 +884,9 @@ Upgrade runs emit notifications (success/partial/failed) when enabled.
 ## 19) Auth & Security
 
 Praxrr supports local auth, OIDC, API keys, and session management. The
-primary flow is enforced in `src/hooks.server.ts` via the auth middleware.
+primary flow is enforced in `packages/praxrr-app/src/hooks.server.ts` via the auth middleware.
 
-**Auth module:** `src/lib/server/utils/auth/`
+**Auth module:** `packages/praxrr-app/src/lib/server/utils/auth/`
 
 ### 19.1 Auth Modes
 
@@ -897,7 +897,7 @@ Controlled by `AUTH` env:
 - `off`: trust external proxy (no auth checks)
 - `oidc`: OIDC login (no local password required)
 
-Details and flow diagrams live in `src/lib/server/utils/auth/README.md`.
+Details and flow diagrams live in `packages/praxrr-app/src/lib/server/utils/auth/README.md`.
 
 ### 19.2 Session & API Key
 
@@ -910,7 +910,7 @@ tables, managed via `authSettingsQueries` and `sessionsQueries`.
 
 ### 19.3 OIDC
 
-OIDC flow lives in `src/routes/auth/oidc/*` and `auth/oidc.ts`:
+OIDC flow lives in `packages/praxrr-app/src/routes/auth/oidc/*` and `auth/oidc.ts`:
 
 - Discovery + token exchange
 - ID token decode + basic verification
@@ -932,7 +932,7 @@ Auth and security routes:
 
 ## 20) Frontend Architecture
 
-The client UI library lives under `src/lib/client/ui/` and provides reusable
+The client UI library lives under `packages/praxrr-app/src/lib/client/ui/` and provides reusable
 Svelte components grouped by purpose. Styling is Tailwind‑first with
 component‑local class composition.
 
@@ -1007,17 +1007,17 @@ component‑local class composition.
 The navigation shell now uses a single server-produced payload to keep desktop and mobile
 surfaces consistent:
 
-- `src/routes/+layout.server.ts` resolves `navShell` once per request via
+- `packages/praxrr-app/src/routes/+layout.server.ts` resolves `navShell` once per request via
   `resolveNavShell({ user })` and passes it through `App.PageData`.
 - Authenticated non-`/auth/*` requests receive `{ version, navShell }`.
   Auth pages and unauthenticated users keep the legacy `{ version }` shape.
-- `src/routes/+layout.svelte` passes `data.navShell` into `PageNav` and `BottomNav`.
-- `resolveNavShell` in `src/lib/server/navigation/resolver.ts` evaluates
+- `packages/praxrr-app/src/routes/+layout.svelte` passes `data.navShell` into `PageNav` and `BottomNav`.
+- `resolveNavShell` in `packages/praxrr-app/src/lib/server/navigation/resolver.ts` evaluates
   static visibility rules, orders groups/items deterministically, and returns JSON-safe
   resolved rows (`activePattern` serialized to strings).
 - `NavShell` is consumed directly by:
-  - `src/lib/client/ui/navigation/pageNav/pageNav.svelte` for grouped sidebar rendering.
-  - `src/lib/client/ui/navigation/bottomNav/BottomNav.svelte` for flattened mobile items.
+  - `packages/praxrr-app/src/lib/client/ui/navigation/pageNav/pageNav.svelte` for grouped sidebar rendering.
+  - `packages/praxrr-app/src/lib/client/ui/navigation/bottomNav/BottomNav.svelte` for flattened mobile items.
 
 Preserved constraints that must not regress:
 
@@ -1028,7 +1028,7 @@ Preserved constraints that must not regress:
   `medium` items hide below `sm` breakpoints,
   `low` items remain hidden by default.
 - Arr capability filtering is handled via Arr capability metadata in
-  `src/shared/arr/capabilities.ts`; unsupported leaf entries are hidden in the
+  `packages/praxrr-app/src/lib/shared/arr/capabilities.ts`; unsupported leaf entries are hidden in the
   active scope.
 
 **State (`ui/state/`)**
@@ -1086,9 +1086,9 @@ Preserved constraints that must not regress:
 
 ## 21) Utilities & Core Services
 
-Shared backend utilities live under `src/lib/server/utils/` and are consumed
+Shared backend utilities live under `packages/praxrr-app/src/lib/server/utils/` and are consumed
 across PCD, sync, jobs, and routes. Cross‑runtime helpers live in
-`src/lib/shared/utils/`.
+`packages/praxrr-app/src/lib/shared/utils/`.
 
 ### 21.1 Logger
 
@@ -1165,7 +1165,7 @@ Project scripts live under `scripts/` and are run via `deno task` or directly.
 ### 22.2 Schema / Type Generation
 
 - `scripts/generate-pcd-types.ts` pulls the schema SQL (GitHub or local) and
-  generates `src/lib/shared/pcd/types.ts` via SQLite introspection.
+  generates `packages/praxrr-app/src/lib/shared/pcd/types.ts` via SQLite introspection.
 
 ### 22.3 Validation Utilities
 
@@ -1183,7 +1183,7 @@ Project scripts live under `scripts/` and are run via `deno task` or directly.
 
 ## 23) API v1
 
-The current API surface lives under `src/routes/api/v1/` and is the target for
+The current API surface lives under `packages/praxrr-app/src/routes/api/v1/` and is the target for
 all future API work. Legacy routes outside `/api/v1` should be migrated into
 this namespace and then removed.
 

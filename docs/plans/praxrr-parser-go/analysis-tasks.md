@@ -20,7 +20,7 @@ The migration should begin with parity and harness work, then port parser intern
 - purpose
   Port parser logic and endpoint behavior while preserving contract fidelity.
 - suggested tasks
-  - Scaffold `src/services/parser-go` with models/server/parser packages.
+  - Scaffold `packages/praxrr-parser-go` with models/server/parser packages.
   - Port shared parser utilities first, then parser domains independently.
   - Implement `/parse`, `/match`, `/match/batch`, and `/health` with matching timeouts and serialization.
 - dependencies

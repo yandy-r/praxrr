@@ -18,11 +18,11 @@ RadarrClient, SonarrClient, LidarrClient, ChaptarrClient (specific API methods)
 ### File Structure
 
 ```
-src/utils/http/
+packages/praxrr-app/src/lib/server/utils/http/
 ├── client.ts           # BaseHttpClient - connection pooling, basic HTTP methods
 └── types.ts            # TypeScript types for HTTP requests/responses
 
-src/utils/arr/
+packages/praxrr-app/src/lib/server/utils/arr/
 ├── base.ts             # BaseArrClient - arr-specific auth, common patterns
 ├── radarr.ts           # RadarrClient - Radarr API methods
 ├── sonarr.ts           # SonarrClient - Sonarr API methods
@@ -35,7 +35,7 @@ src/utils/arr/
 
 ## Class Responsibilities
 
-### BaseHttpClient (`src/utils/http/client.ts`)
+### BaseHttpClient (`packages/praxrr-app/src/lib/server/utils/http/client.ts`)
 
 Base HTTP client with generic request capabilities.
 
@@ -62,7 +62,7 @@ new BaseHttpClient(baseUrl: string, options?: HttpClientOptions)
 - `delete<T>(path: string, options?: RequestOptions): Promise<T>`
 - `patch<T>(path: string, body?: unknown, options?: RequestOptions): Promise<T>`
 
-### BaseArrClient (`src/utils/arr/base.ts`)
+### BaseArrClient (`packages/praxrr-app/src/lib/server/utils/arr/base.ts`)
 
 Base client for all \*arr applications. Extends `BaseHttpClient`.
 

@@ -69,8 +69,8 @@ Break implementation into three phases: data foundation, product cutover, and ha
 
 ### Potential Bottlenecks
 
-- `src/lib/server/sync/mediaManagement/syncer.ts` (shared by multiple domains).
-- `src/lib/shared/pcd/portable.ts` and `docs/api/v1/schemas/pcd.yaml` contract alignment.
+- `packages/praxrr-app/src/lib/server/sync/mediaManagement/syncer.ts` (shared by multiple domains).
+- `packages/praxrr-app/src/lib/shared/pcd/portable.ts` and `docs/api/v1/schemas/pcd.yaml` contract alignment.
 
 ## File-to-Task Mapping
 
@@ -78,23 +78,23 @@ Break implementation into three phases: data foundation, product cutover, and ha
 
 | File                              | Suggested Task                   | Phase | Dependencies |
 | --------------------------------- | -------------------------------- | ----- | ------------ |
-| `/src/lib/server/db/migrations/*` | Add first-class Lidarr migration | 1     | none         |
+| `/packages/praxrr-app/src/lib/server/db/migrations/*` | Add first-class Lidarr migration | 1     | none         |
 
 ### Files to Modify
 
 | File                                                           | Suggested Task                        | Phase | Dependencies      |
 | -------------------------------------------------------------- | ------------------------------------- | ----- | ----------------- |
 | `/docs/pcdReference/0.schema.sql`                              | Add `lidarr_*` schema refs            | 1     | none              |
-| `/src/lib/server/db/schema.sql`                                | Align runtime schema docs             | 1     | none              |
-| `/src/lib/shared/pcd/portable.ts`                              | Add first-class Lidarr portable types | 1     | schema decisions  |
+| `/packages/praxrr-app/src/lib/server/db/schema.sql`                                | Align runtime schema docs             | 1     | none              |
+| `/packages/praxrr-app/src/lib/shared/pcd/portable.ts`                              | Add first-class Lidarr portable types | 1     | schema decisions  |
 | `/docs/api/v1/schemas/pcd.yaml`                                | Document first-class Lidarr entities  | 1     | portable changes  |
-| `/src/lib/server/pcd/entities/mediaManagement/**`              | Dedicated Lidarr CRUD/list/get        | 2     | phase 1           |
-| `/src/routes/media-management/[databaseId]/**/+page.server.ts` | Route dispatch to Lidarr helpers      | 2     | entity helpers    |
-| `/src/routes/api/v1/pcd/import/+server.ts`                     | Import support for `lidarr_*`         | 2     | phase 1           |
-| `/src/routes/api/v1/pcd/export/+server.ts`                     | Export support for `lidarr_*`         | 2     | phase 1           |
-| `/src/lib/server/sync/mediaManagement/syncer.ts`               | Sync source cutover to `lidarr_*`     | 2     | helpers+migration |
-| `/src/lib/server/db/queries/arrSync.ts`                        | Rename/config propagation updates     | 2     | migration policy  |
-| `/src/tests/arr/*`                                             | CRUD/sync/migration regressions       | 3     | phase 2           |
+| `/packages/praxrr-app/src/lib/server/pcd/entities/mediaManagement/**`              | Dedicated Lidarr CRUD/list/get        | 2     | phase 1           |
+| `/packages/praxrr-app/src/routes/media-management/[databaseId]/**/+page.server.ts` | Route dispatch to Lidarr helpers      | 2     | entity helpers    |
+| `/packages/praxrr-app/src/routes/api/v1/pcd/import/+server.ts`                     | Import support for `lidarr_*`         | 2     | phase 1           |
+| `/packages/praxrr-app/src/routes/api/v1/pcd/export/+server.ts`                     | Export support for `lidarr_*`         | 2     | phase 1           |
+| `/packages/praxrr-app/src/lib/server/sync/mediaManagement/syncer.ts`               | Sync source cutover to `lidarr_*`     | 2     | helpers+migration |
+| `/packages/praxrr-app/src/lib/server/db/queries/arrSync.ts`                        | Rename/config propagation updates     | 2     | migration policy  |
+| `/packages/praxrr-app/src/tests/arr/*`                                             | CRUD/sync/migration regressions       | 3     | phase 2           |
 
 ## Optimization Opportunities
 

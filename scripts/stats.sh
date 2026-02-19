@@ -48,11 +48,11 @@ MODULES=(
   "routes/settings|packages/praxrr-app/src/routes/settings"
   "routes/auth|packages/praxrr-app/src/routes/auth"
   "routes/api-v1|packages/praxrr-app/src/routes/api/v1"
-  "services/parser|src/services/parser"
-  "tests/base|src/tests/base"
-  "tests/jobs|src/tests/jobs"
-  "tests/logger|src/tests/logger"
-  "tests/upgrades|src/tests/upgrades"
+  "services/parser|packages/praxrr-parser"
+  "tests/base|packages/praxrr-app/src/tests/base"
+  "tests/jobs|packages/praxrr-app/src/tests/jobs"
+  "tests/logger|packages/praxrr-app/src/tests/logger"
+  "tests/upgrades|packages/praxrr-app/src/tests/upgrades"
   "app-shell|packages/praxrr-app/src/app.css,packages/praxrr-app/src/app.d.ts,packages/praxrr-app/src/app.html,packages/praxrr-app/src/hooks.server.ts"
   "schema-reference|packages/praxrr-app/src/lib/server/db/schema.sql,docs/pcdReference/0.schema.sql"
 )
@@ -108,7 +108,7 @@ echo "==========================================================================
 printf "%-20s %8s %10s %10s %8s\n" "Language" "Files" "Code" "Lines" "% Code"
 printf "%-20s %8s %10s %10s %8s\n" "--------" "-----" "----" "-----" "------"
 
-# Collect language data from the whole src/ tree (not per-module)
+# Collect language data from the app package source tree (not per-module)
 lang_total_code=0
 declare -A lang_files lang_code lang_lines
 
@@ -117,7 +117,7 @@ while IFS=$'\t' read -r name files code lines; do
   lang_code["$name"]=$code
   lang_lines["$name"]=$lines
   lang_total_code=$((lang_total_code + code))
-done < <(scc_languages "${ROOT}/src")
+done < <(scc_languages "${ROOT}/packages/praxrr-app/src")
 
 # Also include docs schema reference
 while IFS=$'\t' read -r name files code lines; do

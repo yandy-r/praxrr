@@ -412,7 +412,7 @@ Use a single-page form layout (no tabs needed -- metadata profiles are simpler t
 
 ### Existing Praxrr Quality Profile UI (Baseline)
 
-Based on analysis of the actual Praxrr codebase (`src/routes/quality-profiles/`):
+Based on analysis of the actual Praxrr codebase (`packages/praxrr-app/src/routes/quality-profiles/`):
 
 - **Patterns to reuse**:
   - `CardView.svelte` / `TableView.svelte` dual-view pattern with `ViewToggle`.
@@ -457,8 +457,8 @@ This follows the established pattern where entity types are prefixed with the Ar
 
 ### Sync Integration
 
-- **SectionType**: Add `'metadataProfiles'` to the `SectionType` union in `src/lib/server/sync/types.ts`.
-- **SectionHandler**: Implement a new handler following the existing pattern in `src/lib/server/sync/qualityProfiles/`.
+- **SectionType**: Add `'metadataProfiles'` to the `SectionType` union in `packages/praxrr-app/src/lib/server/sync/types.ts`.
+- **SectionHandler**: Implement a new handler following the existing pattern in `packages/praxrr-app/src/lib/server/sync/qualityProfiles/`.
 - **LidarrClient**: Add `getMetadataProfiles()`, `createMetadataProfile()`, `updateMetadataProfile()`, and `deleteMetadataProfile()` methods.
 - **Transformer**: Convert PCD format (name + allowed type names) to Lidarr API format (arrays with `{albumType: {id, name}, allowed}` objects).
 - **Scope guard**: The sync handler must verify `instance.type === 'lidarr'` before attempting to sync metadata profiles. This is NOT applicable to Radarr/Sonarr/Readarr.

@@ -126,7 +126,7 @@ Radarr (10) and Sonarr (8). Source: `Lidarr/src/NzbDrone.Core/CustomFormats/Spec
 | `quality_modifier` | **NOT IN LIDARR**         | **Skipped**             | Video concept (REMUX, BRDISK)             |
 | `release_type`     | **NOT IN LIDARR**         | **Skipped**             | Sonarr-only (Season Pack)                 |
 
-The praxrr consumer enforces this restriction in `src/lib/server/sync/customFormats/transformer.ts`:
+The praxrr consumer enforces this restriction in `packages/praxrr-app/src/lib/server/sync/customFormats/transformer.ts`:
 
 ```typescript
 const LIDARR_SUPPORTED_CONDITION_TYPES = new Set(['release_title', 'release_group', 'indexer_flag', 'size']);

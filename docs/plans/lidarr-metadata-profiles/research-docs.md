@@ -21,7 +21,7 @@
 ## README Files
 
 - `README.md`: Product-level context, Arr scope, and key project concepts.
-- `src/lib/server/utils/auth/README.md`: API auth behavior context for new route handlers.
+- `packages/praxrr-app/src/lib/server/utils/auth/README.md`: API auth behavior context for new route handlers.
 
 ## Must-Read Documents
 
@@ -34,6 +34,6 @@
 ## Documentation Gaps
 
 - No current OpenAPI paths document `lidarr-metadata-profiles` PCD endpoints; this must be added when routes are implemented.
-- No dedicated user/developer doc exists for metadata profile sync configuration UX in `src/routes/arr/[id]/sync`.
+- No dedicated user/developer doc exists for metadata profile sync configuration UX in `packages/praxrr-app/src/routes/arr/[id]/sync`.
 - Existing plan research mentions both 12 and 13 secondary album types in different places; final implementation docs should normalize the authoritative enum source.
 - No runbook doc exists for migration verification specific to this feature; add one if rollout risk increases.

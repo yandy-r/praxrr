@@ -14,8 +14,8 @@ media-management cutover is complete and correct.
 
 **Test coverage:**
 
-- `src/tests/arr/lidarrFirstClassMigration.test.ts` -- migration idempotency and conflict handling
-- `src/tests/arr/lidarrBuiltInBaseOpsSeed.test.ts` -- seed registration for new databases
+- `packages/praxrr-app/src/tests/arr/lidarrFirstClassMigration.test.ts` -- migration idempotency and conflict handling
+- `packages/praxrr-app/src/tests/arr/lidarrBuiltInBaseOpsSeed.test.ts` -- seed registration for new databases
 
 ## Entity CRUD Operations
 
@@ -28,9 +28,9 @@ media-management cutover is complete and correct.
 
 **Test coverage:**
 
-- `src/tests/arr/lidarrMediaManagement.test.ts` -- end-to-end CRUD operations
-- `src/tests/arr/lidarrMediaSettingsEntityOperations.test.ts` -- media settings entity ops
-- `src/tests/arr/lidarrQualityDefinitionsEntityOperations.test.ts` -- quality definitions entity ops
+- `packages/praxrr-app/src/tests/arr/lidarrMediaManagement.test.ts` -- end-to-end CRUD operations
+- `packages/praxrr-app/src/tests/arr/lidarrMediaSettingsEntityOperations.test.ts` -- media settings entity ops
+- `packages/praxrr-app/src/tests/arr/lidarrQualityDefinitionsEntityOperations.test.ts` -- quality definitions entity ops
 
 ## Sync Configuration
 
@@ -41,8 +41,8 @@ media-management cutover is complete and correct.
 
 **Test coverage:**
 
-- `src/tests/arr/lidarrFirstClassRouteAndSyncCutover.test.ts` -- route dispatch and sync resolution
-- `src/tests/jobs/arrSyncLidarrConfigPropagation.test.ts` -- config name propagation
+- `packages/praxrr-app/src/tests/arr/lidarrFirstClassRouteAndSyncCutover.test.ts` -- route dispatch and sync resolution
+- `packages/praxrr-app/src/tests/jobs/arrSyncLidarrConfigPropagation.test.ts` -- config name propagation
 
 ## Import/Export
 
@@ -53,19 +53,19 @@ media-management cutover is complete and correct.
 
 **Test coverage:**
 
-- `src/tests/arr/lidarrFirstClassRouteAndSyncCutover.test.ts` -- import/export contract parity
-- `src/tests/base/lidarrApiParity.test.ts` -- API contract compliance
+- `packages/praxrr-app/src/tests/arr/lidarrFirstClassRouteAndSyncCutover.test.ts` -- import/export contract parity
+- `packages/praxrr-app/src/tests/base/lidarrApiParity.test.ts` -- API contract compliance
 
 ## API Contract Compliance
 
 - [ ] `EntityType` enum in `docs/api/v1/schemas/pcd.yaml` includes all three `lidarr_*` types
 - [ ] Portable type definitions (`PortableLidarrNaming`, `PortableLidarrMediaSettings`, `PortableLidarrQualityDefinitions`) are documented
-- [ ] Runtime portable type registry (`src/lib/shared/pcd/portable.ts`) matches OpenAPI schema
+- [ ] Runtime portable type registry (`packages/praxrr-app/src/lib/shared/pcd/portable.ts`) matches OpenAPI schema
 - [ ] No "experimental", "reuse", or "backed by Sonarr" annotations remain in API docs
 
 **Test coverage:**
 
-- `src/tests/base/lidarrApiParity.test.ts` -- portable contract parity validation
+- `packages/praxrr-app/src/tests/base/lidarrApiParity.test.ts` -- portable contract parity validation
 
 ## Quality Mappings
 
@@ -76,7 +76,7 @@ media-management cutover is complete and correct.
 
 **Test coverage:**
 
-- `src/tests/arr/lidarrQualityMappingPrereqs.test.ts` -- mapping prerequisite validation
+- `packages/praxrr-app/src/tests/arr/lidarrQualityMappingPrereqs.test.ts` -- mapping prerequisite validation
 
 ## Legacy Cleanup
 

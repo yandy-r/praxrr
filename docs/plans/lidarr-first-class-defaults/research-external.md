@@ -100,7 +100,7 @@ Lidarr-native quality families.
 - **OGG Vorbis Q10 is classified as High Quality Lossy** by Lidarr (group weight 6), not Lossless.
 - **Praxrr consumer enforces condition type restrictions**:
   `LIDARR_SUPPORTED_CONDITION_TYPES = new Set(['release_title', 'release_group', 'indexer_flag', 'size'])`
-  in `src/lib/server/sync/customFormats/transformer.ts`. Unsupported conditions are silently skipped
+  in `packages/praxrr-app/src/lib/server/sync/customFormats/transformer.ts`. Unsupported conditions are silently skipped
   during sync.
 
 ### Servarr and Community Best-Practice Signals

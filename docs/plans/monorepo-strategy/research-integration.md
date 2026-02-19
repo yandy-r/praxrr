@@ -8,72 +8,72 @@
   queue/backups/logs) by reading `migrationRunner`, `databaseInstancesQueries`, `jobQueueQueries`,
   `backupSettingsQueries`, `appInfoQueries`, and `pcdManager.getCache`. Useful for guarding the
   system after relocating the code into `packages/praxrr` and keeping track of migrations referenced
-  in `src/lib/server/db/migrations.ts`.
+  in `packages/praxrr-app/src/lib/server/db/migrations.ts`.
 - `GET /api/databases`: mirrors `pcdManager.getAll()` and surfaces every linked Praxrr Config
-  Database (`src/routes/api/databases/+server.ts`). This is the UI entry point for the database
+  Database (`packages/praxrr-app/src/routes/api/databases/+server.ts`). This is the UI entry point for the database
   dashboard, so the monorepo move needs to keep the `pcdManager` API stable.
 - `GET /api/databases/:id/changes`: gathers git status, incoming changes, branches, and draft PCD
   edits via `databaseInstancesQueries`, `getStatus`, `listDraftEntityChanges`, and `getRepoInfo`
-  (`src/routes/api/databases/[id]/changes/+server.ts`). It depends on `pcd` clones and Git helpers,
+  (`packages/praxrr-app/src/routes/api/databases/[id]/changes/+server.ts`). It depends on `pcd` clones and Git helpers,
   so workspace relocation must keep those paths intact.
 - `GET /api/databases/:id/commits`: exposes git history for a database by calling `getCommits` and
-  reading from `databaseInstancesQueries` (`src/routes/api/databases/[id]/commits/+server.ts`).
+  reading from `databaseInstancesQueries` (`packages/praxrr-app/src/routes/api/databases/[id]/commits/+server.ts`).
   Commit generation for monorepo-shared `packages/praxrr-db` needs to treat these references as
   pointing to whatever clone the UI is working with.
 - `POST /api/databases/:id/generate-commit-message`: forwards diffs to the AI client when
-  `aiSettings` enables it (`src/routes/api/databases/[id]/generate-commit-message/+server.ts`), so
+  `aiSettings` enables it (`packages/praxrr-app/src/routes/api/databases/[id]/generate-commit-message/+server.ts`), so
   the new monorepo layout must keep AI configuration and `ai_settings` (migration
   `014_create_ai_settings.ts`) consistent with the `pcd_ops` files that get committed.
 - `GET /api/v1/pcd/export`: serializes delay profiles, quality profiles, names, and media settings
   from the requested cache via `serializeEntity` and `pcdManager`
-  (`src/routes/api/v1/pcd/export/+server.ts`). The monorepo change should not affect the cache
+  (`packages/praxrr-app/src/routes/api/v1/pcd/export/+server.ts`). The monorepo change should not affect the cache
   registration logic in `pcd/database/registry.ts`.
 - `POST /api/v1/pcd/import`: validates portable payloads, gates base-layer writes with
   `canWriteToBase`, and deserializes into the cache via `deserializeEntity` helpers
-  (`src/routes/api/v1/pcd/import/+server.ts`). Maintaining the schema alias resolution for `ops/`
+  (`packages/praxrr-app/src/routes/api/v1/pcd/import/+server.ts`). Maintaining the schema alias resolution for `ops/`
   files is vital for the shared `packages/praxrr-db` package.
 - `POST /api/v1/arr/cleanup`: scans or executes namespace cleanup via arr clients,
-  `scanForStaleItems`, and `deleteStaleItems` (`src/routes/api/v1/arr/cleanup/+server.ts`). It
+  `scanForStaleItems`, and `deleteStaleItems` (`packages/praxrr-app/src/routes/api/v1/arr/cleanup/+server.ts`). It
   touches the same arr sync configuration that lives in tables created by migration
   `015_create_arr_sync_tables.ts` and thus needs compatible database access after directory moves.
 - `GET /api/v1/arr/library`: fetches paginated Radarr/Sonarr/Lidarr libraries, applies query/sort
-  sanitization, and caches results (`src/routes/api/v1/arr/library/+server.ts`). Because it
-  instantiates arr clients in `src/lib/server/utils/arr/clients`, ensuring those utility paths
+  sanitization, and caches results (`packages/praxrr-app/src/routes/api/v1/arr/library/+server.ts`). Because it
+  instantiates arr clients in `packages/praxrr-app/src/lib/server/utils/arr/clients`, ensuring those utility paths
   survive the move is critical.
 - `GET /api/v1/arr/releases`: runs interactive searches through `RadarrClient`, `SonarrClient`, or
   `LidarrClient` and deduplicates them via `group*Releases` helpers
-  (`src/routes/api/v1/arr/releases/+server.ts`). Monorepo restructuring should keep these client
+  (`packages/praxrr-app/src/routes/api/v1/arr/releases/+server.ts`). Monorepo restructuring should keep these client
   factories in `$utils/arr/` available to the route.
 - `GET /api/tmdb/search` and `POST /api/tmdb/test`: proxy TMDB Movie/TV search and key validation
   through `TMDBClient` and the singleton `tmdb_settings` row
-  (`src/routes/api/tmdb/search/+server.ts`, `src/routes/api/tmdb/test/+server.ts`). TMDB integration
+  (`packages/praxrr-app/src/routes/api/tmdb/search/+server.ts`, `packages/praxrr-app/src/routes/api/tmdb/test/+server.ts`). TMDB integration
   requires no code change but must keep the `tmdb_settings` migration
   (`020_create_tmdb_settings.ts`) and API key persistence intact.
 - `GET /api/regex101/:id`: fetches regex definitions from regex101.com, caches them to
   `regex101_cache`, and validates unit tests via the parser service
-  (`src/routes/api/regex101/[id]/+server.ts`). The parser spawn logic in
-  `src/lib/server/utils/parser/spawn.ts` runs before `hooks.server.ts` and must still be reachable
+  (`packages/praxrr-app/src/routes/api/regex101/[id]/+server.ts`). The parser spawn logic in
+  `packages/praxrr-app/src/lib/server/utils/parser/spawn.ts` runs before `hooks.server.ts` and must still be reachable
   after moving `hooks.server.ts` into `packages/praxrr`.
 - `GET /api/github/avatar/:owner`: returns cached avatars from `github_cache`
-  (`src/routes/api/github/avatar/[owner]/+server.ts`) and therefore depends on the `github_cache`
+  (`packages/praxrr-app/src/routes/api/github/avatar/[owner]/+server.ts`) and therefore depends on the `github_cache`
   table created by migration `033_create_github_cache.ts` and the GitHub cache helpers in
   `$lib/server/utils/github/cache.ts` that wrap GitHub API calls for repo info and releases.
 
 ### Route Organization
 
-- The SvelteKit project keeps API handlers inside `src/routes/api` (e.g., `api/databases`,
-  `api/tmdb`, `api/regex101`), while versioned service endpoints live under `src/routes/api/v1`
+- The SvelteKit project keeps API handlers inside `packages/praxrr-app/src/routes/api` (e.g., `api/databases`,
+  `api/tmdb`, `api/regex101`), while versioned service endpoints live under `packages/praxrr-app/src/routes/api/v1`
   (e.g., `/api/v1/pcd`, `/api/v1/arr`, `/api/v1/health`). Both the `+server.ts` handlers and the
   companion `+page.server.ts` modules (like `/databases/new/+page.server.ts`) import the same `$lib`
-  helpers, so `packages/praxrr` must carry along the `src/lib` tree intact when the monorepo
+  helpers, so `packages/praxrr` must carry along the `packages/praxrr-app/src/lib` tree intact when the monorepo
   resizes.
-- `src/routes/databases/new/+page.server.ts` orchestrates `pcdManager.link()` and logs via `logger`,
+- `packages/praxrr-app/src/routes/databases/new/+page.server.ts` orchestrates `pcdManager.link()` and logs via `logger`,
   so any path reorganization must leave `$pcd/index.ts`, `$db/queries`, and `jobs/init.ts`
   reachable. The `pcdManager` also calls `schedulePcdSyncForDatabase`, linking APIs to the job queue
   described below.
 - All HTTP traffic funnels through `hooks.server.ts`, which now needs to live in the
   `packages/praxrr` package. On startup it initializes the config singleton
-  (`src/lib/server/utils/config/config.ts`), database (`$db/db.ts`), migrations, log settings, PCD
+  (`packages/praxrr-app/src/lib/server/utils/config/config.ts`), database (`$db/db.ts`), migrations, log settings, PCD
   caches, auto-link default DB (via `setupStateQueries` and `pcdManager`), job queue
   (`initializeJobs`), expired session cleanup, and the parser spawn helper. The exported `handle`
   function performs authentication via `$auth/middleware.ts`, redirects to `/auth/setup` when
@@ -115,7 +115,7 @@
   `sync_status`, `next_run_at`, last error, database references, and namespace indexes for quality
   profiles, delay profiles, metadata profiles, and media management settings. They all reference
   `arr_instances.id` (and `database_instances.id` once `database_id` fields were added) and feed the
-  sync processor in `src/lib/server/sync/processor.ts`.
+  sync processor in `packages/praxrr-app/src/lib/server/sync/processor.ts`.
 - `arr_database_namespaces` (`047_create_arr_database_namespaces.ts`): maps each
   `(instance_id, database_id)` pair to `namespace_index`, ensuring the cleanup job can distinguish
   namespace-suffixed configs.
@@ -138,14 +138,14 @@
 
 ### Schema Details
 
-The schema file `src/lib/server/db/schema.sql` documents every column, constraint, and index. Key relationships: `database_instances.id` is the foreign key target for `pcd_ops.database_id`, `pcd_op_history.database_id`, `arr_sync_*` tables, and namespace mapping; `arr_instances.id` is referenced by every `arr_sync_*` table. The `pcd_ops` table maintains unique `(database_id, origin, filename)` via `idx_pcd_ops_base_filename` and orders operations through the multi-column `idx_pcd_ops_apply_order`. The job queue uses `dedupe_key`, `status`, and `run_at` indexes (`idx_job_queue_dedupe_key`, `idx_job_queue_status_run_at`) to avoid duplicate sync runs and to prioritize due jobs. `setup_state` exists as a singleton row with a simple boolean, so bootstrapping the default database is controlled centrally. All of these tables are recreated via the migrations listed above, which the monorepo upgrade must run in order so `packages/praxrr` (the new app package) still sees the same schema.
+The schema file `packages/praxrr-app/src/lib/server/db/schema.sql` documents every column, constraint, and index. Key relationships: `database_instances.id` is the foreign key target for `pcd_ops.database_id`, `pcd_op_history.database_id`, `arr_sync_*` tables, and namespace mapping; `arr_instances.id` is referenced by every `arr_sync_*` table. The `pcd_ops` table maintains unique `(database_id, origin, filename)` via `idx_pcd_ops_base_filename` and orders operations through the multi-column `idx_pcd_ops_apply_order`. The job queue uses `dedupe_key`, `status`, and `run_at` indexes (`idx_job_queue_dedupe_key`, `idx_job_queue_status_run_at`) to avoid duplicate sync runs and to prioritize due jobs. `setup_state` exists as a singleton row with a simple boolean, so bootstrapping the default database is controlled centrally. All of these tables are recreated via the migrations listed above, which the monorepo upgrade must run in order so `packages/praxrr` (the new app package) still sees the same schema.
 
 ## External Services
 
 - **GitHub (PCD deps, schema fetch, mirrors)**: `pcdManager.link()` clones arbitrary git URLs and
   the `processDependencies` helpers clone `pcd.json` dependencies (e.g., the canonical
   `https://github.com/yandy-r/praxrr-schema` entry) before importing them
-  (`src/lib/server/pcd/git/dependencies.ts`). `scripts/generate-pcd-types.ts` presently fetches
+  (`packages/praxrr-app/src/lib/server/pcd/git/dependencies.ts`). `scripts/generate-pcd-types.ts` presently fetches
   `https://raw.githubusercontent.com/yandy-r/praxrr-schema/{version}/ops/0.schema.sql`, reading
   tokens from `PRAXRR_SCHEMA_TOKEN`, `GITHUB_TOKEN`, or `GH_TOKEN`; the monorepo change wants this
   to default to `packages/praxrr-schema/ops/0.schema.sql` while keeping the ability to override with
@@ -153,7 +153,7 @@ The schema file `src/lib/server/db/schema.sql` documents every column, constrain
   `packages/praxrr-db`/`packages/praxrr-schema` back to their GitHub repos, so
   `PRAXRR_DEFAULT_DB_URL` and `PRAXRR_DEFAULT_DB_BRANCH` should still point to those mirrors until
   the new packages are ready.
-- **TMDB**: `TMDBClient` in `src/lib/server/utils/tmdb/client.ts` calls
+- **TMDB**: `TMDBClient` in `packages/praxrr-app/src/lib/server/utils/tmdb/client.ts` calls
   `https://api.themoviedb.org/3` with the `tmdb_settings.api_key` bearer token. `/api/tmdb/search`
   and `/api/tmdb/test` validate and exercise that key, so the TMDB key must be written through the
   app’s settings UI (persisted to `tmdb_settings`) after the monorepo move.
@@ -161,7 +161,7 @@ The schema file `src/lib/server/db/schema.sql` documents every column, constrain
   `regex101_cache`, and then evaluates the suite by forwarding patterns to the parser service for
   match results (`regex101CacheQueries` + `runRegexTests`). No credentials are required, but caching
   ensures the third-party URL path remains consistent after relocation.
-- **AI providers (OpenAI/Anthropic style)**: The AI client (`src/lib/server/utils/ai/client.ts`)
+- **AI providers (OpenAI/Anthropic style)**: The AI client (`packages/praxrr-app/src/lib/server/utils/ai/client.ts`)
   talks to an OpenAI-compatible base URL stored in `ai_settings.api_url`, using
   `ai_settings.api_key` for `Authorization`. The `/api/databases/:id/generate-commit-message`
   endpoint guards this with `isAIEnabled()` and uses either the Responses API or the chat
@@ -170,30 +170,30 @@ The schema file `src/lib/server/db/schema.sql` documents every column, constrain
 
 ## Internal Services
 
-- **PCD Manager (`pcdManager`)**: Located at `src/lib/server/pcd/core/manager.ts`, it orchestrates
+- **PCD Manager (`pcdManager`)**: Located at `packages/praxrr-app/src/lib/server/pcd/core/manager.ts`, it orchestrates
   cloning (`clone`, `checkout`, `getStatus` from `$utils/git`), manifest validation, dependency
   processing (`processDependencies`), base op import (`importBaseOps`), built-in op seeding
   (`seedBuiltInBaseOps`), cache compilation (`compile`), and cache invalidation. The
   `hooks.server.ts` startup sequence calls `pcdManager.initialize()` and auto-links the default
   database via `setupStateQueries` and `pcdManager.link()`; these calls must still happen when the
   app lives under `packages/praxrr`.
-- **Job subsystem**: `initializeJobs`, `jobQueue`, and `jobDispatcher` in `src/lib/server/jobs/*`
+- **Job subsystem**: `initializeJobs`, `jobQueue`, and `jobDispatcher` in `packages/praxrr-app/src/lib/server/jobs/*`
   schedule recurring syncs (PCD pull, arr sync, upgrades, renames, backups) by enqueuing records in
   `job_queue`. Many routes (e.g., `/databases/new`) call `schedulePcdSyncForDatabase` to spin up a
   job for the new repo. The job dispatcher also powers the sync processor by calling
   `processPendingSyncs` through `triggerSyncs()` after a pull.
-- **Sync processor**: `src/lib/server/sync/processor.ts` groups scheduled `arr_sync_*` configs by
-  instance, creates arr clients from `src/lib/server/utils/arr/factory.ts`, and runs each section
+- **Sync processor**: `packages/praxrr-app/src/lib/server/sync/processor.ts` groups scheduled `arr_sync_*` configs by
+  instance, creates arr clients from `packages/praxrr-app/src/lib/server/utils/arr/factory.ts`, and runs each section
   handler (`qualityProfiles`, `delayProfiles`, `mediaManagement`, `metadataProfiles`). That
   processor fires when `triggerSyncs()` is called after `pcdManager.sync()` or when cron timers in
   `evaluateScheduledSyncs()` tick, so monorepo changes must preserve these handlers and their
   registry entries.
-- **Arr clients and cleanup helpers**: `src/lib/server/utils/arr/clients` hosts `RadarrClient`,
+- **Arr clients and cleanup helpers**: `packages/praxrr-app/src/lib/server/utils/arr/clients` hosts `RadarrClient`,
   `SonarrClient`, and `LidarrClient`, while `sync/cleanup.ts` implements namespace cleanup used by
   `/api/v1/arr/cleanup`. Keeping the `$utils/arr` directory in place ensures the arr-based API
   endpoints continue to function.
-- **Parser service**: `src/lib/server/utils/parser/spawn.ts` tries to auto-start the bundled `.NET`
-  parser (from `src/services/parser`) when `PARSER_HOST` is unset and the app isn’t running in
+- **Parser service**: `packages/praxrr-app/src/lib/server/utils/parser/spawn.ts` tries to auto-start the bundled `.NET`
+  parser (from `packages/praxrr-parser`) when `PARSER_HOST` is unset and the app isn’t running in
   Docker. `config.parserUrl` is then used by regex101 and other HTTP handlers; the spawn logic must
   still run before `hooks.server.ts` imports `$config` so parser-based features stay available in
   the new package layout.
@@ -203,7 +203,7 @@ The schema file `src/lib/server/db/schema.sql` documents every column, constrain
 
 ## Configuration
 
-- **Environment variables** (see `src/lib/server/utils/config/config.ts` and the startup logic in
+- **Environment variables** (see `packages/praxrr-app/src/lib/server/utils/config/config.ts` and the startup logic in
   `hooks.server.ts`):
   1. `APP_BASE_PATH`: root of `logs`, `data/databases`, and `backups`; defaults to the directory
      containing the executable. The monorepo move must keep this path configuration intact relative
@@ -232,7 +232,7 @@ The schema file `src/lib/server/db/schema.sql` documents every column, constrain
   tasks like `deno task dev`. `packages/praxrr-db` and `packages/praxrr-schema` will each get
   minimal `deno.json` manifests to track `name`/`version`. The monorepo strategy also reuses the
   existing `packages/praxrr-api` member, so any reference to `$api/v1.d.ts` (e.g.,
-  `src/routes/api/v1/arr/library/+server.ts`) must still resolve via the new workspace structure.
+  `packages/praxrr-app/src/routes/api/v1/arr/library/+server.ts`) must still resolve via the new workspace structure.
 - **Scripts**: `scripts/generate-pcd-types.ts` (which currently fetches from GitHub) should default
   to `packages/praxrr-schema/ops/0.schema.sql` with a `--remote` fallback; `scripts/bundle-api.ts`
   (which writes to `packages/praxrr-api`) already spans multiple packages, so keeping it at the repo

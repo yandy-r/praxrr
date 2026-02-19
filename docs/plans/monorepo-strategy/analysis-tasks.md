@@ -45,7 +45,7 @@ A dependency-aware plan should start by adding workspace/package structure, then
 #### Potential Bottlenecks
 
 - shared edits to `deno.json` and workflow files can conflict.
-- `src/hooks.server.ts` and `scripts/generate-pcd-types.ts` couple runtime and tooling and need coordinated review.
+- `packages/praxrr-app/src/hooks.server.ts` and `scripts/generate-pcd-types.ts` couple runtime and tooling and need coordinated review.
 - release workflow misconfiguration can block all CI if introduced before validation.
 
 ### Suggested Task Template

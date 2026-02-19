@@ -3,28 +3,28 @@
  *
  * Usage:
  *   deno task test              # Run all tests
- *   deno task test filters      # Run src/tests/upgrades/filters.test.ts
- *   deno task test upgrades     # Run all tests in src/tests/upgrades/
- *   deno task test logger       # Run all tests in src/tests/logger/
+ *   deno task test filters      # Run packages/praxrr-app/src/tests/upgrades/filters.test.ts
+ *   deno task test upgrades     # Run all tests in packages/praxrr-app/src/tests/upgrades/
+ *   deno task test logger       # Run all tests in packages/praxrr-app/src/tests/logger/
  */
 
 const aliases: Record<string, string> = {
   // Individual test files
-  filters: 'src/tests/upgrades/filters.test.ts',
-  normalize: 'src/tests/upgrades/normalize.test.ts',
-  selectors: 'src/tests/upgrades/selectors.test.ts',
-  backup: 'src/tests/jobs/createBackup.test.ts',
-  cleanup: 'src/tests/logger/cleanupLogs.test.ts',
+  filters: 'packages/praxrr-app/src/tests/upgrades/filters.test.ts',
+  normalize: 'packages/praxrr-app/src/tests/upgrades/normalize.test.ts',
+  selectors: 'packages/praxrr-app/src/tests/upgrades/selectors.test.ts',
+  backup: 'packages/praxrr-app/src/tests/jobs/createBackup.test.ts',
+  cleanup: 'packages/praxrr-app/src/tests/logger/cleanupLogs.test.ts',
 
   // Directories
-  upgrades: 'src/tests/upgrades',
-  jobs: 'src/tests/jobs',
-  logger: 'src/tests/logger',
+  upgrades: 'packages/praxrr-app/src/tests/upgrades',
+  jobs: 'packages/praxrr-app/src/tests/jobs',
+  logger: 'packages/praxrr-app/src/tests/logger',
 };
 
 // Get the test target from args
 const target = Deno.args[0];
-const testPath = target ? (aliases[target] ?? target) : 'src/tests';
+const testPath = target ? (aliases[target] ?? target) : 'packages/praxrr-app/src/tests';
 
 // Check if it's a valid path
 if (target && !aliases[target]) {

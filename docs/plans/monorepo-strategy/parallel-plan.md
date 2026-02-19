@@ -10,9 +10,9 @@ Monorepo strategy should extend the current root-based Praxrr app with two new w
 - `docs/plans/monorepo-strategy/analysis-code.md`: concrete code patterns and file-level integration points.
 - `docs/plans/monorepo-strategy/analysis-tasks.md`: dependency-shape recommendations for plan execution.
 - `deno.json`: root workspace membership and cross-package task entry points.
-- `src/hooks.server.ts`: auto-link defaults for initial DB wiring.
+- `packages/praxrr-app/src/hooks.server.ts`: auto-link defaults for initial DB wiring.
 - `scripts/generate-pcd-types.ts`: schema source selection and type-generation behavior.
-- `src/routes/databases/[id]/config/+page.svelte`: locked schema dependency configuration surface.
+- `packages/praxrr-app/src/routes/databases/[id]/config/+page.svelte`: locked schema dependency configuration surface.
 - `.github/workflows/release.yml`: app release pathing and gating behavior.
 - `.github/workflows/docker.yml`: container build path assumptions for monorepo layout.
 - `README.md`: contributor-facing monorepo and configuration contract.
@@ -49,7 +49,7 @@ Create the schema workspace member with minimal Deno package metadata and canoni
 
 - `docs/plans/monorepo-strategy/feature-spec.md`
 - `docs/plans/monorepo-strategy/research-business.md`
-- `src/lib/server/pcd/ops/importBaseOps.ts`
+- `packages/praxrr-app/src/lib/server/pcd/ops/importBaseOps.ts`
 
 **Instructions**
 
@@ -91,7 +91,7 @@ Expand the workspace array to include `packages/praxrr-db` and `packages/praxrr-
 
 **READ THESE BEFORE TASK**
 
-- `src/hooks.server.ts`
+- `packages/praxrr-app/src/hooks.server.ts`
 - `docs/plans/monorepo-strategy/feature-spec.md`
 - `docs/plans/monorepo-strategy/research-business.md`
 
@@ -103,7 +103,7 @@ Files to Create
 
 Files to Modify
 
-- `src/hooks.server.ts`
+- `packages/praxrr-app/src/hooks.server.ts`
 
 Replace hardcoded default DB URL/branch/name with `PRAXRR_DEFAULT_DB_URL`, `PRAXRR_DEFAULT_DB_BRANCH`, and `PRAXRR_DEFAULT_DB_NAME` reads, using exact defaults `https://github.com/yandy-r/praxrr-db`, `v2`, and `Praxrr-DB` when vars are unset. Implement explicit empty-URL handling that disables auto-link to satisfy business rules. Validate behavior for `unset`, `empty`, and `non-empty` env var states while keeping existing token/git identity env behavior untouched.
 
@@ -131,7 +131,7 @@ Implement deterministic source precedence for type generation: `--local=<path>` 
 
 **READ THESE BEFORE TASK**
 
-- `src/routes/databases/[id]/config/+page.svelte`
+- `packages/praxrr-app/src/routes/databases/[id]/config/+page.svelte`
 - `docs/plans/monorepo-strategy/feature-spec.md`
 - `docs/plans/monorepo-strategy/analysis-code.md`
 
@@ -143,9 +143,9 @@ Files to Create
 
 Files to Modify
 
-- `src/routes/databases/[id]/config/+page.svelte`
-- `src/lib/server/pcd/git/dependencies.ts`
-- `src/lib/server/pcd/manifest/manifest.ts`
+- `packages/praxrr-app/src/routes/databases/[id]/config/+page.svelte`
+- `packages/praxrr-app/src/lib/server/pcd/git/dependencies.ts`
+- `packages/praxrr-app/src/lib/server/pcd/manifest/manifest.ts`
 
 Replace hardcoded schema lock identity with deterministic resolution from dependency metadata using this order: exact match `https://github.com/yandy-r/praxrr-schema`, then normalized match `https://github.com/*/praxrr-schema` (normalize by lowercasing host/path and trimming trailing `/` or `.git`), then fallback `https://github.com/yandy-r/praxrr-schema` only when dependencies are absent. Apply the same resolution rule in backend dependency handling (`dependencies.ts` and manifest validation) so UI/runtime decisions stay consistent. If multiple schema-like dependencies remain after normalization, enforce a single contract: backend hard-fails with explicit error code/message and UI renders a blocking error state.
 
@@ -177,7 +177,7 @@ Document monorepo workspace layout, new default DB env vars, and local-first sch
 **READ THESE BEFORE TASK**
 
 - `scripts/`
-- `src/lib/server/pcd/ops/loadOps.ts`
+- `packages/praxrr-app/src/lib/server/pcd/ops/loadOps.ts`
 - `docs/plans/monorepo-strategy/feature-spec.md`
 
 **Instructions**
@@ -190,7 +190,7 @@ Files to Modify
 
 - none
 
-Create `scripts/compat-check.ts` as a single-entry contract command (`deno run -A scripts/compat-check.ts`) with explicit checks: apply `packages/praxrr-schema/ops/0.schema.sql`, layer `packages/praxrr-db/ops/*` in lexicographic filename order, and compare regenerated `src/lib/shared/pcd/types.ts` for drift using `git diff --exit-code src/lib/shared/pcd/types.ts`. Define edge-case behavior: if `packages/praxrr-db/ops/` is missing or has zero `*.sql` files, fail with `ops_missing`; always run checks against a temporary SQLite database and remove temp artifacts on success/failure. Exit `0` only when all checks pass; otherwise exit non-zero with named failure stage (`schema_apply`, `ops_layering`, `types_drift`, `ops_missing`).
+Create `scripts/compat-check.ts` as a single-entry contract command (`deno run -A scripts/compat-check.ts`) with explicit checks: apply `packages/praxrr-schema/ops/0.schema.sql`, layer `packages/praxrr-db/ops/*` in lexicographic filename order, and compare regenerated `packages/praxrr-app/src/lib/shared/pcd/types.ts` for drift using `git diff --exit-code packages/praxrr-app/src/lib/shared/pcd/types.ts`. Define edge-case behavior: if `packages/praxrr-db/ops/` is missing or has zero `*.sql` files, fail with `ops_missing`; always run checks against a temporary SQLite database and remove temp artifacts on success/failure. Exit `0` only when all checks pass; otherwise exit non-zero with named failure stage (`schema_apply`, `ops_layering`, `types_drift`, `ops_missing`).
 
 #### Task 3.2: Add compatibility CI workflow Depends on [3.1, 2.1]
 

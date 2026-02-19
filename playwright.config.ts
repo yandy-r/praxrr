@@ -1,7 +1,7 @@
 import { defineConfig } from '@playwright/test';
 
 export default defineConfig({
-  testDir: './src/tests/e2e/specs',
+  testDir: './packages/praxrr-app/src/tests/e2e/specs',
   timeout: 60_000,
   expect: { timeout: 10_000 },
   fullyParallel: false,

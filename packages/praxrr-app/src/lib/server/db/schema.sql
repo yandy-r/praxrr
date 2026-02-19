@@ -6,7 +6,7 @@
 -- ==============================================================================
 -- TABLE: migrations
 -- Purpose: Track applied database migrations
--- Managed by: MigrationRunner (src/db/migrations.ts)
+-- Managed by: MigrationRunner (packages/praxrr-app/src/lib/server/db/migrations.ts)
 -- ==============================================================================
 
 CREATE TABLE IF NOT EXISTS migrations (

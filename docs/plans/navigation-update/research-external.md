@@ -47,7 +47,7 @@ SvelteKit's layout system provides the ideal mechanism for hierarchical navigati
 Data returned from parent layouts is available in all child pages. Child load functions can access parent data via `await parent()`:
 
 ```typescript
-// src/routes/+layout.server.ts
+// packages/praxrr-app/src/routes/+layout.server.ts
 import type { LayoutServerLoad } from './$types';
 
 export const load: LayoutServerLoad = async ({ locals }) => {
@@ -61,7 +61,7 @@ export const load: LayoutServerLoad = async ({ locals }) => {
 ```
 
 ```typescript
-// src/routes/(app)/+layout.server.ts
+// packages/praxrr-app/src/routes/(app)/+layout.server.ts
 import type { LayoutServerLoad } from './$types';
 
 export const load: LayoutServerLoad = async ({ parent }) => {
@@ -82,7 +82,7 @@ export const load: LayoutServerLoad = async ({ parent }) => {
 Route groups (directories wrapped in parentheses) allow logical grouping without affecting the URL structure:
 
 ```
-src/routes/
+packages/praxrr-app/src/routes/
   (app)/
     quality-profiles/     --> /quality-profiles
     custom-formats/       --> /custom-formats
@@ -166,7 +166,7 @@ Snippets can be passed as props to child components for customization:
 The Svelte 5 context API is the recommended pattern for sharing nav state across the component tree without prop drilling. It is SSR-safe because context is scoped per request:
 
 ```typescript
-// src/lib/client/navigation/navContext.ts
+// packages/praxrr-app/src/lib/client/navigation/navContext.ts
 import { getContext, setContext } from 'svelte';
 import type { Writable } from 'svelte/store';
 import { writable } from 'svelte/store';
@@ -193,7 +193,7 @@ export function getNavContext(): NavContext {
 ```
 
 ```svelte
-<!-- src/routes/+layout.svelte (root) -->
+<!-- packages/praxrr-app/src/routes/+layout.svelte (root) -->
 <script lang="ts">
   import { setNavContext } from '$lib/client/navigation/navContext';
 
@@ -253,7 +253,7 @@ INSERT OR IGNORE INTO feature_flags (key, enabled, description) VALUES
 ```
 
 ```typescript
-// src/lib/server/utils/flags/flags.ts
+// packages/praxrr-app/src/lib/server/utils/flags/flags.ts
 import type { Database } from '$db/db';
 
 export interface FeatureFlag {
@@ -390,7 +390,7 @@ See section 3 (Libraries and SDKs) for detailed library comparison.
 - `+layout.server.ts` data inheritance and `parent()` enable hierarchical nav composition.
 - `+layout.svelte` uses `<slot />` to render child routes.
 - The `@` syntax enables pages to break out of layout hierarchies.
-- Route matchers (`src/params/*.ts`) validate dynamic segments.
+- Route matchers (`packages/praxrr-app/src/params/*.ts`) validate dynamic segments.
 
 URLs:
 
@@ -557,7 +557,7 @@ URL: https://github.com/ssleptsov/ninja-keys
 Define a typed navigation manifest that the layout loader resolves into a renderable nav shell. This decouples the nav structure from the rendering components.
 
 ```typescript
-// src/lib/shared/navigation/types.ts
+// packages/praxrr-app/src/lib/shared/navigation/types.ts
 import type { ArrType } from '$shared/arr/types';
 
 export type NavVariant = 'legacy' | 'nav_v2';
@@ -590,7 +590,7 @@ export interface NavShell {
 ```
 
 ```typescript
-// src/lib/server/navigation/registry.ts
+// packages/praxrr-app/src/lib/server/navigation/registry.ts
 import type { NavGroup } from '$shared/navigation/types';
 
 export const NAV_REGISTRY: NavGroup[] = [
@@ -676,7 +676,7 @@ export const NAV_REGISTRY: NavGroup[] = [
 Resolve the nav shell on the server during layout load. This ensures SSR and client render the same nav structure, avoiding hydration mismatches.
 
 ```typescript
-// src/lib/server/navigation/resolver.ts
+// packages/praxrr-app/src/lib/server/navigation/resolver.ts
 import type { NavShell, NavGroup, NavItem } from '$shared/navigation/types';
 import type { ArrType } from '$shared/arr/types';
 import { NAV_REGISTRY } from './registry';
@@ -727,7 +727,7 @@ function isItemVisible(item: NavItem, ctx: ResolveContext): boolean {
 ```
 
 ```typescript
-// src/routes/+layout.server.ts
+// packages/praxrr-app/src/routes/+layout.server.ts
 import type { LayoutServerLoad } from './$types';
 import { appInfoQueries } from '$db/queries/appInfo';
 import { resolveNavShell } from '$lib/server/navigation/resolver';
@@ -748,7 +748,7 @@ export const load: LayoutServerLoad = async ({ locals }) => {
 When the user changes the active Arr scope, re-filter the nav items client-side using the pre-loaded registry data. This avoids a server round-trip for every scope change.
 
 ```svelte
-<!-- src/lib/client/navigation/ScopeSelector.svelte -->
+<!-- packages/praxrr-app/src/lib/client/navigation/ScopeSelector.svelte -->
 <script lang="ts">
   import { getNavContext } from './navContext';
   import type { ArrType } from '$shared/arr/types';
@@ -781,7 +781,7 @@ When the user changes the active Arr scope, re-filter the nav items client-side 
 Wire the nav registry directly into the Bits UI Command component. The registry is the single source of truth for both sidebar rendering and palette search.
 
 ```svelte
-<!-- src/lib/client/navigation/CommandPalette.svelte -->
+<!-- packages/praxrr-app/src/lib/client/navigation/CommandPalette.svelte -->
 <script lang="ts">
   import { Command, Dialog } from 'bits-ui';
   import { goto } from '$app/navigation';
@@ -865,7 +865,7 @@ Wire the nav registry directly into the Bits UI Command component. The registry 
 The toggle decision pattern from Fowler's taxonomy, adapted for SvelteKit:
 
 ```typescript
-// src/lib/server/navigation/featureDecisions.ts
+// packages/praxrr-app/src/lib/server/navigation/featureDecisions.ts
 // Decouples flag checks from business logic (Fowler: "Decouple Decision Points")
 import type { Database } from '$db/db';
 import { getFlag } from '$utils/flags/flags';
@@ -880,7 +880,7 @@ export function createNavFeatureDecisions(db: Database) {
 ```
 
 ```typescript
-// src/routes/+layout.server.ts
+// packages/praxrr-app/src/routes/+layout.server.ts
 import { createNavFeatureDecisions } from '$lib/server/navigation/featureDecisions';
 
 export const load: LayoutServerLoad = async ({ locals }) => {
@@ -903,7 +903,7 @@ export const load: LayoutServerLoad = async ({ locals }) => {
 Lightweight client-side event dispatch with debouncing:
 
 ```typescript
-// src/lib/client/navigation/telemetry.ts
+// packages/praxrr-app/src/lib/client/navigation/telemetry.ts
 interface NavEvent {
   eventName: 'nav_click' | 'nav_impression' | 'nav_search_select' | 'nav_scope_change';
   navItemId?: string;

@@ -7,8 +7,8 @@ Add an optional `external_url` for Arr instances and use it only for browser-fac
 1. Extend the Arr instance contract with a nullable `external_url`.
 
 - Add a migration that appends `external_url TEXT` to `arr_instances`.
-- Register the migration in `src/lib/server/db/migrations.ts` and update `src/lib/server/db/schema.sql` documentation.
-- Update `ArrInstance`, `CreateArrInstanceInput`, and `UpdateArrInstanceInput` in `src/lib/server/db/queries/arrInstances.ts`.
+- Register the migration in `packages/praxrr-app/src/lib/server/db/migrations.ts` and update `packages/praxrr-app/src/lib/server/db/schema.sql` documentation.
+- Update `ArrInstance`, `CreateArrInstanceInput`, and `UpdateArrInstanceInput` in `packages/praxrr-app/src/lib/server/db/queries/arrInstances.ts`.
 
 2. Keep strict URL responsibility boundaries.
 
@@ -18,14 +18,14 @@ Add an optional `external_url` for Arr instances and use it only for browser-fac
 
 3. Add settings support with backward compatibility.
 
-- Update `src/routes/arr/components/InstanceForm.svelte` to include an optional `External URL` input.
+- Update `packages/praxrr-app/src/routes/arr/components/InstanceForm.svelte` to include an optional `External URL` input.
 - Thread the field through hidden form payloads and dirty-state init/update.
-- Parse and persist it in both `src/routes/arr/new/+page.server.ts` and `src/routes/arr/[id]/settings/+page.server.ts`.
+- Parse and persist it in both `packages/praxrr-app/src/routes/arr/new/+page.server.ts` and `packages/praxrr-app/src/routes/arr/[id]/settings/+page.server.ts`.
 - Validation recommendation: required absolute URL validation for `url`; optional absolute URL validation for `external_url` when present.
 
 4. Centralize link base resolution in library UI.
 
-- In `src/routes/arr/[id]/library/+page.svelte`, derive `browserBaseUrl` once from fallback logic.
+- In `packages/praxrr-app/src/routes/arr/[id]/library/+page.svelte`, derive `browserBaseUrl` once from fallback logic.
 - Reuse `browserBaseUrl` for action bar `handleOpen`.
 - Reuse `browserBaseUrl` for Radarr row links.
 - Reuse `browserBaseUrl` for Sonarr row links.
@@ -66,7 +66,7 @@ Phase 3: Library "Open in" adoption
 
 Phase 4: Broader UI consistency (optional)
 
-- Apply same fallback logic to Arr list views (`src/routes/arr/views/TableView.svelte`, `src/routes/arr/views/CardView.svelte`) so all "Open in" actions behave consistently.
+- Apply same fallback logic to Arr list views (`packages/praxrr-app/src/routes/arr/views/TableView.svelte`, `packages/praxrr-app/src/routes/arr/views/CardView.svelte`) so all "Open in" actions behave consistently.
 
 ## Quick Wins
 

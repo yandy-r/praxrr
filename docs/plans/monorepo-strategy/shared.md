@@ -1,22 +1,22 @@
 # monorepo-strategy
 
-Praxrr is a SvelteKit + Deno application centered in `src/`, with runtime orchestration in `src/hooks.server.ts` that initializes config, SQLite state, PCD caches, and background jobs before routes execute. Monorepo strategy work extends the existing Deno workspace (`packages/praxrr-api`) by introducing `packages/praxrr-db` and `packages/praxrr-schema` while keeping runtime contracts stable across PCD linking, cache compilation, and Arr sync flows. The key integration seam is the PCD stack (`src/lib/server/pcd/**`) plus generation/build scripts (`scripts/generate-pcd-types.ts`, `scripts/bundle-api.ts`) that bridge schema, ops, and API types. CI and release workflows under `.github/workflows/` must enforce compatibility and mirror publishing so schema/DB packages remain externally consumable.
+Praxrr is a SvelteKit + Deno application centered in `src/`, with runtime orchestration in `packages/praxrr-app/src/hooks.server.ts` that initializes config, SQLite state, PCD caches, and background jobs before routes execute. Monorepo strategy work extends the existing Deno workspace (`packages/praxrr-api`) by introducing `packages/praxrr-db` and `packages/praxrr-schema` while keeping runtime contracts stable across PCD linking, cache compilation, and Arr sync flows. The key integration seam is the PCD stack (`packages/praxrr-app/src/lib/server/pcd/**`) plus generation/build scripts (`scripts/generate-pcd-types.ts`, `scripts/bundle-api.ts`) that bridge schema, ops, and API types. CI and release workflows under `.github/workflows/` must enforce compatibility and mirror publishing so schema/DB packages remain externally consumable.
 
 ## Relevant Files
 
 - /deno.json: Workspace root; add/coordinate package members and shared tasks.
-- /src/hooks.server.ts: Startup wiring and default database auto-link behavior.
-- /src/lib/server/pcd/core/manager.ts: PCD lifecycle orchestration across clone/sync/compile.
-- /src/lib/server/pcd/git/dependencies.ts: Dependency clone and schema repo resolution logic.
-- /src/lib/server/pcd/manifest/manifest.ts: `pcd.json` validation contract and schema dependency rule.
-- /src/lib/server/pcd/ops/loadOps.ts: Schema/base/tweak/user ops layering and schema path resolution.
-- /src/lib/server/pcd/ops/importBaseOps.ts: Imports repo ops into persisted `pcd_ops` records.
-- /src/lib/server/pcd/ops/seedBuiltInBaseOps.ts: Seeds built-in base ops required for compatibility.
-- /src/lib/server/db/schema.sql: Canonical app database schema for migration/table impact.
-- /src/lib/server/db/migrations.ts: Migration runner used during startup and upgrades.
-- /src/lib/server/db/queries/databaseInstances.ts: Database instance persistence used by PCD manager/routes.
-- /src/lib/server/sync/processor.ts: Arr sync execution from compiled PCD/cache data.
-- /src/lib/server/jobs/init.ts: Background job bootstrap and dispatcher startup.
+- /packages/praxrr-app/src/hooks.server.ts: Startup wiring and default database auto-link behavior.
+- /packages/praxrr-app/src/lib/server/pcd/core/manager.ts: PCD lifecycle orchestration across clone/sync/compile.
+- /packages/praxrr-app/src/lib/server/pcd/git/dependencies.ts: Dependency clone and schema repo resolution logic.
+- /packages/praxrr-app/src/lib/server/pcd/manifest/manifest.ts: `pcd.json` validation contract and schema dependency rule.
+- /packages/praxrr-app/src/lib/server/pcd/ops/loadOps.ts: Schema/base/tweak/user ops layering and schema path resolution.
+- /packages/praxrr-app/src/lib/server/pcd/ops/importBaseOps.ts: Imports repo ops into persisted `pcd_ops` records.
+- /packages/praxrr-app/src/lib/server/pcd/ops/seedBuiltInBaseOps.ts: Seeds built-in base ops required for compatibility.
+- /packages/praxrr-app/src/lib/server/db/schema.sql: Canonical app database schema for migration/table impact.
+- /packages/praxrr-app/src/lib/server/db/migrations.ts: Migration runner used during startup and upgrades.
+- /packages/praxrr-app/src/lib/server/db/queries/databaseInstances.ts: Database instance persistence used by PCD manager/routes.
+- /packages/praxrr-app/src/lib/server/sync/processor.ts: Arr sync execution from compiled PCD/cache data.
+- /packages/praxrr-app/src/lib/server/jobs/init.ts: Background job bootstrap and dispatcher startup.
 - /scripts/generate-pcd-types.ts: Schema SQL to TypeScript generation path.
 - /scripts/bundle-api.ts: OpenAPI packaging path that touches workspace package output.
 - /.github/workflows/release.yml: Release pipeline impacted by path/workspace changes.
@@ -39,15 +39,15 @@ Praxrr is a SvelteKit + Deno application centered in `src/`, with runtime orches
 
 ## Relevant Patterns
 
-**Service/Manager Orchestration**: Keep cross-cutting workflows in manager/service modules, not in routes. Example: [`src/lib/server/pcd/core/manager.ts`](src/lib/server/pcd/core/manager.ts).
+**Service/Manager Orchestration**: Keep cross-cutting workflows in manager/service modules, not in routes. Example: [`packages/praxrr-app/src/lib/server/pcd/core/manager.ts`](packages/praxrr-app/src/lib/server/pcd/core/manager.ts).
 
-**Query Module Boundary**: Use typed query modules for persistence access instead of inline SQL in handlers. Example: [`src/lib/server/db/queries/databaseInstances.ts`](src/lib/server/db/queries/databaseInstances.ts).
+**Query Module Boundary**: Use typed query modules for persistence access instead of inline SQL in handlers. Example: [`packages/praxrr-app/src/lib/server/db/queries/databaseInstances.ts`](packages/praxrr-app/src/lib/server/db/queries/databaseInstances.ts).
 
-**SvelteKit Route Contract**: Keep server route behavior in `load`/`actions` or `+server.ts`, using typed responses and route-layer validation. Example: [`src/routes/databases/new/+page.server.ts`](src/routes/databases/new/+page.server.ts).
+**SvelteKit Route Contract**: Keep server route behavior in `load`/`actions` or `+server.ts`, using typed responses and route-layer validation. Example: [`packages/praxrr-app/src/routes/databases/new/+page.server.ts`](packages/praxrr-app/src/routes/databases/new/+page.server.ts).
 
-**Layered Ops Compilation**: Preserve deterministic schema -> base -> tweaks -> user operation ordering. Example: [`src/lib/server/pcd/ops/loadOps.ts`](src/lib/server/pcd/ops/loadOps.ts).
+**Layered Ops Compilation**: Preserve deterministic schema -> base -> tweaks -> user operation ordering. Example: [`packages/praxrr-app/src/lib/server/pcd/ops/loadOps.ts`](packages/praxrr-app/src/lib/server/pcd/ops/loadOps.ts).
 
-**Job-Driven Sync Execution**: Trigger long-running sync work through queue/scheduler paths, not inline request execution. Example: [`src/lib/server/jobs/init.ts`](src/lib/server/jobs/init.ts).
+**Job-Driven Sync Execution**: Trigger long-running sync work through queue/scheduler paths, not inline request execution. Example: [`packages/praxrr-app/src/lib/server/jobs/init.ts`](packages/praxrr-app/src/lib/server/jobs/init.ts).
 
 ## Relevant Docs
 

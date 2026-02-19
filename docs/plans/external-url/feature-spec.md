@@ -173,19 +173,19 @@ Backend Arr clients, sync jobs, tests --> always use instance.url
 
 #### Files to Create
 
-- `src/lib/server/db/migrations/0XX_add_arr_instances_external_url.ts`: add nullable `external_url`.
+- `packages/praxrr-app/src/lib/server/db/migrations/0XX_add_arr_instances_external_url.ts`: add nullable `external_url`.
 
 #### Files to Modify
 
-- `src/lib/server/db/schema.sql`: document new column.
-- `src/lib/server/db/queries/arrInstances.ts`: types and create/update persistence.
-- `src/routes/arr/components/InstanceForm.svelte`: optional field + hidden form plumbing.
-- `src/routes/arr/new/+page.server.ts`: parse/validate/persist optional field.
-- `src/routes/arr/[id]/settings/+page.server.ts`: parse/validate/persist optional field.
-- `src/routes/arr/[id]/library/+page.svelte`: shared browser link-base resolver.
-- `src/routes/arr/[id]/library/components/LibraryActionBar.svelte`: open action uses resolved base.
-- `src/routes/arr/views/CardView.svelte`: open action uses resolved base.
-- `src/routes/arr/views/TableView.svelte`: open action uses resolved base.
+- `packages/praxrr-app/src/lib/server/db/schema.sql`: document new column.
+- `packages/praxrr-app/src/lib/server/db/queries/arrInstances.ts`: types and create/update persistence.
+- `packages/praxrr-app/src/routes/arr/components/InstanceForm.svelte`: optional field + hidden form plumbing.
+- `packages/praxrr-app/src/routes/arr/new/+page.server.ts`: parse/validate/persist optional field.
+- `packages/praxrr-app/src/routes/arr/[id]/settings/+page.server.ts`: parse/validate/persist optional field.
+- `packages/praxrr-app/src/routes/arr/[id]/library/+page.svelte`: shared browser link-base resolver.
+- `packages/praxrr-app/src/routes/arr/[id]/library/components/LibraryActionBar.svelte`: open action uses resolved base.
+- `packages/praxrr-app/src/routes/arr/views/CardView.svelte`: open action uses resolved base.
+- `packages/praxrr-app/src/routes/arr/views/TableView.svelte`: open action uses resolved base.
 
 #### Configuration
 

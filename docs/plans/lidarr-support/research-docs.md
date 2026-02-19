@@ -7,7 +7,7 @@
 
 ## Architecture Docs
 
-- `/docs/ARCHITECTURE.md`: Describes the Media Management stack (naming, media settings, quality definitions) as separate Radarr/Sonarr entities with UI routes under `src/routes/media-management/**`. The write‑up lists the tables and CRUD flows for Radarr/Sonarr only; Lidarr is nowhere mentioned, so implementers looking for how Lidarr naming/quality/media presets should be surfaced or created get no guidance here.
+- `/docs/ARCHITECTURE.md`: Describes the Media Management stack (naming, media settings, quality definitions) as separate Radarr/Sonarr entities with UI routes under `packages/praxrr-app/src/routes/media-management/**`. The write‑up lists the tables and CRUD flows for Radarr/Sonarr only; Lidarr is nowhere mentioned, so implementers looking for how Lidarr naming/quality/media presets should be surfaced or created get no guidance here.
 
 ## API Docs
 
@@ -17,17 +17,17 @@
 
 ## Development Guides
 
-- `src/lib/server/sync/mediaManagement/syncer.ts`: Module-level documentation at the top of the file explains the three config types (media settings, naming, quality definitions) and the sync flow. Throughout the file there are constants and log messages that explicitly describe how Lidarr v1 reuses Sonarr entities, why unsupported Lidarr fields are skipped, and when Lidarr naming/quality syncs log capability-gating reasons. Reading this is essential to understand the actual behavior behind the documentation, especially the hard-coded reasons (e.g., `LIDARR_REUSE_ENTITY_REASON`) and the `sync*` methods that map Lidarr requests to Sonarr tables.
+- `packages/praxrr-app/src/lib/server/sync/mediaManagement/syncer.ts`: Module-level documentation at the top of the file explains the three config types (media settings, naming, quality definitions) and the sync flow. Throughout the file there are constants and log messages that explicitly describe how Lidarr v1 reuses Sonarr entities, why unsupported Lidarr fields are skipped, and when Lidarr naming/quality syncs log capability-gating reasons. Reading this is essential to understand the actual behavior behind the documentation, especially the hard-coded reasons (e.g., `LIDARR_REUSE_ENTITY_REASON`) and the `sync*` methods that map Lidarr requests to Sonarr tables.
 
 ## README Files
 
 - `/README.md`: Frames this fork as a Lidarr-support branch, warns that “v2” is under heavy development, and points to `yandy-r.dev` for “complete installation, usage, and API documentation.” There’s no mention of how to configure Lidarr media-management naming/quality presets or how the UI surfaces Lidarr configs in those sections.
-- `src/lib/server/utils/arr/README.md`: Explains the arr client hierarchy and enumerates Radarr/Sonarr/Lidarr/Chaptarr clients with their directory layout. It’s useful for developers needing to see where `LidarrClient` lives, but it doesn’t cover media-management naming/quality settings or how Lidarr-specific behaviors differ from its peers.
+- `packages/praxrr-app/src/lib/server/utils/arr/README.md`: Explains the arr client hierarchy and enumerates Radarr/Sonarr/Lidarr/Chaptarr clients with their directory layout. It’s useful for developers needing to see where `LidarrClient` lives, but it doesn’t cover media-management naming/quality settings or how Lidarr-specific behaviors differ from its peers.
 
 ## Must-Read Documents
 
 - `/docs/api/v1/schemas/pcd.yaml` – Details the portable entity contracts that Lidarr shares with Radarr/Sonarr, including the reuse strategy and explicit capability gating of unsupported music fields. Reading it is critical before touching import/export or sync code for Lidarr media management.
-- `src/lib/server/sync/mediaManagement/syncer.ts` – Outlines the runtime flow for media settings, naming, and quality-definition syncs, and documents the Lidarr-specific reuse/gating logic. Anyone implementing or extending Lidarr media-management support needs this as a mental model of what fields are actually touched.
+- `packages/praxrr-app/src/lib/server/sync/mediaManagement/syncer.ts` – Outlines the runtime flow for media settings, naming, and quality-definition syncs, and documents the Lidarr-specific reuse/gating logic. Anyone implementing or extending Lidarr media-management support needs this as a mental model of what fields are actually touched.
 
 ## Documentation Gaps
 

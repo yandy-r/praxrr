@@ -350,14 +350,14 @@ Extraction order:
 
 | Call Site              | File                                                                      | Purpose                                                          |
 | ---------------------- | ------------------------------------------------------------------------- | ---------------------------------------------------------------- |
-| Parse endpoint         | `src/lib/server/utils/arr/parser/client.ts`                               | `ParserClient.parse()` -- all parse calls go through this client |
-| Match endpoint         | `src/lib/server/utils/arr/parser/client.ts`                               | `ParserClient.match()` and `matchBatch()`                        |
-| Health check           | `src/lib/server/utils/arr/parser/client.ts`                               | `ParserClient.health()` via `isParserHealthy()`                  |
-| CF testing page        | `src/routes/custom-formats/[databaseId]/[id]/testing/+page.server.ts`     | Direct `parse()` call for each test case                         |
-| QP entity testing page | `src/routes/quality-profiles/entity-testing/[databaseId]/+page.server.ts` | `isParserHealthy()` check                                        |
-| Entity testing API     | `src/routes/api/v1/entity-testing/evaluate/+server.ts`                    | `parseWithCacheBatch()` + `matchPatternsBatch()`                 |
-| regex101 API           | `src/routes/api/regex101/[id]/+server.ts`                                 | Direct `fetch` to `config.parserUrl/match`                       |
-| CF evaluator           | `src/lib/server/pcd/entities/customFormats/evaluator.ts`                  | Consumes `ParseResult` for condition evaluation                  |
+| Parse endpoint         | `packages/praxrr-app/src/lib/server/utils/arr/parser/client.ts`                               | `ParserClient.parse()` -- all parse calls go through this client |
+| Match endpoint         | `packages/praxrr-app/src/lib/server/utils/arr/parser/client.ts`                               | `ParserClient.match()` and `matchBatch()`                        |
+| Health check           | `packages/praxrr-app/src/lib/server/utils/arr/parser/client.ts`                               | `ParserClient.health()` via `isParserHealthy()`                  |
+| CF testing page        | `packages/praxrr-app/src/routes/custom-formats/[databaseId]/[id]/testing/+page.server.ts`     | Direct `parse()` call for each test case                         |
+| QP entity testing page | `packages/praxrr-app/src/routes/quality-profiles/entity-testing/[databaseId]/+page.server.ts` | `isParserHealthy()` check                                        |
+| Entity testing API     | `packages/praxrr-app/src/routes/api/v1/entity-testing/evaluate/+server.ts`                    | `parseWithCacheBatch()` + `matchPatternsBatch()`                 |
+| regex101 API           | `packages/praxrr-app/src/routes/api/regex101/[id]/+server.ts`                                 | Direct `fetch` to `config.parserUrl/match`                       |
+| CF evaluator           | `packages/praxrr-app/src/lib/server/pcd/entities/customFormats/evaluator.ts`                  | Consumes `ParseResult` for condition evaluation                  |
 
 ### Configuration
 
@@ -365,7 +365,7 @@ Extraction order:
 | ----------------- | --------------------------------------- | --------------------------------------------- |
 | `PARSER_HOST`     | `localhost`                             | Parser service hostname                       |
 | `PARSER_PORT`     | `5000`                                  | Parser service port                           |
-| Config resolution | `src/lib/server/utils/config/config.ts` | Constructs `parserUrl = http://{host}:{port}` |
+| Config resolution | `packages/praxrr-app/src/lib/server/utils/config/config.ts` | Constructs `parserUrl = http://{host}:{port}` |
 
 ### Docker Setup
 
@@ -399,34 +399,34 @@ The Go rewrite must implement:
 
 ## Relevant Files
 
-- `/home/yandy/Projects/github.com/yandy-r/praxrr/src/services/parser/Program.cs`: Entry point, endpoint registration
-- `/home/yandy/Projects/github.com/yandy-r/praxrr/src/services/parser/Parser.csproj`: Project file (net8.0, no external packages)
-- `/home/yandy/Projects/github.com/yandy-r/praxrr/src/services/parser/Endpoints/ParseEndpoints.cs`: Parse endpoint handler
-- `/home/yandy/Projects/github.com/yandy-r/praxrr/src/services/parser/Endpoints/MatchEndpoints.cs`: Match + batch match handlers
-- `/home/yandy/Projects/github.com/yandy-r/praxrr/src/services/parser/Endpoints/HealthEndpoints.cs`: Health check handler
-- `/home/yandy/Projects/github.com/yandy-r/praxrr/src/services/parser/Parsers/QualityParser.cs`: Quality/source/resolution/modifier parsing
-- `/home/yandy/Projects/github.com/yandy-r/praxrr/src/services/parser/Parsers/TitleParser.cs`: Movie title parsing (~420 lines)
-- `/home/yandy/Projects/github.com/yandy-r/praxrr/src/services/parser/Parsers/EpisodeParser.cs`: Series episode parsing (~550 lines)
-- `/home/yandy/Projects/github.com/yandy-r/praxrr/src/services/parser/Parsers/LanguageParser.cs`: Language detection
-- `/home/yandy/Projects/github.com/yandy-r/praxrr/src/services/parser/Parsers/ReleaseGroupParser.cs`: Release group extraction
-- `/home/yandy/Projects/github.com/yandy-r/praxrr/src/services/parser/Parsers/Common/ParserCommon.cs`: Shared utilities (website cleanup, file extension removal)
-- `/home/yandy/Projects/github.com/yandy-r/praxrr/src/services/parser/Parsers/Common/RegexReplace.cs`: Regex replace helper class
-- `/home/yandy/Projects/github.com/yandy-r/praxrr/src/services/parser/Models/Types.cs`: Enums (QualitySource, Resolution, QualityModifier, Revision)
-- `/home/yandy/Projects/github.com/yandy-r/praxrr/src/services/parser/Models/Language.cs`: Language enum (58 values)
-- `/home/yandy/Projects/github.com/yandy-r/praxrr/src/services/parser/Models/Requests.cs`: Request DTOs
-- `/home/yandy/Projects/github.com/yandy-r/praxrr/src/services/parser/Models/Responses.cs`: Response DTOs
-- `/home/yandy/Projects/github.com/yandy-r/praxrr/src/lib/server/utils/arr/parser/client.ts`: TypeScript client for parser service
-- `/home/yandy/Projects/github.com/yandy-r/praxrr/src/lib/server/utils/arr/parser/types.ts`: TypeScript mirror types (enums, interfaces)
-- `/home/yandy/Projects/github.com/yandy-r/praxrr/src/lib/server/utils/arr/parser/index.ts`: Parser module public exports
-- `/home/yandy/Projects/github.com/yandy-r/praxrr/src/lib/server/utils/parser/spawn.ts`: Standalone binary auto-spawn logic
-- `/home/yandy/Projects/github.com/yandy-r/praxrr/src/lib/server/pcd/entities/customFormats/evaluator.ts`: Custom format condition evaluator (consumes ParseResult)
-- `/home/yandy/Projects/github.com/yandy-r/praxrr/src/routes/api/v1/entity-testing/evaluate/+server.ts`: Entity testing evaluation API
-- `/home/yandy/Projects/github.com/yandy-r/praxrr/src/routes/api/regex101/[id]/+server.ts`: regex101 integration (calls /match)
-- `/home/yandy/Projects/github.com/yandy-r/praxrr/src/routes/custom-formats/[databaseId]/[id]/testing/+page.server.ts`: CF testing page server
-- `/home/yandy/Projects/github.com/yandy-r/praxrr/src/routes/quality-profiles/entity-testing/[databaseId]/+page.server.ts`: QP entity testing page server
-- `/home/yandy/Projects/github.com/yandy-r/praxrr/src/lib/server/db/queries/parsedReleaseCache.ts`: Parse result caching queries
-- `/home/yandy/Projects/github.com/yandy-r/praxrr/src/lib/server/db/queries/patternMatchCache.ts`: Pattern match caching queries
-- `/home/yandy/Projects/github.com/yandy-r/praxrr/src/lib/server/utils/config/config.ts`: Config with parserUrl construction
+- `/home/yandy/Projects/github.com/yandy-r/praxrr/packages/praxrr-parser/Program.cs`: Entry point, endpoint registration
+- `/home/yandy/Projects/github.com/yandy-r/praxrr/packages/praxrr-parser/Parser.csproj`: Project file (net8.0, no external packages)
+- `/home/yandy/Projects/github.com/yandy-r/praxrr/packages/praxrr-parser/Endpoints/ParseEndpoints.cs`: Parse endpoint handler
+- `/home/yandy/Projects/github.com/yandy-r/praxrr/packages/praxrr-parser/Endpoints/MatchEndpoints.cs`: Match + batch match handlers
+- `/home/yandy/Projects/github.com/yandy-r/praxrr/packages/praxrr-parser/Endpoints/HealthEndpoints.cs`: Health check handler
+- `/home/yandy/Projects/github.com/yandy-r/praxrr/packages/praxrr-parser/Parsers/QualityParser.cs`: Quality/source/resolution/modifier parsing
+- `/home/yandy/Projects/github.com/yandy-r/praxrr/packages/praxrr-parser/Parsers/TitleParser.cs`: Movie title parsing (~420 lines)
+- `/home/yandy/Projects/github.com/yandy-r/praxrr/packages/praxrr-parser/Parsers/EpisodeParser.cs`: Series episode parsing (~550 lines)
+- `/home/yandy/Projects/github.com/yandy-r/praxrr/packages/praxrr-parser/Parsers/LanguageParser.cs`: Language detection
+- `/home/yandy/Projects/github.com/yandy-r/praxrr/packages/praxrr-parser/Parsers/ReleaseGroupParser.cs`: Release group extraction
+- `/home/yandy/Projects/github.com/yandy-r/praxrr/packages/praxrr-parser/Parsers/Common/ParserCommon.cs`: Shared utilities (website cleanup, file extension removal)
+- `/home/yandy/Projects/github.com/yandy-r/praxrr/packages/praxrr-parser/Parsers/Common/RegexReplace.cs`: Regex replace helper class
+- `/home/yandy/Projects/github.com/yandy-r/praxrr/packages/praxrr-parser/Models/Types.cs`: Enums (QualitySource, Resolution, QualityModifier, Revision)
+- `/home/yandy/Projects/github.com/yandy-r/praxrr/packages/praxrr-parser/Models/Language.cs`: Language enum (58 values)
+- `/home/yandy/Projects/github.com/yandy-r/praxrr/packages/praxrr-parser/Models/Requests.cs`: Request DTOs
+- `/home/yandy/Projects/github.com/yandy-r/praxrr/packages/praxrr-parser/Models/Responses.cs`: Response DTOs
+- `/home/yandy/Projects/github.com/yandy-r/praxrr/packages/praxrr-app/src/lib/server/utils/arr/parser/client.ts`: TypeScript client for parser service
+- `/home/yandy/Projects/github.com/yandy-r/praxrr/packages/praxrr-app/src/lib/server/utils/arr/parser/types.ts`: TypeScript mirror types (enums, interfaces)
+- `/home/yandy/Projects/github.com/yandy-r/praxrr/packages/praxrr-app/src/lib/server/utils/arr/parser/index.ts`: Parser module public exports
+- `/home/yandy/Projects/github.com/yandy-r/praxrr/packages/praxrr-app/src/lib/server/utils/parser/spawn.ts`: Standalone binary auto-spawn logic
+- `/home/yandy/Projects/github.com/yandy-r/praxrr/packages/praxrr-app/src/lib/server/pcd/entities/customFormats/evaluator.ts`: Custom format condition evaluator (consumes ParseResult)
+- `/home/yandy/Projects/github.com/yandy-r/praxrr/packages/praxrr-app/src/routes/api/v1/entity-testing/evaluate/+server.ts`: Entity testing evaluation API
+- `/home/yandy/Projects/github.com/yandy-r/praxrr/packages/praxrr-app/src/routes/api/regex101/[id]/+server.ts`: regex101 integration (calls /match)
+- `/home/yandy/Projects/github.com/yandy-r/praxrr/packages/praxrr-app/src/routes/custom-formats/[databaseId]/[id]/testing/+page.server.ts`: CF testing page server
+- `/home/yandy/Projects/github.com/yandy-r/praxrr/packages/praxrr-app/src/routes/quality-profiles/entity-testing/[databaseId]/+page.server.ts`: QP entity testing page server
+- `/home/yandy/Projects/github.com/yandy-r/praxrr/packages/praxrr-app/src/lib/server/db/queries/parsedReleaseCache.ts`: Parse result caching queries
+- `/home/yandy/Projects/github.com/yandy-r/praxrr/packages/praxrr-app/src/lib/server/db/queries/patternMatchCache.ts`: Pattern match caching queries
+- `/home/yandy/Projects/github.com/yandy-r/praxrr/packages/praxrr-app/src/lib/server/utils/config/config.ts`: Config with parserUrl construction
 - `/home/yandy/Projects/github.com/yandy-r/praxrr/Dockerfile.parser`: Parser Docker image build
 - `/home/yandy/Projects/github.com/yandy-r/praxrr/compose.yml`: Production compose with parser service
 - `/home/yandy/Projects/github.com/yandy-r/praxrr/compose.dev.yml`: Development compose with parser build

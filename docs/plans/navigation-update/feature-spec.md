@@ -107,8 +107,8 @@ No external API dependencies are required for the initial implementation. The na
 ### NavShell Contract
 
 - `NavShell` is the shared transport object `{ variant, arrScopeOptions, groups }`.
-- `src/routes/+layout.server.ts` now returns `{ version }` for auth routes and `{ version, navShell }` for authenticated non-`/auth/*` requests.
-- `src/app.d.ts` includes `App.PageData.navShell?: NavShell`.
+- `packages/praxrr-app/src/routes/+layout.server.ts` now returns `{ version }` for auth routes and `{ version, navShell }` for authenticated non-`/auth/*` requests.
+- `packages/praxrr-app/src/app.d.ts` includes `App.PageData.navShell?: NavShell`.
 - `+layout.svelte` passes the same `navShell` payload to both:
   - `PageNav`
   - `BottomNav`
@@ -175,7 +175,7 @@ No external API dependencies are required for the initial implementation. The na
 #### NavItemDef (Code-First Registry)
 
 ```typescript
-// src/lib/shared/navigation/types.ts
+// packages/praxrr-app/src/lib/shared/navigation/types.ts
 
 import type { ArrFeature } from '$shared/arr/capabilities.ts';
 import type { ArrType } from '$shared/pcd/types.ts';
@@ -244,7 +244,7 @@ export interface NavShell {
 Lucide-svelte `ComponentType` is not JSON-serializable. The registry stores `iconKey: string`, resolved client-side:
 
 ```typescript
-// src/lib/client/navigation/iconMap.ts
+// packages/praxrr-app/src/lib/client/navigation/iconMap.ts
 import { FolderTree, Link, Sliders, Palette, ... } from 'lucide-svelte';
 
 export const NAV_ICON_MAP: Record<string, ComponentType> = {
@@ -283,36 +283,36 @@ The `resolveNavShell` function reads the static registry and returns a pure JSON
 
 | File                                                           | Purpose                                   |
 | -------------------------------------------------------------- | ----------------------------------------- |
-| `src/lib/shared/navigation/types.ts`                           | Shared TypeScript interfaces              |
-| `src/lib/server/navigation/registry.ts`                        | Static `NAV_REGISTRY` constant            |
-| `src/lib/server/navigation/resolver.ts`                        | `resolveNavShell()` -- filter + serialize |
-| `src/lib/client/navigation/iconMap.ts`                         | Icon key -> ComponentType resolution      |
-| `src/lib/client/stores/navScope.ts`                            | App scope writable store (Phase 2)        |
-| `src/lib/client/ui/navigation/pageNav/sectionHeader.svelte`    | Section label component                   |
-| `src/lib/client/ui/navigation/pageNav/navScopeSelector.svelte` | Scope dropdown (Phase 2)                  |
+| `packages/praxrr-app/src/lib/shared/navigation/types.ts`                           | Shared TypeScript interfaces              |
+| `packages/praxrr-app/src/lib/server/navigation/registry.ts`                        | Static `NAV_REGISTRY` constant            |
+| `packages/praxrr-app/src/lib/server/navigation/resolver.ts`                        | `resolveNavShell()` -- filter + serialize |
+| `packages/praxrr-app/src/lib/client/navigation/iconMap.ts`                         | Icon key -> ComponentType resolution      |
+| `packages/praxrr-app/src/lib/client/stores/navScope.ts`                            | App scope writable store (Phase 2)        |
+| `packages/praxrr-app/src/lib/client/ui/navigation/pageNav/sectionHeader.svelte`    | Section label component                   |
+| `packages/praxrr-app/src/lib/client/ui/navigation/pageNav/navScopeSelector.svelte` | Scope dropdown (Phase 2)                  |
 
 #### Files to Modify
 
 | File                                                      | Change                                                          |
 | --------------------------------------------------------- | --------------------------------------------------------------- |
-| `src/routes/+layout.server.ts`                            | Add `resolveNavShell()` call, return `navShell`                 |
-| `src/routes/+layout.svelte`                               | Pass `data.navShell` to `PageNav` and `BottomNav`               |
-| `src/lib/client/ui/navigation/pageNav/pageNav.svelte`     | Replace hard-coded groups with registry-driven `{#each}` loop   |
-| `src/lib/client/ui/navigation/bottomNav/BottomNav.svelte` | Replace hard-coded `NavItem[]` with `navShell.groups` flattened |
-| `src/lib/client/ui/navigation/pageNav/groupItem.svelte`   | Normalize from Svelte 5 runes to `export let` (cleanup)         |
+| `packages/praxrr-app/src/routes/+layout.server.ts`                            | Add `resolveNavShell()` call, return `navShell`                 |
+| `packages/praxrr-app/src/routes/+layout.svelte`                               | Pass `data.navShell` to `PageNav` and `BottomNav`               |
+| `packages/praxrr-app/src/lib/client/ui/navigation/pageNav/pageNav.svelte`     | Replace hard-coded groups with registry-driven `{#each}` loop   |
+| `packages/praxrr-app/src/lib/client/ui/navigation/bottomNav/BottomNav.svelte` | Replace hard-coded `NavItem[]` with `navShell.groups` flattened |
+| `packages/praxrr-app/src/lib/client/ui/navigation/pageNav/groupItem.svelte`   | Normalize from Svelte 5 runes to `export let` (cleanup)         |
 
 #### Files to Delete
 
 | File                               | Reason                                            |
 | ---------------------------------- | ------------------------------------------------- |
-| `src/lib/client/stores/sidebar.ts` | Dead code -- `sidebarCollapsed` is never imported |
+| `packages/praxrr-app/src/lib/client/stores/sidebar.ts` | Dead code -- `sidebarCollapsed` is never imported |
 
 #### Files Unchanged
 
-- All route files under `src/routes/*` -- canonical paths preserved
-- `src/lib/shared/arr/capabilities.ts` -- nav registry imports from it, no changes
-- `src/hooks.server.ts` -- already populates `locals.user`
-- `src/lib/client/ui/navigation/tabs/Tabs.svelte` -- remains route-driven, independent of nav registry
+- All route files under `packages/praxrr-app/src/routes/*` -- canonical paths preserved
+- `packages/praxrr-app/src/lib/shared/arr/capabilities.ts` -- nav registry imports from it, no changes
+- `packages/praxrr-app/src/hooks.server.ts` -- already populates `locals.user`
+- `packages/praxrr-app/src/lib/client/ui/navigation/tabs/Tabs.svelte` -- remains route-driven, independent of nav registry
 
 ## UX Considerations
 
@@ -388,7 +388,7 @@ The `resolveNavShell` function reads the static registry and returns a pure JSON
 ### Quick Wins
 
 - Add section header dividers in `pageNav.svelte` (pure markup, zero risk)
-- Delete `src/lib/client/stores/sidebar.ts` (dead code)
+- Delete `packages/praxrr-app/src/lib/client/stores/sidebar.ts` (dead code)
 - Add `aria-current="page"` to active nav links for screen reader support
 - Normalize `groupItem.svelte` from Svelte 5 runes to `export let` per project convention
 
@@ -566,10 +566,10 @@ graph LR
 **Focus**: Single source of truth, visual grouping, cleanup.
 **Tasks**:
 
-- Create `src/lib/shared/navigation/types.ts` (interfaces)
-- Create `src/lib/server/navigation/registry.ts` (nav item data)
-- Create `src/lib/server/navigation/resolver.ts` (filter + serialize)
-- Create `src/lib/client/navigation/iconMap.ts` (icon resolution)
+- Create `packages/praxrr-app/src/lib/shared/navigation/types.ts` (interfaces)
+- Create `packages/praxrr-app/src/lib/server/navigation/registry.ts` (nav item data)
+- Create `packages/praxrr-app/src/lib/server/navigation/resolver.ts` (filter + serialize)
+- Create `packages/praxrr-app/src/lib/client/navigation/iconMap.ts` (icon resolution)
 - Modify `+layout.server.ts` to return `navShell`
 - Modify `+layout.svelte` to pass `navShell` props
 - Refactor `pageNav.svelte` to render from registry

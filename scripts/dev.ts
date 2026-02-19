@@ -17,6 +17,8 @@ const colors = {
   reset: '\x1b[0m',
 };
 
+const PARSER_PROJECT_DIR = 'packages/praxrr-parser';
+
 async function streamOutput(reader: ReadableStreamDefaultReader<Uint8Array>, label: string, color: string) {
   const decoder = new TextDecoder();
   while (true) {
@@ -71,7 +73,7 @@ async function startArr(): Promise<void> {
 async function runParser() {
   const cmd = new Deno.Command('dotnet', {
     args: ['watch', 'run', '--urls', 'http://localhost:5000'],
-    cwd: 'src/services/parser',
+    cwd: PARSER_PROJECT_DIR,
     stdout: 'piped',
     stderr: 'piped',
   });
@@ -89,12 +91,13 @@ async function runParser() {
 async function runServer() {
   const cmd = new Deno.Command('deno', {
     args: ['run', '-A', 'npm:vite', 'dev'],
+    cwd: 'packages/praxrr-app',
     env: {
       ...Deno.env.toObject(),
       DENO_ENV: 'development',
       PORT: '6969',
       HOST: '0.0.0.0',
-      APP_BASE_PATH: './dist/dev',
+      APP_BASE_PATH: '../../dist/dev',
       PARSER_HOST: 'localhost',
       PARSER_PORT: '5000',
       VITE_PLATFORM: getPlatform(),

@@ -101,5 +101,7 @@ jobs:
       - name: Run app checks
         run: |
           deno install --node-modules-dir
+          cd packages/praxrr-app
           npx svelte-kit sync
+          cd ../..
           deno task check

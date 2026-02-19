@@ -2,7 +2,7 @@
 
 ## Architecture Docs
 
-- `docs/ARCHITECTURE.md`: Describes the overall Praxrr architecture, explicitly naming the parser service, where parser-related modules live (`src/services/parser/`), the runtime stack, PCD cache/operations, and how the parser fits into deploy/test flows.
+- `docs/ARCHITECTURE.md`: Describes the overall Praxrr architecture, explicitly naming the parser service, where parser-related modules live (`packages/praxrr-parser/`), the runtime stack, PCD cache/operations, and how the parser fits into deploy/test flows.
 - `docs/plans/praxrr-parser-go/feature-spec.md`: Provides the parser-specific architecture vision for the Go rewrite, covering API contract, regex inventory, QoS requirements, integration points, and the recommended drop-in HTTP microservice design.
 - `docs/plans/praxrr-parser-go/research-technical.md`: Details the technical architecture for the Go parser (data models, Go module layout, regex migration strategy, CI/docker changes, and HTTP endpoint contracts).
 
@@ -19,8 +19,8 @@
 ## README Files
 
 - `README.md`: Root overview referencing the parser service (Docker compose example, environment variables like `PARSER_HOST`/`PARSER_PORT`, note that the parser is optional but required for CF/QP testing) and links to auth documentation—sets context for the parser’s role in deployment.
-- `src/lib/server/utils/arr/README.md`: Documents the arr HTTP client utilities that currently call the parser; useful to understand how the parser API is consumed and what needs updating if the service changes.
-- `src/lib/server/utils/auth/README.md`: While centered on auth, it’s referenced from the root README and clarifies API/key expectations that also govern parser interactions through the same auth layer.
+- `packages/praxrr-app/src/lib/server/utils/arr/README.md`: Documents the arr HTTP client utilities that currently call the parser; useful to understand how the parser API is consumed and what needs updating if the service changes.
+- `packages/praxrr-app/src/lib/server/utils/auth/README.md`: While centered on auth, it’s referenced from the root README and clarifies API/key expectations that also govern parser interactions through the same auth layer.
 
 ## Must-Read Documents
 

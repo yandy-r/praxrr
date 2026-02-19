@@ -9,6 +9,9 @@ const config = {
     csrf: {
       trustedOrigins: ['*'],
     },
+    files: {
+      src: 'packages/praxrr-app/src',
+    },
     adapter: adapter({
       usage: 'deno-compile',
       out: 'dist/build',

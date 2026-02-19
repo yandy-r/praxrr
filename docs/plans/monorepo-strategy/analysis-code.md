@@ -4,33 +4,33 @@ The codebase already has strong orchestration boundaries (manager/query/job modu
 
 ### Related Components
 
-- `src/hooks.server.ts`: startup link defaults and one-time auto-link behavior.
+- `packages/praxrr-app/src/hooks.server.ts`: startup link defaults and one-time auto-link behavior.
 - `scripts/generate-pcd-types.ts`: schema source resolution and generated type workflow.
-- `src/lib/server/pcd/core/manager.ts`: database link/clone/compile orchestration contract.
-- `src/lib/server/pcd/ops/loadOps.ts`: deterministic operation layering contract.
-- `src/lib/server/db/queries/databaseInstances.ts`: typed persistence boundary.
+- `packages/praxrr-app/src/lib/server/pcd/core/manager.ts`: database link/clone/compile orchestration contract.
+- `packages/praxrr-app/src/lib/server/pcd/ops/loadOps.ts`: deterministic operation layering contract.
+- `packages/praxrr-app/src/lib/server/db/queries/databaseInstances.ts`: typed persistence boundary.
 - `.github/workflows/release.yml`: release pipeline assumptions and workspace pathing.
 
 ### Implementation Patterns
 
 **Manager-Orchestrated Lifecycle**
 
-- Example: `src/lib/server/pcd/core/manager.ts:31`
+- Example: `packages/praxrr-app/src/lib/server/pcd/core/manager.ts:31`
 - Apply to: link/startup orchestration, cache compile, sync kickoff.
 
 **Typed Query Access**
 
-- Example: `src/lib/server/db/queries/databaseInstances.ts:5`
+- Example: `packages/praxrr-app/src/lib/server/db/queries/databaseInstances.ts:5`
 - Apply to: database metadata persistence and migration-adjacent changes.
 
 **Deterministic Ops Layering**
 
-- Example: `src/lib/server/pcd/ops/loadOps.ts:31`
+- Example: `packages/praxrr-app/src/lib/server/pcd/ops/loadOps.ts:31`
 - Apply to: schema/base/tweak/user merge behavior and compatibility checks.
 
 **Queued Background Processing**
 
-- Example: `src/lib/server/jobs/init.ts:6`
+- Example: `packages/praxrr-app/src/lib/server/jobs/init.ts:6`
 - Apply to: sync execution and long-running workflows.
 
 **Scripted Build Artifact Generation**
@@ -57,9 +57,9 @@ The codebase already has strong orchestration boundaries (manager/query/job modu
 #### Files to Modify
 
 - `deno.json`: workspace entries and top-level cross-package tasks.
-- `src/hooks.server.ts`: env-driven default DB URL/branch/name behavior.
+- `packages/praxrr-app/src/hooks.server.ts`: env-driven default DB URL/branch/name behavior.
 - `scripts/generate-pcd-types.ts`: local schema default with remote override path.
-- `src/routes/databases/[id]/config/+page.svelte`: configurable locked schema dependency references.
+- `packages/praxrr-app/src/routes/databases/[id]/config/+page.svelte`: configurable locked schema dependency references.
 - `README.md`: contributor workflow and monorepo structure docs.
 - `CLAUDE.md`: internal workflow and environment variable documentation.
 

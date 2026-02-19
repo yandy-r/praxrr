@@ -159,7 +159,7 @@ ops, and app code changes.
 1. Edit `packages/praxrr-schema/ops/0.schema.sql` -- add the new table DDL
 2. Run `deno task generate:pcd-types --local` -- regenerate TypeScript types from local schema
 3. Edit `packages/praxrr-db/ops/` -- add base ops that populate the new table
-4. Edit `src/lib/server/pcd/` (app code) -- add handlers for the new entity
+4. Edit `packages/praxrr-app/src/lib/server/pcd/` (app code) -- add handlers for the new entity
 5. Run `deno task test` -- verify everything compiles and tests pass
 6. Commit: `feat: add support for delay profiles`
 7. CI validates all three packages together in a single PR
@@ -187,7 +187,7 @@ packages/
   praxrr-api/    # OpenAPI spec + generated TypeScript types (published to JSR)
   praxrr-db/     # Default PCD database (base ops + tweaks)
   praxrr-schema/ # PCD schema DDL (table definitions)
-src/               # Main SvelteKit application
+packages/praxrr-app/src/               # Main SvelteKit application
   lib/
     server/        # Server-side: PCD system, DB, sync, jobs
     client/        # Client-side: UI components, stores
@@ -292,7 +292,7 @@ who encounter the structure and wonder about the rationale. The business researc
 #### Current UX
 
 On first startup, the app automatically links `https://github.com/yandy-r/praxrr-db` at branch `v2`
-as the default PCD database. The URL and branch are hardcoded in `src/hooks.server.ts`. Three env
+as the default PCD database. The URL and branch are hardcoded in `packages/praxrr-app/src/hooks.server.ts`. Three env
 vars exist for optional git credentials (`PRAXRR_DEFAULT_DB_TOKEN`,
 `PRAXRR_DEFAULT_DB_GIT_USERNAME`, `PRAXRR_DEFAULT_DB_GIT_EMAIL`), but URL and branch are not
 configurable.
@@ -390,7 +390,7 @@ jobs:
         with:
           filters: |
             app:
-              - 'src/**'
+              - 'packages/praxrr-app/src/**'
               - 'deno.json'
               - 'svelte.config.js'
             schema:
@@ -890,6 +890,6 @@ external PCD consumer repos.
    `praxrr-db`. The mirror publishing workflow needs to push to this specific branch (not `main`).
    The exact git subtree push configuration for branch targeting needs testing.
 
-5. **E2E test default repo**: `src/tests/e2e/env.ts` references `praxrr-db-v2-testing`, not the main
+5. **E2E test default repo**: `packages/praxrr-app/src/tests/e2e/env.ts` references `praxrr-db-v2-testing`, not the main
    `praxrr-db`. The monorepo transition should not change E2E test behavior, but the relationship
    between the testing repo and the monorepo packages needs clarification.

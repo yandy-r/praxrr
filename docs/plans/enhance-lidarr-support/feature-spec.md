@@ -158,16 +158,16 @@ Media Management Routes
 
 #### Files to Create
 
-- `src/lib/server/db/migrations/*`: migration for `lidarr_*` tables and mapping seed updates.
+- `packages/praxrr-app/src/lib/server/db/migrations/*`: migration for `lidarr_*` tables and mapping seed updates.
 
 #### Files to Modify
 
 - `docs/pcdReference/0.schema.sql`: add first-class Lidarr media-management tables and mapping coverage.
-- `src/lib/server/pcd/entities/mediaManagement/**`: add/use dedicated Lidarr operations and remove default reuse branches.
-- `src/lib/server/sync/mediaManagement/syncer.ts`: resolve Lidarr from dedicated entities.
-- `src/lib/shared/pcd/portable.ts`: include first-class Lidarr entity types.
+- `packages/praxrr-app/src/lib/server/pcd/entities/mediaManagement/**`: add/use dedicated Lidarr operations and remove default reuse branches.
+- `packages/praxrr-app/src/lib/server/sync/mediaManagement/syncer.ts`: resolve Lidarr from dedicated entities.
+- `packages/praxrr-app/src/lib/shared/pcd/portable.ts`: include first-class Lidarr entity types.
 - `docs/api/v1/schemas/pcd.yaml`: document `lidarr_*` portable contracts.
-- `src/routes/media-management/[databaseId]/**/+page.server.ts`: route actions call dedicated Lidarr handlers.
+- `packages/praxrr-app/src/routes/media-management/[databaseId]/**/+page.server.ts`: route actions call dedicated Lidarr handlers.
 
 ## UX Considerations
 

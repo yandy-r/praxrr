@@ -12,60 +12,60 @@ The parser is a minimal ASP.NET Core 8 web application with no external NuGet de
 
 **Entry point and configuration:**
 
-- `/src/services/parser/Program.cs` -- ASP.NET minimal API setup, endpoint registration, config loading
-- `/src/services/parser/Parser.csproj` -- .NET 8.0 SDK Web project, no external packages
-- `/src/services/parser/appsettings.json` -- Logging and version config
-- `/src/services/parser/Directory.Build.props` -- Redirects build output to `dist/parser/`
+- `/packages/praxrr-parser/Program.cs` -- ASP.NET minimal API setup, endpoint registration, config loading
+- `/packages/praxrr-parser/Parser.csproj` -- .NET 8.0 SDK Web project, no external packages
+- `/packages/praxrr-parser/appsettings.json` -- Logging and version config
+- `/packages/praxrr-parser/Directory.Build.props` -- Redirects build output to `dist/parser/`
 
 **Endpoints (3 files):**
 
-- `/src/services/parser/Endpoints/ParseEndpoints.cs` -- `POST /parse` handler; dispatches to all parsers, assembles `ParseResponse`
-- `/src/services/parser/Endpoints/MatchEndpoints.cs` -- `POST /match` and `POST /match/batch` handlers; compiles user-supplied regex patterns, matches against text with 100ms ReDoS timeout
-- `/src/services/parser/Endpoints/HealthEndpoints.cs` -- `GET /health` handler; returns `{ status, version }`
+- `/packages/praxrr-parser/Endpoints/ParseEndpoints.cs` -- `POST /parse` handler; dispatches to all parsers, assembles `ParseResponse`
+- `/packages/praxrr-parser/Endpoints/MatchEndpoints.cs` -- `POST /match` and `POST /match/batch` handlers; compiles user-supplied regex patterns, matches against text with 100ms ReDoS timeout
+- `/packages/praxrr-parser/Endpoints/HealthEndpoints.cs` -- `GET /health` handler; returns `{ status, version }`
 
 **Models (4 files):**
 
-- `/src/services/parser/Models/Types.cs` -- Enums: `QualitySource`, `Resolution`, `QualityModifier`; class: `Revision`, `QualityResult`
-- `/src/services/parser/Models/Requests.cs` -- `ParseRequest`, `MatchRequest`, `BatchMatchRequest`
-- `/src/services/parser/Models/Responses.cs` -- `ParseResponse`, `RevisionResponse`, `EpisodeResponse`, `MatchResponse`, `BatchMatchResponse`
-- `/src/services/parser/Models/Language.cs` -- `Language` enum (58 members)
+- `/packages/praxrr-parser/Models/Types.cs` -- Enums: `QualitySource`, `Resolution`, `QualityModifier`; class: `Revision`, `QualityResult`
+- `/packages/praxrr-parser/Models/Requests.cs` -- `ParseRequest`, `MatchRequest`, `BatchMatchRequest`
+- `/packages/praxrr-parser/Models/Responses.cs` -- `ParseResponse`, `RevisionResponse`, `EpisodeResponse`, `MatchResponse`, `BatchMatchResponse`
+- `/packages/praxrr-parser/Models/Language.cs` -- `Language` enum (58 members)
 
 **Parsers (6 files):**
 
-- `/src/services/parser/Parsers/Common/ParserCommon.cs` -- Shared utilities: file extension removal, website prefix/postfix stripping, torrent suffix cleaning
-- `/src/services/parser/Parsers/Common/RegexReplace.cs` -- Helper class wrapping `Regex` with replace/tryReplace semantics
-- `/src/services/parser/Parsers/TitleParser.cs` -- Movie title extraction: 10 title regex patterns, edition, IMDB/TMDB ID, hardcoded subs, alternative titles (AKA), hashed release rejection, reversed title detection
-- `/src/services/parser/Parsers/QualityParser.cs` -- Source/resolution/modifier/revision extraction: source regex (26 named groups), resolution regex, BRDISK detection, anime patterns, codec detection
-- `/src/services/parser/Parsers/LanguageParser.cs` -- Language detection: string contains checks (34 languages) + 2 regex patterns (case-insensitive and case-sensitive) with 29 named groups each + German DL/ML special handling
-- `/src/services/parser/Parsers/EpisodeParser.cs` -- Episode/season extraction: 38 regex patterns for episodes, daily shows, anime, season packs, mini-series; date validation, word-to-number conversion
-- `/src/services/parser/Parsers/ReleaseGroupParser.cs` -- Release group extraction: main regex, anime regex, exception groups (exact + pattern), invalid group filtering, cleanup regex
+- `/packages/praxrr-parser/Parsers/Common/ParserCommon.cs` -- Shared utilities: file extension removal, website prefix/postfix stripping, torrent suffix cleaning
+- `/packages/praxrr-parser/Parsers/Common/RegexReplace.cs` -- Helper class wrapping `Regex` with replace/tryReplace semantics
+- `/packages/praxrr-parser/Parsers/TitleParser.cs` -- Movie title extraction: 10 title regex patterns, edition, IMDB/TMDB ID, hardcoded subs, alternative titles (AKA), hashed release rejection, reversed title detection
+- `/packages/praxrr-parser/Parsers/QualityParser.cs` -- Source/resolution/modifier/revision extraction: source regex (26 named groups), resolution regex, BRDISK detection, anime patterns, codec detection
+- `/packages/praxrr-parser/Parsers/LanguageParser.cs` -- Language detection: string contains checks (34 languages) + 2 regex patterns (case-insensitive and case-sensitive) with 29 named groups each + German DL/ML special handling
+- `/packages/praxrr-parser/Parsers/EpisodeParser.cs` -- Episode/season extraction: 38 regex patterns for episodes, daily shows, anime, season packs, mini-series; date validation, word-to-number conversion
+- `/packages/praxrr-parser/Parsers/ReleaseGroupParser.cs` -- Release group extraction: main regex, anime regex, exception groups (exact + pattern), invalid group filtering, cleanup regex
 
 **Logging (5 files):**
 
-- `/src/services/parser/Logging/Logger.cs` -- Console (ANSI colored) + file (JSON NDJSON) logger with daily rotation
-- `/src/services/parser/Logging/LogSettings.cs` -- Config loader from appsettings.json + env vars
-- `/src/services/parser/Logging/Colors.cs` -- ANSI escape code constants
-- `/src/services/parser/Logging/Types.cs` -- `LogLevel` enum, `LogOptions`, `LogEntry`, `LoggerConfig`
-- `/src/services/parser/Logging/Startup.cs` -- Docker detection, server info logging
+- `/packages/praxrr-parser/Logging/Logger.cs` -- Console (ANSI colored) + file (JSON NDJSON) logger with daily rotation
+- `/packages/praxrr-parser/Logging/LogSettings.cs` -- Config loader from appsettings.json + env vars
+- `/packages/praxrr-parser/Logging/Colors.cs` -- ANSI escape code constants
+- `/packages/praxrr-parser/Logging/Types.cs` -- `LogLevel` enum, `LogOptions`, `LogEntry`, `LoggerConfig`
+- `/packages/praxrr-parser/Logging/Startup.cs` -- Docker detection, server info logging
 
 ### TypeScript Integration Points
 
 The SvelteKit app communicates with the parser via HTTP. Integration is centralized in `$arr/parser/`.
 
-- `/src/lib/server/utils/arr/parser/client.ts` -- `ParserClient` extends `BaseHttpClient`; exports `parse()`, `parseQuality()`, `isParserHealthy()`, `getParserVersion()`, `parseWithCache()`, `parseWithCacheBatch()`, `matchPatterns()`, `matchPatternsBatch()`
-- `/src/lib/server/utils/arr/parser/types.ts` -- TypeScript enums and interfaces mirroring C# models
-- `/src/lib/server/utils/arr/parser/index.ts` -- Re-exports all client functions and types
-- `/src/lib/server/utils/parser/spawn.ts` -- Auto-spawns parser binary for standalone builds; detects Docker vs bare-metal, finds binary next to executable, allocates free port, streams output, handles SIGINT/SIGTERM cleanup
-- `/src/lib/server/utils/config/config.ts` -- Constructs `parserUrl` from `PARSER_HOST` and `PARSER_PORT` env vars (defaults: `localhost:5000`)
+- `/packages/praxrr-app/src/lib/server/utils/arr/parser/client.ts` -- `ParserClient` extends `BaseHttpClient`; exports `parse()`, `parseQuality()`, `isParserHealthy()`, `getParserVersion()`, `parseWithCache()`, `parseWithCacheBatch()`, `matchPatterns()`, `matchPatternsBatch()`
+- `/packages/praxrr-app/src/lib/server/utils/arr/parser/types.ts` -- TypeScript enums and interfaces mirroring C# models
+- `/packages/praxrr-app/src/lib/server/utils/arr/parser/index.ts` -- Re-exports all client functions and types
+- `/packages/praxrr-app/src/lib/server/utils/parser/spawn.ts` -- Auto-spawns parser binary for standalone builds; detects Docker vs bare-metal, finds binary next to executable, allocates free port, streams output, handles SIGINT/SIGTERM cleanup
+- `/packages/praxrr-app/src/lib/server/utils/config/config.ts` -- Constructs `parserUrl` from `PARSER_HOST` and `PARSER_PORT` env vars (defaults: `localhost:5000`)
 
 **Consumers of parser API:**
 
-- `/src/hooks.server.ts` -- Imports `spawn.ts` as first action (auto-spawn before config loads)
-- `/src/routes/api/v1/entity-testing/evaluate/+server.ts` -- Batch parse + pattern match for CF evaluation
-- `/src/routes/custom-formats/[databaseId]/[id]/testing/+page.server.ts` -- CF test evaluation with parse + evaluate
-- `/src/routes/quality-profiles/entity-testing/[databaseId]/+page.server.ts` -- Checks `isParserHealthy()` for UI status
-- `/src/routes/api/regex101/[id]/+server.ts` -- Fetches regex101 data, runs patterns through parser `/match` endpoint
-- `/src/lib/server/pcd/entities/customFormats/evaluator.ts` -- Evaluates CF conditions using `ParseResult` and pattern matches
+- `/packages/praxrr-app/src/hooks.server.ts` -- Imports `spawn.ts` as first action (auto-spawn before config loads)
+- `/packages/praxrr-app/src/routes/api/v1/entity-testing/evaluate/+server.ts` -- Batch parse + pattern match for CF evaluation
+- `/packages/praxrr-app/src/routes/custom-formats/[databaseId]/[id]/testing/+page.server.ts` -- CF test evaluation with parse + evaluate
+- `/packages/praxrr-app/src/routes/quality-profiles/entity-testing/[databaseId]/+page.server.ts` -- Checks `isParserHealthy()` for UI status
+- `/packages/praxrr-app/src/routes/api/regex101/[id]/+server.ts` -- Fetches regex101 data, runs patterns through parser `/match` endpoint
+- `/packages/praxrr-app/src/lib/server/pcd/entities/customFormats/evaluator.ts` -- Evaluates CF conditions using `ParseResult` and pattern matches
 
 ### Docker and CI/CD
 
@@ -85,9 +85,9 @@ The SvelteKit app communicates with the parser via HTTP. Integration is centrali
 
 ### Caching Layer
 
-- `/src/lib/server/db/queries/parsedReleaseCache.ts` -- SQLite cache for parse results, keyed by `title:type`, invalidated by `parser_version`
-- `/src/lib/server/db/queries/patternMatchCache.ts` -- SQLite cache for pattern match results, keyed by `title` + `patterns_hash` (SHA-256 of sorted patterns)
-- `/src/lib/server/db/migrations/021_create_parsed_release_cache.ts` -- Migration creating the cache table
+- `/packages/praxrr-app/src/lib/server/db/queries/parsedReleaseCache.ts` -- SQLite cache for parse results, keyed by `title:type`, invalidated by `parser_version`
+- `/packages/praxrr-app/src/lib/server/db/queries/patternMatchCache.ts` -- SQLite cache for pattern match results, keyed by `title` + `patterns_hash` (SHA-256 of sorted patterns)
+- `/packages/praxrr-app/src/lib/server/db/migrations/021_create_parsed_release_cache.ts` -- Migration creating the cache table
 
 ---
 
@@ -669,7 +669,7 @@ praxrr-parser-go/
 - `server/` package handles HTTP concerns only
 - `logging/` is a thin wrapper (Go's `slog` or `log/slog` from stdlib would suffice)
 - All regex patterns compiled at package `init()` time, fail-fast on startup
-- The repo can live as a subdirectory within the praxrr monorepo at `src/services/parser-go/` or as a separate repository -- a decision for the project owner
+- The repo can live as a subdirectory within the praxrr monorepo at `packages/praxrr-parser-go/` or as a separate repository -- a decision for the project owner
 
 ### Cross-Compilation
 
@@ -749,8 +749,8 @@ Replace .NET build steps with Go build steps:
 
 - name: Build parser
   run: |
-    rm -f src/services/parser/Directory.Build.props
-    dotnet publish src/services/parser/Parser.csproj \
+    rm -f packages/praxrr-parser/Directory.Build.props
+    dotnet publish packages/praxrr-parser/Parser.csproj \
       -c Release -r ${{ matrix.dotnet_rid }} --self-contained \
       -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true \
       -o dist/parser-out
@@ -766,7 +766,7 @@ Replace .NET build steps with Go build steps:
 
 - name: Build parser
   run: |
-    cd src/services/parser-go
+    cd packages/praxrr-parser-go
     GOOS=${{ matrix.go_os }} GOARCH=${{ matrix.go_arch }} CGO_ENABLED=0 \
       go build -ldflags="-s -w -X main.version=${{ steps.version.outputs.value }}" \
       -o $GITHUB_WORKSPACE/dist/parser-out/praxrr-parser${{ matrix.binary_ext }} .
@@ -784,7 +784,7 @@ Replace .NET build steps with Go build steps:
 
 #### `deno.json` tasks
 
-- `dev:parser` changes from `cd src/services/parser && dotnet watch run --urls http://localhost:5000` to `cd src/services/parser-go && go run . --port 5000` (or use `air` for hot-reload)
+- `dev:parser` changes from `cd packages/praxrr-parser && dotnet watch run --urls http://localhost:5000` to `cd packages/praxrr-parser-go && go run . --port 5000` (or use `air` for hot-reload)
 - `build:standalone` and `build:standalone:windows` replace `dotnet publish` commands with `go build` commands
 - All other tasks remain unchanged
 
@@ -796,37 +796,37 @@ Replace .NET build steps with Go build steps:
 
 | File                                            | Description                      |
 | ----------------------------------------------- | -------------------------------- |
-| `src/services/parser-go/go.mod`                 | Go module definition             |
-| `src/services/parser-go/go.sum`                 | Go dependency checksums          |
-| `src/services/parser-go/main.go`                | Entry point                      |
-| `src/services/parser-go/server/server.go`       | HTTP server                      |
-| `src/services/parser-go/server/handlers.go`     | Request handlers                 |
-| `src/services/parser-go/parser/parser.go`       | Parse orchestrator               |
-| `src/services/parser-go/parser/title.go`        | Title parser                     |
-| `src/services/parser-go/parser/quality.go`      | Quality parser                   |
-| `src/services/parser-go/parser/language.go`     | Language parser                  |
-| `src/services/parser-go/parser/episode.go`      | Episode parser                   |
-| `src/services/parser-go/parser/releasegroup.go` | Release group parser             |
-| `src/services/parser-go/parser/common.go`       | Common utilities                 |
-| `src/services/parser-go/parser/matcher.go`      | Pattern matcher                  |
-| `src/services/parser-go/models/types.go`        | Enums and types                  |
-| `src/services/parser-go/models/request.go`      | Request DTOs                     |
-| `src/services/parser-go/models/response.go`     | Response DTOs                    |
-| `src/services/parser-go/logging/logger.go`      | Logger                           |
-| `src/services/parser-go/parser/*_test.go`       | Unit tests (one per parser file) |
-| `src/services/parser-go/Dockerfile`             | New Go-based Dockerfile          |
-| `src/services/parser-go/Makefile`               | Build targets                    |
+| `packages/praxrr-parser-go/go.mod`                 | Go module definition             |
+| `packages/praxrr-parser-go/go.sum`                 | Go dependency checksums          |
+| `packages/praxrr-parser-go/main.go`                | Entry point                      |
+| `packages/praxrr-parser-go/server/server.go`       | HTTP server                      |
+| `packages/praxrr-parser-go/server/handlers.go`     | Request handlers                 |
+| `packages/praxrr-parser-go/parser/parser.go`       | Parse orchestrator               |
+| `packages/praxrr-parser-go/parser/title.go`        | Title parser                     |
+| `packages/praxrr-parser-go/parser/quality.go`      | Quality parser                   |
+| `packages/praxrr-parser-go/parser/language.go`     | Language parser                  |
+| `packages/praxrr-parser-go/parser/episode.go`      | Episode parser                   |
+| `packages/praxrr-parser-go/parser/releasegroup.go` | Release group parser             |
+| `packages/praxrr-parser-go/parser/common.go`       | Common utilities                 |
+| `packages/praxrr-parser-go/parser/matcher.go`      | Pattern matcher                  |
+| `packages/praxrr-parser-go/models/types.go`        | Enums and types                  |
+| `packages/praxrr-parser-go/models/request.go`      | Request DTOs                     |
+| `packages/praxrr-parser-go/models/response.go`     | Response DTOs                    |
+| `packages/praxrr-parser-go/logging/logger.go`      | Logger                           |
+| `packages/praxrr-parser-go/parser/*_test.go`       | Unit tests (one per parser file) |
+| `packages/praxrr-parser-go/Dockerfile`             | New Go-based Dockerfile          |
+| `packages/praxrr-parser-go/Makefile`               | Build targets                    |
 
 ### Files to Modify
 
 | File                                    | Change                                                                                                  |
 | --------------------------------------- | ------------------------------------------------------------------------------------------------------- |
-| `/Dockerfile.parser`                    | Replace .NET build with Go build (or point to `src/services/parser-go/Dockerfile`)                      |
+| `/Dockerfile.parser`                    | Replace .NET build with Go build (or point to `packages/praxrr-parser-go/Dockerfile`)                      |
 | `/.github/workflows/release.yml`        | Replace `setup-dotnet` with `setup-go`; replace `dotnet publish` with `go build`; update matrix columns |
 | `/.github/workflows/docker.yml`         | Update `Dockerfile.parser` path if moved                                                                |
 | `/deno.json`                            | Update `dev:parser`, `build:standalone`, `build:standalone:windows` tasks                               |
 | `/scripts/dev.ts`                       | Change `isDotnetAvailable()` to check for Go toolchain; update `runParser()` to use `go run`            |
-| `/src/lib/server/utils/parser/spawn.ts` | No changes needed (looks for `praxrr-parser` binary by name, which stays the same)                      |
+| `/packages/praxrr-app/src/lib/server/utils/parser/spawn.ts` | No changes needed (looks for `praxrr-parser` binary by name, which stays the same)                      |
 | `/compose.dev.yml`                      | No changes needed (uses `Dockerfile.parser`)                                                            |
 | `/compose.yml`                          | No changes needed (uses image from GHCR)                                                                |
 
@@ -834,9 +834,9 @@ Replace .NET build steps with Go build steps:
 
 | File                                        | Reason                                |
 | ------------------------------------------- | ------------------------------------- |
-| `src/services/parser/` (entire directory)   | Replaced by `src/services/parser-go/` |
-| `src/services/parser/Directory.Build.props` | .NET-specific                         |
-| `src/services/parser/Parser.csproj`         | .NET-specific                         |
+| `packages/praxrr-parser/` (entire directory)   | Replaced by `packages/praxrr-parser-go/` |
+| `packages/praxrr-parser/Directory.Build.props` | .NET-specific                         |
+| `packages/praxrr-parser/Parser.csproj`         | .NET-specific                         |
 
 **Note:** Keep the .NET parser directory during the transition period. Both parsers can coexist: the TypeScript client does not care which binary responds on port 5000.
 
@@ -896,12 +896,12 @@ Replace .NET build steps with Go build steps:
 
 **Options:**
 
-- A) Subdirectory within praxrr monorepo: `src/services/parser-go/`
+- A) Subdirectory within praxrr monorepo: `packages/praxrr-parser-go/`
 - B) Separate repository: `github.com/yandy-r/praxrr-parser-go`
 
 **Recommendation:** A -- Subdirectory.
 
-**Rationale:** The parser is tightly coupled to the praxrr release cycle, CI/CD, and Docker workflow. A separate repository would require cross-repo versioning, release coordination, and submodule or dependency management. The current .NET parser lives at `src/services/parser/` and the Go version can follow the same pattern.
+**Rationale:** The parser is tightly coupled to the praxrr release cycle, CI/CD, and Docker workflow. A separate repository would require cross-repo versioning, release coordination, and submodule or dependency management. The current .NET parser lives at `packages/praxrr-parser/` and the Go version can follow the same pattern.
 
 ### Decision 6: Logging
 
@@ -931,7 +931,7 @@ Replace .NET build steps with Go build steps:
 
 ## Open Questions
 
-1. **Repository location.** Should the Go parser live at `src/services/parser-go/` within the monorepo or as a separate Go module? (Recommendation: monorepo subdirectory, but confirm with project owner.)
+1. **Repository location.** Should the Go parser live at `packages/praxrr-parser-go/` within the monorepo or as a separate Go module? (Recommendation: monorepo subdirectory, but confirm with project owner.)
 
 2. **Test corpus.** The .NET parser has no unit test files in the repository. Should the Go rewrite include a test corpus derived from known release title formats? This is strongly recommended to validate behavioral parity. Radarr/Sonarr source code has extensive parser tests that could be adapted.
 

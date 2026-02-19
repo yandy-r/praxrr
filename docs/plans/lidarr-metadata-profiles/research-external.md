@@ -222,7 +222,7 @@ There is no published TypeScript or JavaScript client library for the Lidarr API
 
 #### 1. Extend LidarrClient with Metadata Profile Methods
 
-Add CRUD methods to the existing `LidarrClient` class at `src/lib/server/utils/arr/clients/lidarr.ts`:
+Add CRUD methods to the existing `LidarrClient` class at `packages/praxrr-app/src/lib/server/utils/arr/clients/lidarr.ts`:
 
 ```typescript
 // In LidarrClient class
@@ -252,7 +252,7 @@ deleteMetadataProfile(id: number): Promise<void> {
 }
 ```
 
-#### 2. Add TypeScript Types to `src/lib/server/utils/arr/types.ts`
+#### 2. Add TypeScript Types to `packages/praxrr-app/src/lib/server/utils/arr/types.ts`
 
 ```typescript
 // =============================================================================
@@ -321,7 +321,7 @@ export interface LidarrMetadataProfile {
 }
 ```
 
-#### 3. Add Static Mappings to `src/lib/server/sync/mappings.ts`
+#### 3. Add Static Mappings to `packages/praxrr-app/src/lib/server/sync/mappings.ts`
 
 ```typescript
 // =============================================================================
@@ -616,16 +616,16 @@ Lidarr's type system is derived from MusicBrainz but is not identical:
 
 ### Current LidarrClient Location
 
-- **File**: `src/lib/server/utils/arr/clients/lidarr.ts`
-- **Base class**: `BaseArrClient` (at `src/lib/server/utils/arr/base.ts`)
-- **Types**: `src/lib/server/utils/arr/types.ts`
-- **Factory**: `src/lib/server/utils/arr/factory.ts`
+- **File**: `packages/praxrr-app/src/lib/server/utils/arr/clients/lidarr.ts`
+- **Base class**: `BaseArrClient` (at `packages/praxrr-app/src/lib/server/utils/arr/base.ts`)
+- **Types**: `packages/praxrr-app/src/lib/server/utils/arr/types.ts`
+- **Factory**: `packages/praxrr-app/src/lib/server/utils/arr/factory.ts`
 
 ### Current Sync Architecture
 
 - **Section types**: `qualityProfiles | delayProfiles | mediaManagement`
-- **Mappings**: `src/lib/server/sync/mappings.ts`
-- **Section dispatch**: `src/lib/server/sync/types.ts` (`SectionType` union)
+- **Mappings**: `packages/praxrr-app/src/lib/server/sync/mappings.ts`
+- **Section dispatch**: `packages/praxrr-app/src/lib/server/sync/types.ts` (`SectionType` union)
 - **Supported sections**: Gated per `arr_type` in `SUPPORTED_SYNC_SECTIONS`
 
 ### Relevant CLAUDE.md Policies

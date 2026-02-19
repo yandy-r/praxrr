@@ -8,7 +8,7 @@
  *   deno task test:e2e:headed -- 1.12,1.15
  */
 
-const SPEC_DIR = 'src/tests/e2e/specs';
+const SPEC_DIR = 'packages/praxrr-app/src/tests/e2e/specs';
 
 const rawArgs = [...Deno.args];
 const playwrightArgs: string[] = [];

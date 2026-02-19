@@ -6,17 +6,17 @@ Current library loading is a single bulk fetch on both server and client, then i
 
 ### Architecture Approach
 
-- Backend route (`src/routes/api/v1/arr/library/+server.ts`):
+- Backend route (`packages/praxrr-app/src/routes/api/v1/arr/library/+server.ts`):
   - Add query params: `page`, `pageSize`, optional `query`, `sortKey`, `sortDirection`, and selected filters.
   - Return a paginated envelope with existing app-specific item arrays.
   - Keep app-specific fetch/join logic in Arr clients, but slice/filter server-side before response.
-- Frontend route (`src/routes/arr/[id]/library/+page.svelte`):
+- Frontend route (`packages/praxrr-app/src/routes/arr/[id]/library/+page.svelte`):
   - Move from single `library` array assumptions to page state plus current-page items.
   - Preserve existing column toggle stores and action bar behaviors.
   - Optionally layer lazy page loading with a sentinel after baseline fixed pagination works.
 - Cache stores:
   - Server cache key currently `library:${instanceId}` should become pagination-aware.
-  - Client cache in `src/lib/client/stores/libraryCache.ts` should key by instance and query state.
+  - Client cache in `packages/praxrr-app/src/lib/client/stores/libraryCache.ts` should key by instance and query state.
 
 ### Data Model Implications
 
@@ -60,14 +60,14 @@ Current library loading is a single bulk fetch on both server and client, then i
 ### File-Level Impact Preview
 
 - Likely modify:
-  - `src/routes/api/v1/arr/library/+server.ts`
-  - `src/routes/arr/[id]/library/+page.svelte`
-  - `src/lib/client/stores/libraryCache.ts`
+  - `packages/praxrr-app/src/routes/api/v1/arr/library/+server.ts`
+  - `packages/praxrr-app/src/routes/arr/[id]/library/+page.svelte`
+  - `packages/praxrr-app/src/lib/client/stores/libraryCache.ts`
   - `docs/api/v1/schemas/arr.yaml`
   - `docs/api/v1/paths/arr.yaml`
-  - generated API types surface (`src/lib/server/api/v1.d.ts` or generation source)
+  - generated API types surface (`packages/praxrr-app/src/lib/server/api/v1.d.ts` or generation source)
 - Likely review/adjust:
-  - `src/lib/server/utils/arr/clients/radarr.ts`
-  - `src/lib/server/utils/arr/clients/sonarr.ts`
-  - `src/lib/server/utils/arr/clients/lidarr.ts`
-  - `src/routes/arr/[id]/logs/+page.svelte` (for reusable pagination interaction pattern)
+  - `packages/praxrr-app/src/lib/server/utils/arr/clients/radarr.ts`
+  - `packages/praxrr-app/src/lib/server/utils/arr/clients/sonarr.ts`
+  - `packages/praxrr-app/src/lib/server/utils/arr/clients/lidarr.ts`
+  - `packages/praxrr-app/src/routes/arr/[id]/logs/+page.svelte` (for reusable pagination interaction pattern)

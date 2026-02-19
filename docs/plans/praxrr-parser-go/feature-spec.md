@@ -222,11 +222,11 @@ The parser is a minimal ASP.NET Core 8 web application with **no external NuGet 
 | ------------------ | --------------------------------------------------------------------- | ------------------------------------------------- |
 | Parse/Match client | `$arr/parser/client.ts`                                               | `ParserClient.parse()`, `match()`, `matchBatch()` |
 | Health check       | `$arr/parser/client.ts`                                               | `isParserHealthy()` via `health()`                |
-| CF testing page    | `src/routes/custom-formats/[databaseId]/[id]/testing/+page.server.ts` | Direct parse calls                                |
-| Entity testing API | `src/routes/api/v1/entity-testing/evaluate/+server.ts`                | Batch parse + pattern match                       |
-| regex101 API       | `src/routes/api/regex101/[id]/+server.ts`                             | Pattern matching                                  |
+| CF testing page    | `packages/praxrr-app/src/routes/custom-formats/[databaseId]/[id]/testing/+page.server.ts` | Direct parse calls                                |
+| Entity testing API | `packages/praxrr-app/src/routes/api/v1/entity-testing/evaluate/+server.ts`                | Batch parse + pattern match                       |
+| regex101 API       | `packages/praxrr-app/src/routes/api/regex101/[id]/+server.ts`                             | Pattern matching                                  |
 | CF evaluator       | `$pcd/entities/customFormats/evaluator.ts`                            | Consumes ParseResult                              |
-| Auto-spawn         | `src/lib/server/utils/parser/spawn.ts`                                | Standalone binary auto-spawn                      |
+| Auto-spawn         | `packages/praxrr-app/src/lib/server/utils/parser/spawn.ts`                                | Standalone binary auto-spawn                      |
 
 #### Configuration
 
@@ -356,7 +356,7 @@ Research identified two viable approaches with distinct trade-offs:
 | HTTP framework      | `net/http` (stdlib, Go 1.22+)    | 4 endpoints, no middleware needed                                 |
 | JSON                | `encoding/json` (stdlib)         | Payloads <1KB, not the bottleneck                                 |
 | Batch concurrency   | Worker pool (`runtime.NumCPU()`) | Matches .NET `Parallel.ForEach` behavior                          |
-| Repository location | `src/services/parser-go/`        | Same pattern as current `src/services/parser/`                    |
+| Repository location | `packages/praxrr-parser-go/`        | Same pattern as current `packages/praxrr-parser/`                    |
 | Logging             | `log/slog` (stdlib, Go 1.21+)    | Minimal needs, built-in JSON + text output                        |
 | ReDoS protection    | `regexp2.MatchTimeout` (100ms)   | Direct equivalent of .NET `TimeSpan.FromMilliseconds(100)`        |
 
@@ -420,7 +420,7 @@ Research identified two viable approaches with distinct trade-offs:
 **Dependencies**: Phase 1 fixtures must be ready
 **Tasks**:
 
-- Set up Go module with `regexp2` dependency at `src/services/parser-go/`
+- Set up Go module with `regexp2` dependency at `packages/praxrr-parser-go/`
 - Port `ParserCommon` (file extension removal, website cleaning)
 - Port `QualityParser` (source, resolution, modifier, revision)
 - Port `LanguageParser` (58 languages, German DL/ML special handling)
@@ -473,7 +473,7 @@ Before proceeding to implementation planning, clarify:
    - Recommendation: Audit PCD database patterns first, but default to .NET parity
 
 3. **Repository Structure**
-   - Options: (A) `src/services/parser-go/` in monorepo, (B) Separate repository
+   - Options: (A) `packages/praxrr-parser-go/` in monorepo, (B) Separate repository
    - Impact: Monorepo keeps CI/CD simple; separate repo adds versioning complexity
    - Recommendation: (A) monorepo subdirectory
 

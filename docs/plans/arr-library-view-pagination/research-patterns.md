@@ -4,20 +4,20 @@
 
 **Page-Orchestrator Pattern**: The library route centralizes page state (loading/errors/search/filters/cache refresh) and delegates UI rendering to focused child components.
 
-- Example: `src/routes/arr/[id]/library/+page.svelte`
+- Example: `packages/praxrr-app/src/routes/arr/[id]/library/+page.svelte`
 
 **API Aggregation + Arr-Type Dispatch Pattern**: One API handler validates request input, dispatches by Arr instance type, enriches upstream data, and returns a normalized envelope.
 
-- Example: `src/routes/api/v1/arr/library/+server.ts`
+- Example: `packages/praxrr-app/src/routes/api/v1/arr/library/+server.ts`
 
 **Shared Table + App-Specific Rows Pattern**: A common table wrapper renders shared interactions while app-specific row components render domain details.
 
-- Example: `src/lib/client/ui/table/ExpandableTable.svelte`
+- Example: `packages/praxrr-app/src/lib/client/ui/table/ExpandableTable.svelte`
 
 **Persistent State Store Pattern**: Search and page-level view state are persisted through dedicated stores and local storage keys to survive reload/navigation.
 
-- Example: `src/lib/client/stores/search.ts`
-- Example: `src/lib/client/stores/dataPage.ts`
+- Example: `packages/praxrr-app/src/lib/client/stores/search.ts`
+- Example: `packages/praxrr-app/src/lib/client/stores/dataPage.ts`
 
 ## Code Conventions
 
@@ -31,11 +31,11 @@ The library API route performs fast input validation and returns explicit HTTP s
 
 Backend parity and error behavior are tested with Deno tests that patch upstream Arr clients and assert response shape/status behavior.
 
-- Example: `src/tests/base/lidarrApiParity.test.ts`
+- Example: `packages/praxrr-app/src/tests/base/lidarrApiParity.test.ts`
 
 UI behavior is covered with E2E specs that route API calls, assert rendered library data, and validate user feedback behavior for supported/unsupported flows.
 
-- Example: `src/tests/e2e/specs/2.40-lidarr-core-flow.spec.ts`
+- Example: `packages/praxrr-app/src/tests/e2e/specs/2.40-lidarr-core-flow.spec.ts`
 
 ## Patterns to Follow
 

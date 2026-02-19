@@ -12,29 +12,29 @@ Lidarr metadata profiles should be implemented as a dedicated Lidarr-only entity
 
 ## Critical Files Reference
 
-- `src/lib/server/db/migrations.ts`: Registers new migration files into runtime migrator.
-- `src/lib/server/db/schema.sql`: App DB schema source for `arr_sync_*` config/status tables.
+- `packages/praxrr-app/src/lib/server/db/migrations.ts`: Registers new migration files into runtime migrator.
+- `packages/praxrr-app/src/lib/server/db/schema.sql`: App DB schema source for `arr_sync_*` config/status tables.
 - `docs/pcdReference/0.schema.sql`: PCD base schema reference used by generated PCD types.
-- `src/lib/shared/pcd/types.ts`: Generated table interfaces and DB typing for PCD cache access.
-- `src/lib/shared/pcd/portable.ts`: Portable entity definitions and import/export type catalog.
-- `src/lib/server/pcd/entities/registry.ts`: Auto-align entity registry and stable key metadata mapping.
-- `src/lib/server/pcd/ops/seedBuiltInBaseOps.ts`: Built-in schema/base-op seeding for new databases.
-- `src/lib/server/db/queries/arrSync.ts`: Sync config read/write and lifecycle operations.
-- `src/lib/server/sync/types.ts`: Section contracts and per-instance sync result typing.
-- `src/lib/server/sync/mappings.ts`: Section order and per-Arr supported section matrix.
-- `src/lib/server/sync/processor.ts`: Schedules, claims, executes, and finalizes section sync runs.
-- `src/lib/server/utils/arr/clients/lidarr.ts`: Lidarr v1 API surface and extension point for metadata profile methods.
-- `src/routes/arr/[id]/sync/+page.server.ts`: Sync configuration load/actions for Arr instance settings.
-- `src/routes/api/v1/pcd/import/+server.ts`: Portable import flow and entity-type routing.
-- `src/routes/api/v1/pcd/export/+server.ts`: Portable export flow and entity-type routing.
+- `packages/praxrr-app/src/lib/shared/pcd/types.ts`: Generated table interfaces and DB typing for PCD cache access.
+- `packages/praxrr-app/src/lib/shared/pcd/portable.ts`: Portable entity definitions and import/export type catalog.
+- `packages/praxrr-app/src/lib/server/pcd/entities/registry.ts`: Auto-align entity registry and stable key metadata mapping.
+- `packages/praxrr-app/src/lib/server/pcd/ops/seedBuiltInBaseOps.ts`: Built-in schema/base-op seeding for new databases.
+- `packages/praxrr-app/src/lib/server/db/queries/arrSync.ts`: Sync config read/write and lifecycle operations.
+- `packages/praxrr-app/src/lib/server/sync/types.ts`: Section contracts and per-instance sync result typing.
+- `packages/praxrr-app/src/lib/server/sync/mappings.ts`: Section order and per-Arr supported section matrix.
+- `packages/praxrr-app/src/lib/server/sync/processor.ts`: Schedules, claims, executes, and finalizes section sync runs.
+- `packages/praxrr-app/src/lib/server/utils/arr/clients/lidarr.ts`: Lidarr v1 API surface and extension point for metadata profile methods.
+- `packages/praxrr-app/src/routes/arr/[id]/sync/+page.server.ts`: Sync configuration load/actions for Arr instance settings.
+- `packages/praxrr-app/src/routes/api/v1/pcd/import/+server.ts`: Portable import flow and entity-type routing.
+- `packages/praxrr-app/src/routes/api/v1/pcd/export/+server.ts`: Portable export flow and entity-type routing.
 
 ## Patterns to Follow
 
-- **PCD Write Operation Pattern**: Keep CRUD changes funneled through `writeOperation` metadata for audit/conflict consistency (`src/lib/server/pcd/entities/delayProfiles/create.ts`).
-- **Value Guard Pattern**: Apply guarded updates to prevent blind writes and improve conflict detection (`src/lib/server/pcd/entities/delayProfiles/update.ts`).
-- **Sync Section Handler Pattern**: Implement `SectionHandler` methods in handler files and register by import side-effect (`src/lib/server/sync/delayProfiles/handler.ts`).
-- **Arr-Specific Capability Pattern**: Add sync surface capability and gate it explicitly by Arr app in shared capabilities (`src/lib/shared/arr/capabilities.ts`).
-- **Arr-Specific Support Matrix Pattern**: Keep section support explicit by app in `SUPPORTED_SYNC_SECTIONS` with Lidarr-only addition for metadata profiles (`src/lib/server/sync/mappings.ts`).
+- **PCD Write Operation Pattern**: Keep CRUD changes funneled through `writeOperation` metadata for audit/conflict consistency (`packages/praxrr-app/src/lib/server/pcd/entities/delayProfiles/create.ts`).
+- **Value Guard Pattern**: Apply guarded updates to prevent blind writes and improve conflict detection (`packages/praxrr-app/src/lib/server/pcd/entities/delayProfiles/update.ts`).
+- **Sync Section Handler Pattern**: Implement `SectionHandler` methods in handler files and register by import side-effect (`packages/praxrr-app/src/lib/server/sync/delayProfiles/handler.ts`).
+- **Arr-Specific Capability Pattern**: Add sync surface capability and gate it explicitly by Arr app in shared capabilities (`packages/praxrr-app/src/lib/shared/arr/capabilities.ts`).
+- **Arr-Specific Support Matrix Pattern**: Keep section support explicit by app in `SUPPORTED_SYNC_SECTIONS` with Lidarr-only addition for metadata profiles (`packages/praxrr-app/src/lib/server/sync/mappings.ts`).
 
 ## Cross-Cutting Concerns
 
@@ -53,7 +53,7 @@ Lidarr metadata profiles should be implemented as a dedicated Lidarr-only entity
 
 ## Implementation Constraints
 
-- **Technical constraints**: `src/lib/shared/pcd/types.ts` is generated and must be regenerated after schema updates; sync sections require complete `SectionType` and status/query integration.
+- **Technical constraints**: `packages/praxrr-app/src/lib/shared/pcd/types.ts` is generated and must be regenerated after schema updates; sync sections require complete `SectionType` and status/query integration.
 - **Business constraints**: Feature is Lidarr-only; sync should not implicitly delete in-use metadata profiles; profile payloads must include complete type/status structures compatible with Lidarr expectations.
 
 ## Key Recommendations

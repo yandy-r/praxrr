@@ -4,18 +4,18 @@ This initiative replaces Sonarr-backed Lidarr media-management reuse with first-
 
 ## Critically Relevant Files and Documentation
 
-- /src/lib/server/pcd/index.ts: Cache/write orchestration and operation metadata.
-- /src/lib/server/pcd/entities/mediaManagement/naming/read.ts: Current naming read behavior and arr-type shaping.
-- /src/lib/server/pcd/entities/mediaManagement/media-settings/create.ts: Existing deterministic write pattern.
-- /src/lib/server/pcd/entities/mediaManagement/quality-definitions/read.ts: Mapping-dependent quality-definition behavior.
-- /src/lib/server/sync/mediaManagement/syncer.ts: Sync source resolution and Lidarr reuse behavior.
-- /src/lib/server/db/queries/arrSync.ts: Sync config persistence and rename propagation.
-- /src/lib/shared/pcd/portable.ts: Portable entity registration and Lidarr validation matrix.
-- /src/routes/media-management/[databaseId]/media-settings/new/+page.server.ts: Route action validation/dispatch pattern.
-- /src/routes/api/v1/pcd/import/+server.ts: Import validation and deserialization path.
-- /src/routes/api/v1/pcd/export/+server.ts: Export serialization path.
+- /packages/praxrr-app/src/lib/server/pcd/index.ts: Cache/write orchestration and operation metadata.
+- /packages/praxrr-app/src/lib/server/pcd/entities/mediaManagement/naming/read.ts: Current naming read behavior and arr-type shaping.
+- /packages/praxrr-app/src/lib/server/pcd/entities/mediaManagement/media-settings/create.ts: Existing deterministic write pattern.
+- /packages/praxrr-app/src/lib/server/pcd/entities/mediaManagement/quality-definitions/read.ts: Mapping-dependent quality-definition behavior.
+- /packages/praxrr-app/src/lib/server/sync/mediaManagement/syncer.ts: Sync source resolution and Lidarr reuse behavior.
+- /packages/praxrr-app/src/lib/server/db/queries/arrSync.ts: Sync config persistence and rename propagation.
+- /packages/praxrr-app/src/lib/shared/pcd/portable.ts: Portable entity registration and Lidarr validation matrix.
+- /packages/praxrr-app/src/routes/media-management/[databaseId]/media-settings/new/+page.server.ts: Route action validation/dispatch pattern.
+- /packages/praxrr-app/src/routes/api/v1/pcd/import/+server.ts: Import validation and deserialization path.
+- /packages/praxrr-app/src/routes/api/v1/pcd/export/+server.ts: Export serialization path.
 - /docs/pcdReference/0.schema.sql: PCD schema reference for media-management entities.
-- /src/lib/server/db/schema.sql: Runtime schema context for instances and sync tables.
+- /packages/praxrr-app/src/lib/server/db/schema.sql: Runtime schema context for instances and sync tables.
 - /docs/api/v1/schemas/pcd.yaml: Public API schema for portable entity contracts.
 - /docs/ARCHITECTURE.md: Architecture constraints and media-management layering.
 - /docs/plans/enhance-lidarr-support/feature-spec.md: Accepted scope, risks, decisions, and criteria.
@@ -47,19 +47,19 @@ These guardrails are repository-wide policy and apply to all future enhancements
 **READ THESE BEFORE TASK**
 
 - /docs/pcdReference/0.schema.sql
-- /src/lib/server/db/schema.sql
+- /packages/praxrr-app/src/lib/server/db/schema.sql
 - /docs/plans/enhance-lidarr-support/feature-spec.md
 
 **Instructions**
 
 Files to Create
 
-- /src/lib/server/db/migrations/20260215_add_lidarr_media_management_entities.ts
+- /packages/praxrr-app/src/lib/server/db/migrations/20260215_add_lidarr_media_management_entities.ts
 
 Files to Modify
 
 - /docs/pcdReference/0.schema.sql
-- /src/lib/server/db/schema.sql
+- /packages/praxrr-app/src/lib/server/db/schema.sql
 
 Implement dedicated `lidarr_naming`, `lidarr_media_settings`, and `lidarr_quality_definitions` table definitions with indexes/constraints aligned to validated Lidarr semantics; reuse family conventions only where explicit parity is proven. Include deterministic migration logic for legacy Sonarr-backed Lidarr rows and explicit conflict handling semantics. Add `quality_api_mappings` seed/upgrade coverage for `arr_type = 'lidarr'`. Ensure reruns are idempotent and produce stable outcomes.
 
@@ -67,9 +67,9 @@ Implement dedicated `lidarr_naming`, `lidarr_media_settings`, and `lidarr_qualit
 
 **READ THESE BEFORE TASK**
 
-- /src/lib/shared/pcd/portable.ts
+- /packages/praxrr-app/src/lib/shared/pcd/portable.ts
 - /docs/api/v1/schemas/pcd.yaml
-- /src/routes/api/v1/pcd/import/+server.ts
+- /packages/praxrr-app/src/routes/api/v1/pcd/import/+server.ts
 
 **Instructions**
 
@@ -79,7 +79,7 @@ Files to Create
 
 Files to Modify
 
-- /src/lib/shared/pcd/portable.ts
+- /packages/praxrr-app/src/lib/shared/pcd/portable.ts
 - /docs/api/v1/schemas/pcd.yaml
 
 Register `lidarr_*` entity families as first-class portable types, update validation matrices and type mappings, and align OpenAPI schema definitions accordingly. Keep import/export payload expectations deterministic and fail-fast for invalid cross-family payload mixes. Capture explicit legacy alias behavior (if retained temporarily) in mapping notes.
@@ -88,20 +88,20 @@ Register `lidarr_*` entity families as first-class portable types, update valida
 
 **READ THESE BEFORE TASK**
 
-- /src/lib/server/db/queries/arrSync.ts
-- /src/lib/server/db/schema.sql
+- /packages/praxrr-app/src/lib/server/db/queries/arrSync.ts
+- /packages/praxrr-app/src/lib/server/db/schema.sql
 - /docs/plans/enhance-lidarr-support/analysis-code.md
 
 **Instructions**
 
 Files to Create
 
-- /src/tests/jobs/arrSyncLidarrConfigPropagation.test.ts
+- /packages/praxrr-app/src/tests/jobs/arrSyncLidarrConfigPropagation.test.ts
 
 Files to Modify
 
-- /src/lib/server/db/queries/arrSync.ts
-- /src/lib/server/db/schema.sql
+- /packages/praxrr-app/src/lib/server/db/queries/arrSync.ts
+- /packages/praxrr-app/src/lib/server/db/schema.sql
 
 Extend `arrSync` helper behavior to ensure Lidarr config names and migration outcomes remain deterministic after first-class table cutover. Validate rename/update helper coverage for naming, media settings, and quality definitions. Add focused query-level test coverage for Lidarr config propagation semantics.
 
@@ -111,21 +111,21 @@ Extend `arrSync` helper behavior to ensure Lidarr config names and migration out
 
 **READ THESE BEFORE TASK**
 
-- /src/lib/server/pcd/entities/mediaManagement/naming/read.ts
-- /src/lib/server/pcd/entities/mediaManagement/naming/create.ts
-- /src/lib/server/pcd/entities/mediaManagement/naming/update.ts
+- /packages/praxrr-app/src/lib/server/pcd/entities/mediaManagement/naming/read.ts
+- /packages/praxrr-app/src/lib/server/pcd/entities/mediaManagement/naming/create.ts
+- /packages/praxrr-app/src/lib/server/pcd/entities/mediaManagement/naming/update.ts
 
 **Instructions**
 
 Files to Create
 
-- /src/tests/arr/lidarrNamingEntityOperations.test.ts
+- /packages/praxrr-app/src/tests/arr/lidarrNamingEntityOperations.test.ts
 
 Files to Modify
 
-- /src/lib/server/pcd/entities/mediaManagement/naming/read.ts
-- /src/lib/server/pcd/entities/mediaManagement/naming/create.ts
-- /src/lib/server/pcd/entities/mediaManagement/naming/update.ts
+- /packages/praxrr-app/src/lib/server/pcd/entities/mediaManagement/naming/read.ts
+- /packages/praxrr-app/src/lib/server/pcd/entities/mediaManagement/naming/create.ts
+- /packages/praxrr-app/src/lib/server/pcd/entities/mediaManagement/naming/update.ts
 
 Replace default Sonarr-backed Lidarr naming reuse with dedicated `lidarr_naming` reads/writes while preserving deterministic duplicate handling and write metadata. Ensure list/get behavior no longer duplicates Sonarr rows as Lidarr stand-ins. Add direct tests for create/list/update semantics and error behavior.
 
@@ -133,21 +133,21 @@ Replace default Sonarr-backed Lidarr naming reuse with dedicated `lidarr_naming`
 
 **READ THESE BEFORE TASK**
 
-- /src/lib/server/pcd/entities/mediaManagement/media-settings/read.ts
-- /src/lib/server/pcd/entities/mediaManagement/media-settings/create.ts
-- /src/lib/server/pcd/entities/mediaManagement/media-settings/update.ts
+- /packages/praxrr-app/src/lib/server/pcd/entities/mediaManagement/media-settings/read.ts
+- /packages/praxrr-app/src/lib/server/pcd/entities/mediaManagement/media-settings/create.ts
+- /packages/praxrr-app/src/lib/server/pcd/entities/mediaManagement/media-settings/update.ts
 
 **Instructions**
 
 Files to Create
 
-- /src/tests/arr/lidarrMediaSettingsEntityOperations.test.ts
+- /packages/praxrr-app/src/tests/arr/lidarrMediaSettingsEntityOperations.test.ts
 
 Files to Modify
 
-- /src/lib/server/pcd/entities/mediaManagement/media-settings/read.ts
-- /src/lib/server/pcd/entities/mediaManagement/media-settings/create.ts
-- /src/lib/server/pcd/entities/mediaManagement/media-settings/update.ts
+- /packages/praxrr-app/src/lib/server/pcd/entities/mediaManagement/media-settings/read.ts
+- /packages/praxrr-app/src/lib/server/pcd/entities/mediaManagement/media-settings/create.ts
+- /packages/praxrr-app/src/lib/server/pcd/entities/mediaManagement/media-settings/update.ts
 
 Move Lidarr media-settings operations to dedicated `lidarr_media_settings` storage and remove default Sonarr table reuse branches for create/read/update flows. Preserve existing validation and `writeOperation` metadata structure. Add entity-level tests for success and deterministic validation failures.
 
@@ -155,21 +155,21 @@ Move Lidarr media-settings operations to dedicated `lidarr_media_settings` stora
 
 **READ THESE BEFORE TASK**
 
-- /src/lib/server/pcd/entities/mediaManagement/quality-definitions/read.ts
-- /src/lib/server/pcd/entities/mediaManagement/quality-definitions/create.ts
-- /src/lib/server/pcd/entities/mediaManagement/quality-definitions/update.ts
+- /packages/praxrr-app/src/lib/server/pcd/entities/mediaManagement/quality-definitions/read.ts
+- /packages/praxrr-app/src/lib/server/pcd/entities/mediaManagement/quality-definitions/create.ts
+- /packages/praxrr-app/src/lib/server/pcd/entities/mediaManagement/quality-definitions/update.ts
 
 **Instructions**
 
 Files to Create
 
-- /src/tests/arr/lidarrQualityDefinitionsEntityOperations.test.ts
+- /packages/praxrr-app/src/tests/arr/lidarrQualityDefinitionsEntityOperations.test.ts
 
 Files to Modify
 
-- /src/lib/server/pcd/entities/mediaManagement/quality-definitions/read.ts
-- /src/lib/server/pcd/entities/mediaManagement/quality-definitions/create.ts
-- /src/lib/server/pcd/entities/mediaManagement/quality-definitions/update.ts
+- /packages/praxrr-app/src/lib/server/pcd/entities/mediaManagement/quality-definitions/read.ts
+- /packages/praxrr-app/src/lib/server/pcd/entities/mediaManagement/quality-definitions/create.ts
+- /packages/praxrr-app/src/lib/server/pcd/entities/mediaManagement/quality-definitions/update.ts
 
 Switch Lidarr quality-definition operations to dedicated storage while enforcing mapping-aware validation against Lidarr mappings. Keep explicit errors for unmapped entries and maintain deterministic ordering/normalization behavior. Add tests covering mapped/unmapped scenarios and duplicate collision behavior.
 
@@ -177,23 +177,23 @@ Switch Lidarr quality-definition operations to dedicated storage while enforcing
 
 **READ THESE BEFORE TASK**
 
-- /src/routes/media-management/[databaseId]/media-settings/new/+page.server.ts
-- /src/routes/api/v1/pcd/import/+server.ts
-- /src/routes/api/v1/pcd/export/+server.ts
-- /src/lib/server/sync/mediaManagement/syncer.ts
+- /packages/praxrr-app/src/routes/media-management/[databaseId]/media-settings/new/+page.server.ts
+- /packages/praxrr-app/src/routes/api/v1/pcd/import/+server.ts
+- /packages/praxrr-app/src/routes/api/v1/pcd/export/+server.ts
+- /packages/praxrr-app/src/lib/server/sync/mediaManagement/syncer.ts
 
 **Instructions**
 
 Files to Create
 
-- /src/tests/arr/lidarrFirstClassRouteAndSyncCutover.test.ts
+- /packages/praxrr-app/src/tests/arr/lidarrFirstClassRouteAndSyncCutover.test.ts
 
 Files to Modify
 
-- /src/routes/media-management/[databaseId]/media-settings/new/+page.server.ts
-- /src/routes/api/v1/pcd/import/+server.ts
-- /src/routes/api/v1/pcd/export/+server.ts
-- /src/lib/server/sync/mediaManagement/syncer.ts
+- /packages/praxrr-app/src/routes/media-management/[databaseId]/media-settings/new/+page.server.ts
+- /packages/praxrr-app/src/routes/api/v1/pcd/import/+server.ts
+- /packages/praxrr-app/src/routes/api/v1/pcd/export/+server.ts
+- /packages/praxrr-app/src/lib/server/sync/mediaManagement/syncer.ts
 
 Update route dispatch and API entity resolution so `arr_type = 'lidarr'` uses first-class entities end-to-end. Update sync source resolution and logs to remove default reuse-path dependencies. Keep import/export behavior consistent with new portable contracts and verify route + sync integration through focused tests.
 
@@ -203,8 +203,8 @@ Update route dispatch and API entity resolution so `arr_type = 'lidarr'` uses fi
 
 **READ THESE BEFORE TASK**
 
-- /src/lib/server/sync/mediaManagement/syncer.ts
-- /src/lib/server/pcd/entities/mediaManagement/naming/read.ts
+- /packages/praxrr-app/src/lib/server/sync/mediaManagement/syncer.ts
+- /packages/praxrr-app/src/lib/server/pcd/entities/mediaManagement/naming/read.ts
 - /docs/plans/enhance-lidarr-support/feature-spec.md
 
 **Instructions**
@@ -215,9 +215,9 @@ Files to Create
 
 Files to Modify
 
-- /src/lib/server/sync/mediaManagement/syncer.ts
-- /src/lib/server/pcd/entities/mediaManagement/naming/read.ts
-- /src/lib/server/pcd/entities/mediaManagement/media-settings/read.ts
+- /packages/praxrr-app/src/lib/server/sync/mediaManagement/syncer.ts
+- /packages/praxrr-app/src/lib/server/pcd/entities/mediaManagement/naming/read.ts
+- /packages/praxrr-app/src/lib/server/pcd/entities/mediaManagement/media-settings/read.ts
 
 Remove compatibility-only reuse branches once cutover tests pass and migration checks are green. Replace reuse-specific logs/messages with first-class Lidarr diagnostics and document operator migration/rollback steps. Ensure migration semantics remain explicit and deterministic.
 
@@ -225,21 +225,21 @@ Remove compatibility-only reuse branches once cutover tests pass and migration c
 
 **READ THESE BEFORE TASK**
 
-- /src/tests/arr/lidarrMediaManagement.test.ts
-- /src/tests/arr/lidarrQualityMappingPrereqs.test.ts
+- /packages/praxrr-app/src/tests/arr/lidarrMediaManagement.test.ts
+- /packages/praxrr-app/src/tests/arr/lidarrQualityMappingPrereqs.test.ts
 - /docs/plans/enhance-lidarr-support/feature-spec.md
 
 **Instructions**
 
 Files to Create
 
-- /src/tests/arr/lidarrFirstClassMigration.test.ts
+- /packages/praxrr-app/src/tests/arr/lidarrFirstClassMigration.test.ts
 
 Files to Modify
 
-- /src/tests/arr/lidarrMediaManagement.test.ts
-- /src/tests/arr/lidarrQualityMappingPrereqs.test.ts
-- /src/tests/base/lidarrApiParity.test.ts
+- /packages/praxrr-app/src/tests/arr/lidarrMediaManagement.test.ts
+- /packages/praxrr-app/src/tests/arr/lidarrQualityMappingPrereqs.test.ts
+- /packages/praxrr-app/src/tests/base/lidarrApiParity.test.ts
 
 Build regression coverage for first-class Lidarr CRUD/list/edit behavior, import/export contract parity, sync source correctness, and migration idempotency reruns. Assert explicit error codes/messages for mapping and conflict paths. Ensure tests fail against legacy-reuse behavior and pass after cutover.
 

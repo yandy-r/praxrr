@@ -27,19 +27,19 @@ Recommended approach: **Extract nav data into a typed registry, introduce lightw
 
 | File                                                      | Role                                                                                  | Lines |
 | --------------------------------------------------------- | ------------------------------------------------------------------------------------- | ----- |
-| `src/routes/+layout.svelte`                               | Root shell: conditionally renders nav for non-auth pages, passes `version` to PageNav | ~31   |
-| `src/routes/+layout.server.ts`                            | Returns only `{ version }` from app DB                                                | ~8    |
-| `src/lib/client/ui/navigation/pageNav/pageNav.svelte`     | Left sidebar with 9 hardcoded `Group` instances, mobile drawer, Escape handler        | ~160  |
-| `src/lib/client/ui/navigation/bottomNav/BottomNav.svelte` | Mobile bottom bar with separate hardcoded `NavItem[]` array, priority-based hiding    | ~69   |
-| `src/lib/client/ui/navigation/pageNav/group.svelte`       | Collapsible group container with slide transition                                     | ~35   |
-| `src/lib/client/ui/navigation/pageNav/groupItem.svelte`   | Nav link with `activePattern` matching (Svelte 5 `$derived`)                          | ~36   |
-| `src/lib/client/ui/navigation/pageNav/groupHeader.svelte` | Group header with icon, active state, chevron toggle                                  | ~52   |
-| `src/lib/client/ui/navigation/navbar/navbar.svelte`       | Top bar: mobile hamburger, desktop logo, accent picker, theme toggle                  | ~44   |
-| `src/lib/client/ui/navigation/tabs/Tabs.svelte`           | Per-page tab bar with responsive dropdown, breadcrumbs, back button                   | ~155  |
-| `src/lib/client/stores/mobileNav.ts`                      | Simple boolean writable store for mobile drawer open/close                            | ~14   |
-| `src/lib/client/stores/navIcons.ts`                       | Persisted localStorage toggle for emoji vs lucide icons                               | ~43   |
-| `src/lib/client/stores/sidebar.ts`                        | Sidebar collapsed store -- **unused** (not imported anywhere)                         | ~36   |
-| `src/lib/shared/arr/capabilities.ts`                      | Arr app registry with typed workflow/sync surface capabilities                        | ~335  |
+| `packages/praxrr-app/src/routes/+layout.svelte`                               | Root shell: conditionally renders nav for non-auth pages, passes `version` to PageNav | ~31   |
+| `packages/praxrr-app/src/routes/+layout.server.ts`                            | Returns only `{ version }` from app DB                                                | ~8    |
+| `packages/praxrr-app/src/lib/client/ui/navigation/pageNav/pageNav.svelte`     | Left sidebar with 9 hardcoded `Group` instances, mobile drawer, Escape handler        | ~160  |
+| `packages/praxrr-app/src/lib/client/ui/navigation/bottomNav/BottomNav.svelte` | Mobile bottom bar with separate hardcoded `NavItem[]` array, priority-based hiding    | ~69   |
+| `packages/praxrr-app/src/lib/client/ui/navigation/pageNav/group.svelte`       | Collapsible group container with slide transition                                     | ~35   |
+| `packages/praxrr-app/src/lib/client/ui/navigation/pageNav/groupItem.svelte`   | Nav link with `activePattern` matching (Svelte 5 `$derived`)                          | ~36   |
+| `packages/praxrr-app/src/lib/client/ui/navigation/pageNav/groupHeader.svelte` | Group header with icon, active state, chevron toggle                                  | ~52   |
+| `packages/praxrr-app/src/lib/client/ui/navigation/navbar/navbar.svelte`       | Top bar: mobile hamburger, desktop logo, accent picker, theme toggle                  | ~44   |
+| `packages/praxrr-app/src/lib/client/ui/navigation/tabs/Tabs.svelte`           | Per-page tab bar with responsive dropdown, breadcrumbs, back button                   | ~155  |
+| `packages/praxrr-app/src/lib/client/stores/mobileNav.ts`                      | Simple boolean writable store for mobile drawer open/close                            | ~14   |
+| `packages/praxrr-app/src/lib/client/stores/navIcons.ts`                       | Persisted localStorage toggle for emoji vs lucide icons                               | ~43   |
+| `packages/praxrr-app/src/lib/client/stores/sidebar.ts`                        | Sidebar collapsed store -- **unused** (not imported anywhere)                         | ~36   |
+| `packages/praxrr-app/src/lib/shared/arr/capabilities.ts`                      | Arr app registry with typed workflow/sync surface capabilities                        | ~335  |
 
 ### Current Hardcoded Nav Items (in `pageNav.svelte`)
 
@@ -72,7 +72,7 @@ Separate `NavItem[]` array with 9 entries, each declaring `priority: 'always' | 
 - **Dual hardcoded item lists**: `pageNav.svelte` and `BottomNav.svelte` define nav items independently. Adding a route means editing both files and keeping them in sync.
 - **No logical grouping**: All 9 top-level items are at the same hierarchy level. Databases, Arrs, and Settings serve fundamentally different purposes than Quality Profiles and Custom Formats.
 - **No app-scope awareness**: Despite `capabilities.ts` defining per-app capabilities (e.g., metadata profiles only for Lidarr, upgrades only for Radarr), the nav shows all items to all users regardless of context.
-- **Unused sidebar store**: `src/lib/client/stores/sidebar.ts` defines `sidebarCollapsed` but nothing imports it. Dead code.
+- **Unused sidebar store**: `packages/praxrr-app/src/lib/client/stores/sidebar.ts` defines `sidebarCollapsed` but nothing imports it. Dead code.
 - **No section headers**: The sidebar is a flat list of Groups. Adding visual grouping (section headers like "Data", "Operations") would improve scannability without changing routes.
 - **Mixed Svelte patterns**: `groupItem.svelte` uses Svelte 5 `$props()` and `$derived`, while `groupHeader.svelte`, `group.svelte`, and `pageNav.svelte` use Svelte 4 `export let`. Per project conventions: "Svelte 5, no runes" -- so `groupItem.svelte` actually violates this. This should be normalized during the refactor.
 
@@ -112,13 +112,13 @@ Do not introduce external dependencies (PostHog, OpenFeature, cmdk-sv) in the in
 
 **Files to create**:
 
-- `src/lib/shared/navigation/types.ts` -- Nav item and group type definitions
-- `src/lib/shared/navigation/registry.ts` -- Typed nav item array with group assignments
+- `packages/praxrr-app/src/lib/shared/navigation/types.ts` -- Nav item and group type definitions
+- `packages/praxrr-app/src/lib/shared/navigation/registry.ts` -- Typed nav item array with group assignments
 
 **Files to modify**:
 
-- `src/lib/client/ui/navigation/pageNav/pageNav.svelte` -- Replace hardcoded Groups with registry-driven rendering
-- `src/lib/client/ui/navigation/bottomNav/BottomNav.svelte` -- Replace hardcoded items array with registry import
+- `packages/praxrr-app/src/lib/client/ui/navigation/pageNav/pageNav.svelte` -- Replace hardcoded Groups with registry-driven rendering
+- `packages/praxrr-app/src/lib/client/ui/navigation/bottomNav/BottomNav.svelte` -- Replace hardcoded items array with registry import
 
 **Dependencies**: None. This is a pure refactor with no behavioral change.
 
@@ -127,7 +127,7 @@ Do not introduce external dependencies (PostHog, OpenFeature, cmdk-sv) in the in
 **Registry shape** (simplified from first-pass proposal):
 
 ```typescript
-// src/lib/shared/navigation/types.ts
+// packages/praxrr-app/src/lib/shared/navigation/types.ts
 interface NavItem {
   id: string;
   label: string;
@@ -160,11 +160,11 @@ Key difference from first-pass: no `arr_type`, `permission`, `feature_flag`, or 
 
 **Files to create**:
 
-- `src/lib/client/ui/navigation/pageNav/sectionHeader.svelte` -- Simple section label component
+- `packages/praxrr-app/src/lib/client/ui/navigation/pageNav/sectionHeader.svelte` -- Simple section label component
 
 **Files to modify**:
 
-- `src/lib/client/ui/navigation/pageNav/pageNav.svelte` -- Insert section headers between groups based on registry `section` field
+- `packages/praxrr-app/src/lib/client/ui/navigation/pageNav/pageNav.svelte` -- Insert section headers between groups based on registry `section` field
 
 **Dependencies**: Task Group 1 (registry must exist).
 
@@ -186,17 +186,17 @@ This is a minimal grouping. It can be refined later (e.g., splitting "Data" into
 
 **Files to create**:
 
-- `src/lib/client/stores/appScope.ts` -- Store for active app scope (`'all' | 'radarr' | 'sonarr' | 'lidarr'`)
-- `src/lib/client/ui/navigation/pageNav/scopeSelector.svelte` -- Dropdown or pill selector for app scope
+- `packages/praxrr-app/src/lib/client/stores/appScope.ts` -- Store for active app scope (`'all' | 'radarr' | 'sonarr' | 'lidarr'`)
+- `packages/praxrr-app/src/lib/client/ui/navigation/pageNav/scopeSelector.svelte` -- Dropdown or pill selector for app scope
 
 **Files to modify**:
 
-- `src/lib/shared/navigation/registry.ts` -- Add optional `arrScope` field to nav items
-- `src/lib/shared/navigation/types.ts` -- Extend NavItem with `arrScope?: ArrType`
-- `src/lib/client/ui/navigation/pageNav/pageNav.svelte` -- Filter items by active scope
-- `src/lib/client/ui/navigation/navbar/navbar.svelte` -- Possibly add scope indicator to top bar
+- `packages/praxrr-app/src/lib/shared/navigation/registry.ts` -- Add optional `arrScope` field to nav items
+- `packages/praxrr-app/src/lib/shared/navigation/types.ts` -- Extend NavItem with `arrScope?: ArrType`
+- `packages/praxrr-app/src/lib/client/ui/navigation/pageNav/pageNav.svelte` -- Filter items by active scope
+- `packages/praxrr-app/src/lib/client/ui/navigation/navbar/navbar.svelte` -- Possibly add scope indicator to top bar
 
-**Dependencies**: Task Group 1 (registry must exist), plus `src/lib/shared/arr/capabilities.ts` for type references.
+**Dependencies**: Task Group 1 (registry must exist), plus `packages/praxrr-app/src/lib/shared/arr/capabilities.ts` for type references.
 
 **Estimated scope**: ~100 lines new, ~50 lines modified.
 
@@ -210,8 +210,8 @@ This is a minimal grouping. It can be refined later (e.g., splitting "Data" into
 
 **Files to modify**:
 
-- `src/lib/client/stores/sidebar.ts` -- Delete (unused)
-- `src/lib/client/ui/navigation/pageNav/groupItem.svelte` -- Convert from Svelte 5 runes (`$props`, `$derived`) to Svelte 4 pattern (`export let`, reactive `$:`) per project convention "Svelte 5, no runes"
+- `packages/praxrr-app/src/lib/client/stores/sidebar.ts` -- Delete (unused)
+- `packages/praxrr-app/src/lib/client/ui/navigation/pageNav/groupItem.svelte` -- Convert from Svelte 5 runes (`$props`, `$derived`) to Svelte 4 pattern (`export let`, reactive `$:`) per project convention "Svelte 5, no runes"
 
 **Dependencies**: Can run in parallel with Task Groups 1-3.
 
@@ -424,7 +424,7 @@ Proposed sidebar (with section headers):
 ### Quick Wins (< 1 hour each)
 
 1. **Add section header dividers** in `pageNav.svelte` between logical groups (Data, Operations, Settings). Pure markup change, zero risk.
-2. **Delete `src/lib/client/stores/sidebar.ts`** -- it is dead code, imported nowhere.
+2. **Delete `packages/praxrr-app/src/lib/client/stores/sidebar.ts`** -- it is dead code, imported nowhere.
 3. **Normalize `groupItem.svelte`** from Svelte 5 runes back to Svelte 4 `export let` pattern per project convention.
 4. **Add `aria-current="page"`** to active nav links in `groupHeader.svelte` and `groupItem.svelte` for screen reader support.
 5. **Move "Log Out" out of Settings group** -- it is not a setting. Put it at the bottom of the sidebar as a standalone link or in the top navbar.

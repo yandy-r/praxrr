@@ -12,7 +12,7 @@ The monorepo migration moves the main Praxrr application into `packages/praxrr/`
 praxrr/                           # Root of existing repository (unchanged name)
 |-- packages/
 |   |-- praxrr/                   # Main application (moved from root)
-|   |   |-- src/
+|   |   |-- packages/praxrr-app/src/
 |   |   |   |-- hooks.server.ts
 |   |   |   |-- lib/
 |   |   |   |-- routes/
@@ -78,28 +78,28 @@ praxrr/                           # Root of existing repository (unchanged name)
 Current files that are central to the migration:
 
 - `/home/yandy/Projects/github.com/yandy-r/praxrr/deno.json`: Root config already has `"workspace": ["packages/praxrr-api"]`; needs expansion.
-- `/home/yandy/Projects/github.com/yandy-r/praxrr/svelte.config.js`: 18 path aliases; all use relative `./src/` prefix; must be preserved.
+- `/home/yandy/Projects/github.com/yandy-r/praxrr/svelte.config.js`: 18 path aliases; all point at `./packages/praxrr-app/src/`; must be preserved.
 - `/home/yandy/Projects/github.com/yandy-r/praxrr/vite.config.ts`: Reads `./package.json` for version; port and plugin config.
 - `/home/yandy/Projects/github.com/yandy-r/praxrr/tsconfig.json`: Extends `./dist/.svelte-kit/tsconfig.json`.
-- `/home/yandy/Projects/github.com/yandy-r/praxrr/src/hooks.server.ts`: Hardcoded default DB URL `https://github.com/yandy-r/praxrr-db` and branch `v2`.
-- `/home/yandy/Projects/github.com/yandy-r/praxrr/src/lib/server/pcd/git/dependencies.ts`: Dependency clone/sync using manifest `pcd.json`.
-- `/home/yandy/Projects/github.com/yandy-r/praxrr/src/lib/server/pcd/manifest/manifest.ts`: Validates manifest structure; requires schema dependency.
-- `/home/yandy/Projects/github.com/yandy-r/praxrr/src/lib/server/pcd/ops/loadOps.ts`: Resolves schema deps from `deps/` directory; flexible `*schema*` matching.
-- `/home/yandy/Projects/github.com/yandy-r/praxrr/src/lib/server/pcd/core/manager.ts`: Orchestrates link/sync/compile lifecycle.
+- `/home/yandy/Projects/github.com/yandy-r/praxrr/packages/praxrr-app/src/hooks.server.ts`: Hardcoded default DB URL `https://github.com/yandy-r/praxrr-db` and branch `v2`.
+- `/home/yandy/Projects/github.com/yandy-r/praxrr/packages/praxrr-app/src/lib/server/pcd/git/dependencies.ts`: Dependency clone/sync using manifest `pcd.json`.
+- `/home/yandy/Projects/github.com/yandy-r/praxrr/packages/praxrr-app/src/lib/server/pcd/manifest/manifest.ts`: Validates manifest structure; requires schema dependency.
+- `/home/yandy/Projects/github.com/yandy-r/praxrr/packages/praxrr-app/src/lib/server/pcd/ops/loadOps.ts`: Resolves schema deps from `deps/` directory; flexible `*schema*` matching.
+- `/home/yandy/Projects/github.com/yandy-r/praxrr/packages/praxrr-app/src/lib/server/pcd/core/manager.ts`: Orchestrates link/sync/compile lifecycle.
 - `/home/yandy/Projects/github.com/yandy-r/praxrr/scripts/generate-pcd-types.ts`: Hardcoded `SCHEMA_REPO = 'yandy-r/praxrr-schema'`.
-- `/home/yandy/Projects/github.com/yandy-r/praxrr/scripts/dev.ts`: Hardcoded CWD `src/services/parser` for parser, `APP_BASE_PATH=./dist/dev`.
-- `/home/yandy/Projects/github.com/yandy-r/praxrr/scripts/test.ts`: Test paths `src/tests/*`, `APP_BASE_PATH=./dist/test`.
-- `/home/yandy/Projects/github.com/yandy-r/praxrr/scripts/e2e.ts`: `SPEC_DIR = 'src/tests/e2e/specs'`.
+- `/home/yandy/Projects/github.com/yandy-r/praxrr/scripts/dev.ts`: Hardcoded CWD `packages/praxrr-parser` for parser, `APP_BASE_PATH=./dist/dev`.
+- `/home/yandy/Projects/github.com/yandy-r/praxrr/scripts/test.ts`: Test paths `packages/praxrr-app/src/tests/*`, `APP_BASE_PATH=./dist/test`.
+- `/home/yandy/Projects/github.com/yandy-r/praxrr/scripts/e2e.ts`: `SPEC_DIR = 'packages/praxrr-app/src/tests/e2e/specs'`.
 - `/home/yandy/Projects/github.com/yandy-r/praxrr/scripts/bundle-api.ts`: Paths `docs/api/v1` and `packages/praxrr-api`.
-- `/home/yandy/Projects/github.com/yandy-r/praxrr/src/lib/server/utils/config/config.ts`: `APP_BASE_PATH` resolution, all runtime paths.
+- `/home/yandy/Projects/github.com/yandy-r/praxrr/packages/praxrr-app/src/lib/server/utils/config/config.ts`: `APP_BASE_PATH` resolution, all runtime paths.
 - `/home/yandy/Projects/github.com/yandy-r/praxrr/packages/praxrr-api/deno.json`: Existing workspace member; published to JSR as `@yandy-r/praxrr-api`.
 - `/home/yandy/Projects/github.com/yandy-r/praxrr/.github/workflows/docker.yml`: Build context `.` with `Dockerfile` at root.
 - `/home/yandy/Projects/github.com/yandy-r/praxrr/.github/workflows/release.yml`: `deno install --node-modules-dir` + `vite build` + `deno compile` at root.
 - `/home/yandy/Projects/github.com/yandy-r/praxrr/Dockerfile`: `WORKDIR /build`, `COPY . .` from root context.
-- `/home/yandy/Projects/github.com/yandy-r/praxrr/Dockerfile.parser`: `COPY src/services/parser/` from root context.
-- `/home/yandy/Projects/github.com/yandy-r/praxrr/src/tests/e2e/env.ts`: Hardcoded `https://github.com/yandy-r/praxrr-db-v2-testing`.
-- `/home/yandy/Projects/github.com/yandy-r/praxrr/src/lib/server/pcd/ops/seedBuiltInBaseOps.ts`: Built-in ops from migrations; no path coupling.
-- `/home/yandy/Projects/github.com/yandy-r/praxrr/src/lib/server/pcd/ops/importBaseOps.ts`: Reads from PCD `ops/` directory; no hardcoded URLs.
+- `/home/yandy/Projects/github.com/yandy-r/praxrr/Dockerfile.parser`: `COPY packages/praxrr-parser/` from root context.
+- `/home/yandy/Projects/github.com/yandy-r/praxrr/packages/praxrr-app/src/tests/e2e/env.ts`: Hardcoded `https://github.com/yandy-r/praxrr-db-v2-testing`.
+- `/home/yandy/Projects/github.com/yandy-r/praxrr/packages/praxrr-app/src/lib/server/pcd/ops/seedBuiltInBaseOps.ts`: Built-in ops from migrations; no path coupling.
+- `/home/yandy/Projects/github.com/yandy-r/praxrr/packages/praxrr-app/src/lib/server/pcd/ops/importBaseOps.ts`: Reads from PCD `ops/` directory; no hardcoded URLs.
 
 ## Configuration Changes
 
@@ -139,7 +139,7 @@ Key point: The root `deno.json` must NOT define `imports` that conflict with the
 This is the current root `deno.json` with minor adjustments:
 
 - The `"workspace"` field is removed (workspace is declared at root).
-- All `"imports"` stay the same since they use `./src/lib/` relative paths.
+- All `"imports"` stay the same since they use `./packages/praxrr-app/src/lib/` relative paths.
 - All `"tasks"` stay the same since they use relative paths.
 - `"compilerOptions"`, `"exclude"`, `"fmt"`, `"lint"`, `"allowScripts"` stay the same.
 
@@ -149,9 +149,9 @@ This is the current root `deno.json` with minor adjustments:
   "version": "2.0.0",
   "imports": {
     // All existing $lib/, $db/, etc. aliases unchanged
-    "$lib/": "./src/lib/",
-    "$api/": "./src/lib/api/",
-    "$config": "./src/lib/server/utils/config/config.ts",
+    "$lib/": "./packages/praxrr-app/src/lib/",
+    "$api/": "./packages/praxrr-app/src/lib/api/",
+    "$config": "./packages/praxrr-app/src/lib/server/utils/config/config.ts",
     // ... rest unchanged
   },
   "tasks": {
@@ -185,7 +185,7 @@ This is the current root `deno.json` with minor adjustments:
 
 ### SvelteKit / Vite Configuration
 
-The `svelte.config.js` uses entirely relative paths (`./src/lib/...`). As long as it stays at `packages/praxrr/svelte.config.js` and the `src/` directory is co-located, no alias changes are needed.
+The `svelte.config.js` uses entirely relative paths (`./packages/praxrr-app/src/lib/...`). As long as it stays at `packages/praxrr/svelte.config.js` and the `packages/praxrr-app/src/` directory is co-located, no alias changes are needed.
 
 The `vite.config.ts` reads `./package.json` which must move with it. No path changes needed.
 
@@ -195,7 +195,7 @@ The `adapter` output in `svelte.config.js` is `dist/build` (relative) -- unchang
 
 ### Import Maps / Path Aliases
 
-All 18 path aliases (`$lib/`, `$api/`, `$config`, `$logger/`, `$shared/`, `$stores/`, `$ui/`, `$assets/`, `$alerts/`, `$server/`, `$db/`, `$jobs/`, `$pcd/`, `$arr/`, `$http/`, `$utils/`, `$notifications/`, `$sync/`, `$cache/`, `$auth/`) use relative `./src/lib/` prefixes and are defined in both `deno.json` and `svelte.config.js`. Since these files move together with `src/`, no paths change.
+All 18 path aliases (`$lib/`, `$api/`, `$config`, `$logger/`, `$shared/`, `$stores/`, `$ui/`, `$assets/`, `$alerts/`, `$server/`, `$db/`, `$jobs/`, `$pcd/`, `$arr/`, `$http/`, `$utils/`, `$notifications/`, `$sync/`, `$cache/`, `$auth/`) use relative `./packages/praxrr-app/src/lib/` prefixes and are defined in both `deno.json` and `svelte.config.js`. Since these files move together with `packages/praxrr-app/src/`, no paths change.
 
 ### Docker Configuration
 
@@ -222,7 +222,7 @@ RUN deno install --node-modules-dir
 **Option B: Set context to `packages/praxrr/`.**
 Simpler Dockerfile but loses access to root `deno.lock` and sibling packages, complicating workspace resolution. Not recommended.
 
-The `Dockerfile.parser` references `src/services/parser/` which moves to `packages/praxrr/src/services/parser/`. Update the COPY paths accordingly.
+The `Dockerfile.parser` references `packages/praxrr-parser/` which moves to `packages/praxrr/packages/praxrr-parser/`. Update the COPY paths accordingly.
 
 Compose files (`compose.yml`, `compose.dev.yml`, `compose.arr.yml`) move into `packages/praxrr/` and adjust `build.context` to `../..` (repo root) or use Docker Compose's `--project-directory` flag.
 
@@ -268,11 +268,11 @@ const LOCAL_SCHEMA = '../praxrr-schema/ops/0.schema.sql';
 
 ### Test Runner
 
-Test paths in `scripts/test.ts` are relative (`src/tests/*`). Since this script moves with `packages/praxrr/`, the paths remain valid.
+Test paths in `scripts/test.ts` are relative (`packages/praxrr-app/src/tests/*`). Since this script moves with `packages/praxrr/`, the paths remain valid.
 
 The `APP_BASE_PATH=./dist/test` remains relative to `packages/praxrr/`.
 
-E2E tests (`scripts/e2e.ts`) reference `src/tests/e2e/specs` -- still valid after move.
+E2E tests (`scripts/e2e.ts`) reference `packages/praxrr-app/src/tests/e2e/specs` -- still valid after move.
 
 ## Data Models
 
@@ -282,10 +282,10 @@ E2E tests (`scripts/e2e.ts`) reference `src/tests/e2e/specs` -- still valid afte
 
 ### Hardcoded References Found
 
-1. **`src/hooks.server.ts:54`**: `repositoryUrl: 'https://github.com/yandy-r/praxrr-db'` and branch `v2` (line 55).
+1. **`packages/praxrr-app/src/hooks.server.ts:54`**: `repositoryUrl: 'https://github.com/yandy-r/praxrr-db'` and branch `v2` (line 55).
    - **Proposed change**: Read from env vars with current values as defaults.
 
-2. **`src/hooks.server.ts:53`**: `name: 'Praxrr-DB'` (hardcoded default database name).
+2. **`packages/praxrr-app/src/hooks.server.ts:53`**: `name: 'Praxrr-DB'` (hardcoded default database name).
    - **Proposed change**: Make configurable via env var.
 
 3. **`scripts/generate-pcd-types.ts:19`**: `const SCHEMA_REPO = 'yandy-r/praxrr-schema'`.
@@ -294,16 +294,16 @@ E2E tests (`scripts/e2e.ts`) reference `src/tests/e2e/specs` -- still valid afte
 4. **`scripts/generate-pcd-types.ts:37`**: `const SCHEMA_PATH = 'ops/0.schema.sql'`.
    - **Proposed change**: Unchanged; this is the conventional path within any schema package.
 
-5. **`src/tests/e2e/env.ts:33`**: `'https://github.com/yandy-r/praxrr-db-v2-testing'`.
+5. **`packages/praxrr-app/src/tests/e2e/env.ts:33`**: `'https://github.com/yandy-r/praxrr-db-v2-testing'`.
    - **Proposed change**: Already overridable via `TEST_REPO_URL` env var. No change needed.
 
-6. **`src/lib/server/pcd/git/dependencies.ts:12`**: Comment referencing `https://github.com/yandy-r/praxrr-schema`.
+6. **`packages/praxrr-app/src/lib/server/pcd/git/dependencies.ts:12`**: Comment referencing `https://github.com/yandy-r/praxrr-schema`.
    - **Proposed change**: Update comment. No runtime impact.
 
-7. **`src/lib/server/pcd/ops/loadOps.ts:33`**: Comment referencing `deps/praxrr-schema`.
+7. **`packages/praxrr-app/src/lib/server/pcd/ops/loadOps.ts:33`**: Comment referencing `deps/praxrr-schema`.
    - **Proposed change**: Update comment. No runtime impact.
 
-8. **`src/lib/server/pcd/ops/loadOps.ts:47`**: Fallback path `${pcdPath}/deps/schema/ops`.
+8. **`packages/praxrr-app/src/lib/server/pcd/ops/loadOps.ts:47`**: Fallback path `${pcdPath}/deps/schema/ops`.
    - **Proposed change**: Already flexible (line 39 scans for `*schema*` directory). No change needed.
 
 ### Configurable Auto-Link Defaults
@@ -404,7 +404,7 @@ A new workflow `compatibility.yml` runs on PRs that touch `packages/praxrr-db/` 
 
 1. **Schema compilation test**: Apply `packages/praxrr-schema/ops/0.schema.sql` to an in-memory SQLite database.
 2. **DB ops layering test**: Run the full ops stack (schema + base ops from `packages/praxrr-db/ops/`) and verify tables are created.
-3. **Type generation parity test**: Generate types from local schema, diff against committed `src/lib/shared/pcd/types.ts`.
+3. **Type generation parity test**: Generate types from local schema, diff against committed `packages/praxrr-app/src/lib/shared/pcd/types.ts`.
 4. **App build test**: If schema or db changed, also build the app to catch compile-time breakages.
 
 ```yaml
@@ -427,7 +427,7 @@ jobs:
           deno run -A scripts/generate-pcd-types.ts --local=../praxrr-schema/ops/0.schema.sql
       - name: Verify types are up-to-date
         run: |
-          git diff --exit-code packages/praxrr/src/lib/shared/pcd/types.ts
+          git diff --exit-code packages/praxrr/packages/praxrr-app/src/lib/shared/pcd/types.ts
 
   ops-layering:
     runs-on: ubuntu-latest
@@ -570,7 +570,7 @@ The existing Docker workflow (`docker.yml`) updates the build context:
 
 1. Create `packages/praxrr/` directory.
 2. Move these files/directories into `packages/praxrr/`:
-   - `src/` -> `packages/praxrr/src/`
+   - `packages/praxrr-app/src/` -> `packages/praxrr/src/`
    - `scripts/` -> `packages/praxrr/scripts/` (except `bundle-api.ts` which goes to root `scripts/`)
    - `static/` -> `packages/praxrr/static/`
    - `docker/` -> `packages/praxrr/docker/`
@@ -669,7 +669,7 @@ The existing Docker workflow (`docker.yml`) updates the build context:
 ## Files to Modify
 
 - `deno.json` (root): Restructure as workspace-only config; move imports/tasks to `packages/praxrr/deno.json`.
-- `src/hooks.server.ts` (moves to `packages/praxrr/src/hooks.server.ts`): Add configurable auto-link env vars.
+- `packages/praxrr-app/src/hooks.server.ts` (moves to `packages/praxrr/packages/praxrr-app/src/hooks.server.ts`): Add configurable auto-link env vars.
 - `scripts/generate-pcd-types.ts` (moves to `packages/praxrr/scripts/generate-pcd-types.ts`): Default to local schema source.
 - `scripts/bundle-api.ts` (moves to root `scripts/`): Update relative paths for `docs/api/v1` and `packages/praxrr-api`.
 - `Dockerfile` (moves to `packages/praxrr/Dockerfile`): Update COPY paths for monorepo context.
@@ -741,7 +741,7 @@ git subtree push --prefix=packages/praxrr-db https://github.com/yandy-r/praxrr-d
 ## Architectural Patterns
 
 - **Deno Workspace Members**: Each package under `packages/` has its own `deno.json` with `name` and `version`. The root `deno.json` lists them in `workspace`. Deno resolves imports per-member.
-- **Relative Path Aliases**: All `$lib/`, `$db/`, etc. aliases use `./src/lib/` relative paths. This pattern means the aliases are position-independent -- they work wherever `deno.json` and `src/` are co-located.
+- **Relative Path Aliases**: All `$lib/`, `$db/`, etc. aliases use `./packages/praxrr-app/src/lib/` relative paths. This pattern means the aliases are position-independent -- they work wherever `deno.json` and `packages/praxrr-app/src/` are co-located.
 - **PCD Dependency Resolution**: The manifest `pcd.json` declares dependencies by GitHub URL + version tag. The dependency system clones into `deps/` at the PCD path. This is inherently decoupled from the monorepo structure.
 - **Ops Layering**: Schema, base, tweaks, and user ops are loaded from well-known relative paths within a PCD. No absolute paths or URLs are involved in ops loading.
 - **Existing Workspace Precedent**: `packages/praxrr-api` already exists as a workspace member. The JSR publish workflow (`publish-api.yml`) already operates in this pattern.
@@ -751,7 +751,7 @@ git subtree push --prefix=packages/praxrr-db https://github.com/yandy-r/praxrr-d
 - **`deno install --node-modules-dir` scope**: When run from `packages/praxrr/`, this installs `node_modules` at `packages/praxrr/node_modules/`. The root-level `node_modules/` becomes stale. The root `.gitignore` and `packages/praxrr/.gitignore` must both exclude `node_modules/`.
 - **SvelteKit `.svelte-kit` output**: The `outDir: 'dist/.svelte-kit'` in `svelte.config.js` produces `packages/praxrr/dist/.svelte-kit/`. The `tsconfig.json` extends this path. If any CI step runs SvelteKit from the root directory instead of the app package, it will fail to find the generated config.
 - **`APP_BASE_PATH` in Docker**: The Docker entrypoint sets `APP_BASE_PATH=/config`. This is runtime configuration and is unaffected by the monorepo structure.
-- **Parser service CWD**: `scripts/dev.ts` uses `cwd: 'src/services/parser'` for the parser process. After move, this becomes relative to `packages/praxrr/`, which is correct since the script moves with it.
+- **Parser service CWD**: `scripts/dev.ts` uses `cwd: 'packages/praxrr-parser'` for the parser process. After move, this becomes relative to `packages/praxrr/`, which is correct since the script moves with it.
 - **`deno.lock` location**: Deno workspaces resolve the lockfile from the workspace root. After the migration, running `deno install` from `packages/praxrr/` should still find/update the root `deno.lock`. Verify this behavior.
 - **Prettier/ESLint config resolution**: These tools walk up the directory tree for config. Moving `.prettierrc` and `eslint.config.js` into `packages/praxrr/` means they only apply there. Root-level markdown files (like `README.md`) may need a separate `.prettierrc` at root, or the root-level `format` task must specify the config path.
 - **`publish:api` task chain**: Currently `"publish:api": "deno task bundle:api && cd packages/praxrr-api && deno publish"`. After migration, `bundle-api.ts` moves to root `scripts/`. The task needs to reference the root script.

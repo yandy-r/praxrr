@@ -49,7 +49,7 @@ function normalize(value: string): string {
   return value.toLowerCase().replace(/[-_\s]/g, '');
 }
 
-// Canonical value mappings (matches src/lib/shared/conditions.ts)
+// Canonical value mappings (matches packages/praxrr-app/src/lib/shared/conditions.ts)
 const sourceNames: Record<QualitySource, string> = {
   [QualitySource.Unknown]: 'unknown',
   [QualitySource.Cam]: 'cam',

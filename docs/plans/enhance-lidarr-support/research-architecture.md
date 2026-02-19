@@ -6,16 +6,16 @@ Media-management is structured as thin SvelteKit route handlers that delegate to
 
 ## Relevant Components
 
-- `src/routes/media-management/[databaseId]/**/+page.server.ts`: load/action entry points for naming, media settings, quality definitions.
-- `src/lib/server/pcd/entities/mediaManagement/naming/*`: naming list/get/create/update/delete operations.
-- `src/lib/server/pcd/entities/mediaManagement/media-settings/*`: media settings operations.
-- `src/lib/server/pcd/entities/mediaManagement/quality-definitions/*`: quality definitions operations and mapping-aware reads.
-- `src/lib/server/pcd/index.ts`: `pcdManager`, cache access, and write operation orchestration.
-- `src/lib/server/sync/mediaManagement/syncer.ts`: downstream sync to Arr instances with current Lidarr reuse logic.
-- `src/lib/server/db/queries/arrSync.ts`: sync config persistence and rename propagation.
-- `src/lib/shared/pcd/portable.ts`: portable entity typing and Lidarr matrix rules.
-- `src/routes/api/v1/pcd/import/+server.ts`: import validation + deserialization path.
-- `src/routes/api/v1/pcd/export/+server.ts`: export serialization path.
+- `packages/praxrr-app/src/routes/media-management/[databaseId]/**/+page.server.ts`: load/action entry points for naming, media settings, quality definitions.
+- `packages/praxrr-app/src/lib/server/pcd/entities/mediaManagement/naming/*`: naming list/get/create/update/delete operations.
+- `packages/praxrr-app/src/lib/server/pcd/entities/mediaManagement/media-settings/*`: media settings operations.
+- `packages/praxrr-app/src/lib/server/pcd/entities/mediaManagement/quality-definitions/*`: quality definitions operations and mapping-aware reads.
+- `packages/praxrr-app/src/lib/server/pcd/index.ts`: `pcdManager`, cache access, and write operation orchestration.
+- `packages/praxrr-app/src/lib/server/sync/mediaManagement/syncer.ts`: downstream sync to Arr instances with current Lidarr reuse logic.
+- `packages/praxrr-app/src/lib/server/db/queries/arrSync.ts`: sync config persistence and rename propagation.
+- `packages/praxrr-app/src/lib/shared/pcd/portable.ts`: portable entity typing and Lidarr matrix rules.
+- `packages/praxrr-app/src/routes/api/v1/pcd/import/+server.ts`: import validation + deserialization path.
+- `packages/praxrr-app/src/routes/api/v1/pcd/export/+server.ts`: export serialization path.
 
 ## Data Flow
 
@@ -35,8 +35,8 @@ Media-management is structured as thin SvelteKit route handlers that delegate to
 
 ## Key Dependencies
 
-- `src/lib/server/pcd/index.ts` (`pcdManager`, write orchestration)
-- `src/lib/server/sync/mediaManagement/syncer.ts` (sync orchestration)
-- `src/lib/server/db/queries/arrSync.ts` (sync config storage)
-- `src/lib/shared/arr/capabilities.ts` (capability gating)
-- `docs/pcdReference/0.schema.sql` and `src/lib/server/db/schema.sql` (table foundations)
+- `packages/praxrr-app/src/lib/server/pcd/index.ts` (`pcdManager`, write orchestration)
+- `packages/praxrr-app/src/lib/server/sync/mediaManagement/syncer.ts` (sync orchestration)
+- `packages/praxrr-app/src/lib/server/db/queries/arrSync.ts` (sync config storage)
+- `packages/praxrr-app/src/lib/shared/arr/capabilities.ts` (capability gating)
+- `docs/pcdReference/0.schema.sql` and `packages/praxrr-app/src/lib/server/db/schema.sql` (table foundations)

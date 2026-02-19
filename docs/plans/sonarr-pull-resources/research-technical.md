@@ -96,19 +96,19 @@ Behavior in implicit mode:
 
 ### Likely Create
 
-- `src/lib/server/pull/processor.ts`
-- `src/lib/server/pull/types.ts`
-- `src/lib/server/pull/conflicts.ts`
-- `src/routes/api/v1/arr/pull/preview/+server.ts`
-- `src/routes/api/v1/arr/pull/execute/+server.ts`
-- `src/routes/arr/[id]/pull/+page.server.ts`
-- `src/routes/arr/[id]/pull/+page.svelte`
+- `packages/praxrr-app/src/lib/server/pull/processor.ts`
+- `packages/praxrr-app/src/lib/server/pull/types.ts`
+- `packages/praxrr-app/src/lib/server/pull/conflicts.ts`
+- `packages/praxrr-app/src/routes/api/v1/arr/pull/preview/+server.ts`
+- `packages/praxrr-app/src/routes/api/v1/arr/pull/execute/+server.ts`
+- `packages/praxrr-app/src/routes/arr/[id]/pull/+page.server.ts`
+- `packages/praxrr-app/src/routes/arr/[id]/pull/+page.svelte`
 
 ### Likely Modify
 
-- `src/lib/server/pcd/ops/writer.ts` (batch/deferred compile path)
-- `src/lib/server/sync/mappings.ts` (reverse lookup exports as needed)
-- `src/routes/arr/[id]/+layout.svelte` (Import/Pull tab)
+- `packages/praxrr-app/src/lib/server/pcd/ops/writer.ts` (batch/deferred compile path)
+- `packages/praxrr-app/src/lib/server/sync/mappings.ts` (reverse lookup exports as needed)
+- `packages/praxrr-app/src/routes/arr/[id]/+layout.svelte` (Import/Pull tab)
 
 ## Second-pass Corrections
 
