@@ -54,8 +54,8 @@ jobs:
           fi
 
           status_code="$(curl -sS -o /tmp/mirror-repo-info-schema.json -w '%{http_code}' \
-            -H \"Authorization: token ${MIRROR_PAT}\" \
-            \"https://api.github.com/repos/${MIRROR_REPO}\")"
+            -H "Authorization: token ${MIRROR_PAT}" \
+            "https://api.github.com/repos/${MIRROR_REPO}")"
           if [ "$status_code" != "200" ]; then
             if [ "$status_code" = "401" ]; then
               echo "::error::MIRROR_PAT is invalid or not authorized. HTTP ${status_code}. Update the secret and retry."
