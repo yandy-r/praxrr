@@ -1,6 +1,10 @@
+import { createArrClient } from '$arr/factory.ts';
+import { getDefaultDelayProfile } from '$arr/defaults.ts';
+import { config } from '$config';
 import { parseOptionalAbsoluteHttpUrl } from '$utils/validation/url.ts';
 import { db } from '$db/db.ts';
 import { arrInstancesQueries } from '$db/queries/arrInstances.ts';
+import { generalSettingsQueries } from '$db/queries/generalSettings.ts';
 import { ARR_APP_TYPES, type ArrAppType } from '$shared/pcd/types.ts';
 
 const APP_TYPE_KEYS = ARR_APP_TYPES;
@@ -43,8 +47,15 @@ export interface ReconcileEnvInstancesResult {
 	disabled: number;
 	skippedConflictUi: number;
 	skippedDuplicateEnvKey: number;
+	validationSuccesses: number;
+	validationFailures: number;
 	errors: number;
 }
+
+const ARR_TEST_TIMEOUT_MS = 3000;
+const ARR_TEST_RETRIES = 0;
+const DEFAULT_DELAY_PROFILE_ID = 1;
+const DEFAULT_DELAY_PROFILE_ORDER = 2147483647;
 
 function isSupportedArrAppType(value: string): value is ArrAppType {
 	return (APP_TYPE_KEYS as readonly string[]).includes(value);
@@ -102,6 +113,46 @@ export function parseExternalUrlFromEnv(value?: string | null): string | null {
 	}
 
 	return parsed.value;
+}
+
+function shouldApplyDefaultDelayProfile(type: ArrAppType): type is 'radarr' | 'sonarr' {
+	return type === 'radarr' || type === 'sonarr';
+}
+
+async function validateInstanceConnection(descriptor: ParsedEnvInstanceDescriptor): Promise<boolean> {
+	const client = createArrClient(descriptor.type, descriptor.url, descriptor.apiKey, {
+		timeout: ARR_TEST_TIMEOUT_MS,
+		retries: ARR_TEST_RETRIES,
+	});
+
+	try {
+		return await client.testConnection();
+	} finally {
+		client.close();
+	}
+}
+
+async function applyDefaultDelayProfile(descriptor: ParsedEnvInstanceDescriptor): Promise<void> {
+	if (!shouldApplyDefaultDelayProfile(descriptor.type)) {
+		return;
+	}
+
+	if (!generalSettingsQueries.shouldApplyDefaultDelayProfiles()) {
+		return;
+	}
+
+	const client = createArrClient(descriptor.type, descriptor.url, descriptor.apiKey);
+	const defaultProfile = getDefaultDelayProfile(descriptor.type);
+
+	try {
+		await client.updateDelayProfile(DEFAULT_DELAY_PROFILE_ID, {
+			...defaultProfile,
+			id: DEFAULT_DELAY_PROFILE_ID,
+			order: DEFAULT_DELAY_PROFILE_ORDER,
+		});
+	} finally {
+		client.close();
+	}
 }
 
 /**
@@ -227,13 +278,15 @@ function withSavepoint<T>(savepoint: string, fn: () => T): T {
 	}
 }
 
-export function reconcileEnvInstances(): ReconcileEnvInstancesResult {
+export async function reconcileEnvInstances(): Promise<ReconcileEnvInstancesResult> {
 	const metrics: ReconcileEnvInstancesResult = {
 		created: 0,
 		updated: 0,
 		disabled: 0,
 		skippedConflictUi: 0,
 		skippedDuplicateEnvKey: 0,
+		validationSuccesses: 0,
+		validationFailures: 0,
 		errors: 0,
 	};
 
@@ -263,7 +316,25 @@ export function reconcileEnvInstances(): ReconcileEnvInstancesResult {
 		}
 
 		const savepoint = `env_reconcile_${savepointIndex++}`;
+		let createdInstanceId: number | undefined;
 		try {
+			if (config.validateInstances) {
+				try {
+					const isConnected = await validateInstanceConnection(descriptor);
+					if (!isConnected) {
+						metrics.validationFailures += 1;
+						throw new Error(`Validation failed for ${descriptor.type} instance ${descriptor.name}`);
+					}
+				} catch (error) {
+					if (!(error instanceof Error && error.message.startsWith('Validation failed for '))) {
+						metrics.validationFailures += 1;
+					}
+					throw error;
+				}
+
+				metrics.validationSuccesses += 1;
+			}
+
 			withSavepoint(savepoint, () => {
 				if (existing && existing.source === 'env') {
 					const updated = arrInstancesQueries.updateEnvInstanceByApiKey(descriptor.apiKey, {
@@ -298,10 +369,15 @@ export function reconcileEnvInstances(): ReconcileEnvInstancesResult {
 					throw new Error('Failed to create env instance');
 				}
 
+				createdInstanceId = id;
 				metrics.created += 1;
 			});
 
 			activeApiKeys.add(descriptor.apiKey);
+
+			if (createdInstanceId !== undefined) {
+				await applyDefaultDelayProfile(descriptor);
+			}
 		} catch {
 			metrics.errors += 1;
 		}

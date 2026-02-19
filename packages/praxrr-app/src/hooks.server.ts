@@ -92,7 +92,7 @@ if (!setupStateQueries.isDefaultDatabaseLinked()) {
 }
 
 try {
-  const reconcileResult = reconcileEnvInstances();
+  const reconcileResult = await reconcileEnvInstances();
   await logger.info('Environment instance reconciliation completed', {
     source: 'Setup',
     meta: {
@@ -101,6 +101,8 @@ try {
       disabled: reconcileResult.disabled,
       skippedConflictUi: reconcileResult.skippedConflictUi,
       skippedDuplicateEnvKey: reconcileResult.skippedDuplicateEnvKey,
+      validationSuccesses: reconcileResult.validationSuccesses,
+      validationFailures: reconcileResult.validationFailures,
       errors: reconcileResult.errors,
     },
   });
