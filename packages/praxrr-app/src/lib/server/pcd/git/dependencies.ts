@@ -1,11 +1,14 @@
 /**
  * PCD Dependency Resolution
- * Handles cloning and managing PCD dependencies using git tags
+ * Handles cloning and managing PCD dependencies using git refs (tags or branches)
  */
 
-import { checkout, clone, fetchTags } from '$utils/git/index.ts';
+import { checkout, clone, fetch, fetchTags, getBranch } from '$utils/git/index.ts';
+import { execGit, execGitSafe } from '$utils/git/exec.ts';
 import { loadManifest, resolveSchemaDependencyUrl } from '../manifest/manifest.ts';
 import { logger } from '$logger/logger.ts';
+
+const SCHEMA_REF_OVERRIDE_ENV = 'PRAXRR_SCHEMA_REF';
 
 /**
  * Extract repository name from GitHub URL
@@ -73,10 +76,21 @@ async function cloneDependency(
 }
 
 /**
- * Get the installed version of a dependency from its manifest
+ * Get the installed ref of a dependency.
+ * Prefers current branch name, falls back to dependency manifest version.
  */
 async function getInstalledVersion(pcdPath: string, repoName: string): Promise<string | null> {
-  const depManifestPath = `${pcdPath}/deps/${repoName}/pcd.json`;
+  const depPath = `${pcdPath}/deps/${repoName}`;
+  try {
+    const currentBranch = await getBranch(depPath);
+    if (currentBranch && currentBranch !== 'HEAD') {
+      return currentBranch;
+    }
+  } catch {
+    // Dependency repository may not exist yet; fall back to manifest check.
+  }
+
+  const depManifestPath = `${depPath}/pcd.json`;
   try {
     const content = await Deno.readTextFile(depManifestPath);
     const manifest = JSON.parse(content);
@@ -87,11 +101,42 @@ async function getInstalledVersion(pcdPath: string, repoName: string): Promise<s
 }
 
 /**
- * Update a dependency to a new version using fetch + checkout
+ * Update a dependency to a new ref using fetch + checkout
  */
 async function updateDependency(depPath: string, version: string): Promise<void> {
+  await fetch(depPath);
   await fetchTags(depPath);
-  await checkout(depPath, version);
+
+  const remoteBranchRef = `origin/${version}`;
+  const hasRemoteBranch = (await execGitSafe(['rev-parse', '--verify', '--quiet', remoteBranchRef], depPath)) !== null;
+
+  if (!hasRemoteBranch) {
+    await checkout(depPath, version);
+    return;
+  }
+
+  const checkedOutBranch = await execGitSafe(['checkout', version], depPath);
+  if (checkedOutBranch === null) {
+    await execGit(['checkout', '-B', version, remoteBranchRef], depPath);
+  }
+  await execGit(['reset', '--hard', remoteBranchRef], depPath);
+}
+
+function getRequiredDependencyRef(
+  repoUrl: string,
+  manifestRef: string,
+  schemaDependencyUrl: string
+): string {
+  if (repoUrl !== schemaDependencyUrl) {
+    return manifestRef;
+  }
+
+  const overrideRef = Deno.env.get(SCHEMA_REF_OVERRIDE_ENV)?.trim();
+  if (!overrideRef) {
+    return manifestRef;
+  }
+
+  return overrideRef;
 }
 
 /**
@@ -100,7 +145,7 @@ async function updateDependency(depPath: string, version: string): Promise<void>
  */
 export async function processDependencies(pcdPath: string, personalAccessToken?: string): Promise<void> {
   const manifest = await loadManifest(pcdPath);
-  resolveSchemaDependencyUrl(manifest.dependencies);
+  const schemaDependencyUrl = resolveSchemaDependencyUrl(manifest.dependencies);
 
   if (!manifest.dependencies || Object.keys(manifest.dependencies).length === 0) {
     return;
@@ -111,18 +156,19 @@ export async function processDependencies(pcdPath: string, personalAccessToken?:
   await Deno.mkdir(depsDir, { recursive: true });
 
   for (const [repoUrl, version] of Object.entries(manifest.dependencies)) {
+    const requiredRef = getRequiredDependencyRef(repoUrl, version, schemaDependencyUrl);
     const repoName = getRepoName(repoUrl);
     const depPath = getDependencyPath(pcdPath, repoName);
 
     // Clone and checkout the dependency
-    await cloneDependency(pcdPath, repoUrl, version, personalAccessToken);
+    await cloneDependency(pcdPath, repoUrl, requiredRef, personalAccessToken);
 
     // Validate the dependency's manifest
     await loadManifest(depPath);
 
-    await logger.debug(`Installed dependency ${repoName}@${version}`, {
+    await logger.debug(`Installed dependency ${repoName}@${requiredRef}`, {
       source: 'PCDDependencies',
-      meta: { pcdPath, repoName, version },
+      meta: { pcdPath, repoName, manifestRef: version, resolvedRef: requiredRef },
     });
   }
 }
@@ -133,7 +179,7 @@ export async function processDependencies(pcdPath: string, personalAccessToken?:
  */
 export async function syncDependencies(pcdPath: string, personalAccessToken?: string): Promise<void> {
   const manifest = await loadManifest(pcdPath);
-  resolveSchemaDependencyUrl(manifest.dependencies);
+  const schemaDependencyUrl = resolveSchemaDependencyUrl(manifest.dependencies);
 
   if (!manifest.dependencies || Object.keys(manifest.dependencies).length === 0) {
     return;
@@ -142,13 +188,14 @@ export async function syncDependencies(pcdPath: string, personalAccessToken?: st
   const depsDir = `${pcdPath}/deps`;
   await Deno.mkdir(depsDir, { recursive: true });
 
-  for (const [repoUrl, requiredVersion] of Object.entries(manifest.dependencies)) {
+  for (const [repoUrl, manifestRef] of Object.entries(manifest.dependencies)) {
+    const requiredRef = getRequiredDependencyRef(repoUrl, manifestRef, schemaDependencyUrl);
     const repoName = getRepoName(repoUrl);
     const depPath = getDependencyPath(pcdPath, repoName);
     const installedVersion = await getInstalledVersion(pcdPath, repoName);
 
     // Already at correct version
-    if (installedVersion === requiredVersion) {
+    if (installedVersion === requiredRef) {
       continue;
     }
 
@@ -157,10 +204,10 @@ export async function syncDependencies(pcdPath: string, personalAccessToken?: st
 
     if (hasGitFolder) {
       // Fetch tags and checkout new version
-      await updateDependency(depPath, requiredVersion);
-      await logger.info(`Updated dependency ${repoName}: ${installedVersion} -> ${requiredVersion}`, {
+      await updateDependency(depPath, requiredRef);
+      await logger.info(`Updated dependency ${repoName}: ${installedVersion} -> ${requiredRef}`, {
         source: 'PCDDependencies',
-        meta: { pcdPath, repoName, from: installedVersion, to: requiredVersion },
+        meta: { pcdPath, repoName, from: installedVersion, to: requiredRef, manifestRef },
       });
     } else {
       // No .git folder (legacy or corrupted) - re-clone
@@ -169,10 +216,10 @@ export async function syncDependencies(pcdPath: string, personalAccessToken?: st
       } catch {
         // Didn't exist
       }
-      await cloneDependency(pcdPath, repoUrl, requiredVersion, personalAccessToken);
-      await logger.info(`Re-cloned dependency ${repoName}@${requiredVersion}`, {
+      await cloneDependency(pcdPath, repoUrl, requiredRef, personalAccessToken);
+      await logger.info(`Re-cloned dependency ${repoName}@${requiredRef}`, {
         source: 'PCDDependencies',
-        meta: { pcdPath, repoName, version: requiredVersion },
+        meta: { pcdPath, repoName, manifestRef, resolvedRef: requiredRef },
       });
     }
 
@@ -188,7 +235,7 @@ export async function syncDependencies(pcdPath: string, personalAccessToken?: st
 export async function validateDependencies(pcdPath: string, personalAccessToken?: string): Promise<boolean> {
   try {
     const manifest = await loadManifest(pcdPath);
-    resolveSchemaDependencyUrl(manifest.dependencies);
+    const schemaDependencyUrl = resolveSchemaDependencyUrl(manifest.dependencies);
 
     if (!manifest.dependencies || Object.keys(manifest.dependencies).length === 0) {
       return true;
@@ -196,7 +243,8 @@ export async function validateDependencies(pcdPath: string, personalAccessToken?
 
     let allValid = true;
 
-    for (const [repoUrl, requiredVersion] of Object.entries(manifest.dependencies)) {
+    for (const [repoUrl, manifestRef] of Object.entries(manifest.dependencies)) {
+      const requiredRef = getRequiredDependencyRef(repoUrl, manifestRef, schemaDependencyUrl);
       const repoName = getRepoName(repoUrl);
       const depPath = getDependencyPath(pcdPath, repoName);
 
@@ -212,10 +260,10 @@ export async function validateDependencies(pcdPath: string, personalAccessToken?
 
       // Check version
       const installedVersion = await getInstalledVersion(pcdPath, repoName);
-      if (installedVersion !== requiredVersion) {
-        await logger.warn(`Dependency ${repoName} version mismatch: ${installedVersion} != ${requiredVersion}`, {
+      if (installedVersion !== requiredRef) {
+        await logger.warn(`Dependency ${repoName} ref mismatch: ${installedVersion} != ${requiredRef}`, {
           source: 'PCDDependencies',
-          meta: { pcdPath, repoName, installed: installedVersion, required: requiredVersion },
+          meta: { pcdPath, repoName, installed: installedVersion, required: requiredRef, manifestRef },
         });
         allValid = false;
       }

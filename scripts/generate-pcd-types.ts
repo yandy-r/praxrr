@@ -5,8 +5,8 @@
  * Uses SQLite introspection to ensure types match the actual schema.
  *
  * Usage:
- *   deno task generate:pcd-types                    # Uses default version (1.0.0)
- *   deno task generate:pcd-types --version=1.1.0    # Uses specific version
+ *   deno task generate:pcd-types                    # Uses local schema by default
+ *   deno task generate:pcd-types --version=v2       # Uses specific schema ref for --remote
  *   deno task generate:pcd-types --local=/path/to/schema.sql  # Uses local file
  */
 
@@ -34,7 +34,7 @@ const COLUMN_TYPE_OVERRIDES: Record<string, string> = {
   'sonarr_naming.colon_replacement_format': "'delete' | 'dash' | 'spaceDash' | 'spaceDashSpace' | 'smart' | 'custom'",
   'sonarr_naming.multi_episode_style': "'extend' | 'duplicate' | 'repeat' | 'scene' | 'range' | 'prefixedRange'",
 };
-const DEFAULT_VERSION = '1.0.0'; // Schema versions are branch names (e.g., 1.0.0, 1.1.0)
+const DEFAULT_VERSION = Deno.env.get('PRAXRR_SCHEMA_REF')?.trim() || 'v2';
 const SCHEMA_PATH = 'ops/0.schema.sql';
 const OUTPUT_DIR = './packages/praxrr-app/src/lib/shared/pcd';
 const OUTPUT_PATH = `${OUTPUT_DIR}/types.ts`;
@@ -86,17 +86,17 @@ USAGE:
   deno task generate:pcd-types [OPTIONS]
 
 OPTIONS:
-  --version=<ver>    Use specific schema version/branch (default: ${DEFAULT_VERSION})
+  --version=<ref>    Use specific schema tag/branch (default: ${DEFAULT_VERSION})
   --local=<path>     Use local schema file instead of fetching from GitHub
   --remote           Force remote GitHub fetch (default: local-first)
   --help, -h         Show this help message
 
 EXAMPLES:
   deno task generate:pcd-types                      # Use local schema (packages/praxrr-schema/ops/0.schema.sql)
-  deno task generate:pcd-types --version=1.1.0      # Use local schema (version is used only for --remote)
+  deno task generate:pcd-types --version=dev        # Use local schema (ref is used only for --remote)
   deno task generate:pcd-types --local=./schema.sql # Use explicit local file
   deno task generate:pcd-types --remote             # Fetch version ${DEFAULT_VERSION}
-  deno task generate:pcd-types --remote --version=1.1.0 # Fetch version 1.1.0
+  deno task generate:pcd-types --remote --version=v2 # Fetch version v2
 
 OUTPUT:
   ${OUTPUT_PATH}
@@ -104,6 +104,8 @@ OUTPUT:
 AUTHENTICATION:
   For private schema repositories, set one of:
   PRAXRR_SCHEMA_TOKEN, GITHUB_TOKEN, or GH_TOKEN
+  Optional ref override:
+  PRAXRR_SCHEMA_REF (used as default for --remote when --version is not provided)
 `);
 }
 
