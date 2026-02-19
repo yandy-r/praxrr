@@ -1,9 +1,30 @@
+import { error, type ServerLoad } from '@sveltejs/kit';
 import { redirect, fail } from '@sveltejs/kit';
 import type { Actions } from '@sveltejs/kit';
-import { arrInstancesQueries } from '$db/queries/arrInstances.ts';
+import { arrInstancesQueries, type ArrInstance, type ArrInstanceSource } from '$db/queries/arrInstances.ts';
 import { cleanupJobsForArrInstance } from '$lib/server/jobs/cleanup.ts';
 import { logger } from '$logger/logger.ts';
 import { parseOptionalAbsoluteHttpUrl } from '$utils/validation/url.ts';
+
+export const load: ServerLoad = async ({ parent }) => {
+	const parentData = await parent();
+	const rawInstance = parentData.instance;
+
+	if (!rawInstance) {
+		error(404, 'Instance not found');
+	}
+
+	const instance = rawInstance as ArrInstance;
+	const source: ArrInstanceSource = instance.source ?? 'ui';
+
+	return {
+		instance: {
+			...instance,
+			source,
+		},
+		canEditCoreConnectionFields: source === 'ui',
+	};
+};
 
 export const actions: Actions = {
   update: async ({ params, request }) => {
