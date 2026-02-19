@@ -20,15 +20,16 @@ export function resolveRootLayoutData({
   user,
   authBypass,
 }: ResolveRootLayoutDataInput): RootLayoutData {
-  const resolvedUser: User | null = user ??
+  const resolvedUser: User | null =
+    user ??
     (authBypass
       ? {
-        id: 0,
-        username: 'auth-bypass',
-        password_hash: '',
-        created_at: '',
-        updated_at: '',
-      }
+          id: 0,
+          username: 'auth-bypass',
+          password_hash: '',
+          created_at: '',
+          updated_at: '',
+        }
       : null);
 
   if ((!resolvedUser && !authBypass) || pathname.startsWith('/auth/')) {

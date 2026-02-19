@@ -129,25 +129,25 @@ This runs the parser service and Vite dev server concurrently. See
 
 ### Environment Variables
 
-| Variable                         | Default         | Description                             |
-| -------------------------------- | --------------- | --------------------------------------- |
-| `PUID`                           | `1000`          | User ID for file permissions            |
-| `PGID`                           | `1000`          | Group ID for file permissions           |
-| `UMASK`                          | `022`           | File creation mask                      |
-| `TZ`                             | `Etc/UTC`       | Timezone for scheduling                 |
-| `PORT`                           | `6868`          | Web UI port                             |
-| `HOST`                           | `0.0.0.0`       | Bind address                            |
-| `APP_BASE_PATH`                  | `/config`       | Base path for data, logs, backups       |
-| `AUTH`                           | `on`            | Auth mode: `on`, `local`, `off`, `oidc` |
-| `PARSER_HOST`                    | `localhost`     | Parser service host                     |
-| `PARSER_PORT`                    | `5000`          | Parser service port                     |
-| `PRAXRR_DEFAULT_DB_TOKEN`        | `your_token`    | Default database token                  |
-| `PRAXRR_DEFAULT_DB_GIT_USERNAME` | `your_username` | Default database Git username           |
-| `PRAXRR_DEFAULT_DB_GIT_EMAIL`    | `your_email`    | Default database Git email              |
-| `PRAXRR_DEFAULT_DB_URL`          | `https://github.com/yandy-r/praxrr-db` | Default PCD auto-link repository URL |
-| `PRAXRR_DEFAULT_DB_BRANCH`       | `v2`            | Default PCD auto-link branch            |
-| `PRAXRR_DEFAULT_DB_NAME`         | `Praxrr-DB`     | Default PCD display name                |
-| `PRAXRR_SCHEMA_REF`              | manifest value  | Override schema dependency ref (tag or branch, e.g. `v2`, `dev`, `1.0.0`) |
+| Variable                         | Default                                | Description                                                               |
+| -------------------------------- | -------------------------------------- | ------------------------------------------------------------------------- |
+| `PUID`                           | `1000`                                 | User ID for file permissions                                              |
+| `PGID`                           | `1000`                                 | Group ID for file permissions                                             |
+| `UMASK`                          | `022`                                  | File creation mask                                                        |
+| `TZ`                             | `Etc/UTC`                              | Timezone for scheduling                                                   |
+| `PORT`                           | `6868`                                 | Web UI port                                                               |
+| `HOST`                           | `0.0.0.0`                              | Bind address                                                              |
+| `APP_BASE_PATH`                  | `/config`                              | Base path for data, logs, backups                                         |
+| `AUTH`                           | `on`                                   | Auth mode: `on`, `local`, `off`, `oidc`                                   |
+| `PARSER_HOST`                    | `localhost`                            | Parser service host                                                       |
+| `PARSER_PORT`                    | `5000`                                 | Parser service port                                                       |
+| `PRAXRR_DEFAULT_DB_TOKEN`        | `your_token`                           | Default database token                                                    |
+| `PRAXRR_DEFAULT_DB_GIT_USERNAME` | `your_username`                        | Default database Git username                                             |
+| `PRAXRR_DEFAULT_DB_GIT_EMAIL`    | `your_email`                           | Default database Git email                                                |
+| `PRAXRR_DEFAULT_DB_URL`          | `https://github.com/yandy-r/praxrr-db` | Default PCD auto-link repository URL                                      |
+| `PRAXRR_DEFAULT_DB_BRANCH`       | `v2`                                   | Default PCD auto-link branch                                              |
+| `PRAXRR_DEFAULT_DB_NAME`         | `Praxrr-DB`                            | Default PCD display name                                                  |
+| `PRAXRR_SCHEMA_REF`              | manifest value                         | Override schema dependency ref (tag or branch, e.g. `v2`, `dev`, `1.0.0`) |
 
 ## Monorepo Workspace Layout
 
@@ -169,7 +169,7 @@ are consumed through workspace references and mirror publishes.
 - [ ] `PRAXRR_DEFAULT_DB_NAME` defaults to `Praxrr-DB` when unset.
 - [ ] `PRAXRR_SCHEMA_REF` optionally overrides the schema dependency ref (`tag` or `branch`) at runtime.
 - [ ] `PRAXRR_DEFAULT_DB_TOKEN`, `PRAXRR_DEFAULT_DB_GIT_USERNAME`, and
-  `PRAXRR_DEFAULT_DB_GIT_EMAIL` remain supported for git push/auth flows.
+      `PRAXRR_DEFAULT_DB_GIT_EMAIL` remain supported for git push/auth flows.
 - [ ] Any custom DB fork used by default-link must be Arr/PCD schema-compatible and PCD manifest-valid.
 
 ### Empty URL Behavior

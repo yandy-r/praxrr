@@ -129,12 +129,7 @@ Radarr (10) and Sonarr (8). Source: `Lidarr/src/NzbDrone.Core/CustomFormats/Spec
 The praxrr consumer enforces this restriction in `src/lib/server/sync/customFormats/transformer.ts`:
 
 ```typescript
-const LIDARR_SUPPORTED_CONDITION_TYPES = new Set([
-  'release_title',
-  'release_group',
-  'indexer_flag',
-  'size',
-]);
+const LIDARR_SUPPORTED_CONDITION_TYPES = new Set(['release_title', 'release_group', 'indexer_flag', 'size']);
 ```
 
 ### Lidarr Quality Definitions (38 total, verified against Quality.cs)

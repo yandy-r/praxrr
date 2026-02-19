@@ -31,51 +31,50 @@ export interface Manifest {
 }
 
 function normalizeDependencyUrlForSchemaMatch(repoUrl: string): string {
-	const trimmed = repoUrl.trim().replace(/\/+$/, '').replace(/\.git$/i, '');
-	try {
-		const parsed = new URL(trimmed);
-		const pathname = parsed.pathname.toLowerCase().replace(/\/+$/, '');
-		return `${parsed.protocol.toLowerCase()}//${parsed.hostname.toLowerCase()}${pathname}`;
-	} catch {
-		return trimmed.toLowerCase().replace(/\/+$/, '');
-	}
+  const trimmed = repoUrl
+    .trim()
+    .replace(/\/+$/, '')
+    .replace(/\.git$/i, '');
+  try {
+    const parsed = new URL(trimmed);
+    const pathname = parsed.pathname.toLowerCase().replace(/\/+$/, '');
+    return `${parsed.protocol.toLowerCase()}//${parsed.hostname.toLowerCase()}${pathname}`;
+  } catch {
+    return trimmed.toLowerCase().replace(/\/+$/, '');
+  }
 }
 
 function isSchemaDependencyUrl(repoUrl: string): boolean {
-	return SCHEMA_DEPENDENCY_PATTERN.test(normalizeDependencyUrlForSchemaMatch(repoUrl));
+  return SCHEMA_DEPENDENCY_PATTERN.test(normalizeDependencyUrlForSchemaMatch(repoUrl));
 }
 
-export function resolveSchemaDependencyUrl(
-	dependencies: Record<string, string> | undefined
-): string {
-	if (!dependencies || Object.keys(dependencies).length === 0) {
-		return SCHEMA_DEPENDENCY_URL;
-	}
+export function resolveSchemaDependencyUrl(dependencies: Record<string, string> | undefined): string {
+  if (!dependencies || Object.keys(dependencies).length === 0) {
+    return SCHEMA_DEPENDENCY_URL;
+  }
 
-	const exactMatch = Object.keys(dependencies).find((dependency) => dependency === SCHEMA_DEPENDENCY_URL);
-	if (exactMatch) {
-		return exactMatch;
-	}
+  const exactMatch = Object.keys(dependencies).find((dependency) => dependency === SCHEMA_DEPENDENCY_URL);
+  if (exactMatch) {
+    return exactMatch;
+  }
 
-	const schemaDependencies = Object.keys(dependencies).filter(isSchemaDependencyUrl);
-	if (schemaDependencies.length > 1) {
-		const resolved = schemaDependencies
-			.map((dependency) => `"${dependency}"`)
-			.join(', ');
-		const error = new ManifestValidationError(
-			`SCHEMA_DEPENDENCY_RESOLUTION_ERROR: found ${schemaDependencies.length} schema-like dependencies: ${resolved}`
-		);
-		Object.assign(error, {
-			code: SCHEMA_DEPENDENCY_CODE,
-		});
-		throw error;
-	}
+  const schemaDependencies = Object.keys(dependencies).filter(isSchemaDependencyUrl);
+  if (schemaDependencies.length > 1) {
+    const resolved = schemaDependencies.map((dependency) => `"${dependency}"`).join(', ');
+    const error = new ManifestValidationError(
+      `SCHEMA_DEPENDENCY_RESOLUTION_ERROR: found ${schemaDependencies.length} schema-like dependencies: ${resolved}`
+    );
+    Object.assign(error, {
+      code: SCHEMA_DEPENDENCY_CODE,
+    });
+    throw error;
+  }
 
-	if (schemaDependencies.length === 1) {
-		return schemaDependencies[0]!;
-	}
+  if (schemaDependencies.length === 1) {
+    return schemaDependencies[0]!;
+  }
 
-	throw new ManifestValidationError('Manifest dependencies must include schema repository');
+  throw new ManifestValidationError('Manifest dependencies must include schema repository');
 }
 
 /**

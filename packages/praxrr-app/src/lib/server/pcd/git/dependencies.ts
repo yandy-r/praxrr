@@ -15,7 +15,10 @@ const SCHEMA_REF_OVERRIDE_ENV = 'PRAXRR_SCHEMA_REF';
  * https://github.com/yandy-r/praxrr-schema -> schema
  */
 function getRepoName(repoUrl: string): string {
-  const trimmed = repoUrl.trim().replace(/\/+$/, '').replace(/\.git$/i, '');
+  const trimmed = repoUrl
+    .trim()
+    .replace(/\/+$/, '')
+    .replace(/\.git$/i, '');
   try {
     const parsed = new URL(trimmed);
     const parts = parsed.pathname.split('/').filter(Boolean);
@@ -122,11 +125,7 @@ async function updateDependency(depPath: string, version: string): Promise<void>
   await execGit(['reset', '--hard', remoteBranchRef], depPath);
 }
 
-function getRequiredDependencyRef(
-  repoUrl: string,
-  manifestRef: string,
-  schemaDependencyUrl: string
-): string {
+function getRequiredDependencyRef(repoUrl: string, manifestRef: string, schemaDependencyUrl: string): string {
   if (repoUrl !== schemaDependencyUrl) {
     return manifestRef;
   }

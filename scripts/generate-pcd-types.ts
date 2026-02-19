@@ -586,7 +586,7 @@ import type { Generated } from 'kysely';
   categorized.set('DELAY PROFILES', sortByOrder(categorized.get('DELAY PROFILES')!, delayProfileTables));
   categorized.set(
     'LIDARR METADATA PROFILES',
-    sortByOrder(categorized.get('LIDARR METADATA PROFILES')!, lidarrMetadataProfileTables),
+    sortByOrder(categorized.get('LIDARR METADATA PROFILES')!, lidarrMetadataProfileTables)
   );
   categorized.set('MEDIA MANAGEMENT', sortByOrder(categorized.get('MEDIA MANAGEMENT')!, mediaManagementTables));
   categorized.set('CORE', sortByOrder(categorized.get('CORE')!, coreTables));
@@ -656,13 +656,13 @@ import type { Generated } from 'kysely';
   lines.push('// - Radarr/Sonarr legacy targets remain valid.');
   lines.push('// - Lidarr is an explicit, intentional Arr app type addition (no string fallback).');
   lines.push(
-    "const ARR_APP_TYPE_NON_REGRESSION_CHECK = ['radarr', 'sonarr'] as const satisfies readonly ArrAppType[];",
+    "const ARR_APP_TYPE_NON_REGRESSION_CHECK = ['radarr', 'sonarr'] as const satisfies readonly ArrAppType[];"
   );
   lines.push(
-    "const ARR_APP_TYPE_WITH_LIDARR_CHECK = ['radarr', 'sonarr', 'lidarr'] as const satisfies readonly ArrAppType[];",
+    "const ARR_APP_TYPE_WITH_LIDARR_CHECK = ['radarr', 'sonarr', 'lidarr'] as const satisfies readonly ArrAppType[];"
   );
   lines.push(
-    "const ARR_TYPE_NON_REGRESSION_CHECK = ['radarr', 'sonarr', 'all'] as const satisfies readonly ArrType[];",
+    "const ARR_TYPE_NON_REGRESSION_CHECK = ['radarr', 'sonarr', 'all'] as const satisfies readonly ArrType[];"
   );
   lines.push('void ARR_APP_TYPE_NON_REGRESSION_CHECK;');
   lines.push('void ARR_APP_TYPE_WITH_LIDARR_CHECK;');
@@ -689,11 +689,9 @@ import type { Generated } from 'kysely';
   lines.push('};');
   lines.push('');
   lines.push('/** Extract selectable type from a table (Generated<T> becomes T) */');
+  lines.push('export type Selectable<T> = {');
   lines.push(
-    'export type Selectable<T> = {',
-  );
-  lines.push(
-    '  [K in keyof T]: T[K] extends Generated<infer U> ? U : T[K] extends Generated<infer U> | null ? U | null : T[K];',
+    '  [K in keyof T]: T[K] extends Generated<infer U> ? U : T[K] extends Generated<infer U> | null ? U | null : T[K];'
   );
   lines.push('};');
   lines.push('');

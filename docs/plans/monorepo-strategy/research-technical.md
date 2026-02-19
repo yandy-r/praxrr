@@ -310,15 +310,15 @@ E2E tests (`scripts/e2e.ts`) reference `src/tests/e2e/specs` -- still valid afte
 
 New environment variables for the default database auto-link (in `hooks.server.ts`):
 
-| Env Var                            | Purpose                                       | Default Value                          |
-| ---------------------------------- | --------------------------------------------- | -------------------------------------- |
-| `PRAXRR_DEFAULT_DB_URL`            | Repository URL for auto-link on first startup | `https://github.com/yandy-r/praxrr-db` |
-| `PRAXRR_DEFAULT_DB_BRANCH`         | Branch to clone for auto-link                 | `v2`                                   |
-| `PRAXRR_DEFAULT_DB_NAME`           | Display name for auto-linked database         | `Praxrr-DB`                            |
-| `PRAXRR_DEFAULT_DB_SYNC_STRATEGY`  | Sync interval in minutes                      | `60`                                   |
-| `PRAXRR_DEFAULT_DB_TOKEN`          | PAT for private repos (already exists)        | (none)                                 |
+| Env Var                           | Purpose                                       | Default Value                          |
+| --------------------------------- | --------------------------------------------- | -------------------------------------- |
+| `PRAXRR_DEFAULT_DB_URL`           | Repository URL for auto-link on first startup | `https://github.com/yandy-r/praxrr-db` |
+| `PRAXRR_DEFAULT_DB_BRANCH`        | Branch to clone for auto-link                 | `v2`                                   |
+| `PRAXRR_DEFAULT_DB_NAME`          | Display name for auto-linked database         | `Praxrr-DB`                            |
+| `PRAXRR_DEFAULT_DB_SYNC_STRATEGY` | Sync interval in minutes                      | `60`                                   |
+| `PRAXRR_DEFAULT_DB_TOKEN`         | PAT for private repos (already exists)        | (none)                                 |
 | `PRAXRR_DEFAULT_DB_GIT_USERNAME`  | Git author name (already exists)              | (none)                                 |
-| `PRAXRR_DEFAULT_DB_GIT_EMAIL` | Git author email (already exists)             | (none)                                 |
+| `PRAXRR_DEFAULT_DB_GIT_EMAIL`     | Git author email (already exists)             | (none)                                 |
 
 Implementation in `hooks.server.ts`:
 
