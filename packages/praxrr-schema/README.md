@@ -1,9 +1,22 @@
 # Praxrr Schema
 
-The **base SQLite schema** for all
-[Praxrr Compliant Databases (PCDs)](https://github.com/yandy-r/praxrr). This repository defines the
-structural foundation -- tables, constraints, indexes, and seed data -- that every PCD builds upon.
+The **base SQLite schema** for all [Praxrr Compliant Databases (PCDs)](https://github.com/yandy-r/praxrr) is maintained in the monorepo at
+`praxrr/packages/praxrr-schema`. This repository defines the structural foundation -- tables, constraints,
+indexes, and seed data -- that every PCD builds upon.
 It supports **Radarr**, **Sonarr**, and **Lidarr** media management applications.
+
+## Distribution and release workflow
+
+This is a distribution mirror of the main Praxrr monorepo:
+[`https://github.com/yandy-r/praxrr`](https://github.com/yandy-r/praxrr).
+
+Source-of-truth locations for this package:
+
+- Package source: `praxrr/packages/praxrr-schema`
+- Mirror publish workflow: `praxrr/.github/workflows/publish-schema.yml`
+
+Do not edit this repository directly. Changes must be made in the monorepo and are published automatically
+via the workflow above using `git subtree split`.
 
 PCDs describe a database as a sequence of SQL operations, not as final data. The stored artifact is
 **how to build the state**, not the state itself. This schema is the first layer in that sequence:
@@ -14,6 +27,7 @@ that downstream PCDs depend on. Every PCD must declare `schema` as a dependency 
 
 ## Table of Contents
 
+- [Distribution and release workflow](#distribution-and-release-workflow)
 - [What Is a PCD?](#what-is-a-pcd)
 - [Schema Diagram](#schema-diagram)
 - [How It Works](#how-it-works)
