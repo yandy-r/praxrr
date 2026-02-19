@@ -32,14 +32,39 @@
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   export let form: any = undefined;
 
-  // Parse tags from JSON string
-  const parseTags = (tagsJson: string | null): string[] => {
-    if (!tagsJson) return [];
-    try {
-      return JSON.parse(tagsJson);
-    } catch {
+  // Parse persisted tag values from either JSON array payloads or legacy comma-separated strings.
+  const parseTags = (tagsValue: string | string[] | null | undefined): string[] => {
+    if (!tagsValue) return [];
+    if (Array.isArray(tagsValue)) {
+      return tagsValue
+        .filter((tag): tag is string => typeof tag === 'string')
+        .map((tag) => tag.trim())
+        .filter((tag) => tag.length > 0);
+    }
+
+    if (typeof tagsValue !== 'string') {
       return [];
     }
+
+    const trimmed = tagsValue.trim();
+    if (!trimmed) return [];
+
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (Array.isArray(parsed)) {
+        return parsed
+          .filter((tag): tag is string => typeof tag === 'string')
+          .map((tag) => tag.trim())
+          .filter((tag) => tag.length > 0);
+      }
+    } catch {
+      // Fall back to legacy comma-separated representation.
+    }
+
+    return trimmed
+      .split(',')
+      .map((tag) => tag.trim())
+      .filter((tag) => tag.length > 0);
   };
 
   // Initialize dirty tracking on mount
@@ -429,7 +454,7 @@
     <div class="space-y-2">
       <span class="block text-sm font-medium text-neutral-900 dark:text-neutral-100"> Tags </span>
       <p class="text-xs text-neutral-500 dark:text-neutral-400">Press Enter to add a tag, Backspace to remove</p>
-      <TagInput {tags} on:change={(e) => update('tags', JSON.stringify(e.detail))} />
+      <TagInput {tags} onchange={(newTags) => update('tags', JSON.stringify(newTags))} />
     </div>
   </div>
 </div>
