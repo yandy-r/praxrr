@@ -25,8 +25,8 @@ Recommended approach: **Extract nav data into a typed registry, introduce lightw
 
 ### Key Files
 
-| File                                                      | Role                                                                                  | Lines |
-| --------------------------------------------------------- | ------------------------------------------------------------------------------------- | ----- |
+| File                                                                          | Role                                                                                  | Lines |
+| ----------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- | ----- |
 | `packages/praxrr-app/src/routes/+layout.svelte`                               | Root shell: conditionally renders nav for non-auth pages, passes `version` to PageNav | ~31   |
 | `packages/praxrr-app/src/routes/+layout.server.ts`                            | Returns only `{ version }` from app DB                                                | ~8    |
 | `packages/praxrr-app/src/lib/client/ui/navigation/pageNav/pageNav.svelte`     | Left sidebar with 9 hardcoded `Group` instances, mobile drawer, Escape handler        | ~160  |

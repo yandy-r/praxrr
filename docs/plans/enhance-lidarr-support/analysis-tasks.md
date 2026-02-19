@@ -76,18 +76,18 @@ Break implementation into three phases: data foundation, product cutover, and ha
 
 ### Files to Create
 
-| File                              | Suggested Task                   | Phase | Dependencies |
-| --------------------------------- | -------------------------------- | ----- | ------------ |
+| File                                                  | Suggested Task                   | Phase | Dependencies |
+| ----------------------------------------------------- | -------------------------------- | ----- | ------------ |
 | `/packages/praxrr-app/src/lib/server/db/migrations/*` | Add first-class Lidarr migration | 1     | none         |
 
 ### Files to Modify
 
-| File                                                           | Suggested Task                        | Phase | Dependencies      |
-| -------------------------------------------------------------- | ------------------------------------- | ----- | ----------------- |
-| `/docs/pcdReference/0.schema.sql`                              | Add `lidarr_*` schema refs            | 1     | none              |
+| File                                                                               | Suggested Task                        | Phase | Dependencies      |
+| ---------------------------------------------------------------------------------- | ------------------------------------- | ----- | ----------------- |
+| `/docs/pcdReference/0.schema.sql`                                                  | Add `lidarr_*` schema refs            | 1     | none              |
 | `/packages/praxrr-app/src/lib/server/db/schema.sql`                                | Align runtime schema docs             | 1     | none              |
 | `/packages/praxrr-app/src/lib/shared/pcd/portable.ts`                              | Add first-class Lidarr portable types | 1     | schema decisions  |
-| `/docs/api/v1/schemas/pcd.yaml`                                | Document first-class Lidarr entities  | 1     | portable changes  |
+| `/docs/api/v1/schemas/pcd.yaml`                                                    | Document first-class Lidarr entities  | 1     | portable changes  |
 | `/packages/praxrr-app/src/lib/server/pcd/entities/mediaManagement/**`              | Dedicated Lidarr CRUD/list/get        | 2     | phase 1           |
 | `/packages/praxrr-app/src/routes/media-management/[databaseId]/**/+page.server.ts` | Route dispatch to Lidarr helpers      | 2     | entity helpers    |
 | `/packages/praxrr-app/src/routes/api/v1/pcd/import/+server.ts`                     | Import support for `lidarr_*`         | 2     | phase 1           |

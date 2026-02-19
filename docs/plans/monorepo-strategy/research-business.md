@@ -263,18 +263,18 @@ praxrr-schema (schema repo)
 
 ### Hardcoded References
 
-| File                                            | Line         | Reference                                           | Impact                       |
-| ----------------------------------------------- | ------------ | --------------------------------------------------- | ---------------------------- |
+| File                                                                | Line         | Reference                                           | Impact                       |
+| ------------------------------------------------------------------- | ------------ | --------------------------------------------------- | ---------------------------- |
 | `packages/praxrr-app/src/hooks.server.ts`                           | 54           | `'https://github.com/yandy-r/praxrr-db'`            | Auto-link default DB URL     |
 | `packages/praxrr-app/src/hooks.server.ts`                           | 55           | `'v2'`                                              | Auto-link default branch     |
-| `scripts/generate-pcd-types.ts`                 | 19           | `'yandy-r/praxrr-schema'`                           | GitHub raw URL for type gen  |
-| `scripts/generate-pcd-types.ts`                 | 37           | `'ops/0.schema.sql'`                                | Schema file path within repo |
+| `scripts/generate-pcd-types.ts`                                     | 19           | `'yandy-r/praxrr-schema'`                           | GitHub raw URL for type gen  |
+| `scripts/generate-pcd-types.ts`                                     | 37           | `'ops/0.schema.sql'`                                | Schema file path within repo |
 | `packages/praxrr-app/src/routes/databases/[id]/config/+page.svelte` | 316          | `'https://github.com/yandy-r/praxrr-schema'`        | Locked dependency key in UI  |
 | `packages/praxrr-app/src/tests/e2e/env.ts`                          | 33           | `'https://github.com/yandy-r/praxrr-db-v2-testing'` | E2E test default repo        |
 | `packages/praxrr-app/src/lib/server/pcd/git/dependencies.ts`        | 12           | Comment referencing `yandy-r/praxrr-schema`         | Documentation only           |
 | `packages/praxrr-app/src/lib/shared/pcd/types.ts`                   | 6            | Generated comment with schema URL                   | Cosmetic, regenerated        |
-| `README.md`                                     | 27           | Link to `praxrr-db` repo                            | Documentation                |
-| `docs/ARCHITECTURE.md`                          | 252, 266-277 | Multiple references to both repos                   | Documentation                |
+| `README.md`                                                         | 27           | Link to `praxrr-db` repo                            | Documentation                |
+| `docs/ARCHITECTURE.md`                                              | 252, 266-277 | Multiple references to both repos                   | Documentation                |
 
 ### Config/Env Variables
 

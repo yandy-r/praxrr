@@ -218,14 +218,14 @@ The parser is a minimal ASP.NET Core 8 web application with **no external NuGet 
 
 #### How Parser Is Called
 
-| Call Site          | File                                                                  | Purpose                                           |
-| ------------------ | --------------------------------------------------------------------- | ------------------------------------------------- |
-| Parse/Match client | `$arr/parser/client.ts`                                               | `ParserClient.parse()`, `match()`, `matchBatch()` |
-| Health check       | `$arr/parser/client.ts`                                               | `isParserHealthy()` via `health()`                |
+| Call Site          | File                                                                                      | Purpose                                           |
+| ------------------ | ----------------------------------------------------------------------------------------- | ------------------------------------------------- |
+| Parse/Match client | `$arr/parser/client.ts`                                                                   | `ParserClient.parse()`, `match()`, `matchBatch()` |
+| Health check       | `$arr/parser/client.ts`                                                                   | `isParserHealthy()` via `health()`                |
 | CF testing page    | `packages/praxrr-app/src/routes/custom-formats/[databaseId]/[id]/testing/+page.server.ts` | Direct parse calls                                |
 | Entity testing API | `packages/praxrr-app/src/routes/api/v1/entity-testing/evaluate/+server.ts`                | Batch parse + pattern match                       |
 | regex101 API       | `packages/praxrr-app/src/routes/api/regex101/[id]/+server.ts`                             | Pattern matching                                  |
-| CF evaluator       | `$pcd/entities/customFormats/evaluator.ts`                            | Consumes ParseResult                              |
+| CF evaluator       | `$pcd/entities/customFormats/evaluator.ts`                                                | Consumes ParseResult                              |
 | Auto-spawn         | `packages/praxrr-app/src/lib/server/utils/parser/spawn.ts`                                | Standalone binary auto-spawn                      |
 
 #### Configuration
@@ -356,7 +356,7 @@ Research identified two viable approaches with distinct trade-offs:
 | HTTP framework      | `net/http` (stdlib, Go 1.22+)    | 4 endpoints, no middleware needed                                 |
 | JSON                | `encoding/json` (stdlib)         | Payloads <1KB, not the bottleneck                                 |
 | Batch concurrency   | Worker pool (`runtime.NumCPU()`) | Matches .NET `Parallel.ForEach` behavior                          |
-| Repository location | `packages/praxrr-parser-go/`        | Same pattern as current `packages/praxrr-parser/`                    |
+| Repository location | `packages/praxrr-parser-go/`     | Same pattern as current `packages/praxrr-parser/`                 |
 | Logging             | `log/slog` (stdlib, Go 1.21+)    | Minimal needs, built-in JSON + text output                        |
 | ReDoS protection    | `regexp2.MatchTimeout` (100ms)   | Direct equivalent of .NET `TimeSpan.FromMilliseconds(100)`        |
 

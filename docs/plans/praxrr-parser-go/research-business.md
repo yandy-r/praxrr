@@ -348,8 +348,8 @@ Extraction order:
 
 ### How Parser Is Called
 
-| Call Site              | File                                                                      | Purpose                                                          |
-| ---------------------- | ------------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| Call Site              | File                                                                                          | Purpose                                                          |
+| ---------------------- | --------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
 | Parse endpoint         | `packages/praxrr-app/src/lib/server/utils/arr/parser/client.ts`                               | `ParserClient.parse()` -- all parse calls go through this client |
 | Match endpoint         | `packages/praxrr-app/src/lib/server/utils/arr/parser/client.ts`                               | `ParserClient.match()` and `matchBatch()`                        |
 | Health check           | `packages/praxrr-app/src/lib/server/utils/arr/parser/client.ts`                               | `ParserClient.health()` via `isParserHealthy()`                  |
@@ -361,10 +361,10 @@ Extraction order:
 
 ### Configuration
 
-| Variable          | Default                                 | Description                                   |
-| ----------------- | --------------------------------------- | --------------------------------------------- |
-| `PARSER_HOST`     | `localhost`                             | Parser service hostname                       |
-| `PARSER_PORT`     | `5000`                                  | Parser service port                           |
+| Variable          | Default                                                     | Description                                   |
+| ----------------- | ----------------------------------------------------------- | --------------------------------------------- |
+| `PARSER_HOST`     | `localhost`                                                 | Parser service hostname                       |
+| `PARSER_PORT`     | `5000`                                                      | Parser service port                           |
 | Config resolution | `packages/praxrr-app/src/lib/server/utils/config/config.ts` | Constructs `parserUrl = http://{host}:{port}` |
 
 ### Docker Setup
