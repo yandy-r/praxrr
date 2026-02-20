@@ -129,6 +129,32 @@ export abstract class BaseTest {
   }
 
   /**
+   * Record a module/object patch and restore it automatically.
+   */
+  protected installPatch<T extends object, K extends keyof T>(
+    target: T,
+    key: K,
+    replacement: T[K],
+    restoreBucket: Array<() => void>
+  ): void {
+    const original = target[key];
+    target[key] = replacement;
+    restoreBucket.push(() => {
+      target[key] = original;
+    });
+  }
+
+  /**
+   * Assert that a serialized payload does not include a forbidden plaintext boundary.
+   */
+  protected assertPayloadNoLeak(payload: unknown, forbidden: string, context = 'payload'): void {
+    const serialized = typeof payload === 'string' ? payload : JSON.stringify(payload);
+    if (serialized.includes(forbidden)) {
+      throw new Error(`${context} contains forbidden plaintext value`);
+    }
+  }
+
+  /**
    * Read and parse JSON log file
    */
   protected async readJsonLines(filePath: string): Promise<unknown[]> {

@@ -485,7 +485,7 @@
   <input
     type="hidden"
     name="api_key"
-    value={lockCoreFields ? instance?.api_key ?? '' : apiKey}
+    value={lockCoreFields ? '' : apiKey}
   />
   <input type="hidden" name="enabled" value={enabled === 'true' ? '1' : '0'} />
   <input type="hidden" name="tags" value={JSON.stringify(tags)} />

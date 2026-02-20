@@ -2,7 +2,7 @@ import { jobQueueRegistry } from '../queueRegistry.ts';
 import type { JobHandler, JobType } from '../queueTypes.ts';
 import { arrInstancesQueries } from '$db/queries/arrInstances.ts';
 import { arrSyncQueries } from '$db/queries/arrSync.ts';
-import { createArrClient } from '$arr/factory.ts';
+import { getArrInstanceClient } from '$arr/arrInstanceClients.ts';
 import type { ArrType } from '$arr/types.ts';
 import { calculateNextRun } from '$lib/server/sync/utils.ts';
 import type { SectionType } from '$lib/server/sync/types.ts';
@@ -50,6 +50,27 @@ function parseLegacySections(payload: Record<string, unknown>): SectionType[] | 
   return null;
 }
 
+function isArrCredentialFailure(message: string): boolean {
+  return (
+    message.includes('Unable to decrypt Arr API key') ||
+    message.includes('No Arr credentials found for instance') ||
+    message.includes('No Arr credential key configured for version') ||
+    message.includes('ARR_CREDENTIAL_MASTER_KEY')
+  );
+}
+
+function getArrClientFailureMessage(message: string): string {
+  if (message.includes('No Arr credentials found for instance') || message.includes('Unable to decrypt Arr API key')) {
+    return 'Arr credentials are not readable. Check Arr credential key configuration and recreate the API key.';
+  }
+
+  if (message.includes('No Arr credential key configured for version') || message.includes('ARR_CREDENTIAL_MASTER_KEY')) {
+    return 'Arr master key configuration is invalid or incomplete. Update ARR_CREDENTIAL_MASTER_KEY settings and retry.';
+  }
+
+  return message;
+}
+
 function resolveSections(jobType: JobType, payload: Record<string, unknown>): SectionType[] {
   const mapped = jobTypeToSection.get(jobType);
   if (mapped) return [mapped];
@@ -88,7 +109,44 @@ const arrSyncHandler: JobHandler = async (job) => {
     return { status: 'failure', error: `Unsupported sync instance type: ${instance.type}` };
   }
 
-  const client = createArrClient(instance.type as ArrType, instance.url, instance.api_key);
+  let client: Awaited<ReturnType<typeof getArrInstanceClient>>;
+  try {
+    client = await getArrInstanceClient(instance.type as ArrType, instanceId, instance.url);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unable to create Arr client';
+
+    if (isArrCredentialFailure(message)) {
+      try {
+        arrInstancesQueries.update(instanceId, { enabled: false });
+        await logger.warn('Arr sync disabled instance due to credential failure', {
+          source: 'ArrSyncJob',
+          meta: {
+            jobId: job.id,
+            instanceId,
+            instanceName: instance.name,
+            reason: message,
+          },
+        });
+      } catch (disableError) {
+        await logger.error('Failed to disable Arr instance after credential failure', {
+          source: 'ArrSyncJob',
+          meta: {
+            jobId: job.id,
+            instanceId,
+            instanceName: instance.name,
+            disableError: disableError instanceof Error ? disableError.message : String(disableError),
+          },
+        });
+      }
+
+      return {
+        status: 'failure',
+        error: `Arr credentials are not readable. ${getArrClientFailureMessage(message)} The instance has been disabled.`,
+      };
+    }
+
+    return { status: 'failure', error: message };
+  }
   const results: string[] = [];
   let failures = 0;
   let ranSections = 0;

@@ -149,6 +149,9 @@ This runs the parser service and Vite dev server concurrently. See
 | `PRAXRR_DEFAULT_DB_NAME`           | `Praxrr-DB`                            | Default PCD display name                                                    |
 | `PRAXRR_SCHEMA_REF`                | manifest value                         | Override schema dependency ref (tag or branch, e.g. `v2`, `dev`, `1.0.0`)   |
 | `PRAXRR_VALIDATE_INSTANCES`        | `false`                                | Validate env-managed instances against Arr API during startup (optional).   |
+| `ARR_CREDENTIAL_MASTER_KEY`        | _required for Arr access_               | Base64-encoded 32-byte master key for AES-GCM encryption and HMAC fingerprinting |
+| `ARR_CREDENTIAL_MASTER_KEY_VERSION`| _required for Arr access_               | Version label for the active master key, used for encryption and lookup |
+| `ARR_CREDENTIAL_PREVIOUS_KEYS`     | _unset_                                | Optional JSON map of previous versions to base64 keys for decryption during rotation |
 | `RADARR_INSTANCE_URL_<N>`          | _unset_                                | `http://radarr:7878` (required with matching `RADARR_INSTANCE_API_KEY_<N>`) |
 | `RADARR_INSTANCE_API_KEY_<N>`      | _unset_                                | API key (required with matching `RADARR_INSTANCE_URL_<N>`)                  |
 | `RADARR_INSTANCE_NAME_<N>`         | `Radarr`, `Radarr 2`...                | Optional display name                                                       |
@@ -173,6 +176,11 @@ This runs the parser service and Vite dev server concurrently. See
 Use indexed env vars to create instances automatically at startup:
 
 ```env
+ARR_CREDENTIAL_MASTER_KEY=<base64_32byte_key>
+ARR_CREDENTIAL_MASTER_KEY_VERSION=v1
+# Optional for rotations; keep empty to disable
+ARR_CREDENTIAL_PREVIOUS_KEYS='{"v0":"<base64_32byte_legacy_key>"}'
+
 RADARR_INSTANCE_URL_1=http://radarr:7878
 RADARR_INSTANCE_API_KEY_1=REDACTED
 RADARR_INSTANCE_NAME_1=Movies
@@ -194,6 +202,9 @@ PRAXRR_VALIDATE_INSTANCES=true
 services:
   praxrr:
     environment:
+      - ARR_CREDENTIAL_MASTER_KEY=${PRAXRR_ARR_CREDENTIAL_MASTER_KEY} # required
+      - ARR_CREDENTIAL_MASTER_KEY_VERSION=${PRAXRR_ARR_CREDENTIAL_MASTER_KEY_VERSION} # required
+      - ARR_CREDENTIAL_PREVIOUS_KEYS=${PRAXRR_ARR_CREDENTIAL_PREVIOUS_KEYS} # optional
       - RADARR_INSTANCE_URL_1=http://radarr:7878
       - RADARR_INSTANCE_API_KEY_1=REDACTED
       - RADARR_INSTANCE_NAME_1=Movies

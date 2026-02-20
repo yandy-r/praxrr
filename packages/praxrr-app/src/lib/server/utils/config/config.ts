@@ -17,6 +17,9 @@ class Config {
     clientId: string | null;
     clientSecret: string | null;
   };
+  public readonly arrCredentialMasterKey: string | null;
+  public readonly arrCredentialMasterKeyVersion: string | null;
+  public readonly arrCredentialPreviousKeys: string | null;
 
   constructor() {
     // Default base path logic:
@@ -59,6 +62,13 @@ class Config {
       clientId: Deno.env.get('OIDC_CLIENT_ID') || null,
       clientSecret: Deno.env.get('OIDC_CLIENT_SECRET') || null,
     };
+
+    this.arrCredentialMasterKey = Deno.env.get('ARR_CREDENTIAL_MASTER_KEY') || null;
+    this.arrCredentialMasterKeyVersion = Deno.env.get('ARR_CREDENTIAL_MASTER_KEY_VERSION') || null;
+    this.arrCredentialPreviousKeys =
+      Deno.env.get('ARR_CREDENTIAL_PREVIOUS_KEYS') ||
+      Deno.env.get('ARR_CREDENTIAL_MASTER_KEYS') ||
+      null;
   }
 
   /**

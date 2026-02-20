@@ -7,6 +7,7 @@ import { config } from '$config';
 import { printBanner, getServerInfo, logContainerConfig } from '$logger/startup.ts';
 import { logSettings } from '$logger/settings.ts';
 import { logger } from '$logger/logger.ts';
+import { getActiveArrCredentialKeyVersion } from '$server/utils/encryption/keys.ts';
 import { db } from '$db/db.ts';
 import { runMigrations } from '$db/migrations.ts';
 import { reconcileEnvInstances } from '$arr/envInstances.ts';
@@ -18,6 +19,19 @@ import { setupStateQueries } from '$db/queries/setupState.ts';
 
 // Initialize configuration on server startup
 await config.init();
+
+// Validate Arr credential key configuration before services that depend on it
+// to fail startup with a clear action path when encryption material is missing/invalid.
+try {
+  getActiveArrCredentialKeyVersion();
+} catch (error) {
+  await logger.error('Invalid Arr credential master key configuration', {
+    source: 'Startup',
+    meta: { error: error instanceof Error ? error.message : String(error) },
+  });
+
+  throw error;
+}
 
 // Initialize database
 await db.initialize();
