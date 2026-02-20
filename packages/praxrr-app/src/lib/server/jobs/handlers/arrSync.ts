@@ -1,5 +1,5 @@
 import { jobQueueRegistry } from '../queueRegistry.ts';
-import type { JobHandler, JobType } from '../queueTypes.ts';
+import type { JobHandler, JobRunStatus, JobType } from '../queueTypes.ts';
 import { arrInstancesQueries } from '$db/queries/arrInstances.ts';
 import { arrSyncQueries } from '$db/queries/arrSync.ts';
 import { getArrInstanceClient } from '$arr/arrInstanceClients.ts';
@@ -22,6 +22,94 @@ const jobTypeToSection = new Map<JobType, SectionType>([
   ['arr.sync.mediaManagement', 'mediaManagement'],
   ['arr.sync.metadataProfiles', 'metadataProfiles'],
 ]);
+
+const SECTION_SYNC_ORDER: SectionType[] = ['qualityProfiles', 'delayProfiles', 'mediaManagement', 'metadataProfiles'];
+
+function dedupeSections(requestedSections: readonly SectionType[]): SectionType[] {
+  const seen = new Set<SectionType>();
+  const sections: SectionType[] = [];
+  for (const section of requestedSections) {
+    if (seen.has(section)) {
+      continue;
+    }
+    seen.add(section);
+    sections.push(section);
+  }
+  return sections;
+}
+
+function getSectionSyncStatus(instanceId: number, section: SectionType): string {
+  const configStatus = arrSyncQueries.getSyncConfigStatus(instanceId);
+  switch (section) {
+    case 'qualityProfiles':
+      return configStatus.qualityProfiles.syncStatus;
+    case 'delayProfiles':
+      return configStatus.delayProfiles.syncStatus;
+    case 'mediaManagement':
+      return configStatus.mediaManagement.syncStatus;
+    case 'metadataProfiles':
+      return configStatus.metadataProfiles.syncStatus;
+  }
+}
+
+export function getSectionsInProgress(instanceId: number): SectionType[] {
+  return SECTION_SYNC_ORDER.filter((section) => getSectionSyncStatus(instanceId, section) === 'in_progress');
+}
+
+export function setSectionStatusPending(instanceId: number, section: SectionType): void {
+  switch (section) {
+    case 'qualityProfiles':
+      arrSyncQueries.setQualityProfilesStatusPending(instanceId);
+      return;
+    case 'delayProfiles':
+      arrSyncQueries.setDelayProfilesStatusPending(instanceId);
+      return;
+    case 'mediaManagement':
+      arrSyncQueries.setMediaManagementStatusPending(instanceId);
+      return;
+    case 'metadataProfiles':
+      arrSyncQueries.setMetadataProfilesStatusPending(instanceId);
+      return;
+  }
+}
+
+export function setSectionsStatusPending(instanceId: number, sections: readonly SectionType[]): void {
+  for (const section of dedupeSections(sections)) {
+    setSectionStatusPending(instanceId, section);
+  }
+}
+
+export async function executeSyncJob(
+  instanceId: number,
+  sections: readonly SectionType[],
+  source: 'manual' | 'system' | 'schedule' = 'manual'
+): Promise<{
+  status: JobRunStatus;
+  output?: string;
+  error?: string;
+  rescheduleAt?: string | null;
+}> {
+  setSectionsStatusPending(instanceId, sections);
+
+  const now = new Date().toISOString();
+  const payload = sections.length === 0 ? { instanceId } : { instanceId, sections };
+
+  return arrSyncHandler({
+    id: 0,
+    jobType: 'arr.sync',
+    status: 'queued',
+    runAt: now,
+    payload,
+    source,
+    dedupeKey: null,
+    cooldownUntil: null,
+    attempts: 0,
+    startedAt: null,
+    finishedAt: null,
+    createdAt: now,
+    updatedAt: now,
+  } as Parameters<typeof arrSyncHandler>[0]);
+}
 
 function parseLegacySections(payload: Record<string, unknown>): SectionType[] | null {
   const raw = payload.sections ?? payload.section;

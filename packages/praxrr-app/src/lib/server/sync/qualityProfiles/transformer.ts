@@ -4,7 +4,12 @@
  */
 
 import type { PCDCache } from '$pcd/index.ts';
-import type { ArrQualityProfileItem, ArrQualityProfilePayload, QualityProfileFormatItem } from '$arr/types.ts';
+import type {
+  ArrLanguage,
+  ArrQualityProfileItem,
+  ArrQualityProfilePayload,
+  QualityProfileFormatItem,
+} from '$arr/types.ts';
 import {
   type SyncArrType,
   type QualityDefinition,
@@ -49,6 +54,30 @@ export interface PcdCustomFormatScore {
   formatId: number;
   formatName: string;
   score: number;
+}
+
+export interface QualityProfileComparableInput {
+  name?: string;
+  items?: unknown;
+  language?: ArrLanguage;
+  upgradeAllowed?: boolean;
+  cutoff?: number;
+  minFormatScore?: number;
+  cutoffFormatScore?: number;
+  minUpgradeFormatScore?: number;
+  formatItems?: unknown;
+}
+
+export interface QualityProfileComparablePayload {
+  name: string;
+  items: ArrQualityProfileItem[];
+  language?: ArrLanguage;
+  upgradeAllowed: boolean;
+  cutoff: number;
+  minFormatScore: number;
+  cutoffFormatScore: number;
+  minUpgradeFormatScore: number;
+  formatItems: QualityProfileFormatItem[];
 }
 
 // =============================================================================
@@ -215,6 +244,42 @@ export function transformQualityProfile(
     cutoffFormatScore: profile.upgradeUntilScore,
     minUpgradeFormatScore: Math.max(1, profile.upgradeScoreIncrement),
     formatItems,
+  };
+}
+
+/**
+ * Apply quality profile transform and append namespace suffix in one call.
+ */
+export function transformQualityProfileWithSuffix(
+  profile: PcdQualityProfile,
+  arrType: SyncArrType,
+  qualityMappings: Map<string, string>,
+  pcdFormatIdMap: Map<string, number>,
+  allFormatIdMap: Map<string, number>,
+  suffix: string
+): ArrQualityProfilePayload {
+  const arrProfile = transformQualityProfile(profile, arrType, qualityMappings, pcdFormatIdMap, allFormatIdMap);
+  arrProfile.name = profile.name + suffix;
+  return arrProfile;
+}
+
+/**
+ * Normalize quality profile payloads for deterministic preview diffing.
+ */
+export function normalizeQualityProfileForPreview(
+  profile: QualityProfileComparableInput
+): QualityProfileComparablePayload {
+  return {
+    name: profile.name ?? '',
+    items: Array.isArray(profile.items) ? profile.items : [],
+    language: profile.language,
+    upgradeAllowed: profile.upgradeAllowed ?? false,
+    cutoff: profile.cutoff ?? 0,
+    minFormatScore: profile.minFormatScore ?? 0,
+    cutoffFormatScore: profile.cutoffFormatScore ?? 0,
+    minUpgradeFormatScore:
+      profile.minUpgradeFormatScore && profile.minUpgradeFormatScore > 0 ? profile.minUpgradeFormatScore : 1,
+    formatItems: Array.isArray(profile.formatItems) ? profile.formatItems : [],
   };
 }
 

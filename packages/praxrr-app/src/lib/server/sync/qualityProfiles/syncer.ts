@@ -13,28 +13,39 @@
  */
 
 import { BaseSyncer, type SyncResult } from '../base.ts';
-import { arrSyncQueries } from '$db/queries/arrSync.ts';
+import { arrSyncQueries, type ProfileSelection } from '$db/queries/arrSync.ts';
 import { arrNamespaceQueries } from '$db/queries/arrNamespaces.ts';
 import { getCache, getCachedDatabaseIds } from '$pcd/index.ts';
 import { databaseInstancesQueries } from '$db/queries/databaseInstances.ts';
 import { logger } from '$logger/logger.ts';
 import type { SyncArrType } from '../mappings.ts';
 import { getNamespaceSuffix } from '../namespace.ts';
+import type { SyncPreviewSectionResult, QualityProfilesPreview } from '../preview/types.ts';
+import { CUSTOM_FORMAT_ARRAY_KEY_STRATEGIES, QUALITY_PROFILE_ARRAY_KEY_STRATEGIES, diffEntityCollection } from '../preview/sectionDiffs.ts';
 
 // Custom formats
-import { fetchCustomFormatFromPcd, syncCustomFormats, type PcdCustomFormat } from '../customFormats/index.ts';
+import { syncCustomFormats, previewCustomFormats } from '../customFormats/syncer.ts';
+import { fetchCustomFormatFromPcd } from '../customFormats/transformer.ts';
+import type { PcdCustomFormat } from '../customFormats/transformer.ts';
 import {
   fetchQualityProfileFromPcd,
   getQualityApiMappings,
   getReferencedCustomFormatNames,
-  transformQualityProfile,
+  normalizeQualityProfileForPreview,
+  transformQualityProfileWithSuffix,
   type PcdQualityProfile,
+  type QualityProfileComparableInput,
 } from './transformer.ts';
+import type { ArrCustomFormat, ArrLanguage, ArrQualityProfilePayload } from '$arr/types.ts';
 
 // Internal types for sync data
 interface ProfileSyncData {
   pcdProfile: PcdQualityProfile;
   referencedFormatNames: string[];
+}
+
+interface QualityProfilesPreviewConfig {
+  selections: ProfileSelection[];
 }
 
 /** Per-database batch of profiles and CFs to sync. */
@@ -54,6 +65,115 @@ interface SyncedProfileSummary {
   cutoffFormatScore: number;
   minFormatScore: number;
   formats: { name: string; score: number }[];
+}
+
+interface PreviewComparableCustomFormat extends Record<string, unknown> {
+  readonly name: string;
+  readonly id?: number;
+}
+
+interface PreviewComparableQualityProfile extends Record<string, unknown> {
+  readonly name: string;
+  readonly id?: number;
+  readonly items?: unknown;
+  readonly language?: ArrLanguage;
+  readonly upgradeAllowed?: boolean;
+  readonly cutoff?: number;
+  readonly minFormatScore?: number;
+  readonly cutoffFormatScore?: number;
+  readonly minUpgradeFormatScore?: number;
+  readonly formatItems?: unknown;
+}
+
+function parsePositiveInteger(rawValue: unknown): number | null {
+  if (typeof rawValue !== 'number') {
+    return null;
+  }
+
+  return Number.isInteger(rawValue) ? rawValue : null;
+}
+
+function parseQualityProfileSelection(rawValue: unknown): ProfileSelection | null {
+  if (!rawValue || typeof rawValue !== 'object' || Array.isArray(rawValue)) {
+    return null;
+  }
+
+  const value = rawValue as Record<string, unknown>;
+  const databaseId = parsePositiveInteger(value.databaseId);
+  if (databaseId === null || databaseId <= 0) {
+    return null;
+  }
+
+  if (typeof value.profileName !== 'string' || value.profileName.trim().length === 0) {
+    return null;
+  }
+
+  return { databaseId, profileName: value.profileName };
+}
+
+function parseQualityProfileSelectionArray(rawSelections: unknown): ProfileSelection[] | null {
+  if (!Array.isArray(rawSelections)) {
+    return null;
+  }
+
+  const parsedSelections: ProfileSelection[] = [];
+  for (const rawSelection of rawSelections) {
+    const selection = parseQualityProfileSelection(rawSelection);
+    if (!selection) {
+      continue;
+    }
+
+    parsedSelections.push(selection);
+  }
+
+  return parsedSelections;
+}
+
+function parseQualityProfileSelectionMap(rawSelections: unknown): ProfileSelection[] | null {
+  if (!rawSelections || typeof rawSelections !== 'object' || Array.isArray(rawSelections)) {
+    return null;
+  }
+
+  const parsedSelections: ProfileSelection[] = [];
+  for (const [rawDatabaseId, rawProfiles] of Object.entries(rawSelections as Record<string, unknown>)) {
+    const databaseId = parseInt(rawDatabaseId, 10);
+    if (!Number.isInteger(databaseId) || databaseId <= 0) {
+      continue;
+    }
+
+    if (!rawProfiles || typeof rawProfiles !== 'object' || Array.isArray(rawProfiles)) {
+      continue;
+    }
+
+    for (const [profileName, isSelected] of Object.entries(rawProfiles as Record<string, unknown>)) {
+      if (isSelected === true) {
+        parsedSelections.push({ databaseId, profileName });
+      }
+    }
+  }
+
+  return parsedSelections;
+}
+
+function parseQualityProfilesPreviewConfig(rawConfig: unknown): QualityProfilesPreviewConfig | null {
+  if (!rawConfig || typeof rawConfig !== 'object' || Array.isArray(rawConfig)) {
+    return null;
+  }
+
+  const root = rawConfig as Record<string, unknown>;
+  const source = 'selections' in root ? root.selections : rawConfig;
+
+  const selections = Array.isArray(source)
+    ? parseQualityProfileSelectionArray(source)
+    : parseQualityProfileSelectionMap(source);
+
+  if (selections === null) {
+    return null;
+  }
+
+  return {
+    selections,
+  };
 }
 
 export class QualityProfileSyncer extends BaseSyncer {
@@ -159,10 +279,116 @@ export class QualityProfileSyncer extends BaseSyncer {
   }
 
   /**
+   * Generate a read-only preview diff for quality profiles.
+   */
+  override async generatePreview(): Promise<Readonly<SyncPreviewSectionResult>> {
+    try {
+      await logger.info(`Generating quality profile preview for "${this.instanceName}"`, {
+        source: 'Preview:QualityProfiles',
+        meta: { instanceId: this.instanceId, instanceType: this.instanceType },
+      });
+
+      const batches = await this.fetchSyncBatchByDatabase();
+      const totalProfiles = batches.reduce((sum, batch) => sum + batch.profiles.length, 0);
+      if (totalProfiles === 0) {
+        return {
+          section: 'qualityProfiles',
+          customFormats: [],
+          qualityProfiles: [],
+        };
+      }
+
+      const allArrCustomFormats = await this.client.getCustomFormats();
+      const allFormatIdMap = new Map(allArrCustomFormats.map((f) => [f.name, f.id!]));
+      const allArrProfiles = await this.client.getQualityProfiles();
+      const existingProfilesMap = new Map(allArrProfiles.map((p) => [p.name, p.id]));
+
+      const qualityMappings = await this.getQualityMappings(batches);
+
+      const desiredCustomFormats: ArrCustomFormat[] = [];
+      const desiredProfiles: ArrQualityProfilePayload[] = [];
+
+      for (const batch of batches) {
+        const { preparedFormats, pcdFormatIdMap } = await previewCustomFormats(
+          this.client,
+          this.instanceId,
+          this.instanceType,
+          batch.customFormats,
+          batch.suffix
+        );
+
+        desiredCustomFormats.push(...preparedFormats.map((prepared) => prepared.arrFormat));
+
+        desiredProfiles.push(
+          ...this.buildQualityProfilesPayloads(
+            batch.profiles,
+            batch.suffix,
+            pcdFormatIdMap,
+            allFormatIdMap,
+            qualityMappings
+          )
+        );
+      }
+
+      const customFormatChanges = diffEntityCollection<PreviewComparableCustomFormat, PreviewComparableCustomFormat>({
+        entityType: 'customFormat',
+        desiredEntities: desiredCustomFormats as unknown as readonly PreviewComparableCustomFormat[],
+        currentEntities: allArrCustomFormats as unknown as readonly PreviewComparableCustomFormat[],
+        desiredName: (entity) => entity.name,
+        currentName: (entity) => entity.name,
+        currentRemoteId: (entity) => entity.id ?? null,
+        arrayKeyStrategies: CUSTOM_FORMAT_ARRAY_KEY_STRATEGIES,
+      });
+
+      const qualityProfileChanges = diffEntityCollection<PreviewComparableQualityProfile, PreviewComparableQualityProfile>({
+        entityType: 'qualityProfile',
+        desiredEntities: desiredProfiles as unknown as readonly PreviewComparableQualityProfile[],
+        currentEntities: allArrProfiles as unknown as readonly PreviewComparableQualityProfile[],
+        desiredName: (entity) => entity.name,
+        currentName: (entity) => entity.name,
+        desiredComparable: (entity) => normalizeQualityProfileForPreview(entity as QualityProfileComparableInput),
+        currentComparable: (entity) => normalizeQualityProfileForPreview(entity as QualityProfileComparableInput),
+        currentRemoteId: (entity) => (existingProfilesMap.get(entity.name) ?? null),
+        arrayKeyStrategies: QUALITY_PROFILE_ARRAY_KEY_STRATEGIES,
+      });
+
+      const result: QualityProfilesPreview = {
+        section: 'qualityProfiles',
+        customFormats: customFormatChanges,
+        qualityProfiles: qualityProfileChanges,
+      };
+
+      await logger.info(`Generated quality profile preview for "${this.instanceName}"`, {
+        source: 'Preview:QualityProfiles',
+        meta: {
+          instanceId: this.instanceId,
+          profileCount: desiredProfiles.length,
+          customFormatCount: desiredCustomFormats.length,
+          changes: {
+            customFormats: customFormatChanges.length,
+            qualityProfiles: qualityProfileChanges.length,
+          },
+        },
+      });
+
+      return result;
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+
+      await logger.error(`Failed to generate quality profile preview for "${this.instanceName}"`, {
+        source: 'Preview:QualityProfiles',
+        meta: { instanceId: this.instanceId, error: errorMsg },
+      });
+
+      throw error;
+    }
+  }
+
+  /**
    * Fetch profiles and CFs grouped by database, each with a namespace suffix.
    */
   private async fetchSyncBatchByDatabase(): Promise<DatabaseSyncBatch[]> {
-    const syncConfig = arrSyncQueries.getQualityProfilesSync(this.instanceId);
+    const syncConfig = this.getQualityProfilesSyncConfig();
 
     if (syncConfig.selections.length === 0) return [];
 
@@ -275,6 +501,17 @@ export class QualityProfileSyncer extends BaseSyncer {
     return batches;
   }
 
+  private getQualityProfilesSyncConfig(): QualityProfilesPreviewConfig {
+    const previewConfig = parseQualityProfilesPreviewConfig(this.getPreviewConfig());
+    if (previewConfig) {
+      return previewConfig;
+    }
+
+    return {
+      selections: arrSyncQueries.getQualityProfilesSync(this.instanceId).selections,
+    };
+  }
+
   /**
    * Get quality API mappings from the first available database cache.
    * All databases should have the same quality mappings from the schema PCD.
@@ -304,17 +541,14 @@ export class QualityProfileSyncer extends BaseSyncer {
     const syncedProfiles: SyncedProfileSummary[] = [];
 
     for (const { pcdProfile } of profiles) {
-      const arrProfile = transformQualityProfile(
+      const arrProfile = this.buildQualityProfilePayload(
         pcdProfile,
-        this.instanceType,
-        qualityMappings,
+        suffix,
         pcdFormatIdMap,
-        allFormatIdMap
+        allFormatIdMap,
+        qualityMappings
       );
-
-      // Apply namespace suffix to profile name
-      const suffixedName = pcdProfile.name + suffix;
-      arrProfile.name = suffixedName;
+      const suffixedName = arrProfile.name;
 
       await logger.debug(`Compiled quality profile "${pcdProfile.name}" (suffixed)`, {
         source: 'Compile:QualityProfile',
@@ -375,6 +609,42 @@ export class QualityProfileSyncer extends BaseSyncer {
     }
 
     return syncedProfiles;
+  }
+
+  private buildQualityProfilesPayloads(
+    profiles: ProfileSyncData[],
+    suffix: string,
+    pcdFormatIdMap: Map<string, number>,
+    allFormatIdMap: Map<string, number>,
+    qualityMappings: Map<string, string>
+  ): ArrQualityProfilePayload[] {
+    return profiles.map(({ pcdProfile }) =>
+      transformQualityProfileWithSuffix(
+        pcdProfile,
+        this.instanceType,
+        qualityMappings,
+        pcdFormatIdMap,
+        allFormatIdMap,
+        suffix
+      )
+    );
+  }
+
+  private buildQualityProfilePayload(
+    profile: PcdQualityProfile,
+    suffix: string,
+    pcdFormatIdMap: Map<string, number>,
+    allFormatIdMap: Map<string, number>,
+    qualityMappings: Map<string, string>
+  ): ArrQualityProfilePayload {
+    return transformQualityProfileWithSuffix(
+      profile,
+      this.instanceType,
+      qualityMappings,
+      pcdFormatIdMap,
+      allFormatIdMap,
+      suffix
+    );
   }
 
   /**

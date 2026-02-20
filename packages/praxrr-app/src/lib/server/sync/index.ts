@@ -23,6 +23,7 @@ export { BaseSyncer } from './base.ts';
 
 // Registry
 export { getSection, getAllSections, getAllSectionTypes, hasSection, registerSection } from './registry.ts';
+export { getConfiguredSections, resolveSectionsForInstance, hasConfiguredSection } from './registry.ts';
 
 // Syncer implementations
 export { QualityProfileSyncer } from './qualityProfiles/index.ts';
@@ -34,6 +35,43 @@ export { syncCustomFormats } from './customFormats/index.ts';
 
 // Processor functions
 export { processPendingSyncs, syncInstance, triggerSyncs } from './processor.ts';
+
+// Preview
+export {
+  SyncPreviewStore,
+  previewStore,
+  type SyncPreviewStoreApi,
+  DEFAULT_PREVIEW_TTL_MS,
+  derivePreviewStatus,
+  isPreviewExpired,
+  PREVIEW_STATUS_GENERATING,
+  PREVIEW_STATUS_READY,
+  PREVIEW_STATUS_APPLYING,
+  PREVIEW_STATUS_APPLIED,
+  PREVIEW_STATUS_FAILED,
+  PREVIEW_STATUS_EXPIRED,
+  PREVIEW_STATUS_TRANSITIONS,
+  type SyncPreviewCreateInput,
+  type SyncPreviewUpdatePatch,
+} from './preview/store.ts';
+
+export type {
+  SyncPreviewStatus,
+  SyncPreviewAction,
+  SyncPreviewFieldChangeType,
+  SyncPreviewSection,
+  SyncPreviewSectionMetadata,
+  SyncPreviewSectionResult,
+  SyncPreviewSummary,
+  SyncPreviewArrType,
+  SyncPreviewResult,
+  QualityProfilesPreview,
+  DelayProfilesPreview,
+  MediaManagementPreview,
+  MetadataProfilesPreview,
+  FieldChange,
+  EntityChange,
+} from './preview/types.ts';
 
 // Utilities
 export { calculateNextRun, recoverInterruptedSyncs } from './utils.ts';

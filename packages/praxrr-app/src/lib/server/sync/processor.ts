@@ -31,11 +31,57 @@ import './mediaManagement/handler.ts';
 import './metadataProfiles/handler.ts';
 
 import { getAllSections, getSection } from './registry.ts';
+import { generatePreview, type GeneratePreviewResult } from './preview/orchestrator.ts';
 
 // Concurrency limit for parallel instance processing
 const CONCURRENCY_LIMIT = 3;
 
 export type { ProcessSyncsResult, InstanceSyncResult, SyncTriggerEvent, TriggerContext };
+
+export interface PreviewInstanceRequest {
+	instanceId: number;
+	sections?: SectionType[];
+	nowMs?: number;
+}
+
+async function generateSingleInstancePreview(request: PreviewInstanceRequest): Promise<GeneratePreviewResult> {
+	const instance = arrInstancesQueries.getById(request.instanceId);
+	if (!instance) {
+		throw new Error(`Instance ${request.instanceId} not found`);
+	}
+
+	if (!instance.enabled) {
+		throw new Error(`Instance "${instance.name}" is disabled`);
+	}
+
+	return generatePreview({
+		instance,
+		sections: request.sections,
+		nowMs: request.nowMs,
+	});
+}
+
+/**
+ * Generate a preview for one instance.
+ */
+export function generateInstancePreview(instanceId: number, sections?: SectionType[]): Promise<GeneratePreviewResult> {
+	return generateSingleInstancePreview({ instanceId, sections });
+}
+
+/**
+ * Generate previews for multiple instances with bounded concurrency.
+ */
+export async function generateInstancePreviews(requests: PreviewInstanceRequest[]): Promise<GeneratePreviewResult[]> {
+	if (requests.length === 0) return [];
+
+	const baseNowMs = Date.now();
+	const preparedRequests = requests.map((request, index) => ({
+		...request,
+		nowMs: request.nowMs ?? baseNowMs + index,
+	}));
+
+	return processBatches(preparedRequests, generateSingleInstancePreview, CONCURRENCY_LIMIT);
+}
 
 /**
  * Check if a scheduled config should trigger based on next_run_at
