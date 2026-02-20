@@ -44,13 +44,24 @@ jobs:
           if [ "${DRY_RUN}" = "true" ]; then
             TARGET_BRANCH="dry-run/schema/${GITHUB_RUN_ID}"
             TARGET_REF="refs/heads/${TARGET_BRANCH}"
-          elif [[ "${GITHUB_REF}" == refs/heads/* ]]; then
-            TARGET_BRANCH="${GITHUB_REF#refs/heads/}"
-            TARGET_REF="${GITHUB_REF}"
+            TARGET_AUX_REF=""
+            IS_RELEASE_TAG="false"
+          elif [[ "${GITHUB_REF}" == "refs/heads/v2" ]]; then
+            TARGET_BRANCH="v2"
+            TARGET_REF="refs/heads/v2"
+            TARGET_AUX_REF="refs/tags/develop"
+            IS_RELEASE_TAG="false"
+          elif [[ "${GITHUB_REF}" == "refs/heads/dev" ]]; then
+            TARGET_BRANCH="dev"
+            TARGET_REF="refs/heads/dev"
+            TARGET_AUX_REF="refs/tags/testing"
+            IS_RELEASE_TAG="false"
           elif [[ "${GITHUB_REF}" == refs/tags/schema/* ]]; then
             TARGET_BRANCH=""
             TAG_NAME="${GITHUB_REF#refs/tags/schema/}"
             TARGET_REF="refs/tags/${TAG_NAME}"
+            TARGET_AUX_REF=""
+            IS_RELEASE_TAG="true"
           elif [[ "${GITHUB_REF}" == refs/tags/* ]]; then
             echo "::error::Unsupported tag ref for schema publish: ${GITHUB_REF}"
             exit 1
@@ -112,8 +123,11 @@ jobs:
           }
 
           attempt_push "${TARGET_REF}"
+          if [[ -n "${TARGET_AUX_REF}" ]]; then
+            attempt_push "${TARGET_AUX_REF}"
+          fi
 
-          if [[ "${GITHUB_REF}" == refs/tags/schema/* ]]; then
+          if [[ "${IS_RELEASE_TAG}" == "true" ]]; then
             echo "Tag publish detected; updating refs/tags/latest as moving pointer."
             attempt_push "refs/tags/latest"
           fi
