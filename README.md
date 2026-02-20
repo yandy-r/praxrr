@@ -159,7 +159,7 @@ This runs the parser service and Vite dev server concurrently. See
 | `PRAXRR_DEFAULT_DB_GIT_USERNAME`    | `your_username`                        | Default database Git username                                                        |
 | `PRAXRR_DEFAULT_DB_GIT_EMAIL`       | `your_email`                           | Default database Git email                                                           |
 | `PRAXRR_DEFAULT_DB_URL`             | `https://github.com/yandy-r/praxrr-db` | Default PCD auto-link repository URL                                                 |
-| `PRAXRR_DEFAULT_DB_BRANCH`          | `v2`                                   | Default PCD auto-link branch. You can also use `latest` to track the mirror tag.     |
+| `PRAXRR_DEFAULT_DB_BRANCH`          | `v2`                                   | Default PCD auto-link branch.                                                        |
 | `PRAXRR_DEFAULT_DB_NAME`            | `Praxrr-DB`                            | Default PCD display name                                                             |
 | `PRAXRR_SCHEMA_REF`                 | manifest value                         | Override schema dependency ref (tag or branch, e.g. `v2`, `dev`, `latest`, `1.0.0`)  |
 | `PRAXRR_VALIDATE_INSTANCES`         | `false`                                | Validate env-managed instances against Arr API during startup (optional).            |
