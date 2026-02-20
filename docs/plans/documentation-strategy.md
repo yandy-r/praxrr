@@ -1,85 +1,82 @@
 # Documentation Strategy
 
-## Project Summary
+## Run Metadata
 
-**Praxrr Schema** is the base SQLite schema for all Praxrr Compliant Databases (PCDs). It defines 36 tables, 64 seeded languages, 67 seeded qualities, and the complete foreign key graph. Supports Radarr, Sonarr, and Lidarr media management applications.
+- Date: 2026-02-20
+- Scope: entire codebase
+- Mode: update
+- Source audit: `write-docs/scripts/audit-documentation.sh`
 
-### Key Concepts
+## Audit Summary
 
-- **Operational SQL (OSQL)** - Append-only, ordered, replayable SQL operations
-- **Change-Driven Development (CDD)** - Every change starts from a concrete need
-- **Layers** - Schema, Dependencies, Base, Tweaks, User Ops
-- **Name-based Foreign Keys** - All FKs reference UNIQUE name columns, not autoincrement IDs
-- **Condition Type System** - Type-dispatched architecture with 9 child tables
+- Canonical docs currently live in a small set of files:
+  - `README.md`
+  - `docs/ARCHITECTURE.md`
+  - `docs/CONTRIBUTING.md`
+  - `docs/DEVELOPMENT.md`
+  - `docs/api/v1/openapi.yaml`
+- Documentation does not yet have a navigable index (`docs/README.md` missing).
+- Architecture content exists but is monolithic; there is no modular `docs/architecture/` set.
+- API source-of-truth spec exists, but no reader-oriented docs for auth, errors, and endpoint quick reference.
+- Feature-level docs are missing (`docs/features/` absent).
+- Root README has an empty `## Documentation` section and weak navigation to canonical docs.
+- Existing strategy file was stale and described a different repository structure.
 
-### Repository Structure
+## Gaps
 
-```
-praxrr-schema/
-  pcd.json              - PCD manifest
-  README.md             - Project overview
-  CONTRIBUTING.md       - Contribution guide
-  CHANGELOG.md          - Version history
-  LICENSE.txt           - MIT license
-  ops/
-    0.schema.sql        - 36 table definitions (DDL)
-    1.languages.sql     - 64 languages (seed data)
-    2.qualities.sql     - 67 qualities + API mappings (seed data)
-  docs/
-    structure.md        - PCD architecture reference
-    manifest.md         - pcd.json specification
-  scripts/
-    generate-schema-diagram.sh  - SVG diagram generation
-    validateLanguages.sh        - Language validation
-    validateQualities.sh        - Quality validation
-  .github/
-    image/              - Auto-generated SVG diagrams
-    workflows/          - CI: validation + diagram generation
-```
+1. No docs information architecture (`docs/README.md`, architecture/API/features hubs).
+2. No concise API quickstart docs tied to current `/api/v1` endpoints.
+3. No feature workflow docs for link/bridge/sync and entity testing.
+4. README navigation is incomplete and does not route users to the right docs quickly.
+5. Development docs contain a scoped plan-verification section that should not be in canonical developer guidance.
 
-## Scope
+## Priority Workstreams
 
-**Re-write all existing documentation files** with:
+1. Architecture docs (`docs/architecture/*`) to split critical architecture guidance into focused pages.
+2. API docs (`docs/api/*.md`) to add practical usage docs on top of OpenAPI artifacts.
+3. Feature docs (`docs/features/*.md`) to document top workflows and troubleshooting paths.
+4. README updates (`README.md`, `docs/CONTRIBUTING.md`) for discoverability and cross-links.
 
-- More detail and depth in explanations
-- Additional Mermaid diagrams where they add clarity
-- Convert any remaining ASCII diagrams to Mermaid
-- Richer examples and cross-references
+## Planned Changes
 
-## Target Files (Existing Only)
+### Update
 
-| File                | Agent Assignment     | Focus                                                                                                          |
-| ------------------- | -------------------- | -------------------------------------------------------------------------------------------------------------- |
-| `docs/structure.md` | Architecture Analyst | Deepen architecture docs, add more Mermaid diagrams for table relationships, data flow, and constraint systems |
-| `docs/manifest.md`  | Feature Writer       | Enhance manifest spec with richer examples, add more diagrams for field relationships and validation           |
-| `README.md`         | README Generator     | Enrich project overview with more diagrams, expand table descriptions, add quickstart                          |
-| `CONTRIBUTING.md`   | Code Documenter      | Expand contribution guide with more workflow diagrams, detailed examples, validation details                   |
-| `CHANGELOG.md`      | Changelog Writer     | Expand changelog entries with more context, add diagrams showing before/after for major changes                |
+- `README.md`
+- `docs/CONTRIBUTING.md`
+- `docs/DEVELOPMENT.md`
+- `docs/plans/documentation-strategy.md`
 
-## Style Guidelines
+### Create
 
-- Use Mermaid syntax for ALL diagrams (graph TD, sequenceDiagram, erDiagram, flowchart, etc.)
-- Use dark-theme-friendly Mermaid styling where applicable
-- Include code examples from the actual SQL schema
-- Cross-reference between documents
-- Write clear, concise technical prose
-- Use proper heading hierarchy (H1 title, H2 sections, H3 subsections)
-- Include Tables of Contents for long documents
+- `docs/README.md`
+- `docs/architecture/overview.md`
+- `docs/architecture/components.md`
+- `docs/architecture/data-flow.md`
+- `docs/api/README.md`
+- `docs/api/endpoints.md`
+- `docs/api/authentication.md`
+- `docs/api/errors.md`
+- `docs/features/README.md`
+- `docs/features/link-bridge-sync.md`
+- `docs/features/entity-testing.md`
+- `docs/features/portable-import-export.md`
 
-## Table Architecture (For Reference)
+### Remove
 
-### 36 Tables in 7 Groups
+- Remove stale section `Task 3.3 Documentation Verification` from `docs/DEVELOPMENT.md`.
+- Remove empty/placeholder root README documentation section content and replace with active navigation links.
 
-**Core Entities (6):** tags, languages, regular_expressions, qualities, quality_api_mappings, custom_formats
+## Scope and Boundaries
 
-**Dependent Entities (3):** quality_profiles, quality_groups, custom_format_conditions
+- Keep `docs/api/v1/**` as the OpenAPI source of truth.
+- Do not rewrite package distribution READMEs (`packages/praxrr-db/README.md`, `packages/praxrr-schema/README.md`) in this pass.
+- Preserve deep reference content in `docs/ARCHITECTURE.md`; new architecture docs provide quick navigation, not replacement.
 
-**Junction Tables (7):** regular_expression_tags, custom_format_tags, quality_profile_tags, quality_profile_languages, quality_group_members, quality_profile_qualities, quality_profile_custom_formats
+## Priority Files For Code Documentation Stream
 
-**Condition Types (9):** condition_patterns, condition_languages, condition_indexer_flags, condition_sources, condition_resolutions, condition_quality_modifiers, condition_sizes, condition_release_types, condition_years
+- `packages/praxrr-app/src/routes/api/v1/arr/library/+server.ts`
+- `packages/praxrr-app/src/routes/api/v1/pcd/import/+server.ts`
+- `packages/praxrr-app/src/lib/server/sync/index.ts`
+- `packages/praxrr-app/src/lib/server/jobs/init.ts`
 
-**Testing (3):** custom_format_tests, test_entities, test_releases
-
-**Media Management (7):** radarr_quality_definitions, sonarr_quality_definitions, lidarr_quality_definitions, radarr_naming, sonarr_naming, radarr_media_settings, sonarr_media_settings
-
-**Other (1):** delay_profiles
+Code-comment updates are optional in this run and only apply if gaps are found during workstream integration.
