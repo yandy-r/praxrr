@@ -112,7 +112,7 @@ function collectArrInstanceUpdates(
 
   if (patch.apiKey !== undefined) {
     updates.push('api_key = ?');
-    params.push(patch.apiKey);
+    params.push('');
   }
   if (patch.tags !== undefined) {
     updates.push('tags = ?');
@@ -194,7 +194,7 @@ export const arrInstancesQueries = {
         input.type,
         input.url,
         externalUrl,
-        input.apiKey,
+        '',
         apiKeyFingerprint,
         tagsJson,
         enabled,

@@ -1,13 +1,27 @@
 <script lang="ts">
+	import { onDestroy } from 'svelte';
 	import { enhance } from '$app/forms';
 	import { alertStore } from '$alerts/store';
 	import { Save, RotateCcw, Eye, EyeOff, Check } from 'lucide-svelte';
+	import MaskedApiKey from '$ui/form/MaskedApiKey.svelte';
 	import IconCheckbox from '$ui/form/IconCheckbox.svelte';
 	import type { AISettings } from './types';
 
 	export let settings: AISettings;
 
 	let showApiKey = false;
+	let apiKeyInput = '';
+	let isApiKeyRevealed = false;
+	let revealedApiKey = '';
+	let remaskSession = 0;
+	let revealInProgress = false;
+	let copyAfterReveal = false;
+	let revealSubmitButton: HTMLButtonElement | null = null;
+	let revealRequestToken = 0;
+	let pendingRevealRequestToken = 0;
+	let autoHideTimer: ReturnType<typeof setTimeout> | null = null;
+	const revealTimeoutMs = 30_000;
+	$: hasStoredKey = settings.has_api_key || Boolean(settings.api_key_masked);
 
 	// Default values
 	const DEFAULTS = {
@@ -17,12 +31,91 @@
 		model: 'gpt-4o-mini'
 	};
 
+	$: maskedApiKeyValue = isApiKeyRevealed && revealedApiKey ? revealedApiKey : settings.api_key_masked;
+	$: plainApiKeyValue = isApiKeyRevealed && revealedApiKey ? revealedApiKey : '';
+
+	function clearAutoHideTimer() {
+		if (autoHideTimer) {
+			clearTimeout(autoHideTimer);
+			autoHideTimer = null;
+		}
+	}
+
+	function setRevealedApiKey(value: string) {
+		isApiKeyRevealed = Boolean(value);
+		revealedApiKey = value;
+
+		clearAutoHideTimer();
+		if (isApiKeyRevealed) {
+			autoHideTimer = setTimeout(() => {
+				setRevealedApiKey('');
+			}, revealTimeoutMs);
+		}
+
+		remaskSession += 1;
+	}
+
+	function requestReveal(showError = false) {
+		if (!hasStoredKey || !revealSubmitButton) {
+			if (showError) {
+				alertStore.add('error', 'Unable to retrieve API key');
+			}
+			return;
+		}
+
+		pendingRevealRequestToken = ++revealRequestToken;
+		revealInProgress = true;
+		revealSubmitButton.click();
+	}
+
 	function resetToDefaults() {
 		settings.enabled = DEFAULTS.enabled;
 		settings.api_url = DEFAULTS.api_url;
-		settings.api_key = DEFAULTS.api_key;
+		apiKeyInput = DEFAULTS.api_key;
 		settings.model = DEFAULTS.model;
+		setRevealedApiKey('');
 	}
+
+	function handleRevealChange(event: CustomEvent<{ revealed: boolean; reason: 'manual' | 'timeout' }>) {
+		if (!event.detail.revealed) {
+			setRevealedApiKey('');
+			return;
+		}
+
+		requestReveal();
+	}
+
+	function handleCopyFeedback(event: CustomEvent<{ success: boolean; message: string; error?: Error }>) {
+		if (event.detail.success) {
+			alertStore.add('success', 'API key copied to clipboard');
+			return;
+		}
+
+		if (event.detail.error?.message === 'Missing key value') {
+			copyAfterReveal = true;
+			requestReveal();
+			return;
+		}
+
+		alertStore.add('error', event.detail.message || 'Copy failed');
+	}
+
+	async function copyRevealedApiKey() {
+		if (!revealedApiKey) {
+			return;
+		}
+
+		try {
+			await navigator.clipboard.writeText(revealedApiKey);
+			alertStore.add('success', 'API key copied to clipboard');
+		} catch {
+			alertStore.add('error', 'Could not copy API key');
+		}
+	}
+
+	onDestroy(() => {
+		clearAutoHideTimer();
+	});
 </script>
 
 <div
@@ -67,12 +160,8 @@
 					class="flex-1 text-left"
 					on:click={() => (settings.enabled = !settings.enabled)}
 				>
-					<span class="text-sm font-medium text-neutral-900 dark:text-neutral-50">
-						Enable AI Features
-					</span>
-					<p class="text-xs text-neutral-500 dark:text-neutral-400">
-						Enable AI-powered commit message generation
-					</p>
+					<span class="text-sm font-medium text-neutral-900 dark:text-neutral-50">Enable AI Features</span>
+					<p class="text-xs text-neutral-500 dark:text-neutral-400">Enable AI-powered commit message generation</p>
 				</button>
 			</div>
 
@@ -102,20 +191,48 @@
 					</p>
 				</div>
 
+				<!-- Stored API Key -->
+				<div>
+					<label
+						for="ai-stored-api-key"
+						class="mb-2 block text-sm font-semibold text-neutral-900 dark:text-neutral-50"
+					>
+						Stored API Key
+					</label>
+					{#key remaskSession}
+						<MaskedApiKey
+							id="ai-stored-api-key"
+							label="AI API Key"
+							maskedValue={maskedApiKeyValue}
+							value={plainApiKeyValue}
+							hasValue={settings.has_api_key}
+							revealLabel="Show"
+							hideLabel="Hide"
+							copyLabel="Copy"
+							disabled={revealInProgress}
+							on:revealChange={handleRevealChange}
+							on:copyFeedback={handleCopyFeedback}
+						/>
+					{/key}
+					<p class="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
+						Stored key values are hidden by default for security.
+					</p>
+				</div>
+
 				<!-- API Key -->
 				<div>
 					<label
 						for="api_key"
 						class="mb-2 block text-sm font-semibold text-neutral-900 dark:text-neutral-50"
 					>
-						API Key
+						Update API Key
 					</label>
-					<div class="relative">
-						<input
+						<div class="relative">
+							<input
 							type={showApiKey ? 'text' : 'password'}
 							id="api_key"
 							name="api_key"
-							bind:value={settings.api_key}
+							bind:value={apiKeyInput}
 							placeholder="sk-..."
 							class="block w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 pr-10 font-mono text-sm text-neutral-900 placeholder-neutral-400 focus:border-neutral-400 focus:ring-1 focus:ring-neutral-400 focus:outline-none dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-50 dark:placeholder-neutral-500 dark:focus:border-neutral-500 dark:focus:ring-neutral-500"
 						/>
@@ -180,5 +297,47 @@
 				Save Settings
 			</button>
 		</div>
+	</form>
+
+	<form
+		method="POST"
+		action="?/revealAI"
+		class="hidden"
+		use:enhance={() => {
+			const requestToken = pendingRevealRequestToken;
+			return async ({ result, update }) => {
+				if (requestToken !== revealRequestToken) {
+					return;
+				}
+
+				revealInProgress = false;
+				if (result.type === 'success') {
+					const response = result.data as { revealedAiKey?: string };
+					if (response?.revealedAiKey) {
+						setRevealedApiKey(response.revealedAiKey);
+						if (copyAfterReveal) {
+							await copyRevealedApiKey();
+							copyAfterReveal = false;
+						}
+					} else {
+						alertStore.add('error', 'Unable to retrieve API key');
+						setRevealedApiKey('');
+					}
+				} else {
+					alertStore.add('error', 'Unable to retrieve API key');
+					setRevealedApiKey('');
+				}
+
+				copyAfterReveal = false;
+				await update();
+			};
+		}}
+	>
+		<button
+			type="submit"
+			class="hidden"
+			aria-label="Reveal AI API key"
+			bind:this={revealSubmitButton}
+		></button>
 	</form>
 </div>

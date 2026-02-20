@@ -77,7 +77,7 @@
 					{#if row.is_private}
 						<Badge variant="neutral" icon={Lock} mono>Private</Badge>
 					{/if}
-					{#if row.personal_access_token}
+					{#if row.has_personal_access_token || row.personal_access_token}
 						<Badge variant="info" icon={Code} mono>Dev</Badge>
 					{/if}
 				</div>

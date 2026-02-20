@@ -12,6 +12,7 @@ import { listDraftEntityChanges } from './draftChanges.ts';
 import { uuid } from '$shared/utils/uuid.ts';
 import { getMaxOpNumber } from '$pcd/utils/git.ts';
 import { loadManifest } from '$pcd/manifest/manifest.ts';
+import { getDecryptedDatabasePersonalAccessToken } from '$server/utils/encryption/database-credentials.ts';
 
 type ExportResult =
   | { success: true; filename: string | null; opId: number | null; dropped: number; fileCount: number }
@@ -190,6 +191,13 @@ async function runPreflight(databaseId: number): Promise<ExportPreflight> {
   };
   const errors: string[] = [];
   let status: ExportPreflightStatus | undefined = undefined;
+  let personalAccessToken: string | undefined;
+
+  try {
+    personalAccessToken = await getDecryptedDatabasePersonalAccessToken(databaseId);
+  } catch (error) {
+    errors.push('Failed to load personal access token.');
+  }
 
   if (!database) {
     return {
@@ -237,7 +245,7 @@ async function runPreflight(databaseId: number): Promise<ExportPreflight> {
     if (!branch) {
       errors.push('Repository is not on a branch.');
     } else {
-      const remoteUrl = buildRemoteUrl(database.repository_url, database.personal_access_token);
+      const remoteUrl = buildRemoteUrl(database.repository_url, personalAccessToken);
       await fetchRemoteBranch(database.local_path, remoteUrl, branch);
       checks.remoteReachable = true;
 
@@ -516,6 +524,12 @@ export async function exportDraftOps(
   const gitUserName = database.git_user_name?.trim() ?? '';
   const gitUserEmail = database.git_user_email?.trim() ?? '';
   const branch = preflight.checks.branch ?? '';
+  let personalAccessToken: string | undefined;
+  try {
+    personalAccessToken = await getDecryptedDatabasePersonalAccessToken(databaseId);
+  } catch {
+    return { success: false, error: 'Failed to load personal access token' };
+  }
   if (!branch) {
     return { success: false, error: 'Repository is not on a branch.' };
   }
@@ -523,7 +537,7 @@ export async function exportDraftOps(
   try {
     const tempDir = await Deno.makeTempDir({ prefix: 'praxrr-export-' });
     const repoDir = `${tempDir}/repo`;
-    const authUrl = buildRemoteUrl(database.repository_url, database.personal_access_token);
+    const authUrl = buildRemoteUrl(database.repository_url, personalAccessToken);
     let sourcePath = database.local_path;
     try {
       sourcePath = await Deno.realPath(database.local_path);

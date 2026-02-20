@@ -1,14 +1,25 @@
 import { assertEquals, assertFalse } from '@std/assert';
 import type { TestContext } from './BaseTest.ts';
 import { BaseTest } from './BaseTest.ts';
+import { aiSettingsQueries } from '../../lib/server/db/queries/aiSettings.ts';
 import { arrInstancesQueries } from '../../lib/server/db/queries/arrInstances.ts';
 import { arrInstanceCredentialsQueries } from '../../lib/server/db/queries/arrInstanceCredentials.ts';
+import { authSettingsQueries } from '../../lib/server/db/queries/authSettings.ts';
+import { backupSettingsQueries } from '../../lib/server/db/queries/backupSettings.ts';
+import { generalSettingsQueries } from '../../lib/server/db/queries/generalSettings.ts';
+import { logSettingsQueries } from '../../lib/server/db/queries/logSettings.ts';
+import { sessionsQueries } from '../../lib/server/db/queries/sessions.ts';
 import { config } from '../../lib/server/utils/config/config.ts';
+import { maskApiKey } from '../../lib/shared/utils/masking.ts';
+import { tmdbSettingsQueries } from '../../lib/server/db/queries/tmdbSettings.ts';
 import type { ArrInstanceCredential } from '../../lib/server/db/queries/arrInstanceCredentials.ts';
 import type { ArrInstance } from '../../lib/server/db/queries/arrInstances.ts';
 import { SonarrClient } from '../../lib/server/utils/arr/clients/sonarr.ts';
 import { load as arrLayoutLoad } from '../../routes/arr/[id]/+layout.server.ts';
 import { GET as libraryEpisodesGet } from '../../routes/api/v1/arr/library/episodes/+server.ts';
+import { usersQueries } from '../../lib/server/db/queries/users.ts';
+import { load as settingsGeneralLoad } from '../../routes/settings/general/+page.server.ts';
+import { load as settingsSecurityLoad } from '../../routes/settings/security/+page.server.ts';
 
 type ArrLayoutLoad = typeof arrLayoutLoad;
 type LibraryEpisodesGet = typeof libraryEpisodesGet;
@@ -113,6 +124,121 @@ class ArrCredentialRedactionRoutesTest extends BaseTest {
       created_at: FIXTURE_TIMESTAMP,
       updated_at: FIXTURE_TIMESTAMP,
     };
+  }
+
+  private patchGeneralSettingsLoadDependencies(tmdbApiKey: string, aiApiKey: string): void {
+    this.installPatch(
+      logSettingsQueries,
+      'get',
+      () => ({
+        id: 1,
+        retention_days: 30,
+        min_level: 'INFO',
+        enabled: 1,
+        file_logging: 1,
+        console_logging: 1,
+        created_at: FIXTURE_TIMESTAMP,
+        updated_at: FIXTURE_TIMESTAMP,
+      }),
+      this.restoreStack
+    );
+
+    this.installPatch(
+      backupSettingsQueries,
+      'get',
+      () => ({
+        id: 1,
+        schedule: 'daily',
+        retention_days: 30,
+        enabled: 1,
+        include_database: 1,
+        compression_enabled: 1,
+        created_at: FIXTURE_TIMESTAMP,
+        updated_at: FIXTURE_TIMESTAMP,
+      }),
+      this.restoreStack
+    );
+
+    this.installPatch(
+      generalSettingsQueries,
+      'get',
+      () => ({
+        id: 1,
+        apply_default_delay_profiles: 1,
+        created_at: FIXTURE_TIMESTAMP,
+        updated_at: FIXTURE_TIMESTAMP,
+      }),
+      this.restoreStack
+    );
+
+    this.installPatch(
+      tmdbSettingsQueries,
+      'get',
+      () => ({
+        id: 1,
+        api_key: tmdbApiKey,
+        created_at: FIXTURE_TIMESTAMP,
+        updated_at: FIXTURE_TIMESTAMP,
+      }),
+      this.restoreStack
+    );
+
+    this.installPatch(
+      aiSettingsQueries,
+      'get',
+      () => ({
+        id: 1,
+        enabled: 1,
+        api_url: 'https://api.example.com',
+        api_key: aiApiKey,
+        model: 'gpt-4o-mini',
+        created_at: FIXTURE_TIMESTAMP,
+        updated_at: FIXTURE_TIMESTAMP,
+      }),
+      this.restoreStack
+    );
+  }
+
+  private patchSecuritySettingsLoadDependencies(apiKey: string | null): void {
+    this.installPatch(
+      usersQueries,
+      'getByUsername',
+      () => ({
+        id: 1,
+        username: 'admin',
+        password_hash: 'bcrypt-hash',
+        created_at: FIXTURE_TIMESTAMP,
+        updated_at: FIXTURE_TIMESTAMP,
+      }),
+      this.restoreStack
+    );
+
+    this.installPatch(
+      usersQueries,
+      'getById',
+      () => ({
+        id: 1,
+        username: 'admin',
+        password_hash: 'bcrypt-hash',
+        created_at: FIXTURE_TIMESTAMP,
+        updated_at: FIXTURE_TIMESTAMP,
+      }),
+      this.restoreStack
+    );
+
+    this.installPatch(
+      sessionsQueries,
+      'getByUserId',
+      () => [],
+      this.restoreStack
+    );
+
+    this.installPatch(
+      authSettingsQueries,
+      'getApiKey',
+      () => apiKey,
+      this.restoreStack
+    );
   }
 
   private patchArrCredentialDecryptor(): void {
@@ -238,9 +364,110 @@ class ArrCredentialRedactionRoutesTest extends BaseTest {
     });
   }
 
+  private runGeneralSettingsLoadRedactionShortKeyTest(): void {
+    this.test('settings/general payload omits short plaintext keys', async () => {
+      const tmdbKey = 'shortTmdb';
+      const aiKey = 'shortAI';
+
+      this.patchGeneralSettingsLoadDependencies(tmdbKey, aiKey);
+
+      const payload = (await settingsGeneralLoad()) as {
+        aiSettings: {
+          api_key_masked: string;
+          has_api_key: boolean;
+        };
+        tmdbSettings: {
+          api_key_masked: string;
+          has_api_key: boolean;
+        };
+      };
+
+      this.assertPayloadNoLeak(payload, tmdbKey, 'general settings load payload');
+      this.assertPayloadNoLeak(payload, aiKey, 'general settings load payload');
+      assertEquals(payload.tmdbSettings.api_key_masked, maskApiKey(tmdbKey));
+      assertEquals(payload.aiSettings.api_key_masked, maskApiKey(aiKey));
+      assertEquals(payload.tmdbSettings.has_api_key, true);
+      assertEquals(payload.aiSettings.has_api_key, true);
+      assertFalse('api_key' in payload.tmdbSettings);
+      assertFalse('api_key' in payload.aiSettings);
+    });
+  }
+
+  private runGeneralSettingsLoadRedactionEmptyKeyTest(): void {
+    this.test('settings/general payload omits empty plaintext keys', async () => {
+      const tmdbKey = '';
+      const aiKey = '';
+
+      this.patchGeneralSettingsLoadDependencies(tmdbKey, aiKey);
+
+      const payload = (await settingsGeneralLoad()) as {
+        aiSettings: {
+          api_key_masked: string;
+          has_api_key: boolean;
+        };
+        tmdbSettings: {
+          api_key_masked: string;
+          has_api_key: boolean;
+        };
+      };
+
+      assertEquals(payload.tmdbSettings.api_key_masked, '');
+      assertEquals(payload.aiSettings.api_key_masked, '');
+      assertEquals(payload.tmdbSettings.has_api_key, false);
+      assertEquals(payload.aiSettings.has_api_key, false);
+      assertFalse('api_key' in payload.tmdbSettings);
+      assertFalse('api_key' in payload.aiSettings);
+    });
+  }
+
+  private runSecuritySettingsLoadRedactionShortKeyTest(): void {
+    this.test('settings/security payload omits short plaintext api_key', async () => {
+      const apiKey = 'shortAuth';
+      this.patchSecuritySettingsLoadDependencies(apiKey);
+
+      const payload = (await settingsSecurityLoad({
+        cookies: {
+          get: () => null,
+        },
+      } as unknown as Parameters<typeof settingsSecurityLoad>[0])) as {
+        apiKeyMasked: string;
+        hasApiKey: boolean;
+      };
+
+      this.assertPayloadNoLeak(payload, apiKey, 'security settings load payload');
+      assertEquals(payload.apiKeyMasked, maskApiKey(apiKey));
+      assertEquals(payload.hasApiKey, true);
+      assertFalse('api_key' in payload);
+    });
+  }
+
+  private runSecuritySettingsLoadRedactionEmptyKeyTest(): void {
+    this.test('settings/security payload omits empty api_key', async () => {
+      const apiKey = '';
+      this.patchSecuritySettingsLoadDependencies(apiKey);
+
+      const payload = (await settingsSecurityLoad({
+        cookies: {
+          get: () => null,
+        },
+      } as unknown as Parameters<typeof settingsSecurityLoad>[0])) as {
+        apiKeyMasked: string;
+        hasApiKey: boolean;
+      };
+
+      assertEquals(payload.apiKeyMasked, '');
+      assertEquals(payload.hasApiKey, false);
+      assertFalse('api_key' in payload);
+    });
+  }
+
   override run(): Promise<void> {
     this.runLayoutRedactionTest();
     this.runEpisodesRouteRedactionTest();
+    this.runGeneralSettingsLoadRedactionShortKeyTest();
+    this.runGeneralSettingsLoadRedactionEmptyKeyTest();
+    this.runSecuritySettingsLoadRedactionShortKeyTest();
+    this.runSecuritySettingsLoadRedactionEmptyKeyTest();
     return Promise.resolve();
   }
 }

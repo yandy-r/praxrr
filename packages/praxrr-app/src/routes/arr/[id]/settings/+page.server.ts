@@ -5,7 +5,8 @@ import { arrInstanceCredentialsQueries } from '$db/queries/arrInstanceCredential
 import { cleanupJobsForArrInstance } from '$lib/server/jobs/cleanup.ts';
 import { logger } from '$logger/logger.ts';
 import { parseOptionalAbsoluteHttpUrl } from '$utils/validation/url.ts';
-import { encryptArrInstanceApiKey } from '$server/utils/encryption/arr-credentials.ts';
+import { decryptArrInstanceApiKey, encryptArrInstanceApiKey } from '$server/utils/encryption/arr-credentials.ts';
+import { maskApiKey } from '$shared/utils/masking.ts';
 
 function getArrCredentialProcessingErrorMessage(error: unknown): string {
   const message = error instanceof Error ? error.message : String(error);
@@ -26,6 +27,33 @@ function getArrCredentialProcessingErrorMessage(error: unknown): string {
   return 'Failed to process API key';
 }
 
+async function getInstanceApiKeyState(instanceId: number): Promise<{ hasApiKey: boolean; apiKeyMasked: string }> {
+  const credential = arrInstanceCredentialsQueries.getByInstanceId(instanceId);
+  if (!credential) {
+    return { hasApiKey: false, apiKeyMasked: '' };
+  }
+
+  try {
+    const apiKey = await decryptArrInstanceApiKey({
+      keyVersion: credential.key_version,
+      nonce: credential.nonce,
+      ciphertext: credential.ciphertext,
+    });
+
+    return {
+      hasApiKey: Boolean(apiKey),
+      apiKeyMasked: maskApiKey(apiKey),
+    };
+  } catch (error) {
+    await logger.warn('Failed to load arr API key mask', {
+      source: 'arr/[id]/settings',
+      meta: { id: instanceId, error: error instanceof Error ? error.message : String(error) },
+    });
+
+    return { hasApiKey: false, apiKeyMasked: '' };
+  }
+}
+
 export const load: ServerLoad = async ({ parent }) => {
   const parentData = await parent();
   const rawInstance = parentData.instance;
@@ -36,6 +64,7 @@ export const load: ServerLoad = async ({ parent }) => {
 
   const instance = rawInstance as ArrInstance;
   const source: ArrInstanceSource = instance.source ?? 'ui';
+  const apiKeyState = await getInstanceApiKeyState(instance.id);
 
   return {
     instance: {
@@ -44,10 +73,52 @@ export const load: ServerLoad = async ({ parent }) => {
       api_key: '',
     },
     canEditCoreConnectionFields: source === 'ui',
+    hasApiKey: apiKeyState.hasApiKey,
+    apiKeyMasked: apiKeyState.apiKeyMasked,
   };
 };
 
 export const actions: Actions = {
+  revealApiKey: async ({ params }) => {
+    const id = parseInt(params.id || '', 10);
+    if (isNaN(id)) {
+      return fail(400, { error: 'Invalid instance ID' });
+    }
+
+    const instance = arrInstancesQueries.getById(id);
+    if (!instance) {
+      return fail(404, { error: 'Instance not found' });
+    }
+
+    const credential = arrInstanceCredentialsQueries.getByInstanceId(id);
+    if (!credential) {
+      return fail(404, { error: 'Unable to retrieve API key' });
+    }
+
+    try {
+      const apiKey = await decryptArrInstanceApiKey({
+        keyVersion: credential.key_version,
+        nonce: credential.nonce,
+        ciphertext: credential.ciphertext,
+      });
+
+      if (!apiKey) {
+        return fail(404, { error: 'Unable to retrieve API key' });
+      }
+
+      return { revealedApiKey: apiKey };
+    } catch (error) {
+      await logger.error('Failed to reveal arr API key', {
+        source: 'arr/[id]/settings',
+        meta: { id, error: error instanceof Error ? error.message : String(error) },
+      });
+
+      return fail(500, {
+        error: getArrCredentialProcessingErrorMessage(error),
+      });
+    }
+  },
+
   update: async ({ params, request }) => {
     const id = parseInt(params.id || '', 10);
 

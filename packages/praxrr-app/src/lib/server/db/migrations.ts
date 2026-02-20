@@ -59,6 +59,7 @@ import { migration as migration20260218 } from './migrations/20260218_add_lidarr
 import { migration as migration20260219 } from './migrations/20260219_seed_default_lidarr_metadata_profile.ts';
 import { migration as migration20260220AddArrInstanceSource } from './migrations/20260220_add_arr_instance_source.ts';
 import { migration as migration20260221EncryptArrApiKeys } from './migrations/20260221_encrypt_arr_api_keys.ts';
+import { migration as migration20260222EncryptDatabasePat } from './migrations/20260222_encrypt_database_pat.ts';
 
 export interface Migration {
   version: number;
@@ -347,6 +348,7 @@ export function loadMigrations(): Migration[] {
     migration20260219,
     migration20260220AddArrInstanceSource,
     migration20260221EncryptArrApiKeys,
+    migration20260222EncryptDatabasePat,
   ];
 
   // Sort by version number

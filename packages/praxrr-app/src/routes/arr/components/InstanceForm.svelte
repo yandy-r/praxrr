@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { enhance } from '$app/forms';
-  import { Save, Wifi, Trash2, Eraser, Loader2 } from 'lucide-svelte';
+  import { Save, Wifi, Trash2, Eraser, Loader2, Eye, EyeOff, Copy } from 'lucide-svelte';
   import CleanupModal from './CleanupModal.svelte';
   import { alertStore } from '$alerts/store';
   import { isDirty, initEdit, update, current, clear } from '$lib/client/stores/dirty';
@@ -29,6 +29,8 @@
   export let instance: ArrInstance | undefined = undefined;
   export let initialType: string = '';
   export let canEditCoreConnectionFields = true;
+  export let hasStoredApiKey = false;
+  export let apiKeyMasked = '';
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   export let form: any = undefined;
 
@@ -119,6 +121,12 @@
   let deleting = false;
   let showDeleteModal = false;
   let showCleanupModal = false;
+  let activeRevealedApiKey = '';
+  let revealSubmitButton: HTMLButtonElement | null = null;
+  let revealInProgress = false;
+  let revealPurpose: 'reveal' | 'copy' | null = null;
+  let isStoredApiKeyRevealed = false;
+  let storedApiKeyDisplayValue = '';
 
   // Options for dropdowns
   const typeOptions = ARR_APP_OPTIONS.map((option) => ({ value: option.value, label: option.label }));
@@ -245,12 +253,104 @@
     }
   }
 
+  async function copyApiKeyToClipboard(apiKey: string) {
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(apiKey);
+        alertStore.add('success', 'API key copied to clipboard');
+        return;
+      }
+
+      // Fallback for non-secure contexts (e.g. http://custom-host:port)
+      const textArea = document.createElement('textarea');
+      textArea.value = apiKey;
+      textArea.setAttribute('readonly', '');
+      textArea.style.position = 'fixed';
+      textArea.style.top = '-9999px';
+      textArea.style.left = '-9999px';
+      document.body.appendChild(textArea);
+      textArea.select();
+      textArea.setSelectionRange(0, textArea.value.length);
+
+      const copied = document.execCommand('copy');
+      document.body.removeChild(textArea);
+      if (!copied) {
+        throw new Error('Copy command failed');
+      }
+
+      alertStore.add('success', 'API key copied to clipboard');
+    } catch {
+      alertStore.add('error', 'Could not copy API key');
+    }
+  }
+
+  function requestApiKeyReveal(purpose: 'reveal' | 'copy') {
+    if (revealInProgress) {
+      return;
+    }
+
+    if (!hasStoredApiKey || !revealSubmitButton) {
+      alertStore.add('error', 'Unable to retrieve API key');
+      return;
+    }
+
+    revealPurpose = purpose;
+    revealInProgress = true;
+    revealSubmitButton.click();
+  }
+
+  function toggleStoredApiKeyReveal() {
+    if (!hasStoredApiKey) {
+      alertStore.add('error', 'Unable to retrieve API key');
+      return;
+    }
+
+    if (isStoredApiKeyRevealed) {
+      isStoredApiKeyRevealed = false;
+      activeRevealedApiKey = '';
+      return;
+    }
+
+    if (activeRevealedApiKey) {
+      isStoredApiKeyRevealed = true;
+      return;
+    }
+
+    requestApiKeyReveal('reveal');
+  }
+
+  async function copyStoredApiKey() {
+    if (!hasStoredApiKey) {
+      alertStore.add('error', 'Unable to retrieve API key');
+      return;
+    }
+
+    if (!activeRevealedApiKey) {
+      requestApiKeyReveal('copy');
+      return;
+    }
+
+    await copyApiKeyToClipboard(activeRevealedApiKey);
+  }
+
   // Handle form response
   let lastFormId: unknown = null;
   $: if (form && form !== lastFormId) {
     lastFormId = form;
+    revealInProgress = false;
+    if (form.revealedApiKey) {
+      if (revealPurpose === 'copy') {
+        void copyApiKeyToClipboard(form.revealedApiKey);
+      } else {
+        activeRevealedApiKey = form.revealedApiKey;
+        isStoredApiKeyRevealed = true;
+      }
+      revealPurpose = null;
+    }
     if (form.success) {
       alertStore.add('success', 'Settings saved successfully');
+      isStoredApiKeyRevealed = false;
+      activeRevealedApiKey = '';
       // Reset dirty state with new values (keep apiKey empty)
       initEdit({
         name,
@@ -263,9 +363,16 @@
       });
     }
     if (form.error) {
+      revealPurpose = null;
       alertStore.add('error', form.error);
     }
   }
+  $: storedApiKeyDisplayValue =
+    hasStoredApiKey
+      ? isStoredApiKeyRevealed && activeRevealedApiKey
+        ? activeRevealedApiKey
+        : apiKeyMasked || '••••••••'
+      : '';
 
   // Display text based on mode
   $: selectedAppType = isArrAppType(type) ? type : null;
@@ -427,18 +534,68 @@
     <!-- API Key + Test Connection Row -->
     <div class="flex flex-col gap-4 md:flex-row md:items-end">
       <div class="flex-1">
+        {#if mode === 'edit'}
+          <div class="mb-3">
+            <FormInput
+              label="Stored API Key"
+              name="stored_api_key"
+              value={storedApiKeyDisplayValue}
+              placeholder={hasStoredApiKey ? '••••••••' : 'No API key configured'}
+              description={hasStoredApiKey
+                ? 'Stored key is masked by default. Use the icons to reveal/hide or copy.'
+                : 'No API key configured'}
+              readonly
+              mono
+              inputClass="pr-24"
+            >
+              <svelte:fragment slot="suffix">
+                <div class="flex items-center gap-1">
+                  <button
+                    type="button"
+                    class="inline-flex h-6 w-6 items-center justify-center rounded text-neutral-500 hover:bg-neutral-100 hover:text-neutral-700 disabled:cursor-not-allowed disabled:opacity-50 dark:text-neutral-400 dark:hover:bg-neutral-800 dark:hover:text-neutral-200"
+                    aria-label="Copy stored API key"
+                    title="Copy"
+                    disabled={!hasStoredApiKey || revealInProgress}
+                    on:click={copyStoredApiKey}
+                  >
+                    <Copy size={14} />
+                  </button>
+                  <button
+                    type="button"
+                    class="inline-flex h-6 w-6 items-center justify-center rounded text-neutral-500 hover:bg-neutral-100 hover:text-neutral-700 disabled:cursor-not-allowed disabled:opacity-50 dark:text-neutral-400 dark:hover:bg-neutral-800 dark:hover:text-neutral-200"
+                    aria-label={isStoredApiKeyRevealed ? 'Hide stored API key' : 'Reveal stored API key'}
+                    title={isStoredApiKeyRevealed ? 'Hide' : 'Reveal'}
+                    disabled={!hasStoredApiKey || revealInProgress}
+                    on:click={toggleStoredApiKeyReveal}
+                  >
+                    {#if isStoredApiKeyRevealed}
+                      <EyeOff size={14} />
+                    {:else}
+                      <Eye size={14} />
+                    {/if}
+                  </button>
+                </div>
+              </svelte:fragment>
+            </FormInput>
+          </div>
+        {/if}
         <FormInput
-          label="API Key"
+          label={mode === 'edit' ? 'New API Key' : 'API Key'}
           name="api_key"
           value={apiKey}
-          placeholder="Enter API key"
+          placeholder={
+            mode === 'create'
+              ? 'Enter API key'
+              : '••••••••'
+          }
           description={mode === 'edit'
             ? canEditCoreConnectionFields
               ? 'Re-enter API key to save changes'
               : 'API key is managed by environment variables and cannot be edited'
             : ''}
           required
-          private_
+          private_={canEditCoreConnectionFields}
+          showPrivateToggle={canEditCoreConnectionFields}
           disabled={lockCoreFields}
           on:input={(e) => update('apiKey', e.detail)}
         />
@@ -458,6 +615,23 @@
     </div>
   </div>
 </div>
+
+{#if mode === 'edit'}
+  <form
+    method="POST"
+    action="?/revealApiKey"
+    class="hidden"
+    use:enhance={() => {
+      revealInProgress = true;
+      return async ({ update: formUpdate }) => {
+        await formUpdate({ reset: false });
+        revealInProgress = false;
+      };
+    }}
+  >
+    <button type="submit" bind:this={revealSubmitButton}>Reveal API key</button>
+  </form>
+{/if}
 
 <!-- Hidden save form -->
 <form

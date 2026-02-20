@@ -1,6 +1,7 @@
 import { fail, redirect } from '@sveltejs/kit';
 import type { Actions } from '@sveltejs/kit';
 import { arrInstancesQueries } from '$db/queries/arrInstances.ts';
+import { arrInstanceCredentialsQueries } from '$db/queries/arrInstanceCredentials.ts';
 import { logger } from '$logger/logger.ts';
 import { encryptArrInstanceApiKey } from '$server/utils/encryption/arr-credentials.ts';
 import { parseOptionalAbsoluteHttpUrl } from '$utils/validation/url.ts';

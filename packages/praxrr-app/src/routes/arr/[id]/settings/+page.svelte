@@ -27,4 +27,6 @@
   {form}
   instance={data.instance}
   canEditCoreConnectionFields={data.canEditCoreConnectionFields}
+  hasStoredApiKey={data.hasApiKey}
+  apiKeyMasked={data.apiKeyMasked}
 />

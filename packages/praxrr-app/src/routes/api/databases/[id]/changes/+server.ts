@@ -3,6 +3,7 @@ import type { RequestHandler } from '@sveltejs/kit';
 import { databaseInstancesQueries } from '$db/queries/databaseInstances.ts';
 import { getBranches, getIncomingChanges, getRepoInfo, getStatus } from '$utils/git/index.ts';
 import { listDraftEntityChanges } from '$pcd/ops/draftChanges.ts';
+import { getDecryptedDatabasePersonalAccessToken } from '$server/utils/encryption/database-credentials.ts';
 
 export const GET: RequestHandler = async ({ params }) => {
   const id = parseInt(params.id || '', 10);
@@ -13,16 +14,22 @@ export const GET: RequestHandler = async ({ params }) => {
   }
 
   // Fetch data for everyone
+  let personalAccessToken: string | undefined;
+  try {
+    personalAccessToken = await getDecryptedDatabasePersonalAccessToken(id);
+  } catch {
+    personalAccessToken = undefined;
+  }
   const [status, incomingChanges, branches, repoInfo] = await Promise.all([
     getStatus(database.local_path),
     getIncomingChanges(database.local_path),
     getBranches(database.local_path),
-    getRepoInfo(database.repository_url, database.personal_access_token),
+    getRepoInfo(database.repository_url, personalAccessToken),
   ]);
 
   // Only fetch draft changes for developers
   let draftChanges = null;
-  if (database.personal_access_token) {
+  if (database.has_personal_access_token || database.personal_access_token) {
     draftChanges = listDraftEntityChanges(id);
 
     // Append working-tree file changes (modified + untracked, excluding deps/ and ops/)
