@@ -47,9 +47,13 @@ jobs:
           elif [[ "${GITHUB_REF}" == refs/heads/* ]]; then
             TARGET_BRANCH="${GITHUB_REF#refs/heads/}"
             TARGET_REF="${GITHUB_REF}"
-          elif [[ "${GITHUB_REF}" == refs/tags/* ]]; then
+          elif [[ "${GITHUB_REF}" == refs/tags/schema/* ]]; then
             TARGET_BRANCH=""
-            TARGET_REF="${GITHUB_REF}"
+            TAG_NAME="${GITHUB_REF#refs/tags/schema/}"
+            TARGET_REF="refs/tags/${TAG_NAME}"
+          elif [[ "${GITHUB_REF}" == refs/tags/* ]]; then
+            echo "::error::Unsupported tag ref for schema publish: ${GITHUB_REF}"
+            exit 1
           else
             echo "::error::Unsupported ref for publish: ${GITHUB_REF}"
             exit 1
@@ -109,7 +113,7 @@ jobs:
 
           attempt_push "${TARGET_REF}"
 
-          if [[ "${TARGET_REF}" == refs/tags/schema/* ]]; then
+          if [[ "${GITHUB_REF}" == refs/tags/schema/* ]]; then
             echo "Tag publish detected; updating refs/tags/latest as moving pointer."
             attempt_push "refs/tags/latest"
           fi
