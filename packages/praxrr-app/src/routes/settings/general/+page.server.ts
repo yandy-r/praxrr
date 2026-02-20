@@ -198,7 +198,8 @@ export const actions: Actions = {
     // Parse form data
     const enabled = formData.get('enabled') === 'on';
     const apiUrl = formData.get('api_url') as string;
-    const apiKey = formData.get('api_key') as string;
+    const apiKeyInput = (formData.get('api_key') as string | null) ?? '';
+    const apiKey = apiKeyInput.length > 0 ? apiKeyInput : undefined;
     const model = formData.get('model') as string;
 
     // Validate
@@ -214,7 +215,7 @@ export const actions: Actions = {
     const updated = aiSettingsQueries.update({
       enabled,
       apiUrl: apiUrl || 'https://api.openai.com/v1',
-      apiKey: apiKey || '',
+      apiKey,
       model: model || 'gpt-4o-mini',
     });
 
@@ -276,11 +277,12 @@ export const actions: Actions = {
     const formData = await request.formData();
 
     // Parse form data
-    const apiKey = formData.get('api_key') as string;
+    const apiKeyInput = (formData.get('api_key') as string | null) ?? '';
+    const apiKey = apiKeyInput.length > 0 ? apiKeyInput : undefined;
 
     // Update settings
     const updated = tmdbSettingsQueries.update({
-      apiKey: apiKey || '',
+      apiKey,
     });
 
     if (!updated) {
