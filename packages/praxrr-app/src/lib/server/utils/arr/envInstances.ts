@@ -379,16 +379,20 @@ export async function reconcileEnvInstances(): Promise<ReconcileEnvInstancesResu
       }
 
       if (existing && existing.source === 'env') {
-        const updated = arrInstancesQueries.updateEnvInstanceByApiKey(apiKeyFingerprint, {
-          type: descriptor.type,
-          url: descriptor.url,
-          externalUrl: descriptor.externalUrl,
-          apiKey: '',
-          name: descriptor.name,
-          tags: descriptor.tags,
-          enabled: descriptor.enabled,
-          source: 'env',
-        }, encryptedApiKeyPayload);
+        const updated = arrInstancesQueries.updateEnvInstanceByApiKey(
+          apiKeyFingerprint,
+          {
+            type: descriptor.type,
+            url: descriptor.url,
+            externalUrl: descriptor.externalUrl,
+            apiKey: '',
+            name: descriptor.name,
+            tags: descriptor.tags,
+            enabled: descriptor.enabled,
+            source: 'env',
+          },
+          encryptedApiKeyPayload
+        );
         if (!updated) {
           throw new Error('No env instance found for requested API key');
         }
@@ -398,16 +402,20 @@ export async function reconcileEnvInstances(): Promise<ReconcileEnvInstancesResu
       }
 
       if (existingByName && existingByName.source === 'env') {
-        const updated = arrInstancesQueries.updateEnvInstanceById(existingByName.id, {
-          type: descriptor.type,
-          url: descriptor.url,
-          externalUrl: descriptor.externalUrl,
-          apiKey: '',
-          name: descriptor.name,
-          tags: descriptor.tags,
-          enabled: descriptor.enabled,
-          source: 'env',
-        }, encryptedApiKeyPayload);
+        const updated = arrInstancesQueries.updateEnvInstanceById(
+          existingByName.id,
+          {
+            type: descriptor.type,
+            url: descriptor.url,
+            externalUrl: descriptor.externalUrl,
+            apiKey: '',
+            name: descriptor.name,
+            tags: descriptor.tags,
+            enabled: descriptor.enabled,
+            source: 'env',
+          },
+          encryptedApiKeyPayload
+        );
         if (!updated) {
           throw new Error('No env instance found for name-based key rotation');
         }
@@ -416,17 +424,20 @@ export async function reconcileEnvInstances(): Promise<ReconcileEnvInstancesResu
         continue;
       }
 
-      const id = arrInstancesQueries.create({
-        name: descriptor.name,
-        type: descriptor.type,
-        url: descriptor.url,
-        externalUrl: descriptor.externalUrl,
-        apiKey: '',
-        apiKeyFingerprint: apiKeyFingerprint,
-        tags: descriptor.tags,
-        enabled: descriptor.enabled,
-        source: 'env',
-      }, encryptedApiKeyPayload);
+      const id = arrInstancesQueries.create(
+        {
+          name: descriptor.name,
+          type: descriptor.type,
+          url: descriptor.url,
+          externalUrl: descriptor.externalUrl,
+          apiKey: '',
+          apiKeyFingerprint: apiKeyFingerprint,
+          tags: descriptor.tags,
+          enabled: descriptor.enabled,
+          source: 'env',
+        },
+        encryptedApiKeyPayload
+      );
       if (id === 0) {
         throw new Error('Failed to create env instance');
       }

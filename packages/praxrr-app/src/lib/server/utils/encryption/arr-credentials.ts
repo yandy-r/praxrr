@@ -63,10 +63,7 @@ function getBuffer(data: Uint8Array): ArrayBuffer {
   return new Uint8Array(data).buffer;
 }
 
-async function createFingerprint(
-  plaintext: Uint8Array,
-  keyVersion: ArrCredentialKeyVersion,
-): Promise<string> {
+async function createFingerprint(plaintext: Uint8Array, keyVersion: ArrCredentialKeyVersion): Promise<string> {
   const key = await getArrCredentialFingerprintKey(keyVersion);
   const value = await crypto.subtle.sign('HMAC', key, getBuffer(plaintext));
 
@@ -102,7 +99,7 @@ export async function encryptArrInstanceApiKey(apiKey: string): Promise<ArrApiKe
       iv: getBuffer(nonce),
     },
     key,
-    getBuffer(plaintext),
+    getBuffer(plaintext)
   );
   const ciphertext = encodeBase64(new Uint8Array(cipherBuffer));
   const fingerprint = await createFingerprint(plaintext, resolvedVersion);
@@ -135,11 +132,11 @@ export async function decryptArrInstanceApiKey(payload: ArrCredentialEnvelope): 
   try {
     const plaintext = await crypto.subtle.decrypt(
       {
-      name: 'AES-GCM',
-      iv: getBuffer(nonce),
+        name: 'AES-GCM',
+        iv: getBuffer(nonce),
       },
       key,
-      getBuffer(ciphertext),
+      getBuffer(ciphertext)
     );
 
     return TEXT_DECODER.decode(plaintext);
@@ -150,7 +147,7 @@ export async function decryptArrInstanceApiKey(payload: ArrCredentialEnvelope): 
 
 export async function deriveArrInstanceApiKeyFingerprint(
   apiKey: string,
-  keyVersion?: ArrCredentialKeyVersion,
+  keyVersion?: ArrCredentialKeyVersion
 ): Promise<ArrApiKeyFingerprint> {
   const resolvedVersion = normalizeVersion(keyVersion ?? getActiveArrCredentialKeyVersion());
   const plaintext = TEXT_ENCODER.encode(apiKey);

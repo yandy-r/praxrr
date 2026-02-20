@@ -66,9 +66,7 @@ class Config {
     this.arrCredentialMasterKey = Deno.env.get('ARR_CREDENTIAL_MASTER_KEY') || null;
     this.arrCredentialMasterKeyVersion = Deno.env.get('ARR_CREDENTIAL_MASTER_KEY_VERSION') || null;
     this.arrCredentialPreviousKeys =
-      Deno.env.get('ARR_CREDENTIAL_PREVIOUS_KEYS') ||
-      Deno.env.get('ARR_CREDENTIAL_MASTER_KEYS') ||
-      null;
+      Deno.env.get('ARR_CREDENTIAL_PREVIOUS_KEYS') || Deno.env.get('ARR_CREDENTIAL_MASTER_KEYS') || null;
   }
 
   /**

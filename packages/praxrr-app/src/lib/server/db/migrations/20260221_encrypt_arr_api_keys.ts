@@ -114,20 +114,24 @@ function ensureSchemaScaffold(): void {
 }
 
 function getBackfillState(): BackfillStateRow | undefined {
-  return db.queryFirst<BackfillStateRow>(`
+  return db.queryFirst<BackfillStateRow>(
+    `
 		SELECT migration_version, state, last_instance_id, failure_instance_id, failure_reason
 		FROM ${BACKFILL_STATE_TABLE}
 		WHERE migration_version = ?
-	`, MIGRATION_VERSION);
+	`,
+    MIGRATION_VERSION
+  );
 }
 
 function setBackfillState({
-	state,
-	lastInstanceId,
-	failureInstanceId = null,
-	failureReason = null,
+  state,
+  lastInstanceId,
+  failureInstanceId = null,
+  failureReason = null,
 }: BackfillStateMutation): void {
-  db.execute(`
+  db.execute(
+    `
 		INSERT INTO ${BACKFILL_STATE_TABLE}
 			(migration_version, state, last_instance_id, failure_instance_id, failure_reason)
 		VALUES (?, ?, ?, ?, ?)
@@ -137,18 +141,28 @@ function setBackfillState({
 			failure_instance_id = excluded.failure_instance_id,
 			failure_reason = excluded.failure_reason,
 			updated_at = CURRENT_TIMESTAMP
-	`, MIGRATION_VERSION, state, lastInstanceId, failureInstanceId, failureReason);
+	`,
+    MIGRATION_VERSION,
+    state,
+    lastInstanceId,
+    failureInstanceId,
+    failureReason
+  );
 }
 
 function clearBackfillState(): void {
-  db.execute(`
+  db.execute(
+    `
 		DELETE FROM ${BACKFILL_STATE_TABLE}
 		WHERE migration_version = ?
-	`, MIGRATION_VERSION);
+	`,
+    MIGRATION_VERSION
+  );
 }
 
 function getBackfillCandidates(cursorId: number): ArrInstanceBackfillCandidate[] {
-  return db.query<ArrInstanceBackfillCandidate>(`
+  return db.query<ArrInstanceBackfillCandidate>(
+    `
 		SELECT
 			ai.id,
 			ai.api_key,
@@ -164,7 +178,10 @@ function getBackfillCandidates(cursorId: number): ArrInstanceBackfillCandidate[]
 			AND TRIM(ai.api_key) != ''
 		ORDER BY ai.id
 		LIMIT ?
-	`, cursorId, BACKFILL_BATCH_SIZE);
+	`,
+    cursorId,
+    BACKFILL_BATCH_SIZE
+  );
 }
 
 function getResumedCursor(existingState: BackfillStateRow | undefined): number {
@@ -187,16 +204,16 @@ function assertNoOpenCheckpointFailures(): void {
 
   throw new Error(
     `Gate B check failed: unresolved Arr API key backfill checkpoint remains for migration ${MIGRATION_VERSION}, ` +
-      `instance_id=${state.failure_instance_id ?? 'unknown'} failure=${state.failure_reason ?? 'none'}`,
+      `instance_id=${state.failure_instance_id ?? 'unknown'} failure=${state.failure_reason ?? 'none'}`
   );
 }
 
 function upsertCredentialRow(input: {
-	instanceId: number;
-	ciphertext: string;
-	nonce: string;
-	keyVersion: string;
-	fingerprint: string;
+  instanceId: number;
+  ciphertext: string;
+  nonce: string;
+  keyVersion: string;
+  fingerprint: string;
 }): void {
   db.execute(
     `INSERT INTO arr_instance_credentials (instance_id, ciphertext, nonce, key_version, fingerprint)
@@ -205,14 +222,11 @@ function upsertCredentialRow(input: {
     input.ciphertext,
     input.nonce,
     input.keyVersion,
-    input.fingerprint,
+    input.fingerprint
   );
 }
 
-async function normalizeRowFingerprint(
-	apiKey: string,
-	keyVersion: string,
-): Promise<string> {
+async function normalizeRowFingerprint(apiKey: string, keyVersion: string): Promise<string> {
   const fingerprint = await deriveArrInstanceApiKeyFingerprint(apiKey, keyVersion);
   return fingerprint.value;
 }
@@ -223,16 +237,16 @@ function setArrInstanceFingerprint(instanceId: number, fingerprint: string): voi
 		 SET api_key_fingerprint = ?, updated_at = CURRENT_TIMESTAMP
 		 WHERE id = ?`,
     fingerprint,
-    instanceId,
+    instanceId
   );
 }
 
 async function validateAndAlignCandidate(candidate: ArrInstanceBackfillCandidate): Promise<void> {
   if (
-    candidate.ciphertext === null
-    || candidate.nonce === null
-    || candidate.key_version === null
-    || candidate.credential_fingerprint === null
+    candidate.ciphertext === null ||
+    candidate.nonce === null ||
+    candidate.key_version === null ||
+    candidate.credential_fingerprint === null
   ) {
     const writeData = await encryptArrInstanceApiKey(candidate.api_key);
     const roundTrip = await decryptArrInstanceApiKey(writeData.credential);
@@ -272,13 +286,10 @@ async function validateAndAlignCandidate(candidate: ArrInstanceBackfillCandidate
     throw new Error(`decryption integrity check failed for arr_instance ${candidate.id}`);
   }
 
-  const expectedFingerprint = await normalizeRowFingerprint(
-    candidate.api_key,
-    candidate.key_version,
-  );
+  const expectedFingerprint = await normalizeRowFingerprint(candidate.api_key, candidate.key_version);
   if (candidate.credential_fingerprint !== expectedFingerprint) {
     throw new Error(
-      `Fingerprint integrity check failed for arr_instance ${candidate.id}: credential fingerprint mismatch`,
+      `Fingerprint integrity check failed for arr_instance ${candidate.id}: credential fingerprint mismatch`
     );
   }
 
@@ -321,9 +332,7 @@ async function runBackfillWithCheckpoints(): Promise<void> {
           failureInstanceId: candidate.id,
           failureReason: reason,
         });
-        throw new Error(
-          `Arr API key backfill failed at arr_instance id ${candidate.id}: ${reason}`,
-        );
+        throw new Error(`Arr API key backfill failed at arr_instance id ${candidate.id}: ${reason}`);
       }
     }
   }
@@ -362,10 +371,7 @@ async function assertGateAParity(): Promise<void> {
       throw new Error(`Gate A check failed: arr_instance ${candidate.id} ciphertext round-trip mismatch`);
     }
 
-    const expectedFingerprint = await normalizeRowFingerprint(
-      candidate.api_key,
-      candidate.key_version,
-    );
+    const expectedFingerprint = await normalizeRowFingerprint(candidate.api_key, candidate.key_version);
     if (candidate.api_key_fingerprint !== expectedFingerprint) {
       throw new Error(`Gate A check failed: arr_instance ${candidate.id} fingerprint in arr_instances is out of sync`);
     }

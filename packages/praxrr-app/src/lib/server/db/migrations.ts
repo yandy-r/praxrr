@@ -61,10 +61,10 @@ import { migration as migration20260220AddArrInstanceSource } from './migrations
 import { migration as migration20260221EncryptArrApiKeys } from './migrations/20260221_encrypt_arr_api_keys.ts';
 
 export interface Migration {
- version: number;
- name: string;
- up: string;
- down?: string;
+  version: number;
+  name: string;
+  up: string;
+  down?: string;
   afterUp?: () => void | Promise<void>; // Optional callback for data migrations
 }
 

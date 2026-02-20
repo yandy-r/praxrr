@@ -96,7 +96,7 @@ function getConfiguredKeys(): EncryptionKeyRing {
   const rawMasterKey = config.arrCredentialMasterKey;
   if (!rawMasterKey) {
     throw new Error(
-      `${ACTIVE_KEY_ENV} is required for Arr credential encryption operations. Configure it and restart the process.`,
+      `${ACTIVE_KEY_ENV} is required for Arr credential encryption operations. Configure it and restart the process.`
     );
   }
 
@@ -139,8 +139,7 @@ function getOrInitKeyRing(): EncryptionKeyRing {
     keyRing = getConfiguredKeys();
     return keyRing;
   } catch (error) {
-    const failure =
-      error instanceof Error ? error : new Error('Unable to initialize Arr credential key ring');
+    const failure = error instanceof Error ? error : new Error('Unable to initialize Arr credential key ring');
     keyRingInitializationError = failure;
     throw failure;
   }
@@ -166,7 +165,7 @@ async function importEncryptionKey(version: string): Promise<CryptoKey> {
       length: 256,
     },
     false,
-    ['encrypt', 'decrypt'],
+    ['encrypt', 'decrypt']
   );
 }
 
@@ -180,7 +179,7 @@ async function importFingerprintKey(version: string): Promise<CryptoKey> {
       hash: 'SHA-256',
     },
     false,
-    ['sign'],
+    ['sign']
   );
 }
 
@@ -190,9 +189,7 @@ export function getActiveArrCredentialKeyVersion(): ArrCredentialKeyVersion {
   return getOrInitKeyRing().activeVersion;
 }
 
-export async function getArrCredentialEncryptionKey(
-  version?: ArrCredentialKeyVersion,
-): Promise<CryptoKey> {
+export async function getArrCredentialEncryptionKey(version?: ArrCredentialKeyVersion): Promise<CryptoKey> {
   const keyVersion = normalizeVersion(version ?? getActiveArrCredentialKeyVersion());
   const ring = getOrInitKeyRing();
   const cached = ring.encryptionKeys.get(keyVersion);
@@ -205,9 +202,7 @@ export async function getArrCredentialEncryptionKey(
   return imported;
 }
 
-export async function getArrCredentialFingerprintKey(
-  version?: ArrCredentialKeyVersion,
-): Promise<CryptoKey> {
+export async function getArrCredentialFingerprintKey(version?: ArrCredentialKeyVersion): Promise<CryptoKey> {
   const keyVersion = normalizeVersion(version ?? getActiveArrCredentialKeyVersion());
   const ring = getOrInitKeyRing();
   const cached = ring.fingerprintKeys.get(keyVersion);
