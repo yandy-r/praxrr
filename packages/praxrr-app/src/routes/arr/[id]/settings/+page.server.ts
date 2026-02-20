@@ -116,9 +116,9 @@ export const actions: Actions = {
       });
     }
 
-    if (!isEnvManaged && apiKeyFingerprint && arrInstanceCredentialsQueries.getByFingerprint(apiKeyFingerprint.value)) {
-      const matched = arrInstanceCredentialsQueries.getByFingerprint(apiKeyFingerprint.value);
-      if (matched.instance_id !== id) {
+    if (!isEnvManaged && apiKeyFingerprint) {
+      const matchedCredential = arrInstanceCredentialsQueries.getByFingerprint(apiKeyFingerprint.value);
+      if (matchedCredential && matchedCredential.instance_id !== id) {
         return fail(400, { error: 'This instance is already connected' });
       }
     }
