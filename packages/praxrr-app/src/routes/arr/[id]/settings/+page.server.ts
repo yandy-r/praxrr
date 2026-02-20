@@ -1,6 +1,5 @@
 import { error, fail, redirect, type ServerLoad } from '@sveltejs/kit';
 import type { Actions } from '@sveltejs/kit';
-import { db } from '$db/db.ts';
 import { arrInstancesQueries, type ArrInstance, type ArrInstanceSource } from '$db/queries/arrInstances.ts';
 import { arrInstanceCredentialsQueries } from '$db/queries/arrInstanceCredentials.ts';
 import { cleanupJobsForArrInstance } from '$lib/server/jobs/cleanup.ts';
@@ -134,30 +133,29 @@ export const actions: Actions = {
     }
 
     try {
-      db.transaction(() => {
-        const updated = arrInstancesQueries.update(id, {
+      const updated = arrInstancesQueries.update(
+        id,
+        {
           name,
           url,
           externalUrl: externalUrl.value,
           apiKey: isEnvManaged ? undefined : apiKey,
           tags,
           enabled,
-        });
+        },
+        encryptedApiKey
+          ? {
+              ciphertext: encryptedApiKey.credential.ciphertext,
+              nonce: encryptedApiKey.credential.nonce,
+              keyVersion: encryptedApiKey.credential.keyVersion,
+              fingerprint: encryptedApiKey.fingerprint.value,
+            }
+          : undefined
+      );
 
-        if (!updated) {
-          throw new Error('Failed to update arr instance');
-        }
-
-        if (encryptedApiKey) {
-          arrInstanceCredentialsQueries.upsert({
-            instanceId: id,
-            ciphertext: encryptedApiKey.credential.ciphertext,
-            nonce: encryptedApiKey.credential.nonce,
-            keyVersion: encryptedApiKey.credential.keyVersion,
-            fingerprint: encryptedApiKey.fingerprint.value,
-          });
-        }
-      });
+      if (!updated) {
+        throw new Error('Failed to update arr instance');
+      }
 
       await logger.info(`Updated arr instance: ${name}`, {
         source: 'arr/[id]/settings',

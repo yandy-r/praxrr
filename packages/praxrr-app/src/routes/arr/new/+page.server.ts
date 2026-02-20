@@ -1,8 +1,6 @@
 import { fail, redirect } from '@sveltejs/kit';
 import type { Actions } from '@sveltejs/kit';
-import { db } from '$db/db.ts';
 import { arrInstancesQueries } from '$db/queries/arrInstances.ts';
-import { arrInstanceCredentialsQueries } from '$db/queries/arrInstanceCredentials.ts';
 import { logger } from '$logger/logger.ts';
 import { encryptArrInstanceApiKey } from '$server/utils/encryption/arr-credentials.ts';
 import { parseOptionalAbsoluteHttpUrl } from '$utils/validation/url.ts';
@@ -113,8 +111,8 @@ export const actions = {
 
     let id: number;
     try {
-      id = await db.transaction(() => {
-        const insertedId = arrInstancesQueries.create({
+      const insertedId = arrInstancesQueries.create(
+        {
           name,
           type,
           url,
@@ -122,19 +120,19 @@ export const actions = {
           apiKey,
           tags,
           enabled,
-        });
-
-        arrInstanceCredentialsQueries.create({
-          instanceId: insertedId,
+        },
+        {
           ciphertext: encryptedApiKey.credential.ciphertext,
           nonce: encryptedApiKey.credential.nonce,
           keyVersion: encryptedApiKey.credential.keyVersion,
           fingerprint: encryptedApiKey.fingerprint.value,
-        });
+        }
+      );
 
-        return insertedId;
-      });
-
+      id = insertedId;
+      if (!id) {
+        throw new Error('Failed to create arr instance');
+      }
       await logger.info(`Created new ${type} instance: ${name}`, {
         source: 'arr/new',
         meta: { id, name, type, url },
