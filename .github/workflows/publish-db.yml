@@ -115,6 +115,11 @@ jobs:
 
           attempt_push "$split_sha" "$TARGET_REF"
 
+          if [[ "${TARGET_REF}" == refs/tags/db/* ]]; then
+            echo "Tag publish detected; also updating refs/tags/latest."
+            attempt_push "$split_sha" "refs/tags/latest"
+          fi
+
       - name: Cleanup stale dry-run db branches
         if: always()
         env:

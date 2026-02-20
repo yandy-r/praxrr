@@ -64,44 +64,55 @@ jobs:
           SUBTREE_SHA="$(git subtree split --prefix=packages/praxrr-schema "${GITHUB_SHA}")"
           echo "Subtree commit: ${SUBTREE_SHA}"
 
-          attempts=1
-          max_attempts=3
-          delay_seconds=5
+          attempt_push() {
+            local destination_ref="$1"
+            local attempts=1
+            local max_attempts=3
+            local delay_seconds=5
 
-          while [ "${attempts}" -le "${max_attempts}" ]; do
-            log_file="$(mktemp)"
+            while [ "${attempts}" -le "${max_attempts}" ]; do
+              local log_file
+              log_file="$(mktemp)"
 
-            set +e
-            git push --force \
-              "https://x-access-token:${MIRROR_PAT}@github.com/${MIRROR_REPO}.git" \
-              "${SUBTREE_SHA}:${TARGET_REF}" \
-              >"${log_file}" 2>&1
-            push_status=$?
-            set -e
+              set +e
+              git push --force \
+                "https://x-access-token:${MIRROR_PAT}@github.com/${MIRROR_REPO}.git" \
+                "${SUBTREE_SHA}:${destination_ref}" \
+                >"${log_file}" 2>&1
+              push_status=$?
+              set -e
 
-            if [ "${push_status}" -eq 0 ]; then
-              echo "Schema mirror publish succeeded on attempt ${attempts}."
+              if [ "${push_status}" -eq 0 ]; then
+                echo "Schema mirror publish succeeded for ${destination_ref} on attempt ${attempts}."
+                rm -f "${log_file}"
+                return 0
+              fi
+
+              echo "::error::Schema mirror publish to ${destination_ref} failed on attempt ${attempts}/${max_attempts}."
+              echo "::error::Exit code: ${push_status}"
+              echo "::error::Output:"
+              cat "${log_file}"
               rm -f "${log_file}"
-              break
-            fi
 
-            echo "::error::Schema mirror publish attempt ${attempts}/${max_attempts} failed."
-            echo "::error::Exit code: ${push_status}"
-            echo "::error::Output:"
-            cat "${log_file}"
-            rm -f "${log_file}"
+              if [ "${attempts}" -lt "${max_attempts}" ]; then
+                echo "Retrying publish to ${destination_ref} in ${delay_seconds}s (exponential backoff)."
+                sleep "${delay_seconds}"
+                delay_seconds=$((delay_seconds * 2))
+                attempts=$((attempts + 1))
+                continue
+              fi
 
-            if [ "${attempts}" -lt "${max_attempts}" ]; then
-              echo "Retrying publish in ${delay_seconds}s (exponential backoff)."
-              sleep "${delay_seconds}"
-              delay_seconds=$((delay_seconds * 2))
-              attempts=$((attempts + 1))
-              continue
-            fi
+              echo "::error::Schema mirror publish to ${destination_ref} failed after ${max_attempts} attempts."
+              return "${push_status}"
+            done
+          }
 
-            echo "::error::Schema mirror publish failed after ${max_attempts} attempts."
-            exit "${push_status}"
-          done
+          attempt_push "${TARGET_REF}"
+
+          if [[ "${TARGET_REF}" == refs/tags/schema/* ]]; then
+            echo "Tag publish detected; updating refs/tags/latest as moving pointer."
+            attempt_push "refs/tags/latest"
+          fi
 
           echo "published_branch=${TARGET_BRANCH}" >> "${GITHUB_OUTPUT}"
           echo "dry_run=${DRY_RUN}" >> "${GITHUB_OUTPUT}"
