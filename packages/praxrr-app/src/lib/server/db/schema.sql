@@ -277,7 +277,7 @@ CREATE TABLE notification_history (
 -- ==============================================================================
 -- TABLE: database_instances
 -- Purpose: Store linked Praxrr Compliant Database (PCD) repositories
--- Migration: 008_create_database_instances.ts, 009_add_personal_access_token.ts, 010_add_is_private.ts, 040_add_local_ops_enabled.ts, 043_add_git_identity_to_database_instances.ts, 044_add_conflict_strategy_to_database_instances.ts
+-- Migration: 008_create_database_instances.ts, 009_add_personal_access_token.ts, 010_add_is_private.ts, 040_add_local_ops_enabled.ts, 043_add_git_identity_to_database_instances.ts, 044_add_conflict_strategy_to_database_instances.ts, 20260222_encrypt_database_pat.ts
 -- ==============================================================================
 
 CREATE TABLE database_instances (
@@ -289,7 +289,7 @@ CREATE TABLE database_instances (
 
     -- Repository connection
     repository_url TEXT NOT NULL,               -- Git repository URL
-    personal_access_token TEXT,                 -- PAT for private repos and push access (Migration 009)
+    personal_access_token TEXT,                 -- Legacy plaintext PAT column (kept blank after Migration 20260222)
     is_private INTEGER NOT NULL DEFAULT 0,      -- 1=private repo, 0=public (auto-detected, Migration 010)
     local_ops_enabled INTEGER NOT NULL DEFAULT 0, -- 1=force local ops even with PAT (Migration 040)
     git_user_name TEXT,                         -- Git commit author name (Migration 043)
@@ -312,6 +312,22 @@ CREATE TABLE database_instances (
     -- Metadata
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ==============================================================================
+-- TABLE: database_instance_credentials
+-- Purpose: Store encrypted PAT material for database_instances
+-- Migration: 20260222_encrypt_database_pat.ts
+-- ==============================================================================
+
+CREATE TABLE database_instance_credentials (
+    instance_id INTEGER PRIMARY KEY,            -- FK to database_instances.id
+    ciphertext TEXT NOT NULL,                   -- Encrypted PAT payload
+    nonce TEXT NOT NULL,                        -- AES-GCM nonce
+    key_version TEXT NOT NULL,                  -- Encryption key version
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (instance_id) REFERENCES database_instances(id) ON DELETE CASCADE
 );
 
 -- ==============================================================================

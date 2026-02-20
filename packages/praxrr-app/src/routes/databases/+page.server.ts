@@ -4,7 +4,13 @@ import { pcdManager } from '$pcd/index.ts';
 import { logger } from '$logger/logger.ts';
 
 export const load: ServerLoad = () => {
-  const databases = pcdManager.getAll();
+  const databases = pcdManager.getAll().map((database) => {
+    const { personal_access_token: _redactedToken, ...databaseWithoutToken } = database;
+    return {
+      ...databaseWithoutToken,
+      personal_access_token: '',
+    };
+  });
 
   return {
     databases,

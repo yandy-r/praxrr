@@ -24,6 +24,10 @@ import type { LinkOptions, SyncResult } from './types.ts';
 import { importBaseOps } from '../ops/importBaseOps.ts';
 import { seedBuiltInBaseOps } from '../ops/seedBuiltInBaseOps.ts';
 import { cleanupJobsForDatabase } from '$lib/server/jobs/cleanup.ts';
+import {
+  encryptDatabasePersonalAccessToken,
+  getDecryptedDatabasePersonalAccessToken,
+} from '$server/utils/encryption/database-credentials.ts';
 
 /**
  * PCD Manager - Manages the lifecycle of Praxrr Compliant Databases
@@ -56,6 +60,11 @@ class PCDManager {
       // Process dependencies (clone and validate)
       await processDependencies(localPath, options.personalAccessToken);
 
+      let encryptedPersonalAccessToken: Awaited<ReturnType<typeof encryptDatabasePersonalAccessToken>> | undefined;
+      if (options.personalAccessToken) {
+        encryptedPersonalAccessToken = await encryptDatabasePersonalAccessToken(options.personalAccessToken);
+      }
+
       // Insert into database
       const id = databaseInstancesQueries.create({
         uuid,
@@ -70,7 +79,14 @@ class PCDManager {
         gitUserName: options.gitUserName,
         gitUserEmail: options.gitUserEmail,
         conflictStrategy: options.conflictStrategy as 'override' | 'align' | 'ask' | undefined,
-      });
+      },
+      encryptedPersonalAccessToken
+        ? {
+            ciphertext: encryptedPersonalAccessToken.credential.ciphertext,
+            nonce: encryptedPersonalAccessToken.credential.nonce,
+            keyVersion: encryptedPersonalAccessToken.credential.keyVersion,
+          }
+        : undefined);
 
       // Get and return the created instance
       const instance = databaseInstancesQueries.getById(id);
@@ -184,7 +200,8 @@ class PCDManager {
       await pull(instance.local_path);
 
       // Sync dependencies (schema, etc.) if versions changed
-      await syncDependencies(instance.local_path, instance.personal_access_token ?? undefined);
+      const personalAccessToken = await getDecryptedDatabasePersonalAccessToken(instance.id);
+      await syncDependencies(instance.local_path, personalAccessToken);
 
       try {
         await importBaseOps(id, instance.local_path);
@@ -349,7 +366,8 @@ class PCDManager {
     // Validate dependencies for all instances first
     for (const instance of enabledInstances) {
       try {
-        await validateDependencies(instance.local_path, instance.personal_access_token ?? undefined);
+        const personalAccessToken = await getDecryptedDatabasePersonalAccessToken(instance.id);
+        await validateDependencies(instance.local_path, personalAccessToken);
       } catch (error) {
         await logger.error(`Failed to validate dependencies for "${instance.name}"`, {
           source: 'PCDManager',

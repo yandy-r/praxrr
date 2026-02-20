@@ -5,17 +5,24 @@ import { sessionsQueries } from '$db/queries/sessions.ts';
 import { authSettingsQueries } from '$db/queries/authSettings.ts';
 import { hashPassword, verifyPassword } from '$auth/password.ts';
 import { logger } from '$logger/logger.ts';
+import { maskApiKey } from '$shared/utils/masking.ts';
 
 export const load: ServerLoad = async ({ cookies }) => {
   const currentSessionId = cookies.get('session');
   const user = usersQueries.getByUsername('admin') ?? usersQueries.getById(1);
 
   if (!user) {
-    return { sessions: [], apiKey: null, currentSessionId: null };
+    return {
+      sessions: [],
+      apiKeyMasked: '',
+      hasApiKey: false,
+      currentSessionId: null,
+    };
   }
 
   const sessions = sessionsQueries.getByUserId(user.id);
   const apiKey = authSettingsQueries.getApiKey();
+  const apiKeyMasked = maskApiKey(apiKey);
 
   return {
     sessions: sessions.map((s) => ({
@@ -29,7 +36,8 @@ export const load: ServerLoad = async ({ cookies }) => {
       device_type: s.device_type,
       isCurrent: s.id === currentSessionId,
     })),
-    apiKey,
+    apiKeyMasked,
+    hasApiKey: Boolean(apiKey),
     currentSessionId,
   };
 };
@@ -95,6 +103,24 @@ export const actions: Actions = {
     });
 
     return { apiKey: newKey, apiKeyRegenerated: true };
+  },
+
+  revealAuthKey: async () => {
+    try {
+      const apiKey = authSettingsQueries.getApiKey();
+
+      if (!apiKey) {
+        return fail(404, { error: 'Unable to retrieve API key' });
+      }
+
+      return { revealedAuthKey: apiKey };
+    } catch {
+      await logger.error('Failed to reveal auth API key', {
+        source: 'Auth:APIKey',
+      });
+
+      return fail(500, { error: 'Unable to retrieve API key' });
+    }
   },
 
   revokeSession: async ({ request, cookies }) => {
