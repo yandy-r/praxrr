@@ -20,6 +20,8 @@
 	};
 	export let syncTrigger: 'manual' | 'on_pull' | 'on_change' | 'schedule' = 'manual';
 	export let cronExpression: string = '0 * * * *';
+	export let previewEnabled = false;
+	export let previewConfig: unknown = null;
 
 	let saving = false;
 	let syncing = false;
@@ -29,12 +31,25 @@
 	$: currentState = JSON.stringify({ state, syncTrigger, cronExpression });
 	export let isDirty = false;
 	$: isDirty = currentState !== savedState;
+	let hasUnsyncedPreview = false;
 
 	// Reactive selected key for checkbox state
 	$: selectedKey =
 		state.databaseId !== null && state.profileName !== null
 			? `${state.databaseId}-${state.profileName}`
 			: null;
+
+	$: {
+		if (!selectedKey) {
+			previewEnabled = false;
+			hasUnsyncedPreview = false;
+		} else if (isDirty) {
+			previewEnabled = true;
+			hasUnsyncedPreview = true;
+		} else if (!hasUnsyncedPreview) {
+			previewEnabled = false;
+		}
+	}
 
 	function isSelected(databaseId: number, profileName: string): boolean {
 		return selectedKey === `${databaseId}-${profileName}`;
@@ -50,6 +65,10 @@
 		if (isSelected(databaseId, profileName)) {
 			state = { databaseId: null, profileName: null };
 		}
+	}
+
+	export async function saveSection() {
+		await handleSave();
 	}
 
 	async function handleSave() {
@@ -70,6 +89,7 @@
 				alertStore.add('success', 'Delay profile sync config saved');
 				// Update saved state to current
 				savedState = JSON.stringify({ state, syncTrigger, cronExpression });
+				hasUnsyncedPreview = true;
 			} else {
 				alertStore.add('error', 'Failed to save delay profile sync config');
 			}
@@ -91,6 +111,8 @@
 			if (response.ok) {
 				const data = await response.json();
 				alertStore.add('success', data?.message ?? 'Sync queued');
+				previewEnabled = false;
+				hasUnsyncedPreview = false;
 			} else {
 				alertStore.add('error', 'Sync failed');
 			}
@@ -99,6 +121,10 @@
 		} finally {
 			syncing = false;
 		}
+	}
+
+	export async function syncSection() {
+		await handleSync();
 	}
 </script>
 
@@ -151,6 +177,10 @@
 		{saving}
 		{syncing}
 		{isDirty}
+		{previewEnabled}
+		{previewConfig}
+		on:previewGenerated
+		on:previewError
 		on:save={handleSave}
 		on:sync={handleSync}
 	/>

@@ -16,6 +16,8 @@
 	export let cronExpression: string = '0 * * * *';
 	export let canSave: boolean = true;
 	export let warning: string | null = null;
+	export let previewEnabled = false;
+	export let previewConfig: unknown = null;
 
 	let saving = false;
 	let syncing = false;
@@ -25,6 +27,7 @@
 	$: currentState = JSON.stringify({ state, syncTrigger, cronExpression });
 	export let isDirty = false;
 	$: isDirty = currentState !== savedState;
+	let hasUnsyncedPreview = false;
 
 	// Initialize state for all databases/profiles
 	$: {
@@ -49,6 +52,18 @@
 		)
 	);
 
+	$: {
+		if (selectedKeys.size === 0) {
+			previewEnabled = false;
+			hasUnsyncedPreview = false;
+		} else if (isDirty) {
+			previewEnabled = true;
+			hasUnsyncedPreview = true;
+		} else if (!hasUnsyncedPreview) {
+			previewEnabled = false;
+		}
+	}
+
 	function isSelected(databaseId: number, profileName: string): boolean {
 		return selectedKeys.has(`${databaseId}-${profileName}`);
 	}
@@ -56,6 +71,10 @@
 	function setProfile(databaseId: number, profileName: string, checked: boolean) {
 		state[databaseId][profileName] = checked;
 		state = { ...state }; // Reassign to trigger reactivity
+	}
+
+	export async function saveSection() {
+		await handleSave();
 	}
 
 	function getSelections(): { databaseId: number; profileName: string }[] {
@@ -68,6 +87,10 @@
 			}
 		}
 		return selections;
+	}
+
+	export async function syncSection() {
+		await handleSync();
 	}
 
 	async function handleSave() {
@@ -87,6 +110,7 @@
 				alertStore.add('success', 'Quality profiles sync config saved');
 				// Update saved state to current
 				savedState = JSON.stringify({ state, syncTrigger, cronExpression });
+				hasUnsyncedPreview = true;
 			} else {
 				alertStore.add('error', 'Failed to save quality profiles sync config');
 			}
@@ -108,6 +132,8 @@
 			if (response.ok) {
 				const data = await response.json();
 				alertStore.add('success', data?.message ?? 'Sync queued');
+				previewEnabled = false;
+				hasUnsyncedPreview = false;
 			} else {
 				alertStore.add('error', 'Sync failed');
 			}
@@ -170,6 +196,10 @@
 		{isDirty}
 		{canSave}
 		{warning}
+		{previewEnabled}
+		{previewConfig}
+		on:previewGenerated
+		on:previewError
 		on:save={handleSave}
 		on:sync={handleSync}
 	/>

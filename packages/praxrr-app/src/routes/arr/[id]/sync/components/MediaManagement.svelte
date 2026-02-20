@@ -137,8 +137,14 @@
 		};
 	}
 
+	export async function saveSection() {
+		await handleSave();
+	}
+
 	export let syncTrigger: 'manual' | 'on_pull' | 'on_change' | 'schedule' = 'manual';
 	export let cronExpression: string = '0 * * * *';
+	export let previewEnabled = false;
+	export let previewConfig: unknown = null;
 
 	let saving = false;
 	let syncing = false;
@@ -148,6 +154,24 @@
 	$: currentState = JSON.stringify({ state, syncTrigger, cronExpression });
 	export let isDirty = false;
 	$: isDirty = currentState !== savedState;
+	let hasUnsyncedPreview = false;
+
+	$: {
+		const hasAnySelection =
+			(state.namingDatabaseId !== null && state.namingConfigName !== null) ||
+			(state.qualityDefinitionsDatabaseId !== null && state.qualityDefinitionsConfigName !== null) ||
+			(state.mediaSettingsDatabaseId !== null && state.mediaSettingsConfigName !== null);
+
+		if (!hasAnySelection) {
+			previewEnabled = false;
+			hasUnsyncedPreview = false;
+		} else if (isDirty) {
+			previewEnabled = true;
+			hasUnsyncedPreview = true;
+		} else if (!hasUnsyncedPreview) {
+			previewEnabled = false;
+		}
+	}
 
 	async function handleSave() {
 		saving = true;
@@ -174,6 +198,7 @@
 				alertStore.add('success', 'Media management sync config saved');
 				// Update saved state to current
 				savedState = JSON.stringify({ state, syncTrigger, cronExpression });
+				hasUnsyncedPreview = true;
 			} else {
 				alertStore.add('error', 'Failed to save media management sync config');
 			}
@@ -195,6 +220,8 @@
 			if (response.ok) {
 				const data = await response.json();
 				alertStore.add('success', data?.message ?? 'Sync queued');
+				previewEnabled = false;
+				hasUnsyncedPreview = false;
 			} else {
 				alertStore.add('error', 'Sync failed');
 			}
@@ -203,6 +230,10 @@
 		} finally {
 			syncing = false;
 		}
+	}
+
+	export async function syncSection() {
+		await handleSync();
 	}
 </script>
 
@@ -273,6 +304,10 @@
 		{saving}
 		{syncing}
 		{isDirty}
+		{previewEnabled}
+		{previewConfig}
+		on:previewGenerated
+		on:previewError
 		on:save={handleSave}
 		on:sync={handleSync}
 	/>
