@@ -205,7 +205,10 @@ class ArrCredentialRedactionRoutesTest extends BaseTest {
       } as unknown as Parameters<ArrLayoutLoad>[0])) as { instance: Record<string, unknown> };
 
       this.assertPayloadNoLeak(layout, SECRET_API_KEY, 'settings page load payload');
-      assertFalse('api_key' in (layout.instance as Record<string, unknown>), 'settings payload should not include api_key');
+      assertFalse(
+        'api_key' in (layout.instance as Record<string, unknown>),
+        'settings payload should not include api_key'
+      );
       assertEquals(layout.instance.id, instance.id);
     });
   }

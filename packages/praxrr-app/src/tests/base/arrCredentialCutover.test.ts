@@ -54,7 +54,12 @@ function withArrCredentialConfig<T>(fn: () => T | Promise<T>): Promise<T> {
   }
 }
 
-function patchTarget<T extends object, K extends keyof T>(target: T, key: K, replacement: T[K], restores: Restore[]): void {
+function patchTarget<T extends object, K extends keyof T>(
+  target: T,
+  key: K,
+  replacement: T[K],
+  restores: Restore[]
+): void {
   const original = target[key];
   target[key] = replacement;
   restores.push(() => {
@@ -73,16 +78,13 @@ Deno.test('getArrInstanceClient decrypts credential payload for runtime Arr use'
       const request = new Request(input, init);
       capturedHeaders.set('X-Api-Key', request.headers.get('X-Api-Key'));
       return Promise.resolve(
-        new Response(
-          JSON.stringify({ appName: 'Radarr', version: 'v0.0.1', osName: 'linux' }),
-          {
-            status: 200,
-            headers: { 'content-type': 'application/json' },
-          },
-        ),
+        new Response(JSON.stringify({ appName: 'Radarr', version: 'v0.0.1', osName: 'linux' }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        })
       );
     }) as typeof fetch,
-    restores,
+    restores
   );
 
   try {
@@ -100,7 +102,7 @@ Deno.test('getArrInstanceClient decrypts credential payload for runtime Arr use'
         created_at: '2026-01-01',
         updated_at: '2026-01-01',
       }),
-      restores,
+      restores
     );
 
     const client = await getArrInstanceClient('radarr', 21, 'http://radarr.local');
@@ -119,18 +121,13 @@ Deno.test('getArrInstanceClient decrypts credential payload for runtime Arr use'
 Deno.test('getArrInstanceClient throws when no credentials exist for instance', async () => {
   const restores: Restore[] = [];
 
-  patchTarget(
-    arrInstanceCredentialsQueries,
-    'getByInstanceId',
-    () => undefined,
-    restores,
-  );
+  patchTarget(arrInstanceCredentialsQueries, 'getByInstanceId', () => undefined, restores);
 
   try {
     await assertRejects(
       () => getArrInstanceClient('sonarr', 777, 'http://sonarr.local'),
       Error,
-      'No Arr credentials found for instance 777',
+      'No Arr credentials found for instance 777'
     );
   } finally {
     for (const restore of restores.reverse()) {
@@ -155,14 +152,14 @@ Deno.test('getArrInstanceClient rejects on corrupted ciphertext', async () => {
         created_at: '2026-01-01',
         updated_at: '2026-01-01',
       }),
-      restores,
+      restores
     );
 
     try {
       await assertRejects(
         () => getArrInstanceClient('lidarr', 22, 'http://lidarr.local'),
         Error,
-        'Arr credential nonce must be exactly 12 bytes',
+        'Arr credential nonce must be exactly 12 bytes'
       );
     } finally {
       for (const restore of restores.reverse()) {

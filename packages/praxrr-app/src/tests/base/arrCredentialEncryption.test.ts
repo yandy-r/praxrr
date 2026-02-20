@@ -58,7 +58,12 @@ function withArrCredentialConfig<T>(fn: () => T | Promise<T>): Promise<T> {
   }
 }
 
-function patchTarget<T extends object, K extends keyof T>(target: T, key: K, replacement: T[K], restores: Restore[]): void {
+function patchTarget<T extends object, K extends keyof T>(
+  target: T,
+  key: K,
+  replacement: T[K],
+  restores: Restore[]
+): void {
   const original = target[key];
   target[key] = replacement;
   restores.push(() => {
@@ -87,75 +92,102 @@ Deno.test('encryptArrInstanceApiKey produces encrypted-at-rest payload and decry
   assertEquals(restored, 'cleartext-key-456');
 });
 
-async function __testDecryptEnvelope(payload: { keyVersion: string; nonce: string; ciphertext: string }): Promise<string> {
+async function __testDecryptEnvelope(payload: {
+  keyVersion: string;
+  nonce: string;
+  ciphertext: string;
+}): Promise<string> {
   const { decryptArrInstanceApiKey } = await import('../../lib/server/utils/encryption/arr-credentials.ts');
   return decryptArrInstanceApiKey(payload);
 }
 
-Deno.test('arrInstances create writes ciphertext in instance row and stores encrypted credential separately', async () => {
-  const executeCalls: unknown[][] = [];
-  const executedSql: string[] = [];
-  const restores: Restore[] = [];
-  let credentialCreated = false;
+Deno.test(
+  'arrInstances create writes ciphertext in instance row and stores encrypted credential separately',
+  async () => {
+    const executeCalls: unknown[][] = [];
+    const executedSql: string[] = [];
+    const restores: Restore[] = [];
+    let credentialCreated = false;
 
-  patchTarget(db, 'beginTransaction', () => {
-    // No-op for this regression harness.
-  }, restores);
-  patchTarget(db, 'commit', () => {
-    // No-op for this regression harness.
-  }, restores);
-  patchTarget(db, 'rollback', () => {
-    // No-op for this regression harness.
-  }, restores);
-  patchTarget(db, 'execute', (sql: string, ...params: unknown[]) => {
-    executeCalls.push(params);
-    executedSql.push(sql);
-    return 1;
-  }, restores);
-  patchTarget(db, 'queryFirst', (() => ({ id: 88 }) as { id: number }) as typeof db.queryFirst, restores);
-  patchTarget(
-    arrInstanceCredentialsQueries,
-    'create',
-    () => {
-      credentialCreated = true;
-    },
-    restores,
-  );
-
-  try {
-    const plainApiKey = 'user-supplied-api-key';
-    const encrypted = await withArrCredentialConfig(() => encryptArrInstanceApiKey(plainApiKey));
-
-    const id = arrInstancesQueries.create(
-      {
-        name: 'Radarr Main',
-        type: 'radarr',
-        url: 'http://radarr.local:7878',
-        apiKey: encrypted.credential.ciphertext,
-        apiKeyFingerprint: encrypted.fingerprint.value,
+    patchTarget(
+      db,
+      'beginTransaction',
+      () => {
+        // No-op for this regression harness.
       },
-      {
-        ciphertext: encrypted.credential.ciphertext,
-        nonce: encrypted.credential.nonce,
-        keyVersion: encrypted.credential.keyVersion,
-        fingerprint: encrypted.fingerprint.value,
+      restores
+    );
+    patchTarget(
+      db,
+      'commit',
+      () => {
+        // No-op for this regression harness.
       },
+      restores
+    );
+    patchTarget(
+      db,
+      'rollback',
+      () => {
+        // No-op for this regression harness.
+      },
+      restores
+    );
+    patchTarget(
+      db,
+      'execute',
+      (sql: string, ...params: unknown[]) => {
+        executeCalls.push(params);
+        executedSql.push(sql);
+        return 1;
+      },
+      restores
+    );
+    patchTarget(db, 'queryFirst', (() => ({ id: 88 }) as { id: number }) as typeof db.queryFirst, restores);
+    patchTarget(
+      arrInstanceCredentialsQueries,
+      'create',
+      () => {
+        credentialCreated = true;
+      },
+      restores
     );
 
-    assertEquals(id, 88);
-    assertEquals(executeCalls.length, 1);
-    assertEquals(executedSql[0].includes('INSERT INTO arr_instances'), true);
-    assertEquals(executeCalls[0][4], encrypted.credential.ciphertext);
-    assertEquals(executeCalls[0][5], encrypted.fingerprint.value);
-    assertEquals(executeCalls[0][4], encrypted.credential.ciphertext);
-    assertEquals(executeCalls[0][4] === plainApiKey, false);
-    assertEquals(credentialCreated, true);
-  } finally {
-    for (const restore of restores.reverse()) {
-      restore();
+    try {
+      const plainApiKey = 'user-supplied-api-key';
+      const encrypted = await withArrCredentialConfig(() => encryptArrInstanceApiKey(plainApiKey));
+
+      const id = arrInstancesQueries.create(
+        {
+          name: 'Radarr Main',
+          type: 'radarr',
+          url: 'http://radarr.local:7878',
+          apiKey: encrypted.credential.ciphertext,
+          apiKeyFingerprint: encrypted.fingerprint.value,
+        },
+        {
+          ciphertext: encrypted.credential.ciphertext,
+          nonce: encrypted.credential.nonce,
+          keyVersion: encrypted.credential.keyVersion,
+          fingerprint: encrypted.fingerprint.value,
+        }
+      );
+
+      assertEquals(id, 88);
+      assertEquals(executeCalls.length, 1);
+      assertEquals(executedSql[0].includes('INSERT INTO arr_instances'), true);
+      assertEquals(executeCalls[0][4], encrypted.credential.ciphertext);
+      assertEquals(executeCalls[0][5], encrypted.fingerprint.value);
+      assertEquals(executeCalls[0][4], encrypted.credential.ciphertext);
+      assertEquals(executeCalls[0][4] === plainApiKey, false);
+      assertEquals(credentialCreated, true);
+    } finally {
+      for (const restore of restores.reverse()) {
+        restore();
+      }
     }
   }
-});
+);
 
 Deno.test('arrInstances select projection redacts api_key field in query responses', () => {
   const restores: Restore[] = [];
@@ -181,17 +213,14 @@ Deno.test('arrInstances select projection redacts api_key field in query respons
         api_key: '',
       };
     }) as typeof db.queryFirst,
-    restores,
+    restores
   );
 
   try {
     const instance = arrInstancesQueries.getById(1);
     assertEquals(instance?.api_key, '');
     assertEquals(executeCalls.length, 1);
-    assertEquals(
-      executeCalls[0][0]!.toString().includes("'' AS api_key"),
-      true,
-    );
+    assertEquals(executeCalls[0][0]!.toString().includes("'' AS api_key"), true);
   } finally {
     for (const restore of restores.reverse()) {
       restore();
