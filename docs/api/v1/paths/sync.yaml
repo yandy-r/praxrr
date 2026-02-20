@@ -1,0 +1,191 @@
+preview:
+  post:
+    operationId: createSyncPreview
+    summary: Generate a sync preview
+    description: |
+      Computes a read-only preview of the sync changes for an Arr instance.
+
+      This endpoint performs no writes. It only reads from PCD and Arr GET
+      endpoints to compare desired versus current state, then stores a preview
+      snapshot for later retrieval or application.
+
+      If no `sections` are provided, all configured sections for the instance are
+      included.
+    tags:
+      - Arr
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../schemas/sync.yaml#/SyncPreviewCreateRequest'
+    responses:
+      '200':
+        description: Preview generated
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SyncPreviewResult'
+      '400':
+        description: Invalid instanceId, unsupported section, or request body
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ErrorResponse'
+      '404':
+        description: Instance not found
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ErrorResponse'
+      '409':
+        description: Preview for this instance is already generating
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ErrorResponse'
+      '500':
+        description: Failed to generate preview
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ErrorResponse'
+
+previewById:
+  get:
+    operationId: getSyncPreview
+    summary: Get a sync preview
+    description: |
+      Retrieves a previously generated preview snapshot by ID.
+
+      This endpoint is read-only and is safe to call repeatedly while preview state
+      changes naturally over time.
+
+      Snapshots are subject to staleness rules enforced by the preview TTL. A
+      preview that has exceeded the TTL should be treated as expired.
+    tags:
+      - Arr
+    parameters:
+      - name: previewId
+        in: path
+        required: true
+        description: Preview snapshot ID
+        schema:
+          type: string
+    responses:
+      '200':
+        description: Sync preview
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SyncPreviewResult'
+      '404':
+        description: Preview not found or expired
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ErrorResponse'
+      '500':
+        description: Failed to fetch preview
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ErrorResponse'
+  delete:
+    operationId: deleteSyncPreview
+    summary: Discard a sync preview
+    description: |
+      Removes a stored preview snapshot.
+
+      This endpoint does not trigger any Arr sync action; it only removes the cached
+      preview and does not change runtime configuration.
+    tags:
+      - Arr
+    parameters:
+      - name: previewId
+        in: path
+        required: true
+        description: Preview snapshot ID
+        schema:
+          type: string
+    responses:
+      '204':
+        description: Preview discarded
+      '404':
+        description: Preview not found or expired
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ErrorResponse'
+      '500':
+        description: Failed to delete preview
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ErrorResponse'
+
+previewApply:
+  post:
+    operationId: applySyncPreview
+    summary: Apply a sync preview
+    description: |
+      Applies a previously generated preview to the target Arr instance.
+
+      Preview generation itself is read-only, but this operation runs the normal sync
+      execution path for the selected sections.
+
+      Apply rejects previews that are too stale based on policy:
+      - warnings are returned when the preview is older than 5 minutes
+      - apply is blocked when staleness exceeds the hard threshold
+    tags:
+      - Arr
+    parameters:
+      - name: previewId
+        in: path
+        required: true
+        description: Preview snapshot ID
+        schema:
+          type: string
+    requestBody:
+      required: false
+      content:
+        application/json:
+          schema:
+            $ref: '../schemas/sync.yaml#/SyncPreviewApplyRequest'
+    responses:
+      '200':
+        description: Preview applied
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SyncPreviewResult'
+      '400':
+        description: Invalid request body
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ErrorResponse'
+      '404':
+        description: Preview not found or expired
+        content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      '409':
+        description: Preview is not in a ready state or instance is syncing
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ErrorResponse'
+      '422':
+        description: Preview is stale beyond apply threshold
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ErrorResponse'
+      '500':
+        description: Failed to apply preview
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ErrorResponse'

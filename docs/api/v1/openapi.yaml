@@ -36,6 +36,12 @@ paths:
     $ref: './paths/arr.yaml#/releases'
   /arr/cleanup:
     $ref: './paths/arr.yaml#/cleanup'
+  /sync/preview:
+    $ref: './paths/sync.yaml#/preview'
+  /sync/preview/{previewId}:
+    $ref: './paths/sync.yaml#/previewById'
+  /sync/preview/{previewId}/apply:
+    $ref: './paths/sync.yaml#/previewApply'
   /pcd/export:
     $ref: './paths/pcd.yaml#/export'
   /pcd/import:
@@ -371,6 +377,35 @@ components:
       $ref: './schemas/arr.yaml#/CleanupScanResult'
     CleanupDeleteResult:
       $ref: './schemas/arr.yaml#/CleanupDeleteResult'
+    # Sync - Preview
+    SyncPreviewCreateRequest:
+      $ref: './schemas/sync.yaml#/SyncPreviewCreateRequest'
+    SyncPreviewApplyRequest:
+      $ref: './schemas/sync.yaml#/SyncPreviewApplyRequest'
+    SyncPreviewStatus:
+      $ref: './schemas/sync.yaml#/SyncPreviewStatus'
+    SyncPreviewSection:
+      $ref: './schemas/sync.yaml#/SyncPreviewSection'
+    SyncPreviewAction:
+      $ref: './schemas/sync.yaml#/SyncPreviewAction'
+    SyncPreviewFieldChangeType:
+      $ref: './schemas/sync.yaml#/SyncPreviewFieldChangeType'
+    FieldChange:
+      $ref: './schemas/sync.yaml#/FieldChange'
+    EntityChange:
+      $ref: './schemas/sync.yaml#/EntityChange'
+    QualityProfilesPreview:
+      $ref: './schemas/sync.yaml#/QualityProfilesPreview'
+    DelayProfilesPreview:
+      $ref: './schemas/sync.yaml#/DelayProfilesPreview'
+    MediaManagementPreview:
+      $ref: './schemas/sync.yaml#/MediaManagementPreview'
+    MetadataProfilesPreview:
+      $ref: './schemas/sync.yaml#/MetadataProfilesPreview'
+    SyncPreviewSummary:
+      $ref: './schemas/sync.yaml#/SyncPreviewSummary'
+    SyncPreviewResult:
+      $ref: './schemas/sync.yaml#/SyncPreviewResult'
     # PCD
     EntityType:
       $ref: './schemas/pcd.yaml#/EntityType'

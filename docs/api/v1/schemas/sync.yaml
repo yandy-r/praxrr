@@ -1,0 +1,304 @@
+SyncPreviewCreateRequest:
+  type: object
+  required:
+    - instanceId
+  properties:
+    instanceId:
+      type: integer
+      description: Arr instance ID to preview
+    sections:
+      type: array
+      description: Optional section filters for preview generation
+      items:
+        $ref: '#/SyncPreviewSection'
+
+SyncPreviewApplyRequest:
+  type: object
+  properties:
+    sections:
+      type: array
+      description: Optional section filters for preview application
+      items:
+        $ref: '#/SyncPreviewSection'
+
+SyncPreviewStatus:
+  type: string
+  enum:
+    - generating
+    - ready
+    - applying
+    - applied
+    - failed
+    - expired
+  description: |
+    Preview lifecycle state:
+    - `generating`: build in progress
+    - `ready`: preview fully materialized and runnable
+    - `applying`: preview is being executed as sync
+    - `applied`: execution succeeded
+    - `failed`: generation or execution failed
+    - `expired`: staleness TTL elapsed
+
+SyncPreviewSection:
+  type: string
+  enum:
+    - qualityProfiles
+    - delayProfiles
+    - mediaManagement
+    - metadataProfiles
+  description: Sync section handled by preview generation
+
+SyncPreviewAction:
+  type: string
+  enum:
+    - create
+    - update
+    - delete
+    - unchanged
+
+SyncPreviewFieldChangeType:
+  type: string
+  enum:
+    - added
+    - changed
+    - removed
+
+FieldChange:
+  type: object
+  required:
+    - field
+    - type
+    - current
+    - desired
+  properties:
+    field:
+      type: string
+      description: Dot-notated field path
+    type:
+      $ref: '#/SyncPreviewFieldChangeType'
+    current:
+      description: Previous value from Arr GET state
+      anyOf:
+        - type: string
+        - type: number
+        - type: integer
+        - type: boolean
+        - type: array
+        - type: object
+          additionalProperties: true
+        - type: null
+    desired:
+      description: Desired value after sync transformation
+      anyOf:
+        - type: string
+        - type: number
+        - type: integer
+        - type: boolean
+        - type: array
+        - type: object
+          additionalProperties: true
+        - type: null
+
+EntityChange:
+  type: object
+  required:
+    - entityType
+    - name
+    - action
+    - remoteId
+    - fields
+  properties:
+    entityType:
+      type: string
+      description: Sync target entity kind (e.g., customFormat, qualityProfile)
+    name:
+      type: string
+      description: Entity display name (namespace-stripped where applicable)
+    action:
+      $ref: '#/SyncPreviewAction'
+    remoteId:
+      type: integer
+      nullable: true
+      description: Arr entity ID when present
+    fields:
+      type: array
+      description: Field-level diff; empty for unchanged/create where no deltas are tracked
+      items:
+        $ref: '#/FieldChange'
+
+QualityProfilesPreview:
+  type: object
+  required:
+    - section
+    - customFormats
+    - qualityProfiles
+  properties:
+    section:
+      type: string
+      enum:
+        - qualityProfiles
+    customFormats:
+      type: array
+      items:
+        $ref: '#/EntityChange'
+      description: Custom-format change set
+    qualityProfiles:
+      type: array
+      items:
+        $ref: '#/EntityChange'
+      description: Quality-profile change set
+
+DelayProfilesPreview:
+  type: object
+  required:
+    - section
+    - profile
+  properties:
+    section:
+      type: string
+      enum:
+        - delayProfiles
+    profile:
+      oneOf:
+        - $ref: '#/EntityChange'
+        - type: null
+      description: Delay profile singleton section payload
+
+MediaManagementPreview:
+  type: object
+  required:
+    - section
+    - naming
+    - qualityDefinitions
+    - mediaSettings
+  properties:
+    section:
+      type: string
+      enum:
+        - mediaManagement
+    naming:
+      oneOf:
+        - $ref: '#/EntityChange'
+        - type: null
+      description: Naming config diff
+    qualityDefinitions:
+      type: array
+      items:
+        $ref: '#/EntityChange'
+      description: Quality definition change set
+    mediaSettings:
+      oneOf:
+        - $ref: '#/EntityChange'
+        - type: null
+      description: Media settings config diff
+
+MetadataProfilesPreview:
+  type: object
+  required:
+    - section
+    - profile
+  properties:
+    section:
+      type: string
+      enum:
+        - metadataProfiles
+    profile:
+      oneOf:
+        - $ref: '#/EntityChange'
+        - type: null
+      description: Lidarr metadata profile singleton diff
+
+SyncPreviewSummary:
+  type: object
+  required:
+    - totalCreates
+    - totalUpdates
+    - totalDeletes
+    - totalUnchanged
+  properties:
+    totalCreates:
+      type: integer
+      minimum: 0
+      description: Number of create actions
+    totalUpdates:
+      type: integer
+      minimum: 0
+      description: Number of update actions
+    totalDeletes:
+      type: integer
+      minimum: 0
+      description: Number of delete actions
+    totalUnchanged:
+      type: integer
+      minimum: 0
+      description: Number of unchanged entities
+
+SyncPreviewResult:
+  type: object
+  required:
+    - id
+    - instanceId
+    - instanceName
+    - arrType
+    - createdAt
+    - expiresAt
+    - status
+    - sections
+    - qualityProfiles
+    - delayProfiles
+    - mediaManagement
+    - metadataProfiles
+    - summary
+  properties:
+    id:
+      type: string
+      description: Preview identifier
+    instanceId:
+      type: integer
+      description: Target Arr instance ID
+    instanceName:
+      type: string
+      description: Target Arr instance name
+    arrType:
+      type: string
+      enum:
+        - radarr
+        - sonarr
+        - lidarr
+      description: Arr instance family
+    createdAt:
+      type: string
+      format: date-time
+      description: ISO 8601 timestamp when preview was generated
+    expiresAt:
+      type: string
+      format: date-time
+      description: ISO 8601 timestamp when preview becomes expired
+    status:
+      $ref: '#/SyncPreviewStatus'
+    error:
+      type: string
+      description: Optional error message from generation or apply
+    sections:
+      type: array
+      items:
+        $ref: '#/SyncPreviewSection'
+      description: Sections included in preview
+    qualityProfiles:
+      oneOf:
+        - $ref: '#/QualityProfilesPreview'
+        - type: null
+    delayProfiles:
+      oneOf:
+        - $ref: '#/DelayProfilesPreview'
+        - type: null
+    mediaManagement:
+      oneOf:
+        - $ref: '#/MediaManagementPreview'
+        - type: null
+    metadataProfiles:
+      oneOf:
+        - $ref: '#/MetadataProfilesPreview'
+        - type: null
+    summary:
+      $ref: '#/SyncPreviewSummary'
