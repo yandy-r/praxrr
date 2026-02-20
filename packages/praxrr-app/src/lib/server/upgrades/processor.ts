@@ -3,7 +3,7 @@
  * Coordinates fetching, filtering, selection, and searching
  */
 
-import { RadarrClient } from '$lib/server/utils/arr/clients/radarr.ts';
+import type { RadarrClient } from '$lib/server/utils/arr/clients/radarr.ts';
 import type { ArrInstance } from '$lib/server/db/queries/arrInstances.ts';
 import type { UpgradeConfig, FilterConfig } from '$shared/upgrades/filters.ts';
 import { evaluateGroup } from '$shared/upgrades/filters.ts';
@@ -20,6 +20,7 @@ import {
 import { logUpgradeRun, logUpgradeError, logUpgradeSkipped } from './logger.ts';
 import { notifications } from '$lib/server/notifications/definitions/index.ts';
 import { notificationServicesQueries } from '$lib/server/db/queries/notificationServices.ts';
+import { getArrInstanceClient } from '$arr/arrInstanceClients.ts';
 
 /**
  * In-memory cache for dry run exclusions
@@ -188,7 +189,7 @@ export async function processUpgradeConfig(
   }
 
   // Create client
-  const client = new RadarrClient(instance.url, instance.api_key);
+  const client = (await getArrInstanceClient('radarr', instance.id, instance.url)) as RadarrClient;
 
   try {
     // Step 1: Fetch library data

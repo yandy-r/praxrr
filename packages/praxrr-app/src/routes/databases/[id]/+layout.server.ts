@@ -15,7 +15,12 @@ export const load: LayoutServerLoad = ({ params }) => {
     error(404, 'Database not found');
   }
 
+  const { personal_access_token: _redactedToken, ...databaseWithoutToken } = database;
+
   return {
-    database,
+    database: {
+      ...databaseWithoutToken,
+      personal_access_token: '',
+    },
   };
 };

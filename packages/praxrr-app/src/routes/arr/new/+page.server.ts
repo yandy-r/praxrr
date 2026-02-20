@@ -1,7 +1,13 @@
 import { fail, redirect } from '@sveltejs/kit';
 import type { Actions } from '@sveltejs/kit';
 import { arrInstancesQueries } from '$db/queries/arrInstances.ts';
+import { arrInstanceCredentialsQueries } from '$db/queries/arrInstanceCredentials.ts';
 import { logger } from '$logger/logger.ts';
+import {
+  encryptArrInstanceApiKey,
+  deriveArrInstanceApiKeyFingerprint,
+} from '$server/utils/encryption/arr-credentials.ts';
+import { getAllArrCredentialKeyVersions } from '$server/utils/encryption/keys.ts';
 import { parseOptionalAbsoluteHttpUrl } from '$utils/validation/url.ts';
 
 const VALID_TYPES = ['radarr', 'sonarr', 'lidarr'];
@@ -64,8 +70,26 @@ export const actions = {
       });
     }
 
-    // Check if API key already exists (each Arr instance has a unique API key)
-    if (arrInstancesQueries.apiKeyExists(apiKey)) {
+    // Check if API key fingerprint already exists under any credential key version
+    let candidateFingerprints: string[];
+    try {
+      const versions = getAllArrCredentialKeyVersions();
+      candidateFingerprints = await Promise.all(
+        versions.map((version) => deriveArrInstanceApiKeyFingerprint(apiKey, version).then((fp) => fp.value))
+      );
+    } catch (error) {
+      await logger.error('Failed to derive API key fingerprints', {
+        source: 'arr/new',
+        meta: { error },
+      });
+
+      return fail(500, {
+        error: 'Failed to process API key',
+        values: { name, type, url },
+      });
+    }
+
+    if (arrInstanceCredentialsQueries.getByAnyFingerprint(candidateFingerprints)) {
       await logger.warn('Attempted to create duplicate instance', {
         source: 'arr/new',
         meta: { name, type, url },
@@ -73,6 +97,21 @@ export const actions = {
 
       return fail(400, {
         error: 'This instance is already connected',
+        values: { name, type, url },
+      });
+    }
+
+    let encryptedApiKey;
+    try {
+      encryptedApiKey = await encryptArrInstanceApiKey(apiKey);
+    } catch (error) {
+      await logger.error('Failed to encrypt arr api key', {
+        source: 'arr/new',
+        meta: { error },
+      });
+
+      return fail(500, {
+        error: 'Failed to process API key',
         values: { name, type, url },
       });
     }
@@ -95,22 +134,32 @@ export const actions = {
 
     let id: number;
     try {
-      // Create the instance
-      id = arrInstancesQueries.create({
-        name,
-        type,
-        url,
-        externalUrl: externalUrl.value,
-        apiKey,
-        tags,
-        enabled,
-      });
+      const insertedId = arrInstancesQueries.create(
+        {
+          name,
+          type,
+          url,
+          externalUrl: externalUrl.value,
+          apiKey,
+          tags,
+          enabled,
+        },
+        {
+          ciphertext: encryptedApiKey.credential.ciphertext,
+          nonce: encryptedApiKey.credential.nonce,
+          keyVersion: encryptedApiKey.credential.keyVersion,
+          fingerprint: encryptedApiKey.fingerprint.value,
+        }
+      );
 
+      id = insertedId;
+      if (!id) {
+        throw new Error('Failed to create arr instance');
+      }
       await logger.info(`Created new ${type} instance: ${name}`, {
         source: 'arr/new',
         meta: { id, name, type, url },
       });
-
     } catch (error) {
       await logger.error('Failed to create arr instance', {
         source: 'arr/new',

@@ -1,9 +1,10 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from '@sveltejs/kit';
 import { arrInstancesQueries } from '$db/queries/arrInstances.ts';
-import { LidarrClient } from '$utils/arr/clients/lidarr.ts';
-import { RadarrClient } from '$utils/arr/clients/radarr.ts';
-import { SonarrClient } from '$utils/arr/clients/sonarr.ts';
+import type { LidarrClient } from '$utils/arr/clients/lidarr.ts';
+import { getArrInstanceClient } from '$arr/arrInstanceClients.ts';
+import type { RadarrClient } from '$utils/arr/clients/radarr.ts';
+import type { SonarrClient } from '$utils/arr/clients/sonarr.ts';
 import {
   decodeSonarrFlags,
   groupRadarrReleases,
@@ -12,7 +13,7 @@ import {
   titleSimilarity,
   type GroupedRelease,
 } from '$utils/arr/releaseImport.ts';
-import type { LidarrRelease } from '$utils/arr/types.ts';
+import type { ArrType, LidarrRelease } from '$utils/arr/types.ts';
 
 function union<T>(arr1: T[], arr2: T[]): T[] {
   return [...new Set([...arr1, ...arr2])];
@@ -99,7 +100,7 @@ export const GET: RequestHandler = async ({ url }) => {
 
   try {
     if (instance.type === 'radarr') {
-      const client = new RadarrClient(instance.url, instance.api_key);
+      const client = (await getArrInstanceClient(instance.type as ArrType, instance.id, instance.url)) as RadarrClient;
       try {
         const releases = await client.getReleases(itemIdNum);
         const grouped = groupRadarrReleases(releases);
@@ -112,7 +113,7 @@ export const GET: RequestHandler = async ({ url }) => {
         client.close();
       }
     } else if (instance.type === 'sonarr') {
-      const client = new SonarrClient(instance.url, instance.api_key);
+      const client = (await getArrInstanceClient(instance.type as ArrType, instance.id, instance.url)) as SonarrClient;
       try {
         // Search specified season (default to 1) and filter for season packs
         const seasonNum = season ? parseInt(season, 10) : 1;
@@ -127,7 +128,7 @@ export const GET: RequestHandler = async ({ url }) => {
         client.close();
       }
     } else if (instance.type === 'lidarr') {
-      const client = new LidarrClient(instance.url, instance.api_key);
+      const client = (await getArrInstanceClient(instance.type as ArrType, instance.id, instance.url)) as LidarrClient;
       try {
         const releases = await client.getReleases(itemIdNum);
         const grouped = groupLidarrReleases(releases);

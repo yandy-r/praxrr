@@ -15,8 +15,9 @@ export const load: ServerLoad = ({ params }) => {
     error(404, `Instance not found: ${id}`);
   }
 
-  const typedInstance: ArrInstance = {
-    ...instance,
+  const { api_key: _api_key, ...instanceWithoutSecret } = instance;
+  const typedInstance: Omit<ArrInstance, 'api_key'> = {
+    ...instanceWithoutSecret,
     external_url: instance.external_url ?? null,
   };
 

@@ -14,8 +14,8 @@ clone = serialize → swap name → deserialize
 
 ### New files
 
-| File                                         | Purpose                                               |
-| -------------------------------------------- | ----------------------------------------------------- |
+| File                                                             | Purpose                                               |
+| ---------------------------------------------------------------- | ----------------------------------------------------- |
 | `packages/praxrr-app/src/lib/shared/pcd/portable.ts`             | Portable type definitions (shared client+server)      |
 | `packages/praxrr-app/src/lib/server/pcd/entities/serialize.ts`   | All serialize functions (cache → portable)            |
 | `packages/praxrr-app/src/lib/server/pcd/entities/deserialize.ts` | All deserialize functions (portable → PCD ops)        |
@@ -24,8 +24,8 @@ clone = serialize → swap name → deserialize
 
 ### Modified files (per entity type)
 
-| File                                                      | Change                                                |
-| --------------------------------------------------------- | ----------------------------------------------------- |
+| File                                                                          | Change                                                |
+| ----------------------------------------------------------------------------- | ----------------------------------------------------- |
 | `packages/praxrr-app/src/routes/[entity]/[databaseId]/+page.server.ts`        | Add `canWriteToBase` to load, add `clone` form action |
 | `packages/praxrr-app/src/routes/[entity]/[databaseId]/+page.svelte`           | Add clone state + CloneModal                          |
 | `packages/praxrr-app/src/routes/[entity]/[databaseId]/views/CardView.svelte`  | Add clone button (Copy icon in card footer)           |

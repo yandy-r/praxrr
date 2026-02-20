@@ -1,7 +1,7 @@
 import { error } from '@sveltejs/kit';
 import type { ServerLoad } from '@sveltejs/kit';
 import { arrInstancesQueries } from '$db/queries/arrInstances.ts';
-import { createArrClient } from '$arr/factory.ts';
+import { getArrInstanceClient } from '$arr/arrInstanceClients.ts';
 import type { ArrType } from '$arr/types.ts';
 
 export const load: ServerLoad = async ({ params, url }) => {
@@ -22,7 +22,7 @@ export const load: ServerLoad = async ({ params, url }) => {
   const pageSize = parseInt(url.searchParams.get('pageSize') || '50', 10);
   const level = url.searchParams.get('level') || undefined;
 
-  const client = createArrClient(instance.type as ArrType, instance.url, instance.api_key);
+  const client = await getArrInstanceClient(instance.type as ArrType, instance.id, instance.url);
 
   try {
     const logs = await client.getLogs({
