@@ -44,6 +44,7 @@ The Arr credential encryption model is implemented and running on the new migrat
 5. Runtime call sites consume `getArrInstanceClient()` for persisted credentials.
 
 Plaintext path status:
+
 - Persisted plaintext storage/write behavior is removed from active contracts.
 - Direct `instance.api_key` usage for persisted credentials is out-of-contract and should be considered a regression if reintroduced.
 

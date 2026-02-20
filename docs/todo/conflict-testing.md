@@ -481,8 +481,8 @@ Comprehensive QP conflict coverage modeled after CF learnings.
 
 ### 2.1-2.5 Non-Overlapping No-Conflict
 
-| ID  | Scenario                                      | Type        | Expected                                          | E2E spec                                                                  | Pass  |
-| --- | --------------------------------------------- | ----------- | ------------------------------------------------- | ------------------------------------------------------------------------- | ----- |
+| ID  | Scenario                                      | Type        | Expected                                          | E2E spec                                                                                      | Pass  |
+| --- | --------------------------------------------- | ----------- | ------------------------------------------------- | --------------------------------------------------------------------------------------------- | ----- |
 | 2.1 | Tags-only local vs upstream description       | No conflict | Tag change applies; upstream description applies  | `packages/praxrr-app/src/tests/e2e/specs/2.1-qp-tags-only-vs-upstream-description.spec.ts`    | - [x] |
 | 2.2 | Local rename vs upstream description          | No conflict | Local name persists; upstream description applies | `packages/praxrr-app/src/tests/e2e/specs/2.2-qp-local-rename-vs-upstream-description.spec.ts` | - [x] |
 | 2.3 | Local description vs upstream tags            | No conflict | Local description persists; upstream tags merge   | `packages/praxrr-app/src/tests/e2e/specs/2.3-qp-local-description-vs-upstream-tags.spec.ts`   | - [x] |
@@ -491,8 +491,8 @@ Comprehensive QP conflict coverage modeled after CF learnings.
 
 ### 2.6-2.16 Auto-Align
 
-| ID   | Scenario                                                   | Type       | Expected                                               | E2E spec                                                                                    | Pass  |
-| ---- | ---------------------------------------------------------- | ---------- | ------------------------------------------------------ | ------------------------------------------------------------------------------------------- | ----- |
+| ID   | Scenario                                                   | Type       | Expected                                               | E2E spec                                                                                                        | Pass  |
+| ---- | ---------------------------------------------------------- | ---------- | ------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------- | ----- |
 | 2.6  | Local description change, upstream same value              | Auto-align | No conflict row; user op dropped                       | `packages/praxrr-app/src/tests/e2e/specs/2.6-qp-description-same-value-auto-align.spec.ts`                      | - [x] |
 | 2.7  | Local delete, upstream already deleted                     | Auto-align | No conflict row; profile remains deleted               | `packages/praxrr-app/src/tests/e2e/specs/2.7-qp-delete-upstream-deleted-auto-align.spec.ts`                     | - [x] |
 | 2.8  | Local delete, upstream renamed                             | Auto-align | No conflict row; profile persists under upstream name  | `packages/praxrr-app/src/tests/e2e/specs/2.8-qp-delete-upstream-renamed-auto-align.spec.ts`                     | - [x] |
@@ -507,8 +507,8 @@ Comprehensive QP conflict coverage modeled after CF learnings.
 
 ### 2.17-2.22 Rename Family
 
-| ID   | Scenario                                         | Type     | Expected                                                                                 | E2E spec                                                                               | Pass  |
-| ---- | ------------------------------------------------ | -------- | ---------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- | ----- |
+| ID   | Scenario                                         | Type     | Expected                                                                                 | E2E spec                                                                                                   | Pass  |
+| ---- | ------------------------------------------------ | -------- | ---------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- | ----- |
 | 2.17 | Rename vs rename                                 | Conflict | Override: local rename. Align: upstream rename                                           | `packages/praxrr-app/src/tests/e2e/specs/2.17-qp-rename-vs-rename-conflict.spec.ts`                        | - [x] |
 | 2.18 | Upstream rename + local description              | Conflict | Override: upstream name + local description. Align: upstream name + upstream description | `packages/praxrr-app/src/tests/e2e/specs/2.18-qp-upstream-rename-local-description-conflict.spec.ts`       | - [x] |
 | 2.19 | Upstream rename + local scoring                  | Conflict | Override: upstream name + local scoring. Align: upstream name + upstream scoring         | `packages/praxrr-app/src/tests/e2e/specs/2.19-qp-upstream-rename-local-scoring-conflict.spec.ts`           | - [x] |
@@ -518,8 +518,8 @@ Comprehensive QP conflict coverage modeled after CF learnings.
 
 ### 2.23-2.26 General Field Conflicts
 
-| ID   | Scenario                     | Type        | Expected                                                                         | E2E spec                                                             | Pass  |
-| ---- | ---------------------------- | ----------- | -------------------------------------------------------------------------------- | -------------------------------------------------------------------- | ----- |
+| ID   | Scenario                     | Type        | Expected                                                                         | E2E spec                                                                                 | Pass  |
+| ---- | ---------------------------- | ----------- | -------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- | ----- |
 | 2.23 | Description conflict         | Conflict    | Override: local description. Align: upstream description                         | `packages/praxrr-app/src/tests/e2e/specs/2.23-qp-description-conflict.spec.ts`           | - [x] |
 | 2.24 | Language conflict            | Conflict    | Override: local language. Align: upstream language                               | `packages/praxrr-app/src/tests/e2e/specs/2.24-qp-language-conflict.spec.ts`              | - [x] |
 | 2.25 | Tag remove/add overlap merge | No conflict | Expected merged tags, no conflict row                                            | `packages/praxrr-app/src/tests/e2e/specs/2.25-qp-tags-overlap-merge-no-conflict.spec.ts` | - [x] |
@@ -527,8 +527,8 @@ Comprehensive QP conflict coverage modeled after CF learnings.
 
 ### 2.27-2.31 Qualities (Full-Replace Surface)
 
-| ID   | Scenario                                      | Type     | Expected                                                                   | E2E spec                                                                      | Pass  |
-| ---- | --------------------------------------------- | -------- | -------------------------------------------------------------------------- | ----------------------------------------------------------------------------- | ----- |
+| ID   | Scenario                                      | Type     | Expected                                                                   | E2E spec                                                                                          | Pass  |
+| ---- | --------------------------------------------- | -------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- | ----- |
 | 2.27 | Reorder vs reorder                            | Conflict | Override: local order. Align: upstream order                               | `packages/praxrr-app/src/tests/e2e/specs/2.27-qp-qualities-reorder-vs-reorder.spec.ts`            | - [x] |
 | 2.28 | Local add group vs upstream reorder           | Conflict | Override: local list with group. Align: upstream list without group        | `packages/praxrr-app/src/tests/e2e/specs/2.28-qp-qualities-add-group-vs-reorder.spec.ts`          | - [x] |
 | 2.29 | Local remove group vs upstream reorder        | Conflict | Override: local group removal. Align: upstream list                        | `packages/praxrr-app/src/tests/e2e/specs/2.29-qp-qualities-remove-group-vs-reorder.spec.ts`       | - [x] |
@@ -537,8 +537,8 @@ Comprehensive QP conflict coverage modeled after CF learnings.
 
 ### 2.32-2.39 Scoring
 
-| ID   | Scenario                                            | Type        | Expected                                                                         | E2E spec                                                                              | Pass  |
-| ---- | --------------------------------------------------- | ----------- | -------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- | ----- |
+| ID   | Scenario                                            | Type        | Expected                                                                         | E2E spec                                                                                                  | Pass  |
+| ---- | --------------------------------------------------- | ----------- | -------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- | ----- |
 | 2.32 | `minimum_custom_format_score` conflict              | Conflict    | Override: local value. Align: upstream value                                     | `packages/praxrr-app/src/tests/e2e/specs/2.32-qp-scoring-minimum-score-conflict.spec.ts`                  | - [x] |
 | 2.33 | `upgrade_until_score` conflict                      | Conflict    | Override: local value. Align: upstream value                                     | `packages/praxrr-app/src/tests/e2e/specs/2.33-qp-scoring-upgrade-until-score-conflict.spec.ts`            | - [x] |
 | 2.34 | `upgrade_score_increment` conflict                  | Conflict    | Override: local value. Align: upstream value                                     | `packages/praxrr-app/src/tests/e2e/specs/2.34-qp-scoring-upgrade-score-increment-conflict.spec.ts`        | - [x] |
@@ -550,8 +550,8 @@ Comprehensive QP conflict coverage modeled after CF learnings.
 
 ### 2.40-2.43 Lifecycle (Create/Delete)
 
-| ID   | Scenario                                                   | Type        | Expected                                                                             | E2E spec                                                                    | Pass  |
-| ---- | ---------------------------------------------------------- | ----------- | ------------------------------------------------------------------------------------ | --------------------------------------------------------------------------- | ----- |
+| ID   | Scenario                                                   | Type        | Expected                                                                             | E2E spec                                                                                        | Pass  |
+| ---- | ---------------------------------------------------------- | ----------- | ------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------- | ----- |
 | 2.40 | Create duplicate (general-only payload)                    | Conflict    | Override: local general values. Align: upstream general values                       | `packages/praxrr-app/src/tests/e2e/specs/2.40-qp-create-duplicate-general-only.spec.ts`         | - [x] |
 | 2.41 | Local general update while upstream deletes profile        | Conflict    | Override: profile re-created with local general values. Align: profile stays deleted | `packages/praxrr-app/src/tests/e2e/specs/2.41-qp-local-general-update-upstream-deleted.spec.ts` | - [x] |
 | 2.42 | Create duplicate (full payload: general+qualities+scoring) | Conflict    | Override: local full desired state. Align: upstream full state                       | `packages/praxrr-app/src/tests/e2e/specs/2.42-qp-create-duplicate-full-payload.spec.ts`         | - [x] |
@@ -559,8 +559,8 @@ Comprehensive QP conflict coverage modeled after CF learnings.
 
 ### 2.44-2.45 Dependencies
 
-| ID   | Scenario                              | Type                | Expected                                                                                       | E2E spec                                                            | Pass  |
-| ---- | ------------------------------------- | ------------------- | ---------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- | ----- |
+| ID   | Scenario                              | Type                | Expected                                                                                       | E2E spec                                                                                | Pass  |
+| ---- | ------------------------------------- | ------------------- | ---------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- | ----- |
 | 2.44 | Scoring dependsOn CF renamed upstream | Dependency conflict | Override: rename chain resolves, local score preserved. Align: upstream rename, original score | `packages/praxrr-app/src/tests/e2e/specs/2.44-qp-scoring-depends-on-cf-renamed.spec.ts` | - [x] |
 | 2.45 | Scoring dependsOn CF deleted upstream | Dependency conflict | Override/align: conflict resolves, score lost (CF gone)                                        | `packages/praxrr-app/src/tests/e2e/specs/2.45-qp-scoring-depends-on-cf-deleted.spec.ts` | - [x] |
 
@@ -598,8 +598,8 @@ Non-conflicting (local didn't touch these):
 - Scoring: set `NF` score (`radarr`) to `500`
 - Scoring: set `ATVP` score (`sonarr`) to `750`
 
-| ID    | Scenario          | Type                | Expected                                                                                                      | E2E spec                                                  | Pass  |
-| ----- | ----------------- | ------------------- | ------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------- | ----- |
+| ID    | Scenario          | Type                | Expected                                                                                                      | E2E spec                                                                      | Pass  |
+| ----- | ----------------- | ------------------- | ------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- | ----- |
 | 2.46a | Ask strategy      | Real-world conflict | 6 conflict rows appear on pull; non-conflicting dev changes (tag, upgradeUntilScore, NF, ATVP) apply cleanly. | `packages/praxrr-app/src/tests/e2e/specs/2.46-qp-real-world-use-case.spec.ts` | - [ ] |
 | 2.46b | Override strategy | Real-world conflict | Conflicts auto-resolve by strategy; no conflict rows remain; local desired values win on conflicting fields.  | `packages/praxrr-app/src/tests/e2e/specs/2.46-qp-real-world-use-case.spec.ts` | - [ ] |
 | 2.46c | Align strategy    | Real-world conflict | Conflicts auto-drop by strategy; no conflict rows remain; upstream values win on conflicting fields.          | `packages/praxrr-app/src/tests/e2e/specs/2.46-qp-real-world-use-case.spec.ts` | - [ ] |

@@ -114,12 +114,12 @@ This avoids full-schema SQLCipher migration while removing plaintext `arr_instan
 
 ### Edge Cases
 
-| Scenario                                 | Expected Behavior                                                   | Notes                                      |
-| ---------------------------------------- | ------------------------------------------------------------------- | ------------------------------------------ |
-| Master key missing at startup            | Fail startup with clear admin guidance                               | Prevents partial writes and hardens startup ordering |
-| Decryption failure during job run         | Mark instance disabled (sync path) and return remediation error         | No secret value in logs                    |
-| Existing plaintext rows during migration   | Backfill in resumable transactional batches, then enforce encrypted-only writes | `arr_instance_api_key_backfill_state` tracks checkpoints |
-| Env-managed credential changes            | Recompute fingerprint and re-encrypt during reconciliation flow        | Preserve `source='env'` immutability in UI |
+| Scenario                                 | Expected Behavior                                                               | Notes                                                    |
+| ---------------------------------------- | ------------------------------------------------------------------------------- | -------------------------------------------------------- |
+| Master key missing at startup            | Fail startup with clear admin guidance                                          | Prevents partial writes and hardens startup ordering     |
+| Decryption failure during job run        | Mark instance disabled (sync path) and return remediation error                 | No secret value in logs                                  |
+| Existing plaintext rows during migration | Backfill in resumable transactional batches, then enforce encrypted-only writes | `arr_instance_api_key_backfill_state` tracks checkpoints |
+| Env-managed credential changes           | Recompute fingerprint and re-encrypt during reconciliation flow                 | Preserve `source='env'` immutability in UI               |
 
 ### Success Criteria
 
@@ -150,15 +150,15 @@ This avoids full-schema SQLCipher migration while removing plaintext `arr_instan
 
 #### `arr_instances` (existing table; updated)
 
-| Field               | Type    | Constraints                    | Description                                          |
-| ------------------- | ------- | ------------------------------ | ---------------------------------------------------- |
-| id                  | INTEGER | PK                             | Instance identifier                                  |
-| name                | TEXT    | UNIQUE per app logic           | Instance label                                       |
-| type                | TEXT    | Arr type enum                  | Sonarr/Radarr/Lidarr selection                       |
-| url                 | TEXT    | NOT NULL                       | Arr base URL                                         |
-| source              | TEXT    | `ui` or `env`                  | Origin of instance configuration                     |
-| api_key             | TEXT    | EMPTY STRING after cutover       | Not used for runtime reads/writes after encryption cutover |
-| api_key_fingerprint | TEXT    | UNIQUE, NOT NULL after cutover | Deterministic keyed fingerprint for duplicate checks |
+| Field               | Type    | Constraints                    | Description                                                |
+| ------------------- | ------- | ------------------------------ | ---------------------------------------------------------- |
+| id                  | INTEGER | PK                             | Instance identifier                                        |
+| name                | TEXT    | UNIQUE per app logic           | Instance label                                             |
+| type                | TEXT    | Arr type enum                  | Sonarr/Radarr/Lidarr selection                             |
+| url                 | TEXT    | NOT NULL                       | Arr base URL                                               |
+| source              | TEXT    | `ui` or `env`                  | Origin of instance configuration                           |
+| api_key             | TEXT    | EMPTY STRING after cutover     | Not used for runtime reads/writes after encryption cutover |
+| api_key_fingerprint | TEXT    | UNIQUE, NOT NULL after cutover | Deterministic keyed fingerprint for duplicate checks       |
 
 **Indexes:**
 
