@@ -178,6 +178,7 @@ This follows the cleanup API pattern at `/api/v1/arr/cleanup/+server.ts`. The cl
 **Location**: `/packages/praxrr-app/src/lib/server/sync/preview/` (new directory)
 
 The preview module needs to:
+
 1. **Reuse existing fetch/transform code** -- `fetchSyncBatchByDatabase()` pattern from `QualityProfileSyncer`, `syncCustomFormats()` transform-only path, `transformQualityProfile()`, delay profile `transform()`, media management field merging, metadata profile `buildPayload()`.
 2. **Fetch remote state** via existing `BaseArrClient` GET methods (read-only).
 3. **Diff desired vs. remote** to produce create/update/delete actions with field-level changes.
@@ -186,23 +187,24 @@ The preview module needs to:
 
 The following functions contain the fetch+transform logic that preview needs, but they are currently tightly coupled to the push phase:
 
-| Function/Method | File | What Preview Needs | Current Coupling Issue |
-|---|---|---|---|
-| `QualityProfileSyncer.fetchSyncBatchByDatabase()` | `qualityProfiles/syncer.ts:164` | PCD data grouped by database with namespace suffixes | Private method on class instance |
-| `syncCustomFormats()` | `customFormats/syncer.ts:24` | Transform-only path (needs existing CFs for ID mapping) | Performs create/update as side effect |
-| `transformQualityProfile()` | `qualityProfiles/transformer.ts:74` | Pure function, directly reusable | None -- already extracted |
-| `transformCustomFormatWithDiagnostics()` | `customFormats/transformer.ts:287` | Pure function, directly reusable | None -- already extracted |
-| `fetchQualityProfileFromPcd()` | `qualityProfiles/transformer.ts:228` | Pure function, directly reusable | None -- already extracted |
-| `fetchCustomFormatFromPcd()` | `customFormats/transformer.ts:336` | Pure function, directly reusable | None -- already extracted |
-| `getReferencedCustomFormatNames()` | `qualityProfiles/transformer.ts:392` | Pure function, directly reusable | None -- already extracted |
-| `getQualityApiMappings()` | `qualityProfiles/transformer.ts:375` | Pure function, directly reusable | None -- already extracted |
-| `DelayProfileSyncer.transform()` | `delayProfiles/syncer.ts:108` | Private method, inline transform | Private method on class instance |
-| `MediaManagementSyncer.sync*()` methods | `mediaManagement/syncer.ts` | GET + PCD fetch + merge logic | Private methods, tightly bound to class |
-| `MetadataProfileSyncer` `buildPayload()` + schema resolution | `metadataProfiles/syncer.ts:147-161` | Module-level function, reusable | Schema fetch requires LidarrClient cast |
+| Function/Method                                              | File                                 | What Preview Needs                                      | Current Coupling Issue                  |
+| ------------------------------------------------------------ | ------------------------------------ | ------------------------------------------------------- | --------------------------------------- |
+| `QualityProfileSyncer.fetchSyncBatchByDatabase()`            | `qualityProfiles/syncer.ts:164`      | PCD data grouped by database with namespace suffixes    | Private method on class instance        |
+| `syncCustomFormats()`                                        | `customFormats/syncer.ts:24`         | Transform-only path (needs existing CFs for ID mapping) | Performs create/update as side effect   |
+| `transformQualityProfile()`                                  | `qualityProfiles/transformer.ts:74`  | Pure function, directly reusable                        | None -- already extracted               |
+| `transformCustomFormatWithDiagnostics()`                     | `customFormats/transformer.ts:287`   | Pure function, directly reusable                        | None -- already extracted               |
+| `fetchQualityProfileFromPcd()`                               | `qualityProfiles/transformer.ts:228` | Pure function, directly reusable                        | None -- already extracted               |
+| `fetchCustomFormatFromPcd()`                                 | `customFormats/transformer.ts:336`   | Pure function, directly reusable                        | None -- already extracted               |
+| `getReferencedCustomFormatNames()`                           | `qualityProfiles/transformer.ts:392` | Pure function, directly reusable                        | None -- already extracted               |
+| `getQualityApiMappings()`                                    | `qualityProfiles/transformer.ts:375` | Pure function, directly reusable                        | None -- already extracted               |
+| `DelayProfileSyncer.transform()`                             | `delayProfiles/syncer.ts:108`        | Private method, inline transform                        | Private method on class instance        |
+| `MediaManagementSyncer.sync*()` methods                      | `mediaManagement/syncer.ts`          | GET + PCD fetch + merge logic                           | Private methods, tightly bound to class |
+| `MetadataProfileSyncer` `buildPayload()` + schema resolution | `metadataProfiles/syncer.ts:147-161` | Module-level function, reusable                         | Schema fetch requires LidarrClient cast |
 
 ### Strategy: Selective Extraction
 
 Rather than refactoring existing syncers (which are working and tested), the preview module should:
+
 1. Import and reuse all exported transformer/PCD-query functions directly (they are already cleanly separated).
 2. Duplicate the fetch-and-group orchestration logic (from `fetchSyncBatchByDatabase`) in a preview-specific context, since it is private and tightly coupled.
 3. The delay profile `transform()` logic is simple enough to duplicate or extract to a shared utility.
@@ -238,16 +240,16 @@ The cleanup module (`cleanup.ts`) already identifies stale items (items that exi
 
 ### Arr API Endpoints Used (Read-Only for Preview)
 
-| Endpoint | Client Method | Used By |
-|---|---|---|
-| `GET /api/v3/customformat` | `client.getCustomFormats()` | QP syncer (CF sync + full refresh), cleanup scan |
-| `GET /api/v3/qualityprofile` | `client.getQualityProfiles()` | QP syncer (existing map), cleanup scan |
-| `GET /api/v3/delayprofile` | `client.getDelayProfiles()` | Delay syncer (Lidarr target resolution) |
-| `GET /api/v3/config/mediamanagement` | `client.getMediaManagementConfig()` | MM syncer (existing config for merge) |
-| `GET /api/v3/config/naming` | `client.getNamingConfig()` | MM syncer (existing config for merge) |
-| `GET /api/v3/qualitydefinition` | `client.getQualityDefinitions()` | MM syncer (existing definitions for merge) |
-| `GET /api/v1/metadataprofile` | `lidarrClient.getMetadataProfiles()` | Metadata syncer (existing profiles) |
-| `GET /api/v1/metadataprofile/schema` | `lidarrClient.getMetadataProfileSchema()` | Metadata syncer (schema normalization) |
+| Endpoint                             | Client Method                             | Used By                                          |
+| ------------------------------------ | ----------------------------------------- | ------------------------------------------------ |
+| `GET /api/v3/customformat`           | `client.getCustomFormats()`               | QP syncer (CF sync + full refresh), cleanup scan |
+| `GET /api/v3/qualityprofile`         | `client.getQualityProfiles()`             | QP syncer (existing map), cleanup scan           |
+| `GET /api/v3/delayprofile`           | `client.getDelayProfiles()`               | Delay syncer (Lidarr target resolution)          |
+| `GET /api/v3/config/mediamanagement` | `client.getMediaManagementConfig()`       | MM syncer (existing config for merge)            |
+| `GET /api/v3/config/naming`          | `client.getNamingConfig()`                | MM syncer (existing config for merge)            |
+| `GET /api/v3/qualitydefinition`      | `client.getQualityDefinitions()`          | MM syncer (existing definitions for merge)       |
+| `GET /api/v1/metadataprofile`        | `lidarrClient.getMetadataProfiles()`      | Metadata syncer (existing profiles)              |
+| `GET /api/v1/metadataprofile/schema` | `lidarrClient.getMetadataProfileSchema()` | Metadata syncer (schema normalization)           |
 
 ## Architectural Patterns
 

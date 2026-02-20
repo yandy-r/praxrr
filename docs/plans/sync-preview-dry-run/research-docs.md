@@ -98,28 +98,28 @@ Key commit: `487b5a0 feat(sync-preview): introduce sync preview feature with det
 
 Ordered by implementation priority. Implementers should read these before writing any code.
 
-| Priority | Document | Topics Covered |
-|----------|----------|----------------|
-| 1 | `/home/yandy/Projects/github.com/yandy-r/praxrr/CLAUDE.md` | Project conventions, path aliases, Svelte 5 rules, Cross-Arr Validation Policy, contract-first API requirement, formatting standards |
-| 2 | `/home/yandy/Projects/github.com/yandy-r/praxrr/docs/plans/sync-preview-dry-run/feature-spec.md` | Complete feature specification: architecture, data models, API design, UX workflows, phased task breakdown |
-| 3 | `/home/yandy/Projects/github.com/yandy-r/praxrr/docs/plans/sync-preview-dry-run/research-technical.md` | Sync pipeline analysis, diff engine design, preview storage, files to create/modify, technical decisions |
-| 4 | `/home/yandy/Projects/github.com/yandy-r/praxrr/docs/plans/sync-preview-dry-run/research-business.md` | Business rules, edge cases, domain model, existing codebase integration patterns |
-| 5 | `/home/yandy/Projects/github.com/yandy-r/praxrr/docs/api/v1/openapi.yaml` | Current API structure, schema references, where to add new preview paths |
-| 6 | `/home/yandy/Projects/github.com/yandy-r/praxrr/docs/api/v1/paths/arr.yaml` | Cleanup endpoint pattern (scan/execute two-phase) that preview API should follow |
-| 7 | `/home/yandy/Projects/github.com/yandy-r/praxrr/docs/api/v1/schemas/arr.yaml` | Cleanup schemas (StaleItem, CleanupScanRequest/Result) as contract precedent |
-| 8 | `/home/yandy/Projects/github.com/yandy-r/praxrr/docs/plans/sync-preview-dry-run/research-external.md` | Diff library details, Arr API endpoint inventory, IaC format precedents, SSE patterns |
-| 9 | `/home/yandy/Projects/github.com/yandy-r/praxrr/docs/plans/sync-preview-dry-run/research-ux.md` | Diff visualization, multi-instance layout, confirmation tiers, accessibility |
-| 10 | `/home/yandy/Projects/github.com/yandy-r/praxrr/docs/plans/sync-preview-dry-run/research-recommendations.md` | Phasing strategy, risk assessment, alternative approaches, task parallelization |
+| Priority | Document                                                                                                     | Topics Covered                                                                                                                       |
+| -------- | ------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------ |
+| 1        | `/home/yandy/Projects/github.com/yandy-r/praxrr/CLAUDE.md`                                                   | Project conventions, path aliases, Svelte 5 rules, Cross-Arr Validation Policy, contract-first API requirement, formatting standards |
+| 2        | `/home/yandy/Projects/github.com/yandy-r/praxrr/docs/plans/sync-preview-dry-run/feature-spec.md`             | Complete feature specification: architecture, data models, API design, UX workflows, phased task breakdown                           |
+| 3        | `/home/yandy/Projects/github.com/yandy-r/praxrr/docs/plans/sync-preview-dry-run/research-technical.md`       | Sync pipeline analysis, diff engine design, preview storage, files to create/modify, technical decisions                             |
+| 4        | `/home/yandy/Projects/github.com/yandy-r/praxrr/docs/plans/sync-preview-dry-run/research-business.md`        | Business rules, edge cases, domain model, existing codebase integration patterns                                                     |
+| 5        | `/home/yandy/Projects/github.com/yandy-r/praxrr/docs/api/v1/openapi.yaml`                                    | Current API structure, schema references, where to add new preview paths                                                             |
+| 6        | `/home/yandy/Projects/github.com/yandy-r/praxrr/docs/api/v1/paths/arr.yaml`                                  | Cleanup endpoint pattern (scan/execute two-phase) that preview API should follow                                                     |
+| 7        | `/home/yandy/Projects/github.com/yandy-r/praxrr/docs/api/v1/schemas/arr.yaml`                                | Cleanup schemas (StaleItem, CleanupScanRequest/Result) as contract precedent                                                         |
+| 8        | `/home/yandy/Projects/github.com/yandy-r/praxrr/docs/plans/sync-preview-dry-run/research-external.md`        | Diff library details, Arr API endpoint inventory, IaC format precedents, SSE patterns                                                |
+| 9        | `/home/yandy/Projects/github.com/yandy-r/praxrr/docs/plans/sync-preview-dry-run/research-ux.md`              | Diff visualization, multi-instance layout, confirmation tiers, accessibility                                                         |
+| 10       | `/home/yandy/Projects/github.com/yandy-r/praxrr/docs/plans/sync-preview-dry-run/research-recommendations.md` | Phasing strategy, risk assessment, alternative approaches, task parallelization                                                      |
 
 **Nice-to-have reads:**
 
-| Document | Why |
-|----------|-----|
+| Document                                                                                                | Why                                           |
+| ------------------------------------------------------------------------------------------------------- | --------------------------------------------- |
 | `/home/yandy/Projects/github.com/yandy-r/praxrr/packages/praxrr-app/src/lib/server/utils/arr/README.md` | Arr client class hierarchy and file structure |
-| `/home/yandy/Projects/github.com/yandy-r/praxrr/research/praxrr-additional-features/report.md` | Strategic validation (7/8 persona consensus) |
-| `/home/yandy/Projects/github.com/yandy-r/praxrr/docs/todo/op-splitting-checklist.md` | Field-level granularity for PCD operations |
-| `/home/yandy/Projects/github.com/yandy-r/praxrr/docs/api/v1/schemas/pcd.yaml` | Portable entity shapes for diff comparison |
-| `/home/yandy/Projects/github.com/yandy-r/praxrr/deno.json` | Path aliases, tasks, workspace config |
+| `/home/yandy/Projects/github.com/yandy-r/praxrr/research/praxrr-additional-features/report.md`          | Strategic validation (7/8 persona consensus)  |
+| `/home/yandy/Projects/github.com/yandy-r/praxrr/docs/todo/op-splitting-checklist.md`                    | Field-level granularity for PCD operations    |
+| `/home/yandy/Projects/github.com/yandy-r/praxrr/docs/api/v1/schemas/pcd.yaml`                           | Portable entity shapes for diff comparison    |
+| `/home/yandy/Projects/github.com/yandy-r/praxrr/deno.json`                                              | Path aliases, tasks, workspace config         |
 
 ---
 

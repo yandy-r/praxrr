@@ -16,32 +16,32 @@ The sync-preview feature requires no new external API integrations -- all necess
 
 #### Key Endpoints for State Comparison
 
-| Endpoint | Method | Purpose | Response Shape |
-|---|---|---|---|
-| `/api/v3/customformat` | GET | List all custom formats | `ArrCustomFormat[]` -- `{ id, name, includeCustomFormatWhenRenaming, specifications: [{ name, implementation, negate, required, fields: [{ name, value }] }] }` |
-| `/api/v3/qualityprofile` | GET | List all quality profiles | `RadarrQualityProfile[]` -- `{ id, name, upgradeAllowed, cutoff, cutoffFormatScore, minFormatScore, formatItems: [{ format, name, score }], items: [{ quality, items, allowed }] }` |
-| `/api/v3/qualitydefinition` | GET | List all quality size limits | `ArrQualityDefinition[]` -- `{ id, quality: { id, name }, title, weight, minSize, maxSize, preferredSize }` |
-| `/api/v3/delayprofile` | GET | List all delay profiles | `ArrDelayProfile[]` -- `{ id, enableUsenet, enableTorrent, preferredProtocol, usenetDelay, torrentDelay, bypassIfHighestQuality, bypassIfAboveCustomFormatScore, minimumCustomFormatScore, order, tags }` |
-| `/api/v3/config/mediamanagement` | GET | Media management config | `ArrMediaManagementConfig` -- `{ id, downloadPropersAndRepacks, enableMediaInfo, ... }` |
-| `/api/v3/config/naming` | GET | Naming convention config | `RadarrNamingConfig` -- `{ id, renameMovies, replaceIllegalCharacters, colonReplacementFormat, standardMovieFormat, movieFolderFormat }` |
-| `/api/v3/tag` | GET | List all tags | `ArrTag[]` -- `{ id, label }` |
+| Endpoint                         | Method | Purpose                      | Response Shape                                                                                                                                                                                            |
+| -------------------------------- | ------ | ---------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/api/v3/customformat`           | GET    | List all custom formats      | `ArrCustomFormat[]` -- `{ id, name, includeCustomFormatWhenRenaming, specifications: [{ name, implementation, negate, required, fields: [{ name, value }] }] }`                                           |
+| `/api/v3/qualityprofile`         | GET    | List all quality profiles    | `RadarrQualityProfile[]` -- `{ id, name, upgradeAllowed, cutoff, cutoffFormatScore, minFormatScore, formatItems: [{ format, name, score }], items: [{ quality, items, allowed }] }`                       |
+| `/api/v3/qualitydefinition`      | GET    | List all quality size limits | `ArrQualityDefinition[]` -- `{ id, quality: { id, name }, title, weight, minSize, maxSize, preferredSize }`                                                                                               |
+| `/api/v3/delayprofile`           | GET    | List all delay profiles      | `ArrDelayProfile[]` -- `{ id, enableUsenet, enableTorrent, preferredProtocol, usenetDelay, torrentDelay, bypassIfHighestQuality, bypassIfAboveCustomFormatScore, minimumCustomFormatScore, order, tags }` |
+| `/api/v3/config/mediamanagement` | GET    | Media management config      | `ArrMediaManagementConfig` -- `{ id, downloadPropersAndRepacks, enableMediaInfo, ... }`                                                                                                                   |
+| `/api/v3/config/naming`          | GET    | Naming convention config     | `RadarrNamingConfig` -- `{ id, renameMovies, replaceIllegalCharacters, colonReplacementFormat, standardMovieFormat, movieFolderFormat }`                                                                  |
+| `/api/v3/tag`                    | GET    | List all tags                | `ArrTag[]` -- `{ id, label }`                                                                                                                                                                             |
 
 #### Write Endpoints (for apply phase)
 
-| Endpoint | Method | Purpose |
-|---|---|---|
-| `/api/v3/customformat` | POST | Create custom format |
-| `/api/v3/customformat/{id}` | PUT | Update custom format |
-| `/api/v3/customformat/{id}` | DELETE | Delete custom format |
-| `/api/v3/customformat/bulk` | PUT/DELETE | Bulk create/delete |
-| `/api/v3/qualityprofile` | POST | Create quality profile |
-| `/api/v3/qualityprofile/{id}` | PUT | Update quality profile |
-| `/api/v3/qualityprofile/{id}` | DELETE | Delete quality profile |
-| `/api/v3/delayprofile` | POST | Create delay profile |
-| `/api/v3/delayprofile/{id}` | PUT | Update delay profile |
-| `/api/v3/delayprofile/{id}` | DELETE | Delete delay profile |
-| `/api/v3/config/mediamanagement/{id}` | PUT | Update media management |
-| `/api/v3/config/naming/{id}` | PUT | Update naming config |
+| Endpoint                              | Method     | Purpose                 |
+| ------------------------------------- | ---------- | ----------------------- |
+| `/api/v3/customformat`                | POST       | Create custom format    |
+| `/api/v3/customformat/{id}`           | PUT        | Update custom format    |
+| `/api/v3/customformat/{id}`           | DELETE     | Delete custom format    |
+| `/api/v3/customformat/bulk`           | PUT/DELETE | Bulk create/delete      |
+| `/api/v3/qualityprofile`              | POST       | Create quality profile  |
+| `/api/v3/qualityprofile/{id}`         | PUT        | Update quality profile  |
+| `/api/v3/qualityprofile/{id}`         | DELETE     | Delete quality profile  |
+| `/api/v3/delayprofile`                | POST       | Create delay profile    |
+| `/api/v3/delayprofile/{id}`           | PUT        | Update delay profile    |
+| `/api/v3/delayprofile/{id}`           | DELETE     | Delete delay profile    |
+| `/api/v3/config/mediamanagement/{id}` | PUT        | Update media management |
+| `/api/v3/config/naming/{id}`          | PUT        | Update naming config    |
 
 **Confidence**: High -- all endpoints are already implemented in `packages/praxrr-app/src/lib/server/utils/arr/base.ts`.
 
@@ -67,15 +67,15 @@ The sync-preview feature requires no new external API integrations -- all necess
 
 #### Key Endpoints for State Comparison
 
-| Endpoint | Method | Purpose | Response Shape |
-|---|---|---|---|
-| `/api/v3/customformat` | GET | List all custom formats | Same schema as Radarr `ArrCustomFormat[]` |
-| `/api/v3/qualityprofile` | GET | List all quality profiles | Same schema as Radarr `RadarrQualityProfile[]` (Praxrr already reuses the type) |
-| `/api/v3/qualitydefinition` | GET | List all quality definitions | Same schema as Radarr `ArrQualityDefinition[]` |
-| `/api/v3/releaseprofile` | GET | List release profiles (deprecated in v4) | `ReleaseProfileResource[]` -- `{ id, enabled, required, ignored, preferred, tags, indexerId }` |
-| `/api/v3/delayprofile` | GET | List delay profiles | Same schema as Radarr `ArrDelayProfile[]` |
-| `/api/v3/config/mediamanagement` | GET | Media management config | `ArrMediaManagementConfig` |
-| `/api/v3/config/naming` | GET | Naming config | `SonarrNamingConfig` -- includes `multiEpisodeStyle`, `standardEpisodeFormat`, `dailyEpisodeFormat`, `animeEpisodeFormat`, `seriesFolderFormat`, `seasonFolderFormat` |
+| Endpoint                         | Method | Purpose                                  | Response Shape                                                                                                                                                        |
+| -------------------------------- | ------ | ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/api/v3/customformat`           | GET    | List all custom formats                  | Same schema as Radarr `ArrCustomFormat[]`                                                                                                                             |
+| `/api/v3/qualityprofile`         | GET    | List all quality profiles                | Same schema as Radarr `RadarrQualityProfile[]` (Praxrr already reuses the type)                                                                                       |
+| `/api/v3/qualitydefinition`      | GET    | List all quality definitions             | Same schema as Radarr `ArrQualityDefinition[]`                                                                                                                        |
+| `/api/v3/releaseprofile`         | GET    | List release profiles (deprecated in v4) | `ReleaseProfileResource[]` -- `{ id, enabled, required, ignored, preferred, tags, indexerId }`                                                                        |
+| `/api/v3/delayprofile`           | GET    | List delay profiles                      | Same schema as Radarr `ArrDelayProfile[]`                                                                                                                             |
+| `/api/v3/config/mediamanagement` | GET    | Media management config                  | `ArrMediaManagementConfig`                                                                                                                                            |
+| `/api/v3/config/naming`          | GET    | Naming config                            | `SonarrNamingConfig` -- includes `multiEpisodeStyle`, `standardEpisodeFormat`, `dailyEpisodeFormat`, `animeEpisodeFormat`, `seriesFolderFormat`, `seasonFolderFormat` |
 
 #### Sonarr-Specific Notes
 
@@ -98,15 +98,15 @@ The sync-preview feature requires no new external API integrations -- all necess
 
 #### Key Endpoints for State Comparison
 
-| Endpoint | Method | Purpose | Response Shape |
-|---|---|---|---|
-| `/api/v1/customformat` | GET | List all custom formats | `CustomFormatResource[]` -- same schema as Radarr/Sonarr |
-| `/api/v1/qualityprofile` | GET | List quality profiles | `QualityProfileResource[]` -- `{ id, name, upgradeAllowed, cutoff, qualities: [{ id, name, source, resolution }] }` |
-| `/api/v1/qualitydefinition` | GET | List quality definitions | `QualityDefinitionResource[]` |
-| `/api/v1/metadataprofile` | GET | List metadata profiles | `LidarrMetadataProfile[]` -- `{ id, name, primaryAlbumTypes: [{ albumType: { id, name }, allowed }], secondaryAlbumTypes, releaseStatuses }` |
-| `/api/v1/delayprofile` | GET | List delay profiles | Same schema as Radarr/Sonarr |
-| `/api/v1/config/mediamanagement` | GET | Media management config | Same base schema |
-| `/api/v1/config/naming` | GET | Naming config | `LidarrNamingConfig` -- `{ id, renameTracks, replaceIllegalCharacters, colonReplacementFormat, standardTrackFormat, multiDiscTrackFormat, artistFolderFormat }` |
+| Endpoint                         | Method | Purpose                  | Response Shape                                                                                                                                                  |
+| -------------------------------- | ------ | ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/api/v1/customformat`           | GET    | List all custom formats  | `CustomFormatResource[]` -- same schema as Radarr/Sonarr                                                                                                        |
+| `/api/v1/qualityprofile`         | GET    | List quality profiles    | `QualityProfileResource[]` -- `{ id, name, upgradeAllowed, cutoff, qualities: [{ id, name, source, resolution }] }`                                             |
+| `/api/v1/qualitydefinition`      | GET    | List quality definitions | `QualityDefinitionResource[]`                                                                                                                                   |
+| `/api/v1/metadataprofile`        | GET    | List metadata profiles   | `LidarrMetadataProfile[]` -- `{ id, name, primaryAlbumTypes: [{ albumType: { id, name }, allowed }], secondaryAlbumTypes, releaseStatuses }`                    |
+| `/api/v1/delayprofile`           | GET    | List delay profiles      | Same schema as Radarr/Sonarr                                                                                                                                    |
+| `/api/v1/config/mediamanagement` | GET    | Media management config  | Same base schema                                                                                                                                                |
+| `/api/v1/config/naming`          | GET    | Naming config            | `LidarrNamingConfig` -- `{ id, renameTracks, replaceIllegalCharacters, colonReplacementFormat, standardTrackFormat, multiDiscTrackFormat, artistFolderFormat }` |
 
 #### Lidarr-Specific Notes
 
@@ -122,15 +122,15 @@ The sync-preview feature requires no new external API integrations -- all necess
 
 For preview generation, the following GET calls are needed per instance:
 
-| Section | Radarr | Sonarr | Lidarr |
-|---|---|---|---|
-| Custom Formats | `/api/v3/customformat` | `/api/v3/customformat` | `/api/v1/customformat` |
-| Quality Profiles | `/api/v3/qualityprofile` | `/api/v3/qualityprofile` | `/api/v1/qualityprofile` |
-| Delay Profiles | `/api/v3/delayprofile` | `/api/v3/delayprofile` | `/api/v1/delayprofile` |
-| Media Management | `/api/v3/config/mediamanagement` | `/api/v3/config/mediamanagement` | `/api/v1/config/mediamanagement` |
-| Naming Config | `/api/v3/config/naming` | `/api/v3/config/naming` | `/api/v1/config/naming` |
-| Metadata Profiles | N/A | N/A | `/api/v1/metadataprofile` |
-| Tags | `/api/v3/tag` | `/api/v3/tag` | `/api/v1/tag` |
+| Section           | Radarr                           | Sonarr                           | Lidarr                           |
+| ----------------- | -------------------------------- | -------------------------------- | -------------------------------- |
+| Custom Formats    | `/api/v3/customformat`           | `/api/v3/customformat`           | `/api/v1/customformat`           |
+| Quality Profiles  | `/api/v3/qualityprofile`         | `/api/v3/qualityprofile`         | `/api/v1/qualityprofile`         |
+| Delay Profiles    | `/api/v3/delayprofile`           | `/api/v3/delayprofile`           | `/api/v1/delayprofile`           |
+| Media Management  | `/api/v3/config/mediamanagement` | `/api/v3/config/mediamanagement` | `/api/v1/config/mediamanagement` |
+| Naming Config     | `/api/v3/config/naming`          | `/api/v3/config/naming`          | `/api/v1/config/naming`          |
+| Metadata Profiles | N/A                              | N/A                              | `/api/v1/metadataprofile`        |
+| Tags              | `/api/v3/tag`                    | `/api/v3/tag`                    | `/api/v1/tag`                    |
 
 All of these are already implemented in `BaseArrClient` and `LidarrClient`. No new API integrations are required.
 
@@ -166,12 +166,13 @@ const changes = diff(oldObject, newObject, { cyclesFix: false });
 interface Difference {
   type: 'CREATE' | 'REMOVE' | 'CHANGE';
   path: (string | number)[];
-  value?: unknown;      // present on CREATE, CHANGE
-  oldValue?: unknown;   // present on CHANGE, REMOVE
+  value?: unknown; // present on CREATE, CHANGE
+  oldValue?: unknown; // present on CHANGE, REMOVE
 }
 ```
 
 **Example output:**
+
 ```typescript
 // CREATE: new property added
 { type: 'CREATE', path: ['specifications', 2], value: { name: 'NewSpec', ... } }
@@ -194,6 +195,7 @@ interface Difference {
 #### Limitation
 
 microdiff does not support key-based array matching. Arrays are compared by index. For quality profile `items` and `formatItems` arrays, this means reordering would show as multiple changes rather than a move. This is acceptable because:
+
 1. Praxrr controls the desired state ordering
 2. Arr instances preserve insertion order
 3. For the diff preview use case, showing exact positional changes is more accurate than inferring moves
@@ -216,7 +218,7 @@ microdiff does not support key-based array matching. Arrays are compared by inde
 import { diff, applyChangeset, revertChangeset, atomizeChangeset } from 'json-diff-ts';
 
 const changeset: IChange[] = diff(oldObject, newObject, {
-  embeddedObjKeys: { formatItems: 'name', items: 'name' }
+  embeddedObjKeys: { formatItems: 'name', items: 'name' },
 });
 ```
 
@@ -228,8 +230,8 @@ interface IChange {
   key: string;
   value?: unknown;
   oldValue?: unknown;
-  changes?: IChange[];      // nested changes for objects
-  embeddedKey?: string;      // array element identifier
+  changes?: IChange[]; // nested changes for objects
+  embeddedKey?: string; // array element identifier
 }
 ```
 
@@ -240,10 +242,10 @@ The `embeddedObjKeys` option enables matching array elements by a named key fiel
 ```typescript
 const changeset = diff(currentProfile, desiredProfile, {
   embeddedObjKeys: {
-    formatItems: 'name',     // match format items by name
-    items: 'name',           // match quality items by name
-    specifications: 'name',  // match CF specifications by name
-  }
+    formatItems: 'name', // match format items by name
+    items: 'name', // match quality items by name
+    specifications: 'name', // match CF specifications by name
+  },
 });
 ```
 
@@ -265,12 +267,12 @@ const atomic = atomizeChangeset(changeset);
 
 ### Other Libraries Evaluated
 
-| Library | Size | Deno | Key Differentiator | Verdict |
-|---|---|---|---|---|
-| **jsondiffpatch** | ~16kb gzipped | Via npm: specifier | Rich HTML/console formatters, RFC 6902 output | Over-engineered for this use case. Delta format is compact but hard to map to plan-style output. |
-| **deep-object-diff** | ~2kb | Via npm: specifier | Returns plain diff objects | No type/action information (only shows new values, not what changed). Insufficient for preview. |
-| **@opentf/obj-diff** | ~3kb | Via JSR | JSR-native, supports Map/Set | Good but less mature. Output uses numeric type codes (`t: 0/1/2`) which are less readable. |
-| **deep-diff** (fry69 fork) | ~5kb | TypeScript port | Mature API, supports circular refs | Good option but microdiff is faster and smaller with equivalent functionality. |
+| Library                    | Size          | Deno               | Key Differentiator                            | Verdict                                                                                          |
+| -------------------------- | ------------- | ------------------ | --------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| **jsondiffpatch**          | ~16kb gzipped | Via npm: specifier | Rich HTML/console formatters, RFC 6902 output | Over-engineered for this use case. Delta format is compact but hard to map to plan-style output. |
+| **deep-object-diff**       | ~2kb          | Via npm: specifier | Returns plain diff objects                    | No type/action information (only shows new values, not what changed). Insufficient for preview.  |
+| **@opentf/obj-diff**       | ~3kb          | Via JSR            | JSR-native, supports Map/Set                  | Good but less mature. Output uses numeric type codes (`t: 0/1/2`) which are less readable.       |
+| **deep-diff** (fry69 fork) | ~5kb          | TypeScript port    | Mature API, supports circular refs            | Good option but microdiff is faster and smaller with equivalent functionality.                   |
 
 **Confidence**: High -- all libraries were evaluated for API shape, Deno compatibility, and output format suitability.
 
@@ -329,20 +331,26 @@ const atomic = atomizeChangeset(changeset);
 
 ```typescript
 interface SyncPlanEntry {
-  address: string;                           // "instance/section/entity"
+  address: string; // "instance/section/entity"
   instanceId: number;
   instanceName: string;
   sectionType: SectionType;
-  entityType: 'customFormat' | 'qualityProfile' | 'delayProfile' | 'mediaManagement' | 'metadataProfile' | 'namingConfig';
+  entityType:
+    | 'customFormat'
+    | 'qualityProfile'
+    | 'delayProfile'
+    | 'mediaManagement'
+    | 'metadataProfile'
+    | 'namingConfig';
   entityName: string;
   action: 'create' | 'update' | 'delete' | 'no-op';
-  before: Record<string, unknown> | null;    // null for creates
-  after: Record<string, unknown> | null;     // null for deletes
-  fieldChanges: FieldChange[];               // microdiff output for human-readable detail
+  before: Record<string, unknown> | null; // null for creates
+  after: Record<string, unknown> | null; // null for deletes
+  fieldChanges: FieldChange[]; // microdiff output for human-readable detail
 }
 
 interface FieldChange {
-  path: string;                              // dot-notation path: "cutoffFormatScore"
+  path: string; // dot-notation path: "cutoffFormatScore"
   type: 'added' | 'changed' | 'removed';
   oldValue?: unknown;
   newValue?: unknown;
@@ -350,7 +358,7 @@ interface FieldChange {
 
 interface SyncPlan {
   version: 1;
-  generatedAt: string;                       // ISO 8601
+  generatedAt: string; // ISO 8601
   instanceId: number;
   instanceName: string;
   summary: {
@@ -360,7 +368,7 @@ interface SyncPlan {
     noOps: number;
   };
   entries: SyncPlanEntry[];
-  errors: SyncPlanError[];                   // errors during plan generation
+  errors: SyncPlanError[]; // errors during plan generation
 }
 ```
 
@@ -419,6 +427,7 @@ interface SyncPlan {
    ```
 
 3. **`--diff` output format**: Ansible diff mode shows before/after for each task:
+
    ```
    --- before
    +++ after
@@ -428,6 +437,7 @@ interface SyncPlan {
    +cutoffFormatScore: 2000
     upgradeAllowed: true
    ```
+
    Praxrr should provide a similar human-readable diff for each entity, either as unified-diff text or as structured field-level changes.
 
 4. **Per-task opt-in/opt-out**: Ansible allows `check_mode: true` or `check_mode: false` overrides per task. Praxrr should allow per-section-type preview (e.g., preview only quality profiles, not custom formats).
@@ -494,14 +504,14 @@ export const GET: RequestHandler = async ({ url }) => {
       } finally {
         controller.close();
       }
-    }
+    },
   });
 
   return new Response(stream, {
     headers: {
       'Content-Type': 'text/event-stream',
       'Cache-Control': 'no-cache',
-      'Connection': 'keep-alive',
+      Connection: 'keep-alive',
     },
   });
 };
@@ -661,6 +671,7 @@ For most use cases, preview generation completes in <2 seconds. A standard POST 
 ## Sources
 
 ### Arr Application APIs
+
 - [Radarr API Documentation](https://radarr.video/docs/api/)
 - [Radarr OpenAPI Spec (GitHub)](https://raw.githubusercontent.com/Radarr/Radarr/develop/src/Radarr.Api.V3/openapi.json)
 - [Radarr REST API (DeepWiki)](https://deepwiki.com/radarr/radarr/4.1-rest-api)
@@ -675,6 +686,7 @@ For most use cases, preview generation completes in <2 seconds. A standard POST 
 - [Radarr Terraform Provider - Custom Format](https://registry.terraform.io/providers/devopsarr/radarr/latest/docs/resources/custom_format)
 
 ### Diff/Comparison Libraries
+
 - [microdiff - GitHub](https://github.com/AsyncBanana/microdiff)
 - [microdiff - deno.land/x](https://deno.land/x/microdiff@v1.3.1)
 - [json-diff-ts - GitHub](https://github.com/ltwlf/json-diff-ts)
@@ -686,6 +698,7 @@ For most use cases, preview generation completes in <2 seconds. A standard POST 
 - [deep-diff TypeScript port - GitHub](https://github.com/fry69/deep-diff)
 
 ### IaC Precedent / Plan Formats
+
 - [Terraform JSON Output Format (HashiCorp)](https://developer.hashicorp.com/terraform/internals/json-format)
 - [terraform-json Go Package](https://pkg.go.dev/github.com/hashicorp/terraform-json)
 - [ArgoCD Diff Customization](https://argo-cd.readthedocs.io/en/stable/user-guide/diffing/)
@@ -697,6 +710,7 @@ For most use cases, preview generation completes in <2 seconds. A standard POST 
 - [Pulumi Update Plans](https://www.pulumi.com/docs/iac/concepts/update-plans/)
 
 ### Streaming / SSE
+
 - [SvelteKit SSE Library](https://github.com/razshare/sveltekit-sse)
 - [Building Real-time SvelteKit Apps with SSE](https://sveltetalk.com/posts/building-real-time-sveltekit-apps-with-server-sent-events)
 - [SvelteKit Streaming Guide](https://khromov.se/sveltekit-streaming-the-complete-guide/)

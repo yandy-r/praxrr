@@ -6,17 +6,17 @@ This document maps the concrete API endpoints, database tables, PCD cache access
 
 ### Existing Related Endpoints
 
-| Method | Path | Purpose | File |
-|--------|------|---------|------|
-| POST | `/api/v1/arr/cleanup` | Scan or execute cleanup of stale configs | `routes/api/v1/arr/cleanup/+server.ts` |
-| GET | `/api/v1/arr/library` | Fetch Arr library with profiles and scores | `routes/api/v1/arr/library/+server.ts` |
-| DELETE | `/api/v1/arr/library` | Invalidate library cache | `routes/api/v1/arr/library/+server.ts` |
-| GET | `/api/v1/arr/library/episodes` | Sonarr episode-level data | `routes/api/v1/arr/library/episodes/+server.ts` |
-| GET | `/api/v1/arr/releases` | Interactive search releases | `routes/api/v1/arr/releases/+server.ts` |
-| GET | `/api/v1/openapi.json` | Serve parsed OpenAPI YAML as JSON | `routes/api/v1/openapi.json/+server.ts` |
-| GET | `/api/v1/health` | Health check | `routes/api/v1/health/` |
-| POST | `/api/v1/entity-testing/evaluate` | CF/release parsing evaluation | `routes/api/v1/entity-testing/` |
-| Various | `/api/v1/pcd/*` | PCD export/import and entity CRUD | `routes/api/v1/pcd/` |
+| Method  | Path                              | Purpose                                    | File                                            |
+| ------- | --------------------------------- | ------------------------------------------ | ----------------------------------------------- |
+| POST    | `/api/v1/arr/cleanup`             | Scan or execute cleanup of stale configs   | `routes/api/v1/arr/cleanup/+server.ts`          |
+| GET     | `/api/v1/arr/library`             | Fetch Arr library with profiles and scores | `routes/api/v1/arr/library/+server.ts`          |
+| DELETE  | `/api/v1/arr/library`             | Invalidate library cache                   | `routes/api/v1/arr/library/+server.ts`          |
+| GET     | `/api/v1/arr/library/episodes`    | Sonarr episode-level data                  | `routes/api/v1/arr/library/episodes/+server.ts` |
+| GET     | `/api/v1/arr/releases`            | Interactive search releases                | `routes/api/v1/arr/releases/+server.ts`         |
+| GET     | `/api/v1/openapi.json`            | Serve parsed OpenAPI YAML as JSON          | `routes/api/v1/openapi.json/+server.ts`         |
+| GET     | `/api/v1/health`                  | Health check                               | `routes/api/v1/health/`                         |
+| POST    | `/api/v1/entity-testing/evaluate` | CF/release parsing evaluation              | `routes/api/v1/entity-testing/`                 |
+| Various | `/api/v1/pcd/*`                   | PCD export/import and entity CRUD          | `routes/api/v1/pcd/`                            |
 
 ### Cleanup Scan/Execute Pattern (Strongest Precedent)
 
@@ -26,6 +26,7 @@ The cleanup endpoint at `/api/v1/arr/cleanup` is the closest architectural prece
 2. **Execute phase** (`action: 'execute'`): Receives the scan result back from the client and performs deletions. The client passes `scanResult` to the execute call.
 
 Key patterns to replicate:
+
 - Instance lookup via `arrInstancesQueries.getById(instanceId)`
 - Client creation via `getArrInstanceClient(instance.type as ArrType, instance.id, instance.url, { retries: 0 })`
 - Client cleanup in `finally` block: `client.close()`
@@ -43,6 +44,7 @@ routes/api/v1/sync/preview/[previewId]/apply/+server.ts -> POST
 ```
 
 Common patterns across all existing endpoints:
+
 - Import `json` from `@sveltejs/kit`
 - Import `type { RequestHandler }` from `@sveltejs/kit`
 - Validate required params early, return 400 on failure
@@ -53,12 +55,14 @@ Common patterns across all existing endpoints:
 ### OpenAPI Spec Structure
 
 The OpenAPI spec is at `/home/yandy/Projects/github.com/yandy-r/praxrr/docs/api/v1/openapi.yaml` (version 3.1.0). It uses `$ref` to external files:
+
 - Paths in `docs/api/v1/paths/*.yaml`
 - Schemas in `docs/api/v1/schemas/*.yaml` or inline under `components/schemas`
 - Served at runtime via `GET /api/v1/openapi.json` which reads the YAML and parses it
 - Types generated via `deno task generate:api-types` -> `packages/praxrr-app/src/lib/api/v1.d.ts`
 
 New preview endpoints need:
+
 1. Path definitions in `docs/api/v1/paths/sync.yaml` (new file)
 2. Schema definitions in `docs/api/v1/schemas/sync.yaml` (new file)
 3. References added to `docs/api/v1/openapi.yaml` under `paths:`
@@ -69,36 +73,43 @@ New preview endpoints need:
 ### Relevant Tables
 
 #### `arr_instances`
+
 - **Purpose**: Stores Arr instance connections (Radarr, Sonarr, Lidarr)
 - **Key columns**: `id`, `name`, `type` (radarr/sonarr/lidarr/chaptarr), `url`, `enabled`, `source` (ui/env)
 - **Queries file**: `/home/yandy/Projects/github.com/yandy-r/praxrr/packages/praxrr-app/src/lib/server/db/queries/arrInstances.ts`
 - **Key methods**: `getById(id)`, `getAll()`, `getEnabled()`, `getByType(type)`
 
 #### `arr_sync_quality_profiles`
+
 - **Purpose**: Many-to-many selections of which quality profiles to sync per instance
 - **Key columns**: `instance_id`, `database_id`, `profile_name`
 - **Primary key**: `(instance_id, database_id, profile_name)`
 - **Created by**: Migration 046 (profile_name based, replaced profile_id)
 
 #### `arr_sync_quality_profiles_config`
+
 - **Purpose**: Per-instance trigger config and sync status for quality profiles
 - **Key columns**: `instance_id` (PK), `trigger`, `cron`, `should_sync`, `next_run_at`, `sync_status`, `last_error`, `last_synced_at`
 - **Sync status values**: `idle`, `pending`, `in_progress`, `failed`
 
 #### `arr_sync_delay_profiles_config`
+
 - **Purpose**: Single delay profile selection and trigger config per instance
 - **Key columns**: `instance_id` (PK), `database_id`, `profile_name`, `trigger`, `cron`, `should_sync`, `next_run_at`, `sync_status`, `last_error`, `last_synced_at`
 
 #### `arr_sync_media_management`
+
 - **Purpose**: Media management sync config with three sub-sections per instance
 - **Key columns**: `instance_id` (PK), `naming_database_id`, `naming_config_name`, `quality_definitions_database_id`, `quality_definitions_config_name`, `media_settings_database_id`, `media_settings_config_name`, `trigger`, `cron`, `should_sync`, `next_run_at`, `sync_status`, `last_error`, `last_synced_at`
 
 #### `arr_sync_metadata_profiles_config`
+
 - **Purpose**: Lidarr-only metadata profile sync config per instance
 - **Key columns**: `instance_id` (PK), `database_id`, `profile_name`, `trigger`, `cron`, `should_sync`, `next_run_at`, `sync_status`, `last_error`, `last_synced_at`
 - **Scoping**: All queries join against `arr_instances` to enforce `type = 'lidarr'`
 
 #### `arr_database_namespaces`
+
 - **Purpose**: Assigns unique namespace index per (Arr instance, database) pair for zero-width suffix generation
 - **Key columns**: `instance_id`, `database_id`, `namespace_index`
 - **Primary key**: `(instance_id, database_id)`
@@ -107,6 +118,7 @@ New preview endpoints need:
 - **Key methods**: `getOrCreate(instanceId, databaseId)`, `get(instanceId, databaseId)`, `getForInstance(instanceId)`
 
 #### `database_instances`
+
 - **Purpose**: Registered PCD database connections
 - **Queries file**: `/home/yandy/Projects/github.com/yandy-r/praxrr/packages/praxrr-app/src/lib/server/db/queries/databaseInstances.ts`
 - **Key methods**: `getById(id)` (used to validate database still exists before sync)
@@ -117,16 +129,17 @@ File: `/home/yandy/Projects/github.com/yandy-r/praxrr/packages/praxrr-app/src/li
 
 **Read queries essential for preview**:
 
-| Method | Returns | Purpose |
-|--------|---------|---------|
-| `getQualityProfilesSync(instanceId)` | `QualityProfilesSyncData` | Selections (databaseId + profileName pairs) and trigger config |
-| `getDelayProfilesSync(instanceId)` | `DelayProfilesSyncData` | Single profile selection (databaseId, profileName) and trigger |
-| `getMediaManagementSync(instanceId)` | `MediaManagementSyncData` | Three sub-section configs (naming, qualityDefs, mediaSettings) each with databaseId + configName |
-| `getMetadataProfilesSync(instanceId)` | `MetadataProfilesSyncData` | Single profile selection (databaseId, profileName) and trigger |
-| `getFullSyncData(instanceId)` | All four above combined | Calls all four getters |
-| `getSyncConfigStatus(instanceId)` | Per-section trigger/cron/status | For checking sync_status before preview |
+| Method                                | Returns                         | Purpose                                                                                          |
+| ------------------------------------- | ------------------------------- | ------------------------------------------------------------------------------------------------ |
+| `getQualityProfilesSync(instanceId)`  | `QualityProfilesSyncData`       | Selections (databaseId + profileName pairs) and trigger config                                   |
+| `getDelayProfilesSync(instanceId)`    | `DelayProfilesSyncData`         | Single profile selection (databaseId, profileName) and trigger                                   |
+| `getMediaManagementSync(instanceId)`  | `MediaManagementSyncData`       | Three sub-section configs (naming, qualityDefs, mediaSettings) each with databaseId + configName |
+| `getMetadataProfilesSync(instanceId)` | `MetadataProfilesSyncData`      | Single profile selection (databaseId, profileName) and trigger                                   |
+| `getFullSyncData(instanceId)`         | All four above combined         | Calls all four getters                                                                           |
+| `getSyncConfigStatus(instanceId)`     | Per-section trigger/cron/status | For checking sync_status before preview                                                          |
 
 **Key types**:
+
 - `ProfileSelection`: `{ databaseId: number; profileName: string }`
 - `SyncConfig`: `{ trigger: SyncTrigger; cron: string | null; nextRunAt?: string | null }`
 - `SyncTrigger`: `'manual' | 'on_pull' | 'on_change' | 'schedule'`
@@ -140,17 +153,20 @@ File: `/home/yandy/Projects/github.com/yandy-r/praxrr/packages/praxrr-app/src/li
 The PCD cache is an in-memory SQLite database per linked PCD database. It is built by replaying all PCD operations (schema, base, tweaks, user layers) into a fresh `:memory:` SQLite database.
 
 **Architecture**:
+
 - `PCDCache` class: `/home/yandy/Projects/github.com/yandy-r/praxrr/packages/praxrr-app/src/lib/server/pcd/database/cache.ts`
 - Cache registry (global Map): `/home/yandy/Projects/github.com/yandy-r/praxrr/packages/praxrr-app/src/lib/server/pcd/database/registry.ts`
 - Public API: `/home/yandy/Projects/github.com/yandy-r/praxrr/packages/praxrr-app/src/lib/server/pcd/index.ts`
 
 **Access pattern**:
+
 ```typescript
 import { getCache, getCachedDatabaseIds } from '$pcd/index.ts';
 const cache = getCache(databaseId); // returns PCDCache | undefined
 ```
 
 **PCDCache query methods**:
+
 - `cache.query<T>(sql, ...params): T[]` - Raw SQL, returns all rows
 - `cache.queryOne<T>(sql, ...params): T | undefined` - Raw SQL, returns first row
 - `cache.kb: Kysely<PCDDatabase>` - Kysely type-safe query builder
@@ -169,17 +185,17 @@ Each syncer follows this pattern:
 
 **Entity read functions used by syncers**:
 
-| Section | Import | Function | Source File |
-|---------|--------|----------|-------------|
-| Quality Profiles | `$sync/qualityProfiles/transformer.ts` | `fetchQualityProfileFromPcd(cache, name, arrType)` | transformer.ts |
-| Quality Profiles | `$sync/qualityProfiles/transformer.ts` | `getReferencedCustomFormatNames(cache, name, arrType)` | transformer.ts |
-| Quality Profiles | `$sync/qualityProfiles/transformer.ts` | `getQualityApiMappings(cache, arrType)` | transformer.ts |
-| Custom Formats | `$sync/customFormats/index.ts` | `fetchCustomFormatFromPcd(cache, formatName)` | customFormats/index.ts |
-| Delay Profiles | `$pcd/entities/delayProfiles/index.ts` | `getByName(cache, profileName)` | PCD entities |
-| Media Mgmt - Settings | `$pcd/entities/mediaManagement/media-settings/read.ts` | `getRadarrByName`, `getSonarrByName`, `getLidarrByName` | PCD entities |
-| Media Mgmt - Naming | `$pcd/entities/mediaManagement/naming/read.ts` | `getRadarrByName`, `getSonarrByName`, `getLidarrByName` | PCD entities |
-| Media Mgmt - QualDefs | `$pcd/entities/mediaManagement/quality-definitions/read.ts` | `getRadarrByName`, `getSonarrByName`, `getLidarrByName` | PCD entities |
-| Metadata Profiles | Cache Kysely query in syncer | `cache.kb.selectFrom('lidarr_metadata_profiles')...` | metadataProfiles/syncer.ts |
+| Section               | Import                                                      | Function                                                | Source File                |
+| --------------------- | ----------------------------------------------------------- | ------------------------------------------------------- | -------------------------- |
+| Quality Profiles      | `$sync/qualityProfiles/transformer.ts`                      | `fetchQualityProfileFromPcd(cache, name, arrType)`      | transformer.ts             |
+| Quality Profiles      | `$sync/qualityProfiles/transformer.ts`                      | `getReferencedCustomFormatNames(cache, name, arrType)`  | transformer.ts             |
+| Quality Profiles      | `$sync/qualityProfiles/transformer.ts`                      | `getQualityApiMappings(cache, arrType)`                 | transformer.ts             |
+| Custom Formats        | `$sync/customFormats/index.ts`                              | `fetchCustomFormatFromPcd(cache, formatName)`           | customFormats/index.ts     |
+| Delay Profiles        | `$pcd/entities/delayProfiles/index.ts`                      | `getByName(cache, profileName)`                         | PCD entities               |
+| Media Mgmt - Settings | `$pcd/entities/mediaManagement/media-settings/read.ts`      | `getRadarrByName`, `getSonarrByName`, `getLidarrByName` | PCD entities               |
+| Media Mgmt - Naming   | `$pcd/entities/mediaManagement/naming/read.ts`              | `getRadarrByName`, `getSonarrByName`, `getLidarrByName` | PCD entities               |
+| Media Mgmt - QualDefs | `$pcd/entities/mediaManagement/quality-definitions/read.ts` | `getRadarrByName`, `getSonarrByName`, `getLidarrByName` | PCD entities               |
+| Metadata Profiles     | Cache Kysely query in syncer                                | `cache.kb.selectFrom('lidarr_metadata_profiles')...`    | metadataProfiles/syncer.ts |
 
 ### Data Available from PCD Cache
 
@@ -205,25 +221,25 @@ File: `/home/yandy/Projects/github.com/yandy-r/praxrr/packages/praxrr-app/src/li
 
 These are the read-only methods preview needs to fetch current remote state:
 
-| Method | Returns | Endpoint | Preview Use Case |
-|--------|---------|----------|------------------|
-| `getCustomFormats()` | `ArrCustomFormat[]` | `/api/v3/customformat` | Compare against desired CFs |
-| `getQualityProfiles()` | `RadarrQualityProfile[]` | `/api/v3/qualityprofile` | Compare against desired QPs |
-| `getQualityDefinitions()` | `ArrQualityDefinition[]` | `/api/v3/qualitydefinition` | Compare against desired quality defs |
-| `getDelayProfiles()` | `ArrDelayProfile[]` | `/api/v3/delayprofile` | Compare against desired delay profile |
-| `getMediaManagementConfig()` | `ArrMediaManagementConfig` | `/api/v3/config/mediamanagement` | Compare media settings fields |
-| `getNamingConfig()` | `ArrNamingConfig` | `/api/v3/config/naming` | Compare naming fields |
-| `getTags()` | `ArrTag[]` | `/api/v3/tag` | Tag resolution (delay profiles) |
-| `testConnection()` | `boolean` | `/api/v3/system/status` | Pre-flight connectivity check |
+| Method                       | Returns                    | Endpoint                         | Preview Use Case                      |
+| ---------------------------- | -------------------------- | -------------------------------- | ------------------------------------- |
+| `getCustomFormats()`         | `ArrCustomFormat[]`        | `/api/v3/customformat`           | Compare against desired CFs           |
+| `getQualityProfiles()`       | `RadarrQualityProfile[]`   | `/api/v3/qualityprofile`         | Compare against desired QPs           |
+| `getQualityDefinitions()`    | `ArrQualityDefinition[]`   | `/api/v3/qualitydefinition`      | Compare against desired quality defs  |
+| `getDelayProfiles()`         | `ArrDelayProfile[]`        | `/api/v3/delayprofile`           | Compare against desired delay profile |
+| `getMediaManagementConfig()` | `ArrMediaManagementConfig` | `/api/v3/config/mediamanagement` | Compare media settings fields         |
+| `getNamingConfig()`          | `ArrNamingConfig`          | `/api/v3/config/naming`          | Compare naming fields                 |
+| `getTags()`                  | `ArrTag[]`                 | `/api/v3/tag`                    | Tag resolution (delay profiles)       |
+| `testConnection()`           | `boolean`                  | `/api/v3/system/status`          | Pre-flight connectivity check         |
 
 ### LidarrClient Additional GET Methods
 
 File: `/home/yandy/Projects/github.com/yandy-r/praxrr/packages/praxrr-app/src/lib/server/utils/arr/clients/lidarr.ts`
 
-| Method | Returns | Endpoint | Preview Use Case |
-|--------|---------|----------|------------------|
-| `getMetadataProfiles()` | `LidarrMetadataProfileListResponse` | `/api/v1/metadataprofile` | Compare metadata profiles |
-| `getMetadataProfileSchema()` | `LidarrMetadataProfileSchema` | `/api/v1/metadataprofile/schema` | Normalize metadata profile types |
+| Method                       | Returns                             | Endpoint                         | Preview Use Case                 |
+| ---------------------------- | ----------------------------------- | -------------------------------- | -------------------------------- |
+| `getMetadataProfiles()`      | `LidarrMetadataProfileListResponse` | `/api/v1/metadataprofile`        | Compare metadata profiles        |
+| `getMetadataProfileSchema()` | `LidarrMetadataProfileSchema`       | `/api/v1/metadataprofile/schema` | Normalize metadata profile types |
 
 Note: Lidarr overrides `apiVersion = 'v1'`, so all inherited base methods use `/api/v1/` automatically.
 
@@ -232,6 +248,7 @@ Note: Lidarr overrides `apiVersion = 'v1'`, so all inherited base methods use `/
 File: `/home/yandy/Projects/github.com/yandy-r/praxrr/packages/praxrr-app/src/lib/server/utils/arr/arrInstanceClients.ts`
 
 **Creation**:
+
 ```typescript
 import { getArrInstanceClient, createArrInstanceClientCache } from '$arr/arrInstanceClients.ts';
 
@@ -244,12 +261,14 @@ const client = await getArrInstanceClient(type, id, url, undefined, clientCache)
 ```
 
 **Key behaviors**:
+
 - Decrypts API key from `arr_instance_credentials` table via `decryptArrInstanceApiKey()`
 - Supports optional `ArrInstanceClientCache` (Map) for reuse across calls
 - Invalidates cache entry on key version mismatch
 - Factory function `createArrClient(type, url, apiKey, options)` in `/home/yandy/Projects/github.com/yandy-r/praxrr/packages/praxrr-app/src/lib/server/utils/arr/factory.ts` dispatches to `RadarrClient`, `SonarrClient`, `LidarrClient`, or `ChaptarrClient`
 
 **Client options**:
+
 ```typescript
 interface ArrClientOptions {
   timeout?: number;
@@ -261,16 +280,16 @@ interface ArrClientOptions {
 
 File: `/home/yandy/Projects/github.com/yandy-r/praxrr/packages/praxrr-app/src/lib/server/utils/arr/types.ts`
 
-| Type | Description | Fields for Diffing |
-|------|-------------|-------------------|
-| `ArrCustomFormat` | CF with specs | `id`, `name`, `includeCustomFormatWhenRenaming`, `specifications[]` |
-| `RadarrQualityProfile` | QP from arr | `id`, `name`, `upgradeAllowed`, `cutoff`, `cutoffFormatScore`, `minFormatScore`, `formatItems[]`, `items[]` |
-| `QualityProfileFormatItem` | CF score in QP | `format` (id), `name`, `score` |
-| `ArrDelayProfile` | Delay profile | `id`, `enableUsenet`, `enableTorrent`, `preferredProtocol`, `usenetDelay`, `torrentDelay`, `bypassIfHighestQuality`, `bypassIfAboveCustomFormatScore`, `minimumCustomFormatScore`, `order`, `tags[]` |
-| `ArrMediaManagementConfig` | Media settings | `id`, `downloadPropersAndRepacks`, `enableMediaInfo`, plus many preserved fields |
-| `ArrNamingConfig` | Union type | Radarr: `renameMovies`, `colonReplacementFormat`, `standardMovieFormat`, `movieFolderFormat`; Sonarr: `renameEpisodes`, `colonReplacementFormat` (int), `multiEpisodeStyle` (int), episode/season formats; Lidarr: `renameTracks`, `standardTrackFormat`, `multiDiscTrackFormat`, `artistFolderFormat` |
-| `ArrQualityDefinition` | Quality sizes | `id`, `quality.id`, `quality.name`, `title`, `weight`, `minSize`, `maxSize`, `preferredSize` |
-| `LidarrMetadataProfile` | Metadata profile | `id`, `name`, `primaryAlbumTypes[]`, `secondaryAlbumTypes[]`, `releaseStatuses[]` |
+| Type                       | Description      | Fields for Diffing                                                                                                                                                                                                                                                                                     |
+| -------------------------- | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `ArrCustomFormat`          | CF with specs    | `id`, `name`, `includeCustomFormatWhenRenaming`, `specifications[]`                                                                                                                                                                                                                                    |
+| `RadarrQualityProfile`     | QP from arr      | `id`, `name`, `upgradeAllowed`, `cutoff`, `cutoffFormatScore`, `minFormatScore`, `formatItems[]`, `items[]`                                                                                                                                                                                            |
+| `QualityProfileFormatItem` | CF score in QP   | `format` (id), `name`, `score`                                                                                                                                                                                                                                                                         |
+| `ArrDelayProfile`          | Delay profile    | `id`, `enableUsenet`, `enableTorrent`, `preferredProtocol`, `usenetDelay`, `torrentDelay`, `bypassIfHighestQuality`, `bypassIfAboveCustomFormatScore`, `minimumCustomFormatScore`, `order`, `tags[]`                                                                                                   |
+| `ArrMediaManagementConfig` | Media settings   | `id`, `downloadPropersAndRepacks`, `enableMediaInfo`, plus many preserved fields                                                                                                                                                                                                                       |
+| `ArrNamingConfig`          | Union type       | Radarr: `renameMovies`, `colonReplacementFormat`, `standardMovieFormat`, `movieFolderFormat`; Sonarr: `renameEpisodes`, `colonReplacementFormat` (int), `multiEpisodeStyle` (int), episode/season formats; Lidarr: `renameTracks`, `standardTrackFormat`, `multiDiscTrackFormat`, `artistFolderFormat` |
+| `ArrQualityDefinition`     | Quality sizes    | `id`, `quality.id`, `quality.name`, `title`, `weight`, `minSize`, `maxSize`, `preferredSize`                                                                                                                                                                                                           |
+| `LidarrMetadataProfile`    | Metadata profile | `id`, `name`, `primaryAlbumTypes[]`, `secondaryAlbumTypes[]`, `releaseStatuses[]`                                                                                                                                                                                                                      |
 
 ## Sync Pipeline Architecture
 
@@ -304,11 +323,11 @@ For preview, `hasConfig(instanceId)` is useful to determine which sections have 
 
 File: `/home/yandy/Projects/github.com/yandy-r/praxrr/packages/praxrr-app/src/lib/server/sync/mappings.ts`
 
-| Arr Type | Supported Sections |
-|----------|--------------------|
-| radarr | qualityProfiles, delayProfiles, mediaManagement |
-| sonarr | qualityProfiles, delayProfiles, mediaManagement |
-| lidarr | qualityProfiles, delayProfiles, mediaManagement, metadataProfiles |
+| Arr Type | Supported Sections                                                |
+| -------- | ----------------------------------------------------------------- |
+| radarr   | qualityProfiles, delayProfiles, mediaManagement                   |
+| sonarr   | qualityProfiles, delayProfiles, mediaManagement                   |
+| lidarr   | qualityProfiles, delayProfiles, mediaManagement, metadataProfiles |
 
 Use `isSyncSectionSupported(arrType, section)` to validate.
 
@@ -328,6 +347,7 @@ Preview must strip suffixes for display names but use suffixed names for matchin
 All four syncers override `sync()` entirely. They do NOT use the base class `fetchFromPcd()` / `transformToArr()` / `pushToArr()` template methods (those are implemented as no-ops). The actual logic is inlined in each syncer's `sync()`. This means preview cannot intercept at the base class level -- it must add separate `generatePreview()` methods that reuse the same internal helpers.
 
 **Quality Profiles syncer** (`/home/yandy/Projects/github.com/yandy-r/praxrr/packages/praxrr-app/src/lib/server/sync/qualityProfiles/syncer.ts`):
+
 1. `fetchSyncBatchByDatabase()` - Groups selections by database, loads PCD profiles and CFs
 2. For each batch: `syncCustomFormats()` - Creates/updates CFs on Arr
 3. Refreshes full CF list from Arr
@@ -337,9 +357,11 @@ All four syncers override `sync()` entirely. They do NOT use the base class `fet
 Preview reuse: Steps 1, 3, 4 are pure reads. Step 2's CF transform can be extracted. Step 5's `transformQualityProfile()` is already a pure function.
 
 **Custom Formats syncer** (`/home/yandy/Projects/github.com/yandy-r/praxrr/packages/praxrr-app/src/lib/server/sync/customFormats/syncer.ts`):
+
 - `transformCustomFormatWithDiagnostics(pcdFormat, instanceType)` returns `{ format, skippedConditions }` -- already a pure function
 
 **Delay Profiles syncer** (`/home/yandy/Projects/github.com/yandy-r/praxrr/packages/praxrr-app/src/lib/server/sync/delayProfiles/syncer.ts`):
+
 1. Read config, get cache, fetch PCD profile
 2. `resolveTargetDelayProfile()` - GET delay profiles, find default
 3. `transform(profile)` - Pure function, maps PCD fields to Arr format
@@ -349,6 +371,7 @@ Preview reuse: Steps 1-3 are all extractable. `transform()` is already pure.
 
 **Media Management syncer** (`/home/yandy/Projects/github.com/yandy-r/praxrr/packages/praxrr-app/src/lib/server/sync/mediaManagement/syncer.ts`):
 Three sub-sections, each: GET existing from Arr, fetch from PCD, merge/transform, PUT back.
+
 - `mapPropersRepacks()` - Pure function
 - `syncRadarrNaming()` / `syncSonarrNaming()` / `syncLidarrNaming()` - Each does GET + PCD fetch + merge
 - Quality definitions: GET existing, map via `getQualityApiMappings()`, merge values
@@ -356,6 +379,7 @@ Three sub-sections, each: GET existing from Arr, fetch from PCD, merge/transform
 Preview reuse: All PCD reads and transforms are extractable. Need to separate "compute desired state" from "PUT to Arr".
 
 **Metadata Profiles syncer** (`/home/yandy/Projects/github.com/yandy-r/praxrr/packages/praxrr-app/src/lib/server/sync/metadataProfiles/syncer.ts`):
+
 1. Read config, get PCD profile from cache
 2. Resolve namespace suffix
 3. GET schema from Lidarr, normalize
@@ -371,11 +395,11 @@ Preview reuse: Steps 1-4 are extractable. Step 5 is a GET.
 
 No new environment variables needed for preview. Relevant existing ones:
 
-| Variable | Default | Relevance |
-|----------|---------|-----------|
-| `PORT` | 6969 (dev) / 6868 (prod) | Server port |
-| `AUTH` | `on` | Auth mode (preview follows same auth gates) |
-| `PARSER_HOST` / `PARSER_PORT` | localhost:5000 | Not needed for preview |
+| Variable                      | Default                  | Relevance                                   |
+| ----------------------------- | ------------------------ | ------------------------------------------- |
+| `PORT`                        | 6969 (dev) / 6868 (prod) | Server port                                 |
+| `AUTH`                        | `on`                     | Auth mode (preview follows same auth gates) |
+| `PARSER_HOST` / `PARSER_PORT` | localhost:5000           | Not needed for preview                      |
 
 ### Concurrency and Timing
 

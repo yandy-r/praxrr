@@ -242,6 +242,7 @@ Tests use a `BaseTest` class that manages test context including database setup,
 - Patching pattern: Tests use a manual `patch()` helper for monkey-patching modules during test (lines 49-55)
 
 For sync preview testing, the most practical approach would be:
+
 1. Unit tests for the diff engine (pure function, no I/O)
 2. Unit tests for preview type construction
 3. Integration tests that mock the Arr client and PCD cache to verify end-to-end preview generation
@@ -273,6 +274,7 @@ sync/preview/
 Add a new method alongside `sync()` on each syncer class. Share internal helper methods between `sync()` and `generatePreview()`. Do NOT modify the existing `sync()` method's behavior.
 
 Example for QualityProfileSyncer:
+
 - `fetchSyncBatchByDatabase()` (private, line 164) -- already extracts fetch logic, reuse as-is
 - `getQualityMappings()` (private, line 282) -- reuse as-is
 - `syncQualityProfiles()` (private, line 296) -- has push logic, preview equivalent skips push and diffs instead
@@ -280,6 +282,7 @@ Example for QualityProfileSyncer:
 ### For the API Route
 
 Follow the cleanup route pattern:
+
 - Single POST endpoint at `/api/v1/sync/preview` with `action` discriminator
 - OR separate endpoints (POST create, GET retrieve, POST apply, DELETE discard) per the feature spec
 - Use `json()` for responses with explicit status codes
@@ -289,6 +292,7 @@ Follow the cleanup route pattern:
 ### For the In-Memory Preview Store
 
 Follow the existing `Cache` class pattern from `$cache/cache.ts`:
+
 - Simple `Map<string, CacheEntry>` with expiration timestamps
 - `get()`, `set()`, `delete()`, `cleanup()` methods
 - TTL-based expiration checked on read
@@ -297,6 +301,7 @@ Follow the existing `Cache` class pattern from `$cache/cache.ts`:
 ### For Logging
 
 Use the established source string hierarchy:
+
 - `'Preview'` for the preview orchestrator
 - `'Preview:QualityProfiles'`, `'Preview:DelayProfile'`, etc. for section-specific preview logic
 - `'Preview:Diff'` for the diff engine if needed
@@ -305,6 +310,7 @@ Use the established source string hierarchy:
 ### For Cross-Arr Handling
 
 Follow the existing per-`arr_type` dispatch pattern:
+
 - Use `isSyncSectionSupported(arrType, section)` before generating section previews
 - Handle Lidarr-specific metadata profiles as conditional (only when `arr_type === 'lidarr'`)
 - Custom format condition skipping for Lidarr should appear in preview diagnostics
@@ -327,6 +333,7 @@ Follow the existing per-`arr_type` dispatch pattern:
 ## Relevant Files
 
 ### Core Sync Infrastructure
+
 - `/packages/praxrr-app/src/lib/server/sync/base.ts`: BaseSyncer abstract class (template method pattern)
 - `/packages/praxrr-app/src/lib/server/sync/types.ts`: All sync type definitions (SyncResult, SectionHandler, SectionType)
 - `/packages/praxrr-app/src/lib/server/sync/registry.ts`: Section handler registry (Map-based)
@@ -338,6 +345,7 @@ Follow the existing per-`arr_type` dispatch pattern:
 - `/packages/praxrr-app/src/lib/server/sync/cleanup.ts`: Scan-then-execute pattern (closest precedent)
 
 ### Section Syncers and Handlers
+
 - `/packages/praxrr-app/src/lib/server/sync/qualityProfiles/syncer.ts`: Most complex syncer (CFs + QPs + namespacing)
 - `/packages/praxrr-app/src/lib/server/sync/qualityProfiles/transformer.ts`: PCD-to-Arr QP transformation + PCD queries
 - `/packages/praxrr-app/src/lib/server/sync/qualityProfiles/handler.ts`: QP section handler registration
@@ -351,11 +359,13 @@ Follow the existing per-`arr_type` dispatch pattern:
 - `/packages/praxrr-app/src/lib/server/sync/metadataProfiles/handler.ts`: Metadata handler registration
 
 ### API Routes (Patterns to Follow)
+
 - `/packages/praxrr-app/src/routes/api/v1/arr/cleanup/+server.ts`: Scan/execute API pattern (closest to preview/apply)
 - `/packages/praxrr-app/src/routes/api/v1/arr/library/+server.ts`: Complex GET API route with caching and pagination
 - `/packages/praxrr-app/src/routes/arr/[id]/sync/+page.server.ts`: Sync config UI server-side logic (form actions)
 
 ### Supporting Infrastructure
+
 - `/packages/praxrr-app/src/lib/server/utils/arr/base.ts`: BaseArrClient with all Arr API GET/POST/PUT/DELETE methods
 - `/packages/praxrr-app/src/lib/server/utils/arr/arrInstanceClients.ts`: Client factory with credential decryption
 - `/packages/praxrr-app/src/lib/server/utils/http/types.ts`: HttpError class
@@ -365,6 +375,7 @@ Follow the existing per-`arr_type` dispatch pattern:
 - `/packages/praxrr-app/src/lib/server/jobs/handlers/arrSync.ts`: Job handler for sync execution
 
 ### Existing Research
+
 - `/home/yandy/Projects/github.com/yandy-r/praxrr/docs/plans/sync-preview-dry-run/feature-spec.md`: Complete feature specification
 - `/home/yandy/Projects/github.com/yandy-r/praxrr/docs/plans/sync-preview-dry-run/research-technical.md`: Technical architecture decisions
 
