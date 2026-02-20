@@ -1,46 +1,87 @@
-## Executive Summary
+# Encrypted Key Storage: Deployment Recommendations (Finalized)
 
-Issue #9 marks encrypted API key storage as a high-priority trust foundation item, and the research explicitly recommends shipping it early with masking rather than treating it as a later add-on. Today, Praxrr still handles multiple API-key fields as plaintext in the DB/query layer, while Arr flows depend on API-key equality for duplicate detection and env reconciliation. The most realistic path is phased: immediate masking and redaction hardening, then app-level encrypted storage with hash-based lookups, then full cutover and lifecycle hardening.
+## Current state
 
-### Recommended Implementation Strategy
+The Arr credential encryption model is implemented and running on the new migration/contract:
 
-- `high-confidence approach`: Implement application-level field encryption for secret-bearing columns with an authenticated cipher and per-record random nonce, plus a deterministic keyed hash column for equality lookups. Start with `arr_instances` first because it is the largest blast-radius surface and is directly tied to sync/runtime operations.
-- `rationale and tradeoffs`: This approach aligns with current Deno + SQLite architecture and avoids an immediate SQLCipher operational migration. It also preserves current behavior that depends on API-key matching by moving those comparisons to hash-based queries. The tradeoff is temporary migration complexity (dual-format reads during backfill) and a new operational dependency on master-key management.
-- `evidence basis`: Issue #9 and Phase 1 recommendations in `research/praxrr-additional-features/report.md`; trust-infrastructure guidance in `research/praxrr-additional-features/synthesis/pattern-recognition.md`; current plaintext handling and API-key equality dependencies in `packages/praxrr-app/src/lib/server/db/schema.sql`, `packages/praxrr-app/src/lib/server/db/queries/arrInstances.ts`, and `packages/praxrr-app/src/lib/server/utils/arr/envInstances.ts`.
+- `arr_instance_credentials` stores encrypted envelopes (`ciphertext`, `nonce`, `key_version`).
+- `arr_instances.api_key_fingerprint` is used for lookup and duplicate/env matching.
+- `arr_instances.api_key` is **not** used for runtime authentication and is treated as a write-blocked compatibility field.
 
-## Phased Rollout Suggestion
+## Finalized Storage Model
 
-- `phase 1 goal`: Reduce exposure immediately and lay compatibility foundations. Complete API-key masking/redaction coverage for UI/log/API surfaces, introduce a shared secret-redaction utility, add encryption primitives and new secret-storage columns for `arr_instances`, and dual-write new/updated keys as `ciphertext + hash` while allowing controlled legacy reads.
-- `phase 2 goal`: Execute cutover for core Arr credentials. Backfill legacy `arr_instances` keys in transactional batches, switch duplicate/env-reconcile lookups from plaintext equality to hash equality, block plaintext writes, and fail fast when encryption key material is missing or invalid.
-- `phase 3 goal`: Expand and harden secret lifecycle. Apply the same pattern to `tmdb_settings`, `auth_settings`, and `ai_settings`, remove legacy plaintext paths/columns, add re-encryption (key-rotation) workflow, and capture audit events for secret updates/rotations.
+- Write path:
+  - Route/action calls `encryptArrInstanceApiKey()`.
+  - Arr instance row stores fingerprint and non-sensitive metadata.
+  - Credential envelope is persisted in `arr_instance_credentials`.
+- Runtime path:
+  - `getArrInstanceClient()` loads envelope from `arr_instance_credentials`.
+  - Decrypt happens just-in-time in server process memory.
+  - Arr clients receive plaintext key only during request/job execution.
+- UI/API contract:
+  - Stored/returned payloads do not include plaintext keys.
+  - `arrInstancesQueries.getById` and list selectors return `api_key` as an empty placeholder.
 
-## Quick Wins
+## Key Management Expectations
 
-- Enforce masked-secret logging everywhere (`hasApiKey`/last-4 only), including auth failures and form validation paths.
-- Ensure Praxrr-generated integrations always use `X-Api-Key` headers and avoid query-param key propagation in internal flows.
-- Add startup warnings when plaintext secret fields are detected pre-cutover so operators know migration status.
-- Document secure backup handling for DB + environment files as part of this feature rollout.
+- Required variables:
+  - `ARR_CREDENTIAL_MASTER_KEY` (base64, 32-byte raw key)
+  - `ARR_CREDENTIAL_MASTER_KEY_VERSION` (active label)
+- Optional:
+  - `ARR_CREDENTIAL_PREVIOUS_KEYS` (JSON map of legacy version -> base64 key)
+- Failure behavior:
+  - Invalid key config causes startup failure in `hooks.server.ts` before migrations.
+  - Decrypt failures surface through credential-specific errors and do not include key material.
 
-## Future Enhancements
+## Migration and Cutover Sequence
 
-- External secret provider support (`_FILE` inputs, Docker secrets, Infisical/OpenBao connectors).
-- Secret rotation metadata (`last_rotated_at`, rotation reminders, stale-key warnings).
-- Per-secret access/change audit views tied to existing ops history.
-- Optional full-database encryption evaluation (SQLCipher) once field-level encryption is stable in production.
+1. `runMigrations()` applies `20260221_encrypt_arr_api_keys`.
+2. Migration creates schema additions and resumable backfill state table.
+3. Migration backfills existing rows in batches, validates round-trip decrypt + fingerprint parity, then:
+   - clears legacy `arr_instances.api_key` values for credential-backed rows.
+   - installs triggers rejecting non-empty `arr_instances.api_key` inserts/updates.
+4. Duplicate detection and env reconciliation consume fingerprints.
+5. Runtime call sites consume `getArrInstanceClient()` for persisted credentials.
 
-### Risk Mitigations
+Plaintext path status:
 
-- `master key loss risk`: Require startup key fingerprint validation, document key backup/recovery steps, and block writes if key config is inconsistent.
-- `migration integrity risk`: Use transactional backfill batches with checkpointing and explicit success/failure counters; support resumable migration runs.
-- `behavior regression risk`: Add targeted tests around `apiKeyExists`, `getByApiKey`, env reconciliation updates/disable logic, and duplicate detection after hash cutover.
-- `leakage risk`: Centralize redaction helper usage and add a CI rule that rejects obvious secret logging patterns.
-- `operational rollout risk`: Ship behind a feature flag with telemetry for decrypt failures, fallback reads, and backfill progress before enforcing hard cutover.
+- Persisted plaintext storage/write behavior is removed from active contracts.
+- Direct `instance.api_key` usage for persisted credentials is out-of-contract and should be considered a regression if reintroduced.
 
-## Decision Checklist
+## Remediation for Decrypt Failures and Key Rotation
 
-- Choose encryption scope for v1: `arr_instances` only first, or all secret-bearing tables in the same milestone.
-- Confirm crypto mode and key format: algorithm, nonce handling, key ID/versioning, and hash function strategy.
-- Decide master-key source of truth: env var, file mount, or secret manager baseline.
-- Approve migration/cutover model: dual-read window length, enforcement criteria, and rollback triggers.
-- Decide whether legacy plaintext columns are removed in phase 3 or retained temporarily with strict read-blocking.
-- Define rotation expectations for first release: manual re-encrypt only vs. user-facing rotation workflow.
+- If startup fails due to master-key config:
+  1. Verify `ARR_CREDENTIAL_MASTER_KEY` and `ARR_CREDENTIAL_MASTER_KEY_VERSION` values.
+  2. Confirm no accidental whitespace/truncation.
+  3. Restart service after correction.
+- If job/runtime sees decryption failures:
+  - Error text must indicate key config or credential read failure.
+  - For sync, affected instances are disabled by design to prevent repeated hard failures.
+  - Correct key config, rotate/update instance credential, then re-enable.
+- Rotation event procedure:
+  1. Add previous versions to `ARR_CREDENTIAL_PREVIOUS_KEYS` to keep decryptability.
+  2. Deploy with new `ARR_CREDENTIAL_MASTER_KEY` and `ARR_CREDENTIAL_MASTER_KEY_VERSION`.
+  3. Re-save credentials through `/arr/[id]/settings` / env reconciliation to re-encrypt under the active version.
+
+## Operator Rollout Checklist
+
+- Pre-rollback checks:
+  - Back up `praxrr.db`.
+  - Confirm env vars are injected in all deploy targets.
+  - Confirm migration table has not already failed mid-run in previous version.
+- Rollout checks:
+  - Service starts and `runMigrations()` succeeds.
+  - `arr_instance_api_key_backfill_state` has no unresolved checkpoint rows.
+  - All non-empty instances have matching `arr_instance_credentials` row and non-empty fingerprint.
+  - API surfaces no longer return or log `instance.api_key` plaintext.
+  - Manual instance test and one scheduled `arr.sync` flow succeed.
+- Rollback decision points:
+  - If startup fails: rollback to previous release only after key vars are fixed or restored.
+  - If migration gate fails: hold deployment and decide restore backup or resolve data/credential issue before rerun.
+  - If active instances begin failing decryption immediately after rollout: pause scheduler jobs, restore previous key material, then rotate credentials in-place.
+
+## Future Enhancements (Out-of-Scope for this task)
+
+- Secret-provider adapters (Vault/OpenBao/Infisical/1Password Connect)
+- Encrypted storage coverage for other credential-bearing tables
+- Centralized secret-change audit trail for credential operations

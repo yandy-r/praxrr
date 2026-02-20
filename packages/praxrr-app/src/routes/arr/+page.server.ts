@@ -5,16 +5,20 @@ import { cleanupJobsForArrInstance } from '$lib/server/jobs/cleanup.ts';
 import { logger } from '$logger/logger.ts';
 
 type ArrInstanceListItem = ArrInstance & {
-	source: ArrInstanceSource;
-	isEnvManaged: boolean;
+  source: ArrInstanceSource;
+  isEnvManaged: boolean;
 };
 
 export const load: ServerLoad = () => {
   const instances: ArrInstanceListItem[] = arrInstancesQueries.getAll().map((instance) => {
     const source: ArrInstanceSource = instance.source ?? 'ui';
+    const { api_key: _redactedApiKey, ...instanceWithoutApiKey } = instance as ArrInstance & {
+      api_key?: string;
+    };
 
     return {
-      ...instance,
+      ...instanceWithoutApiKey,
+      api_key: '',
       source,
       isEnvManaged: source === 'env',
     };

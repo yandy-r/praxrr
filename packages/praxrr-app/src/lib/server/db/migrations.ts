@@ -58,13 +58,14 @@ import { migration as migration20260217 } from './migrations/20260217_set_lidarr
 import { migration as migration20260218 } from './migrations/20260218_add_lidarr_metadata_profiles.ts';
 import { migration as migration20260219 } from './migrations/20260219_seed_default_lidarr_metadata_profile.ts';
 import { migration as migration20260220AddArrInstanceSource } from './migrations/20260220_add_arr_instance_source.ts';
+import { migration as migration20260221EncryptArrApiKeys } from './migrations/20260221_encrypt_arr_api_keys.ts';
 
 export interface Migration {
   version: number;
   name: string;
   up: string;
   down?: string;
-  afterUp?: () => void; // Optional callback for data migrations
+  afterUp?: () => void | Promise<void>; // Optional callback for data migrations
 }
 
 /**
@@ -111,6 +112,25 @@ class MigrationRunner {
    */
   private async applyMigration(migration: Migration): Promise<void> {
     try {
+      if (migration.afterUp) {
+        await db.transaction(async () => {
+          // Execute the migration schema first
+          db.exec(migration.up);
+        });
+
+        await migration.afterUp();
+
+        await db.transaction(() => {
+          // Record migration only after data migration succeeds
+          db.execute(
+            `INSERT INTO ${this.migrationsTable} (version, name) VALUES (?, ?)`,
+            migration.version,
+            migration.name
+          );
+        });
+        return;
+      }
+
       await db.transaction(async () => {
         // Execute the migration
         db.exec(migration.up);
@@ -122,11 +142,6 @@ class MigrationRunner {
           migration.name
         );
       });
-
-      // Run data migration callback if present (outside transaction)
-      if (migration.afterUp) {
-        migration.afterUp();
-      }
     } catch (error) {
       await logger.error(`Failed to apply migration ${migration.version}: ${migration.name}`, {
         source: 'DatabaseMigrations',
@@ -331,6 +346,7 @@ export function loadMigrations(): Migration[] {
     migration20260218,
     migration20260219,
     migration20260220AddArrInstanceSource,
+    migration20260221EncryptArrApiKeys,
   ];
 
   // Sort by version number

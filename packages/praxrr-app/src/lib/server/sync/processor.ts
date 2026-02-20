@@ -11,12 +11,12 @@
 import { arrInstancesQueries, type ArrInstance } from '$db/queries/arrInstances.ts';
 import { arrSyncQueries } from '$db/queries/arrSync.ts';
 import { calculateNextRun } from './utils.ts';
-import { createArrClient } from '$arr/factory.ts';
 import type { ArrType } from '$arr/types.ts';
+import type { ArrInstanceClientCache } from '$arr/arrInstanceClients.ts';
 import { logger } from '$logger/logger.ts';
 import { upsertScheduledJob } from '$lib/server/jobs/queueService.ts';
+import { createArrInstanceClientCache, getArrInstanceClient } from '$arr/arrInstanceClients.ts';
 import type {
-  SyncResult,
   SectionType,
   SectionHandler,
   ProcessSyncsResult,
@@ -122,14 +122,21 @@ function getPendingSyncsByInstance(): Map<number, SectionType[]> {
  */
 async function processInstanceSections(
   instance: ArrInstance,
-  sectionTypes: SectionType[]
+  sectionTypes: SectionType[],
+  clientCache: ArrInstanceClientCache
 ): Promise<InstanceSyncResult> {
   const instanceResult: InstanceSyncResult = {
     instanceId: instance.id,
     instanceName: instance.name,
   };
 
-  const client = createArrClient(instance.type as ArrType, instance.url, instance.api_key);
+  const client = await getArrInstanceClient(
+    instance.type as ArrType,
+    instance.id,
+    instance.url,
+    undefined,
+    clientCache
+  );
 
   // Process sections sequentially (quality profiles depend on custom formats being synced first)
   for (const sectionType of sectionTypes) {
@@ -213,7 +220,11 @@ export async function processPendingSyncs(): Promise<ProcessSyncsResult> {
   });
 
   // Prepare instance processing tasks
-  const instanceTasks: Array<{ instance: ArrInstance; sectionTypes: SectionType[] }> = [];
+  const instanceTasks: Array<{
+    instance: ArrInstance;
+    sectionTypes: SectionType[];
+    clientCache: ArrInstanceClientCache;
+  }> = [];
 
   for (const [instanceId, sectionTypes] of pendingByInstance) {
     const instance = arrInstancesQueries.getById(instanceId);
@@ -232,13 +243,17 @@ export async function processPendingSyncs(): Promise<ProcessSyncsResult> {
       continue;
     }
 
-    instanceTasks.push({ instance, sectionTypes });
+    instanceTasks.push({
+      instance,
+      sectionTypes,
+      clientCache: createArrInstanceClientCache(),
+    });
   }
 
   // Process instances in parallel with concurrency limit
   const results = await processBatches(
     instanceTasks,
-    ({ instance, sectionTypes }) => processInstanceSections(instance, sectionTypes),
+    ({ instance, sectionTypes, clientCache }) => processInstanceSections(instance, sectionTypes, clientCache),
     CONCURRENCY_LIMIT
   );
 
@@ -275,7 +290,13 @@ export async function syncInstance(instanceId: number): Promise<InstanceSyncResu
     meta: { instanceId },
   });
 
-  const client = createArrClient(instance.type as ArrType, instance.url, instance.api_key);
+  const client = await getArrInstanceClient(
+    instance.type as ArrType,
+    instance.id,
+    instance.url,
+    undefined,
+    createArrInstanceClientCache()
+  );
   const result: InstanceSyncResult = {
     instanceId,
     instanceName: instance.name,

@@ -3,14 +3,15 @@
  * Coordinates fetching, filtering, and renaming files/folders
  */
 
-import { RadarrClient } from '$lib/server/utils/arr/clients/radarr.ts';
-import { SonarrClient } from '$lib/server/utils/arr/clients/sonarr.ts';
+import type { RadarrClient } from '$lib/server/utils/arr/clients/radarr.ts';
+import type { SonarrClient } from '$lib/server/utils/arr/clients/sonarr.ts';
 import type { ArrInstance } from '$lib/server/db/queries/arrInstances.ts';
 import type { RenameSettings } from '$lib/server/db/queries/arrRenameSettings.ts';
 import type { RenameJobLog, RenameItem } from './types.ts';
 import { logRenameRun, logRenameStart, logRenameError, logRenameSkipped } from './logger.ts';
 import { notifications } from '$lib/server/notifications/definitions/index.ts';
 import { notificationServicesQueries } from '$lib/server/db/queries/notificationServices.ts';
+import { getArrInstanceClient } from '$arr/arrInstanceClients.ts';
 
 /**
  * Create an empty/skipped job log
@@ -499,14 +500,14 @@ export async function processRenameConfig(
 
   try {
     if (instance.type === 'radarr') {
-      const client = new RadarrClient(instance.url, instance.api_key);
+      const client = (await getArrInstanceClient('radarr', instance.id, instance.url)) as RadarrClient;
       try {
         return await processRadarrRename(client, settings, instance, startedAt, logId, manual);
       } finally {
         client.close();
       }
     } else if (instance.type === 'sonarr') {
-      const client = new SonarrClient(instance.url, instance.api_key);
+      const client = (await getArrInstanceClient('sonarr', instance.id, instance.url)) as SonarrClient;
       try {
         return await processSonarrRename(client, settings, instance, startedAt, logId, manual);
       } finally {

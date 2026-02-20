@@ -18,7 +18,7 @@ CREATE TABLE IF NOT EXISTS migrations (
 -- ==============================================================================
 -- TABLE: arr_instances
 -- Purpose: Store configuration for *arr application instances (Radarr, Sonarr, etc.)
--- Migration: 001_create_arr_instances.ts, 20260216_add_arr_instance_external_url.ts, 20260220_add_arr_instance_source.ts
+-- Migration: 001_create_arr_instances.ts, 20260216_add_arr_instance_external_url.ts, 20260220_add_arr_instance_source.ts, 20260221_encrypt_arr_api_keys.ts
 -- ==============================================================================
 
 CREATE TABLE arr_instances (
@@ -31,7 +31,8 @@ CREATE TABLE arr_instances (
     -- Connection details
     url TEXT NOT NULL,                      -- Base URL (e.g., "http://localhost:7878")
     external_url TEXT,                      -- Optional browser/Open-in URL override (e.g., "https://radarr.example.com")
-    api_key TEXT NOT NULL,                  -- API key for authentication
+    api_key TEXT NOT NULL,                  -- Legacy plaintext API key retained temporarily; runtime write paths should use encrypted credential storage and leave this empty
+    api_key_fingerprint TEXT,               -- Deterministic hashed fingerprint for duplicate detection and env matching
 
     -- Configuration
     tags TEXT,                              -- JSON array of tags (e.g., '["movies","4k"]')
@@ -42,6 +43,44 @@ CREATE TABLE arr_instances (
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
+
+-- ==============================================================================
+-- TABLE: arr_instance_credentials
+-- Purpose: Store encrypted Arr API key material and credential metadata
+-- Migration: 20260221_encrypt_arr_api_keys.ts
+-- ==============================================================================
+
+CREATE TABLE arr_instance_credentials (
+    instance_id INTEGER PRIMARY KEY,         -- Foreign key to arr_instances.id
+    ciphertext TEXT NOT NULL,                -- Base64 AES-GCM ciphertext
+    nonce TEXT NOT NULL,                     -- Base64 96-bit nonce
+    key_version TEXT NOT NULL,               -- Encryption key version label
+    fingerprint TEXT NOT NULL,                -- Deterministic fingerprint for parity checks
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+
+    FOREIGN KEY (instance_id) REFERENCES arr_instances(id) ON DELETE CASCADE
+);
+
+CREATE INDEX idx_arr_instances_api_key_fingerprint
+    ON arr_instances(api_key_fingerprint);
+
+CREATE TRIGGER trg_arr_instances_reject_plain_api_key_insert
+    BEFORE INSERT ON arr_instances
+    WHEN NEW.api_key IS NOT NULL AND TRIM(NEW.api_key) != ''
+    BEGIN
+        SELECT RAISE(ABORT, 'Arr API keys must be written to arr_instance_credentials');
+    END;
+
+CREATE TRIGGER trg_arr_instances_reject_plain_api_key_update
+    BEFORE UPDATE OF api_key ON arr_instances
+    WHEN NEW.api_key IS NOT NULL AND TRIM(NEW.api_key) != ''
+    BEGIN
+        SELECT RAISE(ABORT, 'Arr API keys must be written to arr_instance_credentials');
+    END;
+
+CREATE UNIQUE INDEX idx_arr_instance_credentials_fingerprint
+    ON arr_instance_credentials(fingerprint);
 
 -- ==============================================================================
 -- TABLE: log_settings

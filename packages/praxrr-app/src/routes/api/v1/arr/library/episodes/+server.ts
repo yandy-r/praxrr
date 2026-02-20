@@ -3,7 +3,8 @@ import type { RequestHandler } from '@sveltejs/kit';
 import type { components } from '$api/v1.d.ts';
 import { arrInstancesQueries } from '$db/queries/arrInstances.ts';
 import { cache } from '$cache/cache.ts';
-import { SonarrClient } from '$utils/arr/clients/sonarr.ts';
+import { getArrInstanceClient } from '$arr/arrInstanceClients.ts';
+import type { SonarrClient } from '$utils/arr/clients/sonarr.ts';
 import { logger } from '$logger/logger.ts';
 
 type EpisodesResponse = components['schemas']['EpisodesResponse'];
@@ -62,7 +63,7 @@ export const GET: RequestHandler = async ({ url }) => {
   }
 
   try {
-    const client = new SonarrClient(instance.url, instance.api_key);
+    const client = (await getArrInstanceClient(instance.type, instance.id, instance.url)) as SonarrClient;
     try {
       const profiles = await client.getQualityProfiles();
       const series = await client.getSeries(seriesId);

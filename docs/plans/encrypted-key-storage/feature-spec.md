@@ -2,7 +2,13 @@
 
 ## Executive Summary
 
-Encrypted API key storage is a Phase 1 trust-foundation feature tracked in GitHub issue #9. Praxrr currently centralizes Arr credentials and uses them across UI actions, API routes, and background jobs, so plaintext persistence creates a high-impact compromise path if the database is copied or logs leak sensitive values. The recommended implementation is application-level envelope encryption for Arr API keys using Deno Web Crypto (AES-GCM), with deterministic keyed fingerprints for duplicate detection and environment reconciliation flows that currently compare keys directly. This approach minimizes architecture disruption versus immediate full-database encryption and keeps existing sync behavior intact by decrypting credentials just-in-time for Arr client calls. Primary risks are key-management operational failure, migration integrity, and accidental plaintext exposure during transitional paths.
+Encrypted API key storage is implemented for Arr instances. The runtime contract is now:
+
+- Arr API keys are persisted as encrypted envelopes and keyed fingerprints in the app DB.
+- Runtime Arr clients call a shared decrypt boundary and receive plaintext only inside server call scope.
+- Duplicate detection and env reconciliation now use deterministic fingerprints instead of direct `instance.api_key` comparison.
+
+This avoids full-schema SQLCipher migration while removing plaintext `arr_instances.api_key` write-path usage for active instances and operations.
 
 ## External Dependencies
 
@@ -91,16 +97,16 @@ Encrypted API key storage is a Phase 1 trust-foundation feature tracked in GitHu
 ### Business Rules
 
 1. **Encrypt-at-write rule**: API keys must be encrypted before persistence; plaintext keys must never be stored in SQLite rows.
-   - Validation: Server action fails if encryption key material is unavailable.
-   - Exception: None for persisted keys.
+   - Validation: Startup checks `ARR_CREDENTIAL_MASTER_KEY`/version; runtime writes throw if no valid key material.
+   - Exception: none for persisted keys.
 
 2. **Write-only UI rule**: API keys are accepted on input but never returned to the browser after save.
    - Validation: Load handlers and API responses omit plaintext key fields.
    - Exception: One-time transient value in current form submission only.
 
 3. **Runtime decrypt boundary rule**: Decryption is allowed only in server-side execution paths that need Arr calls.
-   - Validation: Shared helper encapsulates decrypt-and-client creation.
-   - Exception: `/arr/test` accepts ad hoc key in request but does not persist it.
+   - Validation: `getArrInstanceClient()` is the decryption boundary for persisted instances.
+   - Exception: `/arr/test` accepts ad hoc key input for connectivity checks only and does not persist it.
 
 4. **Deduplication parity rule**: Duplicate detection and env reconciliation must continue without plaintext equality checks.
    - Validation: Deterministic keyed fingerprint supports existing matching semantics.
@@ -108,20 +114,20 @@ Encrypted API key storage is a Phase 1 trust-foundation feature tracked in GitHu
 
 ### Edge Cases
 
-| Scenario                                 | Expected Behavior                                                   | Notes                                      |
-| ---------------------------------------- | ------------------------------------------------------------------- | ------------------------------------------ |
-| Master key missing at startup            | Block writes and fail fast with actionable admin error              | Avoid partial unencrypted writes           |
-| Decryption failure during job run        | Mark instance disabled and surface remediation path                 | No secret value in logs                    |
-| Existing plaintext rows during migration | Backfill in transactional batches, then enforce encrypted-only path | Must be resumable                          |
-| Env-managed credential changes           | Recompute fingerprint and re-encrypt value in reconciliation flow   | Preserve `source='env'` immutability in UI |
+| Scenario                                 | Expected Behavior                                                               | Notes                                                    |
+| ---------------------------------------- | ------------------------------------------------------------------------------- | -------------------------------------------------------- |
+| Master key missing at startup            | Fail startup with clear admin guidance                                          | Prevents partial writes and hardens startup ordering     |
+| Decryption failure during job run        | Mark instance disabled (sync path) and return remediation error                 | No secret value in logs                                  |
+| Existing plaintext rows during migration | Backfill in resumable transactional batches, then enforce encrypted-only writes | `arr_instance_api_key_backfill_state` tracks checkpoints |
+| Env-managed credential changes           | Recompute fingerprint and re-encrypt during reconciliation flow                 | Preserve `source='env'` immutability in UI               |
 
 ### Success Criteria
 
-- [ ] New and updated Arr API keys are persisted only as encrypted payload plus deterministic fingerprint.
-- [ ] UI/API payloads never return plaintext keys after save.
-- [ ] Sync/rename/upgrade/library operations continue via just-in-time decrypt without behavior regressions.
-- [ ] Migration converts existing plaintext Arr keys and removes plaintext write path.
-- [ ] Logs, errors, and telemetry are redacted and do not expose secret material.
+- [x] New and updated Arr API keys are persisted as encrypted payloads plus deterministic fingerprint.
+- [x] UI/API payloads do not return Arr API plaintext after save.
+- [x] Sync/rename/upgrade/library flows consume credentials through the JIT decrypt boundary.
+- [x] Legacy Arr rows are migrated during `20260221_encrypt_arr_api_keys` and ciphertext rows are enforced.
+- [x] Logs, errors, and telemetry are redacted and do not expose secret material.
 
 ## Technical Specifications
 
@@ -144,14 +150,15 @@ Encrypted API key storage is a Phase 1 trust-foundation feature tracked in GitHu
 
 #### `arr_instances` (existing table; updated)
 
-| Field               | Type    | Constraints                    | Description                                          |
-| ------------------- | ------- | ------------------------------ | ---------------------------------------------------- |
-| id                  | INTEGER | PK                             | Instance identifier                                  |
-| name                | TEXT    | UNIQUE per app logic           | Instance label                                       |
-| type                | TEXT    | Arr type enum                  | Sonarr/Radarr/Lidarr selection                       |
-| url                 | TEXT    | NOT NULL                       | Arr base URL                                         |
-| source              | TEXT    | `ui` or `env`                  | Origin of instance configuration                     |
-| api_key_fingerprint | TEXT    | UNIQUE, NOT NULL after cutover | Deterministic keyed fingerprint for duplicate checks |
+| Field               | Type    | Constraints                    | Description                                                |
+| ------------------- | ------- | ------------------------------ | ---------------------------------------------------------- |
+| id                  | INTEGER | PK                             | Instance identifier                                        |
+| name                | TEXT    | UNIQUE per app logic           | Instance label                                             |
+| type                | TEXT    | Arr type enum                  | Sonarr/Radarr/Lidarr selection                             |
+| url                 | TEXT    | NOT NULL                       | Arr base URL                                               |
+| source              | TEXT    | `ui` or `env`                  | Origin of instance configuration                           |
+| api_key             | TEXT    | EMPTY STRING after cutover     | Not used for runtime reads/writes after encryption cutover |
+| api_key_fingerprint | TEXT    | UNIQUE, NOT NULL after cutover | Deterministic keyed fingerprint for duplicate checks       |
 
 **Indexes:**
 
@@ -180,6 +187,11 @@ Encrypted API key storage is a Phase 1 trust-foundation feature tracked in GitHu
 **Relationships:**
 
 - One credential row per Arr instance
+
+**Plaintext Behavior Status**
+
+- `arr_instances.api_key` is retained only for compatibility and is no longer populated with plaintext for normal create/update flows.
+- Runtime reads for authentication derive credentials from `arr_instance_credentials` only.
 
 ### API Design
 
@@ -251,7 +263,7 @@ Encrypted API key storage is a Phase 1 trust-foundation feature tracked in GitHu
 
 #### Files to Create
 
-- `packages/praxrr-app/src/lib/server/db/migrations/049_encrypt_arr_api_keys.ts`: schema migration and plaintext backfill.
+- `packages/praxrr-app/src/lib/server/db/migrations/20260221_encrypt_arr_api_keys.ts`: schema migration and plaintext backfill.
 - `packages/praxrr-app/src/lib/server/db/queries/arrInstanceCredentials.ts`: query helpers for encrypted credential rows.
 - `packages/praxrr-app/src/lib/server/utils/encryption/keys.ts`: key loading/versioning helper.
 - `packages/praxrr-app/src/lib/server/utils/encryption/arr-credentials.ts`: AES-GCM + HMAC utility.
@@ -267,6 +279,9 @@ Encrypted API key storage is a Phase 1 trust-foundation feature tracked in GitHu
 - `packages/praxrr-app/src/lib/server/rename/processor.ts`: client creation via decrypt helper.
 - `packages/praxrr-app/src/lib/server/upgrades/processor.ts`: client creation via decrypt helper.
 - `packages/praxrr-app/src/routes/api/v1/arr/library/+server.ts`: remove direct plaintext key dependency.
+- `packages/praxrr-app/src/lib/server/jobs/handlers/arrSync.ts`: classify credential failures and disable instances.
+- `packages/praxrr-app/src/routes/api/v1/arr/releases/+server.ts`: remove direct plaintext key dependency.
+- `packages/praxrr-app/src/routes/api/v1/arr/cleanup/+server.ts`: remove direct plaintext key dependency.
 
 #### Configuration
 
@@ -320,39 +335,49 @@ Encrypted API key storage is a Phase 1 trust-foundation feature tracked in GitHu
 - **Optimistic Updates**: Avoid optimistic secret-state updates; wait for confirmed encrypted persistence.
 - **Error Feedback**: Immediate field and form-level feedback with actionable remediation steps.
 
-## Recommendations
+## Implementation Status (Current)
 
-### Implementation Approach
+The Arr API key encryption model is implemented in code, migrations, and route/runtime call paths.
 
-**Recommended Strategy**: Deliver encrypted Arr API key storage in phased cutover, starting with app-level field encryption and deterministic fingerprinting for parity with existing matching logic.
+- AES-GCM credential envelope storage is live in `arr_instance_credentials`.
+- JIT decrypt is enforced for runtime clients via `getArrInstanceClient()`.
+- Duplicate/env matching now uses deterministic fingerprints stored in `arr_instances.api_key_fingerprint`.
+- Write path is blocked for non-empty `arr_instances.api_key` after migration.
+- Startup validates credential key ring configuration before dependent services initialize.
 
-**Phasing:**
+### Key Management Contract
 
-1. **Phase 1 - Foundation**: Add crypto/key helpers, redaction guarantees, new credential table, and dual-write path.
-2. **Phase 2 - Core Cutover**: Backfill existing plaintext keys, switch duplicate/env logic to fingerprints, enforce encrypted-only writes.
-3. **Phase 3 - Hardening**: Add key rotation workflow, auditability, and extend pattern to other secret-bearing settings tables.
+- `ARR_CREDENTIAL_MASTER_KEY`: required 32-byte base64 key used for AES-GCM and HMAC derivation.
+- `ARR_CREDENTIAL_MASTER_KEY_VERSION`: required active version label used as source-of-truth key version.
+- `ARR_CREDENTIAL_PREVIOUS_KEYS`: optional JSON map of `{ "<version>": "<base64 key>" }` used only for decryption during rotations/restarts.
+- Invalid or missing key material is a hard error at startup and causes startup failure.
+- Runtime key import and fingerprint keys are cached per key version in memory until process restart.
 
-### Technology Decisions
+### Migration and Cutover Sequence (Finalized)
 
-| Decision                  | Recommendation                                 | Rationale                                                       |
-| ------------------------- | ---------------------------------------------- | --------------------------------------------------------------- |
-| Encryption scope (v1)     | Arr credentials first                          | Highest blast-radius reduction with focused migration scope     |
-| Crypto primitive          | AES-GCM + deterministic keyed HMAC fingerprint | Authenticated encryption with parity-friendly dedupe key        |
-| Key source baseline       | Environment/file-backed deployment secret      | Simple, portable default with optional external providers later |
-| External provider support | Optional adapter phase                         | Reduces first-cut complexity while preserving extension path    |
-| Full DB encryption        | Defer SQLCipher evaluation                     | Avoid immediate DB-engine migration overhead                    |
+1. `20260221_encrypt_arr_api_keys` migration adds credential schema and backfill state table.
+2. Backfill runs in configurable batches with checkpoints so reruns resume from the last cursor.
+3. Parity checks validate:
+   - every non-empty legacy row has a credential row,
+   - ciphertext decrypts back to the original key,
+   - `arr_instances.api_key_fingerprint` matches credential fingerprint.
+4. Migration enforces encrypted-only write behavior by:
+   - clearing stored `api_key` values for rows with credentials,
+   - installing `BEFORE INSERT/UPDATE` triggers that abort when `api_key` is non-empty.
+5. Duplicate/env lookup and conflict checks switch to fingerprint inputs.
 
-### Quick Wins
+### Decrypt Failure and Rotation Remediation
 
-- Centralize secret redaction helper and apply across logs/routes.
-- Ensure no API/UI response includes plaintext Arr keys.
-- Add startup warning for legacy plaintext state before cutover completion.
+- Arr client creation failures due to key material (`Unable to decrypt Arr API key`, `No Arr credentials found`, `No Arr credential key configured for version`) are surfaced as credential-availability errors.
+- Sync job path (`arrSync`) disables the affected instance when this occurs and returns a clear remediation action.
+- Operators should restore missing key material, rotate credentials in `/arr/[id]/settings` or env entries, then re-enable the instance.
+- Key rotation without full-table rewrite is handled by:
+  - reading legacy versions via `ARR_CREDENTIAL_PREVIOUS_KEYS`,
+  - re-saving/update flow with active version to re-encrypt in `arr_instance_credentials`.
 
-### Future Enhancements
+### Future Scope
 
-- External secret manager adapters (Vault/OpenBao/Infisical/1Password Connect).
-- Rotation reminders and staleness metadata.
-- Optional broader encrypted storage for `tmdb_settings`, `auth_settings`, and `ai_settings`.
+- Planned vNext work remains: secret manager adapters (Vault/OpenBao/Infisical/1Password Connect) and broader encrypted fields outside Arr instances.
 
 ## Risk Assessment
 
@@ -367,77 +392,15 @@ Encrypted API key storage is a Phase 1 trust-foundation feature tracked in GitHu
 
 ### Integration Challenges
 
-- Existing code paths directly reference `instance.api_key`; all Arr client creation sites must move to shared decrypt helper.
-- Environment reconciliation currently matches by plaintext key semantics; migration must preserve behavior via fingerprints.
-- Transitional period requires careful dual-read/write handling to avoid breaking running jobs.
+- Any remaining callsites that use persisted `instance.api_key` for authentication are now out of contract and should be corrected before release.
+- Arr env reconciliation and duplicate checks now operate on `api_key_fingerprint`; this must be kept consistent with `deriveArrInstanceApiKeyFingerprint` and write paths.
+- Rollouts should include a migration-monitoring checkpoint because failures are resumable and require operator-directed action.
 
 ### Security Considerations
 
 - Master keys must remain outside the DB and never be logged.
 - Plaintext secrets should exist only in request memory and immediate runtime call boundaries.
 - All error and telemetry paths must redact or omit secret values.
-
-## Task Breakdown Preview
-
-### Phase 1: Encryption Foundation
-
-**Focus**: Introduce crypto primitives and safe persistence scaffolding.
-**Tasks**:
-
-- Add encryption/key utilities and deterministic fingerprint helper.
-- Add credential table and migration scaffolding.
-- Implement dual-write in Arr instance create/update flows.
-- Add secret redaction coverage to logs/API payloads.
-  **Parallelization**: crypto helper + logging hardening can proceed while DB query layer is updated.
-
-### Phase 2: Arr Credential Cutover
-
-**Focus**: Migrate existing data and enforce encrypted-only semantics.
-**Dependencies**: Phase 1 complete and key configuration finalized.
-**Tasks**:
-
-- Run backfill for plaintext rows and verify row coverage.
-- Switch duplicate and env reconciliation logic to fingerprint lookups.
-- Update all runtime Arr client call sites to decrypt-on-demand helper.
-- Remove plaintext writes and block fallback paths.
-
-### Phase 3: Lifecycle Hardening
-
-**Focus**: Operational resiliency and broader rollout.
-**Tasks**:
-
-- Add key rotation/re-encryption workflow.
-- Expand pattern to other secret-bearing tables.
-- Add audit and operational observability around secret changes/failures.
-
-## Decisions Needed
-
-Before proceeding to implementation planning, clarify:
-
-1. **Key Management Baseline**
-   - Options: env var only, file mount (Docker secrets), optional external provider from day one
-   - Impact: operational complexity, reliability, and deployment portability
-   - Recommendation: file-mount/env baseline first, external provider adapters in follow-on phase
-
-2. **Migration Enforcement Timing**
-   - Options: immediate hard cutover after backfill, temporary dual-read grace window
-   - Impact: rollback safety versus security posture speed
-   - Recommendation: short, explicit dual-read window with hard deadline and telemetry
-
-3. **Fingerprint Algorithm Contract**
-   - Options: keyed HMAC-SHA256 vs non-keyed hash
-   - Impact: collision resistance and offline attack resistance for leaked DB data
-   - Recommendation: keyed HMAC-SHA256 tied to master key versioning
-
-4. **v1 Scope Boundaries**
-   - Options: Arr credentials only, all secret-bearing tables
-   - Impact: delivery speed versus immediate security coverage breadth
-   - Recommendation: Arr credentials in v1 with documented Phase 3 expansion path
-
-5. **Decryption Failure Behavior**
-   - Options: fail per operation, auto-disable instance with remediation prompt
-   - Impact: runtime safety and operator recovery clarity
-   - Recommendation: auto-disable affected instance and surface explicit recovery steps
 
 ## Research References
 

@@ -97,14 +97,10 @@ export class DelayProfileSyncer extends BaseSyncer {
       return null;
     }
 
-    const untaggedProfiles = profiles.filter(
-      (profile) => !Array.isArray(profile.tags) || profile.tags.length === 0
-    );
+    const untaggedProfiles = profiles.filter((profile) => !Array.isArray(profile.tags) || profile.tags.length === 0);
     const candidates = untaggedProfiles.length > 0 ? untaggedProfiles : profiles;
 
-    const defaultProfile = candidates.reduce((winner, current) =>
-      current.order < winner.order ? current : winner
-    );
+    const defaultProfile = candidates.reduce((winner, current) => (current.order < winner.order ? current : winner));
 
     return defaultProfile;
   }

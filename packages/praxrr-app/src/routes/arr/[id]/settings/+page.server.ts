@@ -1,10 +1,30 @@
-import { error, type ServerLoad } from '@sveltejs/kit';
-import { redirect, fail } from '@sveltejs/kit';
+import { error, fail, redirect, type ServerLoad } from '@sveltejs/kit';
 import type { Actions } from '@sveltejs/kit';
 import { arrInstancesQueries, type ArrInstance, type ArrInstanceSource } from '$db/queries/arrInstances.ts';
+import { arrInstanceCredentialsQueries } from '$db/queries/arrInstanceCredentials.ts';
 import { cleanupJobsForArrInstance } from '$lib/server/jobs/cleanup.ts';
 import { logger } from '$logger/logger.ts';
 import { parseOptionalAbsoluteHttpUrl } from '$utils/validation/url.ts';
+import { encryptArrInstanceApiKey } from '$server/utils/encryption/arr-credentials.ts';
+
+function getArrCredentialProcessingErrorMessage(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error);
+
+  if (
+    message.includes('ARR_CREDENTIAL_MASTER_KEY') ||
+    message.includes('No Arr credential key configured for version') ||
+    message.includes('Arr credential key version must be a non-empty value') ||
+    message.includes('Arr credential key version is required')
+  ) {
+    return 'ARR credential configuration is missing or invalid. Set ARR_CREDENTIAL_MASTER_KEY and ARR_CREDENTIAL_MASTER_KEY_VERSION, then retry.';
+  }
+
+  if (message.includes('Unable to decrypt Arr API key')) {
+    return 'Unable to process API key; key decryption failed. Verify Arr credential key settings and retry.';
+  }
+
+  return 'Failed to process API key';
+}
 
 export const load: ServerLoad = async ({ parent }) => {
   const parentData = await parent();
@@ -21,6 +41,7 @@ export const load: ServerLoad = async ({ parent }) => {
     instance: {
       ...instance,
       source,
+      api_key: '',
     },
     canEditCoreConnectionFields: source === 'ui',
   };
@@ -47,11 +68,12 @@ export const actions: Actions = {
     const formData = await request.formData();
     const name = isEnvManaged ? instance.name : formData.get('name')?.toString().trim();
     const url = isEnvManaged ? instance.url : formData.get('url')?.toString().trim();
-    const apiKey = isEnvManaged ? instance.api_key : formData.get('api_key')?.toString().trim();
+    const apiKey = formData.get('api_key')?.toString().trim() ?? '';
     const rawExternalUrl = formData.get('external_url')?.toString();
     const externalUrl = parseOptionalAbsoluteHttpUrl(rawExternalUrl);
     const tagsJson = formData.get('tags')?.toString() || '';
     const enabled = formData.get('enabled')?.toString() === '1';
+    let encryptedApiKey: Awaited<ReturnType<typeof encryptArrInstanceApiKey>> | undefined;
 
     // Validate required fields
     if (!name) {
@@ -62,7 +84,7 @@ export const actions: Actions = {
       return fail(400, { error: 'URL is required' });
     }
 
-    if (!apiKey) {
+    if (!isEnvManaged && !apiKey) {
       return fail(400, { error: 'API Key is required' });
     }
 
@@ -76,8 +98,28 @@ export const actions: Actions = {
     }
 
     // Check if API key already exists (each Arr instance has a unique API key)
-    if (arrInstancesQueries.apiKeyExists(apiKey, id)) {
-      return fail(400, { error: 'This instance is already connected' });
+    let apiKeyFingerprint: { keyVersion: string; value: string } | undefined;
+    try {
+      if (!isEnvManaged) {
+        encryptedApiKey = await encryptArrInstanceApiKey(apiKey);
+        apiKeyFingerprint = encryptedApiKey.fingerprint;
+      }
+    } catch (error) {
+      await logger.error('Failed to process arr api key', {
+        source: 'arr/[id]/settings',
+        meta: { error: error instanceof Error ? error.message : String(error) },
+      });
+
+      return fail(500, {
+        error: getArrCredentialProcessingErrorMessage(error),
+      });
+    }
+
+    if (!isEnvManaged && apiKeyFingerprint) {
+      const matchedCredential = arrInstanceCredentialsQueries.getByFingerprint(apiKeyFingerprint.value);
+      if (matchedCredential && matchedCredential.instance_id !== id) {
+        return fail(400, { error: 'This instance is already connected' });
+      }
     }
 
     // Parse tags
@@ -91,14 +133,29 @@ export const actions: Actions = {
     }
 
     try {
-      arrInstancesQueries.update(id, {
-        name,
-        url,
-        externalUrl: externalUrl.value,
-        apiKey,
-        tags,
-        enabled,
-      });
+      const updated = arrInstancesQueries.update(
+        id,
+        {
+          name,
+          url,
+          externalUrl: externalUrl.value,
+          apiKey: isEnvManaged ? undefined : apiKey,
+          tags,
+          enabled,
+        },
+        encryptedApiKey
+          ? {
+              ciphertext: encryptedApiKey.credential.ciphertext,
+              nonce: encryptedApiKey.credential.nonce,
+              keyVersion: encryptedApiKey.credential.keyVersion,
+              fingerprint: encryptedApiKey.fingerprint.value,
+            }
+          : undefined
+      );
+
+      if (!updated) {
+        throw new Error('Failed to update arr instance');
+      }
 
       await logger.info(`Updated arr instance: ${name}`, {
         source: 'arr/[id]/settings',
