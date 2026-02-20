@@ -44,23 +44,23 @@ jobs:
           if [ "${DRY_RUN}" = "true" ]; then
             TARGET_BRANCH="dry-run/schema/${GITHUB_RUN_ID}"
             TARGET_REF="refs/heads/${TARGET_BRANCH}"
-            TARGET_AUX_REF=""
+            TARGET_AUX_REFS=""
             IS_RELEASE_TAG="false"
           elif [[ "${GITHUB_REF}" == "refs/heads/v2" ]]; then
             TARGET_BRANCH="v2"
             TARGET_REF="refs/heads/v2"
-            TARGET_AUX_REF="refs/tags/develop"
+            TARGET_AUX_REFS="refs/heads/develop,refs/tags/develop"
             IS_RELEASE_TAG="false"
           elif [[ "${GITHUB_REF}" == "refs/heads/dev" ]]; then
             TARGET_BRANCH="dev"
             TARGET_REF="refs/heads/dev"
-            TARGET_AUX_REF="refs/tags/testing"
+            TARGET_AUX_REFS="refs/heads/testing,refs/tags/testing"
             IS_RELEASE_TAG="false"
           elif [[ "${GITHUB_REF}" == refs/tags/schema/* ]]; then
             TARGET_BRANCH=""
             TAG_NAME="${GITHUB_REF#refs/tags/schema/}"
             TARGET_REF="refs/tags/${TAG_NAME}"
-            TARGET_AUX_REF=""
+            TARGET_AUX_REFS=""
             IS_RELEASE_TAG="true"
           elif [[ "${GITHUB_REF}" == refs/tags/* ]]; then
             echo "::error::Unsupported tag ref for schema publish: ${GITHUB_REF}"
@@ -123,8 +123,15 @@ jobs:
           }
 
           attempt_push "${TARGET_REF}"
-          if [[ -n "${TARGET_AUX_REF}" ]]; then
-            attempt_push "${TARGET_AUX_REF}"
+
+          if [ -n "${TARGET_AUX_REFS}" ]; then
+            IFS=',' read -r -a TARGET_AUX_REF_LIST <<< "${TARGET_AUX_REFS}"
+            for TARGET_AUX_REF in "${TARGET_AUX_REF_LIST[@]}"; do
+              if [[ -z "${TARGET_AUX_REF}" ]]; then
+                continue
+              fi
+              attempt_push "${TARGET_AUX_REF}"
+            done
           fi
 
           if [[ "${IS_RELEASE_TAG}" == "true" ]]; then
