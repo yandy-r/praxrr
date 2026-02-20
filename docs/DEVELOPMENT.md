@@ -1,5 +1,23 @@
 # Development
 
+## Navigation
+
+- [Project README](../README.md) - product overview and setup.
+- [Contributing Guide](CONTRIBUTING.md) - local contributor quickstart and daily commands.
+- [Architecture Guide](ARCHITECTURE.md) - system modules and runtime data flow.
+- [OpenAPI Source](api/v1/openapi.yaml) - canonical `/api/v1` API contract.
+
+## Setup
+
+- Use the local setup in [docs/CONTRIBUTING.md](CONTRIBUTING.md).
+- Default workflow targets the `main` branch plus short-lived feature branches.
+
+## Usage
+
+- Use the commands in this guide for branching, tagging, and releases.
+- Use `deno task dev`, `deno task lint`, `deno task check`, and `deno task test` during feature
+  development before release tagging.
+
 ## Branching Strategy
 
 Praxrr uses **GitHub Flow** with **Release Channels**.
@@ -115,24 +133,4 @@ git commit -m "fix: critical issue"
 git push
 git tag v2.1.1
 git push --tags
-```
-
-## Task 3.3 Documentation Verification
-
-- Confirm env-instance semantics and verification commands are present:
-
-```bash
-rg -n "Env-instance operational model|source='env'|orphan|PRAXRR_VALIDATE_INSTANCES|Task 3.3" docs/plans/initiate-apps/feature-spec.md
-```
-
-- Confirm docs include startup and logging expectations aligned with implementation:
-
-```bash
-rg -n "reconcileEnvInstances|source: 'Setup'|enabled=0|API key|RADARR_INSTANCE_|SONARR_INSTANCE_|LIDARR_INSTANCE_" docs/plans/initiate-apps/feature-spec.md
-```
-
-- Validate the new task alias referenced by docs:
-
-```bash
-deno task test env-instances
 ```

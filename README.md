@@ -75,6 +75,12 @@ API access via `X-Api-Key` header or `?apikey=` query param. See
 
 ## Documentation
 
+- [Architecture Guide](docs/ARCHITECTURE.md)
+- [Contributing Guide](docs/CONTRIBUTING.md)
+- [Development and Release Guide](docs/DEVELOPMENT.md)
+- [API v1 OpenAPI Spec](docs/api/v1/openapi.yaml)
+- [Documentation Strategy Plan](docs/plans/documentation-strategy.md)
+
 ## Getting Started
 
 ### Production
@@ -127,6 +133,14 @@ deno task dev
 This runs the parser service and Vite dev server concurrently. See
 [CONTRIBUTING.md](docs/CONTRIBUTING.md) for architecture documentation.
 
+## Usage
+
+1. Link a Praxrr Compliant Database (PCD) repository.
+2. Bridge Radarr, Sonarr, and Lidarr instances.
+3. Sync configuration changes from Praxrr to connected Arr instances.
+4. Use [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)
+   for deeper implementation and release details.
+
 ### Environment Variables
 
 | Variable                            | Default                                | Description                                                                          |
@@ -145,9 +159,9 @@ This runs the parser service and Vite dev server concurrently. See
 | `PRAXRR_DEFAULT_DB_GIT_USERNAME`    | `your_username`                        | Default database Git username                                                        |
 | `PRAXRR_DEFAULT_DB_GIT_EMAIL`       | `your_email`                           | Default database Git email                                                           |
 | `PRAXRR_DEFAULT_DB_URL`             | `https://github.com/yandy-r/praxrr-db` | Default PCD auto-link repository URL                                                 |
-| `PRAXRR_DEFAULT_DB_BRANCH`          | `v2`                                   | Default PCD auto-link branch                                                         |
+| `PRAXRR_DEFAULT_DB_BRANCH`          | `v2`                                   | Default PCD auto-link branch. You can also use `latest` to track the mirror tag.     |
 | `PRAXRR_DEFAULT_DB_NAME`            | `Praxrr-DB`                            | Default PCD display name                                                             |
-| `PRAXRR_SCHEMA_REF`                 | manifest value                         | Override schema dependency ref (tag or branch, e.g. `v2`, `dev`, `1.0.0`)            |
+| `PRAXRR_SCHEMA_REF`                 | manifest value                         | Override schema dependency ref (tag or branch, e.g. `v2`, `dev`, `latest`, `1.0.0`)  |
 | `PRAXRR_VALIDATE_INSTANCES`         | `false`                                | Validate env-managed instances against Arr API during startup (optional).            |
 | `ARR_CREDENTIAL_MASTER_KEY`         | _required for Arr access_              | Base64-encoded 32-byte master key for AES-GCM encryption and HMAC fingerprinting     |
 | `ARR_CREDENTIAL_MASTER_KEY_VERSION` | _required for Arr access_              | Version label for the active master key, used for encryption and lookup              |
@@ -216,6 +230,8 @@ services:
       - LIDARR_INSTANCE_URL_1=http://lidarr:8686
       - LIDARR_INSTANCE_API_KEY_1=REDACTED
       - LIDARR_INSTANCE_NAME_1=Music
+      - PRAXRR_DEFAULT_DB_BRANCH=latest
+      - PRAXRR_SCHEMA_REF=latest
       - PRAXRR_VALIDATE_INSTANCES=false
 ```
 

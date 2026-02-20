@@ -25,6 +25,7 @@ EntityType:
     - sonarr_media_settings
     - radarr_quality_definitions
     - sonarr_quality_definitions
+    - lidarr_metadata_profile
     - lidarr_naming
     - lidarr_media_settings
     - lidarr_quality_definitions
@@ -52,6 +53,7 @@ ExportResponse:
         - `lidarr_media_settings` → PortableLidarrMediaSettings
         - `radarr_quality_definitions` → PortableQualityDefinitions
         - `sonarr_quality_definitions` → PortableQualityDefinitions
+        - `lidarr_metadata_profile` → PortableLidarrMetadataProfile
         - `lidarr_quality_definitions` → PortableLidarrQualityDefinitions
 
         `lidarr_*` payloads are validated against strict allowlists so mixed
@@ -67,6 +69,7 @@ ExportResponse:
         - $ref: '#/PortableMediaSettings'
         - $ref: '#/PortableLidarrMediaSettings'
         - $ref: '#/PortableQualityDefinitions'
+        - $ref: '#/PortableLidarrMetadataProfile'
         - $ref: '#/PortableLidarrQualityDefinitions'
 
 ImportRequest:
@@ -102,6 +105,7 @@ ImportRequest:
         - $ref: '#/PortableMediaSettings'
         - $ref: '#/PortableLidarrMediaSettings'
         - $ref: '#/PortableQualityDefinitions'
+        - $ref: '#/PortableLidarrMetadataProfile'
         - $ref: '#/PortableLidarrQualityDefinitions'
 
 ImportResponse:
@@ -286,6 +290,47 @@ PortableQualityProfile:
       type: array
       items:
         $ref: '#/PortableCustomFormatScore'
+
+PortableMetadataProfileType:
+  type: object
+  required:
+    - id
+    - name
+    - allowed
+  properties:
+    id:
+      type: integer
+    name:
+      type: string
+    allowed:
+      type: boolean
+
+PortableLidarrMetadataProfile:
+  type: object
+  required:
+    - name
+    - description
+    - primaryTypes
+    - secondaryTypes
+    - releaseStatuses
+  properties:
+    name:
+      type: string
+    description:
+      type: string
+      nullable: true
+    primaryTypes:
+      type: array
+      items:
+        $ref: '#/PortableMetadataProfileType'
+    secondaryTypes:
+      type: array
+      items:
+        $ref: '#/PortableMetadataProfileType'
+    releaseStatuses:
+      type: array
+      items:
+        $ref: '#/PortableMetadataProfileType'
 
 PortableRadarrNaming:
   type: object
