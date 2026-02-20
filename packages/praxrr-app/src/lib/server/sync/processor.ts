@@ -130,7 +130,13 @@ async function processInstanceSections(
     instanceName: instance.name,
   };
 
-  const client = await getArrInstanceClient(instance.type as ArrType, instance.id, instance.url, undefined, clientCache);
+  const client = await getArrInstanceClient(
+    instance.type as ArrType,
+    instance.id,
+    instance.url,
+    undefined,
+    clientCache
+  );
 
   // Process sections sequentially (quality profiles depend on custom formats being synced first)
   for (const sectionType of sectionTypes) {
@@ -247,8 +253,7 @@ export async function processPendingSyncs(): Promise<ProcessSyncsResult> {
   // Process instances in parallel with concurrency limit
   const results = await processBatches(
     instanceTasks,
-    ({ instance, sectionTypes, clientCache }) =>
-      processInstanceSections(instance, sectionTypes, clientCache),
+    ({ instance, sectionTypes, clientCache }) => processInstanceSections(instance, sectionTypes, clientCache),
     CONCURRENCY_LIMIT
   );
 

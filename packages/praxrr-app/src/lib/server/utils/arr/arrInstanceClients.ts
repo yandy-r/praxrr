@@ -56,7 +56,7 @@ export async function getArrInstanceClient(
   instanceId: number,
   url: string,
   options?: ArrClientOptions,
-  cache?: ArrInstanceClientCache,
+  cache?: ArrInstanceClientCache
 ): Promise<BaseArrClient> {
   const credentials = arrInstanceCredentialsQueries.getByInstanceId(instanceId);
   if (!credentials) {

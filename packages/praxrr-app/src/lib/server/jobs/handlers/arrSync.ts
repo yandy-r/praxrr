@@ -64,7 +64,10 @@ function getArrClientFailureMessage(message: string): string {
     return 'Arr credentials are not readable. Check Arr credential key configuration and recreate the API key.';
   }
 
-  if (message.includes('No Arr credential key configured for version') || message.includes('ARR_CREDENTIAL_MASTER_KEY')) {
+  if (
+    message.includes('No Arr credential key configured for version') ||
+    message.includes('ARR_CREDENTIAL_MASTER_KEY')
+  ) {
     return 'Arr master key configuration is invalid or incomplete. Update ARR_CREDENTIAL_MASTER_KEY settings and retry.';
   }
 
