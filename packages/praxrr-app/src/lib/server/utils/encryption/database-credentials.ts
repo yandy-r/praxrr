@@ -1,7 +1,4 @@
-import {
-  decryptArrInstanceApiKey,
-  encryptArrInstanceApiKey,
-} from '$server/utils/encryption/arr-credentials.ts';
+import { decryptArrInstanceApiKey, encryptArrInstanceApiKey } from '$server/utils/encryption/arr-credentials.ts';
 import { databaseInstanceCredentialsQueries } from '$db/queries/databaseInstanceCredentials.ts';
 import { db } from '$db/db.ts';
 

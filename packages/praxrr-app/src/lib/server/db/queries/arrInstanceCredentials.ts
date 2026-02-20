@@ -57,6 +57,17 @@ export const arrInstanceCredentialsQueries = {
     );
   },
 
+  getByAnyFingerprint(fingerprints: string[]): ArrInstanceCredential | undefined {
+    if (fingerprints.length === 0) {
+      return undefined;
+    }
+    const placeholders = fingerprints.map(() => '?').join(', ');
+    return db.queryFirst<ArrInstanceCredential>(
+      `SELECT * FROM arr_instance_credentials WHERE fingerprint IN (${placeholders}) LIMIT 1`,
+      ...fingerprints
+    );
+  },
+
   upsert(input: CreateArrInstanceCredentialInput): void {
     db.execute(
       `INSERT INTO arr_instance_credentials (instance_id, ciphertext, nonce, key_version, fingerprint)

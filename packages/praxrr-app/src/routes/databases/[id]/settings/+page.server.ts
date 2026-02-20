@@ -203,23 +203,26 @@ export const actions: Actions = {
       }
 
       // Update the database
-      const updated = databaseInstancesQueries.update(id, {
-        name,
-        syncStrategy,
-        autoPull,
-        personalAccessToken,
-        localOpsEnabled,
-        gitUserName,
-        gitUserEmail,
-        conflictStrategy,
-      },
-      encryptedPersonalAccessToken
-        ? {
-            ciphertext: encryptedPersonalAccessToken.credential.ciphertext,
-            nonce: encryptedPersonalAccessToken.credential.nonce,
-            keyVersion: encryptedPersonalAccessToken.credential.keyVersion,
-          }
-        : undefined);
+      const updated = databaseInstancesQueries.update(
+        id,
+        {
+          name,
+          syncStrategy,
+          autoPull,
+          personalAccessToken,
+          localOpsEnabled,
+          gitUserName,
+          gitUserEmail,
+          conflictStrategy,
+        },
+        encryptedPersonalAccessToken
+          ? {
+              ciphertext: encryptedPersonalAccessToken.credential.ciphertext,
+              nonce: encryptedPersonalAccessToken.credential.nonce,
+              keyVersion: encryptedPersonalAccessToken.credential.keyVersion,
+            }
+          : undefined
+      );
 
       if (!updated) {
         throw new Error('Update returned false');
@@ -240,7 +243,10 @@ export const actions: Actions = {
       });
 
       return fail(500, {
-        error: personalAccessToken !== undefined ? getDatabaseCredentialProcessingErrorMessage(err) : 'Failed to update database',
+        error:
+          personalAccessToken !== undefined
+            ? getDatabaseCredentialProcessingErrorMessage(err)
+            : 'Failed to update database',
         values: { name },
       });
     }

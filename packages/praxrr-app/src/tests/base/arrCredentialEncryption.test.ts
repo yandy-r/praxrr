@@ -7,9 +7,15 @@ import {
   deriveArrInstanceApiKeyFingerprint,
   encryptArrInstanceApiKey,
 } from '../../lib/server/utils/encryption/arr-credentials.ts';
+import {
+  getAllArrCredentialKeyVersions,
+  __resetArrCredentialKeyRingForTest,
+} from '../../lib/server/utils/encryption/keys.ts';
 
 const TEST_ARR_MASTER_KEY = 'AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=';
 const TEST_ARR_MASTER_KEY_VERSION = 'v-task-3-2';
+// 32-byte key (44 chars with padding); must differ from TEST_ARR_MASTER_KEY
+const TEST_ARR_PREVIOUS_KEY_V2 = 'CQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=';
 
 type Restore = () => void;
 
@@ -70,6 +76,63 @@ function patchTarget<T extends object, K extends keyof T>(
     target[key] = original;
   });
 }
+
+Deno.test('getAllArrCredentialKeyVersions returns at least the active version', async () => {
+  await withArrCredentialConfig(async () => {
+    const versions = getAllArrCredentialKeyVersions();
+    assertEquals(versions.length >= 1, true);
+    assertEquals(versions.includes(TEST_ARR_MASTER_KEY_VERSION), true);
+  });
+});
+
+Deno.test('getByAnyFingerprint with empty array returns undefined', () => {
+  assertEquals(arrInstanceCredentialsQueries.getByAnyFingerprint([]), undefined);
+});
+
+Deno.test(
+  'getAllArrCredentialKeyVersions returns both active and previous versions; same plaintext yields different fingerprints per version',
+  async () => {
+    const mutableConfig = config as unknown as MutableConfig;
+    const originalMasterKey = mutableConfig.arrCredentialMasterKey;
+    const originalKeyVersion = mutableConfig.arrCredentialMasterKeyVersion;
+    const originalPreviousKeys = mutableConfig.arrCredentialPreviousKeys;
+    const originalEnvKey = Deno.env.get('ARR_CREDENTIAL_MASTER_KEY');
+    const originalEnvVersion = Deno.env.get('ARR_CREDENTIAL_MASTER_KEY_VERSION');
+    const originalEnvPrevious = Deno.env.get('ARR_CREDENTIAL_PREVIOUS_KEYS');
+
+    __resetArrCredentialKeyRingForTest();
+    mutableConfig.arrCredentialMasterKey = TEST_ARR_MASTER_KEY;
+    mutableConfig.arrCredentialMasterKeyVersion = TEST_ARR_MASTER_KEY_VERSION;
+    const previousKeysJson = JSON.stringify({ v2: TEST_ARR_PREVIOUS_KEY_V2 });
+    mutableConfig.arrCredentialPreviousKeys = previousKeysJson;
+    Deno.env.set('ARR_CREDENTIAL_MASTER_KEY', TEST_ARR_MASTER_KEY);
+    Deno.env.set('ARR_CREDENTIAL_MASTER_KEY_VERSION', TEST_ARR_MASTER_KEY_VERSION);
+    Deno.env.set('ARR_CREDENTIAL_PREVIOUS_KEYS', previousKeysJson);
+
+    try {
+      const versions = getAllArrCredentialKeyVersions();
+      assertEquals(versions.length, 2);
+      assertEquals(versions.includes(TEST_ARR_MASTER_KEY_VERSION), true);
+      assertEquals(versions.includes('v2'), true);
+
+      const plaintext = 'same-api-key-across-versions';
+      const fpActive = await deriveArrInstanceApiKeyFingerprint(plaintext, TEST_ARR_MASTER_KEY_VERSION);
+      const fpV2 = await deriveArrInstanceApiKeyFingerprint(plaintext, 'v2');
+      assertEquals(fpActive.value !== fpV2.value, true);
+    } finally {
+      mutableConfig.arrCredentialMasterKey = originalMasterKey;
+      mutableConfig.arrCredentialMasterKeyVersion = originalKeyVersion;
+      mutableConfig.arrCredentialPreviousKeys = originalPreviousKeys;
+      if (originalEnvKey === undefined) Deno.env.delete('ARR_CREDENTIAL_MASTER_KEY');
+      else Deno.env.set('ARR_CREDENTIAL_MASTER_KEY', originalEnvKey);
+      if (originalEnvVersion === undefined) Deno.env.delete('ARR_CREDENTIAL_MASTER_KEY_VERSION');
+      else Deno.env.set('ARR_CREDENTIAL_MASTER_KEY_VERSION', originalEnvVersion);
+      if (originalEnvPrevious === undefined) Deno.env.delete('ARR_CREDENTIAL_PREVIOUS_KEYS');
+      else Deno.env.set('ARR_CREDENTIAL_PREVIOUS_KEYS', originalEnvPrevious);
+      __resetArrCredentialKeyRingForTest();
+    }
+  }
+);
 
 Deno.test('deriveArrInstanceApiKeyFingerprint is deterministic for same input', async () => {
   const first = await withArrCredentialConfig(() => deriveArrInstanceApiKeyFingerprint('same-key-123'));
@@ -176,9 +239,8 @@ Deno.test(
       assertEquals(id, 88);
       assertEquals(executeCalls.length, 1);
       assertEquals(executedSql[0].includes('INSERT INTO arr_instances'), true);
-      assertEquals(executeCalls[0][4], encrypted.credential.ciphertext);
+      assertEquals(executeCalls[0][4], '');
       assertEquals(executeCalls[0][5], encrypted.fingerprint.value);
-      assertEquals(executeCalls[0][4], encrypted.credential.ciphertext);
       assertEquals(executeCalls[0][4] === plainApiKey, false);
       assertEquals(credentialCreated, true);
     } finally {

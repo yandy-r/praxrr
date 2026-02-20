@@ -226,19 +226,9 @@ class ArrCredentialRedactionRoutesTest extends BaseTest {
       this.restoreStack
     );
 
-    this.installPatch(
-      sessionsQueries,
-      'getByUserId',
-      () => [],
-      this.restoreStack
-    );
+    this.installPatch(sessionsQueries, 'getByUserId', () => [], this.restoreStack);
 
-    this.installPatch(
-      authSettingsQueries,
-      'getApiKey',
-      () => apiKey,
-      this.restoreStack
-    );
+    this.installPatch(authSettingsQueries, 'getApiKey', () => apiKey, this.restoreStack);
   }
 
   private patchArrCredentialDecryptor(): void {

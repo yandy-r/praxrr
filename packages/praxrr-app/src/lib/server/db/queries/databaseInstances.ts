@@ -249,7 +249,11 @@ export const databaseInstancesQueries = {
   /**
    * Update a database instance
    */
-  update(id: number, input: UpdateDatabaseInstanceInput, credentialInput?: DatabaseInstanceCredentialWriteInput): boolean {
+  update(
+    id: number,
+    input: UpdateDatabaseInstanceInput,
+    credentialInput?: DatabaseInstanceCredentialWriteInput
+  ): boolean {
     const useCredentialTable = supportsDatabaseInstanceCredentials();
     const updates: string[] = [];
     const params: (string | number | null)[] = [];

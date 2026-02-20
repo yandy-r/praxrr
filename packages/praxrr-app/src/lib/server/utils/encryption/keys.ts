@@ -189,6 +189,18 @@ export function getActiveArrCredentialKeyVersion(): ArrCredentialKeyVersion {
   return getOrInitKeyRing().activeVersion;
 }
 
+export function getAllArrCredentialKeyVersions(): ArrCredentialKeyVersion[] {
+  return Array.from(getOrInitKeyRing().configuredKeys.keys());
+}
+
+/**
+ * Reset the key ring cache. For test use only; allows re-initializing with different config (e.g. previous keys).
+ */
+export function __resetArrCredentialKeyRingForTest(): void {
+  keyRing = null;
+  keyRingInitializationError = null;
+}
+
 export async function getArrCredentialEncryptionKey(version?: ArrCredentialKeyVersion): Promise<CryptoKey> {
   const keyVersion = normalizeVersion(version ?? getActiveArrCredentialKeyVersion());
   const ring = getOrInitKeyRing();

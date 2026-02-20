@@ -66,27 +66,29 @@ class PCDManager {
       }
 
       // Insert into database
-      const id = databaseInstancesQueries.create({
-        uuid,
-        name: options.name,
-        repositoryUrl: options.repositoryUrl,
-        localPath,
-        syncStrategy: options.syncStrategy,
-        autoPull: options.autoPull,
-        personalAccessToken: options.personalAccessToken,
-        isPrivate,
-        localOpsEnabled: options.localOpsEnabled,
-        gitUserName: options.gitUserName,
-        gitUserEmail: options.gitUserEmail,
-        conflictStrategy: options.conflictStrategy as 'override' | 'align' | 'ask' | undefined,
-      },
-      encryptedPersonalAccessToken
-        ? {
-            ciphertext: encryptedPersonalAccessToken.credential.ciphertext,
-            nonce: encryptedPersonalAccessToken.credential.nonce,
-            keyVersion: encryptedPersonalAccessToken.credential.keyVersion,
-          }
-        : undefined);
+      const id = databaseInstancesQueries.create(
+        {
+          uuid,
+          name: options.name,
+          repositoryUrl: options.repositoryUrl,
+          localPath,
+          syncStrategy: options.syncStrategy,
+          autoPull: options.autoPull,
+          personalAccessToken: options.personalAccessToken,
+          isPrivate,
+          localOpsEnabled: options.localOpsEnabled,
+          gitUserName: options.gitUserName,
+          gitUserEmail: options.gitUserEmail,
+          conflictStrategy: options.conflictStrategy as 'override' | 'align' | 'ask' | undefined,
+        },
+        encryptedPersonalAccessToken
+          ? {
+              ciphertext: encryptedPersonalAccessToken.credential.ciphertext,
+              nonce: encryptedPersonalAccessToken.credential.nonce,
+              keyVersion: encryptedPersonalAccessToken.credential.keyVersion,
+            }
+          : undefined
+      );
 
       // Get and return the created instance
       const instance = databaseInstancesQueries.getById(id);

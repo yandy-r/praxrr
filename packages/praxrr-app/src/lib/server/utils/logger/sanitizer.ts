@@ -1,4 +1,4 @@
-const REDACTED_VALUE = "[REDACTED]";
+const REDACTED_VALUE = '[REDACTED]';
 
 const SENSITIVE_KEY_PATTERNS = [
   /api[-_]key/i,
@@ -26,7 +26,7 @@ function sanitizeStringValue(value: string): string {
 }
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
-  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
     return false;
   }
 
@@ -34,22 +34,21 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
   return prototype === Object.prototype || prototype === null;
 }
 
-function sanitizeLogMetaInternal(
-  value: unknown,
-  seen: WeakSet<object>,
-): unknown {
+function sanitizeLogMetaInternal(value: unknown, seen: WeakSet<object>): unknown {
   if (value === null || value === undefined) {
     return value;
   }
 
-  if (typeof value === "string") {
+  if (typeof value === 'string') {
     return sanitizeStringValue(value);
   }
 
   if (
-    typeof value === "number" || typeof value === "boolean" ||
-    typeof value === "bigint" || typeof value === "symbol" ||
-    typeof value === "function"
+    typeof value === 'number' ||
+    typeof value === 'boolean' ||
+    typeof value === 'bigint' ||
+    typeof value === 'symbol' ||
+    typeof value === 'function'
   ) {
     return value;
   }
@@ -75,9 +74,7 @@ function sanitizeLogMetaInternal(
 
   for (const [key, nestedValue] of Object.entries(value)) {
     if (SENSITIVE_KEY_PATTERNS.some((pattern) => pattern.test(key))) {
-      sanitizedMeta[key] = typeof nestedValue === "string"
-        ? sanitizeStringValue(nestedValue)
-        : REDACTED_VALUE;
+      sanitizedMeta[key] = typeof nestedValue === 'string' ? sanitizeStringValue(nestedValue) : REDACTED_VALUE;
     } else {
       sanitizedMeta[key] = sanitizeLogMetaInternal(nestedValue, seen);
     }

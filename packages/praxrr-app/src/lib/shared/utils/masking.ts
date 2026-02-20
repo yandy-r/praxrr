@@ -1,4 +1,4 @@
-const MASK_CHARACTER = "•";
+const MASK_CHARACTER = '•';
 const MASK_LENGTH = 8;
 
 /**
@@ -9,12 +9,9 @@ const MASK_LENGTH = 8;
  * @param visibleChars - Number of trailing characters to show
  * @returns Masked key in deterministic "••••••••{lastN}" form
  */
-export function maskApiKey(
-  key: string | null | undefined,
-  visibleChars = 4,
-): string {
+export function maskApiKey(key: string | null | undefined, visibleChars = 4): string {
   if (!key) {
-    return "";
+    return '';
   }
 
   if (key.length <= visibleChars + 3) {

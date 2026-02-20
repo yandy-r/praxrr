@@ -199,7 +199,7 @@ export const actions: Actions = {
     const enabled = formData.get('enabled') === 'on';
     const apiUrl = formData.get('api_url') as string;
     const apiKeyInput = (formData.get('api_key') as string | null) ?? '';
-    const apiKey = apiKeyInput.length > 0 ? apiKeyInput : undefined;
+    const apiKey = apiKeyInput;
     const model = formData.get('model') as string;
 
     // Validate
@@ -278,7 +278,7 @@ export const actions: Actions = {
 
     // Parse form data
     const apiKeyInput = (formData.get('api_key') as string | null) ?? '';
-    const apiKey = apiKeyInput.length > 0 ? apiKeyInput : undefined;
+    const apiKey = apiKeyInput;
 
     // Update settings
     const updated = tmdbSettingsQueries.update({
