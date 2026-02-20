@@ -1,7 +1,6 @@
 <script lang="ts">
   import { resolve } from '$app/paths';
   import { ExternalLink, Trash2 } from 'lucide-svelte';
-  import { SvelteSet } from 'svelte/reactivity';
   import Badge from '$ui/badge/Badge.svelte';
   import type { ArrInstance } from '$db/queries/arrInstances.ts';
   import type { ArrIconKey } from '$shared/arr/capabilities.ts';
@@ -9,6 +8,7 @@
   import { resolveInstanceBrowserUrl } from '$shared/arr/instanceUrl.ts';
   import radarrLogo from '$lib/client/assets/Radarr.svg';
   import sonarrLogo from '$lib/client/assets/Sonarr.svg';
+  import lidarrLogo from '$lib/client/assets/Lidarr.png';
   import { createEventDispatcher } from 'svelte';
 
   export let instances: ArrInstance[];
@@ -17,12 +17,10 @@
     delete: ArrInstance;
   }>();
 
-  // Available logo assets keyed by ArrIconKey.
-  // Apps without a logo asset (e.g. Lidarr) fall back to the initial-letter
-  // display in the template, driven by capability metadata.
   const logoAssets: Record<string, string> = {
     radarr: radarrLogo,
     sonarr: sonarrLogo,
+    lidarr: lidarrLogo,
   };
 
   // Build logo lookup from registered Arr app types so every app in
@@ -30,9 +28,6 @@
   const logos: Partial<Record<ArrIconKey, string>> = Object.fromEntries(
     ARR_APP_TYPES.map((type) => [type, logoAssets[type]])
   ) as Partial<Record<ArrIconKey, string>>;
-
-  // Track loaded images
-  let loadedImages = new SvelteSet<number>();
 
   function formatType(type: string): string {
     return type.charAt(0).toUpperCase() + type.slice(1);
@@ -58,10 +53,6 @@
 
   function getAppInitial(type: string): string {
     return getAppLabel(type).slice(0, 1).toUpperCase();
-  }
-
-  function handleImageLoad(id: number) {
-    loadedImages.add(id);
   }
 
   // Handle delete click
@@ -90,25 +81,15 @@
     >
       <!-- Left: Logo + Name -->
       <div class="flex min-w-0 flex-1 items-center gap-3">
-        <div class="relative h-10 w-10 flex-shrink-0">
-          {#if logoPath}
-            {#if !loadedImages.has(instance.id)}
-              <div class="absolute inset-0 animate-pulse rounded-lg bg-neutral-200 dark:bg-neutral-700"></div>
-            {/if}
-            <img
-              src={logoPath}
-              alt={`${appLabel} logo`}
-              class="h-10 w-10 rounded-lg {loadedImages.has(instance.id) ? 'opacity-100' : 'opacity-0'}"
-              on:load={() => handleImageLoad(instance.id)}
-            />
-          {:else}
-            <div
-              class="flex h-10 w-10 items-center justify-center rounded-lg bg-neutral-100 text-xs font-semibold text-neutral-600 dark:bg-neutral-800 dark:text-neutral-200"
-            >
-              {getAppInitial(instance.type)}
-            </div>
-          {/if}
-        </div>
+        {#if logoPath}
+          <img src={logoPath} alt={`${appLabel} logo`} class="h-10 w-10 flex-shrink-0 rounded-lg" />
+        {:else}
+          <div
+            class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-neutral-100 text-xs font-semibold text-neutral-600 dark:bg-neutral-800 dark:text-neutral-200"
+          >
+            {getAppInitial(instance.type)}
+          </div>
+        {/if}
         <div class="min-w-0">
           <h3 class="truncate text-sm font-semibold text-neutral-900 dark:text-neutral-100">
             {instance.name}
