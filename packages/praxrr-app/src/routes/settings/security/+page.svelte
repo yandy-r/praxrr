@@ -2,10 +2,11 @@
 	import type { PageData, ActionData } from './$types';
 	import { enhance } from '$app/forms';
 	import { invalidateAll } from '$app/navigation';
-	import { Copy, RefreshCw, LogOut, Check, Globe, Monitor, Smartphone, Network, Clock } from 'lucide-svelte';
+	import { RefreshCw, LogOut, Check, Globe, Monitor, Smartphone, Network, Clock } from 'lucide-svelte';
 	import { parseUTC } from '$shared/utils/dates';
 	import Button from '$ui/button/Button.svelte';
 	import FormInput from '$ui/form/FormInput.svelte';
+	import MaskedApiKey from '$ui/form/MaskedApiKey.svelte';
 	import Table from '$ui/table/Table.svelte';
 	import TableActionButton from '$ui/table/TableActionButton.svelte';
 	import { alertStore } from '$alerts/store';
@@ -19,10 +20,24 @@
 	let newPassword = '';
 	let confirmPassword = '';
 
-	let showApiKey = false;
 	let regeneratingKey = false;
+	let revealInProgress = false;
+	let activeAuthApiKey = '';
+	let activeAuthApiKeySource: 'regenerate' | 'reveal' | null = null;
+	let remaskSession = 0;
+	let isAuthApiKeyUnmasked = false;
+	let copyAfterReveal = false;
+	let revealSubmitButton: HTMLButtonElement | null = null;
+	let autoHideTimer: ReturnType<typeof setTimeout> | null = null;
+	let revealRequestToken = 0;
+	let pendingRevealRequestToken = 0;
+	const authApiKeyRevealMs = 30_000;
+	$: hasStoredAuthKey = data.hasApiKey || Boolean(data.apiKeyMasked);
 
 	// Handle form responses
+	$: if (form?.apiKey) {
+		setActiveAuthApiKey(form.apiKey, 'regenerate');
+	}
 	$: if (form?.passwordSuccess) {
 		alertStore.add('success', 'Password changed successfully');
 		currentPassword = '';
@@ -45,14 +60,102 @@
 		alertStore.add('error', form.sessionError);
 	}
 
-	// Get API key from form response or data
-	$: apiKey = form?.apiKey ?? data.apiKey;
-
-	function copyApiKey() {
-		if (apiKey) {
-			navigator.clipboard.writeText(apiKey);
-			alertStore.add('success', 'API key copied to clipboard');
+	function clearAuthApiKeyAutoHide() {
+		if (autoHideTimer) {
+			clearTimeout(autoHideTimer);
+			autoHideTimer = null;
 		}
+	}
+
+	function resetRevealSession() {
+		revealRequestToken += 1;
+		revealInProgress = false;
+	}
+
+	function setActiveAuthApiKey(value: string, source: 'regenerate' | 'reveal') {
+		if (source === 'regenerate') {
+			resetRevealSession();
+		}
+
+		activeAuthApiKey = value;
+		activeAuthApiKeySource = value ? source : null;
+		isAuthApiKeyUnmasked = Boolean(value);
+		clearAuthApiKeyAutoHide();
+
+		if (isAuthApiKeyUnmasked) {
+			autoHideTimer = setTimeout(() => {
+				isAuthApiKeyUnmasked = false;
+				remaskSession += 1;
+			}, authApiKeyRevealMs);
+		}
+
+		remaskSession += 1;
+	}
+
+	function clearActiveAuthApiKey(preserveRegenerated = false) {
+		resetRevealSession();
+		clearAuthApiKeyAutoHide();
+		isAuthApiKeyUnmasked = false;
+
+		if (!preserveRegenerated || activeAuthApiKeySource !== 'regenerate') {
+			activeAuthApiKey = '';
+			activeAuthApiKeySource = null;
+		}
+
+		remaskSession += 1;
+	}
+
+	$: maskedApiKeyValue = isAuthApiKeyUnmasked && activeAuthApiKey ? activeAuthApiKey : data.apiKeyMasked;
+	$: plainApiKeyValue = isAuthApiKeyUnmasked ? activeAuthApiKey : '';
+
+	async function copyActiveAuthApiKey() {
+		if (!activeAuthApiKey) {
+			return;
+		}
+
+		try {
+			await navigator.clipboard.writeText(activeAuthApiKey);
+			alertStore.add('success', 'API key copied to clipboard');
+		} catch {
+			alertStore.add('error', 'Could not copy API key');
+		}
+	}
+
+	function requestRevealCopy(showError = false) {
+		if (!hasStoredAuthKey || !revealSubmitButton) {
+			if (showError) {
+				alertStore.add('error', 'Unable to retrieve API key');
+			}
+			return;
+		}
+
+		pendingRevealRequestToken = ++revealRequestToken;
+		revealInProgress = true;
+		revealSubmitButton.click();
+	}
+
+	function handleRevealChange(event: CustomEvent<{ revealed: boolean; reason: 'manual' | 'timeout' }>) {
+		if (!event.detail.revealed) {
+			clearActiveAuthApiKey();
+			return;
+		}
+
+		requestRevealCopy();
+	}
+
+	function handleCopyFeedback(event: CustomEvent<{ success: boolean; message: string; error?: Error }>) {
+		if (event.detail.success) {
+			alertStore.add('success', 'API key copied to clipboard');
+			return;
+		}
+
+		if (event.detail.error?.message === 'Missing key value') {
+			copyAfterReveal = true;
+			requestRevealCopy();
+			return;
+		}
+
+		alertStore.add('error', 'Copy failed');
 	}
 
 	function formatDate(dateStr: string): string {
@@ -210,26 +313,61 @@
 				</p>
 			</div>
 			<div class="p-6">
-				{#if apiKey}
-					<div class="flex items-center gap-2">
-						<div class="flex-1">
-							<FormInput
-								name="apiKey"
-								label=""
-								type="password"
-								value={apiKey}
-								readonly
-								private_
+		{#if hasStoredAuthKey}
+					<div class="space-y-4">
+						{#key remaskSession}
+							<MaskedApiKey
+								label="Auth API key"
+								maskedValue={maskedApiKeyValue}
+								value={plainApiKeyValue}
+								hasValue={data.hasApiKey}
+								revealLabel="Show"
+								hideLabel="Hide"
+								copyLabel="Copy"
+								disabled={revealInProgress}
+								on:revealChange={handleRevealChange}
+								on:copyFeedback={handleCopyFeedback}
 							/>
-						</div>
-						<button
-							type="button"
-							class="rounded-lg p-2 text-neutral-500 hover:bg-neutral-100 hover:text-neutral-700 dark:hover:bg-neutral-800 dark:hover:text-neutral-300"
-							title="Copy"
-							onclick={copyApiKey}
-						>
-							<Copy size={18} />
-						</button>
+						{/key}
+
+						<form method="POST" action="?/revealAuthKey" use:enhance={() => {
+							const requestToken = pendingRevealRequestToken;
+							return async ({ result, update }) => {
+								if (requestToken !== revealRequestToken) {
+									return;
+								}
+
+								revealInProgress = false;
+								if (result.type === 'success') {
+									const response = result.data as { revealedAuthKey?: string };
+									if (response?.revealedAuthKey) {
+										setActiveAuthApiKey(response.revealedAuthKey, 'reveal');
+										if (copyAfterReveal) {
+											await copyActiveAuthApiKey();
+											copyAfterReveal = false;
+										}
+									} else {
+										alertStore.add('error', 'Unable to retrieve API key');
+										clearActiveAuthApiKey(activeAuthApiKeySource === 'regenerate');
+									}
+								} else {
+									alertStore.add('error', 'Unable to retrieve API key');
+									clearActiveAuthApiKey(activeAuthApiKeySource === 'regenerate');
+								}
+
+								copyAfterReveal = false;
+
+								await update();
+							};
+						}}>
+							<button
+								type="submit"
+								class="hidden"
+								aria-label="Reveal API key"
+								bind:this={revealSubmitButton}
+							></button>
+						</form>
+
 						<form method="POST" action="?/regenerateApiKey" use:enhance={() => {
 							regeneratingKey = true;
 							return async ({ update }) => {
@@ -237,20 +375,27 @@
 								regeneratingKey = false;
 							};
 						}}>
-							<button
+							<Button
 								type="submit"
-								class="rounded-lg p-2 text-neutral-500 hover:bg-neutral-100 hover:text-neutral-700 dark:hover:bg-neutral-800 dark:hover:text-neutral-300"
-								title="Regenerate"
+								variant="secondary"
+								size="sm"
+								icon={RefreshCw}
+								iconColor="text-accent-500"
+								text={regeneratingKey ? 'Regenerating...' : 'Regenerate Key'}
 								disabled={regeneratingKey}
-							>
-								<RefreshCw size={18} class={regeneratingKey ? 'animate-spin' : ''} />
-							</button>
+							/>
 						</form>
 					</div>
 				{:else}
 					<div class="flex items-center gap-4">
 						<p class="text-sm text-neutral-500 dark:text-neutral-400">No API key configured</p>
-						<form method="POST" action="?/regenerateApiKey" use:enhance>
+						<form method="POST" action="?/regenerateApiKey" use:enhance={() => {
+							regeneratingKey = true;
+							return async ({ update }) => {
+								await update();
+								regeneratingKey = false;
+							};
+						}}>
 							<Button type="submit" variant="secondary" size="sm" text="Generate Key" />
 						</form>
 					</div>

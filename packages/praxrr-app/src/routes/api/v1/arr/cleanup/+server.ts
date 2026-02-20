@@ -1,7 +1,8 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from '@sveltejs/kit';
 import { arrInstancesQueries } from '$db/queries/arrInstances.ts';
-import { createArrClient } from '$utils/arr/factory.ts';
+import { getArrInstanceClient } from '$arr/arrInstanceClients.ts';
+import type { BaseArrClient } from '$utils/arr/base.ts';
 import { scanForStaleItems, deleteStaleItems } from '$lib/server/sync/cleanup.ts';
 import type { ArrType } from '$utils/arr/types.ts';
 
@@ -30,12 +31,13 @@ export const POST: RequestHandler = async ({ request }) => {
     return json({ error: 'Instance not found' }, { status: 404 });
   }
 
+  let client: BaseArrClient | null = null;
   // Disable retries so "in use" HTTP 500 from the arr fails fast
-  const client = createArrClient(instance.type as ArrType, instance.url, instance.api_key, {
-    retries: 0,
-  });
-
   try {
+    client = await getArrInstanceClient(instance.type as ArrType, instance.id, instance.url, {
+      retries: 0,
+    });
+
     if (action === 'scan') {
       const result = await scanForStaleItems(client, instanceId);
       return json(result);
@@ -53,6 +55,8 @@ export const POST: RequestHandler = async ({ request }) => {
     const message = err instanceof Error ? err.message : 'Cleanup failed';
     return json({ error: message }, { status: 500 });
   } finally {
-    client.close();
+    if (client) {
+      client.close();
+    }
   }
 };

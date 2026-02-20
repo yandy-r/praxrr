@@ -18,7 +18,7 @@ CREATE TABLE IF NOT EXISTS migrations (
 -- ==============================================================================
 -- TABLE: arr_instances
 -- Purpose: Store configuration for *arr application instances (Radarr, Sonarr, etc.)
--- Migration: 001_create_arr_instances.ts, 20260216_add_arr_instance_external_url.ts, 20260220_add_arr_instance_source.ts
+-- Migration: 001_create_arr_instances.ts, 20260216_add_arr_instance_external_url.ts, 20260220_add_arr_instance_source.ts, 20260221_encrypt_arr_api_keys.ts
 -- ==============================================================================
 
 CREATE TABLE arr_instances (
@@ -31,7 +31,8 @@ CREATE TABLE arr_instances (
     -- Connection details
     url TEXT NOT NULL,                      -- Base URL (e.g., "http://localhost:7878")
     external_url TEXT,                      -- Optional browser/Open-in URL override (e.g., "https://radarr.example.com")
-    api_key TEXT NOT NULL,                  -- API key for authentication
+    api_key TEXT NOT NULL,                  -- Legacy plaintext API key retained temporarily; runtime write paths should use encrypted credential storage and leave this empty
+    api_key_fingerprint TEXT,               -- Deterministic hashed fingerprint for duplicate detection and env matching
 
     -- Configuration
     tags TEXT,                              -- JSON array of tags (e.g., '["movies","4k"]')
@@ -42,6 +43,44 @@ CREATE TABLE arr_instances (
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
+
+-- ==============================================================================
+-- TABLE: arr_instance_credentials
+-- Purpose: Store encrypted Arr API key material and credential metadata
+-- Migration: 20260221_encrypt_arr_api_keys.ts
+-- ==============================================================================
+
+CREATE TABLE arr_instance_credentials (
+    instance_id INTEGER PRIMARY KEY,         -- Foreign key to arr_instances.id
+    ciphertext TEXT NOT NULL,                -- Base64 AES-GCM ciphertext
+    nonce TEXT NOT NULL,                     -- Base64 96-bit nonce
+    key_version TEXT NOT NULL,               -- Encryption key version label
+    fingerprint TEXT NOT NULL,                -- Deterministic fingerprint for parity checks
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+
+    FOREIGN KEY (instance_id) REFERENCES arr_instances(id) ON DELETE CASCADE
+);
+
+CREATE INDEX idx_arr_instances_api_key_fingerprint
+    ON arr_instances(api_key_fingerprint);
+
+CREATE TRIGGER trg_arr_instances_reject_plain_api_key_insert
+    BEFORE INSERT ON arr_instances
+    WHEN NEW.api_key IS NOT NULL AND TRIM(NEW.api_key) != ''
+    BEGIN
+        SELECT RAISE(ABORT, 'Arr API keys must be written to arr_instance_credentials');
+    END;
+
+CREATE TRIGGER trg_arr_instances_reject_plain_api_key_update
+    BEFORE UPDATE OF api_key ON arr_instances
+    WHEN NEW.api_key IS NOT NULL AND TRIM(NEW.api_key) != ''
+    BEGIN
+        SELECT RAISE(ABORT, 'Arr API keys must be written to arr_instance_credentials');
+    END;
+
+CREATE UNIQUE INDEX idx_arr_instance_credentials_fingerprint
+    ON arr_instance_credentials(fingerprint);
 
 -- ==============================================================================
 -- TABLE: log_settings
@@ -238,7 +277,7 @@ CREATE TABLE notification_history (
 -- ==============================================================================
 -- TABLE: database_instances
 -- Purpose: Store linked Praxrr Compliant Database (PCD) repositories
--- Migration: 008_create_database_instances.ts, 009_add_personal_access_token.ts, 010_add_is_private.ts, 040_add_local_ops_enabled.ts, 043_add_git_identity_to_database_instances.ts, 044_add_conflict_strategy_to_database_instances.ts
+-- Migration: 008_create_database_instances.ts, 009_add_personal_access_token.ts, 010_add_is_private.ts, 040_add_local_ops_enabled.ts, 043_add_git_identity_to_database_instances.ts, 044_add_conflict_strategy_to_database_instances.ts, 20260222_encrypt_database_pat.ts
 -- ==============================================================================
 
 CREATE TABLE database_instances (
@@ -250,7 +289,7 @@ CREATE TABLE database_instances (
 
     -- Repository connection
     repository_url TEXT NOT NULL,               -- Git repository URL
-    personal_access_token TEXT,                 -- PAT for private repos and push access (Migration 009)
+    personal_access_token TEXT,                 -- Legacy plaintext PAT column (kept blank after Migration 20260222)
     is_private INTEGER NOT NULL DEFAULT 0,      -- 1=private repo, 0=public (auto-detected, Migration 010)
     local_ops_enabled INTEGER NOT NULL DEFAULT 0, -- 1=force local ops even with PAT (Migration 040)
     git_user_name TEXT,                         -- Git commit author name (Migration 043)
@@ -273,6 +312,22 @@ CREATE TABLE database_instances (
     -- Metadata
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ==============================================================================
+-- TABLE: database_instance_credentials
+-- Purpose: Store encrypted PAT material for database_instances
+-- Migration: 20260222_encrypt_database_pat.ts
+-- ==============================================================================
+
+CREATE TABLE database_instance_credentials (
+    instance_id INTEGER PRIMARY KEY,            -- FK to database_instances.id
+    ciphertext TEXT NOT NULL,                   -- Encrypted PAT payload
+    nonce TEXT NOT NULL,                        -- AES-GCM nonce
+    key_version TEXT NOT NULL,                  -- Encryption key version
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (instance_id) REFERENCES database_instances(id) ON DELETE CASCADE
 );
 
 -- ==============================================================================

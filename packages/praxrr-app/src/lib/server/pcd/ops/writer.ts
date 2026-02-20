@@ -286,7 +286,8 @@ export async function writeOperation(options: WriteOptions): Promise<WriteResult
       return { success: false, error: 'Database instance not found' };
     }
 
-    if (layer === 'base' && (!instance.personal_access_token || instance.local_ops_enabled)) {
+    const hasPersonalAccessToken = !!instance.has_personal_access_token || !!instance.personal_access_token;
+    if (layer === 'base' && (!hasPersonalAccessToken || instance.local_ops_enabled)) {
       return {
         success: false,
         error: 'Base layer requires a personal access token and local ops must be disabled',
@@ -385,7 +386,7 @@ export async function writeOperation(options: WriteOptions): Promise<WriteResult
  */
 export function canWriteToBase(databaseId: number): boolean {
   const instance = databaseInstancesQueries.getById(databaseId);
-  return !!instance?.personal_access_token && !instance?.local_ops_enabled;
+  return (!!instance?.has_personal_access_token || !!instance?.personal_access_token) && !instance?.local_ops_enabled;
 }
 
 // Re-export types for convenience

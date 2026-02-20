@@ -12,11 +12,12 @@ import {
 } from '$pcd/index.ts';
 import { parseMarkdown } from '$utils/markdown/markdown.ts';
 import { databaseInstancesQueries } from '$db/queries/databaseInstances.ts';
+import { getDecryptedDatabasePersonalAccessToken } from '$server/utils/encryption/database-credentials.ts';
 
 export const load: PageServerLoad = async ({ parent }) => {
   const { database } = await parent();
 
-  if (!database.personal_access_token) {
+  if (!database.has_personal_access_token && !database.personal_access_token) {
     error(403, 'Config page requires a personal access token');
   }
 
@@ -51,7 +52,7 @@ export const actions: Actions = {
       return fail(404, { error: 'Database not found' });
     }
 
-    if (!database.personal_access_token) {
+    if (!database.has_personal_access_token && !database.personal_access_token) {
       return fail(403, { error: 'Personal access token required' });
     }
 
@@ -66,7 +67,8 @@ export const actions: Actions = {
       await writeReadme(database.local_path, readme);
 
       try {
-        await syncDependencies(database.local_path, database.personal_access_token ?? undefined);
+        const personalAccessToken = await getDecryptedDatabasePersonalAccessToken(id);
+        await syncDependencies(database.local_path, personalAccessToken);
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         return fail(500, { error: `Failed to sync dependencies: ${message}` });

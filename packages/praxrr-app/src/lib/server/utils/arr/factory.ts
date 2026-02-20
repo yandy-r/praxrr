@@ -1,9 +1,18 @@
 import type { ArrType } from './types.ts';
-import { BaseArrClient, type ArrClientOptions } from './base.ts';
+import type { BaseArrClient, ArrClientOptions } from './base.ts';
 import { RadarrClient } from './clients/radarr.ts';
 import { SonarrClient } from './clients/sonarr.ts';
 import { LidarrClient } from './clients/lidarr.ts';
 import { ChaptarrClient } from './clients/chaptarr.ts';
+
+type ArrClientConstructor = new (url: string, apiKey: string, options?: ArrClientOptions) => BaseArrClient;
+
+const arrClientConstructors: Record<ArrType, ArrClientConstructor> = {
+  radarr: RadarrClient,
+  sonarr: SonarrClient,
+  lidarr: LidarrClient,
+  chaptarr: ChaptarrClient,
+};
 
 /**
  * Factory function to create an arr client instance
@@ -14,16 +23,10 @@ import { ChaptarrClient } from './clients/chaptarr.ts';
  * @returns Arr client instance
  */
 export function createArrClient(type: ArrType, url: string, apiKey: string, options?: ArrClientOptions): BaseArrClient {
-  switch (type) {
-    case 'radarr':
-      return new RadarrClient(url, apiKey, options);
-    case 'sonarr':
-      return new SonarrClient(url, apiKey, options);
-    case 'lidarr':
-      return new LidarrClient(url, apiKey, options);
-    case 'chaptarr':
-      return new ChaptarrClient(url, apiKey, options);
-    default:
-      throw new Error(`Unknown arr type: ${type}`);
+  const constructor = arrClientConstructors[type];
+  if (!constructor) {
+    throw new Error(`Unknown arr type: ${type}`);
   }
+
+  return new constructor(url, apiKey, options);
 }

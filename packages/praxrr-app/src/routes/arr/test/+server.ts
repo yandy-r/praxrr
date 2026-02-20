@@ -6,11 +6,19 @@ import type { ArrType } from '$arr/types.ts';
 const VALID_TYPES = ['radarr', 'sonarr', 'lidarr'];
 
 export const POST: RequestHandler = async ({ request }) => {
+  let client;
   try {
-    const { type, url, apiKey } = await request.json();
+    const body = await request.json();
+    const type = body?.type;
+    const url = body?.url;
+    const apiKey = body?.apiKey;
 
     // Validation
-    if (!type || !url || !apiKey) {
+    if (typeof type !== 'string' || typeof url !== 'string' || typeof apiKey !== 'string') {
+      return json({ success: false, error: 'Missing or invalid required fields' }, { status: 400 });
+    }
+
+    if (!type.trim() || !url.trim() || !apiKey.trim()) {
       return json({ success: false, error: 'Missing required fields' }, { status: 400 });
     }
 
@@ -19,9 +27,8 @@ export const POST: RequestHandler = async ({ request }) => {
     }
 
     // Create client and test connection (3 second timeout, no retries for quick feedback)
-    const client = createArrClient(type as ArrType, url, apiKey, { timeout: 3000, retries: 0 });
+    client = createArrClient(type as ArrType, url, apiKey, { timeout: 3000, retries: 0 });
     const isConnected = await client.testConnection();
-    client.close();
 
     if (isConnected) {
       return json({ success: true });
@@ -36,5 +43,7 @@ export const POST: RequestHandler = async ({ request }) => {
       },
       { status: 500 }
     );
+  } finally {
+    client?.close();
   }
 };

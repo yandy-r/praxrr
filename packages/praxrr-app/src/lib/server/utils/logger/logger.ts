@@ -7,6 +7,7 @@
 import { config } from '$config';
 import { colors } from './colors.ts';
 import { logSettings } from './settings.ts';
+import { sanitizeLogMeta } from './sanitizer.ts';
 import type { LogEntry, LoggerConfig, LogLevel, LogOptions } from './types.ts';
 
 class Logger {
@@ -94,6 +95,8 @@ class Logger {
   }
 
   private async log(level: LogLevel, color: string, message: string, options?: LogOptions): Promise<void> {
+    const sanitizedMeta = options?.meta ? sanitizeLogMeta(options.meta) : undefined;
+
     // Check if this log level should be logged
     if (!this.shouldLog(level)) {
       return;
@@ -108,7 +111,7 @@ class Logger {
         this.formatLevel(level, color),
         message,
         options?.source ? this.formatSource(options.source) : '',
-        options?.meta ? this.formatMeta(options.meta) : '',
+        sanitizedMeta ? this.formatMeta(sanitizedMeta) : '',
       ].filter(Boolean);
 
       console.log(consoleParts.join(' | '));
@@ -121,7 +124,7 @@ class Logger {
         level,
         message,
         ...(options?.source ? { source: options.source } : {}),
-        ...(options?.meta ? { meta: options.meta } : {}),
+        ...(sanitizedMeta ? { meta: sanitizedMeta } : {}),
       };
 
       try {
@@ -175,7 +178,7 @@ class Logger {
         timestamp: new Date().toISOString(),
         level: 'ERROR',
         message: 'Stack trace',
-        meta: { stack: error.stack },
+        meta: sanitizeLogMeta({ stack: error.stack }),
       };
 
       try {

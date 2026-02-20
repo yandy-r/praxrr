@@ -67,7 +67,7 @@
 						{#if database.is_private}
 							<Lock size={14} class="flex-shrink-0 text-neutral-400" />
 						{/if}
-						{#if database.personal_access_token}
+						{#if database.has_personal_access_token || database.personal_access_token}
 							<Code size={14} class="flex-shrink-0 text-blue-500" />
 						{/if}
 					</div>

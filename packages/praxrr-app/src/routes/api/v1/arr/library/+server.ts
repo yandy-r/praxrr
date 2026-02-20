@@ -2,6 +2,7 @@ import { json } from '@sveltejs/kit';
 import type { RequestHandler } from '@sveltejs/kit';
 import type { components } from '$api/v1.d.ts';
 import type {
+  ArrType,
   RadarrLibraryItem as RuntimeRadarrLibraryItem,
   SonarrLibraryItem as RuntimeSonarrLibraryItem,
   LidarrLibraryItem as RuntimeLidarrLibraryItem,
@@ -10,9 +11,10 @@ import { arrInstancesQueries } from '$db/queries/arrInstances.ts';
 import { pcdManager } from '$pcd/index.ts';
 import * as qualityProfileQueries from '$pcd/entities/qualityProfiles/index.ts';
 import { cache, buildArrLibraryCacheKey, getArrLibraryCachePrefix } from '$cache/cache.ts';
-import { RadarrClient } from '$utils/arr/clients/radarr.ts';
-import { SonarrClient } from '$utils/arr/clients/sonarr.ts';
-import { LidarrClient } from '$utils/arr/clients/lidarr.ts';
+import { getArrInstanceClient } from '$arr/arrInstanceClients.ts';
+import type { LidarrClient } from '$utils/arr/clients/lidarr.ts';
+import type { RadarrClient } from '$utils/arr/clients/radarr.ts';
+import type { SonarrClient } from '$utils/arr/clients/sonarr.ts';
 import { logger } from '$logger/logger.ts';
 
 type LibraryResponse = components['schemas']['LibraryResponse'];
@@ -353,7 +355,7 @@ export const GET: RequestHandler = async ({ url }) => {
       }
 
       const praxrrProfileNames = await getPraxrrProfileNames();
-      const client = new RadarrClient(instance.url, instance.api_key);
+      const client = (await getArrInstanceClient(instance.type as ArrType, instance.id, instance.url)) as RadarrClient;
       try {
         const items = await client.getLibrary(praxrrProfileNames);
         cache.set(cacheKey, items, LIBRARY_CACHE_TTL);
@@ -400,7 +402,7 @@ export const GET: RequestHandler = async ({ url }) => {
       }
 
       const praxrrProfileNames = await getPraxrrProfileNames();
-      const client = new SonarrClient(instance.url, instance.api_key);
+      const client = (await getArrInstanceClient(instance.type as ArrType, instance.id, instance.url)) as SonarrClient;
       try {
         const items = await client.getLibrary(praxrrProfileNames);
         cache.set(cacheKey, items, LIBRARY_CACHE_TTL);
@@ -452,7 +454,7 @@ export const GET: RequestHandler = async ({ url }) => {
       }
 
       const praxrrProfileNames = await getPraxrrProfileNames();
-      const client = new LidarrClient(instance.url, instance.api_key);
+      const client = (await getArrInstanceClient(instance.type as ArrType, instance.id, instance.url)) as LidarrClient;
       try {
         const items = await client.getLibrary(praxrrProfileNames);
         cache.set(cacheKey, items, LIBRARY_CACHE_TTL);

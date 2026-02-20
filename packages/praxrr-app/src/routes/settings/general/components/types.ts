@@ -21,12 +21,14 @@ export interface BackupSettings {
 export interface AISettings {
   enabled: boolean;
   api_url: string;
-  api_key: string;
+  api_key_masked: string;
+  has_api_key: boolean;
   model: string;
 }
 
 export interface TMDBSettings {
-  api_key: string;
+  api_key_masked: string;
+  has_api_key: boolean;
 }
 
 export interface GeneralSettings {

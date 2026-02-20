@@ -8,6 +8,7 @@ import { generalSettingsQueries } from '$db/queries/generalSettings.ts';
 import { logSettings } from '$logger/settings.ts';
 import { logger } from '$logger/logger.ts';
 import { scheduleBackupJobs, scheduleLogCleanup } from '$lib/server/jobs/init.ts';
+import { maskApiKey } from '$shared/utils/masking.ts';
 
 export const load = () => {
   const logSetting = logSettingsQueries.get();
@@ -54,11 +55,13 @@ export const load = () => {
     aiSettings: {
       enabled: aiSetting.enabled === 1,
       api_url: aiSetting.api_url,
-      api_key: aiSetting.api_key,
+      api_key_masked: maskApiKey(aiSetting.api_key),
+      has_api_key: aiSetting.api_key.length > 0,
       model: aiSetting.model,
     },
     tmdbSettings: {
-      api_key: tmdbSetting.api_key,
+      api_key_masked: maskApiKey(tmdbSetting.api_key),
+      has_api_key: tmdbSetting.api_key.length > 0,
     },
     generalSettings: {
       apply_default_delay_profiles: generalSetting.apply_default_delay_profiles === 1,
@@ -195,7 +198,8 @@ export const actions: Actions = {
     // Parse form data
     const enabled = formData.get('enabled') === 'on';
     const apiUrl = formData.get('api_url') as string;
-    const apiKey = formData.get('api_key') as string;
+    const apiKeyInput = (formData.get('api_key') as string | null) ?? '';
+    const apiKey = apiKeyInput;
     const model = formData.get('model') as string;
 
     // Validate
@@ -211,7 +215,7 @@ export const actions: Actions = {
     const updated = aiSettingsQueries.update({
       enabled,
       apiUrl: apiUrl || 'https://api.openai.com/v1',
-      apiKey: apiKey || '',
+      apiKey,
       model: model || 'gpt-4o-mini',
     });
 
@@ -235,15 +239,50 @@ export const actions: Actions = {
     return { success: true };
   },
 
+  revealTMDB: async () => {
+    try {
+      const tmdbSetting = tmdbSettingsQueries.get();
+
+      if (!tmdbSetting || tmdbSetting.api_key.length === 0) {
+        return fail(404, { error: 'TMDB API key is not configured' });
+      }
+
+      return { revealedTmdbKey: tmdbSetting.api_key };
+    } catch {
+      await logger.error('Failed to reveal TMDB API key', {
+        source: 'settings/general',
+      });
+      return fail(500, { error: 'Unable to retrieve TMDB API key' });
+    }
+  },
+
+  revealAI: async () => {
+    try {
+      const aiSetting = aiSettingsQueries.get();
+
+      if (!aiSetting || aiSetting.api_key.length === 0) {
+        return fail(404, { error: 'AI API key is not configured' });
+      }
+
+      return { revealedAiKey: aiSetting.api_key };
+    } catch {
+      await logger.error('Failed to reveal AI API key', {
+        source: 'settings/general',
+      });
+      return fail(500, { error: 'Unable to retrieve AI API key' });
+    }
+  },
+
   updateTMDB: async ({ request }: RequestEvent) => {
     const formData = await request.formData();
 
     // Parse form data
-    const apiKey = formData.get('api_key') as string;
+    const apiKeyInput = (formData.get('api_key') as string | null) ?? '';
+    const apiKey = apiKeyInput;
 
     // Update settings
     const updated = tmdbSettingsQueries.update({
-      apiKey: apiKey || '',
+      apiKey,
     });
 
     if (!updated) {

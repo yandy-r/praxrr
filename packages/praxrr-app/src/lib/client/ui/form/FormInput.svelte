@@ -17,6 +17,7 @@
 	export let readonly: boolean = false;
 	export let mono: boolean = false;
 	export let disabled: boolean = false;
+	export let showPrivateToggle: boolean = true;
 	export let wrap: boolean = false;
 	export let size: 'sm' | 'md' | 'lg' = 'md';
 	export let inputClass: string = '';
@@ -135,6 +136,7 @@
 				</div>
 			{/if}
 			<button
+				style:display={showPrivateToggle ? 'inline-flex' : 'none'}
 				type="button"
 				class="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-600 dark:text-neutral-500 dark:hover:text-neutral-300"
 				onclick={() => (showPassword = !showPassword)}

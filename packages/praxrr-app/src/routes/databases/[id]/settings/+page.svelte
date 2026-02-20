@@ -10,4 +10,10 @@
 	<title>{data.database.name} - Settings - Praxrr</title>
 </svelte:head>
 
-<InstanceForm mode="edit" {form} instance={data.database} />
+<InstanceForm
+	mode="edit"
+	{form}
+	instance={data.database}
+	hasStoredPersonalAccessToken={data.hasPersonalAccessToken}
+	personalAccessTokenMasked={data.personalAccessTokenMasked}
+/>

@@ -121,6 +121,50 @@ Parser/evaluation results are cached in SQLite to avoid re‑parsing release
 titles and re‑evaluating conditions. Cache keys include parser version and
 pattern hash.
 
+### Arr Credential Storage (Encrypted at Rest)
+
+Arr API keys are now persisted in an encrypted credentials side table:
+
+- `arr_instances` stores identity, connection metadata, and `api_key_fingerprint`.
+- `arr_instance_credentials` stores:
+  - `ciphertext` (AES-GCM encrypted payload)
+  - `nonce` (12-byte IV)
+  - `key_version` (active master-key label used for this row)
+  - `fingerprint` (deterministic key-hash for duplicate/env matching)
+
+`arr_instances.api_key` is no longer a runtime source for Arr credentials. It is
+present for schema compatibility but treated as write-blocked and must remain
+empty in encrypted-mode rows.
+
+### Storage Contract
+
+All persisted Arr credentials follow this contract:
+
+- Encryption and decryption are handled by
+  `packages/praxrr-app/src/lib/server/utils/encryption/*`.
+- Writes to Arr instances call `encryptArrInstanceApiKey()` and persist
+  credential envelope + fingerprint in one transaction.
+- Runtime reads require:
+  1. `arr_instance_credentials` lookup by `instance_id`
+  2. decrypt with `getArrInstanceClient()`
+  3. instantiate the Arr HTTP client in-memory only for that request/job.
+- Plaintext credentials are not returned from server payloads and must not be
+  logged.
+
+### Migration & Cutover Model in App DB
+
+- Migration `20260221_encrypt_arr_api_keys` adds:
+  - `arr_instances.api_key_fingerprint`
+  - `arr_instance_credentials`
+  - resumable backfill state in `arr_instance_api_key_backfill_state`
+  - triggers that reject non-empty writes to `arr_instances.api_key`.
+- The migration backfills existing plaintext rows in batches and validates parity
+  (`ciphertext` round-trip + fingerprint matching) before enabling encrypted-only
+  writes.
+- Startup path (`src/hooks.server.ts`) validates key configuration before DB
+  migration to ensure migrations that touch `arr_instance_credentials` fail fast when
+  master-key material is missing or invalid.
+
 ## 5) App DB (praxrr.db)
 
 ### Location & Initialization
@@ -1120,6 +1164,8 @@ The shared HTTP stack lives in `utils/http/`:
 Arr integration is an object‑oriented stack:
 
 - `utils/arr/base.ts` extends `BaseHttpClient` and injects API key handling.
+- `utils/arr/arrInstanceClients.ts` provides `getArrInstanceClient()` that loads
+  encrypted credentials for a persisted instance and decrypts just-in-time.
 - `utils/arr/clients/*` implement app‑specific endpoints (Radarr, Sonarr, Lidarr).
 - `createArrClient()` selects a client by type.
 - `utils/arr/defaults.ts` provides default delay profiles.

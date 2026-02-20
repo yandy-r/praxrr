@@ -281,3 +281,63 @@ cleanup:
           application/json:
             schema:
               $ref: '../schemas/arr.yaml#/ErrorResponse'
+
+test:
+  post:
+    operationId: testArrConnection
+    summary: Test Arr credentials
+    description: |
+      Performs a one-off connectivity check against an Arr instance using the provided
+      URL and API key. No credentials are persisted and no credential material is
+      included in any success or error response. Duplicate handling for saved instances
+      is based on server-side fingerprint matching, not plaintext API-key comparison.
+    tags:
+      - Arr
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - type
+              - url
+              - apiKey
+            properties:
+              type:
+                type: string
+                enum:
+                  - radarr
+                  - sonarr
+                  - lidarr
+                description: Arr integration type
+              url:
+                type: string
+                description: Base URL for the Arr instance
+              apiKey:
+                type: string
+                format: password
+                description: Temporary API key for this test call only
+    responses:
+      '200':
+        description: Connection test successful
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success:
+                  type: boolean
+                  example: true
+      '400':
+        description: Invalid request body or failed connection validation
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+      '500':
+        description: Connection test runtime error
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'

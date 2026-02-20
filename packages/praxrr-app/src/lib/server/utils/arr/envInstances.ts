@@ -2,9 +2,12 @@ import { config } from '$config';
 import { createArrClient } from '$arr/factory.ts';
 import { logger } from '$logger/logger.ts';
 import { parseOptionalAbsoluteHttpUrl } from '$utils/validation/url.ts';
-import { db } from '$db/db.ts';
 import { arrInstancesQueries } from '$db/queries/arrInstances.ts';
 import { ARR_APP_TYPES, type ArrAppType } from '$shared/pcd/types.ts';
+import {
+  deriveArrInstanceApiKeyFingerprint,
+  encryptArrInstanceApiKey,
+} from '$server/utils/encryption/arr-credentials.ts';
 
 const APP_TYPE_KEYS = ARR_APP_TYPES;
 const APP_LABELS: Record<ArrAppType, string> = {
@@ -263,19 +266,6 @@ function inspectArrInstanceEnvKeys(): ArrInstanceEnvKeys {
   return { all, unsupported };
 }
 
-function withSavepoint<T>(savepoint: string, fn: () => T): T {
-  db.execute(`SAVEPOINT ${savepoint}`);
-
-  try {
-    return fn();
-  } catch (error) {
-    db.execute(`ROLLBACK TO SAVEPOINT ${savepoint}`);
-    throw error;
-  } finally {
-    db.execute(`RELEASE SAVEPOINT ${savepoint}`);
-  }
-}
-
 export async function reconcileEnvInstances(): Promise<ReconcileEnvInstancesResult> {
   const envKeys = inspectArrInstanceEnvKeys();
   await logger.debug('Discovered environment instance variables', {
@@ -328,17 +318,31 @@ export async function reconcileEnvInstances(): Promise<ReconcileEnvInstancesResu
     },
   });
 
-  const seenApiKeys = new Set<string>();
-  const activeApiKeys = new Set<string>();
-
-  let savepointIndex = 0;
+  const seenApiKeyFingerprints = new Set<string>();
+  const activeApiKeyFingerprints = new Set<string>();
 
   for (const descriptor of parsed) {
-    if (seenApiKeys.has(descriptor.apiKey)) {
+    let apiKeyFingerprint: string;
+    try {
+      apiKeyFingerprint = (await deriveArrInstanceApiKeyFingerprint(descriptor.apiKey)).value;
+    } catch {
+      metrics.errors += 1;
+      continue;
+    }
+
+    if (seenApiKeyFingerprints.has(apiKeyFingerprint)) {
       metrics.skippedDuplicateEnvKey += 1;
       continue;
     }
-    seenApiKeys.add(descriptor.apiKey);
+    seenApiKeyFingerprints.add(apiKeyFingerprint);
+
+    const encryptedApiKey = await encryptArrInstanceApiKey(descriptor.apiKey);
+    const encryptedApiKeyPayload = {
+      ciphertext: encryptedApiKey.credential.ciphertext,
+      nonce: encryptedApiKey.credential.nonce,
+      keyVersion: encryptedApiKey.credential.keyVersion,
+      fingerprint: encryptedApiKey.fingerprint.value,
+    };
 
     const sourceConflict = arrInstancesQueries.getBySourceAndName('ui', descriptor.name) !== undefined;
     if (sourceConflict) {
@@ -346,7 +350,7 @@ export async function reconcileEnvInstances(): Promise<ReconcileEnvInstancesResu
       continue;
     }
 
-    const existing = arrInstancesQueries.getByApiKey(descriptor.apiKey);
+    const existing = arrInstancesQueries.getByApiKey(apiKeyFingerprint);
     if (existing && existing.source !== 'env') {
       metrics.skippedConflictUi += 1;
       continue;
@@ -354,9 +358,8 @@ export async function reconcileEnvInstances(): Promise<ReconcileEnvInstancesResu
 
     const existingByName = !existing ? arrInstancesQueries.getBySourceAndName('env', descriptor.name) : undefined;
 
-    activeApiKeys.add(descriptor.apiKey);
+    activeApiKeyFingerprints.add(apiKeyFingerprint);
 
-    const savepoint = `env_reconcile_${savepointIndex++}`;
     try {
       if (config.validateInstances) {
         try {
@@ -375,68 +378,78 @@ export async function reconcileEnvInstances(): Promise<ReconcileEnvInstancesResu
         metrics.validationSuccesses += 1;
       }
 
-      withSavepoint(savepoint, () => {
-        if (existing && existing.source === 'env') {
-          const updated = arrInstancesQueries.updateEnvInstanceByApiKey(descriptor.apiKey, {
+      if (existing && existing.source === 'env') {
+        const updated = arrInstancesQueries.updateEnvInstanceByApiKey(
+          apiKeyFingerprint,
+          {
             type: descriptor.type,
             url: descriptor.url,
             externalUrl: descriptor.externalUrl,
-            apiKey: descriptor.apiKey,
+            apiKey: '',
             name: descriptor.name,
             tags: descriptor.tags,
             enabled: descriptor.enabled,
             source: 'env',
-          });
-          if (!updated) {
-            throw new Error('No env instance found for requested API key');
-          }
-
-          metrics.updated += 1;
-          return;
+          },
+          encryptedApiKeyPayload
+        );
+        if (!updated) {
+          throw new Error('No env instance found for requested API key');
         }
 
-        if (existingByName && existingByName.source === 'env') {
-          const updated = arrInstancesQueries.updateEnvInstanceById(existingByName.id, {
+        metrics.updated += 1;
+        continue;
+      }
+
+      if (existingByName && existingByName.source === 'env') {
+        const updated = arrInstancesQueries.updateEnvInstanceById(
+          existingByName.id,
+          {
             type: descriptor.type,
             url: descriptor.url,
             externalUrl: descriptor.externalUrl,
-            apiKey: descriptor.apiKey,
+            apiKey: '',
             name: descriptor.name,
             tags: descriptor.tags,
             enabled: descriptor.enabled,
             source: 'env',
-          });
-          if (!updated) {
-            throw new Error('No env instance found for name-based key rotation');
-          }
-
-          metrics.updated += 1;
-          return;
+          },
+          encryptedApiKeyPayload
+        );
+        if (!updated) {
+          throw new Error('No env instance found for name-based key rotation');
         }
 
-        const id = arrInstancesQueries.create({
+        metrics.updated += 1;
+        continue;
+      }
+
+      const id = arrInstancesQueries.create(
+        {
           name: descriptor.name,
           type: descriptor.type,
           url: descriptor.url,
           externalUrl: descriptor.externalUrl,
-          apiKey: descriptor.apiKey,
+          apiKey: '',
+          apiKeyFingerprint: apiKeyFingerprint,
           tags: descriptor.tags,
           enabled: descriptor.enabled,
           source: 'env',
-        });
-        if (id === 0) {
-          throw new Error('Failed to create env instance');
-        }
+        },
+        encryptedApiKeyPayload
+      );
+      if (id === 0) {
+        throw new Error('Failed to create env instance');
+      }
 
-        metrics.created += 1;
-      });
+      metrics.created += 1;
     } catch {
       metrics.errors += 1;
     }
   }
 
   try {
-    metrics.disabled = arrInstancesQueries.disableEnvInstancesMissingApiKeys([...activeApiKeys]);
+    metrics.disabled = arrInstancesQueries.disableEnvInstancesMissingApiKeys([...activeApiKeyFingerprints]);
   } catch {
     metrics.errors += 1;
   }

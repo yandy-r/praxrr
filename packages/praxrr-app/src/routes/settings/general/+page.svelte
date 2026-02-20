@@ -17,7 +17,6 @@
 			Configure general application settings and preferences
 		</p>
 	</div>
-
 	<div class="space-y-8">
 		<!-- UI Preferences -->
 		<UISettings />
@@ -32,9 +31,22 @@
 		<LoggingSettings settings={data.logSettings} />
 
 		<!-- AI Configuration -->
-		<AISettings settings={data.aiSettings} />
+		<AISettings
+			settings={{
+				enabled: data.aiSettings.enabled,
+				api_url: data.aiSettings.api_url,
+				api_key_masked: data.aiSettings.api_key_masked,
+				has_api_key: data.aiSettings.has_api_key,
+				model: data.aiSettings.model
+			}}
+		/>
 
 		<!-- TMDB Configuration -->
-		<TMDBSettings settings={data.tmdbSettings} />
+		<TMDBSettings
+			settings={{
+				api_key_masked: data.tmdbSettings.api_key_masked,
+				has_api_key: data.tmdbSettings.has_api_key
+			}}
+		/>
 	</div>
 </div>

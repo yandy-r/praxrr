@@ -1,25 +1,117 @@
 <script lang="ts">
+	import { onDestroy } from 'svelte';
 	import { enhance } from '$app/forms';
 	import { alertStore } from '$alerts/store';
 	import { Save, RotateCcw, Eye, EyeOff, FlaskConical, Loader2 } from 'lucide-svelte';
+	import MaskedApiKey from '$ui/form/MaskedApiKey.svelte';
 	import type { TMDBSettings } from './types';
 
 	export let settings: TMDBSettings;
 
 	let showApiKey = false;
 	let isTesting = false;
+	let apiKeyInput = '';
+	let isKeyRevealed = false;
+	let revealedApiKey = '';
+	let remaskSession = 0;
+	let revealInProgress = false;
+	let copyAfterReveal = false;
+	let revealSubmitButton: HTMLButtonElement | null = null;
+	let revealRequestToken = 0;
+	let pendingRevealRequestToken = 0;
+	let autoHideTimer: ReturnType<typeof setTimeout> | null = null;
+	const revealTimeoutMs = 30_000;
+	$: hasStoredKey = settings.has_api_key || Boolean(settings.api_key_masked);
 
-	// Default values
 	const DEFAULTS = {
-		api_key: ''
+		apiKey: ''
 	};
 
-	function resetToDefaults() {
-		settings.api_key = DEFAULTS.api_key;
+	$: maskedApiKeyValue = isKeyRevealed && revealedApiKey ? revealedApiKey : settings.api_key_masked;
+	$: plainApiKeyValue = isKeyRevealed && revealedApiKey ? revealedApiKey : '';
+
+	function clearAutoHideTimer() {
+		if (autoHideTimer) {
+			clearTimeout(autoHideTimer);
+			autoHideTimer = null;
+		}
 	}
 
+	function setRevealedApiKey(value: string) {
+		isKeyRevealed = Boolean(value);
+		revealedApiKey = value;
+
+		clearAutoHideTimer();
+		if (isKeyRevealed) {
+			autoHideTimer = setTimeout(() => {
+				setRevealedApiKey('');
+			}, revealTimeoutMs);
+		}
+
+		remaskSession += 1;
+	}
+
+	function requestReveal(showError = false) {
+		if (!hasStoredKey || !revealSubmitButton) {
+			if (showError) {
+				alertStore.add('error', 'Unable to retrieve API key');
+			}
+			return;
+		}
+
+		pendingRevealRequestToken = ++revealRequestToken;
+		revealInProgress = true;
+		revealSubmitButton.click();
+	}
+
+	function resetToDefaults() {
+		apiKeyInput = DEFAULTS.apiKey;
+		setRevealedApiKey('');
+	}
+
+	function handleRevealChange(event: CustomEvent<{ revealed: boolean; reason: 'manual' | 'timeout' }>) {
+		if (!event.detail.revealed) {
+			setRevealedApiKey('');
+			return;
+		}
+
+		requestReveal();
+	}
+
+	function handleCopyFeedback(event: CustomEvent<{ success: boolean; message: string; error?: Error }>) {
+		if (event.detail.success) {
+			alertStore.add('success', 'API key copied to clipboard');
+			return;
+		}
+
+		if (event.detail.error?.message === 'Missing key value') {
+			copyAfterReveal = true;
+			requestReveal();
+			return;
+		}
+
+		alertStore.add('error', event.detail.message || 'Copy failed');
+	}
+
+	async function copyRevealedApiKey() {
+		if (!revealedApiKey) {
+			return;
+		}
+
+		try {
+			await navigator.clipboard.writeText(revealedApiKey);
+			alertStore.add('success', 'API key copied to clipboard');
+		} catch {
+			alertStore.add('error', 'Could not copy API key');
+		}
+	}
+
+	onDestroy(() => {
+		clearAutoHideTimer();
+	});
+
 	async function testConnection() {
-		if (!settings.api_key) {
+		if (!apiKeyInput) {
 			alertStore.add('error', 'Please enter an API key first');
 			return;
 		}
@@ -28,8 +120,8 @@
 		try {
 			const response = await fetch('/api/tmdb/test', {
 				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ apiKey: settings.api_key })
+			headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ apiKey: apiKeyInput })
 			});
 			const data = await response.json();
 
@@ -74,21 +166,56 @@
 		}}
 	>
 		<div class="space-y-6">
-			<!-- API Read Access Token -->
+			<!-- Stored API Read Access Token -->
+			<div>
+				<label
+					for="tmdb_stored_api_key"
+					class="mb-2 block text-sm font-semibold text-neutral-900 dark:text-neutral-50"
+				>
+					Stored API Read Access Token
+				</label>
+				{#key remaskSession}
+					<MaskedApiKey
+						id="tmdb_stored_api_key"
+						label="API Read Access Token"
+						maskedValue={maskedApiKeyValue}
+						value={plainApiKeyValue}
+						hasValue={settings.has_api_key}
+						revealLabel="Show"
+						hideLabel="Hide"
+						copyLabel="Copy"
+						disabled={revealInProgress}
+						on:revealChange={handleRevealChange}
+						on:copyFeedback={handleCopyFeedback}
+					/>
+				{/key}
+				<p class="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
+					Use the API Read Access Token (not API Key) from
+					<a
+						href="https://www.themoviedb.org/settings/api"
+						target="_blank"
+						rel="noopener noreferrer"
+						class="text-accent-600 hover:underline dark:text-accent-400"
+					>themoviedb.org</a
+					>
+				</p>
+			</div>
+
+			<!-- Update API Read Access Token -->
 			<div>
 				<label
 					for="tmdb_api_key"
 					class="mb-2 block text-sm font-semibold text-neutral-900 dark:text-neutral-50"
 				>
-					API Read Access Token
+					Update API Read Access Token
 				</label>
 				<div class="relative">
 					<input
 						type={showApiKey ? 'text' : 'password'}
 						id="tmdb_api_key"
 						name="api_key"
-						bind:value={settings.api_key}
-						placeholder="eyJhbGciOiJIUzI1NiJ9..."
+						bind:value={apiKeyInput}
+						placeholder="Enter new token to save"
 						class="block w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 pr-10 font-mono text-sm text-neutral-900 placeholder-neutral-400 focus:border-neutral-400 focus:ring-1 focus:ring-neutral-400 focus:outline-none dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-50 dark:placeholder-neutral-500 dark:focus:border-neutral-500 dark:focus:ring-neutral-500"
 					/>
 					<button
@@ -103,14 +230,6 @@
 						{/if}
 					</button>
 				</div>
-				<p class="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
-					Use the API Read Access Token (not API Key) from <a
-						href="https://www.themoviedb.org/settings/api"
-						target="_blank"
-						rel="noopener noreferrer"
-						class="text-accent-600 hover:underline dark:text-accent-400">themoviedb.org</a
-					>
-				</p>
 			</div>
 		</div>
 
@@ -150,6 +269,48 @@
 					Save Settings
 				</button>
 			</div>
-		</div>
-	</form>
+			</div>
+		</form>
+
+		<form
+			method="POST"
+			action="?/revealTMDB"
+			class="hidden"
+			use:enhance={() => {
+				const requestToken = pendingRevealRequestToken;
+				return async ({ result, update }) => {
+					if (requestToken !== revealRequestToken) {
+						return;
+					}
+
+					revealInProgress = false;
+					if (result.type === 'success') {
+						const response = result.data as { revealedTmdbKey?: string };
+						if (response?.revealedTmdbKey) {
+							setRevealedApiKey(response.revealedTmdbKey);
+							if (copyAfterReveal) {
+							await copyRevealedApiKey();
+								copyAfterReveal = false;
+							}
+						} else {
+							alertStore.add('error', 'Unable to retrieve API key');
+							setRevealedApiKey('');
+						}
+					} else {
+						alertStore.add('error', 'Unable to retrieve API key');
+						setRevealedApiKey('');
+					}
+
+					copyAfterReveal = false;
+					await update();
+				};
+			}}
+		>
+			<button
+				type="submit"
+				class="hidden"
+				aria-label="Reveal TMDB API key"
+				bind:this={revealSubmitButton}
+			></button>
+		</form>
 </div>

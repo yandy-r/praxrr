@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { enhance } from '$app/forms';
-  import { Save, Trash2 } from 'lucide-svelte';
+  import { Save, Trash2, Eye, EyeOff, Copy } from 'lucide-svelte';
   import { alertStore } from '$alerts/store';
   import { isDirty, initEdit, initCreate, update, current, clear } from '$lib/client/stores/dirty';
   import type { DatabaseInstance } from '$db/queries/databaseInstances.ts';
@@ -15,6 +15,8 @@
   // Props
   export let mode: 'create' | 'edit';
   export let instance: DatabaseInstance | undefined = undefined;
+  export let hasStoredPersonalAccessToken = false;
+  export let personalAccessTokenMasked = '';
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   export let form: any = undefined;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -62,13 +64,21 @@
   $: conflictStrategy = ($current.conflictStrategy ?? 'override') as string;
   $: syncStrategy = ($current.syncStrategy ?? '60') as string;
   $: autoPull = ($current.autoPull ?? 'true') as string;
-  $: showGitIdentity = !!personalAccessToken || (mode === 'edit' && !!instance?.personal_access_token);
-  $: requiresGitIdentity = !!personalAccessToken && localOpsEnabled !== 'true';
+  $: hasTokenForIdentity =
+    !!personalAccessToken || (mode === 'edit' && (hasStoredPersonalAccessToken || !!instance?.personal_access_token));
+  $: showGitIdentity = hasTokenForIdentity;
+  $: requiresGitIdentity = hasTokenForIdentity && localOpsEnabled !== 'true';
 
   // UI state
   let saving = false;
   let deleting = false;
   let showDeleteModal = false;
+  let activeRevealedPersonalAccessToken = '';
+  let revealSubmitButton: HTMLButtonElement | null = null;
+  let revealInProgress = false;
+  let revealPurpose: 'reveal' | 'copy' | null = null;
+  let isStoredPersonalAccessTokenRevealed = false;
+  let storedPersonalAccessTokenDisplayValue = '';
 
   // Options for dropdowns
   const syncStrategyOptions = [
@@ -120,6 +130,85 @@
     }
   }
 
+  async function copyTokenToClipboard(token: string) {
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(token);
+        alertStore.add('success', 'Personal access token copied to clipboard');
+        return;
+      }
+
+      const textArea = document.createElement('textarea');
+      textArea.value = token;
+      textArea.setAttribute('readonly', '');
+      textArea.style.position = 'fixed';
+      textArea.style.top = '-9999px';
+      textArea.style.left = '-9999px';
+      document.body.appendChild(textArea);
+      textArea.select();
+      textArea.setSelectionRange(0, textArea.value.length);
+      const copied = document.execCommand('copy');
+      document.body.removeChild(textArea);
+
+      if (!copied) {
+        throw new Error('Copy command failed');
+      }
+
+      alertStore.add('success', 'Personal access token copied to clipboard');
+    } catch {
+      alertStore.add('error', 'Could not copy personal access token');
+    }
+  }
+
+  function requestPersonalAccessTokenReveal(purpose: 'reveal' | 'copy') {
+    if (revealInProgress) {
+      return;
+    }
+
+    if (!hasStoredPersonalAccessToken || !revealSubmitButton) {
+      alertStore.add('error', 'Unable to retrieve personal access token');
+      return;
+    }
+
+    revealPurpose = purpose;
+    revealInProgress = true;
+    revealSubmitButton.click();
+  }
+
+  function toggleStoredPersonalAccessTokenReveal() {
+    if (!hasStoredPersonalAccessToken) {
+      alertStore.add('error', 'Unable to retrieve personal access token');
+      return;
+    }
+
+    if (isStoredPersonalAccessTokenRevealed) {
+      isStoredPersonalAccessTokenRevealed = false;
+      activeRevealedPersonalAccessToken = '';
+      return;
+    }
+
+    if (activeRevealedPersonalAccessToken) {
+      isStoredPersonalAccessTokenRevealed = true;
+      return;
+    }
+
+    requestPersonalAccessTokenReveal('reveal');
+  }
+
+  async function copyStoredPersonalAccessToken() {
+    if (!hasStoredPersonalAccessToken) {
+      alertStore.add('error', 'Unable to retrieve personal access token');
+      return;
+    }
+
+    if (!activeRevealedPersonalAccessToken) {
+      requestPersonalAccessTokenReveal('copy');
+      return;
+    }
+
+    await copyTokenToClipboard(activeRevealedPersonalAccessToken);
+  }
+
   $: canSubmit =
     $isDirty &&
     !!name &&
@@ -130,8 +219,20 @@
   let lastFormId: unknown = null;
   $: if (form && form !== lastFormId) {
     lastFormId = form;
+    revealInProgress = false;
+    if (form.revealedPersonalAccessToken) {
+      if (revealPurpose === 'copy') {
+        void copyTokenToClipboard(form.revealedPersonalAccessToken);
+      } else {
+        activeRevealedPersonalAccessToken = form.revealedPersonalAccessToken;
+        isStoredPersonalAccessTokenRevealed = true;
+      }
+      revealPurpose = null;
+    }
     if (form.success) {
       alertStore.add('success', 'Settings saved successfully');
+      isStoredPersonalAccessTokenRevealed = false;
+      activeRevealedPersonalAccessToken = '';
       // Reset dirty state with new values (keep personalAccessToken empty)
       initEdit({
         name,
@@ -146,9 +247,16 @@
       });
     }
     if (form.error) {
+      revealPurpose = null;
       alertStore.add('error', form.error);
     }
   }
+  $: storedPersonalAccessTokenDisplayValue =
+    hasStoredPersonalAccessToken
+      ? isStoredPersonalAccessTokenRevealed && activeRevealedPersonalAccessToken
+        ? activeRevealedPersonalAccessToken
+        : personalAccessTokenMasked || '••••••••'
+      : '';
 
   // Display text based on mode
   $: title = mode === 'create' ? 'Link Database' : 'Settings';
@@ -225,8 +333,54 @@
     {/if}
 
     <!-- Personal Access Token Row -->
+    {#if mode === 'edit'}
+      <FormInput
+        label="Stored Personal Access Token"
+        name="stored_personal_access_token"
+        value={storedPersonalAccessTokenDisplayValue}
+        placeholder={hasStoredPersonalAccessToken ? '••••••••' : 'No token configured'}
+        description={hasStoredPersonalAccessToken
+          ? 'Stored token is masked by default. Use the icons to reveal/hide or copy.'
+          : 'No token configured'}
+        readonly
+        mono
+        inputClass="pr-24"
+      >
+        <svelte:fragment slot="suffix">
+          <div class="flex items-center gap-1">
+            <button
+              type="button"
+              class="inline-flex h-6 w-6 items-center justify-center rounded text-neutral-500 hover:bg-neutral-100 hover:text-neutral-700 disabled:cursor-not-allowed disabled:opacity-50 dark:text-neutral-400 dark:hover:bg-neutral-800 dark:hover:text-neutral-200"
+              aria-label="Copy stored personal access token"
+              title="Copy"
+              disabled={!hasStoredPersonalAccessToken || revealInProgress}
+              on:click={copyStoredPersonalAccessToken}
+            >
+              <Copy size={14} />
+            </button>
+            <button
+              type="button"
+              class="inline-flex h-6 w-6 items-center justify-center rounded text-neutral-500 hover:bg-neutral-100 hover:text-neutral-700 disabled:cursor-not-allowed disabled:opacity-50 dark:text-neutral-400 dark:hover:bg-neutral-800 dark:hover:text-neutral-200"
+              aria-label={isStoredPersonalAccessTokenRevealed
+                ? 'Hide stored personal access token'
+                : 'Reveal stored personal access token'}
+              title={isStoredPersonalAccessTokenRevealed ? 'Hide' : 'Reveal'}
+              disabled={!hasStoredPersonalAccessToken || revealInProgress}
+              on:click={toggleStoredPersonalAccessTokenReveal}
+            >
+              {#if isStoredPersonalAccessTokenRevealed}
+                <EyeOff size={14} />
+              {:else}
+                <Eye size={14} />
+              {/if}
+            </button>
+          </div>
+        </svelte:fragment>
+      </FormInput>
+    {/if}
+
     <FormInput
-      label="Personal Access Token"
+      label={mode === 'edit' ? 'New Personal Access Token' : 'Personal Access Token'}
       name="personal_access_token"
       value={personalAccessToken}
       placeholder="ghp_..."
@@ -335,6 +489,23 @@
     {/if}
   </div>
 </div>
+
+{#if mode === 'edit'}
+  <form
+    method="POST"
+    action="?/revealPersonalAccessToken"
+    class="hidden"
+    use:enhance={() => {
+      revealInProgress = true;
+      return async ({ update: formUpdate }) => {
+        await formUpdate({ reset: false });
+        revealInProgress = false;
+      };
+    }}
+  >
+    <button type="submit" bind:this={revealSubmitButton}>Reveal personal access token</button>
+  </form>
+{/if}
 
 <!-- Hidden save form -->
 <form

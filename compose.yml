@@ -1,6 +1,6 @@
 services:
   praxrr:
-    image: ghcr.io/yandy-r/praxrr:v2
+    image: ghcr.io/yandy-r/praxrr:latest
     container_name: praxrr-prod
     restart: unless-stopped
     ports:
@@ -24,6 +24,9 @@ services:
       - PRAXRR_DEFAULT_DB_GIT_USERNAME=${PRAXRR_DEFAULT_DB_GIT_USERNAME}
       - PRAXRR_DEFAULT_DB_GIT_EMAIL=${PRAXRR_DEFAULT_DB_GIT_EMAIL}
       - PRAXRR_SCHEMA_REF=v2
+      - ARR_CREDENTIAL_MASTER_KEY=${ARR_CREDENTIAL_MASTER_KEY}
+      - ARR_CREDENTIAL_MASTER_KEY_VERSION=v1
+      # ARR_CREDENTIAL_PREVIOUS_KEYS: ${ARR_CREDENTIAL_PREVIOUS_KEYS} # optional: JSON map
       # Optional Arr instances via environment at startup
       - LIDARR_INSTANCE_NAME_1=Lidarr # Optional (Generated if not provided)
       - LIDARR_INSTANCE_URL_1=${PRAXRR_LIDARR_URL}
@@ -47,7 +50,7 @@ services:
 
   # Optional - only needed for CF/QP testing features
   parser:
-    image: ghcr.io/yandy-r/praxrr-parser:v2
+    image: ghcr.io/yandy-r/praxrr-parser:latest
     container_name: praxrr-parser
     restart: unless-stopped
     expose:

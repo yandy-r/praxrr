@@ -1,4 +1,8 @@
 import { db } from '../db.ts';
+import {
+  databaseInstanceCredentialsQueries,
+  type DatabaseInstanceCredentialWriteInput,
+} from './databaseInstanceCredentials.ts';
 
 export type ConflictStrategy = 'override' | 'align' | 'ask';
 
@@ -15,6 +19,7 @@ export interface DatabaseInstance {
   auto_pull: number;
   enabled: number;
   personal_access_token: string | null;
+  has_personal_access_token?: number;
   is_private: number;
   local_ops_enabled: number;
   git_user_name: string | null;
@@ -54,6 +59,68 @@ export interface UpdateDatabaseInstanceInput {
   conflictStrategy?: ConflictStrategy;
 }
 
+const databaseInstanceSelectWithCredentials = `
+  SELECT
+    di.id,
+    di.uuid,
+    di.name,
+    di.repository_url,
+    di.local_path,
+    di.sync_strategy,
+    di.auto_pull,
+    di.enabled,
+    '' AS personal_access_token,
+    EXISTS(
+      SELECT 1
+      FROM database_instance_credentials dic
+      WHERE dic.instance_id = di.id
+    ) AS has_personal_access_token,
+    di.is_private,
+    di.local_ops_enabled,
+    di.git_user_name,
+    di.git_user_email,
+    di.conflict_strategy,
+    di.last_synced_at,
+    di.created_at,
+    di.updated_at
+  FROM database_instances di`;
+
+const databaseInstanceSelectLegacy = `
+  SELECT
+    di.id,
+    di.uuid,
+    di.name,
+    di.repository_url,
+    di.local_path,
+    di.sync_strategy,
+    di.auto_pull,
+    di.enabled,
+    di.personal_access_token,
+    CASE
+      WHEN di.personal_access_token IS NOT NULL AND TRIM(di.personal_access_token) != '' THEN 1
+      ELSE 0
+    END AS has_personal_access_token,
+    di.is_private,
+    di.local_ops_enabled,
+    di.git_user_name,
+    di.git_user_email,
+    di.conflict_strategy,
+    di.last_synced_at,
+    di.created_at,
+    di.updated_at
+  FROM database_instances di`;
+
+function supportsDatabaseInstanceCredentials(): boolean {
+  const result = db.queryFirst<{ table_present: number }>(
+    "SELECT 1 as table_present FROM sqlite_master WHERE type = 'table' AND name = 'database_instance_credentials' LIMIT 1"
+  );
+  return (result?.table_present ?? 0) === 1;
+}
+
+function getDatabaseInstanceSelect(): string {
+  return supportsDatabaseInstanceCredentials() ? databaseInstanceSelectWithCredentials : databaseInstanceSelectLegacy;
+}
+
 /**
  * All queries for database_instances table
  */
@@ -61,79 +128,104 @@ export const databaseInstancesQueries = {
   /**
    * Create a new database instance
    */
-  create(input: CreateDatabaseInstanceInput): number {
+  create(input: CreateDatabaseInstanceInput, credentialInput?: DatabaseInstanceCredentialWriteInput): number {
     const syncStrategy = input.syncStrategy ?? 0;
     const autoPull = input.autoPull !== false ? 1 : 0;
     const enabled = input.enabled !== false ? 1 : 0;
-    const personalAccessToken = input.personalAccessToken || null;
     const isPrivate = input.isPrivate ? 1 : 0;
     const localOpsEnabled = input.localOpsEnabled ? 1 : 0;
     const gitUserName = input.gitUserName || null;
     const gitUserEmail = input.gitUserEmail || null;
     const conflictStrategy = input.conflictStrategy ?? 'override';
 
-    db.execute(
-      `INSERT INTO database_instances (
-				uuid,
-				name,
-				repository_url,
-				local_path,
-				sync_strategy,
-				auto_pull,
-				enabled,
-				personal_access_token,
-				is_private,
-				local_ops_enabled,
-				git_user_name,
-				git_user_email,
-				conflict_strategy
-			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      input.uuid,
-      input.name,
-      input.repositoryUrl,
-      input.localPath,
-      syncStrategy,
-      autoPull,
-      enabled,
-      personalAccessToken,
-      isPrivate,
-      localOpsEnabled,
-      gitUserName,
-      gitUserEmail,
-      conflictStrategy
-    );
+    const useCredentialTable = supportsDatabaseInstanceCredentials();
+    const persistedPersonalAccessToken = useCredentialTable ? '' : input.personalAccessToken || null;
 
-    // Get the last inserted ID
-    const result = db.queryFirst<{ id: number }>('SELECT last_insert_rowid() as id');
-    return result?.id ?? 0;
+    db.beginTransaction();
+    try {
+      db.execute(
+        `INSERT INTO database_instances (
+					uuid,
+					name,
+					repository_url,
+					local_path,
+					sync_strategy,
+					auto_pull,
+					enabled,
+					personal_access_token,
+					is_private,
+					local_ops_enabled,
+					git_user_name,
+					git_user_email,
+					conflict_strategy
+				) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        input.uuid,
+        input.name,
+        input.repositoryUrl,
+        input.localPath,
+        syncStrategy,
+        autoPull,
+        enabled,
+        persistedPersonalAccessToken,
+        isPrivate,
+        localOpsEnabled,
+        gitUserName,
+        gitUserEmail,
+        conflictStrategy
+      );
+
+      // Get the last inserted ID
+      const result = db.queryFirst<{ id: number }>('SELECT last_insert_rowid() as id');
+      const id = result?.id ?? 0;
+      if (!id) {
+        throw new Error('Failed to create database instance');
+      }
+
+      if (credentialInput !== undefined && useCredentialTable) {
+        databaseInstanceCredentialsQueries.create({
+          instanceId: id,
+          ...credentialInput,
+        });
+      }
+
+      db.commit();
+      return id;
+    } catch (error) {
+      db.rollback();
+      throw error;
+    }
   },
 
   /**
    * Get a database instance by ID
    */
   getById(id: number): DatabaseInstance | undefined {
-    return db.queryFirst<DatabaseInstance>('SELECT * FROM database_instances WHERE id = ?', id);
+    const databaseInstanceSelect = getDatabaseInstanceSelect();
+    return db.queryFirst<DatabaseInstance>(`${databaseInstanceSelect} WHERE di.id = ?`, id);
   },
 
   /**
    * Get a database instance by UUID
    */
   getByUuid(uuid: string): DatabaseInstance | undefined {
-    return db.queryFirst<DatabaseInstance>('SELECT * FROM database_instances WHERE uuid = ?', uuid);
+    const databaseInstanceSelect = getDatabaseInstanceSelect();
+    return db.queryFirst<DatabaseInstance>(`${databaseInstanceSelect} WHERE di.uuid = ?`, uuid);
   },
 
   /**
    * Get all database instances
    */
   getAll(): DatabaseInstance[] {
-    return db.query<DatabaseInstance>('SELECT * FROM database_instances ORDER BY name');
+    const databaseInstanceSelect = getDatabaseInstanceSelect();
+    return db.query<DatabaseInstance>(`${databaseInstanceSelect} ORDER BY di.name`);
   },
 
   /**
    * Get enabled database instances
    */
   getEnabled(): DatabaseInstance[] {
-    return db.query<DatabaseInstance>('SELECT * FROM database_instances WHERE enabled = 1 ORDER BY name');
+    const databaseInstanceSelect = getDatabaseInstanceSelect();
+    return db.query<DatabaseInstance>(`${databaseInstanceSelect} WHERE di.enabled = 1 ORDER BY di.name`);
   },
 
   /**
@@ -141,22 +233,28 @@ export const databaseInstancesQueries = {
    * Note: last_synced_at may be ISO format (with T and Z), normalize for datetime()
    */
   getDueForSync(): DatabaseInstance[] {
+    const databaseInstanceSelect = getDatabaseInstanceSelect();
     return db.query<DatabaseInstance>(
-      `SELECT * FROM database_instances
-       WHERE enabled = 1
-       AND sync_strategy > 0
+      `${databaseInstanceSelect}
+       WHERE di.enabled = 1
+       AND di.sync_strategy > 0
        AND (
-         last_synced_at IS NULL
-         OR datetime(replace(replace(last_synced_at, 'T', ' '), 'Z', ''), '+' || sync_strategy || ' minutes') <= datetime('now')
+         di.last_synced_at IS NULL
+         OR datetime(replace(replace(di.last_synced_at, 'T', ' '), 'Z', ''), '+' || di.sync_strategy || ' minutes') <= datetime('now')
        )
-       ORDER BY last_synced_at ASC NULLS FIRST`
+       ORDER BY di.last_synced_at ASC NULLS FIRST`
     );
   },
 
   /**
    * Update a database instance
    */
-  update(id: number, input: UpdateDatabaseInstanceInput): boolean {
+  update(
+    id: number,
+    input: UpdateDatabaseInstanceInput,
+    credentialInput?: DatabaseInstanceCredentialWriteInput
+  ): boolean {
+    const useCredentialTable = supportsDatabaseInstanceCredentials();
     const updates: string[] = [];
     const params: (string | number | null)[] = [];
 
@@ -182,7 +280,7 @@ export const databaseInstancesQueries = {
     }
     if (input.personalAccessToken !== undefined) {
       updates.push('personal_access_token = ?');
-      params.push(input.personalAccessToken || null);
+      params.push(useCredentialTable ? '' : input.personalAccessToken || null);
     }
     if (input.localOpsEnabled !== undefined) {
       updates.push('local_ops_enabled = ?');
@@ -201,7 +299,7 @@ export const databaseInstancesQueries = {
       params.push(input.conflictStrategy);
     }
 
-    if (updates.length === 0) {
+    if (updates.length === 0 && credentialInput === undefined) {
       return false;
     }
 
@@ -209,9 +307,24 @@ export const databaseInstancesQueries = {
     updates.push('updated_at = CURRENT_TIMESTAMP');
     params.push(id);
 
-    const affected = db.execute(`UPDATE database_instances SET ${updates.join(', ')} WHERE id = ?`, ...params);
+    db.beginTransaction();
+    try {
+      let affected = db.execute(`UPDATE database_instances SET ${updates.join(', ')} WHERE id = ?`, ...params) > 0;
 
-    return affected > 0;
+      if (credentialInput !== undefined && useCredentialTable) {
+        databaseInstanceCredentialsQueries.upsert({
+          instanceId: id,
+          ...credentialInput,
+        });
+        affected = true;
+      }
+
+      db.commit();
+      return affected;
+    } catch (error) {
+      db.rollback();
+      throw error;
+    }
   },
 
   /**
