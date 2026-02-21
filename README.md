@@ -163,6 +163,9 @@ This runs the parser service and Vite dev server concurrently. See
 | `PRAXRR_DEFAULT_DB_NAME`            | `Praxrr-DB`                            | Default PCD display name                                                             |
 | `PRAXRR_SCHEMA_REF`                 | manifest value                         | Override schema dependency ref (tag or branch, e.g. `v2`, `dev`, `latest`, `1.0.0`)  |
 | `PRAXRR_VALIDATE_INSTANCES`         | `false`                                | Validate env-managed instances against Arr API during startup (optional).            |
+| `PULL_ON_START`                     | `false`                                | Pull sync selections from Arr instances on startup (non-blocking background job).    |
+| `PULL_ON_START_MAX_CONCURRENCY`     | _unset_                                | Max concurrent Arr instance pulls (optional, positive integer).                      |
+| `PULL_ON_START_TIMEOUT_MS`          | _unset_                                | Per-instance pull timeout in milliseconds (optional, positive integer).              |
 | `ARR_CREDENTIAL_MASTER_KEY`         | _required for Arr access_              | Base64-encoded 32-byte master key for AES-GCM encryption and HMAC fingerprinting     |
 | `ARR_CREDENTIAL_MASTER_KEY_VERSION` | _required for Arr access_              | Version label for the active master key, used for encryption and lookup              |
 | `ARR_CREDENTIAL_PREVIOUS_KEYS`      | _unset_                                | Optional JSON map of previous versions to base64 keys for decryption during rotation |

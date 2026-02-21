@@ -44,6 +44,10 @@ services:
       - SONARR_INSTANCE_API_KEY_1=${PRAXRR_SONARR_API_KEY}
       - SONARR_INSTANCE_TAGS_1=tv,4k
       - PRAXRR_VALIDATE_INSTANCES=false
+      # Optional: pull sync selections from Arr instances on startup
+      # - PULL_ON_START=true
+      # - PULL_ON_START_MAX_CONCURRENCY=2
+      # - PULL_ON_START_TIMEOUT_MS=30000
     depends_on:
       parser:
         condition: service_healthy
