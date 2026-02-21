@@ -19,8 +19,10 @@ export type StartupPullMatchReason =
   | 'matched_exact_name'
   | 'matched_fingerprint'
   | 'name_conflict'
+  | 'namespace_conflict'
   | 'fingerprint_conflict'
   | 'default_skip'
+  | 'unmanaged_remote'
   | 'no_match'
   | 'unsupported_section';
 

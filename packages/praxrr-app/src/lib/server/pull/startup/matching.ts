@@ -23,7 +23,7 @@ export interface StartupMatchBatchResult {
 }
 
 export function normalizeStartupName(name: string): string {
-	return name;
+	return name.toLocaleLowerCase();
 }
 
 export function matchStartupEntity(

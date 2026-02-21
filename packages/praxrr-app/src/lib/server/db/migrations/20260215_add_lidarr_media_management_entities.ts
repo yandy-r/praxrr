@@ -14,7 +14,7 @@ CREATE TABLE IF NOT EXISTS lidarr_naming (
 	artist_name TEXT NOT NULL,
 	multi_disc_track_format TEXT NOT NULL,
 	artist_folder_format TEXT NOT NULL,
-	replace_illegal_characters INTEGER NOT NULL DEFAULT 0,
+	replace_illegal_characters INTEGER NOT NULL DEFAULT 1,
 	colon_replacement_format INTEGER NOT NULL DEFAULT 4,
 	custom_colon_replacement_format TEXT,
 	created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
