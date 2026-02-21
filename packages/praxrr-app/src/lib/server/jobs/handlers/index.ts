@@ -1,6 +1,7 @@
 import './arrUpgrade.ts';
 import './arrRename.ts';
 import './arrSync.ts';
+import './arrPullStartup.ts';
 import './pcdSync.ts';
 import './backupCreate.ts';
 import './backupCleanup.ts';

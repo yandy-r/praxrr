@@ -136,7 +136,7 @@ if (config.pullOnStart) {
       jobType: 'arr.pull.startup',
       runAt: new Date().toISOString(),
       source: 'system',
-      payload: {},
+      payload: { enqueuedAt: new Date().toISOString() },
       dedupeKey: 'arr.pull.startup:boot',
     });
 

@@ -36,6 +36,19 @@ import { generatePreview, type GeneratePreviewResult } from './preview/orchestra
 // Concurrency limit for parallel instance processing
 const CONCURRENCY_LIMIT = 3;
 
+// Process-level guard: instances actively being processed by startup pull.
+// When set, triggerSyncs skips on_pull fanout for these instances to prevent
+// redundant sync work (the selections were just reconstructed from live Arr state).
+const startupPullActiveInstances = new Set<number>();
+
+export function markInstanceStartupPullActive(instanceId: number): void {
+	startupPullActiveInstances.add(instanceId);
+}
+
+export function markInstanceStartupPullComplete(instanceId: number): void {
+	startupPullActiveInstances.delete(instanceId);
+}
+
 export type { ProcessSyncsResult, InstanceSyncResult, SyncTriggerEvent, TriggerContext };
 
 export interface PreviewInstanceRequest {
@@ -377,6 +390,16 @@ export async function triggerSyncs(context: TriggerContext): Promise<void> {
   const instanceIds = arrSyncQueries.getInstanceIdsForTrigger(context.event);
 
   for (const instanceId of instanceIds) {
+    // Skip instances actively being processed by startup pull to prevent
+    // redundant sync work (selections were just reconstructed from live state).
+    if (startupPullActiveInstances.has(instanceId)) {
+      await logger.debug(`Skipping sync trigger for instance ${instanceId} (startup pull active)`, {
+        source: 'SyncProcessor',
+        meta: { instanceId, event: context.event },
+      });
+      continue;
+    }
+
     const status = arrSyncQueries.getSyncConfigStatus(instanceId);
 
     if (triggers.includes(status.qualityProfiles.trigger)) {
