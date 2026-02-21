@@ -126,7 +126,7 @@ export const actions: Actions = {
           multiDiscTrackFormat: multiDiscTrackFormat.trim(),
           artistFolderFormat: artistFolderFormat.trim(),
           replaceIllegalCharacters,
-          colonReplacementFormat: colonReplacementFormat || 'delete',
+          colonReplacementFormat: colonReplacementFormat || 'smart',
           customColonReplacementFormat: customColonReplacementFormat || null,
         },
       });

@@ -10,7 +10,6 @@ import type {
 } from '$arr/types.ts';
 import { assertStartupArrType, createAdapterResultEnvelope, getStartupSectionSupportReason, incrementCounter, isStartupSectionSupported, type StartupAdapterResultEnvelope } from './shared.ts';
 import {
-	matchStartupEntity,
 	makeStartupMatchNoMatchResult,
 } from '../matching.ts';
 import {
@@ -39,6 +38,13 @@ import type {
 	StartupPullMatchResult,
 	StartupPullSection,
 } from '../types.ts';
+import {
+	buildDelayProfileFingerprintFromArr,
+	buildDelayProfileFingerprintFromLocal,
+	matchDelayProfileByFingerprint,
+	matchManagedStartupProfileByNamespace,
+	selectDefaultDelayProfileForStartup,
+} from '../profileMatching.ts';
 
 export type LidarrStartupFetchFailureKind = 'auth' | 'unreachable' | 'unknown';
 
@@ -250,9 +256,7 @@ function buildUnsupportedSectionResult(
 	};
 }
 
-function classifyLidarrListSectionMatch(
-	input: StartupPullMatchRequest
-): StartupPullMatchResult {
+function classifyLidarrManagedProfileMatch(input: StartupPullMatchRequest): StartupPullMatchResult {
 	const skipDefault = shouldSkipStartupDefault(input.arrType, input.section, input.remote);
 	if (skipDefault.skip) {
 		return makeStartupMatchNoMatchResult(input, 'default_skip', {
@@ -260,9 +264,27 @@ function classifyLidarrListSectionMatch(
 		});
 	}
 
-	const result = matchStartupEntity(input, {
-		normalizeName: (value) => value,
-	});
+	const result = matchManagedStartupProfileByNamespace(input);
+
+	if (result.status !== 'matched' || result.matchedEntityId === null || result.matchedEntityId === undefined) {
+		return result;
+	}
+
+	const matchedCandidate = input.candidates.find((candidate) => candidate.id === result.matchedEntityId);
+	if (!matchedCandidate) {
+		return result;
+	}
+
+	return {
+		...result,
+		databaseId: matchedCandidate.databaseId,
+		matchedEntityId: matchedCandidate.id,
+		matchedEntityName: matchedCandidate.name,
+	};
+}
+
+function classifyLidarrDelayProfileMatch(input: StartupPullMatchRequest): StartupPullMatchResult {
+	const result = matchDelayProfileByFingerprint(input);
 
 	if (result.status !== 'matched' || result.matchedEntityId === null || result.matchedEntityId === undefined) {
 		return result;
@@ -333,13 +355,23 @@ export async function collectRemoteSectionSnapshots(
 		);
 
 		const remoteDelayProfiles = sortDescriptorSnapshots(
-			delayProfiles.map((profile) => ({
-				id: profile.id,
-				name: getDelayProfileName(profile),
-				section: 'delayProfiles',
-				arrType: 'lidarr',
-				databaseId: -1,
-			}))
+			(() => {
+				const defaultDelayProfile = selectDefaultDelayProfileForStartup('lidarr', delayProfiles);
+				if (!defaultDelayProfile) {
+					return [];
+				}
+
+				return [
+					{
+						id: defaultDelayProfile.id,
+						name: getDelayProfileName(defaultDelayProfile),
+						section: 'delayProfiles' as const,
+						arrType: 'lidarr' as const,
+						databaseId: -1,
+						fingerprint: buildDelayProfileFingerprintFromArr(defaultDelayProfile),
+					},
+				];
+			})()
 		);
 
 		const remoteMetadataProfiles = sortDescriptorSnapshots(
@@ -411,6 +443,7 @@ export async function collectLidarrStartupCandidates(
 				section: 'delayProfiles',
 				arrType: 'lidarr',
 				databaseId,
+				fingerprint: buildDelayProfileFingerprintFromLocal(row),
 			});
 		}
 
@@ -453,7 +486,7 @@ export async function matchLidarrStartupResources(
 					...remoteProfile,
 					databaseId: fallbackDatabaseId,
 				};
-				const result = classifyLidarrListSectionMatch({
+				const result = classifyLidarrManagedProfileMatch({
 					instanceId: input.instanceId,
 					databaseId: fallbackDatabaseId,
 					section,
@@ -473,7 +506,7 @@ export async function matchLidarrStartupResources(
 					...remoteProfile,
 					databaseId: fallbackDatabaseId,
 				};
-				const result = classifyLidarrListSectionMatch({
+				const result = classifyLidarrDelayProfileMatch({
 					instanceId: input.instanceId,
 					databaseId: fallbackDatabaseId,
 					section,

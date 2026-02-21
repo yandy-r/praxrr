@@ -30,8 +30,8 @@ import {
 // normalizeStartupName
 // =============================================================================
 
-Deno.test('normalizeStartupName: preserves name as-is (identity normalization)', () => {
-	assertEquals(normalizeStartupName('HD Bluray + WEB'), 'HD Bluray + WEB');
+Deno.test('normalizeStartupName: compares names using case-insensitive normalization', () => {
+	assertEquals(normalizeStartupName('HD Bluray + WEB'), 'hd bluray + web');
 	assertEquals(normalizeStartupName(''), '');
 	assertEquals(normalizeStartupName('  padded  '), '  padded  ');
 });
@@ -260,7 +260,7 @@ Deno.test('matchStartupEntity: three-way ambiguity still classified as conflicte
 // Case sensitivity behavior in name matching
 // =============================================================================
 
-Deno.test('matchStartupEntity: names are case-sensitive by default (identity normalizer)', () => {
+Deno.test('matchStartupEntity: names are case-insensitive by default', () => {
 	const remote = buildEntityDescriptor('radarr', 'qualityProfiles', {
 		id: 50,
 		name: 'HD Bluray + WEB',
@@ -276,11 +276,10 @@ Deno.test('matchStartupEntity: names are case-sensitive by default (identity nor
 
 	const result = matchStartupEntity(request);
 
-	// Identity normalizer means case-sensitive comparison
-	assertEquals(result.status, 'no_match');
+	assertEquals(result.status, 'matched');
 });
 
-Deno.test('matchStartupEntity: custom case-insensitive normalizer enables case-insensitive matching', () => {
+Deno.test('matchStartupEntity: custom case-sensitive normalizer can enforce strict casing', () => {
 	const remote = buildEntityDescriptor('radarr', 'qualityProfiles', {
 		id: 50,
 		name: 'HD Bluray + WEB',
@@ -295,12 +294,10 @@ Deno.test('matchStartupEntity: custom case-insensitive normalizer enables case-i
 	});
 
 	const result = matchStartupEntity(request, {
-		normalizeName: (name: string) => name.toLowerCase(),
+		normalizeName: (name: string) => name,
 	});
 
-	assertEquals(result.status, 'matched');
-	assertEquals(result.reason, 'matched_exact_name');
-	assertEquals(result.matchedEntityId, 101);
+	assertEquals(result.status, 'no_match');
 });
 
 // =============================================================================

@@ -15,7 +15,6 @@ import {
 	StartupPullArrType,
 	type StartupPullEntityDescriptor,
 	type StartupPullInstanceInput,
-	type StartupPullMatchReason,
 	type StartupPullMatchResult,
 	type StartupPullSection,
 } from '../types.ts';
@@ -27,8 +26,15 @@ import {
 	classifyMediaManagementMatch,
 	collectStartupMediaManagementCandidates,
 } from '../mediaManagement.ts';
-import { matchStartupEntity, makeStartupMatchNoMatchResult } from '../matching.ts';
+import { makeStartupMatchNoMatchResult } from '../matching.ts';
 import { shouldSkipStartupDefault } from '../defaultFilters.ts';
+import {
+	buildDelayProfileFingerprintFromArr,
+	buildDelayProfileFingerprintFromLocal,
+	matchDelayProfileByFingerprint,
+	matchManagedStartupProfileByNamespace,
+	selectDefaultDelayProfileForStartup,
+} from '../profileMatching.ts';
 
 export type RadarrStartupFetchFailureKind = 'auth' | 'unreachable' | 'unknown';
 
@@ -231,10 +237,10 @@ function buildUnsupportedSectionResult(
 	};
 }
 
-function matchSectionByNameThenFingerprint(
+function matchManagedQualityProfiles(
 	instanceId: number,
 	databaseId: number,
-	section: Extract<StartupPullSection, 'qualityProfiles' | 'delayProfiles'>,
+	section: Extract<StartupPullSection, 'qualityProfiles'>,
 	arrType: StartupPullArrType,
 	remote: Omit<StartupPullEntityDescriptor, 'databaseId'>,
 	candidates: readonly StartupPullEntityDescriptor[]
@@ -253,17 +259,54 @@ function matchSectionByNameThenFingerprint(
 
 	const skip = shouldSkipStartupDefault(request.arrType, request.section, request.remote);
 	if (skip.skip) {
-		return makeStartupMatchNoMatchResult(request, 'default_skip' satisfies StartupPullMatchReason, {
+		return makeStartupMatchNoMatchResult(request, 'default_skip', {
 			hasFingerprintAttempt: request.remote.fingerprint !== null,
 		});
 	}
 
-	const result = matchStartupEntity(request);
+	const result = matchManagedStartupProfileByNamespace(request);
 	if (result.status !== 'matched') {
 		return result;
 	}
 
 	if (result.matchedEntityId === null || result.matchedEntityId === undefined) {
+		return result;
+	}
+
+	const matchedCandidate = candidates.find((candidate) => candidate.id === result.matchedEntityId);
+	if (!matchedCandidate) {
+		return result;
+	}
+
+	return {
+		...result,
+		databaseId: matchedCandidate.databaseId,
+		matchedEntityId: matchedCandidate.id,
+		matchedEntityName: matchedCandidate.name,
+	};
+}
+
+function matchDelayProfileFromDefaultSnapshot(
+	instanceId: number,
+	databaseId: number,
+	arrType: StartupPullArrType,
+	remote: Omit<StartupPullEntityDescriptor, 'databaseId'>,
+	candidates: readonly StartupPullEntityDescriptor[]
+): StartupPullMatchResult {
+	const request = {
+		instanceId,
+		databaseId,
+		section: 'delayProfiles' as const,
+		arrType,
+		remote: {
+			...remote,
+			databaseId,
+		},
+		candidates,
+	};
+
+	const result = matchDelayProfileByFingerprint(request);
+	if (result.status !== 'matched' || result.matchedEntityId === null || result.matchedEntityId === undefined) {
 		return result;
 	}
 
@@ -320,6 +363,8 @@ export async function collectRemoteSectionSnapshots(
 				: Promise.resolve([] as Awaited<ReturnType<typeof client.getQualityDefinitions>>),
 		]);
 
+		const defaultDelayProfile = selectDefaultDelayProfileForStartup('radarr', delayProfiles);
+
 		const resources: RadarrStartupRemoteSnapshot['resources'] = {
 			qualityProfiles: toSectionSnapshot(
 				qualityProfiles.map((profile) => ({
@@ -329,14 +374,17 @@ export async function collectRemoteSectionSnapshots(
 					arrType: 'radarr',
 				}))
 			),
-			delayProfiles: toSectionSnapshot(
-				delayProfiles.map((profile) => ({
-					id: profile.id,
-					name: getDelayProfileName(profile),
-					section: 'delayProfiles',
-					arrType: 'radarr',
-				}))
-			),
+			delayProfiles: defaultDelayProfile
+				? toSectionSnapshot([
+					{
+						id: defaultDelayProfile.id,
+						name: getDelayProfileName(defaultDelayProfile),
+						section: 'delayProfiles',
+						arrType: 'radarr',
+						fingerprint: buildDelayProfileFingerprintFromArr(defaultDelayProfile),
+					},
+				])
+				: [],
 			naming: naming ? toSectionSnapshot([buildRemoteNamingSnapshot('radarr', naming)]) : [],
 			mediaSettings: mediaManagement ? toSectionSnapshot([buildRemoteMediaSettingsSnapshot(mediaManagement, 'radarr')]) : [],
 			qualityDefinitions: qualityDefinitions
@@ -394,6 +442,7 @@ export async function collectRadarrStartupCandidates(databaseIds: readonly numbe
 				section: 'delayProfiles',
 				arrType: 'radarr',
 				databaseId,
+				fingerprint: buildDelayProfileFingerprintFromLocal(profile),
 			});
 		}
 
@@ -431,7 +480,7 @@ export async function matchRadarrStartupResources(
 	for (const section of snapshot.supportedSections) {
 		if (section === 'qualityProfiles') {
 			for (const remoteProfile of snapshot.resources.qualityProfiles) {
-				const result = matchSectionByNameThenFingerprint(
+				const result = matchManagedQualityProfiles(
 					input.instanceId,
 					fallbackDatabaseId,
 					'qualityProfiles',
@@ -448,10 +497,9 @@ export async function matchRadarrStartupResources(
 
 		if (section === 'delayProfiles') {
 			for (const remoteProfile of snapshot.resources.delayProfiles) {
-				const result = matchSectionByNameThenFingerprint(
+				const result = matchDelayProfileFromDefaultSnapshot(
 					input.instanceId,
 					fallbackDatabaseId,
-					'delayProfiles',
 					arrType,
 					remoteProfile,
 					candidates.delayProfiles,

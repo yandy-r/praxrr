@@ -91,7 +91,7 @@ export const actions: Actions = {
             movieFormat: movieFormat || '',
             movieFolderFormat: movieFolderFormat || '',
             replaceIllegalCharacters,
-            colonReplacementFormat: colonReplacementFormat || 'delete',
+            colonReplacementFormat: colonReplacementFormat || 'smart',
           },
         });
       } catch (err) {
@@ -148,7 +148,7 @@ export const actions: Actions = {
             seriesFolderFormat: seriesFolderFormat || '',
             seasonFolderFormat: seasonFolderFormat || '',
             replaceIllegalCharacters,
-            colonReplacementFormat: colonReplacementFormat || 'delete',
+            colonReplacementFormat: colonReplacementFormat || 'smart',
             customColonReplacementFormat: customColonReplacementFormat || null,
             multiEpisodeStyle: multiEpisodeStyle || 'extend',
           },
@@ -203,7 +203,7 @@ export const actions: Actions = {
             multiDiscTrackFormat: multiDiscTrackFormat.trim(),
             artistFolderFormat: artistFolderFormat.trim(),
             replaceIllegalCharacters,
-            colonReplacementFormat: colonReplacementFormat || 'delete',
+            colonReplacementFormat: colonReplacementFormat || 'smart',
             customColonReplacementFormat: customColonReplacementFormat || null,
           },
         });

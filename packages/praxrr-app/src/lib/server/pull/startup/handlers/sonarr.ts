@@ -13,10 +13,9 @@ import {
   type StartupAdapterResultEnvelope,
 } from './shared.ts';
 import {
-  StartupPullArrType,
+  type StartupPullArrType,
   type StartupPullEntityDescriptor,
   type StartupPullInstanceInput,
-  type StartupPullMatchReason,
   type StartupPullMatchResult,
   type StartupPullSection,
 } from '../types.ts';
@@ -29,10 +28,16 @@ import {
   collectStartupMediaManagementCandidates,
 } from '../mediaManagement.ts';
 import {
-  matchStartupEntity,
   makeStartupMatchNoMatchResult,
 } from '../matching.ts';
 import { shouldSkipStartupDefault } from '../defaultFilters.ts';
+import {
+	buildDelayProfileFingerprintFromArr,
+	buildDelayProfileFingerprintFromLocal,
+	matchDelayProfileByFingerprint,
+	matchManagedStartupProfileByNamespace,
+	selectDefaultDelayProfileForStartup,
+} from '../profileMatching.ts';
 
 export type SonarrStartupFetchFailureKind = 'auth' | 'unreachable' | 'unknown';
 
@@ -256,16 +261,19 @@ function buildSectionMatchRequest(
     candidates,
   };
 
-  const skip = shouldSkipStartupDefault(request.arrType, request.section, request.remote);
-  if (skip.skip) {
-    return makeStartupMatchNoMatchResult(request, 'default_skip' as StartupPullMatchReason, {
-      hasFingerprintAttempt: remote.fingerprint !== null,
-    });
-  }
+  if (section === 'qualityProfiles') {
+		const skip = shouldSkipStartupDefault(request.arrType, request.section, request.remote);
+		if (skip.skip) {
+			return makeStartupMatchNoMatchResult(request, 'default_skip', {
+				hasFingerprintAttempt: remote.fingerprint !== null,
+			});
+		}
+	}
 
-  const result = matchStartupEntity(request, {
-    normalizeName: (value) => value,
-  });
+	const result =
+		section === 'qualityProfiles'
+			? matchManagedStartupProfileByNamespace(request)
+			: matchDelayProfileByFingerprint(request);
 
   if (result.status !== 'matched') {
     return result;
@@ -330,6 +338,8 @@ export async function collectRemoteSectionSnapshots(client: BaseArrClient): Prom
           : Promise.resolve([] as const),
       ]);
 
+    const defaultDelayProfile = selectDefaultDelayProfileForStartup('sonarr', delayProfiles);
+
     const resources: SonarrStartupRemoteSnapshot['resources'] = {
       qualityProfiles: toSectionSnapshot(qualityProfiles, (remoteProfile) => ({
         id: remoteProfile.id,
@@ -338,13 +348,16 @@ export async function collectRemoteSectionSnapshots(client: BaseArrClient): Prom
         arrType: 'sonarr',
         databaseId: -1,
       })),
-      delayProfiles: toSectionSnapshot(delayProfiles, (remoteProfile) => ({
-        id: remoteProfile.id,
-        name: getDelayProfileName(remoteProfile),
-        section: 'delayProfiles',
-        arrType: 'sonarr',
-        databaseId: -1,
-      })),
+      delayProfiles: defaultDelayProfile
+        ? toSectionSnapshot([defaultDelayProfile], (remoteProfile) => ({
+            id: remoteProfile.id,
+            name: getDelayProfileName(remoteProfile),
+            section: 'delayProfiles',
+            arrType: 'sonarr',
+            databaseId: -1,
+            fingerprint: buildDelayProfileFingerprintFromArr(remoteProfile),
+          }))
+        : [],
       naming: naming ? [buildRemoteNamingSnapshot('sonarr', naming)] : [],
       mediaSettings: mediaManagement ? [buildRemoteMediaSettingsSnapshot(mediaManagement, 'sonarr')] : [],
       qualityDefinitions: qualityDefinitions
@@ -406,12 +419,14 @@ export async function collectSonarrStartupCandidates(databaseIds: readonly numbe
         section: 'delayProfiles'
         arrType: 'sonarr'
         databaseId: number
+        fingerprint: string | null
       } => ({
         id: profile.id,
         name: profile.name,
         section: 'delayProfiles',
         arrType: 'sonarr',
         databaseId,
+        fingerprint: buildDelayProfileFingerprintFromLocal(profile),
       }))
     );
 

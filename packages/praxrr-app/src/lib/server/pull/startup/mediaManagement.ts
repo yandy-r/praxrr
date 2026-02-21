@@ -133,6 +133,29 @@ function buildMediaSettingsFingerprintFromArr(config: ArrMediaManagementConfig):
 	} as const;
 }
 
+const NAMING_TOKEN_REGEX =
+	/\{(?<prefix>[-\[( ._]*)(?<token>[A-Za-z][A-Za-z0-9 :+-]*)(?<suffix>[-\]) ._]*)\}/g;
+
+function normalizeTokenIdentifier(value: string): string {
+	return value.trim().replace(/\s+/g, ' ').toLocaleLowerCase();
+}
+
+function normalizeNamingTemplate(value: string | null | undefined): string | null {
+	if (value === null || value === undefined || value.length === 0) {
+		return null;
+	}
+
+	return value.replace(
+		NAMING_TOKEN_REGEX,
+		(_match, prefix: string, token: string, suffix: string) =>
+			`{${prefix}${normalizeTokenIdentifier(token)}${suffix}}`
+	);
+}
+
+function normalizeRequiredNamingTemplate(value: string | null | undefined): string {
+	return normalizeNamingTemplate(value) ?? '';
+}
+
 function buildNamingFingerprintFromLocal(
 	arrType: StartupPullArrType,
 	naming: RadarrNamingRow | SonarrNamingRow | LidarrNamingRow
@@ -143,8 +166,8 @@ function buildNamingFingerprintFromLocal(
 			renameMovies: radarrNaming.rename,
 			replaceIllegalCharacters: radarrNaming.replace_illegal_characters,
 			colonReplacementFormat: radarrNaming.colon_replacement_format,
-			standardMovieFormat: radarrNaming.movie_format,
-			movieFolderFormat: radarrNaming.movie_folder_format,
+			standardMovieFormat: normalizeRequiredNamingTemplate(radarrNaming.movie_format),
+			movieFolderFormat: normalizeRequiredNamingTemplate(radarrNaming.movie_folder_format),
 		} as const;
 	}
 
@@ -154,22 +177,24 @@ function buildNamingFingerprintFromLocal(
 			renameEpisodes: sonarrNaming.rename,
 			replaceIllegalCharacters: sonarrNaming.replace_illegal_characters,
 			colonReplacementFormat: sonarrNaming.colon_replacement_format,
-			customColonReplacementFormat: sonarrNaming.custom_colon_replacement_format,
+			customColonReplacementFormat: normalizeNamingTemplate(
+				sonarrNaming.custom_colon_replacement_format
+			),
 			multiEpisodeStyle: sonarrNaming.multi_episode_style,
-			standardEpisodeFormat: sonarrNaming.standard_episode_format,
-			dailyEpisodeFormat: sonarrNaming.daily_episode_format,
-			animeEpisodeFormat: sonarrNaming.anime_episode_format,
-			seriesFolderFormat: sonarrNaming.series_folder_format,
-			seasonFolderFormat: sonarrNaming.season_folder_format,
+			standardEpisodeFormat: normalizeRequiredNamingTemplate(sonarrNaming.standard_episode_format),
+			dailyEpisodeFormat: normalizeRequiredNamingTemplate(sonarrNaming.daily_episode_format),
+			animeEpisodeFormat: normalizeRequiredNamingTemplate(sonarrNaming.anime_episode_format),
+			seriesFolderFormat: normalizeRequiredNamingTemplate(sonarrNaming.series_folder_format),
+			seasonFolderFormat: normalizeRequiredNamingTemplate(sonarrNaming.season_folder_format),
 		} as const;
 	}
 
 	const lidarrNaming = naming as LidarrNamingRow;
 	return {
 		renameTracks: lidarrNaming.rename,
-		standardTrackFormat: lidarrNaming.standard_track_format,
-		multiDiscTrackFormat: lidarrNaming.multi_disc_track_format,
-		artistFolderFormat: lidarrNaming.artist_folder_format,
+		standardTrackFormat: normalizeRequiredNamingTemplate(lidarrNaming.standard_track_format),
+		multiDiscTrackFormat: normalizeRequiredNamingTemplate(lidarrNaming.multi_disc_track_format),
+		artistFolderFormat: normalizeRequiredNamingTemplate(lidarrNaming.artist_folder_format),
 		replaceIllegalCharacters: lidarrNaming.replace_illegal_characters,
 		colonReplacementFormat: lidarrNaming.colon_replacement_format,
 	} as const;
@@ -184,8 +209,8 @@ function buildNamingFingerprintFromArr(
 			renameMovies: config.renameMovies,
 			replaceIllegalCharacters: config.replaceIllegalCharacters,
 			colonReplacementFormat: config.colonReplacementFormat,
-			standardMovieFormat: config.standardMovieFormat,
-			movieFolderFormat: config.movieFolderFormat,
+			standardMovieFormat: normalizeRequiredNamingTemplate(config.standardMovieFormat),
+			movieFolderFormat: normalizeRequiredNamingTemplate(config.movieFolderFormat),
 		} as const;
 	}
 
@@ -206,13 +231,15 @@ function buildNamingFingerprintFromArr(
 			renameEpisodes: sonarrConfig.renameEpisodes,
 			replaceIllegalCharacters: sonarrConfig.replaceIllegalCharacters,
 			colonReplacementFormat: colonReplacementFromDb(sonarrConfig.colonReplacementFormat),
-			customColonReplacementFormat: sonarrConfig.customColonReplacementFormat,
+			customColonReplacementFormat: normalizeNamingTemplate(
+				sonarrConfig.customColonReplacementFormat
+			),
 			multiEpisodeStyle: multiEpisodeStyleFromDb(sonarrConfig.multiEpisodeStyle),
-			standardEpisodeFormat: sonarrConfig.standardEpisodeFormat,
-			dailyEpisodeFormat: sonarrConfig.dailyEpisodeFormat,
-			animeEpisodeFormat: sonarrConfig.animeEpisodeFormat,
-			seriesFolderFormat: sonarrConfig.seriesFolderFormat,
-			seasonFolderFormat: sonarrConfig.seasonFolderFormat,
+			standardEpisodeFormat: normalizeRequiredNamingTemplate(sonarrConfig.standardEpisodeFormat),
+			dailyEpisodeFormat: normalizeRequiredNamingTemplate(sonarrConfig.dailyEpisodeFormat),
+			animeEpisodeFormat: normalizeRequiredNamingTemplate(sonarrConfig.animeEpisodeFormat),
+			seriesFolderFormat: normalizeRequiredNamingTemplate(sonarrConfig.seriesFolderFormat),
+			seasonFolderFormat: normalizeRequiredNamingTemplate(sonarrConfig.seasonFolderFormat),
 		} as const;
 	}
 
@@ -226,9 +253,9 @@ function buildNamingFingerprintFromArr(
 	};
 	return {
 		renameTracks: lidarrConfig.renameTracks,
-		standardTrackFormat: lidarrConfig.standardTrackFormat,
-		multiDiscTrackFormat: lidarrConfig.multiDiscTrackFormat,
-		artistFolderFormat: lidarrConfig.artistFolderFormat,
+		standardTrackFormat: normalizeRequiredNamingTemplate(lidarrConfig.standardTrackFormat),
+		multiDiscTrackFormat: normalizeRequiredNamingTemplate(lidarrConfig.multiDiscTrackFormat),
+		artistFolderFormat: normalizeRequiredNamingTemplate(lidarrConfig.artistFolderFormat),
 		replaceIllegalCharacters: lidarrConfig.replaceIllegalCharacters,
 		colonReplacementFormat: colonReplacementFromDb(lidarrConfig.colonReplacementFormat),
 	} as const;

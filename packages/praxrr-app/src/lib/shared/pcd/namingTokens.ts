@@ -633,10 +633,14 @@ function getValidTokenNames(arrType: 'radarr' | 'sonarr'): Set<string> {
   for (const category of categories) {
     for (const t of category.tokens) {
       // Strip outer braces: "{Movie Title}" → "Movie Title"
-      names.add(t.token.slice(1, -1));
+      names.add(normalizeTokenName(t.token.slice(1, -1)));
     }
   }
   return names;
+}
+
+function normalizeTokenName(tokenName: string): string {
+  return tokenName.trim().replace(/\s+/g, ' ').toLocaleLowerCase();
 }
 
 /**
@@ -644,7 +648,7 @@ function getValidTokenNames(arrType: 'radarr' | 'sonarr'): Set<string> {
  *
  * Checks:
  * 1. Balanced braces — every { has a matching }
- * 2. Known tokens — extracted tokens must be in the valid set
+ * 2. Known tokens — extracted tokens must be in the valid set (case-insensitive)
  *
  * Empty format strings are allowed (the form handles "required" separately).
  */
@@ -680,7 +684,7 @@ export function validateNamingFormat(format: string, arrType: 'radarr' | 'sonarr
 
   while ((match = tokenRegex.exec(format)) !== null) {
     const tokenName = match[1].trim();
-    if (!validNames.has(tokenName)) {
+    if (!validNames.has(normalizeTokenName(tokenName))) {
       errors.push(`Unknown token: {${tokenName}}`);
     }
   }
