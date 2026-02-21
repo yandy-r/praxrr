@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { invalidateAll } from '$app/navigation';
 	import SearchDropdown from '$ui/form/SearchDropdown.svelte';
 	import SyncFooter from './SyncFooter.svelte';
 	import { alertStore } from '$lib/client/alerts/store.ts';
@@ -157,11 +158,6 @@
 	$: currentState = JSON.stringify({ state, syncTrigger, cronExpression });
 	export let isDirty = false;
 	$: isDirty = currentState !== savedState;
-	let hasUnsyncedPreview = lastSyncedAt === null && (
-		(state.namingDatabaseId !== null && state.namingConfigName !== null) ||
-		(state.qualityDefinitionsDatabaseId !== null && state.qualityDefinitionsConfigName !== null) ||
-		(state.mediaSettingsDatabaseId !== null && state.mediaSettingsConfigName !== null)
-	);
 
 	$: {
 		const hasAnySelection =
@@ -171,12 +167,10 @@
 
 		if (!hasAnySelection) {
 			previewEnabled = false;
-			hasUnsyncedPreview = false;
 		} else if (isDirty) {
 			previewEnabled = true;
-			hasUnsyncedPreview = true;
 		} else {
-			previewEnabled = hasUnsyncedPreview;
+			previewEnabled = lastSyncedAt === null;
 		}
 	}
 
@@ -201,14 +195,14 @@
 				body: formData
 			});
 
-			if (response.ok) {
-				alertStore.add('success', 'Media management sync config saved');
-				// Update saved state to current
-				savedState = JSON.stringify({ state, syncTrigger, cronExpression });
-				hasUnsyncedPreview = true;
-			} else {
-				alertStore.add('error', 'Failed to save media management sync config');
-			}
+				if (response.ok) {
+					alertStore.add('success', 'Media management sync config saved');
+					// Update saved state to current
+					savedState = JSON.stringify({ state, syncTrigger, cronExpression });
+					await invalidateAll().catch(() => undefined);
+				} else {
+					alertStore.add('error', 'Failed to save media management sync config');
+				}
 		} catch {
 			alertStore.add('error', 'Failed to save media management sync config');
 		} finally {
@@ -224,14 +218,13 @@
 				body: new FormData()
 			});
 
-			if (response.ok) {
-				const data = await response.json();
-				alertStore.add('success', data?.message ?? 'Sync queued');
-				previewEnabled = false;
-				hasUnsyncedPreview = false;
-			} else {
-				alertStore.add('error', 'Sync failed');
-			}
+				if (response.ok) {
+					const data = await response.json();
+					alertStore.add('success', data?.message ?? 'Sync queued');
+					await invalidateAll().catch(() => undefined);
+				} else {
+					alertStore.add('error', 'Sync failed');
+				}
 		} catch {
 			alertStore.add('error', 'Sync failed');
 		} finally {

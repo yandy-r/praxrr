@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { invalidateAll } from '$app/navigation';
 	import type { PageData } from './$types';
 	import { onMount } from 'svelte';
 	import { Info, Loader2, RefreshCw, Save } from 'lucide-svelte';
@@ -113,10 +114,6 @@
 	let delayProfilesPreviewEnabled = false;
 	let mediaManagementPreviewEnabled = false;
 	let metadataProfilesPreviewEnabled = false;
-	let metadataProfilesHasUnsyncedPreview =
-		data.syncData.metadataProfiles.lastSyncedAt === null &&
-		data.syncData.metadataProfiles.databaseId !== null &&
-		data.syncData.metadataProfiles.profileName !== null;
 
 	let metadataProfileSaving = false;
 	let metadataProfileSyncing = false;
@@ -150,12 +147,10 @@
 	$: {
 		if (!metadataProfileSelectionKey) {
 			metadataProfilesPreviewEnabled = false;
-			metadataProfilesHasUnsyncedPreview = false;
 		} else if (metadataProfilesDirty) {
 			metadataProfilesPreviewEnabled = true;
-			metadataProfilesHasUnsyncedPreview = true;
 		} else {
-			metadataProfilesPreviewEnabled = metadataProfilesHasUnsyncedPreview;
+			metadataProfilesPreviewEnabled = data.syncData.metadataProfiles.lastSyncedAt === null;
 		}
 	}
 
@@ -322,18 +317,17 @@
 				body: formData
 			});
 
-			if (response.ok) {
-				alertStore.add('success', 'Metadata profiles sync config saved');
-				metadataProfileSavedState = JSON.stringify({
-					state: metadataProfileState,
-					trigger: metadataProfileTrigger,
-					cronExpression: metadataProfileCron
-				});
-				metadataProfilesPreviewEnabled = true;
-				metadataProfilesHasUnsyncedPreview = true;
-			} else {
-				const payload = await extractFormError(response, 'Failed to save metadata profiles sync config');
-				alertStore.add('error', payload);
+				if (response.ok) {
+					alertStore.add('success', 'Metadata profiles sync config saved');
+					metadataProfileSavedState = JSON.stringify({
+						state: metadataProfileState,
+						trigger: metadataProfileTrigger,
+						cronExpression: metadataProfileCron
+					});
+					await invalidateAll().catch(() => undefined);
+				} else {
+					const payload = await extractFormError(response, 'Failed to save metadata profiles sync config');
+					alertStore.add('error', payload);
 			}
 		} catch {
 			alertStore.add('error', 'Failed to save metadata profiles sync config');
@@ -367,14 +361,13 @@
 				body: new FormData()
 			});
 
-			if (response.ok) {
-				const data = await response.json();
-				alertStore.add('success', data?.message ?? 'Sync queued');
-				metadataProfilesPreviewEnabled = false;
-				metadataProfilesHasUnsyncedPreview = false;
-			} else {
-				const payload = await extractFormError(response, 'Sync failed');
-				alertStore.add('error', payload);
+				if (response.ok) {
+					const data = await response.json();
+					alertStore.add('success', data?.message ?? 'Sync queued');
+					await invalidateAll().catch(() => undefined);
+				} else {
+					const payload = await extractFormError(response, 'Sync failed');
+					alertStore.add('error', payload);
 			}
 		} catch {
 			alertStore.add('error', 'Sync failed');

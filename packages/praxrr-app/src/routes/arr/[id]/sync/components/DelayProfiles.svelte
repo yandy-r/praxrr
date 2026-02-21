@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { invalidateAll } from '$app/navigation';
 	import type { DelayProfilesRow } from '$shared/pcd/display.ts';
 	import Toggle from '$ui/toggle/Toggle.svelte';
 	import SyncFooter from './SyncFooter.svelte';
@@ -34,8 +35,6 @@
 	$: currentState = JSON.stringify({ state, syncTrigger, cronExpression });
 	export let isDirty = false;
 	$: isDirty = currentState !== savedState;
-	let hasUnsyncedPreview = lastSyncedAt === null &&
-		state.databaseId !== null && state.profileName !== null;
 
 	// Reactive selected key for checkbox state
 	$: selectedKey =
@@ -46,12 +45,10 @@
 	$: {
 		if (!selectedKey) {
 			previewEnabled = false;
-			hasUnsyncedPreview = false;
 		} else if (isDirty) {
 			previewEnabled = true;
-			hasUnsyncedPreview = true;
 		} else {
-			previewEnabled = hasUnsyncedPreview;
+			previewEnabled = lastSyncedAt === null;
 		}
 	}
 
@@ -89,14 +86,14 @@
 				body: formData
 			});
 
-			if (response.ok) {
-				alertStore.add('success', 'Delay profile sync config saved');
-				// Update saved state to current
-				savedState = JSON.stringify({ state, syncTrigger, cronExpression });
-				hasUnsyncedPreview = true;
-			} else {
-				alertStore.add('error', 'Failed to save delay profile sync config');
-			}
+				if (response.ok) {
+					alertStore.add('success', 'Delay profile sync config saved');
+					// Update saved state to current
+					savedState = JSON.stringify({ state, syncTrigger, cronExpression });
+					await invalidateAll().catch(() => undefined);
+				} else {
+					alertStore.add('error', 'Failed to save delay profile sync config');
+				}
 		} catch {
 			alertStore.add('error', 'Failed to save delay profile sync config');
 		} finally {
@@ -112,14 +109,13 @@
 				body: new FormData()
 			});
 
-			if (response.ok) {
-				const data = await response.json();
-				alertStore.add('success', data?.message ?? 'Sync queued');
-				previewEnabled = false;
-				hasUnsyncedPreview = false;
-			} else {
-				alertStore.add('error', 'Sync failed');
-			}
+				if (response.ok) {
+					const data = await response.json();
+					alertStore.add('success', data?.message ?? 'Sync queued');
+					await invalidateAll().catch(() => undefined);
+				} else {
+					alertStore.add('error', 'Sync failed');
+				}
 		} catch {
 			alertStore.add('error', 'Sync failed');
 		} finally {
