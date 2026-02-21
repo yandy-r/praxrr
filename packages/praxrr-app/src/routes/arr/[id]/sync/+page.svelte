@@ -113,7 +113,10 @@
 	let delayProfilesPreviewEnabled = false;
 	let mediaManagementPreviewEnabled = false;
 	let metadataProfilesPreviewEnabled = false;
-	let metadataProfilesHasUnsyncedPreview = false;
+	let metadataProfilesHasUnsyncedPreview =
+		data.syncData.metadataProfiles.lastSyncedAt === null &&
+		data.syncData.metadataProfiles.databaseId !== null &&
+		data.syncData.metadataProfiles.profileName !== null;
 
 	let metadataProfileSaving = false;
 	let metadataProfileSyncing = false;
@@ -151,8 +154,8 @@
 		} else if (metadataProfilesDirty) {
 			metadataProfilesPreviewEnabled = true;
 			metadataProfilesHasUnsyncedPreview = true;
-		} else if (!metadataProfilesHasUnsyncedPreview) {
-			metadataProfilesPreviewEnabled = false;
+		} else {
+			metadataProfilesPreviewEnabled = metadataProfilesHasUnsyncedPreview;
 		}
 	}
 
@@ -410,6 +413,7 @@
 		bind:syncTrigger={mediaManagementTrigger}
 		bind:cronExpression={mediaManagementCron}
 		bind:isDirty={mediaManagementDirty}
+		lastSyncedAt={data.syncData.mediaManagement.lastSyncedAt ?? null}
 		previewConfig={mediaManagementPreviewConfig}
 		previewSection="mediaManagement"
 		bind:previewEnabled={mediaManagementPreviewEnabled}
@@ -425,6 +429,7 @@
 		bind:isDirty={qualityProfilesDirty}
 		canSave={qualityProfilesCanSave}
 		warning={qualityProfilesWarning}
+		lastSyncedAt={data.syncData.qualityProfiles.config.lastSyncedAt ?? null}
 		previewConfig={qualityProfilesPreviewConfig}
 		previewSection="qualityProfiles"
 		bind:previewEnabled={qualityProfilesPreviewEnabled}
@@ -438,6 +443,7 @@
 		bind:syncTrigger={delayProfileTrigger}
 		bind:cronExpression={delayProfileCron}
 		bind:isDirty={delayProfilesDirty}
+		lastSyncedAt={data.syncData.delayProfiles.lastSyncedAt ?? null}
 		previewConfig={delayProfilesPreviewConfig}
 		previewSection="delayProfiles"
 		bind:previewEnabled={delayProfilesPreviewEnabled}

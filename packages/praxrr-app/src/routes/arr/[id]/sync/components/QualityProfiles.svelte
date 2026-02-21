@@ -3,6 +3,7 @@
 	import Toggle from '$ui/toggle/Toggle.svelte';
 	import SyncFooter from './SyncFooter.svelte';
 	import { alertStore } from '$lib/client/alerts/store.ts';
+	import type { SectionType } from '$sync/types.ts';
 
 	interface DatabaseWithProfiles {
 		id: number;
@@ -18,6 +19,8 @@
 	export let warning: string | null = null;
 	export let previewEnabled = false;
 	export let previewConfig: unknown = null;
+	export let previewSection: SectionType | null = null;
+	export let lastSyncedAt: string | null = null;
 
 	let saving = false;
 	let syncing = false;
@@ -27,7 +30,9 @@
 	$: currentState = JSON.stringify({ state, syncTrigger, cronExpression });
 	export let isDirty = false;
 	$: isDirty = currentState !== savedState;
-	let hasUnsyncedPreview = false;
+	let hasUnsyncedPreview = lastSyncedAt === null && Object.values(state).some((db) =>
+		Object.values(db).some((selected) => selected)
+	);
 
 	// Initialize state for all databases/profiles
 	$: {
@@ -59,8 +64,8 @@
 		} else if (isDirty) {
 			previewEnabled = true;
 			hasUnsyncedPreview = true;
-		} else if (!hasUnsyncedPreview) {
-			previewEnabled = false;
+		} else {
+			previewEnabled = hasUnsyncedPreview;
 		}
 	}
 
@@ -198,6 +203,7 @@
 		{warning}
 		{previewEnabled}
 		{previewConfig}
+		{previewSection}
 		on:previewGenerated
 		on:previewError
 		on:save={handleSave}

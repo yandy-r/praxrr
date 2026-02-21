@@ -2,6 +2,7 @@
 	import SearchDropdown from '$ui/form/SearchDropdown.svelte';
 	import SyncFooter from './SyncFooter.svelte';
 	import { alertStore } from '$lib/client/alerts/store.ts';
+	import type { SectionType } from '$sync/types.ts';
 
 	interface ConfigOption {
 		name: string;
@@ -145,6 +146,8 @@
 	export let cronExpression: string = '0 * * * *';
 	export let previewEnabled = false;
 	export let previewConfig: unknown = null;
+	export let previewSection: SectionType | null = null;
+	export let lastSyncedAt: string | null = null;
 
 	let saving = false;
 	let syncing = false;
@@ -154,7 +157,11 @@
 	$: currentState = JSON.stringify({ state, syncTrigger, cronExpression });
 	export let isDirty = false;
 	$: isDirty = currentState !== savedState;
-	let hasUnsyncedPreview = false;
+	let hasUnsyncedPreview = lastSyncedAt === null && (
+		(state.namingDatabaseId !== null && state.namingConfigName !== null) ||
+		(state.qualityDefinitionsDatabaseId !== null && state.qualityDefinitionsConfigName !== null) ||
+		(state.mediaSettingsDatabaseId !== null && state.mediaSettingsConfigName !== null)
+	);
 
 	$: {
 		const hasAnySelection =
@@ -168,8 +175,8 @@
 		} else if (isDirty) {
 			previewEnabled = true;
 			hasUnsyncedPreview = true;
-		} else if (!hasUnsyncedPreview) {
-			previewEnabled = false;
+		} else {
+			previewEnabled = hasUnsyncedPreview;
 		}
 	}
 
@@ -306,6 +313,7 @@
 		{isDirty}
 		{previewEnabled}
 		{previewConfig}
+		{previewSection}
 		on:previewGenerated
 		on:previewError
 		on:save={handleSave}
