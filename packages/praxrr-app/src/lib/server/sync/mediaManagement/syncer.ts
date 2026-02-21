@@ -94,10 +94,8 @@ function parseMediaManagementSectionSelection(
   rawConfigName: unknown
 ): { databaseId: number | null; configName: string | null } {
   return {
-    databaseId:
-      rawDatabaseId === null || rawDatabaseId === undefined ? null : parsePositiveInt(rawDatabaseId),
-    configName:
-      typeof rawConfigName === 'string' && rawConfigName.trim().length > 0 ? rawConfigName : null,
+    databaseId: rawDatabaseId === null || rawDatabaseId === undefined ? null : parsePositiveInt(rawDatabaseId),
+    configName: typeof rawConfigName === 'string' && rawConfigName.trim().length > 0 ? rawConfigName : null,
   };
 }
 
@@ -202,7 +200,12 @@ export class MediaManagementSyncer extends BaseSyncer {
     if (!mediaSettings) {
       await logger.debug(`Media settings config "${configName}" not found in ${mediaSettingsSource.entityType}`, {
         source: 'Preview:MediaSettings',
-        meta: { instanceId: this.instanceId, configName, subsection: 'mediaSettings', entityType: mediaSettingsSource.entityType },
+        meta: {
+          instanceId: this.instanceId,
+          configName,
+          subsection: 'mediaSettings',
+          entityType: mediaSettingsSource.entityType,
+        },
       });
       return null;
     }
@@ -404,10 +407,13 @@ export class MediaManagementSyncer extends BaseSyncer {
 
     const qualityDefsConfig = await qualityDefinitionsSource.getByName(cache, configName);
     if (!qualityDefsConfig) {
-      await logger.debug(`Quality definitions config "${configName}" not found in ${qualityDefinitionsSource.entityType}`, {
-        source: 'Preview:QualityDefinitions',
-        meta: { instanceId: this.instanceId, configName, subsection: 'qualityDefinitions' },
-      });
+      await logger.debug(
+        `Quality definitions config "${configName}" not found in ${qualityDefinitionsSource.entityType}`,
+        {
+          source: 'Preview:QualityDefinitions',
+          meta: { instanceId: this.instanceId, configName, subsection: 'qualityDefinitions' },
+        }
+      );
       return [];
     }
 
@@ -584,6 +590,15 @@ export class MediaManagementSyncer extends BaseSyncer {
     return null;
   }
 
+  private getMediaManagementSyncConfig(): MediaManagementSyncConfig {
+    const previewConfig = parseMediaManagementPreviewConfig(this.getPreviewConfig());
+    if (previewConfig) {
+      return previewConfig;
+    }
+
+    return arrSyncQueries.getMediaManagementSync(this.instanceId);
+  }
+
   private getSyncArrType(): SyncArrType | null {
     if (this.instanceType === 'radarr' || this.instanceType === 'sonarr' || this.instanceType === 'lidarr') {
       return this.instanceType;
@@ -592,7 +607,10 @@ export class MediaManagementSyncer extends BaseSyncer {
     return null;
   }
 
-  private assertMediaManagementSubsectionSupported(subsection: MediaManagementSubsection, instanceType: SyncArrType): void {
+  private assertMediaManagementSubsectionSupported(
+    subsection: MediaManagementSubsection,
+    instanceType: SyncArrType
+  ): void {
     const reason = getUnsupportedMediaManagementSubsectionReason(instanceType, subsection);
     if (!reason) {
       return;
@@ -650,14 +668,18 @@ export class MediaManagementSyncer extends BaseSyncer {
         );
       }
 
-      const syncConfig = arrSyncQueries.getMediaManagementSync(this.instanceId);
+      const syncConfig = this.getMediaManagementSyncConfig();
 
       const mediaSettings = await this.generateMediaSettingsPreview(
         syncConfig.mediaSettingsDatabaseId,
         syncConfig.mediaSettingsConfigName,
         instanceType
       );
-      const naming = await this.generateNamingPreview(syncConfig.namingDatabaseId, syncConfig.namingConfigName, instanceType);
+      const naming = await this.generateNamingPreview(
+        syncConfig.namingDatabaseId,
+        syncConfig.namingConfigName,
+        instanceType
+      );
       const qualityDefinitions = await this.generateQualityDefinitionsPreview(
         syncConfig.qualityDefinitionsDatabaseId,
         syncConfig.qualityDefinitionsConfigName,

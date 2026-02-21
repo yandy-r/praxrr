@@ -117,10 +117,7 @@ function appendPath(path: string, segment: string): string {
   return path ? `${path}.${segment}` : segment;
 }
 
-function arrayToKeyedMap(
-  items: unknown[],
-  strategy: PreviewArrayKeyStrategy
-): Map<string, unknown[]> {
+function arrayToKeyedMap(items: unknown[], strategy: PreviewArrayKeyStrategy): Map<string, unknown[]> {
   const map = new Map<string, unknown[]>();
   for (let index = 0; index < items.length; index += 1) {
     const item = items[index];
@@ -189,9 +186,7 @@ function diffValues(current: unknown, desired: unknown, path: string, context: D
           }
 
           if (currentItem === undefined || desiredItem === undefined) {
-            const childPath = maxBucketSize > 1
-              ? buildArrayPath(path, key, index)
-              : buildArrayPath(path, key);
+            const childPath = maxBucketSize > 1 ? buildArrayPath(path, key, index) : buildArrayPath(path, key);
             changes.push({
               field: childPath,
               type: currentItem === undefined ? 'added' : 'removed',
@@ -201,9 +196,7 @@ function diffValues(current: unknown, desired: unknown, path: string, context: D
             continue;
           }
 
-          const childPath = maxBucketSize > 1
-            ? buildArrayPath(path, key, index)
-            : buildArrayPath(path, key);
+          const childPath = maxBucketSize > 1 ? buildArrayPath(path, key, index) : buildArrayPath(path, key);
           const arrayChanges = diffValues(currentItem, desiredItem, childPath, context);
           changes.push(...arrayChanges);
         }
@@ -240,6 +233,17 @@ function diffValues(current: unknown, desired: unknown, path: string, context: D
       const childChanges = diffValues(leftValue, rightValue, childPath, context);
       if (childChanges.length > 0) {
         changes.push(...childChanges);
+        continue;
+      }
+
+      // diffValues fully recurses into arrays and objects. When it returns no
+      // field-level differences for two values of the same structural type,
+      // they are deeply equal — skip the reference-equality fallback which
+      // would false-positive on distinct but identical array/object instances.
+      if (
+        (Array.isArray(leftValue) && Array.isArray(rightValue)) ||
+        (isPlainObject(leftValue) && isPlainObject(rightValue))
+      ) {
         continue;
       }
 
@@ -281,11 +285,7 @@ function diffValues(current: unknown, desired: unknown, path: string, context: D
 /**
  * Deep compare any two serializable objects and emit preview-ready field changes.
  */
-export function diffToFieldChanges(
-  current: unknown,
-  desired: unknown,
-  options: DiffOptions = {}
-): FieldChange[] {
+export function diffToFieldChanges(current: unknown, desired: unknown, options: DiffOptions = {}): FieldChange[] {
   const context = createContext(options);
   const normalizedCurrent = normalizeValue(current, '', context);
   const normalizedDesired = normalizeValue(desired, '', context);
