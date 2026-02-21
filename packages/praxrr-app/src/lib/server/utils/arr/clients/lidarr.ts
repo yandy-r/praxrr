@@ -154,6 +154,17 @@ export class LidarrClient extends BaseArrClient {
   }
 
   /**
+   * Get metadata profile schema defaults, returning null when unavailable.
+   */
+  async getMetadataProfileSchemaOrNull(): Promise<LidarrMetadataProfileSchema | null> {
+    try {
+      return await this.getMetadataProfileSchema();
+    } catch {
+      return null;
+    }
+  }
+
+  /**
    * Create a metadata profile
    */
   createMetadataProfile(profile: LidarrMetadataProfileCreatePayload): Promise<LidarrMetadataProfileGetResponse> {

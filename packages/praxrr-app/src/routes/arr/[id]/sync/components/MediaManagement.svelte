@@ -1,7 +1,9 @@
 <script lang="ts">
+	import { invalidateAll } from '$app/navigation';
 	import SearchDropdown from '$ui/form/SearchDropdown.svelte';
 	import SyncFooter from './SyncFooter.svelte';
 	import { alertStore } from '$lib/client/alerts/store.ts';
+	import type { SectionType } from '$sync/types.ts';
 
 	interface ConfigOption {
 		name: string;
@@ -137,8 +139,16 @@
 		};
 	}
 
+	export async function saveSection() {
+		await handleSave();
+	}
+
 	export let syncTrigger: 'manual' | 'on_pull' | 'on_change' | 'schedule' = 'manual';
 	export let cronExpression: string = '0 * * * *';
+	export let previewEnabled = false;
+	export let previewConfig: unknown = null;
+	export let previewSection: SectionType | null = null;
+	export let lastSyncedAt: string | null = null;
 
 	let saving = false;
 	let syncing = false;
@@ -148,6 +158,21 @@
 	$: currentState = JSON.stringify({ state, syncTrigger, cronExpression });
 	export let isDirty = false;
 	$: isDirty = currentState !== savedState;
+
+	$: {
+		const hasAnySelection =
+			(state.namingDatabaseId !== null && state.namingConfigName !== null) ||
+			(state.qualityDefinitionsDatabaseId !== null && state.qualityDefinitionsConfigName !== null) ||
+			(state.mediaSettingsDatabaseId !== null && state.mediaSettingsConfigName !== null);
+
+		if (!hasAnySelection) {
+			previewEnabled = false;
+		} else if (isDirty) {
+			previewEnabled = true;
+		} else {
+			previewEnabled = lastSyncedAt === null;
+		}
+	}
 
 	async function handleSave() {
 		saving = true;
@@ -170,13 +195,14 @@
 				body: formData
 			});
 
-			if (response.ok) {
-				alertStore.add('success', 'Media management sync config saved');
-				// Update saved state to current
-				savedState = JSON.stringify({ state, syncTrigger, cronExpression });
-			} else {
-				alertStore.add('error', 'Failed to save media management sync config');
-			}
+				if (response.ok) {
+					alertStore.add('success', 'Media management sync config saved');
+					// Update saved state to current
+					savedState = JSON.stringify({ state, syncTrigger, cronExpression });
+					await invalidateAll().catch(() => undefined);
+				} else {
+					alertStore.add('error', 'Failed to save media management sync config');
+				}
 		} catch {
 			alertStore.add('error', 'Failed to save media management sync config');
 		} finally {
@@ -192,17 +218,22 @@
 				body: new FormData()
 			});
 
-			if (response.ok) {
-				const data = await response.json();
-				alertStore.add('success', data?.message ?? 'Sync queued');
-			} else {
-				alertStore.add('error', 'Sync failed');
-			}
+				if (response.ok) {
+					const data = await response.json();
+					alertStore.add('success', data?.message ?? 'Sync queued');
+					await invalidateAll().catch(() => undefined);
+				} else {
+					alertStore.add('error', 'Sync failed');
+				}
 		} catch {
 			alertStore.add('error', 'Sync failed');
 		} finally {
 			syncing = false;
 		}
+	}
+
+	export async function syncSection() {
+		await handleSync();
 	}
 </script>
 
@@ -273,6 +304,11 @@
 		{saving}
 		{syncing}
 		{isDirty}
+		{previewEnabled}
+		{previewConfig}
+		{previewSection}
+		on:previewGenerated
+		on:previewError
 		on:save={handleSave}
 		on:sync={handleSync}
 	/>

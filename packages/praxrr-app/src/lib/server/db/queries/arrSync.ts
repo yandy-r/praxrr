@@ -22,6 +22,7 @@ export interface SyncConfig {
   trigger: SyncTrigger;
   cron: string | null;
   nextRunAt?: string | null;
+  lastSyncedAt?: string | null;
 }
 
 export interface QualityProfilesSyncData {
@@ -35,6 +36,7 @@ export interface DelayProfilesSyncData {
   trigger: SyncTrigger;
   cron: string | null;
   nextRunAt?: string | null;
+  lastSyncedAt?: string | null;
 }
 
 export interface MediaManagementSyncData {
@@ -47,6 +49,7 @@ export interface MediaManagementSyncData {
   trigger: SyncTrigger;
   cron: string | null;
   nextRunAt?: string | null;
+  lastSyncedAt?: string | null;
 }
 
 export interface MetadataProfilesSyncData {
@@ -55,6 +58,7 @@ export interface MetadataProfilesSyncData {
   trigger: SyncTrigger;
   cron: string | null;
   nextRunAt?: string | null;
+  lastSyncedAt?: string | null;
 }
 
 export interface SyncConfigStatus {
@@ -75,6 +79,7 @@ interface ConfigRow {
   instance_id: number;
   trigger: string;
   cron: string | null;
+  last_synced_at: string | null;
 }
 
 interface ConfigStatusRow {
@@ -90,6 +95,7 @@ interface DelayProfileConfigRow {
   profile_name: string | null;
   trigger: string;
   cron: string | null;
+  last_synced_at: string | null;
 }
 
 interface MetadataProfileConfigRow {
@@ -100,6 +106,7 @@ interface MetadataProfileConfigRow {
   cron: string | null;
   next_run_at: string | null;
   sync_status: string;
+  last_synced_at: string | null;
 }
 
 interface MediaManagementRow {
@@ -112,6 +119,7 @@ interface MediaManagementRow {
   media_settings_config_name: string | null;
   trigger: string;
   cron: string | null;
+  last_synced_at: string | null;
 }
 
 type MediaManagementSection = 'naming' | 'qualityDefinitions' | 'mediaSettings';
@@ -444,6 +452,7 @@ export const arrSyncQueries = {
       config: {
         trigger: normalizeTrigger(configRow?.trigger),
         cron: configRow?.cron ?? null,
+        lastSyncedAt: configRow?.last_synced_at ?? null,
       },
     };
   },
@@ -466,7 +475,7 @@ export const arrSyncQueries = {
     db.execute(
       `INSERT INTO arr_sync_quality_profiles_config (instance_id, trigger, cron, next_run_at)
 			 VALUES (?, ?, ?, ?)
-			 ON CONFLICT(instance_id) DO UPDATE SET trigger = ?, cron = ?, next_run_at = ?`,
+			 ON CONFLICT(instance_id) DO UPDATE SET trigger = ?, cron = ?, next_run_at = ?, last_synced_at = NULL`,
       instanceId,
       config.trigger,
       config.cron,
@@ -490,6 +499,7 @@ export const arrSyncQueries = {
       profileName: row?.profile_name ?? null,
       trigger: normalizeTrigger(row?.trigger),
       cron: row?.cron ?? null,
+      lastSyncedAt: row?.last_synced_at ?? null,
     };
   },
 
@@ -503,7 +513,8 @@ export const arrSyncQueries = {
 			 profile_name = ?,
 			 trigger = ?,
 			 cron = ?,
-			 next_run_at = ?`,
+			 next_run_at = ?,
+			 last_synced_at = NULL`,
       instanceId,
       data.databaseId,
       data.profileName,
@@ -522,7 +533,7 @@ export const arrSyncQueries = {
 
   getMetadataProfilesSync(instanceId: number): MetadataProfilesSyncData {
     const row = db.queryFirst<MetadataProfileConfigRow>(
-      `SELECT mp.instance_id, mp.database_id, mp.profile_name, mp.trigger, mp.cron, mp.next_run_at, mp.sync_status
+      `SELECT mp.instance_id, mp.database_id, mp.profile_name, mp.trigger, mp.cron, mp.next_run_at, mp.sync_status, mp.last_synced_at
 			 FROM arr_sync_metadata_profiles_config mp
 			 JOIN arr_instances ai ON ai.id = mp.instance_id
 			 WHERE mp.instance_id = ? AND ai.type = 'lidarr'`,
@@ -534,6 +545,7 @@ export const arrSyncQueries = {
       profileName: row?.profile_name ?? null,
       trigger: normalizeTrigger(row?.trigger),
       cron: row?.cron ?? null,
+      lastSyncedAt: row?.last_synced_at ?? null,
     };
   },
 
@@ -550,7 +562,8 @@ export const arrSyncQueries = {
 			 profile_name = ?,
 			 trigger = ?,
 			 cron = ?,
-			 next_run_at = ?`,
+			 next_run_at = ?,
+			 last_synced_at = NULL`,
       instanceId,
       normalized.databaseId,
       normalized.profileName,
@@ -582,6 +595,7 @@ export const arrSyncQueries = {
       mediaSettingsConfigName: row?.media_settings_config_name ?? null,
       trigger: normalizeTrigger(row?.trigger),
       cron: row?.cron ?? null,
+      lastSyncedAt: row?.last_synced_at ?? null,
     };
   },
 
@@ -601,7 +615,8 @@ export const arrSyncQueries = {
 			 media_settings_config_name = ?,
 			 trigger = ?,
 			 cron = ?,
-			 next_run_at = ?`,
+			 next_run_at = ?,
+			 last_synced_at = NULL`,
       instanceId,
       normalized.namingDatabaseId,
       normalized.namingConfigName,
