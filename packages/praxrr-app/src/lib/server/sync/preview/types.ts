@@ -5,13 +5,7 @@
 
 import type { ArrType } from '$arr/types.ts';
 
-export type SyncPreviewStatus =
-  | 'generating'
-  | 'ready'
-  | 'applying'
-  | 'applied'
-  | 'failed'
-  | 'expired';
+export type SyncPreviewStatus = 'generating' | 'ready' | 'applying' | 'applied' | 'failed' | 'expired';
 
 export type SyncPreviewAction = 'create' | 'update' | 'delete' | 'unchanged';
 
@@ -81,6 +75,12 @@ export interface SyncPreviewSummary {
   readonly totalUnchanged: number;
 }
 
+export interface SyncPreviewSectionOutcome {
+  readonly section: SyncPreviewSection;
+  readonly error: string | null;
+  readonly skipped: boolean;
+}
+
 export interface SyncPreviewResult {
   readonly id: string;
   readonly instanceId: number;
@@ -91,6 +91,7 @@ export interface SyncPreviewResult {
   readonly status: SyncPreviewStatus;
   readonly error?: string;
   readonly sections: readonly SyncPreviewSection[];
+  readonly sectionOutcomes: readonly SyncPreviewSectionOutcome[];
   readonly qualityProfiles: QualityProfilesPreview | null;
   readonly delayProfiles: DelayProfilesPreview | null;
   readonly mediaManagement: MediaManagementPreview | null;

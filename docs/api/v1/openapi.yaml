@@ -386,6 +386,8 @@ components:
       $ref: './schemas/sync.yaml#/SyncPreviewStatus'
     SyncPreviewSection:
       $ref: './schemas/sync.yaml#/SyncPreviewSection'
+    SyncPreviewSectionOutcome:
+      $ref: './schemas/sync.yaml#/SyncPreviewSectionOutcome'
     SyncPreviewAction:
       $ref: './schemas/sync.yaml#/SyncPreviewAction'
     SyncPreviewFieldChangeType:

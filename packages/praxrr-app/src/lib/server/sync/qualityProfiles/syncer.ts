@@ -21,7 +21,11 @@ import { logger } from '$logger/logger.ts';
 import type { SyncArrType } from '../mappings.ts';
 import { getNamespaceSuffix } from '../namespace.ts';
 import type { SyncPreviewSectionResult, QualityProfilesPreview } from '../preview/types.ts';
-import { CUSTOM_FORMAT_ARRAY_KEY_STRATEGIES, QUALITY_PROFILE_ARRAY_KEY_STRATEGIES, diffEntityCollection } from '../preview/sectionDiffs.ts';
+import {
+  CUSTOM_FORMAT_ARRAY_KEY_STRATEGIES,
+  QUALITY_PROFILE_ARRAY_KEY_STRATEGIES,
+  diffEntityCollection,
+} from '../preview/sectionDiffs.ts';
 
 // Custom formats
 import { syncCustomFormats, previewCustomFormats } from '../customFormats/syncer.ts';
@@ -83,6 +87,30 @@ interface PreviewComparableQualityProfile extends Record<string, unknown> {
   readonly cutoffFormatScore?: number;
   readonly minUpgradeFormatScore?: number;
   readonly formatItems?: unknown;
+}
+
+interface PreviewFormatIdMapInput {
+  readonly arrFormat: {
+    readonly name: string;
+    readonly id?: number;
+  };
+}
+
+export function mergePreviewFormatIdMap(
+  existingMap: ReadonlyMap<string, number>,
+  preparedFormats: readonly PreviewFormatIdMapInput[]
+): Map<string, number> {
+  const merged = new Map(existingMap);
+
+  for (const prepared of preparedFormats) {
+    if (typeof prepared.arrFormat.id !== 'number') {
+      continue;
+    }
+
+    merged.set(prepared.arrFormat.name, prepared.arrFormat.id);
+  }
+
+  return merged;
 }
 
 function parsePositiveInteger(rawValue: unknown): number | null {
@@ -299,7 +327,7 @@ export class QualityProfileSyncer extends BaseSyncer {
       }
 
       const allArrCustomFormats = await this.client.getCustomFormats();
-      const allFormatIdMap = new Map(allArrCustomFormats.map((f) => [f.name, f.id!]));
+      let allPreviewFormatIdMap = new Map(allArrCustomFormats.map((f) => [f.name, f.id!]));
       const allArrProfiles = await this.client.getQualityProfiles();
       const existingProfilesMap = new Map(allArrProfiles.map((p) => [p.name, p.id]));
 
@@ -318,13 +346,14 @@ export class QualityProfileSyncer extends BaseSyncer {
         );
 
         desiredCustomFormats.push(...preparedFormats.map((prepared) => prepared.arrFormat));
+        allPreviewFormatIdMap = mergePreviewFormatIdMap(allPreviewFormatIdMap, preparedFormats);
 
         desiredProfiles.push(
           ...this.buildQualityProfilesPayloads(
             batch.profiles,
             batch.suffix,
             pcdFormatIdMap,
-            allFormatIdMap,
+            allPreviewFormatIdMap,
             qualityMappings
           )
         );
@@ -340,7 +369,10 @@ export class QualityProfileSyncer extends BaseSyncer {
         arrayKeyStrategies: CUSTOM_FORMAT_ARRAY_KEY_STRATEGIES,
       });
 
-      const qualityProfileChanges = diffEntityCollection<PreviewComparableQualityProfile, PreviewComparableQualityProfile>({
+      const qualityProfileChanges = diffEntityCollection<
+        PreviewComparableQualityProfile,
+        PreviewComparableQualityProfile
+      >({
         entityType: 'qualityProfile',
         desiredEntities: desiredProfiles as unknown as readonly PreviewComparableQualityProfile[],
         currentEntities: allArrProfiles as unknown as readonly PreviewComparableQualityProfile[],
@@ -348,7 +380,7 @@ export class QualityProfileSyncer extends BaseSyncer {
         currentName: (entity) => entity.name,
         desiredComparable: (entity) => normalizeQualityProfileForPreview(entity as QualityProfileComparableInput),
         currentComparable: (entity) => normalizeQualityProfileForPreview(entity as QualityProfileComparableInput),
-        currentRemoteId: (entity) => (existingProfilesMap.get(entity.name) ?? null),
+        currentRemoteId: (entity) => existingProfilesMap.get(entity.name) ?? null,
         arrayKeyStrategies: QUALITY_PROFILE_ARRAY_KEY_STRATEGIES,
       });
 

@@ -5,6 +5,7 @@ export type {
   SyncPreviewSection,
   SyncPreviewSectionMetadata,
   SyncPreviewSectionResult,
+  SyncPreviewSectionOutcome,
   SyncPreviewSummary,
   SyncPreviewArrType,
   SyncPreviewResult,

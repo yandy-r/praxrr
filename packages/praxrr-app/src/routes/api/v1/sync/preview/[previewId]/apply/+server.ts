@@ -2,6 +2,7 @@ import { json } from '@sveltejs/kit';
 import type { RequestHandler } from '@sveltejs/kit';
 import { getSectionsInProgress, executeSyncJob } from '$lib/server/jobs/handlers/arrSync.ts';
 import type { SectionType } from '$lib/server/sync/types.ts';
+import { PREVIEW_REQUEST_BODY_LIMIT_BYTES } from '$lib/server/sync/preview/limits.ts';
 import {
   previewStore,
   PREVIEW_STATUS_READY,
@@ -11,6 +12,9 @@ import {
   evaluatePreviewStaleness,
   PREVIEW_STALE_BLOCK_MS,
 } from '$lib/server/sync/preview/store.ts';
+import type { SyncPreviewResult } from '$lib/server/sync/preview/types.ts';
+
+const textEncoder = new TextEncoder();
 
 function parseSections(raw: unknown): SectionType[] | null | undefined {
   if (raw === undefined) {
@@ -23,7 +27,12 @@ function parseSections(raw: unknown): SectionType[] | null | undefined {
 
   const sections: SectionType[] = [];
   for (const value of raw) {
-    if (value === 'qualityProfiles' || value === 'delayProfiles' || value === 'mediaManagement' || value === 'metadataProfiles') {
+    if (
+      value === 'qualityProfiles' ||
+      value === 'delayProfiles' ||
+      value === 'mediaManagement' ||
+      value === 'metadataProfiles'
+    ) {
       if (!sections.includes(value)) {
         sections.push(value);
       }
@@ -43,6 +52,26 @@ function staleWarningMessage(previewAgeMs: number): string {
   return `Preview is ${minutes} minute(s) old.`;
 }
 
+function getBodyByteLength(rawBody: string): number {
+  return textEncoder.encode(rawBody).length;
+}
+
+function resolveEligibleSections(snapshot: SyncPreviewResult): SectionType[] {
+  if (snapshot.sectionOutcomes.length === 0) {
+    // Backward-compat fallback for snapshots created before section outcomes were persisted.
+    return snapshot.error ? [] : [...snapshot.sections];
+  }
+
+  const successful = new Set<SectionType>();
+  for (const outcome of snapshot.sectionOutcomes) {
+    if (outcome.error === null && outcome.skipped === false) {
+      successful.add(outcome.section);
+    }
+  }
+
+  return snapshot.sections.filter((section) => successful.has(section));
+}
+
 export const POST: RequestHandler = async ({ params, request }) => {
   const previewId = params.previewId;
   if (!previewId) {
@@ -58,11 +87,28 @@ export const POST: RequestHandler = async ({ params, request }) => {
     return json({ error: `Invalid preview state: ${snapshot.status}` }, { status: 409 });
   }
 
+  const contentLength = request.headers.get('content-length');
+  if (contentLength) {
+    const parsedLength = Number.parseInt(contentLength, 10);
+    if (Number.isInteger(parsedLength) && parsedLength > PREVIEW_REQUEST_BODY_LIMIT_BYTES) {
+      return json({ error: `Request body exceeds ${PREVIEW_REQUEST_BODY_LIMIT_BYTES} bytes` }, { status: 400 });
+    }
+  }
+
   let requestBody: { sections?: unknown };
   try {
-    requestBody = (await request.json()) as { sections?: unknown };
+    const rawBody = await request.text();
+    if (getBodyByteLength(rawBody) > PREVIEW_REQUEST_BODY_LIMIT_BYTES) {
+      return json({ error: `Request body exceeds ${PREVIEW_REQUEST_BODY_LIMIT_BYTES} bytes` }, { status: 400 });
+    }
+
+    if (rawBody.trim().length === 0) {
+      requestBody = {};
+    } else {
+      requestBody = JSON.parse(rawBody) as { sections?: unknown };
+    }
   } catch {
-    requestBody = {};
+    return json({ error: 'Invalid JSON body' }, { status: 400 });
   }
 
   const requestedSections = parseSections(requestBody.sections);
@@ -70,16 +116,32 @@ export const POST: RequestHandler = async ({ params, request }) => {
     return json({ error: 'sections must be an array of valid sync sections' }, { status: 400 });
   }
 
-  const sectionsToApply = requestedSections === undefined ? [...snapshot.sections] : requestedSections;
+  const eligibleSections = resolveEligibleSections(snapshot);
+  const sectionsToApply = requestedSections === undefined ? eligibleSections : requestedSections;
   if (sectionsToApply.length === 0) {
-    return json({ error: 'No sections selected for apply' }, { status: 400 });
+    return json(
+      { error: 'No successfully previewed sections available to apply. Regenerate preview.' },
+      { status: 400 }
+    );
   }
+
   const unsupportedSections = sectionsToApply.filter((section) => !snapshot.sections.includes(section));
   if (unsupportedSections.length > 0) {
     return json({ error: `Invalid sections for this preview: ${unsupportedSections.join(', ')}` }, { status: 400 });
   }
 
+  const ineligibleSections = sectionsToApply.filter((section) => !eligibleSections.includes(section));
+  if (ineligibleSections.length > 0) {
+    return json(
+      {
+        error: `Cannot apply sections with failed preview generation: ${ineligibleSections.join(', ')}`,
+      },
+      { status: 409 }
+    );
+  }
+
   const nowMs = Date.now();
+  previewStore.cleanup(nowMs);
   const staleness = evaluatePreviewStaleness(snapshot, nowMs);
   if (staleness.shouldBlock) {
     const staleMinutes = Math.round(PREVIEW_STALE_BLOCK_MS / 60000);
@@ -95,10 +157,7 @@ export const POST: RequestHandler = async ({ params, request }) => {
   const inProgressSections = getSectionsInProgress(snapshot.instanceId);
   const blockingSections = sectionsToApply.filter((section) => inProgressSections.includes(section));
   if (blockingSections.length > 0) {
-    return json(
-      { error: `Cannot apply while sync is running for: ${blockingSections.join(', ')}` },
-      { status: 409 }
-    );
+    return json({ error: `Cannot apply while sync is running for: ${blockingSections.join(', ')}` }, { status: 409 });
   }
 
   const applyingSnapshot = previewStore.transition(previewId, PREVIEW_STATUS_APPLYING, nowMs);

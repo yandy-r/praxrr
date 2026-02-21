@@ -233,6 +233,24 @@ SyncPreviewSummary:
       minimum: 0
       description: Number of unchanged entities
 
+SyncPreviewSectionOutcome:
+  type: object
+  required:
+    - section
+    - skipped
+    - error
+  properties:
+    section:
+      $ref: '#/SyncPreviewSection'
+    skipped:
+      type: boolean
+      description: True when the section had no config to preview and was skipped.
+    error:
+      oneOf:
+        - type: string
+        - type: null
+      description: Section-level preview generation error, when present.
+
 SyncPreviewResult:
   type: object
   required:
@@ -244,6 +262,7 @@ SyncPreviewResult:
     - expiresAt
     - status
     - sections
+    - sectionOutcomes
     - qualityProfiles
     - delayProfiles
     - mediaManagement
@@ -284,6 +303,11 @@ SyncPreviewResult:
       items:
         $ref: '#/SyncPreviewSection'
       description: Sections included in preview
+    sectionOutcomes:
+      type: array
+      description: Per-section preview generation status used to enforce safe apply behavior.
+      items:
+        $ref: '#/SyncPreviewSectionOutcome'
     qualityProfiles:
       oneOf:
         - $ref: '#/QualityProfilesPreview'
