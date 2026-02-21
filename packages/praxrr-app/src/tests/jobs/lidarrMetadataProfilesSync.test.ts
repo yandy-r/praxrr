@@ -90,6 +90,7 @@ function createInstance(id: number, type: ArrInstance['type']): ArrInstance {
     external_url: null,
     url: 'http://127.0.0.1:8989',
     api_key: `${type}-key`,
+    api_key_fingerprint: null,
     tags: null,
     enabled: 1,
     created_at: new Date().toISOString(),
@@ -373,6 +374,9 @@ Deno.test({
       try {
         metadataProfilesHandler.createSyncer = () => ({
           sync: async () => ({ success: true, itemsSynced: 7 }),
+          generatePreview: async () => ({ section: 'metadataProfiles', profile: null }),
+          setPreviewConfig: () => undefined,
+          clearPreviewConfig: () => undefined,
         });
 
         arrSyncQueries.setMetadataProfilesStatusPending(501);
@@ -388,6 +392,9 @@ Deno.test({
             itemsSynced: 0,
             error: 'Metadata profile sync failed for reporting test',
           }),
+          generatePreview: async () => ({ section: 'metadataProfiles', profile: null }),
+          setPreviewConfig: () => undefined,
+          clearPreviewConfig: () => undefined,
         });
 
         arrSyncQueries.setMetadataProfilesStatusPending(501);
