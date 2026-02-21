@@ -10,7 +10,7 @@ import { SYNC_SECTION_ORDER, type SyncArrType } from '../mappings.ts';
 import type { ArrInstance } from '$db/queries/arrInstances.ts';
 import { getSection } from '../registry.ts';
 import { PREVIEW_STATUS_READY } from './store.ts';
-import type { SectionType } from '../types.ts';
+import type { BaseSyncer, SectionType } from '../types.ts';
 import type {
 	SyncPreviewSectionResult,
 	SyncPreviewSummary,
@@ -37,12 +37,6 @@ interface MutableSyncPreviewSummary {
 	totalUpdates: number;
 	totalDeletes: number;
 	totalUnchanged: number;
-}
-
-interface PreviewSyncer {
-	setPreviewConfig(previewConfig: unknown): void;
-	generatePreview(): Promise<SyncPreviewSectionResult>;
-	clearPreviewConfig(): void;
 }
 
 export interface GeneratePreviewInput {
@@ -232,7 +226,7 @@ export async function generatePreview(input: GeneratePreviewInput): Promise<Gene
 			const hasSectionPreviewConfig =
 				input.sectionConfigs !== undefined &&
 				Object.prototype.hasOwnProperty.call(input.sectionConfigs, section);
-			let syncer: PreviewSyncer | null = null;
+			let syncer: BaseSyncer | null = null;
 
 			if (!handler.hasConfig(input.instance.id) && !hasSectionPreviewConfig) {
 				sectionOutcomes.push({
@@ -245,7 +239,7 @@ export async function generatePreview(input: GeneratePreviewInput): Promise<Gene
 			}
 
 			try {
-				syncer = handler.createSyncer(client, input.instance) as PreviewSyncer;
+				syncer = handler.createSyncer(client, input.instance);
 				if (input.sectionConfigs?.[section] !== undefined) {
 					syncer.setPreviewConfig(input.sectionConfigs[section]);
 				}

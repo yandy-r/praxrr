@@ -114,4 +114,6 @@ export interface TriggerContext {
 export interface BaseSyncer {
   sync(): Promise<SyncResult>;
   generatePreview(): Promise<Readonly<SyncPreviewSectionResult>>;
+  setPreviewConfig(previewConfig: unknown): void;
+  clearPreviewConfig(): void;
 }
