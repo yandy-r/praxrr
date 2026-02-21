@@ -12,6 +12,10 @@
 		error?: string;
 	};
 
+	function isSyncPreviewSuccessResponse(payload: SyncPreviewCreateResponse | null): payload is SyncPreviewResult {
+		return payload !== null && typeof payload === 'object' && !Array.isArray(payload) && typeof (payload as Record<string, unknown>).id === 'string';
+	}
+
 	export let disabled = false;
 	export let sections: readonly SectionType[] = [];
 	export let previewConfig: unknown = null;
@@ -120,8 +124,8 @@
 			});
 
 			const payload = (await response.json().catch(() => null)) as SyncPreviewCreateResponse | null;
-			if (!response.ok || !payload || 'error' in payload || typeof payload.id !== 'string') {
-				const message = payload && 'error' in payload && typeof payload.error === 'string'
+			if (!response.ok || !isSyncPreviewSuccessResponse(payload)) {
+				const message = payload && typeof (payload as ErrorResponse).error === 'string'
 					? payload.error
 					: 'Failed to generate preview.';
 				localError = message;
