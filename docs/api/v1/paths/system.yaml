@@ -42,3 +42,48 @@ openapi:
           application/json:
             schema:
               type: object
+
+startup-pull-latest:
+  get:
+    operationId: getLatestStartupPull
+    summary: Latest startup pull run
+    description: |
+      Returns the latest startup pull run with per-instance outcomes.
+
+      The startup pull feature reconstructs Arr sync selections from live Arr
+      state on application startup when `PULL_ON_START=true`. This endpoint
+      provides visibility into the most recent run for support and diagnostics.
+
+      Run-level status values:
+      - `success`: All instances completed without failures
+      - `partial`: Some instances succeeded and some failed
+      - `failed`: All instances failed
+      - `skipped`: No instances were processed
+      - `disabled`: Feature was disabled at run time
+
+      Per-instance status values follow `JobRunStatus`:
+      - `success`: Instance pull completed
+      - `failure`: Instance pull failed
+      - `skipped`: Instance was skipped
+      - `cancelled`: Instance pull was cancelled
+    tags:
+      - System
+    responses:
+      '200':
+        description: Latest startup pull run with per-instance outcomes
+        content:
+          application/json:
+            schema:
+              $ref: '../openapi.yaml#/components/schemas/StartupPullRunResponse'
+      '404':
+        description: No startup pull runs exist
+        content:
+          application/json:
+            schema:
+              $ref: '../openapi.yaml#/components/schemas/ErrorResponse'
+      '500':
+        description: Failed to fetch latest startup pull run
+        content:
+          application/json:
+            schema:
+              $ref: '../openapi.yaml#/components/schemas/ErrorResponse'

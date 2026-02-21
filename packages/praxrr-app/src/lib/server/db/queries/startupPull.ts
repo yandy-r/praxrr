@@ -1,0 +1,273 @@
+import { db } from '../db.ts';
+import type { JobRunStatus } from '$jobs/queueTypes.ts';
+
+// ========== Row Types ==========
+
+interface StartupPullRunRow {
+  id: string;
+  status: string;
+  started_at: string;
+  finished_at: string | null;
+  imported: number;
+  skipped_default: number;
+  skipped_no_match: number;
+  conflicted: number;
+  failed: number;
+  instances_total: number;
+  instances_failed: number;
+  created_at: string;
+}
+
+interface StartupPullInstanceOutcomeRow {
+  id: number;
+  run_id: string;
+  instance_id: number;
+  instance_name: string;
+  arr_type: string;
+  status: string;
+  imported: number;
+  skipped_default: number;
+  skipped_no_match: number;
+  conflicted: number;
+  failed: number;
+  created_at: string;
+}
+
+// ========== Record Types ==========
+
+export interface StartupPullRunRecord {
+  id: string;
+  status: string;
+  startedAt: string;
+  finishedAt: string | null;
+  imported: number;
+  skippedDefault: number;
+  skippedNoMatch: number;
+  conflicted: number;
+  failed: number;
+  instancesTotal: number;
+  instancesFailed: number;
+  createdAt: string;
+}
+
+export interface StartupPullInstanceOutcomeRecord {
+  id: number;
+  runId: string;
+  instanceId: number;
+  instanceName: string;
+  arrType: string;
+  status: JobRunStatus;
+  imported: number;
+  skippedDefault: number;
+  skippedNoMatch: number;
+  conflicted: number;
+  failed: number;
+  createdAt: string;
+}
+
+export interface StartupPullRunSummaryRecord extends StartupPullRunRecord {
+  instances: StartupPullInstanceOutcomeRecord[];
+}
+
+// ========== Input Types ==========
+
+export interface InsertStartupPullRunInput {
+  id: string;
+  status: string;
+  startedAt: string;
+  finishedAt: string | null;
+  imported: number;
+  skippedDefault: number;
+  skippedNoMatch: number;
+  conflicted: number;
+  failed: number;
+  instancesTotal: number;
+  instancesFailed: number;
+}
+
+export interface InsertStartupPullInstanceOutcomeInput {
+  runId: string;
+  instanceId: number;
+  instanceName: string;
+  arrType: string;
+  status: JobRunStatus;
+  imported: number;
+  skippedDefault: number;
+  skippedNoMatch: number;
+  conflicted: number;
+  failed: number;
+}
+
+// ========== Row-to-Record Mappers ==========
+
+function runRowToRecord(row: StartupPullRunRow): StartupPullRunRecord {
+  return {
+    id: row.id,
+    status: row.status,
+    startedAt: row.started_at,
+    finishedAt: row.finished_at,
+    imported: row.imported,
+    skippedDefault: row.skipped_default,
+    skippedNoMatch: row.skipped_no_match,
+    conflicted: row.conflicted,
+    failed: row.failed,
+    instancesTotal: row.instances_total,
+    instancesFailed: row.instances_failed,
+    createdAt: row.created_at,
+  };
+}
+
+function outcomeRowToRecord(row: StartupPullInstanceOutcomeRow): StartupPullInstanceOutcomeRecord {
+  return {
+    id: row.id,
+    runId: row.run_id,
+    instanceId: row.instance_id,
+    instanceName: row.instance_name,
+    arrType: row.arr_type,
+    status: row.status as JobRunStatus,
+    imported: row.imported,
+    skippedDefault: row.skipped_default,
+    skippedNoMatch: row.skipped_no_match,
+    conflicted: row.conflicted,
+    failed: row.failed,
+    createdAt: row.created_at,
+  };
+}
+
+// ========== Query API ==========
+
+export const startupPullQueries = {
+  /**
+   * Insert a startup pull run record
+   */
+  insertRun(input: InsertStartupPullRunInput): void {
+    db.execute(
+      `INSERT INTO startup_pull_runs
+			 (id, status, started_at, finished_at, imported, skipped_default, skipped_no_match, conflicted, failed, instances_total, instances_failed)
+			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      input.id,
+      input.status,
+      input.startedAt,
+      input.finishedAt,
+      input.imported,
+      input.skippedDefault,
+      input.skippedNoMatch,
+      input.conflicted,
+      input.failed,
+      input.instancesTotal,
+      input.instancesFailed
+    );
+  },
+
+  /**
+   * Insert a per-instance outcome for a startup pull run
+   */
+  insertInstanceOutcome(input: InsertStartupPullInstanceOutcomeInput): void {
+    db.execute(
+      `INSERT INTO startup_pull_instance_outcomes
+			 (run_id, instance_id, instance_name, arr_type, status, imported, skipped_default, skipped_no_match, conflicted, failed)
+			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      input.runId,
+      input.instanceId,
+      input.instanceName,
+      input.arrType,
+      input.status,
+      input.imported,
+      input.skippedDefault,
+      input.skippedNoMatch,
+      input.conflicted,
+      input.failed
+    );
+  },
+
+  /**
+   * Get the latest startup pull run (most recent by started_at)
+   */
+  getLatest(): StartupPullRunRecord | undefined {
+    const row = db.queryFirst<StartupPullRunRow>('SELECT * FROM startup_pull_runs ORDER BY started_at DESC LIMIT 1');
+    return row ? runRowToRecord(row) : undefined;
+  },
+
+  /**
+   * Get a startup pull run by its ID
+   */
+  getById(id: string): StartupPullRunRecord | undefined {
+    const row = db.queryFirst<StartupPullRunRow>('SELECT * FROM startup_pull_runs WHERE id = ?', id);
+    return row ? runRowToRecord(row) : undefined;
+  },
+
+  /**
+   * Get the latest startup pull run with per-instance outcomes
+   */
+  getLatestWithOutcomes(): StartupPullRunSummaryRecord | undefined {
+    const run = this.getLatest();
+    if (!run) return undefined;
+
+    const outcomeRows = db.query<StartupPullInstanceOutcomeRow>(
+      'SELECT * FROM startup_pull_instance_outcomes WHERE run_id = ? ORDER BY instance_id',
+      run.id
+    );
+
+    return {
+      ...run,
+      instances: outcomeRows.map(outcomeRowToRecord),
+    };
+  },
+
+  /**
+   * Get a startup pull run by ID with per-instance outcomes
+   */
+  getByIdWithOutcomes(id: string): StartupPullRunSummaryRecord | undefined {
+    const run = this.getById(id);
+    if (!run) return undefined;
+
+    const outcomeRows = db.query<StartupPullInstanceOutcomeRow>(
+      'SELECT * FROM startup_pull_instance_outcomes WHERE run_id = ? ORDER BY instance_id',
+      run.id
+    );
+
+    return {
+      ...run,
+      instances: outcomeRows.map(outcomeRowToRecord),
+    };
+  },
+
+  /**
+   * Get instance outcomes for a specific run
+   */
+  getInstanceOutcomes(runId: string): StartupPullInstanceOutcomeRecord[] {
+    const rows = db.query<StartupPullInstanceOutcomeRow>(
+      'SELECT * FROM startup_pull_instance_outcomes WHERE run_id = ? ORDER BY instance_id',
+      runId
+    );
+    return rows.map(outcomeRowToRecord);
+  },
+
+  /**
+   * Get recent startup pull runs (newest first)
+   */
+  getRecent(limit: number = 50): StartupPullRunRecord[] {
+    const rows = db.query<StartupPullRunRow>('SELECT * FROM startup_pull_runs ORDER BY started_at DESC LIMIT ?', limit);
+    return rows.map(runRowToRecord);
+  },
+
+  /**
+   * Delete startup pull runs older than the specified number of days
+   * Returns number of rows deleted
+   */
+  deleteOlderThan(days: number): number {
+    return db.execute(
+      `DELETE FROM startup_pull_runs
+			 WHERE datetime(started_at) < datetime('now', '-' || ? || ' days')`,
+      days
+    );
+  },
+
+  /**
+   * Get total count of startup pull runs
+   */
+  getCount(): number {
+    const result = db.queryFirst<{ count: number }>('SELECT COUNT(*) as count FROM startup_pull_runs');
+    return result?.count ?? 0;
+  },
+};
