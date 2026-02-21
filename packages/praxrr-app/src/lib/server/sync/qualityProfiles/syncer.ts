@@ -335,6 +335,8 @@ export class QualityProfileSyncer extends BaseSyncer {
 
       const desiredCustomFormats: ArrCustomFormat[] = [];
       const desiredProfiles: ArrQualityProfilePayload[] = [];
+      /** Per-batch pcdFormatIdMap from first pass to avoid calling previewCustomFormats twice. */
+      const batchPcdFormatIdMaps: Map<string, number>[] = [];
 
       for (const batch of batches) {
         const { preparedFormats, pcdFormatIdMap } = await previewCustomFormats(
@@ -347,7 +349,12 @@ export class QualityProfileSyncer extends BaseSyncer {
 
         desiredCustomFormats.push(...preparedFormats.map((prepared) => prepared.arrFormat));
         allPreviewFormatIdMap = mergePreviewFormatIdMap(allPreviewFormatIdMap, preparedFormats);
+        batchPcdFormatIdMaps.push(pcdFormatIdMap);
+      }
 
+      for (let i = 0; i < batches.length; i++) {
+        const batch = batches[i];
+        const pcdFormatIdMap = batchPcdFormatIdMaps[i]!;
         desiredProfiles.push(
           ...this.buildQualityProfilesPayloads(
             batch.profiles,

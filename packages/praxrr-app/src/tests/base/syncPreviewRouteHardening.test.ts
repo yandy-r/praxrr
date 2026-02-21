@@ -68,6 +68,34 @@ function createSnapshotInput(id: string): SyncPreviewCreateInput {
   };
 }
 
+Deno.test('sync preview apply blocks when preview had section-generation errors', async () => {
+  const previewId = `preview-apply-section-errors-${crypto.randomUUID()}`;
+  previewStore.create(
+    {
+      ...createSnapshotInput(previewId),
+      error: 'Preview generation completed with 1 section error(s)',
+    },
+    Date.now()
+  );
+
+  try {
+    const response = await applyPreviewPost({
+      params: { previewId },
+      request: new Request(`http://localhost/api/v1/sync/preview/${previewId}/apply`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ sections: ['qualityProfiles'] }),
+      }),
+    } as unknown as Parameters<typeof applyPreviewPost>[0]);
+
+    assertEquals(response.status, 409);
+    const payload = (await response.json()) as { error: string };
+    assertMatch(payload.error, /section-generation errors.*Regenerate/i);
+  } finally {
+    previewStore.delete(previewId);
+  }
+});
+
 Deno.test('sync preview apply rejects explicitly requested failed sections', async () => {
   const previewId = `preview-apply-failed-${crypto.randomUUID()}`;
   previewStore.create(createSnapshotInput(previewId), Date.now());

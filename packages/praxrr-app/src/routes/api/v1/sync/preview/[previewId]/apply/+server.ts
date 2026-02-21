@@ -87,6 +87,13 @@ export const POST: RequestHandler = async ({ params, request }) => {
     return json({ error: `Invalid preview state: ${snapshot.status}` }, { status: 409 });
   }
 
+  if (snapshot.error) {
+    return json(
+      { error: 'Preview had section-generation errors. Regenerate preview before applying.' },
+      { status: 409 }
+    );
+  }
+
   const contentLength = request.headers.get('content-length');
   if (contentLength) {
     const parsedLength = Number.parseInt(contentLength, 10);
