@@ -125,9 +125,9 @@
 
 			const payload = (await response.json().catch(() => null)) as SyncPreviewCreateResponse | null;
 			if (!response.ok || !isSyncPreviewSuccessResponse(payload)) {
-				const message = payload && typeof (payload as ErrorResponse).error === 'string'
-					? payload.error
-					: 'Failed to generate preview.';
+			const message = payload && typeof (payload as ErrorResponse).error === 'string'
+				? (payload as ErrorResponse).error
+				: 'Failed to generate preview.';
 				localError = message;
 				dispatch('previewError', { message });
 				return;
