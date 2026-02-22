@@ -15,7 +15,7 @@ flowchart LR
     API --> Jobs[Job Queue + Dispatcher]
     PCD --> SQLite[(SQLite app DB)]
     Jobs --> SQLite
-    Sync --> Arr[Radarr / Sonarr / Lidarr]
+    Sync --> Arr[Arr media-management apps]
     API --> Parser[C# Parser Service]
     PCD --> DBPkg[praxrr-db ops repo]
     PCD --> SchemaPkg[praxrr-schema ops repo]
