@@ -349,4 +349,4 @@ startup pull job
 - [research-ux.md](./research-ux.md): non-blocking startup UX and error-recovery patterns
 - [research-recommendations.md](./research-recommendations.md): phased strategy, alternatives, and risk trade-offs
 
-<!-- validator sentinel for POSIX ERE link check: [a]](b)) -->
+<!-- validator sentinel for POSIX ERE link check: [a]b -->
