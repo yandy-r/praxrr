@@ -360,11 +360,11 @@ export async function collectLidarrStartupCandidates(databaseIds: readonly numbe
   };
 }
 
-export async function matchLidarrStartupResources(
+export function matchLidarrStartupResources(
   input: StartupPullInstanceInput,
   snapshot: LidarrStartupRemoteSnapshot,
   candidates: LidarrStartupCandidates
-): Promise<LidarrStartupMatchRunResult> {
+): LidarrStartupMatchRunResult {
   const arrType = assertStartupArrType(input.arrType, 'lidarr', 'Cannot process non-Lidarr instance in Lidarr adapter');
   const envelope = createAdapterResultEnvelope('skipped');
   const matches: StartupPullMatchResult[] = [];
@@ -491,6 +491,7 @@ export async function matchLidarrStartupResources(
         matches.push(result);
         incrementCountersFromMatchResult(envelope, result);
       }
+      continue;
     }
   }
 

@@ -348,11 +348,11 @@ export async function collectRadarrStartupCandidates(databaseIds: readonly numbe
   };
 }
 
-export async function matchRadarrStartupResources(
+export function matchRadarrStartupResources(
   input: StartupPullInstanceInput,
   snapshot: RadarrStartupRemoteSnapshot,
   candidates: RadarrStartupCandidates
-): Promise<RadarrStartupMatchRunResult> {
+): RadarrStartupMatchRunResult {
   const arrType = assertStartupArrType(input.arrType, 'radarr', 'Cannot process non-Radarr instance in radarr adapter');
   const envelope = createAdapterResultEnvelope('skipped');
   const matches: StartupPullMatchResult[] = [];

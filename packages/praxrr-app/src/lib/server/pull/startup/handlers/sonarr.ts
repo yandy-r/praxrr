@@ -335,11 +335,11 @@ export async function collectSonarrStartupCandidates(databaseIds: readonly numbe
   };
 }
 
-export async function matchSonarrStartupResources(
+export function matchSonarrStartupResources(
   input: StartupPullInstanceInput,
   snapshot: SonarrStartupRemoteSnapshot,
   candidates: SonarrStartupCandidates
-): Promise<SonarrStartupMatchRunResult> {
+): SonarrStartupMatchRunResult {
   const arrType = assertStartupArrType(input.arrType, 'sonarr', 'Cannot process non-Sonarr instance in sonarr adapter');
   const envelope = createAdapterResultEnvelope('skipped');
   const matches: StartupPullMatchResult[] = [];

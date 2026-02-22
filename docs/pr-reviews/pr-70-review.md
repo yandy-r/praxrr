@@ -217,7 +217,7 @@ to consume shared helpers and removed local duplicate implementations.
 
 ### M2. `matchRadarrStartupResources`/`matchSonarrStartupResources` declared `async` with no `await`
 
-- **Status:** [ ] Open
+- **Status:** [x] Fixed
 - **Files:** `handlers/radarr.ts:~463`, `handlers/sonarr.ts:~392`, `handlers/lidarr.ts:~435`
 - **Agent:** code-reviewer
 
@@ -225,11 +225,15 @@ Unnecessary `async` wraps return values in `Promise` with no benefit.
 
 **Fix:** Remove `async` keyword and `Promise` wrapper from return types.
 
+**Resolution:** Removed `async` from `matchRadarrStartupResources`, `matchSonarrStartupResources`,
+and `matchLidarrStartupResources` and changed return types from `Promise<...>` to direct result
+types. No behavior changes; function calls now return synchronously as intended.
+
 ---
 
 ### M3. Lidarr `metadataProfiles` section missing `continue` statement
 
-- **Status:** [ ] Open
+- **Status:** [x] Fixed
 - **Files:** `handlers/lidarr.ts:577-594`
 - **Agent:** silent-failure-hunter
 
@@ -237,6 +241,9 @@ Every other section handler ends with `continue;`. The last section (`metadataPr
 Currently harmless since it's last, but adding a new section would cause fall-through.
 
 **Fix:** Add `continue;` after the `metadataProfiles` block.
+
+**Resolution:** Added a `continue;` after the Lidarr `metadataProfiles` handling block to preserve
+section-loop consistency and guard against future fall-through if sections are extended.
 
 ---
 
