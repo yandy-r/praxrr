@@ -613,7 +613,7 @@ export function classifyMediaManagementMatch(
 		normalizeName: (name) => name,
 	});
 
-	if (result.status !== 'matched' || result.matchedEntityId === null || result.matchedEntityId === undefined) {
+	if (result.status !== 'matched') {
 		return result;
 	}
 

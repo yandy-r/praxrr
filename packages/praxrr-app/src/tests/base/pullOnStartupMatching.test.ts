@@ -62,6 +62,7 @@ Deno.test('matchStartupEntity: exact name match takes priority over fingerprint'
 	const result = matchStartupEntity(requestWithFingerprints);
 
 	assertEquals(result.status, 'matched');
+	if (result.status !== 'matched') throw new Error('unreachable');
 	assertEquals(result.reason, 'matched_exact_name');
 	assertEquals(result.matchMethod, 'exact_name');
 	assertEquals(result.matchedEntityName, 'HD Bluray + WEB');
@@ -73,6 +74,7 @@ Deno.test('matchStartupEntity: exact name match returns correct entity id and na
 	const result = matchStartupEntity(request);
 
 	assertEquals(result.status, 'matched');
+	if (result.status !== 'matched') throw new Error('unreachable');
 	assertEquals(result.reason, 'matched_exact_name');
 	assertEquals(result.matchMethod, 'exact_name');
 	assertEquals(result.matchedEntityId, candidate.id);
@@ -91,6 +93,7 @@ Deno.test('matchStartupEntity: fingerprint match when names differ', () => {
 	const result = matchStartupEntity(request);
 
 	assertEquals(result.status, 'matched');
+	if (result.status !== 'matched') throw new Error('unreachable');
 	assertEquals(result.reason, 'matched_fingerprint');
 	assertEquals(result.matchMethod, 'metadata_fingerprint');
 	assertEquals(result.matchedEntityId, candidate.id);

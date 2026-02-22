@@ -266,7 +266,7 @@ function classifyLidarrManagedProfileMatch(input: StartupPullMatchRequest): Star
 
 	const result = matchManagedStartupProfileByNamespace(input);
 
-	if (result.status !== 'matched' || result.matchedEntityId === null || result.matchedEntityId === undefined) {
+	if (result.status !== 'matched') {
 		return result;
 	}
 
@@ -286,7 +286,7 @@ function classifyLidarrManagedProfileMatch(input: StartupPullMatchRequest): Star
 function classifyLidarrDelayProfileMatch(input: StartupPullMatchRequest): StartupPullMatchResult {
 	const result = matchDelayProfileByFingerprint(input);
 
-	if (result.status !== 'matched' || result.matchedEntityId === null || result.matchedEntityId === undefined) {
+	if (result.status !== 'matched') {
 		return result;
 	}
 

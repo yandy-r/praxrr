@@ -123,9 +123,14 @@ async function processInstance(
 		return timeoutMs != null ? await withTimeout(task, timeoutMs) : await task;
 	} catch (error) {
 		const message = error instanceof Error ? error.message : String(error);
-		await logger.warn(`Startup pull failed for "${input.instanceName}"`, {
+		await logger.error(`Startup pull failed for "${input.instanceName}"`, {
 			source: 'StartupPull',
-			meta: { instanceId: input.instanceId, arrType: input.arrType, error: message },
+			meta: {
+				instanceId: input.instanceId,
+				arrType: input.arrType,
+				error: message,
+				stack: error instanceof Error ? error.stack : undefined,
+			},
 		});
 
 		return makeFailedInstanceResult(input);

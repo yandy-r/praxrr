@@ -1,6 +1,6 @@
 import { arrSyncQueries, type ProfileSelection } from '$db/queries/arrSync.ts';
 import { logger } from '$logger/logger.ts';
-import type { StartupPullArrType, StartupPullMatchResult, StartupPullSection } from './types.ts';
+import type { StartupPullArrType, StartupPullMatchedResult, StartupPullMatchResult, StartupPullSection } from './types.ts';
 
 export type ApplySectionReason = 'applied' | 'unchanged' | 'no_matches';
 
@@ -22,9 +22,9 @@ const NO_MATCHES: ApplySectionOutcome = { written: false, reason: 'no_matches', 
 function getMatchedBySection(
 	matches: readonly StartupPullMatchResult[],
 	section: StartupPullSection
-): StartupPullMatchResult[] {
+): StartupPullMatchedResult[] {
 	return matches.filter(
-		(m) => m.section === section && m.status === 'matched' && m.matchedEntityName != null
+		(m): m is StartupPullMatchedResult => m.section === section && m.status === 'matched'
 	);
 }
 
@@ -46,13 +46,13 @@ function selectionsEqual(a: readonly ProfileSelection[], b: readonly ProfileSele
 
 function applyQualityProfiles(
 	instanceId: number,
-	matched: readonly StartupPullMatchResult[]
+	matched: readonly StartupPullMatchedResult[]
 ): ApplySectionOutcome {
 	if (matched.length === 0) return NO_MATCHES;
 
 	const newSelections: ProfileSelection[] = matched.map((m) => ({
 		databaseId: m.databaseId,
-		profileName: m.matchedEntityName!,
+		profileName: m.matchedEntityName,
 	}));
 
 	const current = arrSyncQueries.getQualityProfilesSync(instanceId);
@@ -71,7 +71,7 @@ function applyQualityProfiles(
 
 function applyDelayProfiles(
 	instanceId: number,
-	matched: readonly StartupPullMatchResult[]
+	matched: readonly StartupPullMatchedResult[]
 ): ApplySectionOutcome {
 	if (matched.length === 0) return NO_MATCHES;
 
@@ -84,7 +84,7 @@ function applyDelayProfiles(
 
 	arrSyncQueries.saveDelayProfilesSync(instanceId, {
 		databaseId: first.databaseId,
-		profileName: first.matchedEntityName!,
+		profileName: first.matchedEntityName,
 		trigger: current.trigger,
 		cron: current.cron,
 	});
@@ -94,9 +94,9 @@ function applyDelayProfiles(
 
 function applyMediaManagement(
 	instanceId: number,
-	namingMatches: readonly StartupPullMatchResult[],
-	mediaSettingsMatches: readonly StartupPullMatchResult[],
-	qualityDefinitionsMatches: readonly StartupPullMatchResult[]
+	namingMatches: readonly StartupPullMatchedResult[],
+	mediaSettingsMatches: readonly StartupPullMatchedResult[],
+	qualityDefinitionsMatches: readonly StartupPullMatchedResult[]
 ): ApplySectionOutcome {
 	const hasAny =
 		namingMatches.length > 0 || mediaSettingsMatches.length > 0 || qualityDefinitionsMatches.length > 0;
@@ -110,18 +110,18 @@ function applyMediaManagement(
 
 	const newData = {
 		namingDatabaseId: namingMatch ? namingMatch.databaseId : current.namingDatabaseId,
-		namingConfigName: namingMatch ? namingMatch.matchedEntityName! : current.namingConfigName,
+		namingConfigName: namingMatch ? namingMatch.matchedEntityName : current.namingConfigName,
 		qualityDefinitionsDatabaseId: qualityDefinitionsMatch
 			? qualityDefinitionsMatch.databaseId
 			: current.qualityDefinitionsDatabaseId,
 		qualityDefinitionsConfigName: qualityDefinitionsMatch
-			? qualityDefinitionsMatch.matchedEntityName!
+			? qualityDefinitionsMatch.matchedEntityName
 			: current.qualityDefinitionsConfigName,
 		mediaSettingsDatabaseId: mediaSettingsMatch
 			? mediaSettingsMatch.databaseId
 			: current.mediaSettingsDatabaseId,
 		mediaSettingsConfigName: mediaSettingsMatch
-			? mediaSettingsMatch.matchedEntityName!
+			? mediaSettingsMatch.matchedEntityName
 			: current.mediaSettingsConfigName,
 		trigger: current.trigger,
 		cron: current.cron,
@@ -149,7 +149,7 @@ function applyMediaManagement(
 function applyMetadataProfiles(
 	instanceId: number,
 	arrType: StartupPullArrType,
-	matched: readonly StartupPullMatchResult[]
+	matched: readonly StartupPullMatchedResult[]
 ): ApplySectionOutcome {
 	if (arrType !== 'lidarr') return NO_MATCHES;
 	if (matched.length === 0) return NO_MATCHES;
@@ -163,7 +163,7 @@ function applyMetadataProfiles(
 
 	arrSyncQueries.saveMetadataProfilesSync(instanceId, {
 		databaseId: first.databaseId,
-		profileName: first.matchedEntityName!,
+		profileName: first.matchedEntityName,
 		trigger: current.trigger,
 		cron: current.cron,
 	});

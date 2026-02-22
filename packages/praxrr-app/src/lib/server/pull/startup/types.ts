@@ -54,19 +54,31 @@ export interface StartupPullMatchRequest {
 	candidates: readonly StartupPullEntityDescriptor[];
 }
 
-export interface StartupPullMatchResult {
-  instanceId: number;
-  databaseId: number;
-  section: StartupPullSection;
-  arrType: StartupPullArrType;
-  status: StartupPullMatchStatus;
-  reason: StartupPullMatchReason;
-  matchMethod?: StartupPullMatchMethod;
-  matchedEntityId?: number | string | null;
-  matchedEntityName?: string | null;
-  matchedCount?: number;
-  candidatesChecked: number;
+interface StartupPullMatchResultBase {
+  readonly instanceId: number;
+  readonly databaseId: number;
+  readonly section: StartupPullSection;
+  readonly arrType: StartupPullArrType;
+  readonly candidatesChecked: number;
 }
+
+export interface StartupPullMatchedResult extends StartupPullMatchResultBase {
+  readonly status: 'matched';
+  readonly reason: 'matched_exact_name' | 'matched_fingerprint';
+  readonly matchMethod: StartupPullMatchMethod;
+  readonly matchedEntityId: number | string;
+  readonly matchedEntityName: string;
+  readonly matchedCount: number;
+}
+
+export interface StartupPullUnmatchedResult extends StartupPullMatchResultBase {
+  readonly status: 'no_match' | 'conflicted';
+  readonly reason: StartupPullMatchReason;
+  readonly matchMethod?: StartupPullMatchMethod;
+  readonly matchedCount?: number;
+}
+
+export type StartupPullMatchResult = StartupPullMatchedResult | StartupPullUnmatchedResult;
 
 export interface StartupPullCounters {
   imported: number;

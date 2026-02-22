@@ -279,10 +279,6 @@ function buildSectionMatchRequest(
     return result;
   }
 
-  if (result.matchedEntityId === null || result.matchedEntityId === undefined) {
-    return result;
-  }
-
   const matchedCandidate = candidates.find((candidate) => candidate.id === result.matchedEntityId);
   if (!matchedCandidate) {
     return result;

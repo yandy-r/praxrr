@@ -269,10 +269,6 @@ function matchManagedQualityProfiles(
 		return result;
 	}
 
-	if (result.matchedEntityId === null || result.matchedEntityId === undefined) {
-		return result;
-	}
-
 	const matchedCandidate = candidates.find((candidate) => candidate.id === result.matchedEntityId);
 	if (!matchedCandidate) {
 		return result;
@@ -306,7 +302,7 @@ function matchDelayProfileFromDefaultSnapshot(
 	};
 
 	const result = matchDelayProfileByFingerprint(request);
-	if (result.status !== 'matched' || result.matchedEntityId === null || result.matchedEntityId === undefined) {
+	if (result.status !== 'matched') {
 		return result;
 	}
 

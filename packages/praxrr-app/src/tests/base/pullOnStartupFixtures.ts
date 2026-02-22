@@ -324,30 +324,33 @@ export function buildMatchResult(
 	overrides: MatchResultFixtureOptions = {}
 ): StartupPullMatchResult {
 	const instanceId = overrides.instanceId ?? getDefaultInstanceId(arrType);
-	const base: StartupPullMatchResult = {
+	const shared = {
 		instanceId,
 		databaseId: overrides.databaseId ?? 1,
 		section: overrides.section ?? section,
 		arrType: overrides.arrType ?? arrType,
-		status,
-		reason: overrides.reason ?? getDefaultReasonForStatus(status),
 		candidatesChecked: overrides.candidatesChecked ?? 0,
 	};
 
-	if (overrides.matchMethod !== undefined) {
-		base.matchMethod = overrides.matchMethod;
-	}
-	if (overrides.matchedEntityId !== undefined) {
-		base.matchedEntityId = overrides.matchedEntityId;
-	}
-	if (overrides.matchedEntityName !== undefined) {
-		base.matchedEntityName = overrides.matchedEntityName;
-	}
-	if (overrides.matchedCount !== undefined) {
-		base.matchedCount = overrides.matchedCount;
+	if (status === 'matched') {
+		return {
+			...shared,
+			status: 'matched' as const,
+			reason: (overrides.reason ?? 'matched_exact_name') as 'matched_exact_name' | 'matched_fingerprint',
+			matchMethod: overrides.matchMethod ?? 'exact_name',
+			matchedEntityId: overrides.matchedEntityId ?? 1,
+			matchedEntityName: overrides.matchedEntityName ?? `${section}-entity-${arrType}`,
+			matchedCount: overrides.matchedCount ?? 1,
+		};
 	}
 
-	return base;
+	return {
+		...shared,
+		status,
+		reason: overrides.reason ?? getDefaultReasonForStatus(status),
+		...(overrides.matchMethod !== undefined ? { matchMethod: overrides.matchMethod } : {}),
+		...(overrides.matchedCount !== undefined ? { matchedCount: overrides.matchedCount } : {}),
+	};
 }
 
 function getDefaultReasonForStatus(status: StartupPullMatchStatus): StartupPullMatchReason {

@@ -1,5 +1,6 @@
 import { config } from '$config';
 import { logger } from '$logger/logger.ts';
+import { startupPullQueries } from '$db/queries/startupPull.ts';
 import { jobQueueRegistry } from '../queueRegistry.ts';
 import type { JobHandler } from '../queueTypes.ts';
 import { runStartupPull, toArrPullStartupRunResult, toJobRunStatus } from '$lib/server/pull/startup/index.ts';
@@ -14,6 +15,48 @@ const arrPullStartupHandler: JobHandler = async (_job) => {
 			maxConcurrency: config.pullOnStartMaxConcurrency ?? undefined,
 			timeoutMs: config.pullOnStartTimeoutMs ?? undefined,
 		});
+
+		try {
+			const instancesFailed = summary.instances.filter((i) => i.status === 'failure').length;
+			startupPullQueries.insertRun({
+				id: summary.runId,
+				status: summary.status,
+				startedAt: summary.startedAt,
+				finishedAt: summary.finishedAt,
+				imported: summary.imported,
+				skippedDefault: summary.skipped_default,
+				skippedNoMatch: summary.skipped_no_match,
+				conflicted: summary.conflicted,
+				failed: summary.failed,
+				instancesTotal: summary.instances.length,
+				instancesFailed,
+			});
+
+			for (const instance of summary.instances) {
+				startupPullQueries.insertInstanceOutcome({
+					runId: summary.runId,
+					instanceId: instance.instanceId,
+					instanceName: instance.instanceName,
+					arrType: instance.arrType,
+					status: instance.status,
+					imported: instance.imported,
+					skippedDefault: instance.skipped_default,
+					skippedNoMatch: instance.skipped_no_match,
+					conflicted: instance.conflicted,
+					failed: instance.failed,
+				});
+			}
+		} catch (persistError) {
+			const persistMessage = persistError instanceof Error ? persistError.message : String(persistError);
+			await logger.error('Failed to persist startup pull run results', {
+				source: 'ArrPullStartupJob',
+				meta: {
+					runId: summary.runId,
+					error: persistMessage,
+					stack: persistError instanceof Error ? persistError.stack : undefined,
+				},
+			});
+		}
 
 		const runResult = toArrPullStartupRunResult(summary);
 		const jobStatus = toJobRunStatus(summary.status);
@@ -38,7 +81,7 @@ const arrPullStartupHandler: JobHandler = async (_job) => {
 		const message = error instanceof Error ? error.message : String(error);
 		await logger.error('Startup pull job failed unexpectedly', {
 			source: 'ArrPullStartupJob',
-			meta: { error: message },
+			meta: { error: message, stack: error instanceof Error ? error.stack : undefined },
 		});
 
 		return {

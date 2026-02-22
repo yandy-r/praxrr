@@ -3,6 +3,7 @@ import type {
 	StartupPullMatchRequest,
 	StartupPullMatchResult,
 	StartupPullSection,
+	StartupPullUnmatchedResult,
 } from '$lib/server/pull/startup/types.ts';
 
 export type StartupNameNormalizer = (name: string) => string;
@@ -178,7 +179,7 @@ export function makeStartupMatchNoMatchResult(
 	request: StartupPullMatchRequest,
 	reason: StartupPullMatchReason,
 	options: { hasFingerprintAttempt?: boolean } = {}
-): StartupPullMatchResult {
+): StartupPullUnmatchedResult {
 	return {
 		instanceId: request.instanceId,
 		databaseId: request.databaseId,

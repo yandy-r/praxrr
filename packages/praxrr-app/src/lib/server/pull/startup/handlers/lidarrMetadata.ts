@@ -183,7 +183,7 @@ export function classifyMetadataProfileMatch(
 		normalizeName: (value) => value,
 	});
 
-	if (result.status !== 'matched' || result.matchedEntityId === null || result.matchedEntityId === undefined) {
+	if (result.status !== 'matched') {
 		return result;
 	}
 
