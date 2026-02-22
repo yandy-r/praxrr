@@ -100,7 +100,7 @@ transport failures.
 
 ### H2. Fallback `databaseId` produces invalid value on empty input
 
-- **Status:** [ ] Open
+- **Status:** [x] Fixed
 - **Files:** `handlers/radarr.ts:472`, `handlers/sonarr.ts:456`, `handlers/lidarr.ts:474`
 - **Agent:** silent-failure-hunter
 
@@ -118,6 +118,12 @@ if (input.databaseIds.length === 0) {
   throw new Error('Cannot match startup resources with no database IDs');
 }
 ```
+
+**Resolution:** Added a guarded check at each adapter entry (`runRadarrStartupAdapter`,
+`runSonarrStartupAdapter`, `runLidarrStartupAdapter`) to throw when `input.databaseIds` is empty.
+Also changed `fallbackDatabaseId` usage from `input.databaseIds[0] ?? 0` to explicit
+`input.databaseIds[0]` with an `undefined` guard, so invalid `0` fallback values are no longer
+possible.
 
 ---
 
@@ -486,7 +492,7 @@ candidate for shared extraction.
    from network failures~~ **DONE**
 5. **M7** -- Verify migration SQL intent (data-touching)
 6. **M1** -- Extract shared handler utilities
-7. **H2** -- Add databaseId assertion in adapters
+7. ~~**H2** -- Add databaseId assertion in adapters~~ **DONE**
 8. **M5** -- Sanitize API error responses
 9. **H5** -- Normalize counter field naming to camelCase
 10. **M4** -- Add DB status validation

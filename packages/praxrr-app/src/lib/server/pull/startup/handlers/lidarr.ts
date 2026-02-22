@@ -515,7 +515,10 @@ export async function matchLidarrStartupResources(
   const arrType = assertStartupArrType(input.arrType, 'lidarr', 'Cannot process non-Lidarr instance in Lidarr adapter');
   const envelope = createAdapterResultEnvelope('skipped');
   const matches: StartupPullMatchResult[] = [];
-  const fallbackDatabaseId = input.databaseIds[0] ?? 0;
+  const fallbackDatabaseId = input.databaseIds[0];
+  if (fallbackDatabaseId === undefined) {
+    throw new Error('Cannot match startup resources with no database IDs');
+  }
 
   for (const unsupportedSection of snapshot.unsupportedSections) {
     const result = buildUnsupportedSectionResult(input.instanceId, fallbackDatabaseId, unsupportedSection);
@@ -654,6 +657,10 @@ export async function runLidarrStartupAdapter(
   client: BaseArrClient
 ): Promise<LidarrStartupMatchRunResult> {
   assertStartupArrType(input.arrType, 'lidarr', 'Cannot run non-Lidarr adapter');
+  if (input.databaseIds.length === 0) {
+    throw new Error('Cannot match startup resources with no database IDs');
+  }
+
   const fetchResult = await collectRemoteSectionSnapshots(client);
 
   if (!fetchResult.success) {

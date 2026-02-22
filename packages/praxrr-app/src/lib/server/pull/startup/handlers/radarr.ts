@@ -508,7 +508,10 @@ export async function matchRadarrStartupResources(
   const arrType = assertStartupArrType(input.arrType, 'radarr', 'Cannot process non-Radarr instance in radarr adapter');
   const envelope = createAdapterResultEnvelope('skipped');
   const matches: StartupPullMatchResult[] = [];
-  const fallbackDatabaseId = input.databaseIds[0] ?? 0;
+  const fallbackDatabaseId = input.databaseIds[0];
+  if (fallbackDatabaseId === undefined) {
+    throw new Error('Cannot match startup resources with no database IDs');
+  }
 
   for (const unsupported of snapshot.unsupportedSections) {
     const result = buildUnsupportedSectionResult(input.instanceId, fallbackDatabaseId, unsupported);
@@ -624,6 +627,9 @@ export async function runRadarrStartupAdapter(
   client: BaseArrClient
 ): Promise<RadarrStartupMatchRunResult> {
   assertStartupArrType(input.arrType, 'radarr', 'Cannot run non-Radarr adapter');
+  if (input.databaseIds.length === 0) {
+    throw new Error('Cannot match startup resources with no database IDs');
+  }
 
   const fetchResult = await collectRemoteSectionSnapshots(client);
   if (!fetchResult.success) {
