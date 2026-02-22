@@ -535,13 +535,13 @@ candidate for shared extraction.
    assertions)~~ **DONE**
 4. ~~**H1** -- Log stack traces in startup snapshot collection and distinguish programming errors
    from network failures~~ **DONE**
-5. **M7** -- Verify migration SQL intent (data-touching)
-6. **M1** -- Extract shared handler utilities
+5. **M7** -- Verify migration SQL intent (data-touching) **DONE**
+6. **M1** -- Extract shared handler utilities into `lib/handlers.ts` **DONE**
 7. ~~**H2** -- Add databaseId assertion in adapters~~ **DONE**
 8. ~~**H3** -- Make Lidarr startup client typing runtime-safe~~ **DONE**
-9. **M5** -- Sanitize API error responses
+9. **M5** -- Sanitize API error responses **DONE**
 10. ~~**H5** -- Normalize counter field naming to camelCase~~ **DONE**
-11. **M4** -- Add DB status validation
-12. **M8 + M10** -- Formatting and import cleanup
-13. **T1 + T2** -- Add critical missing tests
-14. **D1** -- Add key comments
+11. **M4** -- Add DB status validation to startup **DONE**
+12. **M8 + M10** -- Formatting and import cleanup **DONE**
+13. **T1 + T2** -- Add critical missing tests **DONE**
+14. **D1** -- Add key comments **DONE**
