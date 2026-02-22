@@ -313,7 +313,16 @@ export async function collectLidarrStartupCandidates(databaseIds: readonly numbe
 
   for (const databaseId of databaseIds) {
     const cache = pcdManager.getCache(databaseId);
-    if (!cache) continue;
+    if (!cache) {
+      await logger.warn(`PCD cache not found for database ${databaseId}, skipping`, {
+        source: 'StartupPull',
+        meta: {
+          arrType: 'lidarr',
+          databaseId,
+        },
+      });
+      continue;
+    }
 
     const [qualityProfileRows, delayProfileRows, mediaManagementCandidates, metadataProfileCandidates] =
       await Promise.all([

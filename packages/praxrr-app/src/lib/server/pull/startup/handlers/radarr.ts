@@ -303,6 +303,13 @@ export async function collectRadarrStartupCandidates(databaseIds: readonly numbe
   for (const databaseId of databaseIds) {
     const cache = pcdManager.getCache(databaseId);
     if (!cache) {
+      await logger.warn(`PCD cache not found for database ${databaseId}, skipping`, {
+        source: 'StartupPull',
+        meta: {
+          arrType: 'radarr',
+          databaseId,
+        },
+      });
       continue;
     }
 

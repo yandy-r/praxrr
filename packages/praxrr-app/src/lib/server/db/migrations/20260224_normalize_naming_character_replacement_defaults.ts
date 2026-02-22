@@ -31,11 +31,14 @@ SET
   colon_replacement_format = 4,
   custom_colon_replacement_format = NULL,
   updated_at = CURRENT_TIMESTAMP
+-- Legacy onboarding can leave Lidarr defaults with sonarr profile names.
 WHERE lower(name) IN ('default', 'lidarr', 'sonarr');
 `;
 
-const NAMING_CHARACTER_REPLACEMENT_DEFAULTS_OP_SQL_ESCAPED =
-  NAMING_CHARACTER_REPLACEMENT_DEFAULTS_OP_SQL.replaceAll("'", "''");
+const NAMING_CHARACTER_REPLACEMENT_DEFAULTS_OP_SQL_ESCAPED = NAMING_CHARACTER_REPLACEMENT_DEFAULTS_OP_SQL.replaceAll(
+  "'",
+  "''"
+);
 
 export const migration: Migration = {
   version: NAMING_CHARACTER_REPLACEMENT_DEFAULTS_OP_VERSION,

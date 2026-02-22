@@ -303,7 +303,7 @@ Falls back to `'qualityProfiles'` and `'radarr'` when `requests` is empty. Shoul
 
 ### M7. Migration SQL comment accuracy concern
 
-- **Status:** [ ] Open (needs verification)
+- **Status:** [x] Fixed
 - **Files:** `db/migrations/20260224_normalize_naming_character_replacement_defaults.ts:33-34`
 - **Agent:** comment-analyzer
 
@@ -314,11 +314,14 @@ name (legacy onboarding seeded Lidarr rows from Sonarr templates) or it's a bug.
 **Fix:** Verify intent. If intentional, add a comment explaining why. If a bug, remove `'sonarr'`
 from the predicate.
 
+**Resolution:** Added a comment in the migration SQL clarifying the legacy onboarding compatibility
+reason for including `sonarr` in the Lidarr update predicate.
+
 ---
 
 ### M8. Mixed indentation in `types.ts`
 
-- **Status:** [ ] Open
+- **Status:** [x] Fixed
 - **Files:** `pull/startup/types.ts:48-55`
 - **Agent:** code-reviewer
 
@@ -326,11 +329,14 @@ Lines 1-46 use 2-space indentation; lines 48-55 use tabs.
 
 **Fix:** Run `deno task format` on this file.
 
+**Resolution:** Ran formatting on `packages/praxrr-app/src/lib/server/pull/startup/types.ts`; file
+indentation/style now matches project formatter output.
+
 ---
 
 ### M9. Silent PCD cache skip in candidate collection
 
-- **Status:** [ ] Open
+- **Status:** [x] Fixed
 - **Files:** `handlers/radarr.ts:417-419`, `handlers/sonarr.ts:391`, `handlers/lidarr.ts:419`
 - **Agent:** silent-failure-hunter
 
@@ -346,11 +352,14 @@ if (!cache) {
 }
 ```
 
+**Resolution:** Added `logger.warn(...)` for missing PCD cache in all three handler candidate
+collectors before continuing.
+
 ---
 
 ### M10. `StartupPullArrType` imported as value instead of type
 
-- **Status:** [ ] Open
+- **Status:** [x] Fixed
 - **Files:** `handlers/radarr.ts:15`, `mediaManagement.ts:22`, `handlers/lidarr.ts:34`,
   `profileMatching.ts:7`
 - **Agent:** code-reviewer
@@ -359,6 +368,9 @@ if (!cache) {
 `type`.
 
 **Fix:** Add `type` keyword: `type StartupPullArrType,`
+
+**Resolution:** Verified/fixed imports use type-only imports for `StartupPullArrType` in the listed
+files (`radarr`, `mediaManagement`, `lidarr`, `profileMatching`).
 
 ---
 
