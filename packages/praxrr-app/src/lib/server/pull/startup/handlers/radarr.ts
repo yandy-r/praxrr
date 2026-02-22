@@ -12,7 +12,7 @@ import {
 	incrementCounter,
 } from './shared.ts';
 import {
-	StartupPullArrType,
+	type StartupPullArrType,
 	type StartupPullEntityDescriptor,
 	type StartupPullInstanceInput,
 	type StartupPullMatchResult,

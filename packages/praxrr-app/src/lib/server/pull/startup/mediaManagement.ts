@@ -19,7 +19,7 @@ import {
 	multiEpisodeStyleFromDb,
 } from '$shared/pcd/mediaManagement.ts';
 import {
-	StartupPullArrType,
+	type StartupPullArrType,
 	type StartupPullEntityDescriptor,
 	type StartupPullMatchRequest,
 	type StartupPullMatchResult,
