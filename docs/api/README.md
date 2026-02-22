@@ -38,5 +38,5 @@ curl -sS \
 
 ## Scope notes
 
-- These docs cover versioned API endpoints under `/api/v1`.
+- These docs cover versioned API endpoints under `/api/v1`, including shared endpoints and arr app routes (Radarr, Sonarr, Lidarr).
 - Additional `/api/*` routes outside `/api/v1` exist in the codebase and are primarily app-internal utilities, not part of the versioned API contract.

@@ -2,81 +2,69 @@
 
 ## Run Metadata
 
-- Date: 2026-02-20
-- Scope: entire codebase
+- Date: 2026-02-22
+- Scope: entire codebase documentation
 - Mode: update
-- Source audit: `write-docs/scripts/audit-documentation.sh`
+- Source audit: `/home/yandy/.config/dotfiles/.codex/skills/write-docs/scripts/audit-documentation.sh`
 
 ## Audit Summary
 
-- Canonical docs currently live in a small set of files:
+- The main user-facing docs now span:
   - `README.md`
+  - `docs/README.md`
   - `docs/ARCHITECTURE.md`
-  - `docs/CONTRIBUTING.md`
-  - `docs/DEVELOPMENT.md`
+  - `docs/architecture/*.md`
+  - `docs/api/*.md`
+  - `docs/features/*.md`
   - `docs/api/v1/openapi.yaml`
-- Documentation does not yet have a navigable index (`docs/README.md` missing).
-- Architecture content exists but is monolithic; there is no modular `docs/architecture/` set.
-- API source-of-truth spec exists, but no reader-oriented docs for auth, errors, and endpoint quick reference.
-- Feature-level docs are missing (`docs/features/` absent).
-- Root README has an empty `## Documentation` section and weak navigation to canonical docs.
-- Existing strategy file was stale and described a different repository structure.
+  - `docs/api/v1/paths/*.yaml`
+  - `docs/api/v1/schemas/*.yaml`
+  - `packages/praxrr-app/src/lib/server/utils/arr/README.md`
+  - `packages/praxrr-schema/README.md`
+- Existing docs contain many static references to specific apps (notably Radarr and Sonarr) in non-historical narrative.
+- Historical planning artifacts under `docs/plans/**` still intentionally keep historical app-specific scope and should be retained unless a feature is explicitly being rewritten.
 
 ## Gaps
 
-1. No docs information architecture (`docs/README.md`, architecture/API/features hubs).
-2. No concise API quickstart docs tied to current `/api/v1` endpoints.
-3. No feature workflow docs for link/bridge/sync and entity testing.
-4. README navigation is incomplete and does not route users to the right docs quickly.
-5. Development docs contain a scoped plan-verification section that should not be in canonical developer guidance.
+1. Generalized language around Arr-family support is inconsistent across top-level docs and APIs.
+2. Feature docs still describe some workflows in app-specific terms where future app families are implied.
+3. Developer docs under `packages/praxrr-app` and `packages/praxrr-schema` could better reflect “Arr apps” + “media-management apps” semantics.
+4. README docs still present app-specific setup language that can hide broader Arr support story.
 
 ## Priority Workstreams
 
-1. Architecture docs (`docs/architecture/*`) to split critical architecture guidance into focused pages.
-2. API docs (`docs/api/*.md`) to add practical usage docs on top of OpenAPI artifacts.
-3. Feature docs (`docs/features/*.md`) to document top workflows and troubleshooting paths.
-4. README updates (`README.md`, `docs/CONTRIBUTING.md`) for discoverability and cross-links.
+1. README updates (`README.md`, package readmes, high-signal docs readmes)
+2. Architecture docs (`docs/ARCHITECTURE.md`, `docs/architecture/*.md`)
+3. Feature docs (`docs/features/*.md`)
+4. API docs (`docs/api/*.md` and related narrative references in OpenAPI)
+5. Arr utility docs (`packages/praxrr-app/src/lib/server/utils/arr/README.md`, `packages/praxrr-schema/README.md`)
 
 ## Planned Changes
 
 ### Update
 
 - `README.md`
-- `docs/CONTRIBUTING.md`
-- `docs/DEVELOPMENT.md`
-- `docs/plans/documentation-strategy.md`
-
-### Create
-
 - `docs/README.md`
+- `docs/ARCHITECTURE.md`
 - `docs/architecture/overview.md`
 - `docs/architecture/components.md`
-- `docs/architecture/data-flow.md`
 - `docs/api/README.md`
 - `docs/api/endpoints.md`
-- `docs/api/authentication.md`
-- `docs/api/errors.md`
-- `docs/features/README.md`
-- `docs/features/link-bridge-sync.md`
-- `docs/features/entity-testing.md`
-- `docs/features/portable-import-export.md`
+- `docs/features/*.md`
+- `docs/api/v1/openapi.yaml`
+- `docs/api/v1/paths/arr.yaml`
+- `docs/api/v1/schemas/pcd.yaml`
+- `packages/praxrr-app/src/lib/server/utils/arr/README.md`
+- `packages/praxrr-schema/README.md`
 
-### Remove
+### Defer / Keep As-Is
 
-- Remove stale section `Task 3.3 Documentation Verification` from `docs/DEVELOPMENT.md`.
-- Remove empty/placeholder root README documentation section content and replace with active navigation links.
+- Historical execution notes in `docs/plans/**` and `docs/pr-reviews/**` where app-specific scope is part of historical record.
 
 ## Scope and Boundaries
 
-- Keep `docs/api/v1/**` as the OpenAPI source of truth.
-- Do not rewrite package distribution READMEs (`packages/praxrr-db/README.md`, `packages/praxrr-schema/README.md`) in this pass.
-- Preserve deep reference content in `docs/ARCHITECTURE.md`; new architecture docs provide quick navigation, not replacement.
-
-## Priority Files For Code Documentation Stream
-
-- `packages/praxrr-app/src/routes/api/v1/arr/library/+server.ts`
-- `packages/praxrr-app/src/routes/api/v1/pcd/import/+server.ts`
-- `packages/praxrr-app/src/lib/server/sync/index.ts`
-- `packages/praxrr-app/src/lib/server/jobs/init.ts`
-
-Code-comment updates are optional in this run and only apply if gaps are found during workstream integration.
+- Preserve explicit app-scoped requirements in schema/API details where behavior is not uniform.
+- Replace only static, present-tense references where the generic family concept is accurate.
+- Keep historical references (especially in plans and research archives) for auditability unless explicitly requested.
+- Track future docs work as separate scopes; this run intentionally updates
+  present-tense project documentation wording, not historical plan narratives.

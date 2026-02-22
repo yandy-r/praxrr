@@ -16,7 +16,7 @@
 
 Praxrr is a management and automation platform for the \*arr ecosystem. Configure quality profiles,
 custom formats, and media settings once in a Git-backed configuration database, then sync them
-across any number of Radarr, Sonarr, and Lidarr instances — with intelligent upgrade automation and
+across any number of Arr instances (for example Radarr, Sonarr, and Lidarr) — with intelligent upgrade automation and
 more on the way.
 
 ## Features
@@ -25,7 +25,7 @@ more on the way.
 
 - **Link** - Connect to configuration databases like the
   [Praxrr database](https://github.com/yandy-r/praxrr-db) or any Praxrr Compliant Database (PCD)
-- **Bridge** - Add your Radarr, Sonarr, and Lidarr instances by URL and API key
+- **Bridge** - Add your Arr instances (for example Radarr, Sonarr, and Lidarr) by URL and API key
 - **Sync** - Push configurations to your instances. Praxrr compiles everything to the right format
   automatically
 
@@ -36,7 +36,7 @@ more on the way.
   goals
 - **Stay Updated** - Make local tweaks that persist across upstream updates. View changelogs, diffs,
   and revert changes when needed. Merge conflicts are handled transparently
-- **Automated Upgrades** - The arrs don't search for the best release, they grab the first RSS item
+- **Automated Upgrades** - Arr apps don't search for the best release, they grab the first RSS item
   that qualifies. Praxrr triggers intelligent searches based on filters and selectors
 
 ### Release Notes
@@ -49,7 +49,7 @@ more on the way.
 ### For Developers
 
 - **Unified Architecture** - One configuration language that compiles to
-  Radarr/Sonarr/Lidarr-specific formats on sync. No more maintaining separate configs for each app
+  Arr app-specific formats on sync. No more maintaining separate configs for each app
 - **Reusable Components** - Regular expressions are separate entities shared across custom formats.
   Change once, update everywhere
 - **OSQL** - Configurations stored as append-only SQL operations. Readable, auditable, diffable.
@@ -136,7 +136,7 @@ This runs the parser service and Vite dev server concurrently. See
 ## Usage
 
 1. Link a Praxrr Compliant Database (PCD) repository.
-2. Bridge Radarr, Sonarr, and Lidarr instances.
+2. Bridge Arr instances.
 3. Sync configuration changes from Praxrr to connected Arr instances.
 4. Use [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)
    for deeper implementation and release details.

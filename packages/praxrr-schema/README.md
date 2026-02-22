@@ -3,7 +3,7 @@
 The **base SQLite schema** for all [Praxrr Compliant Databases (PCDs)](https://github.com/yandy-r/praxrr) is maintained in the monorepo at
 `praxrr/packages/praxrr-schema`. This repository defines the structural foundation -- tables, constraints,
 indexes, and seed data -- that every PCD builds upon.
-It supports **Radarr**, **Sonarr**, and **Lidarr** media management applications.
+It supports multiple Arr media management applications including **Radarr**, **Sonarr**, and **Lidarr**.
 
 ## Distribution and release workflow
 
@@ -54,13 +54,13 @@ not **the state itself**. This operational approach means any PCD can be rebuilt
 time by replaying its operations in order, producing a deterministic, identical result.
 
 PCDs solve a fundamental problem in media automation: managing complex, interrelated configurations
-for applications like Radarr, Sonarr, and Lidarr in a way that is **versionable**, **composable**,
+for Arr applications like Radarr, Sonarr, and Lidarr in a way that is **versionable**, **composable**,
 **auditable**, and **conflict-aware**.
 
 The following diagram shows how PCDs are layered and composed. The **Schema PCD** (this repository)
 is the foundation. **Base PCDs** build on it with profiles and custom formats. **Tweaks** optionally
 adjust Base PCD behavior. **User Ops** add personal customizations. Together, these layers produce a
-complete database that Praxrr syncs to arr applications.
+complete database that Praxrr syncs to Arr applications.
 
 ```mermaid
 graph TD

@@ -16,9 +16,9 @@ This page is a reader-oriented companion to `docs/api/v1/openapi.yaml`.
 | GET    | `/health`                                         | Service/component health check       |
 | GET    | `/openapi.json`                                   | Runtime OpenAPI JSON                 |
 | POST   | `/entity-testing/evaluate`                        | Parse titles and evaluate CF matches |
-| GET    | `/arr/library`                                    | Paginated Arr library view           |
+| GET    | `/arr/library`                                    | Paginated arr app library view       |
 | DELETE | `/arr/library`                                    | Invalidate Arr library cache         |
-| GET    | `/arr/library/episodes`                           | Sonarr series episode details        |
+| GET    | `/arr/library/episodes`                           | Sonarr-only series episode details   |
 | GET    | `/arr/releases`                                   | Interactive release search           |
 | POST   | `/arr/cleanup`                                    | Scan/execute stale config cleanup    |
 | GET    | `/pcd/export`                                     | Export portable entity payload       |
@@ -80,7 +80,7 @@ Request fields:
 
 - `databaseId` (optional integer): required only for CF evaluation
 - `releases` (required array): `{ id, title, type }`
-- `type` is `movie` or `series`
+- `type` is `movie` (Radarr titles) or `series` (Sonarr titles)
 
 ```bash
 curl -sS \
@@ -128,6 +128,8 @@ Semantics:
 
 ### `GET /arr/library`
 
+- Behavior applies to the selected arr app instance (`instanceId`), unless an endpoint/parameter explicitly notes Sonarr-only constraints.
+
 Parameters:
 
 - `instanceId` (required integer)
@@ -137,7 +139,7 @@ Parameters:
 - `sortDirection` (optional `asc` or `desc`, default `asc`)
 - `query` (optional string, case-insensitive filter)
 
-Sort keys by Arr type:
+Sort keys by app type:
 
 - `radarr`: `id`, `title`, `year`, `qualityProfileName`, `qualityName`, `qualityScore`, `customFormatScore`, `progress`, `popularity`, `dateAdded`
 - `sonarr`: `id`, `title`, `year`, `qualityProfileName`, `status`, `percentOfEpisodes`, `episodeCount`, `seasonCount`, `dateAdded`

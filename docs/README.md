@@ -1,6 +1,6 @@
 # praxrr Documentation
 
-Welcome to the praxrr documentation.
+Welcome to the praxrr documentation for Arr-family workflows and implementation details.
 
 ## Quick Links
 

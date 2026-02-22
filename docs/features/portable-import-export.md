@@ -2,8 +2,10 @@
 
 ## Overview
 
-Portable import/export moves PCD entities between databases using a JSON contract that is
-database-ID-free and timestamp-free.
+Portable import/export moves PCD entities between databases using a JSON contract
+that is database-ID-free and timestamp-free. Compatibility remains constrained by
+supported `entityType` contracts (including family-specific types such as
+`radarr_media_settings` and `sonarr_media_settings`).
 
 Endpoints:
 
@@ -45,7 +47,7 @@ The response shape is:
 ## 2) Review payload
 
 - Keep field names exactly as emitted.
-- Do not mix cross-family fields (for example Radarr naming fields inside `lidarr_naming`).
+- Do not mix cross-family fields (for example Radarr-namespaced fields inside `lidarr_naming`).
 - Preserve `entityType` exactly.
 
 ## 3) Import into target database/layer
@@ -98,9 +100,9 @@ curl -sS -X POST "http://localhost:6868/api/v1/pcd/import" \
 - `Cannot write to base layer`:
   Use `layer: "user"` or switch to a writable base context.
 - `Mixed payload for <entityType>: unsupported fields from another model: ...`:
-  Payload contains fields from a different Arr family.
+  Payload contains fields from a different media-management app family.
 - `Unsupported payload for <entityType>: missing required fields: ...`:
-  Required keys for that portable type are missing.
+  Required keys for that portable app family type are missing.
 - Export returns `not found`:
   `name` does not exist in the source database for that `entityType`.
 - Import returns duplicate/validation errors:

@@ -44,7 +44,7 @@ ExportResponse:
         - `delay_profile` → PortableDelayProfile
         - `regular_expression` → PortableRegularExpression
         - `custom_format` → PortableCustomFormat
-        - `quality_profile` → PortableQualityProfile (contains PortableCustomFormatScore with lidarr-aware arrType)
+        - `quality_profile` → PortableQualityProfile (contains PortableCustomFormatScore with family-scoped arrType)
         - `radarr_naming` → PortableRadarrNaming
         - `sonarr_naming` → PortableSonarrNaming
         - `lidarr_naming` → PortableLidarrNaming
@@ -241,8 +241,8 @@ PortableCustomFormatScore:
       enum: [radarr, sonarr, lidarr, all]
       description: |
         Arr target for this score mapping. `lidarr` is a first-class value
-        so quality profile custom-format scores can be scoped to Lidarr
-        instances. `all` applies the score to every arr type.
+        so quality profile custom-format scores can be scoped to a specific Arr
+        app family. `all` applies the score to every supported family.
 
         Non-regression contract: existing `radarr`, `sonarr`, and `all`
         enum semantics are unchanged; `lidarr` is an explicit additional arr
@@ -407,8 +407,7 @@ PortableLidarrNaming:
 PortableMediaSettings:
   type: object
   description: |
-    Shared media-management settings payload shape used by Radarr, Sonarr, and
-    Lidarr entity families.
+    Shared media-management settings payload shape used across Arr families.
   required:
     - name
     - propersRepacks
@@ -431,8 +430,7 @@ PortableLidarrMediaSettings:
 PortableQualityDefinitions:
   type: object
   description: |
-    Shared quality-definition payload shape used by Radarr, Sonarr, and Lidarr
-    entity families.
+    Shared quality-definition payload shape used across Arr families.
   required:
     - name
     - entries
