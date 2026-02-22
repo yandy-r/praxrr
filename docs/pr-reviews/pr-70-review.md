@@ -378,7 +378,7 @@ files (`radarr`, `mediaManagement`, `lidarr`, `profileMatching`).
 
 ### T1. API endpoint has zero tests (Criticality: 8/10)
 
-- **Status:** [ ] Open
+- **Status:** [x] Fixed
 - **Files:** `routes/api/v1/system/startup-pull/latest/+server.ts`
 
 The GET handler's three code paths (200, 404, 500) are completely untested.
@@ -393,7 +393,7 @@ The GET handler's three code paths (200, 404, 500) are completely untested.
 
 ### T2. Sync processor startup pull guard untested (Criticality: 8/10)
 
-- **Status:** [ ] Open
+- **Status:** [x] Fixed
 - **Files:** `sync/processor.ts:39-50,393-403`
 
 `markInstanceStartupPullActive`/`markInstanceStartupPullComplete` and the `triggerSyncs` guard have
@@ -410,7 +410,7 @@ no direct tests.
 
 ### T3. Per-Arr adapter handlers lack isolated unit tests (Criticality: 7/10)
 
-- **Status:** [ ] Open
+- **Status:** [x] Fixed
 - **Files:** `handlers/radarr.ts`, `handlers/sonarr.ts`, `handlers/lidarr.ts`,
   `handlers/lidarrMetadata.ts`
 
@@ -428,7 +428,7 @@ tested indirectly.
 
 ### T4. Fingerprint cross-format equivalence tests incomplete (Criticality: 6/10)
 
-- **Status:** [ ] Open
+- **Status:** [x] Fixed
 - **Files:** `mediaManagement.ts`
 
 Only delay profile and Sonarr naming fingerprints are tested. Missing: Radarr/Lidarr naming, media
@@ -445,7 +445,7 @@ settings, quality definitions.
 
 ### T5. DB queries (`startupPull.ts`) have no tests (Criticality: 5/10)
 
-- **Status:** [ ] Open
+- **Status:** [x] Fixed
 - **Files:** `db/queries/startupPull.ts`
 
 273 lines of SQL-backed queries with field-mapping logic are untested. `runRowToRecord` and
@@ -455,7 +455,7 @@ settings, quality definitions.
 
 ### T6. Orchestrator timeout and batch concurrency untested (Criticality: 5/10)
 
-- **Status:** [ ] Open
+- **Status:** [x] Fixed
 - **Files:** `orchestrator.ts`
 
 `withTimeout` and `processBatches` have no direct tests.
