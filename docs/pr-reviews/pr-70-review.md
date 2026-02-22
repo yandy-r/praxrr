@@ -472,7 +472,7 @@ settings, quality definitions.
 
 ### D1. Add module-level doc comments to key files
 
-- **Status:** [ ] Open
+- **Status:** [x] Fixed
 - **Agent:** comment-analyzer
 
 Files with zero comments that need module-level or function-level documentation:
@@ -493,7 +493,7 @@ Files with zero comments that need module-level or function-level documentation:
 
 ### D2. Remove redundant section banners and obvious JSDoc
 
-- **Status:** [ ] Open
+- **Status:** [x] Fixed
 - **Files:** `db/queries/startupPull.ts`
 
 Section banners (`// ========== Row Types ==========`) and JSDoc that restates function names
@@ -503,7 +503,7 @@ Section banners (`// ========== Row Types ==========`) and JSDoc that restates f
 
 ### D3. Add duplication rationale comment to handlers
 
-- **Status:** [ ] Open
+- **Status:** [x] Fixed
 - **Files:** `handlers/shared.ts` or each handler
 
 Add a note explaining whether the handler duplication is intentional per Cross-Arr policy or is a
