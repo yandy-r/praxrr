@@ -193,8 +193,8 @@ counter usage across startup logic (`skippedDefault`, `skippedNoMatch`). DB quer
 
 ### M1. Significant code duplication across Arr handlers
 
-- **Status:** [ ] Open
-- **Files:** `handlers/radarr.ts`, `handlers/sonarr.ts`, `handlers/lidarr.ts`
+- **Status:** [x] Fixed
+- **Files:** `handlers/radarr.ts`, `handlers/sonarr.ts`, `handlers/lidarr.ts`, `handlers/shared.ts`
 - **Agents:** code-reviewer, comment-analyzer
 
 These functions are copied identically across all three files:
@@ -207,6 +207,11 @@ These functions are copied identically across all three files:
 
 **Fix:** Move to `handlers/shared.ts`. Create a generic
 `classifyStartupFetchError(arrLabel: string, error: unknown)` parameterized by Arr name.
+
+**Resolution:** Moved identical helpers into `handlers/shared.ts` (including
+`classifyStartupFetchError(arrLabel, error)`, `getDelayProfileName`, `sortStartupCandidates`,
+`incrementCountersFromMatchResult`, and `buildUnsupportedSectionResult`). Updated all three handlers
+to consume shared helpers and removed local duplicate implementations.
 
 ---
 

@@ -1,16 +1,19 @@
-import { HttpError } from '$http/types.ts';
 import { logger } from '$logger/logger.ts';
 import type { BaseArrClient } from '$arr/base.ts';
-import type { ArrDelayProfile } from '$arr/types.ts';
 import * as qualityProfileQueries from '$pcd/entities/qualityProfiles/index.ts';
 import * as delayProfileQueries from '$pcd/entities/delayProfiles/read.ts';
 import { pcdManager } from '$pcd/index.ts';
 import {
   assertStartupArrType,
   createAdapterResultEnvelope,
+  buildUnsupportedSectionResult,
+  classifyStartupFetchError,
+  getDelayProfileName,
   getStartupSectionSupportReason,
-  type StartupAdapterResultEnvelope,
+  incrementCountersFromMatchResult,
   incrementCounter,
+  type StartupAdapterResultEnvelope,
+  sortStartupCandidates,
 } from './shared.ts';
 import {
   type StartupPullArrType,
@@ -97,88 +100,6 @@ const RADARR_SECTIONS: readonly StartupPullSection[] = [
   'qualityDefinitions',
 ] as const;
 
-function classifyRadarrFetchError(error: unknown): RadarrStartupFetchFailure {
-  if (error instanceof HttpError) {
-    if (error.status === 401 || error.status === 403) {
-      return {
-        success: false,
-        kind: 'auth',
-        statusCode: error.status,
-        message: `Radarr startup adapter fetch failed: authentication rejected by Radarr (HTTP ${error.status}).`,
-      };
-    }
-
-    if (
-      error.status === 0 ||
-      error.status === 408 ||
-      error.status === 500 ||
-      error.status === 502 ||
-      error.status === 503 ||
-      error.status === 504
-    ) {
-      return {
-        success: false,
-        kind: 'unreachable',
-        statusCode: error.status,
-        message: `Radarr startup adapter fetch failed: unable to reach Radarr API (HTTP ${error.status}).`,
-      };
-    }
-
-    return {
-      success: false,
-      kind: 'unknown',
-      statusCode: error.status,
-      message: `Radarr startup adapter fetch failed: Radarr API returned HTTP ${error.status}.`,
-    };
-  }
-
-  if (error instanceof Error) {
-    const isNetworkError = isLikelyNetworkError(error);
-    return {
-      success: false,
-      kind: isNetworkError ? 'unreachable' : 'unknown',
-      statusCode: null,
-      message: isNetworkError
-        ? `Radarr startup adapter fetch failed: ${error.message}`
-        : `Radarr startup adapter fetch failed (programming error): ${error.message}`,
-    };
-  }
-
-  return {
-    success: false,
-    kind: 'unknown',
-    statusCode: null,
-    message: 'Radarr startup adapter fetch failed due to an unknown error.',
-  };
-}
-
-function isLikelyNetworkError(error: Error): boolean {
-  const message = error.message.toLowerCase();
-  const cause = error.cause;
-  const causeCode =
-    typeof cause === 'object' && cause !== null && 'code' in cause && typeof cause.code === 'string'
-      ? cause.code.toUpperCase()
-      : null;
-
-  if (error.name === 'AbortError') {
-    return true;
-  }
-
-  if (causeCode === null) {
-    const messageMatches = /(fetch|network|connect|connection|socket|timed.?out|econn|eai_|dns|lookup)/i.test(message);
-    return error.name === 'TypeError' && messageMatches;
-  }
-
-  return (
-    causeCode === 'ECONNABORTED' ||
-    causeCode === 'ECONNREFUSED' ||
-    causeCode === 'ECONNRESET' ||
-    causeCode === 'ENOTFOUND' ||
-    causeCode === 'EAI_AGAIN' ||
-    causeCode === 'ETIMEDOUT'
-  );
-}
-
 function toSectionSnapshot(
   values: readonly Omit<StartupPullEntityDescriptor, 'databaseId'>[]
 ): readonly Omit<StartupPullEntityDescriptor, 'databaseId'>[] {
@@ -190,82 +111,6 @@ function toSectionSnapshot(
 
     return String(left.id).localeCompare(String(right.id));
   });
-}
-
-function getDelayProfileName(profile: ArrDelayProfile): string {
-  const rawName = (profile as { name?: unknown }).name;
-  if (typeof rawName === 'string' && rawName.length > 0) {
-    return rawName;
-  }
-
-  return `Delay Profile ${profile.id}`;
-}
-
-function sortStartupCandidates(items: readonly StartupPullEntityDescriptor[]): StartupPullEntityDescriptor[] {
-  return [...items].sort((left, right) => {
-    const byName = left.name.localeCompare(right.name, undefined, { sensitivity: 'base' });
-    if (byName !== 0) {
-      return byName;
-    }
-
-    if (left.databaseId !== right.databaseId) {
-      return left.databaseId - right.databaseId;
-    }
-
-    return String(left.id).localeCompare(String(right.id));
-  });
-}
-
-function incrementCountersFromMatchResult(
-  envelope: StartupAdapterResultEnvelope,
-  result: StartupPullMatchResult
-): void {
-  if (result.status === 'matched') {
-    incrementCounter(envelope, 'imported');
-    return;
-  }
-
-  if (result.status === 'conflicted') {
-    incrementCounter(envelope, 'conflicted');
-    return;
-  }
-
-  if (result.status === 'no_match' && result.reason === 'default_skip') {
-    incrementCounter(envelope, 'skippedDefault');
-    return;
-  }
-
-  incrementCounter(envelope, 'skippedNoMatch');
-}
-
-function buildUnsupportedSectionResult(
-  instanceId: number,
-  databaseId: number,
-  reason: RadarrUnsupportedSection
-): StartupPullMatchResult {
-  return {
-    ...makeStartupMatchNoMatchResult(
-      {
-        instanceId,
-        databaseId,
-        section: reason.section,
-        arrType: 'radarr',
-        remote: {
-          id: `unsupported:${reason.section}`,
-          name: reason.section,
-          section: reason.section,
-          arrType: 'radarr',
-          databaseId,
-        },
-        candidates: [],
-      },
-      'unsupported_section',
-      {
-        hasFingerprintAttempt: false,
-      }
-    ),
-    reason: 'unsupported_section',
-  };
 }
 
 function matchManagedQualityProfiles(
@@ -441,7 +286,10 @@ export async function collectRemoteSectionSnapshots(client: BaseArrClient): Prom
         },
       }
     );
-    return classifyRadarrFetchError(error);
+    return classifyStartupFetchError('Radarr', error, {
+      programmingErrorLabel: 'programming error',
+      unknownErrorMessage: 'Radarr startup adapter fetch failed due to an unknown error.',
+    });
   }
 }
 
@@ -514,7 +362,7 @@ export async function matchRadarrStartupResources(
   }
 
   for (const unsupported of snapshot.unsupportedSections) {
-    const result = buildUnsupportedSectionResult(input.instanceId, fallbackDatabaseId, unsupported);
+    const result = buildUnsupportedSectionResult(input.instanceId, fallbackDatabaseId, unsupported, 'radarr');
     matches.push(result);
     incrementCountersFromMatchResult(envelope, result);
   }

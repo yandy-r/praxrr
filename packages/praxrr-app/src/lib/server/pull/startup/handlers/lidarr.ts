@@ -1,4 +1,3 @@
-import { HttpError } from '$http/types.ts';
 import { logger } from '$logger/logger.ts';
 import { pcdManager } from '$pcd/index.ts';
 import type { BaseArrClient } from '$arr/base.ts';
@@ -13,10 +12,15 @@ import type {
 import {
   assertStartupArrType,
   createAdapterResultEnvelope,
+  buildUnsupportedSectionResult,
+  classifyStartupFetchError,
+  getDelayProfileName,
   getStartupSectionSupportReason,
   incrementCounter,
   isStartupSectionSupported,
   type StartupAdapterResultEnvelope,
+  incrementCountersFromMatchResult,
+  sortStartupCandidates,
 } from './shared.ts';
 import { makeStartupMatchNoMatchResult } from '../matching.ts';
 import { shouldSkipStartupDefault } from '../defaultFilters.ts';
@@ -111,8 +115,6 @@ const LIDARR_SECTIONS: readonly StartupPullSection[] = [
   'metadataProfiles',
 ] as const;
 
-const LIDARR_STARTUP_ERROR_MESSAGE_PREFIX = 'Lidarr startup adapter fetch failed';
-
 interface LidarrStartupClient extends BaseArrClient {
   getQualityProfiles(): Promise<RadarrQualityProfile[]>;
   getDelayProfiles(): Promise<ArrDelayProfile[]>;
@@ -126,97 +128,6 @@ function isLidarrStartupClient(client: BaseArrClient): client is LidarrStartupCl
   return 'getMetadataProfiles' in client && typeof client.getMetadataProfiles === 'function';
 }
 
-function getDelayProfileName(profile: ArrDelayProfile): string {
-  const rawName = (profile as { name?: unknown }).name;
-  if (typeof rawName === 'string' && rawName.length > 0) {
-    return rawName;
-  }
-
-  return `Delay Profile ${profile.id}`;
-}
-
-function classifyLidarrFetchError(error: unknown): LidarrStartupFetchFailure {
-  if (error instanceof HttpError) {
-    if (error.status === 401 || error.status === 403) {
-      return {
-        success: false,
-        kind: 'auth',
-        statusCode: error.status,
-        message: `${LIDARR_STARTUP_ERROR_MESSAGE_PREFIX}: authentication rejected by Lidarr (HTTP ${error.status}).`,
-      };
-    }
-
-    if (
-      error.status === 0 ||
-      error.status === 408 ||
-      error.status === 500 ||
-      error.status === 502 ||
-      error.status === 503 ||
-      error.status === 504
-    ) {
-      return {
-        success: false,
-        kind: 'unreachable',
-        statusCode: error.status,
-        message: `${LIDARR_STARTUP_ERROR_MESSAGE_PREFIX}: unable to reach Lidarr API (HTTP ${error.status}).`,
-      };
-    }
-
-    return {
-      success: false,
-      kind: 'unknown',
-      statusCode: error.status,
-      message: `${LIDARR_STARTUP_ERROR_MESSAGE_PREFIX}: Lidarr API returned HTTP ${error.status}.`,
-    };
-  }
-
-  if (error instanceof Error) {
-    const isNetworkError = isLikelyNetworkError(error);
-    return {
-      success: false,
-      kind: isNetworkError ? 'unreachable' : 'unknown',
-      statusCode: null,
-      message: isNetworkError
-        ? `${LIDARR_STARTUP_ERROR_MESSAGE_PREFIX}: ${error.message}`
-        : `${LIDARR_STARTUP_ERROR_MESSAGE_PREFIX}: Programming error: ${error.message}`,
-    };
-  }
-
-  return {
-    success: false,
-    kind: 'unknown',
-    statusCode: null,
-    message: `${LIDARR_STARTUP_ERROR_MESSAGE_PREFIX}.`,
-  };
-}
-
-function isLikelyNetworkError(error: Error): boolean {
-  const message = error.message.toLowerCase();
-  const cause = error.cause;
-  const causeCode =
-    typeof cause === 'object' && cause !== null && 'code' in cause && typeof cause.code === 'string'
-      ? cause.code.toUpperCase()
-      : null;
-
-  if (error.name === 'AbortError') {
-    return true;
-  }
-
-  if (causeCode === null) {
-    const messageMatches = /(fetch|network|connect|connection|socket|timed.?out|econn|eai_|dns|lookup)/i.test(message);
-    return error.name === 'TypeError' && messageMatches;
-  }
-
-  return (
-    causeCode === 'ECONNABORTED' ||
-    causeCode === 'ECONNREFUSED' ||
-    causeCode === 'ECONNRESET' ||
-    causeCode === 'ENOTFOUND' ||
-    causeCode === 'EAI_AGAIN' ||
-    causeCode === 'ETIMEDOUT'
-  );
-}
-
 function sortDescriptorSnapshots(
   items: readonly Omit<StartupPullEntityDescriptor, 'databaseId'>[]
 ): Omit<StartupPullEntityDescriptor, 'databaseId'>[] {
@@ -228,73 +139,6 @@ function sortDescriptorSnapshots(
 
     return String(left.id).localeCompare(String(right.id));
   });
-}
-
-function sortStartupCandidates(items: readonly StartupPullEntityDescriptor[]): StartupPullEntityDescriptor[] {
-  return [...items].sort((left, right) => {
-    const byName = left.name.localeCompare(right.name, undefined, { sensitivity: 'base' });
-    if (byName !== 0) {
-      return byName;
-    }
-
-    if (left.databaseId !== right.databaseId) {
-      return left.databaseId - right.databaseId;
-    }
-
-    return String(left.id).localeCompare(String(right.id));
-  });
-}
-
-function incrementCountersFromMatchResult(
-  envelope: StartupAdapterResultEnvelope,
-  result: StartupPullMatchResult
-): void {
-  if (result.status === 'matched') {
-    incrementCounter(envelope, 'imported');
-    return;
-  }
-
-  if (result.status === 'conflicted') {
-    incrementCounter(envelope, 'conflicted');
-    return;
-  }
-
-  if (result.status === 'no_match' && result.reason === 'default_skip') {
-    incrementCounter(envelope, 'skippedDefault');
-    return;
-  }
-
-  incrementCounter(envelope, 'skippedNoMatch');
-}
-
-function buildUnsupportedSectionResult(
-  instanceId: number,
-  databaseId: number,
-  reason: LidarrUnsupportedSection
-): StartupPullMatchResult {
-  return {
-    ...makeStartupMatchNoMatchResult(
-      {
-        instanceId,
-        databaseId,
-        section: reason.section,
-        arrType: 'lidarr',
-        remote: {
-          id: `unsupported:${reason.section}`,
-          name: reason.section,
-          section: reason.section,
-          arrType: 'lidarr',
-          databaseId,
-        },
-        candidates: [],
-      },
-      'unsupported_section',
-      {
-        hasFingerprintAttempt: false,
-      }
-    ),
-    reason: 'unsupported_section',
-  };
 }
 
 function classifyLidarrManagedProfileMatch(input: StartupPullMatchRequest): StartupPullMatchResult {
@@ -455,7 +299,7 @@ export async function collectRemoteSectionSnapshots(client: BaseArrClient): Prom
         },
       }
     );
-    return classifyLidarrFetchError(error);
+    return classifyStartupFetchError('Lidarr', error);
   }
 }
 
@@ -530,7 +374,7 @@ export async function matchLidarrStartupResources(
   }
 
   for (const unsupportedSection of snapshot.unsupportedSections) {
-    const result = buildUnsupportedSectionResult(input.instanceId, fallbackDatabaseId, unsupportedSection);
+    const result = buildUnsupportedSectionResult(input.instanceId, fallbackDatabaseId, unsupportedSection, 'lidarr');
     matches.push(result);
     incrementCountersFromMatchResult(envelope, result);
   }
