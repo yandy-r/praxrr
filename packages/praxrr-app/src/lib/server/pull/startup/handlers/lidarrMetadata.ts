@@ -6,10 +6,11 @@ import type {
   StartupPullMatchRequest,
   StartupPullMatchResult,
 } from '$lib/server/pull/startup/types.ts';
-import { matchStartupEntity, makeStartupMatchNoMatchResult } from '$lib/server/pull/startup/matching.ts';
+import { makeStartupMatchNoMatchResult } from '$lib/server/pull/startup/matching.ts';
 import type { LidarrMetadataProfile as ArrLidarrMetadataProfile } from '$arr/types.ts';
 import type { LidarrMetadataProfile as LocalLidarrMetadataProfile } from '$pcd/entities/metadataProfiles/read.ts';
 import * as metadataProfilesQueries from '$pcd/entities/metadataProfiles/read.ts';
+import { matchManagedStartupProfileByNamespace } from '../profileMatching.ts';
 
 interface LidarrMetadataProfileToggle {
   readonly id: number;
@@ -162,9 +163,7 @@ export function classifyMetadataProfileMatch(request: StartupPullMatchRequest): 
     });
   }
 
-  const result = matchStartupEntity(request, {
-    normalizeName: (value) => value,
-  });
+  const result = matchManagedStartupProfileByNamespace(request);
 
   if (result.status !== 'matched') {
     return result;

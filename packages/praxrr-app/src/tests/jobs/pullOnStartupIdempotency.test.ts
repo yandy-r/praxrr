@@ -502,6 +502,59 @@ Deno.test({
   },
 });
 
+Deno.test({
+  name: 'metadata profiles selection is cleared when lidarr has no startup matches',
+  sanitizeResources: false,
+  fn: async () => {
+    const restores: Restore[] = [];
+    const instanceId = 700;
+    const existingDatabaseId = 1;
+    const existingProfileName = 'Standard Metadata';
+    const emptyMatches: StartupPullMatchResult[] = [];
+
+    let saveCalled = false;
+    let savedInstanceId: number | null = null;
+    let savedDatabaseId: number | null | undefined;
+    let savedProfileName: string | null | undefined;
+
+    patchTarget(
+      arrSyncQueries,
+      'getMetadataProfilesSync',
+      () => createMetadataProfilesSync(existingDatabaseId, existingProfileName),
+      restores
+    );
+    patchTarget(
+      arrSyncQueries,
+      'saveMetadataProfilesSync',
+      ((instanceIdParam: number, payload) => {
+        saveCalled = true;
+        savedInstanceId = instanceIdParam;
+        savedDatabaseId = payload.databaseId;
+        savedProfileName = payload.profileName;
+      }) as typeof arrSyncQueries.saveMetadataProfilesSync,
+      restores
+    );
+
+    patchTarget(arrSyncQueries, 'getQualityProfilesSync', () => createEmptyQualityProfilesSync(), restores);
+    patchTarget(arrSyncQueries, 'getDelayProfilesSync', () => createEmptyDelayProfilesSync(), restores);
+    patchTarget(arrSyncQueries, 'getMediaManagementSync', () => createEmptyMediaManagementSync(), restores);
+
+    try {
+      const result = await applyStartupSelections(instanceId, 'lidarr', emptyMatches);
+
+      assertEquals(result.metadataProfiles.written, true);
+      assertEquals(result.metadataProfiles.reason, 'applied');
+      assertEquals(result.metadataProfiles.count, 0);
+      assertEquals(saveCalled, true);
+      assertEquals(savedInstanceId, instanceId);
+      assertEquals(savedDatabaseId, null);
+      assertEquals(savedProfileName, null);
+    } finally {
+      for (const restore of restores.reverse()) restore();
+    }
+  },
+});
+
 // =============================================================================
 // 3. Counter accuracy: per-instance counters
 // =============================================================================

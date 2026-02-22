@@ -146,10 +146,24 @@ function applyMetadataProfiles(
   matched: readonly StartupPullMatchedResult[]
 ): ApplySectionOutcome {
   if (arrType !== 'lidarr') return NO_MATCHES;
-  if (matched.length === 0) return NO_MATCHES;
+  const current = arrSyncQueries.getMetadataProfilesSync(instanceId);
+
+  if (matched.length === 0) {
+    if (current.databaseId === null && current.profileName === null) {
+      return NO_MATCHES;
+    }
+
+    arrSyncQueries.saveMetadataProfilesSync(instanceId, {
+      databaseId: null,
+      profileName: null,
+      trigger: current.trigger,
+      cron: current.cron,
+    });
+
+    return { written: true, reason: 'applied', count: 0 };
+  }
 
   const first = matched[0];
-  const current = arrSyncQueries.getMetadataProfilesSync(instanceId);
 
   if (current.databaseId === first.databaseId && current.profileName === first.matchedEntityName) {
     return { written: false, reason: 'unchanged', count: 1 };

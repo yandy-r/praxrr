@@ -108,7 +108,7 @@ async function runInstancePipeline(
 
   const adapterResult = await runAdapterForType(input.arrType, input, client);
 
-  if (adapterResult.matches.length > 0) {
+  if (adapterResult.envelope.status !== 'failure') {
     await applyStartupSelections(input.instanceId, input.arrType, adapterResult.matches);
   }
 

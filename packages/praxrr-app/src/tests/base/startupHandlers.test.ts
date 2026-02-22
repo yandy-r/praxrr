@@ -218,7 +218,7 @@ Deno.test('matchLidarrStartupResources handles metadata profiles', () => {
       naming: [],
       mediaSettings: [],
       qualityDefinitions: [],
-      metadataProfiles: [{ id: 9, name: 'Standard', section: 'metadataProfiles', arrType: 'lidarr' }],
+      metadataProfiles: [{ id: 9, name: 'Standard\u200b', section: 'metadataProfiles', arrType: 'lidarr' }],
     },
   };
 
