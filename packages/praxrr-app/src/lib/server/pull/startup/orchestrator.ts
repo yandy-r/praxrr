@@ -35,6 +35,12 @@ interface AdapterRunResult {
   readonly matches: readonly StartupPullMatchResult[];
 }
 
+type StartupProcessPipeline = (
+  instance: ArrInstance,
+  input: StartupPullInstanceInput,
+  timeoutMs?: number
+) => Promise<StartupPullInstanceResult>;
+
 function runAdapterForType(
   arrType: StartupPullArrType,
   input: StartupPullInstanceInput,
@@ -50,7 +56,7 @@ function runAdapterForType(
   }
 }
 
-async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+export async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   let timeoutId: ReturnType<typeof setTimeout>;
   const timeout = new Promise<never>((_, reject) => {
     timeoutId = setTimeout(() => reject(new Error(`Startup pull timed out after ${ms}ms`)), ms);
@@ -63,7 +69,11 @@ async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   }
 }
 
-async function processBatches<T, R>(items: T[], processor: (item: T) => Promise<R>, concurrency: number): Promise<R[]> {
+export async function processBatches<T, R>(
+  items: T[],
+  processor: (item: T) => Promise<R>,
+  concurrency: number
+): Promise<R[]> {
   const results: R[] = [];
 
   for (let i = 0; i < items.length; i += concurrency) {
@@ -104,15 +114,16 @@ async function runInstancePipeline(
   return toStartupPullInstanceResult(input, adapterResult.envelope);
 }
 
-async function processInstance(
+export async function processInstance(
   instance: ArrInstance,
   input: StartupPullInstanceInput,
-  timeoutMs?: number
+  timeoutMs?: number,
+  processPipeline: StartupProcessPipeline = runInstancePipeline
 ): Promise<StartupPullInstanceResult> {
   markInstanceStartupPullActive(input.instanceId);
 
   try {
-    const task = runInstancePipeline(instance, input);
+    const task = processPipeline(instance, input, timeoutMs);
     return timeoutMs != null ? await withTimeout(task, timeoutMs) : await task;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
