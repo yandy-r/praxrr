@@ -112,13 +112,17 @@ const LIDARR_SECTIONS: readonly StartupPullSection[] = [
 
 const LIDARR_STARTUP_ERROR_MESSAGE_PREFIX = 'Lidarr startup adapter fetch failed';
 
-interface LidarrStartupClient {
+interface LidarrStartupClient extends BaseArrClient {
   getQualityProfiles(): Promise<ReadonlyArray<{ readonly id: number; readonly name: string }>>;
   getDelayProfiles(): Promise<ReadonlyArray<ArrDelayProfile>>;
   getNamingConfig(): Promise<ArrNamingConfig>;
   getMediaManagementConfig(): Promise<ArrMediaManagementConfig>;
   getQualityDefinitions(): Promise<ReadonlyArray<ArrQualityDefinition>>;
   getMetadataProfiles(): Promise<LidarrMetadataProfileListResponse>;
+}
+
+function isLidarrStartupClient(client: BaseArrClient): client is LidarrStartupClient {
+  return 'getMetadataProfiles' in client && typeof client.getMetadataProfiles === 'function';
 }
 
 function getDelayProfileName(profile: ArrDelayProfile): string {
@@ -340,7 +344,11 @@ function classifyLidarrDelayProfileMatch(input: StartupPullMatchRequest): Startu
 }
 
 export async function collectRemoteSectionSnapshots(client: BaseArrClient): Promise<LidarrStartupFetchResult> {
-  const lidarrClient = client as unknown as LidarrStartupClient;
+  if (!isLidarrStartupClient(client)) {
+    throw new Error('Cannot collect Lidarr startup snapshots: client is not a Lidarr client');
+  }
+
+  const lidarrClient = client;
   const unsupportedSections: LidarrUnsupportedSection[] = [];
   const supportedSections: StartupPullSection[] = [];
 

@@ -129,7 +129,7 @@ possible.
 
 ### H3. Lidarr client force-cast through `unknown` bypasses compile-time safety
 
-- **Status:** [ ] Open
+- **Status:** [x] Fixed
 - **Files:** `handlers/lidarr.ts:309`
 - **Agents:** silent-failure-hunter, type-design-analyzer
 
@@ -142,6 +142,11 @@ runtime error would be caught and misclassified as a network failure.
 
 **Fix:** Have `LidarrStartupClient` extend `BaseArrClient`, or add a runtime check for
 `getMetadataProfiles` before calling it.
+
+**Resolution:** Updated `LidarrStartupClient` to `extends BaseArrClient` and added an
+`isLidarrStartupClient` runtime guard in `collectRemoteSectionSnapshots`. The adapter now throws an
+explicit error when passed a non-Lidarr client, replacing the
+`client as unknown as LidarrStartupClient` cast.
 
 ---
 
@@ -493,9 +498,10 @@ candidate for shared extraction.
 5. **M7** -- Verify migration SQL intent (data-touching)
 6. **M1** -- Extract shared handler utilities
 7. ~~**H2** -- Add databaseId assertion in adapters~~ **DONE**
-8. **M5** -- Sanitize API error responses
-9. **H5** -- Normalize counter field naming to camelCase
-10. **M4** -- Add DB status validation
-11. **M8 + M10** -- Formatting and import cleanup
-12. **T1 + T2** -- Add critical missing tests
-13. **D1** -- Add key comments
+8. ~~**H3** -- Make Lidarr startup client typing runtime-safe~~ **DONE**
+9. **M5** -- Sanitize API error responses
+10. **H5** -- Normalize counter field naming to camelCase
+11. **M4** -- Add DB status validation
+12. **M8 + M10** -- Formatting and import cleanup
+13. **T1 + T2** -- Add critical missing tests
+14. **D1** -- Add key comments
