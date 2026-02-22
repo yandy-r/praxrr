@@ -26,6 +26,8 @@ paths:
     $ref: './paths/system.yaml#/health'
   /openapi.json:
     $ref: './paths/system.yaml#/openapi'
+  /system/startup-pull/latest:
+    $ref: './paths/system.yaml#/startup-pull-latest'
   /entity-testing/evaluate:
     $ref: './paths/entity-testing.yaml#/evaluate'
   /arr/library:
@@ -664,3 +666,132 @@ components:
         error:
           type: string
           nullable: true
+    # Startup Pull
+    StartupPullRunStatus:
+      type: string
+      enum:
+        - success
+        - partial
+        - failed
+        - skipped
+        - disabled
+      description: |
+        Run-level status for a startup pull execution.
+        - `success`: All instances completed without failures
+        - `partial`: Some instances succeeded and some failed
+        - `failed`: All instances failed
+        - `skipped`: No instances were processed
+        - `disabled`: Feature was disabled at run time
+    StartupPullInstanceStatus:
+      type: string
+      enum:
+        - success
+        - failure
+        - skipped
+        - cancelled
+      description: Per-instance outcome status following JobRunStatus semantics
+    StartupPullInstanceOutcome:
+      type: object
+      required:
+        - id
+        - instanceId
+        - instanceName
+        - arrType
+        - status
+        - imported
+        - skippedDefault
+        - skippedNoMatch
+        - conflicted
+        - failed
+        - createdAt
+      properties:
+        id:
+          type: integer
+          description: Outcome row id
+        instanceId:
+          type: integer
+          description: Arr instance id
+        instanceName:
+          type: string
+          description: Arr instance name at time of run
+        arrType:
+          type: string
+          description: Arr application type (radarr, sonarr, lidarr)
+        status:
+          $ref: '#/components/schemas/StartupPullInstanceStatus'
+        imported:
+          type: integer
+          description: Number of entities imported for this instance
+        skippedDefault:
+          type: integer
+          description: Number of entities skipped as defaults
+        skippedNoMatch:
+          type: integer
+          description: Number of entities with no local match
+        conflicted:
+          type: integer
+          description: Number of entities with ambiguous matches
+        failed:
+          type: integer
+          description: Number of entities that failed processing
+        createdAt:
+          type: string
+          description: Outcome creation timestamp
+    StartupPullRunResponse:
+      type: object
+      required:
+        - id
+        - status
+        - startedAt
+        - finishedAt
+        - imported
+        - skippedDefault
+        - skippedNoMatch
+        - conflicted
+        - failed
+        - instancesTotal
+        - instancesFailed
+        - createdAt
+        - instances
+      properties:
+        id:
+          type: string
+          description: Unique run identifier
+        status:
+          $ref: '#/components/schemas/StartupPullRunStatus'
+        startedAt:
+          type: string
+          description: Run start timestamp
+        finishedAt:
+          type: string
+          nullable: true
+          description: Run completion timestamp, null if still running
+        imported:
+          type: integer
+          description: Total entities imported across all instances
+        skippedDefault:
+          type: integer
+          description: Total entities skipped as defaults across all instances
+        skippedNoMatch:
+          type: integer
+          description: Total entities with no local match across all instances
+        conflicted:
+          type: integer
+          description: Total entities with ambiguous matches across all instances
+        failed:
+          type: integer
+          description: Total entities that failed processing across all instances
+        instancesTotal:
+          type: integer
+          description: Total number of instances processed
+        instancesFailed:
+          type: integer
+          description: Number of instances that failed
+        createdAt:
+          type: string
+          description: Run record creation timestamp
+        instances:
+          type: array
+          description: Per-instance outcomes for this run
+          items:
+            $ref: '#/components/schemas/StartupPullInstanceOutcome'

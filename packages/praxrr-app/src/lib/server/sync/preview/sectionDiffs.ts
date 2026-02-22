@@ -19,8 +19,7 @@ export const CUSTOM_FORMAT_ARRAY_KEY_STRATEGIES: readonly PreviewArrayKeyStrateg
     path: 'specifications',
     selectKey: (specification) => {
       const name = typeof specification.name === 'string' ? specification.name : '';
-      const implementation =
-        typeof specification.implementation === 'string' ? specification.implementation : '';
+      const implementation = typeof specification.implementation === 'string' ? specification.implementation : '';
       return `${name}:${implementation}`;
     },
   },
@@ -113,7 +112,10 @@ interface NamedEntityDiffParams<TDesired extends Record<string, unknown>, TCurre
   readonly sortChangesBy?: (change: EntityChange) => string;
 }
 
-interface SingletonEntityDiffParams<TDesired extends Record<string, unknown>, TCurrent extends Record<string, unknown>> {
+interface SingletonEntityDiffParams<
+  TDesired extends Record<string, unknown>,
+  TCurrent extends Record<string, unknown>,
+> {
   readonly entityType: string;
   readonly name: string;
   readonly desiredEntity: TDesired | null;
@@ -130,7 +132,11 @@ function getEntityId(entity: Record<string, unknown>): number | null {
   return typeof raw === 'number' ? raw : null;
 }
 
-function compareForAction(current: unknown, desired: unknown, options: DiffOptions): {
+function compareForAction(
+  current: unknown,
+  desired: unknown,
+  options: DiffOptions
+): {
   action: SyncPreviewAction;
   fields: readonly FieldChange[];
 } {
@@ -147,12 +153,12 @@ function compareForAction(current: unknown, desired: unknown, options: DiffOptio
  * 2. stripped name match (for namespaced remote entities)
  * 3. deterministic tie-break on shortest/lexicographic suffix when ambiguous
  */
-export function diffEntityCollection<TDesired extends Record<string, unknown>, TCurrent extends Record<string, unknown>>(
-  params: NamedEntityDiffParams<TDesired, TCurrent>
-): EntityChange[] {
-  const readCurrentName = params.currentName ?? ((entity: TCurrent) =>
-    String((entity as { name?: unknown }).name ?? '')
-  );
+export function diffEntityCollection<
+  TDesired extends Record<string, unknown>,
+  TCurrent extends Record<string, unknown>,
+>(params: NamedEntityDiffParams<TDesired, TCurrent>): EntityChange[] {
+  const readCurrentName =
+    params.currentName ?? ((entity: TCurrent) => String((entity as { name?: unknown }).name ?? ''));
   const currentNames = params.currentEntities.map(readCurrentName);
 
   const consumed = new Set<number>();
@@ -186,20 +192,14 @@ export function diffEntityCollection<TDesired extends Record<string, unknown>, T
 
     consumed.add(match.index);
     const currentEntity = params.currentEntities[match.index];
-    const currentPayload = params.currentComparable
-      ? params.currentComparable(currentEntity)
-      : currentEntity;
-    const desiredPayload = params.desiredComparable
-      ? params.desiredComparable(desiredEntity)
-      : desiredEntity;
+    const currentPayload = params.currentComparable ? params.currentComparable(currentEntity) : currentEntity;
+    const desiredPayload = params.desiredComparable ? params.desiredComparable(desiredEntity) : desiredEntity;
 
     const { action, fields } = compareForAction(currentPayload, desiredPayload, comparatorOptions);
 
     changes.push({
       entityType: params.entityType,
-      name: normalizeNamespaceDisplayName(match.matchKind === 'exact'
-        ? desiredName
-        : match.remoteName),
+      name: normalizeNamespaceDisplayName(match.matchKind === 'exact' ? desiredName : match.remoteName),
       action,
       remoteId: params.currentRemoteId
         ? params.currentRemoteId(currentEntity)

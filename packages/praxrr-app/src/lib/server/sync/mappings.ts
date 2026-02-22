@@ -24,11 +24,7 @@ const SUPPORTED_SYNC_SECTIONS: Record<SyncArrType, readonly SectionType[]> = {
   lidarr: SYNC_SECTION_ORDER,
 };
 
-const BASE_SYNC_MEDIA_MANAGEMENT_SUBSECTIONS = [
-  'mediaSettings',
-  'naming',
-  'qualityDefinitions',
-] as const;
+const BASE_SYNC_MEDIA_MANAGEMENT_SUBSECTIONS = ['mediaSettings', 'naming', 'qualityDefinitions'] as const;
 
 export type MediaManagementSubsection = (typeof BASE_SYNC_MEDIA_MANAGEMENT_SUBSECTIONS)[number];
 

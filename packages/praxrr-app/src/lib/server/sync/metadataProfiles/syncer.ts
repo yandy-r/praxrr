@@ -45,10 +45,8 @@ function parseMetadataProfilesPreviewConfig(rawConfig: unknown): MetadataProfile
 
   const rawDatabaseId = value.databaseId;
   const rawProfileName = value.profileName;
-  const databaseId =
-    rawDatabaseId === null || rawDatabaseId === undefined ? null : parsePositiveInt(rawDatabaseId);
-  const profileName =
-    typeof rawProfileName === 'string' && rawProfileName.length > 0 ? rawProfileName : null;
+  const databaseId = rawDatabaseId === null || rawDatabaseId === undefined ? null : parsePositiveInt(rawDatabaseId);
+  const profileName = typeof rawProfileName === 'string' && rawProfileName.length > 0 ? rawProfileName : null;
 
   if (databaseId === null && profileName === null) {
     return {

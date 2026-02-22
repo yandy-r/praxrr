@@ -12,6 +12,9 @@ class Config {
   public readonly host: string;
   public readonly authMode: AuthMode;
   public readonly validateInstances: boolean;
+  public readonly pullOnStart: boolean;
+  public readonly pullOnStartMaxConcurrency: number | null;
+  public readonly pullOnStartTimeoutMs: number | null;
   public readonly oidc: {
     discoveryUrl: string | null;
     clientId: string | null;
@@ -55,6 +58,9 @@ class Config {
 
     const rawValidateInstances = Deno.env.get('PRAXRR_VALIDATE_INSTANCES')?.trim().toLowerCase();
     this.validateInstances = ['1', 'true', 'yes', 'on'].includes(rawValidateInstances || '');
+    this.pullOnStart = Config.parseBooleanEnv(Deno.env.get('PULL_ON_START'));
+    this.pullOnStartMaxConcurrency = Config.parsePositiveIntEnv('PULL_ON_START_MAX_CONCURRENCY');
+    this.pullOnStartTimeoutMs = Config.parsePositiveIntEnv('PULL_ON_START_TIMEOUT_MS');
 
     // OIDC configuration (only used when AUTH=oidc)
     this.oidc = {
@@ -75,6 +81,34 @@ class Config {
   get serverUrl(): string {
     const displayHost = this.host === '0.0.0.0' ? 'localhost' : this.host;
     return `http://${displayHost}:${this.port}`;
+  }
+
+  private static parseBooleanEnv(value: string | null | undefined): boolean {
+    const normalized = value?.trim().toLowerCase();
+    return ['1', 'true', 'yes', 'on'].includes(normalized || '');
+  }
+
+  private static parsePositiveIntEnv(name: string): number | null {
+    const raw = Deno.env.get(name);
+    if (raw === undefined) {
+      return null;
+    }
+
+    const normalized = raw.trim();
+    if (normalized.length === 0) {
+      return null;
+    }
+
+    if (!/^\d+$/.test(normalized)) {
+      throw new Error(`Invalid value for ${name}: "${raw}". Expected a positive integer.`);
+    }
+
+    const parsed = Number.parseInt(normalized, 10);
+    if (parsed <= 0) {
+      throw new Error(`Invalid value for ${name}: "${raw}". Expected a value greater than 0.`);
+    }
+
+    return parsed;
   }
 
   /**
