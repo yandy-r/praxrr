@@ -1,4 +1,5 @@
 import { HttpError } from '$http/types.ts';
+import { logger } from '$logger/logger.ts';
 import type { BaseArrClient } from '$arr/base.ts';
 import type { ArrDelayProfile } from '$arr/types.ts';
 import * as qualityProfileQueries from '$pcd/entities/qualityProfiles/index.ts';
@@ -27,16 +28,14 @@ import {
   classifyMediaManagementMatch,
   collectStartupMediaManagementCandidates,
 } from '../mediaManagement.ts';
-import {
-  makeStartupMatchNoMatchResult,
-} from '../matching.ts';
+import { makeStartupMatchNoMatchResult } from '../matching.ts';
 import { shouldSkipStartupDefault } from '../defaultFilters.ts';
 import {
-	buildDelayProfileFingerprintFromArr,
-	buildDelayProfileFingerprintFromLocal,
-	matchDelayProfileByFingerprint,
-	matchManagedStartupProfileByNamespace,
-	selectDefaultDelayProfileForStartup,
+  buildDelayProfileFingerprintFromArr,
+  buildDelayProfileFingerprintFromLocal,
+  matchDelayProfileByFingerprint,
+  matchManagedStartupProfileByNamespace,
+  selectDefaultDelayProfileForStartup,
 } from '../profileMatching.ts';
 
 export type SonarrStartupFetchFailureKind = 'auth' | 'unreachable' | 'unknown';
@@ -137,11 +136,14 @@ function classifySonarrFetchError(error: unknown): SonarrStartupFetchFailure {
   }
 
   if (error instanceof Error) {
+    const isNetworkError = isLikelyNetworkError(error);
     return {
       success: false,
-      kind: 'unreachable',
+      kind: isNetworkError ? 'unreachable' : 'unknown',
       statusCode: null,
-      message: `${SONARR_STARTUP_ERROR_MESSAGE_PREFIX}: ${error.message}`,
+      message: isNetworkError
+        ? `${SONARR_STARTUP_ERROR_MESSAGE_PREFIX}: ${error.message}`
+        : `${SONARR_STARTUP_ERROR_MESSAGE_PREFIX}: Programming error: ${error.message}`,
     };
   }
 
@@ -151,6 +153,33 @@ function classifySonarrFetchError(error: unknown): SonarrStartupFetchFailure {
     statusCode: null,
     message: `${SONARR_STARTUP_ERROR_MESSAGE_PREFIX}.`,
   };
+}
+
+function isLikelyNetworkError(error: Error): boolean {
+  const message = error.message.toLowerCase();
+  const cause = error.cause;
+  const causeCode =
+    typeof cause === 'object' && cause !== null && 'code' in cause && typeof cause.code === 'string'
+      ? cause.code.toUpperCase()
+      : null;
+
+  if (error.name === 'AbortError') {
+    return true;
+  }
+
+  if (causeCode === null) {
+    const messageMatches = /(fetch|network|connect|connection|socket|timed.?out|econn|eai_|dns|lookup)/i.test(message);
+    return error.name === 'TypeError' && messageMatches;
+  }
+
+  return (
+    causeCode === 'ECONNABORTED' ||
+    causeCode === 'ECONNREFUSED' ||
+    causeCode === 'ECONNRESET' ||
+    causeCode === 'ENOTFOUND' ||
+    causeCode === 'EAI_AGAIN' ||
+    causeCode === 'ETIMEDOUT'
+  );
 }
 
 function toSectionSnapshot<T>(
@@ -169,12 +198,12 @@ function toSectionSnapshot<T>(
 }
 
 function getDelayProfileName(profile: ArrDelayProfile): string {
-	const rawName = (profile as { name?: unknown }).name;
-	if (typeof rawName === 'string' && rawName.length > 0) {
-		return rawName;
-	}
+  const rawName = (profile as { name?: unknown }).name;
+  if (typeof rawName === 'string' && rawName.length > 0) {
+    return rawName;
+  }
 
-	return `Delay Profile ${profile.id}`;
+  return `Delay Profile ${profile.id}`;
 }
 
 function sortStartupCandidates(items: readonly StartupPullEntityDescriptor[]): StartupPullEntityDescriptor[] {
@@ -262,18 +291,18 @@ function buildSectionMatchRequest(
   };
 
   if (section === 'qualityProfiles') {
-		const skip = shouldSkipStartupDefault(request.arrType, request.section, request.remote);
-		if (skip.skip) {
-			return makeStartupMatchNoMatchResult(request, 'default_skip', {
-				hasFingerprintAttempt: remote.fingerprint !== null,
-			});
-		}
-	}
+    const skip = shouldSkipStartupDefault(request.arrType, request.section, request.remote);
+    if (skip.skip) {
+      return makeStartupMatchNoMatchResult(request, 'default_skip', {
+        hasFingerprintAttempt: remote.fingerprint !== null,
+      });
+    }
+  }
 
-	const result =
-		section === 'qualityProfiles'
-			? matchManagedStartupProfileByNamespace(request)
-			: matchDelayProfileByFingerprint(request);
+  const result =
+    section === 'qualityProfiles'
+      ? matchManagedStartupProfileByNamespace(request)
+      : matchDelayProfileByFingerprint(request);
 
   if (result.status !== 'matched') {
     return result;
@@ -315,24 +344,23 @@ export async function collectRemoteSectionSnapshots(client: BaseArrClient): Prom
   }
 
   try {
-    const [qualityProfiles, delayProfiles, naming, mediaManagement, qualityDefinitions] =
-      await Promise.all([
-        getStartupSectionSupportReason('sonarr', 'qualityProfiles') === null
-          ? promiseIfSupported('qualityProfiles', () => client.getQualityProfiles())
-          : Promise.resolve([] as const),
-        getStartupSectionSupportReason('sonarr', 'delayProfiles') === null
-          ? promiseIfSupported('delayProfiles', () => client.getDelayProfiles())
-          : Promise.resolve([] as const),
-        getStartupSectionSupportReason('sonarr', 'naming') === null
-          ? promiseIfSupported('naming', () => client.getNamingConfig())
-          : Promise.resolve(null as unknown as ReturnType<typeof client.getNamingConfig>),
-        getStartupSectionSupportReason('sonarr', 'mediaSettings') === null
-          ? promiseIfSupported('mediaSettings', () => client.getMediaManagementConfig())
-          : Promise.resolve(null as unknown as ReturnType<typeof client.getMediaManagementConfig>),
-        getStartupSectionSupportReason('sonarr', 'qualityDefinitions') === null
-          ? promiseIfSupported('qualityDefinitions', () => client.getQualityDefinitions())
-          : Promise.resolve([] as const),
-      ]);
+    const [qualityProfiles, delayProfiles, naming, mediaManagement, qualityDefinitions] = await Promise.all([
+      getStartupSectionSupportReason('sonarr', 'qualityProfiles') === null
+        ? promiseIfSupported('qualityProfiles', () => client.getQualityProfiles())
+        : Promise.resolve([] as const),
+      getStartupSectionSupportReason('sonarr', 'delayProfiles') === null
+        ? promiseIfSupported('delayProfiles', () => client.getDelayProfiles())
+        : Promise.resolve([] as const),
+      getStartupSectionSupportReason('sonarr', 'naming') === null
+        ? promiseIfSupported('naming', () => client.getNamingConfig())
+        : Promise.resolve(null as unknown as ReturnType<typeof client.getNamingConfig>),
+      getStartupSectionSupportReason('sonarr', 'mediaSettings') === null
+        ? promiseIfSupported('mediaSettings', () => client.getMediaManagementConfig())
+        : Promise.resolve(null as unknown as ReturnType<typeof client.getMediaManagementConfig>),
+      getStartupSectionSupportReason('sonarr', 'qualityDefinitions') === null
+        ? promiseIfSupported('qualityDefinitions', () => client.getQualityDefinitions())
+        : Promise.resolve([] as const),
+    ]);
 
     const defaultDelayProfile = selectDefaultDelayProfileForStartup('sonarr', delayProfiles);
 
@@ -371,6 +399,18 @@ export async function collectRemoteSectionSnapshots(client: BaseArrClient): Prom
       },
     };
   } catch (error) {
+    await logger.errorWithTrace(
+      'Failed to collect Sonarr startup snapshots',
+      error instanceof Error ? error : undefined,
+      {
+        source: 'StartupPull',
+        meta: {
+          arrType: 'sonarr',
+          error: error instanceof Error ? error.message : String(error),
+          stack: error instanceof Error ? error.stack : undefined,
+        },
+      }
+    );
     return classifySonarrFetchError(error);
   }
 }
@@ -392,38 +432,46 @@ export async function collectSonarrStartupCandidates(databaseIds: readonly numbe
       collectStartupMediaManagementCandidates(cache, databaseId, 'sonarr'),
     ]);
 
-      qualityProfiles.push(
-      ...qualityRows.map((profile): {
-        id: number
-        name: string
-        section: 'qualityProfiles'
-        arrType: 'sonarr'
-        databaseId: number
-      } => ({
-        id: profile.id,
-        name: profile.name,
-        section: 'qualityProfiles',
-        arrType: 'sonarr',
-        databaseId,
-      }))
+    qualityProfiles.push(
+      ...qualityRows.map(
+        (
+          profile
+        ): {
+          id: number;
+          name: string;
+          section: 'qualityProfiles';
+          arrType: 'sonarr';
+          databaseId: number;
+        } => ({
+          id: profile.id,
+          name: profile.name,
+          section: 'qualityProfiles',
+          arrType: 'sonarr',
+          databaseId,
+        })
+      )
     );
 
     delayProfiles.push(
-      ...delayRows.map((profile): {
-        id: number
-        name: string
-        section: 'delayProfiles'
-        arrType: 'sonarr'
-        databaseId: number
-        fingerprint: string | null
-      } => ({
-        id: profile.id,
-        name: profile.name,
-        section: 'delayProfiles',
-        arrType: 'sonarr',
-        databaseId,
-        fingerprint: buildDelayProfileFingerprintFromLocal(profile),
-      }))
+      ...delayRows.map(
+        (
+          profile
+        ): {
+          id: number;
+          name: string;
+          section: 'delayProfiles';
+          arrType: 'sonarr';
+          databaseId: number;
+          fingerprint: string | null;
+        } => ({
+          id: profile.id,
+          name: profile.name,
+          section: 'delayProfiles',
+          arrType: 'sonarr',
+          databaseId,
+          fingerprint: buildDelayProfileFingerprintFromLocal(profile),
+        })
+      )
     );
 
     naming.push(...mediaManagementCandidates.naming);
@@ -550,12 +598,7 @@ export async function matchSonarrStartupResources(
     }
   }
 
-  envelope.status =
-    matches.length === 0
-      ? 'skipped'
-      : envelope.counters.failed > 0
-      ? 'failure'
-      : 'success';
+  envelope.status = matches.length === 0 ? 'skipped' : envelope.counters.failed > 0 ? 'failure' : 'success';
 
   return {
     status: envelope.status === 'failure' ? 'failed' : 'success',
@@ -566,7 +609,10 @@ export async function matchSonarrStartupResources(
   };
 }
 
-export async function runSonarrStartupAdapter(input: StartupPullInstanceInput, client: BaseArrClient): Promise<SonarrStartupMatchRunResult> {
+export async function runSonarrStartupAdapter(
+  input: StartupPullInstanceInput,
+  client: BaseArrClient
+): Promise<SonarrStartupMatchRunResult> {
   assertStartupArrType(input.arrType, 'sonarr', 'Cannot run non-Sonarr adapter');
 
   const fetchResult = await collectRemoteSectionSnapshots(client);
