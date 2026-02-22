@@ -205,12 +205,19 @@ function buildNamingFingerprintFromArr(
 	config: ArrNamingConfig
 ): Record<string, unknown> {
 	if (arrType === 'radarr') {
+		const radarrConfig = config as {
+			renameMovies: boolean;
+			replaceIllegalCharacters: boolean;
+			colonReplacementFormat: string | null;
+			standardMovieFormat: string | null;
+			movieFolderFormat: string | null;
+		};
 		return {
-			renameMovies: config.renameMovies,
-			replaceIllegalCharacters: config.replaceIllegalCharacters,
-			colonReplacementFormat: config.colonReplacementFormat,
-			standardMovieFormat: normalizeRequiredNamingTemplate(config.standardMovieFormat),
-			movieFolderFormat: normalizeRequiredNamingTemplate(config.movieFolderFormat),
+			renameMovies: radarrConfig.renameMovies,
+			replaceIllegalCharacters: radarrConfig.replaceIllegalCharacters,
+			colonReplacementFormat: radarrConfig.colonReplacementFormat,
+			standardMovieFormat: normalizeRequiredNamingTemplate(radarrConfig.standardMovieFormat),
+			movieFolderFormat: normalizeRequiredNamingTemplate(radarrConfig.movieFolderFormat),
 		} as const;
 	}
 
