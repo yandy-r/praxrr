@@ -4,6 +4,7 @@ import { pcdManager } from '$pcd/index.ts';
 import type { BaseArrClient } from '$arr/base.ts';
 import type {
   ArrDelayProfile,
+  RadarrQualityProfile,
   ArrMediaManagementConfig,
   ArrNamingConfig,
   ArrQualityDefinition,
@@ -113,11 +114,11 @@ const LIDARR_SECTIONS: readonly StartupPullSection[] = [
 const LIDARR_STARTUP_ERROR_MESSAGE_PREFIX = 'Lidarr startup adapter fetch failed';
 
 interface LidarrStartupClient extends BaseArrClient {
-  getQualityProfiles(): Promise<ReadonlyArray<{ readonly id: number; readonly name: string }>>;
-  getDelayProfiles(): Promise<ReadonlyArray<ArrDelayProfile>>;
+  getQualityProfiles(): Promise<RadarrQualityProfile[]>;
+  getDelayProfiles(): Promise<ArrDelayProfile[]>;
   getNamingConfig(): Promise<ArrNamingConfig>;
   getMediaManagementConfig(): Promise<ArrMediaManagementConfig>;
-  getQualityDefinitions(): Promise<ReadonlyArray<ArrQualityDefinition>>;
+  getQualityDefinitions(): Promise<ArrQualityDefinition[]>;
   getMetadataProfiles(): Promise<LidarrMetadataProfileListResponse>;
 }
 
@@ -259,11 +260,11 @@ function incrementCountersFromMatchResult(
   }
 
   if (result.status === 'no_match' && result.reason === 'default_skip') {
-    incrementCounter(envelope, 'skipped_default');
+    incrementCounter(envelope, 'skippedDefault');
     return;
   }
 
-  incrementCounter(envelope, 'skipped_no_match');
+  incrementCounter(envelope, 'skippedNoMatch');
 }
 
 function buildUnsupportedSectionResult(

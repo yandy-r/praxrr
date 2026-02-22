@@ -36,8 +36,8 @@ export interface JobQueueRecord {
 
 export interface ArrPullStartupCounters {
   imported: number;
-  skipped_default: number;
-  skipped_no_match: number;
+  skippedDefault: number;
+  skippedNoMatch: number;
   conflicted: number;
   failed: number;
 }

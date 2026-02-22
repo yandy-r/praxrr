@@ -231,11 +231,11 @@ function incrementCountersFromMatchResult(
   }
 
   if (result.status === 'no_match' && result.reason === 'default_skip') {
-    incrementCounter(envelope, 'skipped_default');
+    incrementCounter(envelope, 'skippedDefault');
     return;
   }
 
-  incrementCounter(envelope, 'skipped_no_match');
+  incrementCounter(envelope, 'skippedNoMatch');
 }
 
 function buildUnsupportedSectionResult(

@@ -46,12 +46,12 @@ export interface StartupPullEntityDescriptor {
 }
 
 export interface StartupPullMatchRequest {
-	instanceId: number;
-	databaseId: number;
-	section: StartupPullSection;
-	arrType: StartupPullArrType;
-	remote: StartupPullEntityDescriptor;
-	candidates: readonly StartupPullEntityDescriptor[];
+  instanceId: number;
+  databaseId: number;
+  section: StartupPullSection;
+  arrType: StartupPullArrType;
+  remote: StartupPullEntityDescriptor;
+  candidates: readonly StartupPullEntityDescriptor[];
 }
 
 interface StartupPullMatchResultBase {
@@ -82,8 +82,8 @@ export type StartupPullMatchResult = StartupPullMatchedResult | StartupPullUnmat
 
 export interface StartupPullCounters {
   imported: number;
-  skipped_default: number;
-  skipped_no_match: number;
+  skippedDefault: number;
+  skippedNoMatch: number;
   conflicted: number;
   failed: number;
 }

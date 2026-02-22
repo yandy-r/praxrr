@@ -4,7 +4,14 @@ import { getArrInstanceClient } from '$arr/arrInstanceClients.ts';
 import type { ArrClientOptions } from '$arr/base.ts';
 import type { BaseArrClient } from '$arr/base.ts';
 import { isArrAppType } from '$shared/arr/capabilities.ts';
-import { isSyncSectionSupported, getUnsupportedSyncSectionReason, isMediaManagementSubsectionSupported, getUnsupportedMediaManagementSubsectionReason, type MediaManagementSubsection, type SyncArrType } from '$sync/mappings.ts';
+import {
+  isSyncSectionSupported,
+  getUnsupportedSyncSectionReason,
+  isMediaManagementSubsectionSupported,
+  getUnsupportedMediaManagementSubsectionReason,
+  type MediaManagementSubsection,
+  type SyncArrType,
+} from '$sync/mappings.ts';
 import { type JobRunStatus } from '$jobs/queueTypes.ts';
 import type {
   StartupPullArrType,
@@ -52,9 +59,7 @@ export function assertStartupArrType(
 ): StartupPullArrType {
   const resolved = resolveStartupArrType(arrType);
   if (resolved !== expected) {
-    throw new Error(
-      `${context} unsupported for '${resolved}' instances; expected only '${expected}' instances.`
-    );
+    throw new Error(`${context} unsupported for '${resolved}' instances; expected only '${expected}' instances.`);
   }
 
   return resolved;
@@ -118,10 +123,7 @@ export function assertStartupSectionSupported(
   }
 }
 
-export function isStartupSectionSupported(
-  arrType: StartupPullArrType,
-  section: StartupPullSection
-): boolean {
+export function isStartupSectionSupported(arrType: StartupPullArrType, section: StartupPullSection): boolean {
   return getStartupSectionSupportReason(arrType, section) === null;
 }
 
@@ -135,8 +137,8 @@ export interface StartupAdapterResultEnvelope {
 function createEmptyCounters(): StartupPullCounters {
   return {
     imported: 0,
-    skipped_default: 0,
-    skipped_no_match: 0,
+    skippedDefault: 0,
+    skippedNoMatch: 0,
     conflicted: 0,
     failed: 0,
   };
