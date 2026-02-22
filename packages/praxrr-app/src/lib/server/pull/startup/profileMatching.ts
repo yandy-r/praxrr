@@ -110,6 +110,7 @@ export function buildDelayProfileFingerprintFromLocal(profile: DelayProfilesRow)
 	});
 }
 
+// Radarr/Sonarr default delay profile selection is id-based (id === 1). Lidarr has no strict id contract, so we prefer untagged primary order and only fall back to id === 1.
 export function selectDefaultDelayProfileForStartup(
 	arrType: StartupPullArrType,
 	profiles: readonly ArrDelayProfile[]
@@ -127,6 +128,7 @@ export function selectDefaultDelayProfileForStartup(
 	return profiles.find((profile) => profile.id === 1) ?? null;
 }
 
+// Managed profiles carry namespace suffixes in sync metadata; strip namespace to match base local profile names.
 export function matchManagedStartupProfileByNamespace(
 	request: StartupPullMatchRequest
 ): StartupPullMatchResult {

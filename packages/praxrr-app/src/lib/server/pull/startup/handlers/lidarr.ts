@@ -193,6 +193,8 @@ export async function collectRemoteSectionSnapshots(client: BaseArrClient): Prom
     throw new Error('Cannot collect Lidarr startup snapshots: client is not a Lidarr client');
   }
 
+  // Guarded by `isLidarrStartupClient`, this narrow cast keeps behavior type-safe instead
+  // of using a double `as unknown as LidarrStartupClient` cast.
   const lidarrClient = client;
   const unsupportedSections: LidarrUnsupportedSection[] = [];
   const supportedSections: StartupPullSection[] = [];

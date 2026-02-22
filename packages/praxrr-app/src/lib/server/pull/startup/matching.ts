@@ -6,6 +6,11 @@ import type {
   StartupPullUnmatchedResult,
 } from '$lib/server/pull/startup/types.ts';
 
+/**
+ * Startup entity matching uses a two-phase strategy:
+ * first try exact normalized name matching; if that fails, fall back to fingerprint matching.
+ * Either phase can return `conflicted` when multiple candidates match.
+ */
 export type StartupNameNormalizer = (name: string) => string;
 
 export interface StartupMatchOptions {

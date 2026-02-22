@@ -248,6 +248,8 @@ export async function collectRemoteSectionSnapshots(client: BaseArrClient): Prom
         ? toSectionSnapshot([
             {
               id: defaultDelayProfile.id,
+              // ArrDelayProfile typing omits `name` in places, but some API versions provide it;
+              // this helper accepts optional name and falls back to `Delay Profile {id}`.
               name: getDelayProfileName(defaultDelayProfile),
               section: 'delayProfiles',
               arrType: 'radarr',

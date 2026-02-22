@@ -84,7 +84,7 @@ function resolveMediaSettingsByName(
 
 	return mediaSettingsQueries.getLidarrByName(cache, name);
 }
-
+// Arr and PCD naming enums diverge for this field; maintain two directional mapping tables to avoid silent mismatches.
 const PROPER_REPACKS_TO_ARR: Record<LocalPropersRepacks, ArrPropersAndRepacks> = {
 	doNotPrefer: 'doNotPrefer',
 	preferAndUpgrade: 'preferAndUpgrade',
@@ -132,7 +132,7 @@ function buildMediaSettingsFingerprintFromArr(config: ArrMediaManagementConfig):
 		enable_media_info: config.enableMediaInfo,
 	} as const;
 }
-
+// NAMING_TOKEN_REGEX captures placeholders while preserving surrounding punctuation and spacing so only token identifiers are normalized.
 const NAMING_TOKEN_REGEX =
 	/\{(?<prefix>[-\[( ._]*)(?<token>[A-Za-z][A-Za-z0-9 :+-]*)(?<suffix>[-\]) ._]*)\}/g;
 

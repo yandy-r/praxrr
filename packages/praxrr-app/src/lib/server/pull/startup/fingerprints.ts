@@ -1,5 +1,7 @@
 import type { StartupPullEntityDescriptor } from '$lib/server/pull/startup/types.ts';
 
+// Fingerprints normalize scalars and nested structures in a deterministic order, then emit canonical JSON so equal data always hashes identically.
+
 export type StartupMetadataFingerprintInput = Record<string, unknown> | unknown[] | string | number | boolean | null;
 
 export interface StartupMetadataFingerprintOptions {

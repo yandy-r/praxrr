@@ -4,8 +4,6 @@ import type { JobRunStatus } from '$jobs/queueTypes.ts';
 import type { ArrAppType } from '$shared/pcd/types.ts';
 import type { StartupPullRunStatus } from '$lib/server/pull/startup/types.ts';
 
-// ========== Row Types ==========
-
 interface StartupPullRunRow {
   id: string;
   status: string;
@@ -35,8 +33,6 @@ interface StartupPullInstanceOutcomeRow {
   failed: number;
   created_at: string;
 }
-
-// ========== Record Types ==========
 
 export interface StartupPullRunRecord {
   id: string;
@@ -72,8 +68,6 @@ export interface StartupPullRunSummaryRecord extends StartupPullRunRecord {
   instances: StartupPullInstanceOutcomeRecord[];
 }
 
-// ========== Input Types ==========
-
 export interface InsertStartupPullRunInput {
   id: string;
   status: StartupPullRunStatus;
@@ -100,8 +94,6 @@ export interface InsertStartupPullInstanceOutcomeInput {
   conflicted: number;
   failed: number;
 }
-
-// ========== Row-to-Record Mappers ==========
 
 function runRowToRecord(row: StartupPullRunRow): StartupPullRunRecord {
   return {
@@ -170,12 +162,7 @@ function parseArrType(arrType: string): ArrAppType {
   return arrType;
 }
 
-// ========== Query API ==========
-
 export const startupPullQueries = {
-  /**
-   * Insert a startup pull run record
-   */
   insertRun(input: InsertStartupPullRunInput): void {
     db.execute(
       `INSERT INTO startup_pull_runs
@@ -195,9 +182,6 @@ export const startupPullQueries = {
     );
   },
 
-  /**
-   * Insert a per-instance outcome for a startup pull run
-   */
   insertInstanceOutcome(input: InsertStartupPullInstanceOutcomeInput): void {
     db.execute(
       `INSERT INTO startup_pull_instance_outcomes
@@ -216,25 +200,16 @@ export const startupPullQueries = {
     );
   },
 
-  /**
-   * Get the latest startup pull run (most recent by started_at)
-   */
   getLatest(): StartupPullRunRecord | undefined {
     const row = db.queryFirst<StartupPullRunRow>('SELECT * FROM startup_pull_runs ORDER BY started_at DESC LIMIT 1');
     return row ? runRowToRecord(row) : undefined;
   },
 
-  /**
-   * Get a startup pull run by its ID
-   */
   getById(id: string): StartupPullRunRecord | undefined {
     const row = db.queryFirst<StartupPullRunRow>('SELECT * FROM startup_pull_runs WHERE id = ?', id);
     return row ? runRowToRecord(row) : undefined;
   },
 
-  /**
-   * Get the latest startup pull run with per-instance outcomes
-   */
   getLatestWithOutcomes(): StartupPullRunSummaryRecord | undefined {
     const run = this.getLatest();
     if (!run) return undefined;
@@ -250,9 +225,6 @@ export const startupPullQueries = {
     };
   },
 
-  /**
-   * Get a startup pull run by ID with per-instance outcomes
-   */
   getByIdWithOutcomes(id: string): StartupPullRunSummaryRecord | undefined {
     const run = this.getById(id);
     if (!run) return undefined;
@@ -268,9 +240,6 @@ export const startupPullQueries = {
     };
   },
 
-  /**
-   * Get instance outcomes for a specific run
-   */
   getInstanceOutcomes(runId: string): StartupPullInstanceOutcomeRecord[] {
     const rows = db.query<StartupPullInstanceOutcomeRow>(
       'SELECT * FROM startup_pull_instance_outcomes WHERE run_id = ? ORDER BY instance_id',
@@ -279,18 +248,11 @@ export const startupPullQueries = {
     return rows.map(outcomeRowToRecord);
   },
 
-  /**
-   * Get recent startup pull runs (newest first)
-   */
   getRecent(limit: number = 50): StartupPullRunRecord[] {
     const rows = db.query<StartupPullRunRow>('SELECT * FROM startup_pull_runs ORDER BY started_at DESC LIMIT ?', limit);
     return rows.map(runRowToRecord);
   },
 
-  /**
-   * Delete startup pull runs older than the specified number of days
-   * Returns number of rows deleted
-   */
   deleteOlderThan(days: number): number {
     return db.execute(
       `DELETE FROM startup_pull_runs
@@ -299,9 +261,6 @@ export const startupPullQueries = {
     );
   },
 
-  /**
-   * Get total count of startup pull runs
-   */
   getCount(): number {
     const result = db.queryFirst<{ count: number }>('SELECT COUNT(*) as count FROM startup_pull_runs');
     return result?.count ?? 0;

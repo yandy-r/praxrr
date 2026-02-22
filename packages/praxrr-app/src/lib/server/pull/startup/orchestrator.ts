@@ -23,6 +23,7 @@ import type {
   StartupPullRunSummary,
 } from './types.ts';
 
+// Two concurrent pipelines strike a balance between startup latency and Arr API load.
 const DEFAULT_CONCURRENCY = 2;
 
 export interface StartupPullOrchestratorOptions {

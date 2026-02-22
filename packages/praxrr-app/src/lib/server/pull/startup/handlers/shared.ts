@@ -26,6 +26,12 @@ import type {
 } from '$lib/server/pull/startup/types.ts';
 import { makeStartupMatchNoMatchResult } from '../matching.ts';
 
+/**
+ * Handler logic is intentionally duplicated across Radarr/Sonarr/Lidarr where Cross-Arr
+ * semantics differ; this file extracts only behavior that is truly shared. Revisit by
+ * intent before extracting further to avoid accidental parity bugs.
+ */
+
 function isStartupPullSection(section: string): section is StartupPullSection {
   return (
     section === 'qualityProfiles' ||
