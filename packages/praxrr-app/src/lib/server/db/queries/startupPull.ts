@@ -1,5 +1,8 @@
 import { db } from '../db.ts';
+import { isArrAppType } from '$shared/arr/capabilities.ts';
 import type { JobRunStatus } from '$jobs/queueTypes.ts';
+import type { ArrAppType } from '$shared/pcd/types.ts';
+import type { StartupPullRunStatus } from '$lib/server/pull/startup/types.ts';
 
 // ========== Row Types ==========
 
@@ -37,7 +40,7 @@ interface StartupPullInstanceOutcomeRow {
 
 export interface StartupPullRunRecord {
   id: string;
-  status: string;
+  status: StartupPullRunStatus;
   startedAt: string;
   finishedAt: string | null;
   imported: number;
@@ -55,7 +58,7 @@ export interface StartupPullInstanceOutcomeRecord {
   runId: string;
   instanceId: number;
   instanceName: string;
-  arrType: string;
+  arrType: ArrAppType;
   status: JobRunStatus;
   imported: number;
   skippedDefault: number;
@@ -73,7 +76,7 @@ export interface StartupPullRunSummaryRecord extends StartupPullRunRecord {
 
 export interface InsertStartupPullRunInput {
   id: string;
-  status: string;
+  status: StartupPullRunStatus;
   startedAt: string;
   finishedAt: string | null;
   imported: number;
@@ -89,7 +92,7 @@ export interface InsertStartupPullInstanceOutcomeInput {
   runId: string;
   instanceId: number;
   instanceName: string;
-  arrType: string;
+  arrType: ArrAppType;
   status: JobRunStatus;
   imported: number;
   skippedDefault: number;
@@ -103,7 +106,7 @@ export interface InsertStartupPullInstanceOutcomeInput {
 function runRowToRecord(row: StartupPullRunRow): StartupPullRunRecord {
   return {
     id: row.id,
-    status: row.status,
+    status: parseStartupPullRunStatus(row.status),
     startedAt: row.started_at,
     finishedAt: row.finished_at,
     imported: row.imported,
@@ -123,8 +126,8 @@ function outcomeRowToRecord(row: StartupPullInstanceOutcomeRow): StartupPullInst
     runId: row.run_id,
     instanceId: row.instance_id,
     instanceName: row.instance_name,
-    arrType: row.arr_type,
-    status: row.status as JobRunStatus,
+    arrType: parseArrType(row.arr_type),
+    status: parseJobRunStatus(row.status),
     imported: row.imported,
     skippedDefault: row.skipped_default,
     skippedNoMatch: row.skipped_no_match,
@@ -132,6 +135,39 @@ function outcomeRowToRecord(row: StartupPullInstanceOutcomeRow): StartupPullInst
     failed: row.failed,
     createdAt: row.created_at,
   };
+}
+
+function parseJobRunStatus(status: string): JobRunStatus {
+  switch (status) {
+    case 'success':
+    case 'failure':
+    case 'skipped':
+    case 'cancelled':
+      return status;
+  }
+
+  throw new Error(`Invalid JobRunStatus value: ${status}`);
+}
+
+function parseStartupPullRunStatus(status: string): StartupPullRunStatus {
+  switch (status) {
+    case 'success':
+    case 'partial':
+    case 'failed':
+    case 'skipped':
+    case 'disabled':
+      return status;
+  }
+
+  throw new Error(`Invalid StartupPullRunStatus value: ${status}`);
+}
+
+function parseArrType(arrType: string): ArrAppType {
+  if (!isArrAppType(arrType)) {
+    throw new Error(`Invalid ArrAppType value: ${arrType}`);
+  }
+
+  return arrType;
 }
 
 // ========== Query API ==========

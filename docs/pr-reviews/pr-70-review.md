@@ -249,7 +249,7 @@ section-loop consistency and guard against future fall-through if sections are e
 
 ### M4. DB `status` field cast without validation
 
-- **Status:** [ ] Open
+- **Status:** [x] Fixed
 - **Files:** `db/queries/startupPull.ts:127`
 - **Agents:** silent-failure-hunter, type-design-analyzer
 
@@ -260,11 +260,16 @@ typed as `string` instead of `StartupPullRunStatus`, and
 **Fix:** Add runtime validation for status. Type `status` fields as
 `StartupPullRunStatus`/`JobRunStatus`. Type `arrType` as `ArrAppType`.
 
+**Resolution:** Added runtime validation in `startupPull.ts` before mapping DB rows to records,
+rejecting invalid `JobRunStatus`, `StartupPullRunStatus`, or `ArrAppType` values. Updated
+`StartupPullRunRecord.status` and `InsertStartupPullRunInput.status` to `StartupPullRunStatus`, and
+`InsertStartupPullInstanceOutcomeInput` `arrType` to `ArrAppType`.
+
 ---
 
 ### M5. API endpoint exposes raw error messages
 
-- **Status:** [ ] Open
+- **Status:** [x] Fixed
 - **Files:** `routes/api/v1/system/startup-pull/latest/+server.ts:50-57`
 - **Agent:** silent-failure-hunter
 
@@ -274,11 +279,15 @@ internals.
 **Fix:** Return a generic user-facing message for unexpected errors. Log the full error with stack
 trace for debugging.
 
+**Resolution:** Updated the `catch` block in the latest startup-pull API route to log full
+`error.stack` and return `Unable to fetch latest startup pull run.` instead of forwarding raw
+`error.message`.
+
 ---
 
 ### M6. `matchStartupEntityBatch` fabricates fallback values for empty requests
 
-- **Status:** [ ] Open
+- **Status:** [x] Fixed
 - **Files:** `matching.ts:163-166`
 - **Agent:** silent-failure-hunter
 
@@ -286,6 +295,9 @@ Falls back to `'qualityProfiles'` and `'radarr'` when `requests` is empty. Shoul
 
 **Fix:**
 `if (requests.length === 0) throw new Error('matchStartupEntityBatch called with empty requests');`
+
+**Resolution:** Added an explicit empty-input guard to throw
+`new Error('matchStartupEntityBatch called with empty requests')` before any fallback logic runs.
 
 ---
 

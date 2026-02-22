@@ -48,11 +48,11 @@ export const GET: RequestHandler = async () => {
       })),
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Failed to fetch latest startup pull run';
+    const message = error instanceof Error ? error.message : 'Unknown error while fetching startup pull run';
     await logger.error('Failed to get latest startup pull run', {
       source: 'system/startup-pull',
-      meta: { error: message },
+      meta: { error: message, stack: error instanceof Error ? error.stack : undefined },
     });
-    return json({ error: message } satisfies ErrorResponse, { status: 500 });
+    return json({ error: 'Unable to fetch latest startup pull run.' } satisfies ErrorResponse, { status: 500 });
   }
 };
