@@ -6,7 +6,7 @@
  * - Compare-before-save logic in applySelections prevents unnecessary saves
  * - Per-instance counters align with classification events
  * - Run-level counters equal the sum of all instance counters
- * - Correct counting for skipped_default, skipped_no_match, conflicted, and failed
+ * - Correct counting for skippedDefault, skippedNoMatch, conflicted, and failed
  * - Edge cases: empty instances, disabled feature, single-instance-all-skipped
  *
  * Uses the mock/patch/restore pattern from pullOnStartupJob.test.ts and
@@ -538,8 +538,8 @@ Deno.test({
 Deno.test('counter accuracy: matched events increment imported counter', () => {
 	const instance = buildSuccessInstanceResult('radarr', { imported: 5 });
 	assertEquals(instance.imported, 5);
-	assertEquals(instance.skipped_default, 0);
-	assertEquals(instance.skipped_no_match, 0);
+	assertEquals(instance.skippedDefault, 0);
+	assertEquals(instance.skippedNoMatch, 0);
 	assertEquals(instance.conflicted, 0);
 	assertEquals(instance.failed, 0);
 });
@@ -547,13 +547,13 @@ Deno.test('counter accuracy: matched events increment imported counter', () => {
 Deno.test('counter accuracy: per-instance counters sum equals total entities processed', () => {
 	const instance = buildSuccessInstanceResult('radarr', {
 		imported: 3,
-		skipped_default: 2,
-		skipped_no_match: 1,
+		skippedDefault: 2,
+		skippedNoMatch: 1,
 		conflicted: 1,
 		failed: 0,
 	});
 
-	const total = instance.imported + instance.skipped_default + instance.skipped_no_match +
+	const total = instance.imported + instance.skippedDefault + instance.skippedNoMatch +
 		instance.conflicted + instance.failed;
 	assertEquals(total, 7, 'sum of all counters should equal total entities');
 });
@@ -575,15 +575,15 @@ Deno.test('counter accuracy: each classification event increments the correct co
 		} else if (result.status === 'conflicted') {
 			counters.conflicted += 1;
 		} else if (result.status === 'no_match' && result.reason === 'default_skip') {
-			counters.skipped_default += 1;
+			counters.skippedDefault += 1;
 		} else {
-			counters.skipped_no_match += 1;
+			counters.skippedNoMatch += 1;
 		}
 	}
 
 	assertEquals(counters.imported, 2, 'two matched -> imported = 2');
-	assertEquals(counters.skipped_no_match, 1, 'one no_match -> skipped_no_match = 1');
-	assertEquals(counters.skipped_default, 1, 'one default_skip -> skipped_default = 1');
+	assertEquals(counters.skippedNoMatch, 1, 'one no_match -> skippedNoMatch = 1');
+	assertEquals(counters.skippedDefault, 1, 'one default_skip -> skippedDefault = 1');
 	assertEquals(counters.conflicted, 1, 'one conflicted -> conflicted = 1');
 	assertEquals(counters.failed, 0, 'no failures -> failed = 0');
 });
@@ -595,14 +595,14 @@ Deno.test('counter accuracy: each classification event increments the correct co
 Deno.test('counter accuracy: run-level counters equal sum of all instance counters', () => {
 	const radarr = buildSuccessInstanceResult('radarr', {
 		imported: 5,
-		skipped_default: 2,
-		skipped_no_match: 1,
+		skippedDefault: 2,
+		skippedNoMatch: 1,
 		conflicted: 1,
 	});
 	const sonarr = buildSuccessInstanceResult('sonarr', {
 		imported: 3,
-		skipped_default: 1,
-		skipped_no_match: 0,
+		skippedDefault: 1,
+		skippedNoMatch: 0,
 		conflicted: 0,
 	});
 	const lidarr = buildFailedInstanceResult('lidarr', {
@@ -613,8 +613,8 @@ Deno.test('counter accuracy: run-level counters equal sum of all instance counte
 	const aggregated = aggregateCounters(instances);
 
 	assertEquals(aggregated.imported, 8, 'run-level imported = sum of instance imported');
-	assertEquals(aggregated.skipped_default, 3, 'run-level skipped_default = sum of instance skipped_default');
-	assertEquals(aggregated.skipped_no_match, 1, 'run-level skipped_no_match = sum of instance skipped_no_match');
+	assertEquals(aggregated.skippedDefault, 3, 'run-level skippedDefault = sum of instance skippedDefault');
+	assertEquals(aggregated.skippedNoMatch, 1, 'run-level skippedNoMatch = sum of instance skippedNoMatch');
 	assertEquals(aggregated.conflicted, 1, 'run-level conflicted = sum of instance conflicted');
 	assertEquals(aggregated.failed, 1, 'run-level failed = sum of instance failed');
 });
@@ -623,14 +623,14 @@ Deno.test('counter accuracy: mixed outcomes across multiple instances aggregate 
 	// one success, one partial (success with some counters), one failed
 	const successInstance = buildSuccessInstanceResult('radarr', {
 		imported: 10,
-		skipped_default: 3,
-		skipped_no_match: 0,
+		skippedDefault: 3,
+		skippedNoMatch: 0,
 		conflicted: 0,
 	});
 	const partialInstance = buildSuccessInstanceResult('sonarr', {
 		imported: 2,
-		skipped_default: 0,
-		skipped_no_match: 5,
+		skippedDefault: 0,
+		skippedNoMatch: 5,
 		conflicted: 2,
 	});
 	const failedInstance = buildFailedInstanceResult('lidarr', {
@@ -645,8 +645,8 @@ Deno.test('counter accuracy: mixed outcomes across multiple instances aggregate 
 	const aggregated = aggregateCounters(instances);
 
 	assertEquals(aggregated.imported, 12);
-	assertEquals(aggregated.skipped_default, 3);
-	assertEquals(aggregated.skipped_no_match, 5);
+	assertEquals(aggregated.skippedDefault, 3);
+	assertEquals(aggregated.skippedNoMatch, 5);
 	assertEquals(aggregated.conflicted, 2);
 	assertEquals(aggregated.failed, 1);
 
@@ -656,7 +656,7 @@ Deno.test('counter accuracy: mixed outcomes across multiple instances aggregate 
 });
 
 Deno.test('counter accuracy: buildRunSummary aggregates counters from instances correctly', () => {
-	const radarr = buildSuccessInstanceResult('radarr', { imported: 4, skipped_default: 1 });
+	const radarr = buildSuccessInstanceResult('radarr', { imported: 4, skippedDefault: 1 });
 	const sonarr = buildFailedInstanceResult('sonarr', { failed: 1 });
 
 	const summary = buildRunSummaryFromResults(
@@ -667,8 +667,8 @@ Deno.test('counter accuracy: buildRunSummary aggregates counters from instances 
 	);
 
 	assertEquals(summary.imported, 4);
-	assertEquals(summary.skipped_default, 1);
-	assertEquals(summary.skipped_no_match, 0);
+	assertEquals(summary.skippedDefault, 1);
+	assertEquals(summary.skippedNoMatch, 0);
 	assertEquals(summary.conflicted, 0);
 	assertEquals(summary.failed, 1);
 	assertEquals(summary.status, 'partial');
@@ -676,27 +676,27 @@ Deno.test('counter accuracy: buildRunSummary aggregates counters from instances 
 });
 
 // =============================================================================
-// 5. Counter accuracy: skipped_default counting
+// 5. Counter accuracy: skippedDefault counting
 // =============================================================================
 
-Deno.test('counter accuracy: skipped_default increments correctly when defaults are excluded', () => {
+Deno.test('counter accuracy: skippedDefault increments correctly when defaults are excluded', () => {
 	const radarrDefaults = buildSuccessInstanceResult('radarr', {
-		skipped_default: 3,
+		skippedDefault: 3,
 		imported: 0,
 	});
 	const sonarrDefaults = buildSuccessInstanceResult('sonarr', {
-		skipped_default: 2,
+		skippedDefault: 2,
 		imported: 1,
 	});
 	const lidarrDefaults = buildSuccessInstanceResult('lidarr', {
-		skipped_default: 4,
+		skippedDefault: 4,
 		imported: 2,
 	});
 
 	const instances = [radarrDefaults, sonarrDefaults, lidarrDefaults];
 	const aggregated = aggregateCounters(instances);
 
-	assertEquals(aggregated.skipped_default, 9, 'total skipped_default across all arr_types');
+	assertEquals(aggregated.skippedDefault, 9, 'total skippedDefault across all arr_types');
 	assertEquals(aggregated.imported, 3, 'total imported across all arr_types');
 });
 
@@ -704,12 +704,12 @@ Deno.test('counter accuracy: different defaults per arr_type counted independent
 	// Each arr_type has a different number of defaults
 	for (const arrType of ALL_ARR_TYPES) {
 		const instance = buildSuccessInstanceResult(arrType, {
-			skipped_default: arrType === 'radarr' ? 2 : arrType === 'sonarr' ? 1 : 3,
+			skippedDefault: arrType === 'radarr' ? 2 : arrType === 'sonarr' ? 1 : 3,
 		});
 
 		const expected = arrType === 'radarr' ? 2 : arrType === 'sonarr' ? 1 : 3;
 		assertEquals(
-			instance.skipped_default,
+			instance.skippedDefault,
 			expected,
 			`${arrType} should have ${expected} skipped defaults`
 		);
@@ -724,7 +724,7 @@ Deno.test('counter accuracy: conflicted increments correctly for ambiguous match
 	const instance = buildSuccessInstanceResult('radarr', {
 		imported: 2,
 		conflicted: 3,
-		skipped_no_match: 0,
+		skippedNoMatch: 0,
 	});
 
 	assertEquals(instance.conflicted, 3);
@@ -747,20 +747,20 @@ Deno.test('counter accuracy: conflicted items are NOT also counted as no_match',
 	if (conflictedResult.status === 'conflicted') {
 		counters.conflicted += 1;
 	} else if (conflictedResult.status === 'no_match') {
-		counters.skipped_no_match += 1;
+		counters.skippedNoMatch += 1;
 	}
 
 	// Process no_match result
 	if (noMatchResult.status === 'conflicted') {
 		counters.conflicted += 1;
 	} else if (noMatchResult.status === 'no_match') {
-		counters.skipped_no_match += 1;
+		counters.skippedNoMatch += 1;
 	}
 
 	assertEquals(counters.conflicted, 1, 'conflicted counted once');
-	assertEquals(counters.skipped_no_match, 1, 'no_match counted once');
+	assertEquals(counters.skippedNoMatch, 1, 'no_match counted once');
 	// They are mutually exclusive: the total is exactly 2 (one of each)
-	assertEquals(counters.conflicted + counters.skipped_no_match, 2);
+	assertEquals(counters.conflicted + counters.skippedNoMatch, 2);
 });
 
 Deno.test('counter accuracy: multiple conflicted entries aggregate at run level', () => {
@@ -780,8 +780,8 @@ Deno.test('counter accuracy: failed instance has failed=1 and zero for all other
 
 	assertEquals(failed.failed, 1);
 	assertEquals(failed.imported, 0);
-	assertEquals(failed.skipped_default, 0);
-	assertEquals(failed.skipped_no_match, 0);
+	assertEquals(failed.skippedDefault, 0);
+	assertEquals(failed.skippedNoMatch, 0);
 	assertEquals(failed.conflicted, 0);
 });
 
@@ -828,8 +828,8 @@ Deno.test('edge case: empty instance list produces all-zero counters', () => {
 
 	const aggregated = aggregateCounters(instances);
 	assertEquals(aggregated.imported, 0);
-	assertEquals(aggregated.skipped_default, 0);
-	assertEquals(aggregated.skipped_no_match, 0);
+	assertEquals(aggregated.skippedDefault, 0);
+	assertEquals(aggregated.skippedNoMatch, 0);
 	assertEquals(aggregated.conflicted, 0);
 	assertEquals(aggregated.failed, 0);
 
@@ -846,8 +846,8 @@ Deno.test('edge case: empty instance list in buildRunSummary produces all-zero c
 	);
 
 	assertEquals(summary.imported, 0);
-	assertEquals(summary.skipped_default, 0);
-	assertEquals(summary.skipped_no_match, 0);
+	assertEquals(summary.skippedDefault, 0);
+	assertEquals(summary.skippedNoMatch, 0);
 	assertEquals(summary.conflicted, 0);
 	assertEquals(summary.failed, 0);
 	assertEquals(summary.status, 'skipped');
@@ -909,8 +909,8 @@ Deno.test('edge case: skipped instance has all-zero counters', () => {
 	const skipped = buildSkippedInstanceResult('radarr');
 
 	assertEquals(skipped.imported, 0);
-	assertEquals(skipped.skipped_default, 0);
-	assertEquals(skipped.skipped_no_match, 0);
+	assertEquals(skipped.skippedDefault, 0);
+	assertEquals(skipped.skippedNoMatch, 0);
 	assertEquals(skipped.conflicted, 0);
 	assertEquals(skipped.failed, 0);
 	assertEquals(skipped.status, 'skipped');
@@ -928,15 +928,15 @@ Deno.test('edge case: single instance across all arr_types produces correct per-
 	for (const arrType of ALL_ARR_TYPES) {
 		const instance = buildSuccessInstanceResult(arrType, {
 			imported: 1,
-			skipped_default: 1,
-			skipped_no_match: 1,
+			skippedDefault: 1,
+			skippedNoMatch: 1,
 			conflicted: 1,
 		});
 
 		const aggregated = aggregateCounters([instance]);
 		assertEquals(aggregated.imported, 1, `${arrType} imported`);
-		assertEquals(aggregated.skipped_default, 1, `${arrType} skipped_default`);
-		assertEquals(aggregated.skipped_no_match, 1, `${arrType} skipped_no_match`);
+		assertEquals(aggregated.skippedDefault, 1, `${arrType} skippedDefault`);
+		assertEquals(aggregated.skippedNoMatch, 1, `${arrType} skippedNoMatch`);
 		assertEquals(aggregated.conflicted, 1, `${arrType} conflicted`);
 		assertEquals(aggregated.failed, 0, `${arrType} failed`);
 	}

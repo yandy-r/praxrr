@@ -262,8 +262,8 @@ Deno.test({
 
 			// Verify counter fields exist at run level
 			assertEquals(typeof parsed.imported, 'number');
-			assertEquals(typeof parsed.skipped_default, 'number');
-			assertEquals(typeof parsed.skipped_no_match, 'number');
+			assertEquals(typeof parsed.skippedDefault, 'number');
+			assertEquals(typeof parsed.skippedNoMatch, 'number');
 			assertEquals(typeof parsed.conflicted, 'number');
 			assertEquals(typeof parsed.failed, 'number');
 
@@ -273,8 +273,8 @@ Deno.test({
 				assertEquals(typeof instanceResult.instanceName, 'string');
 				assertEquals(typeof instanceResult.status, 'string');
 				assertEquals(typeof instanceResult.imported, 'number');
-				assertEquals(typeof instanceResult.skipped_default, 'number');
-				assertEquals(typeof instanceResult.skipped_no_match, 'number');
+				assertEquals(typeof instanceResult.skippedDefault, 'number');
+				assertEquals(typeof instanceResult.skippedNoMatch, 'number');
 				assertEquals(typeof instanceResult.conflicted, 'number');
 				assertEquals(typeof instanceResult.failed, 'number');
 			}
@@ -309,7 +309,7 @@ Deno.test('toJobRunStatus maps disabled to skipped', () => {
 });
 
 Deno.test('toArrPullStartupRunResult preserves instance-level counters', () => {
-	const radarrSuccess = buildSuccessInstanceResult('radarr', { imported: 5, skipped_default: 2 });
+	const radarrSuccess = buildSuccessInstanceResult('radarr', { imported: 5, skippedDefault: 2 });
 	const sonarrFailed = buildFailedInstanceResult('sonarr', { failed: 1 });
 	const summary = buildRunSummary({
 		status: 'partial',
@@ -321,14 +321,14 @@ Deno.test('toArrPullStartupRunResult preserves instance-level counters', () => {
 	assertEquals(result.status, 'success'); // partial -> success via toJobRunStatus
 	assertEquals(result.instances.length, 2);
 	assertEquals(result.imported, 5);
-	assertEquals(result.skipped_default, 2);
+	assertEquals(result.skippedDefault, 2);
 	assertEquals(result.failed, 1);
 
 	const radarrResult = result.instances.find((i) => i.instanceId === radarrSuccess.instanceId);
 	assertExists(radarrResult);
 	assertEquals(radarrResult!.status, 'success');
 	assertEquals(radarrResult!.imported, 5);
-	assertEquals(radarrResult!.skipped_default, 2);
+	assertEquals(radarrResult!.skippedDefault, 2);
 
 	const sonarrResult = result.instances.find((i) => i.instanceId === sonarrFailed.instanceId);
 	assertExists(sonarrResult);
@@ -347,8 +347,8 @@ Deno.test('toArrPullStartupRunResult handles empty run summary', () => {
 	assertEquals(result.status, 'skipped');
 	assertEquals(result.instances.length, 0);
 	assertEquals(result.imported, 0);
-	assertEquals(result.skipped_default, 0);
-	assertEquals(result.skipped_no_match, 0);
+	assertEquals(result.skippedDefault, 0);
+	assertEquals(result.skippedNoMatch, 0);
 	assertEquals(result.conflicted, 0);
 	assertEquals(result.failed, 0);
 });

@@ -174,7 +174,7 @@ variant.
 
 ### H5. `snake_case` counter fields in TypeScript interfaces
 
-- **Status:** [ ] Open
+- **Status:** [x] Fixed
 - **Files:** `queueTypes.ts:37-58`
 - **Agent:** type-design-analyzer
 
@@ -182,6 +182,10 @@ variant.
 types already use `skippedDefault`.
 
 **Fix:** Rename to camelCase (`skippedDefault`, `skippedNoMatch`). Update all references.
+
+**Resolution:** Renamed startup counter fields to camelCase in the TypeScript interfaces and runtime
+counter usage across startup logic (`skippedDefault`, `skippedNoMatch`). DB query rows remain
+`skipped_default`/`skipped_no_match`, with existing mapping preserved to camelCase domain records.
 
 ---
 
@@ -500,7 +504,7 @@ candidate for shared extraction.
 7. ~~**H2** -- Add databaseId assertion in adapters~~ **DONE**
 8. ~~**H3** -- Make Lidarr startup client typing runtime-safe~~ **DONE**
 9. **M5** -- Sanitize API error responses
-10. **H5** -- Normalize counter field naming to camelCase
+10. ~~**H5** -- Normalize counter field naming to camelCase~~ **DONE**
 11. **M4** -- Add DB status validation
 12. **M8 + M10** -- Formatting and import cleanup
 13. **T1 + T2** -- Add critical missing tests

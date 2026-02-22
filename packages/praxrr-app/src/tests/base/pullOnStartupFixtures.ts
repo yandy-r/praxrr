@@ -471,8 +471,8 @@ export function buildUnsupportedSectionResult(
 export function buildEmptyCounters(): StartupPullCounters {
 	return {
 		imported: 0,
-		skipped_default: 0,
-		skipped_no_match: 0,
+		skippedDefault: 0,
+		skippedNoMatch: 0,
 		conflicted: 0,
 		failed: 0,
 	};
@@ -480,8 +480,8 @@ export function buildEmptyCounters(): StartupPullCounters {
 
 export interface CountersFixtureOptions {
 	imported?: number;
-	skipped_default?: number;
-	skipped_no_match?: number;
+	skippedDefault?: number;
+	skippedNoMatch?: number;
 	conflicted?: number;
 	failed?: number;
 }
@@ -489,8 +489,8 @@ export interface CountersFixtureOptions {
 export function buildCounters(overrides: CountersFixtureOptions = {}): StartupPullCounters {
 	return {
 		imported: overrides.imported ?? 0,
-		skipped_default: overrides.skipped_default ?? 0,
-		skipped_no_match: overrides.skipped_no_match ?? 0,
+		skippedDefault: overrides.skippedDefault ?? 0,
+		skippedNoMatch: overrides.skippedNoMatch ?? 0,
 		conflicted: overrides.conflicted ?? 0,
 		failed: overrides.failed ?? 0,
 	};
@@ -519,8 +519,8 @@ export function buildInstanceResult(
 		arrType: overrides.arrType ?? arrType,
 		status,
 		imported: overrides.imported ?? 0,
-		skipped_default: overrides.skipped_default ?? 0,
-		skipped_no_match: overrides.skipped_no_match ?? 0,
+		skippedDefault: overrides.skippedDefault ?? 0,
+		skippedNoMatch: overrides.skippedNoMatch ?? 0,
 		conflicted: overrides.conflicted ?? 0,
 		failed: overrides.failed ?? 0,
 	};
@@ -653,8 +653,8 @@ export function buildArrPullStartupRunResult(
 		finishedAt: overrides.finishedAt ?? LATER_ISO,
 		instances: overrides.instances ?? [],
 		imported: overrides.imported ?? 0,
-		skipped_default: overrides.skipped_default ?? 0,
-		skipped_no_match: overrides.skipped_no_match ?? 0,
+		skippedDefault: overrides.skippedDefault ?? 0,
+		skippedNoMatch: overrides.skippedNoMatch ?? 0,
 		conflicted: overrides.conflicted ?? 0,
 		failed: overrides.failed ?? 0,
 	};
@@ -894,14 +894,14 @@ export function buildAllImportedCounters(count: number): StartupPullCounters {
  * Expected counters for a run where all entities were skipped as defaults.
  */
 export function buildAllSkippedDefaultCounters(count: number): StartupPullCounters {
-	return buildCounters({ skipped_default: count });
+	return buildCounters({ skippedDefault: count });
 }
 
 /**
  * Expected counters for a run where all entities had no match.
  */
 export function buildAllNoMatchCounters(count: number): StartupPullCounters {
-	return buildCounters({ skipped_no_match: count });
+	return buildCounters({ skippedNoMatch: count });
 }
 
 /**
@@ -1094,8 +1094,8 @@ function aggregateFixtureCounters(instances: readonly StartupPullInstanceResult[
 	const counters = buildEmptyCounters();
 	for (const instance of instances) {
 		counters.imported += instance.imported;
-		counters.skipped_default += instance.skipped_default;
-		counters.skipped_no_match += instance.skipped_no_match;
+		counters.skippedDefault += instance.skippedDefault;
+		counters.skippedNoMatch += instance.skippedNoMatch;
 		counters.conflicted += instance.conflicted;
 		counters.failed += instance.failed;
 	}
