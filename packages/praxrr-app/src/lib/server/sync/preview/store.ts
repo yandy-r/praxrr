@@ -62,7 +62,10 @@ export interface PreviewStalenessState {
   shouldBlock: boolean;
 }
 
-export function evaluatePreviewStaleness(snapshot: SyncPreviewResult, nowMs: number = Date.now()): PreviewStalenessState {
+export function evaluatePreviewStaleness(
+  snapshot: SyncPreviewResult,
+  nowMs: number = Date.now()
+): PreviewStalenessState {
   const ageMs = Math.max(0, nowMs - Date.parse(snapshot.createdAt));
   return {
     ageMs,

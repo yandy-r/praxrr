@@ -80,7 +80,10 @@ export function isDefaultFilterableSection(section: StartupPullSection): boolean
   return DEFAULT_FILTERABLE_STARTUP_SECTIONS.includes(section);
 }
 
-function matchesRule(entity: Record<string, unknown>, rule: StartupDefaultCatalogRule): 'match' | 'nomatch' | 'unknown' {
+function matchesRule(
+  entity: Record<string, unknown>,
+  rule: StartupDefaultCatalogRule
+): 'match' | 'nomatch' | 'unknown' {
   if (rule.kind === 'ids') {
     const rawId = entity.id;
     if (typeof rawId !== 'number' || !Number.isInteger(rawId)) {
@@ -102,11 +105,9 @@ function matchesRule(entity: Record<string, unknown>, rule: StartupDefaultCatalo
 
     const shouldMatch = rule.caseSensitive
       ? new Set(rule.names).has(entity.name)
-      : new Set(
-          rule.names
-            .map((value) => normalizeName(value))
-            .filter((value): value is string => value !== null)
-        ).has(normalizedTarget);
+      : new Set(rule.names.map((value) => normalizeName(value)).filter((value): value is string => value !== null)).has(
+          normalizedTarget
+        );
 
     return shouldMatch ? 'match' : 'nomatch';
   }
@@ -128,7 +129,10 @@ function matchesRule(entity: Record<string, unknown>, rule: StartupDefaultCatalo
   return hasUnknown ? 'unknown' : 'match';
 }
 
-function matchesFieldCriterion(entity: Record<string, unknown>, criterion: StartupDefaultFieldCriterion): 'match' | 'nomatch' | 'unknown' {
+function matchesFieldCriterion(
+  entity: Record<string, unknown>,
+  criterion: StartupDefaultFieldCriterion
+): 'match' | 'nomatch' | 'unknown' {
   const rawValue = entity[criterion.field];
 
   if (criterion.comparator === 'eq') {

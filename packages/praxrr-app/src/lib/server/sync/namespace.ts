@@ -132,9 +132,7 @@ export function findNamespaceMatch(
   }
 
   const targetDisplay = stripNamespaceSuffix(desiredName);
-  const strippedMatches = candidates.filter(
-    (candidate) => stripNamespaceSuffix(candidate.name) === targetDisplay
-  );
+  const strippedMatches = candidates.filter((candidate) => stripNamespaceSuffix(candidate.name) === targetDisplay);
   if (strippedMatches.length === 0) return null;
 
   const unsuffixed = strippedMatches.find((candidate) => !hasNamespaceSuffix(candidate.name));

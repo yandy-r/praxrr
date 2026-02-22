@@ -1,37 +1,32 @@
-import type { ArrAppType } from "$shared/pcd/types.ts";
-import type { JobRunStatus } from "$jobs/queueTypes.ts";
+import type { ArrAppType } from '$shared/pcd/types.ts';
+import type { JobRunStatus } from '$jobs/queueTypes.ts';
 
 export type StartupPullArrType = ArrAppType;
 
 export type StartupPullSection =
-  | "qualityProfiles"
-  | "delayProfiles"
-  | "naming"
-  | "mediaSettings"
-  | "qualityDefinitions"
-  | "metadataProfiles";
+  | 'qualityProfiles'
+  | 'delayProfiles'
+  | 'naming'
+  | 'mediaSettings'
+  | 'qualityDefinitions'
+  | 'metadataProfiles';
 
-export type StartupPullMatchStatus = "matched" | "no_match" | "conflicted";
+export type StartupPullMatchStatus = 'matched' | 'no_match' | 'conflicted';
 
-export type StartupPullMatchMethod = "exact_name" | "metadata_fingerprint";
+export type StartupPullMatchMethod = 'exact_name' | 'metadata_fingerprint';
 
 export type StartupPullMatchReason =
-  | "matched_exact_name"
-  | "matched_fingerprint"
-  | "name_conflict"
-  | "namespace_conflict"
-  | "fingerprint_conflict"
-  | "default_skip"
-  | "unmanaged_remote"
-  | "no_match"
-  | "unsupported_section";
+  | 'matched_exact_name'
+  | 'matched_fingerprint'
+  | 'name_conflict'
+  | 'namespace_conflict'
+  | 'fingerprint_conflict'
+  | 'default_skip'
+  | 'unmanaged_remote'
+  | 'no_match'
+  | 'unsupported_section';
 
-export type StartupPullRunStatus =
-  | "success"
-  | "partial"
-  | "failed"
-  | "skipped"
-  | "disabled";
+export type StartupPullRunStatus = 'success' | 'partial' | 'failed' | 'skipped' | 'disabled';
 
 export interface StartupPullInstanceInput {
   instanceId: number;
@@ -68,8 +63,8 @@ interface StartupPullMatchResultBase {
 }
 
 export interface StartupPullMatchedResult extends StartupPullMatchResultBase {
-  readonly status: "matched";
-  readonly reason: "matched_exact_name" | "matched_fingerprint";
+  readonly status: 'matched';
+  readonly reason: 'matched_exact_name' | 'matched_fingerprint';
   readonly matchMethod: StartupPullMatchMethod;
   readonly matchedEntityId: number | string;
   readonly matchedEntityName: string;
@@ -77,15 +72,13 @@ export interface StartupPullMatchedResult extends StartupPullMatchResultBase {
 }
 
 export interface StartupPullUnmatchedResult extends StartupPullMatchResultBase {
-  readonly status: "no_match" | "conflicted";
+  readonly status: 'no_match' | 'conflicted';
   readonly reason: StartupPullMatchReason;
   readonly matchMethod?: StartupPullMatchMethod;
   readonly matchedCount?: number;
 }
 
-export type StartupPullMatchResult =
-  | StartupPullMatchedResult
-  | StartupPullUnmatchedResult;
+export type StartupPullMatchResult = StartupPullMatchedResult | StartupPullUnmatchedResult;
 
 export interface StartupPullCounters {
   imported: number;

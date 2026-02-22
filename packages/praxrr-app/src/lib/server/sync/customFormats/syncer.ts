@@ -12,11 +12,7 @@
 import type { BaseArrClient } from '$arr/base.ts';
 import { logger } from '$logger/logger.ts';
 import type { SyncArrType } from '../mappings.ts';
-import {
-  type ArrCustomFormat,
-  transformCustomFormatWithDiagnostics,
-  type PcdCustomFormat,
-} from './transformer.ts';
+import { type ArrCustomFormat, transformCustomFormatWithDiagnostics, type PcdCustomFormat } from './transformer.ts';
 
 interface PreparedCustomFormat {
   readonly pcdName: string;

@@ -17,13 +17,13 @@ import { buildJobDisplayName } from '$lib/server/jobs/display.ts';
 import { isSyncSectionSupported } from '$lib/server/sync/mappings.ts';
 import { isArrAppType, supportsArrSyncSurface, type ArrSyncSurface } from '$shared/arr/capabilities.ts';
 import {
-	previewStore,
-	PREVIEW_STATUS_APPLYING,
-	PREVIEW_STATUS_APPLIED,
-	PREVIEW_STATUS_EXPIRED,
-	PREVIEW_STATUS_FAILED,
-	PREVIEW_STATUS_GENERATING,
-	PREVIEW_STATUS_READY,
+  previewStore,
+  PREVIEW_STATUS_APPLYING,
+  PREVIEW_STATUS_APPLIED,
+  PREVIEW_STATUS_EXPIRED,
+  PREVIEW_STATUS_FAILED,
+  PREVIEW_STATUS_GENERATING,
+  PREVIEW_STATUS_READY,
 } from '$sync/preview/store.ts';
 import type { SyncPreviewSummary } from '$sync/preview/types.ts';
 
@@ -31,62 +31,62 @@ const METADATA_PROFILES_SURFACE: ArrSyncSurface = 'metadata_profiles';
 const METADATA_PROFILES_SECTION = 'metadataProfiles';
 const METADATA_PROFILE_UNSUPPORTED_ERROR = 'Metadata profile sync is supported only for Lidarr instances';
 const EMPTY_PREVIEW_SUMMARY: SyncPreviewSummary = {
-	totalCreates: 0,
-	totalUpdates: 0,
-	totalDeletes: 0,
-	totalUnchanged: 0,
+  totalCreates: 0,
+  totalUpdates: 0,
+  totalDeletes: 0,
+  totalUnchanged: 0,
 };
 type SyncPreviewTriggerStatus = 'idle' | 'generating' | 'error' | 'ready';
 
 type SyncPreviewRouteState = {
-	previewId: string | null;
-	status: SyncPreviewTriggerStatus;
-	summary: SyncPreviewSummary | null;
-	error: string | null;
+  previewId: string | null;
+  status: SyncPreviewTriggerStatus;
+  summary: SyncPreviewSummary | null;
+  error: string | null;
 };
 
 function getSyncPreviewRouteState(instanceId: number, previewId: string | null): SyncPreviewRouteState {
-	if (!previewId) {
-		return {
-			previewId: null,
-			status: 'idle',
-			summary: null,
-			error: null,
-		};
-	}
+  if (!previewId) {
+    return {
+      previewId: null,
+      status: 'idle',
+      summary: null,
+      error: null,
+    };
+  }
 
-	const snapshot = previewStore.get(previewId);
-	if (!snapshot || snapshot.instanceId !== instanceId) {
-		return {
-			previewId,
-			status: 'error',
-			summary: null,
-			error: 'Preview not found or not associated with this instance',
-		};
-	}
+  const snapshot = previewStore.get(previewId);
+  if (!snapshot || snapshot.instanceId !== instanceId) {
+    return {
+      previewId,
+      status: 'error',
+      summary: null,
+      error: 'Preview not found or not associated with this instance',
+    };
+  }
 
-	const mapStatus = (() => {
-		switch (snapshot.status) {
-			case PREVIEW_STATUS_GENERATING:
-			case PREVIEW_STATUS_APPLYING:
-				return 'generating';
-			case PREVIEW_STATUS_READY:
-			case PREVIEW_STATUS_APPLIED:
-				return 'ready';
-			case PREVIEW_STATUS_FAILED:
-			case PREVIEW_STATUS_EXPIRED:
-				return 'error';
-			default:
-				return 'error';
-		}
-	})();
+  const mapStatus = (() => {
+    switch (snapshot.status) {
+      case PREVIEW_STATUS_GENERATING:
+      case PREVIEW_STATUS_APPLYING:
+        return 'generating';
+      case PREVIEW_STATUS_READY:
+      case PREVIEW_STATUS_APPLIED:
+        return 'ready';
+      case PREVIEW_STATUS_FAILED:
+      case PREVIEW_STATUS_EXPIRED:
+        return 'error';
+      default:
+        return 'error';
+    }
+  })();
 
-	return {
-		previewId: snapshot.id,
-		status: mapStatus,
-		summary: snapshot.summary ?? EMPTY_PREVIEW_SUMMARY,
-		error: snapshot.error ?? null,
-	};
+  return {
+    previewId: snapshot.id,
+    status: mapStatus,
+    summary: snapshot.summary ?? EMPTY_PREVIEW_SUMMARY,
+    error: snapshot.error ?? null,
+  };
 }
 
 function supportsMetadataProfiles(instanceType: string): boolean {

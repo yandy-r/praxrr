@@ -114,7 +114,7 @@ class Config {
   /**
    * Initialize the configuration (create directories)
    * Must be called before using the config
-  */
+   */
   async init(): Promise<void> {
     await Deno.mkdir(this.paths.logs, { recursive: true });
     await Deno.mkdir(this.paths.data, { recursive: true });
