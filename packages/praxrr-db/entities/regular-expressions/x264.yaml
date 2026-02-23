@@ -1,0 +1,11 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: x264
+pattern: ^(?!.*(?i:remux)).*([xh](\.?264)|DVDRip)
+tags:
+  - Codec
+  - Encoder
+description: 'An open source encoder that produces H.264 videos. '
+regex101Id: null

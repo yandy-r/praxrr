@@ -1,0 +1,9 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: Dual Audio
+pattern: \b((multi[^a-zA-Z]*)|(dual[\s.-](audio|complete)))\b
+tags: []
+description: Matches releases with Dual Audio; Media releases that contain two language tracks - typically the original language (such as Japanese) along with an English dub, allowing viewers to switch between either audio track while watching the same video content.
+regex101Id: null

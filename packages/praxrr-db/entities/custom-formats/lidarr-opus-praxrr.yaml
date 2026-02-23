@@ -1,0 +1,27 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: Lidarr - Opus (Praxrr)
+description: Matches Opus audio codec for Lidarr.
+includeInRename: false
+tags:
+  - Audio
+conditions:
+  - name: Not OPUS Release Group
+    type: release_group
+    arrType: lidarr
+    negate: true
+    required: true
+    patterns:
+      - name: Opus (Negation)
+        pattern: (?<=^|[\s.-])OPUS\b
+  - name: Opus
+    type: release_title
+    arrType: lidarr
+    negate: false
+    required: true
+    patterns:
+      - name: Opus
+        pattern: \bOPUS(\b|\d)(?!.*[ ._-](\d{3,4}p))
+tests: []

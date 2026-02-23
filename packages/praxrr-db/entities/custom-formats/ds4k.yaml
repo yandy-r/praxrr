@@ -1,0 +1,18 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: DS4K
+description: Encoded from a 2160p Source
+includeInRename: false
+tags: []
+conditions:
+  - name: DS4K
+    type: release_title
+    arrType: all
+    negate: false
+    required: true
+    patterns:
+      - name: DS4K
+        pattern: \b(DS4K)\b
+tests: []

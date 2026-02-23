@@ -1,0 +1,243 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: 1080p Quality Tier 6
+description: Matches release groups who fall under 1080p GPPi Tier 6
+includeInRename: false
+tags:
+  - 1080p
+  - GPPi
+  - Quality
+  - Release Group Tier
+conditions:
+  - name: 1080p
+    type: resolution
+    arrType: all
+    negate: false
+    required: true
+    resolutions:
+      - 1080p
+  - name: ASD87
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: ASD87
+        pattern: (?<=^|[\s.-])ASD87\b
+  - name: BRUTE
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: BRUTE
+        pattern: (?<=^|[\s.-])BRUTE\b
+  - name: Bluray
+    type: source
+    arrType: all
+    negate: false
+    required: false
+    sources:
+      - bluray
+  - name: CHD
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: CHD
+        pattern: (?<=^|[\s.-])CHD\b
+  - name: EuReKA
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: EuReKA
+        pattern: (?<=^|[\s.-])EuReKA\b
+  - name: GALVANiZE
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: GALVANiZE
+        pattern: (?<=^|[\s.-])GALVANiZE\b
+  - name: HANDJOB
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: HANDJOB
+        pattern: (?<=^|[\s.-])HANDJOB\b
+  - name: HDC
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: HDC
+        pattern: (?<=^|[\s.-])HDC\b
+  - name: HaB
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: HaB
+        pattern: (?<=^|[\s.-])HaB\b
+  - name: Ivandro
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: Ivandro
+        pattern: (?<=^|[\s.-])Ivandro\b
+  - name: KnG
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: KnG
+        pattern: (?<=^|[\s.-])KnG\b
+  - name: LEGi0N
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: LEGi0N
+        pattern: (?<=^|[\s.-])LEGi0N\b
+  - name: Lulz
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: Lulz
+        pattern: (?<=^|[\s.-])Lulz\b
+  - name: MTeam
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: MTeam
+        pattern: (?<=^|[\s.-])MTeam\b
+  - name: MaG
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: MaG
+        pattern: (?<=^|[\s.-])MaG\b
+  - name: NiP
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: NiP
+        pattern: (?<=^|[\s.-])NiP\b
+  - name: Not Remux
+    type: release_title
+    arrType: all
+    negate: true
+    required: true
+    patterns:
+      - name: Remux
+        pattern: Remux
+  - name: P0W4HD
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: P0W4HD
+        pattern: (?<=^|[\s.-])P0W4HD\b
+  - name: PTP
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: PTP
+        pattern: (?<=^|[\s.-])PTP\b
+  - name: PuTao
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: PuTao
+        pattern: (?<=^|[\s.-])PuTao\b
+  - name: ROCiNANTE
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: ROCiNANTE
+        pattern: (?<=^|[\s.-])ROCiNANTE\b
+  - name: Slappy
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: Slappy
+        pattern: (?<=^|[\s.-])Slappy\b
+  - name: ThD
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: ThD
+        pattern: (?<=^|[\s.-])ThD\b
+  - name: WEBRip
+    type: source
+    arrType: radarr
+    negate: false
+    required: false
+    sources:
+      - webrip
+  - name: WiKi
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: WiKi
+        pattern: (?<=^|[\s.-])WiKi\b
+  - name: WiLDCAT
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: WiLDCAT
+        pattern: (?<=^|[\s.-])WiLDCAT\b
+  - name: iON
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: iON
+        pattern: (?<=^|[\s.-])iON\b
+  - name: j3rico
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: j3rico
+        pattern: (?<=^|[\s.-])j3rico\b
+tests: []

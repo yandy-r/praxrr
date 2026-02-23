@@ -1,0 +1,107 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: 1080p Quality Tier 4
+description: Matches release groups who fall under 1080p GPPi Tier 4
+includeInRename: false
+tags:
+  - 1080p
+  - GPPi
+  - Quality
+  - Release Group Tier
+conditions:
+  - name: 1080p
+    type: resolution
+    arrType: all
+    negate: false
+    required: true
+    resolutions:
+      - 1080p
+  - name: BMF
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: BMF
+        pattern: (?<=^|[\s.-])BMF\b
+  - name: Bluray
+    type: source
+    arrType: all
+    negate: false
+    required: false
+    sources:
+      - bluray
+  - name: HDMaNiAcS
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: HDMaNiAcS
+        pattern: (?<=^|[\s.-])HDMaNiAcS\b
+  - name: IDE
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: IDE
+        pattern: (?<=^|[\s.-])IDE\b
+  - name: LolHD
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: LolHD
+        pattern: (?<=^|[\s.-])LolHD\b
+  - name: NCmt
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: NCmt
+        pattern: (?<=^|[\s.-])NCmt\b
+  - name: NTb
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: NTb
+        pattern: (?<=^|[\s.-])NTb\b
+  - name: Not Remux
+    type: release_title
+    arrType: all
+    negate: true
+    required: true
+    patterns:
+      - name: Remux
+        pattern: Remux
+  - name: Skazhutin
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: Skazhutin
+        pattern: (?<=^|[\s.-])Skazhutin\b
+  - name: WEBRip
+    type: source
+    arrType: radarr
+    negate: false
+    required: false
+    sources:
+      - webrip
+  - name: de[42]
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: de[42]
+        pattern: (?<=^|[\s.-])de[42]\b
+tests: []

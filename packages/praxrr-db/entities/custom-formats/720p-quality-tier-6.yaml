@@ -1,0 +1,147 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: 720p Quality Tier 6
+description: Matches release groups who fall under 720p Quality Tier 6
+includeInRename: false
+tags:
+  - 720p
+  - GPPi
+  - Quality
+  - Release Group Tier
+conditions:
+  - name: 720p
+    type: resolution
+    arrType: all
+    negate: false
+    required: true
+    resolutions:
+      - 720p
+  - name: Bluray
+    type: source
+    arrType: all
+    negate: false
+    required: false
+    sources:
+      - bluray
+  - name: EuReKA
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: EuReKA
+        pattern: (?<=^|[\s.-])EuReKA\b
+  - name: HANDJOB
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: HANDJOB
+        pattern: (?<=^|[\s.-])HANDJOB\b
+  - name: Ivandro
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: Ivandro
+        pattern: (?<=^|[\s.-])Ivandro\b
+  - name: KnG
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: KnG
+        pattern: (?<=^|[\s.-])KnG\b
+  - name: LEGi0N
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: LEGi0N
+        pattern: (?<=^|[\s.-])LEGi0N\b
+  - name: Lulz
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: Lulz
+        pattern: (?<=^|[\s.-])Lulz\b
+  - name: MTeam
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: MTeam
+        pattern: (?<=^|[\s.-])MTeam\b
+  - name: MaG
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: MaG
+        pattern: (?<=^|[\s.-])MaG\b
+  - name: NiP
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: NiP
+        pattern: (?<=^|[\s.-])NiP\b
+  - name: Not Remux
+    type: release_title
+    arrType: all
+    negate: true
+    required: true
+    patterns:
+      - name: Remux
+        pattern: Remux
+  - name: PTP
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: PTP
+        pattern: (?<=^|[\s.-])PTP\b
+  - name: PuTao
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: PuTao
+        pattern: (?<=^|[\s.-])PuTao\b
+  - name: Slappy
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: Slappy
+        pattern: (?<=^|[\s.-])Slappy\b
+  - name: WEBRip
+    type: source
+    arrType: radarr
+    negate: false
+    required: false
+    sources:
+      - webrip
+  - name: WiKi
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: WiKi
+        pattern: (?<=^|[\s.-])WiKi\b
+tests: []

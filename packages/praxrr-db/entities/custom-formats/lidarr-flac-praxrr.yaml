@@ -1,0 +1,27 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: Lidarr - FLAC (Praxrr)
+description: Matches FLAC lossless audio codec for Lidarr.
+includeInRename: false
+tags:
+  - Audio
+conditions:
+  - name: FLAC
+    type: release_title
+    arrType: lidarr
+    negate: false
+    required: true
+    patterns:
+      - name: FLAC
+        pattern: \bFLAC(\b|\d)
+  - name: Not AAC
+    type: release_title
+    arrType: lidarr
+    negate: true
+    required: true
+    patterns:
+      - name: AAC
+        pattern: \bAAC(\b|\d)
+tests: []

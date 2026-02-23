@@ -1,0 +1,40 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: QxR Bluray
+description: Matches 1080p QxR Blurays via Release Title Parsing
+includeInRename: false
+tags: []
+conditions:
+  - name: 1080p
+    type: resolution
+    arrType: all
+    negate: false
+    required: true
+    resolutions:
+      - 1080p
+  - name: Bluray
+    type: source
+    arrType: all
+    negate: false
+    required: true
+    sources:
+      - bluray
+  - name: QxR
+    type: release_title
+    arrType: all
+    negate: false
+    required: true
+    patterns:
+      - name: QxR (Title)
+        pattern: QxR
+  - name: Release Group
+    type: release_group
+    arrType: all
+    negate: true
+    required: true
+    patterns:
+      - name: QxR
+        pattern: (?<=^|[\s.-])(QxR|afm72|Bandi|Bluespots|Celdra|FreetheFish|Garshasp|Ghost|Ime|Kappa|Langbard|LION|Panda|MONOLITH|Natty|r00t|RCVR|RZeroX|SAMPA|Silence|t3nzin|Tigole|YOGI)\b
+tests: []

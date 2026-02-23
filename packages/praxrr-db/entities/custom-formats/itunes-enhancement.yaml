@@ -1,0 +1,26 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: iTunes Enhancement
+description: Augments the Streaming Service Score for 1080p Releases and below for 2160p Profiles
+includeInRename: false
+tags:
+  - Enhancement
+conditions:
+  - name: Not 2160p
+    type: resolution
+    arrType: all
+    negate: true
+    required: true
+    resolutions:
+      - 2160p
+  - name: iT
+    type: release_title
+    arrType: all
+    negate: false
+    required: true
+    patterns:
+      - name: iTunes
+        pattern: \b(it|itunes)\b(?=[ ._-]web[ ._-]?(dl|rip)\b)
+tests: []

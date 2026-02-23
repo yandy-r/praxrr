@@ -1,0 +1,18 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: ASL
+description: American Sign Language Releases
+includeInRename: false
+tags: []
+conditions:
+  - name: ASL
+    type: release_title
+    arrType: all
+    negate: false
+    required: true
+    patterns:
+      - name: ASL
+        pattern: \b(ASL)\b
+tests: []

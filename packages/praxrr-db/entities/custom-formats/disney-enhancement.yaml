@@ -1,0 +1,26 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: Disney+ Enhancement
+description: Augments the Streaming Service Score for 1080p Releases and below for 2160p Profiles
+includeInRename: false
+tags:
+  - Enhancement
+conditions:
+  - name: DSNP
+    type: release_title
+    arrType: all
+    negate: false
+    required: true
+    patterns:
+      - name: Disney+
+        pattern: \b(dsnp|dsny(p)?|disney\+)\s*\b
+  - name: Not 2160p
+    type: resolution
+    arrType: all
+    negate: true
+    required: true
+    resolutions:
+      - 2160p
+tests: []

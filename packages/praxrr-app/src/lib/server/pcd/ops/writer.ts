@@ -8,6 +8,7 @@ import { buildContentHash, type PcdOpSource, pcdOpsQueries } from '$db/queries/p
 import { pcdOpHistoryQueries } from '$db/queries/pcdOpHistory.ts';
 import type { PcdOpOrigin } from '$db/queries/pcdOps.ts';
 import { logger } from '$logger/logger.ts';
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { compiledQueryToSql } from '../utils/sql.ts';
 import { compile } from '../database/compiler.ts';
 import { getCache } from '../database/registry.ts';
@@ -19,6 +20,83 @@ import {
   isValueGuardBlockingStatus,
 } from '../migration/valueGuardGate.ts';
 import { uuid } from '$shared/utils/uuid.ts';
+
+interface RepoImportWriteContext {
+  filenamePrefix: string;
+  sequenceStart: number;
+  nextIndex: number;
+  lastSeenInRepoAt: string;
+  maxOperations: number;
+}
+
+interface WriteContextFrame {
+  source?: PcdOpSource;
+  allowBaseImport?: boolean;
+  repoImport?: RepoImportWriteContext;
+}
+
+const writeContextStorage = new AsyncLocalStorage<WriteContextFrame[]>();
+
+function currentWriteContext(): WriteContextFrame | undefined {
+  const stack = writeContextStorage.getStore();
+  if (!stack || stack.length === 0) return undefined;
+  return stack[stack.length - 1];
+}
+
+interface RepoImportIdentity {
+  filename: string;
+  opNumber: number | null;
+  sequence: number;
+  lastSeenInRepoAt: string;
+}
+
+function consumeRepoImportIdentity(layer: OperationLayer, source: PcdOpSource): RepoImportIdentity | null {
+  const repoImport = currentWriteContext()?.repoImport;
+  if (!repoImport || layer !== 'base' || source !== 'repo') {
+    return null;
+  }
+
+  if (repoImport.nextIndex >= repoImport.maxOperations) {
+    throw new Error(`Migration repo import emitted too many SQL operations for "${repoImport.filenamePrefix}"`);
+  }
+
+  const index = repoImport.nextIndex;
+  repoImport.nextIndex += 1;
+  const suffix = String(index).padStart(5, '0');
+
+  return {
+    filename: `${repoImport.filenamePrefix}#${suffix}.sql`,
+    opNumber: null,
+    sequence: repoImport.sequenceStart + index,
+    lastSeenInRepoAt: repoImport.lastSeenInRepoAt,
+  };
+}
+
+export async function withRepoImportWriteContext<T>(
+  options: {
+    filenamePrefix: string;
+    sequenceStart: number;
+    maxOperations: number;
+    lastSeenInRepoAt: string;
+  },
+  callback: () => Promise<T>
+): Promise<T> {
+  const parent = writeContextStorage.getStore() ?? [];
+  const nextContext: WriteContextFrame = {
+    source: 'repo',
+    allowBaseImport: true,
+    repoImport: {
+      filenamePrefix: options.filenamePrefix,
+      sequenceStart: options.sequenceStart,
+      nextIndex: 0,
+      maxOperations: options.maxOperations,
+      lastSeenInRepoAt: options.lastSeenInRepoAt,
+    },
+  };
+  const nextStack: WriteContextFrame[] = [...parent, nextContext];
+
+  return writeContextStorage.run(nextStack, callback);
+}
 
 function buildMetadataJson(metadata?: OperationMetadata): string | null {
   if (!metadata) return null;
@@ -102,14 +180,7 @@ function resolveConflictStrategy(conflictStrategy: string | undefined): Conflict
     return conflictStrategy;
   }
 
-  if (conflictStrategy !== undefined) {
-    logger.warn('Invalid conflict strategy in database configuration, falling back to override', {
-      source: 'PCDWriter',
-      meta: { conflictStrategy },
-    });
-  }
-
-  return 'override';
+  throw new Error(`Invalid conflict strategy in database configuration: ${String(conflictStrategy)}`);
 }
 
 function runValueGuardGate(
@@ -132,7 +203,11 @@ function runValueGuardGate(
   }
 
   const instance = databaseInstancesQueries.getById(databaseId);
-  const conflictStrategy = resolveConflictStrategy(instance?.conflict_strategy);
+  if (!instance) {
+    throw new Error(`Failed to resolve database instance ${databaseId} for value-guard execution`);
+  }
+
+  const conflictStrategy = resolveConflictStrategy(instance.conflict_strategy);
 
   cacheDb.exec('SAVEPOINT pcd_writer_value_guard');
   try {
@@ -348,7 +423,12 @@ function parseMetadata(raw: string | null): ParsedMetadata | null {
   if (!raw) return null;
   try {
     return JSON.parse(raw) as ParsedMetadata;
-  } catch {
+  } catch (error) {
+    const preview = raw.length > 500 ? `${raw.slice(0, 500)}...` : raw;
+    void logger.debug('Failed to parse operation metadata while checking supersede', {
+      source: 'PCDWriter',
+      meta: { raw: preview, error: String(error) },
+    });
     return null;
   }
 }
@@ -439,7 +519,9 @@ async function supersedePriorUserOps(databaseId: number, newOpId: number, metada
 /**
  * Write operations to a PCD layer in the database
  *
- * For base layer: inserts a draft base op (origin=base, state=draft)
+ * For base layer:
+ *   - repo source: inserts a published base op (origin=base, state=published, source=repo)
+ *   - local source: inserts a draft base op (origin=base, state=draft, source=local)
  * For user layer: inserts a published user op (origin=user, state=published)
  */
 async function writeOperationsFromSqlOperations(options: WriteSqlOperationsOptions): Promise<WriteResult> {
@@ -452,11 +534,17 @@ async function writeOperationsFromSqlOperations(options: WriteSqlOperationsOptio
   try {
     const instance = databaseInstancesQueries.getById(databaseId);
     if (!instance) {
-      return { success: false, error: 'Database instance not found' };
+      throw new Error(`Cannot write operations for missing database instance ${databaseId}`);
     }
 
+    const context = currentWriteContext();
+    const source =
+      layer === 'base' && context?.allowBaseImport === true && context?.source === 'repo'
+        ? 'repo'
+        : (options.source ?? context?.source ?? 'local');
     const hasPersonalAccessToken = !!instance.has_personal_access_token || !!instance.personal_access_token;
-    if (layer === 'base' && (!hasPersonalAccessToken || instance.local_ops_enabled)) {
+    const allowBaseImportBypass = context?.allowBaseImport === true && source === 'repo';
+    if (layer === 'base' && (!hasPersonalAccessToken || instance.local_ops_enabled) && !allowBaseImportBypass) {
       return {
         success: false,
         error: 'Base layer requires a personal access token and local ops must be disabled',
@@ -464,6 +552,7 @@ async function writeOperationsFromSqlOperations(options: WriteSqlOperationsOptio
     }
 
     const sqlStatements = operations.map((operation) => normalizeSql(operation.sql));
+    const fastPathRepoImport = layer === 'base' && source === 'repo' && !!context?.repoImport;
 
     // Validate against current cache
     const cache = getCache(databaseId);
@@ -502,27 +591,62 @@ async function writeOperationsFromSqlOperations(options: WriteSqlOperationsOptio
       }
     }
 
-    const source = options.source ?? 'local';
     let lastOpId: number | null = null;
 
     for (const operation of operations) {
       const { sql, metadataJson, desiredStateJson } = serializeMigrationSqlOperation(operation);
+      const importIdentity = consumeRepoImportIdentity(layer, source);
 
       if (operation.metadata && (await cancelOutCreate(databaseId, layer, operation.metadata))) {
         continue;
       }
 
       const contentHash = await buildContentHash(sql, metadataJson);
-      const opId = pcdOpsQueries.create({
-        databaseId,
-        origin: layer === 'base' ? 'base' : 'user',
-        state: layer === 'base' ? 'draft' : 'published',
-        source,
-        sql,
-        metadata: metadataJson,
-        desiredState: desiredStateJson,
-        contentHash,
-      });
+      let opId: number;
+      if (layer === 'base' && source === 'repo' && importIdentity) {
+        const existing = pcdOpsQueries.getBaseByFilename(databaseId, importIdentity.filename);
+        if (existing) {
+          pcdOpsQueries.update(existing.id, {
+            state: 'published',
+            source: 'repo',
+            filename: importIdentity.filename,
+            opNumber: importIdentity.opNumber,
+            sequence: importIdentity.sequence,
+            sql,
+            metadata: metadataJson,
+            desiredState: desiredStateJson,
+            contentHash,
+            lastSeenInRepoAt: importIdentity.lastSeenInRepoAt,
+          });
+          opId = existing.id;
+        } else {
+          opId = pcdOpsQueries.create({
+            databaseId,
+            origin: 'base',
+            state: 'published',
+            source: 'repo',
+            filename: importIdentity.filename,
+            opNumber: importIdentity.opNumber,
+            sequence: importIdentity.sequence,
+            sql,
+            metadata: metadataJson,
+            desiredState: desiredStateJson,
+            contentHash,
+            lastSeenInRepoAt: importIdentity.lastSeenInRepoAt,
+          });
+        }
+      } else {
+        opId = pcdOpsQueries.create({
+          databaseId,
+          origin: layer === 'base' ? 'base' : 'user',
+          state: layer === 'base' ? (source === 'repo' ? 'published' : 'draft') : 'published',
+          source,
+          sql,
+          metadata: metadataJson,
+          desiredState: desiredStateJson,
+          contentHash,
+        });
+      }
       lastOpId = opId;
 
       const opType = operation.metadata?.operation ?? 'write';
@@ -550,14 +674,30 @@ async function writeOperationsFromSqlOperations(options: WriteSqlOperationsOptio
       ) {
         await supersedePriorUserOps(databaseId, opId, operation.metadata);
       }
+
+      if (fastPathRepoImport && cache) {
+        const rawDb = cache.getRawDb();
+        if (!rawDb) {
+          throw new Error('Cache not built for repo import fast-path apply');
+        }
+
+        rawDb.exec(sql);
+      }
     }
 
-    await compile(instance.local_path, instance.id);
+    if (fastPathRepoImport) {
+      await logger.debug('Skipped full cache recompile for repo import write', {
+        source: 'PCDWriter',
+        meta: { databaseId },
+      });
+    } else {
+      await compile(instance.local_path, instance.id);
 
-    await logger.debug('Cache recompiled after write', {
-      source: 'PCDWriter',
-      meta: { databaseId },
-    });
+      await logger.debug('Cache recompiled after write', {
+        source: 'PCDWriter',
+        meta: { databaseId },
+      });
+    }
 
     return {
       success: true,

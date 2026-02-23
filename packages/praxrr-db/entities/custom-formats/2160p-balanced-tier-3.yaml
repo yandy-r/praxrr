@@ -1,0 +1,43 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: 2160p Balanced Tier 3
+description: Matches release groups who fall under 2160p Balanced Tier 3
+includeInRename: false
+tags:
+  - 2160p
+  - Balanced
+  - Release Group Tier
+conditions:
+  - name: 2160p
+    type: resolution
+    arrType: all
+    negate: false
+    required: true
+    resolutions:
+      - 2160p
+  - name: BHDStudio
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: BHDStudio
+        pattern: (?<=^|[\s.-])BHDStudio\b
+  - name: Bluray
+    type: source
+    arrType: all
+    negate: false
+    required: true
+    sources:
+      - bluray
+  - name: hallowed
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: hallowed
+        pattern: (?<=^|[\s.-])hallowed\b
+tests: []

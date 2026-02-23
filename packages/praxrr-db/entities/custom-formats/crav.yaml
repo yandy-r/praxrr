@@ -1,0 +1,34 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: CRAV
+description: Matches 'Crave' WEB-DLs
+includeInRename: true
+tags:
+  - Streaming Service
+  - WEB-DL
+conditions:
+  - name: CRAV Regex
+    type: release_title
+    arrType: all
+    negate: false
+    required: true
+    patterns:
+      - name: Crave
+        pattern: \b(?:CRAV|(?:CRAVE)(?=\s*.(?:WEB-?DL|WEBRIP)))\b
+  - name: WEB-DL
+    type: source
+    arrType: all
+    negate: false
+    required: false
+    sources:
+      - web_dl
+  - name: WEBRip
+    type: source
+    arrType: all
+    negate: false
+    required: false
+    sources:
+      - webrip
+tests: []

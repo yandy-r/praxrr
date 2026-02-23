@@ -1,0 +1,12 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: Sing Along
+pattern: (?<=\b[12]\d{3}\b).*\b(Sing[-_. ]Along)\b
+tags:
+  - Edition
+description: |-
+  Matches "Sing Along" releases when `Sing Along` is preceded by a year
+  - Ensures that `Sing Along` is not matched in the movie title
+regex101Id: null

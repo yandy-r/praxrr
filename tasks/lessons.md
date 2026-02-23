@@ -1,5 +1,6 @@
 # Lessons
 
+<<<<<<< HEAD
 ## 2026-02-22
 
 - When creating GitHub issue research references, always use markdown file-path links

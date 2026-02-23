@@ -1,0 +1,75 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: Remux Tier 4
+description: Matches release groups who fall under Remux Tier 4
+includeInRename: false
+tags:
+  - Release Group Tier
+  - Remux
+conditions:
+  - name: BTN
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: BTN
+        pattern: (?<=^|[\s.-])BTN\b
+  - name: KRaLiMaRKo
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: KRaLiMaRKo
+        pattern: (?<=^|[\s.-])KRaLiMaRKo\b
+  - name: Not DVD
+    type: source
+    arrType: all
+    negate: true
+    required: true
+    sources:
+      - dvd
+  - name: PTP
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: PTP
+        pattern: (?<=^|[\s.-])PTP\b
+  - name: Remux
+    type: release_title
+    arrType: all
+    negate: false
+    required: true
+    patterns:
+      - name: Remux
+        pattern: Remux
+  - name: TRiToN
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: TRiToN
+        pattern: (?<=^|[\s.-])TRiToN\b
+  - name: iFT
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: iFT
+        pattern: (?<=^|[\s.-])iFT\b
+  - name: playBD
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: playBD
+        pattern: (?<=^|[\s.-])playBD\b
+tests: []

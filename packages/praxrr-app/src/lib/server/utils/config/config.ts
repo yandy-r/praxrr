@@ -98,12 +98,12 @@ class Config {
   private static parsePCDMigrationMode(value: string | null | undefined): PCDMigrationIngestionMode {
     const normalized = (value ?? '').trim().toLowerCase();
 
-    if (normalized.length === 0 || normalized === 'sql-only') {
-      return 'sql-only';
+    if (normalized.length === 0 || normalized === 'hybrid') {
+      return 'hybrid';
     }
 
-    if (normalized === 'hybrid') {
-      return 'hybrid';
+    if (normalized === 'sql-only') {
+      return 'sql-only';
     }
 
     throw new Error(`Invalid value for PRAXRR_PCD_MIGRATION_MODE: "${value}". Expected "sql-only" or "hybrid".`);

@@ -1,0 +1,55 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: SDTV Tier 1
+description: Matches release groups who fall under SDTV Tier 1
+includeInRename: false
+tags:
+  - Release Group Tier
+conditions:
+  - name: CtrlHD
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: CtrlHD
+        pattern: (?<=^|[\s.-])CtrlHD\b
+  - name: NTb
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: NTb
+        pattern: (?<=^|[\s.-])NTb\b
+  - name: Not 1080p
+    type: resolution
+    arrType: all
+    negate: true
+    required: true
+    resolutions:
+      - 1080p
+  - name: Not 2160p
+    type: resolution
+    arrType: all
+    negate: true
+    required: true
+    resolutions:
+      - 2160p
+  - name: Not 720p
+    type: resolution
+    arrType: all
+    negate: true
+    required: true
+    resolutions:
+      - 720p
+  - name: SDTV
+    type: source
+    arrType: all
+    negate: false
+    required: true
+    sources:
+      - television
+tests: []

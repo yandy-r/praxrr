@@ -24,6 +24,22 @@ import { createLidarrNaming } from '$pcd/entities/mediaManagement/naming/create.
 import { validatePortableData } from '$pcd/entities/validate.ts';
 import { logger } from '$logger/logger.ts';
 
+export const deserializeDependencies = {
+  deserializeDelayProfile: deserialize.deserializeDelayProfile,
+  deserializeRegularExpression: deserialize.deserializeRegularExpression,
+  deserializeCustomFormat: deserialize.deserializeCustomFormat,
+  deserializeQualityProfile: deserialize.deserializeQualityProfile,
+  deserializeRadarrNaming: deserialize.deserializeRadarrNaming,
+  deserializeSonarrNaming: deserialize.deserializeSonarrNaming,
+  deserializeLidarrMediaSettings: deserialize.deserializeLidarrMediaSettings,
+  deserializeRadarrMediaSettings: deserialize.deserializeRadarrMediaSettings,
+  deserializeSonarrMediaSettings: deserialize.deserializeSonarrMediaSettings,
+  deserializeRadarrQualityDefinitions: deserialize.deserializeRadarrQualityDefinitions,
+  deserializeSonarrQualityDefinitions: deserialize.deserializeSonarrQualityDefinitions,
+  deserializeLidarrQualityDefinitions: deserialize.deserializeLidarrQualityDefinitions,
+  deserializeLidarrMetadataProfile: deserialize.deserializeLidarrMetadataProfile,
+} as const;
+
 const VALID_ENTITY_TYPES: ReadonlySet<string> = new Set(ENTITY_TYPES);
 
 const VALID_LAYERS: Set<string> = new Set(['user', 'base']);
@@ -140,54 +156,69 @@ async function deserializeEntity({ databaseId, cache, layer, entityType, data }:
 
   switch (entityType) {
     case 'delay_profile':
-      return deserialize.deserializeDelayProfile({ ...opts, portable: data as unknown as PortableDelayProfile });
+      return deserializeDependencies.deserializeDelayProfile({
+        ...opts,
+        portable: data as unknown as PortableDelayProfile,
+      });
     case 'regular_expression':
-      return deserialize.deserializeRegularExpression({
+      return deserializeDependencies.deserializeRegularExpression({
         ...opts,
         portable: data as unknown as PortableRegularExpression,
       });
     case 'custom_format':
-      return deserialize.deserializeCustomFormat({ ...opts, portable: data as unknown as PortableCustomFormat });
+      return deserializeDependencies.deserializeCustomFormat({
+        ...opts,
+        portable: data as unknown as PortableCustomFormat,
+      });
     case 'quality_profile':
-      return deserialize.deserializeQualityProfile({ ...opts, portable: data as unknown as PortableQualityProfile });
+      return deserializeDependencies.deserializeQualityProfile({
+        ...opts,
+        portable: data as unknown as PortableQualityProfile,
+      });
     case 'radarr_naming':
-      return deserialize.deserializeRadarrNaming({ ...opts, portable: data as unknown as PortableRadarrNaming });
+      return deserializeDependencies.deserializeRadarrNaming({
+        ...opts,
+        portable: data as unknown as PortableRadarrNaming,
+      });
     case 'sonarr_naming':
-      return deserialize.deserializeSonarrNaming({ ...opts, portable: data as unknown as PortableSonarrNaming });
+      return deserializeDependencies.deserializeSonarrNaming({
+        ...opts,
+        portable: data as unknown as PortableSonarrNaming,
+      });
     case 'lidarr_naming':
       return createLidarrNaming({ ...opts, input: data as unknown as PortableLidarrNaming });
     case 'radarr_media_settings':
-      return deserialize.deserializeRadarrMediaSettings({
+      return deserializeDependencies.deserializeRadarrMediaSettings({
         ...opts,
         portable: data as unknown as PortableMediaSettings,
       });
     case 'sonarr_media_settings':
-      return deserialize.deserializeSonarrMediaSettings({
+      return deserializeDependencies.deserializeSonarrMediaSettings({
         ...opts,
         portable: data as unknown as PortableMediaSettings,
       });
     case 'lidarr_media_settings':
-      return deserialize.deserializeLidarrMediaSettings({
+      return deserializeDependencies.deserializeLidarrMediaSettings({
         ...opts,
         portable: data as unknown as PortableLidarrMediaSettings,
       });
     case 'radarr_quality_definitions':
-      return deserialize.deserializeRadarrQualityDefinitions({
+      return deserializeDependencies.deserializeRadarrQualityDefinitions({
         ...opts,
         portable: data as unknown as PortableQualityDefinitions,
       });
     case 'sonarr_quality_definitions':
-      return deserialize.deserializeSonarrQualityDefinitions({
+      return deserializeDependencies.deserializeSonarrQualityDefinitions({
         ...opts,
         portable: data as unknown as PortableQualityDefinitions,
       });
     case 'lidarr_quality_definitions':
-      return deserialize.deserializeLidarrQualityDefinitions({
+      return deserializeDependencies.deserializeLidarrQualityDefinitions({
         ...opts,
         portable: data as unknown as PortableLidarrQualityDefinitions,
       });
     case 'lidarr_metadata_profile':
-      return deserialize.deserializeLidarrMetadataProfile({
+      return deserializeDependencies.deserializeLidarrMetadataProfile({
         ...opts,
         portable: data as unknown as PortableLidarrMetadataProfile,
       });

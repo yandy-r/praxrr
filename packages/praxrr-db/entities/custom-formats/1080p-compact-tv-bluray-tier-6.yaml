@@ -1,0 +1,68 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: 1080p Compact TV Bluray Tier 6
+description: Matches release groups who fall under 1080p Compact TV Bluray Tier 6
+includeInRename: false
+tags:
+  - 1080p
+  - Compact
+  - Release Group Tier
+  - TV
+conditions:
+  - name: 1080p
+    type: resolution
+    arrType: all
+    negate: false
+    required: true
+    resolutions:
+      - 1080p
+  - name: Bluray
+    type: source
+    arrType: all
+    negate: false
+    required: true
+    sources:
+      - bluray
+  - name: NAN0
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: NAN0
+        pattern: (?<=^|[\s.-])NAN0\b
+  - name: QxR
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: QxR
+        pattern: (?<=^|[\s.-])(QxR|afm72|Bandi|Bluespots|Celdra|FreetheFish|Garshasp|Ghost|Ime|Kappa|Langbard|LION|Panda|MONOLITH|Natty|r00t|RCVR|RZeroX|SAMPA|Silence|t3nzin|Tigole|YOGI)\b
+  - name: TAoE
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: TAoE
+        pattern: (?<=^|[\s.-])(TAoE|Ainz|AJJMIN|ANONAZ|ArcX|bccornfo|DNU|DrainedDay|DUHIT|Erie|Frys|Goki|HxD|jb2049|JBENT|Nostradamus|r0b0t|Species180|TheSickle|xtrem3x|WEM)\b
+  - name: Vialle
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: Vialle
+        pattern: (?<=^|[\s.-])Vialle\b
+  - name: x265
+    type: release_title
+    arrType: all
+    negate: false
+    required: true
+    patterns:
+      - name: x265 (Efficient)
+        pattern: ^(?!.*(?i:remux))(?=.*([xh]\s?(\.?265)\b|HEVC|\bDS4K\b)).*$
+tests: []

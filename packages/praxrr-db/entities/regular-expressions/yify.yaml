@@ -1,0 +1,11 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: YIFY
+pattern: (?<=^|[\s.-])YIFY\b
+tags:
+  - Bluray
+  - Release Group
+description: Matches "YIFY" when preceded by whitespace, a hyphen or dot
+regex101Id: null

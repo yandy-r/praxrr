@@ -1,0 +1,11 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: P0W4HD
+pattern: (?<=^|[\s.-])P0W4HD\b
+tags:
+  - Bluray
+  - Release Group
+description: null
+regex101Id: null

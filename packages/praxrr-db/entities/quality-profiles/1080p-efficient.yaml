@@ -1,0 +1,775 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: 1080p Efficient
+description: |-
+  1080p Efficient targets high quality x265 Bluray and WEB Encodes
+
+  - Average Movie Sizes ~ 6 to 12gb per Movie
+  - Movie Quality Ranking ~ 7/10
+  - Average TV Sizes ~ 2 to 3gb per Episode
+  - TV Quality Ranking ~ 6/10
+tags:
+  - 1080p
+  - Efficient Focused
+  - Lossy Audio
+  - h265
+  - x265
+language: Any
+orderedItems:
+  - type: group
+    name: 1080p Efficient
+    position: 0
+    enabled: true
+    upgradeUntil: true
+    members:
+      - name: Bluray-1080p
+      - name: Bluray-480p
+      - name: Bluray-576p
+      - name: Bluray-720p
+      - name: DVD
+      - name: HDTV-1080p
+      - name: HDTV-720p
+      - name: SDTV
+      - name: WEBDL-1080p
+      - name: WEBDL-480p
+      - name: WEBDL-720p
+      - name: WEBRip-1080p
+      - name: WEBRip-720p
+  - type: quality
+    name: Remux-2160p
+    position: 1
+    enabled: false
+    upgradeUntil: false
+  - type: quality
+    name: Bluray-2160p
+    position: 2
+    enabled: false
+    upgradeUntil: false
+  - type: quality
+    name: WEBDL-2160p
+    position: 3
+    enabled: false
+    upgradeUntil: false
+  - type: quality
+    name: WEBRip-2160p
+    position: 4
+    enabled: false
+    upgradeUntil: false
+  - type: quality
+    name: HDTV-2160p
+    position: 5
+    enabled: false
+    upgradeUntil: false
+  - type: quality
+    name: Remux-1080p
+    position: 6
+    enabled: false
+    upgradeUntil: false
+  - type: quality
+    name: WEBRip-480p
+    position: 7
+    enabled: false
+    upgradeUntil: false
+  - type: quality
+    name: HDTV-480p
+    position: 8
+    enabled: false
+    upgradeUntil: false
+  - type: quality
+    name: BR-DISK
+    position: 9
+    enabled: false
+    upgradeUntil: false
+  - type: quality
+    name: CAM
+    position: 10
+    enabled: false
+    upgradeUntil: false
+  - type: quality
+    name: DVD-R
+    position: 11
+    enabled: false
+    upgradeUntil: false
+  - type: quality
+    name: DVDSCR
+    position: 12
+    enabled: false
+    upgradeUntil: false
+  - type: quality
+    name: Raw-HD
+    position: 13
+    enabled: false
+    upgradeUntil: false
+  - type: quality
+    name: REGIONAL
+    position: 14
+    enabled: false
+    upgradeUntil: false
+  - type: quality
+    name: TELECINE
+    position: 15
+    enabled: false
+    upgradeUntil: false
+  - type: quality
+    name: TELESYNC
+    position: 16
+    enabled: false
+    upgradeUntil: false
+  - type: quality
+    name: WORKPRINT
+    position: 17
+    enabled: false
+    upgradeUntil: false
+  - type: quality
+    name: Unknown
+    position: 18
+    enabled: false
+    upgradeUntil: false
+minimumScore: 20000
+upgradeUntilScore: 1000000
+upgradeScoreIncrement: 1
+customFormatScores:
+  - customFormatName: 1080p Balanced Tier 1
+    arrType: radarr
+    score: 640000
+  - customFormatName: 1080p Balanced Tier 1
+    arrType: sonarr
+    score: 640000
+  - customFormatName: 1080p Balanced Tier 2
+    arrType: radarr
+    score: 640000
+  - customFormatName: 1080p Balanced Tier 2
+    arrType: sonarr
+    score: 640000
+  - customFormatName: 1080p Bluray HEVC Tier 1
+    arrType: all
+    score: 360000
+  - customFormatName: 1080p Bluray HEVC Tier 1
+    arrType: radarr
+    score: 720000
+  - customFormatName: 1080p Bluray HEVC Tier 1
+    arrType: sonarr
+    score: 720000
+  - customFormatName: 1080p Efficient Movie Bluray Tier 1
+    arrType: radarr
+    score: 683000
+  - customFormatName: 1080p Efficient Movie Bluray Tier 2
+    arrType: radarr
+    score: 682000
+  - customFormatName: 1080p Efficient Movie Bluray Tier 3
+    arrType: radarr
+    score: 681000
+  - customFormatName: 1080p Efficient Movie Bluray Tier 4
+    arrType: radarr
+    score: 680000
+  - customFormatName: 1080p Efficient Movie WEB Tier 1
+    arrType: radarr
+    score: 663000
+  - customFormatName: 1080p Efficient Movie WEB Tier 2
+    arrType: radarr
+    score: 662000
+  - customFormatName: 1080p Efficient Movie WEB Tier 3
+    arrType: radarr
+    score: 661000
+  - customFormatName: 1080p Efficient Movie WEB Tier 4
+    arrType: radarr
+    score: 660000
+  - customFormatName: 1080p Efficient TV Bluray Tier 1
+    arrType: sonarr
+    score: 684000
+  - customFormatName: 1080p Efficient TV Bluray Tier 2
+    arrType: sonarr
+    score: 683000
+  - customFormatName: 1080p Efficient TV Bluray Tier 3
+    arrType: sonarr
+    score: 682000
+  - customFormatName: 1080p Efficient TV Bluray Tier 4
+    arrType: sonarr
+    score: 681000
+  - customFormatName: 1080p Efficient TV Bluray Tier 5
+    arrType: sonarr
+    score: 680000
+  - customFormatName: 1080p Efficient TV Bluray Tier 6
+    arrType: sonarr
+    score: 661000
+  - customFormatName: 1080p Efficient TV WEB Tier 1
+    arrType: sonarr
+    score: 665000
+  - customFormatName: 1080p Efficient TV WEB Tier 2
+    arrType: sonarr
+    score: 664000
+  - customFormatName: 1080p Efficient TV WEB Tier 3
+    arrType: sonarr
+    score: 663000
+  - customFormatName: 1080p Efficient TV WEB Tier 4
+    arrType: sonarr
+    score: 662000
+  - customFormatName: 1080p Efficient TV WEB Tier 5
+    arrType: sonarr
+    score: 660000
+  - customFormatName: 1080p HDTV
+    arrType: radarr
+    score: 340000
+  - customFormatName: 1080p HDTV
+    arrType: sonarr
+    score: 340000
+  - customFormatName: 1080p HDTV Tier 1
+    arrType: radarr
+    score: 102000
+  - customFormatName: 1080p HDTV Tier 1
+    arrType: sonarr
+    score: 102000
+  - customFormatName: 1080p HDTV Tier 2
+    arrType: radarr
+    score: 101000
+  - customFormatName: 1080p HDTV Tier 2
+    arrType: sonarr
+    score: 101000
+  - customFormatName: 1080p HDTV Tier 3
+    arrType: radarr
+    score: 100000
+  - customFormatName: 1080p HDTV Tier 3
+    arrType: sonarr
+    score: 100000
+  - customFormatName: 1080p WEB-DL (h264)
+    arrType: all
+    score: 280000
+  - customFormatName: 1080p WEB-DL (h264)
+    arrType: radarr
+    score: 640000
+  - customFormatName: 1080p WEB-DL (h264)
+    arrType: sonarr
+    score: 640000
+  - customFormatName: 1080p WEB-DL HEVC Tier 1
+    arrType: all
+    score: 340000
+  - customFormatName: 1080p WEB-DL HEVC Tier 1
+    arrType: radarr
+    score: 700000
+  - customFormatName: 1080p WEB-DL HEVC Tier 1
+    arrType: sonarr
+    score: 700000
+  - customFormatName: 3D
+    arrType: radarr
+    score: -999999
+  - customFormatName: 480p Bluray
+    arrType: all
+    score: 80000
+  - customFormatName: 480p Bluray
+    arrType: radarr
+    score: 100000
+  - customFormatName: 480p Bluray
+    arrType: sonarr
+    score: 100000
+  - customFormatName: 480p Quality Tier 1
+    arrType: all
+    score: 23000
+  - customFormatName: 480p Quality Tier 1
+    arrType: radarr
+    score: 43000
+  - customFormatName: 480p Quality Tier 1
+    arrType: sonarr
+    score: 43000
+  - customFormatName: 480p Quality Tier 2
+    arrType: all
+    score: 22000
+  - customFormatName: 480p Quality Tier 2
+    arrType: radarr
+    score: 42000
+  - customFormatName: 480p Quality Tier 2
+    arrType: sonarr
+    score: 42000
+  - customFormatName: 480p Quality Tier 3
+    arrType: all
+    score: 21000
+  - customFormatName: 480p Quality Tier 3
+    arrType: radarr
+    score: 41000
+  - customFormatName: 480p Quality Tier 3
+    arrType: sonarr
+    score: 41000
+  - customFormatName: 480p Quality Tier 4
+    arrType: all
+    score: 20000
+  - customFormatName: 480p Quality Tier 4
+    arrType: radarr
+    score: 40000
+  - customFormatName: 480p Quality Tier 4
+    arrType: sonarr
+    score: 40000
+  - customFormatName: 480p WEB-DL
+    arrType: all
+    score: 60000
+  - customFormatName: 480p WEB-DL
+    arrType: radarr
+    score: 80000
+  - customFormatName: 480p WEB-DL
+    arrType: sonarr
+    score: 80000
+  - customFormatName: 576p Bluray
+    arrType: all
+    score: 120000
+  - customFormatName: 576p Bluray
+    arrType: radarr
+    score: 160000
+  - customFormatName: 576p Bluray
+    arrType: sonarr
+    score: 160000
+  - customFormatName: 576p Quality Tier 1
+    arrType: all
+    score: 43000
+  - customFormatName: 576p Quality Tier 1
+    arrType: radarr
+    score: 63000
+  - customFormatName: 576p Quality Tier 1
+    arrType: sonarr
+    score: 63000
+  - customFormatName: 576p Quality Tier 2
+    arrType: all
+    score: 42000
+  - customFormatName: 576p Quality Tier 2
+    arrType: radarr
+    score: 62000
+  - customFormatName: 576p Quality Tier 2
+    arrType: sonarr
+    score: 62000
+  - customFormatName: 576p Quality Tier 3
+    arrType: all
+    score: 41000
+  - customFormatName: 576p Quality Tier 3
+    arrType: radarr
+    score: 61000
+  - customFormatName: 576p Quality Tier 3
+    arrType: sonarr
+    score: 61000
+  - customFormatName: 576p Quality Tier 4
+    arrType: all
+    score: 40000
+  - customFormatName: 576p Quality Tier 4
+    arrType: radarr
+    score: 60000
+  - customFormatName: 576p Quality Tier 4
+    arrType: sonarr
+    score: 60000
+  - customFormatName: 720p Balanced Tier 1
+    arrType: radarr
+    score: 120000
+  - customFormatName: 720p Balanced Tier 1
+    arrType: sonarr
+    score: 120000
+  - customFormatName: 720p Bluray
+    arrType: all
+    score: 180000
+  - customFormatName: 720p Bluray
+    arrType: radarr
+    score: 460000
+  - customFormatName: 720p Bluray
+    arrType: sonarr
+    score: 460000
+  - customFormatName: 720p HDTV
+    arrType: radarr
+    score: 240000
+  - customFormatName: 720p HDTV
+    arrType: sonarr
+    score: 240000
+  - customFormatName: 720p HDTV Tier 1
+    arrType: radarr
+    score: 82000
+  - customFormatName: 720p HDTV Tier 1
+    arrType: sonarr
+    score: 82000
+  - customFormatName: 720p HDTV Tier 2
+    arrType: radarr
+    score: 81000
+  - customFormatName: 720p HDTV Tier 2
+    arrType: sonarr
+    score: 81000
+  - customFormatName: 720p HDTV Tier 3
+    arrType: radarr
+    score: 80000
+  - customFormatName: 720p HDTV Tier 3
+    arrType: sonarr
+    score: 80000
+  - customFormatName: 720p Quality Tier 1
+    arrType: all
+    score: 85000
+  - customFormatName: 720p Quality Tier 1
+    arrType: radarr
+    score: 145000
+  - customFormatName: 720p Quality Tier 1
+    arrType: sonarr
+    score: 145000
+  - customFormatName: 720p Quality Tier 2
+    arrType: all
+    score: 84000
+  - customFormatName: 720p Quality Tier 2
+    arrType: radarr
+    score: 144000
+  - customFormatName: 720p Quality Tier 2
+    arrType: sonarr
+    score: 144000
+  - customFormatName: 720p Quality Tier 3
+    arrType: all
+    score: 83000
+  - customFormatName: 720p Quality Tier 3
+    arrType: radarr
+    score: 143000
+  - customFormatName: 720p Quality Tier 3
+    arrType: sonarr
+    score: 143000
+  - customFormatName: 720p Quality Tier 4
+    arrType: all
+    score: 82000
+  - customFormatName: 720p Quality Tier 4
+    arrType: radarr
+    score: 142000
+  - customFormatName: 720p Quality Tier 4
+    arrType: sonarr
+    score: 142000
+  - customFormatName: 720p Quality Tier 5
+    arrType: all
+    score: 81000
+  - customFormatName: 720p Quality Tier 5
+    arrType: radarr
+    score: 141000
+  - customFormatName: 720p Quality Tier 5
+    arrType: sonarr
+    score: 141000
+  - customFormatName: 720p Quality Tier 6
+    arrType: all
+    score: 80000
+  - customFormatName: 720p Quality Tier 6
+    arrType: radarr
+    score: 140000
+  - customFormatName: 720p Quality Tier 6
+    arrType: sonarr
+    score: 140000
+  - customFormatName: 720p WEB-DL
+    arrType: all
+    score: 240000
+  - customFormatName: 720p WEB-DL
+    arrType: radarr
+    score: 480000
+  - customFormatName: 720p WEB-DL
+    arrType: sonarr
+    score: 480000
+  - customFormatName: 720p WEBRip
+    arrType: radarr
+    score: 460000
+  - customFormatName: AAC
+    arrType: all
+    score: 200
+  - customFormatName: AMZN
+    arrType: all
+    score: 3000
+  - customFormatName: ASL
+    arrType: all
+    score: -999999
+  - customFormatName: ATVP
+    arrType: all
+    score: 2000
+  - customFormatName: AV1
+    arrType: all
+    score: -999999
+  - customFormatName: B&W
+    arrType: radarr
+    score: -999999
+  - customFormatName: BCORE
+    arrType: all
+    score: -999999
+  - customFormatName: Banned Groups (Efficient)
+    arrType: all
+    score: -999999
+  - customFormatName: Banned WEBRip (Efficient)
+    arrType: all
+    score: -999999
+  - customFormatName: Better Theatricals
+    arrType: radarr
+    score: 1000
+  - customFormatName: CRAV
+    arrType: all
+    score: 0
+  - customFormatName: CRIT
+    arrType: all
+    score: 0
+  - customFormatName: DRPO
+    arrType: all
+    score: 0
+  - customFormatName: DS4K
+    arrType: all
+    score: 1000
+  - customFormatName: DSNP
+    arrType: all
+    score: 3000
+  - customFormatName: DTS
+    arrType: all
+    score: 300
+  - customFormatName: DTS-ES
+    arrType: all
+    score: 500
+  - customFormatName: DTS-HD HRA
+    arrType: all
+    score: 700
+  - customFormatName: DVD
+    arrType: all
+    score: 20000
+  - customFormatName: DVD
+    arrType: radarr
+    score: 40000
+  - customFormatName: DVD
+    arrType: sonarr
+    score: 40000
+  - customFormatName: DVD Quality Tier 1
+    arrType: all
+    score: 11000
+  - customFormatName: DVD Quality Tier 1
+    arrType: radarr
+    score: 21000
+  - customFormatName: DVD Quality Tier 1
+    arrType: sonarr
+    score: 21000
+  - customFormatName: DVD Quality Tier 2
+    arrType: all
+    score: 10000
+  - customFormatName: DVD Quality Tier 2
+    arrType: radarr
+    score: 20000
+  - customFormatName: DVD Quality Tier 2
+    arrType: sonarr
+    score: 20000
+  - customFormatName: DVD Remux
+    arrType: all
+    score: 20000
+  - customFormatName: Dolby Atmos
+    arrType: all
+    score: 400
+  - customFormatName: Dolby Digital
+    arrType: all
+    score: 400
+  - customFormatName: Dolby Digital +
+    arrType: all
+    score: 600
+  - customFormatName: Dolby Vision
+    arrType: all
+    score: 3000
+  - customFormatName: Dolby Vision (Without Fallback)
+    arrType: all
+    score: -999999
+  - customFormatName: Extras
+    arrType: radarr
+    score: -999999
+  - customFormatName: Extras
+    arrType: sonarr
+    score: -999999
+  - customFormatName: FLAC
+    arrType: all
+    score: 800
+  - customFormatName: Full Disc
+    arrType: all
+    score: -999999
+  - customFormatName: Full Disc (Quality Match)
+    arrType: radarr
+    score: -999999
+  - customFormatName: HDR
+    arrType: all
+    score: 1000
+  - customFormatName: HDR10
+    arrType: all
+    score: 1000
+  - customFormatName: HDR10+
+    arrType: all
+    score: 2000
+  - customFormatName: HLG
+    arrType: all
+    score: 1000
+  - customFormatName: HMAX
+    arrType: all
+    score: 2000
+  - customFormatName: HONE Bluray
+    arrType: all
+    score: 360000
+  - customFormatName: HONE Bluray
+    arrType: radarr
+    score: 720000
+  - customFormatName: HONE Bluray
+    arrType: sonarr
+    score: 720000
+  - customFormatName: HONE WEB
+    arrType: all
+    score: 340000
+  - customFormatName: HONE WEB
+    arrType: radarr
+    score: 700000
+  - customFormatName: HONE WEB
+    arrType: sonarr
+    score: 700000
+  - customFormatName: HTSR
+    arrType: all
+    score: 0
+  - customFormatName: HULU
+    arrType: all
+    score: 0
+  - customFormatName: Lossless Audio
+    arrType: all
+    score: -999999
+  - customFormatName: MA
+    arrType: radarr
+    score: 4000
+  - customFormatName: MAX
+    arrType: all
+    score: 2000
+  - customFormatName: MUBI
+    arrType: all
+    score: 0
+  - customFormatName: NF
+    arrType: all
+    score: 1000
+  - customFormatName: NOW
+    arrType: all
+    score: 0
+  - customFormatName: Not Original or English
+    arrType: radarr
+    score: -999999
+  - customFormatName: Not Original or English
+    arrType: sonarr
+    score: -999999
+  - customFormatName: Opus
+    arrType: all
+    score: 700
+  - customFormatName: PCOK
+    arrType: all
+    score: 0
+  - customFormatName: PLAY
+    arrType: all
+    score: 0
+  - customFormatName: PMTP
+    arrType: all
+    score: 0
+  - customFormatName: PQ
+    arrType: all
+    score: 1000
+  - customFormatName: QxR Bluray
+    arrType: radarr
+    score: 683000
+  - customFormatName: QxR Bluray
+    arrType: sonarr
+    score: 684000
+  - customFormatName: QxR WEB
+    arrType: radarr
+    score: 663000
+  - customFormatName: QxR WEB
+    arrType: sonarr
+    score: 665000
+  - customFormatName: ROKU
+    arrType: all
+    score: 0
+  - customFormatName: Remux
+    arrType: all
+    score: -999999
+  - customFormatName: Repack1
+    arrType: all
+    score: 6
+  - customFormatName: Repack2
+    arrType: all
+    score: 7
+  - customFormatName: Repack3
+    arrType: all
+    score: 8
+  - customFormatName: SDTV
+    arrType: radarr
+    score: 20000
+  - customFormatName: SDTV
+    arrType: sonarr
+    score: 20000
+  - customFormatName: SDTV Tier 1
+    arrType: radarr
+    score: 10000
+  - customFormatName: SDTV Tier 1
+    arrType: sonarr
+    score: 10000
+  - customFormatName: SHO
+    arrType: all
+    score: 0
+  - customFormatName: STAN
+    arrType: all
+    score: 0
+  - customFormatName: Season Pack
+    arrType: sonarr
+    score: 10
+  - customFormatName: Sing Along
+    arrType: radarr
+    score: -999999
+  - customFormatName: Special Edition
+    arrType: radarr
+    score: 1000
+  - customFormatName: TAoE Bluray
+    arrType: radarr
+    score: 683000
+  - customFormatName: TAoE Bluray
+    arrType: sonarr
+    score: 684000
+  - customFormatName: TAoE WEB
+    arrType: radarr
+    score: 663000
+  - customFormatName: TAoE WEB
+    arrType: sonarr
+    score: 665000
+  - customFormatName: Upscale
+    arrType: radarr
+    score: -999999
+  - customFormatName: Upscale
+    arrType: sonarr
+    score: -999999
+  - customFormatName: VP9
+    arrType: all
+    score: -999999
+  - customFormatName: VVC
+    arrType: all
+    score: -999999
+  - customFormatName: Vialle Bluray
+    arrType: radarr
+    score: 682000
+  - customFormatName: Vialle Bluray
+    arrType: sonarr
+    score: 684000
+  - customFormatName: Vialle WEB
+    arrType: sonarr
+    score: 665000
+  - customFormatName: WEB-DL Tier 1
+    arrType: all
+    score: 100
+  - customFormatName: WEB-DL Tier 2
+    arrType: all
+    score: 80
+  - customFormatName: WEB-DL Tier 3
+    arrType: all
+    score: 60
+  - customFormatName: WEB-DL Tier 4
+    arrType: all
+    score: 40
+  - customFormatName: WEB-DL Tier 5
+    arrType: all
+    score: 20
+  - customFormatName: Weasley WEB
+    arrType: radarr
+    score: 663000
+  - customFormatName: Weasley WEB
+    arrType: sonarr
+    score: 665000
+  - customFormatName: Xvid
+    arrType: all
+    score: -999999
+  - customFormatName: h265 (Efficient)
+    arrType: all
+    score: -999999
+  - customFormatName: iP
+    arrType: all
+    score: 0
+  - customFormatName: iT
+    arrType: all
+    score: 1000
+  - customFormatName: x265 (Efficient)
+    arrType: all
+    score: -999999

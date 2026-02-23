@@ -1,0 +1,66 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: TrueHD (Missing)
+description: Attempts to match TrueHD releases which are not labelled correctly (TRiTON, EPSiLON groups)
+includeInRename: false
+tags:
+  - Audio
+conditions:
+  - name: 2160p
+    type: resolution
+    arrType: all
+    negate: false
+    required: true
+    resolutions:
+      - 2160p
+  - name: Atmos
+    type: release_title
+    arrType: all
+    negate: false
+    required: true
+    patterns:
+      - name: Atmos (Missing)
+        pattern: \bATMOS(\b|\d)
+  - name: Not DD
+    type: release_title
+    arrType: all
+    negate: true
+    required: true
+    patterns:
+      - name: Dolby Digital
+        pattern: \bDD[^a-z+]|(?<!e)ac3
+  - name: Not DD+
+    type: release_title
+    arrType: all
+    negate: true
+    required: true
+    patterns:
+      - name: Dolby Digital +
+        pattern: \bDD[P+]|\b(e[-_. ]?ac3)\b
+  - name: Not DTS
+    type: release_title
+    arrType: all
+    negate: true
+    required: true
+    patterns:
+      - name: DTS
+        pattern: \bDTS(\b|\d)
+  - name: Not FLAC
+    type: release_title
+    arrType: all
+    negate: true
+    required: true
+    patterns:
+      - name: FLAC
+        pattern: \bFLAC(\b|\d)
+  - name: Not TrueHD
+    type: release_title
+    arrType: all
+    negate: true
+    required: true
+    patterns:
+      - name: TrueHD
+        pattern: True[ .-]?HD[ .-]?
+tests: []

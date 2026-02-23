@@ -1,0 +1,10 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: VVC
+pattern: (?<=^|[\s.-])VVC\b
+tags:
+  - Codec
+description: VVC, or Versatile Video Coding (H.266), is a video coding format that compresses video files and streams to significantly smaller sizes than H.265 while maintaining high quality.
+regex101Id: null

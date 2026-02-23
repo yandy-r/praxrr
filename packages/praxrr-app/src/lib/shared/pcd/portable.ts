@@ -122,6 +122,30 @@ export interface PortableExportMetadata {
   migration?: PortableMigrationMetadata;
 }
 
+export type PortableEntityData =
+  | PortableDelayProfile
+  | PortableRegularExpression
+  | PortableCustomFormat
+  | PortableQualityProfile
+  | PortableRadarrNaming
+  | PortableSonarrNaming
+  | PortableLidarrNaming
+  | PortableMediaSettings
+  | PortableQualityDefinitions
+  | PortableLidarrMetadataProfile;
+
+export interface PortableImportRequest extends PortableExportMetadata {
+  databaseId: number;
+  layer: 'user' | 'base';
+  entityType: EntityType;
+  data: PortableEntityData;
+}
+
+export interface PortableExportResponse extends PortableExportMetadata {
+  entityType: EntityType;
+  data: PortableEntityData;
+}
+
 function validateMigrationFormat(value: unknown): value is PortableMigrationFormat {
   if (typeof value !== 'string') {
     return false;
@@ -172,7 +196,7 @@ export function validatePortableMigrationMetadata(migration: unknown): string | 
 
   return null;
 }
-
+ 
 // ============================================================================
 // ENTITY TYPE ENUM
 // ============================================================================

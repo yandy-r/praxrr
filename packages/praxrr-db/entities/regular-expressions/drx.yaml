@@ -1,0 +1,11 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: DRX
+pattern: (?<=^|[\s.-])DRX\b
+tags:
+  - Release Group
+  - WEB-DL
+description: Banned for Non Retail Audio
+regex101Id: null

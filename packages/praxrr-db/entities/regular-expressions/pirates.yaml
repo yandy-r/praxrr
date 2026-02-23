@@ -1,0 +1,11 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: PiRaTeS
+pattern: (?<=^|[\s.-])PiRaTeS\b
+tags:
+  - Banned
+  - Release Group
+description: Banned for Mislabeling WEB-DLs as WEBRips
+regex101Id: null

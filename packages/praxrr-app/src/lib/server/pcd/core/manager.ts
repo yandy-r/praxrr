@@ -108,8 +108,8 @@ class PCDManager {
       // Cleanup on failure - remove cloned directory
       try {
         await Deno.remove(localPath, { recursive: true });
-      } catch {
-        // Ignore cleanup errors
+      } catch (cleanupError) {
+        console.error(`Failed to remove cloned PCD directory ${localPath} after link failure:`, cleanupError);
       }
       throw error;
     }
@@ -183,6 +183,15 @@ class PCDManager {
           meta: { error: String(error), databaseId: id },
         });
       }
+
+      if (!importedBaseOps) {
+        return {
+          success: false,
+          commitsBehind: updateInfo.commitsBehind,
+          error: `Base op import failed: ${baseOpsError ?? 'unknown error'}`,
+        };
+      }
+
       await this.seedBuiltInBaseOpsWithOrchestration(id, 'sync');
 
       // Update last_synced_at
@@ -193,14 +202,6 @@ class PCDManager {
 
       // Trigger arr syncs for configs with on_pull trigger
       await this.triggerPullSync(id);
-
-      if (!importedBaseOps) {
-        return {
-          success: false,
-          commitsBehind: updateInfo.commitsBehind,
-          error: `Base op import failed: ${baseOpsError ?? 'unknown error'}`,
-        };
-      }
 
       return {
         success: true,
@@ -260,6 +261,11 @@ class PCDManager {
         meta: { error: String(error), databaseId: id },
       });
     }
+
+    if (!importedBaseOps) {
+      return false;
+    }
+
     await this.seedBuiltInBaseOpsWithOrchestration(id, 'switchBranch');
     databaseInstancesQueries.updateSyncedAt(id);
 
@@ -417,7 +423,10 @@ class PCDManager {
       await importBaseOps(databaseId, localPath, { pcdMigrationIngestionMode: migrationMode });
       return true;
     } catch (error) {
-      if (!(error instanceof MigrationReaderError) || !config.pcdMigrationAllowLegacyFallback) {
+      if (!config.pcdMigrationAllowLegacyFallback) {
+        throw error;
+      }
+      if (!(error instanceof MigrationReaderError)) {
         throw error;
       }
 
@@ -426,6 +435,7 @@ class PCDManager {
         meta: {
           databaseId,
           migrationMode,
+          migrationReaderError: error instanceof MigrationReaderError,
           error: String(error),
         },
       });
@@ -478,7 +488,7 @@ class PCDManager {
       });
       return stats;
     } catch (error) {
-      // Log error but don't fail the surrounding operation
+      // Log the error, then either re-throw (failOnError=true) or return zero stats.
       await logger.error(`Failed to compile PCD cache (${context})`, {
         source: 'PCDManager',
         meta: { error: String(error), databaseId: instance.id },

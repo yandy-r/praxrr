@@ -1,0 +1,11 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: Prefer Usenet
+preferredProtocol: prefer_usenet
+usenetDelay: 5
+torrentDelay: 10
+bypassIfHighestQuality: false
+bypassIfAboveCfScore: false
+minimumCfScore: 0

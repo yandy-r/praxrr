@@ -1,0 +1,25 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: 2160p WEB-DL
+description: Matches 2160p WEB-DLs.
+includeInRename: false
+tags:
+  - Source
+conditions:
+  - name: 2160p
+    type: resolution
+    arrType: all
+    negate: false
+    required: true
+    resolutions:
+      - 2160p
+  - name: WEB-DL
+    type: source
+    arrType: all
+    negate: false
+    required: true
+    sources:
+      - web_dl
+tests: []

@@ -1,0 +1,57 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: 1080p HDTV Tier 1
+description: Matches release groups who fall under 1080p HDTV Tier 1
+includeInRename: false
+tags:
+  - Release Group Tier
+conditions:
+  - name: 1080p
+    type: resolution
+    arrType: all
+    negate: false
+    required: true
+    resolutions:
+      - 1080p
+  - name: CtrlHD
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: CtrlHD
+        pattern: (?<=^|[\s.-])CtrlHD\b
+  - name: EDPH
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: EDPH
+        pattern: (?<=^|[\s.-])EDPH\b
+  - name: HDTV
+    type: source
+    arrType: all
+    negate: false
+    required: true
+    sources:
+      - television
+  - name: HDTV Regex
+    type: release_title
+    arrType: all
+    negate: false
+    required: true
+    patterns:
+      - name: HDTV
+        pattern: \b(HDTV)\b
+  - name: NTb
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: NTb
+        pattern: (?<=^|[\s.-])NTb\b
+tests: []

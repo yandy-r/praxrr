@@ -3,6 +3,11 @@
 The UnOfficial Praxrr Database is maintained in the monorepo at `praxrr/packages/praxrr-db` and serves as a
 [Praxrr](https://github.com/yandy-r/praxrr) compliant database.
 
+## YAML-first data source
+
+`entities/` is the canonical source for default PCD data at startup. SQL files in `ops/` are retained
+as transitional artifacts during rollout and compatibility fallback windows.
+
 ## Distribution-only repository
 
 This is a distribution mirror of the main Praxrr monorepo:

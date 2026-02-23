@@ -1,0 +1,12 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: HDR
+pattern: \b(HDR)\b
+tags:
+  - Colour Grade
+  - Enhancement
+  - HDR
+description: 'This regex matches a `HDR` generalisation. This can be HDR10, HDR10+, etc. '
+regex101Id: null

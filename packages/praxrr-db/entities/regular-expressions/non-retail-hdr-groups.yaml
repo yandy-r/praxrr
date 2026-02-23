@@ -1,0 +1,12 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: Non Retail HDR Groups
+pattern: (?<=^|[\s.-])VECTOR|BiTOR|DepraveD|SasukeducK|tarunk9c|jennaortegaUHD|VisionXpert|Flights\b
+tags:
+  - Banned
+  - HDR
+  - Release Group
+description: Matches groups that produce non retail HDR.
+regex101Id: null

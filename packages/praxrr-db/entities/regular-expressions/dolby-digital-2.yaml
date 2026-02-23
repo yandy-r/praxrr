@@ -1,0 +1,10 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: Dolby Digital +
+pattern: \bDD[P+]|\b(e[-_. ]?ac3)\b
+tags:
+  - Audio
+description: null
+regex101Id: null

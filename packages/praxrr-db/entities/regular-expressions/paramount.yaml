@@ -1,0 +1,11 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: Paramount+
+pattern: \b(PMTP|Paramount Plus)\b
+tags:
+  - Streaming Service
+  - WEB-DL
+description: 'Paramount+ is an American subscription video on-demand over-the-top streaming service owned that offers content primarily from the libraries of CBS Media Ventures, CBS Studios, Paramount Media Networks and Paramount Pictures, while also including original series and films, live streaming sports coverage, and in the United States, live streaming of local CBS broadcast stations. '
+regex101Id: null

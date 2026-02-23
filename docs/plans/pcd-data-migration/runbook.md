@@ -1,13 +1,14 @@
 # PCD Data Migration Runbook
 
 This runbook documents rollout and operator checks for the `pcd-data-migration` effort.
-Use it for staged production use of hybrid migration inputs while preserving SQL-first
-compilation and value-guard observability.
+Use it for staged production rollout of YAML-first migration inputs while preserving
+`pcd_ops` observability and value-guard safety checks.
 
 ## Objectives
 
-- Preserve existing runtime semantics (`pcd_ops` -> cache rebuild -> sync queue) while adding
-  hybrid JSON/YAML authoring/import inputs.
+- Make YAML entity files the canonical base data source at startup.
+- Keep SQL ops available as transitional artifacts and fallback-only input.
+- Preserve existing runtime semantics (`pcd_ops` -> cache rebuild -> sync queue).
 - Make migration outcomes visible through `pcd_ops`, `pcd_op_history`, and job tables.
 - Define explicit guard-failure and rollback behavior before broad rollout.
 
@@ -16,7 +17,14 @@ compilation and value-guard observability.
 - A writable app database backup is available.
 - Feature branch/commit containing migration changes is deployed in staging first.
 - Operators know the active conflict strategy (`override`, `align`, or `ask`) for the target instances.
+- Runtime default mode is `PRAXRR_PCD_MIGRATION_MODE=hybrid` (unless explicitly overridden).
 - Logging and admin access to the app DB is available for direct queries.
+
+## Runtime mode controls
+
+- Default rollout mode: `PRAXRR_PCD_MIGRATION_MODE=hybrid`
+- Transitional fallback (optional): `PRAXRR_PCD_MIGRATION_ALLOW_LEGACY_FALLBACK=true`
+- SQL-only emergency override: `PRAXRR_PCD_MIGRATION_MODE=sql-only`
 
 ## Preflight checks (before each rollout phase)
 

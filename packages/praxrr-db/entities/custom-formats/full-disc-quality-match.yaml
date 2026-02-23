@@ -1,0 +1,18 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: Full Disc (Quality Match)
+description: Matches Full Discs using a Radarr Quality Match
+includeInRename: false
+tags:
+  - Storage
+conditions:
+  - name: BRDISK
+    type: quality_modifier
+    arrType: all
+    negate: false
+    required: true
+    qualityModifiers:
+      - brdisk
+tests: []

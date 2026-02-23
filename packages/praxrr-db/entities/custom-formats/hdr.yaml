@@ -1,0 +1,60 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: HDR
+description: Matches the 'HDR' Regex Pattern
+includeInRename: false
+tags:
+  - Colour Grade
+  - HDR
+conditions:
+  - name: HDR
+    type: release_title
+    arrType: all
+    negate: false
+    required: true
+    patterns:
+      - name: HDR
+        pattern: \b(HDR)\b
+  - name: Not HDR10
+    type: release_title
+    arrType: all
+    negate: true
+    required: true
+    patterns:
+      - name: HDR10
+        pattern: \bHDR10(?!\+|Plus)\b
+  - name: Not HDR10+
+    type: release_title
+    arrType: all
+    negate: true
+    required: true
+    patterns:
+      - name: HDR10+
+        pattern: \bHDR10.?(\+|P(lus)?\b)
+  - name: Not HLG
+    type: release_title
+    arrType: all
+    negate: true
+    required: true
+    patterns:
+      - name: HLG
+        pattern: \b(HLG)\b
+  - name: Not PQ
+    type: release_title
+    arrType: all
+    negate: true
+    required: true
+    patterns:
+      - name: PQ
+        pattern: \b(PQ|PQ10)\b
+  - name: Not SDR
+    type: release_title
+    arrType: all
+    negate: true
+    required: true
+    patterns:
+      - name: SDR
+        pattern: \b(SDR)\b
+tests: []

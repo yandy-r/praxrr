@@ -1,0 +1,34 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: Lidarr - High Quality Lossy (Praxrr)
+description: 'Targets high quality lossy audio: AAC-320, AAC-VBR, MP3-320, MP3-VBR-V0, OGG Vorbis Q9, OGG Vorbis Q10, and Opus.'
+tags: []
+language: Any
+orderedItems:
+  - type: group
+    name: High Quality Lossy
+    position: 0
+    enabled: true
+    upgradeUntil: true
+    members:
+      - name: AAC-320
+      - name: AAC-VBR
+      - name: MP3-320
+      - name: MP3-VBR-V0
+      - name: OGG Vorbis Q10
+      - name: OGG Vorbis Q9
+minimumScore: 0
+upgradeUntilScore: 999999
+upgradeScoreIncrement: 1
+customFormatScores:
+  - customFormatName: Lidarr - AAC (Praxrr)
+    arrType: lidarr
+    score: 40000
+  - customFormatName: Lidarr - FLAC (Praxrr)
+    arrType: lidarr
+    score: 20000
+  - customFormatName: Lidarr - Opus (Praxrr)
+    arrType: lidarr
+    score: 50000

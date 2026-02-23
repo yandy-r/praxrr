@@ -1,0 +1,11 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: AVC
+pattern: '[xh][ ._-]?264|\bAVC(\b|\d)'
+tags:
+  - Codec
+  - Encoder
+description: 'An open source encoder that produces AVC videos. '
+regex101Id: null

@@ -1,0 +1,75 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: WEB-DL Tier 5
+description: Matches release groups who fall under WEB-DL Tier 5
+includeInRename: false
+tags:
+  - Release Group Tier
+  - WEB-DL
+conditions:
+  - name: CRUD
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: CRUD
+        pattern: (?<=^|[\s.-])CRUD\b
+  - name: GNOME
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: GNOME
+        pattern: (?<=^|[\s.-])GNOME\b
+  - name: NINJACENTRAL
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: NINJACENTRAL
+        pattern: (?<=^|[\s.-])NINJACENTRAL\b
+  - name: PHOENiX
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: PHOENiX
+        pattern: (?<=^|[\s.-])PHOENiX\b
+  - name: ROCCaT
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: ROCCaT
+        pattern: (?<=^|[\s.-])ROCCaT\b
+  - name: SiGMA
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: SiGMA
+        pattern: (?<=^|[\s.-])SiGMA\b
+  - name: SwAgLaNdEr
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: SwAgLaNdEr
+        pattern: (?<=^|[\s.-])SwAgLaNdEr\b
+  - name: WEB-DL
+    type: source
+    arrType: all
+    negate: false
+    required: true
+    sources:
+      - web_dl
+tests: []

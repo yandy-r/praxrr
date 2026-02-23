@@ -1,0 +1,11 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: HDC
+pattern: (?<=^|[\s.-])HDC\b
+tags:
+  - Bluray
+  - Release Group
+description: null
+regex101Id: null

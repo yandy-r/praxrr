@@ -1,0 +1,10 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: AV1
+pattern: \b(AV1)\b
+tags:
+  - Codec
+description: AV1, or AOMedia Video 1, is a video coding format that compresses video files and streams while maintaining high quality.
+regex101Id: null

@@ -1,0 +1,37 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: Lidarr - Lossy (Praxrr)
+description: 'Targets lossy audio: AAC-192, AAC-256, MP3-192 through MP3-256, MP3-VBR-V2, and OGG Vorbis Q6-Q8.'
+tags: []
+language: Any
+orderedItems:
+  - type: group
+    name: Lossy
+    position: 0
+    enabled: true
+    upgradeUntil: true
+    members:
+      - name: AAC-192
+      - name: AAC-256
+      - name: MP3-192
+      - name: MP3-224
+      - name: MP3-256
+      - name: MP3-VBR-V2
+      - name: OGG Vorbis Q6
+      - name: OGG Vorbis Q7
+      - name: OGG Vorbis Q8
+minimumScore: 0
+upgradeUntilScore: 999999
+upgradeScoreIncrement: 1
+customFormatScores:
+  - customFormatName: Lidarr - AAC (Praxrr)
+    arrType: lidarr
+    score: 50000
+  - customFormatName: Lidarr - FLAC (Praxrr)
+    arrType: lidarr
+    score: 10000
+  - customFormatName: Lidarr - Opus (Praxrr)
+    arrType: lidarr
+    score: 30000

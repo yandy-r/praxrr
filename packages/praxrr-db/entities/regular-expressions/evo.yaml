@@ -1,0 +1,11 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: EVO
+pattern: (?<=^|[\s.-])EVO\b
+tags:
+  - Release Group
+  - WEB-DL
+description: 'iPT Internal known for releasing pre-releases before anyone else. Also releases encodes of varying quality. '
+regex101Id: null

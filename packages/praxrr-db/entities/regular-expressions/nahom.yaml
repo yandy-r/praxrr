@@ -1,0 +1,11 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: NAHOM
+pattern: (?<=^|[\s.-])NAHOM\b
+tags:
+  - Banned
+  - Release Group
+description: Banned for Poor Quality Multi
+regex101Id: null

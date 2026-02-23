@@ -1,0 +1,83 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: 1080p Compact TV WEB Tier 2
+description: Matches release groups who fall under 1080p Compact TV WEB Tier 2
+includeInRename: false
+tags:
+  - 1080p
+  - Compact
+  - Release Group Tier
+  - TV
+conditions:
+  - name: 1080p
+    type: resolution
+    arrType: all
+    negate: false
+    required: true
+    resolutions:
+      - 1080p
+  - name: ARCADE
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: ARCADE
+        pattern: (?<=^|[\s.-])ARCADE\b
+  - name: DarQ
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: DarQ
+        pattern: (?<=^|[\s.-])DarQ\b
+  - name: LSt
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: LSt
+        pattern: (?<=^|[\s.-])LSt\b
+  - name: Not HONE
+    type: release_title
+    arrType: all
+    negate: true
+    required: true
+    patterns:
+      - name: HONE
+        pattern: (?<=^|[\s.-])HONE\b
+  - name: ToNaTo
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: ToNaTo
+        pattern: (?<=^|[\s.-])ToNaTo\b
+  - name: WEB-DL
+    type: source
+    arrType: all
+    negate: false
+    required: false
+    sources:
+      - web_dl
+  - name: WEBRip
+    type: source
+    arrType: all
+    negate: false
+    required: false
+    sources:
+      - webrip
+  - name: x265
+    type: release_title
+    arrType: all
+    negate: false
+    required: true
+    patterns:
+      - name: x265 (Efficient)
+        pattern: ^(?!.*(?i:remux))(?=.*([xh]\s?(\.?265)\b|HEVC|\bDS4K\b)).*$
+tests: []

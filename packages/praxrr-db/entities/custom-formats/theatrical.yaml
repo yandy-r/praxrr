@@ -1,0 +1,61 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: Theatrical
+description: |-
+  Matches any type of theatrical edition.
+  - Ensures that `Theatrical` comes after the year so that movies with 'Theatrical` in the title are not matched
+includeInRename: false
+tags:
+  - Edition
+conditions:
+  - name: Not Extended Clip
+    type: release_title
+    arrType: all
+    negate: true
+    required: true
+    patterns:
+      - name: Extended Clip
+        pattern: \b(extended.?clip)\b
+  - name: Not IMAX
+    type: release_title
+    arrType: all
+    negate: true
+    required: true
+    patterns:
+      - name: IMAX
+        pattern: \b((?<!NON.?)IMAX)\b
+  - name: Not Open Matte
+    type: release_title
+    arrType: all
+    negate: true
+    required: true
+    patterns:
+      - name: Open Matte
+        pattern: \b(open.?matte)\b
+  - name: Not Sing Along
+    type: release_title
+    arrType: all
+    negate: true
+    required: true
+    patterns:
+      - name: Sing Along
+        pattern: (?<=\b[12]\d{3}\b).*\b(Sing[-_. ]Along)\b
+  - name: Not Special Edition
+    type: release_title
+    arrType: all
+    negate: true
+    required: true
+    patterns:
+      - name: Special Edition
+        pattern: (?<=\b[12]\d{3}\b).*\b(Cut|Directors|DC|Edition|Extended|Special|Uncensored|Uncut|Unrated|Version)(\b|\d)
+  - name: Theatrical
+    type: release_title
+    arrType: all
+    negate: false
+    required: true
+    patterns:
+      - name: Theatrical Edition
+        pattern: ^(.*?)(\d{4})(.*?)\b(theatrical)\b
+tests: []

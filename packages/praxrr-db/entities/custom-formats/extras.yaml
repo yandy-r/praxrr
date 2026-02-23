@@ -1,0 +1,28 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: Extras
+description: Matches the 'Extras' Regex Pattern
+includeInRename: false
+tags:
+  - Banned
+  - Enhancement
+conditions:
+  - name: Movie Extras
+    type: release_title
+    arrType: radarr
+    negate: false
+    required: true
+    patterns:
+      - name: Movie Extras
+        pattern: (?i)(?<=\b[12]\d{3}\b).*(\b|\.)\b(Extras?|Bonus|Extended[ ._-]Clip|Special Feature[s]?)\b
+  - name: TV Extras
+    type: release_title
+    arrType: sonarr
+    negate: false
+    required: true
+    patterns:
+      - name: TV Extras
+        pattern: (?<=\bS\d+\b).*\b(Extras|Bonus|Extended[ ._-]Clip)\b
+tests: []

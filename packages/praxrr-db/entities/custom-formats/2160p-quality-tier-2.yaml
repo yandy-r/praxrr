@@ -1,0 +1,59 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: 2160p Quality Tier 2
+description: Matches release groups who fall under 2160p Quality Tier 2
+includeInRename: false
+tags:
+  - 2160p
+  - Quality
+  - Release Group Tier
+conditions:
+  - name: 2160p
+    type: resolution
+    arrType: all
+    negate: false
+    required: true
+    resolutions:
+      - 2160p
+  - name: Bluray
+    type: source
+    arrType: all
+    negate: false
+    required: true
+    sources:
+      - bluray
+  - name: CtrlHD
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: CtrlHD
+        pattern: (?<=^|[\s.-])CtrlHD\b
+  - name: MainFrame
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: MainFrame
+        pattern: (?<=^|[\s.-])MainFrame\b
+  - name: Not Remux
+    type: release_title
+    arrType: all
+    negate: true
+    required: true
+    patterns:
+      - name: Remux
+        pattern: Remux
+  - name: W4NK3R
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: W4NK3R
+        pattern: (?<=^|[\s.-])W4NK3R\b
+tests: []

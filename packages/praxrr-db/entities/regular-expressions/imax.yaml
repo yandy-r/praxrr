@@ -1,0 +1,14 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: IMAX
+pattern: \b((?<!NON.?)IMAX)\b
+tags:
+  - Aspect Ratio
+  - Enhancement
+description: |-
+  Matches any IMAX release. This includes:
+  - Any movie shot with IMAX in mind and henceforth tagged as `IMAX`
+  - IMAX Enchanced digital releases found on `Disney + / Bravia Core`
+regex101Id: null

@@ -1,0 +1,11 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: DepraveD
+pattern: (?<=^|[\s.-])DepraveD\b
+tags:
+  - Banned
+  - Release Group
+description: Banned for Fake DV/HDR Layer
+regex101Id: null

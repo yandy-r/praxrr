@@ -1,0 +1,10 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: Sourceless Groups
+pattern: (?<=^|[\s.-])(ELiTE|Megusta)\b
+tags:
+  - Release Group
+description: null
+regex101Id: null

@@ -1,0 +1,42 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: PLAY
+description: Matches 'Google TV' WEB-DLs
+includeInRename: true
+tags:
+  - Streaming Service
+  - WEB-DL
+conditions:
+  - name: PLAY Regex
+    type: release_title
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: Google TV
+        pattern: \b(PLAY)\b[ ._-]web[ ._-]?(dl|rip)?\b
+  - name: PLAY Rename Regex
+    type: release_title
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: Google TV Rename
+        pattern: \[(PLAY)\b|\b(PLAY)\]
+  - name: WEB-DL
+    type: source
+    arrType: all
+    negate: false
+    required: false
+    sources:
+      - web_dl
+  - name: WEBRip
+    type: source
+    arrType: all
+    negate: false
+    required: false
+    sources:
+      - webrip
+tests: []

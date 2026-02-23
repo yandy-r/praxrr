@@ -1,0 +1,40 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: SDR
+description: Ban 2160p WEB-DL Releases without Dolby Vision or HDR Formats. Movies Anywhere is excluded due to the high bitrate.
+includeInRename: false
+tags: []
+conditions:
+  - name: 2160p
+    type: resolution
+    arrType: all
+    negate: false
+    required: true
+    resolutions:
+      - 2160p
+  - name: DV HDR
+    type: release_title
+    arrType: all
+    negate: true
+    required: true
+    patterns:
+      - name: Basic HDR Formats
+        pattern: (?:(?<=^(?!.*\b(HLG|PQ|SDR)(\b|\d)).*?)HDR)|\b(dv(?![ .](HLG|SDR))|dovi|dolby[ .]?vision)\b
+  - name: Movies Anywhere
+    type: release_title
+    arrType: all
+    negate: true
+    required: true
+    patterns:
+      - name: Movies Anywhere
+        pattern: \b(?<!dts[ .-]?hd[ .-]?)ma\b(?=.*\bweb[ ._-]?(dl|rip)\b)
+  - name: WEB-DL
+    type: source
+    arrType: all
+    negate: false
+    required: true
+    sources:
+      - web_dl
+tests: []

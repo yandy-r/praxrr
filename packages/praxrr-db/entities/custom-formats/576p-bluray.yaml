@@ -1,0 +1,25 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: 576p Bluray
+description: Matches 576p Blurays.
+includeInRename: false
+tags:
+  - Source
+conditions:
+  - name: 576p
+    type: resolution
+    arrType: all
+    negate: false
+    required: true
+    resolutions:
+      - 576p
+  - name: Bluray
+    type: source
+    arrType: all
+    negate: false
+    required: true
+    sources:
+      - bluray
+tests: []

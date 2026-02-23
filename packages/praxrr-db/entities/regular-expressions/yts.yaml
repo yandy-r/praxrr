@@ -1,0 +1,11 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: YTS
+pattern: (?<=^|[\s.-])YTS(.(MX|LT|AG))?\b
+tags:
+  - Bluray
+  - Release Group
+description: Matches "YTS" when preceded by whitespace, a hyphen or dot
+regex101Id: null

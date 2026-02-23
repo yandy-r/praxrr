@@ -1,0 +1,11 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: TrueHD
+pattern: True[ .-]?HD[ .-]?
+tags:
+  - Audio
+  - Lossless
+description: null
+regex101Id: null
