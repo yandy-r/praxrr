@@ -78,6 +78,12 @@ jobs:
       - name: Run contract compatibility checks
         run: |
           npm install -g node-gyp
+          node-gyp --version
+          export npm_config_python="$(command -v python3)"
+          export NODE_GYP_FORCE_PYTHON="$(command -v python3)"
+          echo "Using python for node-gyp: ${npm_config_python}"
+          python3 -V
+          make --version
           deno install --node-modules-dir --allow-scripts=npm:better-sqlite3
           deno run -A scripts/compat-check.ts
 
@@ -98,6 +104,12 @@ jobs:
       - name: Run app checks
         run: |
           npm install -g node-gyp
+          node-gyp --version
+          export npm_config_python="$(command -v python3)"
+          export NODE_GYP_FORCE_PYTHON="$(command -v python3)"
+          echo "Using python for node-gyp: ${npm_config_python}"
+          python3 -V
+          make --version
           deno install --node-modules-dir --allow-scripts=npm:better-sqlite3
           cd packages/praxrr-app
           npx svelte-kit sync
