@@ -215,17 +215,34 @@ export async function serializeLidarrNaming(cache: PCDCache, name: string): Prom
   const row = await namingQueries.getLidarrByName(cache, name);
   if (!row) throw new Error(`Lidarr naming "${name}" not found`);
 
+  const standardTrackFormat = requireLidarrNamingField(name, 'standard_track_format', row.standard_track_format);
+  const artistName = requireLidarrNamingField(name, 'artist_name', row.artist_name);
+  const multiDiscTrackFormat = requireLidarrNamingField(
+    name,
+    'multi_disc_track_format',
+    row.multi_disc_track_format
+  );
+  const artistFolderFormat = requireLidarrNamingField(name, 'artist_folder_format', row.artist_folder_format);
+
   return {
     name: row.name,
     rename: row.rename,
-    standardTrackFormat: row.standard_track_format,
-    artistName: row.artist_name,
-    multiDiscTrackFormat: row.multi_disc_track_format,
-    artistFolderFormat: row.artist_folder_format,
+    standardTrackFormat,
+    artistName,
+    multiDiscTrackFormat,
+    artistFolderFormat,
     replaceIllegalCharacters: row.replace_illegal_characters,
     colonReplacementFormat: row.colon_replacement_format,
     customColonReplacementFormat: row.custom_colon_replacement_format,
   };
+}
+
+function requireLidarrNamingField(name: string, field: string, value: string | null | undefined): string {
+  if (value === null || value === undefined) {
+    throw new Error(`Lidarr naming "${name}" is missing required field "${field}"`);
+  }
+
+  return value;
 }
 
 // ============================================================================
