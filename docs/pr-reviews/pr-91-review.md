@@ -431,7 +431,7 @@ from unrecoverable failures.
 
 ### H-9: Duplicate stable key mappings risk contract drift
 
-- [ ] **Status:** Open
+- [x] **Status:** Fixed
 - **Files:** `reader.ts` (`ENTITY_STABLE_KEY_BY_TYPE`) and `importBaseOps.ts`
   (`SQL_ENTITY_STABLE_KEY_BY_ENTITY`)
 - **Category:** Portable contract fidelity
@@ -444,11 +444,19 @@ duplicates.
 **Fix:** Extract shared stable key constants into a common module. The `importBaseOps.ts` mapping
 can extend the shared map with legacy keys.
 
+### Validation result
+
+- Added a shared stable key module and used it from both migration reader and import paths, with SQL
+  legacy keys retained where needed.
+  - `packages/praxrr-app/src/lib/server/pcd/stableIdentity.ts:1-14`
+  - `packages/praxrr-app/src/lib/server/pcd/migration/reader.ts:12,311`
+  - `packages/praxrr-app/src/lib/server/pcd/ops/importBaseOps.ts:5,109`
+
 ---
 
 ### H-10: `PortableLidarrNaming` aliased to `PortableSonarrNaming` violates Cross-Arr policy
 
-- [ ] **Status:** Open
+- [x] **Status:** Fixed
 - **File:** `packages/praxrr-app/src/lib/shared/pcd/portable.ts:297`
 - **Category:** Cross-Arr semantic validation
 - **Agents:** code-reviewer
@@ -463,11 +471,16 @@ portable types "defined per Arr app and fail-fast on ambiguity."
 
 **Fix:** Define `PortableLidarrNaming` as its own interface with Lidarr-appropriate field names.
 
+### Validation result
+
+- Confirmed `PortableLidarrNaming` is now defined as a Lidarr-specific interface in this branch.
+  - `packages/praxrr-app/src/lib/shared/pcd/portable.ts:297-311`
+
 ---
 
 ### H-11: `pathExists` suppresses all errors, not just NotFound
 
-- [ ] **Status:** Open
+- [x] **Status:** Fixed
 - **Files:** `reader.ts:357-364`, `importBaseOps.ts:50-57`
 - **Category:** Silent failure
 - **Agents:** error-handler
@@ -487,6 +500,13 @@ Permission errors, IO errors, and other non-NotFound failures return `false`, ca
 skip existing-but-inaccessible directories with zero indication.
 
 **Fix:** Only catch `Deno.errors.NotFound`; rethrow all other errors.
+
+### Validation result
+
+- Updated both `pathExists` implementations to return `false` only for missing paths, and rethrow
+  other filesystem errors.
+  - `packages/praxrr-app/src/lib/server/pcd/migration/reader.ts:357-367`
+  - `packages/praxrr-app/src/lib/server/pcd/ops/importBaseOps.ts:39-49`
 
 ---
 

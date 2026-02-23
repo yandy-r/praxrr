@@ -9,6 +9,7 @@
 import { parse as parseYaml } from 'yaml';
 import type { EntityType, PortableMigrationFormat, PortableMigrationMetadata } from '$shared/pcd/portable.ts';
 import { PORTABLE_MIGRATION_MIN_VERSION } from '$shared/pcd/portable.ts';
+import { PORTABLE_ENTITY_STABLE_KEY_BY_TYPE } from '$pcd/stableIdentity.ts';
 import type { EntityDeserializer } from '$pcd/entities/deserialize.ts';
 import { getEntityDeserializer } from '$pcd/entities/deserialize.ts';
 import { validatePortableData } from '$pcd/entities/validate.ts';
@@ -59,23 +60,6 @@ const ENTITY_FORMAT_BY_MEDIA_DIR: Readonly<Record<string, EntityType>> = {
   'radarr-quality-definitions': 'radarr_quality_definitions',
   'sonarr-quality-definitions': 'sonarr_quality_definitions',
   'lidarr-quality-definitions': 'lidarr_quality_definitions',
-};
-
-const ENTITY_STABLE_KEY_BY_TYPE: Readonly<Record<EntityType, string>> = {
-  delay_profile: 'delay_profile_name',
-  regular_expression: 'regular_expression_name',
-  custom_format: 'custom_format_name',
-  quality_profile: 'quality_profile_name',
-  radarr_naming: 'radarr_naming_name',
-  sonarr_naming: 'sonarr_naming_name',
-  lidarr_naming: 'lidarr_naming_name',
-  radarr_media_settings: 'radarr_media_settings_name',
-  sonarr_media_settings: 'sonarr_media_settings_name',
-  lidarr_media_settings: 'lidarr_media_settings_name',
-  radarr_quality_definitions: 'radarr_quality_definitions_name',
-  sonarr_quality_definitions: 'sonarr_quality_definitions_name',
-  lidarr_quality_definitions: 'lidarr_quality_definitions_name',
-  lidarr_metadata_profile: 'metadata_profile_name',
 };
 
 const KNOWN_NON_ENTITY_TOP_LEVEL_FILES = new Set(['tags.yaml', 'quality-api-mappings.yaml']);
@@ -328,7 +312,7 @@ export function resolveMigrationStableIdentity(
   entityType: EntityType,
   entityName: string
 ): MigrationEntityStableIdentity {
-  const stableKey = ENTITY_STABLE_KEY_BY_TYPE[entityType] ?? `migration_${entityType}_name`;
+  const stableKey = PORTABLE_ENTITY_STABLE_KEY_BY_TYPE[entityType] ?? `migration_${entityType}_name`;
   return {
     key: stableKey,
     value: entityName,
@@ -359,8 +343,12 @@ async function pathExists(path: string): Promise<boolean> {
   try {
     await Deno.stat(path);
     return true;
-  } catch {
-    return false;
+  } catch (error) {
+    if (error instanceof Deno.errors.NotFound) {
+      return false;
+    }
+
+    throw error;
   }
 }
 
