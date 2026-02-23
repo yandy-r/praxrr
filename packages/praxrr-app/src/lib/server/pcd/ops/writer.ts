@@ -527,7 +527,10 @@ async function writeOperationsFromSqlOperations(options: WriteSqlOperationsOptio
     }
 
     const context = currentWriteContext();
-    const source = options.source ?? context?.source ?? 'local';
+    const source =
+      layer === 'base' && context?.allowBaseImport === true && context?.source === 'repo'
+        ? 'repo'
+        : options.source ?? context?.source ?? 'local';
     const hasPersonalAccessToken = !!instance.has_personal_access_token || !!instance.personal_access_token;
     const allowBaseImportBypass = context?.allowBaseImport === true && source === 'repo';
     if (layer === 'base' && (!hasPersonalAccessToken || instance.local_ops_enabled) && !allowBaseImportBypass) {
@@ -538,6 +541,7 @@ async function writeOperationsFromSqlOperations(options: WriteSqlOperationsOptio
     }
 
     const sqlStatements = operations.map((operation) => normalizeSql(operation.sql));
+    const fastPathRepoImport = layer === 'base' && source === 'repo' && !!context?.repoImport;
 
     // Validate against current cache
     const cache = getCache(databaseId);
@@ -659,14 +663,30 @@ async function writeOperationsFromSqlOperations(options: WriteSqlOperationsOptio
       ) {
         await supersedePriorUserOps(databaseId, opId, operation.metadata);
       }
+
+      if (fastPathRepoImport && cache) {
+        const rawDb = cache.getRawDb();
+        if (!rawDb) {
+          throw new Error('Cache not built for repo import fast-path apply');
+        }
+
+        rawDb.exec(sql);
+      }
     }
 
-    await compile(instance.local_path, instance.id);
+    if (fastPathRepoImport) {
+      await logger.debug('Skipped full cache recompile for repo import write', {
+        source: 'PCDWriter',
+        meta: { databaseId },
+      });
+    } else {
+      await compile(instance.local_path, instance.id);
 
-    await logger.debug('Cache recompiled after write', {
-      source: 'PCDWriter',
-      meta: { databaseId },
-    });
+      await logger.debug('Cache recompiled after write', {
+        source: 'PCDWriter',
+        meta: { databaseId },
+      });
+    }
 
     return {
       success: true,

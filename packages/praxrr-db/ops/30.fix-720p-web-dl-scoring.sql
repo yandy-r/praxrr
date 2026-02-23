@@ -1,6 +1,6 @@
 -- @operation: export
 -- @entity: batch
--- @name: Fix 720p WEB-DL Scoring
+-- @name: Rebalance 720p WEB-DL Scoring
 -- @exportedAt: 2026-02-09T00:03:19.180Z
 -- @opIds: 1251, 1252, 1253, 1254, 1255, 1256, 1257, 1258, 1259, 1260, 1261, 1262, 1263, 1264, 1265, 1266
 

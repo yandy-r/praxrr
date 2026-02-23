@@ -1,9 +1,9 @@
 {
   "db_file": "dist/dev/data/praxrr.db",
-  "enabled_database_ids": [
-    1
-  ],
+  "enabled_database_ids": [1],
+  "yaml_entity_ops": 4943,
   "unexpected_conflicts_or_errors": 0,
   "failed_sync_runs": 0,
-  "duplicate_pending_or_running_dedupe_keys": 0
+  "duplicate_pending_or_running_dedupe_keys": 0,
+  "manual_sync_failed_runs": 0
 }

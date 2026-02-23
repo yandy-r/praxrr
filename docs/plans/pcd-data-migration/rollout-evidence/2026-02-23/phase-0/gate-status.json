@@ -1,4 +1,5 @@
 {
   "contract_ok": 1,
-  "parity_ok": 1
+  "parity_ok": 1,
+  "runtime_ok": 1
 }

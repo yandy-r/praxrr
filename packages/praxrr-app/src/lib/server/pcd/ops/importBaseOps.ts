@@ -383,13 +383,17 @@ export async function importBaseOps(
     migrationIdentitySet = collectMigrationStableIdentitySet(migrationCandidates);
   }
 
-  const effectiveSqlEntries = isHybridIngestion
-    ? sqlEntries.filter((entry) => {
-        if (!entry.stableIdentity) return true;
-        const identity = formatConflictIdentity(entry.stableIdentity);
-        return !migrationIdentitySet.has(identity);
-      })
-    : sqlEntries;
+  const allowLegacySqlInHybrid = config.pcdMigrationAllowLegacyFallback;
+  const effectiveSqlEntries =
+    isHybridIngestion && !allowLegacySqlInHybrid
+      ? []
+      : isHybridIngestion
+        ? sqlEntries.filter((entry) => {
+            if (!entry.stableIdentity) return true;
+            const identity = formatConflictIdentity(entry.stableIdentity);
+            return !migrationIdentitySet.has(identity);
+          })
+        : sqlEntries;
 
   let created = 0;
   let updated = 0;
@@ -481,6 +485,8 @@ export async function importBaseOps(
 
       migrationImported += 1;
     }
+
+    await compile(pcdPath, databaseId);
   }
 
   const orphaned = pcdOpsQueries.markBaseOrphaned(databaseId, seenAt);
