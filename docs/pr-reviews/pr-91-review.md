@@ -1,10 +1,8 @@
 # PR #91 Review: feat(pcd): implement full pcd-data-migration plan (issues 79-90)
 
-**Branch:** `feat/pcd-data-migration` -> `v2`
-**Feature start commit:** `986403f`
-**Review date:** 2026-02-23
-**Scope:** Feature source code only (excludes docs/plans/, CI files)
-**Stats:** ~4,041 additions, ~312 deletions across 34 files
+**Branch:** `feat/pcd-data-migration` -> `v2` **Feature start commit:** `986403f` **Review date:**
+2026-02-23 **Scope:** Feature source code only (excludes docs/plans/, CI files) **Stats:** ~4,041
+additions, ~312 deletions across 34 files
 
 ## Verification Status
 
@@ -16,12 +14,12 @@
 
 ## Summary
 
-| Severity | Count |
-|----------|-------|
-| Critical | 7 |
-| High | 11 |
-| Medium | 11 |
-| Suggestion | 9 |
+| Severity   | Count |
+| ---------- | ----- |
+| Critical   | 7     |
+| High       | 11    |
+| Medium     | 11    |
+| Suggestion | 9     |
 
 ---
 
@@ -29,14 +27,14 @@
 
 ### C-1: `seedBuiltInBaseOpsWithOrchestration` swallows all errors silently
 
-- [ ] **Status:** Open
+- [x] **Status:** Fixed
 - **File:** `packages/praxrr-app/src/lib/server/pcd/core/manager.ts:427-435`
 - **Category:** Error handling
 - **Agents:** error-handler
 
-`seedBuiltInBaseOps` failures are caught and only logged. No error propagates, no result
-indicator is returned. If seeding fails, cache compilation proceeds on incomplete data, and
-downstream sync pushes that incomplete state to Arr instances with no user-visible indication.
+`seedBuiltInBaseOps` failures are caught and only logged. No error propagates, no result indicator
+is returned. If seeding fails, cache compilation proceeds on incomplete data, and downstream sync
+pushes that incomplete state to Arr instances with no user-visible indication.
 
 ```typescript
 private async seedBuiltInBaseOpsWithOrchestration(databaseId: number, contextLabel = 'operation'): Promise<void> {
@@ -55,6 +53,12 @@ private async seedBuiltInBaseOpsWithOrchestration(databaseId: number, contextLab
 **Fix:** Propagate the error. If design intent is partial success, return a success/failure
 indicator and require callers to check it.
 
+### Validation result
+
+- Updated `seedBuiltInBaseOpsWithOrchestration` to rethrow caught seeding failures after logging:
+  - `packages/praxrr-app/src/lib/server/pcd/core/manager.ts` now throws the caught error instead of
+    swallowing it, so link/sync/initialize paths can fail fast when built-in base ops seeding fails.
+
 ---
 
 ### C-2: `compileIfEnabled` returns fake zeroed stats on failure
@@ -70,12 +74,16 @@ fabricated `CacheBuildStats` with all zeros. Callers cannot distinguish "empty d
 
 ```typescript
 return {
-  schema: 0, base: 0, tweaks: 0, user: 0, timing: 0,
+  schema: 0,
+  base: 0,
+  tweaks: 0,
+  user: 0,
+  timing: 0,
 };
 ```
 
-**Fix:** Return `CacheBuildStats | null` or add an `error` field. For `link` (user-initiated),
-throw by default.
+**Fix:** Return `CacheBuildStats | null` or add an `error` field. For `link` (user-initiated), throw
+by default.
 
 ---
 
@@ -91,8 +99,8 @@ When `pcdMigrationAllowLegacyFallback` is `true`, the catch block intercepts **e
 silently loses all migration entity data on ANY error.
 
 **Fix:** Narrow the catch to migration-reader-specific errors only. Consider a typed
-`MigrationReaderError` class. Default is `false` so this only fires when explicitly enabled, but
-the blast radius when enabled is severe.
+`MigrationReaderError` class. Default is `false` so this only fires when explicitly enabled, but the
+blast radius when enabled is severe.
 
 ---
 
@@ -108,7 +116,8 @@ the blast radius when enabled is severe.
 changes, content hashes from import vs. writer paths will silently diverge, causing incorrect
 "updated" vs. "unchanged" detection.
 
-**Fix:** Delete the local `hashContent()` and import `buildContentHash` from `$db/queries/pcdOps.ts`.
+**Fix:** Delete the local `hashContent()` and import `buildContentHash` from
+`$db/queries/pcdOps.ts`.
 
 ---
 
@@ -120,8 +129,8 @@ changes, content hashes from import vs. writer paths will silently diverge, caus
 - **Agents:** code-reviewer, error-handler
 
 CLAUDE.md states: "Preserve exact config-name identifiers used for sync lookup keys; reject empty
-values, but do not trim persisted names." The `trim()` call modifies entity names before they
-become stable identity values, causing sync lookup key mismatches.
+values, but do not trim persisted names." The `trim()` call modifies entity names before they become
+stable identity values, causing sync lookup key mismatches.
 
 ```typescript
 function extractEntityName(portable: ReaderInputRecord): string | null {
@@ -131,10 +140,11 @@ function extractEntityName(portable: ReaderInputRecord): string | null {
 }
 ```
 
-Also: whitespace-only names like `"   "` produce `""` (empty string) which passes the null check
-but creates entities with empty-string names.
+Also: whitespace-only names like `"   "` produce `""` (empty string) which passes the null check but
+creates entities with empty-string names.
 
 **Fix:**
+
 ```typescript
 function extractEntityName(portable: ReaderInputRecord): string | null {
   const nameValue = portable.name;
@@ -164,8 +174,8 @@ seasonFolderFormat: row.artist_folder_format,     // same value
 multiEpisodeStyle: 'extend',                      // hardcoded, not from Lidarr data
 ```
 
-An export/re-import cycle would corrupt the entity. Root cause: `PortableLidarrNaming` is aliased
-to `PortableSonarrNaming` in `portable.ts:297`, violating the Cross-Arr policy.
+An export/re-import cycle would corrupt the entity. Root cause: `PortableLidarrNaming` is aliased to
+`PortableSonarrNaming` in `portable.ts:297`, violating the Cross-Arr policy.
 
 **Fix:** Define a native `PortableLidarrNaming` type with Lidarr-correct field names.
 
@@ -178,8 +188,8 @@ to `PortableSonarrNaming` in `portable.ts:297`, violating the Cross-Arr policy.
 - **Category:** Type safety, silent failure
 - **Agents:** code-reviewer
 
-No return type annotation, no `default` case, no exhaustive check. If a new `EntityType` variant
-is added, the function silently returns `undefined`, and the export endpoint returns
+No return type annotation, no `default` case, no exhaustive check. If a new `EntityType` variant is
+added, the function silently returns `undefined`, and the export endpoint returns
 `{ entityType, data: undefined, migration: {...} }` as a successful 200 response.
 
 **Fix:** Add return type annotation and exhaustive `never` check in the default case.
@@ -200,8 +210,7 @@ const cacheDb = (cache as unknown as { db: Database | null }).db;
 ```
 
 Double-cast bypasses TypeScript access control. If `PCDCache` renames `db`, this silently returns
-`undefined` (not `null`), the `!cacheDb` check passes, and the value-guard gate is silently
-skipped.
+`undefined` (not `null`), the `!cacheDb` check passes, and the value-guard gate is silently skipped.
 
 **Fix:** Add `getRawDb(): Database | null` public accessor to `PCDCache`.
 
@@ -246,10 +255,11 @@ continues. Seeding and compilation proceed without base ops, producing incomplet
 - **Category:** Logic error
 - **Agents:** code-reviewer
 
-Empty/whitespace input produces `";"` (length 1), which passes the `sql.length === 0` check at
-line 127 and gets passed to `cacheDb.exec(";")`.
+Empty/whitespace input produces `";"` (length 1), which passes the `sql.length === 0` check at line
+127 and gets passed to `cacheDb.exec(";")`.
 
 **Fix:**
+
 ```typescript
 function normalizeSql(sql: string): string {
   const trimmed = sql.trim();
@@ -282,8 +292,8 @@ malformed metadata.
 - **Category:** Silent failure
 - **Agents:** error-handler
 
-The dual-format parser (JSON then key=value fallback) hides JSON.parse errors from strings that
-look like JSON but are malformed (e.g., trailing commas). The fallback returns `null`, losing the
+The dual-format parser (JSON then key=value fallback) hides JSON.parse errors from strings that look
+like JSON but are malformed (e.g., trailing commas). The fallback returns `null`, losing the
 identity entirely.
 
 **Fix:** Log when JSON.parse fails on a string starting with `{` to surface malformed-but-intended
@@ -298,9 +308,9 @@ JSON.
 - **Category:** Error quality
 - **Agents:** error-handler
 
-Both `catch` blocks use unbound `catch` (no error variable), discarding permission errors, file
-not found details, and parse error positions. Users see "Failed to read entity source file" with
-no actionable detail.
+Both `catch` blocks use unbound `catch` (no error variable), discarding permission errors, file not
+found details, and parse error positions. Users see "Failed to read entity source file" with no
+actionable detail.
 
 **Fix:** Bind the error and include `String(error)` in the message.
 
@@ -325,13 +335,14 @@ from unrecoverable failures.
 ### H-9: Duplicate stable key mappings risk contract drift
 
 - [ ] **Status:** Open
-- **Files:** `reader.ts` (`ENTITY_STABLE_KEY_BY_TYPE`) and `importBaseOps.ts` (`SQL_ENTITY_STABLE_KEY_BY_ENTITY`)
+- **Files:** `reader.ts` (`ENTITY_STABLE_KEY_BY_TYPE`) and `importBaseOps.ts`
+  (`SQL_ENTITY_STABLE_KEY_BY_ENTITY`)
 - **Category:** Portable contract fidelity
 - **Agents:** type-design
 
-Both files independently map entity types to stable key column names. If one is updated without
-the other, cross-source conflict detection in `validateStableIdentityConflicts` will miss
-true duplicates.
+Both files independently map entity types to stable key column names. If one is updated without the
+other, cross-source conflict detection in `validateStableIdentityConflicts` will miss true
+duplicates.
 
 **Fix:** Extract shared stable key constants into a common module. The `importBaseOps.ts` mapping
 can extend the shared map with legacy keys.
@@ -349,9 +360,9 @@ can extend the shared map with legacy keys.
 export type PortableLidarrNaming = PortableSonarrNaming;
 ```
 
-Root cause of C-6. Lidarr naming has `standardTrackFormat`, `artistName`,
-`multiDiscTrackFormat`, `artistFolderFormat` -- none of which map to Sonarr's episode/series
-fields. CLAUDE.md requires portable types "defined per Arr app and fail-fast on ambiguity."
+Root cause of C-6. Lidarr naming has `standardTrackFormat`, `artistName`, `multiDiscTrackFormat`,
+`artistFolderFormat` -- none of which map to Sonarr's episode/series fields. CLAUDE.md requires
+portable types "defined per Arr app and fail-fast on ambiguity."
 
 **Fix:** Define `PortableLidarrNaming` as its own interface with Lidarr-appropriate field names.
 
@@ -366,13 +377,17 @@ fields. CLAUDE.md requires portable types "defined per Arr app and fail-fast on 
 
 ```typescript
 async function pathExists(path: string): Promise<boolean> {
-  try { await Deno.stat(path); return true; }
-  catch { return false; }
+  try {
+    await Deno.stat(path);
+    return true;
+  } catch {
+    return false;
+  }
 }
 ```
 
-Permission errors, IO errors, and other non-NotFound failures return `false`, causing the caller
-to skip existing-but-inaccessible directories with zero indication.
+Permission errors, IO errors, and other non-NotFound failures return `false`, causing the caller to
+skip existing-but-inaccessible directories with zero indication.
 
 **Fix:** Only catch `Deno.errors.NotFound`; rethrow all other errors.
 
@@ -396,8 +411,8 @@ function asPortableData<T>(data: unknown): T {
 Used 14 times. If incoming data does not match the expected portable type, deserialization fails
 with obscure errors deep in the call chain.
 
-**Fix:** Add JSDoc precondition documenting that `validatePortableData` must be called before
-this function. Long-term: typed validation results.
+**Fix:** Add JSDoc precondition documenting that `validatePortableData` must be called before this
+function. Long-term: typed validation results.
 
 ---
 
@@ -409,8 +424,9 @@ this function. Long-term: typed validation results.
 - **Agents:** type-design
 
 11-field flat interface where many field combinations are semantically invalid (e.g.,
-`decision: 'applied'` with `shouldAttemptAutoDrop: true`). Optional `autoAlignReason`/`autoAlignRule`
-fields should be required for `auto_align_*` variants and absent otherwise.
+`decision: 'applied'` with `shouldAttemptAutoDrop: true`). Optional
+`autoAlignReason`/`autoAlignRule` fields should be required for `auto_align_*` variants and absent
+otherwise.
 
 **Fix:** Refactor into a discriminated union keyed on `decision`.
 
@@ -436,8 +452,8 @@ When `ok` is `false`, `error` may or may not be present.
 - **Category:** Silent failure
 - **Agents:** error-handler
 
-Multiple `catch { continue }` blocks skip operations with malformed metadata/desired_state.
-A delete that should cancel out a prior create fails silently.
+Multiple `catch { continue }` blocks skip operations with malformed metadata/desired_state. A delete
+that should cancel out a prior create fails silently.
 
 **Fix:** Log at debug level when metadata parsing fails.
 
@@ -450,8 +466,8 @@ A delete that should cancel out a prior create fails silently.
 - **Category:** Error handling
 - **Agents:** error-handler
 
-When `evaluateValueGuardError` returns `non_conflict_error` with `shouldRecordHistory: true`,
-the error is recorded and execution continues. For non-user (base/schema) ops, this should throw.
+When `evaluateValueGuardError` returns `non_conflict_error` with `shouldRecordHistory: true`, the
+error is recorded and execution continues. For non-user (base/schema) ops, this should throw.
 
 ---
 
@@ -493,8 +509,8 @@ Database value is cast without validation. A corrupted row produces incorrect ty
 - **Category:** Type safety
 - **Agents:** type-design
 
-Accepts `string | undefined` instead of `OperationType | undefined`. Arbitrary strings fall
-through to default case returning `'guard_mismatch'`, masking upstream bugs.
+Accepts `string | undefined` instead of `OperationType | undefined`. Arbitrary strings fall through
+to default case returning `'guard_mismatch'`, masking upstream bugs.
 
 ---
 
@@ -505,8 +521,8 @@ through to default case returning `'guard_mismatch'`, masking upstream bugs.
 - **Category:** Type design
 - **Agents:** type-design
 
-Both are `{ readonly key: string; readonly value: string }`. TypeScript structural typing means
-they are interchangeable, undermining the semantic distinction.
+Both are `{ readonly key: string; readonly value: string }`. TypeScript structural typing means they
+are interchangeable, undermining the semantic distinction.
 
 **Fix:** Consider branded types or removing the internal-only `MigrationEntityIdentity`.
 
@@ -533,8 +549,7 @@ they are interchangeable, undermining the semantic distinction.
 - **Category:** Dead code
 - **Agents:** type-design
 
-`?? \`migration_${entityType}_name\`` can never execute because `ENTITY_STABLE_KEY_BY_TYPE` is
-exhaustive over `EntityType`.
+`?? \`migration\_${entityType}\_name\``can never execute because`ENTITY_STABLE_KEY_BY_TYPE`is exhaustive over`EntityType`.
 
 **Fix:** Replace with a `satisfies never` assertion to catch future entity type additions.
 
@@ -588,6 +603,7 @@ No test exercises `readMigrationEntitySources()` or internal functions (`resolve
 `inferFormatFromPath`, `extractEntityName`, `isolatePortablePayload`, `listEntityFiles`).
 
 **Recommended tests:**
+
 - All 4 top-level dirs + media management subdirs for `resolveEntityType()`
 - `.json`, `.yaml`, `.yml` accepted; `.txt`, `.xml` rejected for `inferFormatFromPath()`
 - Non-string/empty/whitespace names for `extractEntityName()`
@@ -613,8 +629,8 @@ Only 2 of 6 `evaluateValueGuardApply` decision outcomes are exercised indirectly
 - **File:** `packages/praxrr-app/src/lib/server/pcd/ops/importBaseOps.ts:149-212`
 - **Priority:** 8/10
 
-`validateStableIdentityConflicts()` has 3 check phases (SQL/SQL, migration/migration,
-cross-source). None are directly tested.
+`validateStableIdentityConflicts()` has 3 check phases (SQL/SQL, migration/migration, cross-source).
+None are directly tested.
 
 ---
 
@@ -656,8 +672,8 @@ Only hybrid-with-fallback is tested. Direct sql-only mode and hybrid mode with
 - **File:** `packages/praxrr-app/src/lib/shared/pcd/portable.ts:130-167`
 - **Priority:** 6/10
 
-`validatePortableMigrationMetadata()` with invalid inputs (missing fields, invalid format,
-version below minimum, extra fields) is not tested.
+`validatePortableMigrationMetadata()` with invalid inputs (missing fields, invalid format, version
+below minimum, extra fields) is not tested.
 
 ---
 
@@ -667,8 +683,8 @@ version below minimum, extra fields) is not tested.
 - **File:** `packages/praxrr-app/src/routes/api/v1/pcd/export/+server.ts`
 - **Priority:** 5/10
 
-No test verifies that export response includes correct `migration.source`, `migration.format`,
-and `migration.version`.
+No test verifies that export response includes correct `migration.source`, `migration.format`, and
+`migration.version`.
 
 ---
 
@@ -678,8 +694,8 @@ and `migration.version`.
 - **File:** `packages/praxrr-app/src/lib/server/db/queries/pcdOps.ts`
 - **Priority:** 5/10
 
-Deterministic output for known inputs is not verified. If hash format changes, duplicate
-detection breaks silently.
+Deterministic output for known inputs is not verified. If hash format changes, duplicate detection
+breaks silently.
 
 ---
 

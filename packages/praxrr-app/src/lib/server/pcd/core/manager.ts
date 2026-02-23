@@ -432,6 +432,7 @@ class PCDManager {
         source: 'PCDManager',
         meta: { error: String(error), databaseId },
       });
+      throw error;
     }
   }
 
