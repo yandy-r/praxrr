@@ -77,7 +77,7 @@ jobs:
 
       - name: Run contract compatibility checks
         run: |
-          deno install --node-modules-dir
+          deno install --node-modules-dir --allow-scripts=npm:better-sqlite3
           deno run -A scripts/compat-check.ts
 
   compatibility-app-check:
@@ -96,7 +96,7 @@ jobs:
 
       - name: Run app checks
         run: |
-          deno install --node-modules-dir
+          deno install --node-modules-dir --allow-scripts=npm:better-sqlite3
           cd packages/praxrr-app
           npx svelte-kit sync
           cd ../..
