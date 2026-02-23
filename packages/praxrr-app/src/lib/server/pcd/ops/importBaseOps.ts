@@ -1,5 +1,5 @@
 import { logger } from '$logger/logger.ts';
-import { config } from '$config';
+import { config, type PCDMigrationIngestionMode } from '$config';
 import { pcdOpsQueries } from '$db/queries/pcdOps.ts';
 import { extractOrderFromFilename, getBaseOpsPath } from '../utils/operations.ts';
 import {
@@ -246,13 +246,22 @@ export interface ImportBaseOpsResult {
   orphaned: number;
 }
 
-export async function importBaseOps(databaseId: number, pcdPath: string): Promise<ImportBaseOpsResult> {
+export interface ImportBaseOpsOptions {
+  pcdMigrationIngestionMode?: PCDMigrationIngestionMode;
+}
+
+export async function importBaseOps(
+  databaseId: number,
+  pcdPath: string,
+  options: ImportBaseOpsOptions = {}
+): Promise<ImportBaseOpsResult> {
   const basePath = getBaseOpsPath(pcdPath);
   if (!(await pathExists(basePath))) {
     return { created: 0, updated: 0, orphaned: 0 };
   }
 
-  const isHybridIngestion = config.pcdMigrationIngestionMode === 'hybrid';
+  const migrationMode = options.pcdMigrationIngestionMode ?? config.pcdMigrationIngestionMode;
+  const isHybridIngestion = migrationMode === 'hybrid';
   const migrationReaderResult = isHybridIngestion
     ? await readMigrationEntitySources(pcdPath)
     : { candidates: [], issues: [] };

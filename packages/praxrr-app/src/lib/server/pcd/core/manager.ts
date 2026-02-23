@@ -20,7 +20,7 @@ import { compile, invalidate } from '../database/compiler.ts';
 import { getCache } from '../database/registry.ts';
 import { logger } from '$logger/logger.ts';
 import { triggerSyncs } from '$sync/processor.ts';
-import { config } from '$config';
+import { config, type PCDMigrationIngestionMode } from '$config';
 import type { CacheBuildStats, LinkOptions, SyncResult } from './types.ts';
 import { importBaseOps } from '../ops/importBaseOps.ts';
 import { seedBuiltInBaseOps } from '../ops/seedBuiltInBaseOps.ts';
@@ -398,13 +398,14 @@ class PCDManager {
   }
 
   private async importBaseOpsWithOrchestration(databaseId: number, localPath: string): Promise<void> {
-    if (config.pcdMigrationIngestionMode === 'sql-only') {
-      await importBaseOps(databaseId, localPath);
+    const migrationMode: PCDMigrationIngestionMode = config.pcdMigrationIngestionMode;
+    if (migrationMode === 'sql-only') {
+      await importBaseOps(databaseId, localPath, { pcdMigrationIngestionMode: 'sql-only' });
       return;
     }
 
     try {
-      await importBaseOps(databaseId, localPath);
+      await importBaseOps(databaseId, localPath, { pcdMigrationIngestionMode: migrationMode });
       return;
     } catch (error) {
       if (!config.pcdMigrationAllowLegacyFallback) {
@@ -415,11 +416,11 @@ class PCDManager {
         source: 'PCDManager',
         meta: {
           databaseId,
-          migrationMode: config.pcdMigrationIngestionMode,
+          migrationMode,
           error: String(error),
         },
       });
-      await importBaseOps(databaseId, localPath);
+      await importBaseOps(databaseId, localPath, { pcdMigrationIngestionMode: 'sql-only' });
     }
   }
 
