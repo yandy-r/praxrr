@@ -170,13 +170,13 @@ async function readMigrationEntitySource(entry: MigrationSourceEntry): Promise<
   let raw: string;
   try {
     raw = await Deno.readTextFile(entry.sourcePath);
-  } catch {
+  } catch (error) {
     return {
       ok: false,
       error: {
         relativePath: entry.relativePath,
         kind: 'read-error',
-        message: 'Failed to read entity source file',
+        message: `Failed to read entity source file: ${String(error)}`,
       },
     };
   }
@@ -184,13 +184,13 @@ async function readMigrationEntitySource(entry: MigrationSourceEntry): Promise<
   let parsed: unknown;
   try {
     parsed = parseSource(raw, format);
-  } catch {
+  } catch (error) {
     return {
       ok: false,
       error: {
         relativePath: entry.relativePath,
         kind: 'parse-error',
-        message: `Failed to parse ${format.toUpperCase()} entity source`,
+        message: `Failed to parse ${format.toUpperCase()} entity source: ${String(error)}`,
       },
     };
   }

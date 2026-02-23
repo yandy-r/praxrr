@@ -534,7 +534,7 @@ async function writeOperationsFromSqlOperations(options: WriteSqlOperationsOptio
         source: options.source,
       },
     });
-    return { success: false, error: String(error) };
+    throw error;
   }
 }
 

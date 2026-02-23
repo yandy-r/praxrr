@@ -344,7 +344,7 @@ function normalizeSql(sql: string): string {
 
 ### H-5: `deriveSqlStableIdentity` silently returns null on invalid JSON
 
-- [ ] **Status:** Open
+- [x] **Status:** Fixed
 - **File:** `packages/praxrr-app/src/lib/server/pcd/ops/importBaseOps.ts:120-131`
 - **Category:** Silent failure, data integrity
 - **Agents:** error-handler
@@ -355,11 +355,17 @@ malformed metadata.
 
 **Fix:** Throw on malformed metadata JSON (per project mandate) or at minimum log a warning.
 
+### Validation result
+
+- `deriveSqlStableIdentity` now throws on malformed metadata JSON instead of returning `null` and
+  bypassing conflict checks.
+  - `packages/praxrr-app/src/lib/server/pcd/ops/importBaseOps.ts:120-131`
+
 ---
 
 ### H-6: `parseStableIdentityFromText` silently loses identity on malformed JSON
 
-- [ ] **Status:** Open
+- [x] **Status:** Fixed
 - **File:** `packages/praxrr-app/src/lib/server/pcd/ops/importBaseOps.ts:65-80`
 - **Category:** Silent failure
 - **Agents:** error-handler
@@ -371,11 +377,17 @@ identity entirely.
 **Fix:** Log when JSON.parse fails on a string starting with `{` to surface malformed-but-intended
 JSON.
 
+### Validation result
+
+- Added warning logging for malformed JSON-like stable-identity strings while preserving fallback
+  for non-JSON formats.
+  - `packages/praxrr-app/src/lib/server/pcd/ops/importBaseOps.ts:65-80`
+
 ---
 
 ### H-7: Reader catch blocks discard original error information
 
-- [ ] **Status:** Open
+- [x] **Status:** Fixed
 - **File:** `packages/praxrr-app/src/lib/server/pcd/migration/reader.ts:171-182, 185-196`
 - **Category:** Error quality
 - **Agents:** error-handler
@@ -386,11 +398,17 @@ actionable detail.
 
 **Fix:** Bind the error and include `String(error)` in the message.
 
+### Validation result
+
+- Reader now captures caught error objects and includes `String(error)` in read/parse issue
+  messages.
+  - `packages/praxrr-app/src/lib/server/pcd/migration/reader.ts:171-196`
+
 ---
 
 ### H-8: `writeOperationsFromSqlOperations` broad catch converts all errors to `{ success: false }`
 
-- [ ] **Status:** Open
+- [x] **Status:** Fixed
 - **File:** `packages/praxrr-app/src/lib/server/pcd/ops/writer.ts:524-536`
 - **Category:** Error handling
 - **Agents:** error-handler
@@ -401,6 +419,13 @@ from unrecoverable failures.
 
 **Fix:** Rethrow unexpected errors (non-validation, non-conflict) and only return
 `{ success: false }` for expected business logic failures.
+
+### Validation result
+
+- Replaced broad failure flattening at the function boundary with rethrowing unexpected exceptions
+  after logging, while retaining `{ success: false }` returns from explicit validation/conflict
+  checks.
+  - `packages/praxrr-app/src/lib/server/pcd/ops/writer.ts:524-536`
 
 ---
 

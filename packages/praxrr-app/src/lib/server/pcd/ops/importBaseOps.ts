@@ -69,7 +69,15 @@ function parseStableIdentityFromText(raw: string): MigrationEntityStableIdentity
   try {
     const parsed = JSON.parse(value) as Record<string, unknown>;
     return parseStableIdentityFromObject(parsed);
-  } catch {
+  } catch (error) {
+    if (value.startsWith('{')) {
+      const preview = value.length > 500 ? `${value.slice(0, 500)}...` : value;
+      logger.warn('Failed to parse stable identity JSON text from migration metadata', {
+        source: 'PCDImport',
+        meta: { raw: preview, error: String(error) },
+      });
+    }
+
     const equalsIndex = value.indexOf('=');
     if (equalsIndex <= 0) return null;
     const key = asString(value.slice(0, equalsIndex));
@@ -124,7 +132,7 @@ function deriveSqlStableIdentity(metadataJson: string | null): MigrationEntitySt
   try {
     parsed = JSON.parse(metadataJson) as Record<string, unknown>;
   } catch {
-    return null;
+    throw new Error('Malformed SQL metadata JSON');
   }
 
   return parseStableIdentityFromMetadata(parsed);
