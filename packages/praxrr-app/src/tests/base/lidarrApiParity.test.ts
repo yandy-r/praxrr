@@ -814,7 +814,7 @@ class LidarrApiParityTest extends BaseTest {
       const getCacheMock: typeof pcdManager.getCache = () => ({ kb: {} }) as unknown as PCDCacheType;
       this.patch(pcdManager, 'getCache', getCacheMock);
       this.patch(deserialize, 'deserializeRegularExpression', async () => {
-        return;
+        return { success: true };
       });
 
       const response = await importPost({

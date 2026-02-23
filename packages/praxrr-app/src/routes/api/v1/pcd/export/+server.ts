@@ -1,10 +1,10 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from '@sveltejs/kit';
 import { pcdManager } from '$pcd/index.ts';
-import type { components } from '$api/v1.d.ts';
 import {
   ENTITY_TYPES,
   type EntityType,
+  type PortableEntityData,
   PORTABLE_MIGRATION_MIN_VERSION,
   PORTABLE_MIGRATION_SOURCE_EXPORT,
 } from '$shared/pcd/portable.ts';
@@ -12,24 +12,6 @@ import type { PCDCache } from '$pcd/index.ts';
 import * as serialize from '$pcd/entities/serialize.ts';
 
 const VALID_ENTITY_TYPES: ReadonlySet<string> = new Set(ENTITY_TYPES);
-type ExportResponse = components['schemas']['ExportResponse'];
-
-type PortableEntityData = Awaited<
-  | ReturnType<typeof serialize.serializeDelayProfile>
-  | ReturnType<typeof serialize.serializeRegularExpression>
-  | ReturnType<typeof serialize.serializeCustomFormat>
-  | ReturnType<typeof serialize.serializeQualityProfile>
-  | ReturnType<typeof serialize.serializeRadarrNaming>
-  | ReturnType<typeof serialize.serializeSonarrNaming>
-  | ReturnType<typeof serialize.serializeLidarrNaming>
-  | ReturnType<typeof serialize.serializeRadarrMediaSettings>
-  | ReturnType<typeof serialize.serializeSonarrMediaSettings>
-  | ReturnType<typeof serialize.serializeLidarrMediaSettings>
-  | ReturnType<typeof serialize.serializeRadarrQualityDefinitions>
-  | ReturnType<typeof serialize.serializeSonarrQualityDefinitions>
-  | ReturnType<typeof serialize.serializeLidarrQualityDefinitions>
-  | ReturnType<typeof serialize.serializeLidarrMetadataProfile>
->;
 
 export const GET: RequestHandler = async ({ url }) => {
   const databaseIdParam = url.searchParams.get('databaseId');
@@ -56,16 +38,15 @@ export const GET: RequestHandler = async ({ url }) => {
 
   try {
     const data = await serializeEntity(cache, entityType as EntityType, name);
-    const response: ExportResponse = {
-      entityType: entityType as ExportResponse['entityType'],
-      data: data as ExportResponse['data'],
+    return json({
+      entityType,
+      data,
       migration: {
         source: PORTABLE_MIGRATION_SOURCE_EXPORT,
         format: 'json',
         version: PORTABLE_MIGRATION_MIN_VERSION,
       },
-    };
-    return json(response);
+    });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Export failed';
     if (message.includes('not found')) {
@@ -75,7 +56,11 @@ export const GET: RequestHandler = async ({ url }) => {
   }
 };
 
-async function serializeEntity(cache: PCDCache, entityType: EntityType, name: string): Promise<PortableEntityData> {
+async function serializeEntity(
+  cache: PCDCache,
+  entityType: EntityType,
+  name: string
+): Promise<PortableEntityData> {
   switch (entityType) {
     case 'delay_profile':
       return serialize.serializeDelayProfile(cache, name);

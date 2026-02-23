@@ -129,6 +129,7 @@ export type PortableEntityData =
   | PortableQualityProfile
   | PortableRadarrNaming
   | PortableSonarrNaming
+  | PortableLidarrNaming
   | PortableMediaSettings
   | PortableQualityDefinitions
   | PortableLidarrMetadataProfile;
