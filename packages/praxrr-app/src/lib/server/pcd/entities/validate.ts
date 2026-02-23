@@ -213,16 +213,24 @@ function validateLidarrNaming(data: Record<string, unknown>): string | null {
   if (typeof data.rename !== 'boolean') {
     return 'data.rename must be a boolean';
   }
-  if (typeof data.standardTrackFormat !== 'string') {
+  const normalizedData = {
+    ...data,
+    standardTrackFormat: data.standardTrackFormat ?? data.standardEpisodeFormat,
+    artistName: data.artistName ?? data.dailyEpisodeFormat,
+    multiDiscTrackFormat: data.multiDiscTrackFormat ?? data.animeEpisodeFormat,
+    artistFolderFormat: data.artistFolderFormat ?? data.seriesFolderFormat,
+  } as Record<string, unknown>;
+
+  if (typeof normalizedData.standardTrackFormat !== 'string') {
     return 'data.standardTrackFormat must be a string';
   }
-  if (typeof data.artistName !== 'string') {
+  if (typeof normalizedData.artistName !== 'string') {
     return 'data.artistName must be a string';
   }
-  if (typeof data.multiDiscTrackFormat !== 'string') {
+  if (typeof normalizedData.multiDiscTrackFormat !== 'string') {
     return 'data.multiDiscTrackFormat must be a string';
   }
-  if (typeof data.artistFolderFormat !== 'string') {
+  if (typeof normalizedData.artistFolderFormat !== 'string') {
     return 'data.artistFolderFormat must be a string';
   }
   if (typeof data.replaceIllegalCharacters !== 'boolean') {
@@ -235,7 +243,19 @@ function validateLidarrNaming(data: Record<string, unknown>): string | null {
     return 'data.customColonReplacementFormat must be a string or null';
   }
 
-  return validateLidarrPortableData('lidarr_naming', data, () => null);
+  const legacyAliasFields = [
+    'standardEpisodeFormat',
+    'dailyEpisodeFormat',
+    'animeEpisodeFormat',
+    'seriesFolderFormat',
+    'seasonFolderFormat',
+    'multiEpisodeStyle',
+  ];
+  for (const field of legacyAliasFields) {
+    delete normalizedData[field];
+  }
+
+  return validateLidarrPortableData('lidarr_naming', normalizedData, () => null);
 }
 
 function validateLidarrPortableData(
