@@ -15,9 +15,7 @@ import { pcdOpsQueries } from '$db/queries/pcdOps.ts';
 import type { PCDDatabase } from '$shared/pcd/types.ts';
 import type { CacheBuildStats, ValidationResult } from '../core/types.ts';
 import { uuid } from '$shared/utils/uuid.ts';
-import type { PcdOpHistoryStatus } from '$db/queries/pcdOpHistory.ts';
-import { evaluateAutoAlign, parseDesiredState, parseOpMetadata } from '$pcd/conflicts/autoAlign/index.ts';
-import { checkFullListConflict } from '$pcd/conflicts/fullListCheck.ts';
+import { evaluateValueGuardApply, evaluateValueGuardError } from '../migration/valueGuardGate.ts';
 
 /**
  * PCDCache - Manages an in-memory compiled database for a single PCD
@@ -107,54 +105,68 @@ export class PCDCache {
         try {
           this.db.exec(operation.sql);
           if (trackHistory) {
+            const trackedOpId = opId as number;
             const rowcount = this.db!.totalChanges - beforeChanges;
             try {
-              let status: PcdOpHistoryStatus = rowcount === 0 ? 'skipped' : 'applied';
-              let conflictReason: string | null = null;
+              const priorReason = priorConflicts.get(trackedOpId) ?? null;
+              const gateResult = evaluateValueGuardApply({
+                db: this.db!,
+                conflictStrategy,
+                isUserOp,
+                rowcount,
+                metadataJson: userOp?.metadata ?? null,
+                desiredStateJson: userOp?.desired_state ?? null,
+                priorConflictReason: priorReason,
+              });
 
-              if (rowcount === 0 && isUserOp) {
-                const metadata = parseOpMetadata(userOp?.metadata ?? null);
-                const desiredState = parseDesiredState(userOp?.desired_state ?? null);
-                const autoAlignDecision = evaluateAutoAlign({
-                  db: this.db!,
-                  conflictStrategy,
-                  metadata,
-                  desiredState,
+              let status = gateResult.status;
+              let conflictReason = gateResult.conflictReason;
+
+              if (gateResult.shouldAttemptAutoDrop) {
+                const dropped = pcdOpsQueries.update(trackedOpId, {
+                  state: 'dropped',
                 });
-
-                if (autoAlignDecision.shouldAlign) {
-                  const updated = pcdOpsQueries.update(opId, {
-                    state: 'dropped',
-                  });
-                  if (updated) {
-                    status = 'dropped';
-                    conflictReason = 'aligned';
+                if (dropped) {
+                  status = 'dropped';
+                  conflictReason = 'aligned';
+                  if (gateResult.decision === 'auto_align_full_list') {
+                    await logger.info('Forced align conflict (full-list mismatch)', {
+                      source: 'PCDCache',
+                      meta: {
+                        opId: trackedOpId,
+                        databaseInstanceId: this.databaseInstanceId,
+                        conflictStrategy,
+                        conflictReason,
+                      },
+                    });
+                  } else {
                     await logger.info(
-                      autoAlignDecision.reason === 'forced' ? 'Forced align conflict' : 'Auto-aligned conflict',
+                      gateResult.autoAlignReason === 'forced' ? 'Forced align conflict' : 'Auto-aligned conflict',
                       {
                         source: 'PCDCache',
                         meta: {
-                          opId,
+                          opId: trackedOpId,
                           databaseInstanceId: this.databaseInstanceId,
                           conflictStrategy,
                           conflictReason,
-                          autoAlignReason: autoAlignDecision.reason,
-                          autoAlignRule: autoAlignDecision.rule,
+                          autoAlignReason: gateResult.autoAlignReason,
+                          autoAlignRule: gateResult.autoAlignRule,
                         },
-                      }
+                      },
                     );
                   }
-                }
-
-                if (status !== 'dropped') {
-                  status = conflictStrategy === 'ask' ? 'conflicted_pending' : 'conflicted';
-                  conflictReason = getConflictReason(metadata?.operation);
-                  const priorReason = priorConflicts.get(opId);
-                  if (priorReason !== conflictReason) {
-                    await logger.info('Recorded op conflict', {
+                } else {
+                  status = gateResult.fallbackStatus;
+                  conflictReason = gateResult.fallbackConflictReason;
+                  if (gateResult.shouldLogConflict) {
+                    const message =
+                      gateResult.decision === 'auto_align_full_list'
+                        ? 'Recorded op conflict (full-list mismatch)'
+                        : 'Recorded op conflict';
+                    await logger.info(message, {
                       source: 'PCDCache',
                       meta: {
-                        opId,
+                        opId: trackedOpId,
                         databaseInstanceId: this.databaseInstanceId,
                         conflictStrategy,
                         conflictReason,
@@ -162,55 +174,28 @@ export class PCDCache {
                     });
                   }
                 }
+              } else if (gateResult.shouldLogConflict) {
+                const message =
+                  gateResult.decision === 'full_list_conflict'
+                    ? 'Recorded op conflict (full-list mismatch)'
+                    : 'Recorded op conflict';
+                await logger.info(message, {
+                  source: 'PCDCache',
+                  meta: {
+                    opId: trackedOpId,
+                    databaseInstanceId: this.databaseInstanceId,
+                    conflictStrategy,
+                    conflictReason,
+                  },
+                });
               }
 
-              // Multi-statement ops can have rowcount > 0 even when
-              // some guards failed (e.g. DELETEs fail but INSERTs
-              // succeed). Detect this by checking whether the DB
-              // state matches the desired "to" state.
-              if (status === 'applied' && isUserOp) {
-                const metadata = parseOpMetadata(userOp?.metadata ?? null);
-                const desiredState = parseDesiredState(userOp?.desired_state ?? null);
-                const conflict = checkFullListConflict(this.db!, metadata, desiredState);
-                if (conflict) {
-                  if (conflictStrategy === 'align') {
-                    const updated = pcdOpsQueries.update(opId, { state: 'dropped' });
-                    if (updated) {
-                      status = 'dropped';
-                      conflictReason = 'aligned';
-                      stats.needsRebuild = true;
-                      await logger.info('Forced align conflict (full-list mismatch)', {
-                        source: 'PCDCache',
-                        meta: {
-                          opId,
-                          databaseInstanceId: this.databaseInstanceId,
-                          conflictStrategy,
-                          conflictReason,
-                        },
-                      });
-                    }
-                  }
-                  if (status !== 'dropped') {
-                    status = conflictStrategy === 'ask' ? 'conflicted_pending' : 'conflicted';
-                    conflictReason = 'guard_mismatch';
-                    const priorReason = priorConflicts.get(opId);
-                    if (priorReason !== conflictReason) {
-                      await logger.info('Recorded op conflict (full-list mismatch)', {
-                        source: 'PCDCache',
-                        meta: {
-                          opId,
-                          databaseInstanceId: this.databaseInstanceId,
-                          conflictStrategy,
-                          conflictReason,
-                        },
-                      });
-                    }
-                  }
-                }
+              if (gateResult.needsRebuild) {
+                stats.needsRebuild = true;
               }
 
               pcdOpHistoryQueries.create({
-                opId,
+                opId: trackedOpId,
                 databaseId: this.databaseInstanceId,
                 batchId,
                 status,
@@ -221,7 +206,7 @@ export class PCDCache {
               await logger.warn('Failed to record op history', {
                 source: 'PCDCache',
                 meta: {
-                  opId,
+                  opId: trackedOpId,
                   databaseInstanceId: this.databaseInstanceId,
                   error: String(historyError),
                 },
@@ -230,77 +215,58 @@ export class PCDCache {
           }
         } catch (error) {
           const errorStr = String(error);
-          const isDuplicateKey = isUserOp && isUniqueConstraintError(errorStr);
-          const isMissingTarget = isUserOp && isForeignKeyConstraintError(errorStr);
-          const shouldRecordConflict = trackHistory && (isDuplicateKey || isMissingTarget);
+          if (!trackHistory) {
+            throw new Error(`Failed to execute operation ${operation.filename} in ${operation.layer} layer: ${error}`);
+          }
+          const trackedOpId = opId as number;
+          const gateError = evaluateValueGuardError({
+            conflictStrategy,
+            error: errorStr,
+            isUserOp,
+            trackHistory,
+            priorConflictReason: priorConflicts.get(trackedOpId) ?? null,
+          });
 
-          if (shouldRecordConflict) {
-            const status: PcdOpHistoryStatus = conflictStrategy === 'ask' ? 'conflicted_pending' : 'conflicted';
-            const conflictReason = isDuplicateKey ? 'duplicate_key' : 'missing_target';
-            const priorReason = priorConflicts.get(opId);
-            if (priorReason !== conflictReason) {
-              await logger.info('Recorded op conflict', {
-                source: 'PCDCache',
-                meta: {
-                  opId,
-                  databaseInstanceId: this.databaseInstanceId,
-                  conflictStrategy,
-                  conflictReason,
-                },
-              });
-            }
-            try {
-              pcdOpHistoryQueries.create({
-                opId,
-                databaseId: this.databaseInstanceId,
-                batchId,
-                status,
-                rowcount: 0,
-                conflictReason,
-                error: errorStr,
-                details: JSON.stringify({
-                  layer: operation.layer,
-                  filename: operation.filename,
-                }),
-              });
-            } catch (historyError) {
-              await logger.warn('Failed to record op history', {
-                source: 'PCDCache',
-                meta: {
-                  opId,
-                  databaseInstanceId: this.databaseInstanceId,
-                  error: String(historyError),
-                },
-              });
-            }
-            continue;
+          if (!gateError.shouldRecordHistory) {
+            throw new Error(`Failed to execute operation ${operation.filename} in ${operation.layer} layer: ${error}`);
           }
-          if (trackHistory) {
-            try {
-              pcdOpHistoryQueries.create({
-                opId,
-                databaseId: this.databaseInstanceId,
-                batchId,
-                status: 'error',
-                rowcount: null,
-                error: errorStr,
-                details: JSON.stringify({
-                  layer: operation.layer,
-                  filename: operation.filename,
-                }),
-              });
-            } catch (historyError) {
-              await logger.warn('Failed to record op history', {
-                source: 'PCDCache',
-                meta: {
-                  opId,
-                  databaseInstanceId: this.databaseInstanceId,
-                  error: String(historyError),
-                },
-              });
-            }
+
+          if (gateError.shouldLogConflict) {
+            await logger.info('Recorded op conflict', {
+              source: 'PCDCache',
+              meta: {
+                opId: trackedOpId,
+                databaseInstanceId: this.databaseInstanceId,
+                conflictStrategy,
+                conflictReason: gateError.conflictReason,
+              },
+            });
           }
-          throw new Error(`Failed to execute operation ${operation.filename} in ${operation.layer} layer: ${error}`);
+          try {
+            pcdOpHistoryQueries.create({
+              opId: trackedOpId,
+              databaseId: this.databaseInstanceId,
+              batchId,
+              status: gateError.status,
+              rowcount: gateError.errorCategory === 'non_conflict_error' ? null : 0,
+              conflictReason: gateError.conflictReason,
+              error: errorStr,
+              details: JSON.stringify({
+                layer: operation.layer,
+                filename: operation.filename,
+              }),
+            });
+          } catch (historyError) {
+            await logger.warn('Failed to record op history', {
+              source: 'PCDCache',
+              meta: {
+                opId: trackedOpId,
+                databaseInstanceId: this.databaseInstanceId,
+                error: String(historyError),
+              },
+            });
+          }
+          continue;
         }
       }
 
@@ -519,24 +485,4 @@ function parseOpId(filepath: string): number | null {
   const raw = filepath.slice('pcd_ops:'.length);
   const opId = Number(raw);
   return Number.isFinite(opId) ? opId : null;
-}
-
-function getConflictReason(operation?: string): string {
-  switch (operation) {
-    case 'create':
-      return 'duplicate_key';
-    case 'delete':
-      return 'missing_target';
-    case 'update':
-    default:
-      return 'guard_mismatch';
-  }
-}
-
-function isUniqueConstraintError(errorStr: string): boolean {
-  return errorStr.includes('UNIQUE constraint failed');
-}
-
-function isForeignKeyConstraintError(errorStr: string): boolean {
-  return errorStr.includes('FOREIGN KEY constraint failed');
 }
