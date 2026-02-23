@@ -1,10 +1,9 @@
 # Lessons
 
+<<<<<<< HEAD
 ## 2026-02-22
 
-- When creating GitHub issue research references, always use markdown file-path links
-  (`[docs/...](https://github.com/.../blob/<branch>/docs/...)`) instead of bare URLs so links are
-  consistently clickable in issue bodies.
+- When creating GitHub issue research references, always use markdown file-path links (`[docs/...](https://github.com/.../blob/<branch>/docs/...)`) instead of bare URLs so links are consistently clickable in issue bodies.
 
 ## 2026-02-15
 
