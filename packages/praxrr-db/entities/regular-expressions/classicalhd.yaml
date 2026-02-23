@@ -1,0 +1,11 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: CLASSiCALHD
+pattern: (?<=^|[\s.-])CLASSiCALHD\b
+tags:
+  - Release Group
+  - WEB-DL
+description: Banned for LQ Non English / RaR
+regex101Id: null

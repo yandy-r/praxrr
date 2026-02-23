@@ -1,0 +1,158 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: Lidarr
+entries:
+  - quality_name: AAC-192
+    min_size: 0
+    max_size: 210
+    preferred_size: 95
+  - quality_name: AAC-256
+    min_size: 0
+    max_size: 280
+    preferred_size: 95
+  - quality_name: AAC-320
+    min_size: 0
+    max_size: 350
+    preferred_size: 195
+  - quality_name: AAC-VBR
+    min_size: 0
+    max_size: 350
+    preferred_size: 195
+  - quality_name: ALAC
+    min_size: 99.9
+    max_size: 0
+    preferred_size: 895
+  - quality_name: ALAC 24bit
+    min_size: 99.9
+    max_size: 0
+    preferred_size: 895
+  - quality_name: APE
+    min_size: 99.9
+    max_size: 0
+    preferred_size: 895
+  - quality_name: FLAC
+    min_size: 99.9
+    max_size: 0
+    preferred_size: 895
+  - quality_name: FLAC 24bit
+    min_size: 99.9
+    max_size: 0
+    preferred_size: 895
+  - quality_name: MP3-112
+    min_size: 0
+    max_size: 125
+    preferred_size: 95
+  - quality_name: MP3-128
+    min_size: 0
+    max_size: 140
+    preferred_size: 95
+  - quality_name: MP3-16
+    min_size: 0
+    max_size: 20
+    preferred_size: 15
+  - quality_name: MP3-160
+    min_size: 0
+    max_size: 175
+    preferred_size: 95
+  - quality_name: MP3-192
+    min_size: 0
+    max_size: 210
+    preferred_size: 95
+  - quality_name: MP3-224
+    min_size: 0
+    max_size: 245
+    preferred_size: 95
+  - quality_name: MP3-24
+    min_size: 0
+    max_size: 30
+    preferred_size: 25
+  - quality_name: MP3-256
+    min_size: 0
+    max_size: 280
+    preferred_size: 95
+  - quality_name: MP3-32
+    min_size: 0
+    max_size: 40
+    preferred_size: 35
+  - quality_name: MP3-320
+    min_size: 0
+    max_size: 350
+    preferred_size: 195
+  - quality_name: MP3-40
+    min_size: 0
+    max_size: 45
+    preferred_size: 40
+  - quality_name: MP3-48
+    min_size: 0
+    max_size: 55
+    preferred_size: 50
+  - quality_name: MP3-56
+    min_size: 0
+    max_size: 65
+    preferred_size: 60
+  - quality_name: MP3-64
+    min_size: 0
+    max_size: 75
+    preferred_size: 70
+  - quality_name: MP3-8
+    min_size: 0
+    max_size: 10
+    preferred_size: 5
+  - quality_name: MP3-80
+    min_size: 0
+    max_size: 95
+    preferred_size: 90
+  - quality_name: MP3-96
+    min_size: 0
+    max_size: 110
+    preferred_size: 95
+  - quality_name: MP3-VBR-V0
+    min_size: 0
+    max_size: 350
+    preferred_size: 195
+  - quality_name: MP3-VBR-V2
+    min_size: 0
+    max_size: 280
+    preferred_size: 95
+  - quality_name: OGG Vorbis Q10
+    min_size: 0
+    max_size: 550
+    preferred_size: 295
+  - quality_name: OGG Vorbis Q5
+    min_size: 0
+    max_size: 175
+    preferred_size: 95
+  - quality_name: OGG Vorbis Q6
+    min_size: 0
+    max_size: 210
+    preferred_size: 95
+  - quality_name: OGG Vorbis Q7
+    min_size: 0
+    max_size: 245
+    preferred_size: 95
+  - quality_name: OGG Vorbis Q8
+    min_size: 0
+    max_size: 280
+    preferred_size: 95
+  - quality_name: OGG Vorbis Q9
+    min_size: 0
+    max_size: 350
+    preferred_size: 195
+  - quality_name: Unknown
+    min_size: 0
+    max_size: 350
+    preferred_size: 195
+  - quality_name: WAV
+    min_size: 0
+    max_size: 0
+    preferred_size: 895
+  - quality_name: WMA
+    min_size: 0
+    max_size: 350
+    preferred_size: 195
+  - quality_name: WavPack
+    min_size: 99.9
+    max_size: 0
+    preferred_size: 895

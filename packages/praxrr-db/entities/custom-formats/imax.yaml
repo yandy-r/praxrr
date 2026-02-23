@@ -1,0 +1,27 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: IMAX
+description: Matches general IMAX releases
+includeInRename: false
+tags:
+  - Edition
+conditions:
+  - name: IMAX
+    type: release_title
+    arrType: all
+    negate: false
+    required: true
+    patterns:
+      - name: IMAX
+        pattern: \b((?<!NON.?)IMAX)\b
+  - name: IMAX Enhanced
+    type: release_title
+    arrType: all
+    negate: true
+    required: true
+    patterns:
+      - name: IMAX Enhanced
+        pattern: ^(?=.*\b((DSNP|BC|B?CORE)\b|Disney\+)(?=.*\bWEB[ ._-]?(DL|Rip)\b))(?=.*\b((?<!NON[ ._-])IMAX)\b)|^(?=.*\b(IMAX[ ._-]Enhanced)\b)
+tests: []

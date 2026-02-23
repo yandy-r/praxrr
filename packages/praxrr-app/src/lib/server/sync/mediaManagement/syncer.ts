@@ -36,13 +36,34 @@ import {
 } from '$pcd/entities/mediaManagement/quality-definitions/read.ts';
 import type {
   LidarrMediaSettingsRow,
+  LidarrNamingRow,
   QualityDefinitionsConfig,
   RadarrMediaSettingsRow,
+  RadarrNamingRow,
   SonarrMediaSettingsRow,
+  SonarrNamingRow,
 } from '$shared/pcd/display.ts';
 import { colonReplacementToDb, multiEpisodeStyleToDb } from '$shared/pcd/mediaManagement.ts';
-import type { ArrPropersAndRepacks, ArrType, RadarrNamingConfig, SonarrNamingConfig } from '$arr/types.ts';
+import type {
+  ArrNamingConfig,
+  ArrMediaManagementConfig,
+  RadarrNamingConfig,
+  ArrPropersAndRepacks,
+  ArrType,
+  ArrQualityDefinition,
+  SonarrNamingConfig,
+} from '$arr/types.ts';
 import { logger } from '$logger/logger.ts';
+import { diffSingletonEntity } from '../preview/sectionDiffs.ts';
+import type { EntityChange, MediaManagementPreview } from '../preview/types.ts';
+import {
+  getUnsupportedMediaManagementSubsectionReason,
+  getUnsupportedSyncSectionReason,
+  isMediaManagementSubsectionSupported,
+  isSyncSectionSupported,
+  type MediaManagementSubsection,
+  type SyncArrType,
+} from '../mappings.ts';
 
 const LIDARR_UNSUPPORTED_FIELD_REASON =
   'Field is not represented by the Lidarr API config payload and is skipped during sync';
@@ -50,6 +71,78 @@ const LIDARR_NAMING_SOURCE_FIELD_REASON =
   'Some stored Lidarr naming fields do not map to current Lidarr API payload fields and are skipped';
 const LIDARR_QUALITY_SKIP_REASON =
   'Lidarr quality definition sync applies only to entries with Lidarr mappings and matching Lidarr definitions';
+
+interface MediaManagementSyncConfig {
+  namingDatabaseId: number | null;
+  namingConfigName: string | null;
+  qualityDefinitionsDatabaseId: number | null;
+  qualityDefinitionsConfigName: string | null;
+  mediaSettingsDatabaseId: number | null;
+  mediaSettingsConfigName: string | null;
+}
+
+function parsePositiveInt(rawValue: unknown): number | null {
+  if (typeof rawValue !== 'number' || !Number.isInteger(rawValue) || rawValue <= 0) {
+    return null;
+  }
+
+  return rawValue;
+}
+
+function parseMediaManagementSectionSelection(
+  rawDatabaseId: unknown,
+  rawConfigName: unknown
+): { databaseId: number | null; configName: string | null } {
+  return {
+    databaseId: rawDatabaseId === null || rawDatabaseId === undefined ? null : parsePositiveInt(rawDatabaseId),
+    configName: typeof rawConfigName === 'string' && rawConfigName.trim().length > 0 ? rawConfigName : null,
+  };
+}
+
+function parseMediaManagementPreviewConfig(rawConfig: unknown): MediaManagementSyncConfig | null {
+  if (!rawConfig || typeof rawConfig !== 'object' || Array.isArray(rawConfig)) {
+    return null;
+  }
+
+  const value = rawConfig as Record<string, unknown>;
+  if (
+    !('namingDatabaseId' in value) ||
+    !('namingConfigName' in value) ||
+    !('qualityDefinitionsDatabaseId' in value) ||
+    !('qualityDefinitionsConfigName' in value) ||
+    !('mediaSettingsDatabaseId' in value) ||
+    !('mediaSettingsConfigName' in value)
+  ) {
+    return null;
+  }
+
+  const naming = parseMediaManagementSectionSelection(value.namingDatabaseId, value.namingConfigName);
+  const qualityDefinitions = parseMediaManagementSectionSelection(
+    value.qualityDefinitionsDatabaseId,
+    value.qualityDefinitionsConfigName
+  );
+  const mediaSettings = parseMediaManagementSectionSelection(
+    value.mediaSettingsDatabaseId,
+    value.mediaSettingsConfigName
+  );
+
+  return {
+    namingDatabaseId: naming.databaseId,
+    namingConfigName: naming.configName,
+    qualityDefinitionsDatabaseId: qualityDefinitions.databaseId,
+    qualityDefinitionsConfigName: qualityDefinitions.configName,
+    mediaSettingsDatabaseId: mediaSettings.databaseId,
+    mediaSettingsConfigName: mediaSettings.configName,
+  };
+}
+
+type NamingRow = RadarrNamingRow | SonarrNamingRow | LidarrNamingRow;
+
+interface NamingSource {
+  getByName: (cache: PCDCache, configName: string) => Promise<NamingRow | null>;
+  entityType: 'radarr_naming' | 'sonarr_naming' | 'lidarr_naming';
+  toDesiredPayload: (naming: NamingRow) => Record<string, unknown>;
+}
 
 const LIDARR_UNSUPPORTED_NAMING_SOURCE_FIELDS = ['artist_name'] as const;
 
@@ -66,8 +159,560 @@ export class MediaManagementSyncer extends BaseSyncer {
     this.instanceType = instanceType;
   }
 
+  private async generateMediaSettingsPreview(
+    databaseId: number | null,
+    configName: string | null,
+    instanceType: SyncArrType
+  ): Promise<EntityChange | null> {
+    this.assertMediaManagementSubsectionSupported('mediaSettings', instanceType);
+
+    if (!databaseId || !configName) {
+      await logger.warn('Media settings preview skipped because it is not configured', {
+        source: 'Preview:MediaManagement',
+        meta: {
+          instanceId: this.instanceId,
+          subsection: 'mediaSettings',
+          code: 'missing_optional_config',
+        },
+      });
+      return null;
+    }
+
+    const cache = getCache(databaseId);
+    if (!cache) {
+      await logger.warn(`PCD cache not found for database ${databaseId}`, {
+        source: 'Preview:MediaSettings',
+        meta: { instanceId: this.instanceId },
+      });
+      return null;
+    }
+
+    const mediaSettingsSource = this.resolveMediaSettingsSource();
+    if (!mediaSettingsSource) {
+      await logger.warn(`Unsupported instance type for media settings preview: ${this.instanceType}`, {
+        source: 'Preview:MediaSettings',
+        meta: { instanceId: this.instanceId, subsection: 'mediaSettings' },
+      });
+      return null;
+    }
+
+    const mediaSettings = await mediaSettingsSource.getByName(cache, configName);
+    if (!mediaSettings) {
+      await logger.debug(`Media settings config "${configName}" not found in ${mediaSettingsSource.entityType}`, {
+        source: 'Preview:MediaSettings',
+        meta: {
+          instanceId: this.instanceId,
+          configName,
+          subsection: 'mediaSettings',
+          entityType: mediaSettingsSource.entityType,
+        },
+      });
+      return null;
+    }
+
+    const existingConfig = (await this.client.getMediaManagementConfig()) as ArrMediaManagementConfig;
+    const managedUpdates = {
+      downloadPropersAndRepacks: this.mapPropersRepacks(mediaSettings.propers_repacks),
+      enableMediaInfo: mediaSettings.enable_media_info,
+    };
+
+    let updatedConfig: ArrMediaManagementConfig = {
+      ...existingConfig,
+      ...managedUpdates,
+    };
+    if (this.instanceType === 'lidarr') {
+      const applied = this.applyConfigUpdates(existingConfig, managedUpdates);
+      updatedConfig = applied.updatedConfig;
+      if (applied.appliedFields.length === 0) {
+        await logger.warn('No supported Lidarr media settings fields available to preview', {
+          source: 'Preview:MediaSettings',
+          meta: {
+            instanceId: this.instanceId,
+            configName,
+            subsection: 'mediaSettings',
+            missingFields: applied.missingFields,
+            reason: LIDARR_UNSUPPORTED_FIELD_REASON,
+          },
+        });
+        return null;
+      }
+
+      if (applied.missingFields.length > 0) {
+        await logger.warn('Skipping unsupported Lidarr media settings fields', {
+          source: 'Preview:MediaSettings',
+          meta: {
+            instanceId: this.instanceId,
+            configName,
+            missingFields: applied.missingFields,
+            reason: LIDARR_UNSUPPORTED_FIELD_REASON,
+            subsection: 'mediaSettings',
+          },
+        });
+      }
+    }
+
+    return diffSingletonEntity({
+      entityType: 'mediaSettings',
+      name: configName,
+      desiredEntity: updatedConfig,
+      currentEntity: existingConfig,
+      currentRemoteId: (entity) => entity.id,
+    });
+  }
+
+  private async generateNamingPreview(
+    databaseId: number | null,
+    configName: string | null,
+    instanceType: SyncArrType
+  ): Promise<EntityChange | null> {
+    this.assertMediaManagementSubsectionSupported('naming', instanceType);
+
+    if (!databaseId || !configName) {
+      await logger.warn('Naming preview skipped because it is not configured', {
+        source: 'Preview:MediaManagement',
+        meta: {
+          instanceId: this.instanceId,
+          subsection: 'naming',
+          code: 'missing_optional_config',
+        },
+      });
+      return null;
+    }
+
+    const cache = getCache(databaseId);
+    if (!cache) {
+      await logger.warn(`PCD cache not found for database ${databaseId}`, {
+        source: 'Preview:Naming',
+        meta: { instanceId: this.instanceId },
+      });
+      return null;
+    }
+
+    const namingSource = this.resolveNamingSource();
+    if (!namingSource) {
+      await logger.warn(`Unsupported instance type for naming preview: ${this.instanceType}`, {
+        source: 'Preview:Naming',
+        meta: { instanceId: this.instanceId, subsection: 'naming' },
+      });
+      return null;
+    }
+
+    const namingConfig = await namingSource.getByName(cache, configName);
+    if (!namingConfig) {
+      await logger.debug(`Naming config "${configName}" not found in ${namingSource.entityType}`, {
+        source: 'Preview:Naming',
+        meta: { instanceId: this.instanceId, configName, subsection: 'naming', entityType: namingSource.entityType },
+      });
+      return null;
+    }
+
+    const existingConfig = (await this.client.getNamingConfig()) as ArrNamingConfig;
+    const previewConfig = namingSource.toDesiredPayload(namingConfig);
+    const currentConfig = existingConfig as Record<string, unknown>;
+    let finalConfig: Record<string, unknown> = {
+      ...currentConfig,
+      ...previewConfig,
+    };
+
+    if (this.instanceType === 'lidarr') {
+      const applied = this.applyConfigUpdates(currentConfig, previewConfig);
+      finalConfig = {
+        ...currentConfig,
+        ...applied.updatedConfig,
+      };
+
+      if (applied.missingFields.length > 0) {
+        await logger.warn('Skipping unsupported Lidarr naming target fields', {
+          source: 'Preview:Naming',
+          meta: {
+            instanceId: this.instanceId,
+            configName,
+            missingFields: applied.missingFields,
+            reason: LIDARR_UNSUPPORTED_FIELD_REASON,
+            subsection: 'naming',
+          },
+        });
+      }
+
+      if (applied.appliedFields.length === 0) {
+        await logger.warn('No supported Lidarr naming fields available to preview', {
+          source: 'Preview:Naming',
+          meta: {
+            instanceId: this.instanceId,
+            configName,
+            reason: LIDARR_UNSUPPORTED_FIELD_REASON,
+            subsection: 'naming',
+          },
+        });
+        return null;
+      }
+
+      await logger.debug('Skipping unsupported Lidarr naming source fields', {
+        source: 'Preview:Naming',
+        meta: {
+          instanceId: this.instanceId,
+          configName,
+          subsection: 'naming',
+          skippedFields: [...LIDARR_UNSUPPORTED_NAMING_SOURCE_FIELDS],
+          reason: LIDARR_NAMING_SOURCE_FIELD_REASON,
+        },
+      });
+    }
+
+    return diffSingletonEntity({
+      entityType: 'naming',
+      name: configName,
+      desiredEntity: finalConfig,
+      currentEntity: currentConfig,
+      currentRemoteId: (entity) => (entity as { id?: number | null }).id ?? null,
+    });
+  }
+
+  private async generateQualityDefinitionsPreview(
+    databaseId: number | null,
+    configName: string | null,
+    instanceType: SyncArrType
+  ): Promise<readonly EntityChange[]> {
+    this.assertMediaManagementSubsectionSupported('qualityDefinitions', instanceType);
+
+    if (!databaseId || !configName) {
+      await logger.warn('Quality definitions preview skipped because it is not configured', {
+        source: 'Preview:MediaManagement',
+        meta: {
+          instanceId: this.instanceId,
+          subsection: 'qualityDefinitions',
+          code: 'missing_optional_config',
+        },
+      });
+      return [];
+    }
+
+    const cache = getCache(databaseId);
+    if (!cache) {
+      await logger.warn(`PCD cache not found for database ${databaseId}`, {
+        source: 'Preview:QualityDefinitions',
+        meta: { instanceId: this.instanceId },
+      });
+      return [];
+    }
+
+    const qualityDefinitionsSource = this.resolveQualityDefinitionsSource();
+    if (!qualityDefinitionsSource) {
+      await logger.warn(`Unsupported instance type for quality definitions preview: ${this.instanceType}`, {
+        source: 'Preview:QualityDefinitions',
+        meta: { instanceId: this.instanceId, subsection: 'qualityDefinitions' },
+      });
+      return [];
+    }
+
+    const qualityDefsConfig = await qualityDefinitionsSource.getByName(cache, configName);
+    if (!qualityDefsConfig) {
+      await logger.debug(
+        `Quality definitions config "${configName}" not found in ${qualityDefinitionsSource.entityType}`,
+        {
+          source: 'Preview:QualityDefinitions',
+          meta: { instanceId: this.instanceId, configName, subsection: 'qualityDefinitions' },
+        }
+      );
+      return [];
+    }
+
+    if (qualityDefsConfig.entries.length === 0) {
+      await logger.debug(`Quality definitions config "${configName}" has no entries`, {
+        source: 'Preview:QualityDefinitions',
+        meta: { instanceId: this.instanceId, configName, subsection: 'qualityDefinitions' },
+      });
+      return [];
+    }
+
+    const apiMappings = await this.getQualityApiMappings(cache);
+    if (instanceType === 'lidarr' && apiMappings.size === 0) {
+      await logger.warn('Skipping Lidarr quality definitions preview due missing mappings', {
+        source: 'Preview:QualityDefinitions',
+        meta: {
+          instanceId: this.instanceId,
+          configName,
+          subsection: 'qualityDefinitions',
+          reason: LIDARR_QUALITY_SKIP_REASON,
+        },
+      });
+      return [];
+    }
+
+    const arrDefinitions = await this.client.getQualityDefinitions();
+    const arrDefMap = new Map<string, ArrQualityDefinition>();
+    for (const def of arrDefinitions) {
+      if (typeof def.quality?.name === 'string') {
+        arrDefMap.set(def.quality.name.toLowerCase(), def);
+      }
+    }
+
+    const changes: EntityChange[] = [];
+    const missingMappingEntries: string[] = [];
+    const missingDefinitionEntries: string[] = [];
+
+    for (const entry of qualityDefsConfig.entries) {
+      const apiName = apiMappings.get(entry.quality_name.toLowerCase());
+      if (!apiName) {
+        missingMappingEntries.push(entry.quality_name);
+        continue;
+      }
+
+      if (instanceType === 'lidarr' && !isKnownQualityApiName('lidarr', apiName)) {
+        missingMappingEntries.push(entry.quality_name);
+        continue;
+      }
+
+      const arrDefinition = arrDefMap.get(apiName.toLowerCase());
+      if (!arrDefinition) {
+        missingDefinitionEntries.push(entry.quality_name);
+        continue;
+      }
+
+      const desiredDefinition = {
+        ...arrDefinition,
+        minSize: entry.min_size,
+        maxSize: entry.max_size === 0 ? null : entry.max_size,
+        preferredSize: entry.preferred_size === 0 ? null : entry.preferred_size,
+      };
+
+      const change = diffSingletonEntity({
+        entityType: 'qualityDefinition',
+        name: entry.quality_name,
+        desiredEntity: desiredDefinition as ArrQualityDefinition & Record<string, unknown>,
+        currentEntity: arrDefinition as ArrQualityDefinition & Record<string, unknown>,
+        currentComparable: (def) => ({
+          minSize: def.minSize,
+          maxSize: def.maxSize,
+          preferredSize: def.preferredSize,
+        }),
+        desiredComparable: (def) => ({
+          minSize: def.minSize,
+          maxSize: def.maxSize,
+          preferredSize: def.preferredSize,
+        }),
+        currentRemoteId: (def) => (def as ArrQualityDefinition).id,
+      });
+
+      if (change.action !== 'unchanged') {
+        changes.push(change);
+      }
+    }
+
+    if (instanceType === 'lidarr' && (missingMappingEntries.length > 0 || missingDefinitionEntries.length > 0)) {
+      await logger.warn('Skipped unsupported Lidarr quality definitions entries', {
+        source: 'Preview:QualityDefinitions',
+        meta: {
+          instanceId: this.instanceId,
+          configName,
+          missingMappings: missingMappingEntries,
+          missingArrDefinitions: missingDefinitionEntries,
+          reason: LIDARR_QUALITY_SKIP_REASON,
+          subsection: 'qualityDefinitions',
+        },
+      });
+    }
+
+    if (changes.length === 0) {
+      await logger.debug('No quality definition changes found for preview', {
+        source: 'Preview:QualityDefinitions',
+        meta: {
+          instanceId: this.instanceId,
+          configName,
+          missingMappings: missingMappingEntries,
+          missingArrDefinitions: missingDefinitionEntries,
+          subsection: 'qualityDefinitions',
+        },
+      });
+    }
+
+    return changes;
+  }
+
+  private resolveNamingSource(): NamingSource | null {
+    if (this.instanceType === 'radarr') {
+      return {
+        getByName: getRadarrNaming,
+        entityType: 'radarr_naming',
+        toDesiredPayload: (naming) => {
+          const radarrNaming = naming as RadarrNamingRow;
+          return {
+            renameMovies: radarrNaming.rename,
+            replaceIllegalCharacters: radarrNaming.replace_illegal_characters,
+            colonReplacementFormat: radarrNaming.colon_replacement_format,
+            standardMovieFormat: radarrNaming.movie_format,
+            movieFolderFormat: radarrNaming.movie_folder_format,
+          };
+        },
+      };
+    }
+
+    if (this.instanceType === 'sonarr') {
+      return {
+        getByName: getSonarrNaming,
+        entityType: 'sonarr_naming',
+        toDesiredPayload: (naming) => {
+          const sonarrNaming = naming as SonarrNamingRow;
+          return {
+            renameEpisodes: sonarrNaming.rename,
+            replaceIllegalCharacters: sonarrNaming.replace_illegal_characters,
+            colonReplacementFormat: colonReplacementToDb(sonarrNaming.colon_replacement_format),
+            customColonReplacementFormat: sonarrNaming.custom_colon_replacement_format,
+            multiEpisodeStyle: multiEpisodeStyleToDb(sonarrNaming.multi_episode_style),
+            standardEpisodeFormat: sonarrNaming.standard_episode_format,
+            dailyEpisodeFormat: sonarrNaming.daily_episode_format,
+            animeEpisodeFormat: sonarrNaming.anime_episode_format,
+            seriesFolderFormat: sonarrNaming.series_folder_format,
+            seasonFolderFormat: sonarrNaming.season_folder_format,
+          };
+        },
+      };
+    }
+
+    if (this.instanceType === 'lidarr') {
+      return {
+        getByName: getLidarrNaming,
+        entityType: 'lidarr_naming',
+        toDesiredPayload: (naming) => {
+          const lidarrNaming = naming as LidarrNamingRow;
+          return {
+            renameTracks: lidarrNaming.rename,
+            standardTrackFormat: lidarrNaming.standard_track_format,
+            multiDiscTrackFormat: lidarrNaming.multi_disc_track_format,
+            artistFolderFormat: lidarrNaming.artist_folder_format,
+            replaceIllegalCharacters: lidarrNaming.replace_illegal_characters,
+            colonReplacementFormat: colonReplacementToDb(lidarrNaming.colon_replacement_format),
+          };
+        },
+      };
+    }
+
+    return null;
+  }
+
+  private getMediaManagementSyncConfig(): MediaManagementSyncConfig {
+    const previewConfig = parseMediaManagementPreviewConfig(this.getPreviewConfig());
+    if (previewConfig) {
+      return previewConfig;
+    }
+
+    return arrSyncQueries.getMediaManagementSync(this.instanceId);
+  }
+
+  private getSyncArrType(): SyncArrType | null {
+    if (this.instanceType === 'radarr' || this.instanceType === 'sonarr' || this.instanceType === 'lidarr') {
+      return this.instanceType;
+    }
+
+    return null;
+  }
+
+  private assertMediaManagementSubsectionSupported(
+    subsection: MediaManagementSubsection,
+    instanceType: SyncArrType
+  ): void {
+    const reason = getUnsupportedMediaManagementSubsectionReason(instanceType, subsection);
+    if (!reason) {
+      return;
+    }
+
+    throw new Error(
+      JSON.stringify({
+        section: 'mediaManagement',
+        subsection,
+        code: 'unsupported_arr_type',
+        reason,
+      })
+    );
+  }
+
   protected get syncType(): string {
     return 'media management';
+  }
+
+  override async generatePreview(): Promise<Readonly<MediaManagementPreview>> {
+    try {
+      await logger.info(`Generating media management preview for "${this.instanceName}"`, {
+        source: 'Preview:MediaManagement',
+        meta: { instanceId: this.instanceId },
+      });
+
+      const instanceType = this.getSyncArrType();
+      if (!instanceType) {
+        await logger.warn('Media management preview unsupported for this arr type', {
+          source: 'Preview:MediaManagement',
+          meta: { instanceId: this.instanceId },
+        });
+        throw new Error(
+          JSON.stringify({
+            section: 'mediaManagement',
+            code: 'unsupported_arr_type',
+            reason: 'Media management preview is not supported for this arr instance type',
+          })
+        );
+      }
+
+      if (!isSyncSectionSupported(instanceType, 'mediaManagement')) {
+        await logger.error(`Media management preview unsupported for ${instanceType}`, {
+          source: 'Preview:MediaManagement',
+          meta: { instanceId: this.instanceId, instanceType },
+        });
+        throw new Error(
+          JSON.stringify({
+            section: 'mediaManagement',
+            code: 'unsupported_section',
+            reason:
+              getUnsupportedSyncSectionReason(instanceType, 'mediaManagement') ??
+              `Media management preview is not supported for ${instanceType}`,
+          })
+        );
+      }
+
+      const syncConfig = this.getMediaManagementSyncConfig();
+
+      const mediaSettings = await this.generateMediaSettingsPreview(
+        syncConfig.mediaSettingsDatabaseId,
+        syncConfig.mediaSettingsConfigName,
+        instanceType
+      );
+      const naming = await this.generateNamingPreview(
+        syncConfig.namingDatabaseId,
+        syncConfig.namingConfigName,
+        instanceType
+      );
+      const qualityDefinitions = await this.generateQualityDefinitionsPreview(
+        syncConfig.qualityDefinitionsDatabaseId,
+        syncConfig.qualityDefinitionsConfigName,
+        instanceType
+      );
+
+      await logger.info(`Generated media management preview for "${this.instanceName}"`, {
+        source: 'Preview:MediaManagement',
+        meta: {
+          instanceId: this.instanceId,
+          section: 'mediaManagement',
+          mediaSettingsAction: mediaSettings?.action ?? null,
+          namingAction: naming?.action ?? null,
+          qualityDefinitionChanges: qualityDefinitions.length,
+        },
+      });
+
+      return {
+        section: 'mediaManagement',
+        mediaSettings,
+        naming,
+        qualityDefinitions,
+      };
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+
+      await logger.error(`Failed to generate media management preview for "${this.instanceName}"`, {
+        source: 'Preview:MediaManagement',
+        meta: { instanceId: this.instanceId, error: errorMsg },
+      });
+
+      throw error instanceof Error ? error : new Error(errorMsg);
+    }
   }
 
   /**

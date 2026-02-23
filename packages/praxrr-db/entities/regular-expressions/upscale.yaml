@@ -1,0 +1,11 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: Upscale
+pattern: (Up[-\.\s]?scale|Re[-\.\s]?Grade|\bAIUS\b|AI[-\.\s]?enhanced)
+tags:
+  - Banned
+  - Enhancement
+description: 'Matches upscales, regrades, AI Enhancements, etc. '
+regex101Id: null

@@ -1,0 +1,40 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: SD Golden Popcorn
+description: Matches SD Golden Popcorns. Only works on PassThePopcorn connected directly to Radarr
+includeInRename: false
+tags:
+  - Flag
+  - Golden Popcorn
+conditions:
+  - name: Golden Popcorn
+    type: indexer_flag
+    arrType: all
+    negate: false
+    required: true
+    indexerFlags:
+      - ptp_golden
+  - name: Not 1080p
+    type: resolution
+    arrType: all
+    negate: true
+    required: true
+    resolutions:
+      - 1080p
+  - name: Not 2160p
+    type: resolution
+    arrType: all
+    negate: true
+    required: true
+    resolutions:
+      - 2160p
+  - name: Not 720p
+    type: resolution
+    arrType: all
+    negate: true
+    required: true
+    resolutions:
+      - 720p
+tests: []

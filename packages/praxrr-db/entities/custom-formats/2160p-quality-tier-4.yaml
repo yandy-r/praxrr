@@ -1,0 +1,123 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: 2160p Quality Tier 4
+description: Matches release groups who fall under 2160p Quality Tier 4
+includeInRename: false
+tags:
+  - 2160p
+  - Quality
+  - Release Group Tier
+conditions:
+  - name: 2160p
+    type: resolution
+    arrType: all
+    negate: false
+    required: true
+    resolutions:
+      - 2160p
+  - name: BSTD
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: BSTD
+        pattern: (?<=^|[\s.-])BSTD\b
+  - name: Bluray
+    type: source
+    arrType: all
+    negate: false
+    required: true
+    sources:
+      - bluray
+  - name: BlzT
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: BlzT
+        pattern: (?<=^|[\s.-])BlzT\b
+  - name: EDPH
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: EDPH
+        pattern: (?<=^|[\s.-])EDPH\b
+  - name: ESiR
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: ESiR
+        pattern: (?<=^|[\s.-])ESiR\b
+  - name: HiDt
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: HiDt
+        pattern: (?<=^|[\s.-])HiDt\b
+  - name: Kitsune
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: Kitsune
+        pattern: (?<=^|[\s.-])Kitsune\b
+  - name: NCmt
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: NCmt
+        pattern: (?<=^|[\s.-])NCmt\b
+  - name: NTb
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: NTb
+        pattern: (?<=^|[\s.-])NTb\b
+  - name: Not Remux
+    type: release_title
+    arrType: all
+    negate: true
+    required: true
+    patterns:
+      - name: Remux
+        pattern: Remux
+  - name: SPHD
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: SPHD
+        pattern: (?<=^|[\s.-])SPHD\b
+  - name: TDD
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: TDD
+        pattern: (?<=^|[\s.-])TDD\b
+  - name: iFT
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: iFT
+        pattern: (?<=^|[\s.-])iFT\b
+tests: []

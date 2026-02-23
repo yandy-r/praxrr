@@ -1,0 +1,11 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: ATELiER
+pattern: (?<=^|[\s.-])ATELiER\b
+tags:
+  - Bluray
+  - Release Group
+description: Matches "ATELiER" when preceded by whitespace, a hyphen or dot
+regex101Id: null

@@ -24,10 +24,31 @@ const SUPPORTED_SYNC_SECTIONS: Record<SyncArrType, readonly SectionType[]> = {
   lidarr: SYNC_SECTION_ORDER,
 };
 
+const BASE_SYNC_MEDIA_MANAGEMENT_SUBSECTIONS = ['mediaSettings', 'naming', 'qualityDefinitions'] as const;
+
+export type MediaManagementSubsection = (typeof BASE_SYNC_MEDIA_MANAGEMENT_SUBSECTIONS)[number];
+
+const SUPPORTED_MEDIA_MANAGEMENT_SUBSECTIONS: Record<SyncArrType, readonly MediaManagementSubsection[]> = {
+  radarr: BASE_SYNC_MEDIA_MANAGEMENT_SUBSECTIONS,
+  sonarr: BASE_SYNC_MEDIA_MANAGEMENT_SUBSECTIONS,
+  lidarr: BASE_SYNC_MEDIA_MANAGEMENT_SUBSECTIONS,
+};
+
 const UNSUPPORTED_SYNC_SECTION_REASONS: Partial<Record<SyncArrType, Partial<Record<SectionType, string>>>> = {};
+
+const UNSUPPORTED_MEDIA_MANAGEMENT_SUBSECTION_REASONS: Partial<
+  Record<SyncArrType, Partial<Record<MediaManagementSubsection, string>>>
+> = {};
 
 export function isSyncSectionSupported(arrType: SyncArrType, section: SectionType): boolean {
   return SUPPORTED_SYNC_SECTIONS[arrType].includes(section);
+}
+
+export function isMediaManagementSubsectionSupported(
+  arrType: SyncArrType,
+  subsection: MediaManagementSubsection
+): boolean {
+  return SUPPORTED_MEDIA_MANAGEMENT_SUBSECTIONS[arrType].includes(subsection);
 }
 
 export function getUnsupportedSyncSectionReason(arrType: SyncArrType, section: SectionType): string | null {
@@ -36,6 +57,20 @@ export function getUnsupportedSyncSectionReason(arrType: SyncArrType, section: S
   }
 
   return UNSUPPORTED_SYNC_SECTION_REASONS[arrType]?.[section] ?? `Section ${section} is not supported for ${arrType}`;
+}
+
+export function getUnsupportedMediaManagementSubsectionReason(
+  arrType: SyncArrType,
+  subsection: MediaManagementSubsection
+): string | null {
+  if (isMediaManagementSubsectionSupported(arrType, subsection)) {
+    return null;
+  }
+
+  return (
+    UNSUPPORTED_MEDIA_MANAGEMENT_SUBSECTION_REASONS[arrType]?.[subsection] ??
+    `Media management subsection ${subsection} is not supported for ${arrType}`
+  );
 }
 
 type MappedSyncArrType = SyncArrType;

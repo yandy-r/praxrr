@@ -1,0 +1,10 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: mkv
+pattern: .mkv|.mp4
+tags:
+  - Container
+description: Matches MKV and MP4 containers. Helps to differentiate file names from torrent names.
+regex101Id: null

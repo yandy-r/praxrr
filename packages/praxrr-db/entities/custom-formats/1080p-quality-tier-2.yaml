@@ -1,0 +1,123 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: 1080p Quality Tier 2
+description: Matches release groups who fall under 1080p GPPi Tier 2
+includeInRename: false
+tags:
+  - 1080p
+  - GPPi
+  - Quality
+  - Release Group Tier
+conditions:
+  - name: 1080p
+    type: resolution
+    arrType: all
+    negate: false
+    required: true
+    resolutions:
+      - 1080p
+  - name: Bluray
+    type: source
+    arrType: all
+    negate: false
+    required: false
+    sources:
+      - bluray
+  - name: CtrlHD
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: CtrlHD
+        pattern: (?<=^|[\s.-])CtrlHD\b
+  - name: D-Z0N3
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: D-Z0N3
+        pattern: (?<=^|[\s.-])D-Z0N3\b
+  - name: EbP
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: EbP
+        pattern: (?<=^|[\s.-])EbP\b
+  - name: Geek
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: Geek
+        pattern: (?<=^|[\s.-])Geek\b
+  - name: HiFi
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: HiFi
+        pattern: (?<=^|[\s.-])HiFi\b
+  - name: LoRD
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: LoRD
+        pattern: (?<=^|[\s.-])LoRD\b
+  - name: Not Remux
+    type: release_title
+    arrType: all
+    negate: true
+    required: true
+    patterns:
+      - name: Remux
+        pattern: Remux
+  - name: TayTo
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: TayTo
+        pattern: (?<=^|[\s.-])TayTo\b
+  - name: VietHD
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: VietHD
+        pattern: (?<=^|[\s.-])VietHD\b
+  - name: WEBRip
+    type: source
+    arrType: radarr
+    negate: false
+    required: false
+    sources:
+      - webrip
+  - name: ZQ
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: ZQ
+        pattern: (?<=^|[\s.-])ZQ\b
+  - name: c0kE
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: c0kE
+        pattern: (?<=^|[\s.-])c0kE\b
+tests: []

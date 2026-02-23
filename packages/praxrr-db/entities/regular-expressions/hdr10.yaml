@@ -1,0 +1,12 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: HDR10
+pattern: \bHDR10(?!\+|Plus)\b
+tags:
+  - Colour Grade
+  - Enhancement
+  - HDR
+description: 'This regex matches `HDR10` only when it *is not* followed by any HDR format specifiers like `+`, or `Plus`. '
+regex101Id: null

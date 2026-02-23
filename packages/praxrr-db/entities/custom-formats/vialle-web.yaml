@@ -1,0 +1,47 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: Vialle WEB
+description: Matches 1080p Vialle WEBs via Release Title Parsing
+includeInRename: false
+tags: []
+conditions:
+  - name: 1080p
+    type: resolution
+    arrType: all
+    negate: false
+    required: true
+    resolutions:
+      - 1080p
+  - name: Release Group
+    type: release_group
+    arrType: all
+    negate: true
+    required: true
+    patterns:
+      - name: Vialle
+        pattern: (?<=^|[\s.-])Vialle\b
+  - name: Vialle
+    type: release_title
+    arrType: all
+    negate: false
+    required: true
+    patterns:
+      - name: Vialle
+        pattern: (?<=^|[\s.-])Vialle\b
+  - name: WEB-DL
+    type: source
+    arrType: all
+    negate: false
+    required: false
+    sources:
+      - web_dl
+  - name: WEBRip
+    type: source
+    arrType: all
+    negate: false
+    required: false
+    sources:
+      - webrip
+tests: []

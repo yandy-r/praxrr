@@ -1,0 +1,84 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: 576p Quality Tier 2
+description: Matches release groups who fall under 576p Quality Tier 2
+includeInRename: false
+tags:
+  - 576p
+  - GPPi
+  - Quality
+  - Release Group Tier
+conditions:
+  - name: 576p
+    type: resolution
+    arrType: all
+    negate: false
+    required: true
+    resolutions:
+      - 576p
+  - name: BV
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: BV
+        pattern: (?<=^|[\s.-])BV\b
+  - name: Bluray
+    type: source
+    arrType: all
+    negate: false
+    required: true
+    sources:
+      - bluray
+  - name: Dariush
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: Dariush
+        pattern: (?<=^|[\s.-])Dariush\b
+  - name: HaB
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: HaB
+        pattern: (?<=^|[\s.-])HaB\b
+  - name: Not Remux
+    type: release_title
+    arrType: all
+    negate: true
+    required: true
+    patterns:
+      - name: Remux
+        pattern: Remux
+  - name: TBB
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: TBB
+        pattern: (?<=^|[\s.-])TBB\b
+  - name: ZQ
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: ZQ
+        pattern: (?<=^|[\s.-])ZQ\b
+  - name: c0kE
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: c0kE
+        pattern: (?<=^|[\s.-])c0kE\b
+tests: []

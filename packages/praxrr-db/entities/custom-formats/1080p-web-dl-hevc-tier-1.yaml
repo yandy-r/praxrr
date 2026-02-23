@@ -1,0 +1,131 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: 1080p WEB-DL HEVC Tier 1
+description: Matches release groups who fall under 1080p WEB-DL HEVC Tier 1
+includeInRename: false
+tags:
+  - 1080p
+  - HEVC
+  - Release Group Tier
+conditions:
+  - name: 1080p
+    type: resolution
+    arrType: all
+    negate: false
+    required: true
+    resolutions:
+      - 1080p
+  - name: BYNDR
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: BYNDR
+        pattern: (?<=^|[\s.-])BYNDR\b
+  - name: CMRG
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: CMRG
+        pattern: (?<=^|[\s.-])CM(a)?R(io)?G\b
+  - name: FLUX
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: FLUX
+        pattern: (?<=^|[\s.-])FLUX\b
+  - name: HHWEB
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: HHWEB
+        pattern: (?<=^|[\s.-])HHWEB\b
+  - name: HONE
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: HONE
+        pattern: (?<=^|[\s.-])HONE\b
+  - name: Kitsune
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: Kitsune
+        pattern: (?<=^|[\s.-])Kitsune\b
+  - name: MZABI
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: MZABI
+        pattern: (?<=^|[\s.-])MZABI\b
+  - name: NTb
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: NTb
+        pattern: (?<=^|[\s.-])NTb\b
+  - name: Not Weasley
+    type: release_title
+    arrType: all
+    negate: true
+    required: true
+    patterns:
+      - name: Weasley
+        pattern: \b(Weasley)\b
+  - name: SMURF
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: SMURF
+        pattern: (?<=^|[\s.-])SMURF\b
+  - name: TEPES
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: TEPES
+        pattern: (?<=^|[\s.-])TEPES\b
+  - name: WEB-DL
+    type: source
+    arrType: all
+    negate: false
+    required: true
+    sources:
+      - web_dl
+  - name: h265
+    type: release_title
+    arrType: all
+    negate: false
+    required: true
+    patterns:
+      - name: HEVC
+        pattern: '[xh][ ._-]?265|\bHEVC(\b|\d)'
+  - name: playWEB
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: playWEB
+        pattern: (?<=^|[\s.-])playWEB\b
+tests: []

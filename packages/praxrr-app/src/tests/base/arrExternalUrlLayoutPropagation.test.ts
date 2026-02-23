@@ -96,6 +96,7 @@ Deno.test('arr layout load reflects updated external_url after settings action r
     url: 'http://arr.internal',
     external_url: null,
     api_key: 'old-key',
+    api_key_fingerprint: null,
     tags: null,
     enabled: 1,
     created_at: '2025-01-01T00:00:00.000Z',

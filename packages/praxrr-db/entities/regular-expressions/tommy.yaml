@@ -1,0 +1,11 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: TOMMY
+pattern: (?<=^|[\s.-])TOMMY\b
+tags:
+  - Release Group
+  - WEB-DL
+description: Matches "TOMMY" when preceded by whitespace, a hyphen or dot
+regex101Id: null

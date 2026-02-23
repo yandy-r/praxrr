@@ -1,0 +1,12 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: B&W
+pattern: \d{4}.*?\bblack\b[\s.]*(?:and|\&|-|\/)?[\s.]*\bwhite\b|\bb\&?w\b
+tags:
+  - Banned
+  - Colour Grade
+  - Enhancement
+description: Black and White colour grading. This regex matches a 4-digit number (optionally surrounded by parentheses), followed by any amount of text, and then detects references to "black and white" in various formats. It supports `blackwhite` (no spaces), `black and white`, `black-white`, "`black & white`, `black/white`, as well as shorthand `BW` and `B&W`, while excluding invalid variations like `b w`, `b-w`, or `b/w`
+regex101Id: null

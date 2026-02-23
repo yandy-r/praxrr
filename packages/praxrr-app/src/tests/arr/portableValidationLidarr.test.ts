@@ -5,15 +5,13 @@ Deno.test('validatePortableData: accepts valid lidarr_naming payload', () => {
   const result = validatePortableData('lidarr_naming', {
     name: 'Lidarr Default',
     rename: true,
-    standardEpisodeFormat: '{Artist Name} - {Album Title}',
-    dailyEpisodeFormat: '{Artist Name} - {Album Title}',
-    animeEpisodeFormat: '{Artist Name} - {Album Title}',
-    seriesFolderFormat: '{Artist Name}',
-    seasonFolderFormat: '{Release Year}',
+    standardTrackFormat: '{Track Name}',
+    artistName: '{Artist Name}',
+    multiDiscTrackFormat: '{Disc Number}',
+    artistFolderFormat: '{Artist Name}',
     replaceIllegalCharacters: true,
     colonReplacementFormat: 'dash',
     customColonReplacementFormat: null,
-    multiEpisodeStyle: 'extend',
   });
 
   assertEquals(result, null);
@@ -59,15 +57,13 @@ Deno.test('validatePortableData: rejects mixed lidarr_naming payloads with Radar
   const result = validatePortableData('lidarr_naming', {
     name: 'Invalid Lidarr Naming',
     rename: true,
-    standardEpisodeFormat: '{Artist Name} - {Album Title}',
-    dailyEpisodeFormat: '{Artist Name} - {Album Title}',
-    animeEpisodeFormat: '{Artist Name} - {Album Title}',
-    seriesFolderFormat: '{Artist Name}',
-    seasonFolderFormat: '{Release Year}',
+    standardTrackFormat: '{Track Name}',
+    artistName: '{Artist Name}',
+    multiDiscTrackFormat: '{Disc Number}',
+    artistFolderFormat: '{Artist Name}',
     replaceIllegalCharacters: true,
     colonReplacementFormat: 'dash',
     customColonReplacementFormat: null,
-    multiEpisodeStyle: 'extend',
     movieFormat: '{Movie Title}',
     movieFolderFormat: '{Movie Title}',
   });

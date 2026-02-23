@@ -1,0 +1,11 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: HEVC
+pattern: '[xh][ ._-]?265|\bHEVC(\b|\d)'
+tags:
+  - Codec
+  - Encoder
+description: 'An open source encoder that produces HEVC videos. '
+regex101Id: null

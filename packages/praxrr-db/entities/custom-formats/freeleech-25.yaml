@@ -1,0 +1,19 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: Freeleech 25%
+description: 25% Freeleech Indexer Flag
+includeInRename: false
+tags:
+  - Flag
+  - Freeleech
+conditions:
+  - name: 25% Freeleech
+    type: indexer_flag
+    arrType: all
+    negate: false
+    required: true
+    indexerFlags:
+      - freeleech_25
+tests: []

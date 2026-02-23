@@ -1,0 +1,11 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: Criterion Channel
+pattern: \b(CRiT)\b
+tags:
+  - Streaming Service
+  - WEB-DL
+description: The Criterion Channel is a subscription-based streaming service launched on April 8, 2019, by The Criterion Collection. Available in the United States and Canada, it features a rich library of films, including Criterion Collection releases with special features, curated playlists, temporarily licensed titles, and original content such as academic overviews and introductions. The Channel also showcases Janus-owned titles not yet available on physical media and maintains a collaborative relationship with Warner Bros. Discovery's Max platform. Perfect for cinephiles, the service brings a curated cinematic experience to the digital space.
+regex101Id: null

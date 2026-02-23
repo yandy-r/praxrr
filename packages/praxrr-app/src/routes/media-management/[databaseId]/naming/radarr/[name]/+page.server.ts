@@ -106,7 +106,7 @@ export const actions: Actions = {
           movieFormat: movieFormat || '',
           movieFolderFormat: movieFolderFormat || '',
           replaceIllegalCharacters,
-          colonReplacementFormat: colonReplacementFormat || 'delete',
+          colonReplacementFormat: colonReplacementFormat || 'smart',
         },
       });
     } catch (err) {

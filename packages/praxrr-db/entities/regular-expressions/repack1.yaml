@@ -1,0 +1,15 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: Repack1
+pattern: \b(re(pack|rip)|proper)\b
+tags:
+  - Flag
+  - Repack
+description: |-
+  Matches 'PROPER' or 'REPACK' or 'RERIP' only when they appear after a year (4 digits) but not before one.
+
+  * `(?<=.*?\d{4}.*?)` - look for a 4-digit number before
+  * `\b(re(pack|rip)|proper)\b` - match proper/repack/rerip
+regex101Id: null

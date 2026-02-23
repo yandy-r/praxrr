@@ -63,3 +63,105 @@ export function getNamespaceIndex(name: string): number | null {
 
   return null;
 }
+
+/**
+ * Preview/preview-diff invariant:
+ * - Normalize display output by stripping namespace suffixes.
+ * - Preserve suffixes when deciding exact identity.
+ *
+ * Acceptance example:
+ * - stripNamespaceSuffix("Quality Profile​") === "Quality Profile"
+ */
+export function normalizeNamespaceDisplayName(name: string): string {
+  return stripNamespaceSuffix(name);
+}
+
+interface NamespaceMatchCandidate {
+  readonly index: number;
+  readonly name: string;
+}
+
+/** Result of namespace-aware matching between desired and remote names. */
+export interface NamespaceNameMatch {
+  /** Original remote index used for lookup. */
+  readonly index: number;
+  /** Whether match was exact by string or by stripped namespace suffix. */
+  readonly matchKind: 'exact' | 'stripped';
+  /** Remote name used for further processing. */
+  readonly remoteName: string;
+  /** Display name after suffix removal. */
+  readonly displayName: string;
+}
+
+/**
+ * Return the match precedence for namespace-aware comparisons.
+ *
+ * Precedence:
+ * 1. Exact name (including suffix) wins.
+ * 2. Then namespace-stripped name match.
+ * 3. If multiple stripped matches, the shortest/lexicographically-first suffix is chosen.
+ *
+ * Acceptance examples:
+ * - desired "Profile A", remote ["Profile A", "Profile A​", "Profile A‫"] => exact match.
+ * - desired "Profile A", remote ["Profile A​", "Profile A‫"] => suffix-agnostic match, shortest suffix wins.
+ */
+export function findNamespaceMatch(
+  desiredName: string,
+  candidateNames: ReadonlyArray<string>,
+  consumedIndexes: ReadonlySet<number> = new Set<number>()
+): NamespaceNameMatch | null {
+  const candidates: NamespaceMatchCandidate[] = candidateNames
+    .map((name, index) => ({ name, index }))
+    .filter((candidate) => !consumedIndexes.has(candidate.index));
+
+  const exact = candidates.find((candidate) => candidate.name === desiredName);
+  if (exact) {
+    return {
+      index: exact.index,
+      matchKind: 'exact',
+      remoteName: exact.name,
+      displayName: stripNamespaceSuffix(exact.name),
+    };
+  }
+
+  // If the desired name already includes a namespace suffix, do not
+  // perform fallback stripping. This prevents accidental cross-db collisions
+  // when desired is already explicit about namespace selection.
+  if (hasNamespaceSuffix(desiredName)) {
+    return null;
+  }
+
+  const targetDisplay = stripNamespaceSuffix(desiredName);
+  const strippedMatches = candidates.filter((candidate) => stripNamespaceSuffix(candidate.name) === targetDisplay);
+  if (strippedMatches.length === 0) return null;
+
+  const unsuffixed = strippedMatches.find((candidate) => !hasNamespaceSuffix(candidate.name));
+  if (unsuffixed) {
+    return {
+      index: unsuffixed.index,
+      matchKind: 'stripped',
+      remoteName: unsuffixed.name,
+      displayName: stripNamespaceSuffix(unsuffixed.name),
+    };
+  }
+
+  const sorted = [...strippedMatches].sort((a, b) => {
+    const aSuffixLen = suffixLength(a.name);
+    const bSuffixLen = suffixLength(b.name);
+    if (aSuffixLen !== bSuffixLen) return aSuffixLen - bSuffixLen;
+    return a.name.localeCompare(b.name);
+  });
+
+  const winner = sorted[0];
+  return {
+    index: winner.index,
+    matchKind: 'stripped',
+    remoteName: winner.name,
+    displayName: stripNamespaceSuffix(winner.name),
+  };
+}
+
+function suffixLength(name: string): number {
+  const match = name.match(SUFFIX_PATTERN);
+  return match ? match[0].length : 0;
+}

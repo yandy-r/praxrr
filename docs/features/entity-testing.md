@@ -3,7 +3,7 @@
 ## Overview
 
 Entity Testing lets you simulate real releases against your custom formats and quality profile
-scores before syncing to Arr.
+scores before syncing to Arr media-management apps.
 
 Primary UI route:
 
@@ -40,7 +40,7 @@ Evaluation API:
 ## 5) Score against a quality profile
 
 - Select a quality profile in the UI.
-- Praxrr totals scores only for matched custom formats and the correct Arr target:
+- Praxrr totals scores only for matched custom formats and the correct target app family:
   - `movie` entities use Radarr-scoped scores.
   - `series` entities use Sonarr-scoped scores.
 
@@ -79,7 +79,7 @@ curl -sS -X POST "http://localhost:6868/api/v1/entity-testing/evaluate" \
 - `Missing or empty releases array`:
   Your evaluate payload must include at least one release entry.
 - Score appears lower than expected:
-  Verify selected profile and Arr-specific score mapping (`movie` vs `series`) for matched custom formats.
+  Verify selected profile and app-specific score mapping (`movie` vs `series`) for matched custom formats.
 
 ## Related docs
 

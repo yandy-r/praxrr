@@ -1,0 +1,11 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: bluespots
+pattern: (?<=^|[\s.-])bluespots\b
+tags:
+  - Release Group
+  - WEB-DL
+description: null
+regex101Id: null

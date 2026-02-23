@@ -1,0 +1,49 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: x265 (Missing)
+description: "Attempts to match 2160p x265 encodes that aren't labelled with any codec. "
+includeInRename: false
+tags:
+  - Codec
+conditions:
+  - name: 2160p
+    type: resolution
+    arrType: all
+    negate: false
+    required: true
+    resolutions:
+      - 2160p
+  - name: Bluray
+    type: source
+    arrType: all
+    negate: false
+    required: true
+    sources:
+      - bluray
+  - name: Not Remux
+    type: release_title
+    arrType: all
+    negate: true
+    required: true
+    patterns:
+      - name: Remux
+        pattern: Remux
+  - name: Not x264
+    type: release_title
+    arrType: all
+    negate: true
+    required: true
+    patterns:
+      - name: x264
+        pattern: ^(?!.*(?i:remux)).*([xh](\.?264)|DVDRip)
+  - name: Not x265
+    type: release_title
+    arrType: all
+    negate: true
+    required: true
+    patterns:
+      - name: x265
+        pattern: ^(?!.*(?i:remux))(?=.*([x]\s?(\.?265)\b|HEVC|\bDS4K\b)).*$
+tests: []

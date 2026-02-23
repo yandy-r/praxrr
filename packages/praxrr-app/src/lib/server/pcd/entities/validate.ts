@@ -31,7 +31,7 @@ export function validatePortableData(entityType: EntityType, data: Record<string
     case 'sonarr_naming':
       return validateSonarrNaming(data);
     case 'lidarr_naming':
-      return validateLidarrPortableData('lidarr_naming', data, validateSonarrNaming);
+      return validateLidarrNaming(data);
     case 'radarr_media_settings':
     case 'sonarr_media_settings':
       return validateMediaSettings(data);
@@ -206,6 +206,37 @@ function validateSonarrNaming(data: Record<string, unknown>): string | null {
   return null;
 }
 
+function validateLidarrNaming(data: Record<string, unknown>): string | null {
+  const nameError = requireName(data);
+  if (nameError) return nameError;
+
+  if (typeof data.rename !== 'boolean') {
+    return 'data.rename must be a boolean';
+  }
+  if (typeof data.standardTrackFormat !== 'string') {
+    return 'data.standardTrackFormat must be a string';
+  }
+  if (typeof data.artistName !== 'string') {
+    return 'data.artistName must be a string';
+  }
+  if (typeof data.multiDiscTrackFormat !== 'string') {
+    return 'data.multiDiscTrackFormat must be a string';
+  }
+  if (typeof data.artistFolderFormat !== 'string') {
+    return 'data.artistFolderFormat must be a string';
+  }
+  if (typeof data.replaceIllegalCharacters !== 'boolean') {
+    return 'data.replaceIllegalCharacters must be a boolean';
+  }
+  if (!VALID_COLON_FORMATS.has(data.colonReplacementFormat as string)) {
+    return `data.colonReplacementFormat must be one of: ${[...VALID_COLON_FORMATS].join(', ')}`;
+  }
+  if (data.customColonReplacementFormat !== null && typeof data.customColonReplacementFormat !== 'string') {
+    return 'data.customColonReplacementFormat must be a string or null';
+  }
+
+  return validateLidarrPortableData('lidarr_naming', data, () => null);
+}
 function validateLidarrPortableData(
   entityType: LidarrMediaManagementPortableEntityType,
   data: Record<string, unknown>,

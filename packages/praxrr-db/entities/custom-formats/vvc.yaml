@@ -1,0 +1,20 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: VVC
+description: Matches the 'VVC' Regex Pattern
+includeInRename: false
+tags:
+  - Bleeding Edge
+  - Codec
+conditions:
+  - name: VVC
+    type: release_title
+    arrType: all
+    negate: false
+    required: true
+    patterns:
+      - name: VVC
+        pattern: (?<=^|[\s.-])VVC\b
+tests: []

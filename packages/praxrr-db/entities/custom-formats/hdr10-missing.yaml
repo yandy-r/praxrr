@@ -1,0 +1,82 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: HDR10 (Missing)
+description: Attempts to match HDR10 to groups that mislabel their releases. *This does not work properly in sonarr.*
+includeInRename: false
+tags:
+  - Colour Grade
+  - HDR
+conditions:
+  - name: 2160p
+    type: resolution
+    arrType: all
+    negate: false
+    required: true
+    resolutions:
+      - 2160p
+  - name: Bluray
+    type: source
+    arrType: all
+    negate: false
+    required: true
+    sources:
+      - bluray
+  - name: Not HDR
+    type: release_title
+    arrType: all
+    negate: true
+    required: true
+    patterns:
+      - name: HDR
+        pattern: \b(HDR)\b
+  - name: Not HDR10
+    type: release_title
+    arrType: all
+    negate: true
+    required: true
+    patterns:
+      - name: HDR10
+        pattern: \bHDR10(?!\+|Plus)\b
+  - name: Not HDR10+
+    type: release_title
+    arrType: all
+    negate: true
+    required: true
+    patterns:
+      - name: HDR10+
+        pattern: \bHDR10.?(\+|P(lus)?\b)
+  - name: Not HLG
+    type: release_title
+    arrType: all
+    negate: true
+    required: true
+    patterns:
+      - name: HLG
+        pattern: \b(HLG)\b
+  - name: Not PQ
+    type: release_title
+    arrType: all
+    negate: true
+    required: true
+    patterns:
+      - name: PQ
+        pattern: \b(PQ|PQ10)\b
+  - name: Not SDR
+    type: release_title
+    arrType: all
+    negate: true
+    required: true
+    patterns:
+      - name: SDR
+        pattern: \b(SDR)\b
+  - name: Release Groups
+    type: release_group
+    arrType: all
+    negate: true
+    required: true
+    patterns:
+      - name: HDR10 (Negation)
+        pattern: (?<=^|[\s.-])BHDStudio\b
+tests: []

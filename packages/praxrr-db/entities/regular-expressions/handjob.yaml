@@ -1,0 +1,12 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: HANDJOB
+pattern: (?<=^|[\s.-])HANDJOB\b
+tags:
+  - Bluray
+  - DVD
+  - Release Group
+description: null
+regex101Id: null

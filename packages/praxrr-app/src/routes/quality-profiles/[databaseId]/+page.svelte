@@ -48,6 +48,7 @@
 	// Initialize data page store
 	const { search, view, filtered, setItems } = createDataPageStore(data.qualityProfiles, {
 		storageKey: 'qualityProfilesView',
+		defaultView: 'cards',
 		searchKeys: ['name'],
 		searchKey: `qualityProfilesSearch:${data.currentDatabase.id}`
 	});

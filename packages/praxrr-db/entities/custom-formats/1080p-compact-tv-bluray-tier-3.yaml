@@ -1,0 +1,100 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: 1080p Compact TV Bluray Tier 3
+description: Matches release groups who fall under 1080p Compact TV Bluray Tier 3
+includeInRename: false
+tags:
+  - 1080p
+  - Compact
+  - Release Group Tier
+  - TV
+conditions:
+  - name: 1080p
+    type: resolution
+    arrType: all
+    negate: false
+    required: true
+    resolutions:
+      - 1080p
+  - name: Bluray
+    type: source
+    arrType: all
+    negate: false
+    required: true
+    sources:
+      - bluray
+  - name: R1GY3B
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: R1GY3B
+        pattern: (?<=^|[\s.-])R1GY3B\b
+  - name: Ralphy
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: Ralphy
+        pattern: (?<=^|[\s.-])Ralphy\b
+  - name: TimeDistortion
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: TimeDistortion
+        pattern: (?<=^|[\s.-])TimeDistortion\b
+  - name: ToNaTo
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: ToNaTo
+        pattern: (?<=^|[\s.-])ToNaTo\b
+  - name: YELLO
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: YELLO
+        pattern: (?<=^|[\s.-])YELLO\b
+  - name: bluegreeen
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: bluegreeen
+        pattern: (?<=^|[\s.-])bluegreeen\b
+  - name: cXcY
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: cXcY
+        pattern: (?<=^|[\s.-])cXcY\b
+  - name: edge2020
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: edge2020
+        pattern: (?<=^|[\s.-])edge2020\b
+  - name: x265
+    type: release_title
+    arrType: all
+    negate: false
+    required: true
+    patterns:
+      - name: x265 (Efficient)
+        pattern: ^(?!.*(?i:remux))(?=.*([xh]\s?(\.?265)\b|HEVC|\bDS4K\b)).*$
+tests: []

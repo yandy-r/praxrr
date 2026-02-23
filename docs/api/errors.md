@@ -49,6 +49,8 @@ Notes:
 | Lidarr metadata profiles     | `403`  | Base-layer write requested without authorization                                       |
 | Lidarr metadata profiles     | `404`  | Database/profile not found                                                             |
 | Lidarr metadata profiles     | `500`  | Unexpected runtime/storage failure                                                     |
+| Startup pull                 | `404`  | No startup pull runs exist                                                             |
+| Startup pull                 | `500`  | Unexpected runtime/storage failure                                                     |
 
 ## Example errors
 

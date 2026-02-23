@@ -6,6 +6,7 @@
 import type { BaseArrClient } from '$arr/base.ts';
 import { logger } from '$logger/logger.ts';
 import type { SyncResult } from './types.ts';
+import type { SyncPreviewSectionResult } from './preview/types.ts';
 
 export type { SyncResult };
 
@@ -17,6 +18,7 @@ export abstract class BaseSyncer {
   protected client: BaseArrClient;
   protected instanceId: number;
   protected instanceName: string;
+  private previewConfig: unknown = null;
 
   constructor(client: BaseArrClient, instanceId: number, instanceName: string) {
     this.client = client;
@@ -87,5 +89,27 @@ export abstract class BaseSyncer {
 
       return { success: false, itemsSynced: 0, error: errorMsg };
     }
+  }
+
+  protected getPreviewConfig(): unknown {
+    return this.previewConfig;
+  }
+
+  public setPreviewConfig(previewConfig: unknown): void {
+    this.previewConfig = previewConfig;
+  }
+
+  public clearPreviewConfig(): void {
+    this.previewConfig = null;
+  }
+
+  /**
+   * Generate a read-only preview diff payload for this section.
+   *
+   * Preview generation must never mutate Arr state; concrete syncers
+   * should implement this method when they are ready to support read-only preview.
+   */
+  async generatePreview(): Promise<Readonly<SyncPreviewSectionResult>> {
+    throw new Error(`Preview generation is not implemented for ${this.syncType}`);
   }
 }

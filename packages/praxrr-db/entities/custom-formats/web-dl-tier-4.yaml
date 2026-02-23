@@ -1,0 +1,91 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: WEB-DL Tier 4
+description: Matches release groups who fall under WEB-DL Tier 4
+includeInRename: false
+tags:
+  - Release Group Tier
+  - WEB-DL
+conditions:
+  - name: APEX
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: APEX
+        pattern: (?<=^|[\s.-])APEX\b
+  - name: BLOOM
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: BLOOM
+        pattern: (?<=^|[\s.-])BLOOM\b
+  - name: BTN
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: BTN
+        pattern: (?<=^|[\s.-])BTN\b
+  - name: PTP
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: PTP
+        pattern: (?<=^|[\s.-])PTP\b
+  - name: RTN
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: RTN
+        pattern: (?<=^|[\s.-])RTN\b
+  - name: SPiRiT
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: SPiRiT
+        pattern: (?<=^|[\s.-])SPiRiT\b
+  - name: SiC
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: SiC
+        pattern: (?<=^|[\s.-])SiC\b
+  - name: ViSUM
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: ViSUM
+        pattern: (?<=^|[\s.-])ViSUM\b
+  - name: WEB-DL
+    type: source
+    arrType: all
+    negate: false
+    required: true
+    sources:
+      - web_dl
+  - name: dB
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: dB
+        pattern: (?<=^|[\s.-])dB\b
+tests: []

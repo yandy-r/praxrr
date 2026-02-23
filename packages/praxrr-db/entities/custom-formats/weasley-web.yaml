@@ -1,0 +1,39 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: Weasley WEB
+description: Matches 1080p Weasley HONE WEBs via Release Title Parsing
+includeInRename: false
+tags: []
+conditions:
+  - name: 1080p
+    type: resolution
+    arrType: all
+    negate: false
+    required: true
+    resolutions:
+      - 1080p
+  - name: WEB-DL
+    type: source
+    arrType: all
+    negate: false
+    required: false
+    sources:
+      - web_dl
+  - name: WEBRip
+    type: source
+    arrType: all
+    negate: false
+    required: false
+    sources:
+      - webrip
+  - name: Weasley
+    type: release_title
+    arrType: all
+    negate: false
+    required: true
+    patterns:
+      - name: Weasley
+        pattern: \b(Weasley)\b
+tests: []

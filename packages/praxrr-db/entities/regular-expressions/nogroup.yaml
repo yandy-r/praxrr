@@ -1,0 +1,11 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: NoGroup
+pattern: (?<=^|[\s.-])NoGr(ou)?p\b
+tags:
+  - Banned
+  - Release Group
+description: null
+regex101Id: null

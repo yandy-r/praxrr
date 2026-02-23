@@ -1,8 +1,10 @@
 <script lang="ts">
+	import { invalidateAll } from '$app/navigation';
 	import type { QualityProfileTableRow } from '$shared/pcd/display.ts';
 	import Toggle from '$ui/toggle/Toggle.svelte';
 	import SyncFooter from './SyncFooter.svelte';
 	import { alertStore } from '$lib/client/alerts/store.ts';
+	import type { SectionType } from '$sync/types.ts';
 
 	interface DatabaseWithProfiles {
 		id: number;
@@ -16,6 +18,10 @@
 	export let cronExpression: string = '0 * * * *';
 	export let canSave: boolean = true;
 	export let warning: string | null = null;
+	export let previewEnabled = false;
+	export let previewConfig: unknown = null;
+	export let previewSection: SectionType | null = null;
+	export let lastSyncedAt: string | null = null;
 
 	let saving = false;
 	let syncing = false;
@@ -49,6 +55,16 @@
 		)
 	);
 
+	$: {
+		if (selectedKeys.size === 0) {
+			previewEnabled = false;
+		} else if (isDirty) {
+			previewEnabled = true;
+		} else {
+			previewEnabled = lastSyncedAt === null;
+		}
+	}
+
 	function isSelected(databaseId: number, profileName: string): boolean {
 		return selectedKeys.has(`${databaseId}-${profileName}`);
 	}
@@ -56,6 +72,10 @@
 	function setProfile(databaseId: number, profileName: string, checked: boolean) {
 		state[databaseId][profileName] = checked;
 		state = { ...state }; // Reassign to trigger reactivity
+	}
+
+	export async function saveSection() {
+		await handleSave();
 	}
 
 	function getSelections(): { databaseId: number; profileName: string }[] {
@@ -68,6 +88,10 @@
 			}
 		}
 		return selections;
+	}
+
+	export async function syncSection() {
+		await handleSync();
 	}
 
 	async function handleSave() {
@@ -83,13 +107,14 @@
 				body: formData
 			});
 
-			if (response.ok) {
-				alertStore.add('success', 'Quality profiles sync config saved');
-				// Update saved state to current
-				savedState = JSON.stringify({ state, syncTrigger, cronExpression });
-			} else {
-				alertStore.add('error', 'Failed to save quality profiles sync config');
-			}
+				if (response.ok) {
+					alertStore.add('success', 'Quality profiles sync config saved');
+					// Update saved state to current
+					savedState = JSON.stringify({ state, syncTrigger, cronExpression });
+					await invalidateAll().catch(() => undefined);
+				} else {
+					alertStore.add('error', 'Failed to save quality profiles sync config');
+				}
 		} catch {
 			alertStore.add('error', 'Failed to save quality profiles sync config');
 		} finally {
@@ -105,12 +130,13 @@
 				body: new FormData()
 			});
 
-			if (response.ok) {
-				const data = await response.json();
-				alertStore.add('success', data?.message ?? 'Sync queued');
-			} else {
-				alertStore.add('error', 'Sync failed');
-			}
+				if (response.ok) {
+					const data = await response.json();
+					alertStore.add('success', data?.message ?? 'Sync queued');
+					await invalidateAll().catch(() => undefined);
+				} else {
+					alertStore.add('error', 'Sync failed');
+				}
 		} catch {
 			alertStore.add('error', 'Sync failed');
 		} finally {
@@ -170,6 +196,11 @@
 		{isDirty}
 		{canSave}
 		{warning}
+		{previewEnabled}
+		{previewConfig}
+		{previewSection}
+		on:previewGenerated
+		on:previewError
 		on:save={handleSave}
 		on:sync={handleSync}
 	/>

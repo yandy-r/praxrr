@@ -1,0 +1,11 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: iQIYI
+pattern: \b(IQIYI|IQ)\b
+tags:
+  - Streaming Service
+  - WEB-DL
+description: iQIYI is a Chinese subscription video on-demand over-the-top streaming service owned by Baidu. Headquartered in Beijing, iQIYI primarily produces and distributes films and television series.
+regex101Id: null

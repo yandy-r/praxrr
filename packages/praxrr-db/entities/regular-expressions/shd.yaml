@@ -1,0 +1,11 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: SHD
+pattern: (?<=^|[\s.-])SHD\b
+tags:
+  - Release Group
+  - WEB-DL
+description: Banned for Retagging
+regex101Id: null

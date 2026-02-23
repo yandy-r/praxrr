@@ -5,7 +5,7 @@
 This workflow is the core Praxrr loop:
 
 1. Link one or more PCD databases.
-2. Bridge Arr instances (Radarr, Sonarr, Lidarr).
+2. Bridge Arr media-management instances.
 3. Configure sync sections and triggers per instance.
 4. Push and maintain settings over time.
 
@@ -22,7 +22,7 @@ with `on_pull`.
 
 ## 2) Bridge an Arr instance
 
-- Go to `/arr` and add an instance (`/arr/new`).
+- Go to `/arr` and add an Arr instance (`/arr/new`).
 - Provide `name`, `type`, `url`, and API key.
 - Test connectivity before save (`/arr/test`).
 
@@ -39,7 +39,7 @@ Important behavior:
   - `Media Management` (naming, quality definitions, media settings)
   - `Quality Profiles`
   - `Delay Profiles`
-  - `Metadata Profiles` (Lidarr only)
+  - `Metadata Profiles` (Lidarr-only)
 - Choose a trigger per section:
   - `manual`
   - `schedule` (cron)

@@ -1,0 +1,91 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: Remux Tier 2
+description: Matches release groups who fall under Remux Tier 2
+includeInRename: false
+tags:
+  - Release Group Tier
+  - Remux
+conditions:
+  - name: BMF
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: BMF
+        pattern: (?<=^|[\s.-])BMF\b
+  - name: FraMeSToR
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: FraMeSToR
+        pattern: (?<=^|[\s.-])FraMeSToR\b
+  - name: LM
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: LM
+        pattern: (?<=^|[\s.-])LM\b
+  - name: Not DVD
+    type: source
+    arrType: all
+    negate: true
+    required: true
+    sources:
+      - dvd
+  - name: PP
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: PP
+        pattern: (?<=^|[\s.-])PP\b
+  - name: PiRAMiDHEAD
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: PiRAMiDHEAD
+        pattern: (?<=^|[\s.-])PiRAMiDHEAD\b
+  - name: PmP
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: PmP
+        pattern: (?<=^|[\s.-])PmP\b
+  - name: Remux
+    type: release_title
+    arrType: all
+    negate: false
+    required: true
+    patterns:
+      - name: Remux
+        pattern: Remux
+  - name: ZQ
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: ZQ
+        pattern: (?<=^|[\s.-])ZQ\b
+  - name: ZoroSenpai
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: ZoroSenpai
+        pattern: (?<=^|[\s.-])ZoroSenpai\b
+tests: []

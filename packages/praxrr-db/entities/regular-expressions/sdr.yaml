@@ -1,0 +1,10 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: SDR
+pattern: \b(SDR)\b
+tags:
+  - HDR
+description: 'Explicitly matches labelled Standard Dynamic Range, i.e. "SDR" '
+regex101Id: null

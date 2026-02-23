@@ -1,0 +1,64 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: Special Edition
+description: |-
+  Special editions are modified versions of movies released after the original theatrical version.
+
+  • They exist because filmmakers want to present their `true vision`, `fix problems`, or because studios want to make more money
+  • You'll see them with names like `Director's Cut`, `Extended Edition`, or creative marketing labels like `Ultimate Cut`
+  • A single film can have `multiple special editions` as technology improves or different creative perspectives emerge
+includeInRename: false
+tags:
+  - Edition
+conditions:
+  - name: Not Extended Clip
+    type: release_title
+    arrType: all
+    negate: true
+    required: true
+    patterns:
+      - name: Extended Clip
+        pattern: \b(extended.?clip)\b
+  - name: Not IMAX
+    type: release_title
+    arrType: all
+    negate: true
+    required: true
+    patterns:
+      - name: IMAX
+        pattern: \b((?<!NON.?)IMAX)\b
+  - name: Not Open Matte
+    type: release_title
+    arrType: all
+    negate: true
+    required: true
+    patterns:
+      - name: Open Matte
+        pattern: \b(open.?matte)\b
+  - name: Not Sing Along
+    type: release_title
+    arrType: all
+    negate: true
+    required: true
+    patterns:
+      - name: Sing Along
+        pattern: (?<=\b[12]\d{3}\b).*\b(Sing[-_. ]Along)\b
+  - name: Not Theatrical Edition
+    type: release_title
+    arrType: all
+    negate: true
+    required: true
+    patterns:
+      - name: Theatrical Edition
+        pattern: ^(.*?)(\d{4})(.*?)\b(theatrical)\b
+  - name: Special Edition
+    type: release_title
+    arrType: all
+    negate: false
+    required: true
+    patterns:
+      - name: Special Edition
+        pattern: (?<=\b[12]\d{3}\b).*\b(Cut|Directors|DC|Edition|Extended|Special|Uncensored|Uncut|Unrated|Version)(\b|\d)
+tests: []

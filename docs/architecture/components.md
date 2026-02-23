@@ -19,7 +19,7 @@ flowchart TB
     PCD --> Git[Git + Dependency Sync]
 
     Sync --> ArrClient[Arr Instance Client Factory]
-    ArrClient --> ArrApps[Radarr / Sonarr / Lidarr]
+    ArrClient --> ArrApps[Arr media-management apps]
 
     Jobs --> JobHandlers[arr.sync / pcd.sync handlers]
     JobHandlers --> Sync

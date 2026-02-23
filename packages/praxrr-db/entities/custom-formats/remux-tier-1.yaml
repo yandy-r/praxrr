@@ -1,0 +1,67 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: Remux Tier 1
+description: Matches release groups who fall under Remux Tier 1
+includeInRename: false
+tags:
+  - Release Group Tier
+  - Remux
+conditions:
+  - name: 3L
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: 3L
+        pattern: (?<=^|[\s.-])3L\b
+  - name: BLURANiUM
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: BLURANiUM
+        pattern: (?<=^|[\s.-])BLURANiUM\b
+  - name: BiZKiT
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: BiZKiT
+        pattern: (?<=^|[\s.-])BiZKiT\b
+  - name: CiNEPHiLES
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: CiNEPHiLES
+        pattern: (?<=^|[\s.-])CiNEPHiLES\b
+  - name: Not DVD
+    type: source
+    arrType: all
+    negate: true
+    required: true
+    sources:
+      - dvd
+  - name: Remux
+    type: release_title
+    arrType: all
+    negate: false
+    required: true
+    patterns:
+      - name: Remux
+        pattern: Remux
+  - name: WiLDCAT
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: WiLDCAT
+        pattern: (?<=^|[\s.-])WiLDCAT\b
+tests: []

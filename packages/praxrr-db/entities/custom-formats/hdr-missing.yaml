@@ -1,0 +1,90 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: HDR (Missing)
+description: Attempts to match HDR in 1080p x265 Encodes labelled with x265
+includeInRename: false
+tags:
+  - Colour Grade
+  - HDR
+conditions:
+  - name: 1080p
+    type: resolution
+    arrType: all
+    negate: false
+    required: true
+    resolutions:
+      - 1080p
+  - name: Bluray
+    type: source
+    arrType: all
+    negate: false
+    required: true
+    sources:
+      - bluray
+  - name: Dolby Vision
+    type: release_title
+    arrType: all
+    negate: false
+    required: true
+    patterns:
+      - name: Dolby Vision
+        pattern: \b(dv(?![ .](HLG|SDR))|dovi|dolby[ .]?vision)\b
+  - name: Not HDR
+    type: release_title
+    arrType: all
+    negate: true
+    required: true
+    patterns:
+      - name: HDR
+        pattern: \b(HDR)\b
+  - name: Not HDR10
+    type: release_title
+    arrType: all
+    negate: true
+    required: true
+    patterns:
+      - name: HDR10
+        pattern: \bHDR10(?!\+|Plus)\b
+  - name: Not HDR10+
+    type: release_title
+    arrType: all
+    negate: true
+    required: true
+    patterns:
+      - name: HDR10+
+        pattern: \bHDR10.?(\+|P(lus)?\b)
+  - name: Not HLG
+    type: release_title
+    arrType: all
+    negate: true
+    required: true
+    patterns:
+      - name: HLG
+        pattern: \b(HLG)\b
+  - name: Not PQ
+    type: release_title
+    arrType: all
+    negate: true
+    required: true
+    patterns:
+      - name: PQ
+        pattern: \b(PQ|PQ10)\b
+  - name: Not SDR
+    type: release_title
+    arrType: all
+    negate: true
+    required: true
+    patterns:
+      - name: SDR
+        pattern: \b(SDR)\b
+  - name: x265
+    type: release_title
+    arrType: all
+    negate: false
+    required: true
+    patterns:
+      - name: x265
+        pattern: ^(?!.*(?i:remux))(?=.*([x]\s?(\.?265)\b|HEVC|\bDS4K\b)).*$
+tests: []

@@ -12,28 +12,36 @@
 import type { BaseArrClient } from '$arr/base.ts';
 import { logger } from '$logger/logger.ts';
 import type { SyncArrType } from '../mappings.ts';
-import { transformCustomFormatWithDiagnostics, type PcdCustomFormat } from './transformer.ts';
+import { type ArrCustomFormat, transformCustomFormatWithDiagnostics, type PcdCustomFormat } from './transformer.ts';
 
-/**
- * Sync custom formats for a single database to an arr instance.
- *
- * @param suffix - Zero-width namespace suffix for this database
- * @returns Map of PCD format name (unsuffixed) → arr format ID.
- *          The caller uses this to resolve CF scores in quality profiles.
- */
-export async function syncCustomFormats(
+interface PreparedCustomFormat {
+  readonly pcdName: string;
+  readonly arrFormat: ArrCustomFormat;
+}
+
+interface PreparedCustomFormatResult {
+  readonly preparedFormats: readonly PreparedCustomFormat[];
+  readonly pcdFormatIdMap: Map<string, number>;
+}
+
+interface CompileCustomFormatsOptions {
+  readonly includeSyntheticIds?: boolean;
+}
+
+async function buildCustomFormatPayloads(
   client: BaseArrClient,
   instanceId: number,
   instanceType: SyncArrType,
   pcdFormats: Map<string, PcdCustomFormat>,
-  suffix: string
-): Promise<Map<string, number>> {
-  // Get existing formats from arr (includes suffixed names from all databases)
+  suffix: string,
+  options: CompileCustomFormatsOptions = {}
+): Promise<PreparedCustomFormatResult> {
   const existingFormats = await client.getCustomFormats();
-  const existingMap = new Map(existingFormats.map((f) => [f.name, f.id!]));
+  const existingMap = new Map(existingFormats.map((format) => [format.name, format.id!]));
 
-  // Maps PCD name (unsuffixed) → arr ID
+  const preparedFormats: PreparedCustomFormat[] = [];
   const pcdFormatIdMap = new Map<string, number>();
+  let syntheticId = -1;
 
   for (const [pcdName, pcdFormat] of pcdFormats) {
     const transformed = transformCustomFormatWithDiagnostics(pcdFormat, instanceType);
@@ -66,6 +74,63 @@ export async function syncCustomFormats(
       continue;
     }
 
+    const existingId = existingMap.get(suffixedName);
+    if (existingId !== undefined) {
+      arrFormat.id = existingId;
+      pcdFormatIdMap.set(pcdName, existingId);
+    } else if (options.includeSyntheticIds) {
+      arrFormat.id = syntheticId;
+      pcdFormatIdMap.set(pcdName, syntheticId);
+      syntheticId -= 1;
+    }
+
+    preparedFormats.push({
+      pcdName,
+      arrFormat,
+    });
+  }
+
+  return { preparedFormats, pcdFormatIdMap };
+}
+
+/**
+ * Prepare custom format payloads and synthetic IDs for preview generation only.
+ */
+export async function previewCustomFormats(
+  client: BaseArrClient,
+  instanceId: number,
+  instanceType: SyncArrType,
+  pcdFormats: Map<string, PcdCustomFormat>,
+  suffix: string
+): Promise<PreparedCustomFormatResult> {
+  return buildCustomFormatPayloads(client, instanceId, instanceType, pcdFormats, suffix, {
+    includeSyntheticIds: true,
+  });
+}
+
+/**
+ * Sync custom formats for a single database to an arr instance.
+ *
+ * @param suffix - Zero-width namespace suffix for this database
+ * @returns Map of PCD format name (unsuffixed) → arr format ID.
+ *          The caller uses this to resolve CF scores in quality profiles.
+ */
+export async function syncCustomFormats(
+  client: BaseArrClient,
+  instanceId: number,
+  instanceType: SyncArrType,
+  pcdFormats: Map<string, PcdCustomFormat>,
+  suffix: string
+): Promise<Map<string, number>> {
+  const { preparedFormats, pcdFormatIdMap } = await buildCustomFormatPayloads(
+    client,
+    instanceId,
+    instanceType,
+    pcdFormats,
+    suffix
+  );
+
+  for (const { pcdName, arrFormat } of preparedFormats) {
     await logger.debug(`Compiled custom format "${pcdName}" (suffixed)`, {
       source: 'Compile:CustomFormat',
       meta: {
@@ -76,24 +141,21 @@ export async function syncCustomFormats(
     });
 
     try {
-      if (existingMap.has(suffixedName)) {
+      if (arrFormat.id !== undefined) {
         // Update existing
-        const existingId = existingMap.get(suffixedName)!;
-        arrFormat.id = existingId;
-        await client.updateCustomFormat(existingId, arrFormat);
-        pcdFormatIdMap.set(pcdName, existingId);
+        await client.updateCustomFormat(arrFormat.id, arrFormat);
+        pcdFormatIdMap.set(pcdName, arrFormat.id);
         await logger.debug(`Updated custom format "${pcdName}"`, {
           source: 'Sync:CustomFormats',
-          meta: { instanceId, formatId: existingId, pcdName, suffixedName },
+          meta: { instanceId, formatId: arrFormat.id, pcdName, suffixedName: arrFormat.name },
         });
       } else {
         // Create new
         const response = await client.createCustomFormat(arrFormat);
-        existingMap.set(suffixedName, response.id!);
         pcdFormatIdMap.set(pcdName, response.id!);
         await logger.debug(`Created custom format "${pcdName}"`, {
           source: 'Sync:CustomFormats',
-          meta: { instanceId, formatId: response.id, pcdName, suffixedName },
+          meta: { instanceId, formatId: response.id, pcdName, suffixedName: arrFormat.name },
         });
       }
     } catch (error) {
@@ -103,7 +165,7 @@ export async function syncCustomFormats(
         meta: {
           instanceId,
           pcdName,
-          suffixedName,
+          suffixedName: arrFormat.name,
           request: arrFormat,
           ...errorDetails,
         },

@@ -1,0 +1,7 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: Radarr
+propersRepacks: doNotPrefer
+enableMediaInfo: true

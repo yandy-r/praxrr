@@ -1,0 +1,186 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: Anime Bluray Tier 4
+description: Do not use Testing Purposes Only
+includeInRename: false
+tags:
+  - Anime
+conditions:
+  - name: 9volt
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: 9volt
+        pattern: (?<=^|[\s.-])9volt\b
+  - name: AOmundson
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: AOmundson
+        pattern: (?<=^|[\s.-])AOmundson\b
+  - name: Asakura
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: Asakura
+        pattern: (?<=^|[\s.-])Asakura\b
+  - name: Bluray
+    type: source
+    arrType: all
+    negate: false
+    required: true
+    sources:
+      - bluray
+  - name: Cait-Sidhe
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: Cait-Sidhe
+        pattern: (?<=^|[\s.-])Cait-Sidhe\b
+  - name: Chihiro
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: Chihiro
+        pattern: (?<=^|[\s.-])Chihiro\b
+  - name: CoalGirls
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: CoalGirls
+        pattern: (?<=^|[\s.-])CoalGirls\b
+  - name: Commie
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: Commie
+        pattern: (?<=^|[\s.-])Commie\b
+  - name: Doki
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: Doki
+        pattern: (?<=^|[\s.-])Doki\b
+  - name: Iznjie Biznjie
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: Iznjie Biznjie
+        pattern: (?<=^|[\s.-])Iznjie Biznjie\b
+  - name: Kaleido
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: Kaleido
+        pattern: (?<=^|[\s.-])Kaleido\b
+  - name: Koten_Gars
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: Koten_Gars
+        pattern: (?<=^|[\s.-])Koten_Gars\b
+  - name: Not Remux
+    type: release_title
+    arrType: all
+    negate: true
+    required: true
+    patterns:
+      - name: Remux
+        pattern: Remux
+  - name: Orphan
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: Orphan
+        pattern: (?<=^|[\s.-])Orphan\b
+  - name: SallySubs
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: SallySubs
+        pattern: (?<=^|[\s.-])SallySubs\b
+  - name: THORA
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: THORA
+        pattern: (?<=^|[\s.-])THORA\b
+  - name: Tsundere
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: Tsundere
+        pattern: (?<=^|[\s.-])Tsundere\b
+  - name: deanzel
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: deanzel
+        pattern: (?<=^|[\s.-])deanzel\b
+  - name: hchcsen
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: hchcsen
+        pattern: (?<=^|[\s.-])hchcsen\b
+  - name: kBaraka
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: kBaraka
+        pattern: (?<=^|[\s.-])kBaraka\b
+  - name: kmplx
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: kmplx
+        pattern: (?<=^|[\s.-])kmplx\b
+  - name: mottoj
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: mottoj
+        pattern: (?<=^|[\s.-])mottoj\b
+tests: []

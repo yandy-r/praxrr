@@ -69,3 +69,7 @@ coverage/
 # Research repos
 tasks/todo.md
 .claude/settings.local.json
+
+# Out files
+*.out
+*.out.exit

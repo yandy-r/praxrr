@@ -1,0 +1,12 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: PQ
+pattern: \b(PQ|PQ10)\b
+tags:
+  - Colour Grade
+  - Enhancement
+  - HDR
+description: This regex matches a `PQ` generalisation. This is a basic HDR Format.
+regex101Id: null

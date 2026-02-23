@@ -6,6 +6,7 @@ export type JobType =
   | 'arr.sync.delayProfiles'
   | 'arr.sync.mediaManagement'
   | 'arr.sync.metadataProfiles'
+  | 'arr.pull.startup'
   | 'pcd.sync'
   | 'backup.create'
   | 'backup.cleanup'
@@ -31,6 +32,29 @@ export interface JobQueueRecord {
   finishedAt: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface ArrPullStartupCounters {
+  imported: number;
+  skippedDefault: number;
+  skippedNoMatch: number;
+  conflicted: number;
+  failed: number;
+}
+
+// Keep run status aligned with JobRunStatus to avoid introducing a separate status model.
+export interface ArrPullStartupInstanceResult extends ArrPullStartupCounters {
+  instanceId: number;
+  instanceName: string;
+  status: JobRunStatus;
+}
+
+export interface ArrPullStartupRunResult extends ArrPullStartupCounters {
+  runId: string;
+  status: JobRunStatus;
+  startedAt: string;
+  finishedAt: string | null;
+  instances: ArrPullStartupInstanceResult[];
 }
 
 export interface JobRunHistoryRecord {

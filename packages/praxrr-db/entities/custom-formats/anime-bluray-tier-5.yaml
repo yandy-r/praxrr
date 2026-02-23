@@ -1,0 +1,90 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: Anime Bluray Tier 5
+description: Do not use Testing Purposes Only
+includeInRename: false
+tags:
+  - Anime
+conditions:
+  - name: ANE
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: ANE
+        pattern: (?<=^|[\s.-])ANE\b
+  - name: Almighty
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: Almighty
+        pattern: (?<=^|[\s.-])Almighty\b
+  - name: Bluray
+    type: source
+    arrType: all
+    negate: false
+    required: true
+    sources:
+      - bluray
+  - name: BlurayDesuYo
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: BlurayDesuYo
+        pattern: (?<=^|[\s.-])BlurayDesuYo\b
+  - name: FFF
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: FFF
+        pattern: (?<=^|[\s.-])FFF\b
+  - name: Final8
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: Final8
+        pattern: (?<=^|[\s.-])Final8\b
+  - name: Not Remux
+    type: release_title
+    arrType: all
+    negate: true
+    required: true
+    patterns:
+      - name: Remux
+        pattern: Remux
+  - name: Raizel
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: Raizel
+        pattern: (?<=^|[\s.-])Raizel\b
+  - name: Saizen
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: Saizen
+        pattern: (?<=^|[\s.-])Saizen\b
+  - name: Zurako
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: Zurako
+        pattern: (?<=^|[\s.-])Zurako\b
+tests: []

@@ -1,5 +1,21 @@
 import { db } from '../db.ts';
 
+function isUninitializedDatabaseError(error: unknown): boolean {
+  return error instanceof Error && error.message.includes('Database not initialized');
+}
+
+function safeQueryFirst<T>(query: () => T | undefined): T | undefined {
+  try {
+    return query();
+  } catch (error) {
+    if (isUninitializedDatabaseError(error)) {
+      return undefined;
+    }
+
+    throw error;
+  }
+}
+
 export interface ArrInstanceCredential {
   instance_id: number;
   ciphertext: string;
@@ -44,16 +60,20 @@ export const arrInstanceCredentialsQueries = {
   },
 
   getByInstanceId(instanceId: number): ArrInstanceCredential | undefined {
-    return db.queryFirst<ArrInstanceCredential>(
-      'SELECT * FROM arr_instance_credentials WHERE instance_id = ?',
-      instanceId
+    return safeQueryFirst(() =>
+      db.queryFirst<ArrInstanceCredential>(
+        'SELECT * FROM arr_instance_credentials WHERE instance_id = ?',
+        instanceId
+      )
     );
   },
 
   getByFingerprint(fingerprint: string): ArrInstanceCredential | undefined {
-    return db.queryFirst<ArrInstanceCredential>(
-      'SELECT * FROM arr_instance_credentials WHERE fingerprint = ? LIMIT 1',
-      fingerprint
+    return safeQueryFirst(() =>
+      db.queryFirst<ArrInstanceCredential>(
+        'SELECT * FROM arr_instance_credentials WHERE fingerprint = ? LIMIT 1',
+        fingerprint
+      )
     );
   },
 
@@ -61,10 +81,13 @@ export const arrInstanceCredentialsQueries = {
     if (fingerprints.length === 0) {
       return undefined;
     }
+
     const placeholders = fingerprints.map(() => '?').join(', ');
-    return db.queryFirst<ArrInstanceCredential>(
-      `SELECT * FROM arr_instance_credentials WHERE fingerprint IN (${placeholders}) LIMIT 1`,
-      ...fingerprints
+    return safeQueryFirst(() =>
+      db.queryFirst<ArrInstanceCredential>(
+        `SELECT * FROM arr_instance_credentials WHERE fingerprint IN (${placeholders}) LIMIT 1`,
+        ...fingerprints
+      )
     );
   },
 

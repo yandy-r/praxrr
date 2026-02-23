@@ -1,0 +1,243 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: WEB-DL Tier 3
+description: Matches release groups who fall under WEB-DL Tier 3
+includeInRename: false
+tags:
+  - Release Group Tier
+  - WEB-DL
+conditions:
+  - name: ABM
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: ABM
+        pattern: (?<=^|[\s.-])ABM\b
+  - name: AJP69
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: AJP69
+        pattern: (?<=^|[\s.-])AJP69\b
+  - name: BLUTONiUM
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: BLUTONiUM
+        pattern: (?<=^|[\s.-])BLUTONiUM\b
+  - name: BTW
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: BTW
+        pattern: (?<=^|[\s.-])BTW\b
+  - name: CRFW
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: CRFW
+        pattern: (?<=^|[\s.-])CRFW\b
+  - name: CasStudio
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: CasStudio
+        pattern: (?<=^|[\s.-])CasStudio\b
+  - name: Cinefeel
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: Cinefeel
+        pattern: (?<=^|[\s.-])Cinefeel\b
+  - name: CtrlHD
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: CtrlHD
+        pattern: (?<=^|[\s.-])CtrlHD\b
+  - name: HHWEB
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: HHWEB
+        pattern: (?<=^|[\s.-])HHWEB\b
+  - name: KHN
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: KHN
+        pattern: (?<=^|[\s.-])KHN\b
+  - name: KiNGS
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: KiNGS
+        pattern: (?<=^|[\s.-])KiNGS\b
+  - name: LAZY
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: LAZY
+        pattern: (?<=^|[\s.-])LAZY\b
+  - name: MZABI
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: MZABI
+        pattern: (?<=^|[\s.-])MZABI\b
+  - name: NOSiViD
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: NOSiViD
+        pattern: (?<=^|[\s.-])NOSiViD\b
+  - name: NPMS
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: NPMS
+        pattern: (?<=^|[\s.-])NPMS\b
+  - name: NTG
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: NTG
+        pattern: (?<=^|[\s.-])NTG\b
+  - name: QOQ
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: QOQ
+        pattern: (?<=^|[\s.-])QOQ\b
+  - name: RAWR
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: RAWR
+        pattern: (?<=^|[\s.-])RAWR\b
+  - name: SA89
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: SA89
+        pattern: (?<=^|[\s.-])SA89\b
+  - name: SMURF
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: SMURF
+        pattern: (?<=^|[\s.-])SMURF\b
+  - name: SbR
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: SbR
+        pattern: (?<=^|[\s.-])SbR\b
+  - name: TOMMY
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: TOMMY
+        pattern: (?<=^|[\s.-])TOMMY\b
+  - name: TVSmash
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: TVSmash
+        pattern: (?<=^|[\s.-])TVSmash\b
+  - name: TeamSyndicate
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: TeamSyndicate
+        pattern: (?<=^|[\s.-])TeamSyndicate\b
+  - name: WEB-DL
+    type: source
+    arrType: all
+    negate: false
+    required: true
+    sources:
+      - web_dl
+  - name: WELP
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: WELP
+        pattern: (?<=^|[\s.-])WELP\b
+  - name: XEBEC
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: XEBEC
+        pattern: (?<=^|[\s.-])XEBEC\b
+  - name: ZoroSenpai
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: ZoroSenpai
+        pattern: (?<=^|[\s.-])ZoroSenpai\b
+  - name: monkee
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: monkee
+        pattern: (?<=^|[\s.-])monkee\b
+tests: []

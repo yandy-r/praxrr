@@ -1,0 +1,502 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: 1080p Remux
+description: |-
+  1080p Remux utilizes **Audio Formats** to prioritise high quality Lossless HD Blurays with a fallback to Transparent Bluray Encodes.
+
+  - Average Movie Sizes ~ 20 to 30gb per Movie
+  - Movie Quality Ranking ~ 10/10
+  - Average TV Sizes ~ 6 to 12gb per Episode
+  - TV Quality Ranking ~ 10/10
+tags:
+  - 1080p
+  - Lossless Audio
+  - Remux Focused
+  - h264
+  - x264
+  - x265
+language: Any
+orderedItems:
+  - type: group
+    name: 1080p Remux
+    position: 0
+    enabled: true
+    upgradeUntil: true
+    members:
+      - name: Bluray-1080p
+      - name: Bluray-480p
+      - name: Bluray-576p
+      - name: Bluray-720p
+      - name: DVD
+      - name: HDTV-1080p
+      - name: HDTV-720p
+      - name: Remux-1080p
+      - name: SDTV
+      - name: WEBDL-1080p
+      - name: WEBDL-480p
+      - name: WEBDL-720p
+      - name: WEBRip-1080p
+      - name: WEBRip-720p
+  - type: quality
+    name: Remux-2160p
+    position: 1
+    enabled: false
+    upgradeUntil: false
+  - type: quality
+    name: Bluray-2160p
+    position: 2
+    enabled: false
+    upgradeUntil: false
+  - type: quality
+    name: WEBDL-2160p
+    position: 3
+    enabled: false
+    upgradeUntil: false
+  - type: quality
+    name: WEBRip-2160p
+    position: 4
+    enabled: false
+    upgradeUntil: false
+  - type: quality
+    name: HDTV-2160p
+    position: 5
+    enabled: false
+    upgradeUntil: false
+  - type: quality
+    name: WEBRip-480p
+    position: 6
+    enabled: false
+    upgradeUntil: false
+  - type: quality
+    name: HDTV-480p
+    position: 7
+    enabled: false
+    upgradeUntil: false
+  - type: quality
+    name: BR-DISK
+    position: 8
+    enabled: false
+    upgradeUntil: false
+  - type: quality
+    name: CAM
+    position: 9
+    enabled: false
+    upgradeUntil: false
+  - type: quality
+    name: DVD-R
+    position: 10
+    enabled: false
+    upgradeUntil: false
+  - type: quality
+    name: DVDSCR
+    position: 11
+    enabled: false
+    upgradeUntil: false
+  - type: quality
+    name: Raw-HD
+    position: 12
+    enabled: false
+    upgradeUntil: false
+  - type: quality
+    name: REGIONAL
+    position: 13
+    enabled: false
+    upgradeUntil: false
+  - type: quality
+    name: TELECINE
+    position: 14
+    enabled: false
+    upgradeUntil: false
+  - type: quality
+    name: TELESYNC
+    position: 15
+    enabled: false
+    upgradeUntil: false
+  - type: quality
+    name: WORKPRINT
+    position: 16
+    enabled: false
+    upgradeUntil: false
+  - type: quality
+    name: Unknown
+    position: 17
+    enabled: false
+    upgradeUntil: false
+minimumScore: 20000
+upgradeUntilScore: 1000000
+upgradeScoreIncrement: 1
+customFormatScores:
+  - customFormatName: 1080p Balanced Tier 1
+    arrType: radarr
+    score: 101000
+  - customFormatName: 1080p Balanced Tier 2
+    arrType: radarr
+    score: 100000
+  - customFormatName: 1080p Bluray
+    arrType: all
+    score: 280000
+  - customFormatName: 1080p Quality Tier 1
+    arrType: all
+    score: 125000
+  - customFormatName: 1080p Quality Tier 2
+    arrType: all
+    score: 124000
+  - customFormatName: 1080p Quality Tier 3
+    arrType: all
+    score: 123000
+  - customFormatName: 1080p Quality Tier 4
+    arrType: all
+    score: 122000
+  - customFormatName: 1080p Quality Tier 5
+    arrType: all
+    score: 121000
+  - customFormatName: 1080p Quality Tier 6
+    arrType: all
+    score: 120000
+  - customFormatName: 1080p Remux
+    arrType: all
+    score: 440000
+  - customFormatName: 1080p WEB-DL
+    arrType: all
+    score: 380000
+  - customFormatName: 1080p WEBRip
+    arrType: radarr
+    score: 280000
+  - customFormatName: 3D
+    arrType: radarr
+    score: -999999
+  - customFormatName: 480p Bluray
+    arrType: all
+    score: 80000
+  - customFormatName: 480p Quality Tier 1
+    arrType: all
+    score: 23000
+  - customFormatName: 480p Quality Tier 2
+    arrType: all
+    score: 22000
+  - customFormatName: 480p Quality Tier 3
+    arrType: all
+    score: 21000
+  - customFormatName: 480p Quality Tier 4
+    arrType: all
+    score: 20000
+  - customFormatName: 480p WEB-DL
+    arrType: all
+    score: 60000
+  - customFormatName: 576p Bluray
+    arrType: all
+    score: 120000
+  - customFormatName: 576p Quality Tier 1
+    arrType: all
+    score: 43000
+  - customFormatName: 576p Quality Tier 2
+    arrType: all
+    score: 42000
+  - customFormatName: 576p Quality Tier 3
+    arrType: all
+    score: 41000
+  - customFormatName: 576p Quality Tier 4
+    arrType: all
+    score: 40000
+  - customFormatName: 720p Balanced Tier 1
+    arrType: radarr
+    score: 60000
+  - customFormatName: 720p Bluray
+    arrType: all
+    score: 180000
+  - customFormatName: 720p Quality Tier 1
+    arrType: all
+    score: 85000
+  - customFormatName: 720p Quality Tier 2
+    arrType: all
+    score: 84000
+  - customFormatName: 720p Quality Tier 3
+    arrType: all
+    score: 83000
+  - customFormatName: 720p Quality Tier 4
+    arrType: all
+    score: 82000
+  - customFormatName: 720p Quality Tier 5
+    arrType: all
+    score: 81000
+  - customFormatName: 720p Quality Tier 6
+    arrType: all
+    score: 80000
+  - customFormatName: 720p WEB-DL
+    arrType: all
+    score: 240000
+  - customFormatName: 720p WEBRip
+    arrType: radarr
+    score: 180000
+  - customFormatName: AAC
+    arrType: all
+    score: 200
+  - customFormatName: AMZN
+    arrType: all
+    score: 3000
+  - customFormatName: ASL
+    arrType: all
+    score: -999999
+  - customFormatName: ATVP
+    arrType: all
+    score: 2000
+  - customFormatName: AV1
+    arrType: all
+    score: -999999
+  - customFormatName: Atmos
+    arrType: all
+    score: 400
+  - customFormatName: Atmos (Missing)
+    arrType: all
+    score: 400
+  - customFormatName: B&W
+    arrType: radarr
+    score: -999999
+  - customFormatName: BCORE
+    arrType: all
+    score: -999999
+  - customFormatName: Banned Groups
+    arrType: all
+    score: -999999
+  - customFormatName: Banned Remux
+    arrType: all
+    score: -999999
+  - customFormatName: Banned UHD Bluray
+    arrType: all
+    score: -999999
+  - customFormatName: Banned WEBRip
+    arrType: all
+    score: -999999
+  - customFormatName: Better Theatricals
+    arrType: radarr
+    score: 1000
+  - customFormatName: CRAV
+    arrType: all
+    score: 0
+  - customFormatName: CRIT
+    arrType: all
+    score: 0
+  - customFormatName: DRPO
+    arrType: all
+    score: 0
+  - customFormatName: DSNP
+    arrType: all
+    score: 3000
+  - customFormatName: DTS
+    arrType: all
+    score: 300
+  - customFormatName: DTS-ES
+    arrType: all
+    score: 500
+  - customFormatName: DTS-HD HRA
+    arrType: all
+    score: 700
+  - customFormatName: DTS-HD MA
+    arrType: all
+    score: 1200
+  - customFormatName: DTS-X
+    arrType: all
+    score: 1600
+  - customFormatName: DVD
+    arrType: all
+    score: 20000
+  - customFormatName: DVD Quality Tier 1
+    arrType: all
+    score: 11000
+  - customFormatName: DVD Quality Tier 2
+    arrType: all
+    score: 10000
+  - customFormatName: DVD Remux
+    arrType: all
+    score: 20000
+  - customFormatName: Dolby Digital
+    arrType: all
+    score: 400
+  - customFormatName: Dolby Digital +
+    arrType: all
+    score: 600
+  - customFormatName: Dolby Vision
+    arrType: all
+    score: 3000
+  - customFormatName: Dolby Vision (Without Fallback)
+    arrType: all
+    score: -999999
+  - customFormatName: Extras
+    arrType: radarr
+    score: -999999
+  - customFormatName: Extras
+    arrType: sonarr
+    score: -999999
+  - customFormatName: FLAC
+    arrType: all
+    score: 800
+  - customFormatName: Full Disc
+    arrType: all
+    score: -999999
+  - customFormatName: Full Disc (Quality Match)
+    arrType: radarr
+    score: -999999
+  - customFormatName: HDR
+    arrType: all
+    score: 1000
+  - customFormatName: HDR (Missing)
+    arrType: all
+    score: 1000
+  - customFormatName: HDR10
+    arrType: all
+    score: 1000
+  - customFormatName: HDR10+
+    arrType: all
+    score: 2000
+  - customFormatName: HLG
+    arrType: all
+    score: 1000
+  - customFormatName: HMAX
+    arrType: all
+    score: 2000
+  - customFormatName: HTSR
+    arrType: all
+    score: 0
+  - customFormatName: HULU
+    arrType: all
+    score: 0
+  - customFormatName: MA
+    arrType: radarr
+    score: 4000
+  - customFormatName: MAX
+    arrType: all
+    score: 2000
+  - customFormatName: MUBI
+    arrType: all
+    score: 0
+  - customFormatName: NF
+    arrType: all
+    score: 1000
+  - customFormatName: NOW
+    arrType: all
+    score: 0
+  - customFormatName: Not Original or English
+    arrType: radarr
+    score: -999999
+  - customFormatName: Not Original or English
+    arrType: sonarr
+    score: -999999
+  - customFormatName: Opus
+    arrType: all
+    score: 700
+  - customFormatName: PCM
+    arrType: all
+    score: 800
+  - customFormatName: PCOK
+    arrType: all
+    score: 0
+  - customFormatName: PLAY
+    arrType: all
+    score: 0
+  - customFormatName: PMTP
+    arrType: all
+    score: 0
+  - customFormatName: PQ
+    arrType: all
+    score: 1000
+  - customFormatName: ROKU
+    arrType: all
+    score: 0
+  - customFormatName: Release Group (Missing)
+    arrType: radarr
+    score: -999999
+  - customFormatName: Release Group (Missing)
+    arrType: sonarr
+    score: -999999
+  - customFormatName: Remux Tier 1
+    arrType: all
+    score: 100
+  - customFormatName: Remux Tier 2
+    arrType: all
+    score: 80
+  - customFormatName: Remux Tier 3
+    arrType: all
+    score: 60
+  - customFormatName: Remux Tier 4
+    arrType: all
+    score: 40
+  - customFormatName: Repack1
+    arrType: all
+    score: 6
+  - customFormatName: Repack2
+    arrType: all
+    score: 7
+  - customFormatName: Repack3
+    arrType: all
+    score: 8
+  - customFormatName: SHO
+    arrType: all
+    score: 0
+  - customFormatName: STAN
+    arrType: all
+    score: 0
+  - customFormatName: Season Pack
+    arrType: sonarr
+    score: 10
+  - customFormatName: Sing Along
+    arrType: radarr
+    score: -999999
+  - customFormatName: Special Edition
+    arrType: radarr
+    score: 1000
+  - customFormatName: TrueHD
+    arrType: all
+    score: 1200
+  - customFormatName: UHD Bluray
+    arrType: all
+    score: 420000
+  - customFormatName: Upscale
+    arrType: radarr
+    score: -999999
+  - customFormatName: Upscale
+    arrType: sonarr
+    score: -999999
+  - customFormatName: VP9
+    arrType: all
+    score: -999999
+  - customFormatName: VVC
+    arrType: all
+    score: -999999
+  - customFormatName: WEB-DL Tier 1
+    arrType: all
+    score: 100
+  - customFormatName: WEB-DL Tier 2
+    arrType: all
+    score: 80
+  - customFormatName: WEB-DL Tier 3
+    arrType: all
+    score: 60
+  - customFormatName: WEB-DL Tier 4
+    arrType: all
+    score: 40
+  - customFormatName: WEB-DL Tier 5
+    arrType: all
+    score: 20
+  - customFormatName: Xvid
+    arrType: all
+    score: -999999
+  - customFormatName: h265
+    arrType: all
+    score: -999999
+  - customFormatName: iP
+    arrType: all
+    score: 0
+  - customFormatName: iT
+    arrType: all
+    score: 1000
+  - customFormatName: x265 (Bluray)
+    arrType: all
+    score: -400000
+  - customFormatName: x265 (Remux)
+    arrType: all
+    score: -999999
+  - customFormatName: x265 (WEB)
+    arrType: all
+    score: -999999

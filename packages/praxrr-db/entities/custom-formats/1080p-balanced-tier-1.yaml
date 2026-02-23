@@ -1,0 +1,35 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: 1080p Balanced Tier 1
+description: Matches release groups who fall under 1080p Balanced Tier 1
+includeInRename: false
+tags:
+  - 1080p
+  - Balanced
+  - Release Group Tier
+conditions:
+  - name: 1080p
+    type: resolution
+    arrType: all
+    negate: false
+    required: true
+    resolutions:
+      - 1080p
+  - name: Bluray
+    type: source
+    arrType: all
+    negate: false
+    required: true
+    sources:
+      - bluray
+  - name: hallowed
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: hallowed
+        pattern: (?<=^|[\s.-])hallowed\b
+tests: []

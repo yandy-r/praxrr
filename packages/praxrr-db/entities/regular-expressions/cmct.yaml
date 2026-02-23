@@ -1,0 +1,11 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: CMCT
+pattern: (?<=^|[\s.-])CMCT\b
+tags:
+  - Anime
+  - Release Group
+description: null
+regex101Id: null

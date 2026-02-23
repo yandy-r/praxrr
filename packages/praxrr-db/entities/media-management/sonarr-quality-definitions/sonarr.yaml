@@ -1,0 +1,94 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: Sonarr
+entries:
+  - quality_name: Bluray-1080p
+    min_size: 0
+    max_size: 0
+    preferred_size: 990
+  - quality_name: Bluray-2160p
+    min_size: 0
+    max_size: 0
+    preferred_size: 990
+  - quality_name: Bluray-480p
+    min_size: 0
+    max_size: 0
+    preferred_size: 990
+  - quality_name: Bluray-576p
+    min_size: 0
+    max_size: 0
+    preferred_size: 990
+  - quality_name: Bluray-720p
+    min_size: 0
+    max_size: 0
+    preferred_size: 990
+  - quality_name: DVD
+    min_size: 0
+    max_size: 0
+    preferred_size: 990
+  - quality_name: HDTV-1080p
+    min_size: 0
+    max_size: 0
+    preferred_size: 990
+  - quality_name: HDTV-2160p
+    min_size: 0
+    max_size: 0
+    preferred_size: 990
+  - quality_name: HDTV-720p
+    min_size: 0
+    max_size: 0
+    preferred_size: 990
+  - quality_name: Raw-HD
+    min_size: 0
+    max_size: 0
+    preferred_size: 990
+  - quality_name: Remux-1080p
+    min_size: 0
+    max_size: 0
+    preferred_size: 990
+  - quality_name: Remux-2160p
+    min_size: 0
+    max_size: 0
+    preferred_size: 990
+  - quality_name: SDTV
+    min_size: 0
+    max_size: 0
+    preferred_size: 990
+  - quality_name: Unknown
+    min_size: 0
+    max_size: 0
+    preferred_size: 990
+  - quality_name: WEBDL-1080p
+    min_size: 0
+    max_size: 0
+    preferred_size: 990
+  - quality_name: WEBDL-2160p
+    min_size: 0
+    max_size: 0
+    preferred_size: 990
+  - quality_name: WEBDL-480p
+    min_size: 0
+    max_size: 0
+    preferred_size: 990
+  - quality_name: WEBDL-720p
+    min_size: 0
+    max_size: 0
+    preferred_size: 990
+  - quality_name: WEBRip-1080p
+    min_size: 0
+    max_size: 0
+    preferred_size: 990
+  - quality_name: WEBRip-2160p
+    min_size: 0
+    max_size: 0
+    preferred_size: 990
+  - quality_name: WEBRip-480p
+    min_size: 0
+    max_size: 0
+    preferred_size: 990
+  - quality_name: WEBRip-720p
+    min_size: 0
+    max_size: 0
+    preferred_size: 990

@@ -5,6 +5,7 @@
 
 import type { BaseArrClient } from '$arr/base.ts';
 import type { ArrInstance } from '$db/queries/arrInstances.ts';
+import type { SyncPreviewSectionResult } from './preview/types.ts';
 
 // =============================================================================
 // SYNC RESULT TYPES
@@ -112,4 +113,7 @@ export interface TriggerContext {
  */
 export interface BaseSyncer {
   sync(): Promise<SyncResult>;
+  generatePreview(): Promise<Readonly<SyncPreviewSectionResult>>;
+  setPreviewConfig(previewConfig: unknown): void;
+  clearPreviewConfig(): void;
 }

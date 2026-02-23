@@ -1,0 +1,11 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: HBO Max
+pattern: \b(?:HMAX|HBOM|(?:HBO[ ._-]?MAX)(?=\s*.(?:WEB-?DL|WEBRIP)))\b
+tags:
+  - Streaming Service
+  - WEB-DL
+description: HBO Max is an American subscription video-on-demand streaming service that offers a range of original programming and content from WarnerMedia's vast library, encompassing brands such as Warner Bros., CNN, Cartoon Network, TBS, and Turner Classic Movies. In mid-to-late 2023, HBO Max underwent a rebranding to "Max".
+regex101Id: null

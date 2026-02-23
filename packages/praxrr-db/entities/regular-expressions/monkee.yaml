@@ -1,0 +1,11 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: monkee
+pattern: (?<=^|[\s.-])monkee\b
+tags:
+  - Release Group
+  - WEB-DL
+description: Matches "monkee" when preceded by whitespace, a hyphen or dot
+regex101Id: null

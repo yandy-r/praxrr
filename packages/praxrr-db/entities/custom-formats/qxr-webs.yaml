@@ -1,0 +1,47 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: QxR WEBs
+description: Matches 2160p QxR WEBs via Releases Title Parsing
+includeInRename: false
+tags: []
+conditions:
+  - name: 2160p
+    type: resolution
+    arrType: all
+    negate: false
+    required: true
+    resolutions:
+      - 2160p
+  - name: QxR
+    type: release_title
+    arrType: all
+    negate: false
+    required: true
+    patterns:
+      - name: QxR (Title)
+        pattern: QxR
+  - name: Release Group
+    type: release_group
+    arrType: all
+    negate: true
+    required: true
+    patterns:
+      - name: QxR
+        pattern: (?<=^|[\s.-])(QxR|afm72|Bandi|Bluespots|Celdra|FreetheFish|Garshasp|Ghost|Ime|Kappa|Langbard|LION|Panda|MONOLITH|Natty|r00t|RCVR|RZeroX|SAMPA|Silence|t3nzin|Tigole|YOGI)\b
+  - name: WEB-DL
+    type: source
+    arrType: all
+    negate: false
+    required: false
+    sources:
+      - web_dl
+  - name: WEBRip
+    type: source
+    arrType: all
+    negate: false
+    required: false
+    sources:
+      - webrip
+tests: []

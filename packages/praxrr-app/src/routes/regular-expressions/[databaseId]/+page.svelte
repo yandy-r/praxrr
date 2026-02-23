@@ -91,6 +91,7 @@
 	// Initialize data page store (we'll use search and view, but do our own filtering)
 	const { search, view, setItems } = createDataPageStore(data.regularExpressions, {
 		storageKey: 'regularExpressionsView',
+		defaultView: 'cards',
 		searchKeys: ['name'], // Placeholder, we do our own filtering
 		searchKey: `regularExpressionsSearch:${data.currentDatabase.id}`
 	});

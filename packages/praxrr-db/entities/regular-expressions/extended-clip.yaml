@@ -1,0 +1,11 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: Extended Clip
+pattern: \b(extended.?clip)\b
+tags:
+  - Banned
+  - Preview
+description: Matches preview releases labelled as `Extended Clip`
+regex101Id: null

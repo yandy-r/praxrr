@@ -4,15 +4,99 @@
  */
 
 import { databaseInstancesQueries } from '$db/queries/databaseInstances.ts';
-import { pcdOpsQueries } from '$db/queries/pcdOps.ts';
+import { buildContentHash, type PcdOpSource, pcdOpsQueries } from '$db/queries/pcdOps.ts';
 import { pcdOpHistoryQueries } from '$db/queries/pcdOpHistory.ts';
 import type { PcdOpOrigin } from '$db/queries/pcdOps.ts';
 import { logger } from '$logger/logger.ts';
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { compiledQueryToSql } from '../utils/sql.ts';
 import { compile } from '../database/compiler.ts';
 import { getCache } from '../database/registry.ts';
-import type { OperationMetadata, OperationType, WriteOptions, WriteResult } from '../core/types.ts';
+import type { OperationLayer, OperationMetadata, OperationType, WriteOptions, WriteResult } from '../core/types.ts';
+import type { ConflictStrategy } from '$pcd/conflicts/autoAlign/index.ts';
+import {
+  evaluateValueGuardApply,
+  evaluateValueGuardError,
+  isValueGuardBlockingStatus,
+} from '../migration/valueGuardGate.ts';
 import { uuid } from '$shared/utils/uuid.ts';
+
+interface RepoImportWriteContext {
+  filenamePrefix: string;
+  sequenceStart: number;
+  nextIndex: number;
+  lastSeenInRepoAt: string;
+  maxOperations: number;
+}
+
+interface WriteContextFrame {
+  source?: PcdOpSource;
+  allowBaseImport?: boolean;
+  repoImport?: RepoImportWriteContext;
+}
+
+const writeContextStorage = new AsyncLocalStorage<WriteContextFrame[]>();
+
+function currentWriteContext(): WriteContextFrame | undefined {
+  const stack = writeContextStorage.getStore();
+  if (!stack || stack.length === 0) return undefined;
+  return stack[stack.length - 1];
+}
+
+interface RepoImportIdentity {
+  filename: string;
+  opNumber: number | null;
+  sequence: number;
+  lastSeenInRepoAt: string;
+}
+
+function consumeRepoImportIdentity(layer: OperationLayer, source: PcdOpSource): RepoImportIdentity | null {
+  const repoImport = currentWriteContext()?.repoImport;
+  if (!repoImport || layer !== 'base' || source !== 'repo') {
+    return null;
+  }
+
+  if (repoImport.nextIndex >= repoImport.maxOperations) {
+    throw new Error(`Migration repo import emitted too many SQL operations for "${repoImport.filenamePrefix}"`);
+  }
+
+  const index = repoImport.nextIndex;
+  repoImport.nextIndex += 1;
+  const suffix = String(index).padStart(5, '0');
+
+  return {
+    filename: `${repoImport.filenamePrefix}#${suffix}.sql`,
+    opNumber: null,
+    sequence: repoImport.sequenceStart + index,
+    lastSeenInRepoAt: repoImport.lastSeenInRepoAt,
+  };
+}
+
+export async function withRepoImportWriteContext<T>(
+  options: {
+    filenamePrefix: string;
+    sequenceStart: number;
+    maxOperations: number;
+    lastSeenInRepoAt: string;
+  },
+  callback: () => Promise<T>
+): Promise<T> {
+  const parent = writeContextStorage.getStore() ?? [];
+  const nextContext: WriteContextFrame = {
+    source: 'repo',
+    allowBaseImport: true,
+    repoImport: {
+      filenamePrefix: options.filenamePrefix,
+      sequenceStart: options.sequenceStart,
+      nextIndex: 0,
+      maxOperations: options.maxOperations,
+      lastSeenInRepoAt: options.lastSeenInRepoAt,
+    },
+  };
+  const nextStack: WriteContextFrame[] = [...parent, nextContext];
+
+  return writeContextStorage.run(nextStack, callback);
+}
 
 function buildMetadataJson(metadata?: OperationMetadata): string | null {
   if (!metadata) return null;
@@ -53,12 +137,144 @@ function serializeDesiredState(desiredState?: Record<string, unknown> | null): s
   return JSON.stringify(desiredState);
 }
 
-async function hashContent(sql: string, metadataJson: string | null): Promise<string> {
-  const payload = `${sql}\n${metadataJson ?? ''}`;
-  const data = new TextEncoder().encode(payload);
-  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
+interface MigrationSqlOperation {
+  sql: string;
+  metadata?: OperationMetadata;
+  desiredState?: Record<string, unknown> | null;
+  source?: PcdOpSource;
+}
+
+interface WriteSqlOperationsOptions {
+  databaseId: number;
+  layer: OperationLayer;
+  description: string;
+  operations: MigrationSqlOperation[];
+  source?: PcdOpSource;
+  runValueGuardGate?: boolean;
+}
+
+type ValueGuardGateResult = { ok: true } | { ok: false; error: string };
+
+function normalizeSql(sql: string): string {
+  const trimmed = sql.trim();
+  if (trimmed.length === 0) {
+    return '';
+  }
+  return trimmed.endsWith(';') ? trimmed : `${trimmed};`;
+}
+
+function serializeMigrationSqlOperation(operation: MigrationSqlOperation): {
+  sql: string;
+  metadataJson: string | null;
+  desiredStateJson: string | null;
+} {
+  return {
+    sql: normalizeSql(operation.sql),
+    metadataJson: buildMetadataJson(operation.metadata),
+    desiredStateJson: serializeDesiredState(operation.desiredState),
+  };
+}
+
+function resolveConflictStrategy(conflictStrategy: string | undefined): ConflictStrategy {
+  if (conflictStrategy === 'override' || conflictStrategy === 'align' || conflictStrategy === 'ask') {
+    return conflictStrategy;
+  }
+
+  throw new Error(`Invalid conflict strategy in database configuration: ${String(conflictStrategy)}`);
+}
+
+function runValueGuardGate(
+  databaseId: number,
+  layer: OperationLayer,
+  operations: MigrationSqlOperation[]
+): ValueGuardGateResult {
+  if (layer !== 'user') {
+    return { ok: true };
+  }
+
+  const cache = getCache(databaseId);
+  if (!cache) {
+    return { ok: false, error: 'Value-guard validation unavailable: cache not built' };
+  }
+
+  const cacheDb = cache.getRawDb();
+  if (!cacheDb) {
+    return { ok: false, error: 'Value-guard validation unavailable: cache not built' };
+  }
+
+  const instance = databaseInstancesQueries.getById(databaseId);
+  if (!instance) {
+    throw new Error(`Failed to resolve database instance ${databaseId} for value-guard execution`);
+  }
+
+  const conflictStrategy = resolveConflictStrategy(instance.conflict_strategy);
+
+  cacheDb.exec('SAVEPOINT pcd_writer_value_guard');
+  try {
+    for (let i = 0; i < operations.length; i++) {
+      const operation = operations[i];
+      const { sql, metadataJson, desiredStateJson } = serializeMigrationSqlOperation(operation);
+      if (sql.length === 0) {
+        continue;
+      }
+
+      const beforeChanges = cacheDb.totalChanges;
+      try {
+        cacheDb.exec(sql);
+      } catch (error) {
+        const errorStr = String(error);
+        const gateError = evaluateValueGuardError({
+          conflictStrategy,
+          error: errorStr,
+          isUserOp: true,
+          trackHistory: true,
+          priorConflictReason: null,
+        });
+
+        if (isValueGuardBlockingStatus(gateError.status) || !gateError.shouldRecordHistory) {
+          return {
+            ok: false,
+            error: `Value-guard gate failed to execute operation ${i + 1}: ${errorStr}`,
+          };
+        }
+
+        continue;
+      }
+
+      const rowcount = cacheDb.totalChanges - beforeChanges;
+      const gateResult = evaluateValueGuardApply({
+        conflictStrategy,
+        isUserOp: true,
+        rowcount,
+        db: cacheDb,
+        metadataJson,
+        desiredStateJson,
+        priorConflictReason: null,
+      });
+
+      if (isValueGuardBlockingStatus(gateResult.status)) {
+        return {
+          ok: false,
+          error: `Value-guard gate rejected operation ${i + 1} (${
+            operation.metadata?.entity ?? 'operation'
+          } "${operation.metadata?.name ?? ''}"): ${gateResult.conflictReason ?? gateResult.status}`,
+        };
+      }
+    }
+
+    return { ok: true };
+  } finally {
+    cacheDb.exec('ROLLBACK TO SAVEPOINT pcd_writer_value_guard');
+    cacheDb.exec('RELEASE SAVEPOINT pcd_writer_value_guard');
+  }
+}
+
+export function __testOnly_runValueGuardGate(
+  databaseId: number,
+  layer: OperationLayer,
+  operations: MigrationSqlOperation[]
+): ValueGuardGateResult {
+  return runValueGuardGate(databaseId, layer, operations);
 }
 
 async function cancelOutCreate(databaseId: number, origin: PcdOpOrigin, metadata: OperationMetadata): Promise<boolean> {
@@ -71,18 +287,11 @@ async function cancelOutCreate(databaseId: number, origin: PcdOpOrigin, metadata
     states: ['published', 'draft'],
   });
 
-  type ParsedMetadata = {
-    operation?: string;
-    entity?: string;
-    name?: string;
-    stable_key?: { key?: string; value?: string };
-  };
-
-  function hasDependentOps(
+  async function hasDependentOps(
     createdOpId: number,
     createdMeta: ParsedMetadata,
     createdStableKey: { key?: string; value?: string } | undefined
-  ): boolean {
+  ): Promise<boolean> {
     for (const op of candidates) {
       if (op.id <= createdOpId) continue;
       if (!op.metadata) continue;
@@ -90,7 +299,16 @@ async function cancelOutCreate(databaseId: number, origin: PcdOpOrigin, metadata
       let parsed: ParsedMetadata;
       try {
         parsed = JSON.parse(op.metadata) as ParsedMetadata;
-      } catch {
+      } catch (error) {
+        await logger.debug('Failed to parse operation metadata while checking cancel-out dependencies', {
+          source: 'PCDWriter',
+          meta: {
+            databaseId,
+            operationId: op.id,
+            metadata: op.metadata,
+            error: String(error),
+          },
+        });
         continue;
       }
 
@@ -133,8 +351,16 @@ async function cancelOutCreate(databaseId: number, origin: PcdOpOrigin, metadata
               if (desired.entity_type === entityType && desired.entity_tmdb_id === entityTmdbId) {
                 return true;
               }
-            } catch {
-              // ignore malformed desired_state
+            } catch (error) {
+              await logger.debug('Failed to parse desired state while checking cancel-out dependencies', {
+                source: 'PCDWriter',
+                meta: {
+                  databaseId,
+                  operationId: op.id,
+                  desiredState: op.desired_state,
+                  error: String(error),
+                },
+              });
             }
           }
         }
@@ -151,18 +377,32 @@ async function cancelOutCreate(databaseId: number, origin: PcdOpOrigin, metadata
     let parsed: ParsedMetadata;
     try {
       parsed = JSON.parse(candidate.metadata) as ParsedMetadata;
-    } catch {
+    } catch (error) {
+      await logger.debug('Failed to parse candidate operation metadata while checking cancel-out', {
+        source: 'PCDWriter',
+        meta: {
+          databaseId,
+          operationId: candidate.id,
+          metadata: candidate.metadata,
+          error: String(error),
+        },
+      });
       continue;
     }
 
     if (parsed.operation === 'create' && parsed.entity === metadata.entity && parsed.name === metadata.name) {
-      if (hasDependentOps(candidate.id, parsed, parsed.stable_key)) {
+      if (await hasDependentOps(candidate.id, parsed, parsed.stable_key)) {
         return false;
       }
       pcdOpsQueries.update(candidate.id, { state: 'dropped' });
       await logger.info('Cancelled out local create operation with delete', {
         source: 'PCDWriter',
-        meta: { databaseId, opId: candidate.id, entity: metadata.entity, name: metadata.name },
+        meta: {
+          databaseId,
+          opId: candidate.id,
+          entity: metadata.entity,
+          name: metadata.name,
+        },
       });
       return true;
     }
@@ -183,7 +423,12 @@ function parseMetadata(raw: string | null): ParsedMetadata | null {
   if (!raw) return null;
   try {
     return JSON.parse(raw) as ParsedMetadata;
-  } catch {
+  } catch (error) {
+    const preview = raw.length > 500 ? `${raw.slice(0, 500)}...` : raw;
+    void logger.debug('Failed to parse operation metadata while checking supersede', {
+      source: 'PCDWriter',
+      meta: { raw: preview, error: String(error) },
+    });
     return null;
   }
 }
@@ -274,28 +519,40 @@ async function supersedePriorUserOps(databaseId: number, newOpId: number, metada
 /**
  * Write operations to a PCD layer in the database
  *
- * For base layer: inserts a draft base op (origin=base, state=draft)
+ * For base layer:
+ *   - repo source: inserts a published base op (origin=base, state=published, source=repo)
+ *   - local source: inserts a draft base op (origin=base, state=draft, source=local)
  * For user layer: inserts a published user op (origin=user, state=published)
  */
-export async function writeOperation(options: WriteOptions): Promise<WriteResult> {
-  const { databaseId, layer, description, queries, metadata, desiredState } = options;
+async function writeOperationsFromSqlOperations(options: WriteSqlOperationsOptions): Promise<WriteResult> {
+  const { databaseId, layer, description } = options;
+  const operations = options.operations;
+  if (!operations || operations.length === 0) {
+    return { success: false, error: 'No SQL operations provided' };
+  }
 
   try {
     const instance = databaseInstancesQueries.getById(databaseId);
     if (!instance) {
-      return { success: false, error: 'Database instance not found' };
+      throw new Error(`Cannot write operations for missing database instance ${databaseId}`);
     }
 
+    const context = currentWriteContext();
+    const source =
+      layer === 'base' && context?.allowBaseImport === true && context?.source === 'repo'
+        ? 'repo'
+        : (options.source ?? context?.source ?? 'local');
     const hasPersonalAccessToken = !!instance.has_personal_access_token || !!instance.personal_access_token;
-    if (layer === 'base' && (!hasPersonalAccessToken || instance.local_ops_enabled)) {
+    const allowBaseImportBypass = context?.allowBaseImport === true && source === 'repo';
+    if (layer === 'base' && (!hasPersonalAccessToken || instance.local_ops_enabled) && !allowBaseImportBypass) {
       return {
         success: false,
         error: 'Base layer requires a personal access token and local ops must be disabled',
       };
     }
 
-    // Convert queries to SQL first (needed for validation)
-    const sqlStatements = queries.map(compiledQueryToSql);
+    const sqlStatements = operations.map((operation) => normalizeSql(operation.sql));
+    const fastPathRepoImport = layer === 'base' && source === 'repo' && !!context?.repoImport;
 
     // Validate against current cache
     const cache = getCache(databaseId);
@@ -324,61 +581,167 @@ export async function writeOperation(options: WriteOptions): Promise<WriteResult
       });
     }
 
-    if (metadata && (await cancelOutCreate(databaseId, layer, metadata))) {
-      await compile(instance.local_path, instance.id);
-      return { success: true };
+    if (options.runValueGuardGate) {
+      const gateResult = runValueGuardGate(databaseId, layer, operations);
+      if (!gateResult.ok) {
+        return {
+          success: false,
+          error: gateResult.error,
+        };
+      }
     }
 
-    const sqlContent = `${sqlStatements.join(';\n\n')};`.trim();
-    const metadataJson = buildMetadataJson(metadata);
-    const desiredStateJson = serializeDesiredState(desiredState);
-    const contentHash = await hashContent(sqlContent, metadataJson);
+    let lastOpId: number | null = null;
 
-    const origin: PcdOpOrigin = layer === 'base' ? 'base' : 'user';
-    const state = layer === 'base' ? 'draft' : 'published';
+    for (const operation of operations) {
+      const { sql, metadataJson, desiredStateJson } = serializeMigrationSqlOperation(operation);
+      const importIdentity = consumeRepoImportIdentity(layer, source);
 
-    const opId = pcdOpsQueries.create({
-      databaseId,
-      origin,
-      state,
-      source: 'local',
-      sql: sqlContent,
-      metadata: metadataJson,
-      desiredState: desiredStateJson,
-      contentHash,
-    });
+      if (operation.metadata && (await cancelOutCreate(databaseId, layer, operation.metadata))) {
+        continue;
+      }
 
-    const opType = metadata?.operation ?? 'write';
-    const entity = metadata?.entity?.replace(/_/g, ' ') ?? 'operation';
-    const entityName = metadata?.name ?? '';
-    const message = `${opType.charAt(0).toUpperCase() + opType.slice(1)} ${entity} "${entityName}" in ${origin} layer`;
+      const contentHash = await buildContentHash(sql, metadataJson);
+      let opId: number;
+      if (layer === 'base' && source === 'repo' && importIdentity) {
+        const existing = pcdOpsQueries.getBaseByFilename(databaseId, importIdentity.filename);
+        if (existing) {
+          pcdOpsQueries.update(existing.id, {
+            state: 'published',
+            source: 'repo',
+            filename: importIdentity.filename,
+            opNumber: importIdentity.opNumber,
+            sequence: importIdentity.sequence,
+            sql,
+            metadata: metadataJson,
+            desiredState: desiredStateJson,
+            contentHash,
+            lastSeenInRepoAt: importIdentity.lastSeenInRepoAt,
+          });
+          opId = existing.id;
+        } else {
+          opId = pcdOpsQueries.create({
+            databaseId,
+            origin: 'base',
+            state: 'published',
+            source: 'repo',
+            filename: importIdentity.filename,
+            opNumber: importIdentity.opNumber,
+            sequence: importIdentity.sequence,
+            sql,
+            metadata: metadataJson,
+            desiredState: desiredStateJson,
+            contentHash,
+            lastSeenInRepoAt: importIdentity.lastSeenInRepoAt,
+          });
+        }
+      } else {
+        opId = pcdOpsQueries.create({
+          databaseId,
+          origin: layer === 'base' ? 'base' : 'user',
+          state: layer === 'base' ? (source === 'repo' ? 'published' : 'draft') : 'published',
+          source,
+          sql,
+          metadata: metadataJson,
+          desiredState: desiredStateJson,
+          contentHash,
+        });
+      }
+      lastOpId = opId;
 
-    if (metadata?.operation === 'create' || metadata?.operation === 'delete') {
-      await logger.info(message, {
+      const opType = operation.metadata?.operation ?? 'write';
+      const entity = operation.metadata?.entity?.replace(/_/g, ' ') ?? 'operation';
+      const entityName = operation.metadata?.name ?? '';
+      const message = `${opType.charAt(0).toUpperCase() + opType.slice(1)} ${entity} "${entityName}" in ${layer} layer`;
+
+      if (operation.metadata?.operation === 'create' || operation.metadata?.operation === 'delete') {
+        await logger.info(message, {
+          source: 'PCDWriter',
+          meta: {
+            databaseId,
+            opId,
+            layer,
+            entity: operation.metadata.entity,
+            name: operation.metadata.name,
+          },
+        });
+      }
+
+      if (
+        layer === 'user' &&
+        operation.metadata &&
+        (operation.metadata.operation === 'update' || operation.metadata.operation === 'delete')
+      ) {
+        await supersedePriorUserOps(databaseId, opId, operation.metadata);
+      }
+
+      if (fastPathRepoImport && cache) {
+        const rawDb = cache.getRawDb();
+        if (!rawDb) {
+          throw new Error('Cache not built for repo import fast-path apply');
+        }
+
+        rawDb.exec(sql);
+      }
+    }
+
+    if (fastPathRepoImport) {
+      await logger.debug('Skipped full cache recompile for repo import write', {
         source: 'PCDWriter',
-        meta: { databaseId, opId, layer: origin, entity: metadata.entity, name: metadata.name },
+        meta: { databaseId },
+      });
+    } else {
+      await compile(instance.local_path, instance.id);
+
+      await logger.debug('Cache recompiled after write', {
+        source: 'PCDWriter',
+        meta: { databaseId },
       });
     }
 
-    if (origin === 'user' && metadata && (metadata.operation === 'update' || metadata.operation === 'delete')) {
-      await supersedePriorUserOps(databaseId, opId, metadata);
-    }
-
-    await compile(instance.local_path, instance.id);
-
-    await logger.debug('Cache recompiled after write', {
-      source: 'PCDWriter',
-      meta: { databaseId },
-    });
-
-    return { success: true, filepath: `pcd_ops:${opId}` };
+    return {
+      success: true,
+      filepath: lastOpId ? `pcd_ops:${lastOpId}` : undefined,
+    };
   } catch (error) {
     await logger.error('Failed to write operation', {
       source: 'PCDWriter',
-      meta: { error: String(error), databaseId, layer, description },
+      meta: {
+        error: String(error),
+        databaseId,
+        layer,
+        description,
+        source: options.source,
+      },
     });
-    return { success: false, error: String(error) };
+    throw error;
   }
+}
+
+export function writeOperation(options: WriteOptions): Promise<WriteResult> {
+  const sqlContent = options.queries.map(compiledQueryToSql).join(';\n\n');
+  return writeOperationsFromSqlOperations({
+    databaseId: options.databaseId,
+    layer: options.layer,
+    description: options.description,
+    operations: [
+      {
+        sql: `${sqlContent};`,
+        metadata: options.metadata,
+        desiredState: options.desiredState,
+      },
+    ],
+    source: 'local',
+    runValueGuardGate: false,
+  });
+}
+
+export function writeOperationsFromSql(options: WriteSqlOperationsOptions): Promise<WriteResult> {
+  return writeOperationsFromSqlOperations({
+    ...options,
+    source: options.source ?? 'import',
+    runValueGuardGate: true,
+  });
 }
 
 /**
@@ -390,4 +753,4 @@ export function canWriteToBase(databaseId: number): boolean {
 }
 
 // Re-export types for convenience
-export type { OperationType, OperationMetadata, WriteOptions, WriteResult };
+export type { OperationMetadata, OperationType, WriteOptions, WriteResult };

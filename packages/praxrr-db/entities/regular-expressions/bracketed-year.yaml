@@ -1,0 +1,9 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: Bracketed Year
+pattern: \[\d{4}\]
+tags: []
+description: Match a year moniker inside square brackets
+regex101Id: null

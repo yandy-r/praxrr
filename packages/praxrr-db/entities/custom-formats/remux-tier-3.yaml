@@ -1,0 +1,83 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: Remux Tier 3
+description: Matches release groups who fall under Remux Tier 3
+includeInRename: false
+tags:
+  - Release Group Tier
+  - Remux
+conditions:
+  - name: ATELiER
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: ATELiER
+        pattern: (?<=^|[\s.-])ATELiER\b
+  - name: EPSiLON
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: EPSiLON
+        pattern: (?<=^|[\s.-])EPSiLON\b
+  - name: HiFi
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: HiFi
+        pattern: (?<=^|[\s.-])HiFi\b
+  - name: NCmt
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: NCmt
+        pattern: (?<=^|[\s.-])NCmt\b
+  - name: Not DVD
+    type: source
+    arrType: all
+    negate: true
+    required: true
+    sources:
+      - dvd
+  - name: Remux
+    type: release_title
+    arrType: all
+    negate: false
+    required: true
+    patterns:
+      - name: Remux
+        pattern: Remux
+  - name: SiCFoI
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: SiCFoI
+        pattern: (?<=^|[\s.-])SiCFoI\b
+  - name: TEPES
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: TEPES
+        pattern: (?<=^|[\s.-])TEPES\b
+  - name: decibeL
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: decibeL
+        pattern: (?<=^|[\s.-])decibeL\b
+tests: []
