@@ -12,6 +12,7 @@ import type {
   PortableRegularExpression,
   PortableCustomFormat,
   PortableQualityProfile,
+  PortableLidarrNaming,
   PortableLidarrMediaSettings,
   PortableLidarrMetadataProfile,
   PortableRadarrNaming,
@@ -28,6 +29,8 @@ import * as namingQueries from './mediaManagement/naming/index.ts';
 import * as mediaSettingsQueries from './mediaManagement/media-settings/index.ts';
 import * as qualityDefsQueries from './mediaManagement/quality-definitions/index.ts';
 import * as metadataProfilesQueries from './metadataProfiles/index.ts';
+import { createLidarrNaming } from './mediaManagement/naming/create.ts';
+import type { EntityType } from '$shared/pcd/portable.ts';
 
 interface LidarrMetadataProfileTypeRow {
   id?: number;
@@ -48,6 +51,158 @@ interface DeserializeOptions<T> {
   cache: PCDCache;
   layer: OperationLayer;
   portable: T;
+}
+
+export interface EntityDeserializerOptions {
+  databaseId: number;
+  cache: PCDCache;
+  layer: OperationLayer;
+  data: unknown;
+}
+
+export type EntityDeserializer = (options: EntityDeserializerOptions) => Promise<unknown>;
+
+export interface DeserializeByEntityTypeOptions extends EntityDeserializerOptions {
+  entityType: EntityType;
+}
+
+const ENTITY_DESERIALIZERS: Record<EntityType, EntityDeserializer> = {
+  delay_profile: (options) => {
+    return deserializeDelayProfile({
+      databaseId: options.databaseId,
+      cache: options.cache,
+      layer: options.layer,
+      portable: asPortableData<PortableDelayProfile>(options.data),
+    });
+  },
+  regular_expression: (options) => {
+    return deserializeRegularExpression({
+      databaseId: options.databaseId,
+      cache: options.cache,
+      layer: options.layer,
+      portable: asPortableData<PortableRegularExpression>(options.data),
+    });
+  },
+  custom_format: (options) => {
+    return deserializeCustomFormat({
+      databaseId: options.databaseId,
+      cache: options.cache,
+      layer: options.layer,
+      portable: asPortableData<PortableCustomFormat>(options.data),
+    });
+  },
+  quality_profile: (options) => {
+    return deserializeQualityProfile({
+      databaseId: options.databaseId,
+      cache: options.cache,
+      layer: options.layer,
+      portable: asPortableData<PortableQualityProfile>(options.data),
+    });
+  },
+  radarr_naming: (options) => {
+    return deserializeRadarrNaming({
+      databaseId: options.databaseId,
+      cache: options.cache,
+      layer: options.layer,
+      portable: asPortableData<PortableRadarrNaming>(options.data),
+    });
+  },
+  sonarr_naming: (options) => {
+    return deserializeSonarrNaming({
+      databaseId: options.databaseId,
+      cache: options.cache,
+      layer: options.layer,
+      portable: asPortableData<PortableSonarrNaming>(options.data),
+    });
+  },
+  lidarr_naming: (options) => {
+    return deserializeLidarrNaming({
+      databaseId: options.databaseId,
+      cache: options.cache,
+      layer: options.layer,
+      portable: asPortableData<PortableLidarrNaming>(options.data),
+    });
+  },
+  radarr_media_settings: (options) => {
+    return deserializeRadarrMediaSettings({
+      databaseId: options.databaseId,
+      cache: options.cache,
+      layer: options.layer,
+      portable: asPortableData<PortableMediaSettings>(options.data),
+    });
+  },
+  sonarr_media_settings: (options) => {
+    return deserializeSonarrMediaSettings({
+      databaseId: options.databaseId,
+      cache: options.cache,
+      layer: options.layer,
+      portable: asPortableData<PortableMediaSettings>(options.data),
+    });
+  },
+  lidarr_media_settings: (options) => {
+    return deserializeLidarrMediaSettings({
+      databaseId: options.databaseId,
+      cache: options.cache,
+      layer: options.layer,
+      portable: asPortableData<PortableLidarrMediaSettings>(options.data),
+    });
+  },
+  radarr_quality_definitions: (options) => {
+    return deserializeRadarrQualityDefinitions({
+      databaseId: options.databaseId,
+      cache: options.cache,
+      layer: options.layer,
+      portable: asPortableData<PortableQualityDefinitions>(options.data),
+    });
+  },
+  sonarr_quality_definitions: (options) => {
+    return deserializeSonarrQualityDefinitions({
+      databaseId: options.databaseId,
+      cache: options.cache,
+      layer: options.layer,
+      portable: asPortableData<PortableQualityDefinitions>(options.data),
+    });
+  },
+  lidarr_quality_definitions: (options) => {
+    return deserializeLidarrQualityDefinitions({
+      databaseId: options.databaseId,
+      cache: options.cache,
+      layer: options.layer,
+      portable: asPortableData<PortableLidarrQualityDefinitions>(options.data),
+    });
+  },
+  lidarr_metadata_profile: (options) => {
+    return deserializeLidarrMetadataProfile({
+      databaseId: options.databaseId,
+      cache: options.cache,
+      layer: options.layer,
+      portable: asPortableData<PortableLidarrMetadataProfile>(options.data),
+    });
+  },
+};
+
+function asPortableData<T>(data: unknown): T {
+  return data as unknown as T;
+}
+
+export function getEntityDeserializer(entityType: EntityType): EntityDeserializer {
+  return ENTITY_DESERIALIZERS[entityType];
+}
+
+export async function deserializeByEntityType({
+  databaseId,
+  cache,
+  layer,
+  entityType,
+  data,
+}: DeserializeByEntityTypeOptions) {
+  const handler = getEntityDeserializer(entityType);
+  return handler({
+    databaseId,
+    cache,
+    layer,
+    data,
+  });
 }
 
 // ============================================================================
@@ -204,6 +359,17 @@ export async function deserializeSonarrNaming(options: DeserializeOptions<Portab
   const { databaseId, cache, layer, portable } = options;
 
   return namingQueries.createSonarrNaming({
+    databaseId,
+    cache,
+    layer,
+    input: portable,
+  });
+}
+
+export async function deserializeLidarrNaming(options: DeserializeOptions<PortableLidarrNaming>) {
+  const { databaseId, cache, layer, portable } = options;
+
+  return createLidarrNaming({
     databaseId,
     cache,
     layer,
