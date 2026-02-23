@@ -6,13 +6,9 @@ import {
   type EntityType,
   PORTABLE_MIGRATION_MIN_VERSION,
   PORTABLE_MIGRATION_SOURCE_EXPORT,
-  type PortableLidarrNaming,
-  type PortableLidarrQualityDefinitions,
 } from '$shared/pcd/portable.ts';
 import type { PCDCache } from '$pcd/index.ts';
 import * as serialize from '$pcd/entities/serialize.ts';
-import { getLidarrByName as getLidarrNamingByName } from '$pcd/entities/mediaManagement/naming/read.ts';
-import { getLidarrByName as getLidarrQualityDefinitionsByName } from '$pcd/entities/mediaManagement/quality-definitions/read.ts';
 
 const VALID_ENTITY_TYPES: ReadonlySet<string> = new Set(ENTITY_TYPES);
 
@@ -59,7 +55,11 @@ export const GET: RequestHandler = async ({ url }) => {
   }
 };
 
-async function serializeEntity(cache: PCDCache, entityType: EntityType, name: string) {
+async function serializeEntity(
+  cache: PCDCache,
+  entityType: EntityType,
+  name: string
+): Promise<Record<string, unknown>> {
   switch (entityType) {
     case 'delay_profile':
       return serialize.serializeDelayProfile(cache, name);
@@ -74,7 +74,7 @@ async function serializeEntity(cache: PCDCache, entityType: EntityType, name: st
     case 'sonarr_naming':
       return serialize.serializeSonarrNaming(cache, name);
     case 'lidarr_naming':
-      return serializeLidarrNaming(cache, name);
+      return serialize.serializeLidarrNaming(cache, name);
     case 'radarr_media_settings':
       return serialize.serializeRadarrMediaSettings(cache, name);
     case 'sonarr_media_settings':
@@ -89,37 +89,10 @@ async function serializeEntity(cache: PCDCache, entityType: EntityType, name: st
       return serializeLidarrQualityDefinitions(cache, name);
     case 'lidarr_metadata_profile':
       return serialize.serializeLidarrMetadataProfile(cache, name);
+
+    default: {
+      const exhaustive: never = entityType;
+      throw new Error(`Unsupported entity type: ${exhaustive}`);
+    }
   }
-}
-
-async function serializeLidarrNaming(cache: PCDCache, name: string): Promise<PortableLidarrNaming> {
-  const row = await getLidarrNamingByName(cache, name);
-  if (!row) throw new Error(`Lidarr naming "${name}" not found`);
-
-  return {
-    name: row.name,
-    rename: row.rename,
-    standardEpisodeFormat: row.standard_track_format,
-    dailyEpisodeFormat: row.artist_name,
-    animeEpisodeFormat: row.multi_disc_track_format,
-    seriesFolderFormat: row.artist_folder_format,
-    seasonFolderFormat: row.artist_folder_format,
-    replaceIllegalCharacters: row.replace_illegal_characters,
-    colonReplacementFormat: row.colon_replacement_format,
-    customColonReplacementFormat: row.custom_colon_replacement_format,
-    multiEpisodeStyle: 'extend',
-  };
-}
-
-async function serializeLidarrQualityDefinitions(
-  cache: PCDCache,
-  name: string
-): Promise<PortableLidarrQualityDefinitions> {
-  const config = await getLidarrQualityDefinitionsByName(cache, name);
-  if (!config) throw new Error(`Lidarr quality definitions "${name}" not found`);
-
-  return {
-    name: config.name,
-    entries: config.entries,
-  };
 }

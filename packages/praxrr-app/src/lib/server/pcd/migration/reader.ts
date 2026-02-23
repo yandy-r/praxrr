@@ -255,7 +255,8 @@ async function readMigrationEntitySource(entry: MigrationSourceEntry): Promise<
 function extractEntityName(portable: ReaderInputRecord): string | null {
   const nameValue = portable.name;
   if (typeof nameValue !== 'string') return null;
-  return nameValue.trim();
+  if (!nameValue.trim()) return null;
+  return nameValue;
 }
 
 function inferFormatFromPath(sourcePath: string): PortableMigrationFormat | null {

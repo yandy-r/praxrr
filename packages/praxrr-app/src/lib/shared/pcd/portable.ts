@@ -14,7 +14,7 @@
 
 import type { ConditionData, OrderedItem, QualityDefinitionEntry } from './display.ts';
 import type { PreferredProtocol } from './display.ts';
-import type { RadarrNamingRow, SonarrNamingRow, RadarrMediaSettingsRow } from './types.ts';
+import type { LidarrNamingRow, RadarrNamingRow, SonarrNamingRow, RadarrMediaSettingsRow } from './types.ts';
 
 type LidarrPortableValidationEntityType = 'sonarr_naming' | 'sonarr_media_settings' | 'sonarr_quality_definitions';
 
@@ -50,17 +50,24 @@ export const LIDARR_MEDIA_MANAGEMENT_PORTABLE_MATRIX: Record<
     requiredFields: [
       'name',
       'rename',
+      'standardTrackFormat',
+      'artistName',
+      'multiDiscTrackFormat',
+      'artistFolderFormat',
+      'replaceIllegalCharacters',
+      'colonReplacementFormat',
+      'customColonReplacementFormat',
+    ],
+    forbiddenFields: [
+      'movieFormat',
+      'movieFolderFormat',
       'standardEpisodeFormat',
       'dailyEpisodeFormat',
       'animeEpisodeFormat',
       'seriesFolderFormat',
       'seasonFolderFormat',
-      'replaceIllegalCharacters',
-      'colonReplacementFormat',
-      'customColonReplacementFormat',
       'multiEpisodeStyle',
     ],
-    forbiddenFields: ['movieFormat', 'movieFolderFormat'],
   },
   lidarr_media_settings: {
     reusableEntityType: 'sonarr_media_settings',
@@ -294,7 +301,17 @@ export interface PortableSonarrNaming {
   multiEpisodeStyle: SonarrNamingRow['multi_episode_style'];
 }
 
-export type PortableLidarrNaming = PortableSonarrNaming;
+export interface PortableLidarrNaming {
+  name: string;
+  rename: boolean;
+  standardTrackFormat: string;
+  artistName: string;
+  multiDiscTrackFormat: string;
+  artistFolderFormat: string;
+  replaceIllegalCharacters: boolean;
+  colonReplacementFormat: LidarrNamingRow['colon_replacement_format'];
+  customColonReplacementFormat: string | null;
+}
 
 // Media Settings
 

@@ -144,7 +144,7 @@ changes, content hashes from import vs. writer paths will silently diverge, caus
 
 ### C-5: `extractEntityName` trims entity names, violating contract
 
-- [ ] **Status:** Open
+- [x] **Status:** Fixed
 - **File:** `packages/praxrr-app/src/lib/server/pcd/migration/reader.ts:255-259`
 - **Category:** Contract violation
 - **Agents:** code-reviewer, error-handler
@@ -175,11 +175,16 @@ function extractEntityName(portable: ReaderInputRecord): string | null {
 }
 ```
 
+### Validation result
+
+- Kept persisted `portable.name` values intact while rejecting blank/whitespace-only names.
+  - `packages/praxrr-app/src/lib/server/pcd/migration/reader.ts:255-259`
+
 ---
 
 ### C-6: Incorrect Lidarr naming field mappings in export route (Cross-Arr violation)
 
-- [ ] **Status:** Open
+- [x] **Status:** Fixed
 - **File:** `packages/praxrr-app/src/routes/api/v1/pcd/export/+server.ts:103-106`
 - **Category:** Cross-Arr semantic validation, data corruption
 - **Agents:** code-reviewer
@@ -200,11 +205,24 @@ An export/re-import cycle would corrupt the entity. Root cause: `PortableLidarrN
 
 **Fix:** Define a native `PortableLidarrNaming` type with Lidarr-correct field names.
 
+### Validation result
+
+- Introduced a native `PortableLidarrNaming` shape with Lidarr-native fields and removed
+  `PortableSonarrNaming` aliasing.
+  - `packages/praxrr-app/src/lib/shared/pcd/portable.ts:297`
+- Updated validation logic to use the Lidarr-specific portable schema.
+  - `packages/praxrr-app/src/lib/server/pcd/entities/validate.ts:140`
+- Added Lidarr serializer that maps DB fields to the Lidarr portable naming contract.
+  - `packages/praxrr-app/src/lib/server/pcd/entities/serialize.ts:56`
+- Updated export route to use the new serializer and removed incorrect cross-Arr mapping.
+  - `packages/praxrr-app/src/routes/api/v1/pcd/export/+server.ts:62`
+  - `packages/praxrr-app/src/routes/api/v1/pcd/export/+server.ts:90-130`
+
 ---
 
 ### C-7: `serializeEntity` can return `undefined` silently (non-exhaustive switch)
 
-- [ ] **Status:** Open
+- [x] **Status:** Fixed
 - **File:** `packages/praxrr-app/src/routes/api/v1/pcd/export/+server.ts:62-93`
 - **Category:** Type safety, silent failure
 - **Agents:** code-reviewer
@@ -214,6 +232,12 @@ added, the function silently returns `undefined`, and the export endpoint return
 `{ entityType, data: undefined, migration: {...} }` as a successful 200 response.
 
 **Fix:** Add return type annotation and exhaustive `never` check in the default case.
+
+### Validation result
+
+- Made `serializeEntity` return a concrete record type and added an exhaustive `default` branch that
+  throws for unhandled `EntityType` values.
+  - `packages/praxrr-app/src/routes/api/v1/pcd/export/+server.ts:62-93`
 
 ---
 
