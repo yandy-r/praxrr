@@ -180,14 +180,7 @@ function resolveConflictStrategy(conflictStrategy: string | undefined): Conflict
     return conflictStrategy;
   }
 
-  if (conflictStrategy !== undefined) {
-    logger.warn('Invalid conflict strategy in database configuration, falling back to override', {
-      source: 'PCDWriter',
-      meta: { conflictStrategy },
-    });
-  }
-
-  return 'override';
+  throw new Error(`Invalid conflict strategy in database configuration: ${String(conflictStrategy)}`);
 }
 
 function runValueGuardGate(
@@ -210,7 +203,11 @@ function runValueGuardGate(
   }
 
   const instance = databaseInstancesQueries.getById(databaseId);
-  const conflictStrategy = resolveConflictStrategy(instance?.conflict_strategy);
+  if (!instance) {
+    throw new Error(`Failed to resolve database instance ${databaseId} for value-guard execution`);
+  }
+
+  const conflictStrategy = resolveConflictStrategy(instance.conflict_strategy);
 
   cacheDb.exec('SAVEPOINT pcd_writer_value_guard');
   try {

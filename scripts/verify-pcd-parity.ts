@@ -305,16 +305,16 @@ async function buildWorkspaceForEntitiesDir(
       cleanup: async () => {
         try {
           await Deno.remove(workspaceDir, { recursive: true });
-        } catch {
-          // Ignore cleanup failure for process exit.
+        } catch (error) {
+          console.error(`Failed to remove parity workspace directory ${workspaceDir}:`, error);
         }
       },
     };
   } catch (error) {
     try {
       await Deno.remove(workspaceDir, { recursive: true });
-    } catch {
-      // Ignore cleanup failure for process exit.
+    } catch (cleanupError) {
+      console.error(`Failed to remove parity workspace directory ${workspaceDir}:`, cleanupError);
     }
     throw error;
   }
@@ -495,8 +495,8 @@ async function runParityCheck(args: ParsedArgs): Promise<ExitCode> {
     if (runtimeBaseDir) {
       try {
         await Deno.remove(runtimeBaseDir, { recursive: true });
-      } catch {
-        // Ignore cleanup failure for process exit.
+      } catch (error) {
+        console.error(`Failed to remove parity runtime directory ${runtimeBaseDir}:`, error);
       }
     }
   }

@@ -141,14 +141,18 @@ function parseStableIdentityFromMetadata(parsed: Record<string, unknown>): Migra
   };
 }
 
-function deriveSqlStableIdentity(metadataJson: string | null): MigrationEntityStableIdentity | null {
+function deriveSqlStableIdentity(
+  metadataJson: string | null,
+  sourcePath: string
+): MigrationEntityStableIdentity | null {
   if (!metadataJson) return null;
 
   let parsed: Record<string, unknown>;
   try {
     parsed = JSON.parse(metadataJson) as Record<string, unknown>;
-  } catch {
-    throw new Error('Malformed SQL metadata JSON');
+  } catch (error) {
+    const cause = error instanceof Error ? error.message : String(error);
+    throw new Error(`Malformed SQL metadata JSON for ${sourcePath}: ${cause}`);
   }
 
   return parseStableIdentityFromMetadata(parsed);
@@ -373,7 +377,7 @@ export async function importBaseOps(
       cleanedSql,
       metadataJson,
       contentHash,
-      stableIdentity: deriveSqlStableIdentity(metadataJson),
+      stableIdentity: deriveSqlStableIdentity(metadataJson, entry.filepath),
     });
   }
 

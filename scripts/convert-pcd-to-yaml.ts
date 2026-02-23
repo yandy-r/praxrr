@@ -29,7 +29,7 @@ interface RuntimeDependencies {
     repositoryUrl: string;
     localPath: string;
     localOpsEnabled: boolean;
-  conflictStrategy: string;
+    conflictStrategy: string;
   }) => number;
   convertCompiledCacheToEntities: typeof import('$pcd/migration/converter.ts').convertCompiledCacheToEntities;
   ConverterConfigError: typeof import('$pcd/migration/converter.ts').ConverterConfigError;
@@ -419,8 +419,8 @@ async function buildStandaloneCache(
     } else {
       try {
         await Deno.remove(runtimeBaseDir, { recursive: true });
-      } catch {
-        // Ignore cleanup failure for process exit.
+      } catch (cleanupError) {
+        console.error(`Failed to remove temporary directory ${runtimeBaseDir}:`, cleanupError);
       }
     }
 
@@ -447,14 +447,14 @@ async function cleanupStandaloneCache(
 
   try {
     dependencies?.db.close();
-  } catch {
-    // Ignore cleanup failure for process exit.
+  } catch (error) {
+    console.error('Failed to close runtime dependency database:', error);
   }
 
   try {
     await Deno.remove(context.runtimeBaseDir, { recursive: true });
-  } catch {
-    // Ignore cleanup failure for process exit.
+  } catch (error) {
+    console.error(`Failed to remove runtime base directory ${context.runtimeBaseDir}:`, error);
   }
 }
 
@@ -490,9 +490,7 @@ async function runConversion(args: ParsedArgs): Promise<ExitCode> {
       console.log(`Built standalone cache at ${runtime.runtimeBaseDir}`);
     }
 
-    conversionOutputDir = args.dryRun
-      ? await Deno.makeTempDir({ prefix: 'praxrr-converter-output-' })
-      : outputDir;
+    conversionOutputDir = args.dryRun ? await Deno.makeTempDir({ prefix: 'praxrr-converter-output-' }) : outputDir;
 
     const cache = runtime.dependencies.getCache(runtime.databaseId);
     if (!cache) {
@@ -533,7 +531,10 @@ async function runConversion(args: ParsedArgs): Promise<ExitCode> {
 
     return 0;
   } catch (error) {
-    if (error instanceof PathConflictError || isPathConflictError(error, runtime?.dependencies ?? runtimeDependencies)) {
+    if (
+      error instanceof PathConflictError ||
+      isPathConflictError(error, runtime?.dependencies ?? runtimeDependencies)
+    ) {
       console.error(error instanceof Error ? error.message : String(error));
       return 3;
     }
@@ -568,8 +569,8 @@ async function runConversion(args: ParsedArgs): Promise<ExitCode> {
     if (args.dryRun && conversionOutputDir) {
       try {
         await Deno.remove(conversionOutputDir, { recursive: true });
-      } catch {
-        // Ignore cleanup failure for process exit.
+      } catch (error) {
+        console.error(`Failed to remove dry-run directory ${conversionOutputDir}:`, error);
       }
     }
 
@@ -589,10 +590,7 @@ function isPathConflictError(error: unknown, runtimeDependencies: RuntimeDepende
   );
 }
 
-function isConverterConfigError(
-  error: unknown,
-  runtimeDependencies: RuntimeDependencies | null
-): error is Error {
+function isConverterConfigError(error: unknown, runtimeDependencies: RuntimeDependencies | null): error is Error {
   if (runtimeDependencies === null) {
     return false;
   }
@@ -600,10 +598,7 @@ function isConverterConfigError(
   return error instanceof runtimeDependencies.ConverterConfigError;
 }
 
-function isConverterConversionError(
-  error: unknown,
-  runtimeDependencies: RuntimeDependencies | null
-): error is Error {
+function isConverterConversionError(error: unknown, runtimeDependencies: RuntimeDependencies | null): error is Error {
   if (runtimeDependencies === null) {
     return false;
   }

@@ -108,8 +108,8 @@ class PCDManager {
       // Cleanup on failure - remove cloned directory
       try {
         await Deno.remove(localPath, { recursive: true });
-      } catch {
-        // Ignore cleanup errors
+      } catch (cleanupError) {
+        console.error(`Failed to remove cloned PCD directory ${localPath} after link failure:`, cleanupError);
       }
       throw error;
     }

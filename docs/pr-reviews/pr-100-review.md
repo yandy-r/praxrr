@@ -317,10 +317,13 @@ which uses `db: { close: () => dbModule.db.close() }`.
 
 - **Source:** silent-failure-hunter
 - **File:** `packages/praxrr-app/src/lib/server/pcd/ops/writer.ts:171-184`
-- **Status:** [ ] Open
+- **Status:** [x] Fixed
 
 An invalid conflict strategy silently corrects to 'override' (the most destructive strategy). Per
 CLAUDE.md: "ALWAYS throw errors early and often. Do not use fallbacks."
+
+**Fix:** `resolveConflictStrategy` now throws `Invalid conflict strategy` and `runValueGuardGate`
+now fails fast if the instance is missing instead of falling back.
 
 ---
 
@@ -328,10 +331,13 @@ CLAUDE.md: "ALWAYS throw errors early and often. Do not use fallbacks."
 
 - **Source:** silent-failure-hunter
 - **File:** `packages/praxrr-app/src/lib/server/pcd/ops/importBaseOps.ts:140-151`
-- **Status:** [ ] Open
+- **Status:** [x] Fixed
 
 Throws generic "Malformed SQL metadata JSON" with no context about which file or the actual parse
 error.
+
+**Fix:** `deriveSqlStableIdentity` now accepts source file path and wraps parse failures with
+filename plus parse error message.
 
 ---
 
@@ -339,9 +345,12 @@ error.
 
 - **Source:** silent-failure-hunter
 - **File:** `packages/praxrr-app/src/lib/server/pcd/migration/parityVerifier.ts:377-399`
-- **Status:** [ ] Open
+- **Status:** [x] Fixed
 
 If `invalidate` throws in the `finally` block, `databaseInstancesQueries.delete` never executes.
+
+**Fix:** `withIsolatedInstance` now catches and logs `invalidate` errors, then always attempts
+`databaseInstancesQueries.delete`.
 
 ---
 
@@ -349,9 +358,12 @@ If `invalidate` throws in the `finally` block, `databaseInstancesQueries.delete`
 
 - **Source:** silent-failure-hunter
 - **Files:** `convert-pcd-to-yaml.ts:422,450,456,571`, `verify-pcd-parity.ts:304,312,514`
-- **Status:** [ ] Open
+- **Status:** [x] Fixed
 
 Per CLAUDE.md, empty catch blocks are not acceptable even in cleanup contexts. Add `console.error`.
+
+**Fix:** Added `console.error` logging to all seven cleanup catches in both scripts with contextual
+path/error details.
 
 ---
 
@@ -359,10 +371,13 @@ Per CLAUDE.md, empty catch blocks are not acceptable even in cleanup contexts. A
 
 - **Source:** silent-failure-hunter
 - **File:** `packages/praxrr-app/src/lib/server/pcd/core/manager.ts:109-113`
-- **Status:** [ ] Open
+- **Status:** [x] Fixed
 
 Nested empty catch in cleanup path. Repeated failed link attempts could fill disk with orphaned PCD
 clones.
+
+**Fix:** `link()` now logs cleanup failures when removing cloned directory on error, instead of
+silently ignoring them.
 
 ---
 
@@ -560,8 +575,8 @@ Missing: invalid values (should throw), default behavior (empty string defaults 
 | ---- | --------- | -------------- | --------------------------------------- | --------- |
 | C-1  | Critical  | Silent Failure | manager.ts:416-435                      | [x] Fixed |
 | C-2  | Critical  | Silent Failure | manager.ts:174-203                      | [x] Fixed |
-| C-3  | Critical  | Type Contract  | v1.d.ts:654-694                         | [ ] Open  |
-| C-4  | Critical  | Concurrency    | writer.ts:36                            | [ ] Open  |
+| C-3  | Critical  | Type Contract  | v1.d.ts:654-694                         | [x] Fixed |
+| C-4  | Critical  | Concurrency    | writer.ts:36                            | [x] Fixed |
 | C-5  | Critical  | Data Integrity | importBaseOps.ts:18-19                  | [ ] Open  |
 | C-6  | Critical  | Comment        | manager.ts:482                          | [ ] Open  |
 | H-1  | High      | Silent Failure | writer.ts:418-425                       | [ ] Open  |
@@ -575,11 +590,11 @@ Missing: invalid values (should throw), default behavior (empty string defaults 
 | I-3  | Important | Duplication    | parityVerifier.ts, verify-pcd-parity.ts | [x] Fixed |
 | I-4  | Important | Type Design    | reader.ts, enumerateEntities.ts         | [x] Fixed |
 | I-5  | Important | Bug Risk       | verify-pcd-parity.ts:67                 | [x] Fixed |
-| I-6  | Important | Error Handling | writer.ts:171-184                       | [ ] Open  |
-| I-7  | Important | Error Context  | importBaseOps.ts:140-151                | [ ] Open  |
-| I-8  | Important | Resource Leak  | parityVerifier.ts:377-399               | [ ] Open  |
-| I-9  | Important | Error Handling | CLI scripts (7 instances)               | [ ] Open  |
-| I-10 | Important | Error Handling | manager.ts:109-113                      | [ ] Open  |
+| I-6  | Important | Error Handling | writer.ts:171-184                       | [x] Fixed |
+| I-7  | Important | Error Context  | importBaseOps.ts:140-151                | [x] Fixed |
+| I-8  | Important | Resource Leak  | parityVerifier.ts:377-399               | [x] Fixed |
+| I-9  | Important | Error Handling | CLI scripts (7 instances)               | [x] Fixed |
+| I-10 | Important | Error Handling | manager.ts:109-113                      | [x] Fixed |
 | I-11 | Important | Error Handling | writer.ts:524-526                       | [ ] Open  |
 | I-12 | Important | Type Design    | parityVerifier.ts                       | [ ] Open  |
 | I-13 | Important | Documentation  | importBaseOps.ts:386-396                | [ ] Open  |

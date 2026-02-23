@@ -334,12 +334,39 @@ async function withIsolatedInstance<T>(
     conflictStrategy: 'override',
   });
 
+  let callbackResult: T | undefined;
+  let callbackError: unknown;
+
   try {
-    return await callback(databaseId);
+    callbackResult = await callback(databaseId);
+  } catch (error) {
+    callbackError = error;
   } finally {
-    invalidate(databaseId);
-    databaseInstancesQueries.delete(databaseId);
+    try {
+      invalidate(databaseId);
+    } catch (error) {
+      console.error(`Failed to invalidate parity verifier instance ${databaseId} for ${pcdPath}/${purpose}:`, error);
+    }
+
+    try {
+      databaseInstancesQueries.delete(databaseId);
+    } catch (error) {
+      if (callbackError === undefined) {
+        throw error;
+      }
+      console.error(`Failed to delete parity verifier instance ${databaseId}:`, error);
+    }
   }
+
+  if (callbackError !== undefined) {
+    throw callbackError;
+  }
+
+  if (callbackResult === undefined) {
+    throw new Error(`Parity verifier callback failed for ${pcdPath}/${purpose} without returning a value`);
+  }
+
+  return callbackResult;
 }
 
 async function buildSqlOnlySnapshot(pcdPath: string): Promise<BuildResult> {
