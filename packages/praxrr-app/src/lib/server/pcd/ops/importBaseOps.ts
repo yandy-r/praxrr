@@ -14,8 +14,13 @@ import { compile } from '../database/compiler.ts';
 import { getCache } from '../database/registry.ts';
 import { withRepoImportWriteContext } from './writer.ts';
 const MIGRATION_OP_FILENAME_PREFIX = 'entities/';
+// Legacy SQL ops with no explicit order prefix are placed in a high-numbered sequence band
+// to preserve ordering determinism while never colliding with explicit file-numbered SQL ops.
 const UNPREFIXED_SEQUENCE_BASE = 2_000_000_000;
+// Migration entity ops are emitted as synthetic SQL ops and occupy a later sequence band.
+// Reserve 10k slots per entity to guarantee stable ordering and allow file-level grouping.
 const YAML_SEQUENCE_BASE = 4_000_000_000;
+// Keep migration entity filenames and op ordering deterministic even when entity counts are large.
 const YAML_SEQUENCE_STRIDE = 10_000;
 
 interface BaseImportSqlEntry {
@@ -387,6 +392,9 @@ export async function importBaseOps(
     migrationIdentitySet = collectMigrationStableIdentitySet(migrationCandidates);
   }
 
+  // Hybrid ingestion uses migration entities as the canonical source for overlapping
+  // identities. SQL entries keep their relative import order for new identities, while
+  // entries with a migration identity match are skipped so migration-driven definitions win.
   const allowLegacySqlInHybrid = config.pcdMigrationAllowLegacyFallback;
   const effectiveSqlEntries =
     isHybridIngestion && !allowLegacySqlInHybrid

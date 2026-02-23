@@ -534,7 +534,7 @@ async function writeOperationsFromSqlOperations(options: WriteSqlOperationsOptio
   try {
     const instance = databaseInstancesQueries.getById(databaseId);
     if (!instance) {
-      return { success: false, error: 'Database instance not found' };
+      throw new Error(`Cannot write operations for missing database instance ${databaseId}`);
     }
 
     const context = currentWriteContext();

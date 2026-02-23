@@ -385,10 +385,13 @@ silently ignoring them.
 
 - **Source:** silent-failure-hunter
 - **File:** `packages/praxrr-app/src/lib/server/pcd/ops/writer.ts:524-526`
-- **Status:** [ ] Open
+- **Status:** [x] Fixed
 
 A missing database instance is a precondition violation that should throw, not return a soft
 failure.
+
+**Fix:** Missing instances now throw an error in `writeOperationsFromSqlOperations`, so callers
+receive an explicit failure instead of `{ success: false }`.
 
 ---
 
@@ -396,9 +399,12 @@ failure.
 
 - **Source:** type-design-analyzer
 - **File:** `packages/praxrr-app/src/lib/server/pcd/migration/parityVerifier.ts`
-- **Status:** [ ] Open
+- **Status:** [x] Fixed
 
 Optional `field`/`valueA`/`valueB` fields should be correlated with `kind` at the type level.
+
+**Fix:** `ParityDiff` is now a discriminated union (`missing_in_a`, `missing_in_b`,
+`field_mismatch`) with fields scoped to the correct `kind`.
 
 ---
 
@@ -406,10 +412,13 @@ Optional `field`/`valueA`/`valueB` fields should be correlated with `kind` at th
 
 - **Source:** comment-analyzer
 - **File:** `packages/praxrr-app/src/lib/server/pcd/ops/importBaseOps.ts:386-396`
-- **Status:** [ ] Open
+- **Status:** [x] Fixed
 
 The three-way branching logic for SQL entry survival in hybrid mode has no comment explaining the
 rationale.
+
+**Fix:** Added rationale comment for SQL-vs-migration precedence in hybrid mode, including fallback
+and identity-based filtering behavior.
 
 ---
 
@@ -417,10 +426,13 @@ rationale.
 
 - **Source:** comment-analyzer
 - **File:** `packages/praxrr-app/src/lib/server/pcd/ops/importBaseOps.ts:17-19`
-- **Status:** [ ] Open
+- **Status:** [x] Fixed
 
 Magic numbers `UNPREFIXED_SEQUENCE_BASE`, `YAML_SEQUENCE_BASE`, `YAML_SEQUENCE_STRIDE` have no
 comment explaining the partitioned sequence space.
+
+**Fix:** Documented the partitioned sequence scheme for legacy SQL and migration-derived generated
+SQL ops at constant declarations.
 
 ---
 
@@ -428,12 +440,13 @@ comment explaining the partitioned sequence space.
 
 - **Source:** comment-analyzer
 - **File:** `scripts/convert-pcd-to-yaml.ts:132`
-- **Status:** [ ] Open
+- **Status:** [x] Fixed
 
 USAGE says `--strict Include migration metadata in output.` The name "strict" misleadingly suggests
 validation rigor, not metadata inclusion.
 
-**Fix:** Rename to `--include-metadata` or rewrite the description.
+**Fix:** Introduced `--include-metadata` as the canonical flag and documented `--strict` as a
+compatibility alias.
 
 ---
 
@@ -577,14 +590,14 @@ Missing: invalid values (should throw), default behavior (empty string defaults 
 | C-2  | Critical  | Silent Failure | manager.ts:174-203                      | [x] Fixed |
 | C-3  | Critical  | Type Contract  | v1.d.ts:654-694                         | [x] Fixed |
 | C-4  | Critical  | Concurrency    | writer.ts:36                            | [x] Fixed |
-| C-5  | Critical  | Data Integrity | importBaseOps.ts:18-19                  | [ ] Open  |
-| C-6  | Critical  | Comment        | manager.ts:482                          | [ ] Open  |
-| H-1  | High      | Silent Failure | writer.ts:418-425                       | [ ] Open  |
-| H-2  | High      | Silent Failure | importBaseOps.ts:322-325                | [ ] Open  |
-| H-3  | High      | Silent Failure | importBaseOps.ts:386-396                | [ ] Open  |
-| H-4  | High      | Type Safety    | importBaseOps.ts:467-482                | [ ] Open  |
-| H-5  | High      | Silent Failure | manager.ts:252-266                      | [ ] Open  |
-| H-6  | High      | Comment        | writer.ts:510-515                       | [ ] Open  |
+| C-5  | Critical  | Data Integrity | importBaseOps.ts:18-19                  | [x] Fixed |
+| C-6  | Critical  | Comment        | manager.ts:482                          | [x] Fixed |
+| H-1  | High      | Silent Failure | writer.ts:418-425                       | [x] Fixed |
+| H-2  | High      | Silent Failure | importBaseOps.ts:322-325                | [x] Fixed |
+| H-3  | High      | Silent Failure | importBaseOps.ts:386-396                | [x] Fixed |
+| H-4  | High      | Type Safety    | importBaseOps.ts:467-482                | [x] Fixed |
+| H-5  | High      | Silent Failure | manager.ts:252-266                      | [x] Fixed |
+| H-6  | High      | Comment        | writer.ts:510-515                       | [x] Fixed |
 | I-1  | Important | Duplication    | importBaseOps.ts, parityVerifier.ts     | [x] Fixed |
 | I-2  | Important | Duplication    | importBaseOps.ts, parityVerifier.ts     | [x] Fixed |
 | I-3  | Important | Duplication    | parityVerifier.ts, verify-pcd-parity.ts | [x] Fixed |
@@ -595,11 +608,11 @@ Missing: invalid values (should throw), default behavior (empty string defaults 
 | I-8  | Important | Resource Leak  | parityVerifier.ts:377-399               | [x] Fixed |
 | I-9  | Important | Error Handling | CLI scripts (7 instances)               | [x] Fixed |
 | I-10 | Important | Error Handling | manager.ts:109-113                      | [x] Fixed |
-| I-11 | Important | Error Handling | writer.ts:524-526                       | [ ] Open  |
-| I-12 | Important | Type Design    | parityVerifier.ts                       | [ ] Open  |
-| I-13 | Important | Documentation  | importBaseOps.ts:386-396                | [ ] Open  |
-| I-14 | Important | Documentation  | importBaseOps.ts:17-19                  | [ ] Open  |
-| I-15 | Important | Comment        | convert-pcd-to-yaml.ts:132              | [ ] Open  |
+| I-11 | Important | Error Handling | writer.ts:524-526                       | [x] Fixed |
+| I-12 | Important | Type Design    | parityVerifier.ts                       | [x] Fixed |
+| I-13 | Important | Documentation  | importBaseOps.ts:386-396                | [x] Fixed |
+| I-14 | Important | Documentation  | importBaseOps.ts:17-19                  | [x] Fixed |
+| I-15 | Important | Comment        | convert-pcd-to-yaml.ts:132              | [x] Fixed |
 | T-1  | Test Gap  | Coverage       | slug.ts                                 | [ ] Open  |
 | T-2  | Test Gap  | Coverage       | yamlFormatter.ts                        | [ ] Open  |
 | T-3  | Test Gap  | Coverage       | enumerateEntities.ts                    | [ ] Open  |

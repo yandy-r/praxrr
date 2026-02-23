@@ -86,7 +86,7 @@ interface ParsedArgs {
   entityTypes: readonly EntityType[];
   overwrite: boolean;
   dryRun: boolean;
-  strict: boolean;
+  includeMigrationMetadata: boolean;
   verbose: boolean;
   help: boolean;
 }
@@ -129,7 +129,10 @@ Options:
                                Default: false
   --dry-run                     Preview planned writes without writing files.
                                Default: false
-  --strict                      Include migration metadata in output.
+  --include-metadata           Include migration metadata in output.
+                               Default: false
+  --strict                      Compatibility alias for --include-metadata.
+                               Deprecated: use --include-metadata for clarity.
                                Default: false
   --verbose                     Print file-level details.
                                Default: false
@@ -139,6 +142,7 @@ Defaults:
   --format=yaml
   --overwrite=false
   --dry-run=false
+  --include-metadata=false
   --strict=false
   --verbose=false
 `;
@@ -151,7 +155,7 @@ function parseArgs(rawArgs: string[]): ParsedArgs {
     entityTypes: [],
     overwrite: false,
     dryRun: false,
-    strict: false,
+    includeMigrationMetadata: false,
     verbose: false,
     help: false,
   };
@@ -175,7 +179,12 @@ function parseArgs(rawArgs: string[]): ParsedArgs {
     }
 
     if (arg === '--strict') {
-      result.strict = true;
+      result.includeMigrationMetadata = true;
+      continue;
+    }
+
+    if (arg === '--include-metadata') {
+      result.includeMigrationMetadata = true;
       continue;
     }
 
@@ -503,7 +512,7 @@ async function runConversion(args: ParsedArgs): Promise<ExitCode> {
       format: args.format,
       overwrite: args.overwrite,
       entityTypes: args.entityTypes.length > 0 ? args.entityTypes : undefined,
-      includeMigrationMetadata: args.strict,
+      includeMigrationMetadata: args.includeMigrationMetadata,
     });
 
     const writtenFiles = await collectFiles(conversionOutputDir);

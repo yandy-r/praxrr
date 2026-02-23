@@ -90,14 +90,28 @@ const TABLE_SORT_KEYS: Readonly<Record<ParityTable, readonly string[]>> = {
 
 const NUMERIC_STRING_RE = /^[+-]?(?:\d+|\d+\.\d+|\.\d+)(?:[eE][+-]?\d+)?$/;
 
-export interface ParityDiff {
+type ParityMissingInB = {
   readonly table: ParityTable;
-  readonly kind: 'missing_in_b' | 'missing_in_a' | 'field_mismatch';
+  readonly kind: 'missing_in_b';
   readonly naturalKey: Record<string, unknown>;
-  readonly field?: string;
-  readonly valueA?: unknown;
-  readonly valueB?: unknown;
-}
+};
+
+type ParityMissingInA = {
+  readonly table: ParityTable;
+  readonly kind: 'missing_in_a';
+  readonly naturalKey: Record<string, unknown>;
+};
+
+type ParityFieldMismatch = {
+  readonly table: ParityTable;
+  readonly kind: 'field_mismatch';
+  readonly naturalKey: Record<string, unknown>;
+  readonly field: string;
+  readonly valueA: unknown;
+  readonly valueB: unknown;
+};
+
+export type ParityDiff = ParityMissingInA | ParityMissingInB | ParityFieldMismatch;
 
 export interface ParityReport {
   readonly pass: boolean;
