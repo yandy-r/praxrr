@@ -24,11 +24,13 @@ interface MigrationSourceEntry {
 export interface MigrationEntityStableIdentity {
   readonly key: string;
   readonly value: string;
+  readonly kind: 'stable';
 }
 
 interface MigrationEntityIdentity {
   readonly key: string;
   readonly value: string;
+  readonly kind: 'identity';
 }
 
 interface TopLevelEntityPath {
@@ -227,6 +229,7 @@ async function readMigrationEntitySource(entry: MigrationSourceEntry): Promise<
       portable,
       entityName: candidateName,
       identity: {
+        kind: 'identity',
         key: `migration:${resolution.entityType}`,
         value: candidateName,
       },
@@ -308,12 +311,38 @@ function resolveMigrationMetadata(format: PortableMigrationFormat, relativePath:
   };
 }
 
+const STABLE_KEYS_BY_ENTITY = PORTABLE_ENTITY_STABLE_KEY_BY_TYPE;
+
+function resolveStableEntityType(entityType: EntityType): keyof typeof STABLE_KEYS_BY_ENTITY {
+  switch (entityType) {
+    case 'delay_profile':
+    case 'regular_expression':
+    case 'custom_format':
+    case 'quality_profile':
+    case 'radarr_naming':
+    case 'sonarr_naming':
+    case 'lidarr_naming':
+    case 'radarr_media_settings':
+    case 'sonarr_media_settings':
+    case 'lidarr_media_settings':
+    case 'radarr_quality_definitions':
+    case 'sonarr_quality_definitions':
+    case 'lidarr_quality_definitions':
+    case 'lidarr_metadata_profile':
+      return entityType;
+    default:
+      const _unreachable = entityType satisfies never;
+      throw new Error(`Unsupported entity type: ${String(_unreachable)}`);
+  }
+}
+
 export function resolveMigrationStableIdentity(
   entityType: EntityType,
   entityName: string
 ): MigrationEntityStableIdentity {
-  const stableKey = PORTABLE_ENTITY_STABLE_KEY_BY_TYPE[entityType] ?? `migration_${entityType}_name`;
+  const stableKey = STABLE_KEYS_BY_ENTITY[resolveStableEntityType(entityType)];
   return {
+    kind: 'stable',
     key: stableKey,
     value: entityName,
   };

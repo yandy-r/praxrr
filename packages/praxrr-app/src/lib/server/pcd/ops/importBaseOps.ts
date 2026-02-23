@@ -69,14 +69,14 @@ function parseStableIdentityFromText(raw: string): MigrationEntityStableIdentity
     const key = asString(value.slice(0, equalsIndex));
     const stableValue = asString(value.slice(equalsIndex + 1));
     if (!key || !stableValue) return null;
-    return { key, value: stableValue };
+    return { key, value: stableValue, kind: 'stable' };
   }
 }
 
 function parseStableIdentityFromObject(parsed: Record<string, unknown>): MigrationEntityStableIdentity | null {
   const key = asString(parsed.key);
   const value = asString(parsed.value);
-  if (key && value) return { key, value };
+  if (key && value) return { key, value, kind: 'stable' };
 
   const stableKey = parsed.stable_key;
   if (typeof stableKey === 'object' && stableKey !== null && !Array.isArray(stableKey)) {
@@ -84,7 +84,7 @@ function parseStableIdentityFromObject(parsed: Record<string, unknown>): Migrati
     const nestedKey = asString(nested.key);
     const nestedValue = asString(nested.value);
     if (nestedKey && nestedValue) {
-      return { key: nestedKey, value: nestedValue };
+      return { key: nestedKey, value: nestedValue, kind: 'stable' };
     }
   }
 
@@ -106,6 +106,7 @@ function parseStableIdentityFromMetadata(parsed: Record<string, unknown>): Migra
   if (!entity || !name) return null;
 
   return {
+    kind: 'stable',
     key: SQL_ENTITY_STABLE_KEY_BY_ENTITY[entity.toLowerCase()] ?? `sql_${entity.toLowerCase()}_name`,
     value: name,
   };
@@ -146,7 +147,7 @@ export class MigrationReaderError extends Error {
   }
 }
 
-function formatMigrationIssueList(issues: MigrationReaderIssue[]): string {
+function formatMigrationIssueList(issues: ReadonlyArray<MigrationReaderIssue>): string {
   return issues.map((issue) => `${issue.relativePath}: ${issue.kind} - ${issue.message}`).join('\n');
 }
 

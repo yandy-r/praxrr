@@ -204,18 +204,11 @@ async function cancelOutCreate(databaseId: number, origin: PcdOpOrigin, metadata
     states: ['published', 'draft'],
   });
 
-  type ParsedMetadata = {
-    operation?: string;
-    entity?: string;
-    name?: string;
-    stable_key?: { key?: string; value?: string };
-  };
-
-  function hasDependentOps(
+  async function hasDependentOps(
     createdOpId: number,
     createdMeta: ParsedMetadata,
     createdStableKey: { key?: string; value?: string } | undefined
-  ): boolean {
+  ): Promise<boolean> {
     for (const op of candidates) {
       if (op.id <= createdOpId) continue;
       if (!op.metadata) continue;
@@ -315,7 +308,7 @@ async function cancelOutCreate(databaseId: number, origin: PcdOpOrigin, metadata
     }
 
     if (parsed.operation === 'create' && parsed.entity === metadata.entity && parsed.name === metadata.name) {
-      if (hasDependentOps(candidate.id, parsed, parsed.stable_key)) {
+      if (await hasDependentOps(candidate.id, parsed, parsed.stable_key)) {
         return false;
       }
       pcdOpsQueries.update(candidate.id, { state: 'dropped' });

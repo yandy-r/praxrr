@@ -658,7 +658,7 @@ to default case returning `'guard_mismatch'`, masking upstream bugs.
 
 ### M-9: `MigrationEntityIdentity` and `MigrationEntityStableIdentity` are structurally identical
 
-- [ ] **Status:** Open
+- [x] **Status:** Fixed
 - **File:** `packages/praxrr-app/src/lib/server/pcd/migration/reader.ts`
 - **Category:** Type design
 - **Agents:** type-design
@@ -672,7 +672,7 @@ are interchangeable, undermining the semantic distinction.
 
 ### M-10: Duplicate `ParsedMetadata` type definitions in writer.ts
 
-- [ ] **Status:** Open
+- [x] **Status:** Fixed
 - **File:** `packages/praxrr-app/src/lib/server/pcd/ops/writer.ts:192-197, 297-303`
 - **Category:** Code quality
 - **Agents:** code-reviewer
@@ -686,7 +686,7 @@ are interchangeable, undermining the semantic distinction.
 
 ### M-11: Unreachable fallback in `resolveMigrationStableIdentity`
 
-- [ ] **Status:** Open
+- [x] **Status:** Fixed
 - **File:** `packages/praxrr-app/src/lib/server/pcd/migration/reader.ts:330`
 - **Category:** Dead code
 - **Agents:** type-design
