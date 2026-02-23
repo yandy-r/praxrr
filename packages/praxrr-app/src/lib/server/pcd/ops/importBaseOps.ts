@@ -1,6 +1,6 @@
 import { logger } from '$logger/logger.ts';
 import { config, type PCDMigrationIngestionMode } from '$config';
-import { pcdOpsQueries } from '$db/queries/pcdOps.ts';
+import { buildContentHash, pcdOpsQueries } from '$db/queries/pcdOps.ts';
 import { extractOrderFromFilename, getBaseOpsPath } from '../utils/operations.ts';
 import {
   type MigrationEntityStableIdentity,
@@ -142,6 +142,16 @@ function formatConflictPath(
   return `${formatConflictIdentity(identity)} in ${first.kind} (${first.file}) and ${second.kind} (${second.file})`;
 }
 
+export class MigrationReaderError extends Error {
+  readonly issues: ReadonlyArray<MigrationReaderIssue>;
+
+  constructor(pcdPath: string, issues: ReadonlyArray<MigrationReaderIssue>) {
+    super(`Failed to read migration entity sources from ${pcdPath}/entities\n${formatMigrationIssueList(issues)}`);
+    this.name = 'MigrationReaderError';
+    this.issues = issues;
+  }
+}
+
 function formatMigrationIssueList(issues: MigrationReaderIssue[]): string {
   return issues.map((issue) => `${issue.relativePath}: ${issue.kind} - ${issue.message}`).join('\n');
 }
@@ -232,14 +242,6 @@ function parseMetadata(sql: string): { metadataJson: string | null; cleanedSql: 
   return { metadataJson, cleanedSql };
 }
 
-async function hashContent(sql: string, metadataJson: string | null): Promise<string> {
-  const payload = `${sql}\n${metadataJson ?? ''}`;
-  const data = new TextEncoder().encode(payload);
-  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
-}
-
 export interface ImportBaseOpsResult {
   created: number;
   updated: number;
@@ -267,11 +269,7 @@ export async function importBaseOps(
     : { candidates: [], issues: [] };
 
   if (isHybridIngestion && migrationReaderResult.issues.length > 0) {
-    throw new Error(
-      `Failed to read migration entity sources from ${pcdPath}/entities\n${formatMigrationIssueList(
-        migrationReaderResult.issues
-      )}`
-    );
+    throw new MigrationReaderError(pcdPath, migrationReaderResult.issues);
   }
 
   const migrationCandidates = migrationReaderResult.candidates.map((candidate) => ({
@@ -303,7 +301,7 @@ export async function importBaseOps(
     const sequence = opNumber === null ? UNPREFIXED_SEQUENCE_BASE + unprefixedIndex++ : opNumber;
     const rawSql = await Deno.readTextFile(entry.filepath);
     const { metadataJson, cleanedSql } = parseMetadata(rawSql);
-    const contentHash = await hashContent(cleanedSql, metadataJson);
+    const contentHash = await buildContentHash(cleanedSql, metadataJson);
 
     sqlEntries.push({
       name: entry.name,

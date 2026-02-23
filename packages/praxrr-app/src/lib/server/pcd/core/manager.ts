@@ -22,7 +22,7 @@ import { logger } from '$logger/logger.ts';
 import { triggerSyncs } from '$sync/processor.ts';
 import { config, type PCDMigrationIngestionMode } from '$config';
 import type { CacheBuildStats, LinkOptions, SyncResult } from './types.ts';
-import { importBaseOps } from '../ops/importBaseOps.ts';
+import { importBaseOps, MigrationReaderError } from '../ops/importBaseOps.ts';
 import { seedBuiltInBaseOps } from '../ops/seedBuiltInBaseOps.ts';
 import { cleanupJobsForDatabase } from '$lib/server/jobs/cleanup.ts';
 import {
@@ -408,7 +408,7 @@ class PCDManager {
       await importBaseOps(databaseId, localPath, { pcdMigrationIngestionMode: migrationMode });
       return;
     } catch (error) {
-      if (!config.pcdMigrationAllowLegacyFallback) {
+      if (!(error instanceof MigrationReaderError) || !config.pcdMigrationAllowLegacyFallback) {
         throw error;
       }
 
@@ -440,7 +440,7 @@ class PCDManager {
     instance: DatabaseInstance,
     localPath: string,
     context: string,
-    failOnError = false
+    failOnError = true
   ): Promise<CacheBuildStats> {
     if (!instance.enabled) {
       return {

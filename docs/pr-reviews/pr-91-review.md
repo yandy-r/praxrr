@@ -63,7 +63,7 @@ indicator and require callers to check it.
 
 ### C-2: `compileIfEnabled` returns fake zeroed stats on failure
 
-- [ ] **Status:** Open
+- [x] **Status:** Fixed
 - **File:** `packages/praxrr-app/src/lib/server/pcd/core/manager.ts:438-487`
 - **Category:** Error handling
 - **Agents:** error-handler
@@ -85,11 +85,17 @@ return {
 **Fix:** Return `CacheBuildStats | null` or add an `error` field. For `link` (user-initiated), throw
 by default.
 
+### Validation result
+
+- Updated `compileIfEnabled` to default `failOnError` to `true`, so `link` and `sync` now fail fast
+  on compilation errors and return the real error instead of fabricated zero stats.
+  - `packages/praxrr-app/src/lib/server/pcd/core/manager.ts:447-486`
+
 ---
 
 ### C-3: `importBaseOpsWithOrchestration` fallback catches ALL errors
 
-- [ ] **Status:** Open
+- [x] **Status:** Fixed
 - **File:** `packages/praxrr-app/src/lib/server/pcd/core/manager.ts:407-424`
 - **Category:** Error handling
 - **Agents:** error-handler, code-reviewer
@@ -102,11 +108,19 @@ silently loses all migration entity data on ANY error.
 `MigrationReaderError` class. Default is `false` so this only fires when explicitly enabled, but the
 blast radius when enabled is severe.
 
+### Validation result
+
+- Added a typed `MigrationReaderError` and switched import failure signaling to throw it when
+  migration entity parsing yields issues, then updated orchestration to fallback only for that error
+  when config allows it.
+  - `packages/praxrr-app/src/lib/server/pcd/ops/importBaseOps.ts:39-74`
+  - `packages/praxrr-app/src/lib/server/pcd/core/manager.ts:403-420`
+
 ---
 
 ### C-4: Duplicate `hashContent` function risks hash divergence
 
-- [ ] **Status:** Open
+- [x] **Status:** Fixed
 - **File:** `packages/praxrr-app/src/lib/server/pcd/ops/importBaseOps.ts:235-241`
 - **Category:** Code quality, portable contract fidelity
 - **Agents:** code-reviewer
@@ -118,6 +132,13 @@ changes, content hashes from import vs. writer paths will silently diverge, caus
 
 **Fix:** Delete the local `hashContent()` and import `buildContentHash` from
 `$db/queries/pcdOps.ts`.
+
+### Validation result
+
+- Removed local `hashContent()` and now use shared `buildContentHash` from `pcdOps.ts` for both
+  import and writer paths, preventing hash divergence risk.
+  - `packages/praxrr-app/src/lib/server/pcd/ops/importBaseOps.ts:19`
+  - `packages/praxrr-app/src/lib/server/pcd/ops/importBaseOps.ts:235-307`
 
 ---
 
