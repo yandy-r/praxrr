@@ -260,12 +260,14 @@ local imports (`draft`).
 
 - **Source:** code-reviewer, comment-analyzer
 - **Files:** `importBaseOps.ts:22-36`, `parityVerifier.ts:100-115`
-- **Status:** [ ] Open
+- **Status:** [x] Fixed
 
 Same constant defined independently in two files. Per Portable Contract Fidelity, shared constants
 should be defined once to prevent silent contract drift.
 
-**Fix:** Extract to a shared module.
+**Fix:** Extracted `ENTITY_IMPORT_ORDER` to
+`packages/praxrr-app/src/lib/server/pcd/migration/migrationImportUtils.ts` and updated both call
+sites.
 
 ---
 
@@ -273,7 +275,7 @@ should be defined once to prevent silent contract drift.
 
 - **Source:** code-reviewer
 - **Files:** `importBaseOps.ts:272-284`, `parityVerifier.ts:391-401`
-- **Status:** [ ] Open
+- **Status:** [x] Fixed
 
 Same logic duplicated. Same drift risk as I-1.
 
@@ -283,7 +285,7 @@ Same logic duplicated. Same drift risk as I-1.
 
 - **Source:** code-reviewer
 - **Files:** `parityVerifier.ts:135`, `verify-pcd-parity.ts:319`
-- **Status:** [ ] Open
+- **Status:** [x] Fixed
 
 ---
 
@@ -291,7 +293,7 @@ Same logic duplicated. Same drift risk as I-1.
 
 - **Source:** type-design-analyzer
 - **Files:** `reader.ts` (with `kind: 'stable'`), `enumerateEntities.ts` (without `kind`)
-- **Status:** [ ] Open
+- **Status:** [x] Fixed
 
 Two structurally incompatible interfaces share the same name. Consolidate into a single canonical
 definition.
@@ -302,7 +304,7 @@ definition.
 
 - **Source:** code-reviewer
 - **File:** `scripts/verify-pcd-parity.ts:67`
-- **Status:** [ ] Open
+- **Status:** [x] Fixed
 
 `db: { close: dbModule.db.close }` may lose `this` context. Compare with `convert-pcd-to-yaml.ts:70`
 which uses `db: { close: () => dbModule.db.close() }`.
@@ -568,11 +570,11 @@ Missing: invalid values (should throw), default behavior (empty string defaults 
 | H-4  | High      | Type Safety    | importBaseOps.ts:467-482                | [ ] Open  |
 | H-5  | High      | Silent Failure | manager.ts:252-266                      | [ ] Open  |
 | H-6  | High      | Comment        | writer.ts:510-515                       | [ ] Open  |
-| I-1  | Important | Duplication    | importBaseOps.ts, parityVerifier.ts     | [ ] Open  |
-| I-2  | Important | Duplication    | importBaseOps.ts, parityVerifier.ts     | [ ] Open  |
-| I-3  | Important | Duplication    | parityVerifier.ts, verify-pcd-parity.ts | [ ] Open  |
-| I-4  | Important | Type Design    | reader.ts, enumerateEntities.ts         | [ ] Open  |
-| I-5  | Important | Bug Risk       | verify-pcd-parity.ts:67                 | [ ] Open  |
+| I-1  | Important | Duplication    | importBaseOps.ts, parityVerifier.ts     | [x] Fixed |
+| I-2  | Important | Duplication    | importBaseOps.ts, parityVerifier.ts     | [x] Fixed |
+| I-3  | Important | Duplication    | parityVerifier.ts, verify-pcd-parity.ts | [x] Fixed |
+| I-4  | Important | Type Design    | reader.ts, enumerateEntities.ts         | [x] Fixed |
+| I-5  | Important | Bug Risk       | verify-pcd-parity.ts:67                 | [x] Fixed |
 | I-6  | Important | Error Handling | writer.ts:171-184                       | [ ] Open  |
 | I-7  | Important | Error Context  | importBaseOps.ts:140-151                | [ ] Open  |
 | I-8  | Important | Resource Leak  | parityVerifier.ts:377-399               | [ ] Open  |

@@ -1,5 +1,7 @@
 import type { PCDCache } from '$pcd/database/cache.ts';
 import type { EntityType } from '$shared/pcd/portable.ts';
+import type { MigrationEntityStableIdentity } from '$pcd/migration/migrationImportUtils.ts';
+export type { MigrationEntityStableIdentity } from '$pcd/migration/migrationImportUtils.ts';
 
 export type MigrationEntitySourceTableFamily =
   | 'regular_expressions'
@@ -112,11 +114,6 @@ interface NameRow {
   readonly name: string;
 }
 
-export interface MigrationEntityStableIdentity {
-  readonly key: string;
-  readonly value: string;
-}
-
 const ENTITY_STABLE_KEY_BY_TYPE: Readonly<Record<EntityType, string>> = {
   delay_profile: 'delay_profile_name',
   regular_expression: 'regular_expression_name',
@@ -197,6 +194,7 @@ function listEntityNamesForFamily(cache: PCDCache, family: MigrationEntityFamily
 function resolveMigrationStableIdentity(entityType: EntityType, entityName: string): MigrationEntityStableIdentity {
   const stableKey = ENTITY_STABLE_KEY_BY_TYPE[entityType] ?? `migration_${entityType}_name`;
   return {
+    kind: 'stable',
     key: stableKey,
     value: entityName,
   };

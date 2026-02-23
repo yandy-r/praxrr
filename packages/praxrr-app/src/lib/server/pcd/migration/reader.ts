@@ -10,21 +10,17 @@ import { parse as parseYaml } from 'yaml';
 import type { EntityType, PortableMigrationFormat, PortableMigrationMetadata } from '$shared/pcd/portable.ts';
 import { PORTABLE_MIGRATION_MIN_VERSION } from '$shared/pcd/portable.ts';
 import { PORTABLE_ENTITY_STABLE_KEY_BY_TYPE } from '$pcd/stableIdentity.ts';
+import type { MigrationEntityStableIdentity } from '$pcd/migration/migrationImportUtils.ts';
 import type { EntityDeserializer } from '$pcd/entities/deserialize.ts';
 import { getEntityDeserializer } from '$pcd/entities/deserialize.ts';
 import { validatePortableData } from '$pcd/entities/validate.ts';
+export type { MigrationEntityStableIdentity } from '$pcd/migration/migrationImportUtils.ts';
 
 type ReaderInputRecord = Record<string, unknown>;
 
 interface MigrationSourceEntry {
   sourcePath: string;
   relativePath: string;
-}
-
-export interface MigrationEntityStableIdentity {
-  readonly key: string;
-  readonly value: string;
-  readonly kind: 'stable';
 }
 
 interface MigrationEntityIdentity {

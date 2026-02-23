@@ -1,6 +1,7 @@
 #!/usr/bin/env -S deno run -A
 
 import type { ParityReport } from '$pcd/migration/parityVerifier.ts';
+import { formatStableJson } from '$pcd/migration/migrationImportUtils.ts';
 
 interface RuntimeDependencies {
   config: {
@@ -64,7 +65,7 @@ async function loadRuntimeDependencies(runtimeBaseDir: string): Promise<RuntimeD
   return {
     config,
     runMigrations: migrationModule.runMigrations,
-    db: { close: dbModule.db.close },
+    db: { close: () => dbModule.db.close() },
     initializeDb: dbModule.db.initialize,
     verifyPcdParity: parityModule.verifyPcdParity,
   };
@@ -271,7 +272,10 @@ async function copyDirectory(source: string, destination: string): Promise<void>
   await Deno.copyFile(source, destination);
 }
 
-async function buildWorkspaceForEntitiesDir(pcdPath: string, entitiesDir: string): Promise<{
+async function buildWorkspaceForEntitiesDir(
+  pcdPath: string,
+  entitiesDir: string
+): Promise<{
   path: string;
   cleanup: () => Promise<void>;
 }> {
@@ -314,26 +318,6 @@ async function buildWorkspaceForEntitiesDir(pcdPath: string, entitiesDir: string
     }
     throw error;
   }
-}
-
-function formatStableJson(value: unknown): string {
-  if (value === undefined) {
-    return 'null';
-  }
-
-  if (Array.isArray(value)) {
-    return `[${value.map((entry) => formatStableJson(entry)).join(', ')}]`;
-  }
-
-  if (value !== null && typeof value === 'object') {
-    const entries = Object.keys(value as Record<string, unknown>)
-      .sort((a, b) => a.localeCompare(b))
-      .map((key) => `${JSON.stringify(key)}: ${formatStableJson((value as Record<string, unknown>)[key])}`);
-
-    return `{${entries.join(', ')}}`;
-  }
-
-  return JSON.stringify(value);
 }
 
 function summarizeByTable(report: ParityReport): Map<string, { count: number; kinds: Set<string> }> {

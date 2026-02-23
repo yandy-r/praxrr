@@ -3,38 +3,20 @@ import { config, type PCDMigrationIngestionMode } from '$config';
 import { buildContentHash, pcdOpsQueries } from '$db/queries/pcdOps.ts';
 import { extractOrderFromFilename, getBaseOpsPath } from '../utils/operations.ts';
 import { SQL_ENTITY_STABLE_KEY_BY_ENTITY } from '$pcd/stableIdentity.ts';
-import type { EntityType } from '$shared/pcd/portable.ts';
 import {
   type MigrationEntityStableIdentity,
   type MigrationEntityCandidate,
   type MigrationReaderIssue,
   readMigrationEntitySources,
 } from '$pcd/migration/reader.ts';
+import { ENTITY_IMPORT_ORDER, sortMigrationCandidatesByImportOrder } from '$pcd/migration/migrationImportUtils.ts';
 import { compile } from '../database/compiler.ts';
 import { getCache } from '../database/registry.ts';
 import { withRepoImportWriteContext } from './writer.ts';
-
+const MIGRATION_OP_FILENAME_PREFIX = 'entities/';
 const UNPREFIXED_SEQUENCE_BASE = 2_000_000_000;
 const YAML_SEQUENCE_BASE = 4_000_000_000;
 const YAML_SEQUENCE_STRIDE = 10_000;
-const MIGRATION_OP_FILENAME_PREFIX = 'entities/';
-
-const ENTITY_IMPORT_ORDER: readonly EntityType[] = [
-  'regular_expression',
-  'custom_format',
-  'quality_profile',
-  'delay_profile',
-  'radarr_naming',
-  'sonarr_naming',
-  'lidarr_naming',
-  'radarr_media_settings',
-  'sonarr_media_settings',
-  'lidarr_media_settings',
-  'radarr_quality_definitions',
-  'sonarr_quality_definitions',
-  'lidarr_quality_definitions',
-  'lidarr_metadata_profile',
-] as const;
 
 interface BaseImportSqlEntry {
   name: string;
@@ -289,22 +271,6 @@ function collectMigrationStableIdentitySet(
     identities.add(formatConflictIdentity(entry.stableIdentity));
   }
   return identities;
-}
-
-function sortMigrationCandidatesByImportOrder(
-  candidates: readonly MigrationEntityCandidate[]
-): MigrationEntityCandidate[] {
-  const entityOrder = new Map<EntityType, number>();
-  for (let i = 0; i < ENTITY_IMPORT_ORDER.length; i++) {
-    entityOrder.set(ENTITY_IMPORT_ORDER[i], i);
-  }
-
-  return [...candidates].sort((a, b) => {
-    const aPriority = entityOrder.get(a.entityType) ?? Number.MAX_SAFE_INTEGER;
-    const bPriority = entityOrder.get(b.entityType) ?? Number.MAX_SAFE_INTEGER;
-    if (aPriority !== bPriority) return aPriority - bPriority;
-    return a.entityName.localeCompare(b.entityName);
-  });
 }
 
 function parseMetadata(sql: string): { metadataJson: string | null; cleanedSql: string } {
