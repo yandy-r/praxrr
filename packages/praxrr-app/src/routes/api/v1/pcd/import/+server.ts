@@ -18,6 +18,7 @@ import {
   type PortableRadarrNaming,
   type PortableSonarrNaming,
   type PortableLidarrMetadataProfile,
+  validatePortableMigrationMetadata,
 } from '$shared/pcd/portable.ts';
 import * as deserialize from '$pcd/entities/deserialize.ts';
 import { createLidarrNaming } from '$pcd/entities/mediaManagement/naming/create.ts';
@@ -35,10 +36,17 @@ export const POST: RequestHandler = async ({ request }) => {
     return json({ error: 'Invalid JSON body' }, { status: 400 });
   }
 
-  const { databaseId, layer, entityType, data } = body;
+  const { databaseId, layer, entityType, data, migration } = body;
 
   if (databaseId === undefined || !layer || !entityType || !data) {
     return json({ error: 'Missing required fields: databaseId, layer, entityType, data' }, { status: 400 });
+  }
+
+  if (migration !== undefined) {
+    const migrationError = validatePortableMigrationMetadata(migration);
+    if (migrationError) {
+      return json({ error: migrationError }, { status: 400 });
+    }
   }
 
   if (typeof databaseId !== 'number' || !Number.isInteger(databaseId)) {

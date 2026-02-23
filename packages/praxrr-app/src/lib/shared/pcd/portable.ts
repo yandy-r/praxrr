@@ -94,6 +94,7 @@ export type LidarrMetadataProfilePortableEntityType = (typeof LIDARR_METADATA_PR
 export type PortableMigrationFormat = 'json' | 'yaml';
 export const PORTABLE_MIGRATION_FORMATS = ['json', 'yaml'] as const satisfies readonly PortableMigrationFormat[];
 export const PORTABLE_MIGRATION_MIN_VERSION = 1;
+export const PORTABLE_MIGRATION_SOURCE_EXPORT = 'pcd-export';
 
 /**
  * Optional migration metadata for hybrid JSON/YAML ingestion.
@@ -112,6 +113,57 @@ export interface PortableMigrationMetadata {
 export interface PortableExportMetadata {
   /** Optional migration metadata included on export responses. */
   migration?: PortableMigrationMetadata;
+}
+
+function validateMigrationFormat(value: unknown): value is PortableMigrationFormat {
+  if (typeof value !== 'string') {
+    return false;
+  }
+
+  return (PORTABLE_MIGRATION_FORMATS as readonly string[]).includes(value);
+}
+
+function formatMigrationRequiredMessage(path: string): string {
+  return `${path}.format must be one of: ${PORTABLE_MIGRATION_FORMATS.join(', ')}`;
+}
+
+export function validatePortableMigrationMetadata(migration: unknown): string | null {
+  if (migration === null || typeof migration !== 'object' || Array.isArray(migration)) {
+    return 'migration must be an object';
+  }
+
+  const candidate = migration as Record<string, unknown>;
+  const requiredFields = ['format', 'version', 'source'] as const;
+
+  const missingFields = requiredFields.filter((field) => !Object.hasOwn(candidate, field));
+  if (missingFields.length > 0) {
+    return `migration is missing required fields: ${missingFields.join(', ')}`;
+  }
+
+  const unsupportedFields = Object.keys(candidate).filter(
+    (field) => !requiredFields.includes(field as (typeof requiredFields)[number])
+  );
+  if (unsupportedFields.length > 0) {
+    return `migration contains unsupported fields: ${unsupportedFields.join(', ')}`;
+  }
+
+  if (!validateMigrationFormat(candidate.format)) {
+    return formatMigrationRequiredMessage('migration');
+  }
+
+  if (
+    typeof candidate.version !== 'number' ||
+    !Number.isInteger(candidate.version) ||
+    candidate.version < PORTABLE_MIGRATION_MIN_VERSION
+  ) {
+    return `migration.version must be an integer >= ${PORTABLE_MIGRATION_MIN_VERSION}`;
+  }
+
+  if (typeof candidate.source !== 'string' || candidate.source.length === 0) {
+    return 'migration.source must be a non-empty string';
+  }
+
+  return null;
 }
 
 // ============================================================================

@@ -4,6 +4,8 @@ import { pcdManager } from '$pcd/index.ts';
 import {
   ENTITY_TYPES,
   type EntityType,
+  PORTABLE_MIGRATION_MIN_VERSION,
+  PORTABLE_MIGRATION_SOURCE_EXPORT,
   type PortableLidarrNaming,
   type PortableLidarrQualityDefinitions,
 } from '$shared/pcd/portable.ts';
@@ -39,7 +41,15 @@ export const GET: RequestHandler = async ({ url }) => {
 
   try {
     const data = await serializeEntity(cache, entityType as EntityType, name);
-    return json({ entityType, data });
+    return json({
+      entityType,
+      data,
+      migration: {
+        source: PORTABLE_MIGRATION_SOURCE_EXPORT,
+        format: 'json',
+        version: PORTABLE_MIGRATION_MIN_VERSION,
+      },
+    });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Export failed';
     if (message.includes('not found')) {
