@@ -172,7 +172,7 @@ export function validatePortableMigrationMetadata(migration: unknown): string | 
 
   return null;
 }
-
+ 
 // ============================================================================
 // ENTITY TYPE ENUM
 // ============================================================================
