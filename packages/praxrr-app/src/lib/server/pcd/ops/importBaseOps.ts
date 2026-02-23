@@ -54,6 +54,28 @@ interface SourceConflictRef {
   file: string;
 }
 
+type DeserializeResult = {
+  success: boolean;
+  filepath?: string;
+  error?: string;
+};
+
+function isDeserializeResult(value: unknown): value is DeserializeResult {
+  if (typeof value !== 'object' || value === null) {
+    return false;
+  }
+
+  if (!('success' in value)) {
+    return false;
+  }
+
+  if (typeof (value as { success: unknown }).success !== 'boolean') {
+    return false;
+  }
+
+  return true;
+}
+
 async function pathExists(path: string): Promise<boolean> {
   try {
     await Deno.stat(path);
@@ -496,13 +518,14 @@ export async function importBaseOps(
             data: candidate.portable,
           });
 
-          if (
-            typeof result === 'object' &&
-            result !== null &&
-            'success' in result &&
-            (result as { success?: boolean }).success === false
-          ) {
-            const error = (result as { error?: string }).error ?? 'unknown write failure';
+          if (!isDeserializeResult(result)) {
+            throw new Error(
+              `Failed to import migration entity "${candidate.relativePath}": invalid deserialize result`
+            );
+          }
+
+          if (result.success === false) {
+            const error = result.error ?? 'unknown write failure';
             throw new Error(`Failed to import migration entity "${candidate.relativePath}": ${error}`);
           }
         }

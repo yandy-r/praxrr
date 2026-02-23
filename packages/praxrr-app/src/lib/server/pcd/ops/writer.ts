@@ -522,7 +522,9 @@ async function supersedePriorUserOps(databaseId: number, newOpId: number, metada
 /**
  * Write operations to a PCD layer in the database
  *
- * For base layer: inserts a draft base op (origin=base, state=draft)
+ * For base layer:
+ *   - repo source: inserts a published base op (origin=base, state=published, source=repo)
+ *   - local source: inserts a draft base op (origin=base, state=draft, source=local)
  * For user layer: inserts a published user op (origin=user, state=published)
  */
 async function writeOperationsFromSqlOperations(options: WriteSqlOperationsOptions): Promise<WriteResult> {

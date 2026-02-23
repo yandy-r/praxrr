@@ -215,13 +215,14 @@ migration candidates, ensuring zero-op import is visible rather than silently su
 
 - **Source:** silent-failure-hunter
 - **File:** `packages/praxrr-app/src/lib/server/pcd/ops/importBaseOps.ts:467-482`
-- **Status:** [ ] Open
+- **Status:** [x] Fixed
 
 If `deserialize` returns `undefined`, `null`, or an object without a `success` field, all are
 silently treated as success. A malfunctioning deserializer would increment `migrationImported`
 without writing data.
 
-**Fix:** Define a proper `DeserializeResult` type and validate the return shape.
+**Fix:** Added a `DeserializeResult` type and strict return-shape validation before treating a
+migration entity import as successful.
 
 ---
 
@@ -229,12 +230,13 @@ without writing data.
 
 - **Source:** silent-failure-hunter
 - **File:** `packages/praxrr-app/src/lib/server/pcd/core/manager.ts:252-266`
-- **Status:** [ ] Open
+- **Status:** [x] Fixed
 
 After a branch switch, if base-op import fails, the function continues to seed built-in ops and call
 `updateSyncedAt`, marking the sync as successful. The cache is in an inconsistent state.
 
-**Fix:** Do not update `syncedAt` when import fails. Move the failure check before `updateSyncedAt`.
+**Fix:** Added an early return on failed base-op import so built-in seed and `updateSyncedAt` are
+skipped when the branch import fails.
 
 ---
 
@@ -242,12 +244,13 @@ After a branch switch, if base-op import fails, the function continues to seed b
 
 - **Source:** comment-analyzer
 - **File:** `packages/praxrr-app/src/lib/server/pcd/ops/writer.ts:510-515`
-- **Status:** [ ] Open
+- **Status:** [x] Fixed
 
 JSDoc says "For base layer: inserts a draft base op" but after the refactoring, base ops are
 inserted as `state: 'published'` with `source: 'repo'` when a `repoImport` write context is active.
 
-**Fix:** Update JSDoc to reflect published/draft distinction based on repo vs. local source.
+**Fix:** Updated the JSDoc to reflect base-layer differences for repo imports (`published`) versus
+local imports (`draft`).
 
 ---
 

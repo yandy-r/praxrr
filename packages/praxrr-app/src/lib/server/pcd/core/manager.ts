@@ -261,6 +261,11 @@ class PCDManager {
         meta: { error: String(error), databaseId: id },
       });
     }
+
+    if (!importedBaseOps) {
+      return false;
+    }
+
     await this.seedBuiltInBaseOpsWithOrchestration(id, 'switchBranch');
     databaseInstancesQueries.updateSyncedAt(id);
 
