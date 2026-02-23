@@ -2,7 +2,7 @@
  * Entity Deserialization
  *
  * Creates entities from portable format by calling existing PCD create functions.
- * Used by clone (serialize → rename → deserialize) and future import.
+ * Used by clone (serialize → rename → deserialize) and import.
  */
 
 import type { PCDCache } from '$pcd/index.ts';

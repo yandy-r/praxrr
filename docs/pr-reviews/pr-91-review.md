@@ -701,7 +701,7 @@ are interchangeable, undermining the semantic distinction.
 
 ### Comment-1: `tag(name)` comment contradicts code behavior
 
-- [ ] **Status:** Open
+- [x] **Status:** Fixed
 - **File:** `packages/praxrr-app/src/lib/server/pcd/database/cache.ts:344`
 - **Category:** Inaccurate comment
 
@@ -713,7 +713,7 @@ Comment says "creates if not exists" but the code throws `'Tag not found'`.
 
 ### Comment-2: `validateSql` JSDoc inaccurate
 
-- [ ] **Status:** Open
+- [x] **Status:** Fixed
 - **File:** `packages/praxrr-app/src/lib/server/pcd/database/cache.ts:416-418`
 - **Category:** Inaccurate comment
 
@@ -723,7 +723,7 @@ Says "Returns null if valid, or an error message" but actually returns a `Valida
 
 ### Comment-3: Stale "future" references
 
-- [ ] **Status:** Open
+- [x] **Status:** Fixed
 - **Files:** `deserialize.ts:4-6`, `portable.ts:9`
 - **Category:** Stale comment
 

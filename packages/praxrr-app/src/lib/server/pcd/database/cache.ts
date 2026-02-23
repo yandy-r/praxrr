@@ -345,7 +345,7 @@ export class PCDCache {
       return result.id;
     });
 
-    // tag(name) - Tag lookup by name (creates if not exists)
+    // tag(name) - Tag lookup by name (throws if not found)
     this.db.function('tag', (name: string) => {
       const result = this.db!.prepare('SELECT id FROM tags WHERE name = ?').get(name) as { id: number } | undefined;
       if (!result) {
@@ -426,7 +426,8 @@ export class PCDCache {
 
   /**
    * Validate SQL statements by doing a dry-run in a transaction
-   * Returns null if valid, or an error message if invalid
+   * Returns a ValidationResult with valid=true when all statements are safe,
+   * otherwise valid=false with a normalized error message.
    *
    * This is a safety check before writing operations to files.
    * It catches FK violations, constraint errors, etc.

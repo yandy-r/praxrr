@@ -6,7 +6,7 @@
  *
  * These are the wire format for:
  * - Clone (serialize → rename → deserialize)
- * - Import/Export (future)
+ * - Import/Export
  *
  * Field names use camelCase to match existing create input interfaces,
  * so portable types can be passed directly as create function inputs.
