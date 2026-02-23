@@ -170,13 +170,14 @@ usage), the operation **does** fail. The comment describes the opposite of what 
 
 - **Source:** silent-failure-hunter
 - **File:** `packages/praxrr-app/src/lib/server/pcd/ops/writer.ts:418-425`
-- **Status:** [ ] Open
+- **Status:** [x] Fixed
 
 The function catches all JSON parse errors and returns `null` with zero logging. Corrupted metadata
 in existing operations prevents the supersede mechanism from working, allowing duplicate operations
 to accumulate.
 
-**Fix:** Add debug-level logging consistent with `cancelOutCreate`.
+**Fix:** Added debug-level logging on parse failures in `parseMetadata` with raw-metadata preview
+and error details, matching the `cancelOutCreate` metadata parse diagnostics path.
 
 ---
 
@@ -184,12 +185,14 @@ to accumulate.
 
 - **Source:** silent-failure-hunter
 - **File:** `packages/praxrr-app/src/lib/server/pcd/ops/importBaseOps.ts:322-325`
-- **Status:** [ ] Open
+- **Status:** [x] Fixed
 
 If the base ops directory does not exist, the function returns zero-count success with no logging. A
 mis-cloned or corrupted repository silently produces an empty import.
 
-**Fix:** Add a warning log when the base path does not exist. Consider erroring in hybrid mode.
+**Fix:** Added a warning log when the base ops path is missing, including import mode/database
+context. Kept import to continue (to preserve non-fatal behavior) while surfacing the failure
+explicitly.
 
 ---
 
@@ -197,13 +200,14 @@ mis-cloned or corrupted repository silently produces an empty import.
 
 - **Source:** silent-failure-hunter
 - **File:** `packages/praxrr-app/src/lib/server/pcd/ops/importBaseOps.ts:386-396`
-- **Status:** [ ] Open
+- **Status:** [x] Fixed
 
 When `isHybridIngestion && !allowLegacySqlInHybrid`, `effectiveSqlEntries` is `[]` with only a
 debug-level log. If migration candidates are also empty, the user loses all SQL ops AND all entity
 ops, resulting in a completely empty import that reports success.
 
-**Fix:** Log a warning when both sources produce zero effective entries.
+**Fix:** Added a warning when hybrid import evaluates to zero effective SQL entries and zero
+migration candidates, ensuring zero-op import is visible rather than silently succeeding.
 
 ---
 

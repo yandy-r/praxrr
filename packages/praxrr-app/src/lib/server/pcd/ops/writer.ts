@@ -426,7 +426,12 @@ function parseMetadata(raw: string | null): ParsedMetadata | null {
   if (!raw) return null;
   try {
     return JSON.parse(raw) as ParsedMetadata;
-  } catch {
+  } catch (error) {
+    const preview = raw.length > 500 ? `${raw.slice(0, 500)}...` : raw;
+    void logger.debug('Failed to parse operation metadata while checking supersede', {
+      source: 'PCDWriter',
+      meta: { raw: preview, error: String(error) },
+    });
     return null;
   }
 }

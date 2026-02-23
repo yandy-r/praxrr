@@ -322,10 +322,6 @@ export async function importBaseOps(
   options: ImportBaseOpsOptions = {}
 ): Promise<ImportBaseOpsResult> {
   const basePath = getBaseOpsPath(pcdPath);
-  if (!(await pathExists(basePath))) {
-    return { created: 0, updated: 0, orphaned: 0 };
-  }
-
   const migrationMode = options.pcdMigrationIngestionMode ?? config.pcdMigrationIngestionMode;
   const isHybridIngestion = migrationMode === 'hybrid';
   const migrationReaderResult = isHybridIngestion
@@ -341,15 +337,29 @@ export async function importBaseOps(
     sourcePath: candidate.sourcePath,
   }));
 
-  const entries: Array<{ name: string; filepath: string; order: number }> = [];
-  for await (const entry of Deno.readDir(basePath)) {
-    if (!entry.isFile || !entry.name.endsWith('.sql')) continue;
-    const filepath = `${basePath}/${entry.name}`;
-    entries.push({
-      name: entry.name,
-      filepath,
-      order: extractOrderFromFilename(entry.name),
+  const hasBasePath = await pathExists(basePath);
+  if (!hasBasePath) {
+    await logger.warn('Base ops path missing during repository import', {
+      source: 'PCDImport',
+      meta: {
+        databaseId,
+        basePath,
+        migrationMode,
+      },
     });
+  }
+
+  const entries: Array<{ name: string; filepath: string; order: number }> = [];
+  if (hasBasePath) {
+    for await (const entry of Deno.readDir(basePath)) {
+      if (!entry.isFile || !entry.name.endsWith('.sql')) continue;
+      const filepath = `${basePath}/${entry.name}`;
+      entries.push({
+        name: entry.name,
+        filepath,
+        order: extractOrderFromFilename(entry.name),
+      });
+    }
   }
 
   entries.sort((a, b) => {
@@ -396,6 +406,18 @@ export async function importBaseOps(
             return !migrationIdentitySet.has(identity);
           })
         : sqlEntries;
+
+  if (isHybridIngestion && effectiveSqlEntries.length === 0 && migrationReaderResult.candidates.length === 0) {
+    await logger.warn('Hybrid base-op import has no effective SQL or migration candidates', {
+      source: 'PCDImport',
+      meta: {
+        databaseId,
+        pcdPath,
+        basePath,
+        migrationMode,
+      },
+    });
+  }
 
   let created = 0;
   let updated = 0;
