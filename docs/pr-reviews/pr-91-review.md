@@ -802,56 +802,73 @@ multi-op mid-sequence failure rollback behavior, base-layer non-user bypass, and
 
 ### T-5: Entity deserialization for 13 of 14 entity types untested
 
-- [ ] **Status:** Open
+- [x] **Status:** Closed
 - **File:** `packages/praxrr-app/src/lib/server/pcd/entities/deserialize.ts`
 - **Priority:** 8/10
 
 Only `delay_profile` is tested via cache parity. Compound types (`custom_format` with conditions,
 `quality_profile` with 3-step creation) have no test coverage.
 
+**Validation result:** Added `packages/praxrr-app/src/tests/pcd/entities/deserialize.test.ts`
+covering compound custom format and quality profile creation/deserialization flows.
+
 ---
 
 ### T-6: Manager `sql-only` and `hybrid-no-fallback` paths untested
 
-- [ ] **Status:** Open
+- [x] **Status:** Closed
 - **File:** `packages/praxrr-app/src/lib/server/pcd/core/manager.ts`
 - **Priority:** 7/10
 
 Only hybrid-with-fallback is tested. Direct sql-only mode and hybrid mode with
 `pcdMigrationAllowLegacyFallback=false` are untested.
 
+**Validation result:** Added
+`packages/praxrr-app/src/tests/pcd/migration/managerHybridFallback.test.ts` coverage for direct
+sql-only imports and hybrid fallback-disabled parse error propagation.
+
 ---
 
 ### T-7: Portable migration metadata validation untested
 
-- [ ] **Status:** Open
+- [x] **Status:** Closed
 - **File:** `packages/praxrr-app/src/lib/shared/pcd/portable.ts:130-167`
 - **Priority:** 6/10
 
 `validatePortableMigrationMetadata()` with invalid inputs (missing fields, invalid format, version
 below minimum, extra fields) is not tested.
 
+**Validation result:** Added `packages/praxrr-app/src/tests/pcd/portableMigrationMetadata.test.ts`
+for valid and invalid payload cases (missing fields, invalid format, low version, unsupported
+fields).
+
 ---
 
 ### T-8: Export API migration metadata inclusion untested
 
-- [ ] **Status:** Open
+- [x] **Status:** Closed
 - **File:** `packages/praxrr-app/src/routes/api/v1/pcd/export/+server.ts`
 - **Priority:** 5/10
 
 No test verifies that export response includes correct `migration.source`, `migration.format`, and
 `migration.version`.
 
+**Validation result:** Added `packages/praxrr-app/src/tests/pcd/exportRoute.test.ts` validating
+export response migration fields and values.
+
 ---
 
 ### T-9: `buildContentHash` shared hash function untested
 
-- [ ] **Status:** Open
+- [x] **Status:** Closed
 - **File:** `packages/praxrr-app/src/lib/server/db/queries/pcdOps.ts`
 - **Priority:** 5/10
 
 Deterministic output for known inputs is not verified. If hash format changes, duplicate detection
 breaks silently.
+
+**Validation result:** Extended `packages/praxrr-app/src/tests/pcd/ops/writer.test.ts` with
+deterministic `buildContentHash` input/output assertions.
 
 ---
 

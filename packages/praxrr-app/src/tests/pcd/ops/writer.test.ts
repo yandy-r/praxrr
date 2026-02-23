@@ -4,6 +4,7 @@ import { deleteCache, setCache } from '$pcd/database/registry.ts';
 import { databaseInstancesQueries } from '$db/queries/databaseInstances.ts';
 import { __testOnly_runValueGuardGate } from '$pcd/ops/writer.ts';
 import type { PCDCache } from '$pcd/database/cache.ts';
+import { buildContentHash } from '$db/queries/pcdOps.ts';
 
 function patch<T extends object, K extends keyof T>(
   target: T,
@@ -145,4 +146,21 @@ Deno.test('writer: runValueGuardGate skips empty SQL statements', () => {
     cacheDb.close();
     deleteCache(databaseId);
   }
+});
+
+Deno.test('pcdOps: buildContentHash is deterministic for SQL payloads', async () => {
+  assertEquals(
+    await buildContentHash('CREATE TABLE x (id INTEGER);', '{"operation":"create"}'),
+    '4887682114438c9438001a61c3c88a128f5b3332e5f3ccbf0c2a3f0c91d0dcf0'
+  );
+
+  assertEquals(
+    await buildContentHash('INSERT INTO t VALUES (1);', null),
+    'ded6194afab0fba8959725b981c2f9a089f131f83b175c06a1a82166decaa6ea'
+  );
+
+  assertEquals(
+    await buildContentHash('INSERT INTO t VALUES (1);', 'null'),
+    'b7f15d99947c7d1c7a34b702cc79e44a7bf002b38c3b2a2b3b02a23166a3b493'
+  );
 });
