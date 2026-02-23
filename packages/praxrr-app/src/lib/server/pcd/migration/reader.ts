@@ -6,8 +6,8 @@
  * No persistence or side-effectful writes are performed.
  */
 
-import { parse as parseYaml } from '@std/yaml';
-import type { PortableMigrationFormat, PortableMigrationMetadata, EntityType } from '$shared/pcd/portable.ts';
+import { parse as parseYaml } from 'yaml';
+import type { EntityType, PortableMigrationFormat, PortableMigrationMetadata } from '$shared/pcd/portable.ts';
 import { PORTABLE_MIGRATION_MIN_VERSION } from '$shared/pcd/portable.ts';
 import type { EntityDeserializer } from '$pcd/entities/deserialize.ts';
 import { getEntityDeserializer } from '$pcd/entities/deserialize.ts';
@@ -18,6 +18,16 @@ type ReaderInputRecord = Record<string, unknown>;
 interface MigrationSourceEntry {
   sourcePath: string;
   relativePath: string;
+}
+
+export interface MigrationEntityStableIdentity {
+  readonly key: string;
+  readonly value: string;
+}
+
+interface MigrationEntityIdentity {
+  readonly key: string;
+  readonly value: string;
 }
 
 interface TopLevelEntityPath {
@@ -51,6 +61,23 @@ const ENTITY_FORMAT_BY_MEDIA_DIR: Readonly<Record<string, EntityType>> = {
   'lidarr-quality-definitions': 'lidarr_quality_definitions',
 };
 
+const ENTITY_STABLE_KEY_BY_TYPE: Readonly<Record<EntityType, string>> = {
+  delay_profile: 'delay_profile_name',
+  regular_expression: 'regular_expression_name',
+  custom_format: 'custom_format_name',
+  quality_profile: 'quality_profile_name',
+  radarr_naming: 'radarr_naming_name',
+  sonarr_naming: 'sonarr_naming_name',
+  lidarr_naming: 'lidarr_naming_name',
+  radarr_media_settings: 'radarr_media_settings_name',
+  sonarr_media_settings: 'sonarr_media_settings_name',
+  lidarr_media_settings: 'lidarr_media_settings_name',
+  radarr_quality_definitions: 'radarr_quality_definitions_name',
+  sonarr_quality_definitions: 'sonarr_quality_definitions_name',
+  lidarr_quality_definitions: 'lidarr_quality_definitions_name',
+  lidarr_metadata_profile: 'metadata_profile_name',
+};
+
 const KNOWN_NON_ENTITY_TOP_LEVEL_FILES = new Set(['tags.yaml', 'quality-api-mappings.yaml']);
 
 export interface MigrationEntityCandidate {
@@ -59,6 +86,9 @@ export interface MigrationEntityCandidate {
   readonly entityType: EntityType;
   readonly migration: PortableMigrationMetadata;
   readonly portable: ReaderInputRecord;
+  readonly entityName: string;
+  readonly identity: MigrationEntityIdentity;
+  readonly stableIdentity: MigrationEntityStableIdentity;
   readonly deserialize: EntityDeserializer;
 }
 
@@ -88,7 +118,10 @@ export async function readMigrationEntitySources(pcdPath: string): Promise<Migra
 
   for (const sourcePath of sortedPaths) {
     const relativePath = toRelativePath(sourcePath, entitiesPath);
-    const parsed = await readMigrationEntitySource({ sourcePath, relativePath });
+    const parsed = await readMigrationEntitySource({
+      sourcePath,
+      relativePath,
+    });
 
     if (!parsed.ok) {
       issues.push(parsed.error);
@@ -101,9 +134,13 @@ export async function readMigrationEntitySources(pcdPath: string): Promise<Migra
   return { candidates, issues };
 }
 
-async function readMigrationEntitySource(
-  entry: MigrationSourceEntry
-): Promise<{ ok: true; candidate: MigrationEntityCandidate } | { ok: false; error: MigrationReaderIssue }> {
+async function readMigrationEntitySource(entry: MigrationSourceEntry): Promise<
+  | { ok: true; candidate: MigrationEntityCandidate }
+  | {
+      ok: false;
+      error: MigrationReaderIssue;
+    }
+> {
   const format = inferFormatFromPath(entry.sourcePath);
   if (!format) {
     return {
@@ -170,6 +207,18 @@ async function readMigrationEntitySource(
     };
   }
 
+  const candidateName = extractEntityName(portable);
+  if (!candidateName) {
+    return {
+      ok: false,
+      error: {
+        relativePath: entry.relativePath,
+        kind: 'validation-error',
+        message: 'Entity source payload must include a non-empty string field "name"',
+      },
+    };
+  }
+
   const migration = resolveMigrationMetadata(format, entry.relativePath);
 
   const validationError = validatePortableData(resolution.entityType, portable);
@@ -192,9 +241,21 @@ async function readMigrationEntitySource(
       entityType: resolution.entityType,
       migration,
       portable,
+      entityName: candidateName,
+      identity: {
+        key: `migration:${resolution.entityType}`,
+        value: candidateName,
+      },
+      stableIdentity: resolveMigrationStableIdentity(resolution.entityType, candidateName),
       deserialize: getEntityDeserializer(resolution.entityType),
     },
   };
+}
+
+function extractEntityName(portable: ReaderInputRecord): string | null {
+  const nameValue = portable.name;
+  if (typeof nameValue !== 'string') return null;
+  return nameValue.trim();
 }
 
 function inferFormatFromPath(sourcePath: string): PortableMigrationFormat | null {
@@ -220,8 +281,12 @@ function resolveEntityType(relativePath: string): EntityPathResolution {
   }
 
   if (parts.length === 3 && parts[0].toLowerCase() === 'metadata-profiles') {
-    if (parts[1].toLowerCase() === 'lidarr')
-      return { entityType: 'lidarr_metadata_profile', kind: 'metadata-profiles' };
+    if (parts[1].toLowerCase() === 'lidarr') {
+      return {
+        entityType: 'lidarr_metadata_profile',
+        kind: 'metadata-profiles',
+      };
+    }
   }
 
   return null;
@@ -236,15 +301,16 @@ function parseSource(raw: string, format: PortableMigrationFormat): unknown {
 }
 
 function isolatePortablePayload(input: unknown): ReaderInputRecord | null {
-  if (typeof input !== 'object' || input === null || Array.isArray(input)) return null;
+  if (typeof input !== 'object' || input === null || Array.isArray(input)) {
+    return null;
+  }
 
   if (!Object.hasOwn(input, 'migration')) {
     return input as ReaderInputRecord;
   }
 
-  const { migration: _migration, ...portable } = input as {
-    migration?: unknown;
-  } & ReaderInputRecord;
+  const portable = { ...(input as ReaderInputRecord) };
+  delete (portable as { migration?: unknown }).migration;
 
   return portable;
 }
@@ -254,6 +320,17 @@ function resolveMigrationMetadata(format: PortableMigrationFormat, relativePath:
     source: `entities/${relativePath}`,
     format,
     version: PORTABLE_MIGRATION_MIN_VERSION,
+  };
+}
+
+export function resolveMigrationStableIdentity(
+  entityType: EntityType,
+  entityName: string
+): MigrationEntityStableIdentity {
+  const stableKey = ENTITY_STABLE_KEY_BY_TYPE[entityType] ?? `migration_${entityType}_name`;
+  return {
+    key: stableKey,
+    value: entityName,
   };
 }
 
