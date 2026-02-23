@@ -1,4 +1,4 @@
-import { stringify as stringifyYaml } from 'yaml';
+import { stringify as stringifyYaml } from '@std/yaml';
 import type { PortableMigrationMetadata } from '$shared/pcd/portable.ts';
 import { validatePortableMigrationMetadata } from '$shared/pcd/portable.ts';
 

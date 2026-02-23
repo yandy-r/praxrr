@@ -57,6 +57,7 @@ LICENSE
 temp/
 coverage/
 .nyc_output/
+.arr/
 
 # -----------------------------------------------------------------------------
 # Docker files themselves (prevent recursion)

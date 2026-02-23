@@ -6,7 +6,7 @@
  * No persistence or side-effectful writes are performed.
  */
 
-import { parse as parseYaml } from 'yaml';
+import { parse as parseYaml } from '@std/yaml';
 import type { EntityType, PortableMigrationFormat, PortableMigrationMetadata } from '$shared/pcd/portable.ts';
 import { PORTABLE_MIGRATION_MIN_VERSION } from '$shared/pcd/portable.ts';
 import { PORTABLE_ENTITY_STABLE_KEY_BY_TYPE } from '$pcd/stableIdentity.ts';
