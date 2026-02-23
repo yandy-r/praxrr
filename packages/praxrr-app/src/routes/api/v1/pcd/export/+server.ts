@@ -12,6 +12,23 @@ import * as serialize from '$pcd/entities/serialize.ts';
 
 const VALID_ENTITY_TYPES: ReadonlySet<string> = new Set(ENTITY_TYPES);
 
+type PortableEntityData = Awaited<
+  | ReturnType<typeof serialize.serializeDelayProfile>
+  | ReturnType<typeof serialize.serializeRegularExpression>
+  | ReturnType<typeof serialize.serializeCustomFormat>
+  | ReturnType<typeof serialize.serializeQualityProfile>
+  | ReturnType<typeof serialize.serializeRadarrNaming>
+  | ReturnType<typeof serialize.serializeSonarrNaming>
+  | ReturnType<typeof serialize.serializeLidarrNaming>
+  | ReturnType<typeof serialize.serializeRadarrMediaSettings>
+  | ReturnType<typeof serialize.serializeSonarrMediaSettings>
+  | ReturnType<typeof serialize.serializeLidarrMediaSettings>
+  | ReturnType<typeof serialize.serializeRadarrQualityDefinitions>
+  | ReturnType<typeof serialize.serializeSonarrQualityDefinitions>
+  | ReturnType<typeof serialize.serializeLidarrQualityDefinitions>
+  | ReturnType<typeof serialize.serializeLidarrMetadataProfile>
+>;
+
 export const GET: RequestHandler = async ({ url }) => {
   const databaseIdParam = url.searchParams.get('databaseId');
   const entityType = url.searchParams.get('entityType');
@@ -55,11 +72,7 @@ export const GET: RequestHandler = async ({ url }) => {
   }
 };
 
-async function serializeEntity(
-  cache: PCDCache,
-  entityType: EntityType,
-  name: string
-): Promise<Record<string, unknown>> {
+async function serializeEntity(cache: PCDCache, entityType: EntityType, name: string): Promise<PortableEntityData> {
   switch (entityType) {
     case 'delay_profile':
       return serialize.serializeDelayProfile(cache, name);
@@ -86,7 +99,7 @@ async function serializeEntity(
     case 'sonarr_quality_definitions':
       return serialize.serializeSonarrQualityDefinitions(cache, name);
     case 'lidarr_quality_definitions':
-      return serializeLidarrQualityDefinitions(cache, name);
+      return serialize.serializeLidarrQualityDefinitions(cache, name);
     case 'lidarr_metadata_profile':
       return serialize.serializeLidarrMetadataProfile(cache, name);
 
