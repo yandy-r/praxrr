@@ -230,6 +230,10 @@ export class PCDCache {
             throw new Error(`Failed to execute operation ${operation.filename} in ${operation.layer} layer: ${error}`);
           }
 
+          if (!isUserOp && gateError.errorCategory === 'non_conflict_error') {
+            throw new Error(`Failed to execute operation ${operation.filename} in ${operation.layer} layer: ${error}`);
+          }
+
           if (gateError.shouldLogConflict) {
             await logger.info('Recorded op conflict', {
               source: 'PCDCache',

@@ -15,6 +15,7 @@ import {
 } from '$pcd/conflicts/autoAlign/index.ts';
 import { checkFullListConflict } from '$pcd/conflicts/fullListCheck.ts';
 import type { PcdOpHistoryStatus } from '$db/queries/pcdOpHistory.ts';
+import type { OperationType } from '../core/types.ts';
 
 export type ValueGuardApplyDecision =
   | 'applied'
@@ -127,7 +128,7 @@ function resolveConflictStatus(conflictStrategy: ConflictStrategy): PcdOpHistory
   return conflictStrategy === 'ask' ? 'conflicted_pending' : 'conflicted';
 }
 
-export function getConflictReason(operation?: string): string {
+export function getConflictReason(operation?: OperationType): string {
   switch (operation) {
     case 'create':
       return 'duplicate_key';
@@ -145,6 +146,13 @@ export function isUniqueConstraintError(error: string): boolean {
 
 export function isForeignKeyConstraintError(error: string): boolean {
   return error.includes('FOREIGN KEY constraint failed');
+}
+
+function normalizeOperationType(operation?: string): OperationType | undefined {
+  if (operation === 'create' || operation === 'update' || operation === 'delete') {
+    return operation;
+  }
+  return undefined;
 }
 
 export function isValueGuardBlockingStatus(status: PcdOpHistoryStatus): boolean {
@@ -178,14 +186,16 @@ export function evaluateValueGuardApply(input: ValueGuardApplyContext): ValueGua
     });
 
     if (autoAlignDecision.shouldAlign) {
+      const normalizedOperation = normalizeOperationType(metadata?.operation);
+      const conflictReason = getConflictReason(normalizedOperation);
       return {
         ...defaultResult,
         status: 'dropped',
         conflictReason: 'aligned',
         shouldAttemptAutoDrop: true,
         fallbackStatus: conflictStatus,
-        fallbackConflictReason: getConflictReason(metadata?.operation),
-        shouldLogConflict: priorConflictReason !== getConflictReason(metadata?.operation),
+        fallbackConflictReason: conflictReason,
+        shouldLogConflict: priorConflictReason !== conflictReason,
         shouldLogAutoAlign: true,
         autoAlignReason: autoAlignDecision.reason === 'none' ? null : autoAlignDecision.reason,
         autoAlignRule: autoAlignDecision.rule ?? null,
@@ -193,7 +203,7 @@ export function evaluateValueGuardApply(input: ValueGuardApplyContext): ValueGua
       };
     }
 
-    const conflictReason = getConflictReason(metadata?.operation);
+    const conflictReason = getConflictReason(normalizeOperationType(metadata?.operation));
     return {
       ...defaultResult,
       status: conflictStatus,

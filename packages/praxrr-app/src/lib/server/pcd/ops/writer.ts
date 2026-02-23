@@ -12,6 +12,7 @@ import { compiledQueryToSql } from '../utils/sql.ts';
 import { compile } from '../database/compiler.ts';
 import { getCache } from '../database/registry.ts';
 import type { OperationLayer, OperationMetadata, OperationType, WriteOptions, WriteResult } from '../core/types.ts';
+import type { ConflictStrategy } from '$pcd/conflicts/autoAlign/index.ts';
 import {
   evaluateValueGuardApply,
   evaluateValueGuardError,
@@ -75,7 +76,6 @@ interface WriteSqlOperationsOptions {
 }
 
 type ValueGuardGateResult = { ok: true } | { ok: false; error: string };
-}
 
 function normalizeSql(sql: string): string {
   const trimmed = sql.trim();
@@ -95,6 +95,21 @@ function serializeMigrationSqlOperation(operation: MigrationSqlOperation): {
     metadataJson: buildMetadataJson(operation.metadata),
     desiredStateJson: serializeDesiredState(operation.desiredState),
   };
+}
+
+function resolveConflictStrategy(conflictStrategy: string | undefined): ConflictStrategy {
+  if (conflictStrategy === 'override' || conflictStrategy === 'align' || conflictStrategy === 'ask') {
+    return conflictStrategy;
+  }
+
+  if (conflictStrategy !== undefined) {
+    logger.warn('Invalid conflict strategy in database configuration, falling back to override', {
+      source: 'PCDWriter',
+      meta: { conflictStrategy },
+    });
+  }
+
+  return 'override';
 }
 
 function runValueGuardGate(
@@ -117,7 +132,7 @@ function runValueGuardGate(
   }
 
   const instance = databaseInstancesQueries.getById(databaseId);
-  const conflictStrategy = (instance?.conflict_strategy ?? 'override') as 'override' | 'align' | 'ask';
+  const conflictStrategy = resolveConflictStrategy(instance?.conflict_strategy);
 
   cacheDb.exec('SAVEPOINT pcd_writer_value_guard');
   try {

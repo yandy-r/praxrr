@@ -603,7 +603,7 @@ that should cancel out a prior create fails silently.
 
 ### M-5: Non-conflict errors in tracked ops continue instead of throwing
 
-- [ ] **Status:** Open
+- [x] **Status:** Fixed
 - **File:** `packages/praxrr-app/src/lib/server/pcd/database/cache.ts:244-268`
 - **Category:** Error handling
 - **Agents:** error-handler
@@ -615,7 +615,7 @@ error is recorded and execution continues. For non-user (base/schema) ops, this 
 
 ### M-6: Import API returns generic 400 for all deserialization errors
 
-- [ ] **Status:** Open
+- [x] **Status:** Fixed
 - **File:** `packages/praxrr-app/src/routes/api/v1/pcd/import/+server.ts:89-101`
 - **Category:** Error handling, API quality
 - **Agents:** error-handler
@@ -629,7 +629,7 @@ their payload is wrong.
 
 ### M-7: Unvalidated `conflictStrategy` cast from database
 
-- [ ] **Status:** Open
+- [x] **Status:** Fixed
 - **File:** `packages/praxrr-app/src/lib/server/pcd/ops/writer.ts:120`
 - **Category:** Type safety
 - **Agents:** type-design
@@ -646,7 +646,7 @@ Database value is cast without validation. A corrupted row produces incorrect ty
 
 ### M-8: `getConflictReason` parameter too loose
 
-- [ ] **Status:** Open
+- [x] **Status:** Fixed
 - **File:** `packages/praxrr-app/src/lib/server/pcd/migration/valueGuardGate.ts`
 - **Category:** Type safety
 - **Agents:** type-design
