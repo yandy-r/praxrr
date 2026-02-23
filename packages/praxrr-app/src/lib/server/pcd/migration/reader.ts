@@ -246,12 +246,20 @@ function extractEntityName(portable: ReaderInputRecord): string | null {
   return nameValue;
 }
 
+export function __testOnly_extractEntityName(portable: ReaderInputRecord): string | null {
+  return extractEntityName(portable);
+}
+
 function inferFormatFromPath(sourcePath: string): PortableMigrationFormat | null {
   const name = sourcePath.toLowerCase();
   if (name.endsWith('.json')) return 'json';
   if (name.endsWith('.yaml')) return 'yaml';
   if (name.endsWith('.yml')) return 'yaml';
   return null;
+}
+
+export function __testOnly_inferFormatFromPath(sourcePath: string): PortableMigrationFormat | null {
+  return inferFormatFromPath(sourcePath);
 }
 
 function resolveEntityType(relativePath: string): EntityPathResolution {
@@ -280,6 +288,10 @@ function resolveEntityType(relativePath: string): EntityPathResolution {
   return null;
 }
 
+export function __testOnly_resolveEntityType(relativePath: string): EntityPathResolution {
+  return resolveEntityType(relativePath);
+}
+
 function parseSource(raw: string, format: PortableMigrationFormat): unknown {
   if (format === 'json') {
     return JSON.parse(raw);
@@ -301,6 +313,10 @@ function isolatePortablePayload(input: unknown): ReaderInputRecord | null {
   delete (portable as { migration?: unknown }).migration;
 
   return portable;
+}
+
+export function __testOnly_isolatePortablePayload(input: unknown): ReaderInputRecord | null {
+  return isolatePortablePayload(input);
 }
 
 function resolveMigrationMetadata(format: PortableMigrationFormat, relativePath: string): PortableMigrationMetadata {
@@ -366,6 +382,10 @@ async function listEntityFiles(dirPath: string): Promise<string[]> {
   }
 
   return files;
+}
+
+export async function __testOnly_listEntityFiles(dirPath: string): Promise<string[]> {
+  return listEntityFiles(dirPath);
 }
 
 async function pathExists(path: string): Promise<boolean> {

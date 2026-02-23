@@ -216,6 +216,35 @@ function validateStableIdentityConflicts(
   // 3) SQL + migration duplicate stable keys (cross source)
 }
 
+type TestOnlyStableIdentitySqlEntry = {
+  readonly name: string;
+  readonly filepath: string;
+  readonly opNumber: number | null;
+  readonly sequence: number;
+  readonly cleanedSql: string;
+  readonly metadataJson: string | null;
+  readonly contentHash: string;
+  readonly stableIdentity: MigrationEntityStableIdentity | null;
+};
+
+type TestOnlyStableIdentityMigrationEntry = {
+  readonly stableIdentity: MigrationEntityStableIdentity | null;
+  readonly sourcePath: string;
+};
+
+export function __testOnly_validateStableIdentityConflicts(
+  sqlEntries: ReadonlyArray<TestOnlyStableIdentitySqlEntry>,
+  migrationEntries: ReadonlyArray<TestOnlyStableIdentityMigrationEntry>
+): void {
+  validateStableIdentityConflicts(
+    sqlEntries as BaseImportSqlEntry[],
+    migrationEntries as Array<{
+      readonly stableIdentity: MigrationEntityStableIdentity;
+      readonly sourcePath: string;
+    }>
+  );
+}
+
 function parseMetadata(sql: string): { metadataJson: string | null; cleanedSql: string } {
   const lines = sql.split(/\r?\n/);
   const metadata: Record<string, string> = {};

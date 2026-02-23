@@ -737,12 +737,16 @@ References to "future import" are now stale -- this PR implements import.
 
 ### T-1: Migration reader has ZERO tests (376 lines)
 
-- [ ] **Status:** Open
+- [x] **Status:** Closed
 - **File:** `packages/praxrr-app/src/lib/server/pcd/migration/reader.ts`
 - **Priority:** 9/10
 
 No test exercises `readMigrationEntitySources()` or internal functions (`resolveEntityType`,
 `inferFormatFromPath`, `extractEntityName`, `isolatePortablePayload`, `listEntityFiles`).
+
+**Validation result:** Added `packages/praxrr-app/src/tests/pcd/migration/reader.test.ts` covering
+top-level/media path resolution, format inference, entity name extraction, portable payload
+isolation, nested traversal, and `readMigrationEntitySources`.
 
 **Recommended tests:**
 
@@ -756,33 +760,43 @@ No test exercises `readMigrationEntitySources()` or internal functions (`resolve
 
 ### T-2: Value guard gate has no direct unit tests (225 lines)
 
-- [ ] **Status:** Open
+- [x] **Status:** Closed
 - **File:** `packages/praxrr-app/src/lib/server/pcd/migration/valueGuardGate.ts`
 - **Priority:** 8/10
 
 Only 2 of 6 `evaluateValueGuardApply` decision outcomes are exercised indirectly.
 `full_list_conflict`, both `auto_align_*`, and `ask` conflict strategy are untested.
 
+**Validation result:** Added `packages/praxrr-app/src/tests/pcd/migration/valueGuardGate.test.ts`
+asserting `full_list_conflict`, `auto_align_rowcount_zero`, `auto_align_full_list`, and `ask`
+conflict strategy behavior.
+
 ---
 
 ### T-3: Stable identity conflict detection untested
 
-- [ ] **Status:** Open
+- [x] **Status:** Closed
 - **File:** `packages/praxrr-app/src/lib/server/pcd/ops/importBaseOps.ts:149-212`
 - **Priority:** 8/10
 
 `validateStableIdentityConflicts()` has 3 check phases (SQL/SQL, migration/migration, cross-source).
 None are directly tested.
 
+**Validation result:** Added `packages/praxrr-app/src/tests/pcd/ops/importBaseOps.test.ts` covering
+SQL/SQL, migration/migration, and cross-source conflict checks.
+
 ---
 
 ### T-4: Writer gate SAVEPOINT edge cases untested
 
-- [ ] **Status:** Open
+- [x] **Status:** Closed
 - **File:** `packages/praxrr-app/src/lib/server/pcd/ops/writer.ts:100-180`
 - **Priority:** 8/10
 
 Multi-op gate with mid-sequence failure, no-cache bypass, and empty SQL handling are untested.
+
+**Validation result:** Added `packages/praxrr-app/src/tests/pcd/ops/writer.test.ts` covering
+multi-op mid-sequence failure rollback behavior, base-layer non-user bypass, and empty SQL handling.
 
 ---
 

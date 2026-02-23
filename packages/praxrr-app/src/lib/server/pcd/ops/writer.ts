@@ -194,6 +194,14 @@ function runValueGuardGate(
   }
 }
 
+export function __testOnly_runValueGuardGate(
+  databaseId: number,
+  layer: OperationLayer,
+  operations: MigrationSqlOperation[]
+): ValueGuardGateResult {
+  return runValueGuardGate(databaseId, layer, operations);
+}
+
 async function cancelOutCreate(databaseId: number, origin: PcdOpOrigin, metadata: OperationMetadata): Promise<boolean> {
   if (metadata.operation !== 'delete') {
     return false;
