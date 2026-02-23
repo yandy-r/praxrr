@@ -1,0 +1,11 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: Peacock TV
+pattern: \b(?:PCOK|(?:Peacock)(?=\s*.(?:WEB-?DL|WEBRIP)))\b
+tags:
+  - Streaming Service
+  - WEB-DL
+description: Peacock is an American over-the-top subscription streaming service owned and operated by Peacock TV, LLC, a subsidiary of NBCUniversal Media Group. The service primarily features series and film content from NBCUniversal studios and other third-party content providers (such as WWE and Hallmark Channel).
+regex101Id: null

@@ -1,0 +1,42 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: NOW
+description: Matches 'Now' WEB-DLs
+includeInRename: true
+tags:
+  - Streaming Service
+  - WEB-DL
+conditions:
+  - name: NOW Regex
+    type: release_title
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: Now
+        pattern: \b(now)\b[ ._-]web[ ._-]?(dl|rip)?\b
+  - name: NOW Rename Regex
+    type: release_title
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: Now Rename
+        pattern: \[(NOW)\b|\b(NOW)\]
+  - name: WEB-DL
+    type: source
+    arrType: all
+    negate: false
+    required: false
+    sources:
+      - web_dl
+  - name: WEBRip
+    type: source
+    arrType: all
+    negate: false
+    required: false
+    sources:
+      - webrip
+tests: []

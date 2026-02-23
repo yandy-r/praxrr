@@ -1,8 +1,10 @@
 <script lang="ts">
+	import { invalidateAll } from '$app/navigation';
 	import type { DelayProfilesRow } from '$shared/pcd/display.ts';
 	import Toggle from '$ui/toggle/Toggle.svelte';
 	import SyncFooter from './SyncFooter.svelte';
 	import { alertStore } from '$lib/client/alerts/store.ts';
+	import type { SectionType } from '$sync/types.ts';
 
 	interface DatabaseWithProfiles {
 		id: number;
@@ -20,6 +22,10 @@
 	};
 	export let syncTrigger: 'manual' | 'on_pull' | 'on_change' | 'schedule' = 'manual';
 	export let cronExpression: string = '0 * * * *';
+	export let previewEnabled = false;
+	export let previewConfig: unknown = null;
+	export let previewSection: SectionType | null = null;
+	export let lastSyncedAt: string | null = null;
 
 	let saving = false;
 	let syncing = false;
@@ -35,6 +41,16 @@
 		state.databaseId !== null && state.profileName !== null
 			? `${state.databaseId}-${state.profileName}`
 			: null;
+
+	$: {
+		if (!selectedKey) {
+			previewEnabled = false;
+		} else if (isDirty) {
+			previewEnabled = true;
+		} else {
+			previewEnabled = lastSyncedAt === null;
+		}
+	}
 
 	function isSelected(databaseId: number, profileName: string): boolean {
 		return selectedKey === `${databaseId}-${profileName}`;
@@ -52,6 +68,10 @@
 		}
 	}
 
+	export async function saveSection() {
+		await handleSave();
+	}
+
 	async function handleSave() {
 		saving = true;
 		try {
@@ -66,13 +86,14 @@
 				body: formData
 			});
 
-			if (response.ok) {
-				alertStore.add('success', 'Delay profile sync config saved');
-				// Update saved state to current
-				savedState = JSON.stringify({ state, syncTrigger, cronExpression });
-			} else {
-				alertStore.add('error', 'Failed to save delay profile sync config');
-			}
+				if (response.ok) {
+					alertStore.add('success', 'Delay profile sync config saved');
+					// Update saved state to current
+					savedState = JSON.stringify({ state, syncTrigger, cronExpression });
+					await invalidateAll().catch(() => undefined);
+				} else {
+					alertStore.add('error', 'Failed to save delay profile sync config');
+				}
 		} catch {
 			alertStore.add('error', 'Failed to save delay profile sync config');
 		} finally {
@@ -88,17 +109,22 @@
 				body: new FormData()
 			});
 
-			if (response.ok) {
-				const data = await response.json();
-				alertStore.add('success', data?.message ?? 'Sync queued');
-			} else {
-				alertStore.add('error', 'Sync failed');
-			}
+				if (response.ok) {
+					const data = await response.json();
+					alertStore.add('success', data?.message ?? 'Sync queued');
+					await invalidateAll().catch(() => undefined);
+				} else {
+					alertStore.add('error', 'Sync failed');
+				}
 		} catch {
 			alertStore.add('error', 'Sync failed');
 		} finally {
 			syncing = false;
 		}
+	}
+
+	export async function syncSection() {
+		await handleSync();
 	}
 </script>
 
@@ -151,6 +177,11 @@
 		{saving}
 		{syncing}
 		{isDirty}
+		{previewEnabled}
+		{previewConfig}
+		{previewSection}
+		on:previewGenerated
+		on:previewError
 		on:save={handleSave}
 		on:sync={handleSync}
 	/>

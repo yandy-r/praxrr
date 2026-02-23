@@ -12,6 +12,7 @@ import { db } from '$db/db.ts';
 import { runMigrations } from '$db/migrations.ts';
 import { reconcileEnvInstances } from '$arr/envInstances.ts';
 import { initializeJobs } from '$jobs/init.ts';
+import { upsertScheduledJob } from '$jobs/queueService.ts';
 import { pcdManager } from '$pcd/index.ts';
 import { getAuthState, isPublicPath, maybeExtendSession, cleanupExpiredSessions } from '$auth/middleware.ts';
 import { getClientIp } from '$auth/network.ts';
@@ -129,6 +130,35 @@ try {
 
 // Initialize and start job queue
 await initializeJobs();
+if (config.pullOnStart) {
+  try {
+    const startupJob = upsertScheduledJob({
+      jobType: 'arr.pull.startup',
+      runAt: new Date().toISOString(),
+      source: 'system',
+      payload: { enqueuedAt: new Date().toISOString() },
+      dedupeKey: 'arr.pull.startup:boot',
+    });
+
+    await logger.info('Startup pull job enqueued', {
+      source: 'Startup',
+      meta: { dedupeKey: startupJob.dedupeKey, jobId: startupJob.id },
+    });
+  } catch (error) {
+    await logger.warn('Failed to enqueue startup pull job; continuing startup', {
+      source: 'Startup',
+      meta: {
+        dedupeKey: 'arr.pull.startup:boot',
+        error: error instanceof Error ? error.message : String(error),
+      },
+    });
+  }
+} else {
+  await logger.info('Startup pull disabled via PULL_ON_START', {
+    source: 'Startup',
+    meta: { enabled: false },
+  });
+}
 
 // Clean expired sessions on startup
 const expiredCount = cleanupExpiredSessions();

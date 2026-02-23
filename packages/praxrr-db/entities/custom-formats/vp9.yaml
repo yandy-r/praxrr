@@ -1,0 +1,20 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: VP9
+description: Matches the 'VP9' Regex Pattern
+includeInRename: false
+tags:
+  - Bleeding Edge
+  - Codec
+conditions:
+  - name: VP9
+    type: release_title
+    arrType: all
+    negate: false
+    required: true
+    patterns:
+      - name: VP9
+        pattern: \b(VP9)\b
+tests: []

@@ -1,0 +1,42 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: MAX
+description: Matches 'Max' WEB-DLs
+includeInRename: true
+tags:
+  - Streaming Service
+  - WEB-DL
+conditions:
+  - name: MAX Regex
+    type: release_title
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: Max
+        pattern: \b((?<!hbo[ ._-])max)\b(?=[ ._-]web[ ._-]?(dl|rip)\b)
+  - name: MAX Rename Regex
+    type: release_title
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: Max Rename
+        pattern: \[(MAX)\b|\b(MAX)\]
+  - name: WEB-DL
+    type: source
+    arrType: all
+    negate: false
+    required: false
+    sources:
+      - web_dl
+  - name: WEBRip
+    type: source
+    arrType: all
+    negate: false
+    required: false
+    sources:
+      - webrip
+tests: []

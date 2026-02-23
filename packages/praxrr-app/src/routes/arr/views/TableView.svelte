@@ -1,7 +1,6 @@
 <script lang="ts">
   import { resolve } from '$app/paths';
   import { ExternalLink, Trash2 } from 'lucide-svelte';
-  import { SvelteSet } from 'svelte/reactivity';
   import Table from '$ui/table/Table.svelte';
   import TableActionButton from '$ui/table/TableActionButton.svelte';
   import Badge from '$ui/badge/Badge.svelte';
@@ -12,6 +11,7 @@
   import { resolveInstanceBrowserUrl } from '$shared/arr/instanceUrl.ts';
   import radarrLogo from '$lib/client/assets/Radarr.svg';
   import sonarrLogo from '$lib/client/assets/Sonarr.svg';
+  import lidarrLogo from '$lib/client/assets/Lidarr.png';
   import { createEventDispatcher } from 'svelte';
 
   export let instances: ArrInstance[];
@@ -20,12 +20,10 @@
     delete: ArrInstance;
   }>();
 
-  // Available logo assets keyed by ArrIconKey.
-  // Apps without a logo asset (e.g. Lidarr) fall back to the initial-letter
-  // display in the template, driven by capability metadata.
   const logoAssets: Record<string, string> = {
     radarr: radarrLogo,
     sonarr: sonarrLogo,
+    lidarr: lidarrLogo,
   };
 
   // Build logo lookup from registered Arr app types so every app in
@@ -33,9 +31,6 @@
   const logos: Partial<Record<ArrIconKey, string>> = Object.fromEntries(
     ARR_APP_TYPES.map((type) => [type, logoAssets[type]])
   ) as Partial<Record<ArrIconKey, string>>;
-
-  // Track loaded images
-  let loadedImages = new SvelteSet<number>();
 
   function formatType(type: string): string {
     return type.charAt(0).toUpperCase() + type.slice(1);
@@ -57,10 +52,6 @@
 
     const metadata = getArrAppMetadata(type);
     return logos[metadata.iconKey] ?? '';
-  }
-
-  function handleImageLoad(id: number) {
-    loadedImages.add(id);
   }
 
   function getAppInitial(type: string): string {
@@ -99,25 +90,15 @@
       {@const appLabel = getAppLabel(row.type)}
       {@const logoPath = getLogoPath(row.type)}
       <div class="flex items-center gap-3">
-        <div class="relative h-8 w-8">
-          {#if logoPath}
-            {#if !loadedImages.has(row.id)}
-              <div class="absolute inset-0 animate-pulse rounded-lg bg-neutral-200 dark:bg-neutral-700"></div>
-            {/if}
-            <img
-              src={logoPath}
-              alt={`${appLabel} logo`}
-              class="h-8 w-8 rounded-lg {loadedImages.has(row.id) ? 'opacity-100' : 'opacity-0'}"
-              on:load={() => handleImageLoad(row.id)}
-            />
-          {:else}
-            <div
-              class="flex h-8 w-8 items-center justify-center rounded-lg bg-neutral-100 text-xs font-semibold text-neutral-600 dark:bg-neutral-800 dark:text-neutral-200"
-            >
-              {getAppInitial(row.type)}
-            </div>
-          {/if}
-        </div>
+        {#if logoPath}
+          <img src={logoPath} alt={`${appLabel} logo`} class="h-8 w-8 rounded-lg" />
+        {:else}
+          <div
+            class="flex h-8 w-8 items-center justify-center rounded-lg bg-neutral-100 text-xs font-semibold text-neutral-600 dark:bg-neutral-800 dark:text-neutral-200"
+          >
+            {getAppInitial(row.type)}
+          </div>
+        {/if}
         <div class="flex items-center gap-2">
           <div class="font-medium text-neutral-900 dark:text-neutral-50">
             {row.name}

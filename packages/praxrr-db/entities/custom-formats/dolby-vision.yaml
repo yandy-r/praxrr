@@ -1,0 +1,20 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: Dolby Vision
+description: Matches the 'Dolby Vision' Regex Pattern
+includeInRename: false
+tags:
+  - Colour Grade
+  - HDR
+conditions:
+  - name: Dolby Vision
+    type: release_title
+    arrType: all
+    negate: false
+    required: true
+    patterns:
+      - name: Dolby Vision
+        pattern: \b(dv(?![ .](HLG|SDR))|dovi|dolby[ .]?vision)\b
+tests: []

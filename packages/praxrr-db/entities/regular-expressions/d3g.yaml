@@ -1,0 +1,11 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: d3g
+pattern: (?<=^|[\s.-])d3g\b
+tags:
+  - Banned
+  - Release Group
+description: Banned for LQ and various Encode Issues.
+regex101Id: null

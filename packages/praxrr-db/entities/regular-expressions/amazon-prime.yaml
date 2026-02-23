@@ -1,0 +1,11 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: Amazon Prime
+pattern: \b(?:AMZN|(?:AMAZON)(?=\s*.(?:WEB-?DL|WEBRIP)))\b
+tags:
+  - Streaming Service
+  - WEB-DL
+description: Amazon Prime Video, or simply Prime Video, is an American subscription video on-demand over-the-top streaming and rental service of Amazon offered both as a stand-alone service and as part of Amazon's Prime subscription.
+regex101Id: null

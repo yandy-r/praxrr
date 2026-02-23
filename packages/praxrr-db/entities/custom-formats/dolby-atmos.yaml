@@ -1,0 +1,28 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: Dolby Atmos
+description: Matches 'Atmos' Regex Pattern
+includeInRename: false
+tags:
+  - Audio
+  - Dolby
+conditions:
+  - name: Atmos
+    type: release_title
+    arrType: all
+    negate: false
+    required: true
+    patterns:
+      - name: Atmos
+        pattern: \bATMOS|DDPA(\b|\d)
+  - name: Not TrueHD
+    type: release_title
+    arrType: all
+    negate: true
+    required: true
+    patterns:
+      - name: TrueHD
+        pattern: True[ .-]?HD[ .-]?
+tests: []

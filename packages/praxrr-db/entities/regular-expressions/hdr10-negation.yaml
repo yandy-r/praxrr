@@ -1,0 +1,11 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: HDR10 (Negation)
+pattern: (?<=^|[\s.-])BHDStudio\b
+tags:
+  - HDR
+  - Release Group
+description: Matches groups who mislabel HDR10
+regex101Id: null

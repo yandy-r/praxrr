@@ -1,0 +1,52 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: 576p Quality Tier 4
+description: Matches release groups who fall under 576p Quality Tier 4
+includeInRename: false
+tags:
+  - 576p
+  - GPPi
+  - Quality
+  - Release Group Tier
+conditions:
+  - name: 576p
+    type: resolution
+    arrType: all
+    negate: false
+    required: true
+    resolutions:
+      - 576p
+  - name: Bluray
+    type: source
+    arrType: all
+    negate: false
+    required: true
+    sources:
+      - bluray
+  - name: HANDJOB
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: HANDJOB
+        pattern: (?<=^|[\s.-])HANDJOB\b
+  - name: Not Remux
+    type: release_title
+    arrType: all
+    negate: true
+    required: true
+    patterns:
+      - name: Remux
+        pattern: Remux
+  - name: PTP
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: PTP
+        pattern: (?<=^|[\s.-])PTP\b
+tests: []

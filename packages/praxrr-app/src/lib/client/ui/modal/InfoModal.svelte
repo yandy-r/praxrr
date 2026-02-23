@@ -5,6 +5,8 @@
 
 	export let open = false;
 	export let header = 'Information';
+	export let maxWidth = 'min(42rem, 90vw)';
+	export let maxHeight = 'calc(100svh - 2rem)';
 
 	function handleClose() {
 		open = false;
@@ -44,7 +46,8 @@
 		>
 			<!-- Modal -->
 			<div
-				class="relative my-4 flex max-h-[calc(100svh-2rem)] w-full max-w-lg flex-col rounded-lg border border-neutral-200 bg-white shadow-xl sm:my-0 dark:border-neutral-700 dark:bg-neutral-900"
+				class="relative my-4 flex w-full flex-col rounded-lg border border-neutral-200 bg-white shadow-xl sm:my-0 dark:border-neutral-700 dark:bg-neutral-900"
+				style={`max-width: ${maxWidth}; max-height: ${maxHeight};`}
 				in:scale={{ duration: 170, start: 0.97, opacity: 0.5, easing: cubicOut }}
 				out:scale={{ duration: 120, start: 0.97, opacity: 0.5, easing: cubicIn }}
 			>

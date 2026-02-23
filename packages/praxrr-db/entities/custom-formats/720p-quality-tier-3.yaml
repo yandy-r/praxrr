@@ -1,0 +1,99 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: 720p Quality Tier 3
+description: Matches release groups who fall under 720p Quality Tier 3
+includeInRename: false
+tags:
+  - 720p
+  - GPPi
+  - Quality
+  - Release Group Tier
+conditions:
+  - name: 720p
+    type: resolution
+    arrType: all
+    negate: false
+    required: true
+    resolutions:
+      - 720p
+  - name: BMF
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: BMF
+        pattern: (?<=^|[\s.-])BMF\b
+  - name: Bluray
+    type: source
+    arrType: all
+    negate: false
+    required: false
+    sources:
+      - bluray
+  - name: Geek
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: Geek
+        pattern: (?<=^|[\s.-])Geek\b
+  - name: LolHD
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: LolHD
+        pattern: (?<=^|[\s.-])LolHD\b
+  - name: NCmt
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: NCmt
+        pattern: (?<=^|[\s.-])NCmt\b
+  - name: Not Remux
+    type: release_title
+    arrType: all
+    negate: true
+    required: true
+    patterns:
+      - name: Remux
+        pattern: Remux
+  - name: Positive
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: Positive
+        pattern: (?<=^|[\s.-])Positive\b
+  - name: TBB
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: TBB
+        pattern: (?<=^|[\s.-])TBB\b
+  - name: WEBRip
+    type: source
+    arrType: radarr
+    negate: false
+    required: false
+    sources:
+      - webrip
+  - name: rightSIZE
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: rightSIZE
+        pattern: (?<=^|[\s.-])rightSIZE\b
+tests: []

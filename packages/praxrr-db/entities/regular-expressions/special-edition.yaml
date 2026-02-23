@@ -1,0 +1,10 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: Special Edition
+pattern: (?<=\b[12]\d{3}\b).*\b(Cut|Directors|DC|Edition|Extended|Special|Uncensored|Uncut|Unrated|Version)(\b|\d)
+tags:
+  - Edition
+description: 'Matches any type of non theatrical edition. '
+regex101Id: null

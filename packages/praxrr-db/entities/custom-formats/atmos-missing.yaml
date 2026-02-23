@@ -1,0 +1,44 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: Atmos (Missing)
+description: Attempts to match releases which have Atmos (TrueHD 7.1) that don't label it correctly.
+includeInRename: false
+tags:
+  - Audio
+  - Dolby
+conditions:
+  - name: 7.1 Surround
+    type: release_title
+    arrType: all
+    negate: false
+    required: true
+    patterns:
+      - name: 7.1 Surround
+        pattern: \D7\.1\D
+  - name: Not Atmos
+    type: release_title
+    arrType: all
+    negate: true
+    required: true
+    patterns:
+      - name: Atmos
+        pattern: \bATMOS|DDPA(\b|\d)
+  - name: Not Atmos (BTN)
+    type: release_title
+    arrType: all
+    negate: true
+    required: true
+    patterns:
+      - name: BTN Atmos
+        pattern: \bTrue[ .-]?HDA[ .-]?[57]\.1
+  - name: TrueHD
+    type: release_title
+    arrType: all
+    negate: false
+    required: true
+    patterns:
+      - name: TrueHD
+        pattern: True[ .-]?HD[ .-]?
+tests: []

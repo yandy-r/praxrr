@@ -1,0 +1,50 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: Lossless Audio
+description: Matches any Lossless Audio Track not in a 2160p Release.
+includeInRename: false
+tags:
+  - Audio
+conditions:
+  - name: DTS-HD MA
+    type: release_title
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: DTS-HD MA
+        pattern: \b(dts[-_. ]?(ma|hd([-_. ]?ma)?|xll))(\b|\d)
+  - name: DTS-X
+    type: release_title
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: DTS-X
+        pattern: \b(dts[-_. :]?x)\b(?!\d)
+  - name: Not 2160p
+    type: resolution
+    arrType: all
+    negate: true
+    required: true
+    resolutions:
+      - 2160p
+  - name: PCM
+    type: release_title
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: PCM
+        pattern: \b(l?)PCM(\b|\d)
+  - name: TrueHD
+    type: release_title
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: TrueHD
+        pattern: True[ .-]?HD[ .-]?
+tests: []

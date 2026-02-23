@@ -1,0 +1,57 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: Anime WEB-DL Tier 2
+description: Do not use Testing Purposes Only
+includeInRename: false
+tags:
+  - Anime
+conditions:
+  - name: Erai-Raws
+    type: release_title
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: Erai-Raws
+        pattern: (?<=^|[\s.-])Erai-Raws\b
+  - name: HorribleSubs
+    type: release_title
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: HorribleSubs
+        pattern: (?<=^|[\s.-])HorribleSubs\b
+  - name: Subsplus+
+    type: release_title
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: SubsPlus+
+        pattern: (?<=^|[\s.-])SubsPlus+\b
+  - name: VARYG
+    type: release_title
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: VARYG
+        pattern: (?<=^|[\s.-])VARYG\b
+  - name: WEB
+    type: source
+    arrType: all
+    negate: false
+    required: false
+    sources:
+      - television
+  - name: WEB-DL
+    type: source
+    arrType: all
+    negate: false
+    required: false
+    sources:
+      - web_dl
+tests: []

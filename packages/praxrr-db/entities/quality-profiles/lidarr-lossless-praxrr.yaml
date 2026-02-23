@@ -1,0 +1,41 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: Lidarr - Lossless (Praxrr)
+description: 'Targets lossless audio: FLAC, ALAC, APE, WavPack, FLAC 24bit, ALAC 24bit, and WAV.'
+tags: []
+language: Any
+orderedItems:
+  - type: group
+    name: Lossless Hi-Res
+    position: 0
+    enabled: true
+    upgradeUntil: true
+    members:
+      - name: ALAC 24bit
+      - name: FLAC 24bit
+  - type: group
+    name: Lossless
+    position: 1
+    enabled: true
+    upgradeUntil: false
+    members:
+      - name: ALAC
+      - name: APE
+      - name: FLAC
+      - name: WAV
+      - name: WavPack
+minimumScore: 0
+upgradeUntilScore: 999999
+upgradeScoreIncrement: 1
+customFormatScores:
+  - customFormatName: Lidarr - AAC (Praxrr)
+    arrType: lidarr
+    score: 10000
+  - customFormatName: Lidarr - FLAC (Praxrr)
+    arrType: lidarr
+    score: 50000
+  - customFormatName: Lidarr - Opus (Praxrr)
+    arrType: lidarr
+    score: 20000

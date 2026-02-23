@@ -43,6 +43,15 @@ export interface CreatePcdOpInput {
   pushedCommit?: string | null;
 }
 
+export async function buildContentHash(sql: string, metadataJson: string | null): Promise<string> {
+  // Shared writer/import hash path for deterministic content identity.
+  const payload = `${sql}\n${metadataJson ?? ''}`;
+  const data = new TextEncoder().encode(payload);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map((byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
 export interface UpdatePcdOpInput {
   state?: PcdOpState;
   source?: PcdOpSource;

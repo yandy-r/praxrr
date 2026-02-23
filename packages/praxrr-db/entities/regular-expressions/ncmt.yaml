@@ -1,0 +1,12 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: NCmt
+pattern: (?<=^|[\s.-])NCmt\b
+tags:
+  - Bluray
+  - Release Group
+  - Remux
+description: null
+regex101Id: null

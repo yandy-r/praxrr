@@ -1,0 +1,10 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: h264
+pattern: (?i)h\s*\.?\s*264
+tags:
+  - Codec
+description: 'An open source encoder that produces H.264 videos. '
+regex101Id: null

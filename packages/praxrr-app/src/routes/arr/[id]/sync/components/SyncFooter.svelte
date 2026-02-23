@@ -4,6 +4,9 @@
 	import Toggle from '$ui/toggle/Toggle.svelte';
 	import { RefreshCw, Save, Loader2, AlertTriangle } from 'lucide-svelte';
 	import { createEventDispatcher } from 'svelte';
+	import SyncPreviewTrigger from './SyncPreviewTrigger.svelte';
+	import type { SyncPreviewSummary } from '$sync/preview/types.ts';
+	import type { SectionType } from '$sync/types.ts';
 
 	export let syncTrigger: 'manual' | 'on_pull' | 'on_change' | 'schedule' = 'manual';
 	export let cronExpression: string = '0 * * * *';
@@ -12,8 +15,16 @@
 	export let isDirty: boolean = false;
 	export let canSave: boolean = true;
 	export let warning: string | null = null;
+	export let previewEnabled = false;
+	export let previewSection: SectionType | null = null;
+	export let previewConfig: unknown = null;
 
-	const dispatch = createEventDispatcher<{ save: void; sync: void }>();
+	const dispatch = createEventDispatcher<{
+		save: void;
+		sync: void;
+		previewGenerated: { id: string; summary?: SyncPreviewSummary };
+		previewError: { message: string };
+	}>();
 
 	const triggerOptions = [
 		{ value: 'manual', label: 'Manual' },
@@ -25,6 +36,7 @@
 	// Save disabled when not dirty or can't save, Sync disabled when dirty (unsaved changes)
 	$: saveDisabled = saving || !isDirty || !canSave;
 	$: syncDisabled = syncing || isDirty;
+	$: previewDisabled = syncing || !previewEnabled;
 
 	function selectTrigger(value: (typeof triggerOptions)[number]['value'], enabled: boolean) {
 		// Keep trigger single-select: selecting a toggle sets it; unchecking the active one is ignored.
@@ -64,6 +76,13 @@
 				</div>
 			{/if}
 			<div class="flex items-center gap-3">
+		<SyncPreviewTrigger
+			disabled={previewDisabled}
+			sections={previewSection ? [previewSection] : []}
+			previewConfig={previewConfig}
+			on:previewGenerated={(event) => dispatch('previewGenerated', event.detail)}
+			on:previewError={(event) => dispatch('previewError', event.detail)}
+		/>
 				<Button
 					text="Sync Now"
 					variant="secondary"

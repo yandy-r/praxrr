@@ -1,0 +1,11 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: tarunk9c
+pattern: (?<=^|[\s.-])tarunk9c\b
+tags:
+  - Banned
+  - Release Group
+description: Banned for Fake DV/HDR Layer
+regex101Id: null

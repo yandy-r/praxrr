@@ -2,7 +2,7 @@
 
 ## 1) Purpose & Audience
 
-Praxrr manages configuration for Radarr, Sonarr, and Lidarr by syncing
+Praxrr manages configuration for Arr media-management apps by syncing
 curated configuration databases (PCDs) into Arr instances. It targets two
 audiences:
 
@@ -27,7 +27,7 @@ exported when publishing.
 
 ## 2) Glossary
 
-- **Arr** — Radarr/Sonarr/Lidarr instances managed by Praxrr.
+- **Arr** — media-management app instances managed by Praxrr.
 - **PCD** — “Praxrr Config Database”: the configuration dataset (custom
   formats, profiles, media settings) stored as ops.
 - **Op** — An append‑only SQL operation (create/update/delete) applied to build
@@ -366,7 +366,7 @@ formats referenced by profiles) are synced first.
 ### 7.1) Lidarr Metadata Profile Guardrails
 
 Metadata profiles are introduced as a Lidarr-only contract and must remain
-isolated from Radarr/Sonarr runtime paths:
+isolated from non-Lidarr Arr runtime paths:
 
 - Profile tables are explicitly Lidarr-prefixed (`lidarr_metadata_profiles`,
   child tables for primary types, secondary types, and release statuses).
@@ -378,7 +378,7 @@ isolated from Radarr/Sonarr runtime paths:
   Lidarr metadata profile shapes are accepted only on Lidarr metadata paths.
 - Runtime sync paths must never use `arr_type = 'all'` fallbacks. All
   selection/config/writes for metadata profiles must check `arr_instances.type ===
-'lidarr'` before executing, so Sonarr/Radarr entities never enter metadata
+'lidarr'` before executing, so non-Lidarr entities never enter metadata
   sync pipelines.
 - Sync section config and PCD read/write helpers must treat metadata profiles as a
   single-name contract (`metadataProfileName`) and keep API payload fields strictly
@@ -603,8 +603,8 @@ category.
 
 ## 12) Media Management
 
-Media management configs are stored as **named presets** for Radarr, Sonarr,
-and Lidarr: Naming, Media Settings, and Quality Definitions. Each Arr app has
+Media management configs are stored as **named presets** for Arr app families
+(movie/series/music): Naming, Media Settings, and Quality Definitions. Each family has
 dedicated tables and entity operations; there is no cross‑Arr table reuse or
 fallback behavior. Each preset is a distinct entity with its own CRUD ops and
 value guards.
@@ -626,8 +626,8 @@ Ops live in `packages/praxrr-app/src/lib/server/pcd/entities/mediaManagement/nam
 - **Delete:** guarded delete using all fields as value guards.
 
 Each Arr variant stores format strings and flags specific to its domain.
-Radarr uses movie formats; Sonarr uses episode/season formats; Lidarr uses
-artist/album/track formats.
+Movie apps use movie formats; series apps use episode/season formats; music
+apps use artist/album/track formats.
 
 ### 12.2 Media Settings
 
@@ -734,7 +734,7 @@ commands when files/folders don’t match the current naming config.
 
 Core logic lives in `packages/praxrr-app/src/lib/server/rename/`:
 
-- **processor.ts** orchestrates Radarr/Sonarr runs.
+- **processor.ts** orchestrates movie/series media-app runs.
 - **logger.ts** records structured logs and persists runs.
 
 Processing steps:
@@ -1166,7 +1166,7 @@ Arr integration is an object‑oriented stack:
 - `utils/arr/base.ts` extends `BaseHttpClient` and injects API key handling.
 - `utils/arr/arrInstanceClients.ts` provides `getArrInstanceClient()` that loads
   encrypted credentials for a persisted instance and decrypts just-in-time.
-- `utils/arr/clients/*` implement app‑specific endpoints (Radarr, Sonarr, Lidarr).
+- `utils/arr/clients/*` implement media-management-app specific endpoints.
 - `createArrClient()` selects a client by type.
 - `utils/arr/defaults.ts` provides default delay profiles.
 - `utils/arr/releaseImport.ts` normalizes + groups releases for entity testing.

@@ -1,0 +1,11 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: Dropout TV
+pattern: \b(DRPO)\b
+tags:
+  - Streaming Service
+  - WEB-DL
+description: Dropout is an American comedy subscription streaming service run by the production company of the same name (formerly CollegeHumor), founded in September 2018. Its ad-free original shows are mainly composed of live play, such as Dimension 20 hosted by Brennan Lee Mulligan, and improv comedy and panel shows like Game Changer, Make Some Noise (both hosted by Dropout owner and CEO Sam Reich), and Very Important People hosted by Vic Michaelis. Dropout's series often feature a rotating cast of regular comedians and performers.
+regex101Id: null

@@ -1,0 +1,10 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: PHOENiX
+pattern: (?<=^|[\s.-])PHOENiX\b
+tags:
+  - Release Group
+description: Matches "PHOENiX" when preceded by whitespace, a hyphen or dot
+regex101Id: null

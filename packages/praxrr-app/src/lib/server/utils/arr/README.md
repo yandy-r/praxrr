@@ -1,7 +1,7 @@
 # Arr HTTP Client Utilities
 
-Object-oriented HTTP client architecture for communicating with \*arr
-applications (Radarr, Sonarr, Lidarr, Chaptarr).
+Object-oriented HTTP client architecture for communicating with the supported Arr
+applications: Radarr, Sonarr, Lidarr, and Chaptarr.
 
 ## Architecture
 

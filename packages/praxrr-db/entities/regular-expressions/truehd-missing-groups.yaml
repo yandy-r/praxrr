@@ -1,0 +1,10 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: TrueHD (Missing Groups)
+pattern: (?<=^|[\s.-])(TRiToN|EPSiLON|NoGroup|PmP)\b
+tags:
+  - Audio
+description: Matches groups who mislabel TrueHD
+regex101Id: null

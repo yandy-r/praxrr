@@ -18,6 +18,7 @@ export interface TestContext {
  */
 export abstract class BaseTest {
   private static testCounter = 0;
+  private patchRestores: Array<() => void> = [];
   protected context: TestContext | null = null;
 
   /**
@@ -41,7 +42,7 @@ export abstract class BaseTest {
    * Override this in your test class if needed
    */
   protected beforeEach(_context: TestContext): void | Promise<void> {
-    // Override in subclass if needed
+    void _context;
   }
 
   /**
@@ -49,7 +50,7 @@ export abstract class BaseTest {
    * Override this in your test class if needed
    */
   protected afterEach(_context: TestContext): void | Promise<void> {
-    // Override in subclass if needed
+    void _context;
   }
 
   /**
@@ -135,13 +136,20 @@ export abstract class BaseTest {
     target: T,
     key: K,
     replacement: T[K],
-    restoreBucket: Array<() => void>
+    restoreBucket: Array<() => void> = this.patchRestores
   ): void {
     const original = target[key];
     target[key] = replacement;
     restoreBucket.push(() => {
       target[key] = original;
     });
+  }
+
+  private runPatchRestores(): void {
+    for (const restore of this.patchRestores.reverse()) {
+      restore();
+    }
+    this.patchRestores = [];
   }
 
   /**
@@ -215,6 +223,7 @@ export abstract class BaseTest {
         this.context = context;
 
         try {
+          this.patchRestores = [];
           // Run beforeEach hook
           await this.beforeEach(context);
 
@@ -223,6 +232,9 @@ export abstract class BaseTest {
         } finally {
           // Run afterEach hook
           await this.afterEach(context);
+
+          // Restore any patches installed without explicit restore buckets
+          this.runPatchRestores();
 
           // Cleanup temp directory
           await this.cleanupTempDir(tempDir);

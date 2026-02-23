@@ -1,0 +1,11 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: HDMaNiAcS
+pattern: (?<=^|[\s.-])HDMaNiAcS\b
+tags:
+  - Bluray
+  - Release Group
+description: null
+regex101Id: null

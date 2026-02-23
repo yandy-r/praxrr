@@ -1,0 +1,11 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: 4KDVS
+pattern: (?<=^|[\s.-])4KDVS\b
+tags:
+  - Bluray
+  - Release Group
+description: Matches "4KDVS" when preceded by whitespace, a hyphen or dot
+regex101Id: null

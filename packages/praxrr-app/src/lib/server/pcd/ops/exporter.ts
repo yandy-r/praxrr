@@ -7,6 +7,7 @@ import { execGit } from '$utils/git/exec.ts';
 import { getBranch, getStatus } from '$utils/git/read.ts';
 import { compile } from '../database/compiler.ts';
 import { syncDependencies } from '../git/dependencies.ts';
+import { entityNameToSlug } from '../migration/slug.ts';
 import { canWriteToBase } from './writer.ts';
 import { listDraftEntityChanges } from './draftChanges.ts';
 import { uuid } from '$shared/utils/uuid.ts';
@@ -86,15 +87,6 @@ function isCleanEnough(status: ExportPreflightStatus): boolean {
   // Modified and untracked files are OK — the clone only has committed state,
   // and selected file changes get explicitly copied into the clone
   return true;
-}
-
-function slugify(value: string): string {
-  const slug = value
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .slice(0, 60);
-  return slug.length > 0 ? slug : 'export-batch';
 }
 
 function buildHeader(message: string, opIds: number[], exportedAt: string): string {
@@ -378,7 +370,7 @@ async function buildExportPlan(
 
   const maxOpNumber = await getMaxOpNumber(repoPath);
   const opNumber = maxOpNumber + 1;
-  const filename = `${opNumber}.${slugify(trimmedMessage)}.sql`;
+  const filename = `${opNumber}.${entityNameToSlug(trimmedMessage)}.sql`;
 
   return {
     success: true,

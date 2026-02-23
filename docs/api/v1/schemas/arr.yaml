@@ -443,7 +443,8 @@ LibraryResponse:
     - $ref: '#/LibraryLidarrResponse'
   description: |
     Library response varies by instance type.
-    Lidarr payload details remain capability-gated until dedicated library route support ships.
+    Payload details for partially supported families remain capability-gated until
+    their dedicated library routes are available.
 
 EpisodesResponse:
   type: object

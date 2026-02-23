@@ -1,0 +1,12 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: RARBG
+pattern: (?<=^|[\s.-])RARBG\b
+tags:
+  - Bluray
+  - Release Group
+  - Remux
+description: Banned for Low Quality
+regex101Id: null

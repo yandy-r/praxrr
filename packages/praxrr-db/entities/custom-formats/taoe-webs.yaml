@@ -1,0 +1,47 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: TAoE WEBs
+description: Matches 2160p TAoE WEBs via Release Title Parsing
+includeInRename: false
+tags: []
+conditions:
+  - name: 2160p
+    type: resolution
+    arrType: all
+    negate: false
+    required: true
+    resolutions:
+      - 2160p
+  - name: Release Group
+    type: release_group
+    arrType: all
+    negate: true
+    required: true
+    patterns:
+      - name: TAoE
+        pattern: (?<=^|[\s.-])(TAoE|Ainz|AJJMIN|ANONAZ|ArcX|bccornfo|DNU|DrainedDay|DUHIT|Erie|Frys|Goki|HxD|jb2049|JBENT|Nostradamus|r0b0t|Species180|TheSickle|xtrem3x|WEM)\b
+  - name: TAoE
+    type: release_title
+    arrType: all
+    negate: false
+    required: true
+    patterns:
+      - name: TAoE (Title)
+        pattern: TAoE
+  - name: WEB-DL
+    type: source
+    arrType: all
+    negate: false
+    required: false
+    sources:
+      - web_dl
+  - name: WEBRip
+    type: source
+    arrType: all
+    negate: false
+    required: false
+    sources:
+      - webrip
+tests: []

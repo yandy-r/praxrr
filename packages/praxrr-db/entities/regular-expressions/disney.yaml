@@ -1,0 +1,11 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: Disney+
+pattern: \b(dsnp|dsny(p)?|disney\+)\s*\b
+tags:
+  - Streaming Service
+  - WEB-DL
+description: Disney+ is an American subscription video on-demand over-the-top streaming media service that primarily distributes films and television shows produced by Walt Disney Studios and Disney Television Studios, with dedicated content hubs for Disney's flagship brands; Disney, Pixar, Marvel, Star Wars, National Geographic, ESPN, Hulu and Star.
+regex101Id: null

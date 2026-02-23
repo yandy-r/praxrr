@@ -1,0 +1,35 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: 2160p Balanced Tier 1
+description: Matches release groups who fall under 2160p Balanced Tier 1
+includeInRename: false
+tags:
+  - 2160p
+  - Balanced
+  - Release Group Tier
+conditions:
+  - name: 2160p
+    type: resolution
+    arrType: all
+    negate: false
+    required: true
+    resolutions:
+      - 2160p
+  - name: Bluray
+    type: source
+    arrType: all
+    negate: false
+    required: true
+    sources:
+      - bluray
+  - name: HONE
+    type: release_title
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: HONE
+        pattern: (?<=^|[\s.-])HONE\b
+tests: []

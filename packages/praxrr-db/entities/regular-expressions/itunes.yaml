@@ -1,0 +1,16 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: iTunes
+pattern: \b(it|itunes)\b(?=[ ._-]web[ ._-]?(dl|rip)\b)
+tags:
+  - Streaming Service
+  - WEB-DL
+description: |-
+  iTunes began offering video content in October 2005 with the release of iTunes 6. At launch, the iTunes Store provided popular TV shows from ABC, Disney Channel, and other networks. Users could purchase and view video content, such as episodes of Desperate Housewives, Lost, That's So Raven, and The Suite Life of Zack & Cody.
+
+  In 2008, Apple introduced "iTunes Digital Copy," a feature on select DVDs and Blu-ray discs that allowed users to obtain a digital copy of the video content in iTunes and associated media players.
+
+  Over time, iTunes expanded its video offerings and became a significant platform for purchasing, organizing, and viewing movies and TV shows.
+regex101Id: null

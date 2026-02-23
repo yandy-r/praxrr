@@ -1,0 +1,12 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: HLG
+pattern: \b(HLG)\b
+tags:
+  - Colour Grade
+  - Enhancement
+  - HDR
+description: This regex matches a `HLG` generalisation. This is a basic HDR Format.
+regex101Id: null

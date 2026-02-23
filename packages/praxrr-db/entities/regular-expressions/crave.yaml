@@ -1,0 +1,11 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: Crave
+pattern: \b(?:CRAV|(?:CRAVE)(?=\s*.(?:WEB-?DL|WEBRIP)))\b
+tags:
+  - Streaming Service
+  - WEB-DL
+description: Crave (originally CraveTV) is a Canadian subscription video on demand service. The service competes directly with other subscription-based over-the-top streaming services operating in Canada, primarily against American-based services. The service features Bell Media original programming, exclusive Canadian access to programming acquired from several U.S. television and streaming services, and various theatrically-released films. Crave's major programming supplier is Warner Bros. Discovery (HBO / Max and Warner Bros. films). Starz, offered in partnership with Lionsgate.
+regex101Id: null

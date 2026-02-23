@@ -119,7 +119,7 @@ export const actions: Actions = {
           seriesFolderFormat: seriesFolderFormat || '',
           seasonFolderFormat: seasonFolderFormat || '',
           replaceIllegalCharacters,
-          colonReplacementFormat: colonReplacementFormat || 'delete',
+          colonReplacementFormat: colonReplacementFormat || 'smart',
           customColonReplacementFormat: customColonReplacementFormat || null,
           multiEpisodeStyle: multiEpisodeStyle || 'extend',
         },

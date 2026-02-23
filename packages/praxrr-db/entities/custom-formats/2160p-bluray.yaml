@@ -1,0 +1,33 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: 2160p Bluray
+description: Matches 2160p Blurays that are NOT remuxes
+includeInRename: false
+tags:
+  - Source
+conditions:
+  - name: 2160p
+    type: resolution
+    arrType: all
+    negate: false
+    required: true
+    resolutions:
+      - 2160p
+  - name: Bluray
+    type: source
+    arrType: all
+    negate: false
+    required: true
+    sources:
+      - bluray
+  - name: Not Remux
+    type: release_title
+    arrType: all
+    negate: true
+    required: true
+    patterns:
+      - name: Remux
+        pattern: Remux
+tests: []

@@ -1,0 +1,28 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: DVD Remux
+description: A DVD Remux is a direct rip of a DVD's content without any re-encoding, preserving the original video, audio, and subtitle quality. It retains the exact resolution, bitrate, and format of the DVD, ensuring no loss in fidelity compared to the source.
+includeInRename: false
+tags:
+  - Lossless
+  - SD
+  - Source
+conditions:
+  - name: DVD
+    type: source
+    arrType: all
+    negate: false
+    required: true
+    sources:
+      - dvd
+  - name: Remux
+    type: release_title
+    arrType: all
+    negate: false
+    required: true
+    patterns:
+      - name: Remux
+        pattern: Remux
+tests: []

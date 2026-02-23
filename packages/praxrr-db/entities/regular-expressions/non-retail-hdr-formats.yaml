@@ -1,0 +1,12 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: Non Retail HDR Formats
+pattern: (?:(?<=^(?!.*\b(HLG|PQ|SDR)(\b|\d)).*?)HDR10(\+|P(lus)?))|\b(dv(?![ .](HLG|SDR))|dovi|dolby[ .]?vision)\b
+tags:
+  - Colour Grade
+  - Enhancement
+  - HDR
+description: 'Matches Dolby Vision OR HDR10+. Needed to match release groups who create custom HDR layers. '
+regex101Id: null

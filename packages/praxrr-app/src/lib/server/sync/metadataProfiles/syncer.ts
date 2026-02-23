@@ -15,6 +15,7 @@ import type {
 } from '$pcd/entities/metadataProfiles/read.ts';
 import type {
   LidarrMetadataProfileCreatePayload,
+  LidarrMetadataProfile,
   LidarrMetadataProfileSchema,
   LidarrProfilePrimaryAlbumTypeItem,
   LidarrProfileReleaseStatusItem,
@@ -24,6 +25,53 @@ import { LidarrClient } from '$arr/clients/lidarr.ts';
 import { getNamespaceSuffix } from '../namespace.ts';
 import { logger } from '$logger/logger.ts';
 import { HttpError } from '$http/types.ts';
+import { diffSingletonEntity, METADATA_PROFILE_ARRAY_KEY_STRATEGIES } from '../preview/sectionDiffs.ts';
+import type { MetadataProfilesPreview, SyncPreviewSectionResult } from '../preview/types.ts';
+
+interface MetadataProfilesPreviewConfig {
+  databaseId: number | null;
+  profileName: string | null;
+}
+
+function parseMetadataProfilesPreviewConfig(rawConfig: unknown): MetadataProfilesPreviewConfig | null {
+  if (!rawConfig || typeof rawConfig !== 'object' || Array.isArray(rawConfig)) {
+    return null;
+  }
+
+  const value = rawConfig as Record<string, unknown>;
+  if (!('databaseId' in value) || !('profileName' in value)) {
+    return null;
+  }
+
+  const rawDatabaseId = value.databaseId;
+  const rawProfileName = value.profileName;
+  const databaseId = rawDatabaseId === null || rawDatabaseId === undefined ? null : parsePositiveInt(rawDatabaseId);
+  const profileName = typeof rawProfileName === 'string' && rawProfileName.length > 0 ? rawProfileName : null;
+
+  if (databaseId === null && profileName === null) {
+    return {
+      databaseId: null,
+      profileName: null,
+    };
+  }
+
+  if (databaseId === null || profileName === null) {
+    return null;
+  }
+
+  return {
+    databaseId,
+    profileName,
+  };
+}
+
+function parsePositiveInt(rawValue: unknown): number | null {
+  if (typeof rawValue !== 'number' || !Number.isInteger(rawValue) || rawValue <= 0) {
+    return null;
+  }
+
+  return rawValue;
+}
 
 const METADATA_PROFILE_SCHEMA_FALLBACK: Omit<LidarrMetadataProfileSchema, 'id' | 'name'> = {
   primaryAlbumTypes: [
@@ -203,8 +251,8 @@ function readErrorDetails(error: unknown): { message: string; response?: unknown
 
 function findMatchingRemoteProfile(
   profileName: string,
-  remoteProfiles: ReadonlyArray<{ id: number; name: string }>
-): { id: number; name: string } | undefined {
+  remoteProfiles: ReadonlyArray<LidarrMetadataProfile>
+): LidarrMetadataProfile | undefined {
   return remoteProfiles.find((profile) => profile.name === profileName);
 }
 
@@ -268,7 +316,97 @@ export class MetadataProfileSyncer extends BaseSyncer {
     return 'metadata profile';
   }
 
+  override async generatePreview(): Promise<Readonly<SyncPreviewSectionResult>> {
+    const lidarrClient = this.getLidarrClient();
+    const syncConfig = this.getMetadataProfilesSyncConfig();
+
+    if (!syncConfig.databaseId || !syncConfig.profileName) {
+      await logger.debug('No metadata profile configured for preview', {
+        source: 'Preview:MetadataProfile',
+        meta: { instanceId: this.instanceId },
+      });
+      const result: MetadataProfilesPreview = {
+        section: 'metadataProfiles',
+        profile: null,
+      };
+
+      return result;
+    }
+
+    const profile = await getMetadataProfileFromCache(syncConfig.databaseId, syncConfig.profileName);
+    if (!profile) {
+      throw new Error(`Metadata profile "${syncConfig.profileName}" not found in PCD cache`);
+    }
+
+    const namespaceIndex = arrNamespaceQueries.getOrCreate(this.instanceId, syncConfig.databaseId);
+    const namespaceSuffix = getNamespaceSuffix(namespaceIndex);
+    const suffixedProfileName = `${profile.name}${namespaceSuffix}`;
+
+    let metadataSchema: LidarrMetadataProfileSchema | null = null;
+    try {
+      metadataSchema = await lidarrClient.getMetadataProfileSchemaOrNull();
+      if (!metadataSchema) {
+        await logger.warn('Failed to load Lidarr metadata profile schema for preview; using local values', {
+          source: 'Preview:MetadataProfile',
+          meta: { instanceId: this.instanceId },
+        });
+      }
+    } catch (error) {
+      const { message, response } = readErrorDetails(error);
+      await logger.warn('Failed to load Lidarr metadata profile schema for preview; using local values', {
+        source: 'Preview:MetadataProfile',
+        meta: {
+          instanceId: this.instanceId,
+          error: message,
+          response,
+        },
+      });
+    }
+
+    const normalizedSchema = normalizeSchema(metadataSchema);
+
+    const normalizedPayload = buildPayload(
+      {
+        ...profile,
+        name: suffixedProfileName,
+      },
+      normalizedSchema
+    );
+
+    const remoteProfiles = await lidarrClient.getMetadataProfiles();
+    const existingProfile = findMatchingRemoteProfile(suffixedProfileName, remoteProfiles);
+
+    const profileChange = diffSingletonEntity({
+      entityType: 'metadataProfile',
+      name: suffixedProfileName,
+      desiredEntity: normalizedPayload as unknown as Record<string, unknown>,
+      currentEntity: (existingProfile ?? null) as Record<string, unknown> | null,
+      currentComparable: (entity) => ({
+        name: (entity as unknown as LidarrMetadataProfile).name,
+        primaryAlbumTypes: (entity as unknown as LidarrMetadataProfile).primaryAlbumTypes,
+        secondaryAlbumTypes: (entity as unknown as LidarrMetadataProfile).secondaryAlbumTypes,
+        releaseStatuses: (entity as unknown as LidarrMetadataProfile).releaseStatuses,
+      }),
+      desiredComparable: (entity) => ({
+        name: (entity as unknown as LidarrMetadataProfileCreatePayload).name,
+        primaryAlbumTypes: (entity as unknown as LidarrMetadataProfileCreatePayload).primaryAlbumTypes,
+        secondaryAlbumTypes: (entity as unknown as LidarrMetadataProfileCreatePayload).secondaryAlbumTypes,
+        releaseStatuses: (entity as unknown as LidarrMetadataProfileCreatePayload).releaseStatuses,
+      }),
+      currentRemoteId: (entity) => (entity as unknown as LidarrMetadataProfile).id,
+      arrayKeyStrategies: METADATA_PROFILE_ARRAY_KEY_STRATEGIES,
+    });
+
+    const result: MetadataProfilesPreview = {
+      section: 'metadataProfiles',
+      profile: profileChange,
+    };
+
+    return result;
+  }
+
   override async sync(): Promise<SyncResult> {
+    const lidarrClient = this.getLidarrClient();
     const syncConfig = arrSyncQueries.getMetadataProfilesSync(this.instanceId);
 
     if (!syncConfig.databaseId || !syncConfig.profileName) {
@@ -296,7 +434,6 @@ export class MetadataProfileSyncer extends BaseSyncer {
     const namespaceSuffix = getNamespaceSuffix(namespaceIndex);
     const suffixedProfileName = `${profile.name}${namespaceSuffix}`;
 
-    const lidarrClient = this.client as LidarrClient;
     let metadataSchema: LidarrMetadataProfileSchema | null = null;
     try {
       metadataSchema = await lidarrClient.getMetadataProfileSchema();
@@ -364,9 +501,26 @@ export class MetadataProfileSyncer extends BaseSyncer {
     return [];
   }
 
+  private getMetadataProfilesSyncConfig(): { databaseId: number | null; profileName: string | null } {
+    const previewConfig = parseMetadataProfilesPreviewConfig(this.getPreviewConfig());
+    if (previewConfig) {
+      return previewConfig;
+    }
+
+    return arrSyncQueries.getMetadataProfilesSync(this.instanceId);
+  }
+
   protected transformToArr(_pcdData: unknown[]): unknown[] {
     return [];
   }
 
   protected async pushToArr(_arrData: unknown[]): Promise<void> {}
+
+  private getLidarrClient(): LidarrClient {
+    if (!(this.client instanceof LidarrClient)) {
+      throw new Error('Metadata profile sync is only supported for Lidarr instances');
+    }
+
+    return this.client;
+  }
 }

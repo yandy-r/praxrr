@@ -1,0 +1,11 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: CREATiVE24
+pattern: (?<=^|[\s.-])CREATiVE24\b
+tags:
+  - Bluray
+  - Release Group
+description: Banned for Bloated Garbage
+regex101Id: null

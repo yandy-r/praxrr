@@ -1,0 +1,26 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: Amazon Enhancement
+description: Augments the Streaming Service Score for 1080p Releases and below for 2160p Profiles
+includeInRename: false
+tags:
+  - Enhancement
+conditions:
+  - name: AMZN
+    type: release_title
+    arrType: all
+    negate: false
+    required: true
+    patterns:
+      - name: Amazon Prime
+        pattern: \b(?:AMZN|(?:AMAZON)(?=\s*.(?:WEB-?DL|WEBRIP)))\b
+  - name: Not 2160p
+    type: resolution
+    arrType: all
+    negate: true
+    required: true
+    resolutions:
+      - 2160p
+tests: []

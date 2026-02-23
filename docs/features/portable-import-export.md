@@ -2,8 +2,10 @@
 
 ## Overview
 
-Portable import/export moves PCD entities between databases using a JSON contract that is
-database-ID-free and timestamp-free.
+Portable import/export moves PCD entities between databases using a JSON contract
+that is database-ID-free and timestamp-free. Compatibility remains constrained by
+supported `entityType` contracts (including family-specific types such as
+`radarr_media_settings` and `sonarr_media_settings`).
 
 Endpoints:
 
@@ -45,10 +47,54 @@ The response shape is:
 ## 2) Review payload
 
 - Keep field names exactly as emitted.
-- Do not mix cross-family fields (for example Radarr naming fields inside `lidarr_naming`).
+- Do not mix cross-family fields (for example Radarr-namespaced fields inside `lidarr_naming`).
 - Preserve `entityType` exactly.
 
-## 3) Import into target database/layer
+Hybrid migration payloads may include `migration` metadata under the import request body:
+
+```json
+{
+  "format": "json",
+  "version": 1,
+  "source": "pcd-export"
+}
+```
+
+This metadata is validated by `validatePortableMigrationMetadata` and is optional for legacy compatibility.
+
+## 3) Migration operator checks
+
+Use these checks after any hybrid import/export operation:
+
+```sql
+SELECT h.id, h.op_id, h.status, h.rowcount, h.conflict_reason, h.error, h.details, h.applied_at
+FROM pcd_op_history h
+WHERE h.database_id = :databaseId
+ORDER BY h.applied_at DESC, h.id DESC
+LIMIT 200;
+```
+
+```sql
+SELECT id, origin, state, source, filename, metadata
+FROM pcd_ops
+WHERE database_id = :databaseId
+  AND source = 'import'
+ORDER BY id DESC
+LIMIT 200;
+```
+
+- `pcd_op_history` should show expected `applied` rows for the migration write and no unexpected `conflicted`/`error` rows.
+- For import-driven sync changes, validate `job_queue` rows for evented sync dedupe keys:
+
+```sql
+SELECT id, job_type, status, dedupe_key, run_at
+FROM job_queue
+WHERE dedupe_key LIKE 'arr.sync.%:event:%'
+  AND json_extract(payload, '$.instanceId') = :instanceId
+ORDER BY run_at DESC;
+```
+
+## 4) Import into target database/layer
 
 Send:
 
@@ -59,7 +105,7 @@ Send:
 
 If `layer=base`, write permission is required for that database context.
 
-## 4) Validate in UI
+## 5) Validate in UI
 
 Open the target entity page and sync configuration views to confirm the imported entity is
 available for selection.
@@ -98,9 +144,9 @@ curl -sS -X POST "http://localhost:6868/api/v1/pcd/import" \
 - `Cannot write to base layer`:
   Use `layer: "user"` or switch to a writable base context.
 - `Mixed payload for <entityType>: unsupported fields from another model: ...`:
-  Payload contains fields from a different Arr family.
+  Payload contains fields from a different media-management app family.
 - `Unsupported payload for <entityType>: missing required fields: ...`:
-  Required keys for that portable type are missing.
+  Required keys for that portable app family type are missing.
 - Export returns `not found`:
   `name` does not exist in the source database for that `entityType`.
 - Import returns duplicate/validation errors:

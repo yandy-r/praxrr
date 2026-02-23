@@ -1,0 +1,25 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: 720p WEBRip
+description: Matches 720p WEBRips.
+includeInRename: false
+tags:
+  - Source
+conditions:
+  - name: 720p
+    type: resolution
+    arrType: all
+    negate: false
+    required: true
+    resolutions:
+      - 720p
+  - name: WEBRip
+    type: source
+    arrType: all
+    negate: false
+    required: true
+    sources:
+      - webrip
+tests: []

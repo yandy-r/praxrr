@@ -1,0 +1,9 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: Scene
+pattern: (?<=^|[\s.-])(SPARKS|DRONES|ROVERS|SPRINTER|GECKOS|SHORTBREHD|EDITH|FilmHD|POW4HD|HD4U|TENEIGHTY|ETHEL)\b
+tags: []
+description: Matches Scene Groups
+regex101Id: null

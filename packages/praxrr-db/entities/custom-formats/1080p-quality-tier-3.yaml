@@ -1,0 +1,115 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: 1080p Quality Tier 3
+description: Matches release groups who fall under 1080p GPPi Tier 3
+includeInRename: false
+tags:
+  - 1080p
+  - GPPi
+  - Quality
+  - Release Group Tier
+conditions:
+  - name: 1080p
+    type: resolution
+    arrType: all
+    negate: false
+    required: true
+    resolutions:
+      - 1080p
+  - name: BV
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: BV
+        pattern: (?<=^|[\s.-])BV\b
+  - name: Bluray
+    type: source
+    arrType: all
+    negate: false
+    required: false
+    sources:
+      - bluray
+  - name: CRiSC
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: CRiSC
+        pattern: (?<=^|[\s.-])CRiSC\b
+  - name: FoRM
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: FoRM
+        pattern: (?<=^|[\s.-])FoRM\b
+  - name: HiDt
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: HiDt
+        pattern: (?<=^|[\s.-])HiDt\b
+  - name: HiP
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: HiP
+        pattern: (?<=^|[\s.-])HiP\b
+  - name: Not Remux
+    type: release_title
+    arrType: all
+    negate: true
+    required: true
+    patterns:
+      - name: Remux
+        pattern: Remux
+  - name: SbR
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: SbR
+        pattern: (?<=^|[\s.-])SbR\b
+  - name: WEBRip
+    type: source
+    arrType: radarr
+    negate: false
+    required: false
+    sources:
+      - webrip
+  - name: WMING
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: WMING
+        pattern: (?<=^|[\s.-])WMING\b
+  - name: decibeL
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: decibeL
+        pattern: (?<=^|[\s.-])decibeL\b
+  - name: iFT
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: iFT
+        pattern: (?<=^|[\s.-])iFT\b
+tests: []

@@ -1,0 +1,34 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: DSNP
+description: Matches 'Disney+' WEB-DLs
+includeInRename: true
+tags:
+  - Streaming Service
+  - WEB-DL
+conditions:
+  - name: DNSP Regex
+    type: release_title
+    arrType: all
+    negate: false
+    required: true
+    patterns:
+      - name: Disney+
+        pattern: \b(dsnp|dsny(p)?|disney\+)\s*\b
+  - name: WEB-DL
+    type: source
+    arrType: all
+    negate: false
+    required: false
+    sources:
+      - web_dl
+  - name: WEBRip
+    type: source
+    arrType: all
+    negate: false
+    required: false
+    sources:
+      - webrip
+tests: []

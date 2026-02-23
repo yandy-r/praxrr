@@ -1,0 +1,33 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: Anime WEB-DL Tier 1
+description: Do not use Testing Purposes Only
+includeInRename: false
+tags:
+  - Anime
+conditions:
+  - name: Subsplease
+    type: release_title
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: SubsPlease
+        pattern: (?<=^|[\s.-])SubsPlease\b
+  - name: WEB
+    type: source
+    arrType: all
+    negate: false
+    required: false
+    sources:
+      - television
+  - name: WEB-DL
+    type: source
+    arrType: all
+    negate: false
+    required: false
+    sources:
+      - web_dl
+tests: []
