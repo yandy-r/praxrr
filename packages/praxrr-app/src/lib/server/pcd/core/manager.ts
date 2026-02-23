@@ -7,8 +7,8 @@ import {
   checkout,
   clone,
   getStatus,
-  pull,
   type GitStatus,
+  pull,
   type UpdateInfo,
 } from '$utils/git/index.ts';
 import { databaseInstancesQueries } from '$db/queries/databaseInstances.ts';
@@ -20,7 +20,8 @@ import { compile, invalidate } from '../database/compiler.ts';
 import { getCache } from '../database/registry.ts';
 import { logger } from '$logger/logger.ts';
 import { triggerSyncs } from '$sync/processor.ts';
-import type { LinkOptions, SyncResult } from './types.ts';
+import { config } from '$config';
+import type { CacheBuildStats, LinkOptions, SyncResult } from './types.ts';
 import { importBaseOps } from '../ops/importBaseOps.ts';
 import { seedBuiltInBaseOps } from '../ops/seedBuiltInBaseOps.ts';
 import { cleanupJobsForDatabase } from '$lib/server/jobs/cleanup.ts';
@@ -97,45 +98,17 @@ class PCDManager {
       }
 
       try {
-        await importBaseOps(id, localPath);
+        await this.importBaseOpsWithOrchestration(id, localPath);
       } catch (error) {
         await logger.error('Failed to import base ops after linking', {
           source: 'PCDManager',
           meta: { error: String(error), databaseId: id },
         });
       }
-      try {
-        await seedBuiltInBaseOps(id);
-      } catch (error) {
-        await logger.error('Failed to seed built-in base ops after linking', {
-          source: 'PCDManager',
-          meta: { error: String(error), databaseId: id },
-        });
-      }
+      await this.seedBuiltInBaseOpsWithOrchestration(id, 'link');
 
       // Compile cache (only if enabled)
-      if (instance.enabled) {
-        try {
-          const stats = await compile(localPath, id);
-
-          await logger.debug(`Cache compiled for "${options.name}"`, {
-            source: 'PCDManager',
-            meta: {
-              databaseId: id,
-              schema: stats.schema,
-              base: stats.base,
-              tweaks: stats.tweaks,
-              user: stats.user,
-            },
-          });
-        } catch (error) {
-          // Log error but don't fail the link operation
-          await logger.error('Failed to compile PCD cache after linking', {
-            source: 'PCDManager',
-            meta: { error: String(error), databaseId: id },
-          });
-        }
-      }
+      await this.compileIfEnabled(instance, localPath, 'link');
 
       return instance;
     } catch (error) {
@@ -206,39 +179,23 @@ class PCDManager {
       await syncDependencies(instance.local_path, personalAccessToken);
 
       try {
-        await importBaseOps(id, instance.local_path);
+        await this.importBaseOpsWithOrchestration(id, instance.local_path);
       } catch (error) {
         await logger.error('Failed to import base ops after sync', {
           source: 'PCDManager',
           meta: { error: String(error), databaseId: id },
         });
       }
-      try {
-        await seedBuiltInBaseOps(id);
-      } catch (error) {
-        await logger.error('Failed to seed built-in base ops after sync', {
-          source: 'PCDManager',
-          meta: { error: String(error), databaseId: id },
-        });
-      }
+      await this.seedBuiltInBaseOpsWithOrchestration(id, 'sync');
 
       // Update last_synced_at
       databaseInstancesQueries.updateSyncedAt(id);
 
       // Recompile cache (only if enabled)
-      if (instance.enabled) {
-        try {
-          await compile(instance.local_path, id);
-        } catch (error) {
-          await logger.error('Failed to recompile PCD cache after sync', {
-            source: 'PCDManager',
-            meta: { error: String(error), databaseId: id },
-          });
-        }
-      }
+      await this.compileIfEnabled(instance, instance.local_path, 'sync');
 
       // Trigger arr syncs for configs with on_pull trigger
-      await triggerSyncs({ event: 'on_pull', databaseId: id });
+      await this.triggerPullSync(id);
 
       return {
         success: true,
@@ -289,21 +246,14 @@ class PCDManager {
     await checkout(instance.local_path, branch);
     await pull(instance.local_path);
     try {
-      await importBaseOps(id, instance.local_path);
+      await this.importBaseOpsWithOrchestration(id, instance.local_path);
     } catch (error) {
       await logger.error('Failed to import base ops after branch switch', {
         source: 'PCDManager',
         meta: { error: String(error), databaseId: id },
       });
     }
-    try {
-      await seedBuiltInBaseOps(id);
-    } catch (error) {
-      await logger.error('Failed to seed built-in base ops after branch switch', {
-        source: 'PCDManager',
-        meta: { error: String(error), databaseId: id },
-      });
-    }
+    await this.seedBuiltInBaseOpsWithOrchestration(id, 'switchBranch');
     databaseInstancesQueries.updateSyncedAt(id);
   }
 
@@ -355,14 +305,7 @@ class PCDManager {
     // Seed built-in local base ops for all databases so newly linked instances
     // receive migration-backed scaffolding even when migrations are not rerun.
     for (const instance of instances) {
-      try {
-        await seedBuiltInBaseOps(instance.id);
-      } catch (error) {
-        await logger.error(`Failed to seed built-in base ops for "${instance.name}"`, {
-          source: 'PCDManager',
-          meta: { error: String(error), databaseId: instance.id },
-        });
-      }
+      await this.seedBuiltInBaseOpsWithOrchestration(instance.id, `initialize:${instance.name}`);
     }
 
     // Validate dependencies for all instances first
@@ -381,7 +324,7 @@ class PCDManager {
     // Import base ops from repo for all enabled instances
     for (const instance of enabledInstances) {
       try {
-        await importBaseOps(instance.id, instance.local_path);
+        await this.importBaseOpsWithOrchestration(instance.id, instance.local_path);
       } catch (error) {
         await logger.error(`Failed to import base ops for "${instance.name}"`, {
           source: 'PCDManager',
@@ -403,7 +346,7 @@ class PCDManager {
     // Compile all enabled instances
     for (const instance of enabledInstances) {
       try {
-        const stats = await compile(instance.local_path, instance.id);
+        const stats = await this.compileIfEnabled(instance, instance.local_path, 'initialize', true);
 
         results.push({
           name: instance.name,
@@ -452,6 +395,98 @@ class PCDManager {
    */
   getCache(id: number) {
     return getCache(id);
+  }
+
+  private async importBaseOpsWithOrchestration(databaseId: number, localPath: string): Promise<void> {
+    if (config.pcdMigrationIngestionMode === 'sql-only') {
+      await importBaseOps(databaseId, localPath);
+      return;
+    }
+
+    try {
+      await importBaseOps(databaseId, localPath);
+      return;
+    } catch (error) {
+      if (!config.pcdMigrationAllowLegacyFallback) {
+        throw error;
+      }
+
+      await logger.warn('Hybrid base-op ingestion failed; falling back to SQL-only path', {
+        source: 'PCDManager',
+        meta: {
+          databaseId,
+          migrationMode: config.pcdMigrationIngestionMode,
+          error: String(error),
+        },
+      });
+      await importBaseOps(databaseId, localPath);
+    }
+  }
+
+  private async seedBuiltInBaseOpsWithOrchestration(databaseId: number, contextLabel = 'operation'): Promise<void> {
+    try {
+      await seedBuiltInBaseOps(databaseId);
+    } catch (error) {
+      await logger.error(`Failed to seed built-in base ops during ${contextLabel}`, {
+        source: 'PCDManager',
+        meta: { error: String(error), databaseId },
+      });
+    }
+  }
+
+  private async compileIfEnabled(
+    instance: DatabaseInstance,
+    localPath: string,
+    context: string,
+    failOnError = false
+  ): Promise<CacheBuildStats> {
+    if (!instance.enabled) {
+      return {
+        schema: 0,
+        base: 0,
+        tweaks: 0,
+        user: 0,
+        timing: 0,
+      };
+    }
+
+    try {
+      const stats = await compile(localPath, instance.id);
+      await logger.debug(`Cache compiled for "${instance.name}"`, {
+        source: 'PCDManager',
+        meta: {
+          databaseId: instance.id,
+          context,
+          migrationMode: config.pcdMigrationIngestionMode,
+          schema: stats.schema,
+          base: stats.base,
+          tweaks: stats.tweaks,
+          user: stats.user,
+        },
+      });
+      return stats;
+    } catch (error) {
+      // Log error but don't fail the surrounding operation
+      await logger.error(`Failed to compile PCD cache (${context})`, {
+        source: 'PCDManager',
+        meta: { error: String(error), databaseId: instance.id },
+      });
+      if (failOnError) {
+        throw error;
+      }
+
+      return {
+        schema: 0,
+        base: 0,
+        tweaks: 0,
+        user: 0,
+        timing: 0,
+      };
+    }
+  }
+
+  private async triggerPullSync(databaseId: number): Promise<void> {
+    await triggerSyncs({ event: 'on_pull', databaseId });
   }
 }
 
