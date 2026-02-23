@@ -1,121 +1,163 @@
-# PCD Data Migration Rollout Checklist (Task 3.4)
+# Task 3.4: Rollout and Contract Verification Checklist
 
-## Scope and objective
+Use this checklist for every hybrid rollout phase change. A phase advances only when all
+items are green and evidence artifacts are attached to the change record.
 
-This checklist is the final go/no-go gate for enabling hybrid JSON/YAML
-migration inputs in PCD flows. Rollout is limited to the migration features
-delivered by tasks `2.1`, `2.2`, `2.3`, and `2.4` plus validation tasks `3.1`,
-`3.2`, and `3.3`.
+## Required Evidence Directory
 
-## Deterministic go/no-go rules
+Create one directory per phase using the pattern:
 
-### Hard no-go (any one blocks rollout)
+`docs/plans/pcd-data-migration/rollout-evidence/<YYYY-MM-DD>/phase-<N>/`
 
-- Schema/API/runtime contract mismatch between:
-  - `docs/api/v1/schemas/pcd.yaml`
-  - `docs/api/v1/paths/pcd.yaml`
-  - `packages/praxrr-app/src/lib/shared/pcd/portable.ts`
-- Missing or invalid migration metadata contract:
-  - `PortableMigrationMetadata` not present with required
-    `format/version/source`
-  - `import`/`export` request/response schemas missing `migration` field
-    compatibility
-- `pcd_op_history` contains `error` rows caused by the migration window, or
-  `conflicted`/`conflicted_pending` above allowed thresholds (see Rollout
-  gates).
-- New migration metadata or hybrid imports fail to route through existing
-  writer/cache/sync flow and bypass guard history (`pcd_op_history` has no rows
-  for migration-triggered ops after a successful import attempt).
-- Any sustained `pcd.sync` or `arr.sync` failures not attributable to upstream
-  Arr/API issues during the validation window.
-- Required sign-off artifacts are missing.
+Store every command output or log sample referenced below in that directory.
 
-### Proceed conditions (all must be true)
+## A) Contract Consistency Gate
 
-- Import and export schemas are semantically aligned and strict for migration
-  metadata.
-- Cache parity and value-guard regression tests pass for equivalent SQL and
-  hybrid imports.
-- Sync trigger regressions validate one-time enqueue behavior and bounded queue
-  growth.
-- Runbook preflight and checkpoint monitoring are in place and verified.
+Validate that the schema contract and runtime serialization/deserialization paths stay in sync:
 
-## Sign-off criteria
+1. Run contract/type synchronization
 
-- **Platform owner sign-off:** code-path change evidence (Task 2.x) reviewed.
-- **Runtime owner sign-off:** guard parity and sync regression evidence
-  collected.
-- **Release owner sign-off:** migration checklist and rollback artifacts
-  published in ticket/issue.
-- **Consumer-facing sign-off:** API contract references verified (schemas +
-  routes) and backward-compatible behavior confirmed.
+```bash
+deno task generate:pcd-types
+```
 
-## Validation gates
+1. Capture proof of success:
 
-### Gate 1 — Schema and contract lockstep
+- `portable-types-gen.out` (command exit success + resulting file diff summary, if any)
+- `docs/api/v1/schemas/pcd.yaml`
+- `docs/api/v1/paths/pcd.yaml`
 
-- Execute contract diff checks and capture output:
-  - `rg -n "PortableMigrationMetadata|migration" docs/api/v1/schemas/pcd.yaml docs/api/v1/paths/pcd.yaml`
-  - Confirm `ImportRequest`/`ExportResponse` and portable schema references
-    include migration metadata as intended.
-- Confirm runtime contract parity:
-  - `rg -n "PortableMigrationMetadata|migration" packages/praxrr-app/src/lib/shared/pcd/portable.ts`
-- Confirm generated portable type outputs remain in sync:
-  - `deno task generate:pcd-types`
-  - Capture regenerated file diff (expected no unintended contract drift).
-- Gate outcome:
-  - `PASS` if all three sources contain equivalent migration fields and no
-    extra/unknown-metadata keys are accepted.
+1. Run project checks covering generated API/PCD contracts:
 
-### Gate 2 — Guard/parity correctness
+```bash
+deno task check:server
+```
 
-- Run cache parity regression test for legacy SQL vs hybrid migration inputs:
-  - `deno task test packages/praxrr-app/src/tests/pcd/migration/cacheParity.test.ts`
-- Run conflict negative-path and history expectations:
-  - `deno task test packages/praxrr-app/src/tests/pcd/migration/cacheParity.test.ts --filter guard`
-- Run sync-trigger coverage:
-  - `deno task test packages/praxrr-app/src/tests/jobs/hybridSyncTrigger.test.ts`
-- Validate gate evidence in database after staged import:
-  - `SELECT h.batch_id, h.status, COUNT(*) FROM pcd_op_history h WHERE h.applied_at >= datetime('now', '-30 minutes') GROUP BY h.batch_id, h.status;`
-  - expect dominant `applied`/`skipped` and no unexpected `error` rows.
-- Gate outcome:
-  - `PASS` only if parity and negative-path assertions are green and history
-    states match expected statuses.
+1. Capture:
 
-### Gate 3 — Sync/queue behavior
+- `check-server.out`
 
-- Validate queue/job health for the rollout window:
-  - `SELECT job_type, status, COUNT(*) FROM job_queue WHERE created_at >= datetime('now', '-30 minutes') AND job_type IN ('pcd.sync', 'arr.sync', 'arr.sync.qualityProfiles', 'arr.sync.delayProfiles', 'arr.sync.mediaManagement', 'arr.sync.metadataProfiles') GROUP BY job_type, status;`
-  - `SELECT job_type, status, COUNT(*) FROM job_run_history WHERE started_at >= datetime('now', '-30 minutes') AND job_type IN ('pcd.sync', 'arr.sync', 'arr.sync.qualityProfiles', 'arr.sync.delayProfiles', 'arr.sync.mediaManagement', 'arr.sync.metadataProfiles') GROUP BY job_type, status;`
-- Confirm no duplicate enqueue for single writes and that sync-pending
-  transitions occur after hybrid writes.
-- Gate outcome:
-  - `PASS` when sync trigger counts are bounded and match legacy import
-    behavior.
+Pass condition:
 
-### Gate 4 — Operator rollback readiness
+- `PortableMigrationMetadata` remains present with required keys (`format`, `version`, `source`) in
+  `docs/api/v1/schemas/pcd.yaml`.
+- The migration fields appear in both import/export OpenAPI paths where required:
+  `docs/api/v1/paths/pcd.yaml`.
 
-- Confirm runbook checks are available and executable from
-  `docs/plans/pcd-data-migration/runbook.md`:
-  - preflight backup/restore commands
-  - checkpoints A/B/C SQL snippets
-  - rollback command artifacts.
-- Confirm evidence bundle includes:
-  - backup artifact path/timestamp
-  - migration batch IDs used during validation
-  - `pcd_op_history` sample rows for migration batch
-  - sync queue/job histograms at the same timestamps
-  - sign-off record for each required approver
+No-go condition:
 
-## Explicit rollout blockers
+- Any contract mismatch or schema-generation step fails.
+- Any missing migration metadata field in schema or path docs.
 
-- Any of the following in the pilot/staging window: `error` in `pcd_op_history`,
-  unexpected `conflicted_pending` count, repeated startup disable events, or
-  recurring Arr sync failures.
-- Contract drift across OpenAPI/schema/runtime.
-- Failed deterministic rollback drill or absent backup/recovery evidence.
+## B) Guard and Parity Test Gate
 
-## Ready for production if all gates are `PASS`
+Run the migration verification tests before declaring rollout-ready:
 
-Rollout decision is `GO` only when all gates pass and all sign-offs are
-captured. Any single `FAIL` in gates or blockers is `NO-GO`.
+```bash
+deno test packages/praxrr-app/src/tests/pcd/migration/cacheParity.test.ts
+deno test packages/praxrr-app/src/tests/jobs/hybridSyncTrigger.test.ts
+```
+
+Capture:
+
+- `cache-parity.test.out`
+- `hybrid-sync-trigger.test.out`
+
+Pass condition:
+
+- Both tests pass.
+- Cache parity assertions show equivalent compiled state between SQL and hybrid inputs for the tested
+  entities.
+- No unexpected `conflicted`/`error` outcomes in the test-asserted history checks.
+
+No-go condition:
+
+- Any new failed parity case.
+- Any regression in sync-trigger behavior.
+
+## C) Runtime Outcome Gate (Per Database)
+
+1. Capture pre/post database state before enabling hybrid mode for that database:
+
+```sql
+SELECT database_id, origin, source, state, COUNT(*) AS ops
+FROM pcd_ops
+GROUP BY database_id, origin, source, state
+ORDER BY database_id, origin, source;
+
+SELECT database_id, status, COUNT(*) AS rows
+FROM pcd_op_history
+GROUP BY database_id, status
+ORDER BY database_id, status;
+
+SELECT job_type, status, COUNT(*) AS rows
+FROM job_queue
+GROUP BY job_type, status
+ORDER BY job_type, status;
+```
+
+1. Capture post-compile and post-sync checks:
+
+```sql
+SELECT h.id, h.op_id, h.status, h.rowcount, h.conflict_reason, h.error, h.applied_at
+FROM pcd_op_history h
+WHERE h.database_id = :databaseId
+ORDER BY h.applied_at DESC, h.id DESC
+LIMIT 200;
+
+SELECT id, job_type, status, json_extract(payload, '$.instanceId') AS instance_id, dedupe_key, run_at
+FROM job_queue
+WHERE dedupe_key LIKE 'arr.sync.%:event:%'
+  OR job_type = 'arr.sync.mediaManagement'
+ORDER BY run_at DESC
+LIMIT 200;
+
+SELECT queue_id, job_type, status, started_at, finished_at, duration_ms
+FROM job_run_history
+ORDER BY started_at DESC
+LIMIT 200;
+```
+
+Capture:
+
+- `pcd_ops-baseline.out`
+- `pcd_ops-post.out`
+- `pcd_op_history-baseline.out`
+- `pcd_op_history-post.out`
+- `job_queue-baseline.out`
+- `job_queue-post.out`
+- `job_run_history-post.out`
+
+Pass condition:
+
+- `pcd_ops` includes expected migration-origin rows for the target database.
+- `pcd_op_history` rows for migration actions are expected (`applied`, optionally `conflicted` only when
+  tested/approved).
+- Sync jobs are emitted and deduplicated for affected Arr instances.
+- Manual sync run for the target instances completes successfully.
+
+No-go condition:
+
+- New unexpected conflict/error rows in `pcd_op_history`.
+- Missing/double `arr.sync.*` jobs for affected instances.
+- Startup/import/compile errors tied to migration mode change.
+
+## D) Phase Sign-off (Go/No-Go)
+
+Complete all required files and sign-off fields in one line per phase:
+
+- `rollout-signoff.json`
+- `phase` (`0`, `1`, `2`, `3`)
+- `decision` (`GO` / `NO-GO`)
+- `contract_gate` (`PASS` / `FAIL`)
+- `parity_gate` (`PASS` / `FAIL`)
+- `runtime_gate` (`PASS` / `FAIL`)
+- `evidence_dir`
+- `owner`
+- `timestamp`
+- `blocking_findings` (if no-go)
+
+Promotion rule:
+
+- A phase advances only if all three gates are `PASS`.
+- Any single `FAIL` forces `NO-GO` and rollback action before proceeding.

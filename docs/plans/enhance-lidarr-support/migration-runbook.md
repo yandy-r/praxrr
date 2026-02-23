@@ -108,6 +108,145 @@ Open the default Lidarr naming config and confirm that field values use Lidarr-n
 - `artist_folder_format` contains `{Artist Name}`, `{Artist MbId}`
 - No fields contain Sonarr tokens like `{Series TitleYear}`, `S{season:00}E{episode:00}`
 
+## Hybrid Migration Rollout (Task 3.3)
+
+For deterministic phase progression, complete the Task 3.4 rollout checklist before each phase transition:
+
+`docs/plans/pcd-data-migration/rollout-checklist.md`
+
+### Phased rollout
+
+1. **Phase 0 — SQL-only baseline**
+
+- Keep `PRAXRR_PCD_MIGRATION_MODE=sql-only` for one maintenance window.
+- Capture baseline `pcd_ops`, `pcd_op_history`, `job_queue`, and `job_run_history` counts.
+
+2. **Phase 1 — Canaries**
+   - Enable `PRAXRR_PCD_MIGRATION_MODE=hybrid` for one low-risk database.
+   - Keep `PRAXRR_PCD_MIGRATION_ALLOW_LEGACY_FALLBACK=true`.
+   - Validate startup success, compile success, and no unexpected fallback logs.
+3. **Phase 2 — Controlled rollout**
+   - Expand to a small subset of production databases using the same checks.
+   - Confirm sync trigger behavior and history visibility are consistent.
+4. **Phase 3 — Full rollout**
+   - Expand to all remaining databases after two stable checkpoints.
+   - Decide whether to keep legacy fallback enabled as a guardrail.
+
+### Preflight checks
+
+1. Backup app DB:
+
+```bash
+cp praxrr.db praxrr.db.backup-$(date +%Y%m%d)
+```
+
+2. Validate migration mode:
+
+```bash
+echo "PRAXRR_PCD_MIGRATION_MODE=$PRAXRR_PCD_MIGRATION_MODE"
+echo "PRAXRR_PCD_MIGRATION_ALLOW_LEGACY_FALLBACK=$PRAXRR_PCD_MIGRATION_ALLOW_LEGACY_FALLBACK"
+```
+
+3. Capture baseline rows:
+
+```sql
+SELECT database_id, origin, source, state, COUNT(*) AS ops
+FROM pcd_ops
+GROUP BY database_id, origin, source, state
+ORDER BY database_id, origin, source;
+
+SELECT database_id, status, COUNT(*) AS rows
+FROM pcd_op_history
+GROUP BY database_id, status
+ORDER BY database_id, status;
+```
+
+4. Confirm sync queue baselines:
+
+```sql
+SELECT job_type, status, COUNT(*) AS rows
+FROM job_queue
+GROUP BY job_type, status
+ORDER BY job_type, status;
+```
+
+### Guard verification checkpoints
+
+#### Ingestion checkpoint
+
+After each phase change:
+
+- **Expected logs**
+  - `Imported base ops from repo` (`PCDImporter`)
+  - `Cache compiled for "<instance>"` (`PCDManager`)
+  - No immediate `Hybrid base-op ingestion failed; falling back to SQL-only path` for the phase target unless explicitly approved.
+- **Expected history**
+  - New or updated base rows in `pcd_ops` for the target database.
+  - Latest `pcd_op_history` rows for that database are primarily `applied`.
+- **Expected command**
+
+```sql
+SELECT h.id, h.op_id, h.status, h.rowcount, h.conflict_reason, h.applied_at
+FROM pcd_op_history h
+WHERE h.database_id = :databaseId
+ORDER BY h.applied_at DESC, h.id DESC
+LIMIT 200;
+```
+
+#### Value-guard checkpoint
+
+- Verify conflict signals are scoped and intentional:
+
+```sql
+SELECT h.id, h.op_id, h.status, h.conflict_reason, h.error, h.details, h.applied_at
+FROM pcd_op_history h
+WHERE h.database_id = :databaseId
+  AND h.status IN ('conflicted', 'conflicted_pending', 'error')
+ORDER BY h.applied_at DESC, h.id DESC
+LIMIT 200;
+```
+
+- Any unexpected rows in this set before advancing phase requires holding rollout and investigating the failing payload.
+
+#### Sync trigger checkpoint
+
+- Confirm event-trigger jobs are deduplicated and queued for active Lidarr/Arr instances:
+
+```sql
+SELECT id, job_type, status, json_extract(payload, '$.instanceId') AS instance_id, dedupe_key, run_at
+FROM job_queue
+WHERE dedupe_key LIKE 'arr.sync.%:event:%'
+  OR job_type = 'arr.sync.mediaManagement'
+ORDER BY run_at DESC
+LIMIT 200;
+```
+
+- Confirm completion state in job run history:
+
+```sql
+SELECT queue_id, job_type, status, started_at, finished_at, duration_ms
+FROM job_run_history
+ORDER BY started_at DESC
+LIMIT 200;
+```
+
+### Rollback criteria for hybrid rollout
+
+Pause rollout and rollback to SQL-only immediately if any are observed in the same phase:
+
+1. Repeated startup/import failure logs:
+   - `Failed to import base ops...`
+   - `Failed to compile PCD cache`
+2. New unexpected conflict/error rows in `pcd_op_history`.
+3. Missing or duplicate evented `arr.sync.*` jobs for a database after a migration run.
+4. Post-migration UI behavior regresses (for example, Lidarr sync assignments resolve to fallback names or missing `lidarr_*` entities).
+
+For immediate rollback:
+
+1. Set `PRAXRR_PCD_MIGRATION_MODE=sql-only`.
+2. Restart the application.
+3. Restore `praxrr.db.backup-YYYYMMDD` if business impact requires.
+
 ## Rollback Procedure
 
 ### Scenario: Migration Produces Unexpected Results

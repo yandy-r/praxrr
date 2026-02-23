@@ -50,7 +50,51 @@ The response shape is:
 - Do not mix cross-family fields (for example Radarr-namespaced fields inside `lidarr_naming`).
 - Preserve `entityType` exactly.
 
-## 3) Import into target database/layer
+Hybrid migration payloads may include `migration` metadata under the import request body:
+
+```json
+{
+  "format": "json",
+  "version": 1,
+  "source": "pcd-export"
+}
+```
+
+This metadata is validated by `validatePortableMigrationMetadata` and is optional for legacy compatibility.
+
+## 3) Migration operator checks
+
+Use these checks after any hybrid import/export operation:
+
+```sql
+SELECT h.id, h.op_id, h.status, h.rowcount, h.conflict_reason, h.error, h.details, h.applied_at
+FROM pcd_op_history h
+WHERE h.database_id = :databaseId
+ORDER BY h.applied_at DESC, h.id DESC
+LIMIT 200;
+```
+
+```sql
+SELECT id, origin, state, source, filename, metadata
+FROM pcd_ops
+WHERE database_id = :databaseId
+  AND source = 'import'
+ORDER BY id DESC
+LIMIT 200;
+```
+
+- `pcd_op_history` should show expected `applied` rows for the migration write and no unexpected `conflicted`/`error` rows.
+- For import-driven sync changes, validate `job_queue` rows for evented sync dedupe keys:
+
+```sql
+SELECT id, job_type, status, dedupe_key, run_at
+FROM job_queue
+WHERE dedupe_key LIKE 'arr.sync.%:event:%'
+  AND json_extract(payload, '$.instanceId') = :instanceId
+ORDER BY run_at DESC;
+```
+
+## 4) Import into target database/layer
 
 Send:
 
@@ -61,7 +105,7 @@ Send:
 
 If `layer=base`, write permission is required for that database context.
 
-## 4) Validate in UI
+## 5) Validate in UI
 
 Open the target entity page and sync configuration views to confirm the imported entity is
 available for selection.
