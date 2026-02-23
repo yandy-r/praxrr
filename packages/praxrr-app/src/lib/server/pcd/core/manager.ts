@@ -183,6 +183,15 @@ class PCDManager {
           meta: { error: String(error), databaseId: id },
         });
       }
+
+      if (!importedBaseOps) {
+        return {
+          success: false,
+          commitsBehind: updateInfo.commitsBehind,
+          error: `Base op import failed: ${baseOpsError ?? 'unknown error'}`,
+        };
+      }
+
       await this.seedBuiltInBaseOpsWithOrchestration(id, 'sync');
 
       // Update last_synced_at
@@ -193,14 +202,6 @@ class PCDManager {
 
       // Trigger arr syncs for configs with on_pull trigger
       await this.triggerPullSync(id);
-
-      if (!importedBaseOps) {
-        return {
-          success: false,
-          commitsBehind: updateInfo.commitsBehind,
-          error: `Base op import failed: ${baseOpsError ?? 'unknown error'}`,
-        };
-      }
 
       return {
         success: true,
@@ -418,6 +419,9 @@ class PCDManager {
       return true;
     } catch (error) {
       if (!config.pcdMigrationAllowLegacyFallback) {
+        throw error;
+      }
+      if (!(error instanceof MigrationReaderError)) {
         throw error;
       }
 
