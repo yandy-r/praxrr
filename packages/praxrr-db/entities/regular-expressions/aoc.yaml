@@ -1,0 +1,11 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: AOC
+pattern: (?<=^|[\s.-])AOC\b
+tags:
+  - Release Group
+  - WEB-DL
+description: Banned for Excessive Audio Streams
+regex101Id: null

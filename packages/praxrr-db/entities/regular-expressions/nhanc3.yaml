@@ -1,0 +1,11 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: NhaNc3
+pattern: (?<=^|[\s.-])NhaNc3\b
+tags:
+  - Bluray
+  - Release Group
+description: Banned for Low Mixed Quality Releases
+regex101Id: null

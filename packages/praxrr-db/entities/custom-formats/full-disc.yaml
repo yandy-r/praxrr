@@ -1,0 +1,57 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: Full Disc
+description: "Matches the 'Full Disc' regex pattern and negates any remuxes / encodes. "
+includeInRename: false
+tags:
+  - Storage
+conditions:
+  - name: Full Disc
+    type: release_title
+    arrType: all
+    negate: false
+    required: true
+    patterns:
+      - name: Full Disc
+        pattern: ^(?!.*\b((?<!HD[._ -]|HD)DVD|BDRip|MKV|XviD|WMV|d3g|BDREMUX|REMUX|^(?=.*1080p)(?=.*HEVC)|[xh][-_. ]?26[45]|German.*DL|((?<=\d{4}).*German.*(DL)?)(?=.*\b(AVC|HEVC|VC[-_. ]?1|MVC|MPEG[-_. ]?2)\b))\b)(((?=.*\b(Blu[-_. ]?ray|BD|HD[-_. ]?DVD)\b)(?=.*\b(AVC|HEVC|VC[-_. ]?1|MVC|MPEG[-_. ]?2|BDMV|ISO)\b))|^((?=.*\b(^((?=.*\b((.*_)?COMPLETE.*|Dis[ck])\b)(?=.*(Blu[-_. ]?ray|HD[-_. ]?DVD)))|3D[-_. ]?BD|BR[-_. ]?DISK|Full[-_. ]?Blu[-_. ]?ray|^((?=.*((BD|UHD)[-_. ]?(25|50|66|100|ISO)))))))).*|(?i)(DVD9|DVD5|NTSC|PAL|VOB IFO|VC-1|AVC|MPEG-2|\bCOMPLETE[-.\s]?(?:UHD[-.\s])?BLU[-.\s]?RAY\b|\bCOMPLETE BLURAY\b|\bBR-Disk\b)
+  - name: Not Remux
+    type: release_title
+    arrType: all
+    negate: true
+    required: true
+    patterns:
+      - name: Remux
+        pattern: Remux
+  - name: Not WEB-DL
+    type: source
+    arrType: all
+    negate: true
+    required: true
+    sources:
+      - web_dl
+  - name: Not WEBRip
+    type: source
+    arrType: all
+    negate: true
+    required: true
+    sources:
+      - webrip
+  - name: Not x264
+    type: release_title
+    arrType: all
+    negate: true
+    required: true
+    patterns:
+      - name: x264
+        pattern: ^(?!.*(?i:remux)).*([xh](\.?264)|DVDRip)
+  - name: Not x265
+    type: release_title
+    arrType: all
+    negate: true
+    required: true
+    patterns:
+      - name: x265
+        pattern: ^(?!.*(?i:remux))(?=.*([x]\s?(\.?265)\b|HEVC|\bDS4K\b)).*$
+tests: []

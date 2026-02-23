@@ -1,0 +1,98 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: Anime Bluray Tier 2
+description: Do not use Testing Purposes Only
+includeInRename: false
+tags:
+  - Anime
+conditions:
+  - name: Arid
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: Arid
+        pattern: (?<=^|[\s.-])Arid\b
+  - name: Bluray
+    type: source
+    arrType: all
+    negate: false
+    required: true
+    sources:
+      - bluray
+  - name: Drag
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: Drag
+        pattern: (?<=^|[\s.-])Drag\b
+  - name: Lulu
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: Lulu
+        pattern: (?<=^|[\s.-])Lulu\b
+  - name: Not Remux
+    type: release_title
+    arrType: all
+    negate: true
+    required: true
+    patterns:
+      - name: Remux
+        pattern: Remux
+  - name: Okay-Subs
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: Okay-Subs
+        pattern: (?<=^|[\s.-])Okay-Subs\b
+  - name: UDF
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: UDF
+        pattern: (?<=^|[\s.-])UDF\b
+  - name: YURI
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: YURI
+        pattern: (?<=^|[\s.-])YURI\b
+  - name: ZR
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: ZR
+        pattern: (?<=^|[\s.-])ZR\b
+  - name: hydes
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: hydes
+        pattern: (?<=^|[\s.-])hydes\b
+  - name: pog42
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: pog42
+        pattern: (?<=^|[\s.-])pog42\b
+tests: []

@@ -1,0 +1,33 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: x265 (WEB)
+description: Matches x265 Releases when not 2160p or Blurays
+includeInRename: false
+tags:
+  - Codec
+conditions:
+  - name: Bluray
+    type: source
+    arrType: all
+    negate: true
+    required: true
+    sources:
+      - bluray
+  - name: Not 2160p
+    type: resolution
+    arrType: all
+    negate: true
+    required: true
+    resolutions:
+      - 2160p
+  - name: x265
+    type: release_title
+    arrType: all
+    negate: false
+    required: true
+    patterns:
+      - name: x265
+        pattern: ^(?!.*(?i:remux))(?=.*([x]\s?(\.?265)\b|HEVC|\bDS4K\b)).*$
+tests: []

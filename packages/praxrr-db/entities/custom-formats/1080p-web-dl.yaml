@@ -1,0 +1,25 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: 1080p WEB-DL
+description: Matches 1080p WEB-DLs.
+includeInRename: false
+tags:
+  - Source
+conditions:
+  - name: 1080p
+    type: resolution
+    arrType: all
+    negate: false
+    required: true
+    resolutions:
+      - 1080p
+  - name: WEB-DL
+    type: source
+    arrType: all
+    negate: false
+    required: true
+    sources:
+      - web_dl
+tests: []

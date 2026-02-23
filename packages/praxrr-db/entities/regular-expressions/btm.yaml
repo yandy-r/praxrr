@@ -1,0 +1,11 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: BTM
+pattern: (?<=^|[\s.-])(BEN THE MEN|BEN|BTM)\b
+tags:
+  - Release Group
+  - WEB-DL
+description: null
+regex101Id: null

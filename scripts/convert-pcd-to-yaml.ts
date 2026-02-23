@@ -67,8 +67,8 @@ async function loadRuntimeDependencies(runtimeBaseDir: string): Promise<RuntimeD
     deleteCache: registryModule.deleteCache,
     importBaseOps: importBaseOpsModule.importBaseOps,
     runMigrations: migrationModule.runMigrations,
-    db: { close: dbModule.db.close },
-    initializeDb: dbModule.db.initialize,
+    db: { close: () => dbModule.db.close() },
+    initializeDb: () => dbModule.db.initialize(),
     createDatabaseInstance: databaseInstancesModule.databaseInstancesQueries.create,
     convertCompiledCacheToEntities: converterModule.convertCompiledCacheToEntities,
     ConverterConfigError: converterModule.ConverterConfigError,
@@ -545,6 +545,20 @@ async function runConversion(args: ParsedArgs): Promise<ExitCode> {
 
     if (isConverterConversionError(error, runtime?.dependencies ?? runtimeDependencies)) {
       console.error(error.message);
+      if ('failures' in error && Array.isArray((error as { failures?: unknown[] }).failures)) {
+        const failures = (error as { failures: Array<Record<string, unknown>> }).failures;
+        const limit = args.verbose ? failures.length : Math.min(failures.length, 20);
+        for (let i = 0; i < limit; i += 1) {
+          const failure = failures[i];
+          const path = typeof failure.path === 'string' ? failure.path : '<unknown-path>';
+          const stage = typeof failure.stage === 'string' ? failure.stage : 'unknown-stage';
+          const message = typeof failure.message === 'string' ? failure.message : 'unknown failure';
+          console.error(`  [${stage}] ${path}: ${message}`);
+        }
+        if (!args.verbose && failures.length > limit) {
+          console.error(`  ... ${failures.length - limit} more failures omitted (use --verbose)`);
+        }
+      }
       return 1;
     }
 

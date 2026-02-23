@@ -1,0 +1,11 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: MgB
+pattern: (?<=^|[\s.-])MgB\b
+tags:
+  - Release Group
+  - WEB-DL
+description: Banned for Mislabeled 2160p WEBRips
+regex101Id: null

@@ -1,0 +1,227 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: 2160p Quality Tier 6
+description: Matches release groups who fall under 2160p Quality Tier 5
+includeInRename: false
+tags:
+  - 2160p
+  - Quality
+  - Release Group Tier
+conditions:
+  - name: 2160p
+    type: resolution
+    arrType: all
+    negate: false
+    required: true
+    resolutions:
+      - 2160p
+  - name: ADE
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: ADE
+        pattern: (?<=^|[\s.-])ADE\b
+  - name: AViATOR
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: AViATOR
+        pattern: (?<=^|[\s.-])AViATOR\b
+  - name: BeiTai
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: BeiTai
+        pattern: (?<=^|[\s.-])BeiTai\b
+  - name: Bluray
+    type: source
+    arrType: all
+    negate: false
+    required: true
+    sources:
+      - bluray
+  - name: CHD
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: CHD
+        pattern: (?<=^|[\s.-])CHD\b
+  - name: CMCT
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: CMCT
+        pattern: (?<=^|[\s.-])CMCT\b
+  - name: EMERALD
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: EMERALD
+        pattern: (?<=^|[\s.-])EMERALD\b
+  - name: FLAME
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: FLAME
+        pattern: (?<=^|[\s.-])FLAME\b
+  - name: GUHZER
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: GUHZER
+        pattern: (?<=^|[\s.-])GUHZER\b
+  - name: HDChina
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: HDChina
+        pattern: (?<=^|[\s.-])HDChina\b
+  - name: HDmux
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: HDmux
+        pattern: (?<=^|[\s.-])HDmux\b
+  - name: HypStu
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: HypStu
+        pattern: (?<=^|[\s.-])HypStu\b
+  - name: IAMABLE
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: IAMABLE
+        pattern: (?<=^|[\s.-])IAMABLE\b
+  - name: KAN3D2M
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: KAN3D2M
+        pattern: (?<=^|[\s.-])KAN3D2M\b
+  - name: LAZARUS
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: LAZARUS
+        pattern: (?<=^|[\s.-])LAZARUS\b
+  - name: MiMiC
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: MiMiC
+        pattern: (?<=^|[\s.-])MiMiC\b
+  - name: Not Remux
+    type: release_title
+    arrType: all
+    negate: true
+    required: true
+    patterns:
+      - name: Remux
+        pattern: Remux
+  - name: PussyFoot
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: PussyFoot
+        pattern: (?<=^|[\s.-])PussyFoot\b
+  - name: ReQuEsT
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: ReQuEsT
+        pattern: (?<=^|[\s.-])ReQuEsT\b
+  - name: ReaLHD
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: ReaLHD
+        pattern: (?<=^|[\s.-])ReaLHD\b
+  - name: STRiKES
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: STRiKES
+        pattern: (?<=^|[\s.-])STRiKES\b
+  - name: SWTYBLZ
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: SWTYBLZ
+        pattern: (?<=^|[\s.-])SWTYBLZ\b
+  - name: TERMiNAL
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: TERMiNAL
+        pattern: (?<=^|[\s.-])TERMiNAL\b
+  - name: ULTRAHDCLUB
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: ULTRAHDCLUB
+        pattern: (?<=^|[\s.-])ULTRAHDCLUB\b
+  - name: Whiterhino
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: WhiteRhino
+        pattern: (?<=^|[\s.-])WhiteRhino\b
+  - name: beAst
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: beAst
+        pattern: (?<=^|[\s.-])beAst\b
+tests: []

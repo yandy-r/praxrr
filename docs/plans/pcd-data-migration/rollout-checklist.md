@@ -1,6 +1,6 @@
-# Task 3.4: Rollout and Contract Verification Checklist
+# Task 3.4: Rollout and Contract Verification Checklist (YAML-First Default)
 
-Use this checklist for every hybrid rollout phase change. A phase advances only when all
+Use this checklist for every YAML-first rollout phase change. A phase advances only when all
 items are green and evidence artifacts are attached to the change record.
 
 ## Required Evidence Directory
@@ -10,6 +10,7 @@ Create one directory per phase using the pattern:
 `docs/plans/pcd-data-migration/rollout-evidence/<YYYY-MM-DD>/phase-<N>/`
 
 Store every command output or log sample referenced below in that directory.
+Also update `docs/plans/pcd-data-migration/rollout-signoff.json` for each phase decision.
 
 ## A) Contract Consistency Gate
 
@@ -77,7 +78,7 @@ No-go condition:
 
 ## C) Runtime Outcome Gate (Per Database)
 
-1. Capture pre/post database state before enabling hybrid mode for that database:
+1. Capture pre/post database state before enabling YAML-first mode for that database:
 
 ```sql
 SELECT database_id, origin, source, state, COUNT(*) AS ops

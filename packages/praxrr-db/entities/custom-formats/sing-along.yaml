@@ -1,0 +1,20 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: Sing Along
+description: Match Sing Along Releases
+includeInRename: false
+tags:
+  - Banned
+  - Edition
+conditions:
+  - name: Sing Along
+    type: release_title
+    arrType: all
+    negate: false
+    required: true
+    patterns:
+      - name: Sing Along
+        pattern: (?<=\b[12]\d{3}\b).*\b(Sing[-_. ]Along)\b
+tests: []

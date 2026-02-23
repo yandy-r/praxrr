@@ -1,0 +1,25 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: 480p Bluray
+description: Matches 480p Blurays.
+includeInRename: false
+tags:
+  - Source
+conditions:
+  - name: 480p
+    type: resolution
+    arrType: all
+    negate: false
+    required: true
+    resolutions:
+      - 480p
+  - name: Bluray
+    type: source
+    arrType: all
+    negate: false
+    required: true
+    sources:
+      - bluray
+tests: []

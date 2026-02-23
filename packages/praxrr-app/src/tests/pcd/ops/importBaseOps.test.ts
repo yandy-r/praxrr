@@ -52,15 +52,10 @@ Deno.test('importBaseOps: validateStableIdentityConflicts detects migration/migr
   );
 });
 
-Deno.test('importBaseOps: validateStableIdentityConflicts detects cross-source duplicates', () => {
-  assertThrows(
-    () =>
-      __testOnly_validateStableIdentityConflicts(
-        [sqlEntry(duplicateIdentity, '001-base.sql')],
-        [migrationEntry(duplicateIdentity, '/path/entity.yaml')]
-      ),
-    Error,
-    'cross-source'
+Deno.test('importBaseOps: validateStableIdentityConflicts allows cross-source duplicates', () => {
+  __testOnly_validateStableIdentityConflicts(
+    [sqlEntry(duplicateIdentity, '001-base.sql')],
+    [migrationEntry(duplicateIdentity, '/path/entity.yaml')]
   );
 });
 

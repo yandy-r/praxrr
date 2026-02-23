@@ -77,7 +77,11 @@ function normalizeRecord(input: Readonly<Record<string, unknown>>, path: string)
   const normalized: JsonLikeRecord = {};
 
   for (const key of Object.keys(input)) {
-    normalized[key] = normalizeValue(input[key], `${path}.${key}`);
+    const value = input[key];
+    if (typeof value === 'undefined') {
+      continue;
+    }
+    normalized[key] = normalizeValue(value, `${path}.${key}`);
   }
 
   return normalized;
@@ -105,7 +109,7 @@ function normalizeValue(input: unknown, path: string): JsonLikeValue {
   }
 
   if (typeof input === 'undefined') {
-    throw new Error(`${path} is undefined; use null for explicit empty values`);
+    return null;
   }
 
   if (typeof input !== 'object') {

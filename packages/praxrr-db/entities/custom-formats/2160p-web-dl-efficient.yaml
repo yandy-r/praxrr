@@ -1,0 +1,65 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: 2160p WEB-DL (Efficient)
+description: Matches 2160p WEB-DLs.
+includeInRename: false
+tags:
+  - Source
+conditions:
+  - name: 2160p
+    type: resolution
+    arrType: all
+    negate: false
+    required: true
+    resolutions:
+      - 2160p
+  - name: Not QxR
+    type: release_group
+    arrType: all
+    negate: true
+    required: true
+    patterns:
+      - name: QxR
+        pattern: (?<=^|[\s.-])(QxR|afm72|Bandi|Bluespots|Celdra|FreetheFish|Garshasp|Ghost|Ime|Kappa|Langbard|LION|Panda|MONOLITH|Natty|r00t|RCVR|RZeroX|SAMPA|Silence|t3nzin|Tigole|YOGI)\b
+  - name: Not QxR Title
+    type: release_title
+    arrType: all
+    negate: true
+    required: true
+    patterns:
+      - name: QxR (Title)
+        pattern: QxR
+  - name: Not TAoE
+    type: release_group
+    arrType: all
+    negate: true
+    required: true
+    patterns:
+      - name: TAoE
+        pattern: (?<=^|[\s.-])(TAoE|Ainz|AJJMIN|ANONAZ|ArcX|bccornfo|DNU|DrainedDay|DUHIT|Erie|Frys|Goki|HxD|jb2049|JBENT|Nostradamus|r0b0t|Species180|TheSickle|xtrem3x|WEM)\b
+  - name: Not TAoE Title
+    type: release_title
+    arrType: all
+    negate: true
+    required: true
+    patterns:
+      - name: TAoE (Title)
+        pattern: TAoE
+  - name: Not Vyndros
+    type: release_group
+    arrType: all
+    negate: true
+    required: true
+    patterns:
+      - name: Vyndros
+        pattern: (?<=^|[\s.-])Vyndros\b
+  - name: WEB-DL
+    type: source
+    arrType: all
+    negate: false
+    required: true
+    sources:
+      - web_dl
+tests: []

@@ -1,0 +1,33 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: 1080p HDTV
+description: Matches 1080p HDTV.
+includeInRename: false
+tags:
+  - Source
+conditions:
+  - name: 1080p
+    type: resolution
+    arrType: all
+    negate: false
+    required: true
+    resolutions:
+      - 1080p
+  - name: HDTV
+    type: source
+    arrType: all
+    negate: false
+    required: true
+    sources:
+      - television
+  - name: HDTV Regex
+    type: release_title
+    arrType: all
+    negate: false
+    required: true
+    patterns:
+      - name: HDTV
+        pattern: \b(HDTV)\b
+tests: []

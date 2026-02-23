@@ -1,0 +1,11 @@
+{
+  "phase": 0,
+  "decision": "NO-GO",
+  "contract_gate": "PASS",
+  "parity_gate": "PASS",
+  "runtime_gate": "FAIL",
+  "evidence_dir": "docs/plans/pcd-data-migration/rollout-evidence/2026-02-23/phase-0",
+  "owner": "codex",
+  "timestamp": "2026-02-23T18:15:36Z",
+  "blocking_findings": "Runtime outcome gate pending per-database SQL validation and manual sync verification."
+}

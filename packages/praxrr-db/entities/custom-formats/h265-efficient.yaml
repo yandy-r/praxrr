@@ -1,0 +1,33 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: h265 (Efficient)
+description: Matches h265 Releases that are not 2160p or 1080p
+includeInRename: false
+tags:
+  - Codec
+conditions:
+  - name: Not 1080p
+    type: resolution
+    arrType: all
+    negate: true
+    required: true
+    resolutions:
+      - 1080p
+  - name: Not 2160p
+    type: resolution
+    arrType: all
+    negate: true
+    required: true
+    resolutions:
+      - 2160p
+  - name: h265
+    type: release_title
+    arrType: all
+    negate: false
+    required: true
+    patterns:
+      - name: h265
+        pattern: (?i)h\s*\.?\s*265
+tests: []

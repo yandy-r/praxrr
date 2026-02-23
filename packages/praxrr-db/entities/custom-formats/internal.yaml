@@ -1,0 +1,17 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: Internal
+description: Internal Indexer Flag
+includeInRename: false
+tags: []
+conditions:
+  - name: Internal
+    type: indexer_flag
+    arrType: all
+    negate: false
+    required: true
+    indexerFlags:
+      - internal
+tests: []

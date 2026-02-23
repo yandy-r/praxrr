@@ -1,0 +1,34 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: VIU
+description: Matches 'VIU' WEB-DLs
+includeInRename: true
+tags:
+  - Streaming Service
+  - WEB-DL
+conditions:
+  - name: VIU Regex
+    type: release_title
+    arrType: all
+    negate: false
+    required: true
+    patterns:
+      - name: Viu
+        pattern: \b(Viu)\b
+  - name: WEB-DL
+    type: source
+    arrType: all
+    negate: false
+    required: false
+    sources:
+      - web_dl
+  - name: WEBRip
+    type: source
+    arrType: all
+    negate: false
+    required: false
+    sources:
+      - webrip
+tests: []

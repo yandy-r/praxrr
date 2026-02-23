@@ -1,0 +1,19 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: IMAX Enhanced
+description: Matches higher quality IMAX releases from a WEB-DL Source
+includeInRename: false
+tags:
+  - Edition
+conditions:
+  - name: IMAX Enhanced
+    type: release_title
+    arrType: all
+    negate: false
+    required: true
+    patterns:
+      - name: IMAX Enhanced
+        pattern: ^(?=.*\b((DSNP|BC|B?CORE)\b|Disney\+)(?=.*\bWEB[ ._-]?(DL|Rip)\b))(?=.*\b((?<!NON[ ._-])IMAX)\b)|^(?=.*\b(IMAX[ ._-]Enhanced)\b)
+tests: []

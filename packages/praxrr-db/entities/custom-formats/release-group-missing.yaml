@@ -1,0 +1,56 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: Release Group (Missing)
+description: Matches releases with no group. Common Sources with no release group are negated
+includeInRename: false
+tags:
+  - Banned
+  - Release Group
+conditions:
+  - name: DVD
+    type: source
+    arrType: all
+    negate: true
+    required: false
+    sources:
+      - dvd
+  - name: HDTV
+    type: source
+    arrType: all
+    negate: true
+    required: false
+    sources:
+      - television
+  - name: Release Group (Missing)
+    type: release_group
+    arrType: all
+    negate: true
+    required: false
+    patterns:
+      - name: Release Group (Missing)
+        pattern: .
+  - name: Remux
+    type: release_title
+    arrType: all
+    negate: true
+    required: false
+    patterns:
+      - name: Remux
+        pattern: Remux
+  - name: Remux Quality Match
+    type: quality_modifier
+    arrType: radarr
+    negate: true
+    required: false
+    qualityModifiers:
+      - remux
+  - name: Remux Source
+    type: source
+    arrType: sonarr
+    negate: true
+    required: false
+    sources:
+      - bluray_raw
+tests: []

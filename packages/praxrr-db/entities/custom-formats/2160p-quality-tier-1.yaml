@@ -1,0 +1,67 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: 2160p Quality Tier 1
+description: Matches release groups who fall under 2160p Quality Tier 1
+includeInRename: false
+tags:
+  - 2160p
+  - Quality
+  - Release Group Tier
+conditions:
+  - name: 2160p
+    type: resolution
+    arrType: all
+    negate: false
+    required: true
+    resolutions:
+      - 2160p
+  - name: Bluray
+    type: source
+    arrType: all
+    negate: false
+    required: true
+    sources:
+      - bluray
+  - name: DON
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: DON
+        pattern: (?<=^|[\s.-])DON\b
+  - name: Not Remux
+    type: release_title
+    arrType: all
+    negate: true
+    required: true
+    patterns:
+      - name: Remux
+        pattern: Remux
+  - name: REBORN
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: REBORN
+        pattern: (?<=^|[\s.-])REBORN\b
+  - name: SA89
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: SA89
+        pattern: (?<=^|[\s.-])SA89\b
+  - name: SoLaR
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: SoLaR
+        pattern: (?<=^|[\s.-])SoLaR\b
+tests: []

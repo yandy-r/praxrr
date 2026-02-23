@@ -1,0 +1,43 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: WEB-DL Tier 1
+description: Matches release groups who fall under WEB-DL Tier 1
+includeInRename: false
+tags:
+  - Release Group Tier
+  - WEB-DL
+conditions:
+  - name: FLUX
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: FLUX
+        pattern: (?<=^|[\s.-])FLUX\b
+  - name: NTb
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: NTb
+        pattern: (?<=^|[\s.-])NTb\b
+  - name: TheFarm
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: TheFarm
+        pattern: (?<=^|[\s.-])TheFarm\b
+  - name: WEB-DL
+    type: source
+    arrType: all
+    negate: false
+    required: true
+    sources:
+      - web_dl
+tests: []

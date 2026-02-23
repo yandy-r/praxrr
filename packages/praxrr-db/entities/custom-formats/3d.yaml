@@ -1,0 +1,20 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: 3D
+description: Matches the '3D' Regex Pattern
+includeInRename: false
+tags:
+  - Banned
+  - Enhancement
+conditions:
+  - name: 3D
+    type: release_title
+    arrType: all
+    negate: false
+    required: true
+    patterns:
+      - name: 3D
+        pattern: (?<=\b[12]\d{3}\b).*\b((bluray|bd)?3d|sbs|half[ .-]ou|half[ .-]sbs)\b
+tests: []

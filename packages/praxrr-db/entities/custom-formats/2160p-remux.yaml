@@ -1,0 +1,26 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: 2160p Remux
+description: Matches 2160p Remux
+includeInRename: false
+tags:
+  - Source
+conditions:
+  - name: 2160p
+    type: resolution
+    arrType: all
+    negate: false
+    required: true
+    resolutions:
+      - 2160p
+  - name: Remux
+    type: release_title
+    arrType: all
+    negate: false
+    required: true
+    patterns:
+      - name: Remux
+        pattern: Remux
+tests: []

@@ -1,0 +1,26 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: x264 (2160p)
+description: Matches x264 releases for 2160p
+includeInRename: false
+tags:
+  - Codec
+conditions:
+  - name: 2160p
+    type: resolution
+    arrType: all
+    negate: false
+    required: true
+    resolutions:
+      - 2160p
+  - name: x264
+    type: release_title
+    arrType: all
+    negate: false
+    required: true
+    patterns:
+      - name: x264
+        pattern: ^(?!.*(?i:remux)).*([xh](\.?264)|DVDRip)
+tests: []

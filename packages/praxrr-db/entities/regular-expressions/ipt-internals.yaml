@@ -1,0 +1,10 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: iPT Internals
+pattern: (?<=^|[\s.-])CM(a)?R(io)?G|EVO\b
+tags:
+  - Release Group
+description: 'Matches EVO / CMRG. Needed for the iTunes (Missing) CF. '
+regex101Id: null

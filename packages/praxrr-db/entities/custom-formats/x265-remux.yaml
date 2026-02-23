@@ -1,0 +1,34 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: x265 (Remux)
+description: Matches x265 Remux Releases when not 2160p
+includeInRename: false
+tags:
+  - Codec
+conditions:
+  - name: Not 2160p
+    type: resolution
+    arrType: all
+    negate: true
+    required: true
+    resolutions:
+      - 2160p
+  - name: Remux
+    type: release_title
+    arrType: all
+    negate: false
+    required: true
+    patterns:
+      - name: Remux
+        pattern: Remux
+  - name: x265
+    type: release_title
+    arrType: all
+    negate: false
+    required: true
+    patterns:
+      - name: HEVC
+        pattern: '[xh][ ._-]?265|\bHEVC(\b|\d)'
+tests: []

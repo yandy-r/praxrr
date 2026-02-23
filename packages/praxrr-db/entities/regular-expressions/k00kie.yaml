@@ -1,0 +1,11 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: k00kie
+pattern: (?<=^|[\s.-])k00kie\b
+tags:
+  - Bluray
+  - Release Group
+description: null
+regex101Id: null

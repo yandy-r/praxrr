@@ -1,0 +1,11 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: KC
+pattern: (?<=^|[\s.-])KC\b
+tags:
+  - Banned
+  - Release Group
+description: Banned for AI Upscales
+regex101Id: null

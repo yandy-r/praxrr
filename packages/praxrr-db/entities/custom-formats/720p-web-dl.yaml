@@ -1,0 +1,25 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: 720p WEB-DL
+description: Matches 720p WEB-DLs.
+includeInRename: false
+tags:
+  - Source
+conditions:
+  - name: 720p
+    type: resolution
+    arrType: all
+    negate: false
+    required: true
+    resolutions:
+      - 720p
+  - name: WEB-DL
+    type: source
+    arrType: all
+    negate: false
+    required: true
+    sources:
+      - web_dl
+tests: []

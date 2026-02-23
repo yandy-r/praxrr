@@ -3,13 +3,38 @@ import { config, type PCDMigrationIngestionMode } from '$config';
 import { buildContentHash, pcdOpsQueries } from '$db/queries/pcdOps.ts';
 import { extractOrderFromFilename, getBaseOpsPath } from '../utils/operations.ts';
 import { SQL_ENTITY_STABLE_KEY_BY_ENTITY } from '$pcd/stableIdentity.ts';
+import type { EntityType } from '$shared/pcd/portable.ts';
 import {
   type MigrationEntityStableIdentity,
+  type MigrationEntityCandidate,
   type MigrationReaderIssue,
   readMigrationEntitySources,
 } from '$pcd/migration/reader.ts';
+import { compile } from '../database/compiler.ts';
+import { getCache } from '../database/registry.ts';
+import { withRepoImportWriteContext } from './writer.ts';
 
 const UNPREFIXED_SEQUENCE_BASE = 2_000_000_000;
+const YAML_SEQUENCE_BASE = 4_000_000_000;
+const YAML_SEQUENCE_STRIDE = 1_000;
+const MIGRATION_OP_FILENAME_PREFIX = 'entities/';
+
+const ENTITY_IMPORT_ORDER: readonly EntityType[] = [
+  'regular_expression',
+  'custom_format',
+  'quality_profile',
+  'delay_profile',
+  'radarr_naming',
+  'sonarr_naming',
+  'lidarr_naming',
+  'radarr_media_settings',
+  'sonarr_media_settings',
+  'lidarr_media_settings',
+  'radarr_quality_definitions',
+  'sonarr_quality_definitions',
+  'lidarr_quality_definitions',
+  'lidarr_metadata_profile',
+] as const;
 
 interface BaseImportSqlEntry {
   name: string;
@@ -195,25 +220,11 @@ function validateStableIdentityConflicts(
     migrationSeen.set(identity, { kind: 'migration', file: entry.sourcePath });
   }
 
-  for (const entry of migrationEntries) {
-    if (!entry.stableIdentity) continue;
-    const identity = formatConflictIdentity(entry.stableIdentity);
-    if (!seenSql.has(identity)) continue;
-    const existing = seenSql.get(identity);
-    if (!existing) continue;
-
-    throw new Error(
-      `Ambiguous duplicate base import identity (cross-source): ${formatConflictPath(
-        [existing, { kind: 'migration', file: entry.sourcePath }],
-        entry.stableIdentity
-      )}`
-    );
-  }
-
   // Regression checks cover:
   // 1) SQL duplicate stable keys (same source)
   // 2) Migration duplicate stable keys (same source)
-  // 3) SQL + migration duplicate stable keys (cross source)
+  // 3) Cross-source duplicate handling is resolved during import precedence
+  //    (migration entities suppress overlapping SQL entries).
 }
 
 type TestOnlyStableIdentitySqlEntry = {
@@ -243,6 +254,33 @@ export function __testOnly_validateStableIdentityConflicts(
       readonly sourcePath: string;
     }>
   );
+}
+
+function collectMigrationStableIdentitySet(
+  migrationEntries: ReadonlyArray<{
+    readonly stableIdentity: MigrationEntityStableIdentity;
+  }>
+): Set<string> {
+  const identities = new Set<string>();
+  for (const entry of migrationEntries) {
+    if (!entry.stableIdentity) continue;
+    identities.add(formatConflictIdentity(entry.stableIdentity));
+  }
+  return identities;
+}
+
+function sortMigrationCandidatesByImportOrder(candidates: readonly MigrationEntityCandidate[]): MigrationEntityCandidate[] {
+  const entityOrder = new Map<EntityType, number>();
+  for (let i = 0; i < ENTITY_IMPORT_ORDER.length; i++) {
+    entityOrder.set(ENTITY_IMPORT_ORDER[i], i);
+  }
+
+  return [...candidates].sort((a, b) => {
+    const aPriority = entityOrder.get(a.entityType) ?? Number.MAX_SAFE_INTEGER;
+    const bPriority = entityOrder.get(b.entityType) ?? Number.MAX_SAFE_INTEGER;
+    if (aPriority !== bPriority) return aPriority - bPriority;
+    return a.entityName.localeCompare(b.entityName);
+  });
 }
 
 function parseMetadata(sql: string): { metadataJson: string | null; cleanedSql: string } {
@@ -339,15 +377,38 @@ export async function importBaseOps(
     });
   }
 
+  let migrationIdentitySet = new Set<string>();
   if (isHybridIngestion) {
     validateStableIdentityConflicts(sqlEntries, migrationCandidates);
+    migrationIdentitySet = collectMigrationStableIdentitySet(migrationCandidates);
   }
+
+  const effectiveSqlEntries = isHybridIngestion
+    ? sqlEntries.filter((entry) => {
+        if (!entry.stableIdentity) return true;
+        const identity = formatConflictIdentity(entry.stableIdentity);
+        return !migrationIdentitySet.has(identity);
+      })
+    : sqlEntries;
 
   let created = 0;
   let updated = 0;
   const seenAt = new Date().toISOString();
 
-  for (const entry of sqlEntries) {
+  if (isHybridIngestion) {
+    const existingRepoBaseOps = pcdOpsQueries.listByDatabaseAndOrigin(databaseId, 'base', {
+      source: 'repo',
+      states: ['published', 'draft'],
+    });
+    for (const op of existingRepoBaseOps) {
+      if (!op.filename?.startsWith(MIGRATION_OP_FILENAME_PREFIX)) continue;
+      pcdOpsQueries.update(op.id, {
+        state: 'orphaned',
+      });
+    }
+  }
+
+  for (const entry of effectiveSqlEntries) {
     const existing = pcdOpsQueries.getBaseByFilename(databaseId, entry.name);
     if (existing) {
       pcdOpsQueries.update(existing.id, {
@@ -380,6 +441,48 @@ export async function importBaseOps(
     }
   }
 
+  let migrationImported = 0;
+  if (isHybridIngestion && migrationReaderResult.candidates.length > 0) {
+    await compile(pcdPath, databaseId);
+    const sortedCandidates = sortMigrationCandidatesByImportOrder(migrationReaderResult.candidates);
+
+    for (let i = 0; i < sortedCandidates.length; i++) {
+      const candidate = sortedCandidates[i];
+      const cache = getCache(databaseId);
+      if (!cache) {
+        throw new Error(`Cache not available while importing migration entity "${candidate.relativePath}"`);
+      }
+
+      await withRepoImportWriteContext(
+        {
+          filenamePrefix: `${MIGRATION_OP_FILENAME_PREFIX}${candidate.relativePath}`,
+          sequenceStart: YAML_SEQUENCE_BASE + i * YAML_SEQUENCE_STRIDE,
+          lastSeenInRepoAt: seenAt,
+        },
+        async () => {
+          const result = await candidate.deserialize({
+            databaseId,
+            cache,
+            layer: 'base',
+            data: candidate.portable,
+          });
+
+          if (
+            typeof result === 'object' &&
+            result !== null &&
+            'success' in result &&
+            (result as { success?: boolean }).success === false
+          ) {
+            const error = (result as { error?: string }).error ?? 'unknown write failure';
+            throw new Error(`Failed to import migration entity "${candidate.relativePath}": ${error}`);
+          }
+        }
+      );
+
+      migrationImported += 1;
+    }
+  }
+
   const orphaned = pcdOpsQueries.markBaseOrphaned(databaseId, seenAt);
 
   await logger.debug('Imported base ops from repo', {
@@ -390,6 +493,8 @@ export async function importBaseOps(
       created,
       updated,
       orphaned,
+      migrationImported,
+      sqlSuppressedByMigration: sqlEntries.length - effectiveSqlEntries.length,
     },
   });
 

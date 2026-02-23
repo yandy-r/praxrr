@@ -1,0 +1,37 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: DVD Quality Tier 1
+description: Matches release groups who fall under DVD GPPi Tier 1
+includeInRename: false
+tags:
+  - DVD
+  - GPPi
+  - Quality
+  - Release Group Tier
+conditions:
+  - name: DVD
+    type: source
+    arrType: all
+    negate: false
+    required: true
+    sources:
+      - dvd
+  - name: Dariush
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: Dariush
+        pattern: (?<=^|[\s.-])Dariush\b
+  - name: TBB
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: TBB
+        pattern: (?<=^|[\s.-])TBB\b
+tests: []

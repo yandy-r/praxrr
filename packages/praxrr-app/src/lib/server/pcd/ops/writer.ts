@@ -20,6 +20,77 @@ import {
 } from '../migration/valueGuardGate.ts';
 import { uuid } from '$shared/utils/uuid.ts';
 
+interface RepoImportWriteContext {
+  filenamePrefix: string;
+  sequenceStart: number;
+  nextIndex: number;
+  lastSeenInRepoAt: string;
+}
+
+interface WriteContextFrame {
+  source?: PcdOpSource;
+  allowBaseImport?: boolean;
+  repoImport?: RepoImportWriteContext;
+}
+
+const writeContextStack: WriteContextFrame[] = [];
+
+function currentWriteContext(): WriteContextFrame | undefined {
+  if (writeContextStack.length === 0) return undefined;
+  return writeContextStack[writeContextStack.length - 1];
+}
+
+interface RepoImportIdentity {
+  filename: string;
+  opNumber: number | null;
+  sequence: number;
+  lastSeenInRepoAt: string;
+}
+
+function consumeRepoImportIdentity(layer: OperationLayer, source: PcdOpSource): RepoImportIdentity | null {
+  const repoImport = currentWriteContext()?.repoImport;
+  if (!repoImport || layer !== 'base' || source !== 'repo') {
+    return null;
+  }
+
+  const index = repoImport.nextIndex;
+  repoImport.nextIndex += 1;
+  const suffix = String(index).padStart(5, '0');
+
+  return {
+    filename: `${repoImport.filenamePrefix}#${suffix}.sql`,
+    opNumber: null,
+    sequence: repoImport.sequenceStart + index,
+    lastSeenInRepoAt: repoImport.lastSeenInRepoAt,
+  };
+}
+
+export async function withRepoImportWriteContext<T>(
+  options: {
+    filenamePrefix: string;
+    sequenceStart: number;
+    lastSeenInRepoAt: string;
+  },
+  callback: () => Promise<T>
+): Promise<T> {
+  writeContextStack.push({
+    source: 'repo',
+    allowBaseImport: true,
+    repoImport: {
+      filenamePrefix: options.filenamePrefix,
+      sequenceStart: options.sequenceStart,
+      nextIndex: 0,
+      lastSeenInRepoAt: options.lastSeenInRepoAt,
+    },
+  });
+
+  try {
+    return await callback();
+  } finally {
+    writeContextStack.pop();
+  }
+}
+
 function buildMetadataJson(metadata?: OperationMetadata): string | null {
   if (!metadata) return null;
   const payload: Record<string, unknown> = {
@@ -455,8 +526,11 @@ async function writeOperationsFromSqlOperations(options: WriteSqlOperationsOptio
       return { success: false, error: 'Database instance not found' };
     }
 
+    const context = currentWriteContext();
+    const source = options.source ?? context?.source ?? 'local';
     const hasPersonalAccessToken = !!instance.has_personal_access_token || !!instance.personal_access_token;
-    if (layer === 'base' && (!hasPersonalAccessToken || instance.local_ops_enabled)) {
+    const allowBaseImportBypass = context?.allowBaseImport === true && source === 'repo';
+    if (layer === 'base' && (!hasPersonalAccessToken || instance.local_ops_enabled) && !allowBaseImportBypass) {
       return {
         success: false,
         error: 'Base layer requires a personal access token and local ops must be disabled',
@@ -502,27 +576,62 @@ async function writeOperationsFromSqlOperations(options: WriteSqlOperationsOptio
       }
     }
 
-    const source = options.source ?? 'local';
     let lastOpId: number | null = null;
 
     for (const operation of operations) {
       const { sql, metadataJson, desiredStateJson } = serializeMigrationSqlOperation(operation);
+      const importIdentity = consumeRepoImportIdentity(layer, source);
 
       if (operation.metadata && (await cancelOutCreate(databaseId, layer, operation.metadata))) {
         continue;
       }
 
       const contentHash = await buildContentHash(sql, metadataJson);
-      const opId = pcdOpsQueries.create({
-        databaseId,
-        origin: layer === 'base' ? 'base' : 'user',
-        state: layer === 'base' ? 'draft' : 'published',
-        source,
-        sql,
-        metadata: metadataJson,
-        desiredState: desiredStateJson,
-        contentHash,
-      });
+      let opId: number;
+      if (layer === 'base' && source === 'repo' && importIdentity) {
+        const existing = pcdOpsQueries.getBaseByFilename(databaseId, importIdentity.filename);
+        if (existing) {
+          pcdOpsQueries.update(existing.id, {
+            state: 'published',
+            source: 'repo',
+            filename: importIdentity.filename,
+            opNumber: importIdentity.opNumber,
+            sequence: importIdentity.sequence,
+            sql,
+            metadata: metadataJson,
+            desiredState: desiredStateJson,
+            contentHash,
+            lastSeenInRepoAt: importIdentity.lastSeenInRepoAt,
+          });
+          opId = existing.id;
+        } else {
+          opId = pcdOpsQueries.create({
+            databaseId,
+            origin: 'base',
+            state: 'published',
+            source: 'repo',
+            filename: importIdentity.filename,
+            opNumber: importIdentity.opNumber,
+            sequence: importIdentity.sequence,
+            sql,
+            metadata: metadataJson,
+            desiredState: desiredStateJson,
+            contentHash,
+            lastSeenInRepoAt: importIdentity.lastSeenInRepoAt,
+          });
+        }
+      } else {
+        opId = pcdOpsQueries.create({
+          databaseId,
+          origin: layer === 'base' ? 'base' : 'user',
+          state: layer === 'base' ? (source === 'repo' ? 'published' : 'draft') : 'published',
+          source,
+          sql,
+          metadata: metadataJson,
+          desiredState: desiredStateJson,
+          contentHash,
+        });
+      }
       lastOpId = opId;
 
       const opType = operation.metadata?.operation ?? 'write';

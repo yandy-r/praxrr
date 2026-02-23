@@ -1,0 +1,83 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: 720p Quality Tier 1
+description: Matches release groups who fall under 720p Quality Tier 1
+includeInRename: false
+tags:
+  - 720p
+  - GPPi
+  - Quality
+  - Release Group Tier
+conditions:
+  - name: 720p
+    type: resolution
+    arrType: all
+    negate: false
+    required: true
+    resolutions:
+      - 720p
+  - name: Bluray
+    type: source
+    arrType: all
+    negate: false
+    required: false
+    sources:
+      - bluray
+  - name: DON
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: DON
+        pattern: (?<=^|[\s.-])DON\b
+  - name: Not Remux
+    type: release_title
+    arrType: all
+    negate: true
+    required: true
+    patterns:
+      - name: Remux
+        pattern: Remux
+  - name: REBORN
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: REBORN
+        pattern: (?<=^|[\s.-])REBORN\b
+  - name: SoLaR
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: SoLaR
+        pattern: (?<=^|[\s.-])SoLaR\b
+  - name: TeamSyndicate
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: TeamSyndicate
+        pattern: (?<=^|[\s.-])TeamSyndicate\b
+  - name: WEBRip
+    type: source
+    arrType: radarr
+    negate: false
+    required: false
+    sources:
+      - webrip
+  - name: ZoroSenpai
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: ZoroSenpai
+        pattern: (?<=^|[\s.-])ZoroSenpai\b
+tests: []

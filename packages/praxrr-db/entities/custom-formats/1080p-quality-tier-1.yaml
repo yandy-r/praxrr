@@ -1,0 +1,99 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: 1080p Quality Tier 1
+description: Matches release groups who fall under 1080p GPPi Tier 1
+includeInRename: false
+tags:
+  - 1080p
+  - GPPi
+  - Quality
+  - Release Group Tier
+conditions:
+  - name: 1080p
+    type: resolution
+    arrType: all
+    negate: false
+    required: true
+    resolutions:
+      - 1080p
+  - name: Bluray
+    type: source
+    arrType: all
+    negate: false
+    required: false
+    sources:
+      - bluray
+  - name: DON
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: DON
+        pattern: (?<=^|[\s.-])DON\b
+  - name: Not Remux
+    type: release_title
+    arrType: all
+    negate: true
+    required: true
+    patterns:
+      - name: Remux
+        pattern: Remux
+  - name: REBORN
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: REBORN
+        pattern: (?<=^|[\s.-])REBORN\b
+  - name: SA89
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: SA89
+        pattern: (?<=^|[\s.-])SA89\b
+  - name: SoLaR
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: SoLaR
+        pattern: (?<=^|[\s.-])SoLaR\b
+  - name: TeamSyndicate
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: TeamSyndicate
+        pattern: (?<=^|[\s.-])TeamSyndicate\b
+  - name: WEBRip
+    type: source
+    arrType: radarr
+    negate: false
+    required: false
+    sources:
+      - webrip
+  - name: ZoroSenpai
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: ZoroSenpai
+        pattern: (?<=^|[\s.-])ZoroSenpai\b
+  - name: coffee
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: coffee
+        pattern: (?<=^|[\s.-])coffee\b
+tests: []

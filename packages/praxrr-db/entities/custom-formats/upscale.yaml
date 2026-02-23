@@ -1,0 +1,36 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: Upscale
+description: Matches Upscale Releases
+includeInRename: false
+tags:
+  - Banned
+  - Enhancement
+conditions:
+  - name: AI Movies Upscale
+    type: release_title
+    arrType: radarr
+    negate: false
+    required: false
+    patterns:
+      - name: AI Movie Upscale
+        pattern: (?<=\b[12]\d{3}\b).*(\b(AI)\b)
+  - name: AI TV Upscale
+    type: release_title
+    arrType: sonarr
+    negate: false
+    required: false
+    patterns:
+      - name: AI TV Upscale
+        pattern: (?<=\bS\d+\b).*(\b(AI)\b)
+  - name: Upscale
+    type: release_title
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: Upscale
+        pattern: (Up[-\.\s]?scale|Re[-\.\s]?Grade|\bAIUS\b|AI[-\.\s]?enhanced)
+tests: []

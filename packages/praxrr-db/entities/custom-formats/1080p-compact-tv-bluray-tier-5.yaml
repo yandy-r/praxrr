@@ -1,0 +1,76 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: 1080p Compact TV Bluray Tier 5
+description: Matches release groups who fall under 1080p Compact TV Bluray Tier 5
+includeInRename: false
+tags:
+  - 1080p
+  - Compact
+  - Release Group Tier
+  - TV
+conditions:
+  - name: 1080p
+    type: resolution
+    arrType: all
+    negate: false
+    required: true
+    resolutions:
+      - 1080p
+  - name: Bluray
+    type: source
+    arrType: all
+    negate: false
+    required: true
+    sources:
+      - bluray
+  - name: DarQ
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: DarQ
+        pattern: (?<=^|[\s.-])DarQ\b
+  - name: GRiMM
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: GRiMM
+        pattern: (?<=^|[\s.-])GRiMM\b
+  - name: MNHD
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: MNHD
+        pattern: (?<=^|[\s.-])MNHD\b
+  - name: Not HONE
+    type: release_title
+    arrType: all
+    negate: true
+    required: true
+    patterns:
+      - name: HONE
+        pattern: (?<=^|[\s.-])HONE\b
+  - name: dkore
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: dkore
+        pattern: (?<=^|[\s.-])dkore\b
+  - name: x265
+    type: release_title
+    arrType: all
+    negate: false
+    required: true
+    patterns:
+      - name: x265 (Efficient)
+        pattern: ^(?!.*(?i:remux))(?=.*([xh]\s?(\.?265)\b|HEVC|\bDS4K\b)).*$
+tests: []

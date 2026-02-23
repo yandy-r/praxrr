@@ -1,0 +1,10 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: BTN Atmos
+pattern: \bTrue[ .-]?HDA[ .-]?[57]\.1
+tags:
+  - Audio
+description: Matches BroadcastTheNet Atmos naming convention
+regex101Id: null

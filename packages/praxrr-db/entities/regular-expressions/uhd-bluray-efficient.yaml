@@ -1,0 +1,9 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: UHD Bluray (Efficient)
+pattern: \b(UHD[-_.\s]?Blu[-]?Ray)|(UHD[-_.\s]?BD?Rip)\b
+tags: []
+description: Matches "UHD Bluray" or "UHD Blu-Ray" with a hyphen, space, dot or underscore between them
+regex101Id: null

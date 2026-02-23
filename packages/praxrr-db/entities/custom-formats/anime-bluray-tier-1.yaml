@@ -1,0 +1,82 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: Anime Bluray Tier 1
+description: Do not use Testing Purposes Only
+includeInRename: false
+tags:
+  - Anime
+conditions:
+  - name: Bluray
+    type: source
+    arrType: all
+    negate: false
+    required: true
+    sources:
+      - bluray
+  - name: LYS1TH3A
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: LYS1TH3A
+        pattern: (?<=^|[\s.-])LYS1TH3A\b
+  - name: MTBB
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: MTBB
+        pattern: (?<=^|[\s.-])MTBB\b
+  - name: Not Remux
+    type: release_title
+    arrType: all
+    negate: true
+    required: true
+    patterns:
+      - name: Remux
+        pattern: Remux
+  - name: OZR
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: OZR
+        pattern: (?<=^|[\s.-])OZR\b
+  - name: SCY
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: SCY
+        pattern: (?<=^|[\s.-])SCY\b
+  - name: Vodes
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: Vodes
+        pattern: (?<=^|[\s.-])Vodes\b
+  - name: sam
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: sam
+        pattern: (?<=^|[\s.-])sam\b
+  - name: smol
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: smol
+        pattern: (?<=^|[\s.-])smol\b
+tests: []

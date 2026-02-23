@@ -1,0 +1,115 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: 2160p Quality Tier 5
+description: Matches release groups who fall under 2160p Quality Tier 5
+includeInRename: false
+tags:
+  - 2160p
+  - Quality
+  - Release Group Tier
+conditions:
+  - name: 2160p
+    type: resolution
+    arrType: all
+    negate: false
+    required: true
+    resolutions:
+      - 2160p
+  - name: 4KDVS
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: 4KDVS
+        pattern: (?<=^|[\s.-])4KDVS\b
+  - name: Bluray
+    type: source
+    arrType: all
+    negate: false
+    required: true
+    sources:
+      - bluray
+  - name: DEFLATE
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: DEFLATE
+        pattern: (?<=^|[\s.-])DEFLATE\b
+  - name: DEPTH
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: DEPTH
+        pattern: (?<=^|[\s.-])DEPTH\b
+  - name: JustWatch
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: JustWatch
+        pattern: (?<=^|[\s.-])JustWatch\b
+  - name: Not Remux
+    type: release_title
+    arrType: all
+    negate: true
+    required: true
+    patterns:
+      - name: Remux
+        pattern: Remux
+  - name: ORBiT
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: ORBiT
+        pattern: (?<=^|[\s.-])ORBiT\b
+  - name: SURCODE
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: SURCODE
+        pattern: (?<=^|[\s.-])SURCODE\b
+  - name: WATCHABLE
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: WATCHABLE
+        pattern: (?<=^|[\s.-])WATCHABLE\b
+  - name: WiKi
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: WiKi
+        pattern: (?<=^|[\s.-])WiKi\b
+  - name: b0mbardiers
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: b0mbardiers
+        pattern: (?<=^|[\s.-])b0mbardiers\b
+  - name: j3rico
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: j3rico
+        pattern: (?<=^|[\s.-])j3rico\b
+tests: []

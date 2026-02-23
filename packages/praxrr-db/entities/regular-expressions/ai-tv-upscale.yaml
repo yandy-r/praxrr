@@ -1,0 +1,11 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: AI TV Upscale
+pattern: (?<=\bS\d+\b).*(\b(AI)\b)
+tags:
+  - Banned
+  - Enhancement
+description: Matches AI Upscales
+regex101Id: null

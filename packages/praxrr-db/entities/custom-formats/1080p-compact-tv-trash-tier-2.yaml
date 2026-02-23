@@ -1,0 +1,82 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: 1080p Compact TV Trash Tier 2
+description: Matches release groups who fall under 1080p Compact TV Trash Tier 2
+includeInRename: false
+tags:
+  - 1080p
+  - Compact
+  - Release Group Tier
+  - TV
+conditions:
+  - name: 1080p
+    type: resolution
+    arrType: all
+    negate: false
+    required: true
+    resolutions:
+      - 1080p
+  - name: ELiTE
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: ELiTE
+        pattern: (?<=^|[\s.-])ELiTE\b
+  - name: HDTV
+    type: source
+    arrType: all
+    negate: false
+    required: false
+    sources:
+      - television
+  - name: Megusta
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: MeGusta
+        pattern: (?<=^|[\s.-])MeGusta\b
+  - name: PSA
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: PSA
+        pattern: (?<=^|[\s.-])PSA\b
+  - name: RARBG
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: RARBG
+        pattern: (?<=^|[\s.-])RARBG\b
+  - name: WEB-DL
+    type: source
+    arrType: all
+    negate: false
+    required: false
+    sources:
+      - web_dl
+  - name: WEBRip
+    type: source
+    arrType: all
+    negate: false
+    required: false
+    sources:
+      - webrip
+  - name: x265
+    type: release_title
+    arrType: all
+    negate: false
+    required: true
+    patterns:
+      - name: x265 (Efficient)
+        pattern: ^(?!.*(?i:remux))(?=.*([xh]\s?(\.?265)\b|HEVC|\bDS4K\b)).*$
+tests: []

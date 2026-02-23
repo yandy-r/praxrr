@@ -1,0 +1,9 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: HDTV
+pattern: \b(HDTV)\b
+tags: []
+description: null
+regex101Id: null

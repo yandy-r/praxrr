@@ -1,0 +1,33 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: Xvid
+description: Matches Xvid Regex
+includeInRename: false
+tags:
+  - Codec
+conditions:
+  - name: Not DVD
+    type: source
+    arrType: all
+    negate: true
+    required: true
+    sources:
+      - dvd
+  - name: Not HDTV
+    type: source
+    arrType: all
+    negate: true
+    required: true
+    sources:
+      - television
+  - name: Xvid
+    type: release_title
+    arrType: all
+    negate: false
+    required: true
+    patterns:
+      - name: Xvid
+        pattern: (?i)[-. ]Xvid
+tests: []

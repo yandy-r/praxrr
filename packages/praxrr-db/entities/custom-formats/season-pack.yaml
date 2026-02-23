@@ -1,0 +1,18 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: Season Pack
+description: Matches Season Pack Release Type on Sonarr
+includeInRename: false
+tags:
+  - Enhancement
+conditions:
+  - name: Season Pack
+    type: release_type
+    arrType: all
+    negate: false
+    required: true
+    releaseTypes:
+      - season_pack
+tests: []

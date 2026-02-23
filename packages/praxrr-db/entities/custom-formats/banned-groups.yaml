@@ -1,0 +1,380 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: Banned Groups
+description: Matches Release Groups that are Banned
+includeInRename: false
+tags:
+  - Banned
+  - Release Group
+conditions:
+  - name: 4K4U
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: 4K4U
+        pattern: (?<=^|[\s.-])4K4U\b
+  - name: AOC
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: AOC
+        pattern: (?<=^|[\s.-])AOC\b
+  - name: AROMA
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: AROMA
+        pattern: (?<=^|[\s.-])AROMA\b
+  - name: BLASPHEMY
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: BLASPHEMY
+        pattern: (?<=^|[\s.-])BLASPHEMY\b
+  - name: BOLS
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: BOLS
+        pattern: (?<=^|[\s.-])BOLS\b
+  - name: BTM
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: BTM
+        pattern: (?<=^|[\s.-])(BEN THE MEN|BEN|BTM)\b
+  - name: BeyondHD
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: BeyondHD
+        pattern: (?<=^|[\s.-])BeyondHD\b
+  - name: BiTOR
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: BiTOR
+        pattern: (?<=^|[\s.-])BiTOR\b
+  - name: CLASSiCALHD
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: CLASSiCALHD
+        pattern: (?<=^|[\s.-])CLASSiCALHD\b
+  - name: CREATiVE24
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: CREATiVE24
+        pattern: (?<=^|[\s.-])CREATiVE24\b
+  - name: DRX
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: DRX
+        pattern: (?<=^|[\s.-])DRX\b
+  - name: DeViSiVE
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: DeViSiVE
+        pattern: (?<=^|[\s.-])DeViSiVE\b
+  - name: DepraveD
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: DepraveD
+        pattern: (?<=^|[\s.-])DepraveD\b
+  - name: E
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: E
+        pattern: (?<=^|[\s.-])E\b
+  - name: FGT
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: FGT
+        pattern: (?<=^|[\s.-])FGT\b
+  - name: Flights
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: Flights
+        pattern: (?<=^|[\s.-])Flights\b
+  - name: HDS
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: HDS
+        pattern: (?<=^|[\s.-])HDS\b
+  - name: KC
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: KC
+        pattern: (?<=^|[\s.-])KC\b
+  - name: LAMA
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: LAMA
+        pattern: (?<=^|[\s.-])LAMA\b
+  - name: MeGusta
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: MeGusta
+        pattern: (?<=^|[\s.-])MeGusta\b
+  - name: MgB
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: MgB
+        pattern: (?<=^|[\s.-])MgB\b
+  - name: NAHOM
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: NAHOM
+        pattern: (?<=^|[\s.-])NAHOM\b
+  - name: NhaNc3
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: NhaNc3
+        pattern: (?<=^|[\s.-])NhaNc3\b
+  - name: NoGroup
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: NoGroup
+        pattern: (?<=^|[\s.-])NoGr(ou)?p\b
+  - name: OEPlus
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: OEPlus
+        pattern: (?<=^|[\s.-])OEPlus\b
+  - name: PSA
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: PSA
+        pattern: (?<=^|[\s.-])PSA\b
+  - name: PiRaTeS
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: PiRaTeS
+        pattern: (?<=^|[\s.-])PiRaTeS\b
+  - name: RARBG
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: RARBG
+        pattern: (?<=^|[\s.-])RARBG\b
+  - name: SHD
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: SHD
+        pattern: (?<=^|[\s.-])SHD\b
+  - name: STUTTERSHIT
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: STUTTERSHIT
+        pattern: (?<=^|[\s.-])STUTTERSHIT\b
+  - name: SasukeducK
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: SasukeducK
+        pattern: (?<=^|[\s.-])SasukeducK\b
+  - name: ShieldBearer
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: ShieldBearer
+        pattern: (?<=^|[\s.-])ShieldBearer\b
+  - name: TEKNO3D
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: TEKNO3D
+        pattern: (?<=^|[\s.-])TEKNO3D\b
+  - name: Telly
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: Telly
+        pattern: (?<=^|[\s.-])Telly\b
+  - name: TvR
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: TvR
+        pattern: (?<=^|[\s.-])TvR\b
+  - name: UnKn0wn
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: UnKn0wn
+        pattern: (?<=^|[\s.-])UnKn0wn\b
+  - name: VD0N
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: VD0N
+        pattern: (?<=^|[\s.-])VD0N\b
+  - name: VECTOR
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: VECTOR
+        pattern: (?<=^|[\s.-])VECTOR\b
+  - name: VisionXpert
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: VisionXpert
+        pattern: (?<=^|[\s.-])VisionXpert\b
+  - name: YIFY
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: YIFY
+        pattern: (?<=^|[\s.-])YIFY\b
+  - name: YTS
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: YTS
+        pattern: (?<=^|[\s.-])YTS(.(MX|LT|AG))?\b
+  - name: d3g
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: d3g
+        pattern: (?<=^|[\s.-])d3g\b
+  - name: iVy
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: iVy
+        pattern: (?<=^|[\s.-])iVy\b
+  - name: jennaortegaUHD
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: jennaortegaUHD
+        pattern: (?<=^|[\s.-])jennaortega(UHD)?\b
+  - name: tarunk9c
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: tarunk9c
+        pattern: (?<=^|[\s.-])tarunk9c\b
+  - name: x0r
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: x0r
+        pattern: (?<=^|[\s.-])x0r\b
+tests: []

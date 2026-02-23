@@ -1,0 +1,11 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: ShieldBearer
+pattern: (?<=^|[\s.-])ShieldBearer\b
+tags:
+  - Banned
+  - Release Group
+description: Banned For AI Upscale
+regex101Id: null

@@ -1,0 +1,35 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: Banned Remux
+description: Matches otherwise unfavourable remux groups - bloated audio tracks, fake HDR, etc.
+includeInRename: false
+tags:
+  - Banned
+  - Release Group
+conditions:
+  - name: LEGi0N
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: LEGi0N
+        pattern: (?<=^|[\s.-])LEGi0N\b
+  - name: Not DVD
+    type: source
+    arrType: all
+    negate: true
+    required: true
+    sources:
+      - dvd
+  - name: Remux
+    type: release_title
+    arrType: all
+    negate: false
+    required: true
+    patterns:
+      - name: Remux
+        pattern: Remux
+tests: []

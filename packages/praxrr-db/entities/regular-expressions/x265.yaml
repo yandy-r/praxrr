@@ -1,0 +1,11 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: x265
+pattern: ^(?!.*(?i:remux))(?=.*([x]\s?(\.?265)\b|HEVC|\bDS4K\b)).*$
+tags:
+  - Codec
+  - Encoder
+description: 'An open source encoder that produces H.265 videos. '
+regex101Id: null

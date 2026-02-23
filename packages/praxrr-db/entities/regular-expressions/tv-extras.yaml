@@ -1,0 +1,10 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: TV Extras
+pattern: (?<=\bS\d+\b).*\b(Extras|Bonus|Extended[ ._-]Clip)\b
+tags:
+  - Banned
+description: Extras, Special Features, Featurettes, etc
+regex101Id: null

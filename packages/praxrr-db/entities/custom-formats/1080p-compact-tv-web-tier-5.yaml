@@ -1,0 +1,83 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: 1080p Compact TV WEB Tier 5
+description: Matches release groups who fall under 1080p Compact TV WEB Tier 5
+includeInRename: false
+tags:
+  - 1080p
+  - Compact
+  - Release Group Tier
+  - TV
+conditions:
+  - name: 1080p
+    type: resolution
+    arrType: all
+    negate: false
+    required: true
+    resolutions:
+      - 1080p
+  - name: HODL
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: HODL
+        pattern: (?<=^|[\s.-])HODL\b
+  - name: KONTRAST
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: KONTRAST
+        pattern: (?<=^|[\s.-])KONTRAST\b
+  - name: PHOCiS
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: PHOCiS
+        pattern: (?<=^|[\s.-])PHOCiS\b
+  - name: WEB-DL
+    type: source
+    arrType: all
+    negate: false
+    required: false
+    sources:
+      - web_dl
+  - name: WEBRip
+    type: source
+    arrType: all
+    negate: false
+    required: false
+    sources:
+      - webrip
+  - name: YAWNiX
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: YAWNiX
+        pattern: (?<=^|[\s.-])YAWNiX\b
+  - name: iVy
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: iVy
+        pattern: (?<=^|[\s.-])iVy\b
+  - name: x265
+    type: release_title
+    arrType: all
+    negate: false
+    required: true
+    patterns:
+      - name: x265 (Efficient)
+        pattern: ^(?!.*(?i:remux))(?=.*([xh]\s?(\.?265)\b|HEVC|\bDS4K\b)).*$
+tests: []

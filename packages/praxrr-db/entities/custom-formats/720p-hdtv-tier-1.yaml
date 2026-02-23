@@ -1,0 +1,81 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: 720p HDTV Tier 1
+description: Matches release groups who fall under 720p HDTV Tier 1
+includeInRename: false
+tags:
+  - Release Group Tier
+conditions:
+  - name: 720p
+    type: resolution
+    arrType: all
+    negate: false
+    required: true
+    resolutions:
+      - 720p
+  - name: BMF
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: BMF
+        pattern: (?<=^|[\s.-])BMF\b
+  - name: CtrlHD
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: CtrlHD
+        pattern: (?<=^|[\s.-])CtrlHD\b
+  - name: DON
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: DON
+        pattern: (?<=^|[\s.-])DON\b
+  - name: EDPH
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: EDPH
+        pattern: (?<=^|[\s.-])EDPH\b
+  - name: EbP
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: EbP
+        pattern: (?<=^|[\s.-])EbP\b
+  - name: HDTV
+    type: source
+    arrType: all
+    negate: false
+    required: true
+    sources:
+      - television
+  - name: HDTV Regex
+    type: release_title
+    arrType: all
+    negate: false
+    required: true
+    patterns:
+      - name: HDTV
+        pattern: \b(HDTV)\b
+  - name: NTb
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: NTb
+        pattern: (?<=^|[\s.-])NTb\b
+tests: []

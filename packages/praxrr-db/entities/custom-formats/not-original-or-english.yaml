@@ -1,0 +1,27 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: Not Original or English
+description: Matches releases that don''t include the Original or English language. Other Languages are allowed.
+includeInRename: false
+tags:
+  - Language
+conditions:
+  - name: English
+    type: language
+    arrType: all
+    negate: true
+    required: true
+    languages:
+      - name: English
+        except: false
+  - name: Original
+    type: language
+    arrType: all
+    negate: true
+    required: true
+    languages:
+      - name: Original
+        except: false
+tests: []

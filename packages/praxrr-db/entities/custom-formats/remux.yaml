@@ -1,0 +1,40 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: Remux
+description: Matches Remux as a codec, not a source. Either h265 or h264.
+includeInRename: false
+tags:
+  - Storage
+conditions:
+  - name: Not DVD
+    type: source
+    arrType: all
+    negate: true
+    required: true
+    sources:
+      - dvd
+  - name: Remux
+    type: release_title
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: Remux
+        pattern: Remux
+  - name: Remux Quality Match
+    type: quality_modifier
+    arrType: radarr
+    negate: false
+    required: false
+    qualityModifiers:
+      - remux
+  - name: Remux Source
+    type: source
+    arrType: sonarr
+    negate: false
+    required: false
+    sources:
+      - bluray_raw
+tests: []

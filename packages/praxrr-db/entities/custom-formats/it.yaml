@@ -1,0 +1,42 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: iT
+description: Matches 'iTunes' WEB-DLs
+includeInRename: true
+tags:
+  - Streaming Service
+  - WEB-DL
+conditions:
+  - name: WEB-DL
+    type: source
+    arrType: all
+    negate: false
+    required: false
+    sources:
+      - web_dl
+  - name: WEBRip
+    type: source
+    arrType: all
+    negate: false
+    required: false
+    sources:
+      - webrip
+  - name: iT Regex
+    type: release_title
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: iTunes
+        pattern: \b(it|itunes)\b(?=[ ._-]web[ ._-]?(dl|rip)\b)
+  - name: iT Rename Regex
+    type: release_title
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: iTunes Rename
+        pattern: \[(iT)\b|\b(iT)\]
+tests: []

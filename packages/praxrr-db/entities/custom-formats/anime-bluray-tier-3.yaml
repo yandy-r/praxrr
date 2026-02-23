@@ -1,0 +1,170 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: Anime Bluray Tier 3
+description: Do not use Testing Purposes Only
+includeInRename: false
+tags:
+  - Anime
+conditions:
+  - name: Bluray
+    type: source
+    arrType: all
+    negate: false
+    required: true
+    sources:
+      - bluray
+  - name: CBT
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: CBT
+        pattern: (?<=^|[\s.-])CBT\b
+  - name: CTR
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: CTR
+        pattern: (?<=^|[\s.-])CTR\b
+  - name: Dekinai
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: Dekinai
+        pattern: (?<=^|[\s.-])Dekinai\b
+  - name: EXP
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: EXP
+        pattern: (?<=^|[\s.-])EXP\b
+  - name: Flugel
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: Flugel
+        pattern: (?<=^|[\s.-])Flugel\b
+  - name: Headpatter
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: Headpatter
+        pattern: (?<=^|[\s.-])Headpatter\b
+  - name: Holomux
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: Holomux
+        pattern: (?<=^|[\s.-])Holomux\b
+  - name: IK
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: IK
+        pattern: (?<=^|[\s.-])IK\b
+  - name: KH
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: KH
+        pattern: (?<=^|[\s.-])KH\b
+  - name: Kametsu
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: Kametsu
+        pattern: (?<=^|[\s.-])Kametsu\b
+  - name: Mysteria
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: Mysteria
+        pattern: (?<=^|[\s.-])Mysteria\b
+  - name: Netaro
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: Netaro
+        pattern: (?<=^|[\s.-])Netaro\b
+  - name: Not Remux
+    type: release_title
+    arrType: all
+    negate: true
+    required: true
+    patterns:
+      - name: Remux
+        pattern: Remux
+  - name: Pookie
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: Pookie
+        pattern: (?<=^|[\s.-])Pookie\b
+  - name: Quetzal
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: Quetzal
+        pattern: (?<=^|[\s.-])Quetzal\b
+  - name: Rasetsu
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: Rasetsu
+        pattern: (?<=^|[\s.-])Rasetsu\b
+  - name: Senjou
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: Senjou
+        pattern: (?<=^|[\s.-])Senjou\b
+  - name: WBDP
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: WBDP
+        pattern: (?<=^|[\s.-])WBDP\b
+  - name: kuchikirukia
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: kuchikirukia
+        pattern: (?<=^|[\s.-])kuchikirukia\b
+tests: []

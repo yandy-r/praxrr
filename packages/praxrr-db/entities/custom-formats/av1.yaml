@@ -1,0 +1,20 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: AV1
+description: Matches the 'AV1' Regex Pattern
+includeInRename: false
+tags:
+  - Bleeding Edge
+  - Codec
+conditions:
+  - name: AV1
+    type: release_title
+    arrType: all
+    negate: false
+    required: true
+    patterns:
+      - name: AV1
+        pattern: \b(AV1)\b
+tests: []

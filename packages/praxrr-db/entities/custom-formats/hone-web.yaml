@@ -1,0 +1,56 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: HONE WEB
+description: Matches 1080p x265 HONE WEB-DLs via Release Title Parsing
+includeInRename: false
+tags: []
+conditions:
+  - name: 1080p
+    type: resolution
+    arrType: all
+    negate: false
+    required: true
+    resolutions:
+      - 1080p
+  - name: HONE
+    type: release_title
+    arrType: all
+    negate: false
+    required: true
+    patterns:
+      - name: HONE
+        pattern: (?<=^|[\s.-])HONE\b
+  - name: Not Weasley
+    type: release_title
+    arrType: all
+    negate: true
+    required: true
+    patterns:
+      - name: Weasley
+        pattern: \b(Weasley)\b
+  - name: Release Group
+    type: release_group
+    arrType: all
+    negate: true
+    required: true
+    patterns:
+      - name: HONE
+        pattern: (?<=^|[\s.-])HONE\b
+  - name: WEB-DL
+    type: source
+    arrType: all
+    negate: false
+    required: true
+    sources:
+      - web_dl
+  - name: x265
+    type: release_title
+    arrType: all
+    negate: false
+    required: true
+    patterns:
+      - name: x265 (Efficient)
+        pattern: ^(?!.*(?i:remux))(?=.*([xh]\s?(\.?265)\b|HEVC|\bDS4K\b)).*$
+tests: []

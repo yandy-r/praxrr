@@ -1,0 +1,42 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: SHO
+description: Matches 'Showtime' WEB-DLs
+includeInRename: true
+tags:
+  - Streaming Service
+  - WEB-DL
+conditions:
+  - name: SHO Regex
+    type: release_title
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: Showtime
+        pattern: \b(sho|showtime)\b[ ._-]web[ ._-]?(dl|rip)?\b
+  - name: SHO Rename Regex
+    type: release_title
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: Showtime Rename
+        pattern: \[(SHO)\b|\b(SHO)\]
+  - name: WEB-DL
+    type: source
+    arrType: all
+    negate: false
+    required: false
+    sources:
+      - web_dl
+  - name: WEBRip
+    type: source
+    arrType: all
+    negate: false
+    required: false
+    sources:
+      - webrip
+tests: []

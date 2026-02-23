@@ -1,0 +1,67 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: WEB-DL Tier 2
+description: Matches release groups who fall under WEB-DL Tier 2
+includeInRename: false
+tags:
+  - Release Group Tier
+  - WEB-DL
+conditions:
+  - name: BYNDR
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: BYNDR
+        pattern: (?<=^|[\s.-])BYNDR\b
+  - name: CMRG
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: CMRG
+        pattern: (?<=^|[\s.-])CM(a)?R(io)?G\b
+  - name: HONE
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: HONE
+        pattern: (?<=^|[\s.-])HONE\b
+  - name: Kitsune
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: Kitsune
+        pattern: (?<=^|[\s.-])Kitsune\b
+  - name: TEPES
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: TEPES
+        pattern: (?<=^|[\s.-])TEPES\b
+  - name: WEB-DL
+    type: source
+    arrType: all
+    negate: false
+    required: true
+    sources:
+      - web_dl
+  - name: playWEB
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: playWEB
+        pattern: (?<=^|[\s.-])playWEB\b
+tests: []

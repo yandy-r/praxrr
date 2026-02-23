@@ -1,0 +1,73 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: 720p HDTV Tier 2
+description: Matches release groups who fall under 720p HDTV Tier 2
+includeInRename: false
+tags:
+  - Release Group Tier
+conditions:
+  - name: 720p
+    type: resolution
+    arrType: all
+    negate: false
+    required: true
+    resolutions:
+      - 720p
+  - name: BTN
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: BTN
+        pattern: (?<=^|[\s.-])BTN\b
+  - name: CBFM
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: CBFM
+        pattern: (?<=^|[\s.-])CBFM\b
+  - name: DARKFLiX
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: DARKFLiX
+        pattern: (?<=^|[\s.-])DARKFLiX\b
+  - name: HDTV
+    type: source
+    arrType: all
+    negate: false
+    required: true
+    sources:
+      - television
+  - name: HDTV Regex
+    type: release_title
+    arrType: all
+    negate: false
+    required: true
+    patterns:
+      - name: HDTV
+        pattern: \b(HDTV)\b
+  - name: PLUTONiUM
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: PLUTONiUM
+        pattern: (?<=^|[\s.-])PLUTONiUM\b
+  - name: ViETNAM
+    type: release_group
+    arrType: all
+    negate: false
+    required: false
+    patterns:
+      - name: ViETNAM
+        pattern: (?<=^|[\s.-])ViETNAM\b
+tests: []

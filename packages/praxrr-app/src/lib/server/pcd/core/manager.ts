@@ -417,7 +417,7 @@ class PCDManager {
       await importBaseOps(databaseId, localPath, { pcdMigrationIngestionMode: migrationMode });
       return true;
     } catch (error) {
-      if (!(error instanceof MigrationReaderError) || !config.pcdMigrationAllowLegacyFallback) {
+      if (!config.pcdMigrationAllowLegacyFallback) {
         throw error;
       }
 
@@ -426,6 +426,7 @@ class PCDManager {
         meta: {
           databaseId,
           migrationMode,
+          migrationReaderError: error instanceof MigrationReaderError,
           error: String(error),
         },
       });
