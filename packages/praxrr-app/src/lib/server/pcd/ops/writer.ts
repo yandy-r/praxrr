@@ -17,7 +17,6 @@ import {
   evaluateValueGuardError,
   isValueGuardBlockingStatus,
 } from '../migration/valueGuardGate.ts';
-import type { Database } from '@jsr/db__sqlite';
 import { uuid } from '$shared/utils/uuid.ts';
 
 function buildMetadataJson(metadata?: OperationMetadata): string | null {
@@ -82,6 +81,9 @@ interface ValueGuardGateResult {
 
 function normalizeSql(sql: string): string {
   const trimmed = sql.trim();
+  if (trimmed.length === 0) {
+    return '';
+  }
   return trimmed.endsWith(';') ? trimmed : `${trimmed};`;
 }
 
@@ -108,12 +110,12 @@ function runValueGuardGate(
 
   const cache = getCache(databaseId);
   if (!cache) {
-    return { ok: true };
+    return { ok: false, error: 'Value-guard validation unavailable: cache not built' };
   }
 
-  const cacheDb = (cache as unknown as { db: Database | null }).db;
+  const cacheDb = cache.getRawDb();
   if (!cacheDb) {
-    return { ok: true };
+    return { ok: false, error: 'Value-guard validation unavailable: cache not built' };
   }
 
   const instance = databaseInstancesQueries.getById(databaseId);

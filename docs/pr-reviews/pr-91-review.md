@@ -245,7 +245,7 @@ added, the function silently returns `undefined`, and the export endpoint return
 
 ### H-1: Writer `runValueGuardGate` accesses private `db` field via unsafe cast
 
-- [ ] **Status:** Open
+- [x] **Status:** Fixed
 - **File:** `packages/praxrr-app/src/lib/server/pcd/ops/writer.ts:114`
 - **Category:** Type safety, encapsulation
 - **Agents:** code-reviewer, type-design
@@ -259,11 +259,17 @@ Double-cast bypasses TypeScript access control. If `PCDCache` renames `db`, this
 
 **Fix:** Add `getRawDb(): Database | null` public accessor to `PCDCache`.
 
+### Validation result
+
+- Added `PCDCache#getRawDb(): Database | null` and removed unsafe cache field casts in writer.
+  - `packages/praxrr-app/src/lib/server/pcd/database/cache.ts:54`
+  - `packages/praxrr-app/src/lib/server/pcd/ops/writer.ts:114`
+
 ---
 
 ### H-2: Value-guard gate silently passes when cache is missing
 
-- [ ] **Status:** Open
+- [x] **Status:** Fixed
 - **File:** `packages/praxrr-app/src/lib/server/pcd/ops/writer.ts:100-117`
 - **Category:** Error handling, silent failure
 - **Agents:** error-handler, code-reviewer
@@ -275,11 +281,17 @@ accepted.
 **Fix:** When `runValueGuardGate` is `true` (explicitly requested), missing cache should return
 `{ ok: false, error: 'Value-guard validation unavailable: cache not built' }`.
 
+### Validation result
+
+- `runValueGuardGate` now returns `{ ok: false, error: ... }` when cache is missing or cache DB is
+  unavailable.
+  - `packages/praxrr-app/src/lib/server/pcd/ops/writer.ts:100-117`
+
 ---
 
 ### H-3: `importBaseOps` errors caught and swallowed at link/sync/switchBranch
 
-- [ ] **Status:** Open
+- [x] **Status:** Fixed
 - **File:** `packages/praxrr-app/src/lib/server/pcd/core/manager.ts:100-107, 181-188, 248-255`
 - **Category:** Error handling
 - **Agents:** error-handler
@@ -291,11 +303,21 @@ continues. Seeding and compilation proceed without base ops, producing incomplet
 **Fix:** Propagate errors at minimum for `link`. Return partial-success indicator for
 `sync`/`switchBranch`.
 
+### Validation result
+
+- Link path now allows `importBaseOpsWithOrchestration` errors to fail the link operation.
+- Sync now returns `success: false` when base-op import fails while still completing other
+  operations.
+- `switchBranch` now returns a boolean import-success indicator.
+- `importBaseOpsWithOrchestration` now returns boolean and preserves fallback behavior only when
+  explicitly allowed.
+  - `packages/praxrr-app/src/lib/server/pcd/core/manager.ts:240-340`
+
 ---
 
 ### H-4: `normalizeSql` produces `;` for empty SQL, bypassing empty check
 
-- [ ] **Status:** Open
+- [x] **Status:** Fixed
 - **File:** `packages/praxrr-app/src/lib/server/pcd/ops/writer.ts:83-86, 127`
 - **Category:** Logic error
 - **Agents:** code-reviewer
@@ -312,6 +334,11 @@ function normalizeSql(sql: string): string {
   return trimmed.endsWith(';') ? trimmed : `${trimmed};`;
 }
 ```
+
+### Validation result
+
+- Added empty-input guard in SQL normalization to return empty string before semicolon appending.
+  - `packages/praxrr-app/src/lib/server/pcd/ops/writer.ts:83-86`
 
 ---
 

@@ -359,6 +359,14 @@ export class PCDCache {
   }
 
   /**
+   * Access the underlying SQLite database instance.
+   * Prefer this over private field casts.
+   */
+  getRawDb(): Database | null {
+    return this.db;
+  }
+
+  /**
    * Close the database connection
    */
   close(): void {
