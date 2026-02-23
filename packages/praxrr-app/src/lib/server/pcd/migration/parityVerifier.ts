@@ -512,3 +512,19 @@ export function compareRowsByNaturalKey(
   compareTableRows(table, a, b, diffs);
   return diffs;
 }
+
+export function __testOnly_normalizeScalarValue(value: unknown): unknown {
+  return normalizeScalarValue(value);
+}
+
+export function __testOnly_valuesEqual(a: unknown, b: unknown): boolean {
+  return valuesEqual(a, b);
+}
+
+export function __testOnly_compareRowsBySortKeys(
+  a: Record<string, unknown>,
+  b: Record<string, unknown>,
+  keys: readonly string[]
+): number {
+  return compareRowsBySortKeys(a, b, keys);
+}

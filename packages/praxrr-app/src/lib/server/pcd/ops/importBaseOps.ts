@@ -13,6 +13,16 @@ import { ENTITY_IMPORT_ORDER, sortMigrationCandidatesByImportOrder } from '$pcd/
 import { compile } from '../database/compiler.ts';
 import { getCache } from '../database/registry.ts';
 import { withRepoImportWriteContext } from './writer.ts';
+let compileForTests: typeof compile = compile;
+let getCacheForTests = getCache;
+type RepoImportWriteContext = Parameters<typeof withRepoImportWriteContext>[0];
+type RepoImportWriteContextRunner = (
+  context: RepoImportWriteContext,
+  callback: () => Promise<unknown>
+) => Promise<unknown>;
+let withRepoImportWriteContextForTests: RepoImportWriteContextRunner =
+  withRepoImportWriteContext as unknown as RepoImportWriteContextRunner;
+let readMigrationEntitySourcesForTests = readMigrationEntitySources;
 const MIGRATION_OP_FILENAME_PREFIX = 'entities/';
 // Legacy SQL ops with no explicit order prefix are placed in a high-numbered sequence band
 // to preserve ordering determinism while never colliding with explicit file-numbered SQL ops.
@@ -313,6 +323,61 @@ export interface ImportBaseOpsOptions {
   pcdMigrationIngestionMode?: PCDMigrationIngestionMode;
 }
 
+export function __testOnly_parseMetadata(sql: string): { metadataJson: string | null; cleanedSql: string } {
+  return parseMetadata(sql);
+}
+
+export function __testOnly_setReadMigrationEntitySources(
+  reader: (pcdPath: string) => Promise<{ candidates: MigrationEntityCandidate[]; issues: MigrationReaderIssue[] }>
+): void {
+  readMigrationEntitySourcesForTests = reader;
+}
+
+export function __testOnly_resetReadMigrationEntitySources(): void {
+  readMigrationEntitySourcesForTests = readMigrationEntitySources;
+}
+
+export function __testOnly_setCompile(compilerFn: typeof compile): void {
+  compileForTests = compilerFn;
+}
+
+export function __testOnly_resetCompile(): void {
+  compileForTests = compile;
+}
+
+export function __testOnly_setWithRepoImportWriteContext(writer: RepoImportWriteContextRunner): void {
+  withRepoImportWriteContextForTests = writer;
+}
+
+export function __testOnly_resetWithRepoImportWriteContext(): void {
+  withRepoImportWriteContextForTests = withRepoImportWriteContext as unknown as RepoImportWriteContextRunner;
+}
+
+export function __testOnly_setGetCache(getCacheImpl: typeof getCache): void {
+  getCacheForTests = getCacheImpl;
+}
+
+export function __testOnly_resetGetCache(): void {
+  getCacheForTests = getCache;
+}
+
+export function __testOnly_parseStableIdentityFromText(raw: string): MigrationEntityStableIdentity | null {
+  return parseStableIdentityFromText(raw);
+}
+
+export function __testOnly_parseStableIdentityFromObject(
+  parsed: Record<string, unknown>
+): MigrationEntityStableIdentity | null {
+  return parseStableIdentityFromObject(parsed);
+}
+
+export function __testOnly_deriveSqlStableIdentity(
+  metadataJson: string | null,
+  sourcePath: string
+): MigrationEntityStableIdentity | null {
+  return deriveSqlStableIdentity(metadataJson, sourcePath);
+}
+
 export async function importBaseOps(
   databaseId: number,
   pcdPath: string,
@@ -322,7 +387,7 @@ export async function importBaseOps(
   const migrationMode = options.pcdMigrationIngestionMode ?? config.pcdMigrationIngestionMode;
   const isHybridIngestion = migrationMode === 'hybrid';
   const migrationReaderResult = isHybridIngestion
-    ? await readMigrationEntitySources(pcdPath)
+    ? await readMigrationEntitySourcesForTests(pcdPath)
     : { candidates: [], issues: [] };
 
   if (isHybridIngestion && migrationReaderResult.issues.length > 0) {
@@ -471,17 +536,17 @@ export async function importBaseOps(
 
   let migrationImported = 0;
   if (isHybridIngestion && migrationReaderResult.candidates.length > 0) {
-    await compile(pcdPath, databaseId);
+    await compileForTests(pcdPath, databaseId);
     const sortedCandidates = sortMigrationCandidatesByImportOrder(migrationReaderResult.candidates);
 
     for (let i = 0; i < sortedCandidates.length; i++) {
       const candidate = sortedCandidates[i];
-      const cache = getCache(databaseId);
+      const cache = getCacheForTests(databaseId);
       if (!cache) {
         throw new Error(`Cache not available while importing migration entity "${candidate.relativePath}"`);
       }
 
-      await withRepoImportWriteContext(
+      await withRepoImportWriteContextForTests(
         {
           filenamePrefix: `${MIGRATION_OP_FILENAME_PREFIX}${candidate.relativePath}`,
           sequenceStart: YAML_SEQUENCE_BASE + i * YAML_SEQUENCE_STRIDE,
@@ -512,7 +577,7 @@ export async function importBaseOps(
       migrationImported += 1;
     }
 
-    await compile(pcdPath, databaseId);
+    await compileForTests(pcdPath, databaseId);
   }
 
   const orphaned = pcdOpsQueries.markBaseOrphaned(databaseId, seenAt);

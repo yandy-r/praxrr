@@ -456,10 +456,11 @@ compatibility alias.
 
 - **Source:** pr-test-analyzer
 - **File:** `packages/praxrr-app/src/lib/server/pcd/migration/slug.ts`
-- **Status:** [ ] Open
+- **Status:** [x] Fixed
 
-Critical to migration determinism. Every entity file path depends on correct slug generation.
-Missing coverage: empty/whitespace names, 60-char truncation, unicode, collision resolution.
+Critical to migration determinism. Every entity file path depends on correct slug generation. Added
+`packages/praxrr-app/src/tests/pcd/migration/slug.test.ts` covering empty/whitespace names, 60-char
+truncation, unicode normalization, and deterministic collision resolution.
 
 ---
 
@@ -467,10 +468,12 @@ Missing coverage: empty/whitespace names, 60-char truncation, unicode, collision
 
 - **Source:** pr-test-analyzer
 - **File:** `packages/praxrr-app/src/lib/server/pcd/migration/yamlFormatter.ts`
-- **Status:** [ ] Open
+- **Status:** [x] Fixed
 
 Serialization backbone for YAML-first migration. 139 lines of normalization logic including
-migration key rejection, non-finite numbers, undefined normalization. No edge case tests.
+migration key rejection, unsupported metadata, non-finite number handling, and undefined
+normalization. Added `packages/praxrr-app/src/tests/pcd/migration/yamlFormatter.test.ts` for these
+edge cases. unsupported metadata, non-finite number failures, and undefined normalization.
 
 ---
 
@@ -478,10 +481,11 @@ migration key rejection, non-finite numbers, undefined normalization. No edge ca
 
 - **Source:** pr-test-analyzer
 - **File:** `packages/praxrr-app/src/lib/server/pcd/migration/enumerateEntities.ts`
-- **Status:** [ ] Open
+- **Status:** [x] Fixed
 
 203-line module driving entity enumeration for converter and parity verifier. Missing: entityTypes
-filtering, unsupported type error, `distinctNames` behavior, empty cache tables.
+Added `packages/praxrr-app/src/tests/pcd/migration/enumerateEntities.test.ts` covering entityTypes
+filtering, unsupported family errors, distinct-name query behavior, and empty cache tables.
 
 ---
 
@@ -489,10 +493,11 @@ filtering, unsupported type error, `distinctNames` behavior, empty cache tables.
 
 - **Source:** pr-test-analyzer
 - **File:** `packages/praxrr-app/src/lib/server/pcd/migration/converter.ts`
-- **Status:** [ ] Open
+- **Status:** [x] Fixed
 
-Only happy-path scenarios covered. Missing: all `ConverterConfigError` paths,
-`ConverterSerializationError`, `ConverterWriteError`, JSON format, no-metadata mode.
+Only happy-path scenarios were covered previously. Added
+`packages/praxrr-app/src/tests/pcd/migration/converter.test.ts` cases for unsupported format and
+outputDir validation, all converter error classes, JSON path behavior, and metadata-disabled output.
 
 ---
 
@@ -500,10 +505,12 @@ Only happy-path scenarios covered. Missing: all `ConverterConfigError` paths,
 
 - **Source:** pr-test-analyzer
 - **File:** `packages/praxrr-app/src/lib/server/pcd/migration/parityVerifier.ts`
-- **Status:** [ ] Open
+- **Status:** [x] Fixed
 
 `normalizeScalarValue()`, `valuesEqual()`, `compareRowsBySortKeys()`, duplicate row detection -- all
-untested. A type coercion bug could cause false parity passes.
+untested. A type coercion bug could cause false parity passes. Added
+`packages/praxrr-app/src/tests/pcd/migration/parityVerifier.test.ts` covering normalization,
+comparison sort-key behavior, structured value equality, and duplicate natural key detection.
 
 ---
 
@@ -511,10 +518,12 @@ untested. A type coercion bug could cause false parity passes.
 
 - **Source:** pr-test-analyzer
 - **File:** `packages/praxrr-app/src/lib/server/pcd/ops/importBaseOps.ts`
-- **Status:** [ ] Open
+- **Status:** [x] Fixed
 
 `parseMetadata()`, `deriveSqlStableIdentity()`, `parseStableIdentityFromText/Object()`, migration
-entity suppression via `migrationIdentitySet` -- all untested.
+entity suppression via `migrationIdentitySet` -- all untested. Added
+`packages/praxrr-app/src/tests/pcd/ops/importBaseOps.test.ts` for metadata/identity parsing and
+hybrid identity-overlap suppression behavior, plus `__testOnly_` test hooks for private helpers.
 
 ---
 
@@ -522,10 +531,13 @@ entity suppression via `migrationIdentitySet` -- all untested.
 
 - **Source:** pr-test-analyzer
 - **File:** `packages/praxrr-app/src/lib/server/utils/config/config.ts`
-- **Status:** [ ] Open
+
+- **Status:** [x] Fixed
 
 Missing: invalid values (should throw), default behavior (empty string defaults to 'hybrid'),
-`parseBooleanEnv` edge cases.
+`parseBooleanEnv` edge cases. Added
+`packages/praxrr-app/src/tests/base/pcdMigrationModeConfig.test.ts` and reused cache-busted module
+reload patterns to validate migration mode and boolean fallback parsing.
 
 ---
 
@@ -613,10 +625,10 @@ Missing: invalid values (should throw), default behavior (empty string defaults 
 | I-13 | Important | Documentation  | importBaseOps.ts:386-396                | [x] Fixed |
 | I-14 | Important | Documentation  | importBaseOps.ts:17-19                  | [x] Fixed |
 | I-15 | Important | Comment        | convert-pcd-to-yaml.ts:132              | [x] Fixed |
-| T-1  | Test Gap  | Coverage       | slug.ts                                 | [ ] Open  |
-| T-2  | Test Gap  | Coverage       | yamlFormatter.ts                        | [ ] Open  |
-| T-3  | Test Gap  | Coverage       | enumerateEntities.ts                    | [ ] Open  |
-| T-4  | Test Gap  | Coverage       | converter.ts                            | [ ] Open  |
-| T-5  | Test Gap  | Coverage       | parityVerifier.ts                       | [ ] Open  |
-| T-6  | Test Gap  | Coverage       | importBaseOps.ts                        | [ ] Open  |
-| T-7  | Test Gap  | Coverage       | config.ts                               | [ ] Open  |
+| T-1  | Test Gap  | Coverage       | slug.ts                                 | [x] Fixed |
+| T-2  | Test Gap  | Coverage       | yamlFormatter.ts                        | [x] Fixed |
+| T-3  | Test Gap  | Coverage       | enumerateEntities.ts                    | [x] Fixed |
+| T-4  | Test Gap  | Coverage       | converter.ts                            | [x] Fixed |
+| T-5  | Test Gap  | Coverage       | parityVerifier.ts                       | [x] Fixed |
+| T-6  | Test Gap  | Coverage       | importBaseOps.ts                        | [x] Fixed |
+| T-7  | Test Gap  | Coverage       | config.ts                               | [x] Fixed |
