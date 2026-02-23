@@ -91,6 +91,29 @@ export function getLidarrMediaManagementPortableEntry(entityType: EntityType) {
 export const LIDARR_METADATA_PROFILE_PORTABLE_ENTITIES = ['lidarr_metadata_profile'] as const;
 export type LidarrMetadataProfilePortableEntityType = (typeof LIDARR_METADATA_PROFILE_PORTABLE_ENTITIES)[number];
 
+export type PortableMigrationFormat = 'json' | 'yaml';
+export const PORTABLE_MIGRATION_FORMATS = ['json', 'yaml'] as const satisfies readonly PortableMigrationFormat[];
+export const PORTABLE_MIGRATION_MIN_VERSION = 1;
+
+/**
+ * Optional migration metadata for hybrid JSON/YAML ingestion.
+ *
+ * Keep as runtime-facing metadata only. Existing payloads remain valid when omitted.
+ */
+export interface PortableMigrationMetadata {
+  /** Ingestion format marker for hybrid imports/exports. */
+  format: PortableMigrationFormat;
+  /** Schema version marker for migration payload format compatibility checks. */
+  version: number;
+  /** Source marker used to distinguish migration ingestion origin. */
+  source: string;
+}
+
+export interface PortableExportMetadata {
+  /** Optional migration metadata included on export responses. */
+  migration?: PortableMigrationMetadata;
+}
+
 // ============================================================================
 // ENTITY TYPE ENUM
 // ============================================================================
