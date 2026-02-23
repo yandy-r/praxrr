@@ -11,7 +11,7 @@ import {
 import type { PCDCache } from '$pcd/index.ts';
 import * as serialize from '$pcd/entities/serialize.ts';
 
-export const serializeDependencies = {
+const _serializeDependencies = {
   serializeDelayProfile: serialize.serializeDelayProfile,
   serializeRegularExpression: serialize.serializeRegularExpression,
   serializeCustomFormat: serialize.serializeCustomFormat,
@@ -76,33 +76,33 @@ export const GET: RequestHandler = async ({ url }) => {
 async function serializeEntity(cache: PCDCache, entityType: EntityType, name: string): Promise<PortableEntityData> {
   switch (entityType) {
     case 'delay_profile':
-      return serializeDependencies.serializeDelayProfile(cache, name);
+      return _serializeDependencies.serializeDelayProfile(cache, name);
     case 'regular_expression':
-      return serializeDependencies.serializeRegularExpression(cache, name);
+      return _serializeDependencies.serializeRegularExpression(cache, name);
     case 'custom_format':
-      return serializeDependencies.serializeCustomFormat(cache, name);
+      return _serializeDependencies.serializeCustomFormat(cache, name);
     case 'quality_profile':
-      return serializeDependencies.serializeQualityProfile(cache, name);
+      return _serializeDependencies.serializeQualityProfile(cache, name);
     case 'radarr_naming':
-      return serializeDependencies.serializeRadarrNaming(cache, name);
+      return _serializeDependencies.serializeRadarrNaming(cache, name);
     case 'sonarr_naming':
-      return serializeDependencies.serializeSonarrNaming(cache, name);
+      return _serializeDependencies.serializeSonarrNaming(cache, name);
     case 'lidarr_naming':
-      return serializeDependencies.serializeLidarrNaming(cache, name);
+      return _serializeDependencies.serializeLidarrNaming(cache, name);
     case 'radarr_media_settings':
-      return serializeDependencies.serializeRadarrMediaSettings(cache, name);
+      return _serializeDependencies.serializeRadarrMediaSettings(cache, name);
     case 'sonarr_media_settings':
-      return serializeDependencies.serializeSonarrMediaSettings(cache, name);
+      return _serializeDependencies.serializeSonarrMediaSettings(cache, name);
     case 'lidarr_media_settings':
-      return serializeDependencies.serializeLidarrMediaSettings(cache, name);
+      return _serializeDependencies.serializeLidarrMediaSettings(cache, name);
     case 'radarr_quality_definitions':
-      return serializeDependencies.serializeRadarrQualityDefinitions(cache, name);
+      return _serializeDependencies.serializeRadarrQualityDefinitions(cache, name);
     case 'sonarr_quality_definitions':
-      return serializeDependencies.serializeSonarrQualityDefinitions(cache, name);
+      return _serializeDependencies.serializeSonarrQualityDefinitions(cache, name);
     case 'lidarr_quality_definitions':
-      return serializeDependencies.serializeLidarrQualityDefinitions(cache, name);
+      return _serializeDependencies.serializeLidarrQualityDefinitions(cache, name);
     case 'lidarr_metadata_profile':
-      return serializeDependencies.serializeLidarrMetadataProfile(cache, name);
+      return _serializeDependencies.serializeLidarrMetadataProfile(cache, name);
 
     default: {
       const exhaustive: never = entityType;

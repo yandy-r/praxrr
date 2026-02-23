@@ -24,7 +24,7 @@ import { createLidarrNaming } from '$pcd/entities/mediaManagement/naming/create.
 import { validatePortableData } from '$pcd/entities/validate.ts';
 import { logger } from '$logger/logger.ts';
 
-export const deserializeDependencies = {
+const _deserializeDependencies = {
   deserializeDelayProfile: deserialize.deserializeDelayProfile,
   deserializeRegularExpression: deserialize.deserializeRegularExpression,
   deserializeCustomFormat: deserialize.deserializeCustomFormat,
@@ -156,69 +156,69 @@ async function deserializeEntity({ databaseId, cache, layer, entityType, data }:
 
   switch (entityType) {
     case 'delay_profile':
-      return deserializeDependencies.deserializeDelayProfile({
+      return _deserializeDependencies.deserializeDelayProfile({
         ...opts,
         portable: data as unknown as PortableDelayProfile,
       });
     case 'regular_expression':
-      return deserializeDependencies.deserializeRegularExpression({
+      return _deserializeDependencies.deserializeRegularExpression({
         ...opts,
         portable: data as unknown as PortableRegularExpression,
       });
     case 'custom_format':
-      return deserializeDependencies.deserializeCustomFormat({
+      return _deserializeDependencies.deserializeCustomFormat({
         ...opts,
         portable: data as unknown as PortableCustomFormat,
       });
     case 'quality_profile':
-      return deserializeDependencies.deserializeQualityProfile({
+      return _deserializeDependencies.deserializeQualityProfile({
         ...opts,
         portable: data as unknown as PortableQualityProfile,
       });
     case 'radarr_naming':
-      return deserializeDependencies.deserializeRadarrNaming({
+      return _deserializeDependencies.deserializeRadarrNaming({
         ...opts,
         portable: data as unknown as PortableRadarrNaming,
       });
     case 'sonarr_naming':
-      return deserializeDependencies.deserializeSonarrNaming({
+      return _deserializeDependencies.deserializeSonarrNaming({
         ...opts,
         portable: data as unknown as PortableSonarrNaming,
       });
     case 'lidarr_naming':
       return createLidarrNaming({ ...opts, input: data as unknown as PortableLidarrNaming });
     case 'radarr_media_settings':
-      return deserializeDependencies.deserializeRadarrMediaSettings({
+      return _deserializeDependencies.deserializeRadarrMediaSettings({
         ...opts,
         portable: data as unknown as PortableMediaSettings,
       });
     case 'sonarr_media_settings':
-      return deserializeDependencies.deserializeSonarrMediaSettings({
+      return _deserializeDependencies.deserializeSonarrMediaSettings({
         ...opts,
         portable: data as unknown as PortableMediaSettings,
       });
     case 'lidarr_media_settings':
-      return deserializeDependencies.deserializeLidarrMediaSettings({
+      return _deserializeDependencies.deserializeLidarrMediaSettings({
         ...opts,
         portable: data as unknown as PortableLidarrMediaSettings,
       });
     case 'radarr_quality_definitions':
-      return deserializeDependencies.deserializeRadarrQualityDefinitions({
+      return _deserializeDependencies.deserializeRadarrQualityDefinitions({
         ...opts,
         portable: data as unknown as PortableQualityDefinitions,
       });
     case 'sonarr_quality_definitions':
-      return deserializeDependencies.deserializeSonarrQualityDefinitions({
+      return _deserializeDependencies.deserializeSonarrQualityDefinitions({
         ...opts,
         portable: data as unknown as PortableQualityDefinitions,
       });
     case 'lidarr_quality_definitions':
-      return deserializeDependencies.deserializeLidarrQualityDefinitions({
+      return _deserializeDependencies.deserializeLidarrQualityDefinitions({
         ...opts,
         portable: data as unknown as PortableLidarrQualityDefinitions,
       });
     case 'lidarr_metadata_profile':
-      return deserializeDependencies.deserializeLidarrMetadataProfile({
+      return _deserializeDependencies.deserializeLidarrMetadataProfile({
         ...opts,
         portable: data as unknown as PortableLidarrMetadataProfile,
       });
