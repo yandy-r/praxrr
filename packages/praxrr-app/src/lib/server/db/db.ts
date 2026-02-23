@@ -100,6 +100,10 @@ class DatabaseManager {
     return this.db;
   }
 
+  private isDatabaseNotInitializedError(error: unknown): boolean {
+    return error instanceof Error && error.message.includes('Database not initialized');
+  }
+
   /**
    * Execute a SQL statement
    */
@@ -155,21 +159,45 @@ class DatabaseManager {
    * Begin a transaction
    */
   beginTransaction(): void {
-    this.exec('BEGIN TRANSACTION');
+    try {
+      this.exec('BEGIN TRANSACTION');
+    } catch (error) {
+      if (this.isDatabaseNotInitializedError(error)) {
+        return;
+      }
+
+      throw error;
+    }
   }
 
   /**
    * Commit a transaction
    */
   commit(): void {
-    this.exec('COMMIT');
+    try {
+      this.exec('COMMIT');
+    } catch (error) {
+      if (this.isDatabaseNotInitializedError(error)) {
+        return;
+      }
+
+      throw error;
+    }
   }
 
   /**
    * Rollback a transaction
    */
   rollback(): void {
-    this.exec('ROLLBACK');
+    try {
+      this.exec('ROLLBACK');
+    } catch (error) {
+      if (this.isDatabaseNotInitializedError(error)) {
+        return;
+      }
+
+      throw error;
+    }
   }
 
   /**

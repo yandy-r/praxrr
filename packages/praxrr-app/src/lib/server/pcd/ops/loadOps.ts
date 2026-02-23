@@ -22,10 +22,18 @@ function toOperation(op: PcdOp, layer: 'base' | 'user', orderOffset = 0): Operat
   };
 }
 
+function compareOperations(a: Operation, b: Operation): number {
+  if (a.order !== b.order) return a.order - b.order;
+  if (a.filename !== b.filename) return a.filename.localeCompare(b.filename);
+  if (a.filepath === b.filepath) return 0;
+
+  return a.filepath.localeCompare(b.filepath);
+}
+
 function loadDbOps(databaseId: number, origin: 'base' | 'user', states: PcdOpState[], orderOffset = 0): Operation[] {
   const rows = pcdOpsQueries.listByDatabaseAndOrigin(databaseId, origin, { states });
   const operations = rows.map((op) => toOperation(op, origin, orderOffset));
-  return operations.sort((a, b) => a.order - b.order);
+  return operations.sort(compareOperations);
 }
 
 /**

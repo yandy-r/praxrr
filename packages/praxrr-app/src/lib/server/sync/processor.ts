@@ -49,6 +49,10 @@ export function markInstanceStartupPullComplete(instanceId: number): void {
   startupPullActiveInstances.delete(instanceId);
 }
 
+export function isStartupPullInstanceActive(instanceId: number): boolean {
+  return startupPullActiveInstances.has(instanceId);
+}
+
 export type { ProcessSyncsResult, InstanceSyncResult, SyncTriggerEvent, TriggerContext };
 
 export interface PreviewInstanceRequest {

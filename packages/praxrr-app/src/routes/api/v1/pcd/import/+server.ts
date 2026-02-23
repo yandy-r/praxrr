@@ -1,7 +1,6 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from '@sveltejs/kit';
-import { pcdManager, canWriteToBase } from '$pcd/index.ts';
-import type { PCDCache, OperationLayer } from '$pcd/index.ts';
+import { pcdManager, canWriteToBase, type PCDCache, type OperationLayer, type WriteResult } from '$pcd/index.ts';
 import {
   ENTITY_TYPES,
   getLidarrMediaManagementPortableEntry,
@@ -18,10 +17,12 @@ import {
   type PortableRadarrNaming,
   type PortableSonarrNaming,
   type PortableLidarrMetadataProfile,
+  validatePortableMigrationMetadata,
 } from '$shared/pcd/portable.ts';
 import * as deserialize from '$pcd/entities/deserialize.ts';
 import { createLidarrNaming } from '$pcd/entities/mediaManagement/naming/create.ts';
 import { validatePortableData } from '$pcd/entities/validate.ts';
+import { logger } from '$logger/logger.ts';
 
 const VALID_ENTITY_TYPES: ReadonlySet<string> = new Set(ENTITY_TYPES);
 
@@ -35,10 +36,17 @@ export const POST: RequestHandler = async ({ request }) => {
     return json({ error: 'Invalid JSON body' }, { status: 400 });
   }
 
-  const { databaseId, layer, entityType, data } = body;
+  const { databaseId, layer, entityType, data, migration } = body;
 
   if (databaseId === undefined || !layer || !entityType || !data) {
     return json({ error: 'Missing required fields: databaseId, layer, entityType, data' }, { status: 400 });
+  }
+
+  if (migration !== undefined) {
+    const migrationError = validatePortableMigrationMetadata(migration);
+    if (migrationError) {
+      return json({ error: migrationError }, { status: 400 });
+    }
   }
 
   if (typeof databaseId !== 'number' || !Number.isInteger(databaseId)) {
@@ -79,17 +87,43 @@ export const POST: RequestHandler = async ({ request }) => {
   }
 
   try {
-    await deserializeEntity({
+    const result = await deserializeEntity({
       databaseId: databaseId as number,
       cache,
       layer: layer as OperationLayer,
       entityType: typedEntityType,
       data: data as Record<string, unknown>,
     });
+
+    if (!result?.success) {
+      const errorMessage = result?.error ?? 'Import failed';
+      await logger.warn('Import route received non-successful deserialize write result', {
+        source: 'PCDImport',
+        meta: {
+          databaseId: databaseId as number,
+          layer,
+          entityType,
+          error: errorMessage,
+        },
+      });
+      const status = isValidationError(errorMessage) ? 400 : 500;
+      return json({ error: errorMessage }, { status });
+    }
+
     return json({ success: true });
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Import failed';
-    return json({ error: message }, { status: 400 });
+    const message = getErrorMessage(err);
+    await logger.error('Import route failed while writing portable entity', {
+      source: 'PCDImport',
+      meta: {
+        databaseId: databaseId as number,
+        layer,
+        entityType,
+        error: message,
+      },
+    });
+    const status = isValidationError(err) ? 400 : 500;
+    return json({ error: message }, { status });
   }
 };
 
@@ -158,6 +192,9 @@ async function deserializeEntity({ databaseId, cache, layer, entityType, data }:
         portable: data as unknown as PortableLidarrMetadataProfile,
       });
   }
+
+  const exhaustiveCheck: never = entityType;
+  throw new Error(`Unsupported entity type: ${exhaustiveCheck}`);
 }
 
 function validateLidarrPayload(entityType: EntityType, data: Record<string, unknown>): string | null {
@@ -202,4 +239,29 @@ function validateLidarrPayload(entityType: EntityType, data: Record<string, unkn
   }
 
   return null;
+}
+
+function isValidationError(error: unknown): boolean {
+  const message = getErrorMessage(error).toLowerCase();
+  return (
+    message.includes('already exists') ||
+    message.includes('unsupported') ||
+    message.includes('required') ||
+    message.includes('invalid') ||
+    message.includes('missing') ||
+    message.includes('must') ||
+    message.includes('cannot')
+  );
+}
+
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  if (typeof error === 'string') {
+    return error;
+  }
+
+  return 'Import failed';
 }

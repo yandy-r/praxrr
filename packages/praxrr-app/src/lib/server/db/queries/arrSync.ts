@@ -346,8 +346,7 @@ function updateMetadataProfileConfigName(
     return 0;
   }
 
-  const effectiveScope = { ...scope, arrType: 'lidarr' as const };
-  const matches = findMetadataProfileSyncRows(oldName, effectiveScope);
+  const matches = findMetadataProfileSyncRows(oldName, scope);
 
   if (matches.length === 0) {
     return 0;
@@ -701,30 +700,47 @@ export const arrSyncQueries = {
    * Remove all references to a database (when database is deleted)
    */
   removeDatabaseReferences(databaseId: number): void {
-    db.execute('DELETE FROM arr_sync_quality_profiles WHERE database_id = ?', databaseId);
-    db.execute(
-      'UPDATE arr_sync_delay_profiles_config SET database_id = NULL, profile_name = NULL WHERE database_id = ?',
-      databaseId
-    );
-    db.execute(
-      'UPDATE arr_sync_media_management SET naming_database_id = NULL, naming_config_name = NULL WHERE naming_database_id = ?',
-      databaseId
-    );
-    db.execute(
-      'UPDATE arr_sync_media_management SET quality_definitions_database_id = NULL, quality_definitions_config_name = NULL WHERE quality_definitions_database_id = ?',
-      databaseId
-    );
-    db.execute(
-      'UPDATE arr_sync_media_management SET media_settings_database_id = NULL, media_settings_config_name = NULL WHERE media_settings_database_id = ?',
-      databaseId
-    );
-    db.execute(
-      `UPDATE arr_sync_metadata_profiles_config
+    const cleanupStatements = [
+      () => db.execute('DELETE FROM arr_sync_quality_profiles WHERE database_id = ?', databaseId),
+      () =>
+        db.execute(
+          'UPDATE arr_sync_delay_profiles_config SET database_id = NULL, profile_name = NULL WHERE database_id = ?',
+          databaseId
+        ),
+      () =>
+        db.execute(
+          'UPDATE arr_sync_media_management SET naming_database_id = NULL, naming_config_name = NULL WHERE naming_database_id = ?',
+          databaseId
+        ),
+      () =>
+        db.execute(
+          'UPDATE arr_sync_media_management SET quality_definitions_database_id = NULL, quality_definitions_config_name = NULL WHERE quality_definitions_database_id = ?',
+          databaseId
+        ),
+      () =>
+        db.execute(
+          'UPDATE arr_sync_media_management SET media_settings_database_id = NULL, media_settings_config_name = NULL WHERE media_settings_database_id = ?',
+          databaseId
+        ),
+      () =>
+        db.execute(
+          `UPDATE arr_sync_metadata_profiles_config
 			 SET database_id = NULL, profile_name = NULL
 			 WHERE database_id = ?
 			 AND instance_id IN (SELECT id FROM arr_instances WHERE type = 'lidarr')`,
-      databaseId
-    );
+          databaseId
+        ),
+    ];
+
+    for (const statement of cleanupStatements) {
+      try {
+        statement();
+      } catch (error) {
+        if (!(error instanceof Error) || !error.message.includes('no such table')) {
+          throw error;
+        }
+      }
+    }
   },
 
   removeMetadataProfileReference(profileName: string): number {

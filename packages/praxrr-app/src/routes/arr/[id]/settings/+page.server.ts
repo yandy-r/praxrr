@@ -187,6 +187,10 @@ export const actions: Actions = {
     }
 
     if (!isEnvManaged && apiKeyFingerprint) {
+      if (arrInstancesQueries.apiKeyExists(apiKeyFingerprint.value, id)) {
+        return fail(400, { error: 'This instance is already connected' });
+      }
+
       const matchedCredential = arrInstanceCredentialsQueries.getByFingerprint(apiKeyFingerprint.value);
       if (matchedCredential && matchedCredential.instance_id !== id) {
         return fail(400, { error: 'This instance is already connected' });

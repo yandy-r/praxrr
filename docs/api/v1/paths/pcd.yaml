@@ -65,6 +65,8 @@ import:
 
       The request body matches the export response format (`entityType` + `data`),
       plus `databaseId` and `layer` to specify the target.
+      Optional `migration` metadata (`format`, `version`, `source`) can be provided
+      for hybrid JSON/YAML ingestion flows.
 
       Name uniqueness is validated — importing an entity with a name that already
       exists will return a 400 error.

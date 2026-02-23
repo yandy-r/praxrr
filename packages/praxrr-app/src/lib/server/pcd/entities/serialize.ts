@@ -14,6 +14,7 @@ import type {
   PortableLidarrMediaSettings,
   PortableLidarrQualityDefinitions,
   PortableRadarrNaming,
+  PortableLidarrNaming,
   PortableSonarrNaming,
   PortableMediaSettings,
   PortableQualityDefinitions,
@@ -207,6 +208,23 @@ export async function serializeSonarrNaming(cache: PCDCache, name: string): Prom
     colonReplacementFormat: row.colon_replacement_format,
     customColonReplacementFormat: row.custom_colon_replacement_format,
     multiEpisodeStyle: row.multi_episode_style,
+  };
+}
+
+export async function serializeLidarrNaming(cache: PCDCache, name: string): Promise<PortableLidarrNaming> {
+  const row = await namingQueries.getLidarrByName(cache, name);
+  if (!row) throw new Error(`Lidarr naming "${name}" not found`);
+
+  return {
+    name: row.name,
+    rename: row.rename,
+    standardTrackFormat: row.standard_track_format,
+    artistName: row.artist_name,
+    multiDiscTrackFormat: row.multi_disc_track_format,
+    artistFolderFormat: row.artist_folder_format,
+    replaceIllegalCharacters: row.replace_illegal_characters,
+    colonReplacementFormat: row.colon_replacement_format,
+    customColonReplacementFormat: row.custom_colon_replacement_format,
   };
 }
 

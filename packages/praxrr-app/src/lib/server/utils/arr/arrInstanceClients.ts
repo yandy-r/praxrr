@@ -1,5 +1,6 @@
 import { decryptArrInstanceApiKey } from '$server/utils/encryption/arr-credentials.ts';
 import { arrInstanceCredentialsQueries } from '$db/queries/arrInstanceCredentials.ts';
+import { arrInstancesQueries } from '$db/queries/arrInstances.ts';
 import type { ArrClientOptions } from './base.ts';
 import { createArrClient } from './factory.ts';
 import type { BaseArrClient } from './base.ts';
@@ -58,9 +59,40 @@ export async function getArrInstanceClient(
   options?: ArrClientOptions,
   cache?: ArrInstanceClientCache
 ): Promise<BaseArrClient> {
-  const credentials = arrInstanceCredentialsQueries.getByInstanceId(instanceId);
+  let credentials;
+  try {
+    credentials = arrInstanceCredentialsQueries.getByInstanceId(instanceId);
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      (error.message.includes('Database not initialized') ||
+        error.message.includes('no such table: arr_instance_credentials'))
+    ) {
+      credentials = undefined;
+    } else {
+      throw error;
+    }
+  }
   if (!credentials) {
-    throw new Error(`No Arr credentials found for instance ${instanceId}`);
+    let instance;
+    try {
+      instance = arrInstancesQueries.getById(instanceId);
+    } catch (error) {
+      if (
+        error instanceof Error &&
+        error.message.includes('Database not initialized')
+      ) {
+        throw new Error(`No Arr credentials found for instance ${instanceId}`);
+      }
+
+      throw error;
+    }
+
+    if (!instance || !instance.api_key) {
+      throw new Error(`No Arr credentials found for instance ${instanceId}`);
+    }
+
+    return createArrClient(type, url, instance.api_key, options);
   }
 
   const cacheKey = getCacheKey(instanceId, credentials.key_version);

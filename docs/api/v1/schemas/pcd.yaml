@@ -30,6 +30,34 @@ EntityType:
     - lidarr_media_settings
     - lidarr_quality_definitions
 
+PortableMigrationMetadata:
+  type: object
+  required:
+    - format
+    - version
+    - source
+  additionalProperties: false
+  properties:
+    format:
+      type: string
+      enum:
+        - json
+        - yaml
+      description: |
+        Migration payload format marker (`json` for JSON payloads, `yaml` for YAML
+        in future hybrid ingestion flows).
+    version:
+      type: integer
+      minimum: 1
+      description: Migration schema contract version for hybrid payloads.
+    source:
+      type: string
+      description: |
+        Migration source marker (example: `pcd-export`, `pcd-file`, `pcd-importer`).
+  description: |
+    Optional metadata for hybrid JSON/YAML migration envelopes.
+    Existing payloads are backward-compatible when omitted.
+
 ExportResponse:
   type: object
   required:
@@ -38,6 +66,9 @@ ExportResponse:
   properties:
     entityType:
       $ref: '#/EntityType'
+    migration:
+      $ref: '#/PortableMigrationMetadata'
+      description: Optional migration metadata for hybrid ingestion/egress.
     data:
       description: |
         The portable entity payload. Shape varies by entityType:
@@ -89,6 +120,11 @@ ImportRequest:
       description: The operation layer to write to
     entityType:
       $ref: '#/EntityType'
+    migration:
+      $ref: '#/PortableMigrationMetadata'
+      description: |
+        Optional migration metadata for hybrid imports. If provided, this field must
+        include all keys from `PortableMigrationMetadata`.
     data:
       description: |
         The portable entity payload (same shape as ExportResponse.data).

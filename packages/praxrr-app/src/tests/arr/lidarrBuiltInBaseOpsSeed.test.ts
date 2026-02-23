@@ -10,6 +10,11 @@ import {
 } from '$db/migrations/20260215_add_lidarr_media_management_entities.ts';
 import { LIDARR_NATIVE_QUALITY_MAPPINGS_OP_FILENAME } from '$db/migrations/20260216_enforce_native_lidarr_quality_mappings.ts';
 import { LIDARR_NAMING_DEFAULTS_OP_FILENAME } from '$db/migrations/20260217_set_lidarr_naming_defaults.ts';
+import {
+  LIDARR_METADATA_PROFILES_OP_FILENAME,
+} from '$db/migrations/20260218_add_lidarr_metadata_profiles.ts';
+import { LIDARR_DEFAULT_METADATA_PROFILE_OP_FILENAME } from '$db/migrations/20260219_seed_default_lidarr_metadata_profile.ts';
+import { NAMING_CHARACTER_REPLACEMENT_DEFAULTS_OP_FILENAME } from '$db/migrations/20260224_normalize_naming_character_replacement_defaults.ts';
 
 type Restore = () => void;
 
@@ -44,8 +49,8 @@ class LidarrBuiltInBaseOpsSeedTest extends BaseTest {
 
       const result = await seedBuiltInBaseOps(42);
 
-      assertEquals(result, { created: 3, skipped: 0 });
-      assertEquals(createdInputs.length, 3);
+      assertEquals(result, { created: 6, skipped: 0 });
+      assertEquals(createdInputs.length, 6);
 
       // First op: Lidarr media management entities
       assertEquals(createdInputs[0].databaseId, 42);
@@ -63,6 +68,15 @@ class LidarrBuiltInBaseOpsSeedTest extends BaseTest {
 
       // Third op: Lidarr naming defaults
       assertEquals(createdInputs[2].filename, LIDARR_NAMING_DEFAULTS_OP_FILENAME);
+
+      // Fourth op: Lidarr metadata profiles
+      assertEquals(createdInputs[3].filename, LIDARR_METADATA_PROFILES_OP_FILENAME);
+
+      // Fifth op: Lidarr default metadata profile
+      assertEquals(createdInputs[4].filename, LIDARR_DEFAULT_METADATA_PROFILE_OP_FILENAME);
+
+      // Sixth op: Naming character replacement defaults
+      assertEquals(createdInputs[5].filename, NAMING_CHARACTER_REPLACEMENT_DEFAULTS_OP_FILENAME);
     });
 
     this.test('skips creation when built-in base op already exists', async () => {
@@ -96,7 +110,7 @@ class LidarrBuiltInBaseOpsSeedTest extends BaseTest {
 
       const result = await seedBuiltInBaseOps(42);
 
-      assertEquals(result, { created: 0, skipped: 3 });
+      assertEquals(result, { created: 0, skipped: 6 });
       assertEquals(createCalls, 0);
     });
   }
