@@ -2,10 +2,8 @@ import { assertArrayIncludes, assertEquals, assertExists } from '@std/assert';
 import { BaseTest, type TestContext } from './BaseTest.ts';
 import { GET as libraryGet } from '../../routes/api/v1/arr/library/+server.ts';
 import { GET as releasesGet } from '../../routes/api/v1/arr/releases/+server.ts';
-import { GET as exportGet } from '../../routes/api/v1/pcd/export/+server.ts';
-import { POST as importPost } from '../../routes/api/v1/pcd/import/+server.ts';
-import * as deserialize from '../../lib/server/pcd/entities/deserialize.ts';
-import * as serialize from '../../lib/server/pcd/entities/serialize.ts';
+import { GET as exportGet, serializeDependencies } from '../../routes/api/v1/pcd/export/+server.ts';
+import { POST as importPost, deserializeDependencies } from '../../routes/api/v1/pcd/import/+server.ts';
 import { type ArrInstance, arrInstancesQueries } from '../../lib/server/db/queries/arrInstances.ts';
 import { pcdManager, type PCDCache as PCDCacheType } from '../../lib/server/pcd/index.ts';
 import { cache } from '../../lib/server/utils/cache/cache.ts';
@@ -813,7 +811,7 @@ class LidarrApiParityTest extends BaseTest {
     this.test('import accepts valid migration metadata', async () => {
       const getCacheMock: typeof pcdManager.getCache = () => ({ kb: {} }) as unknown as PCDCacheType;
       this.patch(pcdManager, 'getCache', getCacheMock);
-      this.patch(deserialize, 'deserializeRegularExpression', async () => {
+      this.patch(deserializeDependencies, 'deserializeRegularExpression', async () => {
         return { success: true };
       });
 
@@ -848,7 +846,7 @@ class LidarrApiParityTest extends BaseTest {
     this.test('export includes migration metadata in response', async () => {
       const getCacheMock: typeof pcdManager.getCache = () => ({ kb: {} }) as unknown as PCDCacheType;
       this.patch(pcdManager, 'getCache', getCacheMock);
-      this.patch(serialize, 'serializeRegularExpression', async () => {
+      this.patch(serializeDependencies, 'serializeRegularExpression', async () => {
         return {
           name: 'Regular Expression',
           pattern: 'test',
@@ -859,9 +857,7 @@ class LidarrApiParityTest extends BaseTest {
       });
 
       const response = await exportGet({
-        url: this.createUrl(
-          '/api/v1/pcd/export?databaseId=1&entityType=regular_expression&name=Regular%20Expression'
-        ),
+        url: this.createUrl('/api/v1/pcd/export?databaseId=1&entityType=regular_expression&name=Regular%20Expression'),
       } as Parameters<typeof exportGet>[0]);
 
       assertEquals(response.status, 200);

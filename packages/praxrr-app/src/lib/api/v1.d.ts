@@ -657,7 +657,9 @@ export interface components {
         | components['schemas']['PortableQualityProfile']
         | components['schemas']['PortableRadarrNaming']
         | components['schemas']['PortableSonarrNaming']
+        | components['schemas']['PortableLidarrNaming']
         | components['schemas']['PortableMediaSettings']
+        | components['schemas']['PortableLidarrMetadataProfile']
         | components['schemas']['PortableQualityDefinitions'];
       /** @description Optional migration metadata emitted by portable exports. */
       migration?: components['schemas']['PortableMigrationMetadata'];
@@ -690,7 +692,9 @@ export interface components {
         | components['schemas']['PortableQualityProfile']
         | components['schemas']['PortableRadarrNaming']
         | components['schemas']['PortableSonarrNaming']
+        | components['schemas']['PortableLidarrNaming']
         | components['schemas']['PortableMediaSettings']
+        | components['schemas']['PortableLidarrMetadataProfile']
         | components['schemas']['PortableQualityDefinitions'];
       /** @description Optional migration metadata for migration tracking. */
       migration?: components['schemas']['PortableMigrationMetadata'];
@@ -803,6 +807,18 @@ export interface components {
       conditions: Record<string, never>[];
       tests: components['schemas']['PortableCustomFormatTest'][];
     };
+    PortableMetadataProfileType: {
+      id: number;
+      name: string;
+      allowed: boolean;
+    };
+    PortableLidarrMetadataProfile: {
+      name: string;
+      description: string | null;
+      primaryTypes: components['schemas']['PortableMetadataProfileType'][];
+      secondaryTypes: components['schemas']['PortableMetadataProfileType'][];
+      releaseStatuses: components['schemas']['PortableMetadataProfileType'][];
+    };
     PortableCustomFormatScore: {
       customFormatName: string;
       /**
@@ -837,6 +853,19 @@ export interface components {
       colonReplacementFormat: string;
     };
     PortableSonarrNaming: {
+      name: string;
+      rename: boolean;
+      standardEpisodeFormat: string;
+      dailyEpisodeFormat: string;
+      animeEpisodeFormat: string;
+      seriesFolderFormat: string;
+      seasonFolderFormat: string;
+      replaceIllegalCharacters: boolean;
+      colonReplacementFormat: string;
+      customColonReplacementFormat: string | null;
+      multiEpisodeStyle: string;
+    };
+    PortableLidarrNaming: {
       name: string;
       rename: boolean;
       standardEpisodeFormat: string;

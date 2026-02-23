@@ -483,7 +483,7 @@ class PCDManager {
       });
       return stats;
     } catch (error) {
-      // Log error but don't fail the surrounding operation
+      // Log the error, then either re-throw (failOnError=true) or return zero stats.
       await logger.error(`Failed to compile PCD cache (${context})`, {
         source: 'PCDManager',
         meta: { error: String(error), databaseId: instance.id },

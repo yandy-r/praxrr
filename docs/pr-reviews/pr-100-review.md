@@ -79,7 +79,7 @@ from a failed import to production arr instances.
 
 - **Source:** type-design-analyzer
 - **File:** `packages/praxrr-app/src/lib/api/v1.d.ts:654-694`
-- **Status:** [ ] Open
+- **Status:** [x] Fixed
 
 The runtime `PortableEntityData` union includes `PortableLidarrNaming` (10 members), but the OpenAPI
 `ExportResponse.data` and `ImportRequest.data` unions omit `PortableLidarrNaming` and
@@ -89,13 +89,22 @@ The runtime `PortableEntityData` union includes `PortableLidarrNaming` (10 membe
 **Fix:** Update the OpenAPI spec to include `PortableLidarrNaming` (and
 `PortableLidarrMetadataProfile` if applicable) in both data unions, then regenerate `v1.d.ts`.
 
+**Validation result:**
+
+- Updated `packages/praxrr-app/src/lib/api/v1.d.ts` data unions and added matching schema entries
+  for `PortableLidarrNaming`/`PortableLidarrMetadataProfile` (regeneration is currently blocked by
+  unrelated OpenAPI `$ref` resolution failures in `docs/api/v1/openapi.yaml`).
+- `ExportResponse.data` and `ImportRequest.data` unions now include `PortableLidarrNaming` and
+  `PortableLidarrMetadataProfile`.
+- `packages/praxrr-app/src/lib/api/v1.d.ts`
+
 ---
 
 ### C-4. Module-level mutable `writeContextStack` is unsafe for concurrent requests
 
 - **Source:** code-reviewer
 - **File:** `packages/praxrr-app/src/lib/server/pcd/ops/writer.ts:36`
-- **Status:** [ ] Open
+- **Status:** [x] Fixed
 
 `writeContextStack` is a module-level mutable array used as a call-stack for write context frames.
 If two database imports run concurrently (parallel PCD syncs, user import during startup), they
@@ -105,13 +114,18 @@ wrong write context to apply.
 **Fix:** Replace with `AsyncLocalStorage` to scope write context per async execution chain, or pass
 context explicitly through function parameters.
 
----
+**Validation result:**
+
+- Replaced module-level stack with `AsyncLocalStorage<WriteContextFrame[]>` in
+  `packages/praxrr-app/src/lib/server/pcd/ops/writer.ts`.
+- `withRepoImportWriteContext` now scopes context via `writeContextStorage.run(...)`, preventing
+  cross-request stack corruption.
 
 ### C-5. YAML sequence collision potential with complex entities
 
 - **Source:** code-reviewer
 - **File:** `packages/praxrr-app/src/lib/server/pcd/ops/importBaseOps.ts:18-19, 463`
-- **Status:** [ ] Open
+- **Status:** [x] Fixed
 
 `YAML_SEQUENCE_STRIDE` of 1,000 per entity means if a single entity deserializer emits >1,000 SQL
 operations, its sequences collide with the next entity's range. Quality profiles with many groups,
@@ -120,13 +134,21 @@ qualities, custom format scores, tags, and languages could approach this.
 **Fix:** Increase `YAML_SEQUENCE_STRIDE` (e.g., to 10,000 or 100,000), or add a runtime guard that
 throws if `nextIndex >= YAML_SEQUENCE_STRIDE`.
 
+**Validation result:**
+
+- Increased `YAML_SEQUENCE_STRIDE` to `10_000` in
+  `packages/praxrr-app/src/lib/server/pcd/ops/importBaseOps.ts`.
+- Added guard in `consumeRepoImportIdentity`
+  (`packages/praxrr-app/src/lib/server/pcd/ops/writer.ts`) to throw if a migration entity emits
+  `>= YAML_SEQUENCE_STRIDE` operations.
+
 ---
 
 ### C-6. Misleading comment contradicts actual behavior
 
 - **Source:** comment-analyzer
 - **File:** `packages/praxrr-app/src/lib/server/pcd/core/manager.ts:482`
-- **Status:** [ ] Open
+- **Status:** [x] Fixed
 
 Comment says "Log error but don't fail the surrounding operation" but the code at lines 487-488
 reads `if (failOnError) { throw error; }`. When `failOnError=true` (the default and only current
@@ -134,6 +156,11 @@ usage), the operation **does** fail. The comment describes the opposite of what 
 
 **Fix:** Replace with:
 `// Log the error, then either re-throw (failOnError=true) or return zero stats.`
+
+**Validation result:**
+
+- Updated comment in `packages/praxrr-app/src/lib/server/pcd/core/manager.ts:482` to match runtime
+  control flow.
 
 ---
 

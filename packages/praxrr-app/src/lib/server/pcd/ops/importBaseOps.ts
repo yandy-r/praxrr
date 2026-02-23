@@ -16,7 +16,7 @@ import { withRepoImportWriteContext } from './writer.ts';
 
 const UNPREFIXED_SEQUENCE_BASE = 2_000_000_000;
 const YAML_SEQUENCE_BASE = 4_000_000_000;
-const YAML_SEQUENCE_STRIDE = 1_000;
+const YAML_SEQUENCE_STRIDE = 10_000;
 const MIGRATION_OP_FILENAME_PREFIX = 'entities/';
 
 const ENTITY_IMPORT_ORDER: readonly EntityType[] = [
@@ -269,7 +269,9 @@ function collectMigrationStableIdentitySet(
   return identities;
 }
 
-function sortMigrationCandidatesByImportOrder(candidates: readonly MigrationEntityCandidate[]): MigrationEntityCandidate[] {
+function sortMigrationCandidatesByImportOrder(
+  candidates: readonly MigrationEntityCandidate[]
+): MigrationEntityCandidate[] {
   const entityOrder = new Map<EntityType, number>();
   for (let i = 0; i < ENTITY_IMPORT_ORDER.length; i++) {
     entityOrder.set(ENTITY_IMPORT_ORDER[i], i);
@@ -461,6 +463,7 @@ export async function importBaseOps(
         {
           filenamePrefix: `${MIGRATION_OP_FILENAME_PREFIX}${candidate.relativePath}`,
           sequenceStart: YAML_SEQUENCE_BASE + i * YAML_SEQUENCE_STRIDE,
+          maxOperations: YAML_SEQUENCE_STRIDE,
           lastSeenInRepoAt: seenAt,
         },
         async () => {

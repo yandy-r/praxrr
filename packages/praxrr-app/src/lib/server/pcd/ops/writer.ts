@@ -8,6 +8,7 @@ import { buildContentHash, type PcdOpSource, pcdOpsQueries } from '$db/queries/p
 import { pcdOpHistoryQueries } from '$db/queries/pcdOpHistory.ts';
 import type { PcdOpOrigin } from '$db/queries/pcdOps.ts';
 import { logger } from '$logger/logger.ts';
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { compiledQueryToSql } from '../utils/sql.ts';
 import { compile } from '../database/compiler.ts';
 import { getCache } from '../database/registry.ts';
@@ -25,6 +26,7 @@ interface RepoImportWriteContext {
   sequenceStart: number;
   nextIndex: number;
   lastSeenInRepoAt: string;
+  maxOperations: number;
 }
 
 interface WriteContextFrame {
@@ -33,11 +35,12 @@ interface WriteContextFrame {
   repoImport?: RepoImportWriteContext;
 }
 
-const writeContextStack: WriteContextFrame[] = [];
+const writeContextStorage = new AsyncLocalStorage<WriteContextFrame[]>();
 
 function currentWriteContext(): WriteContextFrame | undefined {
-  if (writeContextStack.length === 0) return undefined;
-  return writeContextStack[writeContextStack.length - 1];
+  const stack = writeContextStorage.getStore();
+  if (!stack || stack.length === 0) return undefined;
+  return stack[stack.length - 1];
 }
 
 interface RepoImportIdentity {
@@ -51,6 +54,10 @@ function consumeRepoImportIdentity(layer: OperationLayer, source: PcdOpSource): 
   const repoImport = currentWriteContext()?.repoImport;
   if (!repoImport || layer !== 'base' || source !== 'repo') {
     return null;
+  }
+
+  if (repoImport.nextIndex >= repoImport.maxOperations) {
+    throw new Error(`Migration repo import emitted too many SQL operations for "${repoImport.filenamePrefix}"`);
   }
 
   const index = repoImport.nextIndex;
@@ -69,26 +76,26 @@ export async function withRepoImportWriteContext<T>(
   options: {
     filenamePrefix: string;
     sequenceStart: number;
+    maxOperations: number;
     lastSeenInRepoAt: string;
   },
   callback: () => Promise<T>
 ): Promise<T> {
-  writeContextStack.push({
+  const parent = writeContextStorage.getStore() ?? [];
+  const nextContext: WriteContextFrame = {
     source: 'repo',
     allowBaseImport: true,
     repoImport: {
       filenamePrefix: options.filenamePrefix,
       sequenceStart: options.sequenceStart,
       nextIndex: 0,
+      maxOperations: options.maxOperations,
       lastSeenInRepoAt: options.lastSeenInRepoAt,
     },
-  });
+  };
+  const nextStack: WriteContextFrame[] = [...parent, nextContext];
 
-  try {
-    return await callback();
-  } finally {
-    writeContextStack.pop();
-  }
+  return writeContextStorage.run(nextStack, callback);
 }
 
 function buildMetadataJson(metadata?: OperationMetadata): string | null {
@@ -530,7 +537,7 @@ async function writeOperationsFromSqlOperations(options: WriteSqlOperationsOptio
     const source =
       layer === 'base' && context?.allowBaseImport === true && context?.source === 'repo'
         ? 'repo'
-        : options.source ?? context?.source ?? 'local';
+        : (options.source ?? context?.source ?? 'local');
     const hasPersonalAccessToken = !!instance.has_personal_access_token || !!instance.personal_access_token;
     const allowBaseImportBypass = context?.allowBaseImport === true && source === 'repo';
     if (layer === 'base' && (!hasPersonalAccessToken || instance.local_ops_enabled) && !allowBaseImportBypass) {
