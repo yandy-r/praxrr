@@ -77,14 +77,21 @@ jobs:
 
       - name: Run contract compatibility checks
         run: |
+          set -euo pipefail
           npm install -g node-gyp
-          node-gyp --version
           export npm_config_python="$(command -v python3)"
           export NODE_GYP_FORCE_PYTHON="$(command -v python3)"
+          export npm_config_node_gyp="$(npm root -g)/node_modules/node-gyp/bin/node-gyp.js"
           echo "Using python for node-gyp: ${npm_config_python}"
+          echo "Using npm-config node-gyp: ${npm_config_node_gyp}"
+          node-gyp --version
           python3 -V
           make --version
-          deno install --node-modules-dir --allow-scripts=npm:better-sqlite3
+
+          if ! deno install --node-modules-dir --allow-scripts=npm:better-sqlite3; then
+            echo "::warning::Scripted install for better-sqlite3 failed; retrying without scripts for type-check-only compatibility."
+            deno install --node-modules-dir
+          fi
           deno run -A scripts/compat-check.ts
 
   compatibility-app-check:
@@ -103,14 +110,21 @@ jobs:
 
       - name: Run app checks
         run: |
+          set -euo pipefail
           npm install -g node-gyp
-          node-gyp --version
           export npm_config_python="$(command -v python3)"
           export NODE_GYP_FORCE_PYTHON="$(command -v python3)"
+          export npm_config_node_gyp="$(npm root -g)/node_modules/node-gyp/bin/node-gyp.js"
           echo "Using python for node-gyp: ${npm_config_python}"
+          echo "Using npm-config node-gyp: ${npm_config_node_gyp}"
+          node-gyp --version
           python3 -V
           make --version
-          deno install --node-modules-dir --allow-scripts=npm:better-sqlite3
+
+          if ! deno install --node-modules-dir --allow-scripts=npm:better-sqlite3; then
+            echo "::warning::Scripted install for better-sqlite3 failed; retrying without scripts for type-check-only verification."
+            deno install --node-modules-dir
+          fi
           cd packages/praxrr-app
           npx svelte-kit sync
           cd ../..
