@@ -4,7 +4,6 @@
 
 import { Database } from '@jsr/db__sqlite';
 import { Kysely } from 'kysely';
-// @ts-ignore - Deno JSR import not recognized by svelte-check
 import { DenoSqlite3Dialect } from '@soapbox/kysely-deno-sqlite';
 import { logger } from '$logger/logger.ts';
 import { loadAllOperations } from '../ops/loadOps.ts';
@@ -152,7 +151,7 @@ export class PCDCache {
                           autoAlignReason: gateResult.autoAlignReason,
                           autoAlignRule: gateResult.autoAlignRule,
                         },
-                      },
+                      }
                     );
                   }
                 } else {

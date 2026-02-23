@@ -4,14 +4,20 @@
  */
 
 import { databaseInstancesQueries } from '$db/queries/databaseInstances.ts';
-import { pcdOpsQueries } from '$db/queries/pcdOps.ts';
+import { buildContentHash, type PcdOpSource, pcdOpsQueries } from '$db/queries/pcdOps.ts';
 import { pcdOpHistoryQueries } from '$db/queries/pcdOpHistory.ts';
 import type { PcdOpOrigin } from '$db/queries/pcdOps.ts';
 import { logger } from '$logger/logger.ts';
 import { compiledQueryToSql } from '../utils/sql.ts';
 import { compile } from '../database/compiler.ts';
 import { getCache } from '../database/registry.ts';
-import type { OperationMetadata, OperationType, WriteOptions, WriteResult } from '../core/types.ts';
+import type { OperationLayer, OperationMetadata, OperationType, WriteOptions, WriteResult } from '../core/types.ts';
+import {
+  evaluateValueGuardApply,
+  evaluateValueGuardError,
+  isValueGuardBlockingStatus,
+} from '../migration/valueGuardGate.ts';
+import type { Database } from '@jsr/db__sqlite';
 import { uuid } from '$shared/utils/uuid.ts';
 
 function buildMetadataJson(metadata?: OperationMetadata): string | null {
@@ -53,12 +59,124 @@ function serializeDesiredState(desiredState?: Record<string, unknown> | null): s
   return JSON.stringify(desiredState);
 }
 
-async function hashContent(sql: string, metadataJson: string | null): Promise<string> {
-  const payload = `${sql}\n${metadataJson ?? ''}`;
-  const data = new TextEncoder().encode(payload);
-  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
+interface MigrationSqlOperation {
+  sql: string;
+  metadata?: OperationMetadata;
+  desiredState?: Record<string, unknown> | null;
+  source?: PcdOpSource;
+}
+
+interface WriteSqlOperationsOptions {
+  databaseId: number;
+  layer: OperationLayer;
+  description: string;
+  operations: MigrationSqlOperation[];
+  source?: PcdOpSource;
+  runValueGuardGate?: boolean;
+}
+
+interface ValueGuardGateResult {
+  ok: boolean;
+  error?: string;
+}
+
+function normalizeSql(sql: string): string {
+  const trimmed = sql.trim();
+  return trimmed.endsWith(';') ? trimmed : `${trimmed};`;
+}
+
+function serializeMigrationSqlOperation(operation: MigrationSqlOperation): {
+  sql: string;
+  metadataJson: string | null;
+  desiredStateJson: string | null;
+} {
+  return {
+    sql: normalizeSql(operation.sql),
+    metadataJson: buildMetadataJson(operation.metadata),
+    desiredStateJson: serializeDesiredState(operation.desiredState),
+  };
+}
+
+function runValueGuardGate(
+  databaseId: number,
+  layer: OperationLayer,
+  operations: MigrationSqlOperation[]
+): ValueGuardGateResult {
+  if (layer !== 'user') {
+    return { ok: true };
+  }
+
+  const cache = getCache(databaseId);
+  if (!cache) {
+    return { ok: true };
+  }
+
+  const cacheDb = (cache as unknown as { db: Database | null }).db;
+  if (!cacheDb) {
+    return { ok: true };
+  }
+
+  const instance = databaseInstancesQueries.getById(databaseId);
+  const conflictStrategy = (instance?.conflict_strategy ?? 'override') as 'override' | 'align' | 'ask';
+
+  cacheDb.exec('SAVEPOINT pcd_writer_value_guard');
+  try {
+    for (let i = 0; i < operations.length; i++) {
+      const operation = operations[i];
+      const { sql, metadataJson, desiredStateJson } = serializeMigrationSqlOperation(operation);
+      if (sql.length === 0) {
+        continue;
+      }
+
+      const beforeChanges = cacheDb.totalChanges;
+      try {
+        cacheDb.exec(sql);
+      } catch (error) {
+        const errorStr = String(error);
+        const gateError = evaluateValueGuardError({
+          conflictStrategy,
+          error: errorStr,
+          isUserOp: true,
+          trackHistory: true,
+          priorConflictReason: null,
+        });
+
+        if (isValueGuardBlockingStatus(gateError.status) || !gateError.shouldRecordHistory) {
+          return {
+            ok: false,
+            error: `Value-guard gate failed to execute operation ${i + 1}: ${errorStr}`,
+          };
+        }
+
+        continue;
+      }
+
+      const rowcount = cacheDb.totalChanges - beforeChanges;
+      const gateResult = evaluateValueGuardApply({
+        conflictStrategy,
+        isUserOp: true,
+        rowcount,
+        db: cacheDb,
+        metadataJson,
+        desiredStateJson,
+        priorConflictReason: null,
+      });
+
+      if (isValueGuardBlockingStatus(gateResult.status)) {
+        return {
+          ok: false,
+          error: `Value-guard gate rejected operation ${i + 1} (${
+            operation.metadata?.entity ?? 'operation'
+          } "${operation.metadata?.name ?? ''}"): ${gateResult.conflictReason ?? gateResult.status}`,
+        };
+      }
+    }
+
+    return { ok: true };
+  } finally {
+    cacheDb.exec('ROLLBACK TO SAVEPOINT pcd_writer_value_guard');
+    cacheDb.exec('RELEASE SAVEPOINT pcd_writer_value_guard');
+  }
 }
 
 async function cancelOutCreate(databaseId: number, origin: PcdOpOrigin, metadata: OperationMetadata): Promise<boolean> {
@@ -162,7 +280,12 @@ async function cancelOutCreate(databaseId: number, origin: PcdOpOrigin, metadata
       pcdOpsQueries.update(candidate.id, { state: 'dropped' });
       await logger.info('Cancelled out local create operation with delete', {
         source: 'PCDWriter',
-        meta: { databaseId, opId: candidate.id, entity: metadata.entity, name: metadata.name },
+        meta: {
+          databaseId,
+          opId: candidate.id,
+          entity: metadata.entity,
+          name: metadata.name,
+        },
       });
       return true;
     }
@@ -277,8 +400,12 @@ async function supersedePriorUserOps(databaseId: number, newOpId: number, metada
  * For base layer: inserts a draft base op (origin=base, state=draft)
  * For user layer: inserts a published user op (origin=user, state=published)
  */
-export async function writeOperation(options: WriteOptions): Promise<WriteResult> {
-  const { databaseId, layer, description, queries, metadata, desiredState } = options;
+async function writeOperationsFromSqlOperations(options: WriteSqlOperationsOptions): Promise<WriteResult> {
+  const { databaseId, layer, description } = options;
+  const operations = options.operations;
+  if (!operations || operations.length === 0) {
+    return { success: false, error: 'No SQL operations provided' };
+  }
 
   try {
     const instance = databaseInstancesQueries.getById(databaseId);
@@ -294,8 +421,7 @@ export async function writeOperation(options: WriteOptions): Promise<WriteResult
       };
     }
 
-    // Convert queries to SQL first (needed for validation)
-    const sqlStatements = queries.map(compiledQueryToSql);
+    const sqlStatements = operations.map((operation) => normalizeSql(operation.sql));
 
     // Validate against current cache
     const cache = getCache(databaseId);
@@ -324,44 +450,64 @@ export async function writeOperation(options: WriteOptions): Promise<WriteResult
       });
     }
 
-    if (metadata && (await cancelOutCreate(databaseId, layer, metadata))) {
-      await compile(instance.local_path, instance.id);
-      return { success: true };
+    if (options.runValueGuardGate) {
+      const gateResult = runValueGuardGate(databaseId, layer, operations);
+      if (!gateResult.ok) {
+        return {
+          success: false,
+          error: gateResult.error ?? 'Migration operations failed value-guard check',
+        };
+      }
     }
 
-    const sqlContent = `${sqlStatements.join(';\n\n')};`.trim();
-    const metadataJson = buildMetadataJson(metadata);
-    const desiredStateJson = serializeDesiredState(desiredState);
-    const contentHash = await hashContent(sqlContent, metadataJson);
+    const source = options.source ?? 'local';
+    let lastOpId: number | null = null;
 
-    const origin: PcdOpOrigin = layer === 'base' ? 'base' : 'user';
-    const state = layer === 'base' ? 'draft' : 'published';
+    for (const operation of operations) {
+      const { sql, metadataJson, desiredStateJson } = serializeMigrationSqlOperation(operation);
 
-    const opId = pcdOpsQueries.create({
-      databaseId,
-      origin,
-      state,
-      source: 'local',
-      sql: sqlContent,
-      metadata: metadataJson,
-      desiredState: desiredStateJson,
-      contentHash,
-    });
+      if (operation.metadata && (await cancelOutCreate(databaseId, layer, operation.metadata))) {
+        continue;
+      }
 
-    const opType = metadata?.operation ?? 'write';
-    const entity = metadata?.entity?.replace(/_/g, ' ') ?? 'operation';
-    const entityName = metadata?.name ?? '';
-    const message = `${opType.charAt(0).toUpperCase() + opType.slice(1)} ${entity} "${entityName}" in ${origin} layer`;
-
-    if (metadata?.operation === 'create' || metadata?.operation === 'delete') {
-      await logger.info(message, {
-        source: 'PCDWriter',
-        meta: { databaseId, opId, layer: origin, entity: metadata.entity, name: metadata.name },
+      const contentHash = await buildContentHash(sql, metadataJson);
+      const opId = pcdOpsQueries.create({
+        databaseId,
+        origin: layer === 'base' ? 'base' : 'user',
+        state: layer === 'base' ? 'draft' : 'published',
+        source,
+        sql,
+        metadata: metadataJson,
+        desiredState: desiredStateJson,
+        contentHash,
       });
-    }
+      lastOpId = opId;
 
-    if (origin === 'user' && metadata && (metadata.operation === 'update' || metadata.operation === 'delete')) {
-      await supersedePriorUserOps(databaseId, opId, metadata);
+      const opType = operation.metadata?.operation ?? 'write';
+      const entity = operation.metadata?.entity?.replace(/_/g, ' ') ?? 'operation';
+      const entityName = operation.metadata?.name ?? '';
+      const message = `${opType.charAt(0).toUpperCase() + opType.slice(1)} ${entity} "${entityName}" in ${layer} layer`;
+
+      if (operation.metadata?.operation === 'create' || operation.metadata?.operation === 'delete') {
+        await logger.info(message, {
+          source: 'PCDWriter',
+          meta: {
+            databaseId,
+            opId,
+            layer,
+            entity: operation.metadata.entity,
+            name: operation.metadata.name,
+          },
+        });
+      }
+
+      if (
+        layer === 'user' &&
+        operation.metadata &&
+        (operation.metadata.operation === 'update' || operation.metadata.operation === 'delete')
+      ) {
+        await supersedePriorUserOps(databaseId, opId, operation.metadata);
+      }
     }
 
     await compile(instance.local_path, instance.id);
@@ -371,14 +517,49 @@ export async function writeOperation(options: WriteOptions): Promise<WriteResult
       meta: { databaseId },
     });
 
-    return { success: true, filepath: `pcd_ops:${opId}` };
+    return {
+      success: true,
+      filepath: lastOpId ? `pcd_ops:${lastOpId}` : undefined,
+    };
   } catch (error) {
     await logger.error('Failed to write operation', {
       source: 'PCDWriter',
-      meta: { error: String(error), databaseId, layer, description },
+      meta: {
+        error: String(error),
+        databaseId,
+        layer,
+        description,
+        source: options.source,
+      },
     });
     return { success: false, error: String(error) };
   }
+}
+
+export function writeOperation(options: WriteOptions): Promise<WriteResult> {
+  const sqlContent = options.queries.map(compiledQueryToSql).join(';\n\n');
+  return writeOperationsFromSqlOperations({
+    databaseId: options.databaseId,
+    layer: options.layer,
+    description: options.description,
+    operations: [
+      {
+        sql: `${sqlContent};`,
+        metadata: options.metadata,
+        desiredState: options.desiredState,
+      },
+    ],
+    source: 'local',
+    runValueGuardGate: false,
+  });
+}
+
+export function writeOperationsFromSql(options: WriteSqlOperationsOptions): Promise<WriteResult> {
+  return writeOperationsFromSqlOperations({
+    ...options,
+    source: options.source ?? 'import',
+    runValueGuardGate: true,
+  });
 }
 
 /**
@@ -390,4 +571,4 @@ export function canWriteToBase(databaseId: number): boolean {
 }
 
 // Re-export types for convenience
-export type { OperationType, OperationMetadata, WriteOptions, WriteResult };
+export type { OperationMetadata, OperationType, WriteOptions, WriteResult };

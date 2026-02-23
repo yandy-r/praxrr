@@ -6,23 +6,23 @@
  * (op drops/history writes/logging) from the returned decision.
  */
 
-import type { Database } from "@jsr/db__sqlite";
+import type { Database } from '@jsr/db__sqlite';
 import {
   type ConflictStrategy,
   evaluateAutoAlign,
   parseDesiredState,
   parseOpMetadata,
-} from "$pcd/conflicts/autoAlign/index.ts";
-import { checkFullListConflict } from "$pcd/conflicts/fullListCheck.ts";
-import type { PcdOpHistoryStatus } from "$db/queries/pcdOpHistory.ts";
+} from '$pcd/conflicts/autoAlign/index.ts';
+import { checkFullListConflict } from '$pcd/conflicts/fullListCheck.ts';
+import type { PcdOpHistoryStatus } from '$db/queries/pcdOpHistory.ts';
 
 export type ValueGuardApplyDecision =
-  | "applied"
-  | "skipped"
-  | "rowcount_zero_conflict"
-  | "full_list_conflict"
-  | "auto_align_rowcount_zero"
-  | "auto_align_full_list";
+  | 'applied'
+  | 'skipped'
+  | 'rowcount_zero_conflict'
+  | 'full_list_conflict'
+  | 'auto_align_rowcount_zero'
+  | 'auto_align_full_list';
 
 export interface ValueGuardApplyContext {
   db: Database;
@@ -43,7 +43,7 @@ export interface ValueGuardApplyDecisionResult {
   fallbackConflictReason: string | null;
   shouldLogConflict: boolean;
   shouldLogAutoAlign: boolean;
-  autoAlignReason?: "forced" | "auto_delete" | "auto_update" | null;
+  autoAlignReason?: 'forced' | 'auto_delete' | 'auto_update' | null;
   autoAlignRule?: string;
   decision: ValueGuardApplyDecision;
 }
@@ -61,55 +61,45 @@ export interface ValueGuardErrorDecisionResult {
   conflictReason: string | null;
   shouldRecordHistory: boolean;
   shouldLogConflict: boolean;
-  errorCategory: "duplicate_key" | "missing_target" | "non_conflict_error";
+  errorCategory: 'duplicate_key' | 'missing_target' | 'non_conflict_error';
 }
 
-function resolveConflictStatus(
-  conflictStrategy: ConflictStrategy,
-): PcdOpHistoryStatus {
-  return conflictStrategy === "ask" ? "conflicted_pending" : "conflicted";
+function resolveConflictStatus(conflictStrategy: ConflictStrategy): PcdOpHistoryStatus {
+  return conflictStrategy === 'ask' ? 'conflicted_pending' : 'conflicted';
 }
 
 export function getConflictReason(operation?: string): string {
   switch (operation) {
-    case "create":
-      return "duplicate_key";
-    case "delete":
-      return "missing_target";
-    case "update":
+    case 'create':
+      return 'duplicate_key';
+    case 'delete':
+      return 'missing_target';
+    case 'update':
     default:
-      return "guard_mismatch";
+      return 'guard_mismatch';
   }
 }
 
 export function isUniqueConstraintError(error: string): boolean {
-  return error.includes("UNIQUE constraint failed");
+  return error.includes('UNIQUE constraint failed');
 }
 
 export function isForeignKeyConstraintError(error: string): boolean {
-  return error.includes("FOREIGN KEY constraint failed");
+  return error.includes('FOREIGN KEY constraint failed');
+}
+
+export function isValueGuardBlockingStatus(status: PcdOpHistoryStatus): boolean {
+  return status === 'conflicted' || status === 'conflicted_pending';
 }
 
 /**
  * Evaluate whether a successfully executed operation should be recorded as
  * applied/skipped or should be treated as a conflict under cache semantics.
  */
-export function evaluateValueGuardApply(
-  input: ValueGuardApplyContext,
-): ValueGuardApplyDecisionResult {
-  const {
-    conflictStrategy,
-    isUserOp,
-    rowcount,
-    db,
-    metadataJson,
-    desiredStateJson,
-    priorConflictReason,
-  } = input;
+export function evaluateValueGuardApply(input: ValueGuardApplyContext): ValueGuardApplyDecisionResult {
+  const { conflictStrategy, isUserOp, rowcount, db, metadataJson, desiredStateJson, priorConflictReason } = input;
 
-  const defaultNoConflictStatus: PcdOpHistoryStatus = rowcount === 0
-    ? "skipped"
-    : "applied";
+  const defaultNoConflictStatus: PcdOpHistoryStatus = rowcount === 0 ? 'skipped' : 'applied';
   const defaultResult: ValueGuardApplyDecisionResult = {
     status: defaultNoConflictStatus,
     conflictReason: null,
@@ -119,7 +109,7 @@ export function evaluateValueGuardApply(
     fallbackConflictReason: null,
     shouldLogConflict: false,
     shouldLogAutoAlign: false,
-    decision: defaultNoConflictStatus === "applied" ? "applied" : "skipped",
+    decision: defaultNoConflictStatus === 'applied' ? 'applied' : 'skipped',
   };
 
   if (!isUserOp) {
@@ -130,7 +120,7 @@ export function evaluateValueGuardApply(
   const desiredState = parseDesiredState(desiredStateJson);
   const conflictStatus = resolveConflictStatus(conflictStrategy);
 
-  if (defaultNoConflictStatus === "skipped") {
+  if (defaultNoConflictStatus === 'skipped') {
     const autoAlignDecision = evaluateAutoAlign({
       db,
       conflictStrategy,
@@ -141,19 +131,16 @@ export function evaluateValueGuardApply(
     if (autoAlignDecision.shouldAlign) {
       return {
         ...defaultResult,
-        status: "dropped",
-        conflictReason: "aligned",
+        status: 'dropped',
+        conflictReason: 'aligned',
         shouldAttemptAutoDrop: true,
         fallbackStatus: conflictStatus,
         fallbackConflictReason: getConflictReason(metadata?.operation),
-        shouldLogConflict:
-          priorConflictReason !== getConflictReason(metadata?.operation),
+        shouldLogConflict: priorConflictReason !== getConflictReason(metadata?.operation),
         shouldLogAutoAlign: true,
-        autoAlignReason: autoAlignDecision.reason === "none"
-          ? null
-          : autoAlignDecision.reason,
+        autoAlignReason: autoAlignDecision.reason === 'none' ? null : autoAlignDecision.reason,
         autoAlignRule: autoAlignDecision.rule,
-        decision: "auto_align_rowcount_zero",
+        decision: 'auto_align_rowcount_zero',
       };
     }
 
@@ -163,38 +150,38 @@ export function evaluateValueGuardApply(
       status: conflictStatus,
       conflictReason,
       shouldLogConflict: priorConflictReason !== conflictReason,
-      decision: "rowcount_zero_conflict",
+      decision: 'rowcount_zero_conflict',
     };
   }
 
   if (checkFullListConflict(db, metadata, desiredState)) {
-    if (conflictStrategy === "align") {
+    if (conflictStrategy === 'align') {
       return {
         ...defaultResult,
-        status: "dropped",
-        conflictReason: "aligned",
+        status: 'dropped',
+        conflictReason: 'aligned',
         needsRebuild: true,
         shouldAttemptAutoDrop: true,
         fallbackStatus: conflictStatus,
-        fallbackConflictReason: "guard_mismatch",
-        shouldLogConflict: priorConflictReason !== "guard_mismatch",
+        fallbackConflictReason: 'guard_mismatch',
+        shouldLogConflict: priorConflictReason !== 'guard_mismatch',
         shouldLogAutoAlign: true,
-        decision: "auto_align_full_list",
+        decision: 'auto_align_full_list',
       };
     }
 
     return {
       ...defaultResult,
       status: conflictStatus,
-      conflictReason: "guard_mismatch",
-      shouldLogConflict: priorConflictReason !== "guard_mismatch",
-      decision: "full_list_conflict",
+      conflictReason: 'guard_mismatch',
+      shouldLogConflict: priorConflictReason !== 'guard_mismatch',
+      decision: 'full_list_conflict',
     };
   }
 
   return {
     ...defaultResult,
-    decision: "applied",
+    decision: 'applied',
   };
 }
 
@@ -202,24 +189,16 @@ export function evaluateValueGuardApply(
  * Evaluate whether an execution error should be treated as a recoverable conflict
  * versus a hard replay error.
  */
-export function evaluateValueGuardError(
-  input: ValueGuardErrorContext,
-): ValueGuardErrorDecisionResult {
-  const {
-    conflictStrategy,
-    error,
-    isUserOp,
-    trackHistory,
-    priorConflictReason,
-  } = input;
+export function evaluateValueGuardError(input: ValueGuardErrorContext): ValueGuardErrorDecisionResult {
+  const { conflictStrategy, error, isUserOp, trackHistory, priorConflictReason } = input;
 
   if (!trackHistory) {
     return {
-      status: "error",
+      status: 'error',
       conflictReason: null,
       shouldRecordHistory: false,
       shouldLogConflict: false,
-      errorCategory: "non_conflict_error",
+      errorCategory: 'non_conflict_error',
     };
   }
 
@@ -227,20 +206,20 @@ export function evaluateValueGuardError(
   const isMissingTarget = isUserOp && isForeignKeyConstraintError(error);
   if (!isDuplicateKey && !isMissingTarget) {
     return {
-      status: "error",
+      status: 'error',
       conflictReason: null,
       shouldRecordHistory: true,
       shouldLogConflict: false,
-      errorCategory: "non_conflict_error",
+      errorCategory: 'non_conflict_error',
     };
   }
 
-  const conflictReason = isDuplicateKey ? "duplicate_key" : "missing_target";
+  const conflictReason = isDuplicateKey ? 'duplicate_key' : 'missing_target';
   return {
     status: resolveConflictStatus(conflictStrategy),
     conflictReason,
     shouldRecordHistory: true,
     shouldLogConflict: priorConflictReason !== conflictReason,
-    errorCategory: isDuplicateKey ? "duplicate_key" : "missing_target",
+    errorCategory: isDuplicateKey ? 'duplicate_key' : 'missing_target',
   };
 }
