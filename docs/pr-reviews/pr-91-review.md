@@ -514,7 +514,7 @@ skip existing-but-inaccessible directories with zero indication.
 
 ### M-1: `asPortableData<T>` performs unsafe double-cast with no validation
 
-- [ ] **Status:** Open
+- [x] **Status:** Closed
 - **File:** `packages/praxrr-app/src/lib/server/pcd/entities/deserialize.ts:184-186`
 - **Category:** Type safety
 - **Agents:** error-handler, type-design
@@ -531,11 +531,17 @@ with obscure errors deep in the call chain.
 **Fix:** Add JSDoc precondition documenting that `validatePortableData` must be called before this
 function. Long-term: typed validation results.
 
+### Validation result
+
+- Added precondition JSDoc to `asPortableData` and kept cast behavior unchanged to preserve existing
+  runtime behavior.
+  - `packages/praxrr-app/src/lib/server/pcd/entities/deserialize.ts:184-186`
+
 ---
 
 ### M-2: `ValueGuardApplyDecisionResult` is flat instead of discriminated union
 
-- [ ] **Status:** Open
+- [x] **Status:** Closed
 - **File:** `packages/praxrr-app/src/lib/server/pcd/migration/valueGuardGate.ts`
 - **Category:** Type design
 - **Agents:** type-design
@@ -547,11 +553,18 @@ otherwise.
 
 **Fix:** Refactor into a discriminated union keyed on `decision`.
 
+### Validation result
+
+- Converted `ValueGuardApplyDecisionResult` to a discriminated union by decision bucket, with
+  `autoAlignReason`/ `autoAlignRule` required for `auto_align_*` variants and unavailable for
+  non-auto-align variants.
+  - `packages/praxrr-app/src/lib/server/pcd/migration/valueGuardGate.ts:37-49, 99-186`
+
 ---
 
 ### M-3: `ValueGuardGateResult` ambiguous ok/error pattern
 
-- [ ] **Status:** Open
+- [x] **Status:** Closed
 - **File:** `packages/praxrr-app/src/lib/server/pcd/ops/writer.ts`
 - **Category:** Type design
 - **Agents:** type-design
@@ -560,11 +573,17 @@ When `ok` is `false`, `error` may or may not be present.
 
 **Fix:** Make it a proper discriminated union: `{ ok: true } | { ok: false; error: string }`.
 
+### Validation result
+
+- Replaced ambiguous `ValueGuardGateResult` with a discriminated union and updated the value-guard
+  gate caller to consume the guaranteed `error` when `ok` is `false`.
+  - `packages/praxrr-app/src/lib/server/pcd/ops/writer.ts:77-81, 455-461`
+
 ---
 
 ### M-4: `cancelOutCreate` silently skips ops with malformed metadata JSON
 
-- [ ] **Status:** Open
+- [x] **Status:** Closed
 - **File:** `packages/praxrr-app/src/lib/server/pcd/ops/writer.ts:208-212, 246-254`
 - **Category:** Silent failure
 - **Agents:** error-handler
@@ -573,6 +592,12 @@ Multiple `catch { continue }` blocks skip operations with malformed metadata/des
 that should cancel out a prior create fails silently.
 
 **Fix:** Log at debug level when metadata parsing fails.
+
+### Validation result
+
+- Replaced silent `catch` fallthroughs with `DEBUG` logging for malformed metadata/desired-state
+  JSON in both dependency checks inside `cancelOutCreate`.
+  - `packages/praxrr-app/src/lib/server/pcd/ops/writer.ts:210-260, 267-294`
 
 ---
 

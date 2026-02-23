@@ -74,9 +74,7 @@ interface WriteSqlOperationsOptions {
   runValueGuardGate?: boolean;
 }
 
-interface ValueGuardGateResult {
-  ok: boolean;
-  error?: string;
+type ValueGuardGateResult = { ok: true } | { ok: false; error: string };
 }
 
 function normalizeSql(sql: string): string {
@@ -210,7 +208,16 @@ async function cancelOutCreate(databaseId: number, origin: PcdOpOrigin, metadata
       let parsed: ParsedMetadata;
       try {
         parsed = JSON.parse(op.metadata) as ParsedMetadata;
-      } catch {
+      } catch (error) {
+        await logger.debug('Failed to parse operation metadata while checking cancel-out dependencies', {
+          source: 'PCDWriter',
+          meta: {
+            databaseId,
+            operationId: op.id,
+            metadata: op.metadata,
+            error: String(error),
+          },
+        });
         continue;
       }
 
@@ -253,8 +260,16 @@ async function cancelOutCreate(databaseId: number, origin: PcdOpOrigin, metadata
               if (desired.entity_type === entityType && desired.entity_tmdb_id === entityTmdbId) {
                 return true;
               }
-            } catch {
-              // ignore malformed desired_state
+            } catch (error) {
+              await logger.debug('Failed to parse desired state while checking cancel-out dependencies', {
+                source: 'PCDWriter',
+                meta: {
+                  databaseId,
+                  operationId: op.id,
+                  desiredState: op.desired_state,
+                  error: String(error),
+                },
+              });
             }
           }
         }
@@ -271,7 +286,16 @@ async function cancelOutCreate(databaseId: number, origin: PcdOpOrigin, metadata
     let parsed: ParsedMetadata;
     try {
       parsed = JSON.parse(candidate.metadata) as ParsedMetadata;
-    } catch {
+    } catch (error) {
+      await logger.debug('Failed to parse candidate operation metadata while checking cancel-out', {
+        source: 'PCDWriter',
+        meta: {
+          databaseId,
+          operationId: candidate.id,
+          metadata: candidate.metadata,
+          error: String(error),
+        },
+      });
       continue;
     }
 
@@ -457,7 +481,7 @@ async function writeOperationsFromSqlOperations(options: WriteSqlOperationsOptio
       if (!gateResult.ok) {
         return {
           success: false,
-          error: gateResult.error ?? 'Migration operations failed value-guard check',
+          error: gateResult.error,
         };
       }
     }

@@ -34,19 +34,78 @@ export interface ValueGuardApplyContext {
   priorConflictReason: string | null;
 }
 
-export interface ValueGuardApplyDecisionResult {
-  status: PcdOpHistoryStatus;
+type ValueGuardApplyDecisionMetadata = {
   conflictReason: string | null;
   needsRebuild: boolean;
-  shouldAttemptAutoDrop: boolean;
   fallbackStatus: PcdOpHistoryStatus;
   fallbackConflictReason: string | null;
   shouldLogConflict: boolean;
-  shouldLogAutoAlign: boolean;
-  autoAlignReason?: 'forced' | 'auto_delete' | 'auto_update' | null;
-  autoAlignRule?: string;
-  decision: ValueGuardApplyDecision;
-}
+};
+
+type ValueGuardApplyDecisionNoAuto = ValueGuardApplyDecisionMetadata & {
+  decision: Exclude<ValueGuardApplyDecision, 'auto_align_rowcount_zero' | 'auto_align_full_list'>;
+  status: PcdOpHistoryStatus;
+  shouldAttemptAutoDrop: false;
+  shouldLogAutoAlign: false;
+  autoAlignReason?: never;
+  autoAlignRule?: never;
+};
+
+type ValueGuardApplyDecisionAutoAlign = ValueGuardApplyDecisionMetadata & {
+  decision: Extract<ValueGuardApplyDecision, 'auto_align_rowcount_zero' | 'auto_align_full_list'>;
+  status: PcdOpHistoryStatus;
+  shouldAttemptAutoDrop: true;
+  shouldLogAutoAlign: true;
+  autoAlignReason: 'forced' | 'auto_delete' | 'auto_update' | null;
+  autoAlignRule: string | null;
+};
+
+type ValueGuardApplyDecisionNoAutoResult = ValueGuardApplyDecisionNoAuto & {
+  status: 'applied' | 'skipped';
+};
+
+const makeDefaultNoAutoResult = (status: 'applied' | 'skipped'): ValueGuardApplyDecisionNoAutoResult => {
+  return {
+    status,
+    conflictReason: null,
+    needsRebuild: false,
+    shouldAttemptAutoDrop: false,
+    fallbackStatus: status,
+    fallbackConflictReason: null,
+    shouldLogConflict: false,
+    shouldLogAutoAlign: false,
+    decision: status === 'applied' ? 'applied' : 'skipped',
+  };
+};
+
+type ValueGuardApplyDecisionRowcountConflict = ValueGuardApplyDecisionNoAuto & {
+  decision: 'rowcount_zero_conflict';
+  status: PcdOpHistoryStatus;
+};
+
+type ValueGuardApplyDecisionFullListConflict = ValueGuardApplyDecisionNoAuto & {
+  decision: 'full_list_conflict';
+  status: PcdOpHistoryStatus;
+};
+
+type ValueGuardApplyDecisionAutoAlignRowcount = ValueGuardApplyDecisionAutoAlign & {
+  decision: 'auto_align_rowcount_zero';
+  status: 'dropped';
+  conflictReason: 'aligned';
+};
+
+type ValueGuardApplyDecisionAutoAlignFullList = ValueGuardApplyDecisionAutoAlign & {
+  decision: 'auto_align_full_list';
+  status: 'dropped';
+  conflictReason: 'aligned';
+};
+
+export type ValueGuardApplyDecisionResult =
+  | ValueGuardApplyDecisionNoAutoResult
+  | ValueGuardApplyDecisionRowcountConflict
+  | ValueGuardApplyDecisionFullListConflict
+  | ValueGuardApplyDecisionAutoAlignRowcount
+  | ValueGuardApplyDecisionAutoAlignFullList;
 
 export interface ValueGuardErrorContext {
   conflictStrategy: ConflictStrategy;
@@ -100,17 +159,7 @@ export function evaluateValueGuardApply(input: ValueGuardApplyContext): ValueGua
   const { conflictStrategy, isUserOp, rowcount, db, metadataJson, desiredStateJson, priorConflictReason } = input;
 
   const defaultNoConflictStatus: PcdOpHistoryStatus = rowcount === 0 ? 'skipped' : 'applied';
-  const defaultResult: ValueGuardApplyDecisionResult = {
-    status: defaultNoConflictStatus,
-    conflictReason: null,
-    needsRebuild: false,
-    shouldAttemptAutoDrop: false,
-    fallbackStatus: defaultNoConflictStatus,
-    fallbackConflictReason: null,
-    shouldLogConflict: false,
-    shouldLogAutoAlign: false,
-    decision: defaultNoConflictStatus === 'applied' ? 'applied' : 'skipped',
-  };
+  const defaultResult = makeDefaultNoAutoResult(defaultNoConflictStatus === 'applied' ? 'applied' : 'skipped');
 
   if (!isUserOp) {
     return defaultResult;
@@ -139,7 +188,7 @@ export function evaluateValueGuardApply(input: ValueGuardApplyContext): ValueGua
         shouldLogConflict: priorConflictReason !== getConflictReason(metadata?.operation),
         shouldLogAutoAlign: true,
         autoAlignReason: autoAlignDecision.reason === 'none' ? null : autoAlignDecision.reason,
-        autoAlignRule: autoAlignDecision.rule,
+        autoAlignRule: autoAlignDecision.rule ?? null,
         decision: 'auto_align_rowcount_zero',
       };
     }
@@ -150,6 +199,7 @@ export function evaluateValueGuardApply(input: ValueGuardApplyContext): ValueGua
       status: conflictStatus,
       conflictReason,
       shouldLogConflict: priorConflictReason !== conflictReason,
+      shouldAttemptAutoDrop: false,
       decision: 'rowcount_zero_conflict',
     };
   }
@@ -166,6 +216,8 @@ export function evaluateValueGuardApply(input: ValueGuardApplyContext): ValueGua
         fallbackConflictReason: 'guard_mismatch',
         shouldLogConflict: priorConflictReason !== 'guard_mismatch',
         shouldLogAutoAlign: true,
+        autoAlignReason: 'forced',
+        autoAlignRule: 'force_align_strategy',
         decision: 'auto_align_full_list',
       };
     }

@@ -181,6 +181,11 @@ const ENTITY_DESERIALIZERS: Record<EntityType, EntityDeserializer> = {
   },
 };
 
+/**
+ * Cast helper for already-validated portable entity payloads.
+ *
+ * @precondition Call `validatePortableData` for the target entity type before invoking this helper.
+ */
 function asPortableData<T>(data: unknown): T {
   return data as unknown as T;
 }
