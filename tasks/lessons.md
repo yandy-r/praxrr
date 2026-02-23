@@ -1,5 +1,9 @@
 # Lessons
 
+## 2026-02-22
+
+- When creating GitHub issue research references, always use markdown file-path links (`[docs/...](https://github.com/.../blob/<branch>/docs/...)`) instead of bare URLs so links are consistently clickable in issue bodies.
+
 ## 2026-02-15
 
 - When implementing mapping-gated reads, verify server log behavior under repeated page loads and dedupe repeated warnings by stable metadata keys (`arrType`, config name, skipped set), not only by message text.
