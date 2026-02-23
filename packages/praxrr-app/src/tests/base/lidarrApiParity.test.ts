@@ -4,6 +4,8 @@ import { GET as libraryGet } from '../../routes/api/v1/arr/library/+server.ts';
 import { GET as releasesGet } from '../../routes/api/v1/arr/releases/+server.ts';
 import { GET as exportGet } from '../../routes/api/v1/pcd/export/+server.ts';
 import { POST as importPost } from '../../routes/api/v1/pcd/import/+server.ts';
+import * as deserialize from '../../lib/server/pcd/entities/deserialize.ts';
+import * as serialize from '../../lib/server/pcd/entities/serialize.ts';
 import { type ArrInstance, arrInstancesQueries } from '../../lib/server/db/queries/arrInstances.ts';
 import { pcdManager, type PCDCache as PCDCacheType } from '../../lib/server/pcd/index.ts';
 import { cache } from '../../lib/server/utils/cache/cache.ts';
@@ -18,7 +20,12 @@ import type {
   SonarrLibraryItem,
   SonarrRelease,
 } from '../../lib/server/utils/arr/types.ts';
-import { LIDARR_MEDIA_MANAGEMENT_PORTABLE_ENTITIES, ENTITY_TYPES } from '../../lib/shared/pcd/portable.ts';
+import {
+  ENTITY_TYPES,
+  LIDARR_MEDIA_MANAGEMENT_PORTABLE_ENTITIES,
+  PORTABLE_MIGRATION_MIN_VERSION,
+  PORTABLE_MIGRATION_SOURCE_EXPORT,
+} from '../../lib/shared/pcd/portable.ts';
 
 type Restore = () => void;
 
@@ -771,6 +778,101 @@ class LidarrApiParityTest extends BaseTest {
       if (response.status === 400) {
         assertEquals((body.error as string).includes('Invalid entityType'), false);
       }
+    });
+
+    this.test('import rejects invalid migration metadata format', async () => {
+      const response = await importPost({
+        request: new Request('http://localhost/api/v1/pcd/import', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            databaseId: 1,
+            layer: 'user',
+            entityType: 'regular_expression',
+            migration: {
+              format: 'xml',
+              version: PORTABLE_MIGRATION_MIN_VERSION,
+              source: 'invalid-migration-test',
+            },
+            data: {
+              name: 'Regular Expression',
+              pattern: 'test',
+              tags: [],
+              description: null,
+              regex101Id: null,
+            },
+          }),
+        }),
+      } as Parameters<typeof importPost>[0]);
+
+      assertEquals(response.status, 400);
+      const body = (await response.json()) as ErrorEnvelope;
+      assertEquals(body.error, 'migration.format must be one of: json, yaml');
+    });
+
+    this.test('import accepts valid migration metadata', async () => {
+      const getCacheMock: typeof pcdManager.getCache = () => ({ kb: {} }) as unknown as PCDCacheType;
+      this.patch(pcdManager, 'getCache', getCacheMock);
+      this.patch(deserialize, 'deserializeRegularExpression', async () => {
+        return;
+      });
+
+      const response = await importPost({
+        request: new Request('http://localhost/api/v1/pcd/import', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            databaseId: 1,
+            layer: 'user',
+            entityType: 'regular_expression',
+            migration: {
+              format: 'json',
+              version: PORTABLE_MIGRATION_MIN_VERSION,
+              source: 'pcd-import-test',
+            },
+            data: {
+              name: 'Regular Expression',
+              pattern: 'test',
+              tags: [],
+              description: 'Test',
+              regex101Id: null,
+            },
+          }),
+        }),
+      } as Parameters<typeof importPost>[0]);
+
+      assertEquals(response.status, 200);
+      assertEquals((await response.json()) as { success: boolean }, { success: true });
+    });
+
+    this.test('export includes migration metadata in response', async () => {
+      const getCacheMock: typeof pcdManager.getCache = () => ({ kb: {} }) as unknown as PCDCacheType;
+      this.patch(pcdManager, 'getCache', getCacheMock);
+      this.patch(serialize, 'serializeRegularExpression', async () => {
+        return {
+          name: 'Regular Expression',
+          pattern: 'test',
+          tags: [],
+          description: 'Test',
+          regex101Id: null,
+        };
+      });
+
+      const response = await exportGet({
+        url: this.createUrl(
+          '/api/v1/pcd/export?databaseId=1&entityType=regular_expression&name=Regular%20Expression'
+        ),
+      } as Parameters<typeof exportGet>[0]);
+
+      assertEquals(response.status, 200);
+      const body = (await response.json()) as {
+        migration: { source: string; format: 'json' | 'yaml'; version: number };
+      };
+      assertEquals(body.migration, {
+        source: PORTABLE_MIGRATION_SOURCE_EXPORT,
+        format: 'json',
+        version: PORTABLE_MIGRATION_MIN_VERSION,
+      });
     });
 
     this.test('no cross-Arr entity leakage: library responses contain only matching arr_type', async () => {

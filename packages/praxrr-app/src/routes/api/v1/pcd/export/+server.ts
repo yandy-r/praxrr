@@ -1,6 +1,7 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from '@sveltejs/kit';
 import { pcdManager } from '$pcd/index.ts';
+import type { components } from '$api/v1.d.ts';
 import {
   ENTITY_TYPES,
   type EntityType,
@@ -11,6 +12,7 @@ import type { PCDCache } from '$pcd/index.ts';
 import * as serialize from '$pcd/entities/serialize.ts';
 
 const VALID_ENTITY_TYPES: ReadonlySet<string> = new Set(ENTITY_TYPES);
+type ExportResponse = components['schemas']['ExportResponse'];
 
 type PortableEntityData = Awaited<
   | ReturnType<typeof serialize.serializeDelayProfile>
@@ -54,15 +56,16 @@ export const GET: RequestHandler = async ({ url }) => {
 
   try {
     const data = await serializeEntity(cache, entityType as EntityType, name);
-    return json({
-      entityType,
-      data,
+    const response: ExportResponse = {
+      entityType: entityType as ExportResponse['entityType'],
+      data: data as ExportResponse['data'],
       migration: {
         source: PORTABLE_MIGRATION_SOURCE_EXPORT,
         format: 'json',
         version: PORTABLE_MIGRATION_MIN_VERSION,
       },
-    });
+    };
+    return json(response);
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Export failed';
     if (message.includes('not found')) {

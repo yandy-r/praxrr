@@ -659,9 +659,19 @@ export interface components {
         | components['schemas']['PortableSonarrNaming']
         | components['schemas']['PortableMediaSettings']
         | components['schemas']['PortableQualityDefinitions'];
+      /** @description Optional migration metadata emitted by portable exports. */
+      migration?: components['schemas']['PortableMigrationMetadata'];
     };
     PcdErrorResponse: {
       error: string;
+    };
+    PortableMigrationMetadata: {
+      /** @description Payload format for migration. */
+      format: 'json' | 'yaml';
+      /** @description Migration metadata schema version. */
+      version: number;
+      /** @description Migration source marker. */
+      source: string;
     };
     ImportRequest: {
       /** @description The PCD database ID to import into */
@@ -682,6 +692,8 @@ export interface components {
         | components['schemas']['PortableSonarrNaming']
         | components['schemas']['PortableMediaSettings']
         | components['schemas']['PortableQualityDefinitions'];
+      /** @description Optional migration metadata for migration tracking. */
+      migration?: components['schemas']['PortableMigrationMetadata'];
     };
     ImportResponse: {
       success: boolean;
