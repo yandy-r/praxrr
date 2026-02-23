@@ -1,6 +1,6 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from '@sveltejs/kit';
-import { parse } from 'yaml';
+import { parse } from '@std/yaml';
 
 // Cache the parsed spec to avoid re-reading on every request
 let cachedSpec: unknown = null;
