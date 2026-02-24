@@ -54,7 +54,7 @@ if (!setupStateQueries.isDefaultDatabaseLinked()) {
   const defaultDatabaseUrlFromEnv = Deno.env.get('PRAXRR_DEFAULT_DB_URL');
   const defaultDatabaseUrl =
     defaultDatabaseUrlFromEnv === undefined ? 'https://github.com/yandy-r/praxrr-db' : defaultDatabaseUrlFromEnv.trim();
-  const defaultDatabaseBranch = Deno.env.get('PRAXRR_DEFAULT_DB_BRANCH')?.trim() || 'v2';
+  const defaultDatabaseBranch = Deno.env.get('PRAXRR_DEFAULT_DB_BRANCH')?.trim() || 'main';
   const defaultDatabaseName = Deno.env.get('PRAXRR_DEFAULT_DB_NAME')?.trim() || 'Praxrr-DB';
   const defaultDatabaseToken = Deno.env.get('PRAXRR_DEFAULT_DB_TOKEN')?.trim() || undefined;
   const defaultDatabaseGitUserName = Deno.env.get('PRAXRR_DEFAULT_DB_GIT_USERNAME')?.trim() || undefined;
