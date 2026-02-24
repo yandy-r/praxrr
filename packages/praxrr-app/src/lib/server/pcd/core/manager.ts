@@ -22,9 +22,8 @@ import { compile, invalidate } from '../database/compiler.ts';
 import { getCache } from '../database/registry.ts';
 import { logger } from '$logger/logger.ts';
 import { triggerSyncs } from '$sync/processor.ts';
-import { config, type PCDMigrationIngestionMode } from '$config';
 import type { CacheBuildStats, LinkOptions, SyncResult } from './types.ts';
-import { importBaseOps, MigrationReaderError } from '../ops/importBaseOps.ts';
+import { importBaseOps } from '../ops/importBaseOps.ts';
 import { seedBuiltInBaseOps } from '../ops/seedBuiltInBaseOps.ts';
 import { cleanupJobsForDatabase } from '$lib/server/jobs/cleanup.ts';
 import {
@@ -101,7 +100,7 @@ class PCDManager {
         throw new Error('Failed to retrieve created database instance');
       }
 
-      await this.importBaseOpsWithOrchestration(id, localPath);
+      await importBaseOps(id, localPath);
       await this.seedBuiltInBaseOpsWithOrchestration(id, 'link');
 
       // Compile cache (only if enabled)
@@ -178,7 +177,7 @@ class PCDManager {
         let importedBaseOps = true;
         let baseOpsError: string | undefined;
         try {
-          await this.importBaseOpsWithOrchestration(id, instance.local_path);
+          await importBaseOps(id, instance.local_path);
         } catch (error) {
           importedBaseOps = false;
           baseOpsError = error instanceof Error ? error.message : String(error);
@@ -237,7 +236,7 @@ class PCDManager {
       let importedBaseOps = true;
       let baseOpsError: string | undefined;
       try {
-        await this.importBaseOpsWithOrchestration(id, instance.local_path);
+        await importBaseOps(id, instance.local_path);
       } catch (error) {
         importedBaseOps = false;
         baseOpsError = error instanceof Error ? error.message : String(error);
@@ -324,25 +323,21 @@ class PCDManager {
 
     await checkout(instance.local_path, branch);
     await pull(instance.local_path);
-    let importedBaseOps = true;
     try {
-      await this.importBaseOpsWithOrchestration(id, instance.local_path);
+      await importBaseOps(id, instance.local_path);
     } catch (error) {
-      importedBaseOps = false;
+      const message = error instanceof Error ? error.message : String(error);
       await logger.error('Failed to import base ops after branch switch', {
         source: 'PCDManager',
-        meta: { error: String(error), databaseId: id },
+        meta: { error: message, databaseId: id },
       });
-    }
-
-    if (!importedBaseOps) {
-      return false;
+      throw new Error(`Failed to import base ops after branch switch: ${message}`);
     }
 
     await this.seedBuiltInBaseOpsWithOrchestration(id, 'switchBranch');
     databaseInstancesQueries.updateSyncedAt(id);
 
-    return importedBaseOps;
+    return true;
   }
 
   /**
@@ -412,7 +407,7 @@ class PCDManager {
     // Import base ops from repo for all enabled instances
     for (const instance of enabledInstances) {
       try {
-        await this.importBaseOpsWithOrchestration(instance.id, instance.local_path);
+        await importBaseOps(instance.id, instance.local_path);
       } catch (error) {
         await logger.error(`Failed to import base ops for "${instance.name}"`, {
           source: 'PCDManager',
@@ -485,38 +480,6 @@ class PCDManager {
     return getCache(id);
   }
 
-  private async importBaseOpsWithOrchestration(databaseId: number, localPath: string): Promise<boolean> {
-    const migrationMode: PCDMigrationIngestionMode = config.pcdMigrationIngestionMode;
-    if (migrationMode === 'sql-only') {
-      await importBaseOps(databaseId, localPath, { pcdMigrationIngestionMode: 'sql-only' });
-      return true;
-    }
-
-    try {
-      await importBaseOps(databaseId, localPath, { pcdMigrationIngestionMode: migrationMode });
-      return true;
-    } catch (error) {
-      if (!config.pcdMigrationAllowLegacyFallback) {
-        throw error;
-      }
-      if (!(error instanceof MigrationReaderError)) {
-        throw error;
-      }
-
-      await logger.warn('Hybrid base-op ingestion failed; falling back to SQL-only path', {
-        source: 'PCDManager',
-        meta: {
-          databaseId,
-          migrationMode,
-          migrationReaderError: error instanceof MigrationReaderError,
-          error: String(error),
-        },
-      });
-      await importBaseOps(databaseId, localPath, { pcdMigrationIngestionMode: 'sql-only' });
-      return true;
-    }
-  }
-
   private async seedBuiltInBaseOpsWithOrchestration(databaseId: number, contextLabel = 'operation'): Promise<void> {
     try {
       await seedBuiltInBaseOps(databaseId);
@@ -552,7 +515,6 @@ class PCDManager {
         meta: {
           databaseId: instance.id,
           context,
-          migrationMode: config.pcdMigrationIngestionMode,
           schema: stats.schema,
           base: stats.base,
           tweaks: stats.tweaks,

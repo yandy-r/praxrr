@@ -28,6 +28,8 @@ const _serializeDependencies = {
   serializeLidarrMetadataProfile: serialize.serializeLidarrMetadataProfile,
 } as const;
 
+export const serializeDependencies = _serializeDependencies;
+
 const VALID_ENTITY_TYPES: ReadonlySet<string> = new Set(ENTITY_TYPES);
 
 export const GET: RequestHandler = async ({ url }) => {

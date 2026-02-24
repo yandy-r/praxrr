@@ -3,7 +3,6 @@
  */
 
 export type AuthMode = 'on' | 'local' | 'off' | 'oidc';
-export type PCDMigrationIngestionMode = 'sql-only' | 'hybrid';
 
 class Config {
   private basePath: string;
@@ -16,8 +15,6 @@ class Config {
   public readonly pullOnStart: boolean;
   public readonly pullOnStartMaxConcurrency: number | null;
   public readonly pullOnStartTimeoutMs: number | null;
-  public readonly pcdMigrationIngestionMode: PCDMigrationIngestionMode;
-  public readonly pcdMigrationAllowLegacyFallback: boolean;
   public readonly oidc: {
     discoveryUrl: string | null;
     clientId: string | null;
@@ -64,10 +61,6 @@ class Config {
     this.pullOnStart = Config.parseBooleanEnv(Deno.env.get('PULL_ON_START'));
     this.pullOnStartMaxConcurrency = Config.parsePositiveIntEnv('PULL_ON_START_MAX_CONCURRENCY');
     this.pullOnStartTimeoutMs = Config.parsePositiveIntEnv('PULL_ON_START_TIMEOUT_MS');
-    this.pcdMigrationIngestionMode = Config.parsePCDMigrationMode(Deno.env.get('PRAXRR_PCD_MIGRATION_MODE'));
-    this.pcdMigrationAllowLegacyFallback = Config.parseBooleanEnv(
-      Deno.env.get('PRAXRR_PCD_MIGRATION_ALLOW_LEGACY_FALLBACK')
-    );
 
     // OIDC configuration (only used when AUTH=oidc)
     this.oidc = {
@@ -93,20 +86,6 @@ class Config {
   private static parseBooleanEnv(value: string | null | undefined): boolean {
     const normalized = value?.trim().toLowerCase();
     return ['1', 'true', 'yes', 'on'].includes(normalized || '');
-  }
-
-  private static parsePCDMigrationMode(value: string | null | undefined): PCDMigrationIngestionMode {
-    const normalized = (value ?? '').trim().toLowerCase();
-
-    if (normalized.length === 0 || normalized === 'hybrid') {
-      return 'hybrid';
-    }
-
-    if (normalized === 'sql-only') {
-      return 'sql-only';
-    }
-
-    throw new Error(`Invalid value for PRAXRR_PCD_MIGRATION_MODE: "${value}". Expected "sql-only" or "hybrid".`);
   }
 
   private static parsePositiveIntEnv(name: string): number | null {

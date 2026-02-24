@@ -1,41 +1,29 @@
-import { assertEquals, assertThrows } from '@std/assert';
-import { config } from '$config';
-import { pcdOpsQueries } from '$db/queries/pcdOps.ts';
+import { assertEquals, assertRejects, assertThrows } from '@std/assert';
+import { databaseInstancesQueries, type DatabaseInstance } from '$db/queries/databaseInstances.ts';
+import { pcdOpHistoryQueries } from '$db/queries/pcdOpHistory.ts';
+import { pcdOpsQueries, type ListPcdOpsOptions, type PcdOp } from '$db/queries/pcdOps.ts';
 import * as importBaseOpsModule from '$pcd/ops/importBaseOps.ts';
-import type { PCDCache } from '$pcd/database/cache.ts';
-import type { MigrationEntityCandidate, MigrationEntityStableIdentity } from '$pcd/migration/reader.ts';
+import { PCDCache } from '$pcd/database/cache.ts';
+import type { MigrationEntityCandidate, MigrationReaderIssue, MigrationEntityStableIdentity } from '$pcd/migration/reader.ts';
+import { loadAllOperations } from '$pcd/ops/loadOps.ts';
 
 type Restore = () => void;
 
 type TestStableIdentity = MigrationEntityStableIdentity;
 
-const duplicateIdentity: TestStableIdentity = {
-  key: 'quality_profile_name',
-  value: 'Existing Profile',
-  kind: 'stable',
+type TestStableIdentityEntry = {
+  stableIdentity: TestStableIdentity | null;
+  sourcePath: string;
 };
 
-const migrationEntry = (identity: TestStableIdentity | null, sourcePath: string) => ({
-  stableIdentity: identity,
-  sourcePath,
-});
+function migrationEntry(identity: TestStableIdentity | null, sourcePath: string): TestStableIdentityEntry {
+  return {
+    stableIdentity: identity,
+    sourcePath,
+  };
+}
 
-const sqlEntry = (identity: TestStableIdentity | null, name: string) => ({
-  name,
-  filepath: `/tmp/${name}`,
-  opNumber: 1,
-  sequence: 100,
-  cleanedSql: 'SELECT 1',
-  metadataJson: null,
-  contentHash: 'hash',
-  stableIdentity: identity,
-});
-
-const { __testOnly_validateStableIdentityConflicts, __testOnly_parseMetadata, __testOnly_parseStableIdentityFromText } =
-  importBaseOpsModule;
-
-const { __testOnly_parseStableIdentityFromObject, __testOnly_deriveSqlStableIdentity, importBaseOps } =
-  importBaseOpsModule;
+const { __testOnly_validateStableIdentityConflicts, importBaseOps, MigrationReaderError } = importBaseOpsModule;
 const {
   __testOnly_setReadMigrationEntitySources,
   __testOnly_resetReadMigrationEntitySources,
@@ -55,246 +43,539 @@ function patch<T extends object, K extends keyof T>(target: T, key: K, replaceme
   });
 }
 
-Deno.test('importBaseOps: validateStableIdentityConflicts detects SQL/SQL duplicates', () => {
-  assertThrows(
-    () =>
-      __testOnly_validateStableIdentityConflicts(
-        [sqlEntry(duplicateIdentity, '001-base.sql'), sqlEntry(duplicateIdentity, '002-base.sql')],
-        []
-      ),
-    Error,
-    'sql/duplicate'
-  );
-});
+function buildCandidate(
+  relativePath: string,
+  entityType: MigrationEntityCandidate['entityType'],
+  stableIdentity: TestStableIdentity,
+  deserialize: () => Promise<{ success: boolean }>
+): MigrationEntityCandidate {
+  return {
+    sourcePath: `/tmp/${relativePath}`,
+    relativePath,
+    entityType,
+    migration: {
+      source: `entities/${relativePath}`,
+      format: 'yaml',
+      version: 1,
+    },
+    portable: {
+      name: stableIdentity.value,
+    },
+    entityName: stableIdentity.value,
+    identity: {
+      kind: 'identity',
+      key: 'migration:custom_format',
+      value: stableIdentity.value,
+    },
+    stableIdentity,
+    deserialize,
+  } as unknown as MigrationEntityCandidate;
+}
 
-Deno.test('importBaseOps: validateStableIdentityConflicts detects migration/migration duplicates', () => {
+Deno.test('importBaseOps: validateStableIdentityConflicts detects migration duplicate identities', () => {
+  const identity: TestStableIdentity = {
+    key: 'quality_profile_name',
+    value: 'Existing Profile',
+    kind: 'stable',
+  };
+
   assertThrows(
-    () =>
-      __testOnly_validateStableIdentityConflicts(
-        [],
-        [
-          migrationEntry(duplicateIdentity, '/path/entity-1.yaml'),
-          migrationEntry(duplicateIdentity, '/path/entity-2.yaml'),
-        ]
-      ),
+    () => {
+      __testOnly_validateStableIdentityConflicts([
+        migrationEntry(identity, '/path/entity-1.yaml'),
+        migrationEntry(identity, '/path/entity-2.yaml'),
+      ]);
+    },
     Error,
     'migration/duplicate'
   );
 });
 
-Deno.test('importBaseOps: validateStableIdentityConflicts allows cross-source duplicates', () => {
-  __testOnly_validateStableIdentityConflicts(
-    [sqlEntry(duplicateIdentity, '001-base.sql')],
-    [migrationEntry(duplicateIdentity, '/path/entity.yaml')]
-  );
-});
-
-Deno.test('importBaseOps: validateStableIdentityConflicts allows distinct identities', () => {
-  const migrationIdentity: TestStableIdentity = { key: 'radarr_naming_name', value: 'Radarr naming', kind: 'stable' };
-  const sqlIdentity: TestStableIdentity = { key: 'sonarr_naming_name', value: 'Sonarr naming', kind: 'stable' };
-
-  __testOnly_validateStableIdentityConflicts(
-    [sqlEntry(sqlIdentity, '001-base.sql')],
-    [migrationEntry(migrationIdentity, '/path/entity.yaml')]
-  );
-});
-
-Deno.test('importBaseOps: validateStableIdentityConflicts ignores null stable identities', () => {
-  __testOnly_validateStableIdentityConflicts(
-    [sqlEntry(null, '001-base.sql')],
-    [migrationEntry(null, '/path/entity.yaml')]
-  );
-});
-
-Deno.test('importBaseOps: parseMetadata extracts known migration metadata and strips annotation comments', () => {
-  const sql = [
-    '-- @operation: create',
-    '-- @entity: custom_format',
-    '-- @name: Custom Format',
-    '-- @stable_key: custom_format_name=Custom Format',
-    "INSERT INTO custom_formats (name) VALUES ('Custom Format');",
-    '-- not a metadata comment',
-  ].join('\n');
-
-  const result = __testOnly_parseMetadata(sql);
-  const metadata = result.metadataJson ? JSON.parse(result.metadataJson) : null;
-
-  assertEquals(
-    result.cleanedSql,
-    "INSERT INTO custom_formats (name) VALUES ('Custom Format');\n-- not a metadata comment"
-  );
-  assertEquals(metadata, {
-    operation: 'create',
-    entity: 'custom_format',
-    name: 'Custom Format',
-    stable_key: 'custom_format_name=Custom Format',
-  });
-});
-
-Deno.test('importBaseOps: parseMetadata returns null metadata when required fields are missing', () => {
-  const sql = ['-- @operation: create', "INSERT INTO custom_formats (name) VALUES ('Custom Format');"].join('\n');
-
-  const result = __testOnly_parseMetadata(sql);
-
-  assertEquals(result.metadataJson, null);
-  assertEquals(result.cleanedSql, "INSERT INTO custom_formats (name) VALUES ('Custom Format');");
-});
-
-Deno.test('importBaseOps: parseStableIdentityFromText supports json and key=value fallbacks', () => {
-  assertEquals(__testOnly_parseStableIdentityFromText('{"key":"custom_format_name","value":"Custom Format"}'), {
-    key: 'custom_format_name',
-    value: 'Custom Format',
-    kind: 'stable',
-  });
-
-  assertEquals(__testOnly_parseStableIdentityFromText('custom_format_name=Custom Format'), {
-    key: 'custom_format_name',
-    value: 'Custom Format',
-    kind: 'stable',
-  });
-
-  assertEquals(__testOnly_parseStableIdentityFromText('not-a-valid-identity'), null);
-});
-
-Deno.test('importBaseOps: parseStableIdentityFromObject resolves key/value and stable_key object values', () => {
-  assertEquals(__testOnly_parseStableIdentityFromObject({ key: 'custom_format_name', value: 'Custom Format' }), {
-    key: 'custom_format_name',
-    value: 'Custom Format',
-    kind: 'stable',
-  });
-
-  assertEquals(
-    __testOnly_parseStableIdentityFromObject({
-      stable_key: { key: 'quality_profile_name', value: 'Quality A' },
-      entity: 'radarr_quality_profiles',
-      name: 'Profile A',
-    } as unknown as Record<string, unknown>),
-    { key: 'quality_profile_name', value: 'Quality A', kind: 'stable' }
-  );
-
-  assertEquals(
-    __testOnly_parseStableIdentityFromObject({ entity: 'custom_format', name: 'Legacy Format' } as Record<
-      string,
-      unknown
-    >),
-    null
-  );
-});
-
-Deno.test('importBaseOps: deriveSqlStableIdentity parses metadata json and throws on malformed JSON', () => {
-  assertEquals(
-    __testOnly_deriveSqlStableIdentity(
-      JSON.stringify({
-        stable_key: 'custom_format_name=Custom Format',
-        operation: 'create',
-        entity: 'custom_format',
-        name: 'Custom Format',
-      }),
-      '/tmp/valid.sql'
+Deno.test('importBaseOps: validateStableIdentityConflicts ignores null and allows distinct migration identities', () => {
+  __testOnly_validateStableIdentityConflicts([
+    migrationEntry(null, '/path/entity.yaml'),
+    migrationEntry(null, '/path/other.yaml'),
+    migrationEntry(
+      {
+        key: 'quality_profile_name',
+        value: 'Existing Profile',
+        kind: 'stable',
+      },
+      '/path/first.yaml'
     ),
-    { key: 'custom_format_name', value: 'Custom Format', kind: 'stable' }
-  );
-
-  assertEquals(
-    __testOnly_deriveSqlStableIdentity(
-      JSON.stringify({ operation: 'create', entity: 'custom_format', name: 'Fallback Format' }),
-      '/tmp/fallback.sql'
+    migrationEntry(
+      {
+        key: 'custom_format_name',
+        value: 'Custom Format',
+        kind: 'stable',
+      },
+      '/path/second.yaml'
     ),
-    { key: 'custom_format_name', value: 'Fallback Format', kind: 'stable' }
-  );
-
-  assertThrows(
-    () => __testOnly_deriveSqlStableIdentity('{invalid-json', '/tmp/bad.sql'),
-    Error,
-    'Malformed SQL metadata JSON for /tmp/bad.sql'
-  );
+  ]);
 });
 
-Deno.test('importBaseOps: hybrid mode suppresses SQL entries when migration identity overlaps', async () => {
+Deno.test('importBaseOps: throws on duplicate migration stable identities during import', async () => {
   const restores: Restore[] = [];
-  const databaseId = 9201;
-  const createdFromSql: string[] = [];
-  const deserializeCalls: string[] = [];
-  const tempDir = await Deno.makeTempDir({ prefix: 'importBaseOps-hybrid-' });
+  const databaseId = 9200;
+  const tempDir = await Deno.makeTempDir({ prefix: 'importBaseOps-conflict-' });
+
+  const first: TestStableIdentity = {
+    key: 'custom_format_name',
+    value: 'Conflict',
+    kind: 'stable',
+  };
+
+  const second: TestStableIdentity = {
+    key: 'custom_format_name',
+    value: 'Conflict',
+    kind: 'stable',
+  };
 
   try {
-    const basePath = `${tempDir}/base`;
-    const entitiesPath = `${tempDir}/entities`;
-    await Deno.mkdir(basePath, { recursive: true });
-    await Deno.mkdir(entitiesPath, { recursive: true });
-
-    const stableName = 'Shared Custom Format';
-    const stableIdentity: TestStableIdentity = {
-      key: 'custom_format_name',
-      value: stableName,
-      kind: 'stable',
-    };
-
-    const candidate = {
-      stableIdentity,
-      sourcePath: `${entitiesPath}/custom-formats/shared.yaml`,
-      relativePath: 'custom-formats/shared.yaml',
-      portable: {},
-      deserialize: async () => {
-        deserializeCalls.push(stableName);
-        return { success: true };
-      },
-    } as unknown as MigrationEntityCandidate;
-
-    await Deno.writeTextFile(
-      `${basePath}/001-base.sql`,
-      [
-        '-- @operation: create',
-        '-- @entity: custom_format',
-        `-- @name: ${stableName}`,
-        '-- @stable_key: custom_format_name=Shared Custom Format',
-      ].join('\n') + '\nINSERT INTO custom_formats (name) VALUES ("Shared Custom Format");'
+    __testOnly_setReadMigrationEntitySources(() =>
+      Promise.resolve({
+        candidates: [
+          buildCandidate(
+            'custom-formats/conflict-1.yaml',
+            'custom_format',
+            first,
+            () => Promise.resolve({ success: true })
+          ),
+          buildCandidate(
+            'custom-formats/conflict-2.yaml',
+            'custom_format',
+            second,
+            () => Promise.resolve({ success: true })
+          ),
+        ],
+        issues: [],
+      })
     );
-
-    const configMutable = config as unknown as { pcdMigrationAllowLegacyFallback: boolean };
-    patch(configMutable, 'pcdMigrationAllowLegacyFallback', true, restores);
+    restores.push(__testOnly_resetReadMigrationEntitySources);
 
     __testOnly_setGetCache(
       () => ({ getRawDb: (() => ({})) as unknown as PCDCache['getRawDb'] }) as unknown as PCDCache
     );
     restores.push(__testOnly_resetGetCache);
-    __testOnly_setReadMigrationEntitySources(async () => ({ candidates: [candidate], issues: [] }));
+    __testOnly_setCompile(() => Promise.resolve({ schema: 0, base: 0, tweaks: 0, user: 0, timing: 0 }));
+    restores.push(__testOnly_resetCompile);
+
+    await assertRejects(
+      async () => {
+        await importBaseOps(databaseId, tempDir);
+      },
+      Error,
+      'migration/duplicate'
+    );
+  } finally {
+    for (const restore of restores.reverse()) {
+      restore();
+    }
+    await Deno.remove(tempDir, { recursive: true });
+  }
+});
+
+Deno.test('importBaseOps: throws MigrationReaderError when migration reader returns issues', async () => {
+  const restores: Restore[] = [];
+  const databaseId = 9204;
+  const tempDir = await Deno.makeTempDir({ prefix: 'importBaseOps-reader-issues-' });
+
+  try {
+    __testOnly_setReadMigrationEntitySources(() =>
+      Promise.resolve({
+        candidates: [],
+        issues: [
+          {
+            relativePath: 'media-management/radarr-naming/bad.yaml',
+            kind: 'parse-error',
+            message: 'invalid YAML payload',
+          } as MigrationReaderIssue,
+        ],
+      })
+    );
     restores.push(__testOnly_resetReadMigrationEntitySources);
+
+    await assertRejects(
+      async () => {
+        await importBaseOps(databaseId, tempDir);
+      },
+      MigrationReaderError,
+      'media-management/radarr-naming/bad.yaml'
+    );
+  } finally {
+    for (const restore of restores.reverse()) {
+      restore();
+    }
+    await Deno.remove(tempDir, { recursive: true });
+  }
+});
+
+Deno.test('importBaseOps: throws when base cache is unavailable', async () => {
+  const restores: Restore[] = [];
+  const databaseId = 9205;
+  const tempDir = await Deno.makeTempDir({ prefix: 'importBaseOps-cache-missing-' });
+
+  try {
+    __testOnly_setReadMigrationEntitySources(() =>
+      Promise.resolve({
+        candidates: [
+          buildCandidate(
+            'quality-profiles/default.yaml',
+            'quality_profile',
+            {
+              key: 'quality_profile_name',
+              value: 'Default',
+              kind: 'stable',
+            },
+            () => Promise.resolve({ success: true })
+          ),
+        ],
+        issues: [],
+      })
+    );
+    restores.push(__testOnly_resetReadMigrationEntitySources);
+
+    __testOnly_setGetCache(() => undefined as unknown as PCDCache);
+    restores.push(__testOnly_resetGetCache);
+    __testOnly_setCompile(() => Promise.resolve({ schema: 0, base: 0, tweaks: 0, user: 0, timing: 0 }));
+    restores.push(__testOnly_resetCompile);
+
+    await assertRejects(
+      async () => {
+        await importBaseOps(databaseId, tempDir);
+      },
+      Error,
+      'Cache not available while importing migration entity "quality-profiles/default.yaml"'
+    );
+  } finally {
+    for (const restore of restores.reverse()) {
+      restore();
+    }
+    await Deno.remove(tempDir, { recursive: true });
+  }
+});
+
+Deno.test('importBaseOps: imports YAML candidates in deterministic order and applies deterministic sequencing', async () => {
+  const restores: Restore[] = [];
+  const databaseId = 9201;
+  const order: string[] = [];
+  const seenContexts: Array<{ filenamePrefix: string; sequenceStart: number }> = [];
+  const tempDir = await Deno.makeTempDir({ prefix: 'importBaseOps-order-' });
+
+  const candidates = [
+    buildCandidate(
+      'quality-profiles/zzz.yaml',
+      'quality_profile',
+      {
+        key: 'quality_profile_name',
+        value: 'Zulu',
+        kind: 'stable',
+      },
+      () => {
+        order.push('quality:Zulu');
+        return Promise.resolve({ success: true });
+      }
+    ),
+    buildCandidate(
+      'custom-formats/alpha.yaml',
+      'custom_format',
+      {
+        key: 'custom_format_name',
+        value: 'Alpha',
+        kind: 'stable',
+      },
+      () => {
+        order.push('custom:Alpha');
+        return Promise.resolve({ success: true });
+      }
+    ),
+    buildCandidate(
+      'custom-formats/zeta.yaml',
+      'custom_format',
+      {
+        key: 'custom_format_name',
+        value: 'Zeta',
+        kind: 'stable',
+      },
+      () => {
+        order.push('custom:Zeta');
+        return Promise.resolve({ success: true });
+      }
+    ),
+    buildCandidate(
+      'regular-expressions/root.yaml',
+      'regular_expression',
+      {
+        key: 'regular_expression_name',
+        value: 'Root',
+        kind: 'stable',
+      },
+      () => {
+        order.push('regex:Root');
+        return Promise.resolve({ success: true });
+      }
+    ),
+  ];
+
+  try {
+    __testOnly_setReadMigrationEntitySources(() => Promise.resolve({ candidates, issues: [] }));
+    restores.push(__testOnly_resetReadMigrationEntitySources);
+
+    __testOnly_setGetCache(
+      () => ({ getRawDb: (() => ({})) as unknown as PCDCache['getRawDb'] }) as unknown as PCDCache
+    );
+    restores.push(__testOnly_resetGetCache);
+
     patch(
       pcdOpsQueries,
-      'create',
-      (input) => {
-        createdFromSql.push(input.filename ?? '');
-        return createdFromSql.length;
-      },
+      'markBaseOrphaned',
+      () => 1,
       restores
     );
-    patch(pcdOpsQueries, 'getBaseByFilename', () => undefined, restores);
-    patch(pcdOpsQueries, 'listByDatabaseAndOrigin', () => [], restores);
-    patch(pcdOpsQueries, 'markBaseOrphaned', () => 0, restores);
-    patch(pcdOpsQueries, 'update', () => true, restores);
-    __testOnly_setCompile(async () => ({ schema: 0, base: 0, tweaks: 0, user: 0, timing: 0 }));
+
+    __testOnly_setCompile(() => Promise.resolve({ schema: 0, base: 0, tweaks: 0, user: 0, timing: 0 }));
     restores.push(__testOnly_resetCompile);
+
     __testOnly_setWithRepoImportWriteContext(
-      async (
-        _context: {
-          filenamePrefix: string;
-          sequenceStart: number;
-          maxOperations: number;
-          lastSeenInRepoAt: string;
-        },
+      (
+        context,
         callback: () => Promise<unknown>
-      ) => {
-        return await callback();
+      ): Promise<unknown> => {
+        seenContexts.push({
+          filenamePrefix: context.filenamePrefix,
+          sequenceStart: context.sequenceStart,
+        });
+        return callback();
       }
     );
     restores.push(__testOnly_resetWithRepoImportWriteContext);
 
-    const result = await importBaseOps(databaseId, tempDir, { pcdMigrationIngestionMode: 'hybrid' });
+    const result = await importBaseOps(databaseId, tempDir);
 
-    assertEquals(result.created, 0);
-    assertEquals(createdFromSql.length, 0);
-    assertEquals(deserializeCalls, [stableName]);
+    assertEquals(result.imported, 4);
+    assertEquals(result.orphaned, 1);
+    assertEquals(order, ['regex:Root', 'custom:Alpha', 'custom:Zeta', 'quality:Zulu']);
+    assertEquals(seenContexts.length, 4);
+    assertEquals(seenContexts[0].filenamePrefix, 'entities/regular-expressions/root.yaml');
+    assertEquals(seenContexts[0].sequenceStart, 4_000_000_000);
+    assertEquals(seenContexts[1].sequenceStart, 4_000_010_000);
+    assertEquals(seenContexts[2].sequenceStart, 4_000_020_000);
+    assertEquals(seenContexts[3].sequenceStart, 4_000_030_000);
+  } finally {
+    for (const restore of restores.reverse()) {
+      restore();
+    }
+    await Deno.remove(tempDir, { recursive: true });
+  }
+});
+
+Deno.test('importBaseOps: loadAllOperations includes schema and tweaks SQL layers', async () => {
+  const restores: Restore[] = [];
+  const databaseId = 9202;
+  const tempDir = await Deno.makeTempDir({ prefix: 'importBaseOps-ops-load-' });
+
+  try {
+    const schemaPath = `${tempDir}/deps/schema/ops`;
+    const tweaksPath = `${tempDir}/tweaks`;
+    await Deno.mkdir(schemaPath, { recursive: true });
+    await Deno.mkdir(tweaksPath, { recursive: true });
+
+    await Deno.writeTextFile(
+      `${schemaPath}/0.schema.sql`,
+      'CREATE TABLE schema_marker (id INTEGER PRIMARY KEY);'
+    );
+    await Deno.writeTextFile(`${schemaPath}/1.test.sql`, 'CREATE TABLE test_marker (id INTEGER PRIMARY KEY);');
+    await Deno.writeTextFile(`${tweaksPath}/1.tweak.sql`, 'CREATE TABLE tweak_marker (id INTEGER PRIMARY KEY);');
+
+    patch(
+      pcdOpsQueries,
+      'listByDatabaseAndOrigin',
+      (_databaseId: number, _origin: 'base' | 'user', _options?: ListPcdOpsOptions) => [],
+      restores
+    );
+
+    const operations = await loadAllOperations(tempDir, databaseId);
+
+    assertEquals(
+      operations.some((operation) => operation.layer === 'schema' && operation.filename === '0.schema.sql'),
+      true
+    );
+    assertEquals(operations.some((operation) => operation.layer === 'tweaks' && operation.filename === '1.tweak.sql'), true);
+    assertEquals(
+      operations.findIndex((operation) => operation.layer === 'schema') <
+        operations.findIndex((operation) => operation.layer === 'tweaks'),
+      true
+    );
+  } finally {
+    for (const restore of restores.reverse()) {
+      restore();
+    }
+    await Deno.remove(tempDir, { recursive: true });
+  }
+});
+
+Deno.test('PCDCache: legacy SQL helper functions are preserved', async () => {
+  const restores: Restore[] = [];
+  const databaseId = 9203;
+  const tempDir = await Deno.makeTempDir({ prefix: 'importBaseOps-cache-helpers-' });
+
+  const schemaPath = `${tempDir}/deps/schema/ops`;
+  const seedOp: PcdOp = {
+    id: 500,
+    database_id: databaseId,
+    origin: 'base',
+    state: 'published',
+    source: 'repo',
+    filename: '1.seed.sql',
+    op_number: 1,
+    sequence: 1,
+    sql: [
+      "INSERT INTO quality_profiles (name) VALUES ('Profile A');",
+      "INSERT INTO custom_formats (name) VALUES ('Custom A');",
+      "INSERT INTO delay_profiles (name) VALUES ('Delay A');",
+      "INSERT INTO lidarr_metadata_profiles (name) VALUES ('Metadata A');",
+      "INSERT INTO tags (name) VALUES ('Tag A');",
+    ].join('\n'),
+    metadata: null,
+    desired_state: null,
+    content_hash: null,
+    last_seen_in_repo_at: null,
+    superseded_by_op_id: null,
+    pushed_at: null,
+    pushed_commit: null,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  };
+
+  const helperOp: PcdOp = {
+    id: 501,
+    database_id: databaseId,
+    origin: 'base',
+    state: 'published',
+    source: 'repo',
+    filename: '2.helpers.sql',
+    op_number: 2,
+    sequence: 2,
+    sql: [
+      'INSERT INTO legacy_helper_probe (',
+      '  quality_profile_id,',
+      '  custom_format_id,',
+      '  delay_profile_id,',
+      '  metadata_profile_id,',
+      '  tag_id',
+      ') VALUES (',
+      "  qp('Profile A'),",
+      "  cf('Custom A'),",
+      "  dp('Delay A'),",
+      "  mp('Metadata A'),",
+      "  tag('Tag A')",
+      ')',
+    ].join('\n'),
+    metadata: null,
+    desired_state: null,
+    content_hash: null,
+    last_seen_in_repo_at: null,
+    superseded_by_op_id: null,
+    pushed_at: null,
+    pushed_commit: null,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  };
+
+  const baseOps = [seedOp, helperOp];
+
+  const schemaSql =
+    [
+      'CREATE TABLE quality_profiles (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE);',
+      'CREATE TABLE custom_formats (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE);',
+      'CREATE TABLE delay_profiles (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE);',
+      'CREATE TABLE lidarr_metadata_profiles (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE);',
+      'CREATE TABLE tags (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE);',
+      'CREATE TABLE legacy_helper_probe (',
+      '  quality_profile_id INTEGER NOT NULL,',
+      '  custom_format_id INTEGER NOT NULL,',
+      '  delay_profile_id INTEGER NOT NULL,',
+      '  metadata_profile_id INTEGER NOT NULL,',
+      '  tag_id INTEGER NOT NULL',
+      ');',
+    ].join('\n');
+
+  try {
+    await Deno.mkdir(schemaPath, { recursive: true });
+    await Deno.writeTextFile(`${schemaPath}/0.schema.sql`, schemaSql);
+
+    patch(
+      databaseInstancesQueries,
+      'getById',
+      () =>
+        ({
+          id: databaseId,
+          uuid: 'cache-helper-preservation',
+          name: 'Cache Helper Probe',
+          repository_url: 'file:///tmp/cache-helper-preservation',
+          local_path: tempDir,
+          sync_strategy: 0,
+          auto_pull: 1,
+          enabled: 1,
+          personal_access_token: null,
+          is_private: 0,
+          local_ops_enabled: 0,
+          git_user_name: null,
+          git_user_email: null,
+          conflict_strategy: 'override',
+          last_synced_at: null,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        }) as DatabaseInstance,
+      restores
+    );
+
+    patch(
+      pcdOpsQueries,
+      'listByDatabaseAndOrigin',
+      (
+        _databaseId: number,
+        origin: 'base' | 'user',
+        options?: ListPcdOpsOptions
+      ) => {
+        if (origin === 'base' && options?.states?.includes('published')) return baseOps;
+        return [];
+      },
+      restores
+    );
+
+    patch(
+      pcdOpHistoryQueries,
+      'create',
+      () => 1,
+      restores
+    );
+    patch(
+      pcdOpHistoryQueries,
+      'listLatestByDatabaseWithOps',
+      () => [],
+      restores
+    );
+
+    const cache = new PCDCache(tempDir, databaseId);
+    const stats = await cache.build();
+    assertEquals(stats.schema > 0, true);
+
+    const rows = cache.query<{
+      quality_profile_id: number;
+      custom_format_id: number;
+      delay_profile_id: number;
+      metadata_profile_id: number;
+      tag_id: number;
+    }>('SELECT quality_profile_id, custom_format_id, delay_profile_id, metadata_profile_id, tag_id FROM legacy_helper_probe');
+    assertEquals(rows.length, 1);
+    assertEquals(rows[0].quality_profile_id, 1);
+    assertEquals(rows[0].custom_format_id, 1);
+    assertEquals(rows[0].delay_profile_id, 1);
+    assertEquals(rows[0].metadata_profile_id, 1);
+    assertEquals(rows[0].tag_id, 1);
+
+    cache.close();
   } finally {
     for (const restore of restores.reverse()) {
       restore();

@@ -30,8 +30,8 @@ exported when publishing.
 - **Arr** — media-management app instances managed by Praxrr.
 - **PCD** — “Praxrr Config Database”: the configuration dataset (custom
   formats, profiles, media settings) stored as ops.
-- **Op** — An append‑only SQL operation (create/update/delete) applied to build
-  the final configuration state.
+- **Op** — A compiled SQL operation (create/update/delete) produced by YAML entity
+  ingestion, then replayed to build the final configuration state.
 - **Base ops** — Published operations that define the database’s canonical
   state. These are what gets pushed to repos.
 - **Draft base ops** — Unpublished base ops used by developers while iterating.
@@ -44,8 +44,8 @@ exported when publishing.
 - **Value guard** — Old‑value checks in UPDATE/DELETE statements to detect
   upstream changes (guard mismatch ⇒ rowcount 0).
 - **Compile** — Building an in‑memory cache by replaying all ops in order.
-- **Exporter** — Planned process that materializes base ops into repo files and
-  pushes to Git.
+- **Exporter** — Process that materializes base ops into repo files and pushes to
+  Git.
 - **Parser service** — C# microservice that parses release titles for CF/
   profile testing.
 - **Entity testing** — Quality profile evaluation against test entities and
@@ -239,10 +239,13 @@ Ops live in `pcd_ops` with these key fields:
 
 Ops are loaded in this order (`packages/praxrr-app/src/lib/server/pcd/ops/loadOps.ts`):
 
-1. **Schema** (`deps/schema/ops`)
-2. **Base** (published, then drafts)
-3. **Tweaks** (`tweaks/`)
+1. **Schema** (`deps/schema/ops`) — SQL-only bootstrap layer for DDL/seed data
+2. **Base** (published, then drafts) — derived from YAML `entities/`
+3. **Tweaks** (`tweaks/`) — SQL-only repo-local adjustments
 4. **User** (published)
+
+`pcd_ops` base data no longer reads from `packages/praxrr-db/ops/*.sql`; only the schema and tweaks
+layers remain SQL-based inputs.
 
 ### 6.3 Writer Pipeline
 
@@ -281,10 +284,10 @@ Each compile records a row in `pcd_op_history` with:
 
 This powers conflict visibility and audit trails.
 
-### 6.7 Exporter (Planned)
+### 6.7 Exporter
 
-Base drafts will be exported back to repo files for publishing. The exporter
-will materialize SQL files, push to Git, and mark ops as `pushed` in the DB.
+Base drafts are exported back to repo files for publishing. The exporter
+materializes YAML entity files, pushes to Git, and marks exported ops in the DB.
 
 ### 6.8 Schema + Manifest (PCD Spec)
 
@@ -329,11 +332,13 @@ Repository layout:
 ```
 my-pcd/
 ├── pcd.json
-├── ops/
-│   ├── 1.create-1080p-Efficient.sql
-└── tweaks/
-    ├── allow-DV-no-fallback.sql
-    └── ban-megusta.sql
+└── entities/
+    ├── media-management/
+    │   └── ...
+    ├── quality/
+    │   └── ...
+    ├── custom-formats/
+    └── ...
 ```
 
 Schema PCD layout:

@@ -6,7 +6,7 @@ on:
       - dev
       - main
     tags:
-      - 'db/v*'
+      - "db/v*"
   workflow_dispatch:
     inputs:
       dry_run:
@@ -32,6 +32,17 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
+
+      - name: Validate legacy ops SQL artifacts are absent
+        run: |
+          set -euo pipefail
+
+          if [ -d "packages/praxrr-db/ops" ]; then
+            if [ -n "$(find "packages/praxrr-db/ops" -maxdepth 1 -name '*.sql' -print -quit)" ]; then
+              echo "Legacy SQL base-op files were found in packages/praxrr-db/ops; this package now publishes YAML-only seeds." >&2
+              exit 1
+            fi
+          fi
 
       - name: Determine publish target
         id: publish
