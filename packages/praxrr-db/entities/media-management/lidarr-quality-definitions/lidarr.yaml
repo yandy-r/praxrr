@@ -116,10 +116,6 @@ entries:
     min_size: 0
     max_size: 280
     preferred_size: 95
-  - quality_name: OGG Vorbis Q10
-    min_size: 0
-    max_size: 550
-    preferred_size: 295
   - quality_name: OGG Vorbis Q5
     min_size: 0
     max_size: 175
