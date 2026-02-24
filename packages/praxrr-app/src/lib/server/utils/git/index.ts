@@ -9,4 +9,15 @@ export type { GetStatusOptions } from './read.ts';
 export { getBranch, getBranches, getStatus, checkForUpdates, getIncomingChanges, getCommits, getDiff } from './read.ts';
 
 // Write helpers
-export { clone, fetch, fetchTags, pull, push, checkout, commit, getRepoInfo } from './write.ts';
+export {
+  clone,
+  fetch,
+  fetchTags,
+  pull,
+  push,
+  checkout,
+  commit,
+  getRepoInfo,
+  isLocalRepositorySource,
+  refreshLocalRepositoryClone,
+} from './write.ts';
