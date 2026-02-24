@@ -153,3 +153,23 @@ Deno.test('reader: readMigrationEntitySources parses supported migration entitie
     await Deno.remove(tempDir, { recursive: true });
   }
 });
+
+Deno.test('reader: praxrr-db includes first-class Lidarr entity YAML coverage', async () => {
+  const repoRoot = new URL('../../../../../../', import.meta.url);
+  const entitiesDir = new URL('packages/praxrr-db/entities/', repoRoot);
+  const requiredFiles = [
+    'media-management/lidarr-naming/lidarr.yaml',
+    'media-management/lidarr-media-settings/lidarr.yaml',
+    'media-management/lidarr-quality-definitions/lidarr.yaml',
+    'metadata-profiles/lidarr/lidarr-praxrr.yaml',
+  ] as const;
+
+  for (const relativePath of requiredFiles) {
+    const stat = await Deno.stat(new URL(relativePath, entitiesDir));
+    assertEquals(
+      stat.isFile,
+      true,
+      `Expected Lidarr migration source file to exist: entities/${relativePath}`
+    );
+  }
+});

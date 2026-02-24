@@ -1,0 +1,13 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: Lidarr
+rename: true
+standardTrackFormat: '{Artist Name} - {Album Type} - {Album Title}  - {(Album Disambiguation)}/{Artist Name}_{Album Title}_{track:00}_{Track Title}'
+artistName: '{Artist Name}'
+multiDiscTrackFormat: '{Artist Name} - {Album Type} - {Album Title}  - {(Album Disambiguation)}/{Artist Name}_{Album Title}_{medium:00}-{track:00}_{Track Title}'
+artistFolderFormat: '{Artist Name} ({Artist MbId})'
+replaceIllegalCharacters: true
+colonReplacementFormat: smart
+customColonReplacementFormat: null

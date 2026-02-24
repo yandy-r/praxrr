@@ -30,6 +30,8 @@ Lidarr v1 support in this database covers additive, arr-scoped seeding for:
 - custom format conditions
 - quality profile to custom format score mappings
 - quality definitions/mappings required by selected Lidarr profiles
+- media-management defaults (naming + media settings)
+- metadata profile defaults
 
 Validation evidence for the current v1 seed set (`ops/50`-`ops/54`) shows replay-safe inserts with
 minimum dataset checks passing. See the
@@ -45,7 +47,6 @@ minimum dataset/idempotency checks fail.
 
 The following capabilities are explicitly out of scope for Lidarr v1:
 
-- metadata profile seeding
 - release profile seeding
 - SignalR/event-stream integration
 - automatic OpenAPI client generation pipeline
