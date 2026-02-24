@@ -206,7 +206,9 @@ The PCDCache registers helper functions:
 
 ```typescript
 this.db.function('qp', (name: string) => {
-  const result = this.db!.prepare('SELECT id FROM quality_profiles WHERE name = ?').get(name);
+  const result = this.db!.prepare(
+    'SELECT id FROM quality_profiles WHERE name = ?'
+  ).get(name);
   return result.id;
 });
 // Also: cf(), dp(), mp(), tag()

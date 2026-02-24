@@ -148,8 +148,10 @@ const defaults: SonarrNamingFormData = {
   rename: true,
   standardEpisodeFormat:
     '{Series Title} - S{season:00}E{episode:00} - {Episode Title} {Quality Full}',
-  dailyEpisodeFormat: '{Series Title} - {Air-Date} - {Episode Title} {Quality Full}',
-  animeEpisodeFormat: '{Series Title} - S{season:00}E{episode:00} - {Episode Title} {Quality Full}',
+  dailyEpisodeFormat:
+    '{Series Title} - {Air-Date} - {Episode Title} {Quality Full}',
+  animeEpisodeFormat:
+    '{Series Title} - S{season:00}E{episode:00} - {Episode Title} {Quality Full}',
   seriesFolderFormat: '{Series Title}',
   seasonFolderFormat: 'Season {season}',
   replaceIllegalCharacters: true,

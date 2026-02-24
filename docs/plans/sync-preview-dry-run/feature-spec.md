@@ -256,14 +256,25 @@ No new database tables. Previews stored in a TTL-based in-memory Map (`PreviewSt
   "sections": ["qualityProfiles"],
   "qualityProfiles": {
     "customFormats": [
-      { "entityType": "customFormat", "name": "HDR10+", "action": "create", "remoteId": null, "fields": [] },
+      {
+        "entityType": "customFormat",
+        "name": "HDR10+",
+        "action": "create",
+        "remoteId": null,
+        "fields": []
+      },
       {
         "entityType": "customFormat",
         "name": "DV",
         "action": "update",
         "remoteId": 42,
         "fields": [
-          { "field": "specifications[0].fields[0].value", "type": "changed", "current": "^dv$", "desired": "\\bdv\\b" }
+          {
+            "field": "specifications[0].fields[0].value",
+            "type": "changed",
+            "current": "^dv$",
+            "desired": "\\bdv\\b"
+          }
         ]
       }
     ],
@@ -274,13 +285,28 @@ No new database tables. Previews stored in a TTL-based in-memory Map (`PreviewSt
         "action": "update",
         "remoteId": 5,
         "fields": [
-          { "field": "cutoffFormatScore", "type": "changed", "current": 1500, "desired": 2000 },
-          { "field": "formatItems[HDR10+].score", "type": "changed", "current": 0, "desired": 1500 }
+          {
+            "field": "cutoffFormatScore",
+            "type": "changed",
+            "current": 1500,
+            "desired": 2000
+          },
+          {
+            "field": "formatItems[HDR10+].score",
+            "type": "changed",
+            "current": 0,
+            "desired": 1500
+          }
         ]
       }
     ]
   },
-  "summary": { "totalCreates": 1, "totalUpdates": 2, "totalDeletes": 0, "totalUnchanged": 15 }
+  "summary": {
+    "totalCreates": 1,
+    "totalUpdates": 2,
+    "totalDeletes": 0,
+    "totalUnchanged": 15
+  }
 }
 ```
 

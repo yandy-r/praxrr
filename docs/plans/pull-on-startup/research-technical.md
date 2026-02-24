@@ -168,7 +168,10 @@ export interface ArrPullHandler {
   fetch(client: BaseArrClient): Promise<ArrPullSnapshot>;
   filterDefaults(snapshot: ArrPullSnapshot): ArrPullSnapshot;
   match(cache: PCDCache, snapshot: ArrPullSnapshot): Promise<PullMatchSet>;
-  apply(matchSet: PullMatchSet, ctx: PullWriteContext): Promise<PullApplyResult>;
+  apply(
+    matchSet: PullMatchSet,
+    ctx: PullWriteContext
+  ): Promise<PullApplyResult>;
 }
 ```
 

@@ -92,7 +92,14 @@ export type NavVariant = 'legacy' | 'nav_v2';
 // ============================================================================
 
 /** Top-level group identifiers (exhaustive for hybrid IA) */
-export type NavGroupId = 'overview' | 'apps' | 'policies' | 'automation' | 'operations' | 'settings' | 'dev';
+export type NavGroupId =
+  | 'overview'
+  | 'apps'
+  | 'policies'
+  | 'automation'
+  | 'operations'
+  | 'settings'
+  | 'dev';
 
 /** Metadata for a nav group */
 export interface NavGroupDef {
@@ -331,7 +338,17 @@ The key change: `navShell` is passed as a prop, so both `PageNav` and `BottomNav
 
 ```typescript
 // packages/praxrr-app/src/lib/client/navigation/iconMap.ts
-import { FolderTree, Link, Sliders, Palette, Microscope, Tag, Clock, Settings, Wrench } from 'lucide-svelte';
+import {
+  FolderTree,
+  Link,
+  Sliders,
+  Palette,
+  Microscope,
+  Tag,
+  Clock,
+  Settings,
+  Wrench,
+} from 'lucide-svelte';
 import type { ComponentType } from 'svelte';
 
 export const NAV_ICON_MAP: Record<string, ComponentType> = {

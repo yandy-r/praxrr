@@ -166,10 +166,6 @@ Deno.test('reader: praxrr-db includes first-class Lidarr entity YAML coverage', 
 
   for (const relativePath of requiredFiles) {
     const stat = await Deno.stat(new URL(relativePath, entitiesDir));
-    assertEquals(
-      stat.isFile,
-      true,
-      `Expected Lidarr migration source file to exist: entities/${relativePath}`
-    );
+    assertEquals(stat.isFile, true, `Expected Lidarr migration source file to exist: entities/${relativePath}`);
   }
 });

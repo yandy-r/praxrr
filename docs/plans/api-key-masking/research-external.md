@@ -152,7 +152,9 @@ Also supports wrapping specific object fields:
 ```typescript
 import { wrapSecrets } from '@transcend-io/secret-value';
 
-const config = wrapSecrets({ url: 'http://radarr:7878', apiKey: 'abc123' }, ['apiKey']);
+const config = wrapSecrets({ url: 'http://radarr:7878', apiKey: 'abc123' }, [
+  'apiKey',
+]);
 console.log(config); // { url: 'http://radarr:7878', apiKey: [redacted] }
 ```
 
@@ -355,7 +357,10 @@ export const handle: Handle = async ({ event, resolve }) => {
   const response = await resolve(event);
 
   // Guard: strip any api_key fields from JSON API responses
-  if (event.url.pathname.startsWith('/api/') && response.headers.get('content-type')?.includes('application/json')) {
+  if (
+    event.url.pathname.startsWith('/api/') &&
+    response.headers.get('content-type')?.includes('application/json')
+  ) {
     const body = await response.json();
     const sanitized = redactSensitiveFields(body);
     return new Response(JSON.stringify(sanitized), {
@@ -666,8 +671,11 @@ export function isMaskedApiKey(value: string): boolean {
  * Redact sensitive fields from an object for logging.
  * Operates on a shallow copy; does not mutate the original.
  */
-export function redactSensitiveFields<T extends Record<string, unknown>>(obj: T): T {
-  const SENSITIVE_KEYS = /^(api[_-]?key|apikey|password|secret|token|credential|authorization)$/i;
+export function redactSensitiveFields<T extends Record<string, unknown>>(
+  obj: T
+): T {
+  const SENSITIVE_KEYS =
+    /^(api[_-]?key|apikey|password|secret|token|credential|authorization)$/i;
   const result = { ...obj };
 
   for (const key of Object.keys(result)) {
