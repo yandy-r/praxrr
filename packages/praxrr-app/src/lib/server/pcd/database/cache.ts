@@ -78,7 +78,7 @@ export class PCDCache {
         }),
       });
 
-      // 2. Register helper functions (legacy SQL compatibility layer)
+      // 2. Register helper functions used by SQL-based query compatibility paths
       this.registerHelperFunctions();
 
       // 3. Load all operations

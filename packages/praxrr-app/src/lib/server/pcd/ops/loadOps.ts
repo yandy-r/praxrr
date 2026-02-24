@@ -2,8 +2,8 @@
  * PCD Operations Loader (DB-first)
  * Loads base/user ops from the database and schema/tweaks from files.
  *
- * Schema and tweaks layers are SQL-backed runtime boundaries and remain required even
- * when import migration mode is removed.
+ * Schema and tweaks layers are SQL-backed runtime boundaries and remain required for cache
+ * compilation and validation.
  */
 
 import { pcdOpsQueries } from '$db/queries/pcdOps.ts';
@@ -51,8 +51,14 @@ async function resolveSchemaOpsPath(pcdPath: string): Promise<string> {
         return `${depsPath}/${entry.name}/ops`;
       }
     }
-  } catch {
-    // deps directory doesn't exist
+  } catch (error) {
+    if (error instanceof Deno.errors.NotFound) {
+      // deps directory doesn't exist
+    } else {
+      throw new Error(
+        `Failed to resolve schema ops path: cannot read ${depsPath}: ${String(error)}`
+      );
+    }
   }
   // Fallback to original hardcoded path
   return `${pcdPath}/deps/schema/ops`;

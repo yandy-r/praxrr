@@ -57,7 +57,7 @@ function consumeRepoImportIdentity(layer: OperationLayer, source: PcdOpSource): 
   }
 
   if (repoImport.nextIndex >= repoImport.maxOperations) {
-    throw new Error(`Migration repo import emitted too many SQL operations for "${repoImport.filenamePrefix}"`);
+    throw new Error(`Repository-backed base import emitted too many SQL operations for "${repoImport.filenamePrefix}"`);
   }
 
   const index = repoImport.nextIndex;

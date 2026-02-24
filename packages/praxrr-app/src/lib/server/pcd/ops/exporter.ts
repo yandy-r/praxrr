@@ -190,7 +190,8 @@ async function runPreflight(databaseId: number): Promise<ExportPreflight> {
   try {
     personalAccessToken = await getDecryptedDatabasePersonalAccessToken(databaseId);
   } catch (error) {
-    errors.push('Failed to load personal access token.');
+    const detail = error instanceof Error ? error.message : String(error);
+    errors.push(`Failed to load personal access token: ${detail}`);
   }
 
   if (!database) {
@@ -263,7 +264,12 @@ async function runPreflight(databaseId: number): Promise<ExportPreflight> {
       }
     }
   } catch (error) {
-    errors.push('Failed to reach remote repository.');
+    const details = error instanceof Error ? error.message : String(error);
+    errors.push(`Failed to reach remote repository: ${details}`);
+    await logger.warn('Remote repository preflight check failed', {
+      source: 'PCDExporter',
+      meta: { databaseId, path: database.local_path, error: details },
+    });
   }
 
   return {
@@ -537,7 +543,15 @@ export async function exportDraftOps(
     let sourcePath = database.local_path;
     try {
       sourcePath = await Deno.realPath(database.local_path);
-    } catch {
+    } catch (error) {
+      await logger.warn('Falling back to stored repository path after realPath resolution failure', {
+        source: 'PCDExporter',
+        meta: {
+          databaseId,
+          path: database.local_path,
+          error: error instanceof Error ? error.message : String(error),
+        },
+      });
       // fall back to the stored path
     }
 

@@ -22,15 +22,13 @@ let withRepoImportWriteContextForTests: RepoImportWriteContextRunner =
   withRepoImportWriteContext as unknown as RepoImportWriteContextRunner;
 let readMigrationEntitySourcesForTests = readMigrationEntitySources;
 
-const MIGRATION_OP_FILENAME_PREFIX = 'entities/';
-// Migration entity ops are emitted as synthetic SQL ops and occupy a later sequence band.
+const ENTITY_OP_FILENAME_PREFIX = 'entities/';
+// Entity ops are emitted as synthetic SQL ops and occupy a later sequence band.
 const YAML_SEQUENCE_BASE = 4_000_000_000;
-// Keep migration entity filenames and op ordering deterministic even when entity counts are large.
+// Keep YAML entity filenames and op ordering deterministic even when entity counts are large.
 const YAML_SEQUENCE_STRIDE = 10_000;
 
-type SourceConflictRef = {
-  file: string;
-};
+type SourceConflictRef = string;
 
 type DeserializeResult = {
   success: boolean;
@@ -63,7 +61,7 @@ function formatConflictPath(
   identity: MigrationEntityStableIdentity
 ): string {
   const [first, second] = refs;
-  return `${formatConflictIdentity(identity)} in ${first.file} and ${second.file}`;
+  return `${formatConflictIdentity(identity)} in ${first} and ${second}`;
 }
 
 export class MigrationReaderError extends Error {
@@ -96,13 +94,13 @@ function validateStableIdentityConflicts(
       if (!other) continue;
       throw new Error(
         `Ambiguous duplicate base import identity (migration/duplicate): ${formatConflictPath(
-          [other, { file: entry.sourcePath }],
+          [other, entry.sourcePath],
           entry.stableIdentity
         )}`
       );
     }
 
-    migrationSeen.set(identity, { file: entry.sourcePath });
+    migrationSeen.set(identity, entry.sourcePath);
   }
 }
 
@@ -123,12 +121,8 @@ export function __testOnly_validateStableIdentityConflicts(
 }
 
 export interface ImportBaseOpsResult {
-  created: number;
-  updated: number;
+  imported: number;
   orphaned: number;
-}
-
-export interface ImportBaseOpsOptions {
 }
 
 export function __testOnly_setReadMigrationEntitySources(
@@ -167,8 +161,7 @@ export function __testOnly_resetGetCache(): void {
 
 export async function importBaseOps(
   databaseId: number,
-  pcdPath: string,
-  _options: ImportBaseOpsOptions = {}
+  pcdPath: string
 ): Promise<ImportBaseOpsResult> {
   const migrationReaderResult = await readMigrationEntitySourcesForTests(pcdPath);
 
@@ -180,9 +173,7 @@ export async function importBaseOps(
   validateStableIdentityConflicts(migrationCandidates);
 
   const seenAt = new Date().toISOString();
-  const created = 0;
-  const updated = 0;
-  let migrationImported = 0;
+  let imported = 0;
 
   if (migrationCandidates.length > 0) {
     await compileForTests(pcdPath, databaseId);
@@ -197,7 +188,7 @@ export async function importBaseOps(
 
       await withRepoImportWriteContextForTests(
         {
-          filenamePrefix: `${MIGRATION_OP_FILENAME_PREFIX}${candidate.relativePath}`,
+          filenamePrefix: `${ENTITY_OP_FILENAME_PREFIX}${candidate.relativePath}`,
           sequenceStart: YAML_SEQUENCE_BASE + i * YAML_SEQUENCE_STRIDE,
           maxOperations: YAML_SEQUENCE_STRIDE,
           lastSeenInRepoAt: seenAt,
@@ -223,7 +214,7 @@ export async function importBaseOps(
         }
       );
 
-      migrationImported += 1;
+      imported += 1;
     }
 
     await compileForTests(pcdPath, databaseId);
@@ -235,13 +226,11 @@ export async function importBaseOps(
     source: 'PCDImporter',
     meta: {
       databaseId,
-      created,
-      updated,
+      imported,
       orphaned,
-      migrationImported,
       migrationCandidates: migrationCandidates.length,
     },
   });
 
-  return { created, updated, orphaned };
+  return { imported, orphaned };
 }

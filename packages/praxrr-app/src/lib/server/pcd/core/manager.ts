@@ -100,7 +100,7 @@ class PCDManager {
         throw new Error('Failed to retrieve created database instance');
       }
 
-      await this.importBaseOpsWithOrchestration(id, localPath);
+      await importBaseOps(id, localPath);
       await this.seedBuiltInBaseOpsWithOrchestration(id, 'link');
 
       // Compile cache (only if enabled)
@@ -177,7 +177,7 @@ class PCDManager {
         let importedBaseOps = true;
         let baseOpsError: string | undefined;
         try {
-          await this.importBaseOpsWithOrchestration(id, instance.local_path);
+          await importBaseOps(id, instance.local_path);
         } catch (error) {
           importedBaseOps = false;
           baseOpsError = error instanceof Error ? error.message : String(error);
@@ -236,7 +236,7 @@ class PCDManager {
       let importedBaseOps = true;
       let baseOpsError: string | undefined;
       try {
-        await this.importBaseOpsWithOrchestration(id, instance.local_path);
+        await importBaseOps(id, instance.local_path);
       } catch (error) {
         importedBaseOps = false;
         baseOpsError = error instanceof Error ? error.message : String(error);
@@ -323,25 +323,21 @@ class PCDManager {
 
     await checkout(instance.local_path, branch);
     await pull(instance.local_path);
-    let importedBaseOps = true;
     try {
-      await this.importBaseOpsWithOrchestration(id, instance.local_path);
+      await importBaseOps(id, instance.local_path);
     } catch (error) {
-      importedBaseOps = false;
+      const message = error instanceof Error ? error.message : String(error);
       await logger.error('Failed to import base ops after branch switch', {
         source: 'PCDManager',
-        meta: { error: String(error), databaseId: id },
+        meta: { error: message, databaseId: id },
       });
-    }
-
-    if (!importedBaseOps) {
-      return false;
+      throw new Error(`Failed to import base ops after branch switch: ${message}`);
     }
 
     await this.seedBuiltInBaseOpsWithOrchestration(id, 'switchBranch');
     databaseInstancesQueries.updateSyncedAt(id);
 
-    return importedBaseOps;
+    return true;
   }
 
   /**
@@ -411,7 +407,7 @@ class PCDManager {
     // Import base ops from repo for all enabled instances
     for (const instance of enabledInstances) {
       try {
-        await this.importBaseOpsWithOrchestration(instance.id, instance.local_path);
+        await importBaseOps(instance.id, instance.local_path);
       } catch (error) {
         await logger.error(`Failed to import base ops for "${instance.name}"`, {
           source: 'PCDManager',
@@ -482,11 +478,6 @@ class PCDManager {
    */
   getCache(id: number) {
     return getCache(id);
-  }
-
-  private async importBaseOpsWithOrchestration(databaseId: number, localPath: string): Promise<boolean> {
-    await importBaseOps(databaseId, localPath);
-    return true;
   }
 
   private async seedBuiltInBaseOpsWithOrchestration(databaseId: number, contextLabel = 'operation'): Promise<void> {
