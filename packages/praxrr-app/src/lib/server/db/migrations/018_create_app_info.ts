@@ -20,7 +20,7 @@ export const migration: Migration = {
 		);
 
 		-- Insert initial version
-		INSERT INTO app_info (id, version) VALUES (1, '2.0.0');
+		INSERT INTO app_info (id, version) VALUES (1, '0.1.0');
 	`,
 
   down: `

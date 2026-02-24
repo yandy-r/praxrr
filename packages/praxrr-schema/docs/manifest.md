@@ -265,8 +265,8 @@ references it by name.
   `three-d-profiles` or `profiles-3d` are valid alternatives.
 - Single-character names are technically valid but strongly discouraged. They provide no descriptive
   value and are likely to collide.
-- The name `schema` is reserved for the foundational schema PCD maintained in this repository.
-  Do not use it for other PCDs.
+- The name `schema` is reserved for the foundational schema PCD maintained in this repository. Do
+  not use it for other PCDs.
 - Hyphens are the only separator. Underscores (`_`), dots (`.`), and camelCase are not permitted.
   This ensures consistent, predictable naming across the ecosystem.
 
@@ -293,7 +293,7 @@ references it by name.
 
 ### `version`
 
-The current release version of the PCD, following [Semantic Versioning 2.0.0](https://semver.org).
+The current release version of the PCD, following [Semantic Versioning 0.1.0](https://semver.org).
 
 | Property        | Value                                                                                                                              |
 | --------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
@@ -308,17 +308,17 @@ component.
 
 **Edge cases and guidance:**
 
-- Do not prefix the version with `v`. The semver spec does not include a prefix, and Praxrr
-  rejects strings like `v1.0.0`. Use `1.0.0` instead.
+- Do not prefix the version with `v`. The semver spec does not include a prefix, and Praxrr rejects
+  strings like `v1.0.0`. Use `1.0.0` instead.
 - Two-segment versions like `1.0` are invalid. All three segments (`MAJOR.MINOR.PATCH`) are
   required.
 - Pre-release versions (e.g., `1.0.0-beta.1`, `2.0.0-rc.3`) are parsed correctly but have lower
   precedence than the release version. Use them during development and testing, not for published
   PCDs.
-- Build metadata (e.g., `1.0.0+build.42`) is permitted but ignored during version comparison.
-  It is informational only.
-- The version must be monotonically increasing for each published release. Publishing `1.2.0`
-  after `1.3.0` causes confusion and may break dependency resolution.
+- Build metadata (e.g., `1.0.0+build.42`) is permitted but ignored during version comparison. It is
+  informational only.
+- The version must be monotonically increasing for each published release. Publishing `1.2.0` after
+  `1.3.0` causes confusion and may break dependency resolution.
 
 **Examples:**
 
@@ -348,8 +348,8 @@ single sentence or short phrase that communicates the PCD's purpose at a glance.
 
 - The description must not be an empty string. A PCD with `"description": ""` will fail validation.
 - Whitespace-only strings (e.g., `"description": "   "`) are also rejected after trimming.
-- Keep the description factual and specific. Avoid generic phrases like "A Praxrr database" that
-  do not differentiate the PCD from others.
+- Keep the description factual and specific. Avoid generic phrases like "A Praxrr database" that do
+  not differentiate the PCD from others.
 - The 256-character limit is a recommendation, not a hard constraint. Descriptions exceeding this
   length will be truncated in some tooling displays.
 - Descriptions are not searchable by tag -- use the `tags` field for keyword discovery.
@@ -389,8 +389,8 @@ replays their [OSQL operations](structure.md#2-operational-sql-osql) in
 
 - An empty object `{}` is not valid for non-schema PCDs. You must declare at least `"schema"` as a
   dependency.
-- Dependency keys must exactly match the `name` field of the target PCD. A typo in the key
-  (e.g., `"shcema"` instead of `"schema"`) results in an unresolvable dependency error.
+- Dependency keys must exactly match the `name` field of the target PCD. A typo in the key (e.g.,
+  `"shcema"` instead of `"schema"`) results in an unresolvable dependency error.
 - Circular dependencies are detected and rejected. If PCD A depends on PCD B and PCD B depends on
   PCD A, both fail validation.
 - Self-dependencies (e.g., `"my-pcd": "^1.0.0"` in the manifest for `my-pcd`) are rejected.
@@ -485,7 +485,7 @@ unsupported features.
 
 ```json
 "praxrr": {
-  "minimum_version": "2.0.0"
+  "minimum_version": "0.1.0"
 }
 ```
 
@@ -756,7 +756,7 @@ The simplest and most common pattern. Every non-schema PCD must declare at least
     "schema": "^1.0.0"
   },
   "praxrr": {
-    "minimum_version": "2.0.0"
+    "minimum_version": "0.1.0"
   }
 }
 ```
@@ -801,7 +801,7 @@ When you need a precise version of a dependency, use an exact version string:
     "schema": "1.1.0"
   },
   "praxrr": {
-    "minimum_version": "2.0.0"
+    "minimum_version": "0.1.0"
   }
 }
 ```
@@ -823,7 +823,7 @@ For PCDs that are broadly compatible and do not depend on specific schema featur
     "schema": ">=1.0.0"
   },
   "praxrr": {
-    "minimum_version": "2.0.0"
+    "minimum_version": "0.1.0"
   }
 }
 ```
@@ -840,12 +840,12 @@ When you need to express a specific window of compatibility:
 {
   "name": "legacy-profiles",
   "version": "3.0.0",
-  "description": "Profiles compatible with schema 1.x only",
+  "description": "Profiles compatible with schema 0.x only",
   "dependencies": {
-    "schema": ">=1.0.0 <2.0.0"
+    "schema": ">=0.0.0 <0.1.0"
   },
   "praxrr": {
-    "minimum_version": "2.0.0"
+    "minimum_version": "0.1.0"
   }
 }
 ```
@@ -861,9 +861,9 @@ multiple PCDs.
 
 ```mermaid
 graph TD
-    User["User Configuration<br/><em>Selects: anime-profiles v2.0.0</em>"]
+    User["User Configuration<br/><em>Selects: anime-profiles v0.1.0</em>"]
 
-    User --> AP["anime-profiles v2.0.0<br/><em>dependencies:<br/>schema: ^1.1.0<br/>anime-formats: ~2.0.0</em>"]
+    User --> AP["anime-profiles v0.1.0<br/><em>dependencies:<br/>schema: ^1.1.0<br/>anime-formats: ~2.0.0</em>"]
 
     AP --> Schema["schema<br/><em>Requested: ^1.1.0</em>"]
     AP --> AF["anime-formats v2.0.3<br/><em>dependencies:<br/>schema: ^1.0.0</em>"]
@@ -1096,8 +1096,8 @@ flowchart TD
 
 ## Versioning
 
-PCD versions follow [Semantic Versioning 2.0.0](https://semver.org). The version string
-communicates the nature of changes to both Praxrr and to dependent PCDs.
+PCD versions follow [Semantic Versioning 2.0.0](https://semver.org). The version string communicates
+the nature of changes to both Praxrr and to dependent PCDs.
 
 ### When to Bump MAJOR
 
@@ -1129,13 +1129,13 @@ Examples of minor changes:
 - Adding new seed data (languages, qualities)
 - Adding new tweak files
 
-When you bump minor, reset patch to zero (`1.3.0`, not `1.3.2`). Dependents using caret ranges
-will automatically accept the new minor version.
+When you bump minor, reset patch to zero (`1.3.0`, not `1.3.2`). Dependents using caret ranges will
+automatically accept the new minor version.
 
 ### When to Bump PATCH
 
-Increment the patch version (`x.y.Z`) for **backwards-compatible bug fixes** and minor
-adjustments that do not introduce new features.
+Increment the patch version (`x.y.Z`) for **backwards-compatible bug fixes** and minor adjustments
+that do not introduce new features.
 
 Examples of patch changes:
 

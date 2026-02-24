@@ -251,7 +251,7 @@ praxrr/                              # Repository root
 // packages/praxrr-db/deno.json
 {
   "name": "@yandy-r/praxrr-db",
-  "version": "2.0.0",
+  "version": "0.1.0",
 }
 ```
 
@@ -260,11 +260,7 @@ praxrr/                              # Repository root
 ```jsonc
 // deno.json (root) - add new members to existing workspace array
 {
-  "workspace": [
-    "packages/praxrr-api",
-    "packages/praxrr-db",
-    "packages/praxrr-schema",
-  ],
+  "workspace": ["packages/praxrr-api", "packages/praxrr-db", "packages/praxrr-schema"],
 }
 ```
 
