@@ -1,11 +1,11 @@
 import { assertEquals, assertRejects } from '@std/assert';
-import { pcdManager } from '$pcd/core/manager.ts';
 import { pcdOpsQueries } from '$db/queries/pcdOps.ts';
 import {
   __testOnly_resetCompile,
   __testOnly_resetGetCache,
   __testOnly_resetReadMigrationEntitySources,
   __testOnly_resetWithRepoImportWriteContext,
+  importBaseOps,
   __testOnly_setCompile,
   __testOnly_setGetCache,
   __testOnly_setReadMigrationEntitySources,
@@ -111,12 +111,7 @@ Deno.test('pcdManager: import orchestration surfaces import failures directly', 
     restores.push(__testOnly_resetWithRepoImportWriteContext);
 
     await assertRejects(
-      () =>
-        (
-          pcdManager as unknown as {
-            importBaseOpsWithOrchestration: (id: number, path: string) => Promise<boolean>;
-          }
-        ).importBaseOpsWithOrchestration(databaseId, '/tmp/unused'),
+      () => importBaseOps(databaseId, '/tmp/unused'),
       Error,
       'Failed to import migration entity "quality-profiles/failing.yaml": mock import failure'
     );
@@ -169,13 +164,10 @@ Deno.test('pcdManager: successful migration import still continues orchestration
     );
     restores.push(__testOnly_resetWithRepoImportWriteContext);
 
-    const imported = await (
-      pcdManager as unknown as {
-        importBaseOpsWithOrchestration: (id: number, path: string) => Promise<boolean>;
-      }
-    ).importBaseOpsWithOrchestration(databaseId, '/tmp/unused');
+    const imported = await importBaseOps(databaseId, '/tmp/unused');
 
-    assertEquals(imported, true);
+    assertEquals(imported.imported, 1);
+    assertEquals(imported.orphaned, 0);
     assertEquals(calls, ['quality-profiles/success.yaml']);
   } finally {
     restoreAll();

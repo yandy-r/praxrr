@@ -4,7 +4,7 @@ import { pcdOpHistoryQueries } from '$db/queries/pcdOpHistory.ts';
 import { pcdOpsQueries, type ListPcdOpsOptions, type PcdOp } from '$db/queries/pcdOps.ts';
 import * as importBaseOpsModule from '$pcd/ops/importBaseOps.ts';
 import { PCDCache } from '$pcd/database/cache.ts';
-import type { MigrationEntityCandidate, MigrationEntityStableIdentity } from '$pcd/migration/reader.ts';
+import type { MigrationEntityCandidate, MigrationReaderIssue, MigrationEntityStableIdentity } from '$pcd/migration/reader.ts';
 import { loadAllOperations } from '$pcd/ops/loadOps.ts';
 
 type Restore = () => void;
@@ -23,7 +23,7 @@ function migrationEntry(identity: TestStableIdentity | null, sourcePath: string)
   };
 }
 
-const { __testOnly_validateStableIdentityConflicts, importBaseOps } = importBaseOpsModule;
+const { __testOnly_validateStableIdentityConflicts, importBaseOps, MigrationReaderError } = importBaseOpsModule;
 const {
   __testOnly_setReadMigrationEntitySources,
   __testOnly_resetReadMigrationEntitySources,
@@ -175,6 +175,86 @@ Deno.test('importBaseOps: throws on duplicate migration stable identities during
   }
 });
 
+Deno.test('importBaseOps: throws MigrationReaderError when migration reader returns issues', async () => {
+  const restores: Restore[] = [];
+  const databaseId = 9204;
+  const tempDir = await Deno.makeTempDir({ prefix: 'importBaseOps-reader-issues-' });
+
+  try {
+    __testOnly_setReadMigrationEntitySources(() =>
+      Promise.resolve({
+        candidates: [],
+        issues: [
+          {
+            relativePath: 'media-management/radarr-naming/bad.yaml',
+            kind: 'parse-error',
+            message: 'invalid YAML payload',
+          } as MigrationReaderIssue,
+        ],
+      })
+    );
+    restores.push(__testOnly_resetReadMigrationEntitySources);
+
+    await assertRejects(
+      async () => {
+        await importBaseOps(databaseId, tempDir);
+      },
+      MigrationReaderError,
+      'media-management/radarr-naming/bad.yaml'
+    );
+  } finally {
+    for (const restore of restores.reverse()) {
+      restore();
+    }
+    await Deno.remove(tempDir, { recursive: true });
+  }
+});
+
+Deno.test('importBaseOps: throws when base cache is unavailable', async () => {
+  const restores: Restore[] = [];
+  const databaseId = 9205;
+  const tempDir = await Deno.makeTempDir({ prefix: 'importBaseOps-cache-missing-' });
+
+  try {
+    __testOnly_setReadMigrationEntitySources(() =>
+      Promise.resolve({
+        candidates: [
+          buildCandidate(
+            'quality-profiles/default.yaml',
+            'quality_profile',
+            {
+              key: 'quality_profile_name',
+              value: 'Default',
+              kind: 'stable',
+            },
+            () => Promise.resolve({ success: true })
+          ),
+        ],
+        issues: [],
+      })
+    );
+    restores.push(__testOnly_resetReadMigrationEntitySources);
+
+    __testOnly_setGetCache(() => undefined as unknown as PCDCache);
+    restores.push(__testOnly_resetGetCache);
+    __testOnly_setCompile(() => Promise.resolve({ schema: 0, base: 0, tweaks: 0, user: 0, timing: 0 }));
+    restores.push(__testOnly_resetCompile);
+
+    await assertRejects(
+      async () => {
+        await importBaseOps(databaseId, tempDir);
+      },
+      Error,
+      'Cache not available while importing migration entity "quality-profiles/default.yaml"'
+    );
+  } finally {
+    for (const restore of restores.reverse()) {
+      restore();
+    }
+    await Deno.remove(tempDir, { recursive: true });
+  }
+});
+
 Deno.test('importBaseOps: imports YAML candidates in deterministic order and applies deterministic sequencing', async () => {
   const restores: Restore[] = [];
   const databaseId = 9201;
@@ -272,8 +352,7 @@ Deno.test('importBaseOps: imports YAML candidates in deterministic order and app
 
     const result = await importBaseOps(databaseId, tempDir);
 
-    assertEquals(result.created, 0);
-    assertEquals(result.updated, 0);
+    assertEquals(result.imported, 4);
     assertEquals(result.orphaned, 1);
     assertEquals(order, ['regex:Root', 'custom:Alpha', 'custom:Zeta', 'quality:Zulu']);
     assertEquals(seenContexts.length, 4);
