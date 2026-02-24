@@ -64,7 +64,7 @@ jobs:
           if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
             echo "value=develop" >> $GITHUB_OUTPUT
           elif [[ "${{ github.ref }}" == "refs/heads/dev" ]]; then
-            echo "value=develop" >> $GITHUB_OUTPUT
+            echo "value=testing" >> $GITHUB_OUTPUT
           elif [[ "${{ github.ref }}" == refs/tags/app/v*-beta* ]]; then
             echo "value=beta" >> $GITHUB_OUTPUT
           elif [[ "${{ github.ref }}" == refs/tags/app/v* ]]; then

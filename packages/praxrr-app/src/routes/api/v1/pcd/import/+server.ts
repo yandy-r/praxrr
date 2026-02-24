@@ -24,7 +24,7 @@ import { createLidarrNaming } from '$pcd/entities/mediaManagement/naming/create.
 import { validatePortableData } from '$pcd/entities/validate.ts';
 import { logger } from '$logger/logger.ts';
 
-const _deserializeDependencies = {
+export const _deserializeDependencies = {
   deserializeDelayProfile: deserialize.deserializeDelayProfile,
   deserializeRegularExpression: deserialize.deserializeRegularExpression,
   deserializeCustomFormat: deserialize.deserializeCustomFormat,
@@ -39,8 +39,6 @@ const _deserializeDependencies = {
   deserializeLidarrQualityDefinitions: deserialize.deserializeLidarrQualityDefinitions,
   deserializeLidarrMetadataProfile: deserialize.deserializeLidarrMetadataProfile,
 } as const;
-
-export const deserializeDependencies = _deserializeDependencies;
 
 const VALID_ENTITY_TYPES: ReadonlySet<string> = new Set(ENTITY_TYPES);
 

@@ -2,8 +2,8 @@ import { assertArrayIncludes, assertEquals, assertExists } from '@std/assert';
 import { BaseTest, type TestContext } from './BaseTest.ts';
 import { GET as libraryGet } from '../../routes/api/v1/arr/library/+server.ts';
 import { GET as releasesGet } from '../../routes/api/v1/arr/releases/+server.ts';
-import { GET as exportGet, serializeDependencies } from '../../routes/api/v1/pcd/export/+server.ts';
-import { POST as importPost, deserializeDependencies } from '../../routes/api/v1/pcd/import/+server.ts';
+import { GET as exportGet, _serializeDependencies } from '../../routes/api/v1/pcd/export/+server.ts';
+import { POST as importPost, _deserializeDependencies } from '../../routes/api/v1/pcd/import/+server.ts';
 import { type ArrInstance, arrInstancesQueries } from '../../lib/server/db/queries/arrInstances.ts';
 import { pcdManager, type PCDCache as PCDCacheType } from '../../lib/server/pcd/index.ts';
 import { cache } from '../../lib/server/utils/cache/cache.ts';
@@ -811,7 +811,7 @@ class LidarrApiParityTest extends BaseTest {
     this.test('import accepts valid migration metadata', async () => {
       const getCacheMock: typeof pcdManager.getCache = () => ({ kb: {} }) as unknown as PCDCacheType;
       this.patch(pcdManager, 'getCache', getCacheMock);
-      this.patch(deserializeDependencies, 'deserializeRegularExpression', async () => {
+      this.patch(_deserializeDependencies, 'deserializeRegularExpression', async () => {
         return { success: true };
       });
 
@@ -846,7 +846,7 @@ class LidarrApiParityTest extends BaseTest {
     this.test('export includes migration metadata in response', async () => {
       const getCacheMock: typeof pcdManager.getCache = () => ({ kb: {} }) as unknown as PCDCacheType;
       this.patch(pcdManager, 'getCache', getCacheMock);
-      this.patch(serializeDependencies, 'serializeRegularExpression', async () => {
+      this.patch(_serializeDependencies, 'serializeRegularExpression', async () => {
         return {
           name: 'Regular Expression',
           pattern: 'test',

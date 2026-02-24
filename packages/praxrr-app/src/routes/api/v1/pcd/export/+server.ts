@@ -11,7 +11,7 @@ import {
 import type { PCDCache } from '$pcd/index.ts';
 import * as serialize from '$pcd/entities/serialize.ts';
 
-const _serializeDependencies = {
+export const _serializeDependencies = {
   serializeDelayProfile: serialize.serializeDelayProfile,
   serializeRegularExpression: serialize.serializeRegularExpression,
   serializeCustomFormat: serialize.serializeCustomFormat,
@@ -27,8 +27,6 @@ const _serializeDependencies = {
   serializeLidarrQualityDefinitions: serialize.serializeLidarrQualityDefinitions,
   serializeLidarrMetadataProfile: serialize.serializeLidarrMetadataProfile,
 } as const;
-
-export const serializeDependencies = _serializeDependencies;
 
 const VALID_ENTITY_TYPES: ReadonlySet<string> = new Set(ENTITY_TYPES);
 
