@@ -559,7 +559,9 @@ interface CompilerOutput {
   warnings: string[]; // non-fatal issues
 }
 
-async function compileEntitiesToSql(input: CompilerInput): Promise<CompilerOutput> {
+async function compileEntitiesToSql(
+  input: CompilerInput
+): Promise<CompilerOutput> {
   // 1. Load and parse all YAML files
   const entities = await loadAllEntities(input.entityDir);
 
@@ -689,7 +691,8 @@ function generateCustomFormatSql(cf: PortableCustomFormat): string[] {
   // Insert tag junctions
   for (const tag of cf.tags) {
     sqls.push(
-      `INSERT INTO custom_format_tags (custom_format_name, tag_name) ` + `VALUES ('${esc(cf.name)}', '${esc(tag)}');`
+      `INSERT INTO custom_format_tags (custom_format_name, tag_name) ` +
+        `VALUES ('${esc(cf.name)}', '${esc(tag)}');`
     );
   }
 
@@ -1037,7 +1040,10 @@ SQL ops files into the in-memory cache, it serializes every entity to its portab
 writes YAML files:
 
 ```typescript
-async function migrateToYaml(cache: PCDCache, outputDir: string): Promise<void> {
+async function migrateToYaml(
+  cache: PCDCache,
+  outputDir: string
+): Promise<void> {
   // 1. Serialize all tags
   const tags = await listAllTags(cache);
   await writeYaml(`${outputDir}/tags.yaml`, { tags: tags.map((t) => t.name) });
@@ -1112,7 +1118,10 @@ async function verifyMigration(
   const oldCache = buildCacheFromSqlOps(schemaPath, oldOpsDir);
 
   // 2. Build cache from new format (YAML compile + remaining SQL ops)
-  const compiledSeed = await compileEntitiesToSql({ entityDir: newEntitiesDir, schemaPath });
+  const compiledSeed = await compileEntitiesToSql({
+    entityDir: newEntitiesDir,
+    schemaPath,
+  });
   const newCache = buildCacheFromCompiledSeed(schemaPath, compiledSeed);
 
   // 3. Compare every table row-by-row
@@ -1124,7 +1133,11 @@ async function verifyMigration(
     // Sort by primary key for deterministic comparison
     // Compare row counts, then field values
     // Ignore auto-increment IDs and timestamps
-    if (!rowsMatch(oldRows, newRows, { ignoreColumns: ['id', 'created_at', 'updated_at'] })) {
+    if (
+      !rowsMatch(oldRows, newRows, {
+        ignoreColumns: ['id', 'created_at', 'updated_at'],
+      })
+    ) {
       console.error(`Table ${table}: mismatch`);
       return false;
     }
@@ -1254,7 +1267,9 @@ function importTrashCustomFormat(
           pattern: pattern,
           tags: [],
           description: `Imported from TRaSH-Guides (${trashCf.trash_id})`,
-          regex101Id: trashCf.trash_regex ? extractRegex101Id(trashCf.trash_regex) : null,
+          regex101Id: trashCf.trash_regex
+            ? extractRegex101Id(trashCf.trash_regex)
+            : null,
         };
       }
 
@@ -1317,7 +1332,9 @@ Since entity YAML files are structured and self-describing, documentation genera
 straightforward template expansion:
 
 ```typescript
-async function generateCustomFormatDoc(cf: PortableCustomFormat): Promise<string> {
+async function generateCustomFormatDoc(
+  cf: PortableCustomFormat
+): Promise<string> {
   const lines: string[] = [];
 
   lines.push(`# Custom Format: ${cf.name}`);
@@ -1353,7 +1370,9 @@ async function generateCustomFormatDoc(cf: PortableCustomFormat): Promise<string
     lines.push('| Title | Type | Expected |');
     lines.push('|-------|------|----------|');
     for (const test of cf.tests) {
-      lines.push(`| \`${test.title}\` | ${test.type} | ${test.shouldMatch ? 'MATCH' : 'NO MATCH'} |`);
+      lines.push(
+        `| \`${test.title}\` | ${test.type} | ${test.shouldMatch ? 'MATCH' : 'NO MATCH'} |`
+      );
     }
   }
 
@@ -1385,7 +1404,9 @@ async function generateScoreMatrix(
     const scores = profileNames.map((pn) => {
       const profile = profiles.find((p) => p.name === pn);
       if (!profile) return '-';
-      const score = profile.customFormatScores.find((s) => s.customFormatName === cf.name);
+      const score = profile.customFormatScores.find(
+        (s) => s.customFormatName === cf.name
+      );
       return score ? String(score.score) : '-';
     });
     lines.push(`| ${cf.name} | ${scores.join(' | ')} |`);
@@ -1407,7 +1428,10 @@ interface ChangelogEntry {
   details: string[];
 }
 
-async function generateChangelog(oldEntities: AllEntities, newEntities: AllEntities): Promise<ChangelogEntry[]> {
+async function generateChangelog(
+  oldEntities: AllEntities,
+  newEntities: AllEntities
+): Promise<ChangelogEntry[]> {
   const entries: ChangelogEntry[] = [];
 
   // Detect added/removed custom formats
@@ -1496,7 +1520,10 @@ The primary runtime change is in the base ops import flow. When importing a data
 `entities/` directory:
 
 ```typescript
-async function importBaseOps(pcdPath: string, databaseId: number): Promise<void> {
+async function importBaseOps(
+  pcdPath: string,
+  databaseId: number
+): Promise<void> {
   const entitiesDir = path.join(pcdPath, 'entities');
   const opsDir = path.join(pcdPath, 'ops');
 
@@ -1728,7 +1755,11 @@ script produces `pcd-entities.schema.json`:
         "upgradesAllowed": { "type": "boolean", "default": true },
         "minimumScore": { "type": "integer", "default": 0 },
         "upgradeUntilScore": { "type": "integer", "default": 0 },
-        "upgradeScoreIncrement": { "type": "integer", "minimum": 1, "default": 1 },
+        "upgradeScoreIncrement": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 1
+        },
         "orderedItems": {
           "type": "array",
           "items": {
@@ -1760,7 +1791,10 @@ script produces `pcd-entities.schema.json`:
             "required": ["customFormatName", "arrType", "score"],
             "properties": {
               "customFormatName": { "type": "string" },
-              "arrType": { "type": "string", "enum": ["all", "radarr", "sonarr", "lidarr"] },
+              "arrType": {
+                "type": "string",
+                "enum": ["all", "radarr", "sonarr", "lidarr"]
+              },
               "score": { "type": "integer" }
             }
           }
@@ -1776,7 +1810,12 @@ script produces `pcd-entities.schema.json`:
         "name": { "type": "string", "maxLength": 100 },
         "preferredProtocol": {
           "type": "string",
-          "enum": ["prefer_usenet", "prefer_torrent", "only_usenet", "only_torrent"]
+          "enum": [
+            "prefer_usenet",
+            "prefer_torrent",
+            "only_usenet",
+            "only_torrent"
+          ]
         },
         "usenetDelay": { "type": "integer" },
         "torrentDelay": { "type": "integer" },

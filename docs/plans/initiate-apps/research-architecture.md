@@ -132,7 +132,9 @@ class BaseArrClient extends BaseHttpClient {
 **File**: `packages/praxrr-app/src/lib/server/utils/arr/defaults.ts`
 
 ```typescript
-function getDefaultDelayProfile(arrType: 'radarr' | 'sonarr'): Omit<ArrDelayProfile, 'id' | 'order'>;
+function getDefaultDelayProfile(
+  arrType: 'radarr' | 'sonarr'
+): Omit<ArrDelayProfile, 'id' | 'order'>;
 ```
 
 Only supports `radarr` and `sonarr` (throws for other types). The reconciliation module should apply delay profiles to new Radarr/Sonarr instances using the same pattern as `packages/praxrr-app/src/routes/arr/new/+page.server.ts` (lines 119-142).
@@ -224,7 +226,9 @@ There are two `ArrType` definitions. The PCD-layer `ArrAppType` covers `radarr |
 **File**: `packages/praxrr-app/src/lib/server/utils/validation/url.ts`
 
 ```typescript
-function parseOptionalAbsoluteHttpUrl(rawUrl: string | null | undefined): ParsedHttpUrl;
+function parseOptionalAbsoluteHttpUrl(
+  rawUrl: string | null | undefined
+): ParsedHttpUrl;
 // Returns { value: string | null, isValid: boolean }
 // Accepts http: and https: schemes only
 ```

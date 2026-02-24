@@ -30,7 +30,11 @@ paths or glob patterns:
 
 ```jsonc
 {
-  "workspace": ["./packages/praxrr", "./packages/praxrr-db", "./packages/praxrr-schema"],
+  "workspace": [
+    "./packages/praxrr",
+    "./packages/praxrr-db",
+    "./packages/praxrr-schema",
+  ],
   // OR with globs:
   // "workspace": ["packages/*"]
 }

@@ -32,11 +32,7 @@ Deno.test('yamlFormatter: omits undefined top-level values and normalizes array 
 });
 
 Deno.test('yamlFormatter: rejects non-finite numbers with a path-aware error', () => {
-  assertThrows(
-    () => formatDeterministicYaml({ score: Number.NaN }),
-    Error,
-    'portable.score must be a finite number'
-  );
+  assertThrows(() => formatDeterministicYaml({ score: Number.NaN }), Error, 'portable.score must be a finite number');
 
   assertThrows(
     () => formatDeterministicYaml({ score: Number.POSITIVE_INFINITY }),
@@ -65,8 +61,7 @@ Deno.test('yamlFormatter: enforces migration metadata validation and output orde
   assertStringIncludes(yaml, 'b: 2');
 
   assertThrows(
-    () =>
-      formatDeterministicYaml({ a: 1 }, { migration: { format: 'yaml', version: 0, source: '' } }),
+    () => formatDeterministicYaml({ a: 1 }, { migration: { format: 'yaml', version: 0, source: '' } }),
     Error,
     'migration.version must be an integer >= 1'
   );

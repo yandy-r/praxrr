@@ -12,7 +12,7 @@
       "files": ["*.md", "*.markdown"],
       "options": {
         "proseWrap": "preserve",
-        "printWidth": 120
+        "printWidth": 80
       }
     }
   ]

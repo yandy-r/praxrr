@@ -59,6 +59,13 @@ if (!setupStateQueries.isDefaultDatabaseLinked()) {
   const defaultDatabaseToken = Deno.env.get('PRAXRR_DEFAULT_DB_TOKEN')?.trim() || undefined;
   const defaultDatabaseGitUserName = Deno.env.get('PRAXRR_DEFAULT_DB_GIT_USERNAME')?.trim() || undefined;
   const defaultDatabaseGitUserEmail = Deno.env.get('PRAXRR_DEFAULT_DB_GIT_EMAIL')?.trim() || undefined;
+  const isLocalDefaultDatabasePath =
+    defaultDatabaseUrl.startsWith('file://') ||
+    defaultDatabaseUrl.startsWith('/') ||
+    defaultDatabaseUrl.startsWith('./') ||
+    defaultDatabaseUrl.startsWith('../') ||
+    /^[A-Za-z]:[\\/]/.test(defaultDatabaseUrl);
+  const defaultDatabaseAutoPull = isLocalDefaultDatabasePath ? false : true;
   const hasCompleteGitIdentity = !!defaultDatabaseGitUserName && !!defaultDatabaseGitUserEmail;
   const hasPartialGitIdentity =
     (!!defaultDatabaseGitUserName || !!defaultDatabaseGitUserEmail) && !hasCompleteGitIdentity;
@@ -66,6 +73,15 @@ if (!setupStateQueries.isDefaultDatabaseLinked()) {
   if (hasPartialGitIdentity) {
     await logger.warn('Default database git identity is incomplete; skipping git author configuration', {
       source: 'Setup',
+    });
+  }
+  if (isLocalDefaultDatabasePath) {
+    await logger.info('Using local path override for default database auto-link', {
+      source: 'Setup',
+      meta: {
+        url: defaultDatabaseUrl,
+        autoPull: defaultDatabaseAutoPull,
+      },
     });
   }
 
@@ -80,9 +96,9 @@ if (!setupStateQueries.isDefaultDatabaseLinked()) {
       await pcdManager.link({
         name: defaultDatabaseName,
         repositoryUrl: defaultDatabaseUrl,
-        branch: defaultDatabaseBranch,
+        branch: isLocalDefaultDatabasePath ? undefined : defaultDatabaseBranch,
         syncStrategy: 60,
-        autoPull: true,
+        autoPull: defaultDatabaseAutoPull,
         personalAccessToken: defaultDatabaseToken,
         gitUserName: hasCompleteGitIdentity ? defaultDatabaseGitUserName : undefined,
         gitUserEmail: hasCompleteGitIdentity ? defaultDatabaseGitUserEmail : undefined,

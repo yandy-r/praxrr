@@ -148,7 +148,9 @@ const parserPort = Deno.env.get('PARSER_PORT') || '5000';
 
 // Pattern 4: Enum validation (config.ts:49-50)
 const auth = (Deno.env.get('AUTH') || 'on').toLowerCase();
-this.authMode = ['on', 'local', 'off', 'oidc'].includes(auth) ? (auth as AuthMode) : 'on';
+this.authMode = ['on', 'local', 'off', 'oidc'].includes(auth)
+  ? (auth as AuthMode)
+  : 'on';
 ```
 
 For `initiate-apps`: use `Deno.env.get()?.trim() || undefined` for required fields (treat empty as
@@ -235,7 +237,9 @@ db.execute(
 );
 
 // Query first (returns single row or undefined)
-const result = db.queryFirst<{ id: number }>('SELECT last_insert_rowid() as id');
+const result = db.queryFirst<{ id: number }>(
+  'SELECT last_insert_rowid() as id'
+);
 
 // Query all (returns array)
 db.query<ArrInstance>('SELECT * FROM arr_instances ORDER BY name');
@@ -276,7 +280,11 @@ if (
   try {
     const client = createArrClient(type as ArrType, url, apiKey);
     const defaultProfile = getDefaultDelayProfile(type);
-    await client.updateDelayProfile(1, { ...defaultProfile, id: 1, order: 2147483647 });
+    await client.updateDelayProfile(1, {
+      ...defaultProfile,
+      id: 1,
+      order: 2147483647,
+    });
     await logger.info(`Applied default delay profile to ${name}`, {
       source: 'arr/new',
       meta: { id, type, profile: defaultProfile },
@@ -377,12 +385,18 @@ export interface ParsedHttpUrl {
   isValid: boolean;
 }
 
-export function parseOptionalAbsoluteHttpUrl(rawUrl: string | null | undefined): ParsedHttpUrl {
+export function parseOptionalAbsoluteHttpUrl(
+  rawUrl: string | null | undefined
+): ParsedHttpUrl {
   const value = rawUrl?.trim() || null;
   if (value === null) return { value: null, isValid: true };
   try {
     const parsed = new URL(value);
-    if (!ALLOWED_HTTP_SCHEMES.includes(parsed.protocol as (typeof ALLOWED_HTTP_SCHEMES)[number])) {
+    if (
+      !ALLOWED_HTTP_SCHEMES.includes(
+        parsed.protocol as (typeof ALLOWED_HTTP_SCHEMES)[number]
+      )
+    ) {
       return { value, isValid: false };
     }
     return { value, isValid: true };
@@ -430,7 +444,10 @@ Note: `ArrType` in `$arr/types.ts` includes `'chaptarr'`, but `ArrAppType` from
 From `/packages/praxrr-app/src/routes/arr/test/+server.ts` lines 22-24:
 
 ```typescript
-const client = createArrClient(type as ArrType, url, apiKey, { timeout: 3000, retries: 0 });
+const client = createArrClient(type as ArrType, url, apiKey, {
+  timeout: 3000,
+  retries: 0,
+});
 const isConnected = await client.testConnection();
 client.close();
 ```
@@ -613,7 +630,11 @@ class MyFeatureTest extends BaseTest {
     for (const restore of this.restores.reverse()) restore();
   }
 
-  private patch<T extends object, K extends keyof T>(target: T, key: K, replacement: T[K]): void {
+  private patch<T extends object, K extends keyof T>(
+    target: T,
+    key: K,
+    replacement: T[K]
+  ): void {
     const original = target[key];
     target[key] = replacement;
     this.restores.push(() => {

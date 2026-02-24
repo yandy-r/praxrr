@@ -186,8 +186,11 @@ async function getJson<T>(instance: ArrInstance, path: string): Promise<T> {
   const payload = text.length > 0 ? safeJson(text) : null;
 
   if (!res.ok) {
-    const detail = typeof payload === 'string' ? payload : JSON.stringify(payload);
-    throw new Error(`[${instance.type}] ${res.status} ${res.statusText}: ${detail}`);
+    const detail =
+      typeof payload === 'string' ? payload : JSON.stringify(payload);
+    throw new Error(
+      `[${instance.type}] ${res.status} ${res.statusText}: ${detail}`
+    );
   }
 
   return payload as T;
@@ -212,7 +215,9 @@ function isDefaultDelayProfile(
   return item.order === 1 && (item.tags == null || item.tags.length === 0);
 }
 
-export async function pullOnStartup(instances: ArrInstance[]): Promise<PullResult[]> {
+export async function pullOnStartup(
+  instances: ArrInstance[]
+): Promise<PullResult[]> {
   const enabled = instances.filter((i) => i.enabled);
 
   return Promise.all(
@@ -228,14 +233,19 @@ export async function pullOnStartup(instances: ArrInstance[]): Promise<PullResul
       try {
         await getJson(instance, '/system/status');
 
-        const [customFormats, qualityProfiles, delayProfiles] = await Promise.all([
-          getJson<Array<{ name: string }>>(instance, '/customformat'),
-          getJson<Array<{ name: string }>>(instance, '/qualityprofile'),
-          getJson<Array<{ id?: number; order?: number; tags?: number[] | null; name?: string }>>(
-            instance,
-            '/delayprofile'
-          ),
-        ]);
+        const [customFormats, qualityProfiles, delayProfiles] =
+          await Promise.all([
+            getJson<Array<{ name: string }>>(instance, '/customformat'),
+            getJson<Array<{ name: string }>>(instance, '/qualityprofile'),
+            getJson<
+              Array<{
+                id?: number;
+                order?: number;
+                tags?: number[] | null;
+                name?: string;
+              }>
+            >(instance, '/delayprofile'),
+          ]);
 
         for (const profile of delayProfiles) {
           if (isDefaultDelayProfile(profile, instance.type)) {
@@ -256,7 +266,9 @@ export async function pullOnStartup(instances: ArrInstance[]): Promise<PullResul
           result.imported += 1;
         }
       } catch (error) {
-        result.errors.push(error instanceof Error ? error.message : 'Unknown pull error');
+        result.errors.push(
+          error instanceof Error ? error.message : 'Unknown pull error'
+        );
       }
 
       return result;

@@ -6,7 +6,9 @@ import {
   checkForUpdates,
   checkout,
   clone,
+  refreshLocalRepositoryClone,
   getStatus,
+  isLocalRepositorySource,
   type GitStatus,
   pull,
   type UpdateInfo,
@@ -50,6 +52,7 @@ class PCDManager {
     // Generate UUID for storage
     const uuid = crypto.randomUUID();
     const localPath = getPCDPath(uuid);
+    let createdDatabaseId: number | null = null;
 
     try {
       // Clone the repository and detect if it's private
@@ -90,6 +93,7 @@ class PCDManager {
             }
           : undefined
       );
+      createdDatabaseId = id;
 
       // Get and return the created instance
       const instance = databaseInstancesQueries.getById(id);
@@ -105,6 +109,19 @@ class PCDManager {
 
       return instance;
     } catch (error) {
+      if (createdDatabaseId !== null) {
+        try {
+          databaseInstancesQueries.delete(createdDatabaseId);
+        } catch (cleanupError) {
+          await logger.warn('Failed to rollback database instance after link failure', {
+            source: 'PCDManager',
+            meta: {
+              databaseId: createdDatabaseId,
+              error: String(cleanupError),
+            },
+          });
+        }
+      }
       // Cleanup on failure - remove cloned directory
       try {
         await Deno.remove(localPath, { recursive: true });
@@ -152,6 +169,52 @@ class PCDManager {
     }
 
     try {
+      if (isLocalRepositorySource(instance.repository_url)) {
+        await refreshLocalRepositoryClone(instance.repository_url, instance.local_path);
+
+        const personalAccessToken = await getDecryptedDatabasePersonalAccessToken(instance.id);
+        await syncDependencies(instance.local_path, personalAccessToken);
+
+        let importedBaseOps = true;
+        let baseOpsError: string | undefined;
+        try {
+          await this.importBaseOpsWithOrchestration(id, instance.local_path);
+        } catch (error) {
+          importedBaseOps = false;
+          baseOpsError = error instanceof Error ? error.message : String(error);
+          await logger.error('Failed to import base ops after local-path sync', {
+            source: 'PCDManager',
+            meta: { error: String(error), databaseId: id },
+          });
+        }
+
+        if (!importedBaseOps) {
+          return {
+            success: false,
+            commitsBehind: 0,
+            error: `Base op import failed: ${baseOpsError ?? 'unknown error'}`,
+          };
+        }
+
+        await this.seedBuiltInBaseOpsWithOrchestration(id, 'sync');
+        databaseInstancesQueries.updateSyncedAt(id);
+        await this.compileIfEnabled(instance, instance.local_path, 'sync');
+        await this.triggerPullSync(id);
+
+        await logger.info('Synchronized local-path database source', {
+          source: 'PCDManager',
+          meta: {
+            databaseId: id,
+            repositoryUrl: instance.repository_url,
+          },
+        });
+
+        return {
+          success: true,
+          commitsBehind: 0,
+        };
+      }
+
       // Check for updates first
       const updateInfo = await checkForUpdates(instance.local_path);
 
@@ -223,6 +286,16 @@ class PCDManager {
     const instance = databaseInstancesQueries.getById(id);
     if (!instance) {
       throw new Error(`Database instance ${id} not found`);
+    }
+
+    if (isLocalRepositorySource(instance.repository_url)) {
+      return {
+        hasUpdates: false,
+        commitsBehind: 0,
+        commitsAhead: 0,
+        latestRemoteCommit: 'local',
+        currentLocalCommit: 'local',
+      };
     }
 
     return await checkForUpdates(instance.local_path);

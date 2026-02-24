@@ -51,7 +51,13 @@ curl -sS 'http://localhost:5173/api/v1/health?verbose=true' | jq
   "uptime": 4212,
   "components": {
     "sqlite": { "status": "healthy", "responseTimeMs": 1.2, "migration": 63 },
-    "repos": { "status": "healthy", "total": 1, "enabled": 1, "cached": 1, "disabled": 0 },
+    "repos": {
+      "status": "healthy",
+      "total": 1,
+      "enabled": 1,
+      "cached": 1,
+      "disabled": 0
+    },
     "jobs": { "status": "healthy" },
     "backups": { "status": "healthy", "enabled": true },
     "logs": { "status": "healthy" }
@@ -155,7 +161,9 @@ curl -sS \
 {
   "type": "radarr",
   "items": [{ "id": 1, "title": "A Movie", "qualityProfileName": "Default" }],
-  "profilesByDatabase": [{ "databaseId": 1, "databaseName": "Praxrr-DB", "profiles": ["Default"] }],
+  "profilesByDatabase": [
+    { "databaseId": 1, "databaseName": "Praxrr-DB", "profiles": ["Default"] }
+  ],
   "page": 1,
   "pageSize": 2,
   "totalRecords": 245,
@@ -256,7 +264,9 @@ curl -sS \
 
 ```json
 {
-  "staleCustomFormats": [{ "id": 14, "name": "My CF [ns]", "strippedName": "My CF" }],
+  "staleCustomFormats": [
+    { "id": 14, "name": "My CF [ns]", "strippedName": "My CF" }
+  ],
   "staleQualityProfiles": []
 }
 ```

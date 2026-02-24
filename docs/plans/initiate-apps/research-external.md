@@ -436,7 +436,11 @@ This placement ensures:
 import type { ArrType } from '$arr/types.ts';
 
 /** Supported Arr types for env-var-based instance creation */
-const SUPPORTED_ARR_TYPES: ReadonlySet<string> = new Set(['radarr', 'sonarr', 'lidarr']);
+const SUPPORTED_ARR_TYPES: ReadonlySet<string> = new Set([
+  'radarr',
+  'sonarr',
+  'lidarr',
+]);
 
 /** Parsed instance definition from environment variables */
 interface ParsedInstanceDef {
@@ -451,7 +455,8 @@ interface ParsedInstanceDef {
  * Type-prefixed pattern:
  *   RADARR_INSTANCE_URL_1, RADARR_INSTANCE_API_KEY_1, etc.
  */
-const TYPE_PREFIXED_REGEX = /^(RADARR|SONARR|LIDARR)_INSTANCE_(URL|API_KEY|NAME|EXTERNAL_URL)_(\d+)$/;
+const TYPE_PREFIXED_REGEX =
+  /^(RADARR|SONARR|LIDARR)_INSTANCE_(URL|API_KEY|NAME|EXTERNAL_URL)_(\d+)$/;
 
 /**
  * Generic pattern:
@@ -519,7 +524,9 @@ export function parseInstanceEnvVars(): ParsedInstanceDef[] {
     if (!SUPPORTED_ARR_TYPES.has(rawType)) continue;
 
     // Skip if this URL + apiKey combo is already in type-prefixed results
-    const alreadyDefined = instances.some((inst) => inst.url === url && inst.apiKey === apiKey);
+    const alreadyDefined = instances.some(
+      (inst) => inst.url === url && inst.apiKey === apiKey
+    );
     if (alreadyDefined) continue;
 
     instances.push({
@@ -553,21 +560,28 @@ export async function initiateAppsFromEnv(): Promise<void> {
   const parsed = parseInstanceEnvVars();
   if (parsed.length === 0) return;
 
-  await logger.info(`Found ${parsed.length} Arr instance(s) in environment variables`, {
-    source: 'InitiateApps',
-  });
+  await logger.info(
+    `Found ${parsed.length} Arr instance(s) in environment variables`,
+    {
+      source: 'InitiateApps',
+    }
+  );
 
   for (const def of parsed) {
     // Skip if API key already registered
     if (arrInstancesQueries.apiKeyExists(def.apiKey)) {
-      await logger.debug(`Skipping instance (API key already registered): ${def.url}`, {
-        source: 'InitiateApps',
-      });
+      await logger.debug(
+        `Skipping instance (API key already registered): ${def.url}`,
+        {
+          source: 'InitiateApps',
+        }
+      );
       continue;
     }
 
     // Generate name if not provided
-    const name = def.name || `${def.type.charAt(0).toUpperCase() + def.type.slice(1)}-env`;
+    const name =
+      def.name || `${def.type.charAt(0).toUpperCase() + def.type.slice(1)}-env`;
     const finalName = ensureUniqueName(name);
 
     // Attempt connection test (non-blocking)
@@ -599,10 +613,13 @@ export async function initiateAppsFromEnv(): Promise<void> {
         },
       });
     } catch (error) {
-      await logger.warn(`Failed to register Arr instance from env: ${finalName}`, {
-        source: 'InitiateApps',
-        meta: { error: String(error) },
-      });
+      await logger.warn(
+        `Failed to register Arr instance from env: ${finalName}`,
+        {
+          source: 'InitiateApps',
+          meta: { error: String(error) },
+        }
+      );
     }
   }
 }

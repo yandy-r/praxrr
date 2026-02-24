@@ -260,7 +260,11 @@ praxrr/                              # Repository root
 ```jsonc
 // deno.json (root) - add new members to existing workspace array
 {
-  "workspace": ["packages/praxrr-api", "packages/praxrr-db", "packages/praxrr-schema"],
+  "workspace": [
+    "packages/praxrr-api",
+    "packages/praxrr-db",
+    "packages/praxrr-schema",
+  ],
 }
 ```
 

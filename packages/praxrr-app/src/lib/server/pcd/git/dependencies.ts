@@ -9,6 +9,7 @@ import { loadManifest, resolveSchemaDependencyUrl } from '../manifest/manifest.t
 import { logger } from '$logger/logger.ts';
 
 const SCHEMA_REF_OVERRIDE_ENV = 'PRAXRR_SCHEMA_REF';
+const SCHEMA_PATH_OVERRIDE_ENV = 'PRAXRR_SCHEMA_LOCAL_PATH';
 
 /**
  * Extract repository name from GitHub URL
@@ -46,6 +47,61 @@ async function dirExists(path: string): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+async function copyPathRecursive(sourcePath: string, targetPath: string): Promise<void> {
+  const sourceStat = await Deno.stat(sourcePath);
+
+  if (sourceStat.isFile) {
+    await Deno.copyFile(sourcePath, targetPath);
+    return;
+  }
+
+  if (!sourceStat.isDirectory) {
+    throw new Error(`Unsupported dependency source entry type at "${sourcePath}"`);
+  }
+
+  await Deno.mkdir(targetPath, { recursive: true });
+  for await (const entry of Deno.readDir(sourcePath)) {
+    const entrySourcePath = `${sourcePath}/${entry.name}`;
+    const entryTargetPath = `${targetPath}/${entry.name}`;
+    await copyPathRecursive(entrySourcePath, entryTargetPath);
+  }
+}
+
+async function installLocalDependency(
+  pcdPath: string,
+  repoName: string,
+  localSourcePath: string,
+  scope: 'schema'
+): Promise<void> {
+  const depPath = getDependencyPath(pcdPath, repoName);
+
+  const sourceStat = await Deno.stat(localSourcePath).catch(() => null);
+  if (!sourceStat?.isDirectory) {
+    throw new Error(`Configured local ${scope} dependency path is not a directory: ${localSourcePath}`);
+  }
+
+  const sourceOpsPath = `${localSourcePath}/ops`;
+  const sourceManifestPath = `${localSourcePath}/pcd.json`;
+  const opsStat = await Deno.stat(sourceOpsPath).catch(() => null);
+  const manifestStat = await Deno.stat(sourceManifestPath).catch(() => null);
+  if (!opsStat?.isDirectory) {
+    throw new Error(`Configured local ${scope} dependency path is missing "ops/": ${localSourcePath}`);
+  }
+  if (!manifestStat?.isFile) {
+    throw new Error(`Configured local ${scope} dependency path is missing "pcd.json": ${localSourcePath}`);
+  }
+
+  try {
+    await Deno.remove(depPath, { recursive: true });
+  } catch {
+    // Fresh install path.
+  }
+
+  await Deno.mkdir(depPath, { recursive: true });
+  await copyPathRecursive(sourceOpsPath, `${depPath}/ops`);
+  await Deno.copyFile(sourceManifestPath, `${depPath}/pcd.json`);
 }
 
 /**
@@ -138,6 +194,19 @@ function getRequiredDependencyRef(repoUrl: string, manifestRef: string, schemaDe
   return overrideRef;
 }
 
+function getSchemaLocalPathOverride(repoUrl: string, schemaDependencyUrl: string): string | null {
+  if (repoUrl !== schemaDependencyUrl) {
+    return null;
+  }
+
+  const overridePath = Deno.env.get(SCHEMA_PATH_OVERRIDE_ENV)?.trim();
+  if (!overridePath) {
+    return null;
+  }
+
+  return overridePath;
+}
+
 /**
  * Process all dependencies for a PCD (initial clone)
  * Called when linking a new database
@@ -158,6 +227,25 @@ export async function processDependencies(pcdPath: string, personalAccessToken?:
     const requiredRef = getRequiredDependencyRef(repoUrl, version, schemaDependencyUrl);
     const repoName = getRepoName(repoUrl);
     const depPath = getDependencyPath(pcdPath, repoName);
+    const schemaLocalPathOverride = getSchemaLocalPathOverride(repoUrl, schemaDependencyUrl);
+
+    if (schemaLocalPathOverride) {
+      await installLocalDependency(pcdPath, repoName, schemaLocalPathOverride, 'schema');
+      await loadManifest(depPath);
+
+      await logger.debug(`Installed dependency ${repoName} from local path override`, {
+        source: 'PCDDependencies',
+        meta: {
+          pcdPath,
+          repoName,
+          schemaDependencyUrl,
+          localSourcePath: schemaLocalPathOverride,
+          env: SCHEMA_PATH_OVERRIDE_ENV,
+        },
+      });
+
+      continue;
+    }
 
     // Clone and checkout the dependency
     await cloneDependency(pcdPath, repoUrl, requiredRef, personalAccessToken);
@@ -191,6 +279,26 @@ export async function syncDependencies(pcdPath: string, personalAccessToken?: st
     const requiredRef = getRequiredDependencyRef(repoUrl, manifestRef, schemaDependencyUrl);
     const repoName = getRepoName(repoUrl);
     const depPath = getDependencyPath(pcdPath, repoName);
+    const schemaLocalPathOverride = getSchemaLocalPathOverride(repoUrl, schemaDependencyUrl);
+
+    if (schemaLocalPathOverride) {
+      await installLocalDependency(pcdPath, repoName, schemaLocalPathOverride, 'schema');
+      await loadManifest(depPath);
+
+      await logger.info(`Refreshed dependency ${repoName} from local path override`, {
+        source: 'PCDDependencies',
+        meta: {
+          pcdPath,
+          repoName,
+          schemaDependencyUrl,
+          localSourcePath: schemaLocalPathOverride,
+          env: SCHEMA_PATH_OVERRIDE_ENV,
+        },
+      });
+
+      continue;
+    }
+
     const installedVersion = await getInstalledVersion(pcdPath, repoName);
 
     // Already at correct version
@@ -246,6 +354,23 @@ export async function validateDependencies(pcdPath: string, personalAccessToken?
       const requiredRef = getRequiredDependencyRef(repoUrl, manifestRef, schemaDependencyUrl);
       const repoName = getRepoName(repoUrl);
       const depPath = getDependencyPath(pcdPath, repoName);
+      const schemaLocalPathOverride = getSchemaLocalPathOverride(repoUrl, schemaDependencyUrl);
+
+      if (schemaLocalPathOverride) {
+        await installLocalDependency(pcdPath, repoName, schemaLocalPathOverride, 'schema');
+        await loadManifest(depPath);
+        await logger.debug(`Validated dependency ${repoName} via local path override`, {
+          source: 'PCDDependencies',
+          meta: {
+            pcdPath,
+            repoName,
+            schemaDependencyUrl,
+            localSourcePath: schemaLocalPathOverride,
+            env: SCHEMA_PATH_OVERRIDE_ENV,
+          },
+        });
+        continue;
+      }
 
       // Check if dependency exists
       if (!(await dirExists(depPath))) {

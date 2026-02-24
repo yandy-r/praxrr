@@ -135,7 +135,13 @@ interface SyncPreviewResult {
   arrType: SyncArrType;
   createdAt: string; // ISO 8601
   expiresAt: string; // ISO 8601 (createdAt + TTL)
-  status: 'generating' | 'ready' | 'applying' | 'applied' | 'failed' | 'expired';
+  status:
+    | 'generating'
+    | 'ready'
+    | 'applying'
+    | 'applied'
+    | 'failed'
+    | 'expired';
   error?: string;
 
   // Scoping: which sections were previewed

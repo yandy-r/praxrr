@@ -323,9 +323,11 @@ const defaults: RadarrNamingFormData = {
 const defaults: SonarrNamingFormData = {
   name: '',
   rename: true,
-  standardEpisodeFormat: '{Series Title} - S{season:00}E{episode:00} - {Episode Title} ...',
+  standardEpisodeFormat:
+    '{Series Title} - S{season:00}E{episode:00} - {Episode Title} ...',
   dailyEpisodeFormat: '{Series Title} - {Air-Date} - {Episode Title} ...',
-  animeEpisodeFormat: '{Series Title} - S{season:00}E{episode:00} - {Episode Title} ...',
+  animeEpisodeFormat:
+    '{Series Title} - S{season:00}E{episode:00} - {Episode Title} ...',
   seriesFolderFormat: '{Series Title}',
   seasonFolderFormat: 'Season {season}',
   replaceIllegalCharacters: true,
@@ -513,7 +515,9 @@ function already transforms this into form state.
 Add to `packages/praxrr-app/src/lib/server/pcd/entities/mediaManagement/naming/read.ts`:
 
 ```typescript
-export async function getRadarrDefault(cache: PCDCache): Promise<RadarrNamingRow | null> {
+export async function getRadarrDefault(
+  cache: PCDCache
+): Promise<RadarrNamingRow | null> {
   const db = cache.kb;
   const row = await db
     .selectFrom(RADARR_NAMING_TABLE)

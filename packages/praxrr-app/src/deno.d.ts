@@ -15,14 +15,7 @@ declare module '@felix/bcrypt' {
 }
 
 declare module '@soapbox/kysely-deno-sqlite' {
-  import type {
-    DatabaseIntrospector,
-    Dialect,
-    DialectAdapter,
-    Driver,
-    Kysely,
-    QueryCompiler,
-  } from 'kysely';
+  import type { DatabaseIntrospector, Dialect, DialectAdapter, Driver, Kysely, QueryCompiler } from 'kysely';
 
   export interface DenoSqlite3DialectConfig {
     database: unknown;

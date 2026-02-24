@@ -43,7 +43,12 @@ Request:
 {
   "instanceId": 1,
   "databaseId": 1,
-  "resourceTypes": ["customFormats", "qualityProfiles", "delayProfiles", "qualityDefinitions"]
+  "resourceTypes": [
+    "customFormats",
+    "qualityProfiles",
+    "delayProfiles",
+    "qualityDefinitions"
+  ]
 }
 ```
 
@@ -61,8 +66,12 @@ Request (explicit mode):
   "selections": {
     "customFormats": [{ "name": "x265 (HD)", "action": "import" }],
     "qualityProfiles": [{ "name": "HD-1080p", "action": "import" }],
-    "delayProfiles": [{ "arrId": 1, "pcdName": "Imported - Prefer Usenet", "action": "import" }],
-    "qualityDefinitions": [{ "pcdConfigName": "Imported QD", "action": "import" }]
+    "delayProfiles": [
+      { "arrId": 1, "pcdName": "Imported - Prefer Usenet", "action": "import" }
+    ],
+    "qualityDefinitions": [
+      { "pcdConfigName": "Imported QD", "action": "import" }
+    ]
   }
 }
 ```

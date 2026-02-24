@@ -142,7 +142,10 @@ No schema changes required. Masking is applied at the serialization layer, not t
 
 ```typescript
 // $shared/utils/masking.ts
-export function maskApiKey(key: string | null | undefined, visibleChars?: number): string;
+export function maskApiKey(
+  key: string | null | undefined,
+  visibleChars?: number
+): string;
 
 export function isMaskedValue(value: string): boolean;
 

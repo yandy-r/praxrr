@@ -137,7 +137,9 @@ spinner.stop();
 // For known-count phases, prefer simple console output with carriage return
 const total = entities.length;
 for (let i = 0; i < total; i++) {
-  Deno.stderr.writeSync(new TextEncoder().encode(`\rConverting: ${i + 1}/${total}`));
+  Deno.stderr.writeSync(
+    new TextEncoder().encode(`\rConverting: ${i + 1}/${total}`)
+  );
 }
 ```
 

@@ -365,13 +365,22 @@ Metadata profiles should be added as a new `SectionType` gated exclusively to `l
 
 ```typescript
 // Updated SectionType union
-export type SectionType = 'qualityProfiles' | 'delayProfiles' | 'mediaManagement' | 'metadataProfiles';
+export type SectionType =
+  | 'qualityProfiles'
+  | 'delayProfiles'
+  | 'mediaManagement'
+  | 'metadataProfiles';
 
 // Updated SUPPORTED_SYNC_SECTIONS
 const SUPPORTED_SYNC_SECTIONS: Record<SyncArrType, readonly SectionType[]> = {
   radarr: ['qualityProfiles', 'delayProfiles', 'mediaManagement'],
   sonarr: ['qualityProfiles', 'delayProfiles', 'mediaManagement'],
-  lidarr: ['qualityProfiles', 'delayProfiles', 'mediaManagement', 'metadataProfiles'],
+  lidarr: [
+    'qualityProfiles',
+    'delayProfiles',
+    'mediaManagement',
+    'metadataProfiles',
+  ],
 };
 ```
 

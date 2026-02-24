@@ -180,7 +180,12 @@ The runner sorts by version, skips already-applied migrations, executes `up` SQL
 `packages/praxrr-app/src/lib/server/utils/arr/factory.ts`
 
 ```typescript
-function createArrClient(type: ArrType, url: string, apiKey: string, options?: ArrClientOptions): BaseArrClient;
+function createArrClient(
+  type: ArrType,
+  url: string,
+  apiKey: string,
+  options?: ArrClientOptions
+): BaseArrClient;
 ```
 
 - Returns typed client: `RadarrClient`, `SonarrClient`, `LidarrClient`, or `ChaptarrClient`
