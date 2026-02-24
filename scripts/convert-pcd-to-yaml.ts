@@ -18,7 +18,9 @@ interface RuntimeDependencies {
   importBaseOps: (
     databaseId: number,
     pcdPath: string,
-    options: { pcdMigrationIngestionMode: 'sql-only' | 'hybrid' }
+    options?: {
+      [key: string]: unknown;
+    }
   ) => Promise<unknown>;
   runMigrations: () => Promise<void>;
   db: { close: () => void };
@@ -115,9 +117,9 @@ type ExitCode = 0 | 1 | 2 | 3;
 
 const KNOWN_ENTITY_TYPES = new Set<EntityType>(ENTITY_TYPES);
 
-const USAGE = `Usage: deno task convert:pcd-entities [options]
+const USAGE = `Usage: deno task convert:pcd-entities:legacy [options]
 
-Converts a PCD repo at --pcd-path into migration entity files.
+Converts a PCD repo at --pcd-path into portable entity files.
 
 Options:
   --pcd-path=<path>            Required. Path to a cloned PCD repository.
@@ -129,7 +131,7 @@ Options:
                                Default: false
   --dry-run                     Preview planned writes without writing files.
                                Default: false
-  --include-metadata           Include migration metadata in output.
+  --include-metadata            Include portable metadata in output.
                                Default: false
   --strict                      Compatibility alias for --include-metadata.
                                Deprecated: use --include-metadata for clarity.
@@ -403,7 +405,7 @@ async function buildStandaloneCache(
       console.log(`Created standalone database instance ${databaseId}`);
     }
 
-    await dependencies.importBaseOps(databaseId, pcdPath, { pcdMigrationIngestionMode: 'sql-only' });
+    await dependencies.importBaseOps(databaseId, pcdPath);
     await dependencies.compile(pcdPath, databaseId);
 
     const cache = dependencies.getCache(databaseId);

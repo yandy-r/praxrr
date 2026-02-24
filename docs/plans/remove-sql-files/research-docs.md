@@ -99,8 +99,8 @@ Sections that reference SQL, schema, or PCD ingestion and need review after SQL 
 
 - `/home/yandy/Projects/github.com/yandy-r/praxrr/deno.json`: Contains tasks that touch SQL:
   - `generate:pcd-types`: Uses schema SQL file (schema-layer, stays)
-  - `convert:pcd-entities`: Converts SQL-compiled PCD to YAML entities (may become obsolete)
-  - `verify:pcd-parity`: Compares SQL-compiled vs entity-compiled state (may become obsolete)
+  - `convert:pcd-entities:legacy`: Deprecated command alias retained for historical compatibility; command now surfaces migration-complete guidance
+  - `verify:pcd-parity:legacy`: Deprecated command alias retained for historical compatibility; command now fails fast with migration-complete guidance
   - `compat:check`: Runs `scripts/compat-check.ts` which applies SQL ops files
 
 ### CI/CD Workflows
