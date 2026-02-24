@@ -57,3 +57,9 @@
 
 - When editing a file interactively, always use `apply_patch` (not `exec_command`) unless the task
   explicitly requires another tool; treat the warning to switch tools as the correction cue.
+
+## 2026-02-24
+
+- For monorepo mirror workflows, always provide a local-path development override for both the
+  primary PCD source and schema dependency before asking for mirror-merge validation; otherwise
+  feature testing is blocked on publish/merge order.
