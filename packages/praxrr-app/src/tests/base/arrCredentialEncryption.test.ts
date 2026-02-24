@@ -113,11 +113,11 @@ Deno.test(
       const versions = getAllArrCredentialKeyVersions();
       assertEquals(versions.length, 2);
       assertEquals(versions.includes(TEST_ARR_MASTER_KEY_VERSION), true);
-      assertEquals(versions.includes('v2'), true);
+      assertEquals(versions.includes('main'), true);
 
       const plaintext = 'same-api-key-across-versions';
       const fpActive = await deriveArrInstanceApiKeyFingerprint(plaintext, TEST_ARR_MASTER_KEY_VERSION);
-      const fpV2 = await deriveArrInstanceApiKeyFingerprint(plaintext, 'v2');
+      const fpV2 = await deriveArrInstanceApiKeyFingerprint(plaintext, 'main');
       assertEquals(fpActive.value !== fpV2.value, true);
     } finally {
       mutableConfig.arrCredentialMasterKey = originalMasterKey;

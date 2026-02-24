@@ -39,10 +39,10 @@ There is no build system, test framework, or package manager.
 
 ## Branching Model
 
-- **`stable`** — production/main branch
-- **`dev`** — auto-synced from stable on PR merge (via `.github/workflows/devSync.yml`)
-- **`v2`** — current working branch
-- Origin: `yandy-r/praxrr-db` (fork), Upstream: `yandy-r/database`
+- **`main`** — default branch, published via monorepo subtree mirror
+- **`dev`** — testing/development branch
+- **`develop`** — auxiliary alias updated on `main` push
+- Source of truth: `yandy-r/praxrr` monorepo (`packages/praxrr-db`)
 
 ## SQL Migration Conventions
 
