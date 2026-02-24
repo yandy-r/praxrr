@@ -1,7 +1,6 @@
 #!/usr/bin/env -S deno run -A
 
-const DEPRECATED_MESSAGE =
-  'This verification task is retired after SQL-to-YAML migration completion.';
+const DEPRECATED_MESSAGE = 'This verification task is retired after SQL-to-YAML migration completion.';
 
 const USAGE = `Usage: deno task verify:pcd-parity:legacy
 
