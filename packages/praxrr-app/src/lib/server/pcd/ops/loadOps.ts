@@ -1,6 +1,9 @@
 /**
  * PCD Operations Loader (DB-first)
  * Loads base/user ops from the database and schema/tweaks from files.
+ *
+ * Schema and tweaks layers are SQL-backed runtime boundaries and remain required even
+ * when import migration mode is removed.
  */
 
 import { pcdOpsQueries } from '$db/queries/pcdOps.ts';

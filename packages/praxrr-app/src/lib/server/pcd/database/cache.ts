@@ -78,7 +78,7 @@ export class PCDCache {
         }),
       });
 
-      // 2. Register helper functions
+      // 2. Register helper functions (legacy SQL compatibility layer)
       this.registerHelperFunctions();
 
       // 3. Load all operations
@@ -297,6 +297,7 @@ export class PCDCache {
 
   /**
    * Register SQL helper functions (qp, cf, dp, mp, tag)
+   * Kept for backward compatibility with existing PCD SQL rows that still rely on them.
    */
   private registerHelperFunctions(): void {
     if (!this.db) return;

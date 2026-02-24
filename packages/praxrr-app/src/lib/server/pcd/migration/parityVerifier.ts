@@ -385,9 +385,7 @@ async function withIsolatedInstance<T>(
 
 async function buildSqlOnlySnapshot(pcdPath: string): Promise<BuildResult> {
   return withIsolatedInstance(pcdPath, 'sql', async (databaseId) => {
-    await importBaseOps(databaseId, pcdPath, {
-      pcdMigrationIngestionMode: 'sql-only',
-    });
+    await importBaseOps(databaseId, pcdPath);
     await compile(pcdPath, databaseId);
 
     const cache = getCache(databaseId);

@@ -1,4 +1,4 @@
-import { assertEquals, assertThrows } from '@std/assert';
+import { assertEquals } from '@std/assert';
 
 type EnvRestore = Record<string, string | undefined>;
 
@@ -25,10 +25,7 @@ function restoreMigrationEnv(saved: EnvRestore): void {
 
 async function withMigrationConfig<T>(
   vars: Record<string, string>,
-  fn: (cfg: {
-    pcdMigrationIngestionMode: 'sql-only' | 'hybrid';
-    pcdMigrationAllowLegacyFallback: boolean;
-  }) => Promise<T> | T
+  fn: (cfg: Record<string, unknown>) => Promise<T> | T
 ): Promise<T> {
   const saved = saveAndClearMigrationEnv();
   Object.entries(vars).forEach(([key, value]) => {
@@ -44,66 +41,29 @@ async function withMigrationConfig<T>(
   }
 }
 
-async function withMigrationConfigThrows(vars: Record<string, string>, expectedMessage: string): Promise<void> {
-  const saved = saveAndClearMigrationEnv();
-  Object.entries(vars).forEach(([key, value]) => {
-    Deno.env.set(key, value);
-  });
-
-  try {
-    const ts = `${Date.now()}_${Math.random()}`;
-    let threw = false;
-    try {
-      await import(`../../lib/server/utils/config/config.ts?pcdMigrationConfig=${ts}`);
-    } catch (err: unknown) {
-      threw = true;
-      const message = err instanceof Error ? err.message : String(err);
-      assertEquals(
-        message.includes(expectedMessage),
-        true,
-        `Expected error message to include "${expectedMessage}", got "${message}"`
-      );
-    }
-
-    assertEquals(threw, true, `Expected config import to fail for vars ${JSON.stringify(vars)}`);
-  } finally {
-    restoreMigrationEnv(saved);
-  }
-}
-
-Deno.test('Config: PRAXRR_PCD_MIGRATION_MODE defaults to hybrid', async () => {
+Deno.test('Config: migration mode vars are not exported on config', async () => {
   await withMigrationConfig({}, (cfg) => {
-    assertEquals(cfg.pcdMigrationIngestionMode, 'hybrid');
+    assertEquals('pcdMigrationIngestionMode' in cfg, false);
+    assertEquals('pcdMigrationAllowLegacyFallback' in cfg, false);
   });
 });
 
-Deno.test('Config: PRAXRR_PCD_MIGRATION_MODE accepts SQL-only values', async () => {
-  await withMigrationConfig({ PRAXRR_PCD_MIGRATION_MODE: 'sql-only' }, (cfg) => {
-    assertEquals(cfg.pcdMigrationIngestionMode, 'sql-only');
-  });
-});
-
-Deno.test('Config: PRAXRR_PCD_MIGRATION_MODE treats empty string as default hybrid', async () => {
-  await withMigrationConfig({ PRAXRR_PCD_MIGRATION_MODE: '   ' }, (cfg) => {
-    assertEquals(cfg.pcdMigrationIngestionMode, 'hybrid');
-  });
-});
-
-Deno.test('Config: PRAXRR_PCD_MIGRATION_MODE rejects invalid values', async () => {
-  await withMigrationConfigThrows(
-    { PRAXRR_PCD_MIGRATION_MODE: 'invalid-value' },
-    'Invalid value for PRAXRR_PCD_MIGRATION_MODE'
+Deno.test('Config: migration env values do not affect config parse', async () => {
+  await withMigrationConfig(
+    {
+      PRAXRR_PCD_MIGRATION_MODE: 'sql-only',
+      PRAXRR_PCD_MIGRATION_ALLOW_LEGACY_FALLBACK: 'true',
+      AUTH: 'off',
+    },
+    (cfg) => {
+      assertEquals(cfg.authMode, 'off');
+      assertEquals('pcdMigrationIngestionMode' in cfg, false);
+    }
   );
 });
 
-Deno.test('Config: PRAXRR_PCD_MIGRATION_ALLOW_LEGACY_FALLBACK parses truthy variants', async () => {
-  await withMigrationConfig({ PRAXRR_PCD_MIGRATION_ALLOW_LEGACY_FALLBACK: ' true ' }, (cfg) => {
-    assertEquals(cfg.pcdMigrationAllowLegacyFallback, true);
-  });
-});
-
-Deno.test('Config: PRAXRR_PCD_MIGRATION_ALLOW_LEGACY_FALLBACK defaults false', async () => {
-  await withMigrationConfig({}, (cfg) => {
-    assertEquals(cfg.pcdMigrationAllowLegacyFallback, false);
+Deno.test('Config: migration env values do not prevent invalid AUTH fallback behavior', async () => {
+  await withMigrationConfig({ PRAXRR_PCD_MIGRATION_MODE: 'sql-only', AUTH: 'invalid-mode' }, (cfg) => {
+    assertEquals(cfg.authMode, 'on');
   });
 });

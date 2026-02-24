@@ -1,25 +1,76 @@
 import { assertEquals, assertRejects } from '@std/assert';
 import { pcdManager } from '$pcd/core/manager.ts';
 import { pcdOpsQueries } from '$db/queries/pcdOps.ts';
-import { MigrationReaderError } from '$pcd/ops/importBaseOps.ts';
-import { config } from '$config';
+import {
+  __testOnly_resetCompile,
+  __testOnly_resetGetCache,
+  __testOnly_resetReadMigrationEntitySources,
+  __testOnly_resetWithRepoImportWriteContext,
+  __testOnly_setCompile,
+  __testOnly_setGetCache,
+  __testOnly_setReadMigrationEntitySources,
+  __testOnly_setWithRepoImportWriteContext,
+} from '$pcd/ops/importBaseOps.ts';
+import type { MigrationEntityCandidate, MigrationEntityStableIdentity } from '$pcd/migration/reader.ts';
+import type { PCDCache } from '$pcd/database/cache.ts';
 
-import type { PcdOp } from '$db/queries/pcdOps.ts';
+type Restore = () => void;
 
-Deno.test('pcdManager: hybrid base-op parse failures fall back to sql-only import', async () => {
-  const restores: Array<() => void> = [];
-  const tempPath = `/tmp/praxrr-tests/pcd-hybrid-fallback-${crypto.randomUUID()}`;
+type TestCandidate = {
+  readonly calls: string[];
+  readonly candidate: MigrationEntityCandidate;
+};
+
+function buildTestCandidate(
+  relativePath: string,
+  result: { success: boolean; error?: string },
+  calls: string[]
+): TestCandidate {
+  const stableIdentity: MigrationEntityStableIdentity = {
+    key: 'quality_profile_name',
+    value: 'Flow Test Profile',
+    kind: 'stable',
+  };
+
+  return {
+    calls,
+    candidate: {
+      sourcePath: `/tmp/entities/${relativePath}`,
+      relativePath,
+      entityType: 'quality_profile',
+      migration: {
+        format: 'yaml',
+        version: 1,
+        source: 'praxrr-test',
+      },
+      portable: {},
+      entityName: 'Flow Test Profile',
+      identity: {
+        kind: 'identity',
+        key: 'quality_profile_name',
+        value: 'Flow Test Profile',
+      },
+      stableIdentity,
+      deserialize: () => {
+        calls.push(relativePath);
+        return Promise.resolve(result);
+      },
+    },
+  };
+}
+
+function patch<T extends object, K extends keyof T>(target: T, key: K, replacement: T[K], restores: Restore[]): void {
+  const original = target[key];
+  target[key] = replacement;
+  restores.push(() => {
+    target[key] = original;
+  });
+}
+
+Deno.test('pcdManager: import orchestration surfaces import failures directly', async () => {
+  const restores: Restore[] = [];
   const databaseId = 9010;
-  const importedFilenames: string[] = [];
-  const createdOps: PcdOp[] = [];
-
-  function patch<T extends object, K extends keyof T>(target: T, key: K, replacement: T[K]): void {
-    const original = target[key];
-    target[key] = replacement;
-    restores.push(() => {
-      target[key] = original;
-    });
-  }
+  const calls: string[] = [];
 
   function restoreAll(): void {
     while (restores.length > 0) {
@@ -28,224 +79,105 @@ Deno.test('pcdManager: hybrid base-op parse failures fall back to sql-only impor
   }
 
   try {
-    await Deno.mkdir(`${tempPath}/ops`, { recursive: true });
-    await Deno.mkdir(`${tempPath}/entities`, { recursive: true });
-    await Deno.writeTextFile(
-      `${tempPath}/ops/001-base.sql`,
-      'CREATE TABLE IF NOT EXISTS fallback_guard (id INTEGER PRIMARY KEY);'
+    const { candidate } = buildTestCandidate('quality-profiles/failing.yaml', { success: false, error: 'mock import failure' }, calls);
+
+    patch(
+      pcdOpsQueries,
+      'markBaseOrphaned',
+      () => {
+        return 0;
+      },
+      restores
     );
-    await Deno.writeTextFile(`${tempPath}/entities/unsupported.txt`, 'unsupported migration payload');
-
-    patch(pcdOpsQueries, 'getBaseByFilename', () => undefined);
-    patch(pcdOpsQueries, 'create', (input) => {
-      const created = new Date().toISOString();
-      const op: PcdOp = {
-        id: createdOps.length + 1,
-        database_id: input.databaseId,
-        origin: input.origin,
-        state: input.state,
-        source: input.source,
-        filename: input.filename ?? null,
-        op_number: input.opNumber ?? null,
-        sequence: input.sequence ?? null,
-        sql: input.sql,
-        metadata: input.metadata ?? null,
-        desired_state: input.desiredState ?? null,
-        content_hash: input.contentHash ?? null,
-        last_seen_in_repo_at: input.lastSeenInRepoAt ?? null,
-        superseded_by_op_id: input.supersededByOpId ?? null,
-        pushed_at: input.pushedAt ?? null,
-        pushed_commit: input.pushedCommit ?? null,
-        created_at: created,
-        updated_at: created,
-      };
-
-      createdOps.push(op);
-      importedFilenames.push(input.filename ?? '');
-      return op.id;
-    });
-    patch(pcdOpsQueries, 'update', () => true);
-    patch(pcdOpsQueries, 'markBaseOrphaned', () => 0);
-
-    const configMutable = config as {
-      pcdMigrationIngestionMode: 'sql-only' | 'hybrid';
-      pcdMigrationAllowLegacyFallback: boolean;
-    };
-
-    patch(configMutable, 'pcdMigrationIngestionMode', 'hybrid');
-    patch(configMutable, 'pcdMigrationAllowLegacyFallback', true);
-
-    await (
-      pcdManager as unknown as { importBaseOpsWithOrchestration: (id: number, path: string) => Promise<void> }
-    ).importBaseOpsWithOrchestration(databaseId, tempPath);
-
-    assertEquals(importedFilenames, ['001-base.sql']);
-    assertEquals(createdOps.length, 1);
-  } finally {
-    restoreAll();
-    await Deno.remove(tempPath, { recursive: true });
-  }
-});
-
-Deno.test('pcdManager: sql-only mode imports base ops without migration fallback logic', async () => {
-  const restores: Array<() => void> = [];
-  const tempPath = `/tmp/praxrr-tests/pcd-sql-only-${crypto.randomUUID()}`;
-  const databaseId = 9011;
-  const importedFilenames: string[] = [];
-  const createdOps: PcdOp[] = [];
-
-  function patch<T extends object, K extends keyof T>(target: T, key: K, replacement: T[K]): void {
-    const original = target[key];
-    target[key] = replacement;
-    restores.push(() => {
-      target[key] = original;
-    });
-  }
-
-  function restoreAll(): void {
-    while (restores.length > 0) {
-      restores.pop()?.();
-    }
-  }
-
-  try {
-    await Deno.mkdir(`${tempPath}/ops`, { recursive: true });
-    await Deno.mkdir(`${tempPath}/entities`, { recursive: true });
-    await Deno.writeTextFile(
-      `${tempPath}/ops/001-base.sql`,
-      'CREATE TABLE IF NOT EXISTS fallback_guard (id INTEGER PRIMARY KEY);'
+    __testOnly_setReadMigrationEntitySources(() => Promise.resolve({ candidates: [candidate], issues: [] }));
+    restores.push(__testOnly_resetReadMigrationEntitySources);
+    __testOnly_setCompile(() => Promise.resolve({ schema: 0, base: 0, tweaks: 0, user: 0, timing: 0 }));
+    restores.push(__testOnly_resetCompile);
+    __testOnly_setGetCache(() => ({ getRawDb: (() => ({})) as unknown as PCDCache['getRawDb'] }) as unknown as PCDCache);
+    restores.push(__testOnly_resetGetCache);
+    __testOnly_setWithRepoImportWriteContext(
+      async (
+        _context: {
+          filenamePrefix: string;
+          sequenceStart: number;
+          maxOperations: number;
+          lastSeenInRepoAt: string;
+        },
+        callback: () => Promise<unknown>
+      ) => {
+        return await callback();
+      }
     );
-    await Deno.writeTextFile(`${tempPath}/entities/unsupported.txt`, 'unsupported migration payload');
-
-    patch(pcdOpsQueries, 'getBaseByFilename', () => undefined);
-    patch(pcdOpsQueries, 'create', (input) => {
-      const created = new Date().toISOString();
-      const op: PcdOp = {
-        id: createdOps.length + 1,
-        database_id: input.databaseId,
-        origin: input.origin,
-        state: input.state,
-        source: input.source,
-        filename: input.filename ?? null,
-        op_number: input.opNumber ?? null,
-        sequence: input.sequence ?? null,
-        sql: input.sql,
-        metadata: input.metadata ?? null,
-        desired_state: input.desiredState ?? null,
-        content_hash: input.contentHash ?? null,
-        last_seen_in_repo_at: input.lastSeenInRepoAt ?? null,
-        superseded_by_op_id: input.supersededByOpId ?? null,
-        pushed_at: input.pushedAt ?? null,
-        pushed_commit: input.pushedCommit ?? null,
-        created_at: created,
-        updated_at: created,
-      };
-
-      createdOps.push(op);
-      importedFilenames.push(input.filename ?? '');
-      return op.id;
-    });
-    patch(pcdOpsQueries, 'update', () => true);
-    patch(pcdOpsQueries, 'markBaseOrphaned', () => 0);
-
-    const configMutable = config as {
-      pcdMigrationIngestionMode: 'sql-only' | 'hybrid';
-      pcdMigrationAllowLegacyFallback: boolean;
-    };
-
-    patch(configMutable, 'pcdMigrationIngestionMode', 'sql-only');
-    patch(configMutable, 'pcdMigrationAllowLegacyFallback', false);
-
-    await (
-      pcdManager as unknown as { importBaseOpsWithOrchestration: (id: number, path: string) => Promise<void> }
-    ).importBaseOpsWithOrchestration(databaseId, tempPath);
-
-    assertEquals(importedFilenames, ['001-base.sql']);
-    assertEquals(createdOps.length, 1);
-  } finally {
-    restoreAll();
-    await Deno.remove(tempPath, { recursive: true });
-  }
-});
-
-Deno.test('pcdManager: hybrid mode with legacy fallback disabled rethrows migration parse errors', async () => {
-  const restores: Array<() => void> = [];
-  const tempPath = `/tmp/praxrr-tests/pcd-hybrid-no-fallback-${crypto.randomUUID()}`;
-  const databaseId = 9012;
-  const createdOps: PcdOp[] = [];
-
-  function patch<T extends object, K extends keyof T>(target: T, key: K, replacement: T[K]): void {
-    const original = target[key];
-    target[key] = replacement;
-    restores.push(() => {
-      target[key] = original;
-    });
-  }
-
-  function restoreAll(): void {
-    while (restores.length > 0) {
-      restores.pop()?.();
-    }
-  }
-
-  try {
-    await Deno.mkdir(`${tempPath}/ops`, { recursive: true });
-    await Deno.mkdir(`${tempPath}/entities`, { recursive: true });
-    await Deno.writeTextFile(
-      `${tempPath}/ops/001-base.sql`,
-      'CREATE TABLE IF NOT EXISTS fallback_guard (id INTEGER PRIMARY KEY);'
-    );
-    await Deno.writeTextFile(`${tempPath}/entities/unsupported.txt`, 'unsupported migration payload');
-
-    patch(pcdOpsQueries, 'getBaseByFilename', () => undefined);
-    patch(pcdOpsQueries, 'create', (input) => {
-      const created = new Date().toISOString();
-      const op: PcdOp = {
-        id: createdOps.length + 1,
-        database_id: input.databaseId,
-        origin: input.origin,
-        state: input.state,
-        source: input.source,
-        filename: input.filename ?? null,
-        op_number: input.opNumber ?? null,
-        sequence: input.sequence ?? null,
-        sql: input.sql,
-        metadata: input.metadata ?? null,
-        desired_state: input.desiredState ?? null,
-        content_hash: input.contentHash ?? null,
-        last_seen_in_repo_at: input.lastSeenInRepoAt ?? null,
-        superseded_by_op_id: input.supersededByOpId ?? null,
-        pushed_at: input.pushedAt ?? null,
-        pushed_commit: input.pushedCommit ?? null,
-        created_at: created,
-        updated_at: created,
-      };
-
-      createdOps.push(op);
-      return op.id;
-    });
-    patch(pcdOpsQueries, 'update', () => true);
-    patch(pcdOpsQueries, 'markBaseOrphaned', () => 0);
-
-    const configMutable = config as {
-      pcdMigrationIngestionMode: 'sql-only' | 'hybrid';
-      pcdMigrationAllowLegacyFallback: boolean;
-    };
-
-    patch(configMutable, 'pcdMigrationIngestionMode', 'hybrid');
-    patch(configMutable, 'pcdMigrationAllowLegacyFallback', false);
+    restores.push(__testOnly_resetWithRepoImportWriteContext);
 
     await assertRejects(
       () =>
         (
-          pcdManager as unknown as { importBaseOpsWithOrchestration: (id: number, path: string) => Promise<void> }
-        ).importBaseOpsWithOrchestration(databaseId, tempPath),
-      MigrationReaderError,
-      'Failed to read migration entity sources'
+          pcdManager as unknown as {
+            importBaseOpsWithOrchestration: (id: number, path: string) => Promise<boolean>;
+          }
+        ).importBaseOpsWithOrchestration(databaseId, '/tmp/unused'),
+      Error,
+      'Failed to import migration entity "quality-profiles/failing.yaml": mock import failure'
     );
-    assertEquals(createdOps.length, 0);
+    assertEquals(calls, ['quality-profiles/failing.yaml']);
   } finally {
     restoreAll();
-    await Deno.remove(tempPath, { recursive: true });
+  }
+});
+
+Deno.test('pcdManager: successful migration import still continues orchestration flow', async () => {
+  const restores: Restore[] = [];
+  const databaseId = 9011;
+  const calls: string[] = [];
+
+  function restoreAll(): void {
+    while (restores.length > 0) {
+      restores.pop()?.();
+    }
+  }
+
+  try {
+    const { candidate } = buildTestCandidate('quality-profiles/success.yaml', { success: true }, calls);
+
+    patch(
+      pcdOpsQueries,
+      'markBaseOrphaned',
+      () => {
+        return 0;
+      },
+      restores
+    );
+    __testOnly_setReadMigrationEntitySources(() => Promise.resolve({ candidates: [candidate], issues: [] }));
+    restores.push(__testOnly_resetReadMigrationEntitySources);
+    __testOnly_setCompile(() => Promise.resolve({ schema: 0, base: 0, tweaks: 0, user: 0, timing: 0 }));
+    restores.push(__testOnly_resetCompile);
+    __testOnly_setGetCache(() => ({ getRawDb: (() => ({})) as unknown as PCDCache['getRawDb'] }) as unknown as PCDCache);
+    restores.push(__testOnly_resetGetCache);
+    __testOnly_setWithRepoImportWriteContext(
+      async (
+        _context: {
+          filenamePrefix: string;
+          sequenceStart: number;
+          maxOperations: number;
+          lastSeenInRepoAt: string;
+        },
+        callback: () => Promise<unknown>
+      ) => {
+        return await callback();
+      }
+    );
+    restores.push(__testOnly_resetWithRepoImportWriteContext);
+
+    const imported = await (
+      pcdManager as unknown as {
+        importBaseOpsWithOrchestration: (id: number, path: string) => Promise<boolean>;
+      }
+    ).importBaseOpsWithOrchestration(databaseId, '/tmp/unused');
+
+    assertEquals(imported, true);
+    assertEquals(calls, ['quality-profiles/success.yaml']);
+  } finally {
+    restoreAll();
   }
 });
