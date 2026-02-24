@@ -14,12 +14,12 @@ import { pcdOpHistoryQueries } from '$db/queries/pcdOpHistory.ts';
 import type { PcdOp, PcdOpSource, PcdOpState } from '$db/queries/pcdOps.ts';
 import { pcdOpsQueries } from '$db/queries/pcdOps.ts';
 import { compile } from '$pcd/database/compiler.ts';
-import { deleteCache, getCache, setCache } from '$pcd/database/registry.ts';
+import { deleteCache, setCache } from '$pcd/database/registry.ts';
 import type { PCDCache } from '$pcd/index.ts';
 import { PCDCache as PCDCacheClass } from '$pcd/database/cache.ts';
 import { readMigrationEntitySources } from '$pcd/migration/reader.ts';
 import { ENTITY_TYPES } from '$shared/pcd/portable.ts';
-import { __testOnly_resetCompile, __testOnly_setCompile, importBaseOps } from '$pcd/ops/importBaseOps.ts';
+import { importBaseOps } from '$pcd/ops/importBaseOps.ts';
 
 type CompatibilityError = {
   stage: FailureStage;
@@ -48,8 +48,6 @@ interface SchemaArtifact {
   filename: string;
   sql: string;
 }
-
-interface InMemoryPcdOp extends PcdOp {}
 
 type Restore = () => void;
 
@@ -82,17 +80,7 @@ function installQueryShims(databaseId: number): QueryStateResult {
   const restores: Restore[] = [];
 
   const originalDatabaseInstancesGetById = databaseInstancesQueries.getById;
-  const originalPcdOpsGetById = pcdOpsQueries.getById;
-  const originalPcdOpsListByDatabaseAndOrigin = pcdOpsQueries.listByDatabaseAndOrigin;
-  const originalPcdOpsGetBaseByFilename = pcdOpsQueries.getBaseByFilename;
-  const originalPcdOpsCreate = pcdOpsQueries.create;
-  const originalPcdOpsUpdate = pcdOpsQueries.update;
-  const originalPcdOpsMarkBaseOrphaned = pcdOpsQueries.markBaseOrphaned;
-  const originalPcdOpHistoryCreate = pcdOpHistoryQueries.create;
-  const originalPcdOpHistoryListLatestByDatabaseWithOps = pcdOpHistoryQueries.listLatestByDatabaseWithOps;
-  const originalPcdOpHistoryListLatestConflictsByDatabase = pcdOpHistoryQueries.listLatestConflictsByDatabase;
-
-  const operations: InMemoryPcdOp[] = [];
+  const operations: PcdOp[] = [];
   let nextOpId = 1;
   let nextHistoryId = 1;
 
@@ -107,6 +95,7 @@ function installQueryShims(databaseId: number): QueryStateResult {
     enabled: 1,
     personal_access_token: null,
     is_private: 0,
+    has_personal_access_token: 0,
     local_ops_enabled: 0,
     git_user_name: null,
     git_user_email: null,
@@ -132,7 +121,7 @@ function installQueryShims(databaseId: number): QueryStateResult {
   }) as never);
 
   patch(pcdOpsQueries as Record<string, unknown>, 'create', ((input) => {
-    const next: InMemoryPcdOp = {
+    const next: PcdOp = {
       id: nextOpId,
       database_id: input.databaseId,
       origin: input.origin,
@@ -380,21 +369,14 @@ async function validateWritesCompile(pcdPath: string): Promise<void> {
 
   try {
     setCache(COMPAT_DATABASE_ID, cache);
-    __testOnly_setCompile(compile);
 
     await importBaseOps(COMPAT_DATABASE_ID, pcdPath);
     await compile(pcdPath, COMPAT_DATABASE_ID);
   } catch (error) {
     fail('operation_writes', 'YAML entity writes failed to compile into cache', error);
   } finally {
-    __testOnly_resetCompile();
     deleteCache(COMPAT_DATABASE_ID);
     queryState.restore();
-    const currentCache = getCache(COMPAT_DATABASE_ID);
-    if (currentCache && currentCache !== cache) {
-      currentCache.close();
-      deleteCache(COMPAT_DATABASE_ID);
-    }
     cache.close();
   }
 }

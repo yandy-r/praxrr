@@ -11,12 +11,11 @@ function isHelpRequested(args: string[]): boolean {
   return args.includes('--help') || args.includes('-h');
 }
 
-function printMigrationMessage(): never {
+function printMigrationMessage(): void {
   console.error(DEPRECATED_MESSAGE);
   console.error('');
   console.error('Use scripts/compat-check.ts for the active YAML-first validation path.');
   console.error('This command path is intentionally removed to avoid deprecated SQL-vs-YAML parity builds.');
-  throw new Error('Deprecated command');
 }
 
 if (import.meta.main) {
@@ -28,14 +27,12 @@ if (import.meta.main) {
 
     if (Deno.args.length > 0) {
       console.error(`Unsupported arguments: ${Deno.args.join(' ')}`);
+      Deno.exit(2);
     }
 
     printMigrationMessage();
+    Deno.exit(3);
   } catch (error) {
-    if (error instanceof Error && error.message === 'Deprecated command') {
-      Deno.exit(3);
-    }
-
     console.error(error instanceof Error ? error.message : String(error));
     Deno.exit(1);
   }

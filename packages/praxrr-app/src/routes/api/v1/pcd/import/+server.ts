@@ -40,6 +40,8 @@ const _deserializeDependencies = {
   deserializeLidarrMetadataProfile: deserialize.deserializeLidarrMetadataProfile,
 } as const;
 
+export const deserializeDependencies = _deserializeDependencies;
+
 const VALID_ENTITY_TYPES: ReadonlySet<string> = new Set(ENTITY_TYPES);
 
 const VALID_LAYERS: Set<string> = new Set(['user', 'base']);
