@@ -44,8 +44,8 @@ exported when publishing.
 - **Value guard** — Old‑value checks in UPDATE/DELETE statements to detect
   upstream changes (guard mismatch ⇒ rowcount 0).
 - **Compile** — Building an in‑memory cache by replaying all ops in order.
-- **Exporter** — Planned process that materializes base ops into repo files and
-  pushes to Git.
+- **Exporter** — Process that materializes base ops into repo files and pushes to
+  Git.
 - **Parser service** — C# microservice that parses release titles for CF/
   profile testing.
 - **Entity testing** — Quality profile evaluation against test entities and
@@ -284,10 +284,10 @@ Each compile records a row in `pcd_op_history` with:
 
 This powers conflict visibility and audit trails.
 
-### 6.7 Exporter (Planned)
+### 6.7 Exporter
 
-Base drafts will be exported back to repo files for publishing. The exporter
-will materialize SQL files, push to Git, and mark ops as `pushed` in the DB.
+Base drafts are exported back to repo files for publishing. The exporter
+materializes YAML entity files, pushes to Git, and marks exported ops in the DB.
 
 ### 6.8 Schema + Manifest (PCD Spec)
 
@@ -332,11 +332,13 @@ Repository layout:
 ```
 my-pcd/
 ├── pcd.json
-├── ops/
-│   ├── 1.create-1080p-Efficient.sql
-└── tweaks/
-    ├── allow-DV-no-fallback.sql
-    └── ban-megusta.sql
+└── entities/
+    ├── media-management/
+    │   └── ...
+    ├── quality/
+    │   └── ...
+    ├── custom-formats/
+    └── ...
 ```
 
 Schema PCD layout:

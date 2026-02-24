@@ -35,7 +35,7 @@ states: "single quotes."
 
 - **Source:** silent-failure-hunter
 - **File:** `packages/praxrr-app/src/lib/server/pcd/ops/loadOps.ts:42-48`
-- **Status:** [ ] Open
+- **Status:** [x] Fixed
 
 `resolveSchemaOpsPath` catches ALL errors from `Deno.readDir(depsPath)` with a bare `catch {}`
 block, then silently falls back to a hardcoded path. Permission errors, corrupted filesystem states,
@@ -56,11 +56,14 @@ schema layer loading.
 }
 ```
 
+**Fix details:** Applied targeted catch narrowing in `packages/praxrr-app/src/lib/server/pcd/ops/loadOps.ts`:
+`catch (error) { if (error instanceof Deno.errors.NotFound) { /* fallback */ } else { throw new Error(...) } }`.
+
 ### C-3. `operations.ts` `pathExists` bare catch treats permission errors as "not found"
 
 - **Source:** silent-failure-hunter
 - **File:** `packages/praxrr-app/src/lib/server/pcd/utils/operations.ts:12-19`
-- **Status:** [ ] Open
+- **Status:** [x] Fixed
 
 Pre-existing but now critical: the `pathExists` utility has a bare `catch` returning `false` for ANY
 error. With SQL fallback removed, this is the gatekeeper for schema and tweaks layer loading. A
@@ -78,11 +81,13 @@ incomprehensible downstream "table not found" failures.
 }
 ```
 
+**Fix details:** Updated `pathExists` to return `false` only for `Deno.errors.NotFound`; re-throw all other filesystem errors.
+
 ### C-4. `exporter.ts` PAT decryption error detail discarded
 
 - **Source:** silent-failure-hunter
 - **File:** `packages/praxrr-app/src/lib/server/pcd/ops/exporter.ts:192-196`
-- **Status:** [ ] Open
+- **Status:** [x] Fixed
 
 Pre-existing but now the sole export pathway. The `error` variable is captured but never used. Key
 version mismatch, corrupted nonce, missing encryption key -- all produce the same unhelpful message
@@ -95,6 +100,9 @@ const detail = error instanceof Error ? error.message : String(error);
 errors.push(`Failed to load personal access token: ${detail}`);
 ```
 
+**Fix details:** Updated `runPreflight` to append the underlying decryption error to the failure message:
+`Failed to load personal access token: <detail>`.
+
 ---
 
 ## Important Issues (9 found) -- Should fix before merge
@@ -103,7 +111,7 @@ errors.push(`Failed to load personal access token: ${detail}`);
 
 - **Source:** pr-test-analyzer
 - **File:** `packages/praxrr-app/src/lib/server/pcd/ops/importBaseOps.ts:175-177`
-- **Status:** [ ] Open
+- **Status:** [x] Fixed
 
 `importBaseOps` throws `MigrationReaderError` when reader issues are present. This is now the
 primary validation gate for bad YAML entity data. No test directly exercises this path.
@@ -111,11 +119,15 @@ primary validation gate for bad YAML entity data. No test directly exercises thi
 **Suggested test:** Call `importBaseOps` with `__testOnly_setReadMigrationEntitySources` returning a
 result with non-empty `issues`, and assert it throws `MigrationReaderError`.
 
+**Fix details:** Added
+`importBaseOps: throws MigrationReaderError when migration reader returns issues` in
+`packages/praxrr-app/src/tests/pcd/ops/importBaseOps.test.ts`.
+
 ### I-2. No test for `importBaseOps` when cache is unavailable
 
 - **Source:** pr-test-analyzer
 - **File:** `packages/praxrr-app/src/lib/server/pcd/ops/importBaseOps.ts:193-195`
-- **Status:** [ ] Open
+- **Status:** [x] Fixed
 
 When `getCacheForTests(databaseId)` returns null/undefined, the function throws. No test exercises
 this guard. All existing tests always provide a mock cache.
@@ -123,11 +135,15 @@ this guard. All existing tests always provide a mock cache.
 **Suggested test:** Call `importBaseOps` with `__testOnly_setGetCache` returning `undefined`. Assert
 it throws with `'Cache not available'`.
 
+**Fix details:** Added
+`importBaseOps: throws when base cache is unavailable` in
+`packages/praxrr-app/src/tests/pcd/ops/importBaseOps.test.ts`.
+
 ### I-3. `compat-check.ts` uses `__testOnly_*` APIs in CI script
 
 - **Source:** code-reviewer
 - **File:** `scripts/compat-check.ts:26-27, 477, 488`
-- **Status:** [ ] Open
+- **Status:** [x] Fixed
 
 The CI script imports `__testOnly_setCompile` and `__testOnly_resetCompile`. Using test-only seams
 in a CI validation script blurs the boundary between production and test infrastructure.
@@ -135,72 +151,81 @@ in a CI validation script blurs the boundary between production and test infrast
 **Recommendation:** Consider adding a dedicated API without the `__testOnly_` prefix for legitimate
 non-test usage, or document why test-only APIs are intentionally used here.
 
+**Fix details:** Removed `__testOnly_setCompile` and `__testOnly_resetCompile` usage from
+`scripts/compat-check.ts` and now rely on default `importBaseOps`/`compile` wiring.
+
 ### I-4. Dead code: 9 unused `original*` variable captures in `installQueryShims`
 
 - **Source:** code-reviewer, code-simplifier
 - **File:** `scripts/compat-check.ts:92-103`
-- **Status:** [ ] Open
+- **Status:** [x] Fixed
 
 Only `originalDatabaseInstancesGetById` is actually referenced. The remaining 9 captures are dead
 because the `patch` helper handles save/restore internally via closure.
 
 **Fix:** Remove unused variable captures.
 
+**Fix details:** Deleted the unused `originalPcdOps*` and `originalPcdOpHistory*` captures from
+`installQueryShims` in `scripts/compat-check.ts`.
+
 ### I-5. Empty `InMemoryPcdOp` interface adds no value
 
 - **Source:** code-reviewer, code-simplifier
 - **File:** `scripts/compat-check.ts:59`
-- **Status:** [ ] Open
+- **Status:** [x] Fixed
 
 `interface InMemoryPcdOp extends PcdOp {}` extends `PcdOp` without adding members.
 
-**Fix:** Use `PcdOp` directly or add a comment explaining the intent.
+**Fix:** Removed the redundant `InMemoryPcdOp` type and used `PcdOp` directly in
+`installQueryShims` for in-memory op storage.
 
 ### I-6. `exporter.ts` remote-fetch and realPath error details discarded
 
 - **Source:** silent-failure-hunter
 - **Files:** `packages/praxrr-app/src/lib/server/pcd/ops/exporter.ts:246-248, 478-483`
-- **Status:** [ ] Open
+- **Status:** [x] Fixed
 
 Two additional error-swallowing patterns: (1) remote repository fetch error produces generic
 "Failed to reach remote repository" with no detail; (2) `Deno.realPath` failure silently falls back
 to stored path with no logging.
 
-**Fix:** Include error details in messages and log the `realPath` fallback.
+**Fix:** Included remote failure details in preflight errors and added warning logs for both
+remote check failures and `realPath` fallback behavior.
 
 ### I-7. `manager.ts` `switchBranch` returns `false` with no error context
 
 - **Source:** silent-failure-hunter
 - **File:** `packages/praxrr-app/src/lib/server/pcd/core/manager.ts:280-296`
-- **Status:** [ ] Open
+- **Status:** [x] Fixed
 
 Pre-existing. When `importBaseOps` fails during branch switch, the method logs the error but returns
 `false` to the caller with no error detail. The API handler can only show "Branch switch failed."
 
-**Recommendation:** Either throw the error (preferred per fail-fast philosophy) or change the return
-type to include an error message.
+**Fix:** Switched to fail-fast: `switchBranch` now throws with contextual error details when
+base-op import fails, and returns `true` on success.
 
 ### I-8. `verify-pcd-parity.ts` doesn't exit on unsupported arguments
 
 - **Source:** silent-failure-hunter
 - **File:** `scripts/verify-pcd-parity.ts:29-32`
-- **Status:** [ ] Open
+- **Status:** [x] Fixed
 
 Unsupported arguments are printed to stderr but execution continues to `printMigrationMessage()`
 which throws. The unsupported-args message is lost in the deprecation error noise.
 
-**Fix:** Exit immediately on unsupported args: `Deno.exit(2)`.
+**Fix:** Added immediate `Deno.exit(2)` when unsupported arguments are present so the message is not
+overwritten by the deprecated-path error.
 
 ### I-9. `compat-check.ts` query shim `fakeInstance` missing `has_personal_access_token` field
 
 - **Source:** silent-failure-hunter
 - **File:** `scripts/compat-check.ts:~165`
-- **Status:** [ ] Open
+- **Status:** [x] Fixed
 
 The fake `DatabaseInstance` omits `has_personal_access_token`. TypeScript forces the field, but the
 runtime object may behave unexpectedly if accessed.
 
-**Fix:** Add `has_personal_access_token: 0` to `fakeInstance`.
+**Fix:** Added `has_personal_access_token: 0` to `fakeInstance`.
 
 ---
 
@@ -210,33 +235,49 @@ runtime object may behave unexpectedly if accessed.
 
 - **Source:** code-simplifier
 - **File:** `packages/praxrr-app/src/lib/server/pcd/core/manager.ts:487-490`
+- **Status:** [x] Fixed
 
 The method calls `importBaseOps` and returns `true` unconditionally. The boolean return is never used
 meaningfully. Consider inlining `importBaseOps` at each call site.
+
+**Fix:** Removed `importBaseOpsWithOrchestration` and replaced all call sites with direct
+`importBaseOps(...)` calls.
 
 ### S-2. Empty `ImportBaseOpsOptions` interface and unused `_options` parameter
 
 - **Source:** code-simplifier
 - **File:** `packages/praxrr-app/src/lib/server/pcd/ops/importBaseOps.ts:131-132, 171`
+- **Status:** [x] Fixed
 
 The options interface existed to carry `pcdMigrationIngestionMode`, which was removed. No caller
 passes options anymore.
+
+**Fix:** Removed the unused `ImportBaseOpsOptions` interface and dropped the `_options` parameter.
 
 ### S-3. `created`/`updated` counters hardcoded to `0` and never mutated
 
 - **Source:** pr-test-analyzer, silent-failure-hunter, code-simplifier
 - **File:** `packages/praxrr-app/src/lib/server/pcd/ops/importBaseOps.ts:183-184`
+- **Status:** [x] Fixed
 
 Dead counters. Logs show `created: 0, updated: 0` alongside `migrationImported: 47`, which is
 confusing. Either remove or make meaningful.
+
+**Fix:** Replaced the dead `created/updated` payload with a meaningful `imported` count in
+`ImportBaseOpsResult`, and updated `importBaseOps` to increment `imported` for each successfully
+applied migration candidate.
 
 ### S-4. `managerHybridFallback.test.ts` filename is now misleading
 
 - **Source:** pr-test-analyzer, code-simplifier
 - **File:** `packages/praxrr-app/src/tests/pcd/migration/managerHybridFallback.test.ts`
+- **Status:** [x] Fixed
 
 No hybrid fallback behavior is tested anymore. Rename to `managerImportOrchestration.test.ts` or
 similar.
+
+**Fix:** Renamed file to `packages/praxrr-app/src/tests/pcd/migration/managerImportOrchestration.test.ts` and
+updated it to assert direct import orchestration outcomes.
 
 ### S-5. Stale comments referencing removed SQL/migration concepts
 
@@ -247,69 +288,102 @@ similar.
   - `cache.ts:81` -- "legacy SQL compatibility layer" (functions are still actively needed)
   - `writer.ts:60` -- "Migration repo import" error message
   - `portable.ts:107, 112` -- "hybrid" ingestion references
+- **Status:** [x] Fixed
 
 ### S-6. `ARCHITECTURE.md` Section 6.7 still says "Exporter (Planned)"
 
 - **Source:** comment-analyzer
 - **File:** `docs/ARCHITECTURE.md:287-290`
+- **Status:** [x] Fixed
 
 The exporter is fully implemented. Update header and body to reflect current state. Also update
 glossary entry at line 47 from "Planned process" to "Process".
+
+**Fix:** Updated glossary entry and section header/body so section 6.7 and `Exporter` definition now
+describe the implemented YAML-exporter flow instead of planned status.
 
 ### S-7. `ARCHITECTURE.md` repository layout diagram omits `entities/`
 
 - **Source:** comment-analyzer
 - **File:** `docs/ARCHITECTURE.md:333-340`
+- **Status:** [x] Fixed
 
 The diagram shows `ops/` as the primary data directory without mentioning `entities/`, which is now
 the canonical source for base data.
+
+**Fix:** Updated the repository layout diagram at
+`docs/ARCHITECTURE.md:330-337` to show `entities/` as the canonical base-data directory (with YAML
+files), leaving schema SQL to the separate `Schema PCD layout` section.
 
 ### S-8. `praxrr-db/README.md` references `ops/50`-`ops/54` which no longer exist
 
 - **Source:** comment-analyzer
 - **File:** `packages/praxrr-db/README.md:38`
+- **Status:** [x] Fixed
 
 All `*.sql` files were removed from `packages/praxrr-db/ops/`. Referencing specific SQL files as
 "the current v1 seed set" is factually wrong.
+
+**Fix:** Replaced the seed-set wording to reference the YAML-first seed source under `entities/` in
+`packages/praxrr-db/README.md`.
 
 ### S-9. `SourceConflictRef` single-field wrapper could be simplified
 
 - **Source:** code-simplifier
 - **File:** `packages/praxrr-app/src/lib/server/pcd/ops/importBaseOps.ts:31-33`
+- **Status:** [x] Fixed
 
 After removing `kind: SourceType`, the type wraps only `file: string`. Could be replaced by plain
 `string`.
+
+**Fix:** Simplified `SourceConflictRef` from `{ file: string }` to `string` in
+`packages/praxrr-app/src/lib/server/pcd/ops/importBaseOps.ts` and updated conflict-path formatting to
+use plain source-path strings.
 
 ### S-10. `verify-pcd-parity.ts` uses throw/catch for control flow
 
 - **Source:** code-simplifier
 - **File:** `scripts/verify-pcd-parity.ts`
+- **Status:** [x] Fixed
 
 The deprecation flow uses exception-based control flow to exit with code 3. Simpler to call
 `Deno.exit(3)` directly after console output.
+
+**Fix:** Removed the dedicated throw path and replaced it with direct `Deno.exit(3)` after printing the
+deprecation message. The script now exits via explicit control-flow only.
 
 ### S-11. Consider deleting `parityVerifier.ts` entirely vs. maintaining stub
 
 - **Source:** code-simplifier
 - **File:** `packages/praxrr-app/src/lib/server/pcd/migration/parityVerifier.ts`
+- **Status:** [x] Fixed
 
 Two stub files (`parityVerifier.ts` and `verify-pcd-parity.ts`) maintained long-term to say "this is
 removed" is overhead. If no external consumers exist, outright deletion may be cleaner.
+
+**Fix:** Removed `packages/praxrr-app/src/lib/server/pcd/migration/parityVerifier.ts` and its now-redundant
+unit test `packages/praxrr-app/src/tests/pcd/migration/parityVerifier.test.ts` to reduce dead API surface.
+
+`verify-pcd-parity.ts` remains the explicit compatibility message exit point.
 
 ### S-12. `compat-check.ts` cleanup block has redundant cache check
 
 - **Source:** code-simplifier
 - **File:** `scripts/compat-check.ts:487-497`
+- **Status:** [x] Fixed
 
 After `deleteCache` at line 489, the subsequent `getCache` at line 491 should return `undefined`.
 The double-delete pattern appears to be defensive code that may be unnecessary after simplification.
+
+**Fix:** Removed the redundant post-`deleteCache` `getCache`/re-delete block in
+`scripts/compat-check.ts` cleanup path.
 
 ---
 
 ## Strengths
 
 - **Clean removal of hybrid/SQL-only mode dispatch** from `manager.ts`, `importBaseOps.ts`,
-  `config.ts`, and `parityVerifier.ts`. The simplification is thorough and complete.
+  `config.ts`, and retired parity-verification shims. The simplification is thorough and complete.
 - **`publish-db.yml` CI gate** preventing accidental SQL file reintroduction is a good safety net.
 - **Test suite correctly restructured** -- removed tests for deleted code paths, added new tests for
   YAML-only pipeline. All behavioral contracts are covered (duplicate identity detection,
@@ -318,8 +392,8 @@ The double-delete pattern appears to be defensive code that may be unnecessary a
   proper cleanup in `finally` blocks, and comprehensive behavioral coverage.
 - **`git.ts` comment on `getMaxOpNumber`** is an excellent model: explains "why" (export-history-only),
   establishes boundary (no dependency on `ops/` filesystem for import).
-- **`parityVerifier.ts` replacement** is clean: typed `ParityVerifierRemovedError`, `Promise<never>`
-  return type, and clear deprecation message.
+- **`verify-pcd-parity.ts` retirement behavior** is explicit: it exits with clear codes/messages and
+  no longer depends on retained parity comparison runtime code.
 - **CLAUDE.md PCD section** accurately describes the new architecture.
 - **`compat-check.ts` rewrite** eliminates `better-sqlite3` native module dependency from CI,
   significantly simplifying the compatibility workflow.

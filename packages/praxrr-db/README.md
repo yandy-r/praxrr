@@ -35,8 +35,8 @@ Lidarr v1 support in this database covers additive, arr-scoped seeding for:
 - media-management defaults (naming + media settings)
 - metadata profile defaults
 
-Validation evidence for the current v1 seed set (`ops/50`-`ops/54`) shows
-replay-safe inserts with minimum dataset checks passing. See the
+Validation evidence for the current v1 seed set under `entities/` shows replay-safe inserts
+with minimum dataset checks passing. See the
 [Lidarr Compatibility Matrix](docs/plans/lidarr-support/lidarr-compatibility-matrix.md).
 
 ## Compatibility Gate
