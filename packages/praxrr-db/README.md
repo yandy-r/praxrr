@@ -1,12 +1,14 @@
 ## Praxrr Database
 
-The UnOfficial Praxrr Database is maintained in the monorepo at `praxrr/packages/praxrr-db` and serves as a
+The UnOfficial Praxrr Database is maintained in the monorepo at
+`praxrr/packages/praxrr-db` and serves as a
 [Praxrr](https://github.com/yandy-r/praxrr) compliant database.
 
 ## YAML-first data source
 
-`entities/` is the canonical source for default PCD data at startup. SQL files in `ops/` are retained
-as transitional artifacts during rollout and compatibility fallback windows.
+`entities/` is the canonical source for default PCD data at startup. Legacy SQL
+fixtures in `ops/` used for bootstrap ingestion were removed during the
+SQL-to-YAML cutover, so repository seed data is now YAML-only.
 
 ## Distribution-only repository
 
@@ -18,8 +20,8 @@ Source-of-truth locations for this package:
 - Package source: `praxrr/packages/praxrr-db`
 - Mirror publish workflow: `praxrr/.github/workflows/publish-db.yml`
 
-Do not edit this repository directly. Changes must be made in the monorepo and are published automatically
-via the workflow above using `git subtree split`.
+Do not edit this repository directly. Changes must be made in the monorepo and
+are published automatically via the workflow above using `git subtree split`.
 
 ## Lidarr Support Scope
 
@@ -33,15 +35,16 @@ Lidarr v1 support in this database covers additive, arr-scoped seeding for:
 - media-management defaults (naming + media settings)
 - metadata profile defaults
 
-Validation evidence for the current v1 seed set (`ops/50`-`ops/54`) shows replay-safe inserts with
-minimum dataset checks passing. See the
+Validation evidence for the current v1 seed set (`ops/50`-`ops/54`) shows
+replay-safe inserts with minimum dataset checks passing. See the
 [Lidarr Compatibility Matrix](docs/plans/lidarr-support/lidarr-compatibility-matrix.md).
 
 ## Compatibility Gate
 
-Lidarr publication is compatibility-gated and requires `praxrr >= 2.1.0`. Release remains blocked if
-`lidarr` metadata and the minimum version gate are not present in the published manifest, or if
-minimum dataset/idempotency checks fail.
+Lidarr publication is compatibility-gated and requires `praxrr >= 2.1.0`.
+Release remains blocked if `lidarr` metadata and the minimum version gate are
+not present in the published manifest, or if minimum dataset/idempotency checks
+fail.
 
 ## Known Limitations
 
