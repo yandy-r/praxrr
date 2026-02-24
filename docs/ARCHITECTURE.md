@@ -30,8 +30,8 @@ exported when publishing.
 - **Arr** — media-management app instances managed by Praxrr.
 - **PCD** — “Praxrr Config Database”: the configuration dataset (custom
   formats, profiles, media settings) stored as ops.
-- **Op** — An append‑only SQL operation (create/update/delete) applied to build
-  the final configuration state.
+- **Op** — A compiled SQL operation (create/update/delete) produced by YAML entity
+  ingestion, then replayed to build the final configuration state.
 - **Base ops** — Published operations that define the database’s canonical
   state. These are what gets pushed to repos.
 - **Draft base ops** — Unpublished base ops used by developers while iterating.
@@ -239,10 +239,13 @@ Ops live in `pcd_ops` with these key fields:
 
 Ops are loaded in this order (`packages/praxrr-app/src/lib/server/pcd/ops/loadOps.ts`):
 
-1. **Schema** (`deps/schema/ops`)
-2. **Base** (published, then drafts)
-3. **Tweaks** (`tweaks/`)
+1. **Schema** (`deps/schema/ops`) — SQL-only bootstrap layer for DDL/seed data
+2. **Base** (published, then drafts) — derived from YAML `entities/`
+3. **Tweaks** (`tweaks/`) — SQL-only repo-local adjustments
 4. **User** (published)
+
+`pcd_ops` base data no longer reads from `packages/praxrr-db/ops/*.sql`; only the schema and tweaks
+layers remain SQL-based inputs.
 
 ### 6.3 Writer Pipeline
 

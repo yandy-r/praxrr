@@ -137,10 +137,13 @@ Defined in `packages/praxrr-app/svelte.config.js` and mirrored in `deno.json`:
 
 ### PCD (Praxrr Config Database)
 
-Configuration is stored as append-only **ops** (SQL operations) in `pcd_ops`. Ops are replayed into an in-memory SQLite cache on each compile. Two layers exist:
+Configuration is stored as append-only **ops** in `pcd_ops`. Base ops are derived from YAML entity
+imports during runtime ingestion and compiled to SQL before persistence. Two layers exist:
 
 - **Base ops**: published canonical state (from repo)
 - **User ops**: local overrides that persist across syncs
+- SQL schema and tweak inputs remain file-based in `deps/schema/ops` and repo `tweaks/`; they are not the
+  YAML base-data ingestion path.
 
 Writer pipeline: Kysely query -> SQL compile -> validate against cache -> write to `pcd_ops` -> recompile cache.
 
