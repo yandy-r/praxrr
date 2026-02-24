@@ -77,6 +77,10 @@ jobs:
 
       - name: Run contract compatibility checks
         run: |
+          if ! deno install --node-modules-dir --allow-scripts=npm:better-sqlite3; then
+            echo "::warning::Deno install with restricted scripts failed; retrying without script allowlist."
+            deno install --node-modules-dir
+          fi
           deno run -A scripts/compat-check.ts
 
   compatibility-app-check:
