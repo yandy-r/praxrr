@@ -80,6 +80,8 @@ type ParsedMetadata = {
   group_id?: string;
 };
 
+const EXPORTED_SQL_DIR = 'ops';
+
 function isCleanEnough(status: ExportPreflightStatus): boolean {
   if (!status.isDirty) return true;
   // Staged files indicate a manual git operation in progress — block export
@@ -370,13 +372,15 @@ async function buildExportPlan(
 
   const maxOpNumber = await getMaxOpNumber(repoPath);
   const opNumber = maxOpNumber + 1;
+  // Export numbering is based on committed export-artifact history in ops/ only.
+  // Import no longer reads ops/ as a source; these files are retained for audit history.
   const filename = `${opNumber}.${entityNameToSlug(trimmedMessage)}.sql`;
 
   return {
     success: true,
     plan: {
       filename,
-      filepath: `ops/${filename}`,
+      filepath: `${EXPORTED_SQL_DIR}/${filename}`,
       fileContent,
       dbSql,
       metadataJson,
@@ -545,8 +549,8 @@ export async function exportDraftOps(
 
       // Write SQL file if there are ops
       if (plan) {
-        const filepath = `${repoDir}/ops/${plan.filename}`;
-        await Deno.mkdir(`${repoDir}/ops`, { recursive: true });
+        const filepath = `${repoDir}/${EXPORTED_SQL_DIR}/${plan.filename}`;
+        await Deno.mkdir(`${repoDir}/${EXPORTED_SQL_DIR}`, { recursive: true });
         await Deno.writeTextFile(filepath, plan.fileContent);
         toStage.push(filepath);
       }

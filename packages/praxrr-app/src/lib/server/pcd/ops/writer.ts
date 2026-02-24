@@ -65,6 +65,8 @@ function consumeRepoImportIdentity(layer: OperationLayer, source: PcdOpSource): 
   const suffix = String(index).padStart(5, '0');
 
   return {
+    // Repo import filenames are synthetic, deterministic identifiers used for
+    // pcd_ops lineage and should not be interpreted as import file paths.
     filename: `${repoImport.filenamePrefix}#${suffix}.sql`,
     opNumber: null,
     sequence: repoImport.sequenceStart + index,
