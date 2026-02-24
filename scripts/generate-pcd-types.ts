@@ -36,7 +36,7 @@ const COLUMN_TYPE_OVERRIDES: Record<string, string> = {
   // Lidarr stores colon_replacement_format as integer, same semantic mapping as Sonarr
   'lidarr_naming.colon_replacement_format': "'delete' | 'dash' | 'spaceDash' | 'spaceDashSpace' | 'smart' | 'custom'",
 };
-const DEFAULT_VERSION = Deno.env.get('PRAXRR_SCHEMA_REF')?.trim() || 'v2';
+const DEFAULT_VERSION = Deno.env.get('PRAXRR_SCHEMA_REF')?.trim() || 'main';
 const SCHEMA_PATH = 'ops/0.schema.sql';
 const OUTPUT_DIR = './packages/praxrr-app/src/lib/shared/pcd';
 const OUTPUT_PATH = `${OUTPUT_DIR}/types.ts`;

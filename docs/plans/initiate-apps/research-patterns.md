@@ -1,31 +1,48 @@
 # Pattern Research: initiate-apps
 
-This document catalogs the exact coding patterns, conventions, and architectural approaches found in the Praxrr codebase that are directly relevant to implementing environment-variable-based Arr instance provisioning at startup. Every pattern is referenced with file paths and line numbers from actual code.
+This document catalogs the exact coding patterns, conventions, and architectural approaches found in
+the Praxrr codebase that are directly relevant to implementing environment-variable-based Arr
+instance provisioning at startup. Every pattern is referenced with file paths and line numbers from
+actual code.
 
 ---
 
 ## Relevant Files
 
-- `/packages/praxrr-app/src/hooks.server.ts`: Startup sequence and default-DB auto-link pattern (the primary template for this feature)
-- `/packages/praxrr-app/src/lib/server/db/queries/arrInstances.ts`: Instance CRUD queries, type interfaces, `nameExists()`/`apiKeyExists()` checks
-- `/packages/praxrr-app/src/lib/server/db/queries/setupState.ts`: One-time guard pattern (setup_state singleton)
-- `/packages/praxrr-app/src/lib/server/db/queries/generalSettings.ts`: `shouldApplyDefaultDelayProfiles()` check
-- `/packages/praxrr-app/src/lib/server/db/db.ts`: Database singleton (`db.execute`, `db.queryFirst`, `db.query`, `db.transaction`)
-- `/packages/praxrr-app/src/lib/server/db/migrations.ts`: Migration runner, `Migration` interface, registration pattern
-- `/packages/praxrr-app/src/lib/server/db/migrations/20260216_add_arr_instance_external_url.ts`: ALTER TABLE ADD COLUMN pattern
+- `/packages/praxrr-app/src/hooks.server.ts`: Startup sequence and default-DB auto-link pattern (the
+  primary template for this feature)
+- `/packages/praxrr-app/src/lib/server/db/queries/arrInstances.ts`: Instance CRUD queries, type
+  interfaces, `nameExists()`/`apiKeyExists()` checks
+- `/packages/praxrr-app/src/lib/server/db/queries/setupState.ts`: One-time guard pattern
+  (setup_state singleton)
+- `/packages/praxrr-app/src/lib/server/db/queries/generalSettings.ts`:
+  `shouldApplyDefaultDelayProfiles()` check
+- `/packages/praxrr-app/src/lib/server/db/db.ts`: Database singleton (`db.execute`, `db.queryFirst`,
+  `db.query`, `db.transaction`)
+- `/packages/praxrr-app/src/lib/server/db/migrations.ts`: Migration runner, `Migration` interface,
+  registration pattern
+- `/packages/praxrr-app/src/lib/server/db/migrations/20260216_add_arr_instance_external_url.ts`:
+  ALTER TABLE ADD COLUMN pattern
 - `/packages/praxrr-app/src/lib/server/db/migrations/_template.ts`: Migration template
-- `/packages/praxrr-app/src/lib/server/utils/config/config.ts`: Config singleton, env var reading patterns
+- `/packages/praxrr-app/src/lib/server/utils/config/config.ts`: Config singleton, env var reading
+  patterns
 - `/packages/praxrr-app/src/lib/server/utils/logger/logger.ts`: Logger singleton, async log methods
-- `/packages/praxrr-app/src/lib/server/utils/logger/types.ts`: `LogOptions` interface (`source`, `meta`)
-- `/packages/praxrr-app/src/lib/server/utils/validation/url.ts`: URL validation helper (`parseOptionalAbsoluteHttpUrl`)
+- `/packages/praxrr-app/src/lib/server/utils/logger/types.ts`: `LogOptions` interface (`source`,
+  `meta`)
+- `/packages/praxrr-app/src/lib/server/utils/validation/url.ts`: URL validation helper
+  (`parseOptionalAbsoluteHttpUrl`)
 - `/packages/praxrr-app/src/lib/server/utils/arr/factory.ts`: `createArrClient()` factory
 - `/packages/praxrr-app/src/lib/server/utils/arr/defaults.ts`: Default delay profile logic
 - `/packages/praxrr-app/src/lib/server/utils/arr/types.ts`: `ArrType` union (includes `'chaptarr'`)
-- `/packages/praxrr-app/src/lib/shared/pcd/types.ts` (lines 805-806): Canonical `ARR_APP_TYPES` and `ArrAppType` (excludes `'chaptarr'`)
-- `/packages/praxrr-app/src/lib/shared/arr/capabilities.ts`: `isArrAppType()` guard, `ArrAppType` re-export
-- `/packages/praxrr-app/src/routes/arr/new/+page.server.ts`: Instance creation validation flow and delay profile application
+- `/packages/praxrr-app/src/lib/shared/pcd/types.ts` (lines 805-806): Canonical `ARR_APP_TYPES` and
+  `ArrAppType` (excludes `'chaptarr'`)
+- `/packages/praxrr-app/src/lib/shared/arr/capabilities.ts`: `isArrAppType()` guard, `ArrAppType`
+  re-export
+- `/packages/praxrr-app/src/routes/arr/new/+page.server.ts`: Instance creation validation flow and
+  delay profile application
 - `/packages/praxrr-app/src/routes/arr/test/+server.ts`: Connection test client creation pattern
-- `/packages/praxrr-app/src/tests/base/arrExternalUrlPersistence.test.ts`: DB mock/stub test pattern for arrInstances
+- `/packages/praxrr-app/src/tests/base/arrExternalUrlPersistence.test.ts`: DB mock/stub test pattern
+  for arrInstances
 - `/packages/praxrr-app/src/tests/base/BaseTest.ts`: BaseTest class with lifecycle hooks
 - `/packages/praxrr-app/src/scripts/test.ts`: Test runner with aliases
 
@@ -37,7 +54,9 @@ This document catalogs the exact coding patterns, conventions, and architectural
 
 **Pattern: Top-level await chain in hooks.server.ts**
 
-The startup sequence runs as sequential top-level `await` statements before the `handle` export. Each step depends on the previous. The new `reconcileEnvInstances()` call slots between the default-DB auto-link block (line 37) and `initializeJobs()` (line 94).
+The startup sequence runs as sequential top-level `await` statements before the `handle` export.
+Each step depends on the previous. The new `reconcileEnvInstances()` call slots between the
+default-DB auto-link block (line 37) and `initializeJobs()` (line 94).
 
 ```typescript
 // hooks.server.ts structure:
@@ -56,7 +75,9 @@ await initializeJobs(); // line 94
 
 **Pattern: Guard-check -> env-read -> domain-call -> mark-guard -> log**
 
-This is the closest existing pattern to what `reconcileEnvInstances()` needs. Key differences: the auto-link uses a one-time `setupState` guard, while env instance reconciliation runs every startup (no guard needed).
+This is the closest existing pattern to what `reconcileEnvInstances()` needs. Key differences: the
+auto-link uses a one-time `setupState` guard, while env instance reconciliation runs every startup
+(no guard needed).
 
 ```typescript
 // hooks.server.ts lines 37-91 -- the exact pattern to follow
@@ -113,10 +134,12 @@ Found in `hooks.server.ts` lines 38-46 and `config.ts` constructor:
 // Pattern 1: Distinguish "not set" from "set to empty" (hooks.server.ts:38-40)
 const defaultDatabaseUrlFromEnv = Deno.env.get('PRAXRR_DEFAULT_DB_URL');
 const defaultDatabaseUrl =
-  defaultDatabaseUrlFromEnv === undefined ? 'https://github.com/yandy-r/praxrr-db' : defaultDatabaseUrlFromEnv.trim();
+  defaultDatabaseUrlFromEnv === undefined
+    ? 'https://github.com/yandy-r/praxrr-db'
+    : defaultDatabaseUrlFromEnv.trim();
 
 // Pattern 2: Optional with trim and default (hooks.server.ts:41-45)
-const branch = Deno.env.get('PRAXRR_DEFAULT_DB_BRANCH')?.trim() || 'v2';
+const branch = Deno.env.get('PRAXRR_DEFAULT_DB_BRANCH')?.trim() || 'main';
 const token = Deno.env.get('PRAXRR_DEFAULT_DB_TOKEN')?.trim() || undefined;
 
 // Pattern 3: Simple with fallback (config.ts:40-41)
@@ -128,7 +151,8 @@ const auth = (Deno.env.get('AUTH') || 'on').toLowerCase();
 this.authMode = ['on', 'local', 'off', 'oidc'].includes(auth) ? (auth as AuthMode) : 'on';
 ```
 
-For `initiate-apps`: use `Deno.env.get()?.trim() || undefined` for required fields (treat empty as unset), and `?.trim() || 'default'` for optional fields.
+For `initiate-apps`: use `Deno.env.get()?.trim() || undefined` for required fields (treat empty as
+unset), and `?.trim() || 'default'` for optional fields.
 
 ### Migration Pattern
 
@@ -144,7 +168,8 @@ export interface Migration {
 }
 ```
 
-**Version numbering**: Recent migrations use `YYYYMMDD` format (e.g., `20260216`, `20260217`, `20260218`, `20260219`). The next available version is `20260220` or later.
+**Version numbering**: Recent migrations use `YYYYMMDD` format (e.g., `20260216`, `20260217`,
+`20260218`, `20260219`). The next available version is `20260220` or later.
 
 **ALTER TABLE ADD COLUMN pattern** (`20260216_add_arr_instance_external_url.ts`):
 
@@ -169,7 +194,9 @@ For a NOT NULL column with DEFAULT, the migration SQL is:
 ALTER TABLE arr_instances ADD COLUMN source TEXT NOT NULL DEFAULT 'ui';
 ```
 
-**Registration**: Each migration is statically imported in `/packages/praxrr-app/src/lib/server/db/migrations.ts` and added to the `loadMigrations()` array (lines 275-332). The import alias follows a consistent pattern:
+**Registration**: Each migration is statically imported in
+`/packages/praxrr-app/src/lib/server/db/migrations.ts` and added to the `loadMigrations()` array
+(lines 275-332). The import alias follows a consistent pattern:
 
 ```typescript
 // In migrations.ts -- add at end of imports
@@ -190,7 +217,8 @@ export function loadMigrations(): Migration[] {
 
 **Pattern: Raw parameterized SQL via `db` singleton**
 
-All queries in `arrInstances.ts` use raw SQL strings with `?` placeholders passed as rest parameters. No ORM or query builder is used.
+All queries in `arrInstances.ts` use raw SQL strings with `?` placeholders passed as rest
+parameters. No ORM or query builder is used.
 
 ```typescript
 // Execute (returns affected row count)
@@ -213,11 +241,15 @@ const result = db.queryFirst<{ id: number }>('SELECT last_insert_rowid() as id')
 db.query<ArrInstance>('SELECT * FROM arr_instances ORDER BY name');
 
 // Count pattern for existence checks
-const result = db.queryFirst<{ count: number }>('SELECT COUNT(*) as count FROM arr_instances WHERE name = ?', name);
+const result = db.queryFirst<{ count: number }>(
+  'SELECT COUNT(*) as count FROM arr_instances WHERE name = ?',
+  name
+);
 return (result?.count ?? 0) > 0;
 ```
 
-The `db.execute()` method returns the number of affected rows (`db.getDatabase().changes`). The `db.transaction()` method wraps a callback in BEGIN/COMMIT/ROLLBACK.
+The `db.execute()` method returns the number of affected rows (`db.getDatabase().changes`). The
+`db.transaction()` method wraps a callback in BEGIN/COMMIT/ROLLBACK.
 
 ### Instance Create Flow
 
@@ -231,12 +263,16 @@ From `/packages/praxrr-app/src/routes/arr/new/+page.server.ts` (lines 27-157):
 4. Check `arrInstancesQueries.nameExists(name)` -- rejects duplicates
 5. Check `arrInstancesQueries.apiKeyExists(apiKey)` -- rejects duplicates
 6. Call `arrInstancesQueries.create({ name, type, url, externalUrl, apiKey, tags, enabled })`
-7. Apply default delay profile if `type === 'radarr' || type === 'sonarr'` AND `generalSettingsQueries.shouldApplyDefaultDelayProfiles()`
+7. Apply default delay profile if `type === 'radarr' || type === 'sonarr'` AND
+   `generalSettingsQueries.shouldApplyDefaultDelayProfiles()`
 8. Delay profile failure is caught and logged but does not fail instance creation
 
 ```typescript
 // Delay profile application pattern (lines 119-142)
-if ((type === 'radarr' || type === 'sonarr') && generalSettingsQueries.shouldApplyDefaultDelayProfiles()) {
+if (
+  (type === 'radarr' || type === 'sonarr') &&
+  generalSettingsQueries.shouldApplyDefaultDelayProfiles()
+) {
   try {
     const client = createArrClient(type as ArrType, url, apiKey);
     const defaultProfile = getDefaultDelayProfile(type);
@@ -283,7 +319,8 @@ export interface CreateArrInstanceInput {
 }
 ```
 
-The `create()` method (lines 54-74) returns the new row ID. Tags are JSON-stringified, enabled defaults to 1, and `externalUrl` is normalized via `normalizeExternalUrl()`.
+The `create()` method (lines 54-74) returns the new row ID. Tags are JSON-stringified, enabled
+defaults to 1, and `externalUrl` is normalized via `normalizeExternalUrl()`.
 
 ### Logger Pattern
 
@@ -325,7 +362,8 @@ await logger.debug('Database up to date', {
 });
 ```
 
-The `source` field uses short descriptive tags. For this feature, use `'Setup'` to match the default-DB auto-link precedent, or `'Setup:Instances'` for more specificity.
+The `source` field uses short descriptive tags. For this feature, use `'Setup'` to match the
+default-DB auto-link precedent, or `'Setup:Instances'` for more specificity.
 
 **Critical: Never log API keys.** Existing code logs `url`, `name`, `type`, `id` but never `apiKey`.
 
@@ -354,7 +392,9 @@ export function parseOptionalAbsoluteHttpUrl(rawUrl: string | null | undefined):
 }
 ```
 
-For `initiate-apps`, instance URLs are required and must be valid absolute HTTP(S) URLs. Use `new URL(value)` for validation and check the protocol. External URLs are optional and use this same helper.
+For `initiate-apps`, instance URLs are required and must be valid absolute HTTP(S) URLs. Use
+`new URL(value)` for validation and check the protocol. External URLs are optional and use this same
+helper.
 
 ### Type Validation Pattern
 
@@ -381,7 +421,9 @@ export function isArrAppType(value: string): value is ArrAppType {
 }
 ```
 
-Note: `ArrType` in `$arr/types.ts` includes `'chaptarr'`, but `ArrAppType` from `$shared/pcd/types.ts` does not. Instance creation only validates against `['radarr', 'sonarr', 'lidarr']`.
+Note: `ArrType` in `$arr/types.ts` includes `'chaptarr'`, but `ArrAppType` from
+`$shared/pcd/types.ts` does not. Instance creation only validates against
+`['radarr', 'sonarr', 'lidarr']`.
 
 ### Connection Test Pattern
 
@@ -393,7 +435,8 @@ const isConnected = await client.testConnection();
 client.close();
 ```
 
-For startup connection testing (optional Phase 2), follow this exact pattern with `timeout: 3000` and `retries: 0`.
+For startup connection testing (optional Phase 2), follow this exact pattern with `timeout: 3000`
+and `retries: 0`.
 
 ---
 
@@ -404,13 +447,16 @@ For startup connection testing (optional Phase 2), follow this exact pattern wit
 - **File names**: `camelCase.ts` for modules, `YYYYMMDD_snake_case.ts` for migrations
 - **Export pattern**: Named exports (`export const arrInstancesQueries`, `export const migration`)
 - **Query modules**: Object literal with methods exported as `const xxxQueries = { ... }`
-- **Interfaces**: PascalCase, prefixed descriptively (`ArrInstance`, `CreateArrInstanceInput`, `UpdateArrInstanceInput`)
+- **Interfaces**: PascalCase, prefixed descriptively (`ArrInstance`, `CreateArrInstanceInput`,
+  `UpdateArrInstanceInput`)
 - **SQL column names**: `snake_case` (`api_key`, `external_url`, `created_at`)
-- **TypeScript property names**: `camelCase` in interfaces/inputs, except when matching SQL columns directly in query result types (`ArrInstance.api_key` matches the DB column)
+- **TypeScript property names**: `camelCase` in interfaces/inputs, except when matching SQL columns
+  directly in query result types (`ArrInstance.api_key` matches the DB column)
 
 ### Boolean Storage
 
-SQLite booleans are stored as `INTEGER` (0/1). TypeScript interfaces use `number` for DB types and `boolean` for input types:
+SQLite booleans are stored as `INTEGER` (0/1). TypeScript interfaces use `number` for DB types and
+`boolean` for input types:
 
 ```typescript
 // DB result type
@@ -447,7 +493,9 @@ All server-side imports include the `.ts` extension.
 
 ### Startup Error Philosophy
 
-**Non-blocking**: Startup operations that are not strictly required for the server to function use try/catch and continue. This is the established pattern for the default-DB auto-link and must be followed by env instance reconciliation.
+**Non-blocking**: Startup operations that are not strictly required for the server to function use
+try/catch and continue. This is the established pattern for the default-DB auto-link and must be
+followed by env instance reconciliation.
 
 ```typescript
 // Pattern: try domain-logic, catch and log, continue startup
@@ -465,14 +513,17 @@ try {
 
 ### Per-Instance Error Isolation
 
-The instance creation route wraps individual instance creation in try/catch and continues. For reconciliation, each env instance should be processed independently so one failure does not block others.
+The instance creation route wraps individual instance creation in try/catch and continues. For
+reconciliation, each env instance should be processed independently so one failure does not block
+others.
 
 ### Error Stringification
 
 When logging caught errors, the codebase uses:
 
 - `String(error)` for unknown error types (hooks.server.ts line 87)
-- `error instanceof Error ? error.message : error` for typed errors (arr/new/+page.server.ts line 139)
+- `error instanceof Error ? error.message : error` for typed errors (arr/new/+page.server.ts
+  line 139)
 
 ---
 
@@ -489,7 +540,9 @@ Tests live in `/packages/praxrr-app/src/tests/` organized by domain:
 
 ### Test Runner
 
-Tests run via `deno task test` which invokes `/scripts/test.ts`. Custom aliases map to specific files/directories. The runner passes `--allow-read --allow-write --allow-env --allow-ffi` and sets `APP_BASE_PATH=./dist/test`.
+Tests run via `deno task test` which invokes `/scripts/test.ts`. Custom aliases map to specific
+files/directories. The runner passes `--allow-read --allow-write --allow-env --allow-ffi` and sets
+`APP_BASE_PATH=./dist/test`.
 
 A new alias should be added for env instance tests:
 
@@ -500,7 +553,8 @@ A new alias should be added for env instance tests:
 
 ### DB Mock Pattern (Simple)
 
-For unit tests that mock `db` methods directly, from `/packages/praxrr-app/src/tests/base/arrExternalUrlPersistence.test.ts`:
+For unit tests that mock `db` methods directly, from
+`/packages/praxrr-app/src/tests/base/arrExternalUrlPersistence.test.ts`:
 
 ```typescript
 function captureDbWrites(): {
@@ -581,7 +635,9 @@ suite.runTests();
 
 ### Env Var Testing
 
-The test runner already passes `--allow-env`, and `Deno.env.toObject()` is already used in the test runner itself (scripts/test.ts line 49). For parser unit tests, use `Deno.env.set()` and `Deno.env.delete()` to set up test scenarios, or mock `Deno.env.get()` / `Deno.env.toObject()`.
+The test runner already passes `--allow-env`, and `Deno.env.toObject()` is already used in the test
+runner itself (scripts/test.ts line 49). For parser unit tests, use `Deno.env.set()` and
+`Deno.env.delete()` to set up test scenarios, or mock `Deno.env.get()` / `Deno.env.toObject()`.
 
 ---
 
@@ -595,7 +651,8 @@ Place the new env instances module at:
 packages/praxrr-app/src/lib/server/utils/arr/envInstances.ts
 ```
 
-This aligns with the `$arr/` alias and keeps Arr-domain logic co-located with the factory, types, and defaults.
+This aligns with the `$arr/` alias and keeps Arr-domain logic co-located with the factory, types,
+and defaults.
 
 ### 2. Migration File
 
@@ -605,7 +662,8 @@ Create at:
 packages/praxrr-app/src/lib/server/db/migrations/20260220_add_arr_instance_source.ts
 ```
 
-Follow the exact structure of `20260216_add_arr_instance_external_url.ts`. Version number `20260220` (next date after existing `20260219`).
+Follow the exact structure of `20260216_add_arr_instance_external_url.ts`. Version number `20260220`
+(next date after existing `20260219`).
 
 ### 3. hooks.server.ts Integration
 
@@ -637,7 +695,8 @@ Add to `arrInstancesQueries` in `/packages/praxrr-app/src/lib/server/db/queries/
 
 ### 5. Env Var Scanning
 
-Use `Deno.env.get()` per variable (not `Deno.env.toObject()`), matching the established pattern from hooks.server.ts. Iterate over known app types and index range:
+Use `Deno.env.get()` per variable (not `Deno.env.toObject()`), matching the established pattern from
+hooks.server.ts. Iterate over known app types and index range:
 
 ```typescript
 const APP_PREFIXES = ['RADARR', 'SONARR', 'LIDARR'] as const;
@@ -654,7 +713,8 @@ for (const prefix of APP_PREFIXES) {
 
 ### 6. Logging Convention
 
-Use `source: 'Setup'` for consistency with the default-DB auto-link. Log a per-instance line for each action and a summary at the end:
+Use `source: 'Setup'` for consistency with the default-DB auto-link. Log a per-instance line for
+each action and a summary at the end:
 
 ```typescript
 await logger.info('Created env instance', {
@@ -675,7 +735,8 @@ await logger.info('Reconciled env instances', {
 
 ### 7. Type Validation
 
-Use the canonical `ARR_APP_TYPES` from `$shared/pcd/types.ts` or `isArrAppType()` from `$shared/arr/capabilities.ts` rather than hard-coding the array:
+Use the canonical `ARR_APP_TYPES` from `$shared/pcd/types.ts` or `isArrAppType()` from
+`$shared/arr/capabilities.ts` rather than hard-coding the array:
 
 ```typescript
 import { ARR_APP_TYPES } from '$shared/pcd/types.ts';
@@ -685,11 +746,13 @@ import { isArrAppType } from '$shared/arr/capabilities.ts';
 
 ### 8. Delay Profile Application
 
-Follow the exact pattern from `arr/new/+page.server.ts` lines 119-142. Only applies to `radarr` and `sonarr` (not `lidarr`). Must be non-blocking (catch errors, log, continue).
+Follow the exact pattern from `arr/new/+page.server.ts` lines 119-142. Only applies to `radarr` and
+`sonarr` (not `lidarr`). Must be non-blocking (catch errors, log, continue).
 
 ### 9. URL Validation for Instance URLs
 
-Instance URLs (required) should be validated as absolute HTTP(S) URLs. Reuse `parseOptionalAbsoluteHttpUrl` or use `new URL()` directly since the URL is required (not optional):
+Instance URLs (required) should be validated as absolute HTTP(S) URLs. Reuse
+`parseOptionalAbsoluteHttpUrl` or use `new URL()` directly since the URL is required (not optional):
 
 ```typescript
 try {
@@ -708,21 +771,38 @@ External URLs (optional) should use the existing `parseOptionalAbsoluteHttpUrl()
 
 ## Edge Cases
 
-- **`api_key` uniqueness is app-level only**: No SQL UNIQUE constraint on `api_key` in `arr_instances`. Must check via `arrInstancesQueries.apiKeyExists()` or a new `getByApiKey()` query.
-- **`name` uniqueness is case-sensitive at SQL level**: The UNIQUE constraint on `name` is case-sensitive. `arrInstancesQueries.nameExists()` uses exact match. Two env instances named "Radarr" and "radarr" would be treated as different names.
-- **`ArrType` vs `ArrAppType`**: `ArrType` (from `$arr/types.ts`) includes `'chaptarr'`, but instance creation only allows `['radarr', 'sonarr', 'lidarr']`. Use `ArrAppType` from `$shared/pcd/types.ts`.
-- **Empty string env vars**: `Deno.env.get('VAR')` returns `undefined` when unset, but returns `""` when set to empty. The `?.trim() || undefined` pattern treats both as absent, which is the correct behavior per feature spec.
-- **HMR re-runs in dev**: The upsert logic must be idempotent. Since `hooks.server.ts` re-runs on HMR, the reconciliation will re-execute. This is safe if the logic does compare-before-update.
-- **Tag format**: The route handler expects tags as a JSON-stringified array from FormData. Env vars use comma-separated values (`TAGS_1=movies,4k`). Parser must convert comma-separated to `string[]`.
-- **Default delay profiles need network access**: If Arr instances are not reachable at startup (common in Docker Compose), delay profile application will fail. This is expected and handled by the existing catch-and-continue pattern.
-- **FK cascade on delete**: All sync tables have `ON DELETE CASCADE` referencing `arr_instances(id)`. Disabling orphans (`enabled=0`) preserves FKs; deleting would cascade.
+- **`api_key` uniqueness is app-level only**: No SQL UNIQUE constraint on `api_key` in
+  `arr_instances`. Must check via `arrInstancesQueries.apiKeyExists()` or a new `getByApiKey()`
+  query.
+- **`name` uniqueness is case-sensitive at SQL level**: The UNIQUE constraint on `name` is
+  case-sensitive. `arrInstancesQueries.nameExists()` uses exact match. Two env instances named
+  "Radarr" and "radarr" would be treated as different names.
+- **`ArrType` vs `ArrAppType`**: `ArrType` (from `$arr/types.ts`) includes `'chaptarr'`, but
+  instance creation only allows `['radarr', 'sonarr', 'lidarr']`. Use `ArrAppType` from
+  `$shared/pcd/types.ts`.
+- **Empty string env vars**: `Deno.env.get('VAR')` returns `undefined` when unset, but returns `""`
+  when set to empty. The `?.trim() || undefined` pattern treats both as absent, which is the correct
+  behavior per feature spec.
+- **HMR re-runs in dev**: The upsert logic must be idempotent. Since `hooks.server.ts` re-runs on
+  HMR, the reconciliation will re-execute. This is safe if the logic does compare-before-update.
+- **Tag format**: The route handler expects tags as a JSON-stringified array from FormData. Env vars
+  use comma-separated values (`TAGS_1=movies,4k`). Parser must convert comma-separated to
+  `string[]`.
+- **Default delay profiles need network access**: If Arr instances are not reachable at startup
+  (common in Docker Compose), delay profile application will fail. This is expected and handled by
+  the existing catch-and-continue pattern.
+- **FK cascade on delete**: All sync tables have `ON DELETE CASCADE` referencing
+  `arr_instances(id)`. Disabling orphans (`enabled=0`) preserves FKs; deleting would cascade.
 
 ---
 
 ## Other Docs
 
-- `/docs/plans/initiate-apps/feature-spec.md`: Complete feature specification with business rules, conflict resolution, and task breakdown
-- `/docs/plans/initiate-apps/research-technical.md`: Architecture design, data model, upsert logic, and startup integration details
+- `/docs/plans/initiate-apps/feature-spec.md`: Complete feature specification with business rules,
+  conflict resolution, and task breakdown
+- `/docs/plans/initiate-apps/research-technical.md`: Architecture design, data model, upsert logic,
+  and startup integration details
 - `/docs/plans/initiate-apps/research-business.md`: User stories and business rules
 - `/docs/plans/initiate-apps/research-recommendations.md`: Implementation strategy and phasing
-- `/packages/praxrr-app/src/lib/server/db/migrations/_template.ts`: Migration template with documentation
+- `/packages/praxrr-app/src/lib/server/db/migrations/_template.ts`: Migration template with
+  documentation

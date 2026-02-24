@@ -30,7 +30,7 @@ export const BASE_URL = process.env.BASE_URL || 'http://localhost:6969';
 export const DB_PATH = path.resolve(process.env.DB_PATH || 'dist/dev/data/praxrr.db');
 
 /** Git repo URL used for both local and dev database instances */
-export const TEST_REPO_URL = process.env.TEST_REPO_URL || 'https://github.com/yandy-r/praxrr-db-v2-testing';
+export const TEST_REPO_URL = process.env.TEST_REPO_URL || 'https://github.com/yandy-r/praxrr-db-testing';
 
 /** Personal access token for the dev (write) database */
 export const TEST_PAT = process.env.TEST_PAT || '';
