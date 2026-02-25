@@ -2,7 +2,7 @@ import { redirect, fail } from '@sveltejs/kit';
 import type { Actions, ServerLoad } from '@sveltejs/kit';
 import { pcdManager } from '$pcd/index.ts';
 import { canWriteToBase } from '$pcd/index.ts';
-import type { OperationLayer } from '$pcd/index.ts';
+import { parseOperationLayer } from '$pcd/index.ts';
 import type { ArrType } from '$shared/pcd/types.ts';
 import type { PropersRepacks } from '$shared/pcd/mediaManagement.ts';
 import {
@@ -39,7 +39,11 @@ export const actions: Actions = {
     const formData = await request.formData();
     const arrType = formData.get('arrType') as ArrType;
     const name = formData.get('name') as string;
-    const layer = (formData.get('layer') as OperationLayer) || 'user';
+    const layerResult = parseOperationLayer(formData.get('layer'));
+    if ('error' in layerResult) {
+      return fail(400, { error: layerResult.error });
+    }
+    const layer = layerResult.value;
 
     if (!name?.trim()) {
       return fail(400, { error: 'Name is required' });

@@ -2,11 +2,16 @@ import { assertEquals, assertMatch } from '@std/assert';
 import { isRedirect } from '@sveltejs/kit';
 import { BaseTest, type TestContext } from '../base/BaseTest.ts';
 import { load as namingListLoad } from '../../routes/media-management/[databaseId]/naming/+page.server.ts';
-import { actions as namingNewActions } from '../../routes/media-management/[databaseId]/naming/new/+page.server.ts';
+import {
+  actions as namingNewActions,
+  load as namingNewLoad,
+} from '../../routes/media-management/[databaseId]/naming/new/+page.server.ts';
 import {
   actions as namingLidarrEditActions,
   load as namingLidarrEditLoad,
 } from '../../routes/media-management/[databaseId]/naming/lidarr/[name]/+page.server.ts';
+import { actions as namingRadarrEditActions } from '../../routes/media-management/[databaseId]/naming/radarr/[name]/+page.server.ts';
+import { actions as namingSonarrEditActions } from '../../routes/media-management/[databaseId]/naming/sonarr/[name]/+page.server.ts';
 import { load as mediaSettingsListLoad } from '../../routes/media-management/[databaseId]/media-settings/+page.server.ts';
 import { actions as mediaSettingsNewActions } from '../../routes/media-management/[databaseId]/media-settings/new/+page.server.ts';
 import { actions as mediaSettingsLidarrEditActions } from '../../routes/media-management/[databaseId]/media-settings/lidarr/[name]/+page.server.ts';
@@ -19,6 +24,7 @@ import { arrSyncQueries } from '$db/queries/arrSync.ts';
 import { databaseInstancesQueries } from '$db/queries/databaseInstances.ts';
 import { pcdOpsQueries, type PcdOp } from '$db/queries/pcdOps.ts';
 import { pcdOpHistoryQueries } from '$db/queries/pcdOpHistory.ts';
+import { pcdManager } from '$pcd/index.ts';
 import type { PCDDatabase } from '$shared/pcd/types.ts';
 
 interface ActionFailure {
@@ -33,6 +39,13 @@ interface ActionFailure {
 
 interface Restore {
   (): void;
+}
+
+interface NamingDefaultsLoadResult {
+  canWriteToBase: boolean;
+  radarrDefaults: unknown;
+  sonarrDefaults: unknown;
+  lidarrDefaults: unknown;
 }
 
 type FixtureRequest = Parameters<typeof namingNewActions.default>[0];
@@ -502,6 +515,7 @@ VALUES ('R-QD-Seed', 'FLAC', 0, 1024, 256);
           artistName: '{Artist Name}',
           multiDiscTrackFormat: '{Artist Name} - CD{medium:00}',
           artistFolderFormat: '{Artist Name}',
+          colonReplacementFormat: 'smart',
         }),
         params: {
           databaseId: `${LidarrMediaManagementTest.DATABASE_ID}`,
@@ -532,6 +546,7 @@ VALUES ('R-QD-Seed', 'FLAC', 0, 1024, 256);
             animeEpisodeFormat: '{Episode Title}',
             seriesFolderFormat: '{Series Title}',
             seasonFolderFormat: 'Season {season:00}',
+            colonReplacementFormat: 'smart',
             customColonReplacementFormat: ':-',
             multiEpisodeStyle: 'extend',
           }),
@@ -553,6 +568,7 @@ VALUES ('R-QD-Seed', 'FLAC', 0, 1024, 256);
             artistName: '{Artist Name}',
             multiDiscTrackFormat: '{Artist Name} - CD{medium:00}',
             artistFolderFormat: '{Artist Name}',
+            colonReplacementFormat: 'smart',
           }),
           params: {
             databaseId: `${LidarrMediaManagementTest.DATABASE_ID}`,
@@ -616,6 +632,7 @@ VALUES ('R-QD-Seed', 'FLAC', 0, 1024, 256);
           artistName: '{Artist Name}',
           multiDiscTrackFormat: '{Artist Name} - CD{medium:00}',
           artistFolderFormat: '{Artist Name}',
+          colonReplacementFormat: 'smart',
         }),
         params: {
           databaseId: `${LidarrMediaManagementTest.DATABASE_ID}`,
@@ -625,6 +642,124 @@ VALUES ('R-QD-Seed', 'FLAC', 0, 1024, 256);
 
       assertEquals(failure.status, 403);
       assertEquals(failure.data.error, 'Cannot write to base layer without personal access token');
+    });
+
+    this.test('[NM-03e] naming create radarr missing colon replacement format fails with 400', async () => {
+      await this.bootstrapFixture();
+
+      const failure = (await namingNewActions.default({
+        request: this.createRequest('media-management/901/naming/new', {
+          arrType: 'radarr',
+          name: 'Radarr-Naming-No-Colon',
+          layer: 'user',
+          rename: 'true',
+          movieFormat: '{Movie Title} ({Release Year})',
+          movieFolderFormat: '{Movie Title}',
+          replaceIllegalCharacters: 'true',
+        }),
+        params: {
+          databaseId: `${LidarrMediaManagementTest.DATABASE_ID}`,
+        },
+      } as unknown as FixtureRequest)) as ActionFailure;
+
+      assertEquals(failure.status, 400);
+      assertEquals(failure.data.error, 'Colon replacement format is required');
+    });
+
+    this.test('[NM-03f] naming create sonarr without colon replacement fails with 400', async () => {
+      await this.bootstrapFixture();
+
+      const failure = (await namingNewActions.default({
+        request: this.createRequest('media-management/901/naming/new', {
+          arrType: 'sonarr',
+          name: 'Sonarr-Naming-No-Colon',
+          layer: 'user',
+          rename: 'true',
+          standardEpisodeFormat: 'S{season:00}E{episode:00}',
+          dailyEpisodeFormat: '{Series Title}',
+          animeEpisodeFormat: '{Episode Title}',
+          seriesFolderFormat: '{Series Title}',
+          seasonFolderFormat: 'Season {season:00}',
+          multiEpisodeStyle: 'extend',
+          replaceIllegalCharacters: 'true',
+        }),
+        params: {
+          databaseId: `${LidarrMediaManagementTest.DATABASE_ID}`,
+        },
+      } as unknown as FixtureRequest)) as ActionFailure;
+
+      assertEquals(failure.status, 400);
+      assertEquals(failure.data.error, 'Colon replacement format is required');
+    });
+
+    this.test('[NM-03g] naming create sonarr without multi-episode style fails with 400', async () => {
+      await this.bootstrapFixture();
+
+      const failure = (await namingNewActions.default({
+        request: this.createRequest('media-management/901/naming/new', {
+          arrType: 'sonarr',
+          name: 'Sonarr-Naming-No-Multi',
+          layer: 'user',
+          rename: 'true',
+          standardEpisodeFormat: 'S{season:00}E{episode:00}',
+          dailyEpisodeFormat: '{Series Title}',
+          animeEpisodeFormat: '{Episode Title}',
+          seriesFolderFormat: '{Series Title}',
+          seasonFolderFormat: 'Season {season:00}',
+          colonReplacementFormat: 'smart',
+          replaceIllegalCharacters: 'true',
+        }),
+        params: {
+          databaseId: `${LidarrMediaManagementTest.DATABASE_ID}`,
+        },
+      } as unknown as FixtureRequest)) as ActionFailure;
+
+      assertEquals(failure.status, 400);
+      assertEquals(failure.data.error, 'Multi-episode style is required');
+    });
+
+    this.test('[NM-03h] naming create lidarr without colon replacement format fails with 400', async () => {
+      await this.bootstrapFixture();
+
+      const failure = (await namingNewActions.default({
+        request: this.createRequest('media-management/901/naming/new', {
+          arrType: 'lidarr',
+          name: 'Lidarr-Naming-No-Colon',
+          layer: 'user',
+          rename: 'true',
+          standardTrackFormat: '{Artist Name} - {Album Title}',
+          artistName: '{Artist Name}',
+          multiDiscTrackFormat: '{Artist Name} - CD{medium:00}',
+          artistFolderFormat: '{Artist Name}',
+          replaceIllegalCharacters: 'true',
+        }),
+        params: {
+          databaseId: `${LidarrMediaManagementTest.DATABASE_ID}`,
+        },
+      } as unknown as FixtureRequest)) as ActionFailure;
+
+      assertEquals(failure.status, 400);
+      assertEquals(failure.data.error, 'Colon replacement format is required');
+    });
+
+    this.test('[NM-03i] naming defaults load returns null when cache is unavailable', async () => {
+      this.patch(pcdManager, 'getCache', () => {
+        return undefined;
+      });
+
+      const loaded = (await namingNewLoad({
+        params: {
+          databaseId: `${LidarrMediaManagementTest.DATABASE_ID}`,
+        },
+        parent: async () => ({
+          canWriteToBase: false,
+        }),
+      } as unknown as Parameters<typeof namingNewLoad>[0])) as NamingDefaultsLoadResult;
+
+      assertEquals(loaded.canWriteToBase, false);
+      assertEquals(loaded.radarrDefaults, null);
+      assertEquals(loaded.sonarrDefaults, null);
+      assertEquals(loaded.lidarrDefaults, null);
     });
 
     this.test('[NM-04] naming edit lidarr rename persists and updates sync mapping reference', async () => {
@@ -666,6 +801,7 @@ VALUES ('R-QD-Seed', 'FLAC', 0, 1024, 256);
             artistName: '{Artist Name}',
             multiDiscTrackFormat: '{Artist Name} - CD{medium:00} - {Track Title}',
             artistFolderFormat: '{Artist Name}',
+            colonReplacementFormat: 'smart',
             customColonReplacementFormat: ':-',
           }),
           params: {
@@ -693,6 +829,148 @@ VALUES ('R-QD-Seed', 'FLAC', 0, 1024, 256);
         namingConfigs.find((item) => item.arr_type === 'lidarr' && item.name === 'Lidarr-Naming-Seed'),
         undefined
       );
+    });
+
+    this.test('[NM-04a] naming edit radarr without colon replacement format fails with 400', async () => {
+      await this.bootstrapFixture();
+
+      const failure = (await namingRadarrEditActions.update({
+        request: this.createRequest('media-management/901/naming/radarr/R-Naming-Seed', {
+          layer: 'user',
+          name: 'R-Naming-Seed-Edited',
+          rename: 'true',
+          movieFormat: '{Movie Title} ({Release Year})',
+          movieFolderFormat: '{Movie Title}',
+          replaceIllegalCharacters: 'true',
+        }),
+        params: {
+          databaseId: `${LidarrMediaManagementTest.DATABASE_ID}`,
+          name: 'R-Naming-Seed',
+        },
+      } as unknown as Parameters<typeof namingRadarrEditActions.update>[0])) as ActionFailure;
+
+      assertEquals(failure.status, 400);
+      assertEquals(failure.data.error, 'Colon replacement format is required');
+    });
+
+    this.test('[NM-04b] naming edit sonarr without colon replacement format fails with 400', async () => {
+      await this.bootstrapFixture();
+
+      await this.expectRedirect(async () => {
+        await namingNewActions.default({
+          request: this.createRequest('media-management/901/naming/new', {
+            arrType: 'sonarr',
+            name: 'Sonarr-Naming-Editable',
+            layer: 'user',
+            rename: 'true',
+            standardEpisodeFormat: 'S{season:00}E{episode:00}',
+            dailyEpisodeFormat: '{Series Title}',
+            animeEpisodeFormat: '{Episode Title}',
+            seriesFolderFormat: '{Series Title}',
+            seasonFolderFormat: 'Season {season:00}',
+            colonReplacementFormat: 'smart',
+            multiEpisodeStyle: 'extend',
+            replaceIllegalCharacters: 'true',
+          }),
+          params: {
+            databaseId: `${LidarrMediaManagementTest.DATABASE_ID}`,
+          },
+        } as unknown as FixtureRequest);
+      }, `/media-management/${LidarrMediaManagementTest.DATABASE_ID}/naming`);
+
+      const failure = (await namingSonarrEditActions.update({
+        request: this.createRequest(`media-management/901/naming/sonarr/Sonarr-Naming-Editable`, {
+          layer: 'user',
+          name: 'Sonarr-Naming-Edited',
+          rename: 'true',
+          standardEpisodeFormat: 'S{season:00}E{episode:00}',
+          dailyEpisodeFormat: '{Series Title}',
+          animeEpisodeFormat: '{Episode Title}',
+          seriesFolderFormat: '{Series Title}',
+          seasonFolderFormat: 'Season {season:00}',
+          multiEpisodeStyle: 'extend',
+          replaceIllegalCharacters: 'true',
+        }),
+        params: {
+          databaseId: `${LidarrMediaManagementTest.DATABASE_ID}`,
+          name: 'Sonarr-Naming-Editable',
+        },
+      } as unknown as Parameters<typeof namingSonarrEditActions.update>[0])) as ActionFailure;
+
+      assertEquals(failure.status, 400);
+      assertEquals(failure.data.error, 'Colon replacement format is required');
+    });
+
+    this.test('[NM-04c] naming edit sonarr without multi-episode style fails with 400', async () => {
+      await this.bootstrapFixture();
+
+      await this.expectRedirect(async () => {
+        await namingNewActions.default({
+          request: this.createRequest('media-management/901/naming/new', {
+            arrType: 'sonarr',
+            name: 'Sonarr-Naming-Editable-Style',
+            layer: 'user',
+            rename: 'true',
+            standardEpisodeFormat: 'S{season:00}E{episode:00}',
+            dailyEpisodeFormat: '{Series Title}',
+            animeEpisodeFormat: '{Episode Title}',
+            seriesFolderFormat: '{Series Title}',
+            seasonFolderFormat: 'Season {season:00}',
+            colonReplacementFormat: 'smart',
+            multiEpisodeStyle: 'extend',
+            replaceIllegalCharacters: 'true',
+          }),
+          params: {
+            databaseId: `${LidarrMediaManagementTest.DATABASE_ID}`,
+          },
+        } as unknown as FixtureRequest);
+      }, `/media-management/${LidarrMediaManagementTest.DATABASE_ID}/naming`);
+
+      const failure = (await namingSonarrEditActions.update({
+        request: this.createRequest(`media-management/901/naming/sonarr/Sonarr-Naming-Editable-Style`, {
+          layer: 'user',
+          name: 'Sonarr-Naming-Style-Edited',
+          rename: 'true',
+          standardEpisodeFormat: 'S{season:00}E{episode:00}',
+          dailyEpisodeFormat: '{Series Title}',
+          animeEpisodeFormat: '{Episode Title}',
+          seriesFolderFormat: '{Series Title}',
+          seasonFolderFormat: 'Season {season:00}',
+          colonReplacementFormat: 'smart',
+          replaceIllegalCharacters: 'true',
+        }),
+        params: {
+          databaseId: `${LidarrMediaManagementTest.DATABASE_ID}`,
+          name: 'Sonarr-Naming-Editable-Style',
+        },
+      } as unknown as Parameters<typeof namingSonarrEditActions.update>[0])) as ActionFailure;
+
+      assertEquals(failure.status, 400);
+      assertEquals(failure.data.error, 'Multi-episode style is required');
+    });
+
+    this.test('[NM-04d] naming edit lidarr without colon replacement format fails with 400', async () => {
+      await this.bootstrapFixture();
+
+      const failure = (await namingLidarrEditActions.update({
+        request: this.createRequest(`media-management/901/naming/lidarr/Lidarr-Naming-Seed`, {
+          layer: 'user',
+          name: 'Lidarr-Naming-Edited',
+          rename: 'true',
+          standardTrackFormat: '{Artist Name} - {Album Title} - {Track Title}',
+          artistName: '{Artist Name}',
+          multiDiscTrackFormat: '{Artist Name} - CD{medium:00} - {Track Title}',
+          artistFolderFormat: '{Artist Name}',
+          customColonReplacementFormat: ':-',
+        }),
+        params: {
+          databaseId: `${LidarrMediaManagementTest.DATABASE_ID}`,
+          name: 'Lidarr-Naming-Seed',
+        },
+      } as unknown as Parameters<typeof namingLidarrEditActions.update>[0])) as ActionFailure;
+
+      assertEquals(failure.status, 400);
+      assertEquals(failure.data.error, 'Colon replacement format is required');
     });
 
     this.test('[NM-05] naming edit lidarr base layer denied without write permission', async () => {

@@ -1,15 +1,14 @@
 <script lang="ts">
-	import { ExternalLink, Unlink, Lock, Code } from 'lucide-svelte';
+	import { ExternalLink, Unlink, Lock, Code, AlertTriangle } from 'lucide-svelte';
 	import Badge from '$ui/badge/Badge.svelte';
-	import type { DatabaseInstance } from '$db/queries/databaseInstances.ts';
 	import { parseUTC } from '$shared/utils/dates';
 	import { createEventDispatcher } from 'svelte';
 	import DatabaseAvatar from '../components/DatabaseAvatar.svelte';
+	import type { DatabaseWithCache } from '../types';
 
-	export let databases: DatabaseInstance[];
-
+	export let databases: DatabaseWithCache[];
 	const dispatch = createEventDispatcher<{
-		unlink: DatabaseInstance;
+		unlink: DatabaseWithCache;
 	}>();
 
 	// Avatar handled by DatabaseAvatar component
@@ -36,7 +35,7 @@
 	}
 
 	// Handle unlink click
-	function handleUnlinkClick(e: MouseEvent, database: DatabaseInstance) {
+	function handleUnlinkClick(e: MouseEvent, database: DatabaseWithCache) {
 		e.stopPropagation();
 		e.preventDefault();
 		dispatch('unlink', database);
@@ -98,6 +97,9 @@
 				</Badge>
 				<Badge variant="neutral" mono>{formatSyncStrategy(database.sync_strategy)}</Badge>
 				<Badge variant="neutral" mono>{formatLastSynced(database.last_synced_at)}</Badge>
+				{#if !database.cacheAvailable}
+					<Badge variant="warning" icon={AlertTriangle} mono>Cache Unavailable</Badge>
+				{/if}
 			</div>
 		</a>
 	{/each}

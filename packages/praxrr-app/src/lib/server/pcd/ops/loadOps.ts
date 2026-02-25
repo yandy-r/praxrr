@@ -55,9 +55,7 @@ async function resolveSchemaOpsPath(pcdPath: string): Promise<string> {
     if (error instanceof Deno.errors.NotFound) {
       // deps directory doesn't exist
     } else {
-      throw new Error(
-        `Failed to resolve schema ops path: cannot read ${depsPath}: ${String(error)}`
-      );
+      throw new Error(`Failed to resolve schema ops path: cannot read ${depsPath}: ${String(error)}`);
     }
   }
   // Fallback to original hardcoded path

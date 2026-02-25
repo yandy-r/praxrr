@@ -22,6 +22,7 @@ export { compile, invalidate, invalidateAll } from './database/compiler.ts';
 // ============================================================================
 
 export { writeOperation, canWriteToBase } from './ops/writer.ts';
+export { parseOperationLayer } from './utils/operationLayer.ts';
 
 // ============================================================================
 // MANIFEST

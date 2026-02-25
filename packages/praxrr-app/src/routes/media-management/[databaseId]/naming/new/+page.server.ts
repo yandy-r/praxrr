@@ -1,16 +1,21 @@
-import { error, redirect, fail } from '@sveltejs/kit';
+import { fail, redirect } from '@sveltejs/kit';
 import type { Actions, ServerLoad } from '@sveltejs/kit';
 import { pcdManager } from '$pcd/index.ts';
 import { canWriteToBase } from '$pcd/index.ts';
-import type { OperationLayer } from '$pcd/index.ts';
+import type { PCDCache } from '$pcd/index.ts';
+import { parseOperationLayer } from '$pcd/index.ts';
 import type { LidarrNamingRow, RadarrNamingRow, SonarrNamingRow } from '$shared/pcd/display.ts';
 import {
   createLidarrNaming,
   createRadarrNaming,
   createSonarrNaming,
+  getRadarrDefaults,
+  getSonarrDefaults,
+  getLidarrDefaults,
 } from '$pcd/entities/mediaManagement/naming/index.ts';
 import type { ArrAppType } from '$shared/pcd/types.ts';
 import { validateNamingFormat } from '$shared/pcd/namingTokens.ts';
+import { logger } from '$logger/logger.ts';
 
 const SUPPORTED_NAMING_ARR_TYPES = ['radarr', 'sonarr', 'lidarr'] as const;
 
@@ -18,10 +23,46 @@ function isSupportedNamingArrType(value: FormDataEntryValue | null): value is Ar
   return typeof value === 'string' && SUPPORTED_NAMING_ARR_TYPES.some((arrType) => arrType === value);
 }
 
-export const load: ServerLoad = async ({ parent }) => {
+export const load: ServerLoad = async ({ params, parent }) => {
   const parentData = await parent();
+  const databaseId = parseInt(params.databaseId!, 10);
+  const cache = isNaN(databaseId) ? undefined : pcdManager.getCache(databaseId);
+  const safeGetDefaults = async <T>(
+    cache: PCDCache,
+    fn: (cache: PCDCache) => Promise<T | null>,
+    label: string
+  ): Promise<T | null> => {
+    try {
+      return await fn(cache);
+    } catch (err) {
+      await logger.error(`Failed to load ${label} naming defaults from cache`, {
+        source: 'naming-new',
+        meta: {
+          databaseId,
+          error: err instanceof Error ? err.message : String(err),
+        },
+      });
+      return null;
+    }
+  };
+
+  let radarrDefaults: RadarrNamingRow | null = null;
+  let sonarrDefaults: SonarrNamingRow | null = null;
+  let lidarrDefaults: LidarrNamingRow | null = null;
+
+  if (cache) {
+    [radarrDefaults, sonarrDefaults, lidarrDefaults] = await Promise.all([
+      safeGetDefaults(cache, getRadarrDefaults, 'radarr'),
+      safeGetDefaults(cache, getSonarrDefaults, 'sonarr'),
+      safeGetDefaults(cache, getLidarrDefaults, 'lidarr'),
+    ]);
+  }
+
   return {
     canWriteToBase: parentData.canWriteToBase,
+    radarrDefaults,
+    sonarrDefaults,
+    lidarrDefaults,
   };
 };
 
@@ -46,7 +87,11 @@ export const actions: Actions = {
     const formData = await request.formData();
     const arrTypeRaw = formData.get('arrType');
     const name = formData.get('name') as string;
-    const layer = (formData.get('layer') as OperationLayer) || 'user';
+    const layerResult = parseOperationLayer(formData.get('layer'));
+    if ('error' in layerResult) {
+      return fail(400, { error: layerResult.error });
+    }
+    const layer = layerResult.value;
 
     if (!name?.trim()) {
       return fail(400, { error: 'Name is required' });
@@ -79,6 +124,10 @@ export const actions: Actions = {
         return fail(400, { error: `Folder format: ${folderFormatValidation.errors.join(', ')}` });
       }
 
+      if (!colonReplacementFormat) {
+        return fail(400, { error: 'Colon replacement format is required' });
+      }
+
       let result;
       try {
         result = await createRadarrNaming({
@@ -91,7 +140,7 @@ export const actions: Actions = {
             movieFormat: movieFormat || '',
             movieFolderFormat: movieFolderFormat || '',
             replaceIllegalCharacters,
-            colonReplacementFormat: colonReplacementFormat || 'smart',
+            colonReplacementFormat,
           },
         });
       } catch (err) {
@@ -133,6 +182,13 @@ export const actions: Actions = {
         }
       }
 
+      if (!colonReplacementFormat) {
+        return fail(400, { error: 'Colon replacement format is required' });
+      }
+      if (!multiEpisodeStyle) {
+        return fail(400, { error: 'Multi-episode style is required' });
+      }
+
       let result;
       try {
         result = await createSonarrNaming({
@@ -148,9 +204,9 @@ export const actions: Actions = {
             seriesFolderFormat: seriesFolderFormat || '',
             seasonFolderFormat: seasonFolderFormat || '',
             replaceIllegalCharacters,
-            colonReplacementFormat: colonReplacementFormat || 'smart',
+            colonReplacementFormat,
             customColonReplacementFormat: customColonReplacementFormat || null,
-            multiEpisodeStyle: multiEpisodeStyle || 'extend',
+            multiEpisodeStyle,
           },
         });
       } catch (err) {
@@ -189,6 +245,10 @@ export const actions: Actions = {
       }
 
       const artistNameValue = (artistName as string)?.trim();
+      if (!colonReplacementFormat) {
+        return fail(400, { error: 'Colon replacement format is required' });
+      }
+
       let result;
       try {
         result = await createLidarrNaming({
@@ -203,7 +263,7 @@ export const actions: Actions = {
             multiDiscTrackFormat: multiDiscTrackFormat.trim(),
             artistFolderFormat: artistFolderFormat.trim(),
             replaceIllegalCharacters,
-            colonReplacementFormat: colonReplacementFormat || 'smart',
+            colonReplacementFormat,
             customColonReplacementFormat: customColonReplacementFormat || null,
           },
         });

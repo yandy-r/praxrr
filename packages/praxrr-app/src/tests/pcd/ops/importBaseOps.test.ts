@@ -4,7 +4,11 @@ import { pcdOpHistoryQueries } from '$db/queries/pcdOpHistory.ts';
 import { pcdOpsQueries, type ListPcdOpsOptions, type PcdOp } from '$db/queries/pcdOps.ts';
 import * as importBaseOpsModule from '$pcd/ops/importBaseOps.ts';
 import { PCDCache } from '$pcd/database/cache.ts';
-import type { MigrationEntityCandidate, MigrationReaderIssue, MigrationEntityStableIdentity } from '$pcd/migration/reader.ts';
+import type {
+  MigrationEntityCandidate,
+  MigrationReaderIssue,
+  MigrationEntityStableIdentity,
+} from '$pcd/migration/reader.ts';
 import { loadAllOperations } from '$pcd/ops/loadOps.ts';
 
 type Restore = () => void;
@@ -91,28 +95,31 @@ Deno.test('importBaseOps: validateStableIdentityConflicts detects migration dupl
   );
 });
 
-Deno.test('importBaseOps: validateStableIdentityConflicts ignores null and allows distinct migration identities', () => {
-  __testOnly_validateStableIdentityConflicts([
-    migrationEntry(null, '/path/entity.yaml'),
-    migrationEntry(null, '/path/other.yaml'),
-    migrationEntry(
-      {
-        key: 'quality_profile_name',
-        value: 'Existing Profile',
-        kind: 'stable',
-      },
-      '/path/first.yaml'
-    ),
-    migrationEntry(
-      {
-        key: 'custom_format_name',
-        value: 'Custom Format',
-        kind: 'stable',
-      },
-      '/path/second.yaml'
-    ),
-  ]);
-});
+Deno.test(
+  'importBaseOps: validateStableIdentityConflicts ignores null and allows distinct migration identities',
+  () => {
+    __testOnly_validateStableIdentityConflicts([
+      migrationEntry(null, '/path/entity.yaml'),
+      migrationEntry(null, '/path/other.yaml'),
+      migrationEntry(
+        {
+          key: 'quality_profile_name',
+          value: 'Existing Profile',
+          kind: 'stable',
+        },
+        '/path/first.yaml'
+      ),
+      migrationEntry(
+        {
+          key: 'custom_format_name',
+          value: 'Custom Format',
+          kind: 'stable',
+        },
+        '/path/second.yaml'
+      ),
+    ]);
+  }
+);
 
 Deno.test('importBaseOps: throws on duplicate migration stable identities during import', async () => {
   const restores: Restore[] = [];
@@ -135,17 +142,11 @@ Deno.test('importBaseOps: throws on duplicate migration stable identities during
     __testOnly_setReadMigrationEntitySources(() =>
       Promise.resolve({
         candidates: [
-          buildCandidate(
-            'custom-formats/conflict-1.yaml',
-            'custom_format',
-            first,
-            () => Promise.resolve({ success: true })
+          buildCandidate('custom-formats/conflict-1.yaml', 'custom_format', first, () =>
+            Promise.resolve({ success: true })
           ),
-          buildCandidate(
-            'custom-formats/conflict-2.yaml',
-            'custom_format',
-            second,
-            () => Promise.resolve({ success: true })
+          buildCandidate('custom-formats/conflict-2.yaml', 'custom_format', second, () =>
+            Promise.resolve({ success: true })
           ),
         ],
         issues: [],
@@ -255,119 +256,112 @@ Deno.test('importBaseOps: throws when base cache is unavailable', async () => {
   }
 });
 
-Deno.test('importBaseOps: imports YAML candidates in deterministic order and applies deterministic sequencing', async () => {
-  const restores: Restore[] = [];
-  const databaseId = 9201;
-  const order: string[] = [];
-  const seenContexts: Array<{ filenamePrefix: string; sequenceStart: number }> = [];
-  const tempDir = await Deno.makeTempDir({ prefix: 'importBaseOps-order-' });
+Deno.test(
+  'importBaseOps: imports YAML candidates in deterministic order and applies deterministic sequencing',
+  async () => {
+    const restores: Restore[] = [];
+    const databaseId = 9201;
+    const order: string[] = [];
+    const seenContexts: Array<{ filenamePrefix: string; sequenceStart: number }> = [];
+    const tempDir = await Deno.makeTempDir({ prefix: 'importBaseOps-order-' });
 
-  const candidates = [
-    buildCandidate(
-      'quality-profiles/zzz.yaml',
-      'quality_profile',
-      {
-        key: 'quality_profile_name',
-        value: 'Zulu',
-        kind: 'stable',
-      },
-      () => {
-        order.push('quality:Zulu');
-        return Promise.resolve({ success: true });
-      }
-    ),
-    buildCandidate(
-      'custom-formats/alpha.yaml',
-      'custom_format',
-      {
-        key: 'custom_format_name',
-        value: 'Alpha',
-        kind: 'stable',
-      },
-      () => {
-        order.push('custom:Alpha');
-        return Promise.resolve({ success: true });
-      }
-    ),
-    buildCandidate(
-      'custom-formats/zeta.yaml',
-      'custom_format',
-      {
-        key: 'custom_format_name',
-        value: 'Zeta',
-        kind: 'stable',
-      },
-      () => {
-        order.push('custom:Zeta');
-        return Promise.resolve({ success: true });
-      }
-    ),
-    buildCandidate(
-      'regular-expressions/root.yaml',
-      'regular_expression',
-      {
-        key: 'regular_expression_name',
-        value: 'Root',
-        kind: 'stable',
-      },
-      () => {
-        order.push('regex:Root');
-        return Promise.resolve({ success: true });
-      }
-    ),
-  ];
+    const candidates = [
+      buildCandidate(
+        'quality-profiles/zzz.yaml',
+        'quality_profile',
+        {
+          key: 'quality_profile_name',
+          value: 'Zulu',
+          kind: 'stable',
+        },
+        () => {
+          order.push('quality:Zulu');
+          return Promise.resolve({ success: true });
+        }
+      ),
+      buildCandidate(
+        'custom-formats/alpha.yaml',
+        'custom_format',
+        {
+          key: 'custom_format_name',
+          value: 'Alpha',
+          kind: 'stable',
+        },
+        () => {
+          order.push('custom:Alpha');
+          return Promise.resolve({ success: true });
+        }
+      ),
+      buildCandidate(
+        'custom-formats/zeta.yaml',
+        'custom_format',
+        {
+          key: 'custom_format_name',
+          value: 'Zeta',
+          kind: 'stable',
+        },
+        () => {
+          order.push('custom:Zeta');
+          return Promise.resolve({ success: true });
+        }
+      ),
+      buildCandidate(
+        'regular-expressions/root.yaml',
+        'regular_expression',
+        {
+          key: 'regular_expression_name',
+          value: 'Root',
+          kind: 'stable',
+        },
+        () => {
+          order.push('regex:Root');
+          return Promise.resolve({ success: true });
+        }
+      ),
+    ];
 
-  try {
-    __testOnly_setReadMigrationEntitySources(() => Promise.resolve({ candidates, issues: [] }));
-    restores.push(__testOnly_resetReadMigrationEntitySources);
+    try {
+      __testOnly_setReadMigrationEntitySources(() => Promise.resolve({ candidates, issues: [] }));
+      restores.push(__testOnly_resetReadMigrationEntitySources);
 
-    __testOnly_setGetCache(
-      () => ({ getRawDb: (() => ({})) as unknown as PCDCache['getRawDb'] }) as unknown as PCDCache
-    );
-    restores.push(__testOnly_resetGetCache);
+      __testOnly_setGetCache(
+        () => ({ getRawDb: (() => ({})) as unknown as PCDCache['getRawDb'] }) as unknown as PCDCache
+      );
+      restores.push(__testOnly_resetGetCache);
 
-    patch(
-      pcdOpsQueries,
-      'markBaseOrphaned',
-      () => 1,
-      restores
-    );
+      patch(pcdOpsQueries, 'markBaseOrphaned', () => 1, restores);
 
-    __testOnly_setCompile(() => Promise.resolve({ schema: 0, base: 0, tweaks: 0, user: 0, timing: 0 }));
-    restores.push(__testOnly_resetCompile);
+      __testOnly_setCompile(() => Promise.resolve({ schema: 0, base: 0, tweaks: 0, user: 0, timing: 0 }));
+      restores.push(__testOnly_resetCompile);
 
-    __testOnly_setWithRepoImportWriteContext(
-      (
-        context,
-        callback: () => Promise<unknown>
-      ): Promise<unknown> => {
+      __testOnly_setWithRepoImportWriteContext((context, callback: () => Promise<unknown>): Promise<unknown> => {
         seenContexts.push({
           filenamePrefix: context.filenamePrefix,
           sequenceStart: context.sequenceStart,
         });
         return callback();
+      });
+      restores.push(__testOnly_resetWithRepoImportWriteContext);
+
+      const result = await importBaseOps(databaseId, tempDir);
+
+      assertEquals(result.imported, 4);
+      assertEquals(result.orphaned, 1);
+      assertEquals(order, ['regex:Root', 'custom:Alpha', 'custom:Zeta', 'quality:Zulu']);
+      assertEquals(seenContexts.length, 4);
+      assertEquals(seenContexts[0].filenamePrefix, 'entities/regular-expressions/root.yaml');
+      assertEquals(seenContexts[0].sequenceStart, 4_000_000_000);
+      assertEquals(seenContexts[1].sequenceStart, 4_000_010_000);
+      assertEquals(seenContexts[2].sequenceStart, 4_000_020_000);
+      assertEquals(seenContexts[3].sequenceStart, 4_000_030_000);
+    } finally {
+      for (const restore of restores.reverse()) {
+        restore();
       }
-    );
-    restores.push(__testOnly_resetWithRepoImportWriteContext);
-
-    const result = await importBaseOps(databaseId, tempDir);
-
-    assertEquals(result.imported, 4);
-    assertEquals(result.orphaned, 1);
-    assertEquals(order, ['regex:Root', 'custom:Alpha', 'custom:Zeta', 'quality:Zulu']);
-    assertEquals(seenContexts.length, 4);
-    assertEquals(seenContexts[0].filenamePrefix, 'entities/regular-expressions/root.yaml');
-    assertEquals(seenContexts[0].sequenceStart, 4_000_000_000);
-    assertEquals(seenContexts[1].sequenceStart, 4_000_010_000);
-    assertEquals(seenContexts[2].sequenceStart, 4_000_020_000);
-    assertEquals(seenContexts[3].sequenceStart, 4_000_030_000);
-  } finally {
-    for (const restore of restores.reverse()) {
-      restore();
+      await Deno.remove(tempDir, { recursive: true });
     }
-    await Deno.remove(tempDir, { recursive: true });
   }
-});
+);
 
 Deno.test('importBaseOps: loadAllOperations includes schema and tweaks SQL layers', async () => {
   const restores: Restore[] = [];
@@ -380,10 +374,7 @@ Deno.test('importBaseOps: loadAllOperations includes schema and tweaks SQL layer
     await Deno.mkdir(schemaPath, { recursive: true });
     await Deno.mkdir(tweaksPath, { recursive: true });
 
-    await Deno.writeTextFile(
-      `${schemaPath}/0.schema.sql`,
-      'CREATE TABLE schema_marker (id INTEGER PRIMARY KEY);'
-    );
+    await Deno.writeTextFile(`${schemaPath}/0.schema.sql`, 'CREATE TABLE schema_marker (id INTEGER PRIMARY KEY);');
     await Deno.writeTextFile(`${schemaPath}/1.test.sql`, 'CREATE TABLE test_marker (id INTEGER PRIMARY KEY);');
     await Deno.writeTextFile(`${tweaksPath}/1.tweak.sql`, 'CREATE TABLE tweak_marker (id INTEGER PRIMARY KEY);');
 
@@ -400,7 +391,10 @@ Deno.test('importBaseOps: loadAllOperations includes schema and tweaks SQL layer
       operations.some((operation) => operation.layer === 'schema' && operation.filename === '0.schema.sql'),
       true
     );
-    assertEquals(operations.some((operation) => operation.layer === 'tweaks' && operation.filename === '1.tweak.sql'), true);
+    assertEquals(
+      operations.some((operation) => operation.layer === 'tweaks' && operation.filename === '1.tweak.sql'),
+      true
+    );
     assertEquals(
       operations.findIndex((operation) => operation.layer === 'schema') <
         operations.findIndex((operation) => operation.layer === 'tweaks'),
@@ -484,21 +478,20 @@ Deno.test('PCDCache: legacy SQL helper functions are preserved', async () => {
 
   const baseOps = [seedOp, helperOp];
 
-  const schemaSql =
-    [
-      'CREATE TABLE quality_profiles (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE);',
-      'CREATE TABLE custom_formats (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE);',
-      'CREATE TABLE delay_profiles (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE);',
-      'CREATE TABLE lidarr_metadata_profiles (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE);',
-      'CREATE TABLE tags (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE);',
-      'CREATE TABLE legacy_helper_probe (',
-      '  quality_profile_id INTEGER NOT NULL,',
-      '  custom_format_id INTEGER NOT NULL,',
-      '  delay_profile_id INTEGER NOT NULL,',
-      '  metadata_profile_id INTEGER NOT NULL,',
-      '  tag_id INTEGER NOT NULL',
-      ');',
-    ].join('\n');
+  const schemaSql = [
+    'CREATE TABLE quality_profiles (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE);',
+    'CREATE TABLE custom_formats (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE);',
+    'CREATE TABLE delay_profiles (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE);',
+    'CREATE TABLE lidarr_metadata_profiles (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE);',
+    'CREATE TABLE tags (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE);',
+    'CREATE TABLE legacy_helper_probe (',
+    '  quality_profile_id INTEGER NOT NULL,',
+    '  custom_format_id INTEGER NOT NULL,',
+    '  delay_profile_id INTEGER NOT NULL,',
+    '  metadata_profile_id INTEGER NOT NULL,',
+    '  tag_id INTEGER NOT NULL',
+    ');',
+  ].join('\n');
 
   try {
     await Deno.mkdir(schemaPath, { recursive: true });
@@ -533,29 +526,15 @@ Deno.test('PCDCache: legacy SQL helper functions are preserved', async () => {
     patch(
       pcdOpsQueries,
       'listByDatabaseAndOrigin',
-      (
-        _databaseId: number,
-        origin: 'base' | 'user',
-        options?: ListPcdOpsOptions
-      ) => {
+      (_databaseId: number, origin: 'base' | 'user', options?: ListPcdOpsOptions) => {
         if (origin === 'base' && options?.states?.includes('published')) return baseOps;
         return [];
       },
       restores
     );
 
-    patch(
-      pcdOpHistoryQueries,
-      'create',
-      () => 1,
-      restores
-    );
-    patch(
-      pcdOpHistoryQueries,
-      'listLatestByDatabaseWithOps',
-      () => [],
-      restores
-    );
+    patch(pcdOpHistoryQueries, 'create', () => 1, restores);
+    patch(pcdOpHistoryQueries, 'listLatestByDatabaseWithOps', () => [], restores);
 
     const cache = new PCDCache(tempDir, databaseId);
     const stats = await cache.build();
@@ -567,7 +546,9 @@ Deno.test('PCDCache: legacy SQL helper functions are preserved', async () => {
       delay_profile_id: number;
       metadata_profile_id: number;
       tag_id: number;
-    }>('SELECT quality_profile_id, custom_format_id, delay_profile_id, metadata_profile_id, tag_id FROM legacy_helper_probe');
+    }>(
+      'SELECT quality_profile_id, custom_format_id, delay_profile_id, metadata_profile_id, tag_id FROM legacy_helper_probe'
+    );
     assertEquals(rows.length, 1);
     assertEquals(rows[0].quality_profile_id, 1);
     assertEquals(rows[0].custom_format_id, 1);

@@ -1,7 +1,7 @@
 import { error, fail } from '@sveltejs/kit';
 import type { ServerLoad, Actions } from '@sveltejs/kit';
 import { pcdManager } from '$pcd/index.ts';
-import { canWriteToBase, type OperationLayer } from '$pcd/index.ts';
+import { canWriteToBase, parseOperationLayer } from '$pcd/index.ts';
 import * as customFormatQueries from '$pcd/entities/customFormats/index.ts';
 import type { ConditionResult, ParsedInfo } from '$shared/pcd/display.ts';
 import { parse, isParserHealthy } from '$lib/server/utils/arr/parser/client.ts';
@@ -154,7 +154,11 @@ export const actions: Actions = {
     const formatName = formData.get('formatName') as string;
     const testTitle = formData.get('testTitle') as string;
     const testType = formData.get('testType') as string;
-    const layer = (formData.get('layer') as OperationLayer) || 'user';
+    const layerResult = parseOperationLayer(formData.get('layer'));
+    if ('error' in layerResult) {
+      return fail(400, { error: layerResult.error });
+    }
+    const layer = layerResult.value;
 
     if (!formatName) {
       return fail(400, { error: 'Format name is required' });

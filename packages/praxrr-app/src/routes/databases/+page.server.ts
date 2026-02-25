@@ -1,6 +1,6 @@
 import { fail, redirect } from '@sveltejs/kit';
 import type { Actions, ServerLoad } from '@sveltejs/kit';
-import { pcdManager } from '$pcd/index.ts';
+import { pcdManager, getCache } from '$pcd/index.ts';
 import { logger } from '$logger/logger.ts';
 
 export const load: ServerLoad = () => {
@@ -9,6 +9,7 @@ export const load: ServerLoad = () => {
     return {
       ...databaseWithoutToken,
       personal_access_token: '',
+      cacheAvailable: !!getCache(database.id),
     };
   });
 

@@ -1,6 +1,13 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from '@sveltejs/kit';
-import { pcdManager, canWriteToBase, type PCDCache, type OperationLayer, type WriteResult } from '$pcd/index.ts';
+import {
+  pcdManager,
+  canWriteToBase,
+  parseOperationLayer,
+  type PCDCache,
+  type OperationLayer,
+  type WriteResult,
+} from '$pcd/index.ts';
 import {
   ENTITY_TYPES,
   getLidarrMediaManagementPortableEntry,
@@ -42,8 +49,6 @@ export const _deserializeDependencies = {
 
 const VALID_ENTITY_TYPES: ReadonlySet<string> = new Set(ENTITY_TYPES);
 
-const VALID_LAYERS: Set<string> = new Set(['user', 'base']);
-
 export const POST: RequestHandler = async ({ request }) => {
   let body: Record<string, unknown>;
   try {
@@ -69,9 +74,11 @@ export const POST: RequestHandler = async ({ request }) => {
     return json({ error: 'Invalid databaseId' }, { status: 400 });
   }
 
-  if (!VALID_LAYERS.has(layer as string)) {
-    return json({ error: `Invalid layer: ${layer}` }, { status: 400 });
+  const layerResult = parseOperationLayer(layer);
+  if ('error' in layerResult) {
+    return json({ error: layerResult.error }, { status: 400 });
   }
+  const parsedLayer = layerResult.value;
 
   if (!VALID_ENTITY_TYPES.has(entityType as string)) {
     return json({ error: `Invalid entityType: ${entityType}` }, { status: 400 });
@@ -79,7 +86,7 @@ export const POST: RequestHandler = async ({ request }) => {
 
   const typedEntityType = entityType as EntityType;
 
-  if (layer === 'base' && !canWriteToBase(databaseId as number)) {
+  if (parsedLayer === 'base' && !canWriteToBase(databaseId as number)) {
     return json({ error: 'Cannot write to base layer' }, { status: 403 });
   }
 
@@ -106,7 +113,7 @@ export const POST: RequestHandler = async ({ request }) => {
     const result = await deserializeEntity({
       databaseId: databaseId as number,
       cache,
-      layer: layer as OperationLayer,
+      layer: parsedLayer,
       entityType: typedEntityType,
       data: data as Record<string, unknown>,
     });
@@ -117,7 +124,7 @@ export const POST: RequestHandler = async ({ request }) => {
         source: 'PCDImport',
         meta: {
           databaseId: databaseId as number,
-          layer,
+          layer: parsedLayer,
           entityType,
           error: errorMessage,
         },
@@ -133,7 +140,7 @@ export const POST: RequestHandler = async ({ request }) => {
       source: 'PCDImport',
       meta: {
         databaseId: databaseId as number,
-        layer,
+        layer: parsedLayer,
         entityType,
         error: message,
       },
