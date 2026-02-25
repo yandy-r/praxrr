@@ -53,7 +53,7 @@ export const actions = {
     // Validation
     if (!name || !repositoryUrl) {
       await logger.warn('Attempted to link database with missing required fields', {
-        source: 'databases/new',
+        source: 'databases/new/custom',
         meta: { name, repositoryUrl },
       });
 
@@ -100,7 +100,7 @@ export const actions = {
     // Check if name already exists
     if (databaseInstancesQueries.nameExists(name)) {
       await logger.warn('Attempted to link database with duplicate name', {
-        source: 'databases/new',
+        source: 'databases/new/custom',
         meta: { name },
       });
 
@@ -112,7 +112,7 @@ export const actions = {
 
     try {
       await logger.debug('Link database request parsed', {
-        source: 'databases/new',
+        source: 'databases/new/custom',
         meta: {
           name,
           repositoryUrl,
@@ -136,7 +136,7 @@ export const actions = {
       });
 
       await logger.info(`Linked new database: ${name}`, {
-        source: 'databases/new',
+        source: 'databases/new/custom',
         meta: { id: instance.id, name, repositoryUrl },
       });
 
@@ -151,7 +151,7 @@ export const actions = {
       }
 
       await logger.error('Failed to link database', {
-        source: 'databases/new',
+        source: 'databases/new/custom',
         meta: {
           error: error instanceof Error ? error.message : String(error),
           name,
