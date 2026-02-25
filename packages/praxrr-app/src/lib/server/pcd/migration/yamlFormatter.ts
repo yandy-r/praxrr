@@ -16,7 +16,8 @@ const RESERVED_MIGRATION_KEY = 'migration';
 
 const YAML_STRINGIFY_OPTIONS = {
   indent: 2,
-  lineWidth: 0,
+  // Keep plain scalar strings inline (`name: value`) instead of folded block style.
+  lineWidth: -1,
   defaultKeyType: 'PLAIN',
   defaultStringType: 'PLAIN',
   nullStr: 'null',
