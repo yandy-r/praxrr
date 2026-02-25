@@ -288,6 +288,15 @@ fallback chain -- has no tests. Specific scenarios needed (per arr type):
 - Tier 4: returns null when table is empty
 - Tiebreaker: deterministic ordering when two rows share `created_at`
 
+**Status:** [x] Fixed (2026-02-25)
+
+- Added direct coverage in `packages/praxrr-app/src/tests/arr/namingDefaultsSelection.test.ts` for:
+  - Case-insensitive `default` match.
+  - Arr-type fallback by exact table name.
+  - Oldest-row fallback when no match exists.
+  - Empty-table null behavior.
+  - `created_at` tie-breaker by `name` asc.
+
 ### T-2. `fail(400)` validation for missing required fields not tested as negative cases (Criticality: 8/10)
 
 The behavioral change from silent `|| 'smart'` fallback to `fail(400)` rejection has no negative
@@ -299,15 +308,33 @@ omission path. Needed:
 - Sonarr create/edit without `multiEpisodeStyle` -> `fail(400)`
 - Lidarr create/edit without `colonReplacementFormat` -> `fail(400)`
 
+**Status:** [x] Fixed (2026-02-25)
+
+- Added negative cases in `packages/praxrr-app/src/tests/arr/lidarrMediaManagement.test.ts`:
+  - `[NM-03e]`, `[NM-03f]`, `[NM-03g]`, `[NM-03h]`
+  - `[NM-04a]`, `[NM-04b]`, `[NM-04c]`, `[NM-04d]`
+- Tests assert exact `fail(400)` errors and no state changes beyond required route behavior.
+
 ### T-3. Load function cache-unavailable path untested (Criticality: 6/10)
 
 No test verifies the load function returns null defaults when `pcdManager.getCache()` returns
 undefined.
 
+**Status:** [x] Fixed (2026-02-25)
+
+- Added `[NM-03i] naming defaults load returns null when cache is unavailable` in
+  `packages/praxrr-app/src/tests/arr/lidarrMediaManagement.test.ts` and validated `namingNewLoad()`
+  returns null for all defaults.
+
 ### T-4. Deterministic ordering tiebreaker behavior untested (Criticality: 5/10)
 
 The `orderBy('created_at', 'asc').orderBy('name', 'asc')` secondary sort was added per commit
 `f4eea703` but has no test proving it works. Can be combined with T-1 tests.
+
+**Status:** [x] Fixed (2026-02-25)
+
+- Covered in `packages/praxrr-app/src/tests/arr/namingDefaultsSelection.test.ts` with a dedicated
+  tiebreaker case.
 
 ### T-5. Existing test changes are reactive, not proactive
 
@@ -315,6 +342,13 @@ The 5 updated test payloads in `lidarrMediaManagement.test.ts` add `colonReplace
 to prevent breakage under the new required-field validation. This is correct but only covers the
 happy path. The formatting-only changes in `managerImportOrchestration.test.ts` and
 `importBaseOps.test.ts` add no coverage value.
+
+**Status:** [x] Fixed (2026-02-25)
+
+- Replaced reliance on payload-only compatibility by adding proactive negative-path coverage for
+  required-field validation and cache-unavailable behavior in
+  `packages/praxrr-app/src/tests/arr/lidarrMediaManagement.test.ts` and
+  `packages/praxrr-app/src/tests/arr/namingDefaultsSelection.test.ts`.
 
 ---
 
@@ -350,7 +384,7 @@ happy path. The formatting-only changes in `managerImportOrchestration.test.ts` 
 ## Validation Results (2026-02-25)
 
 - `deno task test packages/praxrr-app/src/tests/arr/namingDefaultsSelection.test.ts`: pass (15/15)
-- `deno task test packages/praxrr-app/src/tests/arr/lidarrMediaManagement.test.ts`: pass (23/23)
+- `deno task test packages/praxrr-app/src/tests/arr/lidarrMediaManagement.test.ts`: pass (32/32)
 - `deno task test packages/praxrr-app/src/tests/arr/lidarrFirstClassRouteAndSyncCutover.test.ts`:
   pass (5/5)
 - `deno task test`: failed with 3 existing unrelated suite failures:

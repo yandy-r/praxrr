@@ -1,5 +1,5 @@
 import { error, redirect, fail } from '@sveltejs/kit';
-import type { PageServerLoad, Actions } from './$types';
+import type { Actions, ServerLoad } from '@sveltejs/kit';
 import { pcdManager } from '$pcd/index.ts';
 import { canWriteToBase } from '$pcd/index.ts';
 import { parseOperationLayer } from '$pcd/index.ts';
@@ -9,7 +9,7 @@ import { logger } from '$logger/logger.ts';
 import type { RadarrNamingRow } from '$shared/pcd/display.ts';
 import { validateNamingFormat } from '$shared/pcd/namingTokens.ts';
 
-export const load: PageServerLoad = async ({ params, parent }) => {
+export const load: ServerLoad = async ({ params, parent }) => {
   const { databaseId, name } = params;
 
   if (!databaseId || !name) {
