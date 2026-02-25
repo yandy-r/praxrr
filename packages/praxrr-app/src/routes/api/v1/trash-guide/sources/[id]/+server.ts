@@ -14,6 +14,7 @@ const UPDATE_ALLOWED_FIELDS = new Set([
   'repositoryUrl',
   'branch',
   'arrType',
+  'autoPull',
   'scoreProfile',
   'enabled',
   'syncStrategy',
@@ -137,6 +138,10 @@ function parseUpdatePayload(body: unknown): { value: TrashGuideSourceUpdateInput
     }
   }
 
+  if (payload.autoPull !== undefined && typeof payload.autoPull !== 'boolean') {
+    return { error: 'autoPull must be a boolean when provided' };
+  }
+
   return {
     value: {
       name: name.value,
@@ -144,6 +149,7 @@ function parseUpdatePayload(body: unknown): { value: TrashGuideSourceUpdateInput
       branch: branch.value,
       arrType: arrType.value,
       scoreProfile: scoreProfile.value,
+      autoPull: payload.autoPull as boolean | undefined,
       enabled: payload.enabled as boolean | undefined,
       syncStrategy: payload.syncStrategy as number | undefined,
     },

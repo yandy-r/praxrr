@@ -19,17 +19,19 @@ export const actions = {
     const name = formData.get('name')?.toString().trim();
     const scoreProfile = formData.get('score_profile')?.toString().trim();
     const syncStrategy = formData.get('sync_strategy')?.toString().trim();
-    const autoPull = formData.get('auto_pull')?.toString();
+    const autoPullValue = formData.get('auto_pull')?.toString();
+    const autoPull = autoPullValue === undefined ? undefined : autoPullValue === '1';
 
     if (name !== undefined && !name) {
       return fail(400, { error: 'Name is required' });
     }
 
     try {
-      trashGuideManager.updateSource(id, {
+      await trashGuideManager.updateSource(id, {
         ...(name !== undefined ? { name } : {}),
         ...(scoreProfile !== undefined ? { scoreProfile } : {}),
         ...(syncStrategy !== undefined ? { syncStrategy: parseInt(syncStrategy, 10) } : {}),
+        ...(autoPullValue !== undefined ? { autoPull } : {}),
       });
 
       await logger.info(`Updated TRaSH source settings: ${id}`, {

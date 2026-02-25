@@ -12,6 +12,7 @@ const CREATE_ALLOWED_FIELDS = new Set([
   'repositoryUrl',
   'branch',
   'arrType',
+  'autoPull',
   'scoreProfile',
   'enabled',
   'syncStrategy',
@@ -98,6 +99,10 @@ function parseCreatePayload(body: unknown): { value: TrashGuideSourceCreateInput
     }
   }
 
+  if (payload.autoPull !== undefined && typeof payload.autoPull !== 'boolean') {
+    return { error: 'autoPull must be a boolean when provided' };
+  }
+
   return {
     value: {
       name,
@@ -105,6 +110,7 @@ function parseCreatePayload(body: unknown): { value: TrashGuideSourceCreateInput
       branch: branch.value,
       arrType,
       scoreProfile: scoreProfile.value,
+      autoPull: payload.autoPull as boolean | undefined,
       enabled: payload.enabled as boolean | undefined,
       syncStrategy: payload.syncStrategy as number | undefined,
     },

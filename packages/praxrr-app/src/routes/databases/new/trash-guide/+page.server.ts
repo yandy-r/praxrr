@@ -32,6 +32,7 @@ export const actions = {
         arrType,
         scoreProfile,
         syncStrategy,
+        autoPull,
         enabled: true,
       });
 

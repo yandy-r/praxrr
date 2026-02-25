@@ -2,6 +2,7 @@ import { config } from '$config';
 import { logger } from '$logger/logger.ts';
 import { type TrashGuideSource, trashGuideSourcesQueries } from '$db/queries/trashGuideSources.ts';
 import { type TrashGuideEntityCacheInput, trashGuideEntityCacheQueries } from '$db/queries/trashGuideEntityCache.ts';
+import { arrInstancesQueries } from '$db/queries/arrInstances.ts';
 import { trashGuideSyncQueries } from '$db/queries/trashGuideSync.ts';
 import { trashIdMappingsQueries } from '$db/queries/trashIdMappings.ts';
 import { triggerSyncs } from '$sync/processor.ts';
@@ -71,6 +72,7 @@ export interface TrashGuideSourceCreateInput {
   branch?: string;
   arrType: string;
   scoreProfile?: string;
+  autoPull?: boolean;
   enabled?: boolean;
   syncStrategy?: number;
 }
@@ -81,6 +83,7 @@ export interface TrashGuideSourceUpdateInput {
   branch?: string;
   arrType?: string;
   scoreProfile?: string;
+  autoPull?: boolean;
   enabled?: boolean;
   syncStrategy?: number;
 }
@@ -132,10 +135,12 @@ class TrashGuideManager {
             source: 'TrashGuideManager',
             meta: { sourceId: source.id, localPath: source.local_path },
           });
-          continue;
+        } else {
+          throw error;
         }
-        throw error;
       }
+
+      this.ensureSyncConfigRows(source);
     }
 
     await logger.info('TRaSH guide manager initialized', {
@@ -173,6 +178,7 @@ class TrashGuideManager {
         arrType,
         scoreProfile: input.scoreProfile,
         syncStrategy: input.syncStrategy,
+        autoPull: input.autoPull,
         enabled: input.enabled,
       });
     } catch (error) {
@@ -186,7 +192,7 @@ class TrashGuideManager {
     return this.toSourceResponse(this.getSourceOrThrow(source.id));
   }
 
-  updateSource(id: number, input: TrashGuideSourceUpdateInput): TrashGuideSourceResponse {
+  async updateSource(id: number, input: TrashGuideSourceUpdateInput): Promise<TrashGuideSourceResponse> {
     const current = this.getSourceOrThrow(id);
 
     if (input.arrType !== undefined) {
@@ -211,26 +217,94 @@ class TrashGuideManager {
       arrType: nextArrType,
     });
 
+    const shouldReinitializeClone =
+      input.repositoryUrl !== undefined && input.repositoryUrl !== current.repository_url;
+    const updateInput = {
+      name: input.name,
+      repositoryUrl: input.repositoryUrl,
+      branch: input.branch,
+      scoreProfile: input.scoreProfile,
+      enabled: input.enabled,
+      syncStrategy: input.syncStrategy,
+      autoPull: input.autoPull,
+    };
+
     let updated = false;
+    let tempClonePath: string | null = null;
+
     try {
-      updated = trashGuideSourcesQueries.update(id, {
-        name: input.name,
-        repositoryUrl: input.repositoryUrl,
-        branch: input.branch,
-        scoreProfile: input.scoreProfile,
-        enabled: input.enabled,
-        syncStrategy: input.syncStrategy,
-      });
+      if (shouldReinitializeClone) {
+        const clonePath = `${TRASHGUIDE_CLONES_DIR}/${crypto.randomUUID()}`;
+        tempClonePath = clonePath;
+
+        const fetchResult = await fetchTrashGuideSource({
+          repository_url: nextRepositoryUrl,
+          local_path: clonePath,
+          branch: nextBranch,
+          arr_type: current.arr_type,
+        });
+        const parsed = await parseTrashGuideEntities({
+          arr_type: fetchResult.arr_type,
+          discovery: fetchResult.discovery,
+        });
+
+        const nextSource = {
+          ...current,
+          repository_url: nextRepositoryUrl,
+          branch: fetchResult.branch,
+          local_path: clonePath,
+        };
+
+        await this.persistSourceSyncData(nextSource, parsed);
+
+        updated = trashGuideSourcesQueries.update(id, {
+          ...updateInput,
+          branch: fetchResult.branch,
+          localPath: clonePath,
+        });
+      } else {
+        updated = trashGuideSourcesQueries.update(id, updateInput);
+      }
+
+      if (!updated) {
+        throw new TrashGuideSourceNotFoundError(id);
+      }
     } catch (error) {
       if (this.isNameConflictError(error)) {
         throw new TrashGuideSourceConflictError('name', `TRaSH source name already exists: ${nextName}`);
       }
 
+      if (tempClonePath !== null) {
+        try {
+          await Deno.remove(tempClonePath, { recursive: true });
+        } catch (cleanupError) {
+          if (!(cleanupError instanceof Deno.errors.NotFound)) {
+            await logger.warn('Failed to cleanup temporary TRaSH clone path after update failure', {
+              source: 'TrashGuideManager',
+              meta: { sourceId: id, clonePath: tempClonePath, error: String(cleanupError) },
+            });
+          }
+        }
+      }
+
       throw error;
     }
 
-    if (!updated) {
-      throw new TrashGuideSourceNotFoundError(id);
+    if (shouldReinitializeClone && current.local_path) {
+      try {
+        await Deno.remove(current.local_path, { recursive: true });
+      } catch (error) {
+        if (!(error instanceof Deno.errors.NotFound)) {
+          await logger.warn('Failed to replace TRaSH source clone during update', {
+            source: 'TrashGuideManager',
+            meta: {
+              sourceId: id,
+              oldPath: current.local_path,
+              error: String(error),
+            },
+          });
+        }
+      }
     }
 
     return this.toSourceResponse(this.getSourceOrThrow(id));
@@ -270,6 +344,7 @@ class TrashGuideManager {
 
       const source = this.getSourceOrThrow(sourceId);
       await this.persistSourceSyncData(source, parsed);
+      this.ensureSyncConfigRows(source);
 
       await this.triggerPullSync(source.id);
 
@@ -513,12 +588,31 @@ class TrashGuideManager {
   }
 
   private async triggerPullSync(sourceId: number): Promise<void> {
+    const source = this.getSourceOrThrow(sourceId);
+    this.ensureSyncConfigRows(source);
+
     const marked = trashGuideSyncQueries.setStatusPendingBySource(sourceId);
     if (marked <= 0) {
       return;
     }
 
     await triggerSyncs({ event: 'on_pull' });
+  }
+
+  private ensureSyncConfigRows(source: TrashGuideSource): void {
+    const instances = arrInstancesQueries.getByType(source.arr_type);
+    for (const instance of instances) {
+      const existing = trashGuideSyncQueries.getConfig(instance.id, source.id);
+      if (existing) {
+        continue;
+      }
+
+      trashGuideSyncQueries.saveConfig({
+        instanceId: instance.id,
+        sourceId: source.id,
+        trigger: 'on_pull',
+      });
+    }
   }
 
   private async persistSourceSyncData(source: TrashGuideSource, parsed: TrashGuideParseResult) {
