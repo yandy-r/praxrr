@@ -110,80 +110,39 @@ on failures so broken/default resolution for one app does not prevent the create
 
 - **Source:** code-reviewer, code-simplifier
 - **File:** `packages/praxrr-app/src/lib/server/pcd/entities/mediaManagement/naming/read.ts:120-214`
-- **Status:** [ ] Open
+- **Status:** [x] Fixed
 
 `getRadarrDefaults`, `getSonarrDefaults`, `getLidarrDefaults` are structurally identical, differing
 only in table name, arr type fallback string, and mapper function. Each issues up to 3 sequential
 queries. A single parameterized helper or a `CASE WHEN` ordering query would eliminate ~60 lines of
 duplication and reduce the query count from 3 to 1.
 
-**Option A -- Single-query with `CASE WHEN` ordering:**
+**Resolved in code (2026-02-25):**
 
-```typescript
-async function getDefaultRow<T>(
-  cache: PCDCache,
-  table: string,
-  arrType: string,
-  mapper: (row: Record<string, unknown>) => T
-): Promise<T | null> {
-  const row = await cache.kb
-    .selectFrom(table)
-    .selectAll()
-    .orderBy(
-      sql`CASE WHEN lower(name) = 'default' THEN 0
-      WHEN lower(name) = ${arrType} THEN 1 ELSE 2 END`
-    )
-    .orderBy('created_at', 'asc')
-    .orderBy('name', 'asc')
-    .executeTakeFirst();
-  return row ? mapper(row) : null;
-}
-```
-
-**Option B -- Keep 3 queries but extract shared helper (avoids Kysely generic constraints):**
-
-```typescript
-async function getDefaults<T>(
-  cache: PCDCache,
-  table: string,
-  arrType: string,
-  mapper: (row: any) => T
-): Promise<T | null> {
-  const base = () =>
-    cache.kb
-      .selectFrom(table)
-      .selectAll()
-      .orderBy('created_at', 'asc')
-      .orderBy('name', 'asc');
-
-  const defaultRow = await base()
-    .where(sql`lower(name)`, '=', 'default')
-    .executeTakeFirst();
-  if (defaultRow) return mapper(defaultRow);
-
-  const fallbackRow = await base()
-    .where(sql`lower(name)`, '=', arrType)
-    .executeTakeFirst();
-  if (fallbackRow) return mapper(fallbackRow);
-
-  const row = await base().executeTakeFirst();
-  return row ? mapper(row) : null;
-}
-```
+- Added shared helper `getDefaultNamingRow(cache, table, arrType)` in
+  `packages/praxrr-app/src/lib/server/pcd/entities/mediaManagement/naming/read.ts`.
+- Helper now uses one query with deterministic priority ordering:
+  `lower(name)='default'` -> `lower(name)=arrType` -> remaining rows by
+  `created_at ASC, name ASC`.
+- `getRadarrDefaults`, `getSonarrDefaults`, and `getLidarrDefaults` now delegate to the helper.
 
 ### I-2. Warning block duplicated 3x in `+page.svelte`
 
 - **Source:** code-reviewer, code-simplifier
 - **File:** `packages/praxrr-app/src/routes/media-management/[databaseId]/naming/new/+page.svelte:73-165`
-- **Status:** [ ] Open
+- **Status:** [x] Fixed
 
 The amber warning block (AlertTriangle icon, message, database link) is copy-pasted identically
 three times for radarr, lidarr, and sonarr. The only varying data is `{selectedLabel}`, which is
 already a reactive variable.
 
-**Fix:** Extract into a Svelte `{#snippet}` (Svelte 5 template feature, not a rune) or a separate
-`NamingDefaultsWarning.svelte` component with a `label` prop. This would replace ~45 lines of
-duplicated markup with a single definition and three `{@render}` calls.
+**Resolved in code (2026-02-25):**
+
+- Added local Svelte snippet `{#snippet missingDefaultsWarning(label)}` in
+  `packages/praxrr-app/src/routes/media-management/[databaseId]/naming/new/+page.svelte`.
+- Replaced all three duplicated warning blocks with
+  `{@render missingDefaultsWarning(selectedLabel)}`.
+- Kept warning copy, icon, styles, and `/databases` link behavior unchanged.
 
 ### I-3. `selectedLabel` defaults to `'Lidarr'` when `selectedArrType` is null
 
@@ -386,3 +345,13 @@ happy path. The formatting-only changes in `managerImportOrchestration.test.ts` 
 2. Address I-1 through I-5 (DRY violations, unguarded calls)
 3. Add tests for T-1 and T-2 at minimum (core feature + behavioral contract change)
 4. Consider S-1 through S-3 as follow-up improvements
+
+## Validation Results (2026-02-25)
+
+- `deno task test packages/praxrr-app/src/tests/arr/namingDefaultsSelection.test.ts`: pass (15/15)
+- `deno task test packages/praxrr-app/src/tests/arr/lidarrMediaManagement.test.ts`: pass (23/23)
+- `deno task test packages/praxrr-app/src/tests/arr/lidarrFirstClassRouteAndSyncCutover.test.ts`:
+  pass (5/5)
+- `deno task test`: failed with 3 existing unrelated suite failures:
+  - `packages/praxrr-app/src/tests/base/arrCredentialEncryption.test.ts`
+  - `packages/praxrr-app/src/tests/pcd/migration/yamlFormatter.test.ts` (2 failing tests)

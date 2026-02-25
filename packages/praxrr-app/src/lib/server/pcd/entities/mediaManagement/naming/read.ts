@@ -5,7 +5,7 @@
 import type { PCDCache } from '$pcd/index.ts';
 import type { LidarrNamingRow, NamingListItem, RadarrNamingRow, SonarrNamingRow } from '$shared/pcd/display.ts';
 import { colonReplacementFromDb, multiEpisodeStyleFromDb } from '$shared/pcd/mediaManagement.ts';
-import type { LidarrNamingTable, RadarrNamingTable, SonarrNamingTable } from '$shared/pcd/types.ts';
+import type { ArrAppType, LidarrNamingTable, PCDDatabase, RadarrNamingTable, SonarrNamingTable } from '$shared/pcd/types.ts';
 import { LIDARR_NAMING_TABLE, RADARR_NAMING_TABLE, SONARR_NAMING_TABLE } from './constants.ts';
 import type { Selectable } from 'kysely';
 import { sql } from 'kysely';
@@ -101,6 +101,29 @@ function mapLidarrRow(row: Selectable<LidarrNamingTable>): LidarrNamingRow {
   };
 }
 
+type NamingDefaultsArrType = Exclude<ArrAppType, 'all'>;
+
+type NamingDefaultsTable =
+  | typeof RADARR_NAMING_TABLE
+  | typeof SONARR_NAMING_TABLE
+  | typeof LIDARR_NAMING_TABLE;
+
+async function getDefaultNamingRow<T extends NamingDefaultsTable>(
+  cache: PCDCache,
+  table: T,
+  arrType: NamingDefaultsArrType
+): Promise<Selectable<PCDDatabase[T]> | null> {
+  const row = await cache.kb
+    .selectFrom(table)
+    .selectAll()
+    .orderBy(sql<number>`CASE WHEN lower(name) = 'default' THEN 0 WHEN lower(name) = ${arrType} THEN 1 ELSE 2 END`)
+    .orderBy('created_at', 'asc')
+    .orderBy('name', 'asc')
+    .executeTakeFirst();
+
+  return (row as Selectable<PCDDatabase[T]> | undefined) ?? null;
+}
+
 export async function getRadarrByName(cache: PCDCache, name: string): Promise<RadarrNamingRow | null> {
   const row = await cache.kb.selectFrom(RADARR_NAMING_TABLE).selectAll().where('name', '=', name).executeTakeFirst();
   return row ? mapRadarrRow(row) : null;
@@ -117,97 +140,16 @@ export async function getLidarrByName(cache: PCDCache, name: string): Promise<Li
 }
 
 export async function getRadarrDefaults(cache: PCDCache): Promise<RadarrNamingRow | null> {
-  const defaultRow = await cache.kb
-    .selectFrom(RADARR_NAMING_TABLE)
-    .selectAll()
-    .where(sql`lower(name)`, '=', 'default')
-    .orderBy('created_at', 'asc')
-    .orderBy('name', 'asc')
-    .executeTakeFirst();
-  if (defaultRow) {
-    return mapRadarrRow(defaultRow);
-  }
-
-  const fallbackRow = await cache.kb
-    .selectFrom(RADARR_NAMING_TABLE)
-    .selectAll()
-    .where(sql`lower(name)`, '=', 'radarr')
-    .orderBy('created_at', 'asc')
-    .orderBy('name', 'asc')
-    .executeTakeFirst();
-  if (fallbackRow) {
-    return mapRadarrRow(fallbackRow);
-  }
-
-  const row = await cache.kb
-    .selectFrom(RADARR_NAMING_TABLE)
-    .selectAll()
-    .orderBy('created_at', 'asc')
-    .orderBy('name', 'asc')
-    .executeTakeFirst();
+  const row = await getDefaultNamingRow(cache, RADARR_NAMING_TABLE, 'radarr');
   return row ? mapRadarrRow(row) : null;
 }
 
 export async function getSonarrDefaults(cache: PCDCache): Promise<SonarrNamingRow | null> {
-  const defaultRow = await cache.kb
-    .selectFrom(SONARR_NAMING_TABLE)
-    .selectAll()
-    .where(sql`lower(name)`, '=', 'default')
-    .orderBy('created_at', 'asc')
-    .orderBy('name', 'asc')
-    .executeTakeFirst();
-  if (defaultRow) {
-    return mapSonarrRow(defaultRow);
-  }
-
-  const fallbackRow = await cache.kb
-    .selectFrom(SONARR_NAMING_TABLE)
-    .selectAll()
-    .where(sql`lower(name)`, '=', 'sonarr')
-    .orderBy('created_at', 'asc')
-    .orderBy('name', 'asc')
-    .executeTakeFirst();
-  if (fallbackRow) {
-    return mapSonarrRow(fallbackRow);
-  }
-
-  const row = await cache.kb
-    .selectFrom(SONARR_NAMING_TABLE)
-    .selectAll()
-    .orderBy('created_at', 'asc')
-    .orderBy('name', 'asc')
-    .executeTakeFirst();
+  const row = await getDefaultNamingRow(cache, SONARR_NAMING_TABLE, 'sonarr');
   return row ? mapSonarrRow(row) : null;
 }
 
 export async function getLidarrDefaults(cache: PCDCache): Promise<LidarrNamingRow | null> {
-  const defaultRow = await cache.kb
-    .selectFrom(LIDARR_NAMING_TABLE)
-    .selectAll()
-    .where(sql`lower(name)`, '=', 'default')
-    .orderBy('created_at', 'asc')
-    .orderBy('name', 'asc')
-    .executeTakeFirst();
-  if (defaultRow) {
-    return mapLidarrRow(defaultRow);
-  }
-
-  const fallbackRow = await cache.kb
-    .selectFrom(LIDARR_NAMING_TABLE)
-    .selectAll()
-    .where(sql`lower(name)`, '=', 'lidarr')
-    .orderBy('created_at', 'asc')
-    .orderBy('name', 'asc')
-    .executeTakeFirst();
-  if (fallbackRow) {
-    return mapLidarrRow(fallbackRow);
-  }
-
-  const row = await cache.kb
-    .selectFrom(LIDARR_NAMING_TABLE)
-    .selectAll()
-    .orderBy('created_at', 'asc')
-    .orderBy('name', 'asc')
-    .executeTakeFirst();
+  const row = await getDefaultNamingRow(cache, LIDARR_NAMING_TABLE, 'lidarr');
   return row ? mapLidarrRow(row) : null;
 }

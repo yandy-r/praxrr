@@ -39,6 +39,28 @@
 		selectedArrType === 'radarr' ? 'Radarr' : selectedArrType === 'sonarr' ? 'Sonarr' : 'Lidarr';
 </script>
 
+{#snippet missingDefaultsWarning(label)}
+	<div class="rounded-lg border border-amber-300 bg-amber-50 p-6 dark:border-amber-700 dark:bg-amber-950">
+		<div class="flex items-start gap-3">
+			<AlertTriangle size={20} class="mt-0.5 flex-shrink-0 text-amber-600 dark:text-amber-400" />
+			<div class="space-y-2">
+				<h3 class="font-medium text-amber-800 dark:text-amber-200">
+					No default {label} naming configuration found
+				</h3>
+				<p class="text-sm text-amber-700 dark:text-amber-300">
+					The PCD database may not be synced or doesn't contain naming seed data for {label}.
+				</p>
+				<a
+					href="/databases"
+					class="inline-block text-sm font-medium text-amber-800 underline hover:text-amber-900 dark:text-amber-200 dark:hover:text-amber-100"
+				>
+					Check database status
+				</a>
+			</div>
+		</div>
+	</div>
+{/snippet}
+
 {#if !selectedArrType}
 	<div class="grid gap-4 sm:grid-cols-2">
 		{#each arrTypeOptions as option (option.value)}
@@ -70,30 +92,7 @@
 			initialData={{ ...data.radarrDefaults, name: '' }}
 		/>
 	{:else}
-		<div
-			class="rounded-lg border border-amber-300 bg-amber-50 p-6 dark:border-amber-700 dark:bg-amber-950"
-		>
-			<div class="flex items-start gap-3">
-				<AlertTriangle
-					size={20}
-					class="mt-0.5 flex-shrink-0 text-amber-600 dark:text-amber-400"
-				/>
-				<div class="space-y-2">
-					<h3 class="font-medium text-amber-800 dark:text-amber-200">
-						No default {selectedLabel} naming configuration found
-					</h3>
-					<p class="text-sm text-amber-700 dark:text-amber-300">
-						The PCD database may not be synced or doesn't contain naming seed data for {selectedLabel}.
-					</p>
-					<a
-						href="/databases"
-						class="inline-block text-sm font-medium text-amber-800 underline hover:text-amber-900 dark:text-amber-200 dark:hover:text-amber-100"
-					>
-						Check database status
-					</a>
-				</div>
-			</div>
-		</div>
+		{@render missingDefaultsWarning(selectedLabel)}
 	{/if}
 {:else if selectedArrType === 'lidarr'}
 	{#if data.lidarrDefaults}
@@ -104,30 +103,7 @@
 			initialData={{ ...data.lidarrDefaults, name: '' }}
 		/>
 	{:else}
-		<div
-			class="rounded-lg border border-amber-300 bg-amber-50 p-6 dark:border-amber-700 dark:bg-amber-950"
-		>
-			<div class="flex items-start gap-3">
-				<AlertTriangle
-					size={20}
-					class="mt-0.5 flex-shrink-0 text-amber-600 dark:text-amber-400"
-				/>
-				<div class="space-y-2">
-					<h3 class="font-medium text-amber-800 dark:text-amber-200">
-						No default {selectedLabel} naming configuration found
-					</h3>
-					<p class="text-sm text-amber-700 dark:text-amber-300">
-						The PCD database may not be synced or doesn't contain naming seed data for {selectedLabel}.
-					</p>
-					<a
-						href="/databases"
-						class="inline-block text-sm font-medium text-amber-800 underline hover:text-amber-900 dark:text-amber-200 dark:hover:text-amber-100"
-					>
-						Check database status
-					</a>
-				</div>
-			</div>
-		</div>
+		{@render missingDefaultsWarning(selectedLabel)}
 	{/if}
 {:else}
 	{#if data.sonarrDefaults}
@@ -139,30 +115,7 @@
 			initialData={{ ...data.sonarrDefaults, name: '' }}
 		/>
 	{:else}
-		<div
-			class="rounded-lg border border-amber-300 bg-amber-50 p-6 dark:border-amber-700 dark:bg-amber-950"
-		>
-			<div class="flex items-start gap-3">
-				<AlertTriangle
-					size={20}
-					class="mt-0.5 flex-shrink-0 text-amber-600 dark:text-amber-400"
-				/>
-				<div class="space-y-2">
-					<h3 class="font-medium text-amber-800 dark:text-amber-200">
-						No default {selectedLabel} naming configuration found
-					</h3>
-					<p class="text-sm text-amber-700 dark:text-amber-300">
-						The PCD database may not be synced or doesn't contain naming seed data for {selectedLabel}.
-					</p>
-					<a
-						href="/databases"
-						class="inline-block text-sm font-medium text-amber-800 underline hover:text-amber-900 dark:text-amber-200 dark:hover:text-amber-100"
-					>
-						Check database status
-					</a>
-				</div>
-			</div>
-		</div>
+		{@render missingDefaultsWarning(selectedLabel)}
 	{/if}
 {/if}
 
