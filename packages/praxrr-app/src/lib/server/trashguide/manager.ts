@@ -1,7 +1,7 @@
 import { config } from '$config';
 import { logger } from '$logger/logger.ts';
-import { trashGuideSourcesQueries, type TrashGuideSource } from '$db/queries/trashGuideSources.ts';
-import { trashGuideEntityCacheQueries, type TrashGuideEntityCacheInput } from '$db/queries/trashGuideEntityCache.ts';
+import { type TrashGuideSource, trashGuideSourcesQueries } from '$db/queries/trashGuideSources.ts';
+import { type TrashGuideEntityCacheInput, trashGuideEntityCacheQueries } from '$db/queries/trashGuideEntityCache.ts';
 import { trashGuideSyncQueries } from '$db/queries/trashGuideSync.ts';
 import { trashIdMappingsQueries } from '$db/queries/trashIdMappings.ts';
 import { triggerSyncs } from '$sync/processor.ts';
@@ -11,12 +11,15 @@ import { parseTrashGuideEntities } from './parser.ts';
 import { transformTrashGuideEntities } from './transformer.ts';
 import type {
   TrashGuideArrType,
+  TrashGuideParsedEntity,
   TrashGuideParseResult,
   TrashGuideParseStatus,
-  TrashGuideParsedEntity,
+  TrashGuideSupportedArrType,
 } from './types.ts';
+import { isTrashGuideSupportedArrType } from './types.ts';
 
 const TRASHGUIDE_CLONES_DIR = `${config.paths.data}/trashguide`;
+const DEFAULT_BRANCH = 'master';
 
 export interface TrashGuideLinkOptions {
   name: string;
@@ -39,6 +42,77 @@ export interface TrashGuideSyncResult {
   removedEntities: number;
   renamedEntities: number;
   error?: string;
+}
+
+export interface TrashGuideSourceEntityCounts {
+  customFormats: number;
+  qualityProfiles: number;
+  qualitySizes: number;
+  naming: number;
+}
+
+export interface TrashGuideSourceResponse {
+  id: number;
+  name: string;
+  repositoryUrl: string;
+  branch: string;
+  arrType: TrashGuideSupportedArrType;
+  scoreProfile: string;
+  enabled: boolean;
+  syncStrategy: number;
+  lastSyncedAt: string | null;
+  lastCommitHash: string | null;
+  entityCounts: TrashGuideSourceEntityCounts;
+}
+
+export interface TrashGuideSourceCreateInput {
+  name: string;
+  repositoryUrl: string;
+  branch?: string;
+  arrType: string;
+  scoreProfile?: string;
+  enabled?: boolean;
+  syncStrategy?: number;
+}
+
+export interface TrashGuideSourceUpdateInput {
+  name?: string;
+  repositoryUrl?: string;
+  branch?: string;
+  arrType?: string;
+  scoreProfile?: string;
+  enabled?: boolean;
+  syncStrategy?: number;
+}
+
+export class TrashGuideSourceNotFoundError extends Error {
+  readonly sourceId: number;
+
+  constructor(sourceId: number) {
+    super(`TRaSH source ${sourceId} not found`);
+    this.name = 'TrashGuideSourceNotFoundError';
+    this.sourceId = sourceId;
+  }
+}
+
+export class TrashGuideSourceConflictError extends Error {
+  readonly conflictField: 'name' | 'repository';
+
+  constructor(conflictField: 'name' | 'repository', message: string) {
+    super(message);
+    this.name = 'TrashGuideSourceConflictError';
+    this.conflictField = conflictField;
+  }
+}
+
+export class TrashGuideSourceValidationError extends Error {
+  readonly code: 'arr_type_invalid' | 'arr_type_mismatch';
+
+  constructor(code: 'arr_type_invalid' | 'arr_type_mismatch', message: string) {
+    super(message);
+    this.name = 'TrashGuideSourceValidationError';
+    this.code = code;
+  }
 }
 
 class TrashGuideManager {
@@ -71,6 +145,99 @@ class TrashGuideManager {
         missingLocalClones,
       },
     });
+  }
+
+  listSources(): TrashGuideSourceResponse[] {
+    return trashGuideSourcesQueries.getAll().map((source) => this.toSourceResponse(source));
+  }
+
+  getSource(id: number): TrashGuideSourceResponse {
+    return this.toSourceResponse(this.getSourceOrThrow(id));
+  }
+
+  async createSource(input: TrashGuideSourceCreateInput): Promise<TrashGuideSourceResponse> {
+    const arrType = this.parseArrType(input.arrType);
+    this.assertCreateConflicts({
+      name: input.name,
+      repositoryUrl: input.repositoryUrl,
+      branch: input.branch ?? DEFAULT_BRANCH,
+      arrType,
+    });
+
+    let source: TrashGuideSource;
+    try {
+      source = await this.link({
+        name: input.name,
+        repositoryUrl: input.repositoryUrl,
+        branch: input.branch,
+        arrType,
+        scoreProfile: input.scoreProfile,
+        syncStrategy: input.syncStrategy,
+        enabled: input.enabled,
+      });
+    } catch (error) {
+      if (this.isNameConflictError(error)) {
+        throw new TrashGuideSourceConflictError('name', `TRaSH source name already exists: ${input.name}`);
+      }
+
+      throw error;
+    }
+
+    return this.toSourceResponse(this.getSourceOrThrow(source.id));
+  }
+
+  updateSource(id: number, input: TrashGuideSourceUpdateInput): TrashGuideSourceResponse {
+    const current = this.getSourceOrThrow(id);
+
+    if (input.arrType !== undefined) {
+      const nextArrType = this.parseArrType(input.arrType);
+      if (nextArrType !== current.arr_type) {
+        throw new TrashGuideSourceValidationError(
+          'arr_type_mismatch',
+          'TRaSH source arrType cannot be changed once created'
+        );
+      }
+    }
+
+    const nextName = input.name ?? current.name;
+    const nextRepositoryUrl = input.repositoryUrl ?? current.repository_url;
+    const nextBranch = input.branch ?? current.branch;
+    const nextArrType = current.arr_type;
+
+    this.assertUpdateConflicts(id, {
+      name: nextName,
+      repositoryUrl: nextRepositoryUrl,
+      branch: nextBranch,
+      arrType: nextArrType,
+    });
+
+    let updated = false;
+    try {
+      updated = trashGuideSourcesQueries.update(id, {
+        name: input.name,
+        repositoryUrl: input.repositoryUrl,
+        branch: input.branch,
+        scoreProfile: input.scoreProfile,
+        enabled: input.enabled,
+        syncStrategy: input.syncStrategy,
+      });
+    } catch (error) {
+      if (this.isNameConflictError(error)) {
+        throw new TrashGuideSourceConflictError('name', `TRaSH source name already exists: ${nextName}`);
+      }
+
+      throw error;
+    }
+
+    if (!updated) {
+      throw new TrashGuideSourceNotFoundError(id);
+    }
+
+    return this.toSourceResponse(this.getSourceOrThrow(id));
+  }
+
+  async deleteSource(id: number): Promise<void> {
+    await this.unlink(id);
   }
 
   async link(options: TrashGuideLinkOptions): Promise<TrashGuideSource> {
@@ -219,10 +386,128 @@ class TrashGuideManager {
     return await checkGitForUpdates(source.local_path);
   }
 
+  private parseArrType(arrType: string): TrashGuideSupportedArrType {
+    if (!isTrashGuideSupportedArrType(arrType)) {
+      throw new TrashGuideSourceValidationError('arr_type_invalid', `Invalid TRaSH source arrType: ${arrType}`);
+    }
+
+    return arrType;
+  }
+
+  private assertCreateConflicts(input: {
+    name: string;
+    repositoryUrl: string;
+    branch: string;
+    arrType: TrashGuideSupportedArrType;
+  }): void {
+    if (trashGuideSourcesQueries.nameExists(input.name)) {
+      throw new TrashGuideSourceConflictError('name', `TRaSH source name already exists: ${input.name}`);
+    }
+
+    if (this.repositoryConflictExists(input.repositoryUrl, input.branch, input.arrType)) {
+      throw new TrashGuideSourceConflictError(
+        'repository',
+        'TRaSH source repository already exists for this branch and arrType'
+      );
+    }
+  }
+
+  private assertUpdateConflicts(
+    sourceId: number,
+    input: {
+      name: string;
+      repositoryUrl: string;
+      branch: string;
+      arrType: TrashGuideSupportedArrType;
+    }
+  ): void {
+    if (trashGuideSourcesQueries.nameExists(input.name, sourceId)) {
+      throw new TrashGuideSourceConflictError('name', `TRaSH source name already exists: ${input.name}`);
+    }
+
+    if (this.repositoryConflictExists(input.repositoryUrl, input.branch, input.arrType, sourceId)) {
+      throw new TrashGuideSourceConflictError(
+        'repository',
+        'TRaSH source repository already exists for this branch and arrType'
+      );
+    }
+  }
+
+  private repositoryConflictExists(
+    repositoryUrl: string,
+    branch: string,
+    arrType: TrashGuideSupportedArrType,
+    excludeSourceId?: number
+  ): boolean {
+    return trashGuideSourcesQueries.getAll().some((source) => {
+      if (excludeSourceId !== undefined && source.id === excludeSourceId) {
+        return false;
+      }
+
+      return source.repository_url === repositoryUrl && source.branch === branch && source.arr_type === arrType;
+    });
+  }
+
+  private isNameConflictError(error: unknown): boolean {
+    if (!(error instanceof Error)) {
+      return false;
+    }
+
+    const message = error.message.toLowerCase();
+    return message.includes('unique') && message.includes('trash_guide_sources.name');
+  }
+
+  private toSourceResponse(source: TrashGuideSource): TrashGuideSourceResponse {
+    return {
+      id: source.id,
+      name: source.name,
+      repositoryUrl: source.repository_url,
+      branch: source.branch,
+      arrType: source.arr_type,
+      scoreProfile: source.score_profile,
+      enabled: source.enabled === 1,
+      syncStrategy: source.sync_strategy,
+      lastSyncedAt: source.last_synced_at,
+      lastCommitHash: source.last_commit_hash,
+      entityCounts: this.getEntityCounts(source.id),
+    };
+  }
+
+  private getEntityCounts(sourceId: number): TrashGuideSourceEntityCounts {
+    const counts: TrashGuideSourceEntityCounts = {
+      customFormats: 0,
+      qualityProfiles: 0,
+      qualitySizes: 0,
+      naming: 0,
+    };
+
+    const entities = trashGuideEntityCacheQueries.getBySource(sourceId);
+    for (const entity of entities) {
+      if (entity.entityType === 'custom_format') {
+        counts.customFormats += 1;
+        continue;
+      }
+
+      if (entity.entityType === 'quality_profile') {
+        counts.qualityProfiles += 1;
+        continue;
+      }
+
+      if (entity.entityType === 'quality_size') {
+        counts.qualitySizes += 1;
+        continue;
+      }
+
+      counts.naming += 1;
+    }
+
+    return counts;
+  }
+
   private getSourceOrThrow(id: number): TrashGuideSource {
     const source = trashGuideSourcesQueries.getById(id);
     if (!source) {
-      throw new Error(`TRaSH source ${id} not found`);
+      throw new TrashGuideSourceNotFoundError(id);
     }
     return source;
   }
