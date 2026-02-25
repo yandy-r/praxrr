@@ -1260,12 +1260,13 @@ export const arrSyncQueries = {
     return candidates.reduce((earliest, current) => (new Date(current) < new Date(earliest) ? current : earliest));
   },
 
-  getInstanceIdsForTrigger(trigger: SyncTrigger): number[] {
+  getInstanceIdsForTrigger(trigger: SyncTrigger, arrType?: ArrType): number[] {
     const triggers = trigger === 'on_change' ? ['on_pull', 'on_change'] : [trigger];
     const placeholders = triggers.map(() => '?').join(', ');
 
-    const rows = db.query<{ instance_id: number }>(
-      `SELECT instance_id FROM arr_sync_quality_profiles_config WHERE trigger IN (${placeholders})
+    if (arrType === undefined) {
+      const rows = db.query<{ instance_id: number }>(
+        `SELECT instance_id FROM arr_sync_quality_profiles_config WHERE trigger IN (${placeholders})
 			 UNION
 			 SELECT instance_id FROM arr_sync_delay_profiles_config WHERE trigger IN (${placeholders})
 			 UNION
@@ -1275,10 +1276,44 @@ export const arrSyncQueries = {
 			 FROM arr_sync_metadata_profiles_config amp
 			 JOIN arr_instances ai ON ai.id = amp.instance_id
 			 WHERE amp.trigger IN (${placeholders}) AND ai.type = 'lidarr'`,
+        ...triggers,
+        ...triggers,
+        ...triggers,
+        ...triggers
+      );
+
+      return rows.map((row) => row.instance_id);
+    }
+
+    const rows = db.query<{ instance_id: number }>(
+      `SELECT instance_id
+       FROM arr_sync_quality_profiles_config
+       WHERE trigger IN (${placeholders})
+         AND instance_id IN (SELECT id FROM arr_instances WHERE type = ?)
+       UNION
+       SELECT instance_id
+       FROM arr_sync_delay_profiles_config
+       WHERE trigger IN (${placeholders})
+         AND instance_id IN (SELECT id FROM arr_instances WHERE type = ?)
+       UNION
+       SELECT instance_id
+       FROM arr_sync_media_management
+       WHERE trigger IN (${placeholders})
+         AND instance_id IN (SELECT id FROM arr_instances WHERE type = ?)
+       UNION
+       SELECT amp.instance_id
+       FROM arr_sync_metadata_profiles_config amp
+       JOIN arr_instances ai ON ai.id = amp.instance_id
+       WHERE amp.trigger IN (${placeholders})
+         AND ai.type = ?`,
       ...triggers,
+      arrType,
       ...triggers,
+      arrType,
       ...triggers,
-      ...triggers
+      arrType,
+      ...triggers,
+      arrType
     );
 
     return rows.map((row) => row.instance_id);
