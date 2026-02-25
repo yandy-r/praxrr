@@ -31,19 +31,9 @@
   export let databaseName: string;
   export let canWriteToBase: boolean = false;
   export let actionUrl: string = '';
-  export let initialData: RadarrNamingRow | null;
+  export let initialData: RadarrNamingRow;
 
-  const defaults: RadarrNamingFormData = {
-    name: '',
-    rename: true,
-    movieFormat: '{Movie Title} ({Release Year}) {Quality Full}',
-    movieFolderFormat: '{Movie Title} ({Release Year})',
-    replaceIllegalCharacters: true,
-    colonReplacementFormat: 'smart',
-  };
-
-  function mapToFormData(data: RadarrNamingRow | null): RadarrNamingFormData {
-    if (!data) return defaults;
+  function mapToFormData(data: RadarrNamingRow): RadarrNamingFormData {
     return {
       name: data.name,
       rename: data.rename,

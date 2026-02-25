@@ -502,6 +502,7 @@ VALUES ('R-QD-Seed', 'FLAC', 0, 1024, 256);
           artistName: '{Artist Name}',
           multiDiscTrackFormat: '{Artist Name} - CD{medium:00}',
           artistFolderFormat: '{Artist Name}',
+          colonReplacementFormat: 'smart',
         }),
         params: {
           databaseId: `${LidarrMediaManagementTest.DATABASE_ID}`,
@@ -532,6 +533,7 @@ VALUES ('R-QD-Seed', 'FLAC', 0, 1024, 256);
             animeEpisodeFormat: '{Episode Title}',
             seriesFolderFormat: '{Series Title}',
             seasonFolderFormat: 'Season {season:00}',
+            colonReplacementFormat: 'smart',
             customColonReplacementFormat: ':-',
             multiEpisodeStyle: 'extend',
           }),
@@ -553,6 +555,7 @@ VALUES ('R-QD-Seed', 'FLAC', 0, 1024, 256);
             artistName: '{Artist Name}',
             multiDiscTrackFormat: '{Artist Name} - CD{medium:00}',
             artistFolderFormat: '{Artist Name}',
+            colonReplacementFormat: 'smart',
           }),
           params: {
             databaseId: `${LidarrMediaManagementTest.DATABASE_ID}`,
@@ -616,6 +619,7 @@ VALUES ('R-QD-Seed', 'FLAC', 0, 1024, 256);
           artistName: '{Artist Name}',
           multiDiscTrackFormat: '{Artist Name} - CD{medium:00}',
           artistFolderFormat: '{Artist Name}',
+          colonReplacementFormat: 'smart',
         }),
         params: {
           databaseId: `${LidarrMediaManagementTest.DATABASE_ID}`,
@@ -666,6 +670,7 @@ VALUES ('R-QD-Seed', 'FLAC', 0, 1024, 256);
             artistName: '{Artist Name}',
             multiDiscTrackFormat: '{Artist Name} - CD{medium:00} - {Track Title}',
             artistFolderFormat: '{Artist Name}',
+            colonReplacementFormat: 'smart',
             customColonReplacementFormat: ':-',
           }),
           params: {

@@ -6,6 +6,7 @@
 	import RadarrIcon from '$lib/client/assets/Radarr.svg';
 	import SonarrIcon from '$lib/client/assets/Sonarr.svg';
 	import LidarrIcon from '$lib/client/assets/Lidarr.png';
+	import { AlertTriangle } from 'lucide-svelte';
 	import type { ArrAppType } from '$shared/pcd/types.ts';
 	import type { PageData } from './$types';
 
@@ -33,6 +34,9 @@
 			icon: LidarrIcon
 		}
 	];
+
+	$: selectedLabel =
+		selectedArrType === 'radarr' ? 'Radarr' : selectedArrType === 'sonarr' ? 'Sonarr' : 'Lidarr';
 </script>
 
 {#if !selectedArrType}
@@ -58,27 +62,108 @@
 		{/each}
 	</div>
 {:else if selectedArrType === 'radarr'}
-	<RadarrNamingForm
-		mode="create"
-		databaseName={data.currentDatabase.name}
-		canWriteToBase={data.canWriteToBase}
-		initialData={null}
-	/>
+	{#if data.radarrDefaults}
+		<RadarrNamingForm
+			mode="create"
+			databaseName={data.currentDatabase.name}
+			canWriteToBase={data.canWriteToBase}
+			initialData={{ ...data.radarrDefaults, name: '' }}
+		/>
+	{:else}
+		<div
+			class="rounded-lg border border-amber-300 bg-amber-50 p-6 dark:border-amber-700 dark:bg-amber-950"
+		>
+			<div class="flex items-start gap-3">
+				<AlertTriangle
+					size={20}
+					class="mt-0.5 flex-shrink-0 text-amber-600 dark:text-amber-400"
+				/>
+				<div class="space-y-2">
+					<h3 class="font-medium text-amber-800 dark:text-amber-200">
+						No default {selectedLabel} naming configuration found
+					</h3>
+					<p class="text-sm text-amber-700 dark:text-amber-300">
+						The PCD database may not be synced or doesn't contain naming seed data for {selectedLabel}.
+					</p>
+					<a
+						href="/databases"
+						class="inline-block text-sm font-medium text-amber-800 underline hover:text-amber-900 dark:text-amber-200 dark:hover:text-amber-100"
+					>
+						Check database status
+					</a>
+				</div>
+			</div>
+		</div>
+	{/if}
 {:else if selectedArrType === 'lidarr'}
-	<LidarrNamingForm
-		mode="create"
-		databaseName={data.currentDatabase.name}
-		canWriteToBase={data.canWriteToBase}
-		initialData={null}
-	/>
+	{#if data.lidarrDefaults}
+		<LidarrNamingForm
+			mode="create"
+			databaseName={data.currentDatabase.name}
+			canWriteToBase={data.canWriteToBase}
+			initialData={{ ...data.lidarrDefaults, name: '' }}
+		/>
+	{:else}
+		<div
+			class="rounded-lg border border-amber-300 bg-amber-50 p-6 dark:border-amber-700 dark:bg-amber-950"
+		>
+			<div class="flex items-start gap-3">
+				<AlertTriangle
+					size={20}
+					class="mt-0.5 flex-shrink-0 text-amber-600 dark:text-amber-400"
+				/>
+				<div class="space-y-2">
+					<h3 class="font-medium text-amber-800 dark:text-amber-200">
+						No default {selectedLabel} naming configuration found
+					</h3>
+					<p class="text-sm text-amber-700 dark:text-amber-300">
+						The PCD database may not be synced or doesn't contain naming seed data for {selectedLabel}.
+					</p>
+					<a
+						href="/databases"
+						class="inline-block text-sm font-medium text-amber-800 underline hover:text-amber-900 dark:text-amber-200 dark:hover:text-amber-100"
+					>
+						Check database status
+					</a>
+				</div>
+			</div>
+		</div>
+	{/if}
 {:else}
-	<SonarrNamingForm
-		arrType={selectedArrType}
-		mode="create"
-		databaseName={data.currentDatabase.name}
-		canWriteToBase={data.canWriteToBase}
-		initialData={null}
-	/>
+	{#if data.sonarrDefaults}
+		<SonarrNamingForm
+			arrType={selectedArrType}
+			mode="create"
+			databaseName={data.currentDatabase.name}
+			canWriteToBase={data.canWriteToBase}
+			initialData={{ ...data.sonarrDefaults, name: '' }}
+		/>
+	{:else}
+		<div
+			class="rounded-lg border border-amber-300 bg-amber-50 p-6 dark:border-amber-700 dark:bg-amber-950"
+		>
+			<div class="flex items-start gap-3">
+				<AlertTriangle
+					size={20}
+					class="mt-0.5 flex-shrink-0 text-amber-600 dark:text-amber-400"
+				/>
+				<div class="space-y-2">
+					<h3 class="font-medium text-amber-800 dark:text-amber-200">
+						No default {selectedLabel} naming configuration found
+					</h3>
+					<p class="text-sm text-amber-700 dark:text-amber-300">
+						The PCD database may not be synced or doesn't contain naming seed data for {selectedLabel}.
+					</p>
+					<a
+						href="/databases"
+						class="inline-block text-sm font-medium text-amber-800 underline hover:text-amber-900 dark:text-amber-200 dark:hover:text-amber-100"
+					>
+						Check database status
+					</a>
+				</div>
+			</div>
+		</div>
+	{/if}
 {/if}
 
 <DirtyModal />

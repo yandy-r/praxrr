@@ -111,6 +111,10 @@ export const actions: Actions = {
       }
     }
 
+    if (!colonReplacementFormat) {
+      return fail(400, { error: 'Colon replacement format is required' });
+    }
+
     let result;
     try {
       result = await updateLidarrNaming({
@@ -126,7 +130,7 @@ export const actions: Actions = {
           multiDiscTrackFormat: multiDiscTrackFormat.trim(),
           artistFolderFormat: artistFolderFormat.trim(),
           replaceIllegalCharacters,
-          colonReplacementFormat: colonReplacementFormat || 'smart',
+          colonReplacementFormat,
           customColonReplacementFormat: customColonReplacementFormat || null,
         },
       });

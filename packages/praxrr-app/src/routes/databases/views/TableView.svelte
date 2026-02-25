@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { ExternalLink, Unlink, Lock, Code } from 'lucide-svelte';
+	import { ExternalLink, Unlink, Lock, Code, AlertTriangle } from 'lucide-svelte';
 	import Table from '$ui/table/Table.svelte';
 	import TableActionButton from '$ui/table/TableActionButton.svelte';
 	import Badge from '$ui/badge/Badge.svelte';
@@ -9,10 +9,11 @@
 	import { createEventDispatcher } from 'svelte';
 	import DatabaseAvatar from '../components/DatabaseAvatar.svelte';
 
-	export let databases: DatabaseInstance[];
+	type DatabaseWithCache = DatabaseInstance & { cacheAvailable?: boolean };
+	export let databases: DatabaseWithCache[];
 
 	const dispatch = createEventDispatcher<{
-		unlink: DatabaseInstance;
+		unlink: DatabaseWithCache;
 	}>();
 
 	// Avatar handled by DatabaseAvatar component
@@ -38,12 +39,12 @@
 		});
 	}
 
-	function getRowHref(database: DatabaseInstance): string {
+	function getRowHref(database: DatabaseWithCache): string {
 		return `/databases/${database.id}`;
 	}
 
 	// Handle unlink click
-	function handleUnlinkClick(e: Event, database: DatabaseInstance) {
+	function handleUnlinkClick(e: Event, database: DatabaseWithCache) {
 		e.stopPropagation();
 		e.preventDefault();
 		dispatch('unlink', database);
@@ -57,7 +58,7 @@
 	}
 
 	// Define table columns
-	const columns: Column<DatabaseInstance>[] = [
+	const columns: Column<DatabaseWithCache>[] = [
 		{ key: 'name', header: 'Name', align: 'left' },
 		{ key: 'repository_url', header: 'Repository', align: 'left' },
 		{ key: 'sync_strategy', header: 'Sync', align: 'left', width: 'w-32' },
@@ -79,6 +80,9 @@
 					{/if}
 					{#if row.has_personal_access_token || row.personal_access_token}
 						<Badge variant="info" icon={Code} mono>Dev</Badge>
+					{/if}
+					{#if row.cacheAvailable === false}
+						<Badge variant="warning" icon={AlertTriangle} mono>Cache Unavailable</Badge>
 					{/if}
 				</div>
 			</div>

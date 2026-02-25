@@ -93,6 +93,10 @@ export const actions: Actions = {
       return fail(400, { error: `Folder format: ${folderFormatValidation.errors.join(', ')}` });
     }
 
+    if (!colonReplacementFormat) {
+      return fail(400, { error: 'Colon replacement format is required' });
+    }
+
     let result;
     try {
       result = await updateRadarrNaming({
@@ -106,7 +110,7 @@ export const actions: Actions = {
           movieFormat: movieFormat || '',
           movieFolderFormat: movieFolderFormat || '',
           replaceIllegalCharacters,
-          colonReplacementFormat: colonReplacementFormat || 'smart',
+          colonReplacementFormat,
         },
       });
     } catch (err) {

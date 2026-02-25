@@ -103,6 +103,13 @@ export const actions: Actions = {
       }
     }
 
+    if (!colonReplacementFormat) {
+      return fail(400, { error: 'Colon replacement format is required' });
+    }
+    if (!multiEpisodeStyle) {
+      return fail(400, { error: 'Multi-episode style is required' });
+    }
+
     let result;
     try {
       result = await updateSonarrNaming({
@@ -119,9 +126,9 @@ export const actions: Actions = {
           seriesFolderFormat: seriesFolderFormat || '',
           seasonFolderFormat: seasonFolderFormat || '',
           replaceIllegalCharacters,
-          colonReplacementFormat: colonReplacementFormat || 'smart',
+          colonReplacementFormat,
           customColonReplacementFormat: customColonReplacementFormat || null,
-          multiEpisodeStyle: multiEpisodeStyle || 'extend',
+          multiEpisodeStyle,
         },
       });
     } catch (err) {

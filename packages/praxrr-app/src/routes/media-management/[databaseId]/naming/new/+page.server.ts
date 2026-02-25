@@ -8,6 +8,9 @@ import {
   createLidarrNaming,
   createRadarrNaming,
   createSonarrNaming,
+  getRadarrDefaults,
+  getSonarrDefaults,
+  getLidarrDefaults,
 } from '$pcd/entities/mediaManagement/naming/index.ts';
 import type { ArrAppType } from '$shared/pcd/types.ts';
 import { validateNamingFormat } from '$shared/pcd/namingTokens.ts';
@@ -18,10 +21,28 @@ function isSupportedNamingArrType(value: FormDataEntryValue | null): value is Ar
   return typeof value === 'string' && SUPPORTED_NAMING_ARR_TYPES.some((arrType) => arrType === value);
 }
 
-export const load: ServerLoad = async ({ parent }) => {
+export const load: ServerLoad = async ({ params, parent }) => {
   const parentData = await parent();
+  const databaseId = parseInt(params.databaseId!, 10);
+  const cache = isNaN(databaseId) ? undefined : pcdManager.getCache(databaseId);
+
+  let radarrDefaults: RadarrNamingRow | null = null;
+  let sonarrDefaults: SonarrNamingRow | null = null;
+  let lidarrDefaults: LidarrNamingRow | null = null;
+
+  if (cache) {
+    [radarrDefaults, sonarrDefaults, lidarrDefaults] = await Promise.all([
+      getRadarrDefaults(cache),
+      getSonarrDefaults(cache),
+      getLidarrDefaults(cache),
+    ]);
+  }
+
   return {
     canWriteToBase: parentData.canWriteToBase,
+    radarrDefaults,
+    sonarrDefaults,
+    lidarrDefaults,
   };
 };
 
@@ -79,6 +100,10 @@ export const actions: Actions = {
         return fail(400, { error: `Folder format: ${folderFormatValidation.errors.join(', ')}` });
       }
 
+      if (!colonReplacementFormat) {
+        return fail(400, { error: 'Colon replacement format is required' });
+      }
+
       let result;
       try {
         result = await createRadarrNaming({
@@ -91,7 +116,7 @@ export const actions: Actions = {
             movieFormat: movieFormat || '',
             movieFolderFormat: movieFolderFormat || '',
             replaceIllegalCharacters,
-            colonReplacementFormat: colonReplacementFormat || 'smart',
+            colonReplacementFormat,
           },
         });
       } catch (err) {
@@ -133,6 +158,13 @@ export const actions: Actions = {
         }
       }
 
+      if (!colonReplacementFormat) {
+        return fail(400, { error: 'Colon replacement format is required' });
+      }
+      if (!multiEpisodeStyle) {
+        return fail(400, { error: 'Multi-episode style is required' });
+      }
+
       let result;
       try {
         result = await createSonarrNaming({
@@ -148,9 +180,9 @@ export const actions: Actions = {
             seriesFolderFormat: seriesFolderFormat || '',
             seasonFolderFormat: seasonFolderFormat || '',
             replaceIllegalCharacters,
-            colonReplacementFormat: colonReplacementFormat || 'smart',
+            colonReplacementFormat,
             customColonReplacementFormat: customColonReplacementFormat || null,
-            multiEpisodeStyle: multiEpisodeStyle || 'extend',
+            multiEpisodeStyle,
           },
         });
       } catch (err) {
@@ -189,6 +221,10 @@ export const actions: Actions = {
       }
 
       const artistNameValue = (artistName as string)?.trim();
+      if (!colonReplacementFormat) {
+        return fail(400, { error: 'Colon replacement format is required' });
+      }
+
       let result;
       try {
         result = await createLidarrNaming({
@@ -203,7 +239,7 @@ export const actions: Actions = {
             multiDiscTrackFormat: multiDiscTrackFormat.trim(),
             artistFolderFormat: artistFolderFormat.trim(),
             replaceIllegalCharacters,
-            colonReplacementFormat: colonReplacementFormat || 'smart',
+            colonReplacementFormat,
             customColonReplacementFormat: customColonReplacementFormat || null,
           },
         });

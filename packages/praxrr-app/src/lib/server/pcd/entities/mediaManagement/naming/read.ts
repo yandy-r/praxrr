@@ -115,3 +115,68 @@ export async function getLidarrByName(cache: PCDCache, name: string): Promise<Li
     updated_at: row.updated_at,
   } satisfies LidarrNamingRow;
 }
+
+export async function getRadarrDefaults(cache: PCDCache): Promise<RadarrNamingRow | null> {
+  const db = cache.kb;
+
+  const row = await db.selectFrom(RADARR_NAMING_TABLE).selectAll().executeTakeFirst();
+
+  if (!row) return null;
+
+  return {
+    name: row.name!,
+    rename: row.rename === 1,
+    movie_format: row.movie_format,
+    movie_folder_format: row.movie_folder_format,
+    replace_illegal_characters: row.replace_illegal_characters === 1,
+    colon_replacement_format: row.colon_replacement_format as RadarrNamingRow['colon_replacement_format'],
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+  };
+}
+
+export async function getSonarrDefaults(cache: PCDCache): Promise<SonarrNamingRow | null> {
+  const db = cache.kb;
+
+  const row = await db.selectFrom(SONARR_NAMING_TABLE).selectAll().executeTakeFirst();
+
+  if (!row) return null;
+
+  return {
+    name: row.name!,
+    rename: row.rename === 1,
+    standard_episode_format: row.standard_episode_format,
+    daily_episode_format: row.daily_episode_format,
+    anime_episode_format: row.anime_episode_format,
+    series_folder_format: row.series_folder_format,
+    season_folder_format: row.season_folder_format,
+    replace_illegal_characters: row.replace_illegal_characters === 1,
+    colon_replacement_format: colonReplacementFromDb(row.colon_replacement_format),
+    custom_colon_replacement_format: row.custom_colon_replacement_format,
+    multi_episode_style: multiEpisodeStyleFromDb(row.multi_episode_style),
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+  };
+}
+
+export async function getLidarrDefaults(cache: PCDCache): Promise<LidarrNamingRow | null> {
+  const db = cache.kb;
+
+  const row = await db.selectFrom(LIDARR_NAMING_TABLE).selectAll().executeTakeFirst();
+
+  if (!row) return null;
+
+  return {
+    name: row.name!,
+    rename: row.rename === 1,
+    standard_track_format: row.standard_track_format,
+    artist_name: row.artist_name,
+    multi_disc_track_format: row.multi_disc_track_format,
+    artist_folder_format: row.artist_folder_format,
+    replace_illegal_characters: row.replace_illegal_characters === 1,
+    colon_replacement_format: colonReplacementFromDb(row.colon_replacement_format),
+    custom_colon_replacement_format: row.custom_colon_replacement_format,
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+  } satisfies LidarrNamingRow;
+}

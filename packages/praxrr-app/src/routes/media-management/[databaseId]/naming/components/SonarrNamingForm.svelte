@@ -45,7 +45,7 @@
   export let databaseName: string;
   export let canWriteToBase: boolean = false;
   export let actionUrl: string = '';
-  export let initialData: SonarrNamingRow | null;
+  export let initialData: SonarrNamingRow;
 
   const inferArrTypeFromRoute = (): ArrAppType => {
     const pathname = get(page).url.pathname;
@@ -63,22 +63,7 @@
 
   export let arrType: ArrAppType = inferArrTypeFromRoute();
 
-  const defaults: SonarrNamingFormData = {
-    name: '',
-    rename: true,
-    standardEpisodeFormat: '{Series Title} - S{season:00}E{episode:00} - {Episode Title} {Quality Full}',
-    dailyEpisodeFormat: '{Series Title} - {Air-Date} - {Episode Title} {Quality Full}',
-    animeEpisodeFormat: '{Series Title} - S{season:00}E{episode:00} - {Episode Title} {Quality Full}',
-    seriesFolderFormat: '{Series Title}',
-    seasonFolderFormat: 'Season {season}',
-    replaceIllegalCharacters: true,
-    colonReplacementFormat: 'smart',
-    customColonReplacementFormat: '',
-    multiEpisodeStyle: 'extend',
-  };
-
-  function mapToFormData(data: SonarrNamingRow | null): SonarrNamingFormData {
-    if (!data) return defaults;
+  function mapToFormData(data: SonarrNamingRow): SonarrNamingFormData {
     return {
       name: data.name,
       rename: data.rename,
