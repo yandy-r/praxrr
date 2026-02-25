@@ -3,7 +3,7 @@ import type { ServerLoad, Actions } from '@sveltejs/kit';
 import { pcdManager } from '$pcd/index.ts';
 import { canWriteToBase } from '$pcd/index.ts';
 import * as customFormatQueries from '$pcd/entities/customFormats/index.ts';
-import type { OperationLayer } from '$pcd/index.ts';
+import { parseOperationLayer } from '$pcd/index.ts';
 
 export const load: ServerLoad = ({ params }) => {
   const { databaseId } = params;
@@ -53,7 +53,11 @@ export const actions: Actions = {
     const description = (formData.get('description') as string) || null;
     const tagsJson = formData.get('tags') as string;
     const includeInRename = formData.get('includeInRename') === 'true';
-    const layer = (formData.get('layer') as OperationLayer) || 'user';
+    const layerResult = parseOperationLayer(formData.get('layer'));
+    if ('error' in layerResult) {
+      return fail(400, { error: layerResult.error });
+    }
+    const layer = layerResult.value;
 
     // Validate
     if (!name?.trim()) {

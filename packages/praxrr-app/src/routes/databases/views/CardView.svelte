@@ -97,7 +97,7 @@
 				</Badge>
 				<Badge variant="neutral" mono>{formatSyncStrategy(database.sync_strategy)}</Badge>
 				<Badge variant="neutral" mono>{formatLastSynced(database.last_synced_at)}</Badge>
-				{#if database.cacheAvailable === false}
+				{#if !database.cacheAvailable}
 					<Badge variant="warning" icon={AlertTriangle} mono>Cache Unavailable</Badge>
 				{/if}
 			</div>

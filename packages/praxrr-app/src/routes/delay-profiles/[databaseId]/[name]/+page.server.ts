@@ -3,7 +3,7 @@ import type { ServerLoad, Actions } from '@sveltejs/kit';
 import { pcdManager } from '$pcd/index.ts';
 import { canWriteToBase } from '$pcd/index.ts';
 import * as delayProfileQueries from '$pcd/entities/delayProfiles/index.ts';
-import type { OperationLayer } from '$pcd/index.ts';
+import { parseOperationLayer } from '$pcd/index.ts';
 import type { PreferredProtocol } from '$shared/pcd/display.ts';
 import { logger } from '$logger/logger.ts';
 import { arrSyncQueries } from '$db/queries/arrSync.ts';
@@ -78,7 +78,11 @@ export const actions: Actions = {
     const bypassIfHighestQuality = formData.get('bypassIfHighestQuality') === 'true';
     const bypassIfAboveCfScore = formData.get('bypassIfAboveCfScore') === 'true';
     const minimumCfScore = parseInt(formData.get('minimumCfScore') as string, 10) || 0;
-    const layer = (formData.get('layer') as OperationLayer) || 'user';
+    const layerResult = parseOperationLayer(formData.get('layer'));
+    if ('error' in layerResult) {
+      return fail(400, { error: layerResult.error });
+    }
+    const layer = layerResult.value;
 
     // Validate
     if (!name?.trim()) {
@@ -153,7 +157,11 @@ export const actions: Actions = {
 
     const formData = await request.formData();
     const layerFromForm = formData.get('layer');
-    const layer = (layerFromForm as OperationLayer) || 'user';
+    const layerResult = parseOperationLayer(layerFromForm);
+    if ('error' in layerResult) {
+      return fail(400, { error: layerResult.error });
+    }
+    const layer = layerResult.value;
 
     await logger.debug('Delete action received', {
       source: 'DelayProfileDelete',

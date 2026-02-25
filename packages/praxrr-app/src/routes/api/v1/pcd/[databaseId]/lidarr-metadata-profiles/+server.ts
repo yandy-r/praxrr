@@ -1,6 +1,6 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from '@sveltejs/kit';
-import { canWriteToBase, pcdManager, type OperationLayer, type PCDCache } from '$pcd/index.ts';
+import { canWriteToBase, parseOperationLayer, pcdManager, type OperationLayer, type PCDCache } from '$pcd/index.ts';
 import type { LidarrMetadataProfileListItem } from '$shared/pcd/display.ts';
 import type { PortableMetadataProfileType } from '$shared/pcd/portable.ts';
 import * as metadataProfiles from '$pcd/entities/metadataProfiles/index.ts';
@@ -29,7 +29,6 @@ interface CreateMetadataProfileRequest {
   releaseStatuses: ProfileTypeInput[];
 }
 
-const VALID_LAYERS: ReadonlySet<OperationLayer> = new Set(['user', 'base']);
 const POSITIVE_INTEGER_ID = /^\d+$/;
 const RESERVED_METADATA_PROFILE_NAME = 'none';
 const MIN_SELECTION_ERROR = 'Each metadata profile section must include at least one allowed entry';
@@ -57,18 +56,6 @@ function parseDatabaseId(rawId: string | undefined): { value: number } | { error
   }
 
   return { value: databaseId };
-}
-
-function parseLayer(rawLayer: unknown): { value: OperationLayer } | { error: string } {
-  if (!rawLayer) {
-    return { value: 'user' };
-  }
-
-  if (typeof rawLayer !== 'string' || !VALID_LAYERS.has(rawLayer as OperationLayer)) {
-    return { error: 'Invalid layer' };
-  }
-
-  return { value: rawLayer as OperationLayer };
 }
 
 function getDatabase(databaseId: number): { value: PCDCache } | { error: string; status: number } {
@@ -180,7 +167,7 @@ function validateCreatePayload(body: unknown): { value: CreateMetadataProfileReq
     return { error: 'Description must be a string or null' };
   }
 
-  const layerResult = parseLayer(root.layer);
+  const layerResult = parseOperationLayer(root.layer);
   if ('error' in layerResult) {
     return { error: layerResult.error };
   }

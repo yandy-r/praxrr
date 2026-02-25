@@ -3,7 +3,7 @@ import type { Actions, ServerLoad } from '@sveltejs/kit';
 import { pcdManager } from '$pcd/index.ts';
 import { canWriteToBase } from '$pcd/index.ts';
 import type { PCDCache } from '$pcd/index.ts';
-import type { OperationLayer } from '$pcd/index.ts';
+import { parseOperationLayer } from '$pcd/index.ts';
 import type { LidarrNamingRow, RadarrNamingRow, SonarrNamingRow } from '$shared/pcd/display.ts';
 import {
   createLidarrNaming,
@@ -87,7 +87,11 @@ export const actions: Actions = {
     const formData = await request.formData();
     const arrTypeRaw = formData.get('arrType');
     const name = formData.get('name') as string;
-    const layer = (formData.get('layer') as OperationLayer) || 'user';
+    const layerResult = parseOperationLayer(formData.get('layer'));
+    if ('error' in layerResult) {
+      return fail(400, { error: layerResult.error });
+    }
+    const layer = layerResult.value;
 
     if (!name?.trim()) {
       return fail(400, { error: 'Name is required' });

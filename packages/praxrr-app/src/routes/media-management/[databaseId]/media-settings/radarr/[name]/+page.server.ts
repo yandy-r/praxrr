@@ -2,7 +2,7 @@ import { error, redirect, fail } from '@sveltejs/kit';
 import type { PageServerLoad, Actions } from './$types';
 import { pcdManager } from '$pcd/index.ts';
 import { canWriteToBase } from '$pcd/index.ts';
-import type { OperationLayer } from '$pcd/index.ts';
+import { parseOperationLayer } from '$pcd/index.ts';
 import {
   getRadarrByName,
   updateRadarrMediaSettings,
@@ -69,7 +69,11 @@ export const actions: Actions = {
 
     const formData = await request.formData();
     const newName = formData.get('name') as string;
-    const layer = (formData.get('layer') as OperationLayer) || 'user';
+    const layerResult = parseOperationLayer(formData.get('layer'));
+    if ('error' in layerResult) {
+      return fail(400, { error: layerResult.error });
+    }
+    const layer = layerResult.value;
 
     if (!newName?.trim()) {
       return fail(400, { error: 'Name is required' });
@@ -141,7 +145,11 @@ export const actions: Actions = {
     }
 
     const formData = await request.formData();
-    const layer = (formData.get('layer') as OperationLayer) || 'user';
+    const layerResult = parseOperationLayer(formData.get('layer'));
+    if ('error' in layerResult) {
+      return fail(400, { error: layerResult.error });
+    }
+    const layer = layerResult.value;
 
     if (layer === 'base' && !canWriteToBase(currentDatabaseId)) {
       return fail(403, { error: 'Cannot write to base layer without personal access token' });

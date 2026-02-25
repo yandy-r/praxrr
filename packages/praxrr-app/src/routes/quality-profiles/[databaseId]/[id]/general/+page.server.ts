@@ -4,7 +4,7 @@ import { pcdManager } from '$pcd/index.ts';
 import { canWriteToBase } from '$pcd/index.ts';
 import * as qualityProfileQueries from '$pcd/entities/qualityProfiles/index.ts';
 import { getRadarrLanguages } from '$lib/server/sync/mappings.ts';
-import type { OperationLayer } from '$pcd/index.ts';
+import { parseOperationLayer } from '$pcd/index.ts';
 import { arrSyncQueries } from '$db/queries/arrSync.ts';
 
 export const load: ServerLoad = async ({ params }) => {
@@ -91,7 +91,11 @@ export const actions: Actions = {
     const tagsJson = formData.get('tags') as string;
     const languageRaw = formData.get('language') as string;
     const language = languageRaw && languageRaw.trim() !== '' ? languageRaw.trim() : null;
-    const layer = (formData.get('layer') as OperationLayer) || 'user';
+    const layerResult = parseOperationLayer(formData.get('layer'));
+    if ('error' in layerResult) {
+      return fail(400, { error: layerResult.error });
+    }
+    const layer = layerResult.value;
 
     // Validate
     if (!name?.trim()) {
@@ -172,7 +176,11 @@ export const actions: Actions = {
     }
 
     const formData = await request.formData();
-    const layer = (formData.get('layer') as OperationLayer) || 'user';
+    const layerResult = parseOperationLayer(formData.get('layer'));
+    if ('error' in layerResult) {
+      return fail(400, { error: layerResult.error });
+    }
+    const layer = layerResult.value;
 
     // Check layer permission
     if (layer === 'base' && !canWriteToBase(currentDatabaseId)) {

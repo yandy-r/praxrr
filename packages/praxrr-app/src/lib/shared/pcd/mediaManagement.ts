@@ -35,7 +35,11 @@ const COLON_REPLACEMENT_TO_DB: Record<SonarrColonReplacementFormat, number> = {
 };
 
 export function colonReplacementFromDb(value: number): SonarrColonReplacementFormat {
-  return COLON_REPLACEMENT_FROM_DB[value] ?? 'delete';
+  const mappedValue = COLON_REPLACEMENT_FROM_DB[value];
+  if (mappedValue === undefined) {
+    throw new Error(`Unknown sonarr colon replacement value: ${value}`);
+  }
+  return mappedValue;
 }
 
 export function colonReplacementToDb(value: SonarrColonReplacementFormat): number {
@@ -87,7 +91,11 @@ const MULTI_EPISODE_TO_DB: Record<MultiEpisodeStyle, number> = {
 };
 
 export function multiEpisodeStyleFromDb(value: number): MultiEpisodeStyle {
-  return MULTI_EPISODE_FROM_DB[value] ?? 'extend';
+  const mappedValue = MULTI_EPISODE_FROM_DB[value];
+  if (mappedValue === undefined) {
+    throw new Error(`Unknown sonarr multi-episode style value: ${value}`);
+  }
+  return mappedValue;
 }
 
 export function multiEpisodeStyleToDb(value: MultiEpisodeStyle): number {

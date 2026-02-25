@@ -1,6 +1,6 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from '@sveltejs/kit';
-import { canWriteToBase, pcdManager, type OperationLayer, type PCDCache } from '$pcd/index.ts';
+import { canWriteToBase, parseOperationLayer, pcdManager, type OperationLayer, type PCDCache } from '$pcd/index.ts';
 import type { LidarrMetadataProfileDetail } from '$shared/pcd/display.ts';
 import * as metadataProfiles from '$pcd/entities/metadataProfiles/index.ts';
 
@@ -33,7 +33,6 @@ interface DeleteMetadataProfileRequest {
   name: string;
 }
 
-const VALID_LAYERS: ReadonlySet<OperationLayer> = new Set(['user', 'base']);
 const POSITIVE_INTEGER_ID = /^\d+$/;
 const RESERVED_METADATA_PROFILE_NAME = 'none';
 const LIDARR_METADATA_PROFILE_SCHEMA_ERROR = 'This database does not expose Lidarr metadata profile tables';
@@ -60,18 +59,6 @@ function parseDatabaseId(rawId: string | undefined, fieldName: string): { value:
   }
 
   return { value: id };
-}
-
-function parseLayer(rawLayer: unknown): { value: OperationLayer } | { error: string } {
-  if (!rawLayer) {
-    return { value: 'user' };
-  }
-
-  if (typeof rawLayer !== 'string' || !VALID_LAYERS.has(rawLayer as OperationLayer)) {
-    return { error: 'Invalid layer' };
-  }
-
-  return { value: rawLayer as OperationLayer };
 }
 
 function getDatabase(databaseId: number): { value: PCDCache } | { error: string; status: number } {
@@ -226,7 +213,7 @@ function parseUpdatePayload(
     return { error: 'At least one field is required for update' };
   }
 
-  const layerResult = parseLayer(root.layer);
+  const layerResult = parseOperationLayer(root.layer);
   if ('error' in layerResult) {
     return { error: layerResult.error };
   }
@@ -271,7 +258,7 @@ function parseDeletePayload(body: unknown): { value: DeleteMetadataProfileReques
   }
 
   const root = body as Record<string, unknown>;
-  const layerResult = parseLayer(root.layer);
+  const layerResult = parseOperationLayer(root.layer);
   if ('error' in layerResult) {
     return { error: layerResult.error };
   }

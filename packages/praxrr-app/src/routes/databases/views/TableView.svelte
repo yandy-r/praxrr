@@ -79,7 +79,7 @@
 					{#if row.has_personal_access_token || row.personal_access_token}
 						<Badge variant="info" icon={Code} mono>Dev</Badge>
 					{/if}
-					{#if row.cacheAvailable === false}
+					{#if !row.cacheAvailable}
 						<Badge variant="warning" icon={AlertTriangle} mono>Cache Unavailable</Badge>
 					{/if}
 				</div>

@@ -1,8 +1,8 @@
 # PR #112 Review: feat(naming): derive create-mode defaults from PCD seed data
 
 **PR:** [#112](https://github.com/yandy-r/praxrr/pull/112) **Branch:** `feat/naming-forms-from-pcd`
--> `main` **Date:** 2026-02-25 **Reviewers:** code-reviewer, silent-failure-hunter, pr-test-analyzer,
-code-simplifier
+-> `main` **Date:** 2026-02-25 **Reviewers:** code-reviewer, silent-failure-hunter,
+pr-test-analyzer, code-simplifier
 
 ## Summary
 
@@ -49,15 +49,17 @@ function mapLidarrRow(row: Selectable<LidarrNamingTable>): LidarrNamingRow { ...
 This also eliminates the `row.name!` non-null assertions since `name` is typed as `string` (not
 `Generated<string>`) in the table types.
 
-**Resolved in code:** `packages/praxrr-app/src/lib/server/pcd/entities/mediaManagement/naming/read.ts`
-imports `Selectable` plus `RadarrNamingTable`, `SonarrNamingTable`, and `LidarrNamingTable`, and
-updates all three row mappers to use strongly-typed inputs.
+**Resolved in code:**
+`packages/praxrr-app/src/lib/server/pcd/entities/mediaManagement/naming/read.ts` imports
+`Selectable` plus `RadarrNamingTable`, `SonarrNamingTable`, and `LidarrNamingTable`, and updates all
+three row mappers to use strongly-typed inputs.
 
 ### C-2. `getDefaults` queries have no error handling; a corrupted/locked cache DB crashes the load function
 
 - **Source:** silent-failure-hunter
 - **File:** `packages/praxrr-app/src/lib/server/pcd/entities/mediaManagement/naming/read.ts:120-214`
-- **Caller:** `packages/praxrr-app/src/routes/media-management/[databaseId]/naming/new/+page.server.ts:33-38`
+- **Caller:**
+  `packages/praxrr-app/src/routes/media-management/[databaseId]/naming/new/+page.server.ts:33-38`
 - **Status:** [x] Fixed
 
 The three `get*Defaults` functions perform up to 3 sequential Kysely queries each with no try/catch.
@@ -98,9 +100,10 @@ if (cache) {
 
 This preserves the existing UI contract: null defaults show the warning banner.
 
-**Resolved in code:** `packages/praxrr-app/src/routes/media-management/[databaseId]/naming/new/+page.server.ts`
-introduces a typed `safeGetDefaults(cache, fn, label)` wrapper with per-type logging and returns `null`
-on failures so broken/default resolution for one app does not prevent the create form from loading.
+**Resolved in code:**
+`packages/praxrr-app/src/routes/media-management/[databaseId]/naming/new/+page.server.ts` introduces
+a typed `safeGetDefaults(cache, fn, label)` wrapper with per-type logging and returns `null` on
+failures so broken/default resolution for one app does not prevent the create form from loading.
 
 ---
 
@@ -121,15 +124,15 @@ duplication and reduce the query count from 3 to 1.
 
 - Added shared helper `getDefaultNamingRow(cache, table, arrType)` in
   `packages/praxrr-app/src/lib/server/pcd/entities/mediaManagement/naming/read.ts`.
-- Helper now uses one query with deterministic priority ordering:
-  `lower(name)='default'` -> `lower(name)=arrType` -> remaining rows by
-  `created_at ASC, name ASC`.
+- Helper now uses one query with deterministic priority ordering: `lower(name)='default'` ->
+  `lower(name)=arrType` -> remaining rows by `created_at ASC, name ASC`.
 - `getRadarrDefaults`, `getSonarrDefaults`, and `getLidarrDefaults` now delegate to the helper.
 
 ### I-2. Warning block duplicated 3x in `+page.svelte`
 
 - **Source:** code-reviewer, code-simplifier
-- **File:** `packages/praxrr-app/src/routes/media-management/[databaseId]/naming/new/+page.svelte:73-165`
+- **File:**
+  `packages/praxrr-app/src/routes/media-management/[databaseId]/naming/new/+page.svelte:73-165`
 - **Status:** [x] Fixed
 
 The amber warning block (AlertTriangle icon, message, database link) is copy-pasted identically
@@ -147,24 +150,22 @@ already a reactive variable.
 ### I-3. `selectedLabel` defaults to `'Lidarr'` when `selectedArrType` is null
 
 - **Source:** code-reviewer, silent-failure-hunter
-- **File:** `packages/praxrr-app/src/routes/media-management/[databaseId]/naming/new/+page.svelte:38-39`
+- **File:**
+  `packages/praxrr-app/src/routes/media-management/[databaseId]/naming/new/+page.svelte:38-39`
 - **Status:** [x] Fixed
 
 ```typescript
 $: selectedLabel =
-  selectedArrType === 'radarr'
-    ? 'Radarr'
-    : selectedArrType === 'sonarr'
-      ? 'Sonarr'
-      : 'Lidarr';
+  selectedArrType === 'radarr' ? 'Radarr' : selectedArrType === 'sonarr' ? 'Sonarr' : 'Lidarr';
 ```
 
 When `selectedArrType` is `null` (initial state), `selectedLabel` evaluates to `'Lidarr'`. While the
 current template structure prevents this from rendering (the null branch shows the selection grid),
 it is fragile and semantically incorrect.
 
-**Resolved in code (2026-02-25):** `selectedLabel` now resolves via lookup from `arrTypeOptions` with a
-safe fallback: `arrTypeOptions.find((option) => option.value === selectedArrType)?.label ?? ''`.
+**Resolved in code (2026-02-25):** `selectedLabel` now resolves via lookup from `arrTypeOptions`
+with a safe fallback:
+`arrTypeOptions.find((option) => option.value === selectedArrType)?.label ?? ''`.
 
 ### I-4. Unguarded `arrSyncQueries.updateNamingConfigName()` call in edit route handlers
 
@@ -181,9 +182,9 @@ try/catch. If this throws (DB error, `validateRenameNames` failure), the user se
 the primary PCD rename succeeded. The PCD state and sync config become inconsistent -- the naming
 config is renamed but sync references still point at the old name.
 
-**Resolved in code (2026-02-25):** Wrapped all three update handlers in
-`try/catch` around `arrSyncQueries.updateNamingConfigName(...)` and added `logger.error(...)` on failure.
-The action now still redirects after the naming rename is persisted.
+**Resolved in code (2026-02-25):** Wrapped all three update handlers in `try/catch` around
+`arrSyncQueries.updateNamingConfigName(...)` and added `logger.error(...)` on failure. The action
+now still redirects after the naming rename is persisted.
 
 ### I-5. Delete actions lack try/catch around `remove*Naming` calls
 
@@ -224,24 +225,36 @@ CardView also uses the inline intersection at line 9. These could drift apart.
 
 - **Source:** silent-failure-hunter
 - **File:** `packages/praxrr-app/src/lib/shared/pcd/mediaManagement.ts:37-38, 89-90`
-- **Status:** [ ] Open (pre-existing, not introduced by this PR)
+- **Status:** [x] Fixed
 
 These conversion functions use `?? 'delete'` and `?? 'extend'` as fallbacks when the DB integer does
 not map to a known enum member. This is the same class of silent fallback the PR is eliminating
-elsewhere. If a newer PCD schema introduces unknown integer values, users silently get wrong settings.
+elsewhere. If a newer PCD schema introduces unknown integer values, users silently get wrong
+settings.
 
-**Fix (if addressed):** Throw on unknown values rather than silently defaulting.
+**Resolved in code (2026-02-25):**
+
+- `colonReplacementFromDb` and `multiEpisodeStyleFromDb` now throw explicit errors on unknown
+  integer values instead of defaulting to `'delete'` or `'extend'`.
 
 ### S-2. `OperationLayer` silent fallback to `'user'` with unchecked `as` cast
 
 - **Source:** silent-failure-hunter
 - **Files:** All action handlers (pre-existing pattern, not introduced by this PR)
-- **Status:** [ ] Open
+- **Status:** [x] Fixed
 
 `const layer = (formData.get('layer') as OperationLayer) || 'user'` bypasses type checking. A
 tampered request with `layer=admin` passes through unchecked.
 
-**Fix (if addressed):** Validate the `layer` value explicitly, similar to `isSupportedNamingArrType`.
+**Resolved in code (2026-02-25):**
+
+- Added `parseOperationLayer` to `pcd` shared exports and migrated action handlers across
+  naming/media-management/custom-formats/quality-profiles/regular-expressions/delay-profiles to
+  validate and reject invalid `layer` values with `fail(400)`.
+- Updated API v1 PCD import endpoints (`api/v1/pcd/import`,
+  `api/v1/pcd/[databaseId]/lidarr-metadata-profiles`,
+  `api/v1/pcd/[databaseId]/lidarr-metadata-profiles/[id]`) to consume the same parser and remove
+  unchecked casts.
 
 ### S-3. `cacheAvailable` typed as optional but always set -- strict `=== false` check is fragile
 
@@ -249,14 +262,16 @@ tampered request with `layer=admin` passes through unchecked.
 - **Files:**
   - `packages/praxrr-app/src/routes/databases/views/CardView.svelte:102`
   - `packages/praxrr-app/src/routes/databases/views/TableView.svelte:84`
-- **Status:** [ ] Open
+- **Status:** [x] Fixed
 
-The views check `{#if database.cacheAvailable === false}` but the type is `cacheAvailable?: boolean`.
-If a code path ever returns a database object without `cacheAvailable` set, `undefined !== false`
-means the badge silently won't show.
+The views check `{#if database.cacheAvailable === false}` but the type is
+`cacheAvailable?: boolean`. If a code path ever returns a database object without `cacheAvailable`
+set, `undefined !== false` means the badge silently won't show.
 
-**Fix (if addressed):** Make `cacheAvailable` required (not optional) in the type, or change the
-check to `{#if !database.cacheAvailable}`.
+**Resolved in code (2026-02-25):**
+
+- Made `cacheAvailable` required in `DatabaseWithCache` and changed both views to check
+  `{#if !database.cacheAvailable}`.
 
 ---
 
@@ -308,13 +323,14 @@ happy path. The formatting-only changes in `managerImportOrchestration.test.ts` 
 1. **Correct architectural direction.** Replacing hardcoded defaults with PCD-derived data makes the
    config database the single source of truth for form pre-population.
 
-2. **Silent fallback elimination.** Converting `|| 'smart'` and `|| 'extend'` to `fail(400)`
-   aligns with the CLAUDE.md principle of throwing errors early and failing fast.
+2. **Silent fallback elimination.** Converting `|| 'smart'` and `|| 'extend'` to `fail(400)` aligns
+   with the CLAUDE.md principle of throwing errors early and failing fast.
 
 3. **Graceful degradation design.** The amber warning banner when defaults are unavailable, combined
    with the `cacheAvailable` badge on the databases page, provides clear user feedback.
 
-4. **Deterministic ordering.** `created_at ASC, name ASC` ensures reproducible default row selection.
+4. **Deterministic ordering.** `created_at ASC, name ASC` ensures reproducible default row
+   selection.
 
 5. **Form component simplification.** Making `initialData` required (removing null checks and
    hardcoded defaults objects) enforces the contract that the parent must supply valid data.
