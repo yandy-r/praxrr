@@ -284,7 +284,7 @@ function parseQualityProfileFormatItem(value: unknown, context: string): TrashGu
 	const record = asRecord(value, context);
 	const name = readRequiredString(record, 'name', context);
 	const score = readOptionalNumber(record, 'score');
-	const trashId = readOptionalString(record, 'trash_id');
+	const trashId = readOptionalString(record, 'trash_id')?.trim() ?? null;
 	if (trashId !== null && !isTrashGuideId(trashId)) {
 		throw new Error(`${context}: trash_id must be a 32-char hex string when provided`);
 	}

@@ -15,6 +15,7 @@ import type {
 export interface TrashGuideQualityProfileTransformContext {
   arrType: TrashGuideSupportedArrType;
   customFormatsByTrashId: ReadonlyMap<string, TrashGuideCustomFormatEntity>;
+  customFormatsByName: ReadonlyMap<string, readonly TrashGuideCustomFormatEntity[]>;
 }
 
 export interface TrashGuideQualityDefinitionsTransformResult {
@@ -60,11 +61,6 @@ export function toPortableQualityDefinitions(
     );
   }
 
-  if (arrType === 'radarr' && entity.profile_type !== 'movie') {
-    throw new Error(
-      `Quality-size "${entity.name}" profile_type "${entity.profile_type}" is incompatible with arr_type "${arrType}"`
-    );
-  }
   if (arrType === 'sonarr' && entity.profile_type === 'movie') {
     throw new Error(
       `Quality-size "${entity.name}" profile_type "${entity.profile_type}" is incompatible with arr_type "${arrType}"`
@@ -118,7 +114,8 @@ function toOrderedItems(entity: TrashGuideQualityProfileEntity): OrderedItem[] {
 
   const normalizedCutoff = resolveQualityNameOrNull(rawCutoff, entity.arr_type);
   const drafts: OrderedItemDraft[] = entity.items.map((item, index) => {
-    const mappedQualities = normalizeQualityList(item.qualities, entity.arr_type, `${entity.name}:${item.name}`);
+    const qualityCandidates = item.qualities.length > 0 ? item.qualities : [item.name];
+    const mappedQualities = normalizeQualityList(qualityCandidates, entity.arr_type, `${entity.name}:${item.name}`);
     if (mappedQualities.length === 0) {
       throw new Error(`Quality profile "${entity.name}" item "${item.name}" does not contain any qualities`);
     }
@@ -189,6 +186,10 @@ function toCustomFormatScores(
 
   for (const item of entity.format_items) {
     const resolved = resolveCustomFormatReference(entity, item, context);
+    if (resolved.customFormat === null && item.score === null) {
+      continue;
+    }
+
     if (scoresByCustomFormat.has(resolved.customFormatName)) {
       throw new Error(
         `Ambiguous custom format score mapping for profile "${entity.name}": duplicate format "${resolved.customFormatName}"`
@@ -224,26 +225,38 @@ function resolveCustomFormatReference(
   item: TrashGuideQualityProfileEntity['format_items'][number],
   context: TrashGuideQualityProfileTransformContext
 ): { customFormatName: string; customFormat: TrashGuideCustomFormatEntity | null } {
-  let resolvedFromTrashId: TrashGuideCustomFormatEntity | null = null;
-  if (item.custom_format_trash_id !== null) {
-    const mapped = context.customFormatsByTrashId.get(item.custom_format_trash_id);
-    if (!mapped) {
-      throw new Error(
-        `Quality profile "${entity.name}" references custom format trash_id "${item.custom_format_trash_id}" that was not parsed for arr_type "${context.arrType}"`
-      );
-    }
-    resolvedFromTrashId = mapped;
-  }
-
   const statedName = item.name.trim();
   if (statedName.length === 0) {
     throw new Error(`Quality profile "${entity.name}" contains an empty custom format name entry`);
   }
 
+  let resolvedFromTrashId: TrashGuideCustomFormatEntity | null = null;
+  if (item.custom_format_trash_id !== null) {
+    const mapped = context.customFormatsByTrashId.get(item.custom_format_trash_id.toLowerCase());
+    if (!mapped) {
+      const fallbackByName = context.customFormatsByName.get(statedName.toLowerCase());
+      if (!fallbackByName || fallbackByName.length === 0) {
+        return {
+          customFormatName: statedName,
+          customFormat: null,
+        };
+      }
+      if (fallbackByName.length > 1) {
+        throw new Error(
+          `Ambiguous custom format reference in profile "${entity.name}": name "${statedName}" matches multiple custom formats`
+        );
+      }
+      resolvedFromTrashId = fallbackByName[0];
+    } else {
+      resolvedFromTrashId = mapped;
+    }
+  }
+
   if (resolvedFromTrashId !== null && statedName !== resolvedFromTrashId.name) {
-    throw new Error(
-      `Ambiguous custom format reference in profile "${entity.name}": name "${statedName}" does not match referenced trash_id name "${resolvedFromTrashId.name}"`
-    );
+    return {
+      customFormatName: resolvedFromTrashId.name,
+      customFormat: resolvedFromTrashId,
+    };
   }
 
   if (item.custom_format_trash_id !== null && item.score !== null) {

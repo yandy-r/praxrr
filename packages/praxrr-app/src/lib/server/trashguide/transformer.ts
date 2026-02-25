@@ -131,9 +131,11 @@ export function transformTrashGuideEntities(input: TrashGuideTransformInput): Tr
 
   const uniqueEntries = dedupeAndValidateEntities(input.parsed.ordered_entities, input.arrType);
   const customFormatsByTrashId = buildCustomFormatLookup(uniqueEntries);
+  const customFormatsByName = buildCustomFormatLookupByName(uniqueEntries);
   const qualityProfileContext: TrashGuideQualityProfileTransformContext = {
     arrType: input.arrType,
     customFormatsByTrashId,
+    customFormatsByName,
   };
 
   const mappingWrites = uniqueEntries
@@ -311,9 +313,29 @@ function buildCustomFormatLookup(
     if (entity.entity_type !== 'custom_format') {
       continue;
     }
-    customFormatsByTrashId.set(entity.trash_id, entity);
+    customFormatsByTrashId.set(entity.trash_id.toLowerCase(), entity);
   }
   return customFormatsByTrashId;
+}
+
+function buildCustomFormatLookupByName(
+  entries: readonly UniqueEntityEntry[]
+): ReadonlyMap<string, readonly TrashGuideCustomFormatEntity[]> {
+  const customFormatsByName = new Map<string, TrashGuideCustomFormatEntity[]>();
+  for (const { entity } of entries) {
+    if (entity.entity_type !== 'custom_format') {
+      continue;
+    }
+
+    const key = entity.name.trim().toLowerCase();
+    const existing = customFormatsByName.get(key);
+    if (existing) {
+      existing.push(entity);
+      continue;
+    }
+    customFormatsByName.set(key, [entity]);
+  }
+  return customFormatsByName;
 }
 
 function toMappingInput(
@@ -392,7 +414,7 @@ function toConditionData(
         ...base,
         languages: [
           {
-            name: readRequiredStringField(spec.fields, ['value'], `${entity.name}:${spec.name}`),
+            name: readRequiredStringField(spec.fields, ['value'], `${entity.name}:${spec.name}`, spec.name),
             except: readOptionalBooleanField(spec.fields, ['exceptLanguage'], false),
           },
         ],
@@ -400,27 +422,29 @@ function toConditionData(
     case 'source':
       return {
         ...base,
-        sources: [readRequiredStringField(spec.fields, ['value'], `${entity.name}:${spec.name}`)],
+        sources: [readRequiredStringField(spec.fields, ['value'], `${entity.name}:${spec.name}`, spec.name)],
       };
     case 'resolution':
       return {
         ...base,
-        resolutions: [readRequiredStringField(spec.fields, ['value'], `${entity.name}:${spec.name}`)],
+        resolutions: [
+          readRequiredStringField(spec.fields, ['value'], `${entity.name}:${spec.name}`, spec.name),
+        ],
       };
     case 'quality_modifier':
       return {
         ...base,
-        qualityModifiers: [readRequiredStringField(spec.fields, ['value'], `${entity.name}:${spec.name}`)],
+        qualityModifiers: [readRequiredStringField(spec.fields, ['value'], `${entity.name}:${spec.name}`, spec.name)],
       };
     case 'release_type':
       return {
         ...base,
-        releaseTypes: [readRequiredStringField(spec.fields, ['value'], `${entity.name}:${spec.name}`)],
+        releaseTypes: [readRequiredStringField(spec.fields, ['value'], `${entity.name}:${spec.name}`, spec.name)],
       };
     case 'indexer_flag':
       return {
         ...base,
-        indexerFlags: [readRequiredStringField(spec.fields, ['value'], `${entity.name}:${spec.name}`)],
+        indexerFlags: [readRequiredStringField(spec.fields, ['value'], `${entity.name}:${spec.name}`, spec.name)],
       };
     case 'size':
       return {
@@ -478,16 +502,33 @@ function mapSpecificationImplementation(value: string): ConditionData['type'] {
 function readRequiredStringField(
   fields: Readonly<Record<string, unknown>>,
   keys: readonly string[],
-  context: string
+  context: string,
+  fallback?: string
 ): string {
+  const fallbackValue = typeof fallback === 'string' ? fallback.trim() : '';
+  const value = readOptionalStringField(fields, keys);
+  if (value !== null) {
+    return value;
+  }
+
+  if (fallbackValue.length > 0) {
+    return fallbackValue;
+  }
+
+  throw new Error(`Missing required TRaSH specification string field (${keys.join(', ')}) for ${context}`);
+}
+
+function readOptionalStringField(
+  fields: Readonly<Record<string, unknown>>,
+  keys: readonly string[]
+): string | null {
   for (const key of keys) {
     const value = fields[key];
     if (typeof value === 'string' && value.trim().length > 0) {
       return value;
     }
   }
-
-  throw new Error(`Missing required TRaSH specification string field (${keys.join(', ')}) for ${context}`);
+  return null;
 }
 
 function readOptionalBooleanField(

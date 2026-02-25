@@ -1,6 +1,6 @@
 import { assertEquals, assertThrows } from '@std/assert';
 import type { TrashIdMapping } from '$db/queries/trashIdMappings.ts';
-import type { PortableQualityProfile } from '$shared/pcd/portable.ts';
+import type { PortableCustomFormat, PortableQualityProfile } from '$shared/pcd/portable.ts';
 import {
   transformTrashGuideEntities,
   TrashGuideTransformError,
@@ -278,4 +278,243 @@ Deno.test('transformTrashGuideEntities generates idempotent operations from dupl
   assertEquals(resultA.skippedEntities, []);
   assertEquals(resultA.activeOperations, resultB.activeOperations);
   assertEquals(resultA.mappingWrites, resultB.mappingWrites);
+});
+
+Deno.test('transformTrashGuideEntities accepts radarr anime quality-size profiles', () => {
+  const result = transformTrashGuideEntities({
+    sourceId: 95,
+    arrType: 'radarr',
+    parsed: createParseResult('radarr', [
+      {
+        entity_type: 'quality_size',
+        arr_type: 'radarr',
+        trash_id: 'dddddddddddddddddddddddddddddddd',
+        file_path: 'quality-size/anime.json',
+        name: 'anime',
+        profile_type: 'anime',
+        qualities: [
+          {
+            quality: 'Bluray-1080p',
+            min: 1,
+            preferred: 2,
+            max: 3,
+          },
+        ],
+      },
+    ]),
+    existingMappings: [],
+  });
+
+  const operation = result.activeOperations.find((row) => row.portableEntityType === 'radarr_quality_definitions');
+  if (!operation) {
+    throw new Error('Expected radarr quality definitions operation');
+  }
+  assertEquals(operation.data.name, 'anime');
+});
+
+Deno.test('transformTrashGuideEntities resolves profile item quality from item name when qualities are omitted', () => {
+  const result = transformTrashGuideEntities({
+    sourceId: 23,
+    arrType: 'radarr',
+    parsed: createParseResult('radarr', [
+      createQualityProfileEntity({
+        name: '[Anime] Remux-1080p',
+        cutoff: 'Bluray-720p',
+        items: [
+          {
+            name: 'Bluray-720p',
+            allowed: true,
+            qualities: [],
+          },
+        ],
+      }),
+    ]),
+    existingMappings: [],
+  });
+
+  const profileData = getQualityProfileData(result);
+  assertEquals(profileData.orderedItems.length, 1);
+  assertEquals(profileData.orderedItems[0]?.type, 'quality');
+  assertEquals(profileData.orderedItems[0]?.name, 'Bluray-720p');
+});
+
+Deno.test('transformTrashGuideEntities rejects profile item missing implicit quality name', () => {
+  const error = assertThrows(
+    () =>
+      transformTrashGuideEntities({
+        sourceId: 24,
+        arrType: 'radarr',
+        parsed: createParseResult('radarr', [
+          createQualityProfileEntity({
+            name: 'Invalid Profile',
+            items: [
+              {
+                name: 'Definitely Not A Quality',
+                allowed: true,
+                qualities: [],
+              },
+            ],
+          }),
+        ]),
+        existingMappings: [],
+      }),
+    TrashGuideTransformError
+  );
+
+  assertEquals(error.code, 'ambiguous_mapping');
+  assertEquals(
+    error.message,
+    'Unknown quality "Definitely Not A Quality" in Invalid Profile:Definitely Not A Quality for arr_type "radarr" after normalization to "Definitely Not A Quality"'
+  );
+});
+
+Deno.test('transformTrashGuideEntities resolves resolution spec value from spec name when fields.value is missing', () => {
+  const result = transformTrashGuideEntities({
+    sourceId: 88,
+    arrType: 'radarr',
+    parsed: createParseResult('radarr', [
+      createCustomFormatEntity({
+        name: '1080p missing resolution value',
+        specifications: [
+          {
+            name: '1080p',
+            implementation: 'ResolutionSpecification',
+            negate: false,
+            required: true,
+            fields: {},
+          },
+        ],
+      }),
+    ]),
+    existingMappings: [],
+  });
+
+  assertEquals(result.activeOperations.length, 1);
+  const operation = result.activeOperations[0];
+  assertEquals(operation.portableEntityType, 'custom_format');
+  const customFormatData = operation.data as PortableCustomFormat;
+  assertEquals(customFormatData.conditions[0]?.type, 'resolution');
+  assertEquals(customFormatData.conditions[0]?.resolutions, ['1080p']);
+});
+
+Deno.test('transformTrashGuideEntities resolves source spec value from spec name when fields.value is missing', () => {
+  const result = transformTrashGuideEntities({
+    sourceId: 89,
+    arrType: 'radarr',
+    parsed: createParseResult('radarr', [
+      createCustomFormatEntity({
+        name: 'Anime BD Tier 01',
+        specifications: [
+          {
+            name: 'Bluray',
+            implementation: 'SourceSpecification',
+            negate: false,
+            required: true,
+            fields: {},
+          },
+        ],
+      }),
+    ]),
+    existingMappings: [],
+  });
+
+  assertEquals(result.activeOperations.length, 1);
+  const operation = result.activeOperations[0];
+  assertEquals(operation.portableEntityType, 'custom_format');
+  const customFormatData = operation.data as PortableCustomFormat;
+  assertEquals(customFormatData.conditions[0]?.type, 'source');
+  assertEquals(customFormatData.conditions[0]?.sources, ['Bluray']);
+});
+
+Deno.test('transformTrashGuideEntities resolves custom format score by trash_id name fallback when trash_id was not parsed', () => {
+  const result = transformTrashGuideEntities({
+    sourceId: 90,
+    arrType: 'radarr',
+    parsed: createParseResult('radarr', [
+      createCustomFormatEntity({
+        name: 'Anime Dual Audio',
+        trash_id: 'ffffffffffffffffffffffffffffffff',
+      }),
+      createQualityProfileEntity({
+        name: 'Fallback CF',
+        format_items: [
+          {
+            name: 'Anime Dual Audio',
+            score: null,
+            custom_format_trash_id: '11111111111111111111111111111111',
+          },
+        ],
+      }),
+    ]),
+    existingMappings: [],
+  });
+
+  const profileData = getQualityProfileData(result);
+  assertEquals(profileData.customFormatScores, [
+    {
+      customFormatName: 'Anime Dual Audio',
+      arrType: 'radarr',
+      score: 100,
+    },
+  ]);
+});
+
+Deno.test('transformTrashGuideEntities skips unresolved custom format score references while still importing profile', () => {
+  const profile = createQualityProfileEntity({
+    name: 'Profile with Missing CF',
+    format_items: [
+      {
+        name: 'Missing Custom Format',
+        score: null,
+        custom_format_trash_id: '11111111111111111111111111111111',
+      },
+    ],
+  });
+
+  const result = transformTrashGuideEntities({
+    sourceId: 92,
+    arrType: 'radarr',
+    parsed: createParseResult('radarr', [profile]),
+    existingMappings: [],
+  });
+
+  const profileData = getQualityProfileData(result);
+  assertEquals(profileData.customFormatScores, []);
+});
+
+Deno.test('transformTrashGuideEntities rejects custom format reference when trash_id is missing and name is ambiguous', () => {
+  const error = assertThrows(
+    () =>
+      transformTrashGuideEntities({
+        sourceId: 91,
+        arrType: 'radarr',
+        parsed: createParseResult('radarr', [
+          createCustomFormatEntity({
+            name: 'Anime Dual Audio',
+            trash_id: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1',
+          }),
+          createCustomFormatEntity({
+            name: 'Anime Dual Audio',
+            trash_id: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa2',
+          }),
+          createQualityProfileEntity({
+            name: 'Ambiguous Fallback',
+            format_items: [
+              {
+                name: 'Anime Dual Audio',
+                score: null,
+                custom_format_trash_id: '11111111111111111111111111111111',
+              },
+            ],
+          }),
+        ]),
+        existingMappings: [],
+      }),
+    TrashGuideTransformError
+  );
+
+  assertEquals(
+    error.message,
+    'Ambiguous custom format reference in profile "Ambiguous Fallback": name "Anime Dual Audio" matches multiple custom formats'
+  );
 });
