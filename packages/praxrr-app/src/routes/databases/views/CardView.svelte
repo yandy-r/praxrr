@@ -1,14 +1,12 @@
 <script lang="ts">
 	import { ExternalLink, Unlink, Lock, Code, AlertTriangle } from 'lucide-svelte';
 	import Badge from '$ui/badge/Badge.svelte';
-	import type { DatabaseInstance } from '$db/queries/databaseInstances.ts';
 	import { parseUTC } from '$shared/utils/dates';
 	import { createEventDispatcher } from 'svelte';
 	import DatabaseAvatar from '../components/DatabaseAvatar.svelte';
+	import type { DatabaseWithCache } from '../types';
 
-	export let databases: (DatabaseInstance & { cacheAvailable?: boolean })[];
-
-	type DatabaseWithCache = DatabaseInstance & { cacheAvailable?: boolean };
+	export let databases: DatabaseWithCache[];
 	const dispatch = createEventDispatcher<{
 		unlink: DatabaseWithCache;
 	}>();

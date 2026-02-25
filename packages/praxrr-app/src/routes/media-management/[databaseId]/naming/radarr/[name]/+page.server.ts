@@ -5,6 +5,7 @@ import { canWriteToBase } from '$pcd/index.ts';
 import type { OperationLayer } from '$pcd/index.ts';
 import { getRadarrByName, updateRadarrNaming, removeRadarrNaming } from '$pcd/entities/mediaManagement/naming/index.ts';
 import { arrSyncQueries } from '$db/queries/arrSync.ts';
+import { logger } from '$logger/logger.ts';
 import type { RadarrNamingRow } from '$shared/pcd/display.ts';
 import { validateNamingFormat } from '$shared/pcd/namingTokens.ts';
 
@@ -126,10 +127,22 @@ export const actions: Actions = {
     }
 
     if (newName.trim() !== decodedName) {
-      arrSyncQueries.updateNamingConfigName(decodedName, newName.trim(), {
-        arrType: 'radarr',
-        databaseId: currentDatabaseId,
-      });
+      try {
+        arrSyncQueries.updateNamingConfigName(decodedName, newName.trim(), {
+          arrType: 'radarr',
+          databaseId: currentDatabaseId,
+        });
+      } catch (err) {
+        await logger.error('Failed to sync updated Radarr naming config name', {
+          source: 'naming-update',
+          meta: {
+            databaseId: currentDatabaseId,
+            oldName: decodedName,
+            newName: newName.trim(),
+            error: err instanceof Error ? err.message : String(err),
+          },
+        });
+      }
     }
 
     throw redirect(303, `/media-management/${databaseId}/naming`);
@@ -165,12 +178,25 @@ export const actions: Actions = {
       return fail(403, { error: 'Cannot write to base layer without personal access token' });
     }
 
-    const result = await removeRadarrNaming({
-      databaseId: currentDatabaseId,
-      cache,
-      layer,
-      current,
-    });
+    let result;
+    try {
+      result = await removeRadarrNaming({
+        databaseId: currentDatabaseId,
+        cache,
+        layer,
+        current,
+      });
+    } catch (err) {
+      await logger.error('Failed to delete Radarr naming config', {
+        source: 'naming-delete',
+        meta: {
+          databaseId: currentDatabaseId,
+          name: decodedName,
+          error: err instanceof Error ? err.message : String(err),
+        },
+      });
+      return fail(500, { error: err instanceof Error ? err.message : 'Failed to delete naming config' });
+    }
 
     if (!result.success) {
       return fail(500, { error: result.error || 'Failed to delete naming config' });

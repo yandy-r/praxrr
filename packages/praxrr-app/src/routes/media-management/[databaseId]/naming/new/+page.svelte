@@ -35,8 +35,7 @@
 		}
 	];
 
-	$: selectedLabel =
-		selectedArrType === 'radarr' ? 'Radarr' : selectedArrType === 'sonarr' ? 'Sonarr' : 'Lidarr';
+	$: selectedLabel = arrTypeOptions.find((option) => option.value === selectedArrType)?.label ?? '';
 </script>
 
 {#snippet missingDefaultsWarning(label: string)}

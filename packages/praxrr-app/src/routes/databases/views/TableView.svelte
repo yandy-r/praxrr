@@ -4,12 +4,10 @@
 	import TableActionButton from '$ui/table/TableActionButton.svelte';
 	import Badge from '$ui/badge/Badge.svelte';
 	import type { Column } from '$ui/table/types';
-	import type { DatabaseInstance } from '$db/queries/databaseInstances.ts';
 	import { parseUTC } from '$shared/utils/dates';
 	import { createEventDispatcher } from 'svelte';
 	import DatabaseAvatar from '../components/DatabaseAvatar.svelte';
-
-	type DatabaseWithCache = DatabaseInstance & { cacheAvailable?: boolean };
+	import type { DatabaseWithCache } from '../types';
 	export let databases: DatabaseWithCache[];
 
 	const dispatch = createEventDispatcher<{

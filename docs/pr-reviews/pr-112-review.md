@@ -148,7 +148,7 @@ already a reactive variable.
 
 - **Source:** code-reviewer, silent-failure-hunter
 - **File:** `packages/praxrr-app/src/routes/media-management/[databaseId]/naming/new/+page.svelte:38-39`
-- **Status:** [ ] Open
+- **Status:** [x] Fixed
 
 ```typescript
 $: selectedLabel =
@@ -163,25 +163,8 @@ When `selectedArrType` is `null` (initial state), `selectedLabel` evaluates to `
 current template structure prevents this from rendering (the null branch shows the selection grid),
 it is fragile and semantically incorrect.
 
-**Fix:** Add explicit null/lidarr handling:
-
-```typescript
-$: selectedLabel =
-  selectedArrType === 'radarr'
-    ? 'Radarr'
-    : selectedArrType === 'sonarr'
-      ? 'Sonarr'
-      : selectedArrType === 'lidarr'
-        ? 'Lidarr'
-        : '';
-```
-
-Or use a lookup map from the existing `arrTypeOptions` array:
-
-```typescript
-$: selectedLabel =
-  arrTypeOptions.find((o) => o.value === selectedArrType)?.label ?? '';
-```
+**Resolved in code (2026-02-25):** `selectedLabel` now resolves via lookup from `arrTypeOptions` with a
+safe fallback: `arrTypeOptions.find((option) => option.value === selectedArrType)?.label ?? ''`.
 
 ### I-4. Unguarded `arrSyncQueries.updateNamingConfigName()` call in edit route handlers
 
@@ -191,14 +174,16 @@ $: selectedLabel =
   - `packages/praxrr-app/src/routes/media-management/[databaseId]/naming/sonarr/[name]/+page.server.ts:146-151`
   - `packages/praxrr-app/src/routes/media-management/[databaseId]/naming/lidarr/[name]/+page.server.ts:149-154`
 - **Status:** [ ] Open
+- **Status:** [x] Fixed
 
 After a successful naming config update, `arrSyncQueries.updateNamingConfigName()` is called without
 try/catch. If this throws (DB error, `validateRenameNames` failure), the user sees a 500 even though
 the primary PCD rename succeeded. The PCD state and sync config become inconsistent -- the naming
 config is renamed but sync references still point at the old name.
 
-**Fix:** Wrap in try/catch. Log the error. Allow the redirect to proceed since the primary operation
-succeeded, but surface the sync propagation failure via alert or logger.
+**Resolved in code (2026-02-25):** Wrapped all three update handlers in
+`try/catch` around `arrSyncQueries.updateNamingConfigName(...)` and added `logger.error(...)` on failure.
+The action now still redirects after the naming rename is persisted.
 
 ### I-5. Delete actions lack try/catch around `remove*Naming` calls
 
@@ -207,15 +192,15 @@ succeeded, but surface the sync propagation failure via alert or logger.
   - `packages/praxrr-app/src/routes/media-management/[databaseId]/naming/radarr/[name]/+page.server.ts:168-173`
   - `packages/praxrr-app/src/routes/media-management/[databaseId]/naming/sonarr/[name]/+page.server.ts:186-191`
   - `packages/praxrr-app/src/routes/media-management/[databaseId]/naming/lidarr/[name]/+page.server.ts:189-194`
-- **Status:** [ ] Open
+- **Status:** [x] Fixed
 
 The `delete` action handlers call `remove*Naming` without try/catch, while the `create` and `update`
 actions in the same files DO have try/catch blocks. If `writeOperation` throws (SQL compilation
 failure, DB lock, cache recompilation error), the user sees a generic 500 error instead of an
 actionable form error.
 
-**Fix:** Wrap the `remove*Naming` call in try/catch matching the pattern used in create/update
-actions.
+**Resolved in code (2026-02-25):** Wrapped `remove*Naming` calls in all three delete handlers with
+`try/catch`, added `logger.error(...)`, and return `fail(500)` on thrown removal errors.
 
 ### I-6. `DatabaseWithCache` type defined independently in two files
 
@@ -223,13 +208,13 @@ actions.
 - **Files:**
   - `packages/praxrr-app/src/routes/databases/views/CardView.svelte:11`
   - `packages/praxrr-app/src/routes/databases/views/TableView.svelte:12`
-- **Status:** [ ] Open
+- **Status:** [x] Fixed
 
 Both files define `type DatabaseWithCache = DatabaseInstance & { cacheAvailable?: boolean }` and
 CardView also uses the inline intersection at line 9. These could drift apart.
 
-**Fix:** Define the type once in a shared location (e.g., `+page.server.ts` export or a
-`databases/types.ts` file) and import from both views.
+**Resolved in code (2026-02-25):** Added shared `DatabaseWithCache` export to
+`packages/praxrr-app/src/routes/databases/types.ts` and updated both views to import it.
 
 ---
 
