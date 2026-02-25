@@ -39,7 +39,7 @@
 		selectedArrType === 'radarr' ? 'Radarr' : selectedArrType === 'sonarr' ? 'Sonarr' : 'Lidarr';
 </script>
 
-{#snippet missingDefaultsWarning(label)}
+{#snippet missingDefaultsWarning(label: string)}
 	<div class="rounded-lg border border-amber-300 bg-amber-50 p-6 dark:border-amber-700 dark:bg-amber-950">
 		<div class="flex items-start gap-3">
 			<AlertTriangle size={20} class="mt-0.5 flex-shrink-0 text-amber-600 dark:text-amber-400" />
