@@ -4,8 +4,8 @@ migration:
   source: pcd-export
 name: Prefer Usenet
 preferredProtocol: prefer_usenet
-usenetDelay: 5
-torrentDelay: 10
+usenetDelay: 15
+torrentDelay: 0
 bypassIfHighestQuality: false
 bypassIfAboveCfScore: false
 minimumCfScore: 0
