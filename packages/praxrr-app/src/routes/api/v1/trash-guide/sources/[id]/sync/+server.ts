@@ -4,7 +4,7 @@ import { jobQueueQueries } from '$db/queries/jobQueue.ts';
 import { jobRunHistoryQueries } from '$db/queries/jobRunHistory.ts';
 import { jobDispatcher } from '$jobs/dispatcher.ts';
 import { trashGuideManager } from '$lib/server/trashguide/manager.ts';
-import { mapReadErrorStatus, parseSourceId, toErrorMessage } from '../+server.ts';
+import { mapReadErrorStatus, parseSourceId, toErrorMessage } from '../_helpers.ts';
 
 const TRASHGUIDE_SYNC_DEDUPE_KEY_PREFIX = 'trashguide.sync:';
 

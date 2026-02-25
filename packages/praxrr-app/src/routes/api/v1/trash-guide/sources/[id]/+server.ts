@@ -7,6 +7,7 @@ import {
   TrashGuideSourceValidationError,
   type TrashGuideSourceUpdateInput,
 } from '$lib/server/trashguide/manager.ts';
+import { mapReadErrorStatus, parseSourceId, toErrorMessage } from './_helpers.ts';
 
 const UPDATE_ALLOWED_FIELDS = new Set([
   'name',
@@ -73,23 +74,6 @@ export const DELETE: RequestHandler = async ({ params }) => {
     return json({ error: toErrorMessage(error) }, { status });
   }
 };
-
-export function parseSourceId(raw: string | undefined): { value: number } | { error: string } {
-  if (!raw) {
-    return { error: 'Missing source id' };
-  }
-
-  if (!/^\d+$/.test(raw)) {
-    return { error: 'Invalid source id' };
-  }
-
-  const id = Number.parseInt(raw, 10);
-  if (!Number.isInteger(id) || id <= 0) {
-    return { error: 'Invalid source id' };
-  }
-
-  return { value: id };
-}
 
 function parseUpdatePayload(body: unknown): { value: TrashGuideSourceUpdateInput } | { error: string } {
   if (!body || typeof body !== 'object' || Array.isArray(body)) {
@@ -198,15 +182,7 @@ function validateRepositoryUrl(value: string): string | null {
   return null;
 }
 
-export function mapReadErrorStatus(error: unknown): number {
-  if (error instanceof TrashGuideSourceNotFoundError) {
-    return 404;
-  }
-
-  return 500;
-}
-
-export function mapWriteErrorStatus(error: unknown): number {
+function mapWriteErrorStatus(error: unknown): number {
   if (error instanceof TrashGuideSourceNotFoundError) {
     return 404;
   }
@@ -220,12 +196,4 @@ export function mapWriteErrorStatus(error: unknown): number {
   }
 
   return 500;
-}
-
-export function toErrorMessage(error: unknown): string {
-  if (error instanceof Error) {
-    return error.message;
-  }
-
-  return 'TRaSH source request failed';
 }
