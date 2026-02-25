@@ -5,7 +5,9 @@
 import type { PCDCache } from '$pcd/index.ts';
 import type { LidarrNamingRow, NamingListItem, RadarrNamingRow, SonarrNamingRow } from '$shared/pcd/display.ts';
 import { colonReplacementFromDb, multiEpisodeStyleFromDb } from '$shared/pcd/mediaManagement.ts';
+import type { LidarrNamingTable, RadarrNamingTable, SonarrNamingTable } from '$shared/pcd/types.ts';
 import { LIDARR_NAMING_TABLE, RADARR_NAMING_TABLE, SONARR_NAMING_TABLE } from './constants.ts';
+import type { Selectable } from 'kysely';
 import { sql } from 'kysely';
 
 // Note: name is PRIMARY KEY so never null, but Kysely types it as nullable
@@ -52,10 +54,9 @@ export async function list(cache: PCDCache): Promise<NamingListItem[]> {
   return items;
 }
 
-// deno-lint-ignore no-explicit-any
-function mapRadarrRow(row: Record<string, any>): RadarrNamingRow {
+function mapRadarrRow(row: Selectable<RadarrNamingTable>): RadarrNamingRow {
   return {
-    name: row.name!,
+    name: row.name,
     rename: row.rename === 1,
     movie_format: row.movie_format,
     movie_folder_format: row.movie_folder_format,
@@ -66,10 +67,9 @@ function mapRadarrRow(row: Record<string, any>): RadarrNamingRow {
   };
 }
 
-// deno-lint-ignore no-explicit-any
-function mapSonarrRow(row: Record<string, any>): SonarrNamingRow {
+function mapSonarrRow(row: Selectable<SonarrNamingTable>): SonarrNamingRow {
   return {
-    name: row.name!,
+    name: row.name,
     rename: row.rename === 1,
     standard_episode_format: row.standard_episode_format,
     daily_episode_format: row.daily_episode_format,
@@ -85,10 +85,9 @@ function mapSonarrRow(row: Record<string, any>): SonarrNamingRow {
   };
 }
 
-// deno-lint-ignore no-explicit-any
-function mapLidarrRow(row: Record<string, any>): LidarrNamingRow {
+function mapLidarrRow(row: Selectable<LidarrNamingTable>): LidarrNamingRow {
   return {
-    name: row.name!,
+    name: row.name,
     rename: row.rename === 1,
     standard_track_format: row.standard_track_format,
     artist_name: row.artist_name,

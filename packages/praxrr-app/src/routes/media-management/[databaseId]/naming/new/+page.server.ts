@@ -1,7 +1,8 @@
-import { error, redirect, fail } from '@sveltejs/kit';
+import { fail, redirect } from '@sveltejs/kit';
 import type { Actions, ServerLoad } from '@sveltejs/kit';
 import { pcdManager } from '$pcd/index.ts';
 import { canWriteToBase } from '$pcd/index.ts';
+import type { PCDCache } from '$pcd/index.ts';
 import type { OperationLayer } from '$pcd/index.ts';
 import type { LidarrNamingRow, RadarrNamingRow, SonarrNamingRow } from '$shared/pcd/display.ts';
 import {
@@ -14,6 +15,7 @@ import {
 } from '$pcd/entities/mediaManagement/naming/index.ts';
 import type { ArrAppType } from '$shared/pcd/types.ts';
 import { validateNamingFormat } from '$shared/pcd/namingTokens.ts';
+import { logger } from '$logger/logger.ts';
 
 const SUPPORTED_NAMING_ARR_TYPES = ['radarr', 'sonarr', 'lidarr'] as const;
 
@@ -25,6 +27,24 @@ export const load: ServerLoad = async ({ params, parent }) => {
   const parentData = await parent();
   const databaseId = parseInt(params.databaseId!, 10);
   const cache = isNaN(databaseId) ? undefined : pcdManager.getCache(databaseId);
+  const safeGetDefaults = async <T>(
+    cache: PCDCache,
+    fn: (cache: PCDCache) => Promise<T | null>,
+    label: string
+  ): Promise<T | null> => {
+    try {
+      return await fn(cache);
+    } catch (err) {
+      await logger.error(`Failed to load ${label} naming defaults from cache`, {
+        source: 'naming-new',
+        meta: {
+          databaseId,
+          error: err instanceof Error ? err.message : String(err),
+        },
+      });
+      return null;
+    }
+  };
 
   let radarrDefaults: RadarrNamingRow | null = null;
   let sonarrDefaults: SonarrNamingRow | null = null;
@@ -32,9 +52,9 @@ export const load: ServerLoad = async ({ params, parent }) => {
 
   if (cache) {
     [radarrDefaults, sonarrDefaults, lidarrDefaults] = await Promise.all([
-      getRadarrDefaults(cache),
-      getSonarrDefaults(cache),
-      getLidarrDefaults(cache),
+      safeGetDefaults(cache, getRadarrDefaults, 'radarr'),
+      safeGetDefaults(cache, getSonarrDefaults, 'sonarr'),
+      safeGetDefaults(cache, getLidarrDefaults, 'lidarr'),
     ]);
   }
 
