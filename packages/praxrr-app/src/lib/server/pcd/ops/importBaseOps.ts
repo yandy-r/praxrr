@@ -159,10 +159,7 @@ export function __testOnly_resetGetCache(): void {
   getCacheForTests = getCache;
 }
 
-export async function importBaseOps(
-  databaseId: number,
-  pcdPath: string
-): Promise<ImportBaseOpsResult> {
+export async function importBaseOps(databaseId: number, pcdPath: string): Promise<ImportBaseOpsResult> {
   const migrationReaderResult = await readMigrationEntitySourcesForTests(pcdPath);
 
   if (migrationReaderResult.issues.length > 0) {

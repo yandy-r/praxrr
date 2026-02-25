@@ -389,19 +389,27 @@ Implementation in `hooks.server.ts`:
 
 ```typescript
 const defaultDbUrl =
-  Deno.env.get('PRAXRR_DEFAULT_DB_URL')?.trim() || 'https://github.com/yandy-r/praxrr-db';
-const defaultDbBranch = Deno.env.get('PRAXRR_DEFAULT_DB_BRANCH')?.trim() || 'main';
-const defaultDbName = Deno.env.get('PRAXRR_DEFAULT_DB_NAME')?.trim() || 'Praxrr-DB';
+  Deno.env.get('PRAXRR_DEFAULT_DB_URL')?.trim() ||
+  'https://github.com/yandy-r/praxrr-db';
+const defaultDbBranch =
+  Deno.env.get('PRAXRR_DEFAULT_DB_BRANCH')?.trim() || 'main';
+const defaultDbName =
+  Deno.env.get('PRAXRR_DEFAULT_DB_NAME')?.trim() || 'Praxrr-DB';
 
 await pcdManager.link({
   name: defaultDbName,
   repositoryUrl: defaultDbUrl,
   branch: defaultDbBranch,
-  syncStrategy: parseInt(Deno.env.get('PRAXRR_DEFAULT_DB_SYNC_STRATEGY') || '60', 10),
+  syncStrategy: parseInt(
+    Deno.env.get('PRAXRR_DEFAULT_DB_SYNC_STRATEGY') || '60',
+    10
+  ),
   autoPull: true,
   personalAccessToken: defaultDatabaseToken,
   gitUserName: hasCompleteGitIdentity ? defaultDatabaseGitUserName : undefined,
-  gitUserEmail: hasCompleteGitIdentity ? defaultDatabaseGitUserEmail : undefined,
+  gitUserEmail: hasCompleteGitIdentity
+    ? defaultDatabaseGitUserEmail
+    : undefined,
 });
 ```
 

@@ -79,7 +79,11 @@ Deno.test('pcdManager: import orchestration surfaces import failures directly', 
   }
 
   try {
-    const { candidate } = buildTestCandidate('quality-profiles/failing.yaml', { success: false, error: 'mock import failure' }, calls);
+    const { candidate } = buildTestCandidate(
+      'quality-profiles/failing.yaml',
+      { success: false, error: 'mock import failure' },
+      calls
+    );
 
     patch(
       pcdOpsQueries,
@@ -93,7 +97,9 @@ Deno.test('pcdManager: import orchestration surfaces import failures directly', 
     restores.push(__testOnly_resetReadMigrationEntitySources);
     __testOnly_setCompile(() => Promise.resolve({ schema: 0, base: 0, tweaks: 0, user: 0, timing: 0 }));
     restores.push(__testOnly_resetCompile);
-    __testOnly_setGetCache(() => ({ getRawDb: (() => ({})) as unknown as PCDCache['getRawDb'] }) as unknown as PCDCache);
+    __testOnly_setGetCache(
+      () => ({ getRawDb: (() => ({})) as unknown as PCDCache['getRawDb'] }) as unknown as PCDCache
+    );
     restores.push(__testOnly_resetGetCache);
     __testOnly_setWithRepoImportWriteContext(
       async (
@@ -147,7 +153,9 @@ Deno.test('pcdManager: successful migration import still continues orchestration
     restores.push(__testOnly_resetReadMigrationEntitySources);
     __testOnly_setCompile(() => Promise.resolve({ schema: 0, base: 0, tweaks: 0, user: 0, timing: 0 }));
     restores.push(__testOnly_resetCompile);
-    __testOnly_setGetCache(() => ({ getRawDb: (() => ({})) as unknown as PCDCache['getRawDb'] }) as unknown as PCDCache);
+    __testOnly_setGetCache(
+      () => ({ getRawDb: (() => ({})) as unknown as PCDCache['getRawDb'] }) as unknown as PCDCache
+    );
     restores.push(__testOnly_resetGetCache);
     __testOnly_setWithRepoImportWriteContext(
       async (

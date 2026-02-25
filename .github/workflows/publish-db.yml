@@ -6,7 +6,7 @@ on:
       - dev
       - main
     tags:
-      - "db/v*"
+      - 'db/v*'
   workflow_dispatch:
     inputs:
       dry_run:
