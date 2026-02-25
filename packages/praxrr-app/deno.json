@@ -22,6 +22,7 @@
     "$utils/": "./src/lib/server/utils/",
     "$notifications/": "./src/lib/server/notifications/",
     "$sync/": "./src/lib/server/sync/",
+    "$trashguide/": "./src/lib/server/trashguide/",
     "$cache/": "./src/lib/server/utils/cache/",
     "$auth/": "./src/lib/server/utils/auth/"
   },
