@@ -2,9 +2,9 @@ migration:
   format: yaml
   version: 1
   source: pcd-export
-name: Prefer Usenet
+name: Prefer Usenet (Radarr)
 preferredProtocol: prefer_usenet
-usenetDelay: 15
+usenetDelay: 20
 torrentDelay: 0
 bypassIfHighestQuality: false
 bypassIfAboveCfScore: false
