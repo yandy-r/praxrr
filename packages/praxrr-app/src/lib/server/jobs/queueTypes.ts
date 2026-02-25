@@ -8,6 +8,7 @@ export type JobType =
   | 'arr.sync.metadataProfiles'
   | 'arr.pull.startup'
   | 'pcd.sync'
+  | 'trashguide.sync'
   | 'backup.create'
   | 'backup.cleanup'
   | 'logs.cleanup';
@@ -75,6 +76,12 @@ export interface JobHandlerResult {
   output?: string;
   error?: string;
   rescheduleAt?: string | null;
+}
+
+export interface TrashGuideSyncJobPayload {
+  sourceId: number;
+  trigger: 'manual' | 'scheduled';
+  requestedAt?: string;
 }
 
 export type JobHandler = (job: JobQueueRecord) => Promise<JobHandlerResult>;
