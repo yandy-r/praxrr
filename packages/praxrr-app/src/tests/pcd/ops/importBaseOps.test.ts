@@ -230,6 +230,13 @@ Deno.test('importBaseOps: skips entities already present in the base cache', asy
     );
     restores.push(__testOnly_resetGetCache);
 
+    patch(
+      pcdOpsQueries,
+      'listByDatabaseAndOrigin',
+      () => [],
+      restores
+    );
+
     patch(pcdOpsQueries, 'markBaseOrphaned', () => 0, restores);
 
     __testOnly_setCompile(() => Promise.resolve({ schema: 0, base: 0, tweaks: 0, user: 0, timing: 0 }));
@@ -240,6 +247,109 @@ Deno.test('importBaseOps: skips entities already present in the base cache', asy
     assertEquals(result.imported, 0);
     assertEquals(result.orphaned, 0);
     assertEquals(calls, []);
+  } finally {
+    for (const restore of restores.reverse()) {
+      restore();
+    }
+    await Deno.remove(tempDir, { recursive: true });
+  }
+});
+
+Deno.test('importBaseOps: refreshes last_seen_in_repo_at when an entity already exists in published repo base ops', async () => {
+  const restores: Restore[] = [];
+  const databaseId = 9207;
+  const tempDir = await Deno.makeTempDir({ prefix: 'importBaseOps-refresh-seen-' });
+  const updates: Array<{ id: number; lastSeenInRepoAt: string | null | undefined }> = [];
+  let seenAtFromImport: string | null = null;
+
+  try {
+    __testOnly_setReadMigrationEntitySources(() =>
+      Promise.resolve({
+        candidates: [
+          buildCandidate(
+            'quality-profiles/default.yaml',
+            'quality_profile',
+            {
+              key: 'quality_profile_name',
+              value: 'Default',
+              kind: 'stable',
+            },
+            () => Promise.resolve({ success: true })
+          ),
+        ],
+        issues: [],
+      })
+    );
+    restores.push(__testOnly_resetReadMigrationEntitySources);
+
+    __testOnly_setGetCache(
+      () =>
+        ({
+          getRawDb: () => ({
+            prepare: () => ({
+              get: () => ({ exists_in_cache: 1 }),
+            }),
+          }),
+        }) as unknown as PCDCache
+    );
+    restores.push(__testOnly_resetGetCache);
+
+    patch(
+      pcdOpsQueries,
+      'listByDatabaseAndOrigin',
+      (_databaseId: number, _origin: 'base' | 'user', _options?: ListPcdOpsOptions) => [
+        {
+          id: 7001,
+          database_id: databaseId,
+          origin: 'base',
+          state: 'published',
+          source: 'repo',
+          filename: 'entities/quality-profiles/default.yaml#00000.sql',
+          op_number: null,
+          sequence: 4_000_000_000,
+          sql: 'INSERT INTO quality_profiles (name) VALUES ("Default");',
+          metadata: JSON.stringify({
+            operation: 'create',
+            entity: 'quality_profile',
+            name: 'Default',
+            stable_key: {
+              key: 'quality_profile_name',
+              value: 'Default',
+            },
+          }),
+          desired_state: null,
+          content_hash: null,
+          last_seen_in_repo_at: null,
+          superseded_by_op_id: null,
+          pushed_at: null,
+          pushed_commit: null,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        },
+      ],
+      restores
+    );
+
+    patch(pcdOpsQueries, 'update', (_id: number, input: { lastSeenInRepoAt?: string | null }) => {
+      updates.push({ id: _id, lastSeenInRepoAt: input.lastSeenInRepoAt });
+      if (typeof input.lastSeenInRepoAt === 'string') {
+        seenAtFromImport = input.lastSeenInRepoAt;
+      }
+      return true;
+    }, restores);
+
+    patch(pcdOpsQueries, 'markBaseOrphaned', () => 0, restores);
+
+    __testOnly_setCompile(() => Promise.resolve({ schema: 0, base: 0, tweaks: 0, user: 0, timing: 0 }));
+    restores.push(__testOnly_resetCompile);
+
+    const result = await importBaseOps(databaseId, tempDir);
+
+    assertEquals(result.imported, 0);
+    assertEquals(result.orphaned, 0);
+    assertEquals(updates.length, 1);
+    assertEquals(updates[0].id, 7001);
+    assertEquals(typeof seenAtFromImport, 'string');
   } finally {
     for (const restore of restores.reverse()) {
       restore();
@@ -310,6 +420,12 @@ Deno.test('importBaseOps: throws when base cache is unavailable', async () => {
 
     __testOnly_setGetCache(() => undefined as unknown as PCDCache);
     restores.push(__testOnly_resetGetCache);
+    patch(
+      pcdOpsQueries,
+      'listByDatabaseAndOrigin',
+      () => [],
+      restores
+    );
     __testOnly_setCompile(() => Promise.resolve({ schema: 0, base: 0, tweaks: 0, user: 0, timing: 0 }));
     restores.push(__testOnly_resetCompile);
 
@@ -396,12 +512,13 @@ Deno.test(
       __testOnly_setReadMigrationEntitySources(() => Promise.resolve({ candidates, issues: [] }));
       restores.push(__testOnly_resetReadMigrationEntitySources);
 
-      __testOnly_setGetCache(
-        () => ({ getRawDb: (() => ({})) as unknown as PCDCache['getRawDb'] }) as unknown as PCDCache
-      );
-      restores.push(__testOnly_resetGetCache);
+    __testOnly_setGetCache(
+      () => ({ getRawDb: (() => ({})) as unknown as PCDCache['getRawDb'] }) as unknown as PCDCache
+    );
+    restores.push(__testOnly_resetGetCache);
 
-      patch(pcdOpsQueries, 'markBaseOrphaned', () => 1, restores);
+    patch(pcdOpsQueries, 'listByDatabaseAndOrigin', () => [], restores);
+    patch(pcdOpsQueries, 'markBaseOrphaned', () => 1, restores);
 
       __testOnly_setCompile(() => Promise.resolve({ schema: 0, base: 0, tweaks: 0, user: 0, timing: 0 }));
       restores.push(__testOnly_resetCompile);

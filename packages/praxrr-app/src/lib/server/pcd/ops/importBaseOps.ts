@@ -40,6 +40,7 @@ const ENTITY_TABLE_BY_STABLE_KEY = {
   metadata_profile_name: 'lidarr_metadata_profiles',
   delay_profile_name: 'delay_profiles',
 } as const;
+const ENTITY_KEY_SEPARATOR = '::';
 // Entity ops are emitted as synthetic SQL ops and occupy a later sequence band.
 const YAML_SEQUENCE_BASE = 4_000_000_000;
 // Keep YAML entity filenames and op ordering deterministic even when entity counts are large.
@@ -48,6 +49,108 @@ const YAML_SEQUENCE_STRIDE = 10_000;
 type SourceConflictRef = string;
 
 type StableEntityTableKey = keyof typeof ENTITY_TABLE_BY_STABLE_KEY;
+type ParsedPcdOpMetadata = {
+  stable_key?: {
+    key?: string;
+    value?: string;
+  };
+  entity?: string;
+  name?: string;
+};
+
+type RepoOpIndex = {
+  stableIdentityToOpIds: Map<string, number[]>;
+  legacyIdentityToOpIds: Map<string, number[]>;
+};
+
+function stableIdentityLookupKey(identity: MigrationEntityStableIdentity): string {
+  return `${identity.key}${ENTITY_KEY_SEPARATOR}${identity.value}`;
+}
+
+function legacyIdentityLookupKey(entityType: string, name: string): string {
+  return `${entityType}${ENTITY_KEY_SEPARATOR}${name.toLowerCase()}`;
+}
+
+function parsePcdOpMetadata(rawMetadata: string | null): ParsedPcdOpMetadata | null {
+  if (!rawMetadata) return null;
+  try {
+    return JSON.parse(rawMetadata) as ParsedPcdOpMetadata;
+  } catch (_error) {
+    return null;
+  }
+}
+
+function buildPublishedRepoBaseOpIndex(databaseId: number): RepoOpIndex {
+  const ops = pcdOpsQueries.listByDatabaseAndOrigin(databaseId, 'base', {
+    source: 'repo',
+    states: ['published'],
+  });
+
+  const stableIdentityToOpIds = new Map<string, number[]>();
+  const legacyIdentityToOpIds = new Map<string, number[]>();
+
+  for (const op of ops) {
+    const parsed = parsePcdOpMetadata(op.metadata);
+    if (!parsed) continue;
+
+    if (parsed.stable_key?.key && parsed.stable_key.value) {
+      const key = stableIdentityLookupKey({
+        key: parsed.stable_key.key,
+        value: parsed.stable_key.value,
+        kind: 'stable',
+      });
+      const ids = stableIdentityToOpIds.get(key);
+      if (ids) {
+        ids.push(op.id);
+      } else {
+        stableIdentityToOpIds.set(key, [op.id]);
+      }
+      continue;
+    }
+
+    if (parsed.entity && parsed.name) {
+      const key = legacyIdentityLookupKey(parsed.entity, parsed.name);
+      const ids = legacyIdentityToOpIds.get(key);
+      if (ids) {
+        ids.push(op.id);
+      } else {
+        legacyIdentityToOpIds.set(key, [op.id]);
+      }
+    }
+  }
+
+  return { stableIdentityToOpIds, legacyIdentityToOpIds };
+}
+
+function matchingPublishedRepoBaseOpIds(index: RepoOpIndex, candidate: MigrationEntityCandidate): number[] {
+  const stableKey = stableIdentityLookupKey(candidate.stableIdentity);
+  const legacyKey = legacyIdentityLookupKey(candidate.entityType, candidate.stableIdentity.value);
+
+  const matched: number[] = [];
+  const seen = new Set<number>();
+
+  const stableMatchIds = index.stableIdentityToOpIds.get(stableKey);
+  if (stableMatchIds) {
+    for (const id of stableMatchIds) {
+      if (!seen.has(id)) {
+        seen.add(id);
+        matched.push(id);
+      }
+    }
+  }
+
+  const legacyMatchIds = index.legacyIdentityToOpIds.get(legacyKey);
+  if (legacyMatchIds) {
+    for (const id of legacyMatchIds) {
+      if (!seen.has(id)) {
+        seen.add(id);
+        matched.push(id);
+      }
+    }
+  }
+
+  return matched;
+}
 
 function resolveEntityTableForStableKey(stableKey: string): string | null {
   if (Object.prototype.hasOwnProperty.call(ENTITY_TABLE_BY_STABLE_KEY, stableKey)) {
@@ -74,7 +177,6 @@ function hasBaseEntityByStableIdentity(cache: PCDCache, stableIdentity: Migratio
 
   return !!row;
 }
-
 type DeserializeResult = {
   success: boolean;
   filepath?: string;
@@ -220,6 +322,7 @@ export async function importBaseOps(databaseId: number, pcdPath: string): Promis
   if (migrationCandidates.length > 0) {
     await compileForTests(pcdPath, databaseId);
     const sortedCandidates = sortMigrationCandidatesByImportOrder(migrationCandidates);
+    let repoOpIndex: RepoOpIndex | null = null;
 
     for (let i = 0; i < sortedCandidates.length; i++) {
       const candidate = sortedCandidates[i];
@@ -227,6 +330,46 @@ export async function importBaseOps(databaseId: number, pcdPath: string): Promis
       if (!cache) {
         throw new Error(`Cache not available while importing migration entity "${candidate.relativePath}"`);
       }
+      if (hasBaseEntityByStableIdentity(cache, candidate.stableIdentity)) {
+        await logger.warn(`Skipping existing base import entity "${candidate.relativePath}"`, {
+          source: 'PCDImporter',
+          meta: {
+            databaseId,
+            entityType: candidate.entityType,
+            stableIdentity: `${candidate.stableIdentity.key}=${candidate.stableIdentity.value}`,
+          },
+        });
+        continue;
+      }
+
+      if (repoOpIndex === null) {
+        repoOpIndex = buildPublishedRepoBaseOpIndex(databaseId);
+      }
+
+      const matchingRepoOpIds = matchingPublishedRepoBaseOpIds(repoOpIndex, candidate);
+      if (matchingRepoOpIds.length > 0) {
+        let refreshedAny = false;
+
+        for (const opId of matchingRepoOpIds) {
+          const updated = pcdOpsQueries.update(opId, { lastSeenInRepoAt: seenAt });
+          if (updated) {
+            refreshedAny = true;
+          }
+        }
+
+        if (refreshedAny) {
+          await logger.warn(`Skipping existing base import entity "${candidate.relativePath}"`, {
+            source: 'PCDImporter',
+            meta: {
+              databaseId,
+              entityType: candidate.entityType,
+              stableIdentity: `${candidate.stableIdentity.key}=${candidate.stableIdentity.value}`,
+            },
+          });
+          continue;
+        }
+      }
+
       if (hasBaseEntityByStableIdentity(cache, candidate.stableIdentity)) {
         await logger.warn(`Skipping existing base import entity "${candidate.relativePath}"`, {
           source: 'PCDImporter',
