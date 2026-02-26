@@ -176,6 +176,78 @@ Deno.test('importBaseOps: throws on duplicate migration stable identities during
   }
 });
 
+Deno.test('importBaseOps: skips entities already present in the base cache', async () => {
+  const restores: Restore[] = [];
+  const databaseId = 9206;
+  const tempDir = await Deno.makeTempDir({ prefix: 'importBaseOps-skip-existing-' });
+  const calls: string[] = [];
+
+  try {
+    __testOnly_setReadMigrationEntitySources(() =>
+      Promise.resolve({
+        candidates: [
+          buildCandidate(
+            'quality-profiles/default.yaml',
+            'quality_profile',
+            {
+              key: 'quality_profile_name',
+              value: 'Default',
+              kind: 'stable',
+            },
+            () => {
+              calls.push('quality_profile');
+              return Promise.resolve({ success: true });
+            }
+          ),
+          buildCandidate(
+            'custom-formats/legacy.yaml',
+            'custom_format',
+            {
+              key: 'custom_format_name',
+              value: 'Legacy Custom',
+              kind: 'stable',
+            },
+            () => {
+              calls.push('custom_format');
+              return Promise.resolve({ success: true });
+            }
+          ),
+        ],
+        issues: [],
+      })
+    );
+    restores.push(__testOnly_resetReadMigrationEntitySources);
+
+    __testOnly_setGetCache(
+      () =>
+        ({
+          getRawDb: () => ({
+            prepare: () => ({
+              get: () => ({ exists_in_cache: 1 }),
+            }),
+          }),
+        }) as unknown as PCDCache
+    );
+    restores.push(__testOnly_resetGetCache);
+
+    patch(pcdOpsQueries, 'markBaseOrphaned', () => 0, restores);
+
+    __testOnly_setCompile(() => Promise.resolve({ schema: 0, base: 0, tweaks: 0, user: 0, timing: 0 }));
+    restores.push(__testOnly_resetCompile);
+
+    const result = await importBaseOps(databaseId, tempDir);
+
+    assertEquals(result.imported, 0);
+    assertEquals(result.orphaned, 0);
+    assertEquals(calls, []);
+  } finally {
+    for (const restore of restores.reverse()) {
+      restore();
+    }
+    await Deno.remove(tempDir, { recursive: true });
+  }
+});
+
 Deno.test('importBaseOps: throws MigrationReaderError when migration reader returns issues', async () => {
   const restores: Restore[] = [];
   const databaseId = 9204;
