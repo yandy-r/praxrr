@@ -344,6 +344,19 @@ export class ConverterWriteError extends Error {
   }
 }
 
+/**
+ * Convert all (or a filtered subset of) entities from a compiled PCD cache to portable files on disk.
+ *
+ * Serializes each entity using its registered serializer, formats the payload as JSON or YAML, and
+ * writes it to `outputDir/<entityFamily>/<slug>.<ext>`. Throws on config errors, serialization
+ * failures, or write failures, each including a partial `ConvertReport`.
+ *
+ * @param options - Conversion options including cache, output dir, format, overwrite flag, and entity filter
+ * @returns A full report of written, failed, and total files per entity type
+ * @throws {ConverterConfigError} When the output directory cannot be prepared
+ * @throws {ConverterSerializationError} When one or more entities fail to serialize or format
+ * @throws {ConverterWriteError} When one or more entity files cannot be written to disk
+ */
 export async function convertCompiledCacheToEntities(options: ConvertOptions): Promise<ConvertReport> {
   const outputDir = normalizeOutputDir(options.outputDir);
   const format = normalizeOutputFormat(options.format);

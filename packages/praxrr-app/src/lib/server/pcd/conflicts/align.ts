@@ -25,6 +25,15 @@ function getGroupId(op: PcdOp): string | null {
   }
 }
 
+/**
+ * Align (drop) a conflicting published user op and recompile the database cache.
+ *
+ * If the op belongs to a group, all ops in the same group are dropped together.
+ *
+ * @param input.databaseId - The PCD database instance ID
+ * @param input.opId - The ID of the conflicting user op to drop
+ * @returns Result indicating success or a descriptive error message
+ */
 export async function alignConflict(input: { databaseId: number; opId: number }): Promise<AlignConflictResult> {
   const { databaseId, opId } = input;
 

@@ -74,6 +74,20 @@ function consumeRepoImportIdentity(layer: OperationLayer, source: PcdOpSource): 
   };
 }
 
+/**
+ * Run a callback inside an async-local write context that marks operations as repo-sourced base imports.
+ *
+ * Operations written within this context receive `origin='base'`, `state='published'`, and
+ * deterministic synthetic filenames derived from `filenamePrefix` and a per-call index.
+ *
+ * @param options.filenamePrefix - Prefix used to build synthetic op filenames
+ * @param options.sequenceStart - Sequence number assigned to the first emitted op
+ * @param options.maxOperations - Maximum number of SQL ops allowed within the callback
+ * @param options.lastSeenInRepoAt - ISO timestamp recorded as the repo-seen date for each op
+ * @param callback - Async callback that performs the import writes
+ * @returns The resolved value of the callback
+ * @throws {Error} When the callback emits more ops than `maxOperations`
+ */
 export async function withRepoImportWriteContext<T>(
   options: {
     filenamePrefix: string;
@@ -271,6 +285,14 @@ function runValueGuardGate(
   }
 }
 
+/**
+ * Run a value-guard gate against a set of SQL operations on the given layer, exposed for testing.
+ *
+ * @param databaseId - The PCD database instance ID
+ * @param layer - The operation layer to gate (`'user'` gates are enforced; others pass through)
+ * @param operations - SQL operations to validate
+ * @returns `{ ok: true }` if all guards pass, or `{ ok: false, error }` with the first failure reason
+ */
 export function __testOnly_runValueGuardGate(
   databaseId: number,
   layer: OperationLayer,
@@ -720,6 +742,14 @@ async function writeOperationsFromSqlOperations(options: WriteSqlOperationsOptio
   }
 }
 
+/**
+ * Write a single operation to a PCD layer using compiled Kysely queries.
+ *
+ * Compiles each query to SQL and delegates to the internal SQL writer without running the value-guard gate.
+ *
+ * @param options - Write options including database ID, layer, queries, metadata, and desired state
+ * @returns Write result indicating success or failure with an error message
+ */
 export function writeOperation(options: WriteOptions): Promise<WriteResult> {
   const sqlContent = options.queries.map(compiledQueryToSql).join(';\n\n');
   return writeOperationsFromSqlOperations({
@@ -738,6 +768,14 @@ export function writeOperation(options: WriteOptions): Promise<WriteResult> {
   });
 }
 
+/**
+ * Write one or more raw SQL operations to a PCD layer, running the value-guard gate first.
+ *
+ * Intended for bulk or import flows where SQL is provided directly rather than via Kysely queries.
+ *
+ * @param options - Write options including database ID, layer, SQL operations, and optional source override
+ * @returns Write result indicating success or failure with an error message
+ */
 export function writeOperationsFromSql(options: WriteSqlOperationsOptions): Promise<WriteResult> {
   return writeOperationsFromSqlOperations({
     ...options,

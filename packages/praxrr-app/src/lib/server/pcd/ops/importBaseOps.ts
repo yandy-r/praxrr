@@ -256,6 +256,12 @@ type TestOnlyStableIdentityMigrationEntry = {
   readonly sourcePath: string;
 };
 
+/**
+ * Test-only helper to validate that no two migration entries share the same stable identity.
+ *
+ * @param migrationEntries - Array of entries with optional stable identities and source paths
+ * @throws {Error} When duplicate stable identities are detected across entries
+ */
 export function __testOnly_validateStableIdentityConflicts(
   migrationEntries: ReadonlyArray<TestOnlyStableIdentityMigrationEntry>
 ): void {
@@ -272,40 +278,76 @@ export interface ImportBaseOpsResult {
   orphaned: number;
 }
 
+/**
+ * Test-only: replace the migration entity source reader with a custom implementation.
+ *
+ * @param reader - Replacement async reader function that returns candidates and issues
+ */
 export function __testOnly_setReadMigrationEntitySources(
   reader: (pcdPath: string) => Promise<{ candidates: MigrationEntityCandidate[]; issues: MigrationReaderIssue[] }>
 ): void {
   readMigrationEntitySourcesForTests = reader;
 }
 
+/** Test-only: restore the migration entity source reader to its default implementation. */
 export function __testOnly_resetReadMigrationEntitySources(): void {
   readMigrationEntitySourcesForTests = readMigrationEntitySources;
 }
 
+/**
+ * Test-only: replace the cache compiler with a custom implementation.
+ *
+ * @param compilerFn - Replacement compiler function
+ */
 export function __testOnly_setCompile(compilerFn: typeof compile): void {
   compileForTests = compilerFn;
 }
 
+/** Test-only: restore the cache compiler to its default implementation. */
 export function __testOnly_resetCompile(): void {
   compileForTests = compile;
 }
 
+/**
+ * Test-only: replace the repo import write context runner with a custom implementation.
+ *
+ * @param writer - Replacement write context runner
+ */
 export function __testOnly_setWithRepoImportWriteContext(writer: RepoImportWriteContextRunner): void {
   withRepoImportWriteContextForTests = writer;
 }
 
+/** Test-only: restore the repo import write context runner to its default implementation. */
 export function __testOnly_resetWithRepoImportWriteContext(): void {
   withRepoImportWriteContextForTests = withRepoImportWriteContext as unknown as RepoImportWriteContextRunner;
 }
 
+/**
+ * Test-only: replace the cache getter with a custom implementation.
+ *
+ * @param getCacheImpl - Replacement cache getter function
+ */
 export function __testOnly_setGetCache(getCacheImpl: typeof getCache): void {
   getCacheForTests = getCacheImpl;
 }
 
+/** Test-only: restore the cache getter to its default implementation. */
 export function __testOnly_resetGetCache(): void {
   getCacheForTests = getCache;
 }
 
+/**
+ * Import base ops for a PCD database from YAML entity sources on disk.
+ *
+ * Reads migration entity candidates from `pcdPath/entities`, validates for duplicate stable
+ * identities, skips already-imported entities, and writes new ops via the repo import write
+ * context. Marks previously-seen base ops as orphaned when they no longer appear in the repo.
+ *
+ * @param databaseId - The PCD database instance ID
+ * @param pcdPath - Filesystem path to the PCD repository
+ * @returns Counts of imported and orphaned ops
+ * @throws {MigrationReaderError} When entity source files contain parse or validation issues
+ */
 export async function importBaseOps(databaseId: number, pcdPath: string): Promise<ImportBaseOpsResult> {
   const migrationReaderResult = await readMigrationEntitySourcesForTests(pcdPath);
 

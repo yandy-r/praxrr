@@ -13,6 +13,18 @@ const UPDATE_RULES: UpdateRule[] = [
 
 const DELETE_RULES: DeleteRule[] = [missingTargetDeleteRule];
 
+/**
+ * Evaluate whether a conflicting user op should be automatically aligned based on the configured strategy.
+ *
+ * Applies the `force_align_strategy` shortcut when the strategy is `'align'`, then delegates to
+ * registered delete/update rules to determine if auto-alignment is appropriate.
+ *
+ * @param input.db - In-memory PCD cache database
+ * @param input.conflictStrategy - Configured conflict resolution strategy for the database
+ * @param input.metadata - Parsed op metadata, or null if unavailable
+ * @param input.desiredState - Parsed desired state object, or null if unavailable
+ * @returns Decision object indicating whether to align and the matching rule/reason
+ */
 export function evaluateAutoAlign(input: {
   db: Database;
   conflictStrategy: ConflictStrategy;
@@ -59,6 +71,12 @@ export function evaluateAutoAlign(input: {
   return { shouldAlign: false, reason: 'none' };
 }
 
+/**
+ * Parse raw op metadata JSON into a structured `ParsedOpMetadata` object.
+ *
+ * @param raw - Raw JSON string from the `metadata` column, or null
+ * @returns Parsed metadata object, or null if the input is empty or unparseable
+ */
 export function parseOpMetadata(raw: string | null): ParsedOpMetadata | null {
   if (!raw) return null;
   try {
@@ -68,6 +86,12 @@ export function parseOpMetadata(raw: string | null): ParsedOpMetadata | null {
   }
 }
 
+/**
+ * Parse raw desired-state JSON into an untyped record.
+ *
+ * @param raw - Raw JSON string from the `desired_state` column, or null
+ * @returns Parsed record, or null if the input is empty or unparseable
+ */
 export function parseDesiredState(raw: string | null): Record<string, unknown> | null {
   if (!raw) return null;
   try {

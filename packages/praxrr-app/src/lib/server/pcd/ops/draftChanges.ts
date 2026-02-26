@@ -699,6 +699,15 @@ function buildSections(entity: string, aggregates: Map<string, FieldAggregate>):
   return [{ id: 'changes', title: 'Changes', rows: fallbackRows }];
 }
 
+/**
+ * List all pending draft entity changes for a PCD database, grouped by entity.
+ *
+ * Reads draft base ops, aggregates field-level diffs per entity key, resolves rename chains,
+ * and returns a sorted list of changes including sections, dependencies, and group membership.
+ *
+ * @param databaseId - The PCD database instance ID
+ * @returns Array of aggregated draft entity changes ordered by most-recently-updated first
+ */
 export function listDraftEntityChanges(databaseId: number): DraftEntityChange[] {
   const ops = pcdOpsQueries.listByDatabaseAndOrigin(databaseId, 'base', { states: ['draft'] });
   const parsedOps = ops.map((op) => ({

@@ -48,6 +48,16 @@ function isSchemaDependencyUrl(repoUrl: string): boolean {
   return SCHEMA_DEPENDENCY_PATTERN.test(normalizeDependencyUrlForSchemaMatch(repoUrl));
 }
 
+/**
+ * Resolve the canonical schema dependency URL from a manifest's `dependencies` map.
+ *
+ * Returns the default schema URL when no dependencies are declared. Throws when multiple
+ * schema-like dependency URLs are found or when no schema dependency is present.
+ *
+ * @param dependencies - The `dependencies` record from a manifest, or undefined
+ * @returns The resolved schema dependency URL
+ * @throws {ManifestValidationError} When dependency resolution is ambiguous or missing
+ */
 export function resolveSchemaDependencyUrl(dependencies: Record<string, string> | undefined): string {
   if (!dependencies || Object.keys(dependencies).length === 0) {
     return SCHEMA_DEPENDENCY_URL;

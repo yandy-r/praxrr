@@ -131,10 +131,23 @@ const ENTITY_STABLE_KEY_BY_TYPE: Readonly<Record<EntityType, string>> = {
   lidarr_metadata_profile: 'metadata_profile_name',
 };
 
+/**
+ * Return the ordered list of all supported migration entity family descriptors.
+ *
+ * @returns Read-only array of entity family descriptors in canonical import order
+ */
 export function listMigrationEntityFamilies(): readonly MigrationEntityFamilyDescriptor[] {
   return MIGRATION_ENTITY_FAMILY_SEQUENCE;
 }
 
+/**
+ * Enumerate all entity names of a single entity type from the compiled cache.
+ *
+ * @param cache - Compiled PCD cache to query
+ * @param entityType - The entity type to enumerate
+ * @returns Array of entity descriptors with stable identities
+ * @throws {Error} When the entity type is not supported for migration enumeration
+ */
 export function enumerateMigrationEntityFamily(
   cache: PCDCache,
   entityType: EntityType
@@ -154,6 +167,15 @@ export function enumerateMigrationEntityFamily(
   }));
 }
 
+/**
+ * Enumerate all migration entity descriptors from the compiled cache, optionally filtered by type.
+ *
+ * Iterates entity families in canonical import order and queries the cache for each family's names.
+ *
+ * @param cache - Compiled PCD cache to query
+ * @param options.entityTypes - Optional allowlist of entity types to include (all types if omitted)
+ * @returns Flat array of entity descriptors with stable identities in family order
+ */
 export function enumerateMigrationEntities(
   cache: PCDCache,
   options: {

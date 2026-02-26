@@ -96,6 +96,16 @@ async function overrideEntity(
   }
 }
 
+/**
+ * Override a conflicting published user op by dropping it and re-generating the op from current state.
+ *
+ * For delete ops the old op is simply dropped. For create/update ops the old op is dropped, the cache
+ * is recompiled to clean state, and a fresh replacement op is written via the entity override handler.
+ *
+ * @param input.databaseId - The PCD database instance ID
+ * @param input.opId - The ID of the conflicting user op to override
+ * @returns Result indicating success or a descriptive error message
+ */
 export async function overrideConflict(input: { databaseId: number; opId: number }): Promise<OverrideConflictResult> {
   const { databaseId, opId } = input;
 

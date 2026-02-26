@@ -407,6 +407,15 @@ async function pushHeadToBranch(repoPath: string, branch: string): Promise<void>
   await execGit(['push', 'origin', `HEAD:refs/heads/${branch}`], repoPath);
 }
 
+/**
+ * Build a preview of a pending draft export without committing anything.
+ *
+ * @param databaseId - The PCD database instance ID
+ * @param opIds - Draft op IDs to include in the export
+ * @param message - Commit message for the export
+ * @param filePaths - Additional working-tree file paths to include
+ * @returns A preview result containing preflight checks, plan details, and git identity
+ */
 export async function previewDraftOps(
   databaseId: number,
   opIds: number[],
@@ -478,6 +487,16 @@ export async function previewDraftOps(
   };
 }
 
+/**
+ * Commit and push selected draft ops (and optional file changes) to the remote PCD repository.
+ *
+ * @param databaseId - The PCD database instance ID
+ * @param opIds - Draft op IDs to export
+ * @param message - Commit message
+ * @param exportedAtOverride - Optional ISO timestamp to use as the export date instead of now
+ * @param filePaths - Additional working-tree file paths to stage alongside the ops
+ * @returns Export result with filename, new op ID, and counts; or an error string
+ */
 export async function exportDraftOps(
   databaseId: number,
   opIds: number[],

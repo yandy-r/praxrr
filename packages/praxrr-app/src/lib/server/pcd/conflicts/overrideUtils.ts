@@ -20,6 +20,12 @@ export type StoredDesiredState = Record<string, unknown>;
 
 // ── Parsing ──
 
+/**
+ * Safely parse a JSON string into a typed value.
+ *
+ * @param raw - Raw JSON string to parse, or null
+ * @returns Parsed value cast to `T`, or null if the input is empty or unparseable
+ */
 export function parseJson<T>(raw: string | null): T | null {
   if (!raw) return null;
   try {
@@ -29,6 +35,12 @@ export function parseJson<T>(raw: string | null): T | null {
   }
 }
 
+/**
+ * Extract the numeric op ID from a `pcd_ops:<id>` filepath string.
+ *
+ * @param path - Filepath string of the form `pcd_ops:<id>`, or null/undefined
+ * @returns The numeric op ID, or null if the path is absent or malformed
+ */
 export function parseOpIdFromFilepath(path?: string | null): number | null {
   if (!path) return null;
   if (!path.startsWith('pcd_ops:')) return null;
@@ -38,6 +50,14 @@ export function parseOpIdFromFilepath(path?: string | null): number | null {
 
 // ── Op lifecycle ──
 
+/**
+ * Mark an op as superseded by a newer op and record the transition in history.
+ *
+ * @param databaseId - The PCD database instance ID
+ * @param oldOpId - ID of the op to supersede
+ * @param newOpId - ID of the replacement op, or null (no-op when null)
+ * @returns `true` if the op was successfully updated, `false` otherwise
+ */
 export async function supersedeOp(databaseId: number, oldOpId: number, newOpId: number | null): Promise<boolean> {
   if (!newOpId) return false;
   const updated = pcdOpsQueries.update(oldOpId, {
@@ -55,6 +75,13 @@ export async function supersedeOp(databaseId: number, oldOpId: number, newOpId: 
   return true;
 }
 
+/**
+ * Mark an op as dropped and record the transition in history.
+ *
+ * @param databaseId - The PCD database instance ID
+ * @param opId - ID of the op to drop
+ * @returns `true` if the op was successfully updated, `false` otherwise
+ */
 export async function dropOp(databaseId: number, opId: number): Promise<boolean> {
   const updated = pcdOpsQueries.update(opId, { state: 'dropped' });
   if (!updated) return false;
@@ -156,20 +183,42 @@ function extractRenamesFromSql(sql: string, tableName: string, renameMap: Map<st
 
 // ── Value helpers ──
 
+/**
+ * Type guard that checks whether a value has a `to` property (i.e. is a from/to change record).
+ *
+ * @param value - Value to inspect
+ * @returns `true` if `value` is a non-null object containing a `to` key
+ */
 export function isFromTo(value: unknown): value is { to: unknown } {
-  return !!value && typeof value === 'object' && 'to' in value;
-}
 
+/**
+ * Extract the `to` value from a from/to change record, returning `undefined` when absent.
+ *
+ * @param value - The value to inspect
+ * @returns The `to` field cast to `T`, or `undefined` if `value` is not a from/to record
+ */
 export function getDesiredTo<T = unknown>(value: unknown): T | undefined {
   if (!isFromTo(value)) return undefined;
   return value.to as T;
 }
 
+/**
+ * Coerce a value to a trimmed string, returning an empty string for null/undefined.
+ *
+ * @param value - Value to normalize
+ * @returns String representation of `value`, or `''` if null or undefined
+ */
 export function normalizeText(value: unknown): string {
   if (value === null || value === undefined) return '';
   return String(value);
 }
 
+/**
+ * Normalize a tag array to a deduplicated, sorted list of non-empty strings.
+ *
+ * @param value - Raw value to normalize (non-arrays return an empty list)
+ * @returns Sorted, deduplicated array of tag strings
+ */
 export function normalizeTags(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
   const set = new Set<string>();
@@ -180,6 +229,13 @@ export function normalizeTags(value: unknown): string[] {
   return Array.from(set).sort();
 }
 
+/**
+ * Compare two tag arrays for equality regardless of order.
+ *
+ * @param a - First tag array
+ * @param b - Second tag array
+ * @returns `true` if both arrays contain the same tags after sorting
+ */
 export function tagsEqual(a: string[], b: string[]): boolean {
   if (a.length !== b.length) return false;
   const sortedA = [...a].sort();
@@ -187,6 +243,15 @@ export function tagsEqual(a: string[], b: string[]): boolean {
   return sortedA.every((value, idx) => value === sortedB[idx]);
 }
 
+/**
+ * Normalize a raw ordered-items array to a stable, position-sorted structure.
+ *
+ * Handles flexible input shapes (camelCase/snake_case, member strings vs. objects) and sorts
+ * group members alphabetically.
+ *
+ * @param items - Raw items value (non-arrays return an empty list)
+ * @returns Normalized array of ordered-item objects sorted by position
+ */
 export function normalizeOrderedItems(items: unknown): Array<{
   type?: string;
   name?: string;
@@ -224,12 +289,26 @@ export function normalizeOrderedItems(items: unknown): Array<{
     .sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
 }
 
+/**
+ * Compare two ordered-items arrays for equality using normalized, position-sorted comparison.
+ *
+ * @param a - First ordered-items value
+ * @param b - Second ordered-items value
+ * @returns `true` if the normalized representations are identical
+ */
 export function orderedItemsEqual(a: unknown, b: unknown): boolean {
   const left = normalizeOrderedItems(a);
   const right = normalizeOrderedItems(b);
   return JSON.stringify(left) === JSON.stringify(right);
 }
 
+/**
+ * Compare an expected value to an actual DB value with type coercion for booleans and numbers.
+ *
+ * @param expected - The desired target value
+ * @param actual - The current value from the database row
+ * @returns `true` if the values are semantically equal after coercion
+ */
 export function valuesEqual(expected: unknown, actual: unknown): boolean {
   if (expected === null || expected === undefined) {
     return actual === null || actual === undefined;
