@@ -199,6 +199,9 @@ function toCustomFormatScores(
       item.score !== null
         ? item.score
         : resolveScoreFromCustomFormat(entity, resolved.customFormat, scoreSet, item.custom_format_trash_id);
+    if (score === null) {
+      continue;
+    }
 
     scoresByCustomFormat.set(resolved.customFormatName, {
       customFormatName: resolved.customFormatName,
@@ -276,11 +279,9 @@ function resolveScoreFromCustomFormat(
   customFormat: TrashGuideCustomFormatEntity | null,
   scoreSet: string,
   customFormatTrashId: string | null
-): number {
+): number | null {
   if (!customFormat || customFormatTrashId === null) {
-    throw new Error(
-      `Quality profile "${entity.name}" has a format item without explicit score and without a resolvable custom format trash_id`
-    );
+    return null;
   }
 
   const scoreBySet = customFormat.scores[scoreSet];
@@ -292,10 +293,7 @@ function resolveScoreFromCustomFormat(
   if (typeof fallbackScore === 'number' && Number.isFinite(fallbackScore)) {
     return fallbackScore;
   }
-
-  throw new Error(
-    `Quality profile "${entity.name}" references custom format "${customFormat.name}" without a score in set "${scoreSet}" and without a usable default score`
-  );
+  return null;
 }
 
 function normalizeQualityList(

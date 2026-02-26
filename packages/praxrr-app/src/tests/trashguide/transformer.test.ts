@@ -200,7 +200,7 @@ Deno.test('transformTrashGuideEntities tracks rename by stable trash_id identity
 });
 
 Deno.test(
-  'transformTrashGuideEntities throws when custom format default score is missing and no profile score set exists',
+  'transformTrashGuideEntities skips custom format scores when score_set and default scores are not available',
   () => {
     const customFormatWithoutDefaultScore = createCustomFormatEntity({
       trash_id: ALPHA_CF_ID,
@@ -223,19 +223,15 @@ Deno.test(
 
     const parsed = createParseResult('radarr', [customFormatWithoutDefaultScore, profileUsingTrashIdReference]);
 
-    const transform = () =>
-      transformTrashGuideEntities({
-        sourceId: 12,
-        arrType: 'radarr',
-        parsed,
-        existingMappings: [],
-      });
+    const result = transformTrashGuideEntities({
+      sourceId: 12,
+      arrType: 'radarr',
+      parsed,
+      existingMappings: [],
+    });
 
-    assertThrows(
-      transform,
-      Error,
-      'references custom format "Scored by profile only" without a score in set "unknown-score-set"'
-    );
+    const profileData = getQualityProfileData(result);
+    assertEquals(profileData.customFormatScores, []);
   }
 );
 
