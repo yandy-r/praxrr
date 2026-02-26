@@ -2,12 +2,11 @@ import { error, fail } from '@sveltejs/kit';
 import type { ServerLoad, Actions } from '@sveltejs/kit';
 import { arrInstancesQueries } from '$db/queries/arrInstances.ts';
 import { arrSyncQueries, type SyncTrigger, type ProfileSelection } from '$db/queries/arrSync.ts';
-import { trashGuideEntityCacheQueries, type TrashGuideEntityType } from '$db/queries/trashGuideEntityCache.ts';
+import { trashGuideEntityCacheQueries } from '$db/queries/trashGuideEntityCache.ts';
 import {
   trashGuideSyncQueries,
   TrashGuideSyncScopeError,
   TrashGuideSyncValidationError,
-  type TrashGuideSyncSectionType,
   type TrashGuideSyncSelectionInput,
   type TrashGuideSyncTrigger,
 } from '$db/queries/trashGuideSync.ts';
@@ -63,65 +62,24 @@ type SyncPreviewRouteState = {
   error: string | null;
 };
 
-interface TrashGuideAvailableSelectionGroup {
-  sectionType: TrashGuideSyncSectionType;
-  label: string;
-  items: string[];
-}
-
-const TRASH_GUIDE_SECTION_LABELS: Record<TrashGuideSyncSectionType, string> = {
-  qualityProfiles: 'Quality Profiles',
-  customFormats: 'Custom Formats',
-  qualityDefinitions: 'Quality Definitions',
-  naming: 'Naming',
-  mediaManagement: 'Media Management',
-};
-
-const TRASH_GUIDE_SECTION_ORDER: readonly TrashGuideSyncSectionType[] = [
-  'qualityProfiles',
-  'customFormats',
-  'qualityDefinitions',
-  'naming',
-];
-
-const TRASH_ENTITY_SECTION_MAP: Record<TrashGuideEntityType, TrashGuideSyncSectionType> = {
-  quality_profile: 'qualityProfiles',
-  custom_format: 'customFormats',
-  quality_size: 'qualityDefinitions',
-  naming: 'naming',
-};
-
-function buildTrashGuideAvailableSelections(sourceId: number): TrashGuideAvailableSelectionGroup[] {
-  const grouped = new Map<TrashGuideSyncSectionType, Set<string>>();
-  for (const sectionType of TRASH_GUIDE_SECTION_ORDER) {
-    grouped.set(sectionType, new Set<string>());
+function buildTrashGuideAvailableSelections(sourceId: number, selectedQualityProfiles: string[]): string[] {
+  const names = new Set<string>();
+  const cachedProfiles = trashGuideEntityCacheQueries.getBySourceAndType(sourceId, 'quality_profile');
+  for (const profile of cachedProfiles) {
+    const normalized = profile.name.trim();
+    if (normalized.length > 0) {
+      names.add(normalized);
+    }
   }
 
-  const entities = trashGuideEntityCacheQueries.getBySource(sourceId);
-  for (const entity of entities) {
-    const sectionType = TRASH_ENTITY_SECTION_MAP[entity.entityType];
-    const normalizedName = entity.name.trim();
-    if (!sectionType || normalizedName.length === 0) {
-      continue;
+  for (const selected of selectedQualityProfiles) {
+    const normalized = selected.trim();
+    if (normalized.length > 0) {
+      names.add(normalized);
     }
-
-    grouped.get(sectionType)?.add(normalizedName);
   }
 
-  return TRASH_GUIDE_SECTION_ORDER.flatMap((sectionType) => {
-    const values = grouped.get(sectionType);
-    if (!values || values.size === 0) {
-      return [];
-    }
-
-    return [
-      {
-        sectionType,
-        label: TRASH_GUIDE_SECTION_LABELS[sectionType],
-        items: [...values].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' })),
-      },
-    ];
-  });
+  return [...names].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
 }
 
 function getSyncPreviewRouteState(instanceId: number, previewId: string | null): SyncPreviewRouteState {
@@ -353,16 +311,18 @@ export const load: ServerLoad = async ({ params, url }) => {
 
   // Load existing sync data
   const syncData = arrSyncQueries.getFullSyncData(id);
-  const trashGuideSyncBySource = trashGuideSyncQueries.getSourceHydrationByInstance(id).map((source) => ({
-    ...source,
-    availableSelections: buildTrashGuideAvailableSelections(source.sourceId),
-  }));
+  const trashGuideQualityProfilesBySource = trashGuideSyncQueries
+    .getQualityProfileSourceHydrationByInstance(id)
+    .map((source) => ({
+      ...source,
+      availableQualityProfiles: buildTrashGuideAvailableSelections(source.sourceId, source.selectedQualityProfiles),
+    }));
 
   return {
     instance,
     databases: databasesWithProfiles,
     syncData,
-    trashGuideSyncBySource,
+    trashGuideQualityProfilesBySource,
     metadataProfilesSupported: canLoadMetadataProfiles,
     syncPreview,
   };

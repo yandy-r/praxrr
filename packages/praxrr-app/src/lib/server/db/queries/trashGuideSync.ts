@@ -152,6 +152,14 @@ export interface TrashGuideSyncSourceHydration {
   selections: TrashGuideSyncSelection[];
 }
 
+export interface TrashGuideSyncQualityProfileSourceHydration {
+  sourceId: number;
+  sourceName: string;
+  sourceArrType: TrashGuideSourceArrType;
+  config: TrashGuideSyncConfig | null;
+  selectedQualityProfiles: string[];
+}
+
 export interface TrashGuideSyncConfigInput {
   instanceId: number;
   sourceId: number;
@@ -375,6 +383,45 @@ export const trashGuideSyncQueries = {
       config: trashGuideSyncQueries.getConfig(instanceId, row.source_id) ?? null,
       selections: trashGuideSyncQueries.getSelections(instanceId, row.source_id),
     }));
+  },
+
+  /**
+   * Return source-grouped TRaSH sync state scoped to quality profile selections only.
+   */
+  getQualityProfileSourceHydrationByInstance(instanceId: number): TrashGuideSyncQualityProfileSourceHydration[] {
+    const rows = db.query<TrashGuideSyncSourceRow>(
+      `SELECT s.id AS source_id,
+              s.name AS source_name,
+              s.arr_type AS source_arr_type
+         FROM arr_instances ai
+         JOIN trash_guide_sources s ON s.arr_type = ai.type
+        WHERE ai.id = ?
+          AND s.enabled = 1
+        ORDER BY s.name`,
+      instanceId
+    );
+
+    return rows.map((row) => {
+      const selectedQualityProfiles = trashGuideSyncQueries
+        .getSelections(instanceId, row.source_id)
+        .flatMap((selection) => {
+          if (selection.sectionType !== 'qualityProfiles') {
+            return [];
+          }
+
+          const normalized = selection.itemName.trim();
+          return normalized.length > 0 ? [normalized] : [];
+        })
+        .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+
+      return {
+        sourceId: row.source_id,
+        sourceName: row.source_name,
+        sourceArrType: parseTrashGuideSourceArrType(row.source_arr_type),
+        config: trashGuideSyncQueries.getConfig(instanceId, row.source_id) ?? null,
+        selectedQualityProfiles: [...new Set(selectedQualityProfiles)],
+      };
+    });
   },
 
   /**

@@ -189,7 +189,7 @@ const trashGuideSyncHandler: JobHandler = async (job) => {
     );
   }
 
-  if (!updates.hasUpdates) {
+  if (!updates.hasUpdates && payload.trigger !== 'manual') {
     trashGuideSourcesQueries.updateSyncMetadata(payload.sourceId, { lastSyncedAt: new Date().toISOString() });
     return {
       status: 'skipped',

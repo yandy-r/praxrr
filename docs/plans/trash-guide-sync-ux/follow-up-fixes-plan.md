@@ -42,22 +42,22 @@ acceptance criteria, and validation commands.
 
 ### Workstream A: Sync page consolidation (TRaSH quality profiles only)
 
-- [ ] A1. Remove standalone `TrashGuideSources` section from `/arr/{id}/sync`.
+- [x] A1. Remove standalone `TrashGuideSources` section from `/arr/{id}/sync`.
   - Files:
     - `packages/praxrr-app/src/routes/arr/[id]/sync/+page.svelte`
     - `packages/praxrr-app/src/routes/arr/[id]/sync/components/TrashGuideSources.svelte` (remove or
       deprecate)
-- [ ] A2. Refactor sync data contract so only TRaSH quality-profile selections are surfaced for this
+- [x] A2. Refactor sync data contract so only TRaSH quality-profile selections are surfaced for this
       UX.
   - Files:
     - `packages/praxrr-app/src/routes/arr/[id]/sync/+page.server.ts`
     - `packages/praxrr-app/src/lib/server/db/queries/trashGuideSync.ts`
-- [ ] A3. Extend `QualityProfiles.svelte` with integrated TRaSH source filtering + search in its
+- [x] A3. Extend `QualityProfiles.svelte` with integrated TRaSH source filtering + search in its
       primary section.
   - Files:
     - `packages/praxrr-app/src/routes/arr/[id]/sync/components/QualityProfiles.svelte`
     - `packages/praxrr-app/src/routes/arr/[id]/sync/+page.svelte`
-- [ ] A4. Keep sync actions consistent: save/sync still call existing section actions; no new sync
+- [x] A4. Keep sync actions consistent: save/sync still call existing section actions; no new sync
       section added.
 
 Acceptance for Workstream A:
@@ -129,10 +129,10 @@ Acceptance for Workstream D:
 
 ## Verification checklist
 
-- [ ] `deno task check`
-- [ ] `deno task test packages/praxrr-app/src/tests/base/trashGuideSyncUxFlows.test.ts`
-- [ ] `deno task test packages/praxrr-app/src/tests/base/trashGuideSyncSourceScope.test.ts`
-- [ ] `deno task test packages/praxrr-app/src/tests/arr/lidarrMediaManagement.test.ts`
+- [x] `deno task check`
+- [x] `deno task test packages/praxrr-app/src/tests/base/trashGuideSyncUxFlows.test.ts`
+- [x] `deno task test packages/praxrr-app/src/tests/base/trashGuideSyncSourceScope.test.ts`
+- [x] `deno task test packages/praxrr-app/src/tests/arr/lidarrMediaManagement.test.ts`
 - [ ] Manual UI pass:
   - [ ] `/arr/{id}/sync`: no standalone TRaSH section; quality profiles only.
   - [ ] `/custom-formats/{databaseId}`: source filter is dropdown and scalable.

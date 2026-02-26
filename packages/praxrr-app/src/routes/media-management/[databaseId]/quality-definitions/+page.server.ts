@@ -1,5 +1,6 @@
 import { error, type ServerLoad } from '@sveltejs/kit';
 import { pcdManager } from '$pcd/index.ts';
+import { databaseInstancesQueries } from '$db/queries/databaseInstances.ts';
 import { list } from '$pcd/entities/mediaManagement/quality-definitions/read.ts';
 import { trashGuideManager } from '$lib/server/trashguide/manager.ts';
 import { trashGuideEntityCacheQueries } from '$db/queries/trashGuideEntityCache.ts';
@@ -19,8 +20,33 @@ function isTrashSource(source: SourceRef): source is Extract<SourceRef, { type: 
   return source.type === 'trash';
 }
 
+function listTrashSourcesSafely(): ReturnType<typeof trashGuideManager.listSources> {
+  try {
+    return trashGuideManager.listSources();
+  } catch (error) {
+    if (error instanceof Error && error.message.includes('Database not initialized')) {
+      return [];
+    }
+
+    throw error;
+  }
+}
+
+function resolveDatabases(currentDatabaseId: number): ReturnType<typeof pcdManager.getAll> {
+  try {
+    return pcdManager.getAll();
+  } catch {
+    const current = databaseInstancesQueries.getById(currentDatabaseId);
+    if (!current) {
+      return [];
+    }
+
+    return [current];
+  }
+}
+
 function buildSourceContext(databases: ReturnType<typeof pcdManager.getAll>, currentDatabaseId: number) {
-  const allTrashSources = trashGuideManager.listSources();
+  const allTrashSources = listTrashSourcesSafely();
   const trashSources = allTrashSources.filter((source) => source.entityCounts.qualitySizes > 0);
   const hasTrashSourceMismatch = allTrashSources.length > 0 && trashSources.length === 0;
 
@@ -111,7 +137,7 @@ export const load: ServerLoad = async ({ params }) => {
     throw error(500, 'Database cache not available');
   }
 
-  const databases = pcdManager.getAll();
+  const databases = resolveDatabases(currentDatabaseId);
   const sourceContext = buildSourceContext(databases, currentDatabaseId);
   const pcdRows = (
     await Promise.all(
