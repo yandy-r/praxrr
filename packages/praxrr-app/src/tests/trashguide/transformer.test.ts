@@ -198,44 +198,45 @@ Deno.test('transformTrashGuideEntities tracks rename by stable trash_id identity
   assertEquals(result.activeOperations[0].previousName, 'Legacy Alpha CF');
 });
 
-Deno.test('transformTrashGuideEntities falls back to score 0 when custom format default score is missing', () => {
-  const customFormatWithoutDefaultScore = createCustomFormatEntity({
-    trash_id: ALPHA_CF_ID,
-    name: 'Scored by profile only',
-    scores: {
-      sqp_special: 450,
-    },
-  });
-
-  const profileUsingTrashIdReference = createQualityProfileEntity({
-    score_set: 'unknown-score-set',
-    format_items: [
-      {
-        name: 'Scored by profile only',
-        score: null,
-        custom_format_trash_id: ALPHA_CF_ID,
+Deno.test(
+  'transformTrashGuideEntities throws when custom format default score is missing and no profile score set exists',
+  () => {
+    const customFormatWithoutDefaultScore = createCustomFormatEntity({
+      trash_id: ALPHA_CF_ID,
+      name: 'Scored by profile only',
+      scores: {
+        sqp_special: 450,
       },
-    ],
-  });
+    });
 
-  const parsed = createParseResult('radarr', [customFormatWithoutDefaultScore, profileUsingTrashIdReference]);
+    const profileUsingTrashIdReference = createQualityProfileEntity({
+      score_set: 'unknown-score-set',
+      format_items: [
+        {
+          name: 'Scored by profile only',
+          score: null,
+          custom_format_trash_id: ALPHA_CF_ID,
+        },
+      ],
+    });
 
-  const result = transformTrashGuideEntities({
-    sourceId: 12,
-    arrType: 'radarr',
-    parsed,
-    existingMappings: [],
-  });
+    const parsed = createParseResult('radarr', [customFormatWithoutDefaultScore, profileUsingTrashIdReference]);
 
-  const profileData = getQualityProfileData(result);
-  assertEquals(profileData.customFormatScores, [
-    {
-      customFormatName: 'Scored by profile only',
-      arrType: 'radarr',
-      score: 0,
-    },
-  ]);
-});
+    const transform = () =>
+      transformTrashGuideEntities({
+        sourceId: 12,
+        arrType: 'radarr',
+        parsed,
+        existingMappings: [],
+      });
+
+    assertThrows(
+      transform,
+      Error,
+      'references custom format "Scored by profile only" without a score in set "unknown-score-set"'
+    );
+  }
+);
 
 Deno.test('transformTrashGuideEntities generates idempotent operations from duplicate and reordered entities', () => {
   const alpha = createCustomFormatEntity({
@@ -368,34 +369,37 @@ Deno.test('transformTrashGuideEntities rejects profile item missing implicit qua
   );
 });
 
-Deno.test('transformTrashGuideEntities resolves resolution spec value from spec name when fields.value is missing', () => {
-  const result = transformTrashGuideEntities({
-    sourceId: 88,
-    arrType: 'radarr',
-    parsed: createParseResult('radarr', [
-      createCustomFormatEntity({
-        name: '1080p missing resolution value',
-        specifications: [
-          {
-            name: '1080p',
-            implementation: 'ResolutionSpecification',
-            negate: false,
-            required: true,
-            fields: {},
-          },
-        ],
-      }),
-    ]),
-    existingMappings: [],
-  });
+Deno.test(
+  'transformTrashGuideEntities resolves resolution spec value from spec name when fields.value is missing',
+  () => {
+    const result = transformTrashGuideEntities({
+      sourceId: 88,
+      arrType: 'radarr',
+      parsed: createParseResult('radarr', [
+        createCustomFormatEntity({
+          name: '1080p missing resolution value',
+          specifications: [
+            {
+              name: '1080p',
+              implementation: 'ResolutionSpecification',
+              negate: false,
+              required: true,
+              fields: {},
+            },
+          ],
+        }),
+      ]),
+      existingMappings: [],
+    });
 
-  assertEquals(result.activeOperations.length, 1);
-  const operation = result.activeOperations[0];
-  assertEquals(operation.portableEntityType, 'custom_format');
-  const customFormatData = operation.data as PortableCustomFormat;
-  assertEquals(customFormatData.conditions[0]?.type, 'resolution');
-  assertEquals(customFormatData.conditions[0]?.resolutions, ['1080p']);
-});
+    assertEquals(result.activeOperations.length, 1);
+    const operation = result.activeOperations[0];
+    assertEquals(operation.portableEntityType, 'custom_format');
+    const customFormatData = operation.data as PortableCustomFormat;
+    assertEquals(customFormatData.conditions[0]?.type, 'resolution');
+    assertEquals(customFormatData.conditions[0]?.resolutions, ['1080p']);
+  }
+);
 
 Deno.test('transformTrashGuideEntities resolves source spec value from spec name when fields.value is missing', () => {
   const result = transformTrashGuideEntities({
@@ -426,95 +430,104 @@ Deno.test('transformTrashGuideEntities resolves source spec value from spec name
   assertEquals(customFormatData.conditions[0]?.sources, ['Bluray']);
 });
 
-Deno.test('transformTrashGuideEntities resolves custom format score by trash_id name fallback when trash_id was not parsed', () => {
-  const result = transformTrashGuideEntities({
-    sourceId: 90,
-    arrType: 'radarr',
-    parsed: createParseResult('radarr', [
-      createCustomFormatEntity({
-        name: 'Anime Dual Audio',
-        trash_id: 'ffffffffffffffffffffffffffffffff',
-      }),
-      createQualityProfileEntity({
-        name: 'Fallback CF',
-        format_items: [
-          {
-            name: 'Anime Dual Audio',
-            score: null,
-            custom_format_trash_id: '11111111111111111111111111111111',
-          },
-        ],
-      }),
-    ]),
-    existingMappings: [],
-  });
-
-  const profileData = getQualityProfileData(result);
-  assertEquals(profileData.customFormatScores, [
-    {
-      customFormatName: 'Anime Dual Audio',
+Deno.test(
+  'transformTrashGuideEntities resolves custom format score by trash_id name fallback when trash_id was not parsed',
+  () => {
+    const result = transformTrashGuideEntities({
+      sourceId: 90,
       arrType: 'radarr',
-      score: 100,
-    },
-  ]);
-});
+      parsed: createParseResult('radarr', [
+        createCustomFormatEntity({
+          name: 'Anime Dual Audio',
+          trash_id: 'ffffffffffffffffffffffffffffffff',
+        }),
+        createQualityProfileEntity({
+          name: 'Fallback CF',
+          format_items: [
+            {
+              name: 'Anime Dual Audio',
+              score: null,
+              custom_format_trash_id: '11111111111111111111111111111111',
+            },
+          ],
+        }),
+      ]),
+      existingMappings: [],
+    });
 
-Deno.test('transformTrashGuideEntities skips unresolved custom format score references while still importing profile', () => {
-  const profile = createQualityProfileEntity({
-    name: 'Profile with Missing CF',
-    format_items: [
+    const profileData = getQualityProfileData(result);
+    assertEquals(profileData.customFormatScores, [
       {
-        name: 'Missing Custom Format',
-        score: null,
-        custom_format_trash_id: '11111111111111111111111111111111',
-      },
-    ],
-  });
-
-  const result = transformTrashGuideEntities({
-    sourceId: 92,
-    arrType: 'radarr',
-    parsed: createParseResult('radarr', [profile]),
-    existingMappings: [],
-  });
-
-  const profileData = getQualityProfileData(result);
-  assertEquals(profileData.customFormatScores, []);
-});
-
-Deno.test('transformTrashGuideEntities rejects custom format reference when trash_id is missing and name is ambiguous', () => {
-  const error = assertThrows(
-    () =>
-      transformTrashGuideEntities({
-        sourceId: 91,
+        customFormatName: 'Anime Dual Audio',
         arrType: 'radarr',
-        parsed: createParseResult('radarr', [
-          createCustomFormatEntity({
-            name: 'Anime Dual Audio',
-            trash_id: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1',
-          }),
-          createCustomFormatEntity({
-            name: 'Anime Dual Audio',
-            trash_id: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa2',
-          }),
-          createQualityProfileEntity({
-            name: 'Ambiguous Fallback',
-            format_items: [
-              {
-                name: 'Anime Dual Audio',
-                score: null,
-                custom_format_trash_id: '11111111111111111111111111111111',
-              },
-            ],
-          }),
-        ]),
-        existingMappings: [],
-      }),
-    TrashGuideTransformError
-  );
+        score: 100,
+      },
+    ]);
+  }
+);
 
-  assertEquals(
-    error.message,
-    'Ambiguous custom format reference in profile "Ambiguous Fallback": name "Anime Dual Audio" matches multiple custom formats'
-  );
-});
+Deno.test(
+  'transformTrashGuideEntities skips unresolved custom format score references while still importing profile',
+  () => {
+    const profile = createQualityProfileEntity({
+      name: 'Profile with Missing CF',
+      format_items: [
+        {
+          name: 'Missing Custom Format',
+          score: null,
+          custom_format_trash_id: '11111111111111111111111111111111',
+        },
+      ],
+    });
+
+    const result = transformTrashGuideEntities({
+      sourceId: 92,
+      arrType: 'radarr',
+      parsed: createParseResult('radarr', [profile]),
+      existingMappings: [],
+    });
+
+    const profileData = getQualityProfileData(result);
+    assertEquals(profileData.customFormatScores, []);
+  }
+);
+
+Deno.test(
+  'transformTrashGuideEntities rejects custom format reference when trash_id is missing and name is ambiguous',
+  () => {
+    const error = assertThrows(
+      () =>
+        transformTrashGuideEntities({
+          sourceId: 91,
+          arrType: 'radarr',
+          parsed: createParseResult('radarr', [
+            createCustomFormatEntity({
+              name: 'Anime Dual Audio',
+              trash_id: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1',
+            }),
+            createCustomFormatEntity({
+              name: 'Anime Dual Audio',
+              trash_id: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa2',
+            }),
+            createQualityProfileEntity({
+              name: 'Ambiguous Fallback',
+              format_items: [
+                {
+                  name: 'Anime Dual Audio',
+                  score: null,
+                  custom_format_trash_id: '11111111111111111111111111111111',
+                },
+              ],
+            }),
+          ]),
+          existingMappings: [],
+        }),
+      TrashGuideTransformError
+    );
+
+    assertEquals(
+      error.message,
+      'Ambiguous custom format reference in profile "Ambiguous Fallback": name "Anime Dual Audio" matches multiple custom formats'
+    );
+  }
+);

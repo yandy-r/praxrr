@@ -293,7 +293,9 @@ function resolveScoreFromCustomFormat(
     return fallbackScore;
   }
 
-  return 0;
+  throw new Error(
+    `Quality profile "${entity.name}" references custom format "${customFormat.name}" without a score in set "${scoreSet}" and without a usable default score`
+  );
 }
 
 function normalizeQualityList(

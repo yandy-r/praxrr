@@ -9,7 +9,13 @@ import {
 } from '$lib/server/trashguide/manager.ts';
 import { TrashGuideFetcherError } from '$lib/server/trashguide/types.ts';
 import { TrashGuideTransformError } from '$lib/server/trashguide/transformer.ts';
-import { mapReadErrorStatus, parseSourceId, toErrorMessage } from './_helpers.ts';
+import {
+  logTrashGuideRouteError,
+  parseOptionalNonEmptyString,
+  parseSourceId,
+  toErrorMessage,
+  validateRepositoryUrl,
+} from './_helpers.ts';
 
 const UPDATE_ALLOWED_FIELDS = new Set([
   'name',
@@ -22,7 +28,7 @@ const UPDATE_ALLOWED_FIELDS = new Set([
   'syncStrategy',
 ]);
 
-export const GET: RequestHandler = ({ params }) => {
+export const GET: RequestHandler = async ({ params }) => {
   const idResult = parseSourceId(params.id);
   if ('error' in idResult) {
     return json({ error: idResult.error }, { status: 400 });
@@ -32,6 +38,9 @@ export const GET: RequestHandler = ({ params }) => {
     return json({ source: trashGuideManager.getSource(idResult.value) });
   } catch (error) {
     const status = mapReadErrorStatus(error);
+    if (status >= 500) {
+      await logTrashGuideRouteError(error, `Failed to fetch TRaSH source id=${idResult.value}`);
+    }
     return json({ error: toErrorMessage(error) }, { status });
   }
 };
@@ -59,6 +68,9 @@ export const PUT: RequestHandler = async ({ params, request }) => {
     return json({ source });
   } catch (error) {
     const status = mapWriteErrorStatus(error);
+    if (status >= 500) {
+      await logTrashGuideRouteError(error, `Failed to update TRaSH source id=${idResult.value}`);
+    }
     return json({ error: toErrorMessage(error) }, { status });
   }
 };
@@ -74,6 +86,9 @@ export const DELETE: RequestHandler = async ({ params }) => {
     return new Response(null, { status: 204 });
   } catch (error) {
     const status = mapReadErrorStatus(error);
+    if (status >= 500) {
+      await logTrashGuideRouteError(error, `Failed to delete TRaSH source id=${idResult.value}`);
+    }
     return json({ error: toErrorMessage(error) }, { status });
   }
 };
@@ -158,36 +173,12 @@ function parseUpdatePayload(body: unknown): { value: TrashGuideSourceUpdateInput
   };
 }
 
-function parseOptionalNonEmptyString(value: unknown, field: string): { value: string | undefined } | { error: string } {
-  if (value === undefined) {
-    return { value: undefined };
+function mapReadErrorStatus(error: unknown): number {
+  if (error instanceof TrashGuideSourceNotFoundError) {
+    return 404;
   }
 
-  if (typeof value !== 'string') {
-    return { error: `${field} must be a string when provided` };
-  }
-
-  const trimmed = value.trim();
-  if (!trimmed) {
-    return { error: `${field} cannot be empty` };
-  }
-
-  return { value: trimmed };
-}
-
-function validateRepositoryUrl(value: string): string | null {
-  let parsed: URL;
-  try {
-    parsed = new URL(value);
-  } catch {
-    return 'repositoryUrl must be a valid URL';
-  }
-
-  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
-    return 'repositoryUrl must use http or https';
-  }
-
-  return null;
+  return 500;
 }
 
 function mapWriteErrorStatus(error: unknown): number {

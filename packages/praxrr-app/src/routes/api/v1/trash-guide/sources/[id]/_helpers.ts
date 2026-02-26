@@ -1,4 +1,5 @@
 import { TrashGuideSourceNotFoundError } from '$lib/server/trashguide/manager.ts';
+import { logger } from '$logger/logger.ts';
 
 export function parseSourceId(raw: string | undefined): { value: number } | { error: string } {
   if (!raw) {
@@ -33,3 +34,47 @@ export function toErrorMessage(error: unknown): string {
   return 'TRaSH source request failed';
 }
 
+export function parseOptionalNonEmptyString(
+  value: unknown,
+  field: string
+): { value: string | undefined } | { error: string } {
+  if (value === undefined) {
+    return { value: undefined };
+  }
+
+  if (typeof value !== 'string') {
+    return { error: `${field} must be a string when provided` };
+  }
+
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return { error: `${field} cannot be empty` };
+  }
+
+  return { value: trimmed };
+}
+
+export function validateRepositoryUrl(value: string): string | null {
+  let parsed: URL;
+  try {
+    parsed = new URL(value);
+  } catch {
+    return 'repositoryUrl must be a valid URL';
+  }
+
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    return 'repositoryUrl must use http or https';
+  }
+
+  return null;
+}
+
+export async function logTrashGuideRouteError(error: unknown, context: string): Promise<void> {
+  await logger.error('TRaSH Guide API route error', {
+    source: 'TRaSH Guide',
+    meta: {
+      context,
+      error: error instanceof Error ? error.message : String(error),
+    },
+  });
+}

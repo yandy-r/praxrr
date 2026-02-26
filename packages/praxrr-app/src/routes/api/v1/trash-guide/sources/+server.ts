@@ -8,6 +8,12 @@ import {
 } from '$lib/server/trashguide/manager.ts';
 import { TrashGuideFetcherError } from '$lib/server/trashguide/types.ts';
 import { TrashGuideTransformError } from '$lib/server/trashguide/transformer.ts';
+import {
+  logTrashGuideRouteError,
+  parseOptionalNonEmptyString,
+  toErrorMessage,
+  validateRepositoryUrl,
+} from './[id]/_helpers.ts';
 
 const CREATE_ALLOWED_FIELDS = new Set([
   'name',
@@ -42,6 +48,9 @@ export const POST: RequestHandler = async ({ request }) => {
     return json({ source }, { status: 201 });
   } catch (error) {
     const status = mapWriteErrorStatus(error);
+    if (status >= 500) {
+      await logTrashGuideRouteError(error, 'Failed to create TRaSH source');
+    }
     return json({ error: toErrorMessage(error) }, { status });
   }
 };
@@ -119,38 +128,6 @@ function parseCreatePayload(body: unknown): { value: TrashGuideSourceCreateInput
   };
 }
 
-function parseOptionalNonEmptyString(value: unknown, field: string): { value: string | undefined } | { error: string } {
-  if (value === undefined) {
-    return { value: undefined };
-  }
-
-  if (typeof value !== 'string') {
-    return { error: `${field} must be a string when provided` };
-  }
-
-  const trimmed = value.trim();
-  if (!trimmed) {
-    return { error: `${field} cannot be empty` };
-  }
-
-  return { value: trimmed };
-}
-
-function validateRepositoryUrl(value: string): string | null {
-  let parsed: URL;
-  try {
-    parsed = new URL(value);
-  } catch {
-    return 'repositoryUrl must be a valid URL';
-  }
-
-  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
-    return 'repositoryUrl must use http or https';
-  }
-
-  return null;
-}
-
 function mapWriteErrorStatus(error: unknown): number {
   if (error instanceof TrashGuideSourceConflictError) {
     return 409;
@@ -169,12 +146,4 @@ function mapWriteErrorStatus(error: unknown): number {
   }
 
   return 500;
-}
-
-function toErrorMessage(error: unknown): string {
-  if (error instanceof Error) {
-    return error.message;
-  }
-
-  return 'TRaSH source request failed';
 }

@@ -1,10 +1,16 @@
 import type { PortableRadarrNaming, PortableSonarrNaming } from '$shared/pcd/portable.ts';
 import type { TrashGuideNamingEntity, TrashGuideSupportedArrType } from '../types.ts';
+import { isRecord } from '../utils.ts';
 
-export interface TrashGuideNamingTransformResult {
-  portableEntityType: 'radarr_naming' | 'sonarr_naming';
-  data: PortableRadarrNaming | PortableSonarrNaming;
-}
+export type TrashGuideNamingTransformResult =
+  | {
+      portableEntityType: 'radarr_naming';
+      data: PortableRadarrNaming;
+    }
+  | {
+      portableEntityType: 'sonarr_naming';
+      data: PortableSonarrNaming;
+    };
 
 export function toPortableNaming(
   entity: TrashGuideNamingEntity,
@@ -139,8 +145,4 @@ function resolveTemplateValue(value: unknown, context: string): string | null {
   }
 
   return [...resolvedChildren][0];
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return !!value && typeof value === 'object' && !Array.isArray(value);
 }

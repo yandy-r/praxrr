@@ -58,23 +58,37 @@ export interface TrashGuideTransformIdentity {
   entityName: string;
 }
 
-export interface TrashGuideTransformedOperation {
-  identity: TrashGuideTransformIdentity;
-  previousName: string | null;
-  portableEntityType:
-    | 'custom_format'
-    | 'quality_profile'
-    | 'radarr_quality_definitions'
-    | 'sonarr_quality_definitions'
-    | 'radarr_naming'
-    | 'sonarr_naming';
-  data:
-    | PortableCustomFormat
-    | PortableQualityProfile
-    | PortableQualityDefinitions
-    | PortableRadarrNaming
-    | PortableSonarrNaming;
-}
+export type TrashGuideTransformedOperation =
+  | {
+      identity: TrashGuideTransformIdentity;
+      previousName: string | null;
+      portableEntityType: 'custom_format';
+      data: PortableCustomFormat;
+    }
+  | {
+      identity: TrashGuideTransformIdentity;
+      previousName: string | null;
+      portableEntityType: 'quality_profile';
+      data: PortableQualityProfile;
+    }
+  | {
+      identity: TrashGuideTransformIdentity;
+      previousName: string | null;
+      portableEntityType: 'radarr_quality_definitions' | 'sonarr_quality_definitions';
+      data: PortableQualityDefinitions;
+    }
+  | {
+      identity: TrashGuideTransformIdentity;
+      previousName: string | null;
+      portableEntityType: 'radarr_naming';
+      data: PortableRadarrNaming;
+    }
+  | {
+      identity: TrashGuideTransformIdentity;
+      previousName: string | null;
+      portableEntityType: 'sonarr_naming';
+      data: PortableSonarrNaming;
+    };
 
 export interface TrashGuideRemovedEntity {
   identity: TrashGuideTransformIdentity;
@@ -238,12 +252,21 @@ export function transformTrashGuideEntities(input: TrashGuideTransformInput): Tr
         }
         case 'naming': {
           const transformed = toPortableNaming(entity, input.arrType);
-          activeOperations.push({
-            identity,
-            previousName: previous?.entityName ?? null,
-            portableEntityType: transformed.portableEntityType,
-            data: transformed.data,
-          });
+          if (transformed.portableEntityType === 'radarr_naming') {
+            activeOperations.push({
+              identity,
+              previousName: previous?.entityName ?? null,
+              portableEntityType: 'radarr_naming',
+              data: transformed.data,
+            });
+          } else {
+            activeOperations.push({
+              identity,
+              previousName: previous?.entityName ?? null,
+              portableEntityType: 'sonarr_naming',
+              data: transformed.data,
+            });
+          }
           break;
         }
         default: {
@@ -427,9 +450,7 @@ function toConditionData(
     case 'resolution':
       return {
         ...base,
-        resolutions: [
-          readRequiredStringField(spec.fields, ['value'], `${entity.name}:${spec.name}`, spec.name),
-        ],
+        resolutions: [readRequiredStringField(spec.fields, ['value'], `${entity.name}:${spec.name}`, spec.name)],
       };
     case 'quality_modifier':
       return {
@@ -518,10 +539,7 @@ function readRequiredStringField(
   throw new Error(`Missing required TRaSH specification string field (${keys.join(', ')}) for ${context}`);
 }
 
-function readOptionalStringField(
-  fields: Readonly<Record<string, unknown>>,
-  keys: readonly string[]
-): string | null {
+function readOptionalStringField(fields: Readonly<Record<string, unknown>>, keys: readonly string[]): string | null {
   for (const key of keys) {
     const value = fields[key];
     if (typeof value === 'string' && value.trim().length > 0) {
@@ -595,7 +613,22 @@ function compareEntityTypes(
   a: TrashGuideEntityType | TrashIdMappingEntityType,
   b: TrashGuideEntityType | TrashIdMappingEntityType
 ): number {
-  return ENTITY_TYPE_ORDER[a as TrashGuideEntityType] - ENTITY_TYPE_ORDER[b as TrashGuideEntityType];
+  if (!isSortableEntityType(a) || !isSortableEntityType(b)) {
+    const invalidTypes: string[] = [];
+    if (!isSortableEntityType(a)) {
+      invalidTypes.push(a);
+    }
+    if (!isSortableEntityType(b)) {
+      invalidTypes.push(b);
+    }
+    throw new Error(`Unsupported TRaSH entity type for sorting: ${invalidTypes.join(', ')}`);
+  }
+
+  return ENTITY_TYPE_ORDER[a] - ENTITY_TYPE_ORDER[b];
+}
+
+function isSortableEntityType(value: string): value is TrashGuideEntityType {
+  return Object.hasOwn(ENTITY_TYPE_ORDER, value);
 }
 
 function toIdentityComparable(entity: TrashGuideParsedEntity): TrashGuideTransformIdentity {

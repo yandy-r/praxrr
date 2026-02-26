@@ -1,6 +1,6 @@
 import { db } from '../db.ts';
 import type { ArrType } from '$shared/pcd/types.ts';
-import { type TrashGuideSourceArrType } from './trashGuideSources.ts';
+import { parseTrashGuideSourceArrType, type TrashGuideSourceArrType } from '$lib/server/trashguide/types.ts';
 
 export type TrashGuideSyncTrigger = 'none' | 'manual' | 'on_pull' | 'on_change' | 'schedule';
 export type TrashGuideSyncStatus = 'idle' | 'pending' | 'in_progress' | 'failed';
@@ -55,14 +55,6 @@ function parseTrashGuideSectionType(raw: string): TrashGuideSyncSectionType {
   }
 
   throw new Error(`Invalid TRaSH sync section type: ${raw}`);
-}
-
-function parseTrashGuideSourceArrType(raw: string): TrashGuideSourceArrType {
-  if (raw === 'radarr' || raw === 'sonarr') {
-    return raw;
-  }
-
-  throw new Error(`Invalid TRaSH source arr type: ${raw}`);
 }
 
 function parseInstanceArrType(raw: string): ArrType {

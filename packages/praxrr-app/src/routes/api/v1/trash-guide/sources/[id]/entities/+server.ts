@@ -7,13 +7,13 @@ import {
 } from '$db/queries/trashGuideEntityCache.ts';
 import { trashGuideManager } from '$lib/server/trashguide/manager.ts';
 import { isTrashGuideSupportedArrType } from '$lib/server/trashguide/types.ts';
-import { mapReadErrorStatus, parseSourceId, toErrorMessage } from '../_helpers.ts';
+import { logTrashGuideRouteError, mapReadErrorStatus, parseSourceId, toErrorMessage } from '../_helpers.ts';
 
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 200;
 const VALID_ENTITY_TYPES: ReadonlySet<string> = new Set(['custom_format', 'quality_profile', 'quality_size', 'naming']);
 
-export const GET: RequestHandler = ({ params, url }) => {
+export const GET: RequestHandler = async ({ params, url }) => {
   const sourceIdResult = parseSourceId(params.id);
   if ('error' in sourceIdResult) {
     return json({ error: sourceIdResult.error }, { status: 400 });
@@ -26,6 +26,9 @@ export const GET: RequestHandler = ({ params, url }) => {
     source = trashGuideManager.getSource(sourceId);
   } catch (error) {
     const status = mapReadErrorStatus(error);
+    if (status >= 500) {
+      await logTrashGuideRouteError(error, `Failed to fetch TRaSH source id=${sourceId} before entities query`);
+    }
     return json({ error: toErrorMessage(error) }, { status });
   }
 
@@ -42,6 +45,10 @@ export const GET: RequestHandler = ({ params, url }) => {
   try {
     const entities = trashGuideEntityCacheQueries.getBySource(sourceId);
     if (!isSourceOwnedEntitySet(entities, sourceId)) {
+      await logTrashGuideRouteError(
+        new Error('TRaSH entity cache ownership validation failed for source'),
+        'Failed to list entities'
+      );
       return json({ error: 'TRaSH source ownership validation failed for entity cache rows' }, { status: 500 });
     }
 
@@ -64,6 +71,7 @@ export const GET: RequestHandler = ({ params, url }) => {
       },
     });
   } catch (error) {
+    await logTrashGuideRouteError(error, `Failed to list TRaSH source entities id=${sourceId}`);
     return json({ error: toErrorMessage(error) }, { status: 500 });
   }
 };

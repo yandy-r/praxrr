@@ -1,30 +1,39 @@
 import type { DatabaseInstance } from '$db/queries/databaseInstances.ts';
 import type { TrashGuideSourceResponse } from '$lib/server/trashguide/manager.ts';
+import type { TrashGuideSupportedArrType } from '$lib/server/trashguide/types.ts';
 
 export type DatabaseWithCache = DatabaseInstance & { cacheAvailable: boolean };
 
-export interface UnifiedDatabaseItem {
-  type: 'pcd' | 'trash';
-  id: number;
-  name: string;
-  repositoryUrl: string;
-  syncStrategy: number;
-  lastSyncedAt: string | null;
-  enabled: boolean;
-  // PCD-specific
-  isPrivate?: boolean;
-  hasPersonalAccessToken?: boolean;
-  cacheAvailable?: boolean;
-  // TRaSH-specific
-  arrType?: string;
-  scoreProfile?: string;
-  entityCounts?: {
-    customFormats: number;
-    qualityProfiles: number;
-    qualitySizes: number;
-    naming: number;
-  };
-}
+export type UnifiedDatabaseItem =
+  | {
+      type: 'pcd';
+      id: number;
+      name: string;
+      repositoryUrl: string;
+      syncStrategy: number;
+      lastSyncedAt: string | null;
+      enabled: boolean;
+      isPrivate?: boolean;
+      hasPersonalAccessToken?: boolean;
+      cacheAvailable?: boolean;
+    }
+  | {
+      type: 'trash';
+      id: number;
+      name: string;
+      repositoryUrl: string;
+      syncStrategy: number;
+      lastSyncedAt: string | null;
+      enabled: boolean;
+      arrType: TrashGuideSupportedArrType;
+      scoreProfile?: string;
+      entityCounts?: {
+        customFormats: number;
+        qualityProfiles: number;
+        qualitySizes: number;
+        naming: number;
+      };
+    };
 
 export function pcdToUnifiedItem(db: DatabaseWithCache): UnifiedDatabaseItem {
   return {

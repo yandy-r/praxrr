@@ -1,6 +1,5 @@
 import { db } from '../db.ts';
-
-export type TrashGuideSourceArrType = 'radarr' | 'sonarr';
+import { parseTrashGuideSourceArrType, type TrashGuideSourceArrType } from '$lib/server/trashguide/types.ts';
 
 const DEFAULT_BRANCH = 'master';
 const DEFAULT_SCORE_PROFILE = 'default';
@@ -87,14 +86,6 @@ function toDbBoolean(value: boolean): 0 | 1 {
   return value ? 1 : 0;
 }
 
-function parseArrType(arrType: string): TrashGuideSourceArrType {
-  if (arrType === 'radarr' || arrType === 'sonarr') {
-    return arrType;
-  }
-
-  throw new Error(`Invalid TRaSH source arrType: ${arrType}`);
-}
-
 function rowToSource(row: TrashGuideSourceRow): TrashGuideSource {
   return {
     id: row.id,
@@ -102,7 +93,7 @@ function rowToSource(row: TrashGuideSourceRow): TrashGuideSource {
     repository_url: row.repository_url,
     branch: row.branch,
     local_path: row.local_path,
-    arr_type: parseArrType(row.arr_type),
+    arr_type: parseTrashGuideSourceArrType(row.arr_type),
     score_profile: row.score_profile,
     sync_strategy: row.sync_strategy,
     auto_pull: row.auto_pull,
@@ -194,18 +185,14 @@ export const trashGuideSourcesQueries = {
    * Get all TRaSH sources by Arr type
    */
   getByArrType(arrType: TrashGuideSourceArrType): TrashGuideSource[] {
-    return db
-      .query<TrashGuideSourceRow>(`${sourceSelect} WHERE arr_type = ? ORDER BY name`, arrType)
-      .map(rowToSource);
+    return db.query<TrashGuideSourceRow>(`${sourceSelect} WHERE arr_type = ? ORDER BY name`, arrType).map(rowToSource);
   },
 
   /**
    * Get enabled TRaSH sources
    */
   getEnabled(): TrashGuideSource[] {
-    return db
-      .query<TrashGuideSourceRow>(`${sourceSelect} WHERE enabled = 1 ORDER BY name`)
-      .map(rowToSource);
+    return db.query<TrashGuideSourceRow>(`${sourceSelect} WHERE enabled = 1 ORDER BY name`).map(rowToSource);
   },
 
   /**
@@ -221,7 +208,7 @@ export const trashGuideSourcesQueries = {
          last_synced_at IS NULL
          OR datetime(replace(replace(last_synced_at, 'T', ' '), 'Z', ''), '+' || sync_strategy || ' minutes') <= datetime('now')
        )
-       ORDER BY last_synced_at ASC NULLS FIRST`,
+       ORDER BY last_synced_at ASC NULLS FIRST`
       )
       .map(rowToSource);
   },
@@ -299,10 +286,7 @@ export const trashGuideSourcesQueries = {
   /**
    * Update sync metadata for a source
    */
-  updateSyncMetadata(
-    id: number,
-    input: { lastSyncedAt?: string | null; lastCommitHash?: string | null }
-  ): boolean {
+  updateSyncMetadata(id: number, input: { lastSyncedAt?: string | null; lastCommitHash?: string | null }): boolean {
     const updates: string[] = [];
     const params: (string | number | null)[] = [];
 
@@ -325,10 +309,7 @@ export const trashGuideSourcesQueries = {
 
     db.beginTransaction();
     try {
-      const affected = db.execute(
-        `UPDATE trash_guide_sources SET ${updates.join(', ')} WHERE id = ?`,
-        ...params
-      );
+      const affected = db.execute(`UPDATE trash_guide_sources SET ${updates.join(', ')} WHERE id = ?`, ...params);
       db.commit();
       return affected > 0;
     } catch (error) {
@@ -376,7 +357,10 @@ export const trashGuideSourcesQueries = {
       return (result?.count ?? 0) > 0;
     }
 
-    const result = db.queryFirst<{ count: number }>('SELECT COUNT(*) as count FROM trash_guide_sources WHERE name = ?', name);
+    const result = db.queryFirst<{ count: number }>(
+      'SELECT COUNT(*) as count FROM trash_guide_sources WHERE name = ?',
+      name
+    );
     return (result?.count ?? 0) > 0;
   },
 };

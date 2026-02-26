@@ -4,11 +4,11 @@ import { jobQueueQueries } from '$db/queries/jobQueue.ts';
 import { jobRunHistoryQueries } from '$db/queries/jobRunHistory.ts';
 import { jobDispatcher } from '$jobs/dispatcher.ts';
 import { trashGuideManager } from '$lib/server/trashguide/manager.ts';
-import { mapReadErrorStatus, parseSourceId, toErrorMessage } from '../_helpers.ts';
+import { logTrashGuideRouteError, mapReadErrorStatus, parseSourceId, toErrorMessage } from '../_helpers.ts';
 
 const TRASHGUIDE_SYNC_DEDUPE_KEY_PREFIX = 'trashguide.sync:';
 
-export const POST: RequestHandler = ({ params }) => {
+export const POST: RequestHandler = async ({ params }) => {
   const sourceIdResult = parseSourceId(params.id);
   if ('error' in sourceIdResult) {
     return json({ error: sourceIdResult.error }, { status: 400 });
@@ -21,6 +21,9 @@ export const POST: RequestHandler = ({ params }) => {
     trashGuideManager.getSource(sourceId);
   } catch (error) {
     const status = mapReadErrorStatus(error);
+    if (status >= 500) {
+      await logTrashGuideRouteError(error, `Failed to validate TRaSH source id=${sourceId} before sync`);
+    }
     return json({ error: toErrorMessage(error) }, { status });
   }
 
@@ -74,6 +77,7 @@ export const POST: RequestHandler = ({ params }) => {
       },
     });
   } catch (error) {
+    await logTrashGuideRouteError(error, `Failed to enqueue TRaSH source sync id=${sourceId}`);
     return json({ error: toErrorMessage(error) }, { status: 500 });
   }
 };

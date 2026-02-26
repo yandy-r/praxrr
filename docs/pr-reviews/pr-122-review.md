@@ -131,6 +131,8 @@ Targeted checks passed: `deno task check:server` and
 
 ### 6. API routes return 500 without server-side logging
 
+Status: ✅ Fixed.
+
 **Files:** All API route catch blocks under `routes/api/v1/trash-guide/` **Agent:**
 silent-failure-hunter
 
@@ -140,7 +142,12 @@ nothing is written to server logs.
 
 **Fix:** Add `logger.error()` calls for 500-level responses in all catch blocks.
 
+Validation: Verified by
+`deno task test packages/praxrr-app/src/tests/routes/trashGuideSources.test.ts`.
+
 ### 7. Score fallback silently returns 0 when no score set matches
+
+Status: ✅ Fixed.
 
 **File:** `packages/praxrr-app/src/lib/server/trashguide/transformers/qualityProfiles.ts:274-297`
 **Agent:** silent-failure-hunter
@@ -153,6 +160,8 @@ so this can cause quality profiles to behave differently than TRaSH Guide author
 intentional.
 
 ### 8. Duplicate utility functions across files
+
+Status: ✅ Fixed.
 
 **Files:** Multiple **Agent:** code-reviewer
 
@@ -167,6 +176,8 @@ parse module).
 
 ### 9. Unsafe type assertion in `compareEntityTypes`
 
+Status: ✅ Fixed.
+
 **File:** `packages/praxrr-app/src/lib/server/trashguide/transformer.ts:594-599` **Agent:**
 code-reviewer, type-design-analyzer
 
@@ -180,6 +191,8 @@ the lookup returns `undefined` causing `NaN` subtraction and broken sort order.
 **Fix:** Use a unified type or add a runtime guard.
 
 ### 10. `UnifiedDatabaseItem` is a weak flat type instead of a discriminated union
+
+Status: ✅ Fixed.
 
 **File:** `packages/praxrr-app/src/routes/databases/types.ts` **Agent:** type-design-analyzer
 
@@ -196,6 +209,8 @@ type UnifiedDatabaseItem =
 
 ### 11. `TrashGuideTransformedOperation` has uncorrelated `portableEntityType` and `data`
 
+Status: ✅ Fixed.
+
 **File:** `packages/praxrr-app/src/lib/server/trashguide/transformer.ts:61-77` **Agent:**
 type-design-analyzer
 
@@ -203,6 +218,9 @@ The type allows impossible combinations (e.g., `portableEntityType: 'custom_form
 `data: PortableSonarrNaming`). Runtime is correct but the type system does not prevent mismatches.
 
 **Fix:** Make it a discriminated union on `portableEntityType`.
+
+Validation: Verified by
+`deno task test packages/praxrr-app/src/tests/trashguide/transformer.test.ts`.
 
 ### 12. `toRunMetadata` fabricates "unknown" status instead of failing
 
