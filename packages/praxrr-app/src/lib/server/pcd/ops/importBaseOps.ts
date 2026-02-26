@@ -1,5 +1,6 @@
 import { logger } from '$logger/logger.ts';
 import { pcdOpsQueries } from '$db/queries/pcdOps.ts';
+import type { PCDCache } from '$pcd/index.ts';
 import {
   type MigrationEntityCandidate,
   type MigrationReaderIssue,
@@ -23,12 +24,56 @@ let withRepoImportWriteContextForTests: RepoImportWriteContextRunner =
 let readMigrationEntitySourcesForTests = readMigrationEntitySources;
 
 const ENTITY_OP_FILENAME_PREFIX = 'entities/';
+const ENTITY_TABLE_BY_STABLE_KEY = {
+  regular_expression_name: 'regular_expressions',
+  custom_format_name: 'custom_formats',
+  quality_profile_name: 'quality_profiles',
+  radarr_naming_name: 'radarr_naming',
+  sonarr_naming_name: 'sonarr_naming',
+  lidarr_naming_name: 'lidarr_naming',
+  radarr_media_settings_name: 'radarr_media_settings',
+  sonarr_media_settings_name: 'sonarr_media_settings',
+  lidarr_media_settings_name: 'lidarr_media_settings',
+  radarr_quality_definitions_name: 'radarr_quality_definitions',
+  sonarr_quality_definitions_name: 'sonarr_quality_definitions',
+  lidarr_quality_definitions_name: 'lidarr_quality_definitions',
+  metadata_profile_name: 'lidarr_metadata_profiles',
+  delay_profile_name: 'delay_profiles',
+} as const;
 // Entity ops are emitted as synthetic SQL ops and occupy a later sequence band.
 const YAML_SEQUENCE_BASE = 4_000_000_000;
 // Keep YAML entity filenames and op ordering deterministic even when entity counts are large.
 const YAML_SEQUENCE_STRIDE = 10_000;
 
 type SourceConflictRef = string;
+
+type StableEntityTableKey = keyof typeof ENTITY_TABLE_BY_STABLE_KEY;
+
+function resolveEntityTableForStableKey(stableKey: string): string | null {
+  if (Object.prototype.hasOwnProperty.call(ENTITY_TABLE_BY_STABLE_KEY, stableKey)) {
+    return ENTITY_TABLE_BY_STABLE_KEY[stableKey as StableEntityTableKey];
+  }
+
+  return null;
+}
+
+function hasBaseEntityByStableIdentity(cache: PCDCache, stableIdentity: MigrationEntityStableIdentity): boolean {
+  const table = resolveEntityTableForStableKey(stableIdentity.key);
+  if (!table) {
+    return false;
+  }
+
+  const rawDb = cache.getRawDb();
+  if (!rawDb || typeof rawDb.prepare !== 'function') {
+    return false;
+  }
+
+  const row = rawDb
+    .prepare(`SELECT 1 AS exists_in_cache FROM ${table} WHERE lower(name) = ? LIMIT 1`)
+    .get(stableIdentity.value.toLowerCase());
+
+  return !!row;
+}
 
 type DeserializeResult = {
   success: boolean;
@@ -181,6 +226,17 @@ export async function importBaseOps(databaseId: number, pcdPath: string): Promis
       const cache = getCacheForTests(databaseId);
       if (!cache) {
         throw new Error(`Cache not available while importing migration entity "${candidate.relativePath}"`);
+      }
+      if (hasBaseEntityByStableIdentity(cache, candidate.stableIdentity)) {
+        await logger.warn(`Skipping existing base import entity "${candidate.relativePath}"`, {
+          source: 'PCDImporter',
+          meta: {
+            databaseId,
+            entityType: candidate.entityType,
+            stableIdentity: `${candidate.stableIdentity.key}=${candidate.stableIdentity.value}`,
+          },
+        });
+        continue;
       }
 
       await withRepoImportWriteContextForTests(
