@@ -1,5 +1,6 @@
 import type { Migration } from '../migrations.ts';
 
+/** Database migration: Create parsed release cache table for storing parser microservice responses. */
 export const migration: Migration = {
   version: 21,
   name: 'create_parsed_release_cache',

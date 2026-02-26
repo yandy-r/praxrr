@@ -104,6 +104,11 @@ function rowToHash(row: TrashGuideEntityCacheRow): TrashGuideEntityCacheHash {
   };
 }
 
+/**
+ * Database queries for the TRaSH guide entity cache.
+ * Stores parsed TRaSH guide entities (custom formats, quality profiles, etc.)
+ * indexed by source and trash ID for diff and sync operations.
+ */
 export const trashGuideEntityCacheQueries = {
   /**
    * Upsert a single parsed entity.

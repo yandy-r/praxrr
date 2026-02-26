@@ -1,5 +1,6 @@
 import type { Migration } from '../migrations.ts';
 
+/** Database migration: Create pattern match cache table for storing regex match results. */
 export const migration: Migration = {
   version: 23,
   name: 'create_pattern_match_cache',

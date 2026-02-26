@@ -171,6 +171,11 @@ function computeDiff(current: readonly TrashIdMapping[], next: readonly TrashIdM
   };
 }
 
+/**
+ * Database queries for TRaSH ID mappings.
+ * Tracks the mapping between TRaSH guide entity IDs and their current names
+ * to support diff detection and rename propagation across Arr instances.
+ */
 export const trashIdMappingsQueries = {
   /**
    * Get mapping rows for one source, optionally scoped by arr_type.

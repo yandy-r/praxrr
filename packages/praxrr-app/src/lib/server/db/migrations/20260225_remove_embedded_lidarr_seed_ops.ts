@@ -1,5 +1,6 @@
 import type { Migration } from '../migrations.ts';
 
+/** Database migration: Remove embedded Lidarr built-in seed ops from pcd_ops (superseded by seedBuiltInBaseOps). */
 export const migration: Migration = {
   version: 20260225,
   name: 'Remove embedded Lidarr built-in seed ops',

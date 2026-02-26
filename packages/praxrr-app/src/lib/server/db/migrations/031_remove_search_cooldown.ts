@@ -58,6 +58,7 @@ function migrateFilterConfigs(): void {
   }
 }
 
+/** Database migration: Remove searchCooldown field from upgrade filter configs (data migration via afterUp). */
 export const migration: Migration = {
   version: 31,
   name: 'Remove searchCooldown from filter configs',

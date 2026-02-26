@@ -43,6 +43,14 @@ export interface CreatePcdOpInput {
   pushedCommit?: string | null;
 }
 
+/**
+ * Computes a SHA-256 content hash for a PCD op from its SQL and metadata JSON.
+ * Used as a deterministic content identity key during write and import operations.
+ *
+ * @param sql - The SQL string of the PCD op.
+ * @param metadataJson - The metadata JSON string, or null if absent.
+ * @returns Hex-encoded SHA-256 hash of the combined content.
+ */
 export async function buildContentHash(sql: string, metadataJson: string | null): Promise<string> {
   // Shared writer/import hash path for deterministic content identity.
   const payload = `${sql}\n${metadataJson ?? ''}`;
@@ -73,6 +81,11 @@ export interface ListPcdOpsOptions {
   source?: PcdOpSource;
 }
 
+/**
+ * Database queries for the pcd_ops table.
+ * Provides CRUD operations for managing PCD operation records, including base and user ops
+ * for all connected database instances.
+ */
 export const pcdOpsQueries = {
   create(input: CreatePcdOpInput): number {
     db.execute(

@@ -1,5 +1,6 @@
 import type { Migration } from '../migrations.ts';
 
+/** Database migration: Create GitHub cache table for storing GitHub API responses with TTL expiry. */
 export const migration: Migration = {
   version: 33,
   name: 'Create GitHub cache table',

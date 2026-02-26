@@ -429,6 +429,11 @@ function updateMediaManagementSectionConfigName(
   );
 }
 
+/**
+ * Database queries for Arr sync configuration.
+ * Provides read/write operations for quality profiles, delay profiles, media management,
+ * and metadata profile sync settings across all supported Arr instance types.
+ */
 export const arrSyncQueries = {
   // ========== Quality Profiles ==========
 

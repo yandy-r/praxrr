@@ -1,10 +1,14 @@
 import type { Migration } from '../migrations.ts';
 
+/** Filename of the PCD built-in base op SQL file for Lidarr media management entities. */
 export const LIDARR_MEDIA_MANAGEMENT_OP_FILENAME = '20260215_add_lidarr_media_management_entities.sql';
+/** Migration version number for the Lidarr media management PCD built-in base op. */
 export const LIDARR_MEDIA_MANAGEMENT_OP_VERSION = 20260215;
+/** JSON metadata string for the Lidarr media management PCD built-in base op. */
 export const LIDARR_MEDIA_MANAGEMENT_OP_METADATA =
   '{"operation":"seed","entity":"lidarr_media_management","conflict_policy":"preserve_existing_lidarr_rows"}';
 
+/** SQL content of the Lidarr media management PCD built-in base op. */
 export const LIDARR_MEDIA_MANAGEMENT_OP_SQL = `
 -- Add first-class Lidarr media-management entities.
 CREATE TABLE IF NOT EXISTS lidarr_naming (
@@ -126,6 +130,7 @@ WHERE quality_api_mappings.api_name <> excluded.api_name;
 
 const LIDARR_MEDIA_MANAGEMENT_OP_SQL_ESCAPED = LIDARR_MEDIA_MANAGEMENT_OP_SQL.replaceAll("'", "''");
 
+/** Database migration: Seed first-class Lidarr media management entities as a PCD built-in base op. */
 export const migration: Migration = {
   version: LIDARR_MEDIA_MANAGEMENT_OP_VERSION,
   name: 'Add Lidarr media-management entities',

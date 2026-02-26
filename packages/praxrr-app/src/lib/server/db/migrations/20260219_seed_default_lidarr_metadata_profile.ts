@@ -1,7 +1,10 @@
 import type { Migration } from '../migrations.ts';
 
+/** Filename of the PCD built-in base op SQL file for the default Lidarr metadata profile. */
 export const LIDARR_DEFAULT_METADATA_PROFILE_OP_FILENAME = '20260219_seed_default_lidarr_metadata_profiles.sql';
+/** Migration version number for the default Lidarr metadata profile PCD built-in base op. */
 export const LIDARR_DEFAULT_METADATA_PROFILE_OP_VERSION = 20260219;
+/** JSON metadata string for the default Lidarr metadata profile PCD built-in base op. */
 export const LIDARR_DEFAULT_METADATA_PROFILE_OP_METADATA =
   '{"operation":"seed","entity":"lidarr_metadata_profiles","conflict_policy":"preserve_existing_lidarr_metadata_profiles"}';
 
@@ -15,6 +18,7 @@ function toSqlStringLiteral(value: string): string {
 const DEFAULT_PROFILE_NAME_SQL = toSqlStringLiteral(DEFAULT_PROFILE_NAME);
 const DEFAULT_PROFILE_DESCRIPTION_SQL = toSqlStringLiteral(DEFAULT_PROFILE_DESCRIPTION);
 
+/** SQL content of the default Lidarr metadata profile PCD built-in base op. */
 export const LIDARR_DEFAULT_METADATA_PROFILE_OP_SQL = `
 INSERT INTO lidarr_metadata_profiles (name, description)
 VALUES (${DEFAULT_PROFILE_NAME_SQL}, ${DEFAULT_PROFILE_DESCRIPTION_SQL})
@@ -70,6 +74,7 @@ ON CONFLICT(metadata_profile_name, status_id) DO NOTHING;
 
 const LIDARR_DEFAULT_METADATA_PROFILE_OP_SQL_ESCAPED = LIDARR_DEFAULT_METADATA_PROFILE_OP_SQL.replaceAll("'", "''");
 
+/** Database migration: Seed the default Lidarr metadata profile as a PCD built-in base op. */
 export const migration: Migration = {
   version: LIDARR_DEFAULT_METADATA_PROFILE_OP_VERSION,
   name: 'Seed default Lidarr metadata profile',

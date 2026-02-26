@@ -1,10 +1,14 @@
 import type { Migration } from '../migrations.ts';
 
+/** Filename of the PCD built-in base op SQL file for Lidarr metadata profiles. */
 export const LIDARR_METADATA_PROFILES_OP_FILENAME = '20260218_add_lidarr_metadata_profiles.sql';
+/** Migration version number for the Lidarr metadata profiles PCD built-in base op. */
 export const LIDARR_METADATA_PROFILES_OP_VERSION = 20260218;
+/** JSON metadata string for the Lidarr metadata profiles PCD built-in base op. */
 export const LIDARR_METADATA_PROFILES_OP_METADATA =
   '{"operation":"seed","entity":"lidarr_metadata_profiles","conflict_policy":"preserve_existing_lidarr_metadata_profiles"}';
 
+/** SQL content of the Lidarr metadata profiles PCD built-in base op. */
 export const LIDARR_METADATA_PROFILES_OP_SQL = `
 -- Add first-class Lidarr metadata-profile entities.
 CREATE TABLE IF NOT EXISTS lidarr_metadata_profiles (
@@ -45,6 +49,7 @@ CREATE TABLE IF NOT EXISTS lidarr_metadata_profile_release_statuses (
 
 const LIDARR_METADATA_PROFILES_OP_SQL_ESCAPED = LIDARR_METADATA_PROFILES_OP_SQL.replaceAll("'", "''");
 
+/** Database migration: Add first-class Lidarr metadata profile entities and sync tables. */
 export const migration: Migration = {
   version: LIDARR_METADATA_PROFILES_OP_VERSION,
   name: 'Add Lidarr metadata profiles',

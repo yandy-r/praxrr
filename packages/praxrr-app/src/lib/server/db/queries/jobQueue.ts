@@ -54,6 +54,10 @@ export interface CreateJobQueueInput<T extends JobType = JobType> {
   cooldownUntil?: string | null;
 }
 
+/**
+ * Database queries for the job queue.
+ * Provides CRUD operations for managing queued background jobs with deduplication and cooldown support.
+ */
 export const jobQueueQueries = {
   create(input: CreateJobQueueInput): number {
     const payload = JSON.stringify(input.payload ?? {});

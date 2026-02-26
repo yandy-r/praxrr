@@ -107,6 +107,11 @@ function mapLatestRow(row: LatestOpHistoryRow): PcdOpHistoryWithOp {
   };
 }
 
+/**
+ * Database queries for PCD op history.
+ * Tracks the application history of PCD ops per database instance, recording status,
+ * row counts, conflict details, and push metadata.
+ */
 export const pcdOpHistoryQueries = {
   create(input: CreatePcdOpHistoryInput): number {
     db.execute(

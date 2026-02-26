@@ -29,6 +29,10 @@ function rowToRecord(row: JobRunHistoryRow): JobRunHistoryRecord {
   };
 }
 
+/**
+ * Database queries for job run history.
+ * Records completed job executions with status, duration, and error details.
+ */
 export const jobRunHistoryQueries = {
   create(
     queueId: number | null,

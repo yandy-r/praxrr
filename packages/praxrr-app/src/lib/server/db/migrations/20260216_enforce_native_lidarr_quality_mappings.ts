@@ -1,7 +1,10 @@
 import type { Migration } from '../migrations.ts';
 
+/** Filename of the PCD built-in base op SQL file for Lidarr native quality mappings. */
 export const LIDARR_NATIVE_QUALITY_MAPPINGS_OP_FILENAME = '20260216_enforce_native_lidarr_quality_mappings.sql';
+/** Migration version number for the Lidarr native quality mappings PCD built-in base op. */
 export const LIDARR_NATIVE_QUALITY_MAPPINGS_OP_VERSION = 20260216;
+/** JSON metadata string for the Lidarr native quality mappings PCD built-in base op. */
 export const LIDARR_NATIVE_QUALITY_MAPPINGS_OP_METADATA =
   '{"operation":"seed","entity":"lidarr_media_management","conflict_policy":"enforce_native_lidarr_contracts"}';
 
@@ -55,6 +58,7 @@ const LIDARR_NATIVE_QUALITY_NAMES_VALUES_SQL = LIDARR_NATIVE_QUALITY_API_NAMES.m
   (qualityName) => `(${toSqlStringLiteral(qualityName)})`
 ).join(',\n');
 
+/** SQL content of the Lidarr native quality mappings PCD built-in base op. */
 export const LIDARR_NATIVE_QUALITY_MAPPINGS_OP_SQL = `
 -- Enforce native Lidarr media-management contracts.
 -- 1) Ensure canonical Lidarr quality names exist.
@@ -175,6 +179,7 @@ ON CONFLICT(name, quality_name) DO NOTHING;
 
 const LIDARR_NATIVE_QUALITY_MAPPINGS_OP_SQL_ESCAPED = LIDARR_NATIVE_QUALITY_MAPPINGS_OP_SQL.replaceAll("'", "''");
 
+/** Database migration: Enforce native Lidarr quality mappings as a PCD built-in base op. */
 export const migration: Migration = {
   version: LIDARR_NATIVE_QUALITY_MAPPINGS_OP_VERSION,
   name: 'Enforce native Lidarr quality mappings',

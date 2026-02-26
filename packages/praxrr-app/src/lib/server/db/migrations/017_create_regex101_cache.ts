@@ -1,5 +1,6 @@
 import type { Migration } from '../migrations.ts';
 
+/** Database migration: Create regex101 cache table for storing fetched regex101 permalink responses. */
 export const migration: Migration = {
   version: 17,
   name: 'Create regex101 cache table',

@@ -1,7 +1,10 @@
 import type { Migration } from '../migrations.ts';
 
+/** Filename of the PCD built-in base op SQL file for Lidarr naming defaults. */
 export const LIDARR_NAMING_DEFAULTS_OP_FILENAME = '20260217_set_lidarr_naming_defaults.sql';
+/** Migration version number for the Lidarr naming defaults PCD built-in base op. */
 export const LIDARR_NAMING_DEFAULTS_OP_VERSION = 20260217;
+/** JSON metadata string for the Lidarr naming defaults PCD built-in base op. */
 export const LIDARR_NAMING_DEFAULTS_OP_METADATA =
   '{"operation":"seed","entity":"lidarr_naming","conflict_policy":"set_native_default_templates"}';
 
@@ -21,6 +24,7 @@ const LIDARR_DEFAULT_ARTIST_NAME_SQL = toSqlStringLiteral(LIDARR_DEFAULT_ARTIST_
 const LIDARR_DEFAULT_MULTI_DISC_TRACK_FORMAT_SQL = toSqlStringLiteral(LIDARR_DEFAULT_MULTI_DISC_TRACK_FORMAT);
 const LIDARR_DEFAULT_ARTIST_FOLDER_FORMAT_SQL = toSqlStringLiteral(LIDARR_DEFAULT_ARTIST_FOLDER_FORMAT);
 
+/** SQL content of the Lidarr naming defaults PCD built-in base op. */
 export const LIDARR_NAMING_DEFAULTS_OP_SQL = `
 -- Normalize legacy Sonarr alias to Lidarr naming row if still present.
 INSERT INTO lidarr_naming (
@@ -101,6 +105,7 @@ WHERE name = 'Lidarr'
 
 const LIDARR_NAMING_DEFAULTS_OP_SQL_ESCAPED = LIDARR_NAMING_DEFAULTS_OP_SQL.replaceAll("'", "''");
 
+/** Database migration: Set Lidarr naming default templates as a PCD built-in base op. */
 export const migration: Migration = {
   version: LIDARR_NAMING_DEFAULTS_OP_VERSION,
   name: 'Set Lidarr naming defaults',

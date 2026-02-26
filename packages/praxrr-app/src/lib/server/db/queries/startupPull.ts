@@ -162,6 +162,11 @@ function parseArrType(arrType: string): ArrAppType {
   return arrType;
 }
 
+/**
+ * Database queries for startup pull runs.
+ * Records the outcomes of PCD pull operations performed at application startup,
+ * including per-instance import, skip, conflict, and failure counts.
+ */
 export const startupPullQueries = {
   insertRun(input: InsertStartupPullRunInput): void {
     db.execute(

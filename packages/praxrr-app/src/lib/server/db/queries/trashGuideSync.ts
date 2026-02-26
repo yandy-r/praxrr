@@ -303,6 +303,11 @@ function replaceSelections(instanceId: number, sourceId: number, selections: Tra
   }
 }
 
+/**
+ * Database queries for TRaSH guide sync configuration.
+ * Manages sync settings, section selections, and run state for syncing
+ * TRaSH guide entities to Arr instances.
+ */
 export const trashGuideSyncQueries = {
   /**
    * Ensure an Arr instance and TRaSH source can be paired by arr_type.

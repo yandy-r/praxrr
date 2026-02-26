@@ -1,11 +1,15 @@
 import type { Migration } from '../migrations.ts';
 
+/** Filename of the PCD built-in base op SQL file for normalizing naming character replacement defaults. */
 export const NAMING_CHARACTER_REPLACEMENT_DEFAULTS_OP_FILENAME =
   '20260224_normalize_naming_character_replacement_defaults.sql';
+/** Migration version number for the naming character replacement defaults PCD built-in base op. */
 export const NAMING_CHARACTER_REPLACEMENT_DEFAULTS_OP_VERSION = 20260224;
+/** JSON metadata string for the naming character replacement defaults PCD built-in base op. */
 export const NAMING_CHARACTER_REPLACEMENT_DEFAULTS_OP_METADATA =
   '{"operation":"seed","entity":"naming","conflict_policy":"normalize_default_naming_character_replacement"}';
 
+/** SQL content of the naming character replacement defaults PCD built-in base op. */
 export const NAMING_CHARACTER_REPLACEMENT_DEFAULTS_OP_SQL = `
 -- Normalize Radarr naming defaults to replace illegal characters + smart colon replacement.
 UPDATE radarr_naming
@@ -40,6 +44,7 @@ const NAMING_CHARACTER_REPLACEMENT_DEFAULTS_OP_SQL_ESCAPED = NAMING_CHARACTER_RE
   "''"
 );
 
+/** Database migration: Normalize Radarr naming character replacement defaults as a PCD built-in base op. */
 export const migration: Migration = {
   version: NAMING_CHARACTER_REPLACEMENT_DEFAULTS_OP_VERSION,
   name: 'Normalize naming character replacement defaults',

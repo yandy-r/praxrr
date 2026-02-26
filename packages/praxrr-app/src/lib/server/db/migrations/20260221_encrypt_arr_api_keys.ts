@@ -436,6 +436,7 @@ async function migrateArrApiKeyStorage(): Promise<void> {
   clearBackfillState();
 }
 
+/** Database migration: Add encrypted Arr instance credentials table and backfill existing API keys. */
 export const migration: Migration = {
   version: MIGRATION_VERSION,
   name: 'Add encrypted Arr instance credentials',
