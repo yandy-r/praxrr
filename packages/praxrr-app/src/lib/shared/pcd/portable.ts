@@ -81,12 +81,25 @@ export const LIDARR_MEDIA_MANAGEMENT_PORTABLE_MATRIX: Record<
   },
 } as const;
 
+/**
+ * Type guard that checks whether a string is a known Lidarr media-management portable entity type.
+ *
+ * @param entityType - The entity type string to test
+ * @returns `true` if `entityType` is a `LidarrMediaManagementPortableEntityType`
+ */
 export function isLidarrMediaManagementPortableEntityType(
   entityType: string
 ): entityType is LidarrMediaManagementPortableEntityType {
   return (LIDARR_MEDIA_MANAGEMENT_PORTABLE_ENTITIES as readonly string[]).includes(entityType);
 }
 
+/**
+ * Returns the portable matrix entry for a given Lidarr media-management entity type,
+ * or `null` if the entity type is not recognised.
+ *
+ * @param entityType - The entity type to look up
+ * @returns The corresponding matrix entry, or `null` if not found
+ */
 export function getLidarrMediaManagementPortableEntry(entityType: EntityType) {
   if (!isLidarrMediaManagementPortableEntityType(entityType)) {
     return null;
@@ -158,6 +171,14 @@ function formatMigrationRequiredMessage(path: string): string {
   return `${path}.format must be one of: ${PORTABLE_MIGRATION_FORMATS.join(', ')}`;
 }
 
+/**
+ * Validates a portable migration metadata object.
+ * Checks that the object is present, contains no unknown fields, has a valid format,
+ * an integer version at or above the minimum, and a non-empty source string.
+ *
+ * @param migration - The value to validate (typically parsed from untrusted input)
+ * @returns `null` if valid, or an error message string describing the first problem found
+ */
 export function validatePortableMigrationMetadata(migration: unknown): string | null {
   if (migration === null || typeof migration !== 'object' || Array.isArray(migration)) {
     return 'migration must be an object';

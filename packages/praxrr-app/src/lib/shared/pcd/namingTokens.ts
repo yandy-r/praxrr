@@ -459,6 +459,11 @@ const SONARR_ORIGINAL_TOKENS: NamingToken[] = [
 // CATEGORIZED TOKEN LISTS
 // ============================================================================
 
+/**
+ * Returns the full list of categorised naming token definitions for Radarr.
+ *
+ * @returns Array of token categories with their tokens for Radarr naming formats
+ */
 export function getRadarrTokenCategories(): TokenCategory[] {
   return [
     { name: 'Movie', tokens: RADARR_MOVIE_TOKENS },
@@ -472,6 +477,11 @@ export function getRadarrTokenCategories(): TokenCategory[] {
   ];
 }
 
+/**
+ * Returns the full list of categorised naming token definitions for Sonarr.
+ *
+ * @returns Array of token categories with their tokens for Sonarr naming formats
+ */
 export function getSonarrTokenCategories(): TokenCategory[] {
   return [
     { name: 'Series', tokens: SONARR_SERIES_TOKENS },
@@ -614,10 +624,22 @@ export function resolveFormat(format: string, sampleValues: Record<string, strin
   return resolved.replace(/  +/g, ' ').trim();
 }
 
+/**
+ * Resolves a Radarr naming format string by substituting tokens with Radarr sample values.
+ *
+ * @param format - The naming format string containing tokens (e.g. `{Movie Title}`)
+ * @returns The format string with tokens replaced by Radarr sample values
+ */
 export function resolveRadarrFormat(format: string): string {
   return resolveFormat(format, RADARR_SAMPLE_VALUES);
 }
 
+/**
+ * Resolves a Sonarr naming format string by substituting tokens with Sonarr sample values.
+ *
+ * @param format - The naming format string containing tokens (e.g. `{Series Title}`)
+ * @returns The format string with tokens replaced by Sonarr sample values
+ */
 export function resolveSonarrFormat(format: string): string {
   return resolveFormat(format, SONARR_SAMPLE_VALUES);
 }

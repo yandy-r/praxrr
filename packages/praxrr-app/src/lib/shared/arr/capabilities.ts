@@ -270,6 +270,12 @@ export const ARR_CONDITION_TARGET_OPTIONS: ArrConditionTargetOption[] = [
 // TYPE GUARDS
 // ============================================================================
 
+/**
+ * Type guard that checks whether a string is a known Arr application type.
+ *
+ * @param value - The string to test
+ * @returns `true` if `value` is a valid `ArrAppType`
+ */
 export function isArrAppType(value: string): value is ArrAppType {
   return Object.hasOwn(ARR_APPS, value);
 }
