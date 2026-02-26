@@ -1,11 +1,15 @@
 import { assertEquals, assertMatch, assertStringIncludes } from '@std/assert';
 import { type CreateJobQueueInput, jobQueueQueries } from '$db/queries/jobQueue.ts';
 import { jobRunHistoryQueries } from '$db/queries/jobRunHistory.ts';
+import {
+  trashGuideEntityCacheQueries,
+  type TrashGuideEntityCacheWithSource,
+} from '$db/queries/trashGuideEntityCache.ts';
 import { jobDispatcher } from '$jobs/dispatcher.ts';
 import { trashGuideManager } from '$lib/server/trashguide/manager.ts';
 import { TrashGuideFetcherError } from '$lib/server/trashguide/types.ts';
 import { TrashGuideTransformError } from '$lib/server/trashguide/transformer.ts';
-import type { JobQueueRecord } from '$jobs/queueTypes.ts';
+import type { JobQueueRecord, JobRunHistoryRecord } from '$jobs/queueTypes.ts';
 import { POST as sourcesPost } from '../../routes/api/v1/trash-guide/sources/+server.ts';
 import { GET as sourceByIdGet, PUT as sourceByIdPut } from '../../routes/api/v1/trash-guide/sources/[id]/+server.ts';
 import { GET as sourceEntitiesGet } from '../../routes/api/v1/trash-guide/sources/[id]/entities/+server.ts';
@@ -244,6 +248,137 @@ Deno.test('trash guide source GET validates numeric source id', async () => {
 });
 
 Deno.test({
+  name: 'trash guide source entities GET returns source metadata in entity response shape',
+  sanitizeResources: false,
+  fn: async () => {
+    const restores: Restore[] = [];
+    const fetchedAt = '2026-02-26T11:22:33.000Z';
+    const entities: TrashGuideEntityCacheWithSource[] = [
+      {
+        id: 1,
+        sourceId: 64,
+        trashId: 'cf-001',
+        entityType: 'custom_format',
+        name: 'TRaSH CF One',
+        jsonData: JSON.stringify({
+          name: 'TRaSH CF One',
+          scores: {
+            default: 55,
+          },
+        }),
+        filePath: '/radarr/cf-one.json',
+        contentHash: 'hash-cf-001',
+        fetchedAt,
+        source: {
+          type: 'trash',
+          id: 64,
+          name: 'TRaSH radarr 64',
+          arrType: 'radarr',
+        },
+      },
+      {
+        id: 2,
+        sourceId: 64,
+        trashId: 'qp-001',
+        entityType: 'quality_profile',
+        name: 'TRaSH QP One',
+        jsonData: JSON.stringify({
+          name: 'TRaSH QP One',
+          group: 7,
+        }),
+        filePath: '/radarr/qp-one.json',
+        contentHash: 'hash-qp-001',
+        fetchedAt,
+        source: {
+          type: 'trash',
+          id: 64,
+          name: 'TRaSH radarr 64',
+          arrType: 'radarr',
+        },
+      },
+    ];
+
+    patchTarget(
+      trashGuideManager,
+      'getSource',
+      (() => createSourceResponse(64, 'radarr')) as typeof trashGuideManager.getSource,
+      restores
+    );
+    patchTarget(
+      trashGuideEntityCacheQueries,
+      'getBySourceWithMetadata',
+      ((sourceId: number) => {
+        assertEquals(sourceId, 64);
+        return entities;
+      }) as typeof trashGuideEntityCacheQueries.getBySourceWithMetadata,
+      restores
+    );
+
+    try {
+      const response = await sourceEntitiesGet({
+        params: { id: '64' },
+        url: new URL('http://localhost/api/v1/trash-guide/sources/64/entities?arrType=radarr'),
+      } as unknown as Parameters<typeof sourceEntitiesGet>[0]);
+
+      assertEquals(response.status, 200);
+      const payload = (await response.json()) as {
+        entities: Array<{
+          source: {
+            type: 'trash';
+            id: number;
+            name: string;
+            arrType: 'radarr' | 'sonarr';
+          };
+          trashId: string;
+          type: string;
+          name: string;
+          filePath: string;
+          fetchedAt: string;
+          scores?: Record<string, number>;
+          group?: number | null;
+        }>;
+        pagination: {
+          limit: number;
+          offset: number;
+          nextCursor: string | null;
+          total: number;
+          hasMore: boolean;
+        };
+      };
+
+      assertEquals(payload.entities.length, 2);
+      assertEquals(payload.entities[0].source, {
+        type: 'trash',
+        id: 64,
+        name: 'TRaSH radarr 64',
+        arrType: 'radarr',
+      });
+      assertEquals(payload.entities[0].trashId, 'cf-001');
+      assertEquals(payload.entities[0].scores, { default: 55 });
+
+      assertEquals(payload.entities[1].source, {
+        type: 'trash',
+        id: 64,
+        name: 'TRaSH radarr 64',
+        arrType: 'radarr',
+      });
+      assertEquals(payload.entities[1].trashId, 'qp-001');
+      assertEquals(payload.entities[1].group, 7);
+
+      assertEquals(payload.pagination.limit, 50);
+      assertEquals(payload.pagination.offset, 0);
+      assertEquals(payload.pagination.nextCursor, null);
+      assertEquals(payload.pagination.total, 2);
+      assertEquals(payload.pagination.hasMore, false);
+    } finally {
+      for (const restore of restores.reverse()) {
+        restore();
+      }
+    }
+  },
+});
+
+Deno.test({
   name: 'trash guide source sync POST enqueues manual sync job and notifies dispatcher',
   sanitizeResources: false,
   fn: async () => {
@@ -389,6 +524,118 @@ Deno.test({
 });
 
 Deno.test({
+  name: 'trash guide source sync POST returns 409 when dedupe upsert reports running job',
+  sanitizeResources: false,
+  fn: async () => {
+    const restores: Restore[] = [];
+    const runningAt = '2026-02-25T04:05:06.000Z';
+    const latestRun: JobRunHistoryRecord = {
+      id: 512,
+      queueId: 941,
+      jobType: 'trashguide.sync',
+      status: 'failure',
+      startedAt: '2026-02-25T04:05:00.000Z',
+      finishedAt: '2026-02-25T04:05:05.000Z',
+      durationMs: 5000,
+      error: 'network timeout',
+      output: null,
+      createdAt: '2026-02-25T04:05:05.000Z',
+    };
+
+    patchTarget(
+      trashGuideManager,
+      'getSource',
+      (() => createSourceResponse(54, 'radarr')) as typeof trashGuideManager.getSource,
+      restores
+    );
+    patchTarget(
+      jobQueueQueries,
+      'getByDedupeKey',
+      (() => createJobRecord(940, 'queued', runningAt, 54)) as typeof jobQueueQueries.getByDedupeKey,
+      restores
+    );
+    patchTarget(
+      jobQueueQueries,
+      'upsertScheduled',
+      (() => createJobRecord(941, 'running', runningAt, 54)) as typeof jobQueueQueries.upsertScheduled,
+      restores
+    );
+    patchTarget(
+      jobQueueQueries,
+      'getById',
+      ((id: number) =>
+        id === 941 ? createJobRecord(941, 'running', runningAt, 54) : undefined) as typeof jobQueueQueries.getById,
+      restores
+    );
+    patchTarget(
+      jobRunHistoryQueries,
+      'getByQueueId',
+      (() => [latestRun]) as typeof jobRunHistoryQueries.getByQueueId,
+      restores
+    );
+    patchTarget(
+      jobDispatcher,
+      'notifyJobEnqueued',
+      (() => {
+        throw new Error('did not expect notifyJobEnqueued when upsert resolves to running');
+      }) as typeof jobDispatcher.notifyJobEnqueued,
+      restores
+    );
+
+    try {
+      const response = await sourceSyncPost({
+        params: { id: '54' },
+      } as unknown as Parameters<typeof sourceSyncPost>[0]);
+
+      assertEquals(response.status, 409);
+      const payload = (await response.json()) as {
+        error: string;
+        run: {
+          queueId: number;
+          current: {
+            status: string;
+            runAt: string;
+            startedAt: string | null;
+            attempts: number;
+            source: string;
+          };
+          latestRun: {
+            id: number;
+            status: string;
+            startedAt: string;
+            finishedAt: string;
+            durationMs: number;
+            error: string | null;
+            output: string | null;
+          } | null;
+        };
+      };
+
+      assertMatch(payload.error, /already running/i);
+      assertEquals(payload.run.queueId, 941);
+      assertEquals(payload.run.current.status, 'running');
+      assertEquals(payload.run.current.runAt, runningAt);
+      assertEquals(payload.run.current.startedAt, runningAt);
+      assertEquals(payload.run.current.source, 'manual');
+      assertEquals(payload.run.current.attempts, 0);
+      assertEquals(payload.run.latestRun, {
+        id: 512,
+        status: 'failure',
+        startedAt: '2026-02-25T04:05:00.000Z',
+        finishedAt: '2026-02-25T04:05:05.000Z',
+        durationMs: 5000,
+        error: 'network timeout',
+        output: null,
+      });
+    } finally {
+      for (const restore of restores.reverse()) {
+        restore();
+      }
+    }
+  },
+});
+
+Deno.test({
   name: 'trash guide source sync POST returns 500 if running queue metadata disappears',
   sanitizeResources: false,
   fn: async () => {
@@ -444,6 +691,14 @@ Deno.test({
       trashGuideManager,
       'getSource',
       (() => createSourceResponse(66, 'sonarr')) as typeof trashGuideManager.getSource,
+      restores
+    );
+    patchTarget(
+      trashGuideEntityCacheQueries,
+      'getBySourceWithMetadata',
+      (() => {
+        throw new Error('did not expect entity cache query on arrType mismatch');
+      }) as typeof trashGuideEntityCacheQueries.getBySourceWithMetadata,
       restores
     );
 
