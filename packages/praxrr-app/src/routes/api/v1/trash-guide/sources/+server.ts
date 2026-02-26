@@ -26,10 +26,20 @@ const CREATE_ALLOWED_FIELDS = new Set([
   'syncStrategy',
 ]);
 
+/**
+ * GET handler — returns all registered TRaSH Guide sources.
+ *
+ * @returns JSON response with the full list of configured sources
+ */
 export const GET: RequestHandler = () => {
   return json({ sources: trashGuideManager.listSources() });
 };
 
+/**
+ * POST handler — creates a new TRaSH Guide source and triggers initial fetch.
+ *
+ * @returns 201 JSON response with the created source, or an error response
+ */
 export const POST: RequestHandler = async ({ request }) => {
   let body: unknown;
   try {

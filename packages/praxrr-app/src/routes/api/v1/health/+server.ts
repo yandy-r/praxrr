@@ -29,6 +29,12 @@ function formatBytes(bytes: number): string {
   return `${value.toFixed(i > 0 ? 1 : 0)} ${units[i]}`;
 }
 
+/**
+ * GET handler — returns the current health status of the application.
+ * Accepts an optional `verbose` query parameter for detailed component info.
+ *
+ * @returns JSON response with overall status and per-component health checks
+ */
 export const GET: RequestHandler = async ({ url }) => {
   const verbose = url.searchParams.get('verbose') === 'true';
 

@@ -4,6 +4,12 @@ import { trashGuideManager } from '$lib/server/trashguide/manager.ts';
 import { logTrashGuideRouteError, mapReadErrorStatus, parseSourceId, toErrorMessage } from '../_helpers.ts';
 import { enqueueManualTrashGuideSourceSync } from '$jobs/helpers/trashGuideSyncQueue.ts';
 
+/**
+ * POST handler — enqueue a manual TRaSH Guide source sync job.
+ * Returns 409 if a sync for the same source is already running.
+ *
+ * @returns JSON response with job info, or an error response
+ */
 export const POST: RequestHandler = async ({ params }) => {
   const sourceIdResult = parseSourceId(params.id);
   if ('error' in sourceIdResult) {

@@ -333,6 +333,11 @@ function getReadErrorStatus(message: string): number {
   return 500;
 }
 
+/**
+ * GET handler — fetch detail for a single Lidarr metadata profile.
+ *
+ * @returns JSON response with the metadata profile detail, or an error response
+ */
 export const GET: RequestHandler = async ({ params }) => {
   const databaseIdResult = parseDatabaseId(params.databaseId, 'databaseId');
   if ('error' in databaseIdResult) {
@@ -377,6 +382,12 @@ export const GET: RequestHandler = async ({ params }) => {
   }
 };
 
+/**
+ * PUT handler — update an existing Lidarr metadata profile.
+ * Accepts partial updates; at least one mutable field must be provided.
+ *
+ * @returns JSON `{ success: true }` on success, or an error response
+ */
 export const PUT: RequestHandler = async ({ params, request }) => {
   const databaseIdResult = parseDatabaseId(params.databaseId, 'databaseId');
   if ('error' in databaseIdResult) {
@@ -470,6 +481,12 @@ export const PUT: RequestHandler = async ({ params, request }) => {
   }
 };
 
+/**
+ * DELETE handler — remove a Lidarr metadata profile by ID.
+ * Requires `layer` and `name` in the request body for guard validation.
+ *
+ * @returns JSON `{ success: true }` on success, or an error response
+ */
 export const DELETE: RequestHandler = async ({ params, request }) => {
   const databaseIdResult = parseDatabaseId(params.databaseId, 'databaseId');
   if ('error' in databaseIdResult) {

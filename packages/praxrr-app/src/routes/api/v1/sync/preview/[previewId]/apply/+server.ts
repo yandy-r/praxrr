@@ -72,6 +72,12 @@ function resolveEligibleSections(snapshot: SyncPreviewResult): SectionType[] {
   return snapshot.sections.filter((section) => successful.has(section));
 }
 
+/**
+ * POST handler — apply a ready sync preview to an Arr instance.
+ * Validates staleness, section eligibility, and in-progress sync state before executing.
+ *
+ * @returns JSON response with apply result and an optional stale-warning, or an error response
+ */
 export const POST: RequestHandler = async ({ params, request }) => {
   const previewId = params.previewId;
   if (!previewId) {

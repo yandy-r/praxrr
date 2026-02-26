@@ -16,6 +16,11 @@ function sanitizePreviewId(previewId: string | undefined): string | null {
   return trimmed.length === 0 ? null : trimmed;
 }
 
+/**
+ * GET handler — retrieve a stored sync preview snapshot by ID.
+ *
+ * @returns JSON response with the preview snapshot, or 404 if not found/expired
+ */
 export const GET: RequestHandler = async ({ params }) => {
   const previewId = sanitizePreviewId(params.previewId);
   if (!previewId) {
@@ -40,6 +45,11 @@ export const GET: RequestHandler = async ({ params }) => {
   }
 };
 
+/**
+ * DELETE handler — remove a sync preview snapshot from the store.
+ *
+ * @returns 204 No Content on success, or 404 if the preview is not found
+ */
 export const DELETE: RequestHandler = async ({ params }) => {
   const previewId = sanitizePreviewId(params.previewId);
   if (!previewId) {

@@ -13,6 +13,12 @@ const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 200;
 const VALID_ENTITY_TYPES: ReadonlySet<string> = new Set(['custom_format', 'quality_profile', 'quality_size', 'naming']);
 
+/**
+ * GET handler — list entities cached for a TRaSH Guide source.
+ * Supports filtering by `type`, `search`, and `arrType`, plus cursor-based pagination.
+ *
+ * @returns Paginated JSON response with entity list and pagination metadata
+ */
 export const GET: RequestHandler = async ({ params, url }) => {
   const sourceIdResult = parseSourceId(params.id);
   if ('error' in sourceIdResult) {

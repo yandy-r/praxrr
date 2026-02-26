@@ -1,6 +1,12 @@
 import { TrashGuideSourceNotFoundError } from '$lib/server/trashguide/manager.ts';
 import { logger } from '$logger/logger.ts';
 
+/**
+ * Parse and validate a raw source ID string into a positive integer.
+ *
+ * @param raw - Raw string value from route params
+ * @returns `{ value }` on success or `{ error }` with a message on failure
+ */
 export function parseSourceId(raw: string | undefined): { value: number } | { error: string } {
   if (!raw) {
     return { error: 'Missing source id' };
@@ -18,6 +24,12 @@ export function parseSourceId(raw: string | undefined): { value: number } | { er
   return { value: id };
 }
 
+/**
+ * Map a TRaSH Guide read error to an HTTP status code.
+ *
+ * @param error - The caught error value
+ * @returns 404 for not-found errors, 500 for all others
+ */
 export function mapReadErrorStatus(error: unknown): number {
   if (error instanceof TrashGuideSourceNotFoundError) {
     return 404;
@@ -26,6 +38,12 @@ export function mapReadErrorStatus(error: unknown): number {
   return 500;
 }
 
+/**
+ * Extract a human-readable message from an unknown error value.
+ *
+ * @param error - The caught error value
+ * @returns The error message string, or a generic fallback
+ */
 export function toErrorMessage(error: unknown): string {
   if (error instanceof Error) {
     return error.message;
@@ -34,6 +52,13 @@ export function toErrorMessage(error: unknown): string {
   return 'TRaSH source request failed';
 }
 
+/**
+ * Parse an optional payload field that must be a non-empty string when present.
+ *
+ * @param value - Raw payload value to validate
+ * @param field - Field name used in error messages
+ * @returns `{ value }` (possibly `undefined`) on success or `{ error }` on failure
+ */
 export function parseOptionalNonEmptyString(
   value: unknown,
   field: string
@@ -54,6 +79,12 @@ export function parseOptionalNonEmptyString(
   return { value: trimmed };
 }
 
+/**
+ * Validate that a repository URL uses http or https.
+ *
+ * @param value - URL string to validate
+ * @returns `null` if valid, or an error message string if invalid
+ */
 export function validateRepositoryUrl(value: string): string | null {
   let parsed: URL;
   try {
@@ -69,6 +100,12 @@ export function validateRepositoryUrl(value: string): string | null {
   return null;
 }
 
+/**
+ * Log a TRaSH Guide API route error at the error level.
+ *
+ * @param error - The caught error value
+ * @param context - Human-readable description of where the error occurred
+ */
 export async function logTrashGuideRouteError(error: unknown, context: string): Promise<void> {
   await logger.error('TRaSH Guide API route error', {
     source: 'TRaSH Guide',

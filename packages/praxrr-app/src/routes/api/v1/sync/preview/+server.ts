@@ -197,6 +197,12 @@ async function parseRequestBody(
   }
 }
 
+/**
+ * POST handler — generate a new sync preview for an Arr instance.
+ * Subject to rate limiting and snapshot-store capacity limits.
+ *
+ * @returns JSON response with the generated preview snapshot, or an error response
+ */
 export const POST: RequestHandler = async ({ request }) => {
   const requestBody = await parseRequestBody(request);
   if (!requestBody.ok) {

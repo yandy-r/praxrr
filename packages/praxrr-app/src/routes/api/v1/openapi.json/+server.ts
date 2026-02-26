@@ -5,6 +5,12 @@ import { parse } from '@std/yaml';
 // Cache the parsed spec to avoid re-reading on every request
 let cachedSpec: unknown = null;
 
+/**
+ * GET handler — serve the OpenAPI specification as JSON.
+ * Parses and caches the YAML source on first request.
+ *
+ * @returns JSON response with the full OpenAPI spec object
+ */
 export const GET: RequestHandler = async () => {
   if (!cachedSpec) {
     // Read and parse the OpenAPI spec

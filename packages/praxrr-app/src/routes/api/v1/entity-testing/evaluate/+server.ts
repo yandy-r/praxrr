@@ -20,6 +20,12 @@ type EvaluateResponse = components['schemas']['EvaluateResponse'];
 type ReleaseEvaluation = components['schemas']['ReleaseEvaluation'];
 type MediaType = components['schemas']['MediaType'];
 
+/**
+ * POST handler — evaluate release titles against custom formats in a PCD database.
+ * Parses releases in batch and returns CF match results for each.
+ *
+ * @returns JSON response with parser availability flag and per-release CF evaluations
+ */
 export const POST: RequestHandler = async ({ request }) => {
   const body: EvaluateRequest = await request.json();
   const { databaseId, releases } = body;

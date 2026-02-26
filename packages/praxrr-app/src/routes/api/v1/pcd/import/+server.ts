@@ -49,6 +49,12 @@ export const _deserializeDependencies = {
 
 const VALID_ENTITY_TYPES: ReadonlySet<string> = new Set(ENTITY_TYPES);
 
+/**
+ * POST handler — import a portable entity into a PCD database.
+ * Requires `databaseId`, `layer`, `entityType`, and `data` in the request body.
+ *
+ * @returns JSON `{ success: true }` on success, or an error response
+ */
 export const POST: RequestHandler = async ({ request }) => {
   let body: Record<string, unknown>;
   try {

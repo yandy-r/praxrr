@@ -30,6 +30,12 @@ export const _serializeDependencies = {
 
 const VALID_ENTITY_TYPES: ReadonlySet<string> = new Set(ENTITY_TYPES);
 
+/**
+ * GET handler — export a single PCD entity as a portable JSON payload.
+ * Requires `databaseId`, `entityType`, and `name` query parameters.
+ *
+ * @returns JSON response with the serialized entity and migration metadata
+ */
 export const GET: RequestHandler = async ({ url }) => {
   const databaseIdParam = url.searchParams.get('databaseId');
   const entityType = url.searchParams.get('entityType');

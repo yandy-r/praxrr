@@ -263,6 +263,11 @@ function getWriteErrorStatus(message: string): number {
   return 500;
 }
 
+/**
+ * GET handler — list all Lidarr metadata profiles for a PCD database.
+ *
+ * @returns JSON array of metadata profile list items, or an error response
+ */
 export const GET: RequestHandler = async ({ params }) => {
   const databaseIdResult = parseDatabaseId(params.databaseId);
   if ('error' in databaseIdResult) {
@@ -305,6 +310,12 @@ export const GET: RequestHandler = async ({ params }) => {
   }
 };
 
+/**
+ * POST handler — create a new Lidarr metadata profile in a PCD database.
+ * Requires `layer`, `name`, `primaryTypes`, `secondaryTypes`, and `releaseStatuses` in the request body.
+ *
+ * @returns JSON response with the created profile, or an error response
+ */
 export const POST: RequestHandler = async ({ params, request }) => {
   const databaseIdResult = parseDatabaseId(params.databaseId);
   if ('error' in databaseIdResult) {

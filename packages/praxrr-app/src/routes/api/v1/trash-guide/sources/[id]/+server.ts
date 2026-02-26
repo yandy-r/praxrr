@@ -28,6 +28,11 @@ const UPDATE_ALLOWED_FIELDS = new Set([
   'syncStrategy',
 ]);
 
+/**
+ * GET handler — fetch a single TRaSH Guide source by ID.
+ *
+ * @returns JSON response with the source, or 400/404/5xx on error
+ */
 export const GET: RequestHandler = async ({ params }) => {
   const idResult = parseSourceId(params.id);
   if ('error' in idResult) {
@@ -45,6 +50,11 @@ export const GET: RequestHandler = async ({ params }) => {
   }
 };
 
+/**
+ * PUT handler — update fields on an existing TRaSH Guide source.
+ *
+ * @returns JSON response with the updated source, or an error response
+ */
 export const PUT: RequestHandler = async ({ params, request }) => {
   const idResult = parseSourceId(params.id);
   if ('error' in idResult) {
@@ -75,6 +85,11 @@ export const PUT: RequestHandler = async ({ params, request }) => {
   }
 };
 
+/**
+ * DELETE handler — remove a TRaSH Guide source by ID.
+ *
+ * @returns 204 No Content on success, or an error response
+ */
 export const DELETE: RequestHandler = async ({ params }) => {
   const idResult = parseSourceId(params.id);
   if ('error' in idResult) {
