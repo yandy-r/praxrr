@@ -10,6 +10,7 @@
 	import QualityProfiles from './components/QualityProfiles.svelte';
 	import DelayProfiles from './components/DelayProfiles.svelte';
 	import MediaManagement from './components/MediaManagement.svelte';
+	import TrashGuideSources from './components/TrashGuideSources.svelte';
 	import SyncFooter from './components/SyncFooter.svelte';
 	import SyncPreviewPanel from './components/SyncPreviewPanel.svelte';
 	import Toggle from '$ui/toggle/Toggle.svelte';
@@ -110,10 +111,12 @@
 	let delayProfilesDirty = false;
 	let mediaManagementDirty = false;
 	let metadataProfilesDirty = false;
+	let trashGuideSourcesDirty = false;
 	let qualityProfilesPreviewEnabled = false;
 	let delayProfilesPreviewEnabled = false;
 	let mediaManagementPreviewEnabled = false;
 	let metadataProfilesPreviewEnabled = false;
+	let trashGuideSourcesPreviewEnabled = false;
 
 	let metadataProfileSaving = false;
 	let metadataProfileSyncing = false;
@@ -131,7 +134,11 @@
 
 	// Sync combined dirty state to global dirty store for DirtyModal
 	$: anyDirty =
-		qualityProfilesDirty || delayProfilesDirty || mediaManagementDirty || metadataProfilesDirty;
+		qualityProfilesDirty ||
+		delayProfilesDirty ||
+		mediaManagementDirty ||
+		metadataProfilesDirty ||
+		trashGuideSourcesDirty;
 	$: update('anyDirty', anyDirty);
 
 	$: metadataProfileSelectionKey =
@@ -428,6 +435,11 @@
 		bind:previewEnabled={qualityProfilesPreviewEnabled}
 		on:previewGenerated={(event) => handlePreviewGenerated('qualityProfiles', event)}
 		on:previewError={handlePreviewError}
+	/>
+	<TrashGuideSources
+		sources={data.trashGuideSyncBySource}
+		bind:isDirty={trashGuideSourcesDirty}
+		bind:previewEnabled={trashGuideSourcesPreviewEnabled}
 	/>
 	<DelayProfiles
 		bind:this={delayProfilesSection}

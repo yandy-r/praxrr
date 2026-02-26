@@ -11,6 +11,25 @@ export type TrashGuideSyncSectionType =
   | 'naming'
   | 'mediaManagement';
 
+export class TrashGuideSyncValidationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'TrashGuideSyncValidationError';
+  }
+}
+
+export type TrashGuideSyncScopeErrorCode = 'scope_not_found' | 'arr_type_mismatch';
+
+export class TrashGuideSyncScopeError extends Error {
+  readonly code: TrashGuideSyncScopeErrorCode;
+
+  constructor(code: TrashGuideSyncScopeErrorCode, message: string) {
+    super(message);
+    this.name = 'TrashGuideSyncScopeError';
+    this.code = code;
+  }
+}
+
 const VALID_TRIGGERS: ReadonlySet<string> = new Set<TrashGuideSyncTrigger>([
   'none',
   'manual',
@@ -38,7 +57,7 @@ function parseTrashGuideSyncTrigger(raw: string): TrashGuideSyncTrigger {
     return raw as TrashGuideSyncTrigger;
   }
 
-  throw new Error(`Invalid TRaSH sync trigger: ${raw}`);
+  throw new TrashGuideSyncValidationError(`Invalid TRaSH sync trigger: ${raw}`);
 }
 
 function parseTrashGuideSyncStatus(raw: string): TrashGuideSyncStatus {
@@ -46,7 +65,7 @@ function parseTrashGuideSyncStatus(raw: string): TrashGuideSyncStatus {
     return raw as TrashGuideSyncStatus;
   }
 
-  throw new Error(`Invalid TRaSH sync status: ${raw}`);
+  throw new TrashGuideSyncValidationError(`Invalid TRaSH sync status: ${raw}`);
 }
 
 function parseTrashGuideSectionType(raw: string): TrashGuideSyncSectionType {
@@ -54,7 +73,7 @@ function parseTrashGuideSectionType(raw: string): TrashGuideSyncSectionType {
     return raw as TrashGuideSyncSectionType;
   }
 
-  throw new Error(`Invalid TRaSH sync section type: ${raw}`);
+  throw new TrashGuideSyncValidationError(`Invalid TRaSH sync section type: ${raw}`);
 }
 
 function parseInstanceArrType(raw: string): ArrType {
@@ -62,7 +81,7 @@ function parseInstanceArrType(raw: string): ArrType {
     return raw;
   }
 
-  throw new Error(`Invalid arr instance type: ${raw}`);
+  throw new TrashGuideSyncValidationError(`Invalid arr instance type: ${raw}`);
 }
 
 interface TrashGuideSyncConfigRow {
@@ -145,6 +164,19 @@ export interface TrashGuideSyncConfigInput {
   shouldSync?: boolean;
 }
 
+export interface TrashGuideSyncStateInput {
+  instanceId: number;
+  sourceId: number;
+  trigger: TrashGuideSyncTrigger;
+  cron?: string | null;
+  nextRunAt?: string | null;
+  syncStatus?: TrashGuideSyncStatus;
+  lastError?: string | null;
+  lastSyncedAt?: string | null;
+  shouldSync?: boolean;
+  selections: TrashGuideSyncSelectionInput[];
+}
+
 function rowToConfig(row: TrashGuideSyncConfigRow): TrashGuideSyncConfig {
   return {
     instanceId: row.instance_id,
@@ -181,14 +213,20 @@ function assertScope(instanceId: number, sourceId: number): void {
   );
 
   if (!scope) {
-    throw new Error(`Failed to validate TRaSH sync scope for instanceId=${instanceId}, sourceId=${sourceId}`);
+    throw new TrashGuideSyncScopeError(
+      'scope_not_found',
+      `Failed to validate TRaSH sync scope for instanceId=${instanceId}, sourceId=${sourceId}`
+    );
   }
 
   const sourceArrType = parseTrashGuideSourceArrType(scope.source_arr_type);
   const instanceType = parseInstanceArrType(scope.instance_type);
 
   if (instanceType !== sourceArrType) {
-    throw new Error(`TRaSH source arr_type mismatch: source arr_type=${sourceArrType}, instance type=${instanceType}`);
+    throw new TrashGuideSyncScopeError(
+      'arr_type_mismatch',
+      `TRaSH source arr_type mismatch: source arr_type=${sourceArrType}, instance type=${instanceType}`
+    );
   }
 }
 
@@ -196,7 +234,75 @@ function triggerPlaceholders(triggers: string[]): string {
   return triggers.map(() => '?').join(', ');
 }
 
+function upsertConfig(input: TrashGuideSyncConfigInput): void {
+  db.execute(
+    `INSERT INTO trash_guide_sync_config (
+       instance_id,
+       source_id,
+       trigger,
+       cron,
+       next_run_at,
+       sync_status,
+       last_error,
+       last_synced_at,
+       should_sync
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT(instance_id, source_id)
+     DO UPDATE SET
+       trigger = excluded.trigger,
+       cron = excluded.cron,
+       next_run_at = excluded.next_run_at,
+       sync_status = excluded.sync_status,
+       last_error = excluded.last_error,
+       last_synced_at = excluded.last_synced_at,
+       should_sync = excluded.should_sync`,
+    input.instanceId,
+    input.sourceId,
+    input.trigger,
+    input.cron ?? null,
+    input.nextRunAt ?? null,
+    input.syncStatus ?? 'idle',
+    input.lastError ?? null,
+    input.lastSyncedAt ?? null,
+    toDbBoolean(input.shouldSync ?? false)
+  );
+}
+
+function replaceSelections(instanceId: number, sourceId: number, selections: TrashGuideSyncSelectionInput[]): void {
+  db.execute('DELETE FROM trash_guide_sync_selections WHERE instance_id = ? AND source_id = ?', instanceId, sourceId);
+
+  const seen = new Set<string>();
+  for (const selection of selections) {
+    if (!selection.itemName.trim()) {
+      throw new TrashGuideSyncValidationError('TRaSH sync selection item_name is required');
+    }
+
+    const sectionType = parseTrashGuideSectionType(selection.sectionType);
+    const key = `${sectionType}:${selection.itemName}`;
+
+    if (seen.has(key)) {
+      continue;
+    }
+
+    seen.add(key);
+    db.execute(
+      'INSERT INTO trash_guide_sync_selections (instance_id, source_id, section_type, item_name) VALUES (?, ?, ?, ?)',
+      instanceId,
+      sourceId,
+      sectionType,
+      selection.itemName
+    );
+  }
+}
+
 export const trashGuideSyncQueries = {
+  /**
+   * Ensure an Arr instance and TRaSH source can be paired by arr_type.
+   */
+  assertScope(instanceId: number, sourceId: number): void {
+    assertScope(instanceId, sourceId);
+  },
+
   /**
    * Get all TRaSH sync configs for an instance.
    */
@@ -332,38 +438,24 @@ export const trashGuideSyncQueries = {
    */
   saveConfig(input: TrashGuideSyncConfigInput): void {
     assertScope(input.instanceId, input.sourceId);
+    upsertConfig(input);
+  },
 
-    db.execute(
-      `INSERT INTO trash_guide_sync_config (
-         instance_id,
-         source_id,
-         trigger,
-         cron,
-         next_run_at,
-         sync_status,
-         last_error,
-         last_synced_at,
-         should_sync
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-       ON CONFLICT(instance_id, source_id)
-       DO UPDATE SET
-         trigger = excluded.trigger,
-         cron = excluded.cron,
-         next_run_at = excluded.next_run_at,
-         sync_status = excluded.sync_status,
-         last_error = excluded.last_error,
-         last_synced_at = excluded.last_synced_at,
-         should_sync = excluded.should_sync`,
-      input.instanceId,
-      input.sourceId,
-      input.trigger,
-      input.cron ?? null,
-      input.nextRunAt ?? null,
-      input.syncStatus ?? 'idle',
-      input.lastError ?? null,
-      input.lastSyncedAt ?? null,
-      toDbBoolean(input.shouldSync ?? false)
-    );
+  /**
+   * Save source config + selections in a single transaction.
+   */
+  saveState(input: TrashGuideSyncStateInput): void {
+    assertScope(input.instanceId, input.sourceId);
+
+    db.beginTransaction();
+    try {
+      upsertConfig(input);
+      replaceSelections(input.instanceId, input.sourceId, input.selections);
+      db.commit();
+    } catch (error) {
+      db.rollback();
+      throw error;
+    }
   },
 
   /**
@@ -587,35 +679,7 @@ export const trashGuideSyncQueries = {
 
     db.beginTransaction();
     try {
-      db.execute(
-        'DELETE FROM trash_guide_sync_selections WHERE instance_id = ? AND source_id = ?',
-        instanceId,
-        sourceId
-      );
-
-      const seen = new Set<string>();
-      for (const selection of selections) {
-        if (!selection.itemName.trim()) {
-          throw new Error('TRaSH sync selection item_name is required');
-        }
-
-        const sectionType = parseTrashGuideSectionType(selection.sectionType);
-
-        const key = `${sectionType}:${selection.itemName}`;
-        if (seen.has(key)) {
-          continue;
-        }
-
-        seen.add(key);
-        db.execute(
-          'INSERT INTO trash_guide_sync_selections (instance_id, source_id, section_type, item_name) VALUES (?, ?, ?, ?)',
-          instanceId,
-          sourceId,
-          sectionType,
-          selection.itemName
-        );
-      }
-
+      replaceSelections(instanceId, sourceId, selections);
       db.commit();
     } catch (error) {
       db.rollback();
