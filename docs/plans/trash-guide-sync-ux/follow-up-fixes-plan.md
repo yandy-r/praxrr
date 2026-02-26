@@ -87,15 +87,15 @@ Acceptance for Workstream B:
 
 ### Workstream C: Friendly TRaSH naming labels in media-management
 
-- [ ] C1. Add shared helper(s) for friendly TRaSH source labels and TRaSH media-management entity
+- [x] C1. Add shared helper(s) for friendly TRaSH source labels and TRaSH media-management entity
       labels.
   - Proposed location:
     - `packages/praxrr-app/src/lib/shared/arr/displayName.ts` (or sibling helper)
-- [ ] C2. Apply friendly source labels to naming and quality-definition source contexts.
+- [x] C2. Apply friendly source labels to naming and quality-definition source contexts.
   - Files:
     - `packages/praxrr-app/src/routes/media-management/[databaseId]/naming/+page.server.ts`
     - `packages/praxrr-app/src/routes/media-management/[databaseId]/quality-definitions/+page.server.ts`
-- [ ] C3. Apply friendly display names for TRaSH rows currently shown as `movie` / `series`.
+- [x] C3. Apply friendly display names for TRaSH rows currently shown as `movie` / `series`.
   - Files:
     - `packages/praxrr-app/src/routes/media-management/[databaseId]/naming/views/TableView.svelte`
     - `packages/praxrr-app/src/routes/media-management/[databaseId]/naming/views/CardView.svelte`

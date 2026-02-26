@@ -162,7 +162,7 @@
 					</div>
 					<div class="min-w-0">
 						<h3 class="truncate text-sm font-semibold text-neutral-900 dark:text-neutral-100">
-							{getMediaManagementDisplayName(config.name, config.arr_type)}
+							{getMediaManagementDisplayName(config.name, config.arr_type, config.sourceType)}
 						</h3>
 						<div class="mt-1 flex flex-wrap items-center gap-1.5">
 							{#if showSourceBadges}

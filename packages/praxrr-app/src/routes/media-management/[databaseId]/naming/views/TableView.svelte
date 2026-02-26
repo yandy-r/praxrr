@@ -160,7 +160,7 @@
 <Table {columns} data={configs} rowHref={getRowHref} hoverable={true}>
 	<svelte:fragment slot="cell" let:row let:column>
 		{#if column.key === 'name'}
-			<span class="font-medium">{getMediaManagementDisplayName(row.name, row.arr_type)}</span>
+			<span class="font-medium">{getMediaManagementDisplayName(row.name, row.arr_type, row.sourceType)}</span>
 		{:else if column.key === 'source'}
 			{@const source = resolveSource(row)}
 			<SourceBadge

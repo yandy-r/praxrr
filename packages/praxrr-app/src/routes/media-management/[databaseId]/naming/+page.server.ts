@@ -9,6 +9,7 @@ import { trashGuideEntityCacheQueries } from '$db/queries/trashGuideEntityCache.
 import type { SourceRef } from '$shared/sources/types.ts';
 import { toSourcedNamingListItem, type TrashGuideSourceRef } from '$lib/server/trashguide/displayTransform.ts';
 import { isTrashGuideSupportedArrType } from '$lib/server/trashguide/types.ts';
+import { getTrashSourceDisplayName } from '$shared/arr/displayName.ts';
 
 function sourceKey(source: SourceRef): string {
   return `${source.type}:${source.id}`;
@@ -58,7 +59,7 @@ function buildSourceContext(databases: ReturnType<typeof pcdManager.getAll>, cur
     ...trashSources.map((source) => ({
       type: 'trash' as const,
       id: source.id,
-      name: source.name,
+      name: getTrashSourceDisplayName(source.arrType),
       arrType: source.arrType,
     })),
   ];
