@@ -1,4 +1,4 @@
-import { assertEquals, assertMatch } from '@std/assert';
+import { assertEquals, assertMatch, assertStringIncludes } from '@std/assert';
 import { type CreateJobQueueInput, jobQueueQueries } from '$db/queries/jobQueue.ts';
 import { jobRunHistoryQueries } from '$db/queries/jobRunHistory.ts';
 import { jobDispatcher } from '$jobs/dispatcher.ts';
@@ -376,6 +376,52 @@ Deno.test({
       assertEquals(payload.run.current.status, 'running');
       assertEquals(payload.run.current.runAt, runningAt);
       assertEquals(payload.run.current.startedAt, runningAt);
+    } finally {
+      for (const restore of restores.reverse()) {
+        restore();
+      }
+    }
+  },
+});
+
+Deno.test({
+  name: 'trash guide source sync POST returns 500 if running queue metadata disappears',
+  sanitizeResources: false,
+  fn: async () => {
+    const restores: Restore[] = [];
+    const runningAt = '2026-02-25T01:23:45.000Z';
+
+    patchTarget(
+      trashGuideManager,
+      'getSource',
+      (() => createSourceResponse(53, 'sonarr')) as typeof trashGuideManager.getSource,
+      restores
+    );
+    patchTarget(
+      jobQueueQueries,
+      'getByDedupeKey',
+      (() => createJobRecord(930, 'running', runningAt, 53)) as typeof jobQueueQueries.getByDedupeKey,
+      restores
+    );
+    patchTarget(jobQueueQueries, 'getById', (() => undefined) as typeof jobQueueQueries.getById, restores);
+    patchTarget(
+      jobQueueQueries,
+      'upsertScheduled',
+      (() => {
+        throw new Error('did not expect upsertScheduled when running job metadata is missing');
+      }) as typeof jobQueueQueries.upsertScheduled,
+      restores
+    );
+
+    try {
+      const response = await sourceSyncPost({
+        params: { id: '53' },
+      } as unknown as Parameters<typeof sourceSyncPost>[0]);
+
+      assertEquals(response.status, 500);
+      const payload = (await response.json()) as { error: string };
+
+      assertStringIncludes(payload.error, 'queueId=930');
     } finally {
       for (const restore of restores.reverse()) {
         restore();

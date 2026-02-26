@@ -232,6 +232,9 @@ a response with `status: 'unknown'` and a fake timestamp. This masks a real prob
 
 **Fix:** Throw an error or return 500.
 
+**Status:** Fixed. `toRunMetadata` now throws when queue record lookup fails, which surfaces as a
+500 via the route handler catch block.
+
 ### 13. `walkDirectoryForJson` propagates raw Deno errors without context
 
 **File:** `packages/praxrr-app/src/lib/server/trashguide/fetcher.ts:342-369` **Agent:**
@@ -241,6 +244,9 @@ If a directory becomes unreadable mid-walk, the raw Deno error propagates with n
 which entity directory was being scanned.
 
 **Fix:** Wrap `Deno.readDir` in a try-catch that throws a contextual `TrashGuideFetcherError`.
+
+**Status:** Fixed. Directory read failures now throw `TrashGuideFetcherError` with
+`operation: 'discover'` and path metadata.
 
 ---
 

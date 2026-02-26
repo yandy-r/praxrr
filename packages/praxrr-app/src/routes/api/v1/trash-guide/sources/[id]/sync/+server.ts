@@ -103,17 +103,7 @@ function toRunMetadata(queueId: number): {
 } {
   const queue = jobQueueQueries.getById(queueId);
   if (!queue) {
-    return {
-      queueId,
-      current: {
-        status: 'unknown',
-        runAt: new Date().toISOString(),
-        startedAt: null,
-        attempts: 0,
-        source: 'system',
-      },
-      latestRun: null,
-    };
+    throw new Error(`TRaSH sync queue record missing while resolving run metadata. queueId=${queueId}`);
   }
 
   const latestRun = jobRunHistoryQueries.getByQueueId(queueId, 1)[0];

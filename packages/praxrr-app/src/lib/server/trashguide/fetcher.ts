@@ -343,8 +343,22 @@ async function walkDirectoryForJson(
 ): Promise<void> {
   const absolutePath = toAbsolutePath(repositoryRoot, repoRelativePath);
   const entries: Deno.DirEntry[] = [];
-  for await (const entry of Deno.readDir(absolutePath)) {
-    entries.push(entry);
+  try {
+    for await (const entry of Deno.readDir(absolutePath)) {
+      entries.push(entry);
+    }
+  } catch (error) {
+    throw new TrashGuideFetcherError(
+      'metadata_invalid',
+      `Unable to read TRaSH metadata directory: ${repoRelativePath}`,
+      false,
+      {
+        operation: 'discover',
+        local_path: repositoryRoot,
+        metadata_path: repoRelativePath,
+      },
+      { cause: error }
+    );
   }
   entries.sort((a, b) => a.name.localeCompare(b.name));
 
