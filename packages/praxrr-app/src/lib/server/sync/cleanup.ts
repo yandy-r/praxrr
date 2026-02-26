@@ -50,6 +50,7 @@ export interface CleanupScanResult {
 export interface CleanupDeleteResult {
   deletedCustomFormats: StaleItem[];
   deletedQualityProfiles: StaleItem[];
+  failedCustomFormats: { item: StaleItem; reason: string }[];
   skippedQualityProfiles: { item: StaleItem; reason: string }[];
 }
 
@@ -263,6 +264,7 @@ export async function deleteStaleItems(
 ): Promise<CleanupDeleteResult> {
   const deletedCustomFormats: StaleItem[] = [];
   const deletedQualityProfiles: StaleItem[] = [];
+  const failedCustomFormats: { item: StaleItem; reason: string }[] = [];
   const skippedQualityProfiles: { item: StaleItem; reason: string }[] = [];
 
   // Delete CFs first
@@ -271,6 +273,8 @@ export async function deleteStaleItems(
       await client.deleteCustomFormat(cf.id);
       deletedCustomFormats.push(cf);
     } catch (err) {
+      const reason = err instanceof Error ? err.message : String(err);
+      failedCustomFormats.push({ item: cf, reason });
       await logger.warn(`Failed to delete CF "${cf.strippedName}" (id=${cf.id})`, {
         source: SOURCE,
         meta: { error: err instanceof Error ? err.message : String(err) },
@@ -299,9 +303,10 @@ export async function deleteStaleItems(
     meta: {
       deletedCFs: deletedCustomFormats.map((cf) => cf.strippedName),
       deletedQPs: deletedQualityProfiles.map((qp) => qp.strippedName),
+      failedCFs: failedCustomFormats.map((cf) => cf.item.strippedName),
       skippedQPs: skippedQualityProfiles.map((s) => s.item.strippedName),
     },
   });
 
-  return { deletedCustomFormats, deletedQualityProfiles, skippedQualityProfiles };
+  return { deletedCustomFormats, deletedQualityProfiles, failedCustomFormats, skippedQualityProfiles };
 }

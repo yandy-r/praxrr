@@ -1,7 +1,6 @@
 import { error } from '@sveltejs/kit';
 import type { ServerLoad } from '@sveltejs/kit';
 import { pcdManager } from '$pcd/index.ts';
-import { databaseInstancesQueries } from '$db/queries/databaseInstances.ts';
 import type { SourcedNamingListItem } from '$shared/pcd/display.ts';
 import { list } from '$pcd/entities/mediaManagement/naming/read.ts';
 import { trashGuideManager } from '$lib/server/trashguide/manager.ts';
@@ -10,6 +9,8 @@ import type { SourceRef } from '$shared/sources/types.ts';
 import { toSourcedNamingListItem, type TrashGuideSourceRef } from '$lib/server/trashguide/displayTransform.ts';
 import { isTrashGuideSupportedArrType } from '$lib/server/trashguide/types.ts';
 import { getTrashSourceDisplayName } from '$shared/arr/displayName.ts';
+import { DatabaseNotInitializedError } from '$db/db.ts';
+import { logger } from '$logger/logger.ts';
 
 function sourceKey(source: SourceRef): string {
   return `${source.type}:${source.id}`;
@@ -23,7 +24,11 @@ function listTrashSourcesSafely(): ReturnType<typeof trashGuideManager.listSourc
   try {
     return trashGuideManager.listSources();
   } catch (error) {
-    if (error instanceof Error && error.message.includes('Database not initialized')) {
+    if (error instanceof DatabaseNotInitializedError) {
+      void logger.warn('TRaSH sources not available: database is not initialized', {
+        source: 'media-management:naming',
+        meta: { error: error.message },
+      });
       return [];
     }
 
@@ -34,13 +39,18 @@ function listTrashSourcesSafely(): ReturnType<typeof trashGuideManager.listSourc
 function resolveDatabases(currentDatabaseId: number): ReturnType<typeof pcdManager.getAll> {
   try {
     return pcdManager.getAll();
-  } catch {
-    const current = databaseInstancesQueries.getById(currentDatabaseId);
-    if (!current) {
-      return [];
+  } catch (error) {
+    if (error instanceof DatabaseNotInitializedError) {
+      void logger.error('Cannot resolve PCD databases for naming page', {
+        source: 'media-management:naming',
+        meta: {
+          currentDatabaseId,
+          reason: error.message,
+        },
+      });
     }
 
-    return [current];
+    throw error;
   }
 }
 

@@ -324,6 +324,12 @@ Deno.test('deleteStaleItems: skips assigned quality profiles and keeps successfu
   try {
     assertEquals(result.deletedCustomFormats, [{ id: 902, name: 'Custom 2', strippedName: 'Custom 2' }]);
     assertEquals(result.deletedQualityProfiles, [{ id: 1003, name: 'QP 3', strippedName: 'QP 3' }]);
+    assertEquals(result.failedCustomFormats, [
+      {
+        item: { id: 901, name: 'Custom 1', strippedName: 'Custom 1' },
+        reason: 'failed custom format delete',
+      },
+    ]);
     assertEquals(result.skippedQualityProfiles, [
       {
         item: { id: 1001, name: 'QP 1', strippedName: 'QP 1' },

@@ -743,15 +743,21 @@ export class QualityProfileSyncer extends BaseSyncer {
    * All databases should have the same quality mappings from the schema PCD.
    */
   private async getQualityMappings(batches: DatabaseSyncBatch[]): Promise<Map<string, string>> {
+    let hasPcdBatch = false;
     for (const batch of batches) {
       if (batch.sourceKind !== 'pcd' || batch.databaseId <= 0) {
         continue;
       }
+      hasPcdBatch = true;
 
       const cache = getCache(batch.databaseId);
       if (cache) {
         return getQualityApiMappings(cache, this.instanceType);
       }
+    }
+
+    if (hasPcdBatch) {
+      throw new Error('No PCD cache available for quality API mappings');
     }
 
     return new Map();

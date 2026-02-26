@@ -161,7 +161,14 @@ empty Map. This covers the TRaSH-only case, but also silently masks PCD-batch fa
 empty quality mappings map, quality profiles will be pushed with unmapped quality items.
 
 **Fix:** Return empty Map only when no PCD batches exist. If PCD batches exist but none have a valid
-cache, throw as the original code did.
+cache, throw as the original code did. **Status:** ✅ Fixed
+
+- `QualityProfileSyncer.getQualityMappings` now tracks PCD batches and throws
+  `No PCD cache available for quality API mappings` when a PCD batch is present but uncached.
+- Added unit tests for:
+  - TRaSH-only batches returning empty map.
+  - cached availability missing for PCD batches throws.
+  - successful mapping from first available PCD cache.
 
 ### 9. `resolveDatabases` catches all errors with no logging (2 files)
 
@@ -173,7 +180,10 @@ falls back to a single database or empty array. No logging. Violates CLAUDE.md: 
 early and often. Do not use fallbacks."
 
 **Fix:** Remove the fallback and let errors propagate, or at minimum log at error level and limit
-the catch to a specific expected error type.
+the catch to a specific expected error type. **Status:** ✅ Fixed
+
+- `resolveDatabases` now only logs for `DatabaseNotInitializedError` and rethrows; generic fallbacks
+  were removed.
 
 ### 10. `listTrashSourcesSafely` uses fragile string matching (2 files)
 
@@ -184,7 +194,11 @@ Catches errors by matching `error.message.includes('Database not initialized')`.
 matching is fragile and has no logging when caught.
 
 **Fix:** Use a specific error class (e.g., `DatabaseNotInitializedError`) rather than string
-matching. Log at debug/warn level.
+matching. Log at debug/warn level. **Status:** ✅ Fixed
+
+- Added `DatabaseNotInitializedError` class in `src/lib/server/db/db.ts` and now use instance checks
+  in both affected page loaders.
+- Added warning logs when TRaSH source listing is skipped due to uninitialized DB.
 
 ### 11. CF deletion failures not surfaced to user
 
@@ -194,7 +208,12 @@ Custom format deletion failures are logged at warn level but not included in the
 `CleanupDeleteResult`. The user sees "cleanup complete" while stale CFs remain.
 
 **Fix:** Add `failedCustomFormats` field to `CleanupDeleteResult` (mirroring
-`skippedQualityProfiles`).
+`skippedQualityProfiles`). **Status:** ✅ Fixed
+
+- `deleteStaleItems` now records CF delete failures as `{ item, reason }` in `failedCustomFormats`.
+- Cleanup API/typed docs updated to include `failedCustomFormats`.
+- `CleanupModal` now renders failed CF deletions with reason text.
+- Targeted test coverage added in `tests/sync/cleanup.test.ts`.
 
 ### 12. Individual profile sync failures hidden from result
 

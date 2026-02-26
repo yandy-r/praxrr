@@ -1,6 +1,5 @@
 import { error, type ServerLoad } from '@sveltejs/kit';
 import { pcdManager } from '$pcd/index.ts';
-import { databaseInstancesQueries } from '$db/queries/databaseInstances.ts';
 import { list } from '$pcd/entities/mediaManagement/quality-definitions/read.ts';
 import { trashGuideManager } from '$lib/server/trashguide/manager.ts';
 import { trashGuideEntityCacheQueries } from '$db/queries/trashGuideEntityCache.ts';
@@ -12,6 +11,8 @@ import {
 } from '$lib/server/trashguide/displayTransform.ts';
 import { isTrashGuideSupportedArrType } from '$lib/server/trashguide/types.ts';
 import { getTrashSourceDisplayName } from '$shared/arr/displayName.ts';
+import { DatabaseNotInitializedError } from '$db/db.ts';
+import { logger } from '$logger/logger.ts';
 
 function sourceKey(source: SourceRef): string {
   return `${source.type}:${source.id}`;
@@ -25,7 +26,11 @@ function listTrashSourcesSafely(): ReturnType<typeof trashGuideManager.listSourc
   try {
     return trashGuideManager.listSources();
   } catch (error) {
-    if (error instanceof Error && error.message.includes('Database not initialized')) {
+    if (error instanceof DatabaseNotInitializedError) {
+      void logger.warn('TRaSH sources not available: database is not initialized', {
+        source: 'media-management:quality-definitions',
+        meta: { error: error.message },
+      });
       return [];
     }
 
@@ -36,13 +41,18 @@ function listTrashSourcesSafely(): ReturnType<typeof trashGuideManager.listSourc
 function resolveDatabases(currentDatabaseId: number): ReturnType<typeof pcdManager.getAll> {
   try {
     return pcdManager.getAll();
-  } catch {
-    const current = databaseInstancesQueries.getById(currentDatabaseId);
-    if (!current) {
-      return [];
+  } catch (error) {
+    if (error instanceof DatabaseNotInitializedError) {
+      void logger.error('Cannot resolve PCD databases for quality definitions page', {
+        source: 'media-management:quality-definitions',
+        meta: {
+          currentDatabaseId,
+          reason: error.message,
+        },
+      });
     }
 
-    return [current];
+    throw error;
   }
 }
 

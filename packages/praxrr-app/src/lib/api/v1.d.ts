@@ -595,6 +595,8 @@ export interface components {
       deletedCustomFormats: components['schemas']['StaleItem'][];
       /** @description Quality profiles that were successfully deleted */
       deletedQualityProfiles: components['schemas']['StaleItem'][];
+      /** @description Custom formats that could not be deleted (with reason) */
+      failedCustomFormats: components['schemas']['SkippedItem'][];
       /** @description Quality profiles that were skipped (assigned to media) */
       skippedQualityProfiles: components['schemas']['SkippedItem'][];
     };
