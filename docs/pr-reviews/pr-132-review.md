@@ -20,6 +20,9 @@ additions, 1,843 deletions, 69 files **Closes:** #127, #128, #129, #130, #131
 
 ### 1. Empty catch blocks in cleanup.ts can cause mass deletion from Arr instances
 
+**Status:** Fixed — parse/transform failures are logged with source/trash context, and fully
+malformed sources now fail the cleanup scan.
+
 **Files:** `packages/praxrr-app/src/lib/server/sync/cleanup.ts:99-103`, `cleanup.ts:108-137`
 **Agent:** silent-failure-hunter
 
@@ -42,6 +45,9 @@ rows fail to parse, throw to abort the scan rather than proceeding with an empty
 
 ### 2. Empty catch block in syncer.ts silently produces zero-entity sync batches
 
+**Status:** Fixed — malformed TRaSH cache rows are logged per-row and an all-malformed source now
+fails batch assembly.
+
 **File:** `packages/praxrr-app/src/lib/server/sync/qualityProfiles/syncer.ts:574-579` **Agent:**
 silent-failure-hunter
 
@@ -54,6 +60,9 @@ Arr instance.
 consider failing the batch.
 
 ### 3. TRaSH namespace suffix logic duplicated in 3 places with fragile coupling
+
+**Status:** Fixed — introduced `getTrashGuideNamespaceSuffix()` in `namespace.ts` and reused it from
+cleanup and syncer.
 
 **Files:** `cleanup.ts:150`, `syncer.ts:684`, `namespace.ts` (reference) **Agents:** code-reviewer,
 code-simplifier
@@ -74,6 +83,9 @@ into a common function both syncer and cleanup consume.
 
 ### 4. Dead code after `return` in `getMediaManagementRouteName`
 
+**Status:** Fixed — removed unreachable `void arrType` statement and renamed parameter to
+`_arrType`.
+
 **File:** `packages/praxrr-app/src/lib/shared/arr/displayName.ts:53` **Agent:** code-reviewer
 
 The `void arrType` statement is placed **after** the `return` statement, making it unreachable. The
@@ -83,49 +95,58 @@ sibling function `getMediaManagementDisplayName` correctly places `void arrType`
 
 ### 5. ESLint `@typescript-eslint/no-unused-vars` disabled globally for all Svelte files
 
+**Status:** Fixed — blanket disable replaced with rule enforcement in Svelte override:
+
 **File:** `eslint.config.js` **Agent:** code-reviewer
 
 ```js
 {
   files: ['**/*.svelte', '**/*.svelte.ts', '**/*.svelte.js'],
-  rules: { '@typescript-eslint/no-unused-vars': 'off' },
+  rules: {
+    '@typescript-eslint/no-unused-vars': ['error', { args: 'none', argsIgnorePattern: '^_' }],
+  },
 }
 ```
 
-This blanket suppression weakens static analysis coverage across the entire Svelte codebase.
+This keeps Svelte linting strict for locals while allowing underscore-prefixed intentionally unused
+arguments.
 
-**Fix:** Remove the blanket rule and add targeted `// eslint-disable-next-line` comments in specific
-files that need the exception.
+**Validation:** `deno run -A npm:eslint src/routes/+layout.svelte` (from `packages/praxrr-app`). No
+unused-vars warnings were surfaced for that representative Svelte file.
 
 ### 6. No unit tests for `displayTransform.ts` (171 new lines, criticality 9/10)
+
+**Status:** Fixed — added unit coverage in
+`packages/praxrr-app/src/tests/trashguide/displayTransform.test.ts`.
 
 **File:** `packages/praxrr-app/src/lib/server/trashguide/displayTransform.ts` **Agent:**
 pr-test-analyzer
 
-This file drives the entire TRaSH entity presentation layer: `parseCachedEntity`, `toSyntheticId`,
-`mapQualityItems`, and all `toSourced*Row` transform functions. Key untested risks:
+Tests now cover:
 
-- `parseCachedEntity` silently returns `null` for invalid JSON -- no test catches behavior changes
-- `toSyntheticId` uses hash-truncation that could produce ID collisions -- zero coverage
-- `mapQualityItems` determines `is_upgrade_until` via three match conditions -- untested
-- `toSourcedCustomFormatRow` maps `specifications` to `conditions` -- schema changes go undetected
+- malformed cache rows in `toSourcedCustomFormatRow` and naming/quality-size transforms.
+- custom format transformation of specifications, source metadata, and tag arrays.
+- quality profile upgrade-until inference across group/item members.
+- quality size transform behavior for valid and invalid payloads.
 
-**Fix:** Add unit tests for `parseCachedEntity`, `toSyntheticId`, `mapQualityItems`, and at least
-one end-to-end transform function.
+**Validation:**
+`deno test packages/praxrr-app/src/tests/trashguide/displayTransform.test.ts --allow-read --allow-write --allow-env --allow-net --allow-run --allow-ffi`.
 
 ### 7. No unit tests for `cleanup.ts` (94 new lines, criticality 9/10)
 
+**Status:** Fixed — added unit coverage in `packages/praxrr-app/src/tests/sync/cleanup.test.ts`.
+
 **File:** `packages/praxrr-app/src/lib/server/sync/cleanup.ts` **Agent:** pr-test-analyzer
 
-`scanForStaleItems` determines what gets deleted from Arr instances. Key untested risks:
+Tests now cover:
 
-- TRaSH namespace suffix scheme must match `syncer.ts` -- no test validates this invariant
-- `deleteStaleItems` has HTTP 500 skip logic for QPs assigned to media -- no test verifies
-- Empty PCD + TRaSH selections should produce empty stale sets, not flag everything -- no test
-- Union of PCD and TRaSH expected names is the critical correctness invariant -- untested
+- expected-name set construction across PCD and TRaSH selections.
+- complete TRaSH malformed cache rejection handling.
+- stale deletion behavior, including successful deletion and HTTP 500 assigned-profile skip
+  classification.
 
-**Fix:** Add mock-based tests verifying expected-name set construction, namespace suffix matching
-with syncer, and edge cases (empty selections, all malformed cache).
+**Validation:**
+`deno test packages/praxrr-app/src/tests/sync/cleanup.test.ts --allow-read --allow-write --allow-env --allow-net --allow-run --allow-ffi`.
 
 ---
 
