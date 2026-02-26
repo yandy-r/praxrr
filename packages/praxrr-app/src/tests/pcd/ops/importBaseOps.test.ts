@@ -287,7 +287,7 @@ Deno.test('importBaseOps: refreshes last_seen_in_repo_at when an entity already 
         ({
           getRawDb: () => ({
             prepare: () => ({
-              get: () => ({ exists_in_cache: 1 }),
+              get: () => undefined,
             }),
           }),
         }) as unknown as PCDCache
