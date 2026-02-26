@@ -59,6 +59,7 @@ export interface TrashGuideSourceResponse {
   branch: string;
   arrType: TrashGuideSupportedArrType;
   scoreProfile: string;
+  autoPull: boolean;
   enabled: boolean;
   syncStrategy: number;
   lastSyncedAt: string | null;
@@ -217,8 +218,7 @@ class TrashGuideManager {
       arrType: nextArrType,
     });
 
-    const shouldReinitializeClone =
-      input.repositoryUrl !== undefined && input.repositoryUrl !== current.repository_url;
+    const shouldReinitializeClone = input.repositoryUrl !== undefined && input.repositoryUrl !== current.repository_url;
     const updateInput = {
       name: input.name,
       repositoryUrl: input.repositoryUrl,
@@ -412,7 +412,15 @@ class TrashGuideManager {
 
     try {
       updates = await checkGitForUpdates(source.local_path);
-    } catch {
+    } catch (error) {
+      await logger.warn('Failed TRaSH source pre-sync update check', {
+        source: 'TrashGuideManager',
+        meta: {
+          sourceId: source.id,
+          localPath: source.local_path,
+          error: error instanceof Error ? error.message : String(error),
+        },
+      });
       // Continue with pull/parse sync flow even if pre-check cannot be resolved.
     }
 
@@ -442,6 +450,15 @@ class TrashGuideManager {
         renamedEntities: transformed.renamedEntities.length,
       };
     } catch (error) {
+      await logger.error('TRaSH source sync failed', {
+        source: 'TrashGuideManager',
+        meta: {
+          sourceId: source.id,
+          arrType: source.arr_type,
+          localPath: source.local_path,
+          error: error instanceof Error ? error.message : String(error),
+        },
+      });
       return {
         success: false,
         commitsBehind: updates.commitsBehind,
@@ -540,6 +557,7 @@ class TrashGuideManager {
       branch: source.branch,
       arrType: source.arr_type,
       scoreProfile: source.score_profile,
+      autoPull: source.auto_pull === 1,
       enabled: source.enabled === 1,
       syncStrategy: source.sync_strategy,
       lastSyncedAt: source.last_synced_at,
@@ -659,7 +677,14 @@ class TrashGuideManager {
     try {
       const commits = await getCommits(localPath, 1, 'HEAD');
       return commits[0]?.hash ?? null;
-    } catch {
+    } catch (error) {
+      await logger.warn('Failed to retrieve TRaSH source commit hash', {
+        source: 'TrashGuideManager',
+        meta: {
+          localPath,
+          error: error instanceof Error ? error.message : String(error),
+        },
+      });
       return null;
     }
   }

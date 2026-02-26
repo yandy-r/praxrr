@@ -63,7 +63,7 @@ import { migration as migration20260222EncryptDatabasePat } from './migrations/2
 import { migration as migration20260223CreateStartupPullRuns } from './migrations/20260223_create_startup_pull_runs.ts';
 import { migration as migration20260224NormalizeNamingCharacterReplacementDefaults } from './migrations/20260224_normalize_naming_character_replacement_defaults.ts';
 import { migration as migration20260225RemoveEmbeddedLidarrSeedOps } from './migrations/20260225_remove_embedded_lidarr_seed_ops.ts';
-import { migration as migration20260225CreateTrashGuideTables } from './migrations/20260225_create_trash_guide_tables.ts';
+import { migration as migration20260226CreateTrashGuideTables } from './migrations/20260226_create_trash_guide_tables.ts';
 
 export interface Migration {
   version: number;
@@ -356,7 +356,7 @@ export function loadMigrations(): Migration[] {
     migration20260223CreateStartupPullRuns,
     migration20260224NormalizeNamingCharacterReplacementDefaults,
     migration20260225RemoveEmbeddedLidarrSeedOps,
-    migration20260225CreateTrashGuideTables,
+    migration20260226CreateTrashGuideTables,
   ];
 
   // Sort by version number
