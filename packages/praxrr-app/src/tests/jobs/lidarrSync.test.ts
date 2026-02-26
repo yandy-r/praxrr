@@ -2,6 +2,7 @@ import { assertEquals, assertExists } from '@std/assert';
 import type { ArrInstance } from '$db/queries/arrInstances.ts';
 import { arrInstancesQueries } from '$db/queries/arrInstances.ts';
 import { arrSyncQueries } from '$db/queries/arrSync.ts';
+import { trashGuideSyncQueries } from '$db/queries/trashGuideSync.ts';
 import { jobQueueRegistry } from '$jobs/queueRegistry.ts';
 import type { JobQueueRecord, JobSource } from '$jobs/queueTypes.ts';
 import {
@@ -163,6 +164,7 @@ Deno.test({
     const originalGetSyncConfigStatus = arrSyncQueries.getSyncConfigStatus;
     const originalGetQualityProfilesSync = arrSyncQueries.getQualityProfilesSync;
     const originalGetNextScheduledRunAt = arrSyncQueries.getNextScheduledRunAt;
+    const originalGetTrashHydrations = trashGuideSyncQueries.getQualityProfileSourceHydrationByInstance;
 
     arrInstancesQueries.getById = (id: number) => instances.get(id);
     arrSyncQueries.getSyncConfigStatus = () => ({
@@ -199,6 +201,7 @@ Deno.test({
       },
     });
     arrSyncQueries.getNextScheduledRunAt = () => null;
+    trashGuideSyncQueries.getQualityProfileSourceHydrationByInstance = () => [];
 
     try {
       const lidarrResult = await handler(createSyncJob(101, 'manual'));
@@ -215,6 +218,7 @@ Deno.test({
       arrSyncQueries.getSyncConfigStatus = originalGetSyncConfigStatus;
       arrSyncQueries.getQualityProfilesSync = originalGetQualityProfilesSync;
       arrSyncQueries.getNextScheduledRunAt = originalGetNextScheduledRunAt;
+      trashGuideSyncQueries.getQualityProfileSourceHydrationByInstance = originalGetTrashHydrations;
     }
   },
 });
@@ -238,6 +242,7 @@ Deno.test({
     const originalGetMediaManagementSync = arrSyncQueries.getMediaManagementSync;
     const originalGetMetadataProfilesSync = arrSyncQueries.getMetadataProfilesSync;
     const originalGetNextScheduledRunAt = arrSyncQueries.getNextScheduledRunAt;
+    const originalGetTrashHydrations = trashGuideSyncQueries.getQualityProfileSourceHydrationByInstance;
 
     arrInstancesQueries.getById = (id: number) => instances.get(id);
     arrSyncQueries.getSyncConfigStatus = () => ({
@@ -296,6 +301,7 @@ Deno.test({
       cron: null,
     });
     arrSyncQueries.getNextScheduledRunAt = () => null;
+    trashGuideSyncQueries.getQualityProfileSourceHydrationByInstance = () => [];
 
     try {
       const radarrResult = await handler(createAllSectionsSyncJob(102, 'manual'));
@@ -319,6 +325,7 @@ Deno.test({
       arrSyncQueries.getMediaManagementSync = originalGetMediaManagementSync;
       arrSyncQueries.getMetadataProfilesSync = originalGetMetadataProfilesSync;
       arrSyncQueries.getNextScheduledRunAt = originalGetNextScheduledRunAt;
+      trashGuideSyncQueries.getQualityProfileSourceHydrationByInstance = originalGetTrashHydrations;
     }
   },
 });
