@@ -267,15 +267,19 @@ Deno.test({
     patchTarget(
       jobQueueQueries,
       'upsertScheduled',
-      ((input: CreateJobQueueInput) => {
+      ((input: CreateJobQueueInput<'trashguide.sync'>) => {
         assertEquals(input.jobType, 'trashguide.sync');
         assertEquals(input.source, 'manual');
         assertEquals(input.dedupeKey, 'trashguide.sync:41');
-        assertEquals(input.payload?.sourceId, 41);
-        assertEquals(input.payload?.trigger, 'manual');
-        assertEquals(typeof input.payload?.requestedAt, 'string');
+        const payload = input.payload;
+        if (!payload) {
+          throw new Error('Expected payload for trashguide sync job');
+        }
+        assertEquals(payload.sourceId, 41);
+        assertEquals(payload.trigger, 'manual');
+        assertEquals(typeof payload.requestedAt, 'string');
         capturedRunAt = input.runAt;
-        return createJobRecord(901, 'queued', input.runAt, Number(input.payload?.sourceId));
+        return createJobRecord(901, 'queued', input.runAt, Number(payload.sourceId));
       }) as typeof jobQueueQueries.upsertScheduled,
       restores
     );

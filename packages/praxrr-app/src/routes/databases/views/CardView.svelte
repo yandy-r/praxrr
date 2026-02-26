@@ -46,7 +46,9 @@
 		window.open(url, '_blank');
 	}
 
-	function formatEntityCount(item: UnifiedDatabaseItem): string {
+	type UnifiedTrashDatabaseItem = Extract<UnifiedDatabaseItem, { type: 'trash' }>;
+
+	function formatEntityCount(item: UnifiedTrashDatabaseItem): string {
 		if (!item.entityCounts) return '';
 		const parts: string[] = [];
 		if (item.entityCounts.customFormats > 0)

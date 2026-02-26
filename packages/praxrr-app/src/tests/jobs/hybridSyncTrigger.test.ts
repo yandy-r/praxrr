@@ -60,7 +60,7 @@ function createScheduledRecord(input: CreateJobQueueInput): JobQueueRecord {
     jobType: input.jobType,
     status: 'queued',
     runAt: input.runAt,
-    payload: input.payload ?? {},
+    payload: (input.payload ?? {}) as JobQueueRecord['payload'],
     source: input.source ?? 'system',
     dedupeKey: input.dedupeKey ?? null,
     cooldownUntil: input.cooldownUntil ?? null,
@@ -95,8 +95,7 @@ Deno.test('triggerSyncs uses stable dedupe keys across repeated on_pull events',
     'upsertScheduled',
     (input: CreateJobQueueInput) => {
       const dedupeKey = input.dedupeKey ?? '';
-      const payload = input.payload ?? {};
-      const _instanceId = (payload['instanceId'] as number) ?? 0;
+      const _instanceId = input.payload && 'instanceId' in input.payload ? input.payload.instanceId : 0;
       firstRunKeys.push(dedupeKey);
       return createScheduledRecord(input);
     },
@@ -164,8 +163,7 @@ Deno.test('triggerSyncs uses stable dedupe keys across repeated on_pull events',
     'upsertScheduled',
     (input: CreateJobQueueInput) => {
       const dedupeKey = input.dedupeKey ?? '';
-      const payload = input.payload ?? {};
-      const _instanceId = (payload['instanceId'] as number) ?? 0;
+      const _instanceId = input.payload && 'instanceId' in input.payload ? input.payload.instanceId : 0;
       secondRunKeys.push(dedupeKey);
       return createScheduledRecord(input);
     },
@@ -214,8 +212,7 @@ Deno.test('triggerSyncs skips startup-active instances to avoid duplicate enqueu
     jobQueueQueries,
     'upsertScheduled',
     (input: CreateJobQueueInput) => {
-      const payload = input.payload ?? {};
-      const instanceId = (payload['instanceId'] as number) ?? 0;
+      const instanceId = input.payload && 'instanceId' in input.payload ? input.payload.instanceId : 0;
       scheduledCalls.push({ instanceId, dedupeKey: input.dedupeKey ?? '' });
       return createScheduledRecord(input);
     },
