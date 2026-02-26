@@ -6,12 +6,17 @@ import {
   toSourcedQualityProfileRow,
 } from '$trashguide/displayTransform.ts';
 import type { TrashGuideEntityCache } from '$db/queries/trashGuideEntityCache.ts';
+import { logger } from '$logger/logger.ts';
 
 const SOURCE = {
   id: 12,
   name: 'TRaSH Source',
   arrType: 'radarr',
 } as const;
+
+const noopWarn = async () => Promise.resolve();
+const originalWarn = logger.warn;
+logger.warn = noopWarn;
 
 function syntheticId(sourceId: number, trashId: string): number {
   const normalized = trashId.trim().toLowerCase();

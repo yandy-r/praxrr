@@ -42,10 +42,10 @@ export function isTrashSource(source: SourceRef): source is Extract<SourceRef, {
   return source.type === 'trash';
 }
 
-export function withPcdSource<
-  TRow extends Record<string, unknown>,
-  TDatabase extends DatabaseLike
->(rows: readonly TRow[], database: TDatabase): Array<TRow & {
+export function withPcdSource<TRow extends object, TDatabase extends DatabaseLike>(
+  rows: readonly TRow[],
+  database: TDatabase
+): Array<TRow & {
   sourceType: 'pcd';
   sourceDatabaseId: number;
   sourceDatabaseName: string;

@@ -3,11 +3,10 @@ import type { RequestHandler } from '@sveltejs/kit';
 import {
   type TrashGuideEntityCache,
   type TrashGuideEntityCacheWithSource,
-  type TrashGuideEntityType,
   trashGuideEntityCacheQueries,
 } from '$db/queries/trashGuideEntityCache.ts';
 import { trashGuideManager } from '$lib/server/trashguide/manager.ts';
-import { isTrashGuideSupportedArrType } from '$lib/server/trashguide/types.ts';
+import { isTrashGuideSupportedArrType, type TrashGuideEntityType } from '$lib/server/trashguide/types.ts';
 import { logTrashGuideRouteError, mapReadErrorStatus, parseSourceId, toErrorMessage } from '../_helpers.ts';
 
 const DEFAULT_LIMIT = 50;
