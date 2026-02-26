@@ -62,14 +62,14 @@ type MutableQueueService = {
   -readonly [K in keyof QueueServiceModule]: QueueServiceModule[K];
 };
 
-function createMockJobRecord(input: CreateJobQueueInput): JobQueueRecord {
+function createMockJobRecord(input: StartupJobInput): JobQueueRecord {
   const now = new Date().toISOString();
   return {
     id: 99,
     jobType: input.jobType,
     status: 'queued',
     runAt: input.runAt,
-    payload: input.payload ?? {},
+    payload: (input.payload ?? {}) as JobQueueRecord['payload'],
     source: input.source ?? 'system',
     dedupeKey: input.dedupeKey ?? null,
     cooldownUntil: input.cooldownUntil ?? null,
@@ -94,7 +94,9 @@ interface StartupEnqueueResult {
   error: string | null;
 }
 
-function runStartupEnqueueGate(upsertFn: (input: CreateJobQueueInput) => JobQueueRecord): StartupEnqueueResult {
+type StartupJobInput = CreateJobQueueInput<'arr.pull.startup'>;
+
+function runStartupEnqueueGate(upsertFn: (input: StartupJobInput) => JobQueueRecord): StartupEnqueueResult {
   if (!config.pullOnStart) {
     return { enqueued: false, dedupeKey: null, error: null };
   }
@@ -133,7 +135,7 @@ Deno.test('startup enqueue: PULL_ON_START=false does NOT enqueue any job', () =>
   patchConfigValue('pullOnStart', false, restores);
 
   let enqueueCalled = false;
-  const mockUpsert = (_input: CreateJobQueueInput): JobQueueRecord => {
+  const mockUpsert = (_input: StartupJobInput): JobQueueRecord => {
     enqueueCalled = true;
     return createMockJobRecord(_input);
   };
@@ -155,7 +157,7 @@ Deno.test('startup enqueue: PULL_ON_START=true enqueues exactly one job', () => 
   patchConfigValue('pullOnStart', true as unknown as boolean, restores);
 
   let enqueueCount = 0;
-  const mockUpsert = (input: CreateJobQueueInput): JobQueueRecord => {
+  const mockUpsert = (input: StartupJobInput): JobQueueRecord => {
     enqueueCount += 1;
     return createMockJobRecord(input);
   };
@@ -175,7 +177,7 @@ Deno.test('startup enqueue: dedupe key is arr.pull.startup:boot', () => {
   patchConfigValue('pullOnStart', true as unknown as boolean, restores);
 
   let capturedDedupeKey: string | null = null;
-  const mockUpsert = (input: CreateJobQueueInput): JobQueueRecord => {
+  const mockUpsert = (input: StartupJobInput): JobQueueRecord => {
     capturedDedupeKey = input.dedupeKey ?? null;
     return createMockJobRecord(input);
   };
@@ -194,7 +196,7 @@ Deno.test('startup enqueue: enqueue failure does not block startup (warn and con
 
   patchConfigValue('pullOnStart', true as unknown as boolean, restores);
 
-  const mockUpsert = (_input: CreateJobQueueInput): JobQueueRecord => {
+  const mockUpsert = (_input: StartupJobInput): JobQueueRecord => {
     throw new Error('DB connection refused');
   };
 
@@ -216,7 +218,7 @@ Deno.test('startup enqueue: startup remains non-blocking (enqueue returns synchr
   // Track timing: enqueue is synchronous, job dispatch is deferred to the dispatcher loop
   let upsertCallTimestamp: number | null = null;
 
-  const mockUpsert = (input: CreateJobQueueInput): JobQueueRecord => {
+  const mockUpsert = (input: StartupJobInput): JobQueueRecord => {
     upsertCallTimestamp = Date.now();
     return createMockJobRecord(input);
   };
@@ -245,7 +247,7 @@ Deno.test('startup enqueue: job type is arr.pull.startup', () => {
   patchConfigValue('pullOnStart', true as unknown as boolean, restores);
 
   let capturedJobType: string | null = null;
-  const mockUpsert = (input: CreateJobQueueInput): JobQueueRecord => {
+  const mockUpsert = (input: StartupJobInput): JobQueueRecord => {
     capturedJobType = input.jobType;
     return createMockJobRecord(input);
   };
@@ -264,7 +266,7 @@ Deno.test('startup enqueue: source is system', () => {
   patchConfigValue('pullOnStart', true as unknown as boolean, restores);
 
   let capturedSource: string | undefined | null = null;
-  const mockUpsert = (input: CreateJobQueueInput): JobQueueRecord => {
+  const mockUpsert = (input: StartupJobInput): JobQueueRecord => {
     capturedSource = input.source;
     return createMockJobRecord(input);
   };
@@ -282,9 +284,9 @@ Deno.test('startup enqueue: payload includes enqueuedAt timestamp', () => {
 
   patchConfigValue('pullOnStart', true as unknown as boolean, restores);
 
-  let capturedPayload: Record<string, unknown> | undefined;
-  const mockUpsert = (input: CreateJobQueueInput): JobQueueRecord => {
-    capturedPayload = input.payload;
+  let capturedPayload: JobQueueRecord['payload'] | undefined;
+  const mockUpsert = (input: StartupJobInput): JobQueueRecord => {
+    capturedPayload = input.payload as JobQueueRecord['payload'];
     return createMockJobRecord(input);
   };
 
@@ -312,7 +314,7 @@ Deno.test('startup enqueue: dedupe prevents duplicate runs via upsertScheduledJo
     dedupeKey: 'arr.pull.startup:boot',
   });
 
-  const mockUpsert = (input: CreateJobQueueInput): JobQueueRecord => {
+  const mockUpsert = (input: StartupJobInput): JobQueueRecord => {
     upsertCallCount += 1;
     // Simulate upsert behavior: return existing record if dedupe key matches
     // (no new row created, same record returned)

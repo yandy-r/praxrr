@@ -15,7 +15,9 @@ export const TRASHGUIDE_SUPPORTED_ARR_TYPES = ['radarr', 'sonarr'] as const;
 export type TrashGuideSupportedArrType = (typeof TRASHGUIDE_SUPPORTED_ARR_TYPES)[number];
 
 /** TRaSH stable identity key. */
-export type TrashGuideId = string;
+export type TrashGuideId = string & {
+  readonly __brand: 'TrashGuideId';
+};
 
 /** Identity shape shared by all TRaSH entities persisted in cache/mappings. */
 export type TrashGuideSourceArrType = TrashGuideSupportedArrType;
@@ -40,6 +42,18 @@ export function isTrashGuideSupportedArrType(value: string): value is TrashGuide
 
 export function isTrashGuideId(value: string): value is TrashGuideId {
   return /^[a-f0-9]{32}$/i.test(value.trim());
+}
+
+export function toTrashGuideId(value: string): TrashGuideId {
+  if (!isTrashGuideId(value)) {
+    throw new Error(`Invalid Trash Guide ID: ${value}`);
+  }
+
+  return value as TrashGuideId;
+}
+
+export function asTrashGuideId(value: string): TrashGuideId {
+  return value as TrashGuideId;
 }
 
 export const TRASHGUIDE_METADATA_ENTITY_PATH_KEYS = {

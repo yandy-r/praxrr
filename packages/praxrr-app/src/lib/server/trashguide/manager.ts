@@ -657,20 +657,23 @@ class TrashGuideManager {
     sourceId: number,
     entities: readonly TrashGuideParsedEntity[]
   ): Promise<TrashGuideEntityCacheInput[]> {
-    return await Promise.all(
-      entities.map(async (entity) => {
-        const jsonData = JSON.stringify(entity);
-        return {
-          sourceId,
-          trashId: entity.trash_id,
-          entityType: entity.entity_type,
-          name: entity.name,
-          jsonData,
-          filePath: entity.file_path,
-          contentHash: await computeContentHash(jsonData),
-        } satisfies TrashGuideEntityCacheInput;
-      })
-    );
+    const cacheRows: TrashGuideEntityCacheInput[] = [];
+
+    for (const entity of entities) {
+      const jsonData = JSON.stringify(entity);
+      const contentHash = await computeContentHash(jsonData);
+      cacheRows.push({
+        sourceId,
+        trashId: entity.trash_id,
+        entityType: entity.entity_type,
+        name: entity.name,
+        jsonData,
+        filePath: entity.file_path,
+        contentHash,
+      });
+    }
+
+    return cacheRows;
   }
 
   private async getCurrentCommitHash(localPath: string): Promise<string | null> {

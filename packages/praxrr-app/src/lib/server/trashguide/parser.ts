@@ -18,6 +18,8 @@ import {
   type TrashGuideSourceFile,
   type TrashGuideSupportedArrType,
   TrashGuideParserError,
+  asTrashGuideId,
+  toTrashGuideId,
   isTrashGuideId,
   isTrashGuideSupportedArrType,
 } from './types.ts';
@@ -281,7 +283,7 @@ function parseQualityProfileFormatItems(
           return {
             name,
             score: null,
-            custom_format_trash_id: entryValue,
+            custom_format_trash_id: toTrashGuideId(entryValue),
           } satisfies TrashGuideQualityProfileFormatItem;
         }
         throw new Error(`${filePath}: formatItems["${name}"] must be a numeric score or a 32-char trash_id reference`);
@@ -296,10 +298,7 @@ function parseQualityProfileFormatItem(value: unknown, context: string): TrashGu
   const record = asRecord(value, context);
   const name = readRequiredString(record, 'name', context);
   const score = readOptionalNumber(record, 'score');
-  const trashId = readOptionalString(record, 'trash_id')?.trim() ?? null;
-  if (trashId !== null && !isTrashGuideId(trashId)) {
-    throw new Error(`${context}: trash_id must be a 32-char hex string when provided`);
-  }
+  const trashId = readOptionalTrashGuideId(record, context);
   if (score === null && trashId === null) {
     throw new Error(`${context}: each format item requires either score or trash_id`);
   }
@@ -325,11 +324,9 @@ function parseQualitySize(
     parseQualitySizeEntry(value, `${filePath}: qualities[${index}]`)
   );
 
-  const explicitTrashId = readOptionalString(record, 'trash_id');
-  if (explicitTrashId !== null && !isTrashGuideId(explicitTrashId)) {
-    throw new Error(`${filePath}: trash_id must be a 32-char hex string when provided`);
-  }
-  const trashId = explicitTrashId ?? `quality-size:${arrType}:${profileType}`;
+  const explicitTrashId = readOptionalTrashGuideId(record, `${filePath}: trash_id`);
+  const generatedId = `quality-size:${arrType}:${profileType}`;
+  const trashId = explicitTrashId ?? asTrashGuideId(generatedId);
 
   return {
     entity_type: 'quality_size',
@@ -356,10 +353,11 @@ function parseNaming(payload: unknown, arrType: TrashGuideSupportedArrType, file
   const record = asRecord(payload, `${filePath}: root`);
   validateNamingCompatibility(record, arrType, filePath);
   const name = getFileStem(filePath);
+  const generatedId = `naming:${arrType}:${name}`;
   return {
     entity_type: 'naming',
     arr_type: arrType,
-    trash_id: `naming:${arrType}:${name}`,
+    trash_id: asTrashGuideId(generatedId),
     file_path: filePath,
     name,
     templates: sortRecordDeep(record),
@@ -448,12 +446,20 @@ function readStringArray(value: unknown, context: string): readonly string[] {
   return values;
 }
 
-function readRequiredTrashId(record: Record<string, unknown>, context: string): string {
+function readRequiredTrashId(record: Record<string, unknown>, context: string): ReturnType<typeof toTrashGuideId> {
   const value = readRequiredString(record, 'trash_id', context);
-  if (!isTrashGuideId(value)) {
-    throw new Error(`${context} must be a 32-char hex string`);
+  return toTrashGuideId(value);
+}
+
+function readOptionalTrashGuideId(
+  record: Record<string, unknown>,
+  context: string
+): ReturnType<typeof toTrashGuideId> | null {
+  const value = readOptionalString(record, 'trash_id');
+  if (value === null) {
+    return null;
   }
-  return value;
+  return toTrashGuideId(value);
 }
 
 function readRequiredString(record: Record<string, unknown>, key: string, context: string): string {

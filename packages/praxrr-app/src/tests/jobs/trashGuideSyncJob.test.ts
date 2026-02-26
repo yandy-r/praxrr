@@ -6,6 +6,7 @@ import { scheduleTrashGuideSyncJobs } from '$jobs/schedule.ts';
 import type { JobQueueRecord } from '$jobs/queueTypes.ts';
 
 type Restore = () => void;
+type TrashGuideSyncJobInput = CreateJobQueueInput<'trashguide.sync'>;
 
 function patchTarget<T extends object, K extends keyof T>(
   target: T,
@@ -47,7 +48,7 @@ function createSourceFixture(
   };
 }
 
-function createScheduledRecord(input: CreateJobQueueInput): JobQueueRecord {
+function createScheduledRecord(input: TrashGuideSyncJobInput): JobQueueRecord {
   const now = new Date().toISOString();
 
   return {
@@ -55,7 +56,7 @@ function createScheduledRecord(input: CreateJobQueueInput): JobQueueRecord {
     jobType: input.jobType,
     status: 'queued',
     runAt: input.runAt,
-    payload: input.payload ?? {},
+    payload: (input.payload ?? {}) as JobQueueRecord['payload'],
     source: input.source ?? 'schedule',
     dedupeKey: input.dedupeKey ?? null,
     cooldownUntil: input.cooldownUntil ?? null,
@@ -85,7 +86,7 @@ Deno.test('scheduleTrashGuideSyncJobs reuses stable dedupe keys across repeated 
   patchTarget(
     jobQueueQueries,
     'upsertScheduled',
-    ((input: CreateJobQueueInput) => {
+    ((input: TrashGuideSyncJobInput) => {
       const dedupeKey = input.dedupeKey ?? '';
       const target = runNumber === 1 ? dedupeKeysFirstRun : dedupeKeysSecondRun;
       target.push(dedupeKey);
@@ -163,7 +164,7 @@ Deno.test('scheduleTrashGuideSyncJobs unschedules disabled and non-scheduled sou
   patchTarget(
     jobQueueQueries,
     'upsertScheduled',
-    ((input: CreateJobQueueInput) => {
+    ((input: TrashGuideSyncJobInput) => {
       enqueueCalls += 1;
       return createScheduledRecord(input);
     }) as typeof jobQueueQueries.upsertScheduled,

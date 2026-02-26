@@ -15,10 +15,11 @@ import type {
   TrashGuideQualitySizeEntity,
   TrashGuideSupportedArrType,
 } from '$trashguide/types.ts';
+import { asTrashGuideId, toTrashGuideId } from '$trashguide/types.ts';
 
-const ALPHA_CF_ID = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
-const ZULU_CF_ID = 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
-const PROFILE_ID = 'cccccccccccccccccccccccccccccccc';
+const ALPHA_CF_ID = toTrashGuideId('aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa');
+const ZULU_CF_ID = toTrashGuideId('bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb');
+const PROFILE_ID = toTrashGuideId('cccccccccccccccccccccccccccccccc');
 
 function createCustomFormatEntity(overrides: Partial<TrashGuideCustomFormatEntity> = {}): TrashGuideCustomFormatEntity {
   return {
@@ -140,7 +141,7 @@ Deno.test('transformTrashGuideEntities rejects parsed arr_type mismatch', () => 
   const parsed = createParseResult('sonarr', [
     createCustomFormatEntity({
       arr_type: 'sonarr',
-      trash_id: 'dddddddddddddddddddddddddddddddd',
+      trash_id: toTrashGuideId('dddddddddddddddddddddddddddddddd'),
       file_path: 'custom-formats/sonarr.json',
     }),
   ]);
@@ -289,7 +290,7 @@ Deno.test('transformTrashGuideEntities accepts radarr anime quality-size profile
       {
         entity_type: 'quality_size',
         arr_type: 'radarr',
-        trash_id: 'dddddddddddddddddddddddddddddddd',
+        trash_id: toTrashGuideId('dddddddddddddddddddddddddddddddd'),
         file_path: 'quality-size/anime.json',
         name: 'anime',
         profile_type: 'anime',
@@ -439,7 +440,7 @@ Deno.test(
       parsed: createParseResult('radarr', [
         createCustomFormatEntity({
           name: 'Anime Dual Audio',
-          trash_id: 'ffffffffffffffffffffffffffffffff',
+          trash_id: toTrashGuideId('ffffffffffffffffffffffffffffffff'),
         }),
         createQualityProfileEntity({
           name: 'Fallback CF',
@@ -447,7 +448,7 @@ Deno.test(
             {
               name: 'Anime Dual Audio',
               score: null,
-              custom_format_trash_id: '11111111111111111111111111111111',
+              custom_format_trash_id: toTrashGuideId('11111111111111111111111111111111'),
             },
           ],
         }),
@@ -475,7 +476,7 @@ Deno.test(
         {
           name: 'Missing Custom Format',
           score: null,
-          custom_format_trash_id: '11111111111111111111111111111111',
+          custom_format_trash_id: toTrashGuideId('11111111111111111111111111111111'),
         },
       ],
     });
@@ -503,11 +504,11 @@ Deno.test(
           parsed: createParseResult('radarr', [
             createCustomFormatEntity({
               name: 'Anime Dual Audio',
-              trash_id: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1',
+              trash_id: asTrashGuideId('aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1'),
             }),
             createCustomFormatEntity({
               name: 'Anime Dual Audio',
-              trash_id: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa2',
+              trash_id: asTrashGuideId('aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa2'),
             }),
             createQualityProfileEntity({
               name: 'Ambiguous Fallback',
@@ -515,7 +516,7 @@ Deno.test(
                 {
                   name: 'Anime Dual Audio',
                   score: null,
-                  custom_format_trash_id: '11111111111111111111111111111111',
+                  custom_format_trash_id: toTrashGuideId('11111111111111111111111111111111'),
                 },
               ],
             }),

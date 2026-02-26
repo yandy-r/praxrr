@@ -353,6 +353,9 @@ Public API functions with zero JSDoc documentation:
 
 ### 14. `toCacheRows` uses `Promise.all` over potentially thousands of entities
 
+**Status:** Fixed — `toCacheRows` now processes entities sequentially before caching to avoid
+unbounded concurrent digest calls.
+
 **File:** `manager.ts:638-656`
 
 For large TRaSH Guide repos, `Promise.all` over all entities creates thousands of concurrent
@@ -360,6 +363,9 @@ microtasks for `crypto.subtle.digest`. Consider sequential processing or batchin
 predictability.
 
 ### 15. Consider branded type for `TrashGuideId`
+
+**Status:** Fixed — `TrashGuideId` is now branded (`string & { readonly __brand: 'TrashGuideId' }`),
+with construction via `toTrashGuideId`/`asTrashGuideId`.
 
 **File:** `types.ts`
 
@@ -371,6 +377,9 @@ type TrashGuideId = string & { readonly __brand: 'TrashGuideId' };
 ```
 
 ### 16. Consider a job payload registry type
+
+**Status:** Fixed — `queueTypes.ts` now defines a mapped `JobPayload` registry by `jobType`, and
+queue enqueue/dequeue types are wired to `CreateJobQueueInput` and payload casting paths.
 
 **File:** `queueTypes.ts`
 
