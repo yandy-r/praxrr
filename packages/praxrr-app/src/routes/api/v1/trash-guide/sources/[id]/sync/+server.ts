@@ -50,7 +50,7 @@ function getDedupeKey(sourceId: number): string {
   return `${TRASHGUIDE_SYNC_DEDUPE_KEY_PREFIX}${sourceId}`;
 }
 
-export function enqueueManualTrashGuideSourceSync(sourceId: number): EnqueueManualTrashGuideSyncResult {
+export function _enqueueManualTrashGuideSourceSync(sourceId: number): EnqueueManualTrashGuideSyncResult {
   const dedupeKey = getDedupeKey(sourceId);
   const existing = jobQueueQueries.getByDedupeKey(dedupeKey);
   if (existing?.status === 'running') {
@@ -114,7 +114,7 @@ export const POST: RequestHandler = async ({ params }) => {
   }
 
   try {
-    const result = enqueueManualTrashGuideSourceSync(sourceId);
+    const result = _enqueueManualTrashGuideSourceSync(sourceId);
     if (result.status === 'already_running') {
       return json(
         {

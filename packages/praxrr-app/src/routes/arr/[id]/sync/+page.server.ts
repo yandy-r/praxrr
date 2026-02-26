@@ -25,7 +25,7 @@ import { buildJobDisplayName } from '$lib/server/jobs/display.ts';
 import { isSyncSectionSupported } from '$lib/server/sync/mappings.ts';
 import { isArrAppType, supportsArrSyncSurface, type ArrSyncSurface } from '$shared/arr/capabilities.ts';
 import { TrashGuideSourceNotFoundError } from '$lib/server/trashguide/manager.ts';
-import { enqueueManualTrashGuideSourceSync } from '../../../api/v1/trash-guide/sources/[id]/sync/+server.ts';
+import { _enqueueManualTrashGuideSourceSync } from '../../../api/v1/trash-guide/sources/[id]/sync/+server.ts';
 import {
   previewStore,
   PREVIEW_STATUS_APPLYING,
@@ -594,7 +594,7 @@ export const actions: Actions = {
 
     try {
       trashGuideSyncQueries.assertScope(id, sourceId);
-      const queued = enqueueManualTrashGuideSourceSync(sourceId);
+      const queued = _enqueueManualTrashGuideSourceSync(sourceId);
       if (queued.status === 'already_running') {
         return fail(409, {
           error: 'TRaSH sync is already running for this source',
