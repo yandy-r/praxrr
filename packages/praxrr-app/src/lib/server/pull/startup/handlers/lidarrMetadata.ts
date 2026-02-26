@@ -122,6 +122,13 @@ function sortMetadataProfiles(candidates: readonly StartupPullEntityDescriptor[]
   });
 }
 
+/**
+ * Collects sorted startup entity descriptors for metadata profiles from a PCD cache.
+ *
+ * @param cache - The PCD cache to query metadata profiles from
+ * @param databaseId - The database ID to tag each descriptor with
+ * @returns A sorted list of entity descriptors for all metadata profiles
+ */
 export async function collectStartupMetadataProfileCandidates(
   cache: PCDCache,
   databaseId: number
@@ -143,6 +150,12 @@ export async function collectStartupMetadataProfileCandidates(
   return sortMetadataProfiles(rows);
 }
 
+/**
+ * Builds a remote entity descriptor snapshot from a Lidarr metadata profile API response.
+ *
+ * @param profile - The Lidarr metadata profile from the remote API
+ * @returns An entity descriptor (without databaseId) representing the remote profile
+ */
 export function buildRemoteMetadataProfileSnapshot(
   profile: ArrLidarrMetadataProfile
 ): Omit<StartupPullEntityDescriptor, 'databaseId'> {
@@ -155,6 +168,12 @@ export function buildRemoteMetadataProfileSnapshot(
   };
 }
 
+/**
+ * Classifies a metadata profile match request, skipping defaults and returning the best match result.
+ *
+ * @param request - The match request containing the remote entity and local candidates
+ * @returns A structured match result indicating matched, unmatched, or skipped status
+ */
 export function classifyMetadataProfileMatch(request: StartupPullMatchRequest): StartupPullMatchResult {
   const skipDefault = shouldSkipStartupDefault(request.arrType, request.section, request.remote);
   if (skipDefault.skip) {

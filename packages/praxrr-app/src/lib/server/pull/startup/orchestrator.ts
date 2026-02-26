@@ -57,6 +57,14 @@ function runAdapterForType(
   }
 }
 
+/**
+ * Races a promise against a timeout, rejecting with a descriptive error if the timeout fires first.
+ *
+ * @param promise - The promise to race against the timeout
+ * @param ms - The timeout duration in milliseconds
+ * @returns The resolved value of the promise
+ * @throws {Error} When the timeout fires before the promise resolves
+ */
 export async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   let timeoutId: ReturnType<typeof setTimeout>;
   const timeout = new Promise<never>((_, reject) => {
@@ -70,6 +78,14 @@ export async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T
   }
 }
 
+/**
+ * Processes an array of items in bounded-concurrency batches, collecting results.
+ *
+ * @param items - The items to process
+ * @param processor - An async function to apply to each item
+ * @param concurrency - The maximum number of items to process concurrently per batch
+ * @returns An array of results in the same order as the input items
+ */
 export async function processBatches<T, R>(
   items: T[],
   processor: (item: T) => Promise<R>,
@@ -115,6 +131,16 @@ async function runInstancePipeline(
   return toStartupPullInstanceResult(input, adapterResult.envelope);
 }
 
+/**
+ * Processes a single Arr instance through the startup pull pipeline, with optional timeout,
+ * returning the instance result.
+ *
+ * @param instance - The Arr instance to process
+ * @param input - The startup pull input for the instance
+ * @param timeoutMs - Optional timeout in milliseconds for the pipeline
+ * @param processPipeline - Optional override for the pipeline function
+ * @returns A `StartupPullInstanceResult` with the outcome for this instance
+ */
 export async function processInstance(
   instance: ArrInstance,
   input: StartupPullInstanceInput,
@@ -144,6 +170,12 @@ export async function processInstance(
   }
 }
 
+/**
+ * Runs the full startup pull across all enabled Arr instances and returns a run summary.
+ *
+ * @param options - Optional orchestrator options including timeout and concurrency settings
+ * @returns A `StartupPullRunSummary` with per-instance results and aggregate counters
+ */
 export async function runStartupPull(options?: StartupPullOrchestratorOptions): Promise<StartupPullRunSummary> {
   const runId = crypto.randomUUID();
   const startedAt = new Date().toISOString();

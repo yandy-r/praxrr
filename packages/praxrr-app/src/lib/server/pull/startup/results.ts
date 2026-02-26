@@ -6,6 +6,12 @@ import type {
   StartupPullRunSummary,
 } from './types.ts';
 
+/**
+ * Aggregates per-instance counters into a single combined `StartupPullCounters` total.
+ *
+ * @param instances - The list of instance results to aggregate counters from
+ * @returns A `StartupPullCounters` object with summed values across all instances
+ */
 export function aggregateCounters(instances: readonly StartupPullInstanceResult[]): StartupPullCounters {
   const counters: StartupPullCounters = {
     imported: 0,
@@ -26,6 +32,12 @@ export function aggregateCounters(instances: readonly StartupPullInstanceResult[
   return counters;
 }
 
+/**
+ * Derives the overall run status from individual instance statuses.
+ *
+ * @param instances - The list of instance results to classify
+ * @returns A `StartupPullRunStatus` reflecting the combined outcome
+ */
 export function classifyRunStatus(instances: readonly StartupPullInstanceResult[]): StartupPullRunStatus {
   if (instances.length === 0) return 'skipped';
 
@@ -43,6 +55,12 @@ export function classifyRunStatus(instances: readonly StartupPullInstanceResult[
   return 'success';
 }
 
+/**
+ * Converts a `StartupPullRunStatus` to a `JobRunStatus` for the job queue.
+ *
+ * @param runStatus - The startup pull run status to convert
+ * @returns The corresponding `JobRunStatus`
+ */
 export function toJobRunStatus(runStatus: StartupPullRunStatus): JobRunStatus {
   switch (runStatus) {
     case 'success':
@@ -58,6 +76,15 @@ export function toJobRunStatus(runStatus: StartupPullRunStatus): JobRunStatus {
   }
 }
 
+/**
+ * Constructs a `StartupPullRunSummary` from a completed run's instances and metadata.
+ *
+ * @param runId - The unique identifier for this run
+ * @param instances - The list of per-instance results from the run
+ * @param startedAt - ISO 8601 timestamp of when the run started
+ * @param finishedAt - ISO 8601 timestamp of when the run finished, or null if not yet complete
+ * @returns A `StartupPullRunSummary` with aggregated counters and run status
+ */
 export function buildRunSummary(
   runId: string,
   instances: readonly StartupPullInstanceResult[],
@@ -77,6 +104,13 @@ export function buildRunSummary(
   };
 }
 
+/**
+ * Converts a `StartupPullRunSummary` to the `ArrPullStartupRunResult` format consumed by the jobs
+ * system.
+ *
+ * @param summary - The completed run summary to convert
+ * @returns An `ArrPullStartupRunResult` shaped for the job queue
+ */
 export function toArrPullStartupRunResult(summary: StartupPullRunSummary): ArrPullStartupRunResult {
   return {
     runId: summary.runId,

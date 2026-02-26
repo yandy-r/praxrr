@@ -94,19 +94,37 @@ function buildLocalDelayProfileFingerprintPayload(
   };
 }
 
+/**
+ * Builds a fingerprint for an Arr delay profile for identity comparison.
+ *
+ * @param profile - The Arr delay profile from the remote API
+ * @returns A canonical fingerprint string, or null if the profile cannot be fingerprinted
+ */
 export function buildDelayProfileFingerprintFromArr(profile: ArrDelayProfile): string | null {
   return createStartupMetadataFingerprint(buildDelayProfileFingerprintPayload(profile), {
     sortObjectKeys: true,
   });
 }
 
+/**
+ * Builds a fingerprint for a local PCD delay profile row for identity comparison.
+ *
+ * @param profile - The local PCD delay profile row to fingerprint
+ * @returns A canonical fingerprint string, or null if the profile cannot be fingerprinted
+ */
 export function buildDelayProfileFingerprintFromLocal(profile: DelayProfilesRow): string | null {
   return createStartupMetadataFingerprint(buildLocalDelayProfileFingerprintPayload(profile), {
     sortObjectKeys: true,
   });
 }
 
-// Radarr/Sonarr default delay profile selection is id-based (id === 1). Lidarr has no strict id contract, so we prefer untagged primary order and only fall back to id === 1.
+/**
+ * Selects the default delay profile for startup matching based on arr-type-specific rules.
+ *
+ * @param arrType - The Arr application type to apply selection rules for
+ * @param profiles - The list of remote delay profiles to select from
+ * @returns The selected default delay profile, or null if none matches the criteria
+ */
 export function selectDefaultDelayProfileForStartup(
   arrType: StartupPullArrType,
   profiles: readonly ArrDelayProfile[]
@@ -124,7 +142,12 @@ export function selectDefaultDelayProfileForStartup(
   return profiles.find((profile) => profile.id === 1) ?? null;
 }
 
-// Managed profiles carry namespace suffixes in sync metadata; strip namespace to match base local profile names.
+/**
+ * Matches a remote profile using namespace suffix stripping to find its base local profile.
+ *
+ * @param request - The match request containing the remote entity and local candidates
+ * @returns A structured match result indicating matched, conflicted, or no_match status
+ */
 export function matchManagedStartupProfileByNamespace(request: StartupPullMatchRequest): StartupPullMatchResult {
   const normalizedRemoteName = normalizeStartupName(stripNamespaceSuffix(request.remote.name));
   if (!hasNamespaceSuffix(request.remote.name) || normalizedRemoteName.length === 0) {
@@ -179,6 +202,12 @@ export function matchManagedStartupProfileByNamespace(request: StartupPullMatchR
   };
 }
 
+/**
+ * Matches a remote delay profile to a local candidate by fingerprint identity.
+ *
+ * @param request - The match request containing the remote entity and local candidates
+ * @returns A structured match result indicating matched, conflicted, or no_match status
+ */
 export function matchDelayProfileByFingerprint(request: StartupPullMatchRequest): StartupPullMatchResult {
   const candidateCount = request.candidates.length;
   const remoteFingerprint = request.remote.fingerprint;

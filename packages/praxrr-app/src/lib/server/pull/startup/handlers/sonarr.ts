@@ -175,6 +175,13 @@ function promiseIfSupported<T>(section: StartupPullSection, producer: () => Prom
   return producer();
 }
 
+/**
+ * Fetches all supported Sonarr section data from the remote instance and returns a snapshot with
+ * supported/unsupported section lists.
+ *
+ * @param client - The base Arr client to use for remote API calls
+ * @returns A fetch result containing the remote snapshot or a structured failure
+ */
 export async function collectRemoteSectionSnapshots(client: BaseArrClient): Promise<SonarrStartupFetchResult> {
   const unsupported: SonarrUnsupportedSection[] = [];
   const supported: StartupPullSection[] = [];
@@ -261,6 +268,12 @@ export async function collectRemoteSectionSnapshots(client: BaseArrClient): Prom
   }
 }
 
+/**
+ * Collects PCD entity descriptors for all Sonarr sections across the given database IDs.
+ *
+ * @param databaseIds - The list of PCD database IDs to collect candidates from
+ * @returns An object of sorted entity descriptor lists keyed by section
+ */
 export async function collectSonarrStartupCandidates(databaseIds: readonly number[]): Promise<SonarrStartupCandidates> {
   const qualityProfiles: StartupPullEntityDescriptor[] = [];
   const delayProfiles: StartupPullEntityDescriptor[] = [];
@@ -344,6 +357,15 @@ export async function collectSonarrStartupCandidates(databaseIds: readonly numbe
   };
 }
 
+/**
+ * Matches remote Sonarr instance resources against local PCD candidates and returns scored match results.
+ *
+ * @param input - The startup pull instance input describing the instance and database IDs
+ * @param snapshot - The remote Sonarr section snapshot to match against
+ * @param candidates - The local PCD entity descriptors to compare with
+ * @returns A structured match run result with per-section matches and counters
+ * @throws {Error} When the input is not for a Sonarr instance or no database IDs are provided
+ */
 export function matchSonarrStartupResources(
   input: StartupPullInstanceInput,
   snapshot: SonarrStartupRemoteSnapshot,
@@ -467,6 +489,15 @@ export function matchSonarrStartupResources(
   };
 }
 
+/**
+ * Orchestrates the full Sonarr startup pull: fetch remote snapshot, collect candidates, match
+ * resources, and return a structured result.
+ *
+ * @param input - The startup pull instance input describing the instance and database IDs
+ * @param client - The base Arr client for the Sonarr instance
+ * @returns A structured match run result with all section results and counters
+ * @throws {Error} When the input is not for a Sonarr instance or no database IDs are provided
+ */
 export async function runSonarrStartupAdapter(
   input: StartupPullInstanceInput,
   client: BaseArrClient

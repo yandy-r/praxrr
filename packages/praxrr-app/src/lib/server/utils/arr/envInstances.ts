@@ -266,6 +266,12 @@ function inspectArrInstanceEnvKeys(): ArrInstanceEnvKeys {
   return { all, unsupported };
 }
 
+/**
+ * Reconciles environment-variable-defined Arr instances with the database, creating, updating, or
+ * disabling instances as needed.
+ *
+ * @returns A result object describing which instances were created, updated, or disabled
+ */
 export async function reconcileEnvInstances(): Promise<ReconcileEnvInstancesResult> {
   const envKeys = inspectArrInstanceEnvKeys();
   await logger.debug('Discovered environment instance variables', {

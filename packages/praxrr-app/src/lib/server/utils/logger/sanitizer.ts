@@ -83,6 +83,13 @@ function sanitizeLogMetaInternal(value: unknown, seen: WeakSet<object>): unknown
   return sanitizedMeta;
 }
 
+/**
+ * Recursively sanitizes a log metadata object, redacting values that match sensitive key patterns
+ * or value patterns.
+ *
+ * @param meta - The log metadata value to sanitize
+ * @returns The sanitized metadata with sensitive values replaced by redaction markers
+ */
 export function sanitizeLogMeta(meta: unknown): unknown {
   return sanitizeLogMetaInternal(meta, new WeakSet());
 }

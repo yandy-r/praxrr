@@ -195,6 +195,13 @@ function matchDelayProfileFromDefaultSnapshot(
   };
 }
 
+/**
+ * Fetches all supported Radarr section data from the remote instance and returns a snapshot with
+ * supported/unsupported section lists.
+ *
+ * @param client - The base Arr client to use for remote API calls
+ * @returns A fetch result containing the remote snapshot or a structured failure
+ */
 export async function collectRemoteSectionSnapshots(client: BaseArrClient): Promise<RadarrStartupFetchResult> {
   const unsupportedSections: RadarrUnsupportedSection[] = [];
   const supportedSections: StartupPullSection[] = [];
@@ -295,6 +302,12 @@ export async function collectRemoteSectionSnapshots(client: BaseArrClient): Prom
   }
 }
 
+/**
+ * Collects PCD entity descriptors for all Radarr sections across the given database IDs.
+ *
+ * @param databaseIds - The list of PCD database IDs to collect candidates from
+ * @returns An object of sorted entity descriptor lists keyed by section
+ */
 export async function collectRadarrStartupCandidates(databaseIds: readonly number[]): Promise<RadarrStartupCandidates> {
   const qualityProfiles: StartupPullEntityDescriptor[] = [];
   const delayProfiles: StartupPullEntityDescriptor[] = [];
@@ -357,6 +370,15 @@ export async function collectRadarrStartupCandidates(databaseIds: readonly numbe
   };
 }
 
+/**
+ * Matches remote Radarr instance resources against local PCD candidates and returns scored match results.
+ *
+ * @param input - The startup pull instance input describing the instance and database IDs
+ * @param snapshot - The remote Radarr section snapshot to match against
+ * @param candidates - The local PCD entity descriptors to compare with
+ * @returns A structured match run result with per-section matches and counters
+ * @throws {Error} When the input is not for a Radarr instance or no database IDs are provided
+ */
 export function matchRadarrStartupResources(
   input: StartupPullInstanceInput,
   snapshot: RadarrStartupRemoteSnapshot,
@@ -479,6 +501,15 @@ export function matchRadarrStartupResources(
   };
 }
 
+/**
+ * Orchestrates the full Radarr startup pull: fetch remote snapshot, collect candidates, match
+ * resources, and return a structured result.
+ *
+ * @param input - The startup pull instance input describing the instance and database IDs
+ * @param client - The base Arr client for the Radarr instance
+ * @returns A structured match run result with all section results and counters
+ * @throws {Error} When the input is not for a Radarr instance or no database IDs are provided
+ */
 export async function runRadarrStartupAdapter(
   input: StartupPullInstanceInput,
   client: BaseArrClient

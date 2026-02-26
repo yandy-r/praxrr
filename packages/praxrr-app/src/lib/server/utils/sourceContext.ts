@@ -34,14 +34,33 @@ export type ResolveDatabasesOptions<TDatabase> = {
   onDatabaseNotInitialized?: DatabaseNotInitializedHandler;
 };
 
+/**
+ * Returns a unique string key for a source reference combining its type and ID.
+ *
+ * @param source - The source reference to generate a key for
+ * @returns A string in the format `'type:id'`
+ */
 export function sourceKey(source: Pick<SourceRef, 'type' | 'id'> & { name?: string }): string {
   return `${source.type}:${source.id}`;
 }
 
+/**
+ * Type guard that returns true if the source reference is a trash (TRaSH) source.
+ *
+ * @param source - The source reference to test
+ * @returns Whether the source is a TRaSH source
+ */
 export function isTrashSource(source: SourceRef): source is Extract<SourceRef, { type: 'trash' }> {
   return source.type === 'trash';
 }
 
+/**
+ * Augments a set of rows with PCD source metadata from the given database.
+ *
+ * @param rows - The rows to augment with PCD source fields
+ * @param database - The PCD database to source metadata from
+ * @returns An array of rows each extended with `sourceType`, `sourceDatabaseId`, and `sourceDatabaseName`
+ */
 export function withPcdSource<TRow extends object, TDatabase extends DatabaseLike>(
   rows: readonly TRow[],
   database: TDatabase
@@ -58,6 +77,13 @@ export function withPcdSource<TRow extends object, TDatabase extends DatabaseLik
   }));
 }
 
+/**
+ * Sorts rows case-insensitively by name, using a secondary comparator for tie-breaking.
+ *
+ * @param rows - The rows to sort
+ * @param compareSource - A secondary comparator applied when two rows have the same name
+ * @returns A new sorted array of rows
+ */
 export function sortRowsByNameAndSource<T extends { name: string }>(
   rows: readonly T[],
   compareSource: (a: T, b: T) => number
@@ -70,6 +96,18 @@ export function sortRowsByNameAndSource<T extends { name: string }>(
   });
 }
 
+/**
+ * Builds the full source context (available sources, default key, filter disabled reason) for a UI
+ * entity list.
+ *
+ * @param databases - The list of linked PCD databases
+ * @param currentDatabase - The currently active database, or undefined
+ * @param allTrashSources - All available TRaSH sources
+ * @param getTrashSourceEntityCount - Accessor returning the entity count for a TRaSH source
+ * @param getTrashSourceName - Accessor returning the display name for a TRaSH source
+ * @param sourceLabel - A human-readable label for the entity type shown in disabled-reason messages
+ * @returns A `SourceContext` for use in UI source-filter components
+ */
 export function buildSourceContext<TSource extends SourceForContext, TDatabase extends DatabaseLike>(
   databases: readonly TDatabase[],
   currentDatabase: TDatabase | undefined,
@@ -121,6 +159,12 @@ export function buildSourceContext<TSource extends SourceForContext, TDatabase e
   };
 }
 
+/**
+ * Lists trash sources, returning an empty array if the database is not yet initialized.
+ *
+ * @param options - Options including the `listSources` function and optional error handler
+ * @returns The list of trash sources, or an empty array on `DatabaseNotInitializedError`
+ */
 export function listTrashSourcesSafely<TSource>(options: ListTrashSourcesOptions<TSource>): readonly TSource[] {
   try {
     return options.listSources();
@@ -134,6 +178,13 @@ export function listTrashSourcesSafely<TSource>(options: ListTrashSourcesOptions
   }
 }
 
+/**
+ * Resolves databases, propagating database-not-initialized errors via the optional handler.
+ *
+ * @param options - Options including the `resolveDatabases` function and optional error handler
+ * @returns The resolved list of databases
+ * @throws {DatabaseNotInitializedError} When no handler is provided and the database is not initialized
+ */
 export function resolveDatabases<TDatabase extends DatabaseLike>(
   options: ResolveDatabasesOptions<TDatabase>
 ): readonly TDatabase[] {

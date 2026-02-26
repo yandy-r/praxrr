@@ -13,6 +13,15 @@ export interface StartupDefaultFilterDecision {
   readonly reason: string | null;
 }
 
+/**
+ * Evaluates whether a remote entity should be skipped as a startup default based on catalog rules
+ * for the given arr type and section.
+ *
+ * @param arrType - The Arr application type to evaluate rules for
+ * @param section - The startup pull section being evaluated
+ * @param remoteEntity - The raw remote entity payload to test against catalog rules
+ * @returns A decision object indicating whether to skip and why
+ */
 export function shouldSkipStartupDefault(
   arrType: StartupPullArrType,
   section: StartupPullSection,
@@ -76,6 +85,12 @@ export function shouldSkipStartupDefault(
   };
 }
 
+/**
+ * Returns true if the section participates in startup default filtering.
+ *
+ * @param section - The startup pull section to check
+ * @returns Whether the section is filterable for startup defaults
+ */
 export function isDefaultFilterableSection(section: StartupPullSection): boolean {
   return DEFAULT_FILTERABLE_STARTUP_SECTIONS.includes(section);
 }

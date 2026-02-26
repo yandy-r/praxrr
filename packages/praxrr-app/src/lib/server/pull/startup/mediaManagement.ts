@@ -311,6 +311,14 @@ function buildQualityDefinitionsFingerprintFromArr(definitions: readonly ArrQual
   );
 }
 
+/**
+ * Builds a naming fingerprint string from a local PCD naming row for the given section and arr type.
+ *
+ * @param section - The media management section; returns null if not `'naming'`
+ * @param arrType - The Arr application type for the naming config
+ * @param naming - The local PCD naming row to fingerprint
+ * @returns A fingerprint string, or null if the section is not `'naming'`
+ */
 export function buildStartupNamingFingerprintFromLocal(
   section: MediaManagementSection,
   arrType: StartupPullArrType,
@@ -323,6 +331,13 @@ export function buildStartupNamingFingerprintFromLocal(
   return createStartupMetadataFingerprint(buildNamingFingerprintFromLocal(arrType, naming));
 }
 
+/**
+ * Builds a media-settings fingerprint string from a local PCD media settings row for the given section.
+ *
+ * @param section - The media management section; returns null if not `'mediaSettings'`
+ * @param mediaSettings - The local PCD media settings row to fingerprint
+ * @returns A fingerprint string, or null if the section is not `'mediaSettings'`
+ */
 export function buildStartupMediaSettingsFingerprintFromLocal(
   section: MediaManagementSection,
   mediaSettings: RadarrMediaSettingsRow | SonarrMediaSettingsRow | LidarrMediaSettingsRow
@@ -334,6 +349,14 @@ export function buildStartupMediaSettingsFingerprintFromLocal(
   return createStartupMetadataFingerprint(buildMediaSettingsFingerprintFromLocal(mediaSettings));
 }
 
+/**
+ * Builds a naming fingerprint string from an Arr naming API config for the given section and arr type.
+ *
+ * @param section - The media management section; returns null if not `'naming'`
+ * @param arrType - The Arr application type for the naming config
+ * @param config - The Arr naming API config to fingerprint
+ * @returns A fingerprint string, or null if the section is not `'naming'`
+ */
 export function buildStartupNamingFingerprintFromArr(
   section: MediaManagementSection,
   arrType: StartupPullArrType,
@@ -346,6 +369,13 @@ export function buildStartupNamingFingerprintFromArr(
   return createStartupMetadataFingerprint(buildNamingFingerprintFromArr(arrType, config));
 }
 
+/**
+ * Builds a media-settings fingerprint string from an Arr media management config for the given section.
+ *
+ * @param section - The media management section; returns null if not `'mediaSettings'`
+ * @param config - The Arr media management API config to fingerprint
+ * @returns A fingerprint string, or null if the section is not `'mediaSettings'`
+ */
 export function buildStartupMediaSettingsFingerprintFromArr(
   section: MediaManagementSection,
   config: ArrMediaManagementConfig
@@ -357,6 +387,15 @@ export function buildStartupMediaSettingsFingerprintFromArr(
   return createStartupMetadataFingerprint(buildMediaSettingsFingerprintFromArr(config));
 }
 
+/**
+ * Builds a quality definitions fingerprint string from local PCD config and API mappings for the
+ * given section.
+ *
+ * @param section - The media management section; returns null if not `'qualityDefinitions'`
+ * @param config - The local PCD quality definitions config to fingerprint
+ * @param qualityApiMappings - A map from quality name to API name for normalization
+ * @returns A fingerprint string, or null if the section is not `'qualityDefinitions'`
+ */
 export function buildStartupQualityDefinitionsFingerprintFromLocal(
   section: MediaManagementSection,
   config: QualityDefinitionsConfig,
@@ -369,6 +408,14 @@ export function buildStartupQualityDefinitionsFingerprintFromLocal(
   return buildQualityDefinitionsFingerprintFromLocal(config, qualityApiMappings);
 }
 
+/**
+ * Builds a quality definitions fingerprint string from an Arr quality definitions response for the
+ * given section.
+ *
+ * @param section - The media management section; returns null if not `'qualityDefinitions'`
+ * @param config - The list of Arr quality definitions to fingerprint
+ * @returns A fingerprint string, or null if the section is not `'qualityDefinitions'`
+ */
 export function buildStartupQualityDefinitionsFingerprintFromArr(
   section: MediaManagementSection,
   config: readonly ArrQualityDefinition[]
@@ -396,6 +443,14 @@ function resolveQualityDefinitionsByName(
   return getLidarrQualityDefinitionsByName(cache, name);
 }
 
+/**
+ * Collects naming candidates from a PCD cache for the given arr type and database.
+ *
+ * @param cache - The PCD cache to query naming rows from
+ * @param databaseId - The database ID to tag each descriptor with
+ * @param arrType - The Arr application type to filter naming rows by
+ * @returns A list of entity descriptors for all matching naming rows
+ */
 export async function collectStartupNamingCandidates(
   cache: PCDCache,
   databaseId: number,
@@ -422,6 +477,14 @@ export async function collectStartupNamingCandidates(
   return candidates;
 }
 
+/**
+ * Collects media settings candidates from a PCD cache for the given arr type and database.
+ *
+ * @param cache - The PCD cache to query media settings rows from
+ * @param databaseId - The database ID to tag each descriptor with
+ * @param arrType - The Arr application type to filter media settings rows by
+ * @returns A list of entity descriptors for all valid media settings rows
+ */
 export async function collectStartupMediaSettingsCandidates(
   cache: PCDCache,
   databaseId: number,
@@ -451,6 +514,14 @@ export async function collectStartupMediaSettingsCandidates(
   return candidates.filter(isStartupPullEntityDescriptor);
 }
 
+/**
+ * Collects quality definitions candidates from a PCD cache for the given arr type and database.
+ *
+ * @param cache - The PCD cache to query quality definitions rows from
+ * @param databaseId - The database ID to tag each descriptor with
+ * @param arrType - The Arr application type to filter quality definitions rows by
+ * @returns A list of entity descriptors for all valid quality definitions rows with fingerprints
+ */
 export async function collectStartupQualityDefinitionsCandidates(
   cache: PCDCache,
   databaseId: number,
@@ -492,6 +563,15 @@ export async function collectStartupQualityDefinitionsCandidates(
   return candidates.filter(isStartupPullEntityDescriptor);
 }
 
+/**
+ * Collects all media management candidates (naming, media settings, quality definitions) from a PCD
+ * cache.
+ *
+ * @param cache - The PCD cache to query from
+ * @param databaseId - The database ID to tag each descriptor with
+ * @param arrType - The Arr application type to filter candidates by
+ * @returns An object containing descriptor lists for each media management subsection
+ */
 export async function collectStartupMediaManagementCandidates(
   cache: PCDCache,
   databaseId: number,
@@ -514,6 +594,17 @@ export async function collectStartupMediaManagementCandidates(
   };
 }
 
+/**
+ * Constructs a `StartupPullMatchRequest` from a remote snapshot descriptor and local candidates.
+ *
+ * @param instanceId - The Arr instance ID for the request
+ * @param databaseId - The fallback database ID for the request
+ * @param section - The media management section being matched
+ * @param arrType - The Arr application type for the request
+ * @param remote - The remote entity descriptor (without databaseId)
+ * @param candidates - The local PCD entity descriptors to compare against
+ * @returns A complete `StartupPullMatchRequest` ready for matching
+ */
 export function buildMatchRequestFromRemoteSnapshot(
   instanceId: number,
   databaseId: number,
@@ -535,6 +626,14 @@ export function buildMatchRequestFromRemoteSnapshot(
   };
 }
 
+/**
+ * Builds a remote entity descriptor from an Arr naming config for use in matching.
+ *
+ * @param arrType - The Arr application type for the config
+ * @param config - The Arr naming API config to build the descriptor from
+ * @param fallbackId - A fallback identifier string when the config has no explicit ID
+ * @returns An entity descriptor (without databaseId) for the remote naming config
+ */
 export function buildRemoteNamingSnapshot(
   arrType: StartupPullArrType,
   config: ArrNamingConfig,
@@ -549,6 +648,13 @@ export function buildRemoteNamingSnapshot(
   };
 }
 
+/**
+ * Builds a remote entity descriptor from an Arr media management config for use in matching.
+ *
+ * @param config - The Arr media management API config to build the descriptor from
+ * @param arrType - The Arr application type for the config
+ * @returns An entity descriptor (without databaseId) for the remote media management config
+ */
 export function buildRemoteMediaSettingsSnapshot(
   config: ArrMediaManagementConfig,
   arrType: StartupPullArrType
@@ -562,6 +668,13 @@ export function buildRemoteMediaSettingsSnapshot(
   };
 }
 
+/**
+ * Builds a remote entity descriptor from a list of Arr quality definitions for use in matching.
+ *
+ * @param definitions - The list of Arr quality definitions to build the descriptor from
+ * @param arrType - The Arr application type for the definitions
+ * @returns An entity descriptor (without databaseId) for the remote quality definitions
+ */
 export function buildRemoteQualityDefinitionsSnapshot(
   definitions: readonly ArrQualityDefinition[],
   arrType: StartupPullArrType
@@ -575,6 +688,12 @@ export function buildRemoteQualityDefinitionsSnapshot(
   };
 }
 
+/**
+ * Classifies a media management match request, skipping defaults and returning the best match result.
+ *
+ * @param request - The match request containing the remote entity and local candidates
+ * @returns A structured match result indicating matched, unmatched, or skipped status
+ */
 export function classifyMediaManagementMatch(request: StartupPullMatchRequest): StartupPullMatchResult {
   const skipDefault = shouldSkipStartupDefault(request.arrType, request.section, request.remote);
   if (skipDefault.skip) {

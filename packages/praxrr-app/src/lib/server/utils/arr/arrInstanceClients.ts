@@ -48,10 +48,26 @@ function invalidateMismatchedInstanceClientCache(
   return mismatched;
 }
 
+/**
+ * Creates an empty in-memory cache for Arr instance clients.
+ *
+ * @returns A new, empty `ArrInstanceClientCache`
+ */
 export function createArrInstanceClientCache(): ArrInstanceClientCache {
   return new Map();
 }
 
+/**
+ * Retrieves or creates an authenticated Arr API client for the given instance, resolving credentials
+ * from the database or legacy API key storage.
+ *
+ * @param type - The Arr application type for the client
+ * @param instanceId - The unique identifier of the Arr instance
+ * @param url - The base URL for the Arr instance
+ * @param options - Optional Arr client options
+ * @param cache - Optional client cache to reuse existing clients
+ * @returns An authenticated `BaseArrClient` for the instance
+ */
 export async function getArrInstanceClient(
   type: ArrType,
   instanceId: number,

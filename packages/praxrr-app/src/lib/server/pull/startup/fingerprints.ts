@@ -119,6 +119,14 @@ function canonicalStringify(value: unknown): string {
     .join(',')}}`;
 }
 
+/**
+ * Creates a canonical JSON fingerprint string from the given value, normalizing keys and optionally
+ * sorting for deterministic output. Returns null for empty/null values.
+ *
+ * @param value - The input value to fingerprint
+ * @param options - Options controlling normalization behavior
+ * @returns A canonical fingerprint string, or null if the value is empty/null
+ */
 export function createStartupMetadataFingerprint(
   value: StartupMetadataFingerprintInput,
   options: StartupMetadataFingerprintOptions = {}
@@ -133,6 +141,13 @@ export function createStartupMetadataFingerprint(
   return fingerprint;
 }
 
+/**
+ * Alias for `createStartupMetadataFingerprint`; normalizes a value to a canonical fingerprint string.
+ *
+ * @param value - The input value to normalize
+ * @param options - Options controlling normalization behavior
+ * @returns A canonical fingerprint string, or null if the value is empty/null
+ */
 export function normalizeMetadataForStartupFingerprint(
   value: StartupMetadataFingerprintInput,
   options: StartupMetadataFingerprintOptions = {}
@@ -140,6 +155,13 @@ export function normalizeMetadataForStartupFingerprint(
   return createStartupMetadataFingerprint(value, options);
 }
 
+/**
+ * Returns true if two fingerprint strings are identical (non-null).
+ *
+ * @param left - The first fingerprint to compare
+ * @param right - The second fingerprint to compare
+ * @returns Whether both fingerprints are non-null and equal
+ */
 export function isMetadataFingerprintMatch(left: string | null, right: string | null): boolean {
   if (left === null || right === null) {
     return false;
@@ -148,6 +170,14 @@ export function isMetadataFingerprintMatch(left: string | null, right: string | 
   return left === right;
 }
 
+/**
+ * Resolves the fingerprint from a descriptor's stored fingerprint or falls back to generating one
+ * from its fields.
+ *
+ * @param descriptor - The entity descriptor to extract or generate a fingerprint for
+ * @param options - Options controlling normalization behavior for generated fingerprints
+ * @returns The resolved fingerprint string, or null if one cannot be determined
+ */
 export function toStartupMetadataFingerprintCandidate(
   descriptor: StartupPullEntityDescriptor,
   options: StartupMetadataFingerprintOptions = {}
@@ -167,6 +197,14 @@ export function toStartupMetadataFingerprintCandidate(
   );
 }
 
+/**
+ * Combines two fingerprint candidates, preferring the remote-first value when `preferRemoteFirst` is set.
+ *
+ * @param first - The first (typically remote) fingerprint candidate
+ * @param second - The second (typically local) fingerprint candidate
+ * @param options - Options controlling which candidate takes precedence
+ * @returns The selected fingerprint string, or null if both candidates are null
+ */
 export function buildStartupMetadataFingerprintFromParts(
   first: string | null,
   second: string | null,

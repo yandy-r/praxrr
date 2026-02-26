@@ -55,6 +55,13 @@ function toMediaManagementSubsection(section: StartupPullSection): MediaManageme
   return null;
 }
 
+/**
+ * Resolves a raw string to a valid `StartupPullArrType`, throwing if unrecognized.
+ *
+ * @param arrType - The raw arr type string to resolve
+ * @returns The validated `StartupPullArrType`
+ * @throws {Error} When the string is not a recognized arr type
+ */
 export function resolveStartupArrType(arrType: string): StartupPullArrType {
   if (!isArrAppType(arrType)) {
     throw new Error(`Unsupported startup arr_type '${arrType}'. Expected one of: radarr, sonarr, lidarr.`);
@@ -63,6 +70,15 @@ export function resolveStartupArrType(arrType: string): StartupPullArrType {
   return arrType;
 }
 
+/**
+ * Asserts the given arr type matches the expected type, throwing a descriptive error if not.
+ *
+ * @param arrType - The arr type string to validate
+ * @param expected - The expected `StartupPullArrType`
+ * @param context - A context string included in the thrown error message
+ * @returns The validated `StartupPullArrType`
+ * @throws {Error} When the arr type does not match the expected value
+ */
 export function assertStartupArrType(
   arrType: string,
   expected: StartupPullArrType,
@@ -76,6 +92,15 @@ export function assertStartupArrType(
   return resolved;
 }
 
+/**
+ * Loads an Arr instance and creates its API client for use in startup pull processing.
+ *
+ * @param instance - The Arr instance to load
+ * @param options - Optional Arr client options
+ * @param cache - Optional client cache to reuse existing clients
+ * @returns The resolved instance with its validated type and the constructed API client
+ * @throws {Error} When the instance type is not a recognized startup arr type
+ */
 export async function loadStartupInstanceAndClient(
   instance: ArrInstance,
   options?: ArrClientOptions,
@@ -97,6 +122,13 @@ export async function loadStartupInstanceAndClient(
   };
 }
 
+/**
+ * Returns the reason a section is unsupported for the given arr type, or null if it is supported.
+ *
+ * @param arrType - The Arr application type to check support for
+ * @param section - The startup pull section to evaluate
+ * @returns A string reason if unsupported, or null if supported
+ */
 export function getStartupSectionSupportReason(
   arrType: StartupPullArrType,
   section: StartupPullSection
@@ -123,6 +155,14 @@ export function getStartupSectionSupportReason(
   return null;
 }
 
+/**
+ * Asserts a section is supported for the given arr type, throwing with context if not.
+ *
+ * @param arrType - The Arr application type to check support for
+ * @param section - The startup pull section to assert support for
+ * @param context - A context string included in the thrown error message
+ * @throws {Error} When the section is not supported for the given arr type
+ */
 export function assertStartupSectionSupported(
   arrType: StartupPullArrType,
   section: StartupPullSection,
@@ -134,6 +174,13 @@ export function assertStartupSectionSupported(
   }
 }
 
+/**
+ * Returns true if the section is supported for the given arr type.
+ *
+ * @param arrType - The Arr application type to check support for
+ * @param section - The startup pull section to evaluate
+ * @returns Whether the section is supported
+ */
 export function isStartupSectionSupported(arrType: StartupPullArrType, section: StartupPullSection): boolean {
   return getStartupSectionSupportReason(arrType, section) === null;
 }
@@ -155,6 +202,12 @@ function createEmptyCounters(): StartupPullCounters {
   };
 }
 
+/**
+ * Creates a fresh adapter result envelope with zero counters and the given status.
+ *
+ * @param status - The initial job run status for the envelope
+ * @returns A new adapter result envelope with zeroed counters
+ */
 export function createAdapterResultEnvelope(status: JobRunStatus = 'skipped'): StartupAdapterResultEnvelope {
   return {
     status,
@@ -162,6 +215,13 @@ export function createAdapterResultEnvelope(status: JobRunStatus = 'skipped'): S
   };
 }
 
+/**
+ * Increments a named counter on the adapter envelope by the given amount.
+ *
+ * @param envelope - The adapter result envelope to mutate
+ * @param counter - The name of the counter to increment
+ * @param amount - The amount to add to the counter (default: 1)
+ */
 export function incrementCounter(
   envelope: StartupAdapterResultEnvelope,
   counter: keyof StartupPullCounters,
@@ -170,6 +230,13 @@ export function incrementCounter(
   envelope.counters[counter] += amount;
 }
 
+/**
+ * Converts an adapter envelope into a `StartupPullInstanceResult` for the orchestrator.
+ *
+ * @param input - The instance input containing identification fields
+ * @param envelope - The adapter result envelope with status and counters
+ * @returns A `StartupPullInstanceResult` ready for the orchestrator
+ */
 export function toStartupPullInstanceResult(
   input: Pick<StartupPullInstanceInput, 'instanceId' | 'instanceName' | 'arrType'>,
   envelope: StartupAdapterResultEnvelope
@@ -183,6 +250,13 @@ export function toStartupPullInstanceResult(
   };
 }
 
+/**
+ * Validates and narrows a raw string to a known `StartupPullSection`, throwing if unknown.
+ *
+ * @param section - The raw section string to validate
+ * @returns The validated `StartupPullSection`
+ * @throws {Error} When the string is not a recognized startup pull section
+ */
 export function normalizeStartupSection(section: string): StartupPullSection {
   if (!isStartupPullSection(section)) {
     throw new Error(`Unknown startup section '${section}'`);
@@ -230,6 +304,15 @@ function isLikelyNetworkError(error: Error): boolean {
   );
 }
 
+/**
+ * Classifies a thrown error from an Arr API fetch into a structured `StartupFetchFailure` with kind
+ * and message.
+ *
+ * @param arrLabel - A human-readable label for the Arr application used in error messages
+ * @param error - The thrown error to classify
+ * @param options - Optional overrides for error message labels
+ * @returns A `StartupFetchFailure` with `kind` set to `'auth'`, `'unreachable'`, or `'unknown'`
+ */
 export function classifyStartupFetchError(
   arrLabel: string,
   error: unknown,
@@ -290,6 +373,12 @@ export function classifyStartupFetchError(
   };
 }
 
+/**
+ * Extracts a human-readable name from an Arr delay profile, falling back to `Delay Profile {id}`.
+ *
+ * @param profile - The Arr delay profile to extract the name from
+ * @returns The profile name, or a generated fallback using the profile ID
+ */
 export function getDelayProfileName(profile: ArrDelayProfile): string {
   const rawName = (profile as { name?: unknown }).name;
   if (typeof rawName === 'string' && rawName.length > 0) {
@@ -299,6 +388,12 @@ export function getDelayProfileName(profile: ArrDelayProfile): string {
   return `Delay Profile ${profile.id}`;
 }
 
+/**
+ * Sorts startup entity descriptors alphabetically by name, then by database ID and entity ID.
+ *
+ * @param items - The list of entity descriptors to sort
+ * @returns A new sorted array of entity descriptors
+ */
 export function sortStartupCandidates(items: readonly StartupPullEntityDescriptor[]): StartupPullEntityDescriptor[] {
   return [...items].sort((left, right) => {
     const byName = left.name.localeCompare(right.name, undefined, { sensitivity: 'base' });
@@ -314,6 +409,12 @@ export function sortStartupCandidates(items: readonly StartupPullEntityDescripto
   });
 }
 
+/**
+ * Increments the appropriate counter on an envelope based on the match result status.
+ *
+ * @param envelope - The adapter result envelope to mutate
+ * @param result - The match result whose status determines which counter to increment
+ */
 export function incrementCountersFromMatchResult(
   envelope: StartupAdapterResultEnvelope,
   result: StartupPullMatchResult
@@ -336,6 +437,15 @@ export function incrementCountersFromMatchResult(
   incrementCounter(envelope, 'skippedNoMatch');
 }
 
+/**
+ * Builds a no-match result for a section that is not supported by the given arr type.
+ *
+ * @param instanceId - The instance ID for the result
+ * @param databaseId - The fallback database ID to associate with the result
+ * @param reason - An object containing the unsupported section name
+ * @param arrType - The Arr application type for the result
+ * @returns A `StartupPullMatchResult` with `status: 'no_match'` and reason `'unsupported_section'`
+ */
 export function buildUnsupportedSectionResult(
   instanceId: number,
   databaseId: number,

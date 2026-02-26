@@ -8,6 +8,12 @@ interface DatabaseCredentialEnvelope {
   ciphertext: string;
 }
 
+/**
+ * Encrypts a personal access token for database instance storage.
+ *
+ * @param personalAccessToken - The plaintext personal access token to encrypt
+ * @returns An object containing the encrypted credential envelope
+ */
 export async function encryptDatabasePersonalAccessToken(personalAccessToken: string): Promise<{
   credential: DatabaseCredentialEnvelope;
 }> {
@@ -21,10 +27,23 @@ export async function encryptDatabasePersonalAccessToken(personalAccessToken: st
   };
 }
 
+/**
+ * Decrypts a stored personal access token credential envelope.
+ *
+ * @param payload - The credential envelope containing the key version, nonce, and ciphertext
+ * @returns The decrypted plaintext personal access token
+ */
 export async function decryptDatabasePersonalAccessToken(payload: DatabaseCredentialEnvelope): Promise<string> {
   return decryptArrInstanceApiKey(payload);
 }
 
+/**
+ * Retrieves and decrypts the personal access token for a database instance, falling back to legacy
+ * plaintext storage.
+ *
+ * @param instanceId - The database instance ID to retrieve the token for
+ * @returns The decrypted personal access token, or undefined if none is stored
+ */
 export async function getDecryptedDatabasePersonalAccessToken(instanceId: number): Promise<string | undefined> {
   const credential = databaseInstanceCredentialsQueries.getByInstanceId(instanceId);
   if (credential) {

@@ -86,6 +86,13 @@ function ensureBase64Fields(payload: ArrCredentialEnvelope): ArrCredentialEnvelo
   return payload;
 }
 
+/**
+ * Encrypts an Arr instance API key using AES-GCM and returns the credential envelope and HMAC
+ * fingerprint.
+ *
+ * @param apiKey - The plaintext API key to encrypt
+ * @returns An object containing the encrypted credential envelope and the HMAC fingerprint
+ */
 export async function encryptArrInstanceApiKey(apiKey: string): Promise<ArrApiKeyWriteData> {
   const keyVersion = getActiveArrCredentialKeyVersion();
   const resolvedVersion = normalizeVersion(keyVersion);
@@ -117,6 +124,13 @@ export async function encryptArrInstanceApiKey(apiKey: string): Promise<ArrApiKe
   };
 }
 
+/**
+ * Decrypts an Arr API key credential envelope and returns the plaintext API key.
+ *
+ * @param payload - The credential envelope containing the key version, nonce, and ciphertext
+ * @returns The decrypted plaintext API key
+ * @throws {Error} When the nonce length is invalid or decryption fails
+ */
 export async function decryptArrInstanceApiKey(payload: ArrCredentialEnvelope): Promise<string> {
   const normalized = ensureBase64Fields(payload);
   const keyVersion = normalizeVersion(normalized.keyVersion);
@@ -145,6 +159,14 @@ export async function decryptArrInstanceApiKey(payload: ArrCredentialEnvelope): 
   }
 }
 
+/**
+ * Derives an HMAC fingerprint for an API key without encrypting it, using the active or specified
+ * key version.
+ *
+ * @param apiKey - The plaintext API key to fingerprint
+ * @param keyVersion - Optional key version to use; defaults to the active key version
+ * @returns An `ArrApiKeyFingerprint` containing the key version and HMAC value
+ */
 export async function deriveArrInstanceApiKeyFingerprint(
   apiKey: string,
   keyVersion?: ArrCredentialKeyVersion

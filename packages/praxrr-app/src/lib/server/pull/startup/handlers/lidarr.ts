@@ -188,6 +188,14 @@ function classifyLidarrDelayProfileMatch(input: StartupPullMatchRequest): Startu
   };
 }
 
+/**
+ * Fetches all supported Lidarr section data from the remote instance and returns a snapshot with
+ * supported/unsupported section lists.
+ *
+ * @param client - The base Arr client to use for remote API calls
+ * @returns A fetch result containing the remote snapshot or a structured failure
+ * @throws {Error} When the client is not a valid Lidarr client
+ */
 export async function collectRemoteSectionSnapshots(client: BaseArrClient): Promise<LidarrStartupFetchResult> {
   if (!isLidarrStartupClient(client)) {
     throw new Error('Cannot collect Lidarr startup snapshots: client is not a Lidarr client');
@@ -305,6 +313,12 @@ export async function collectRemoteSectionSnapshots(client: BaseArrClient): Prom
   }
 }
 
+/**
+ * Collects PCD entity descriptors for all Lidarr sections across the given database IDs.
+ *
+ * @param databaseIds - The list of PCD database IDs to collect candidates from
+ * @returns An object of sorted entity descriptor lists keyed by section
+ */
 export async function collectLidarrStartupCandidates(databaseIds: readonly number[]): Promise<LidarrStartupCandidates> {
   const qualityProfiles: StartupPullEntityDescriptor[] = [];
   const delayProfiles: StartupPullEntityDescriptor[] = [];
@@ -371,6 +385,15 @@ export async function collectLidarrStartupCandidates(databaseIds: readonly numbe
   };
 }
 
+/**
+ * Matches remote Lidarr instance resources against local PCD candidates and returns scored match results.
+ *
+ * @param input - The startup pull instance input describing the instance and database IDs
+ * @param snapshot - The remote Lidarr section snapshot to match against
+ * @param candidates - The local PCD entity descriptors to compare with
+ * @returns A structured match run result with per-section matches and counters
+ * @throws {Error} When the input is not for a Lidarr instance or no database IDs are provided
+ */
 export function matchLidarrStartupResources(
   input: StartupPullInstanceInput,
   snapshot: LidarrStartupRemoteSnapshot,
@@ -517,6 +540,15 @@ export function matchLidarrStartupResources(
   };
 }
 
+/**
+ * Orchestrates the full Lidarr startup pull: fetch remote snapshot, collect candidates, match
+ * resources, and return a structured result.
+ *
+ * @param input - The startup pull instance input describing the instance and database IDs
+ * @param client - The base Arr client for the Lidarr instance
+ * @returns A structured match run result with all section results and counters
+ * @throws {Error} When the input is not for a Lidarr instance or no database IDs are provided
+ */
 export async function runLidarrStartupAdapter(
   input: StartupPullInstanceInput,
   client: BaseArrClient

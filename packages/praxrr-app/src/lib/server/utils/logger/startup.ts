@@ -50,6 +50,9 @@ export async function logContainerConfig(): Promise<void> {
   });
 }
 
+/**
+ * Prints the application ASCII banner and server URL to the console.
+ */
 export function printBanner(): void {
   const version = appInfoQueries.getVersion();
   const url = config.serverUrl;
@@ -67,6 +70,11 @@ export interface ServerInfo {
   hostname: string;
 }
 
+/**
+ * Returns structured server info including version, environment, timezone, base path, and hostname.
+ *
+ * @returns A `ServerInfo` object with the current runtime configuration
+ */
 export function getServerInfo(): ServerInfo {
   return {
     version: appInfoQueries.getVersion(),

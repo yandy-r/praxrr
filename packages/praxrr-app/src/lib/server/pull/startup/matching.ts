@@ -28,10 +28,24 @@ export interface StartupMatchBatchResult {
   readonly results: readonly StartupPullMatchResult[];
 }
 
+/**
+ * Lowercases a startup entity name for case-insensitive comparison.
+ *
+ * @param name - The entity name to normalize
+ * @returns The lowercased name string
+ */
 export function normalizeStartupName(name: string): string {
   return name.toLocaleLowerCase();
 }
 
+/**
+ * Attempts to match a single remote entity against a set of local candidates, returning a structured
+ * match result.
+ *
+ * @param request - The match request containing the remote entity and candidate list
+ * @param options - Optional overrides for name normalization behavior
+ * @returns A `StartupPullMatchResult` with matched, conflicted, or no_match status
+ */
 export function matchStartupEntity(
   request: StartupPullMatchRequest,
   options: StartupMatchOptions = {}
@@ -139,6 +153,14 @@ export function matchStartupEntity(
   };
 }
 
+/**
+ * Matches a batch of startup match requests and aggregates counts across all results.
+ *
+ * @param requests - A non-empty list of match requests to process
+ * @param options - Optional overrides for name normalization behavior
+ * @returns An aggregated batch result with per-status counts and all individual results
+ * @throws {Error} When called with an empty requests array
+ */
 export function matchStartupEntityBatch(
   requests: readonly StartupPullMatchRequest[],
   options: StartupMatchOptions = {}
@@ -186,6 +208,14 @@ export function matchStartupEntityBatch(
   };
 }
 
+/**
+ * Creates a no-match result for a startup match request with the given reason.
+ *
+ * @param request - The match request to create a no-match result for
+ * @param reason - The reason for the no-match outcome
+ * @param options - Optional flags such as whether a fingerprint attempt was made
+ * @returns A `StartupPullUnmatchedResult` with `status: 'no_match'`
+ */
 export function makeStartupMatchNoMatchResult(
   request: StartupPullMatchRequest,
   reason: StartupPullMatchReason,

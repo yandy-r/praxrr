@@ -185,10 +185,22 @@ async function importFingerprintKey(version: string): Promise<CryptoKey> {
 
 export type ArrCredentialKeyVersion = string;
 
+/**
+ * Returns the active key version string from the initialized key ring.
+ *
+ * @returns The active `ArrCredentialKeyVersion` string
+ * @throws {Error} When the key ring has not been initialized or initialization failed
+ */
 export function getActiveArrCredentialKeyVersion(): ArrCredentialKeyVersion {
   return getOrInitKeyRing().activeVersion;
 }
 
+/**
+ * Returns all configured key version strings from the key ring.
+ *
+ * @returns An array of all `ArrCredentialKeyVersion` strings in the key ring
+ * @throws {Error} When the key ring has not been initialized or initialization failed
+ */
 export function getAllArrCredentialKeyVersions(): ArrCredentialKeyVersion[] {
   return Array.from(getOrInitKeyRing().configuredKeys.keys());
 }
@@ -201,6 +213,13 @@ export function __resetArrCredentialKeyRingForTest(): void {
   keyRingInitializationError = null;
 }
 
+/**
+ * Lazily imports and caches the AES-GCM `CryptoKey` for the given (or active) key version.
+ *
+ * @param version - Optional key version to retrieve; defaults to the active key version
+ * @returns The AES-GCM `CryptoKey` for the requested version
+ * @throws {Error} When the key version is not found in the key ring
+ */
 export async function getArrCredentialEncryptionKey(version?: ArrCredentialKeyVersion): Promise<CryptoKey> {
   const keyVersion = normalizeVersion(version ?? getActiveArrCredentialKeyVersion());
   const ring = getOrInitKeyRing();
@@ -214,6 +233,13 @@ export async function getArrCredentialEncryptionKey(version?: ArrCredentialKeyVe
   return imported;
 }
 
+/**
+ * Lazily imports and caches the HMAC `CryptoKey` for the given (or active) key version.
+ *
+ * @param version - Optional key version to retrieve; defaults to the active key version
+ * @returns The HMAC `CryptoKey` for the requested version
+ * @throws {Error} When the key version is not found in the key ring
+ */
 export async function getArrCredentialFingerprintKey(version?: ArrCredentialKeyVersion): Promise<CryptoKey> {
   const keyVersion = normalizeVersion(version ?? getActiveArrCredentialKeyVersion());
   const ring = getOrInitKeyRing();

@@ -179,6 +179,14 @@ function applyMetadataProfiles(
   return { written: true, reason: 'applied', count: 1 };
 }
 
+/**
+ * Applies matched startup pull results as sync selections for each section of the given Arr instance.
+ *
+ * @param instanceId - The Arr instance ID to apply selections to
+ * @param arrType - The Arr application type for the instance
+ * @param matches - The set of match results from the startup pull pipeline
+ * @returns A structured result summarizing what was applied per section
+ */
 export async function applyStartupSelections(
   instanceId: number,
   arrType: StartupPullArrType,

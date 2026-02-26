@@ -110,6 +110,13 @@ export const DEFAULT_FILTERABLE_STARTUP_SECTIONS: readonly StartupPullSection[] 
   'metadataProfiles',
 ] as const;
 
+/**
+ * Returns the default catalog rules for a given arr type and section.
+ *
+ * @param arrType - The Arr application type to look up rules for
+ * @param section - The startup pull section to look up rules for
+ * @returns The list of catalog rules for that arr type and section
+ */
 export function getStartupDefaultCatalog(
   arrType: StartupPullArrType,
   section: StartupPullSection
