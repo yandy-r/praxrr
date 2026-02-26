@@ -1,24 +1,56 @@
 <script lang="ts">
 	import { createEventDispatcher } from 'svelte';
 	import type { QualityProfileTableRow } from '$shared/pcd/display.ts';
+	import type { SourceRef } from '$shared/sources/types.ts';
 	import { page } from '$app/stores';
 	import { BookOpenText, Gauge, Earth, Copy, Download } from 'lucide-svelte';
 	import CardGrid from '$ui/card/CardGrid.svelte';
 	import Card from '$ui/card/Card.svelte';
 	import Label from '$ui/label/Label.svelte';
+	import SourceBadge from '$ui/badge/SourceBadge.svelte';
 	import Button from '$ui/button/Button.svelte';
 	import { createProgressiveList } from '$lib/client/utils/progressiveList';
 
 	export let profiles: QualityProfileTableRow[];
+	export let availableSources: SourceRef[] = [];
+	export let showSourceBadges = false;
 
 	const dispatch = createEventDispatcher<{ clone: { name: string }; export: { name: string } }>();
 
 	$: databaseId = $page.params.databaseId;
+	$: sourceMap = new Map(availableSources.map((source) => [`${source.type}:${source.id}`, source]));
 
 	const { visibleCount, sentinel, reset, setTotalCount } = createProgressiveList({ pageSize: 30 });
 	$: setTotalCount(profiles.length);
 	$: profiles, reset();
 	$: visibleProfiles = profiles.slice(0, $visibleCount);
+
+	function resolveSource(profile: QualityProfileTableRow): SourceRef | null {
+		const fallbackDatabaseId = Number(databaseId);
+		const sourceType = profile.sourceType ?? 'pcd';
+		const sourceDatabaseId =
+			profile.sourceDatabaseId != null
+				? profile.sourceDatabaseId
+				: Number.isFinite(fallbackDatabaseId)
+					? fallbackDatabaseId
+					: null;
+
+		if (sourceDatabaseId == null) return null;
+
+		const sourceKey = `${sourceType}:${sourceDatabaseId}`;
+		const matchedSource = sourceMap.get(sourceKey);
+		if (matchedSource) return matchedSource;
+
+		if (sourceType === 'pcd' && profile.sourceDatabaseName) {
+			return {
+				type: 'pcd',
+				id: sourceDatabaseId,
+				name: profile.sourceDatabaseName
+			};
+		}
+
+		return null;
+	}
 </script>
 
 <CardGrid flush>
@@ -54,6 +86,17 @@
 							<Label variant="info" size="sm" rounded="md">{tag.name}</Label>
 						{/each}
 					</div>
+				{/if}
+
+				{#if showSourceBadges}
+					{@const source = resolveSource(profile)}
+					{#if source}
+						<SourceBadge
+							sourceType={source.type}
+							sourceName={source.name}
+							arrType={source.type === 'trash' ? source.arrType : null}
+						/>
+					{/if}
 				{/if}
 
 				{#if profile.description}

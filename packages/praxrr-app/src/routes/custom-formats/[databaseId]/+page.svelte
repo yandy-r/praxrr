@@ -3,6 +3,7 @@
 	import ActionsBar from '$ui/actions/ActionsBar.svelte';
 	import ActionButton from '$ui/actions/ActionButton.svelte';
 	import SearchAction from '$ui/actions/SearchAction.svelte';
+	import SourceFilterAction from '$ui/actions/SourceFilterAction.svelte';
 	import ViewToggle from '$ui/actions/ViewToggle.svelte';
 	import InfoModal from '$ui/modal/InfoModal.svelte';
 	import CloneModal from '$ui/modal/CloneModal.svelte';
@@ -15,6 +16,7 @@
 	import { goto } from '$app/navigation';
 	import { alertStore } from '$alerts/store';
 	import type { CustomFormatTableRow } from '$shared/pcd/display.ts';
+	import type { SourceRef } from '$shared/sources/types.ts';
 	import type { PageData } from './$types';
 
 	export let data: PageData;
@@ -22,6 +24,8 @@
 	let infoModalOpen = false;
 	let cloneModalOpen = false;
 	let cloneSourceName = '';
+	type SourceFilterKey = `${SourceRef['type']}:${number}`;
+	type SourceFilterSelection = SourceFilterKey[];
 
 	function handleClone(event: CustomEvent<{ name: string }>) {
 		cloneSourceName = event.detail.name;
@@ -50,6 +54,7 @@
 	}
 
 	const SEARCH_FILTER_STORAGE_KEY = 'customFormatsSearchFilter';
+	const SOURCE_FILTER_STORAGE_PREFIX = 'customFormatsSourceFilter';
 
 	// Default search filter options
 	const defaultSearchOptions = [
@@ -78,6 +83,78 @@
 
 	let searchOptions = loadSearchOptions();
 
+	function toSourceKey(source: Pick<SourceRef, 'type' | 'id'>): SourceFilterKey {
+		return `${source.type}:${source.id}`;
+	}
+
+	function areSameSelection(a: SourceFilterSelection, b: SourceFilterSelection): boolean {
+		return a.length === b.length && a.every((value, index) => value === b[index]);
+	}
+
+	function normalizeSourceSelection(
+		selection: string[],
+		sources: SourceRef[],
+		defaultKey: string
+	): SourceFilterSelection {
+		if (sources.length === 0) return [];
+
+		const availableKeys = sources.map((source) => toSourceKey(source));
+		const availableSet = new Set(availableKeys);
+		const selected = [...new Set(selection.filter((key) => availableSet.has(key as SourceFilterKey)))];
+
+		if (selected.length > 0) return selected as SourceFilterSelection;
+		if (availableSet.has(defaultKey as SourceFilterKey)) return [defaultKey as SourceFilterKey];
+
+		return [availableKeys[0]];
+	}
+
+	function loadSourceSelection(
+		storageKey: string,
+		sources: SourceRef[],
+		defaultKey: string
+	): SourceFilterSelection {
+		if (!browser) return normalizeSourceSelection([], sources, defaultKey);
+		try {
+			const saved = localStorage.getItem(storageKey);
+			if (saved) {
+				const parsed = JSON.parse(saved);
+				if (Array.isArray(parsed)) {
+					return normalizeSourceSelection(
+						parsed.filter((value) => typeof value === 'string'),
+						sources,
+						defaultKey
+					);
+				}
+			}
+		} catch {
+			// Ignore parse errors and fall back to default selection.
+		}
+
+		return normalizeSourceSelection([], sources, defaultKey);
+	}
+
+	function getFormatSourceKey(item: CustomFormatTableRow, fallbackSourceKey: SourceFilterKey): SourceFilterKey {
+		if (item.sourceType && typeof item.sourceDatabaseId === 'number') {
+			return `${item.sourceType}:${item.sourceDatabaseId}`;
+		}
+
+		return fallbackSourceKey;
+	}
+
+	function filterBySources(
+		items: CustomFormatTableRow[],
+		selectedKeys: SourceFilterSelection,
+		fallbackSourceKey: SourceFilterKey
+	): CustomFormatTableRow[] {
+		if (selectedKeys.length === 0) return items;
+		const selectedSet = new Set(selectedKeys);
+		return items.filter((item) => selectedSet.has(getFormatSourceKey(item, fallbackSourceKey)));
+	}
+
+	function clearSourceFilters() {
+		selectedSourceKeys = availableSources.map((source) => toSourceKey(source));
+	}
+
 	// Save to localStorage when options change
 	$: if (browser) {
 		const enabledMap = searchOptions.map((opt) => [opt.key, opt.enabled] as [string, boolean]);
@@ -98,8 +175,59 @@
 	// Update items when data changes (e.g., switching databases)
 	$: setItems(data.customFormats);
 
+	let selectedSourceKeys: SourceFilterSelection = [];
+	let initializedSourceFilterKey = '';
+
+	$: availableSources = data.sourceContext.availableSources;
+	$: showSourceBadges = data.sourceContext.showAllSourcesTab;
+	$: sourceFilterDisabledReason = data.sourceContext.filterDisabledReason;
+	$: sourceFilterStorageKey = `${SOURCE_FILTER_STORAGE_PREFIX}:${data.currentDatabase.id}`;
+	$: fallbackSourceKey = toSourceKey({ type: 'pcd', id: data.currentDatabase.id });
+
+	$: if (initializedSourceFilterKey !== sourceFilterStorageKey) {
+		initializedSourceFilterKey = sourceFilterStorageKey;
+		selectedSourceKeys = loadSourceSelection(
+			sourceFilterStorageKey,
+			availableSources,
+			data.sourceContext.defaultSourceKey
+		);
+	}
+
+	$: {
+		const normalized = normalizeSourceSelection(
+			selectedSourceKeys,
+			availableSources,
+			data.sourceContext.defaultSourceKey
+		);
+		if (!areSameSelection(normalized, selectedSourceKeys)) {
+			selectedSourceKeys = normalized;
+		}
+	}
+
+	$: if (browser && initializedSourceFilterKey === sourceFilterStorageKey) {
+		localStorage.setItem(sourceFilterStorageKey, JSON.stringify(selectedSourceKeys));
+	}
+
+	$: sourceFiltered = filterBySources(data.customFormats, selectedSourceKeys, fallbackSourceKey);
+
 	// Custom filtering based on selected search options
-	$: filtered = filterFormats(data.customFormats, $debouncedQuery, searchOptions);
+	$: filtered = filterFormats(sourceFiltered, $debouncedQuery, searchOptions);
+	$: sourceFilterActive =
+		availableSources.length > 0 && selectedSourceKeys.length < availableSources.length;
+	$: hasSearchQuery = $debouncedQuery.trim().length > 0;
+	$: showSourceClearAction = sourceFilterActive && availableSources.length > 1;
+
+	$: emptyMessage = (() => {
+		if (sourceFilterActive && hasSearchQuery) {
+			return 'No custom formats match your search and source filters';
+		}
+
+		if (sourceFilterActive) {
+			return 'No custom formats match your selected sources';
+		}
+
+		return 'No custom formats match your search';
+	})();
 
 	function filterFormats(
 		items: CustomFormatTableRow[],
@@ -153,6 +281,16 @@
 			on:click={() => goto(`/custom-formats/${data.currentDatabase.id}/new`)}
 		/>
 		<SearchFilterAction bind:options={searchOptions} />
+		<div title={sourceFilterDisabledReason ?? undefined}>
+			<SourceFilterAction
+				sources={availableSources}
+				bind:selectedKeys={selectedSourceKeys}
+				disabled={Boolean(sourceFilterDisabledReason)}
+				label="Sources"
+				ariaLabel="Filter custom formats by source"
+				responsive
+			/>
+		</div>
 		<ViewToggle bind:value={$view} />
 		<ActionButton icon={Info} on:click={() => (infoModalOpen = true)} />
 	</ActionsBar>
@@ -171,12 +309,37 @@
 			<div
 				class="rounded-lg border border-neutral-200 bg-white p-8 text-center dark:border-neutral-800 dark:bg-neutral-900"
 			>
-				<p class="text-neutral-600 dark:text-neutral-400">No custom formats match your search</p>
+				<p class="text-neutral-600 dark:text-neutral-400">{emptyMessage}</p>
+				{#if showSourceClearAction}
+					<button
+						type="button"
+						class="mt-3 text-sm font-medium text-accent-700 transition-colors hover:text-accent-600 dark:text-accent-300 dark:hover:text-accent-200"
+						on:click={clearSourceFilters}
+					>
+						Clear source filters
+					</button>
+				{/if}
 			</div>
 		{:else if $view === 'table'}
-			<TableView formats={filtered} on:clone={handleClone} on:export={handleExport} />
+			<TableView
+				formats={filtered}
+				sources={availableSources}
+				currentDatabaseId={data.currentDatabase.id}
+				currentDatabaseName={data.currentDatabase.name}
+				{showSourceBadges}
+				on:clone={handleClone}
+				on:export={handleExport}
+			/>
 		{:else}
-			<CardView formats={filtered} on:clone={handleClone} on:export={handleExport} />
+			<CardView
+				formats={filtered}
+				sources={availableSources}
+				currentDatabaseId={data.currentDatabase.id}
+				currentDatabaseName={data.currentDatabase.name}
+				{showSourceBadges}
+				on:clone={handleClone}
+				on:export={handleExport}
+			/>
 		{/if}
 	</div>
 </div>

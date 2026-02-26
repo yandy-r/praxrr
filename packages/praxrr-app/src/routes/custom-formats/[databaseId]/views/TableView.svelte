@@ -2,22 +2,69 @@
 	import { createEventDispatcher } from 'svelte';
 	import Table from '$ui/table/Table.svelte';
 	import Button from '$ui/button/Button.svelte';
+	import SourceBadge from '$ui/badge/SourceBadge.svelte';
 	import type { Column } from '$ui/table/types';
 	import type { CustomFormatTableRow } from '$shared/pcd/display.ts';
-	import { getArrAppMetadata, type ArrConditionTargetType } from '$shared/arr/capabilities.ts';
-	import { Tag, FileText, Layers, FlaskConical, Copy, Download } from 'lucide-svelte';
+	import type { SourceRef } from '$shared/sources/types.ts';
+	import { getArrAppMetadata, type ArrAppType, type ArrConditionTargetType } from '$shared/arr/capabilities.ts';
+	import { Tag, FileText, Layers, FlaskConical, Copy, Download, Database } from 'lucide-svelte';
 	import { marked } from 'marked';
 	import { page } from '$app/stores';
 	import { sortConditions } from '$shared/pcd/conditions';
 
 	export let formats: CustomFormatTableRow[];
+	export let sources: SourceRef[] = [];
+	export let currentDatabaseId: number;
+	export let currentDatabaseName: string;
+	export let showSourceBadges: boolean = false;
 
 	const dispatch = createEventDispatcher<{ clone: { name: string }; export: { name: string } }>();
 
 	$: databaseId = $page.params.databaseId;
+	$: sourceLookup = new Map(sources.map((source) => [`${source.type}:${source.id}`, source] as const));
+	$: fallbackSource = {
+		type: 'pcd' as const,
+		id: currentDatabaseId,
+		name: currentDatabaseName
+	};
+
+	interface ResolvedSource {
+		type: SourceRef['type'];
+		id: number;
+		name: string;
+		arrType: ArrAppType | null;
+	}
 
 	function getRowHref(row: CustomFormatTableRow): string {
 		return `/custom-formats/${databaseId}/${row.id}`;
+	}
+
+	function resolveSource(row: CustomFormatTableRow): ResolvedSource {
+		if (row.sourceType && typeof row.sourceDatabaseId === 'number') {
+			const matched = sourceLookup.get(`${row.sourceType}:${row.sourceDatabaseId}`);
+			if (matched) {
+				return {
+					type: matched.type,
+					id: matched.id,
+					name: matched.name,
+					arrType: matched.type === 'trash' ? matched.arrType : null
+				};
+			}
+
+			return {
+				type: row.sourceType,
+				id: row.sourceDatabaseId,
+				name: row.sourceDatabaseName ?? `Source ${row.sourceDatabaseId}`,
+				arrType: null
+			};
+		}
+
+		return {
+			type: fallbackSource.type,
+			id: fallbackSource.id,
+			name: fallbackSource.name,
+			arrType: null
+		};
 	}
 
 	function escapeHtml(text: string): string {
@@ -48,7 +95,7 @@
 		return `<div class="mt-1 flex flex-wrap gap-1">${targets.map((target) => getArrTargetBadgeHtml(target)).join('')}</div>`;
 	}
 
-	const columns: Column<CustomFormatTableRow>[] = [
+	const baseColumns: Column<CustomFormatTableRow>[] = [
 		{
 			key: 'name',
 			header: 'Name',
@@ -142,6 +189,20 @@
 			})
 		}
 	];
+
+	const sourceColumn: Column<CustomFormatTableRow> = {
+		key: 'source',
+		header: 'Source',
+		headerIcon: Database,
+		align: 'left',
+		width: 'w-40',
+		sortable: true,
+		sortAccessor: (row) => resolveSource(row).name.toLowerCase()
+	};
+
+	$: columns = showSourceBadges
+		? [baseColumns[0], sourceColumn, ...baseColumns.slice(1)]
+		: baseColumns;
 </script>
 
 <Table
@@ -153,6 +214,20 @@
 	rowHref={getRowHref}
 	pageSize={50}
 >
+	<svelte:fragment slot="cell" let:row let:column>
+		{#if column.key === 'source'}
+			{@const source = resolveSource(row)}
+			<SourceBadge
+				sourceType={source.type}
+				sourceName={source.name}
+				size="sm"
+				arrType={source.arrType}
+			/>
+		{:else}
+			{String(row[column.key as keyof CustomFormatTableRow] ?? '')}
+		{/if}
+	</svelte:fragment>
+
 	<!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
 	<svelte:fragment slot="actions" let:row>
 		<div class="flex items-center justify-end gap-0.5" on:click|stopPropagation>

@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { createEventDispatcher } from 'svelte';
 	import type { CustomFormatTableRow } from '$shared/pcd/display.ts';
+	import type { SourceRef } from '$shared/sources/types.ts';
 	import { FlaskConical, Copy, Download } from 'lucide-svelte';
 	import { marked } from 'marked';
 	import { page } from '$app/stores';
@@ -8,20 +9,39 @@
 	import CardGrid from '$ui/card/CardGrid.svelte';
 	import Card from '$ui/card/Card.svelte';
 	import Badge from '$ui/badge/Badge.svelte';
+	import SourceBadge from '$ui/badge/SourceBadge.svelte';
 	import Label from '$ui/label/Label.svelte';
 	import Button from '$ui/button/Button.svelte';
 	import { createProgressiveList } from '$lib/client/utils/progressiveList';
 	import {
 		getArrAppMetadata,
 		isArrAppType,
+		type ArrAppType,
 		type ArrConditionTargetType
 	} from '$shared/arr/capabilities.ts';
 
 	export let formats: CustomFormatTableRow[];
+	export let sources: SourceRef[] = [];
+	export let currentDatabaseId: number;
+	export let currentDatabaseName: string;
+	export let showSourceBadges: boolean = false;
 
 	const dispatch = createEventDispatcher<{ clone: { name: string }; export: { name: string } }>();
 
 	$: databaseId = $page.params.databaseId;
+	$: sourceLookup = new Map(sources.map((source) => [`${source.type}:${source.id}`, source] as const));
+	$: fallbackSource = {
+		type: 'pcd' as const,
+		id: currentDatabaseId,
+		name: currentDatabaseName
+	};
+
+	interface ResolvedSource {
+		type: SourceRef['type'];
+		id: number;
+		name: string;
+		arrType: ArrAppType | null;
+	}
 
 	const { visibleCount, sentinel, reset, setTotalCount } = createProgressiveList({ pageSize: 30 });
 	$: setTotalCount(formats.length);
@@ -44,6 +64,34 @@
 
 	function getArrTargetLabel(target: ArrConditionTargetType): string {
 		return target === 'all' ? 'All Apps' : getArrAppMetadata(target).label;
+	}
+
+	function resolveSource(row: CustomFormatTableRow): ResolvedSource {
+		if (row.sourceType && typeof row.sourceDatabaseId === 'number') {
+			const matched = sourceLookup.get(`${row.sourceType}:${row.sourceDatabaseId}`);
+			if (matched) {
+				return {
+					type: matched.type,
+					id: matched.id,
+					name: matched.name,
+					arrType: matched.type === 'trash' ? matched.arrType : null
+				};
+			}
+
+			return {
+				type: row.sourceType,
+				id: row.sourceDatabaseId,
+				name: row.sourceDatabaseName ?? `Source ${row.sourceDatabaseId}`,
+				arrType: null
+			};
+		}
+
+		return {
+			type: fallbackSource.type,
+			id: fallbackSource.id,
+			name: fallbackSource.name,
+			arrType: null
+		};
 	}
 </script>
 
@@ -85,6 +133,16 @@
 			</svelte:fragment>
 
 			<div class="space-y-3">
+				{#if showSourceBadges}
+					{@const source = resolveSource(format)}
+					<SourceBadge
+						sourceType={source.type}
+						sourceName={source.name}
+						size="sm"
+						arrType={source.arrType}
+					/>
+				{/if}
+
 				{#if format.tags.length > 0}
 					<div class="flex flex-wrap gap-1">
 						{#each format.tags as tag}
