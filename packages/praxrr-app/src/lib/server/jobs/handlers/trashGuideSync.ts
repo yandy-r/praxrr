@@ -91,7 +91,7 @@ function getScheduledRescheduleAt(
   return calculateNextRunFromMinutes(new Date().toISOString(), scheduleMinutes);
 }
 
-function buildFailureResult(
+async function buildFailureResult(
   jobId: number,
   sourceId: number,
   message: string,
@@ -99,7 +99,7 @@ function buildFailureResult(
   trigger: TrashGuideSyncJobPayload['trigger'],
   enabled: number,
   scheduleMinutes: number
-): JobHandlerResult {
+): Promise<JobHandlerResult> {
   const scheduledRescheduleAt = getScheduledRescheduleAt(trigger, enabled, scheduleMinutes);
 
   if (
@@ -109,7 +109,7 @@ function buildFailureResult(
     attempts < MAX_TRANSIENT_RETRY_ATTEMPTS
   ) {
     const retryAt = calculateRetryAt(attempts);
-    void logger.warn('TRaSH sync job transient failure, scheduling retry', {
+    await logger.warn('TRaSH sync job transient failure, scheduling retry', {
       source: 'TrashGuideSyncJob',
       meta: {
         jobId,

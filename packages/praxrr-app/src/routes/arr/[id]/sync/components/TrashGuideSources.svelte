@@ -437,15 +437,33 @@
       group.items.some((item) => item.toLowerCase().includes(normalizedFilter))
     );
   });
-  $: viewState = isLoading
-    ? 'loading'
-    : loadError
-      ? 'server-error'
-      : orderedSources.length === 0
-        ? 'no-sources'
-        : filteredSources.length === 0
-          ? 'filtered-empty'
-          : 'ready';
+
+  function deriveViewState(
+    loading: boolean,
+    error: string | null,
+    hasOrderedSources: boolean,
+    hasFilteredSources: boolean
+  ): ViewState {
+    if (loading) {
+      return 'loading';
+    }
+
+    if (error) {
+      return 'server-error';
+    }
+
+    if (!hasOrderedSources) {
+      return 'no-sources';
+    }
+
+    if (!hasFilteredSources) {
+      return 'filtered-empty';
+    }
+
+    return 'ready';
+  }
+
+  $: viewState = deriveViewState(isLoading, loadError, orderedSources.length > 0, filteredSources.length > 0);
 
   $: isDirty = orderedSources.some((source) => isSourceDirty(source.sourceId));
   $: previewEnabled = false;

@@ -319,6 +319,8 @@ Silent null return on malformed JSON. If the entire entity cache is corrupted, u
 with no error indicators. The `as T` cast is unchecked -- parsed JSON is verified to be a non-null
 non-array object, but not validated against `T`.
 
+**Status:** ✅ Fixed in `packages/praxrr-app/src/lib/server/trashguide/displayTransform.ts` with structured malformed-row logging and strict `entity_type` matching.
+
 ### 20. `toSyntheticId` can produce collisions and silently falls back to 0
 
 **File:** `displayTransform.ts:39-43` **Agents:** code-reviewer, silent-failure-hunter,
@@ -327,12 +329,15 @@ type-design-analyzer
 Uses only first 8 hex chars of UUID mod 1,000,000. Birthday-paradox collisions possible with large
 entity sets. Non-hex trash IDs silently produce `suffix = 0`, causing all unparseable IDs from the
 same source to collide.
+**Status:** ✅ Fixed in `packages/praxrr-app/src/lib/server/trashguide/displayTransform.ts` using full-string hash synthesis with source-isolated negative IDs.
+
 
 ### 21. Nested ternary in `viewState` derivation (CLAUDE.md violation)
 
 **File:** `TrashGuideSources.svelte:460-468` **Agent:** code-simplifier
 
 4-level nested ternary. Should be a helper function with if/else chain per CLAUDE.md conventions.
+**Status:** ✅ Fixed in `packages/praxrr-app/src/routes/arr/[id]/sync/components/TrashGuideSources.svelte` via `deriveViewState` helper and if/else chain.
 
 ### 22. `fetchSyncBatches` is 250 lines with mixed PCD/TRaSH concerns
 
@@ -342,6 +347,8 @@ The TRaSH section alone is ~136 lines handling source lookup, JSON parsing, resu
 transformation, entity extraction, and namespace construction.
 
 **Fix:** Extract TRaSH batch building into a separate private method.
+**Status:** ✅ Fixed in `packages/praxrr-app/src/lib/server/sync/qualityProfiles/syncer.ts` via dedicated `fetchTrashSyncBatches` method.
+
 
 ### 23. `void logger.warn(...)` drops the promise
 
@@ -349,6 +356,7 @@ transformation, entity extraction, and namespace construction.
 
 Inconsistent with other `await logger.warn(...)` calls in the same file. If the logger itself fails,
 the failure is silently discarded.
+**Status:** ✅ Fixed in `packages/praxrr-app/src/lib/server/jobs/handlers/trashGuideSync.ts` by awaiting warning logs for transient retry paths.
 
 ### 24. TRaSH sync types duplicated between client and server
 

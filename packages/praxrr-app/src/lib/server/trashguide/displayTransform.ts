@@ -9,12 +9,15 @@ import type { ArrConditionTargetType } from '$shared/arr/capabilities.ts';
 import type { TrashGuideEntityCache } from '$db/queries/trashGuideEntityCache.ts';
 import type {
   TrashGuideCustomFormatEntity,
+  TrashGuideParsedEntity,
   TrashGuideNamingEntity,
   TrashGuideQualityProfileEntity,
   TrashGuideQualitySizeEntity,
+  TrashGuideEntityType,
   TrashGuideSupportedArrType,
 } from './types.ts';
 import { parseMarkdown } from '$utils/markdown/markdown.ts';
+import { logger } from '$logger/logger.ts';
 
 export interface TrashGuideSourceRef {
   id: number;
@@ -37,19 +40,129 @@ function toSourceFields(source: TrashGuideSourceRef): SourcedResult {
 }
 
 function toSyntheticId(sourceId: number, trashId: string): number {
-  const parsed = Number.parseInt(trashId.slice(0, 8), 16);
-  const suffix = Number.isFinite(parsed) ? parsed % 1_000_000 : 0;
-  return -(sourceId * 1_000_000 + suffix + 1);
+  const normalized = trashId.trim().toLowerCase();
+  let hash = 2_166_136_261; // FNV-1a offset basis
+
+  for (let index = 0; index < normalized.length; index += 1) {
+    hash ^= normalized.charCodeAt(index);
+    hash = Math.imul(hash, 16_777_619); // FNV prime
+  }
+
+  const suffix = (hash >>> 0) % 1_000_000_000;
+  return -(sourceId * 1_000_000_000 + suffix + 1);
 }
 
-function parseCachedEntity<T extends object>(cache: TrashGuideEntityCache): T | null {
+type ParsedTrashGuideEntityByType<T extends TrashGuideEntityType> = Extract<TrashGuideParsedEntity, { entity_type: T }>;
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function isCustomFormatEntity(value: unknown): value is ParsedTrashGuideEntityByType<'custom_format'> {
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  return (
+    value.entity_type === 'custom_format' &&
+    typeof value.name === 'string' &&
+    Array.isArray(value.specifications) &&
+    typeof value.file_path === 'string'
+  );
+}
+
+function isQualityProfileEntity(value: unknown): value is ParsedTrashGuideEntityByType<'quality_profile'> {
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  return (
+    value.entity_type === 'quality_profile' &&
+    typeof value.name === 'string' &&
+    typeof value.file_path === 'string' &&
+    typeof value.upgrade_allowed === 'boolean'
+  );
+}
+
+function isQualitySizeEntity(value: unknown): value is ParsedTrashGuideEntityByType<'quality_size'> {
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  return (
+    value.entity_type === 'quality_size' &&
+    typeof value.name === 'string' &&
+    typeof value.file_path === 'string' &&
+    Array.isArray(value.qualities)
+  );
+}
+
+function isNamingEntity(value: unknown): value is ParsedTrashGuideEntityByType<'naming'> {
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  return (
+    value.entity_type === 'naming' &&
+    typeof value.name === 'string' &&
+    typeof value.file_path === 'string'
+  );
+}
+
+function isExpectedEntity<T extends TrashGuideEntityType>(
+  value: unknown,
+  expectedEntityType: T
+): value is ParsedTrashGuideEntityByType<T> {
+  switch (expectedEntityType) {
+    case 'custom_format':
+      return isCustomFormatEntity(value);
+    case 'quality_profile':
+      return isQualityProfileEntity(value);
+    case 'quality_size':
+      return isQualitySizeEntity(value);
+    case 'naming':
+      return isNamingEntity(value);
+    default:
+      return false;
+  }
+}
+
+function logMalformedCacheRow(cache: TrashGuideEntityCache, sourceType: TrashGuideEntityType, reason: string): void {
+  void logger.warn('Failed to parse TRaSH cache row', {
+    source: 'TRaSH:DisplayTransform',
+    meta: {
+      sourceType,
+      sourceId: cache.sourceId,
+      sourceName: cache.name,
+      trashId: cache.trashId,
+      error: reason,
+    },
+  });
+}
+
+function parseCachedEntity<T extends TrashGuideEntityType>(
+  cache: TrashGuideEntityCache,
+  expectedEntityType: T
+): ParsedTrashGuideEntityByType<T> | null {
   try {
     const parsed = JSON.parse(cache.jsonData);
-    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    if (!isRecord(parsed)) {
+      logMalformedCacheRow(cache, expectedEntityType, 'Invalid JSON object in TRaSH cache');
       return null;
     }
-    return parsed as T;
+
+    if (!isExpectedEntity(parsed, expectedEntityType)) {
+      const reason =
+        typeof parsed.entity_type === 'string'
+          ? `TRaSH cache row entity_type mismatch: expected ${expectedEntityType}, got ${parsed.entity_type}`
+          : 'TRaSH cache row missing entity_type';
+      logMalformedCacheRow(cache, expectedEntityType, reason);
+      return null;
+    }
+
+    return parsed;
   } catch {
+    logMalformedCacheRow(cache, expectedEntityType, 'Malformed JSON in TRaSH cache row');
     return null;
   }
 }
@@ -58,7 +171,7 @@ export function toSourcedCustomFormatRow(
   cache: TrashGuideEntityCache,
   source: TrashGuideSourceRef
 ): CustomFormatTableRow | null {
-  const entity = parseCachedEntity<TrashGuideCustomFormatEntity>(cache);
+  const entity = parseCachedEntity(cache, 'custom_format');
   if (!entity) return null;
 
   const target = source.arrType as ArrConditionTargetType;
@@ -106,7 +219,7 @@ export function toSourcedQualityProfileRow(
   cache: TrashGuideEntityCache,
   source: TrashGuideSourceRef
 ): QualityProfileTableRow | null {
-  const entity = parseCachedEntity<TrashGuideQualityProfileEntity>(cache);
+  const entity = parseCachedEntity(cache, 'quality_profile');
   if (!entity) return null;
 
   const perArrTypeCount = Array.isArray(entity.format_items) ? entity.format_items.length : 0;
@@ -142,7 +255,7 @@ export function toSourcedQualityDefinitionListItem(
   cache: TrashGuideEntityCache,
   source: TrashGuideSourceRef
 ): SourcedQualityDefinitionListItem | null {
-  const entity = parseCachedEntity<TrashGuideQualitySizeEntity>(cache);
+  const entity = parseCachedEntity(cache, 'quality_size');
   if (!entity) return null;
 
   return {
@@ -158,7 +271,7 @@ export function toSourcedNamingListItem(
   cache: TrashGuideEntityCache,
   source: TrashGuideSourceRef
 ): SourcedNamingListItem | null {
-  const entity = parseCachedEntity<TrashGuideNamingEntity>(cache);
+  const entity = parseCachedEntity(cache, 'naming');
   if (!entity) return null;
 
   return {

@@ -14,8 +14,16 @@ const SOURCE = {
 } as const;
 
 function syntheticId(sourceId: number, trashId: string): number {
-  const parsed = Number.parseInt(trashId.slice(0, 8), 16);
-  return -(sourceId * 1_000_000 + (Number.isFinite(parsed) ? parsed % 1_000_000 : 0) + 1);
+  const normalized = trashId.trim().toLowerCase();
+  let hash = 2_166_136_261; // FNV-1a offset basis
+
+  for (let index = 0; index < normalized.length; index += 1) {
+    hash ^= normalized.charCodeAt(index);
+    hash = Math.imul(hash, 16_777_619); // FNV prime
+  }
+
+  const suffix = (hash >>> 0) % 1_000_000_000;
+  return -(sourceId * 1_000_000_000 + suffix + 1);
 }
 
 function entityCache(overrides: Partial<TrashGuideEntityCache>): TrashGuideEntityCache {
@@ -40,6 +48,38 @@ Deno.test('toSourcedCustomFormatRow: returns null for malformed cache JSON', () 
       name: 'Malformed CF',
       trashId: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
       jsonData: '{not json',
+    }),
+    SOURCE
+  );
+
+  assertEquals(row, null);
+});
+
+Deno.test('toSourcedCustomFormatRow: returns null when cached entity_type does not match requested type', () => {
+  const row = toSourcedCustomFormatRow(
+    entityCache({
+      entityType: 'custom_format',
+      name: 'Wrong Entity',
+      trashId: 'ffffffffffffffffffffffffffffffff',
+      jsonData: JSON.stringify({
+        entity_type: 'quality_profile',
+        arr_type: 'radarr',
+        trash_id: 'ffffffffffffffffffffffffffffffff',
+        file_path: 'quality-profiles/wrong.json',
+        name: 'Wrong Entity',
+        description: null,
+        source_url: null,
+        score_set: null,
+        group: null,
+        upgrade_allowed: true,
+        cutoff: 'Any',
+        min_format_score: 0,
+        cutoff_format_score: 0,
+        min_upgrade_format_score: 0,
+        language: null,
+        items: [],
+        format_items: [],
+      }),
     }),
     SOURCE
   );
@@ -238,4 +278,50 @@ Deno.test('toSourcedNamingListItem/toSourcedQualityDefinitionListItem: parse mal
 
   assertEquals(qualityDefinition?.name, 'Good Sizes');
   assertEquals(qualityDefinition?.quality_count, 2);
+});
+
+Deno.test('toSyntheticId: distinguishes malformed TRaSH IDs', () => {
+  const malformedA = toSourcedCustomFormatRow(
+    entityCache({
+      entityType: 'custom_format',
+      name: 'Malformed A CF',
+      trashId: 'not-a-hex-id-a',
+      jsonData: JSON.stringify({
+        entity_type: 'custom_format',
+        name: 'Malformed A CF',
+        arr_type: 'radarr',
+        trash_id: 'not-a-hex-id-a',
+        file_path: 'custom-formats/bad-a.json',
+        description: null,
+        regex_url: null,
+        include_in_rename: false,
+        scores: {},
+        specifications: [],
+      }),
+    }),
+    SOURCE
+  );
+
+  const malformedB = toSourcedCustomFormatRow(
+    entityCache({
+      entityType: 'custom_format',
+      name: 'Malformed B CF',
+      trashId: 'not-a-hex-id-b',
+      jsonData: JSON.stringify({
+        entity_type: 'custom_format',
+        name: 'Malformed B CF',
+        arr_type: 'radarr',
+        trash_id: 'not-a-hex-id-b',
+        file_path: 'custom-formats/bad-b.json',
+        description: null,
+        regex_url: null,
+        include_in_rename: false,
+        scores: {},
+        specifications: [],
+      }),
+    }),
+    SOURCE
+  );
+
+  assertEquals(malformedA?.id === malformedB?.id, false);
 });
