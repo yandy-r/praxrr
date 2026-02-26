@@ -156,7 +156,11 @@ already a reactive variable.
 
 ```typescript
 $: selectedLabel =
-  selectedArrType === 'radarr' ? 'Radarr' : selectedArrType === 'sonarr' ? 'Sonarr' : 'Lidarr';
+  selectedArrType === 'radarr'
+    ? 'Radarr'
+    : selectedArrType === 'sonarr'
+      ? 'Sonarr'
+      : 'Lidarr';
 ```
 
 When `selectedArrType` is `null` (initial state), `selectedLabel` evaluates to `'Lidarr'`. While the

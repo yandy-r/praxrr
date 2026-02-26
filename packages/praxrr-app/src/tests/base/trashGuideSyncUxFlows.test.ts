@@ -88,18 +88,8 @@ async function readFixture(relativePath: string): Promise<string> {
 Deno.test('custom formats source context hides all-sources affordance for single-source state', async () => {
   const restores: Restore[] = [];
 
-  patchTarget(
-    pcdManager,
-    'getAll',
-    (() => [createDatabase(11, 'Praxrr-DB')]) as typeof pcdManager.getAll,
-    restores
-  );
-  patchTarget(
-    trashGuideManager,
-    'listSources',
-    (() => []) as typeof trashGuideManager.listSources,
-    restores
-  );
+  patchTarget(pcdManager, 'getAll', (() => [createDatabase(11, 'Praxrr-DB')]) as typeof pcdManager.getAll, restores);
+  patchTarget(trashGuideManager, 'listSources', (() => []) as typeof trashGuideManager.listSources, restores);
 
   try {
     const payload = (await customFormatsIndexLoad(
@@ -121,127 +111,116 @@ Deno.test('custom formats source context hides all-sources affordance for single
   }
 });
 
-Deno.test('custom formats source context enables all-sources state when two or more sources are available', async () => {
-  const restores: Restore[] = [];
-  const trashSource = createTrashSource(91, 'TRaSH Radarr', 'radarr', {
-    customFormats: 12,
-    qualityProfiles: 0,
-    qualitySizes: 0,
-    naming: 0,
-  });
+Deno.test(
+  'custom formats source context enables all-sources state when two or more sources are available',
+  async () => {
+    const restores: Restore[] = [];
+    const trashSource = createTrashSource(91, 'TRaSH Radarr', 'radarr', {
+      customFormats: 12,
+      qualityProfiles: 0,
+      qualitySizes: 0,
+      naming: 0,
+    });
 
-  patchTarget(
-    pcdManager,
-    'getAll',
-    (() => [createDatabase(11, 'Praxrr-DB')]) as typeof pcdManager.getAll,
-    restores
-  );
-  patchTarget(
-    trashGuideManager,
-    'listSources',
-    (() => [trashSource]) as typeof trashGuideManager.listSources,
-    restores
-  );
-
-  try {
-    const payload = (await customFormatsIndexLoad(
-      {} as Parameters<typeof customFormatsIndexLoad>[0]
-    )) as SourceContextPayload;
-
-    assertEquals(payload.sourceContext.showAllSourcesTab, true);
-    assertEquals(payload.sourceContext.defaultSourceKey, 'pcd:11');
-    assertEquals(payload.sourceContext.filterDisabledReason, null);
-    assertEquals(payload.sourceContext.availableSources, [
-      {
-        type: 'pcd',
-        id: 11,
-        name: 'Praxrr-DB',
-      },
-      {
-        type: 'trash',
-        id: 91,
-        name: 'TRaSH Radarr',
-        arrType: 'radarr',
-      },
-    ]);
-  } finally {
-    restoreAll(restores);
-  }
-});
-
-Deno.test('custom formats source context surfaces mismatch empty-state messaging when TRaSH sources have zero entities', async () => {
-  const restores: Restore[] = [];
-  const trashSource = createTrashSource(92, 'TRaSH Sonarr', 'sonarr', {
-    customFormats: 0,
-    qualityProfiles: 8,
-    qualitySizes: 0,
-    naming: 0,
-  });
-
-  patchTarget(
-    pcdManager,
-    'getAll',
-    (() => [createDatabase(12, 'Main DB')]) as typeof pcdManager.getAll,
-    restores
-  );
-  patchTarget(
-    trashGuideManager,
-    'listSources',
-    (() => [trashSource]) as typeof trashGuideManager.listSources,
-    restores
-  );
-
-  try {
-    const payload = (await customFormatsIndexLoad(
-      {} as Parameters<typeof customFormatsIndexLoad>[0]
-    )) as SourceContextPayload;
-
-    assertEquals(payload.sourceContext.availableSources, [
-      {
-        type: 'pcd',
-        id: 12,
-        name: 'Main DB',
-      },
-    ]);
-    assertEquals(payload.sourceContext.showAllSourcesTab, false);
-    assertEquals(
-      payload.sourceContext.filterDisabledReason,
-      'Linked TRaSH sources do not currently provide custom formats'
+    patchTarget(pcdManager, 'getAll', (() => [createDatabase(11, 'Praxrr-DB')]) as typeof pcdManager.getAll, restores);
+    patchTarget(
+      trashGuideManager,
+      'listSources',
+      (() => [trashSource]) as typeof trashGuideManager.listSources,
+      restores
     );
-  } finally {
-    restoreAll(restores);
+
+    try {
+      const payload = (await customFormatsIndexLoad(
+        {} as Parameters<typeof customFormatsIndexLoad>[0]
+      )) as SourceContextPayload;
+
+      assertEquals(payload.sourceContext.showAllSourcesTab, true);
+      assertEquals(payload.sourceContext.defaultSourceKey, 'pcd:11');
+      assertEquals(payload.sourceContext.filterDisabledReason, null);
+      assertEquals(payload.sourceContext.availableSources, [
+        {
+          type: 'pcd',
+          id: 11,
+          name: 'Praxrr-DB',
+        },
+        {
+          type: 'trash',
+          id: 91,
+          name: 'TRaSH Radarr',
+          arrType: 'radarr',
+        },
+      ]);
+    } finally {
+      restoreAll(restores);
+    }
   }
-});
+);
 
-Deno.test('quality profiles source context exposes explicit empty-state defaults when no sources are available', async () => {
-  const restores: Restore[] = [];
+Deno.test(
+  'custom formats source context surfaces mismatch empty-state messaging when TRaSH sources have zero entities',
+  async () => {
+    const restores: Restore[] = [];
+    const trashSource = createTrashSource(92, 'TRaSH Sonarr', 'sonarr', {
+      customFormats: 0,
+      qualityProfiles: 8,
+      qualitySizes: 0,
+      naming: 0,
+    });
 
-  patchTarget(
-    pcdManager,
-    'getAll',
-    (() => []) as typeof pcdManager.getAll,
-    restores
-  );
-  patchTarget(
-    trashGuideManager,
-    'listSources',
-    (() => []) as typeof trashGuideManager.listSources,
-    restores
-  );
+    patchTarget(pcdManager, 'getAll', (() => [createDatabase(12, 'Main DB')]) as typeof pcdManager.getAll, restores);
+    patchTarget(
+      trashGuideManager,
+      'listSources',
+      (() => [trashSource]) as typeof trashGuideManager.listSources,
+      restores
+    );
 
-  try {
-    const payload = (await qualityProfilesIndexLoad(
-      {} as Parameters<typeof qualityProfilesIndexLoad>[0]
-    )) as SourceContextPayload;
+    try {
+      const payload = (await customFormatsIndexLoad(
+        {} as Parameters<typeof customFormatsIndexLoad>[0]
+      )) as SourceContextPayload;
 
-    assertEquals(payload.sourceContext.availableSources, []);
-    assertEquals(payload.sourceContext.showAllSourcesTab, false);
-    assertEquals(payload.sourceContext.defaultSourceKey, 'all');
-    assertEquals(payload.sourceContext.filterDisabledReason, 'No quality profile sources are available');
-  } finally {
-    restoreAll(restores);
+      assertEquals(payload.sourceContext.availableSources, [
+        {
+          type: 'pcd',
+          id: 12,
+          name: 'Main DB',
+        },
+      ]);
+      assertEquals(payload.sourceContext.showAllSourcesTab, false);
+      assertEquals(
+        payload.sourceContext.filterDisabledReason,
+        'Linked TRaSH sources do not currently provide custom formats'
+      );
+    } finally {
+      restoreAll(restores);
+    }
   }
-});
+);
+
+Deno.test(
+  'quality profiles source context exposes explicit empty-state defaults when no sources are available',
+  async () => {
+    const restores: Restore[] = [];
+
+    patchTarget(pcdManager, 'getAll', (() => []) as typeof pcdManager.getAll, restores);
+    patchTarget(trashGuideManager, 'listSources', (() => []) as typeof trashGuideManager.listSources, restores);
+
+    try {
+      const payload = (await qualityProfilesIndexLoad(
+        {} as Parameters<typeof qualityProfilesIndexLoad>[0]
+      )) as SourceContextPayload;
+
+      assertEquals(payload.sourceContext.availableSources, []);
+      assertEquals(payload.sourceContext.showAllSourcesTab, false);
+      assertEquals(payload.sourceContext.defaultSourceKey, 'all');
+      assertEquals(payload.sourceContext.filterDisabledReason, 'No quality profile sources are available');
+    } finally {
+      restoreAll(restores);
+    }
+  }
+);
 
 Deno.test('quality profiles source context enables all-sources visibility for mixed PCD and TRaSH data', async () => {
   const restores: Restore[] = [];
@@ -252,12 +231,7 @@ Deno.test('quality profiles source context enables all-sources visibility for mi
     naming: 0,
   });
 
-  patchTarget(
-    pcdManager,
-    'getAll',
-    (() => [createDatabase(14, 'Music DB')]) as typeof pcdManager.getAll,
-    restores
-  );
+  patchTarget(pcdManager, 'getAll', (() => [createDatabase(14, 'Music DB')]) as typeof pcdManager.getAll, restores);
   patchTarget(
     trashGuideManager,
     'listSources',
@@ -316,27 +290,20 @@ Deno.test('source filter persistence wiring remains stable for custom formats an
 Deno.test('source badge visibility and zero-result empty-state invariants stay wired to source context', async () => {
   const customFormatsPage = await readFixture('../../routes/custom-formats/[databaseId]/+page.svelte');
   const qualityProfilesPage = await readFixture('../../routes/quality-profiles/[databaseId]/+page.svelte');
-  const trashGuideSourcesComponent = await readFixture('../../routes/arr/[id]/sync/components/TrashGuideSources.svelte');
+  const trashGuideSourcesComponent = await readFixture(
+    '../../routes/arr/[id]/sync/components/TrashGuideSources.svelte'
+  );
 
   assertStringIncludes(customFormatsPage, '$: showSourceBadges = data.sourceContext.showAllSourcesTab;');
   assertMatch(customFormatsPage, /<TableView[\s\S]*\{showSourceBadges\}/);
   assertMatch(customFormatsPage, /<CardView[\s\S]*\{showSourceBadges\}/);
 
-  assertMatch(
-    qualityProfilesPage,
-    /<TableView[\s\S]*showSourceBadges=\{data\.sourceContext\.showAllSourcesTab\}/
-  );
-  assertMatch(
-    qualityProfilesPage,
-    /<CardView[\s\S]*showSourceBadges=\{data\.sourceContext\.showAllSourcesTab\}/
-  );
+  assertMatch(qualityProfilesPage, /<TableView[\s\S]*showSourceBadges=\{data\.sourceContext\.showAllSourcesTab\}/);
+  assertMatch(qualityProfilesPage, /<CardView[\s\S]*showSourceBadges=\{data\.sourceContext\.showAllSourcesTab\}/);
 
   assertStringIncludes(customFormatsPage, 'No custom formats match your selected sources');
   assertStringIncludes(customFormatsPage, 'Clear source filters');
   assertStringIncludes(qualityProfilesPage, 'No quality profiles match your selected sources');
   assertStringIncludes(trashGuideSourcesComponent, 'No TRaSH sources match your current filter');
-  assertStringIncludes(
-    trashGuideSourcesComponent,
-    'No enabled TRaSH Guide sources are linked for this instance type.'
-  );
+  assertStringIncludes(trashGuideSourcesComponent, 'No enabled TRaSH Guide sources are linked for this instance type.');
 });

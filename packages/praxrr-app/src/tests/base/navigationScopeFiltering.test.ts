@@ -228,10 +228,22 @@ Deno.test('arr navigation remains scope-compatible while feature-gated routes st
     assertEquals(bottomOrder.includes('/custom-formats'), true);
   }
 
-  assertEquals(buildBottomNavOrder({ ...shell, groups: shellWithoutDev }, 'radarr').includes('/metadata-profiles'), false);
-  assertEquals(buildBottomNavOrder({ ...shell, groups: shellWithoutDev }, 'sonarr').includes('/metadata-profiles'), false);
-  assertEquals(buildBottomNavOrder({ ...shell, groups: shellWithoutDev }, 'lidarr').includes('/metadata-profiles'), true);
+  assertEquals(
+    buildBottomNavOrder({ ...shell, groups: shellWithoutDev }, 'radarr').includes('/metadata-profiles'),
+    false
+  );
+  assertEquals(
+    buildBottomNavOrder({ ...shell, groups: shellWithoutDev }, 'sonarr').includes('/metadata-profiles'),
+    false
+  );
+  assertEquals(
+    buildBottomNavOrder({ ...shell, groups: shellWithoutDev }, 'lidarr').includes('/metadata-profiles'),
+    true
+  );
 
   const visibleTopLevelHrefs = shellWithoutDev.flatMap((group) => group.items.map((item) => item.href));
-  assertEquals(visibleTopLevelHrefs.some((href) => href.includes('/sync')), false);
+  assertEquals(
+    visibleTopLevelHrefs.some((href) => href.includes('/sync')),
+    false
+  );
 });

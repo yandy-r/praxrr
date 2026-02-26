@@ -112,7 +112,12 @@ extended or reused for entity listing pages.
 // Proposed: shared source identifier type
 type SourceRef =
   | { type: 'pcd'; id: number; name: string }
-  | { type: 'trash'; id: number; name: string; arrType: TrashGuideSupportedArrType };
+  | {
+      type: 'trash';
+      id: number;
+      name: string;
+      arrType: TrashGuideSupportedArrType;
+    };
 ```
 
 ### Entity Source Decoration
