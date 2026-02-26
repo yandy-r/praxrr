@@ -5,9 +5,9 @@
   import Toggle from '$ui/toggle/Toggle.svelte';
   import SyncFooter from './SyncFooter.svelte';
   import { alertStore } from '$lib/client/alerts/store.ts';
+  import type { TrashGuideSourceArrType } from '$trashguide/types.ts';
   import type { SectionType } from '$sync/types.ts';
 
-  type TrashGuideSourceArrType = 'radarr' | 'sonarr' | 'lidarr';
   type TrashGuideSyncTrigger = 'none' | 'manual' | 'on_pull' | 'on_change' | 'schedule';
   type UnifiedSourceType = 'pcd' | 'trash';
 

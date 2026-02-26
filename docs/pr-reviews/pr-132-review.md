@@ -223,7 +223,10 @@ When a quality profile fails to sync, the error is logged but the overall result
 `{ success: true, itemsSynced: N }` with no indication of failures. User sees "sync succeeded" while
 profiles are silently missing.
 
-**Fix:** Track failed profiles alongside synced profiles and include in the result.
+**Status:** ✅ Fixed — track failed profiles alongside synced profiles and include in result.
+
+**Validation:**
+`deno test --allow-env --allow-read --allow-ffi --allow-write packages/praxrr-app/src/tests/sync/qualityProfilesSyncer.test.ts`
 
 ### 13. No unit tests for `trashGuideSyncQueue.ts` (122 new lines, criticality 8/10)
 
@@ -233,9 +236,12 @@ pr-test-analyzer
 The double-check deduplication pattern, `toRunMetadata` throw behavior, and `latestRun`
 null-coalescing path are tested only at the route integration level, not directly.
 
-**Fix:** Add direct unit tests for `enqueueManualTrashGuideSourceSync` covering queued,
-already_running (pre-upsert), already_running (post-upsert race), and `toRunMetadata` with no run
-history.
+**Status:** ✅ Fixed — added direct unit tests for `enqueueManualTrashGuideSourceSync` covering
+queued, already_running (pre-upsert), already_running (post-upsert race), and `toRunMetadata` with
+no run history.
+
+**Validation:**
+`deno test --allow-env --allow-read --allow-ffi --allow-write packages/praxrr-app/src/tests/jobs/trashGuideSyncQueue.test.ts`
 
 ### 14. Client-side `TrashGuideSourceArrType` includes `'lidarr'` but server doesn't support it
 
@@ -245,7 +251,7 @@ Client-side type declares `'radarr' | 'sonarr' | 'lidarr'`, but the canonical se
 `trashguide/types.ts` defines `TRASHGUIDE_SUPPORTED_ARR_TYPES = ['radarr', 'sonarr'] as const`. The
 server's `parseTrashGuideSourceArrType` will throw on `'lidarr'`.
 
-**Fix:** Align client-side type with server-side, or import from a shared location.
+**Status:** ✅ Fixed — align client-side type usage with server-side by importing shared types.
 
 ### 15. Source-filter utility duplicated across 4 listing pages (~250 lines)
 
@@ -253,13 +259,13 @@ server's `parseTrashGuideSourceArrType` will throw on `'lidarr'`.
 `quality-definitions/+page.svelte:28-127`, `quality-profiles/[databaseId]/+page.svelte:59-149`
 **Agent:** code-simplifier
 
-Functions `toSourceKey`, `sameSelection`, `normalizeSourceSelection`, `loadSourceSelection`,
-`filterBySources`, `resolveSourceKey`, `isCurrentDatabasePcd*`, `clearSourceFilters` are copy-pasted
-with trivial naming variations. The reactive `$:` lifecycle pattern (~20 lines per page) is also
-duplicated.
+**Status:** ✅ Fixed — added `packages/praxrr-app/src/lib/client/utils/sourceFilter.ts` and updated
+`custom-formats/[databaseId]/+page.svelte`, `media-management/[databaseId]/naming/+page.svelte`,
+`media-management/[databaseId]/quality-definitions/+page.svelte`,
+`quality-profiles/[databaseId]/+page.svelte` to use shared filtering helpers.
 
-**Fix:** Extract into a shared module at `$lib/client/utils/sourceFilter.ts` with a
-`createSourceFilter` factory parameterized by storage key prefix.
+**Fix:** Replaced duplicated utility logic with shared helpers in
+`$lib/client/utils/sourceFilter.ts`.
 
 ### 16. `buildSourceContext` duplicated across 4 server loaders (~150 lines)
 

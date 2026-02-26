@@ -15,8 +15,18 @@
   import { Info, Plus } from 'lucide-svelte';
   import { goto } from '$app/navigation';
   import { alertStore } from '$alerts/store';
+  import {
+    allSourceKeys,
+    filterBySourceSelection,
+    isCurrentDatabasePcdItem,
+    isSourceFilterActive,
+    loadSourceSelection,
+    normalizeSourceSelection,
+    sameSelection,
+    toSourceFilterKey,
+    type SourceFilterSelection,
+  } from '$lib/client/utils/sourceFilter.ts';
   import type { CustomFormatTableRow } from '$shared/pcd/display.ts';
-  import type { SourceRef } from '$shared/sources/types.ts';
   import type { PageData } from './$types';
 
   export let data: PageData;
@@ -24,8 +34,6 @@
   let infoModalOpen = false;
   let cloneModalOpen = false;
   let cloneSourceName = '';
-  type SourceFilterKey = `${SourceRef['type']}:${number}`;
-  type SourceFilterSelection = SourceFilterKey[];
 
   function handleClone(event: CustomEvent<{ name: string }>) {
     cloneSourceName = event.detail.name;
@@ -83,86 +91,8 @@
 
   let searchOptions = loadSearchOptions();
 
-  function toSourceKey(source: Pick<SourceRef, 'type' | 'id'>): SourceFilterKey {
-    return `${source.type}:${source.id}`;
-  }
-
-  function areSameSelection(a: SourceFilterSelection, b: SourceFilterSelection): boolean {
-    return a.length === b.length && a.every((value, index) => value === b[index]);
-  }
-
-  function normalizeSourceSelection(
-    selection: string[],
-    sources: SourceRef[],
-    defaultKey: string,
-    selectAllSourcesByDefault = false
-  ): SourceFilterSelection {
-    if (sources.length === 0) return [];
-
-    const availableKeys = sources.map((source) => toSourceKey(source));
-    const availableSet = new Set(availableKeys);
-    const selected = [...new Set(selection.filter((key) => availableSet.has(key as SourceFilterKey)))];
-
-    if (selected.length > 0) return selected as SourceFilterSelection;
-    if (selectAllSourcesByDefault) return availableKeys;
-    if (availableSet.has(defaultKey as SourceFilterKey)) return [defaultKey as SourceFilterKey];
-
-    return [availableKeys[0]];
-  }
-
-  function loadSourceSelection(
-    storageKey: string,
-    sources: SourceRef[],
-    defaultKey: string,
-    selectAllSourcesByDefault = false
-  ): SourceFilterSelection {
-    if (!browser) return normalizeSourceSelection([], sources, defaultKey, selectAllSourcesByDefault);
-    try {
-      const saved = localStorage.getItem(storageKey);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) {
-          return normalizeSourceSelection(
-            parsed.filter((value) => typeof value === 'string'),
-            sources,
-            defaultKey,
-            selectAllSourcesByDefault
-          );
-        }
-      }
-    } catch {
-      // Ignore parse errors and fall back to default selection.
-    }
-
-    return normalizeSourceSelection([], sources, defaultKey, selectAllSourcesByDefault);
-  }
-
-  function getFormatSourceKey(item: CustomFormatTableRow, fallbackSourceKey: SourceFilterKey): SourceFilterKey {
-    if (item.sourceType && typeof item.sourceDatabaseId === 'number') {
-      return `${item.sourceType}:${item.sourceDatabaseId}`;
-    }
-
-    return fallbackSourceKey;
-  }
-
-  function filterBySources(
-    items: CustomFormatTableRow[],
-    selectedKeys: SourceFilterSelection,
-    fallbackSourceKey: SourceFilterKey
-  ): CustomFormatTableRow[] {
-    if (selectedKeys.length === 0) return items;
-    const selectedSet = new Set(selectedKeys);
-    return items.filter((item) => selectedSet.has(getFormatSourceKey(item, fallbackSourceKey)));
-  }
-
   function clearSourceFilters() {
-    selectedSourceKeys = availableSources.map((source) => toSourceKey(source));
-  }
-
-  function isCurrentDatabasePcdFormat(item: CustomFormatTableRow): boolean {
-    const sourceType = item.sourceType ?? 'pcd';
-    const sourceDatabaseId = item.sourceDatabaseId ?? data.currentDatabase.id;
-    return sourceType === 'pcd' && sourceDatabaseId === data.currentDatabase.id;
+    selectedSourceKeys = allSourceKeys(availableSources);
   }
 
   // Save to localStorage when options change
@@ -192,7 +122,7 @@
   $: showSourceBadges = data.sourceContext.showAllSourcesTab;
   $: sourceFilterDisabledReason = data.sourceContext.filterDisabledReason;
   $: sourceFilterStorageKey = `${SOURCE_FILTER_STORAGE_PREFIX}:${data.currentDatabase.id}`;
-  $: fallbackSourceKey = toSourceKey({ type: 'pcd', id: data.currentDatabase.id });
+  $: fallbackSourceKey = toSourceFilterKey({ type: 'pcd', id: data.currentDatabase.id });
 
   $: if (initializedSourceFilterKey !== sourceFilterStorageKey) {
     initializedSourceFilterKey = sourceFilterStorageKey;
@@ -211,7 +141,7 @@
       data.sourceContext.defaultSourceKey,
       true
     );
-    if (!areSameSelection(normalized, selectedSourceKeys)) {
+    if (!sameSelection(normalized, selectedSourceKeys)) {
       selectedSourceKeys = normalized;
     }
   }
@@ -220,11 +150,11 @@
     localStorage.setItem(sourceFilterStorageKey, JSON.stringify(selectedSourceKeys));
   }
 
-  $: sourceFiltered = filterBySources(data.customFormats, selectedSourceKeys, fallbackSourceKey);
+  $: sourceFiltered = filterBySourceSelection(data.customFormats, selectedSourceKeys, fallbackSourceKey);
 
   // Custom filtering based on selected search options
   $: filtered = filterFormats(sourceFiltered, $debouncedQuery, searchOptions);
-  $: sourceFilterActive = availableSources.length > 0 && selectedSourceKeys.length < availableSources.length;
+  $: sourceFilterActive = isSourceFilterActive(selectedSourceKeys, availableSources);
   $: hasSearchQuery = $debouncedQuery.trim().length > 0;
   $: showSourceClearAction = sourceFilterActive && availableSources.length > 1;
 
@@ -392,6 +322,8 @@
   databaseId={data.currentDatabase.id}
   entityType="custom_format"
   sourceName={cloneSourceName}
-  existingNames={data.customFormats.filter((format) => isCurrentDatabasePcdFormat(format)).map((format) => format.name)}
+  existingNames={data.customFormats
+    .filter((format) => isCurrentDatabasePcdItem(format, data.currentDatabase.id))
+    .map((format) => format.name)}
   canWriteToBase={data.canWriteToBase}
 />

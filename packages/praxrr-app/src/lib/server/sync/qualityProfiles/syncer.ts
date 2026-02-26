@@ -283,6 +283,7 @@ export class QualityProfileSyncer extends BaseSyncer {
       const existingMap = new Map(existingProfiles.map((p) => [p.name, p.id]));
 
       const allSyncedProfiles: SyncedProfileSummary[] = [];
+      const failedProfiles = new Set<string>();
       for (const batch of batches) {
         const synced = await this.syncQualityProfiles(
           batch.profiles,
@@ -290,9 +291,19 @@ export class QualityProfileSyncer extends BaseSyncer {
           batch.pcdFormatIdMap,
           allFormatIdMap,
           qualityMappings,
-          existingMap
+          existingMap,
+          failedProfiles
         );
         allSyncedProfiles.push(...synced);
+      }
+
+      if (failedProfiles.size > 0) {
+        return {
+          success: false,
+          itemsSynced: allSyncedProfiles.length,
+          failedProfiles: [...failedProfiles],
+          error: `Failed to sync ${failedProfiles.size} quality profile(s)`,
+        };
       }
 
       await logger.info(`Completed quality profile sync for "${this.instanceName}"`, {
@@ -821,7 +832,8 @@ export class QualityProfileSyncer extends BaseSyncer {
     pcdFormatIdMap: Map<string, number>,
     allFormatIdMap: Map<string, number>,
     qualityMappings: Map<string, string>,
-    existingMap: Map<string, number>
+    existingMap: Map<string, number>,
+    failedProfiles: Set<string>
   ): Promise<SyncedProfileSummary[]> {
     const syncedProfiles: SyncedProfileSummary[] = [];
 
@@ -890,6 +902,7 @@ export class QualityProfileSyncer extends BaseSyncer {
             ...errorDetails,
           },
         });
+        failedProfiles.add(pcdProfile.name);
       }
     }
 

@@ -15,9 +15,19 @@
   import { Plus } from 'lucide-svelte';
   import type { EntityType } from '$shared/pcd/portable.ts';
   import { getArrAppMetadata, isArrAppType, type ArrAppType } from '$shared/arr/capabilities.ts';
-  import type { SourceRef } from '$shared/sources/types.ts';
   import { validateQualityDefinitionsActionInput } from './validation.ts';
   import type { PageData } from './$types';
+  import {
+    allSourceKeys,
+    filterBySourceSelection,
+    isCurrentDatabasePcdItem,
+    isSourceFilterActive,
+    loadSourceSelection,
+    normalizeSourceSelection,
+    sameSelection,
+    toSourceFilterKey,
+    type SourceFilterSelection,
+  } from '$lib/client/utils/sourceFilter.ts';
 
   export let data: PageData;
 
@@ -25,114 +35,23 @@
   let cloneSourceName = '';
   let cloneEntityType: EntityType = 'radarr_quality_definitions';
   let cloneArrType: ArrAppType | null = null;
-  type SourceFilterKey = `${SourceRef['type']}:${number}`;
   const SOURCE_FILTER_STORAGE_PREFIX = 'qualityDefinitionsSourceFilter';
-  let selectedSourceKeys: SourceFilterKey[] = [];
+  let selectedSourceKeys: SourceFilterSelection = [];
   let initializedSourceFilterKey = '';
 
-  function toSourceKey(source: Pick<SourceRef, 'type' | 'id'>): SourceFilterKey {
-    return `${source.type}:${source.id}`;
-  }
-
-  function sameSelection(a: SourceFilterKey[], b: SourceFilterKey[]): boolean {
-    return a.length === b.length && a.every((value, index) => value === b[index]);
-  }
-
-  function normalizeSourceSelection(
-    selection: string[],
-    sources: SourceRef[],
-    defaultKey: string,
-    selectAllSourcesByDefault = false
-  ): SourceFilterKey[] {
-    if (sources.length === 0) return [];
-
-    const availableKeys = sources.map((source) => toSourceKey(source));
-    const availableSet = new Set(availableKeys);
-    const selected = [...new Set(selection.filter((key) => availableSet.has(key as SourceFilterKey)))];
-
-    if (selected.length > 0) {
-      return selected as SourceFilterKey[];
-    }
-
-    if (selectAllSourcesByDefault) {
-      return availableKeys;
-    }
-
-    if (availableSet.has(defaultKey as SourceFilterKey)) {
-      return [defaultKey as SourceFilterKey];
-    }
-
-    return [availableKeys[0]];
-  }
-
-  function loadSourceSelection(
-    storageKey: string,
-    sources: SourceRef[],
-    defaultKey: string,
-    selectAllSourcesByDefault = false
-  ): SourceFilterKey[] {
-    if (!browser) {
-      return normalizeSourceSelection([], sources, defaultKey, selectAllSourcesByDefault);
-    }
-
-    try {
-      const saved = localStorage.getItem(storageKey);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) {
-          return normalizeSourceSelection(
-            parsed.filter((value) => typeof value === 'string'),
-            sources,
-            defaultKey,
-            selectAllSourcesByDefault
-          );
-        }
-      }
-    } catch {
-      // Ignore parse errors and use defaults.
-    }
-
-    return normalizeSourceSelection([], sources, defaultKey, selectAllSourcesByDefault);
-  }
-
-  function resolveSourceKey(
-    config: PageData['qualityDefinitionsConfigs'][number],
-    fallbackSourceKey: SourceFilterKey
-  ): SourceFilterKey {
-    if (config.sourceType && typeof config.sourceDatabaseId === 'number') {
-      return `${config.sourceType}:${config.sourceDatabaseId}`;
-    }
-
-    return fallbackSourceKey;
-  }
-
-  function filterBySources(
-    configs: PageData['qualityDefinitionsConfigs'],
-    selectedKeys: SourceFilterKey[],
-    fallbackSourceKey: SourceFilterKey
-  ): PageData['qualityDefinitionsConfigs'] {
-    if (selectedKeys.length === 0) return configs;
-    const selectedSet = new Set(selectedKeys);
-    return configs.filter((config) => selectedSet.has(resolveSourceKey(config, fallbackSourceKey)));
-  }
-
-  function isCurrentDatabasePcdConfig(config: PageData['qualityDefinitionsConfigs'][number]): boolean {
-    const sourceType = config.sourceType ?? 'pcd';
-    const sourceDatabaseId = config.sourceDatabaseId ?? data.currentDatabase.id;
-    return sourceType === 'pcd' && sourceDatabaseId === data.currentDatabase.id;
-  }
-
   function clearSourceFilters() {
-    selectedSourceKeys = availableSources.map((source) => toSourceKey(source));
+    selectedSourceKeys = allSourceKeys(availableSources);
   }
 
   $: cloneExistingNames = cloneArrType
     ? data.qualityDefinitionsConfigs
-        .filter((config) => isCurrentDatabasePcdConfig(config) && config.arr_type === cloneArrType)
+        .filter(
+          (config) => isCurrentDatabasePcdItem(config, data.currentDatabase.id) && config.arr_type === cloneArrType
+        )
         .map((config) => config.name)
     : [];
   $: hasMissingQualityMappings = data.qualityDefinitionsConfigs.some(
-    (config) => isCurrentDatabasePcdConfig(config) && config.quality_count === 0
+    (config) => isCurrentDatabasePcdItem(config, data.currentDatabase.id) && config.quality_count === 0
   );
 
   function formatType(type: string): string {
@@ -211,7 +130,7 @@
   $: availableSources = data.sourceContext.availableSources;
   $: sourceFilterDisabledReason = data.sourceContext.filterDisabledReason;
   $: sourceFilterStorageKey = `${SOURCE_FILTER_STORAGE_PREFIX}:${data.currentDatabase.id}`;
-  $: fallbackSourceKey = toSourceKey({ type: 'pcd', id: data.currentDatabase.id });
+  $: fallbackSourceKey = toSourceFilterKey({ type: 'pcd', id: data.currentDatabase.id });
 
   $: if (initializedSourceFilterKey !== sourceFilterStorageKey) {
     initializedSourceFilterKey = sourceFilterStorageKey;
@@ -239,8 +158,8 @@
     localStorage.setItem(sourceFilterStorageKey, JSON.stringify(selectedSourceKeys));
   }
 
-  $: sourceFiltered = filterBySources($filtered, selectedSourceKeys, fallbackSourceKey);
-  $: sourceFilterActive = availableSources.length > 0 && selectedSourceKeys.length < availableSources.length;
+  $: sourceFiltered = filterBySourceSelection($filtered, selectedSourceKeys, fallbackSourceKey);
+  $: sourceFilterActive = isSourceFilterActive(selectedSourceKeys, availableSources);
   $: hasSearchQuery = $search.query.trim().length > 0;
   $: showSourceClearAction = sourceFilterActive && availableSources.length > 1;
   $: emptyMessage = sourceFilterActive
