@@ -1,4 +1,5 @@
 import { db } from '../db.ts';
+import { parseTrashGuideSourceArrType, type TrashGuideSourceArrType } from '$lib/server/trashguide/types.ts';
 
 export type TrashGuideEntityType = 'custom_format' | 'quality_profile' | 'quality_size' | 'naming';
 
@@ -29,6 +30,11 @@ interface TrashGuideEntityCacheRow {
   fetched_at: string;
 }
 
+interface TrashGuideEntityCacheWithSourceRow extends TrashGuideEntityCacheRow {
+  source_name: string;
+  source_arr_type: string;
+}
+
 export interface TrashGuideEntityCache {
   id: number;
   sourceId: number;
@@ -39,6 +45,17 @@ export interface TrashGuideEntityCache {
   filePath: string;
   contentHash: string;
   fetchedAt: string;
+}
+
+export interface TrashGuideEntitySourceMetadata {
+  type: 'trash';
+  id: number;
+  name: string;
+  arrType: TrashGuideSourceArrType;
+}
+
+export interface TrashGuideEntityCacheWithSource extends TrashGuideEntityCache {
+  source: TrashGuideEntitySourceMetadata;
 }
 
 export interface TrashGuideEntityCacheInput {
@@ -75,6 +92,18 @@ function rowToCache(row: TrashGuideEntityCacheRow): TrashGuideEntityCache {
     filePath: row.file_path,
     contentHash: row.content_hash,
     fetchedAt: row.fetched_at,
+  };
+}
+
+function rowToCacheWithSource(row: TrashGuideEntityCacheWithSourceRow): TrashGuideEntityCacheWithSource {
+  return {
+    ...rowToCache(row),
+    source: {
+      type: 'trash',
+      id: row.source_id,
+      name: row.source_name,
+      arrType: parseTrashGuideSourceArrType(row.source_arr_type),
+    },
   };
 }
 
@@ -188,6 +217,24 @@ export const trashGuideEntityCacheQueries = {
         sourceId
       )
       .map(rowToCache);
+  },
+
+  /**
+   * Get all cached entities for a source with normalized source metadata.
+   */
+  getBySourceWithMetadata(sourceId: number): TrashGuideEntityCacheWithSource[] {
+    return db
+      .query<TrashGuideEntityCacheWithSourceRow>(
+        `SELECT c.*,
+                s.name AS source_name,
+                s.arr_type AS source_arr_type
+           FROM trash_guide_entity_cache c
+           JOIN trash_guide_sources s ON s.id = c.source_id
+          WHERE c.source_id = ?
+          ORDER BY c.entity_type ASC, c.name ASC`,
+        sourceId
+      )
+      .map(rowToCacheWithSource);
   },
 
   /**

@@ -2,6 +2,7 @@ import { json } from '@sveltejs/kit';
 import type { RequestHandler } from '@sveltejs/kit';
 import {
   type TrashGuideEntityCache,
+  type TrashGuideEntityCacheWithSource,
   type TrashGuideEntityType,
   trashGuideEntityCacheQueries,
 } from '$db/queries/trashGuideEntityCache.ts';
@@ -43,8 +44,8 @@ export const GET: RequestHandler = async ({ params, url }) => {
   }
 
   try {
-    const entities = trashGuideEntityCacheQueries.getBySource(sourceId);
-    if (!isSourceOwnedEntitySet(entities, sourceId)) {
+    const entities = trashGuideEntityCacheQueries.getBySourceWithMetadata(sourceId);
+    if (!isSourceOwnedEntitySet(entities, sourceId, source.arrType)) {
       await logTrashGuideRouteError(
         new Error('TRaSH entity cache ownership validation failed for source'),
         'Failed to list entities'
@@ -192,15 +193,26 @@ function parseBoundedInt(
   return { value: parsed };
 }
 
-function isSourceOwnedEntitySet(entities: TrashGuideEntityCache[], sourceId: number): boolean {
-  return entities.every((entity) => entity.sourceId === sourceId);
+function isSourceOwnedEntitySet(
+  entities: TrashGuideEntityCacheWithSource[],
+  sourceId: number,
+  sourceArrType: 'radarr' | 'sonarr'
+): boolean {
+  return entities.every(
+    (entity) =>
+      entity.sourceId === sourceId &&
+      entity.source.type === 'trash' &&
+      entity.source.id === sourceId &&
+      entity.source.arrType === sourceArrType &&
+      entity.source.name.trim().length > 0
+  );
 }
 
 function filterEntities(
-  entities: TrashGuideEntityCache[],
+  entities: TrashGuideEntityCacheWithSource[],
   type?: TrashGuideEntityType,
   search?: string
-): TrashGuideEntityCache[] {
+): TrashGuideEntityCacheWithSource[] {
   const query = search?.toLocaleLowerCase();
 
   return entities.filter((entity) => {
@@ -216,7 +228,13 @@ function filterEntities(
   });
 }
 
-function toEntityResponse(entity: TrashGuideEntityCache): {
+function toEntityResponse(entity: TrashGuideEntityCacheWithSource): {
+  source: {
+    type: 'trash';
+    id: number;
+    name: string;
+    arrType: 'radarr' | 'sonarr';
+  };
   trashId: string;
   type: TrashGuideEntityType;
   name: string;
@@ -229,6 +247,12 @@ function toEntityResponse(entity: TrashGuideEntityCache): {
   const parsed = parseEntityData(entity);
 
   const response: {
+    source: {
+      type: 'trash';
+      id: number;
+      name: string;
+      arrType: 'radarr' | 'sonarr';
+    };
     trashId: string;
     type: TrashGuideEntityType;
     name: string;
@@ -238,6 +262,7 @@ function toEntityResponse(entity: TrashGuideEntityCache): {
     scores?: Record<string, number>;
     group?: number | null;
   } = {
+    source: entity.source,
     trashId: entity.trashId,
     type: entity.entityType,
     name: entity.name,

@@ -2,6 +2,7 @@ import { error, fail } from '@sveltejs/kit';
 import type { ServerLoad, Actions } from '@sveltejs/kit';
 import { arrInstancesQueries } from '$db/queries/arrInstances.ts';
 import { arrSyncQueries, type SyncTrigger, type ProfileSelection } from '$db/queries/arrSync.ts';
+import { trashGuideSyncQueries } from '$db/queries/trashGuideSync.ts';
 import { pcdManager } from '$pcd/index.ts';
 import { logger } from '$logger/logger.ts';
 import * as qualityProfileQueries from '$pcd/entities/qualityProfiles/index.ts';
@@ -173,11 +174,13 @@ export const load: ServerLoad = async ({ params, url }) => {
 
   // Load existing sync data
   const syncData = arrSyncQueries.getFullSyncData(id);
+  const trashGuideSyncBySource = trashGuideSyncQueries.getSourceHydrationByInstance(id);
 
   return {
     instance,
     databases: databasesWithProfiles,
     syncData,
+    trashGuideSyncBySource,
     metadataProfilesSupported: canLoadMetadataProfiles,
     syncPreview,
   };

@@ -88,6 +88,12 @@ interface TrashGuideSyncSelectionRow {
   source_arr_type: string;
 }
 
+interface TrashGuideSyncSourceRow {
+  source_id: number;
+  source_name: string;
+  source_arr_type: string;
+}
+
 interface ScopeCheckRow {
   instance_type: string;
   source_arr_type: string;
@@ -117,6 +123,14 @@ export interface TrashGuideSyncSelection {
 export interface TrashGuideSyncSelectionInput {
   sectionType: TrashGuideSyncSectionType;
   itemName: string;
+}
+
+export interface TrashGuideSyncSourceHydration {
+  sourceId: number;
+  sourceName: string;
+  sourceArrType: TrashGuideSourceArrType;
+  config: TrashGuideSyncConfig | null;
+  selections: TrashGuideSyncSelection[];
 }
 
 export interface TrashGuideSyncConfigInput {
@@ -208,6 +222,53 @@ export const trashGuideSyncQueries = {
         instanceId
       )
       .map(rowToConfig);
+  },
+
+  /**
+   * Get all TRaSH sync selections for an instance.
+   */
+  getSelectionsByInstance(instanceId: number): TrashGuideSyncSelection[] {
+    return db
+      .query<TrashGuideSyncSelectionRow>(
+        `SELECT tgs.instance_id,
+                tgs.source_id,
+                tgs.section_type,
+                tgs.item_name,
+                ai.type AS instance_type,
+                s.arr_type AS source_arr_type
+           FROM trash_guide_sync_selections tgs
+           JOIN arr_instances ai ON ai.id = tgs.instance_id
+           JOIN trash_guide_sources s ON s.id = tgs.source_id
+          WHERE tgs.instance_id = ?
+            AND ai.type = s.arr_type`,
+        instanceId
+      )
+      .map(rowToSelection);
+  },
+
+  /**
+   * Return source-grouped TRaSH sync state for an Arr instance.
+   */
+  getSourceHydrationByInstance(instanceId: number): TrashGuideSyncSourceHydration[] {
+    const rows = db.query<TrashGuideSyncSourceRow>(
+      `SELECT s.id AS source_id,
+              s.name AS source_name,
+              s.arr_type AS source_arr_type
+         FROM arr_instances ai
+         JOIN trash_guide_sources s ON s.arr_type = ai.type
+        WHERE ai.id = ?
+          AND s.enabled = 1
+        ORDER BY s.name`,
+      instanceId
+    );
+
+    return rows.map((row) => ({
+      sourceId: row.source_id,
+      sourceName: row.source_name,
+      sourceArrType: parseTrashGuideSourceArrType(row.source_arr_type),
+      config: trashGuideSyncQueries.getConfig(instanceId, row.source_id) ?? null,
+      selections: trashGuideSyncQueries.getSelections(instanceId, row.source_id),
+    }));
   },
 
   /**

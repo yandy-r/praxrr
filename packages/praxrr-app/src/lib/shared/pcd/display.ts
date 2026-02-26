@@ -122,6 +122,7 @@ export type TestEntity = Omit<TestEntitiesRow, 'created_at' | 'updated_at'> & {
 // ============================================================================
 
 import type { CustomFormatsRow, CustomFormatConditionsRow, CustomFormatTestsRow } from './types.ts';
+import type { SourcedDisplayRow } from '../sources/types.ts';
 
 /** Condition reference for display (minimal info) */
 export type ConditionRef = Pick<CustomFormatConditionsRow, 'name' | 'type' | 'required' | 'negate'>;
@@ -141,7 +142,7 @@ export type CustomFormatTableRow = Omit<CustomFormatsRow, 'include_in_rename' | 
   conditions: ConditionRef[];
   arrTargets: ArrConditionTargetType[];
   testCount: number;
-};
+} & SourcedDisplayRow;
 
 /** Custom format general information (for general tab) */
 export type CustomFormatGeneral = Omit<CustomFormatsRow, 'description' | 'created_at' | 'updated_at'> & {
@@ -261,7 +262,7 @@ export type QualityProfileTableRow = Omit<
   custom_formats: CustomFormatCounts;
   qualities: QualityItem[];
   language?: ProfileLanguage;
-};
+} & SourcedDisplayRow;
 
 // --- General Tab ---
 
