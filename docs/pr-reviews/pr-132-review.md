@@ -277,7 +277,14 @@ Nearly identical function differing only in entity count key and label string. H
 `sourceKey`, `isTrashSource`, `withPcdSource`, `sortRows`, `listTrashSourcesSafely`, and
 `resolveDatabases` are also duplicated.
 
-**Fix:** Extract a generic `buildSourceContext` factory into `$lib/server/utils/sourceContext.ts`.
+**Fix:** ✅ Fixed — extracted a generic `buildSourceContext` factory into
+`$lib/server/utils/sourceContext.ts`, then updated the four server loaders to reuse it.
+
+**Files:** `custom-formats/[databaseId]/+page.server.ts`, `quality-profiles/[databaseId]/+page.server.ts`,
+`media-management/[databaseId]/naming/+page.server.ts`,
+`media-management/[databaseId]/quality-definitions/+page.server.ts`
+
+**Validation:** smoke load-path compile validation is covered by `src/tests/base/trashGuideSyncUxFlows.test.ts`
 
 ### 17. `extractFormError` duplicated in 3 components
 
@@ -286,7 +293,9 @@ Nearly identical function differing only in entity count key and label string. H
 
 Byte-for-byte identical across three files.
 
-**Fix:** Move to `$lib/client/utils/`.
+**Fix:** ✅ Fixed — added shared `$lib/client/utils/extractFormError.ts` and updated
+`arr/[id]/sync/+page.svelte`, `arr/[id]/sync/components/QualityProfiles.svelte`,
+`arr/[id]/sync/components/TrashGuideSources.svelte`.
 
 ### 18. syncer.ts module-level JSDoc is factually incomplete
 
@@ -295,7 +304,8 @@ Byte-for-byte identical across three files.
 Describes sync as PCD-only 4-step process. After this PR, the syncer handles both PCD and TRaSH
 Guide batches. The comment omits the TRaSH source flow entirely.
 
-**Fix:** Rewrite to reflect dual-source nature.
+**Fix:** ✅ Fixed — updated module-level JSDoc in
+`packages/praxrr-app/src/lib/server/sync/qualityProfiles/syncer.ts` to describe both PCD and TRaSH Guide sync flows.
 
 ---
 

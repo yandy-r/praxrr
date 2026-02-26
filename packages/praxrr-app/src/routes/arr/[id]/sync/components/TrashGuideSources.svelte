@@ -7,6 +7,7 @@
   import SourceBadge from '$ui/badge/SourceBadge.svelte';
   import type { TrashGuideSourceArrType } from '$trashguide/types.ts';
   import { parseUTC } from '$shared/utils/dates';
+  import { extractFormError } from '$lib/client/utils/extractFormError.ts';
 
   type TrashGuideSyncStatus = 'idle' | 'pending' | 'in_progress' | 'failed';
   type TrashGuideSyncTrigger = 'none' | 'manual' | 'on_pull' | 'on_change' | 'schedule';
@@ -302,18 +303,6 @@
 
     const currentSnapshot = buildSnapshot(state.trigger, state.cronExpression, state.selectedKeys);
     return currentSnapshot !== state.savedSnapshot;
-  }
-
-  async function extractFormError(response: Response, fallback: string): Promise<string> {
-    try {
-      const body = (await response.json()) as { error?: unknown } | null;
-      if (body && typeof body === 'object' && typeof body.error === 'string') {
-        return body.error;
-      }
-    } catch {
-      // fall through to fallback
-    }
-    return fallback;
   }
 
   function getSourceStateOrThrow(sourceId: number): SourceDraftState {

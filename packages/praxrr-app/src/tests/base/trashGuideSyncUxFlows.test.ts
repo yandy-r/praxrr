@@ -280,10 +280,19 @@ Deno.test('source filter persistence wiring remains stable for custom formats an
   );
 
   assertStringIncludes(qualityProfilesPage, "const SOURCE_FILTER_STORAGE_KEY = 'qualityProfilesSourceFilter';");
-  assertStringIncludes(qualityProfilesPage, 'const saved = localStorage.getItem(SOURCE_FILTER_STORAGE_KEY);');
   assertStringIncludes(
     qualityProfilesPage,
-    'localStorage.setItem(SOURCE_FILTER_STORAGE_KEY, JSON.stringify(selectedSourceKeys));'
+    '$: sourceFilterStorageKey = SOURCE_FILTER_STORAGE_KEY + `:${data.currentDatabase.id}`;'
+  );
+  assertStringIncludes(
+    qualityProfilesPage,
+    'selectedSourceKeys = loadSourceSelection('
+  );
+  assertStringIncludes(qualityProfilesPage, 'data.sourceContext.availableSources,');
+  assertStringIncludes(qualityProfilesPage, 'data.sourceContext.defaultSourceKey,');
+  assertStringIncludes(
+    qualityProfilesPage,
+    'localStorage.setItem(sourceFilterStorageKey, JSON.stringify(selectedSourceKeys));'
   );
 });
 

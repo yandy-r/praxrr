@@ -7,6 +7,7 @@
   import { alertStore } from '$lib/client/alerts/store.ts';
   import type { TrashGuideSourceArrType } from '$trashguide/types.ts';
   import type { SectionType } from '$sync/types.ts';
+  import { extractFormError } from '$lib/client/utils/extractFormError.ts';
 
   type TrashGuideSyncTrigger = 'none' | 'manual' | 'on_pull' | 'on_change' | 'schedule';
   type UnifiedSourceType = 'pcd' | 'trash';
@@ -373,18 +374,6 @@
       }
     }
     return selections;
-  }
-
-  async function extractFormError(response: Response, fallback: string): Promise<string> {
-    try {
-      const body = (await response.json()) as { error?: unknown } | null;
-      if (body && typeof body === 'object' && typeof body.error === 'string') {
-        return body.error;
-      }
-    } catch {
-      // fall through to fallback
-    }
-    return fallback;
   }
 
   async function saveTrashGuideQualityProfiles(): Promise<void> {

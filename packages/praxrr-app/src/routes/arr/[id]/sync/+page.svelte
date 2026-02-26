@@ -17,6 +17,7 @@
   import type { SyncTrigger } from '$db/queries/arrSync.ts';
   import type { SyncPreviewSummary } from '$sync/preview/types.ts';
   import { initEdit, update, clear } from '$lib/client/stores/dirty';
+  import { extractFormError } from '$lib/client/utils/extractFormError.ts';
 
   type SyncPreviewSection = 'qualityProfiles' | 'delayProfiles' | 'mediaManagement' | 'metadataProfiles';
 
@@ -332,18 +333,6 @@
     } finally {
       metadataProfileSaving = false;
     }
-  }
-
-  async function extractFormError(response: Response, fallback: string): Promise<string> {
-    try {
-      const body = (await response.json()) as { error?: unknown } | null;
-      if (body && typeof body === 'object' && typeof body.error === 'string') {
-        return body.error;
-      }
-    } catch {
-      // fall through to fallback
-    }
-    return fallback;
   }
 
   async function handleMetadataProfileSync() {

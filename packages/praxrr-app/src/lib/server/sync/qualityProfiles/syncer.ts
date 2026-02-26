@@ -1,15 +1,18 @@
 /**
  * Quality profile syncer
- * Syncs quality profiles from PCD to arr instances
+ * Syncs quality profiles from PCD and TRaSH Guide sources to arr instances.
  *
  * Each database's CFs and QPs are synced with an invisible namespace suffix
- * so multiple databases can coexist in the same arr instance.
+ * so multiple databases can coexist in the same arr instance. TRaSH Guide profiles
+ * are transformed and synced from source-aware TRaSH caches using the same
+ * namespacing strategy.
  *
  * Sync order:
  * 1. Group sync selections by database, assign namespace suffixes
  * 2. For each database: sync its custom formats (suffixed) → build per-DB formatIdMap
  * 3. Refresh full CF list from arr → build allFormatIdMap
- * 4. For each database: sync its quality profiles (suffixed) using both maps
+ * 4. Resolve TRaSH and PCD source batches
+ * 5. For each source batch: sync quality profiles (suffixed) using the right lookup maps
  */
 
 import { BaseSyncer, type SyncResult } from '../base.ts';
