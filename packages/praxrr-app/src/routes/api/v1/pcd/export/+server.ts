@@ -11,7 +11,7 @@ import {
 import type { PCDCache } from '$pcd/index.ts';
 import * as serialize from '$pcd/entities/serialize.ts';
 
-const _serializeDependencies = {
+export const _serializeDependencies = {
   serializeDelayProfile: serialize.serializeDelayProfile,
   serializeRegularExpression: serialize.serializeRegularExpression,
   serializeCustomFormat: serialize.serializeCustomFormat,

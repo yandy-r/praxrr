@@ -181,7 +181,13 @@ import type { ArrFeature } from '$shared/arr/capabilities.ts';
 import type { ArrType } from '$shared/pcd/types.ts';
 
 export type NavVariant = 'legacy' | 'nav_v2';
-export type NavGroupId = 'overview' | 'apps' | 'policies' | 'operations' | 'settings' | 'dev';
+export type NavGroupId =
+  | 'overview'
+  | 'apps'
+  | 'policies'
+  | 'operations'
+  | 'settings'
+  | 'dev';
 export type NavMobilePriority = 'always' | 'medium' | 'low';
 
 export interface NavItemDef {
@@ -221,7 +227,12 @@ export interface ResolvedNavItem {
   mobilePriority: NavMobilePriority;
   hasChildren: boolean;
   activePattern?: string;
-  children: { id: string; label: string; href: string; activePattern?: string }[];
+  children: {
+    id: string;
+    label: string;
+    href: string;
+    activePattern?: string;
+  }[];
   iconKey: string;
   emoji?: string;
 }

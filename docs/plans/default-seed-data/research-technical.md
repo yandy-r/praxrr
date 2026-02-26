@@ -76,7 +76,12 @@ interface RadarrNamingRow {
   movie_format: string;
   movie_folder_format: string;
   replace_illegal_characters: boolean;
-  colon_replacement_format: 'delete' | 'dash' | 'spaceDash' | 'spaceDashSpace' | 'smart';
+  colon_replacement_format:
+    | 'delete'
+    | 'dash'
+    | 'spaceDash'
+    | 'spaceDashSpace'
+    | 'smart';
   created_at: string;
   updated_at: string;
 }
@@ -94,9 +99,21 @@ interface SonarrNamingRow {
   series_folder_format: string;
   season_folder_format: string;
   replace_illegal_characters: boolean;
-  colon_replacement_format: 'delete' | 'dash' | 'spaceDash' | 'spaceDashSpace' | 'smart' | 'custom';
+  colon_replacement_format:
+    | 'delete'
+    | 'dash'
+    | 'spaceDash'
+    | 'spaceDashSpace'
+    | 'smart'
+    | 'custom';
   custom_colon_replacement_format: string | null;
-  multi_episode_style: 'extend' | 'duplicate' | 'repeat' | 'scene' | 'range' | 'prefixedRange';
+  multi_episode_style:
+    | 'extend'
+    | 'duplicate'
+    | 'repeat'
+    | 'scene'
+    | 'range'
+    | 'prefixedRange';
   created_at: string;
   updated_at: string;
 }
@@ -113,7 +130,13 @@ interface LidarrNamingRow {
   multi_disc_track_format: string;
   artist_folder_format: string;
   replace_illegal_characters: boolean;
-  colon_replacement_format: 'delete' | 'dash' | 'spaceDash' | 'spaceDashSpace' | 'smart' | 'custom';
+  colon_replacement_format:
+    | 'delete'
+    | 'dash'
+    | 'spaceDash'
+    | 'spaceDashSpace'
+    | 'smart'
+    | 'custom';
   custom_colon_replacement_format: string | null;
   created_at: string;
   updated_at: string;
@@ -384,7 +407,9 @@ Add three new functions to `read.ts`. These select the first (oldest) row from e
 a seed template:
 
 ```typescript
-export async function getFirstRadarr(cache: PCDCache): Promise<RadarrNamingRow | null> {
+export async function getFirstRadarr(
+  cache: PCDCache
+): Promise<RadarrNamingRow | null> {
   const db = cache.kb;
   const row = await db
     .selectFrom(RADARR_NAMING_TABLE)
@@ -406,7 +431,9 @@ export async function getFirstRadarr(cache: PCDCache): Promise<RadarrNamingRow |
   };
 }
 
-export async function getFirstSonarr(cache: PCDCache): Promise<SonarrNamingRow | null> {
+export async function getFirstSonarr(
+  cache: PCDCache
+): Promise<SonarrNamingRow | null> {
   const db = cache.kb;
   const row = await db
     .selectFrom(SONARR_NAMING_TABLE)
@@ -424,7 +451,9 @@ export async function getFirstSonarr(cache: PCDCache): Promise<SonarrNamingRow |
     series_folder_format: row.series_folder_format,
     season_folder_format: row.season_folder_format,
     replace_illegal_characters: row.replace_illegal_characters === 1,
-    colon_replacement_format: colonReplacementFromDb(row.colon_replacement_format),
+    colon_replacement_format: colonReplacementFromDb(
+      row.colon_replacement_format
+    ),
     custom_colon_replacement_format: row.custom_colon_replacement_format,
     multi_episode_style: multiEpisodeStyleFromDb(row.multi_episode_style),
     created_at: row.created_at,
@@ -432,7 +461,9 @@ export async function getFirstSonarr(cache: PCDCache): Promise<SonarrNamingRow |
   };
 }
 
-export async function getFirstLidarr(cache: PCDCache): Promise<LidarrNamingRow | null> {
+export async function getFirstLidarr(
+  cache: PCDCache
+): Promise<LidarrNamingRow | null> {
   const db = cache.kb;
   const row = await db
     .selectFrom(LIDARR_NAMING_TABLE)
@@ -449,7 +480,9 @@ export async function getFirstLidarr(cache: PCDCache): Promise<LidarrNamingRow |
     multi_disc_track_format: row.multi_disc_track_format,
     artist_folder_format: row.artist_folder_format,
     replace_illegal_characters: row.replace_illegal_characters === 1,
-    colon_replacement_format: colonReplacementFromDb(row.colon_replacement_format),
+    colon_replacement_format: colonReplacementFromDb(
+      row.colon_replacement_format
+    ),
     custom_colon_replacement_format: row.custom_colon_replacement_format,
     created_at: row.created_at,
     updated_at: row.updated_at,

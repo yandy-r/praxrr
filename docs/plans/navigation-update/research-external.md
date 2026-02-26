@@ -263,12 +263,19 @@ export interface FeatureFlag {
 }
 
 export function getFlag(db: Database, key: string): boolean {
-  const row = db.selectFrom('feature_flags').select('enabled').where('key', '=', key).executeTakeFirst();
+  const row = db
+    .selectFrom('feature_flags')
+    .select('enabled')
+    .where('key', '=', key)
+    .executeTakeFirst();
   return row?.enabled === 1;
 }
 
 export function getAllFlags(db: Database): Record<string, boolean> {
-  const rows = db.selectFrom('feature_flags').select(['key', 'enabled']).execute();
+  const rows = db
+    .selectFrom('feature_flags')
+    .select(['key', 'enabled'])
+    .execute();
   return Object.fromEntries(rows.map((r) => [r.key, r.enabled === 1]));
 }
 ```
@@ -905,7 +912,11 @@ Lightweight client-side event dispatch with debouncing:
 ```typescript
 // packages/praxrr-app/src/lib/client/navigation/telemetry.ts
 interface NavEvent {
-  eventName: 'nav_click' | 'nav_impression' | 'nav_search_select' | 'nav_scope_change';
+  eventName:
+    | 'nav_click'
+    | 'nav_impression'
+    | 'nav_search_select'
+    | 'nav_scope_change';
   navItemId?: string;
   arrScope: string;
   variant: string;

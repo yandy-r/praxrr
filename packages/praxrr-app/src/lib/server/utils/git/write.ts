@@ -12,6 +12,80 @@ type GitHubApiError = {
   rateLimited: boolean;
 };
 
+function isWindowsDrivePath(value: string): boolean {
+  return /^[A-Za-z]:[\\/]/.test(value);
+}
+
+function resolveLocalRepositoryPath(repositoryUrl: string): string | null {
+  const normalized = repositoryUrl.trim();
+  if (!normalized) {
+    return null;
+  }
+
+  if (normalized.startsWith('file://')) {
+    try {
+      return decodeURIComponent(new URL(normalized).pathname);
+    } catch {
+      return null;
+    }
+  }
+
+  if (
+    normalized.startsWith('/') ||
+    normalized.startsWith('./') ||
+    normalized.startsWith('../') ||
+    isWindowsDrivePath(normalized)
+  ) {
+    return normalized;
+  }
+
+  return null;
+}
+
+export function isLocalRepositorySource(repositoryUrl: string): boolean {
+  return resolveLocalRepositoryPath(repositoryUrl) !== null;
+}
+
+async function copyPathRecursive(sourcePath: string, targetPath: string): Promise<void> {
+  const sourceStat = await Deno.stat(sourcePath);
+
+  if (sourceStat.isFile) {
+    await Deno.copyFile(sourcePath, targetPath);
+    return;
+  }
+
+  if (!sourceStat.isDirectory) {
+    throw new Error(`Unsupported local repository entry type at "${sourcePath}"`);
+  }
+
+  await Deno.mkdir(targetPath, { recursive: true });
+  for await (const entry of Deno.readDir(sourcePath)) {
+    const entrySourcePath = `${sourcePath}/${entry.name}`;
+    const entryTargetPath = `${targetPath}/${entry.name}`;
+    await copyPathRecursive(entrySourcePath, entryTargetPath);
+  }
+}
+
+export async function refreshLocalRepositoryClone(repositoryUrl: string, targetPath: string): Promise<void> {
+  const localRepositoryPath = resolveLocalRepositoryPath(repositoryUrl);
+  if (!localRepositoryPath) {
+    throw new Error(`Repository URL is not a local source path: ${repositoryUrl}`);
+  }
+
+  const sourceStat = await Deno.stat(localRepositoryPath).catch(() => null);
+  if (!sourceStat || !sourceStat.isDirectory) {
+    throw new Error(`Local repository path does not exist or is not a directory: ${localRepositoryPath}`);
+  }
+
+  try {
+    await Deno.remove(targetPath, { recursive: true });
+  } catch {
+    // Fresh install path.
+  }
+
+  await copyPathRecursive(localRepositoryPath, targetPath);
+}
+
 async function parseGitHubErrorResponse(response: Response): Promise<{
   message: string;
   rateLimited: boolean;
@@ -185,6 +259,29 @@ export async function clone(
   branch?: string,
   personalAccessToken?: string
 ): Promise<boolean> {
+  const localRepositoryPath = resolveLocalRepositoryPath(repositoryUrl);
+  if (localRepositoryPath) {
+    const sourceStat = await Deno.stat(localRepositoryPath).catch(() => null);
+    if (!sourceStat || !sourceStat.isDirectory) {
+      throw new Error(`Local repository path does not exist or is not a directory: ${localRepositoryPath}`);
+    }
+
+    if (branch) {
+      await logger.warn('Ignoring branch selection for local repository path clone', {
+        source: 'Git',
+        meta: {
+          repositoryUrl,
+          localRepositoryPath,
+          branch,
+        },
+      });
+    }
+
+    await copyPathRecursive(localRepositoryPath, targetPath);
+
+    return false;
+  }
+
   let isPrivate = !!personalAccessToken;
   try {
     isPrivate = await validateRepository(repositoryUrl, personalAccessToken);

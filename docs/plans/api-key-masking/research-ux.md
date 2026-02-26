@@ -209,7 +209,12 @@ async function copyToClipboard(value: string): Promise<boolean> {
 **Required ARIA attributes for the reveal toggle**:
 
 ```html
-<button type="button" aria-pressed="false" aria-controls="api-key-display" aria-label="Show API key">
+<button
+  type="button"
+  aria-pressed="false"
+  aria-controls="api-key-display"
+  aria-label="Show API key"
+>
   <svg aria-hidden="true"><!-- Eye icon --></svg>
 </button>
 ```

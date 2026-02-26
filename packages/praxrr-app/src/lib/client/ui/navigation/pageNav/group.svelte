@@ -1,41 +1,53 @@
 <script lang="ts">
- import GroupHeader from './groupHeader.svelte';
- import SectionHeader from './sectionHeader.svelte';
- import type { ComponentType } from 'svelte';
+  import GroupHeader from './groupHeader.svelte';
+  import SectionHeader from './sectionHeader.svelte';
+  import type { ComponentType } from 'svelte';
   import { slide } from 'svelte/transition';
 
- export let label: string;
- export let href: string;
- export let icon: ComponentType | undefined = undefined;
- export let initialOpen: boolean = true;
- export let hasItems: boolean = false;
-	export let sectionLabel: string | undefined = undefined;
+  export let label: string;
+  export let href: string;
+  export let icon: ComponentType | undefined = undefined;
+  export let initialOpen: boolean = true;
+  export let hasItems: boolean = false;
+  export let sectionLabel: string | undefined = undefined;
 
-	let isOpen = initialOpen;
+  let isOpen = initialOpen;
+  let isRouteOpen = initialOpen;
 
-	function toggleOpen() {
-		isOpen = !isOpen;
-	}
+  $: isRouteOpen = initialOpen;
+  $: if (isRouteOpen) {
+    isOpen = true;
+  } else {
+    isOpen = false;
+  }
+
+  function toggleOpen() {
+    if (isRouteOpen) {
+      return;
+    }
+
+    isOpen = !isOpen;
+  }
 </script>
 
 <div class="mb-4">
-	{#if sectionLabel}
-		<SectionHeader label={sectionLabel} />
-	{/if}
+  {#if sectionLabel}
+    <SectionHeader label={sectionLabel} />
+  {/if}
 
-	<GroupHeader {label} {href} {icon} {isOpen} {hasItems} onToggle={toggleOpen} />
+  <GroupHeader {label} {href} {icon} {isOpen} {hasItems} onToggle={toggleOpen} />
 
-	{#if isOpen && hasItems}
-		<div class="mt-2 grid grid-cols-[auto_1fr]" transition:slide={{ duration: 200 }}>
-			<!-- Column 1: Vertical line -->
-			<div class="flex justify-center px-5">
-				<div class="w-0.5 rounded-full bg-neutral-300 dark:bg-neutral-700"></div>
-			</div>
+  {#if isOpen && hasItems}
+    <div class="mt-2 grid grid-cols-[auto_1fr]" transition:slide={{ duration: 200 }}>
+      <!-- Column 1: Vertical line -->
+      <div class="flex justify-center px-5">
+        <div class="w-0.5 rounded-full bg-neutral-300 dark:bg-neutral-700"></div>
+      </div>
 
-			<!-- Column 2: Items -->
-			<div class="-ml-3 flex flex-col gap-1">
-				<slot />
-			</div>
-		</div>
-	{/if}
+      <!-- Column 2: Items -->
+      <div class="-ml-3 flex flex-col gap-1">
+        <slot />
+      </div>
+    </div>
+  {/if}
 </div>

@@ -61,10 +61,7 @@ export const arrInstanceCredentialsQueries = {
 
   getByInstanceId(instanceId: number): ArrInstanceCredential | undefined {
     return safeQueryFirst(() =>
-      db.queryFirst<ArrInstanceCredential>(
-        'SELECT * FROM arr_instance_credentials WHERE instance_id = ?',
-        instanceId
-      )
+      db.queryFirst<ArrInstanceCredential>('SELECT * FROM arr_instance_credentials WHERE instance_id = ?', instanceId)
     );
   },
 

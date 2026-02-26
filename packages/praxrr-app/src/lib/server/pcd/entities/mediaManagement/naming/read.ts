@@ -5,7 +5,16 @@
 import type { PCDCache } from '$pcd/index.ts';
 import type { LidarrNamingRow, NamingListItem, RadarrNamingRow, SonarrNamingRow } from '$shared/pcd/display.ts';
 import { colonReplacementFromDb, multiEpisodeStyleFromDb } from '$shared/pcd/mediaManagement.ts';
+import type {
+  ArrAppType,
+  LidarrNamingTable,
+  PCDDatabase,
+  RadarrNamingTable,
+  SonarrNamingTable,
+} from '$shared/pcd/types.ts';
 import { LIDARR_NAMING_TABLE, RADARR_NAMING_TABLE, SONARR_NAMING_TABLE } from './constants.ts';
+import type { Selectable } from 'kysely';
+import { sql } from 'kysely';
 
 // Note: name is PRIMARY KEY so never null, but Kysely types it as nullable
 // because the generator doesn't detect non-INTEGER primary keys
@@ -51,15 +60,9 @@ export async function list(cache: PCDCache): Promise<NamingListItem[]> {
   return items;
 }
 
-export async function getRadarrByName(cache: PCDCache, name: string): Promise<RadarrNamingRow | null> {
-  const db = cache.kb;
-
-  const row = await db.selectFrom(RADARR_NAMING_TABLE).selectAll().where('name', '=', name).executeTakeFirst();
-
-  if (!row) return null;
-
+function mapRadarrRow(row: Selectable<RadarrNamingTable>): RadarrNamingRow {
   return {
-    name: row.name!,
+    name: row.name,
     rename: row.rename === 1,
     movie_format: row.movie_format,
     movie_folder_format: row.movie_folder_format,
@@ -70,15 +73,9 @@ export async function getRadarrByName(cache: PCDCache, name: string): Promise<Ra
   };
 }
 
-export async function getSonarrByName(cache: PCDCache, name: string): Promise<SonarrNamingRow | null> {
-  const db = cache.kb;
-
-  const row = await db.selectFrom(SONARR_NAMING_TABLE).selectAll().where('name', '=', name).executeTakeFirst();
-
-  if (!row) return null;
-
+function mapSonarrRow(row: Selectable<SonarrNamingTable>): SonarrNamingRow {
   return {
-    name: row.name!,
+    name: row.name,
     rename: row.rename === 1,
     standard_episode_format: row.standard_episode_format,
     daily_episode_format: row.daily_episode_format,
@@ -94,15 +91,9 @@ export async function getSonarrByName(cache: PCDCache, name: string): Promise<So
   };
 }
 
-export async function getLidarrByName(cache: PCDCache, name: string): Promise<LidarrNamingRow | null> {
-  const db = cache.kb;
-
-  const row = await db.selectFrom(LIDARR_NAMING_TABLE).selectAll().where('name', '=', name).executeTakeFirst();
-
-  if (!row) return null;
-
+function mapLidarrRow(row: Selectable<LidarrNamingTable>): LidarrNamingRow {
   return {
-    name: row.name!,
+    name: row.name,
     rename: row.rename === 1,
     standard_track_format: row.standard_track_format,
     artist_name: row.artist_name,
@@ -113,5 +104,55 @@ export async function getLidarrByName(cache: PCDCache, name: string): Promise<Li
     custom_colon_replacement_format: row.custom_colon_replacement_format,
     created_at: row.created_at,
     updated_at: row.updated_at,
-  } satisfies LidarrNamingRow;
+  };
+}
+
+type NamingDefaultsArrType = Exclude<ArrAppType, 'all'>;
+
+type NamingDefaultsTable = typeof RADARR_NAMING_TABLE | typeof SONARR_NAMING_TABLE | typeof LIDARR_NAMING_TABLE;
+
+async function getDefaultNamingRow<T extends NamingDefaultsTable>(
+  cache: PCDCache,
+  table: T,
+  arrType: NamingDefaultsArrType
+): Promise<Selectable<PCDDatabase[T]> | null> {
+  const row = await cache.kb
+    .selectFrom(table)
+    .selectAll()
+    .orderBy(sql<number>`CASE WHEN lower(name) = 'default' THEN 0 WHEN lower(name) = ${arrType} THEN 1 ELSE 2 END`)
+    .orderBy('created_at', 'asc')
+    .orderBy('name', 'asc')
+    .executeTakeFirst();
+
+  return (row as Selectable<PCDDatabase[T]> | undefined) ?? null;
+}
+
+export async function getRadarrByName(cache: PCDCache, name: string): Promise<RadarrNamingRow | null> {
+  const row = await cache.kb.selectFrom(RADARR_NAMING_TABLE).selectAll().where('name', '=', name).executeTakeFirst();
+  return row ? mapRadarrRow(row) : null;
+}
+
+export async function getSonarrByName(cache: PCDCache, name: string): Promise<SonarrNamingRow | null> {
+  const row = await cache.kb.selectFrom(SONARR_NAMING_TABLE).selectAll().where('name', '=', name).executeTakeFirst();
+  return row ? mapSonarrRow(row) : null;
+}
+
+export async function getLidarrByName(cache: PCDCache, name: string): Promise<LidarrNamingRow | null> {
+  const row = await cache.kb.selectFrom(LIDARR_NAMING_TABLE).selectAll().where('name', '=', name).executeTakeFirst();
+  return row ? mapLidarrRow(row) : null;
+}
+
+export async function getRadarrDefaults(cache: PCDCache): Promise<RadarrNamingRow | null> {
+  const row = await getDefaultNamingRow(cache, RADARR_NAMING_TABLE, 'radarr');
+  return row ? mapRadarrRow(row) : null;
+}
+
+export async function getSonarrDefaults(cache: PCDCache): Promise<SonarrNamingRow | null> {
+  const row = await getDefaultNamingRow(cache, SONARR_NAMING_TABLE, 'sonarr');
+  return row ? mapSonarrRow(row) : null;
+}
+
+export async function getLidarrDefaults(cache: PCDCache): Promise<LidarrNamingRow | null> {
+  const row = await getDefaultNamingRow(cache, LIDARR_NAMING_TABLE, 'lidarr');
+  return row ? mapLidarrRow(row) : null;
 }

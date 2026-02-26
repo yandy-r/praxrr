@@ -3,7 +3,7 @@ import type { ServerLoad, Actions } from '@sveltejs/kit';
 import { pcdManager } from '$pcd/index.ts';
 import { canWriteToBase } from '$pcd/index.ts';
 import * as regularExpressionQueries from '$pcd/entities/regularExpressions/index.ts';
-import type { OperationLayer } from '$pcd/index.ts';
+import { parseOperationLayer } from '$pcd/index.ts';
 import { logger } from '$logger/logger.ts';
 
 export const load: ServerLoad = ({ params, url }) => {
@@ -79,7 +79,11 @@ export const actions: Actions = {
     const description = (formData.get('description') as string) || null;
     const regex101Id = (formData.get('regex101Id') as string) || null;
     const layerFromForm = formData.get('layer');
-    const layer = (layerFromForm as OperationLayer) || 'user';
+    const layerResult = parseOperationLayer(layerFromForm);
+    if ('error' in layerResult) {
+      return fail(400, { error: layerResult.error });
+    }
+    const layer = layerResult.value;
 
     await logger.debug('Create action received', {
       source: 'RegularExpressionCreate',

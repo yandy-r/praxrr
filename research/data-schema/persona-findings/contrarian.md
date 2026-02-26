@@ -167,7 +167,11 @@ The current system gets this for free from file numbering and sequential SQL exe
 From `overrideUtils.ts`, the system already has `followRenameChain()` which parses SQL UPDATE statements to trace entity renames through base ops:
 
 ```typescript
-function extractRenamesFromSql(sql: string, tableName: string, renameMap: Map<string, string>): void {
+function extractRenamesFromSql(
+  sql: string,
+  tableName: string,
+  renameMap: Map<string, string>
+): void {
   const pattern = new RegExp(
     `update\\s+"${escaped}"\\s+set\\s+"name"\\s*=\\s*'((?:[^']|'')*)'\\s+where\\s+"name"\\s*=\\s*'((?:[^']|'')*)'`,
     'gi'
@@ -243,10 +247,18 @@ The export pipeline (`exporter.ts`) is a sophisticated system that:
 The output format is SQL:
 
 ```typescript
-function formatOpBlock(op: { id: number; metadata?: string | null; sql: string }): string {
+function formatOpBlock(op: {
+  id: number;
+  metadata?: string | null;
+  sql: string;
+}): string {
   const label = opLabel(op);
   const trimmedSql = op.sql.trim().replace(/;\s*$/, '');
-  return [`-- --- BEGIN op ${op.id}${title}`, `${trimmedSql};`, `-- --- END op ${op.id}`].join('\n');
+  return [
+    `-- --- BEGIN op ${op.id}${title}`,
+    `${trimmedSql};`,
+    `-- --- END op ${op.id}`,
+  ].join('\n');
 }
 ```
 

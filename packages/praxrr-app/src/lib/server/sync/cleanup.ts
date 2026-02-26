@@ -7,12 +7,29 @@
  */
 
 import type { BaseArrClient } from '$utils/arr/base.ts';
-import { hasNamespaceSuffix, stripNamespaceSuffix, getNamespaceSuffix } from './namespace.ts';
+import {
+  getTrashGuideNamespaceSuffix,
+  getNamespaceSuffix,
+  hasNamespaceSuffix,
+  stripNamespaceSuffix,
+} from './namespace.ts';
 import { arrSyncQueries } from '$db/queries/arrSync.ts';
 import { arrNamespaceQueries } from '$db/queries/arrNamespaces.ts';
 import { arrInstancesQueries } from '$db/queries/arrInstances.ts';
+import { trashGuideSyncQueries } from '$db/queries/trashGuideSync.ts';
+import { trashGuideSourcesQueries } from '$db/queries/trashGuideSources.ts';
+import { trashGuideEntityCacheQueries } from '$db/queries/trashGuideEntityCache.ts';
 import { getCache } from '$pcd/index.ts';
 import { getReferencedCustomFormatNames } from './qualityProfiles/transformer.ts';
+import { transformTrashGuideEntities } from '$lib/server/trashguide/transformer.ts';
+import type {
+  TrashGuideCustomFormatEntity,
+  TrashGuideNamingEntity,
+  TrashGuideParsedEntity,
+  TrashGuideQualityProfileEntity,
+  TrashGuideQualitySizeEntity,
+} from '$lib/server/trashguide/types.ts';
+import type { PortableCustomFormat, PortableQualityProfile } from '$shared/pcd/portable.ts';
 import type { SyncArrType } from './mappings.ts';
 import { HttpError } from '$http/types.ts';
 import { logger } from '$logger/logger.ts';
@@ -33,6 +50,7 @@ export interface CleanupScanResult {
 export interface CleanupDeleteResult {
   deletedCustomFormats: StaleItem[];
   deletedQualityProfiles: StaleItem[];
+  failedCustomFormats: { item: StaleItem; reason: string }[];
   skippedQualityProfiles: { item: StaleItem; reason: string }[];
 }
 
@@ -65,6 +83,132 @@ export async function scanForStaleItems(client: BaseArrClient, instanceId: numbe
       const cfNames = await getReferencedCustomFormatNames(cache, sel.profileName, arrType);
       for (const name of cfNames) {
         expectedCFNames.add(name + suffix);
+      }
+    }
+  }
+
+  // 1b. Also include expected names from TRaSH Guide selections
+  const trashSourceHydrations = trashGuideSyncQueries.getQualityProfileSourceHydrationByInstance(instanceId);
+  let trashNamespaceIndex = 0;
+
+  for (const sourceHydration of trashSourceHydrations) {
+    if (sourceHydration.selectedQualityProfiles.length === 0) continue;
+
+    const source = trashGuideSourcesQueries.getById(sourceHydration.sourceId);
+    if (!source || source.arr_type !== arrType) continue;
+
+    const cachedRows = trashGuideEntityCacheQueries.getBySource(source.id);
+    if (cachedRows.length === 0) continue;
+
+    const parsedEntities: TrashGuideParsedEntity[] = [];
+    let malformedRows = 0;
+    for (const row of cachedRows) {
+      try {
+        parsedEntities.push(JSON.parse(row.jsonData) as TrashGuideParsedEntity);
+      } catch (error) {
+        malformedRows += 1;
+        await logger.warn('Failed to parse TRaSH cache row during cleanup scan', {
+          source: SOURCE,
+          meta: {
+            instanceId,
+            sourceId: source.id,
+            sourceName: source.name,
+            trashId: row.trashId,
+            filePath: row.filePath,
+            error: error instanceof Error ? error.message : String(error),
+          },
+        });
+      }
+    }
+    if (parsedEntities.length === 0) {
+      const message = `Failed to parse all TRaSH cache rows for source "${source.name}" during cleanup scan`;
+      await logger.error(message, {
+        source: SOURCE,
+        meta: {
+          instanceId,
+          sourceId: source.id,
+          sourceName: source.name,
+          totalRows: cachedRows.length,
+          malformedRows,
+        },
+      });
+      throw new Error(message);
+    }
+    if (malformedRows > 0) {
+      await logger.warn('Some TRaSH cache rows were malformed during cleanup scan; using successfully parsed rows', {
+        source: SOURCE,
+        meta: {
+          instanceId,
+          sourceId: source.id,
+          sourceName: source.name,
+          totalRows: cachedRows.length,
+          malformedRows,
+        },
+      });
+    }
+
+    let transformed;
+    try {
+      transformed = transformTrashGuideEntities({
+        sourceId: source.id,
+        arrType: source.arr_type,
+        parsed: {
+          arr_type: source.arr_type,
+          status: 'success',
+          entities: {
+            custom_formats: parsedEntities.filter(
+              (e): e is TrashGuideCustomFormatEntity => e.entity_type === 'custom_format'
+            ),
+            quality_profiles: parsedEntities.filter(
+              (e): e is TrashGuideQualityProfileEntity => e.entity_type === 'quality_profile'
+            ),
+            quality_sizes: parsedEntities.filter(
+              (e): e is TrashGuideQualitySizeEntity => e.entity_type === 'quality_size'
+            ),
+            naming: parsedEntities.filter((e): e is TrashGuideNamingEntity => e.entity_type === 'naming'),
+          },
+          ordered_entities: parsedEntities,
+          issues: [],
+          parsed_files: parsedEntities.length,
+          failed_files: 0,
+        },
+      });
+    } catch (error) {
+      await logger.warn(`Skipping TRaSH quality profiles due to transform failure for source "${source.name}"`, {
+        source: SOURCE,
+        meta: {
+          instanceId,
+          sourceId: source.id,
+          sourceName: source.name,
+          error: error instanceof Error ? error.message : String(error),
+        },
+      });
+      continue;
+    }
+
+    const portableProfilesByName = new Map<string, PortableQualityProfile>();
+    const portableFormatsByName = new Map<string, PortableCustomFormat>();
+    for (const op of transformed.activeOperations) {
+      if (op.portableEntityType === 'quality_profile') {
+        portableProfilesByName.set(op.data.name, op.data);
+      } else if (op.portableEntityType === 'custom_format') {
+        portableFormatsByName.set(op.data.name, op.data);
+      }
+    }
+
+    trashNamespaceIndex += 1;
+    const trashSuffix = getTrashGuideNamespaceSuffix(trashNamespaceIndex);
+
+    for (const profileName of sourceHydration.selectedQualityProfiles) {
+      const portable = portableProfilesByName.get(profileName);
+      if (!portable) continue;
+
+      expectedQPNames.add(profileName + trashSuffix);
+
+      for (const score of portable.customFormatScores) {
+        if (score.arrType === arrType || score.arrType === 'all') {
+          expectedCFNames.add(score.customFormatName + trashSuffix);
+        }
       }
     }
   }
@@ -120,6 +264,7 @@ export async function deleteStaleItems(
 ): Promise<CleanupDeleteResult> {
   const deletedCustomFormats: StaleItem[] = [];
   const deletedQualityProfiles: StaleItem[] = [];
+  const failedCustomFormats: { item: StaleItem; reason: string }[] = [];
   const skippedQualityProfiles: { item: StaleItem; reason: string }[] = [];
 
   // Delete CFs first
@@ -128,6 +273,8 @@ export async function deleteStaleItems(
       await client.deleteCustomFormat(cf.id);
       deletedCustomFormats.push(cf);
     } catch (err) {
+      const reason = err instanceof Error ? err.message : String(err);
+      failedCustomFormats.push({ item: cf, reason });
       await logger.warn(`Failed to delete CF "${cf.strippedName}" (id=${cf.id})`, {
         source: SOURCE,
         meta: { error: err instanceof Error ? err.message : String(err) },
@@ -156,9 +303,10 @@ export async function deleteStaleItems(
     meta: {
       deletedCFs: deletedCustomFormats.map((cf) => cf.strippedName),
       deletedQPs: deletedQualityProfiles.map((qp) => qp.strippedName),
+      failedCFs: failedCustomFormats.map((cf) => cf.item.strippedName),
       skippedQPs: skippedQualityProfiles.map((s) => s.item.strippedName),
     },
   });
 
-  return { deletedCustomFormats, deletedQualityProfiles, skippedQualityProfiles };
+  return { deletedCustomFormats, deletedQualityProfiles, failedCustomFormats, skippedQualityProfiles };
 }

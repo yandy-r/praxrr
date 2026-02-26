@@ -106,7 +106,10 @@ options are well-documented and stable.
 - **Atomic write pattern**:
 
   ```typescript
-  async function atomicWriteTextFile(targetPath: string, content: string): Promise<void> {
+  async function atomicWriteTextFile(
+    targetPath: string,
+    content: string
+  ): Promise<void> {
     const dir = dirname(targetPath);
     const tempPath = await Deno.makeTempFile({ dir, suffix: '.tmp' });
     try {
@@ -655,7 +658,10 @@ interface EntityDirMapping {
   entityType: EntityType;
   dir: string;
   listQuery: string;
-  serializer: (cache: PCDCache, name: string) => Promise<Record<string, unknown>>;
+  serializer: (
+    cache: PCDCache,
+    name: string
+  ) => Promise<Record<string, unknown>>;
 }
 
 const ENTITY_MAPPINGS: EntityDirMapping[] = [
@@ -687,7 +693,10 @@ const ENTITY_MAPPINGS: EntityDirMapping[] = [
   // with nested dirs: media-management/radarr-naming/, etc.
 ];
 
-async function writeEntityFiles(cache: PCDCache, outputDir: string): Promise<void> {
+async function writeEntityFiles(
+  cache: PCDCache,
+  outputDir: string
+): Promise<void> {
   for (const mapping of ENTITY_MAPPINGS) {
     const names = cache.query<{ name: string }>(mapping.listQuery);
     if (names.length === 0) continue;
@@ -699,7 +708,9 @@ async function writeEntityFiles(cache: PCDCache, outputDir: string): Promise<voi
     for (const { name } of names) {
       const slug = toEntitySlug(name);
       if (slugs.has(slug)) {
-        throw new Error(`Slug collision for ${mapping.entityType}: "${name}" -> "${slug}"`);
+        throw new Error(
+          `Slug collision for ${mapping.entityType}: "${name}" -> "${slug}"`
+        );
       }
       slugs.add(slug);
 

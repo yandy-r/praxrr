@@ -3,7 +3,15 @@
  */
 
 // Read
-export { list, getLidarrByName, getRadarrByName, getSonarrByName } from './read.ts';
+export {
+  list,
+  getLidarrByName,
+  getRadarrByName,
+  getSonarrByName,
+  getRadarrDefaults,
+  getSonarrDefaults,
+  getLidarrDefaults,
+} from './read.ts';
 
 // Create
 export { createLidarrNaming, createRadarrNaming, createSonarrNaming } from './create.ts';

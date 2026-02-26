@@ -1,7 +1,7 @@
 import { error, redirect, fail } from '@sveltejs/kit';
 import type { ServerLoad, Actions } from '@sveltejs/kit';
 import { pcdManager } from '$pcd/index.ts';
-import { canWriteToBase, type OperationLayer } from '$pcd/index.ts';
+import { canWriteToBase, parseOperationLayer } from '$pcd/index.ts';
 import * as customFormatQueries from '$pcd/entities/customFormats/index.ts';
 
 export const load: ServerLoad = async ({ params }) => {
@@ -63,7 +63,11 @@ export const actions: Actions = {
     const shouldMatch = formData.get('shouldMatch') === '1';
     const description = (formData.get('description') as string) || null;
     const formatName = formData.get('formatName') as string;
-    const layer = (formData.get('layer') as OperationLayer) || 'user';
+    const layerResult = parseOperationLayer(formData.get('layer'));
+    if ('error' in layerResult) {
+      return fail(400, { error: layerResult.error });
+    }
+    const layer = layerResult.value;
 
     if (!title?.trim()) {
       return fail(400, { error: 'Title is required' });

@@ -1,5 +1,5 @@
 import { db } from '../db.ts';
-import type { JobQueueRecord, JobSource, JobStatus, JobType } from '$jobs/queueTypes.ts';
+import type { JobQueueRecord, JobSource, JobStatus, JobType, JobPayload } from '$jobs/queueTypes.ts';
 
 interface JobQueueRow {
   id: number;
@@ -33,7 +33,7 @@ function rowToRecord(row: JobQueueRow): JobQueueRecord {
     jobType: row.job_type,
     status: row.status,
     runAt: row.run_at,
-    payload: parsePayload(row.payload),
+    payload: parsePayload(row.payload) as JobPayload<JobType> & Record<string, unknown>,
     source: row.source,
     dedupeKey: row.dedupe_key,
     cooldownUntil: row.cooldown_until,
@@ -45,10 +45,10 @@ function rowToRecord(row: JobQueueRow): JobQueueRecord {
   };
 }
 
-export interface CreateJobQueueInput {
-  jobType: JobType;
+export interface CreateJobQueueInput<T extends JobType = JobType> {
+  jobType: T;
   runAt: string;
-  payload?: Record<string, unknown>;
+  payload?: JobPayload<T>;
   source?: JobSource;
   dedupeKey?: string | null;
   cooldownUntil?: string | null;

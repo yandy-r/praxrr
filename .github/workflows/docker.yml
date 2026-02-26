@@ -3,7 +3,7 @@ name: Docker
 on:
   push:
     branches:
-      - v2
+      - main
       - dev
     tags:
       - 'app/v*'
@@ -61,10 +61,10 @@ jobs:
       - name: Determine channel
         id: channel
         run: |
-          if [[ "${{ github.ref }}" == "refs/heads/v2" ]]; then
+          if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
             echo "value=develop" >> $GITHUB_OUTPUT
           elif [[ "${{ github.ref }}" == "refs/heads/dev" ]]; then
-            echo "value=develop" >> $GITHUB_OUTPUT
+            echo "value=testing" >> $GITHUB_OUTPUT
           elif [[ "${{ github.ref }}" == refs/tags/app/v*-beta* ]]; then
             echo "value=beta" >> $GITHUB_OUTPUT
           elif [[ "${{ github.ref }}" == refs/tags/app/v* ]]; then
@@ -85,7 +85,7 @@ jobs:
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
           tags: |
             # Branch pushes
-            type=raw,value=develop,enable=${{ github.ref == 'refs/heads/v2' }}
+            type=raw,value=develop,enable=${{ github.ref == 'refs/heads/main' }}
             type=raw,value=testing,enable=${{ github.ref == 'refs/heads/dev' }}
             # Beta release -> beta + version
             type=raw,value=beta,enable=${{ steps.version.outputs.is_release == 'true' && contains(github.ref, '-beta') }}

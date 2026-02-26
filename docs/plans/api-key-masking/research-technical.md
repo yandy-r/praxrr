@@ -251,7 +251,10 @@ const MASK_CHAR = '\u2022'; // bullet character
 const DEFAULT_VISIBLE_CHARS = 4;
 const DEFAULT_MASK_LENGTH = 8;
 
-export function maskApiKey(key: string | null | undefined, visibleChars: number = DEFAULT_VISIBLE_CHARS): string {
+export function maskApiKey(
+  key: string | null | undefined,
+  visibleChars: number = DEFAULT_VISIBLE_CHARS
+): string {
   if (!key || key.length === 0) return '';
   const mask = MASK_CHAR.repeat(DEFAULT_MASK_LENGTH);
   if (key.length <= visibleChars) return mask;
@@ -301,7 +304,8 @@ export function sanitizeLogMeta(meta: unknown): unknown {
   const result: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(meta as Record<string, unknown>)) {
     if (API_KEY_FIELD_PATTERNS.some((pattern) => pattern.test(key))) {
-      result[key] = typeof value === 'string' ? maskApiKey(value) : '[REDACTED]';
+      result[key] =
+        typeof value === 'string' ? maskApiKey(value) : '[REDACTED]';
     } else {
       result[key] = sanitizeLogMeta(value);
     }

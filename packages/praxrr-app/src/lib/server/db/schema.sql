@@ -634,7 +634,7 @@ CREATE TABLE regex101_cache (
 
 CREATE TABLE app_info (
     id INTEGER PRIMARY KEY CHECK (id = 1),
-    version TEXT NOT NULL,                  -- Application version (e.g., "2.0.0")
+    version TEXT NOT NULL,                  -- Application version (e.g., "0.1.0")
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );

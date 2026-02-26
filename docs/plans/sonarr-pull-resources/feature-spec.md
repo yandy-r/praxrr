@@ -109,7 +109,12 @@ Optional/deferred:
 {
   "instanceId": 1,
   "databaseId": 1,
-  "resourceTypes": ["customFormats", "qualityProfiles", "delayProfiles", "qualityDefinitions"]
+  "resourceTypes": [
+    "customFormats",
+    "qualityProfiles",
+    "delayProfiles",
+    "qualityDefinitions"
+  ]
 }
 ```
 

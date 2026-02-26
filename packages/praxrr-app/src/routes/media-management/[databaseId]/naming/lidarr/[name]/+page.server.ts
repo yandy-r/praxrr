@@ -2,11 +2,12 @@ import { error, redirect, fail } from '@sveltejs/kit';
 import type { Actions, ServerLoad } from '@sveltejs/kit';
 import { pcdManager } from '$pcd/index.ts';
 import { canWriteToBase } from '$pcd/index.ts';
-import type { OperationLayer } from '$pcd/index.ts';
+import { parseOperationLayer } from '$pcd/index.ts';
 import { getLidarrByName } from '$pcd/entities/mediaManagement/naming/read.ts';
 import { updateLidarrNaming } from '$pcd/entities/mediaManagement/naming/update.ts';
 import { removeLidarrNaming } from '$pcd/entities/mediaManagement/naming/index.ts';
 import { arrSyncQueries } from '$db/queries/arrSync.ts';
+import { logger } from '$logger/logger.ts';
 import type { LidarrNamingRow } from '$shared/pcd/display.ts';
 
 async function resolveLidarrNamingByRouteName(cache: ReturnType<typeof pcdManager.getCache>, routeName: string) {
@@ -79,7 +80,11 @@ export const actions: Actions = {
 
     const formData = await request.formData();
     const newName = formData.get('name') as string;
-    const layer = (formData.get('layer') as OperationLayer) || 'user';
+    const layerResult = parseOperationLayer(formData.get('layer'));
+    if ('error' in layerResult) {
+      return fail(400, { error: layerResult.error });
+    }
+    const layer = layerResult.value;
 
     if (!newName?.trim()) {
       return fail(400, { error: 'Name is required' });
@@ -111,6 +116,10 @@ export const actions: Actions = {
       }
     }
 
+    if (!colonReplacementFormat) {
+      return fail(400, { error: 'Colon replacement format is required' });
+    }
+
     let result;
     try {
       result = await updateLidarrNaming({
@@ -126,7 +135,7 @@ export const actions: Actions = {
           multiDiscTrackFormat: multiDiscTrackFormat.trim(),
           artistFolderFormat: artistFolderFormat.trim(),
           replaceIllegalCharacters,
-          colonReplacementFormat: colonReplacementFormat || 'smart',
+          colonReplacementFormat,
           customColonReplacementFormat: customColonReplacementFormat || null,
         },
       });
@@ -143,10 +152,22 @@ export const actions: Actions = {
     }
 
     if (newName.trim() !== resolvedName) {
-      arrSyncQueries.updateNamingConfigName(resolvedName, newName.trim(), {
-        arrType: 'lidarr',
-        databaseId: currentDatabaseId,
-      });
+      try {
+        arrSyncQueries.updateNamingConfigName(resolvedName, newName.trim(), {
+          arrType: 'lidarr',
+          databaseId: currentDatabaseId,
+        });
+      } catch (err) {
+        await logger.error('Failed to sync updated Lidarr naming config name', {
+          source: 'naming-update',
+          meta: {
+            databaseId: currentDatabaseId,
+            oldName: resolvedName,
+            newName: newName.trim(),
+            error: err instanceof Error ? err.message : String(err),
+          },
+        });
+      }
     }
 
     throw redirect(303, `/media-management/${databaseId}/naming`);
@@ -176,18 +197,35 @@ export const actions: Actions = {
     const current = resolved.config;
 
     const formData = await request.formData();
-    const layer = (formData.get('layer') as OperationLayer) || 'user';
+    const layerResult = parseOperationLayer(formData.get('layer'));
+    if ('error' in layerResult) {
+      return fail(400, { error: layerResult.error });
+    }
+    const layer = layerResult.value;
 
     if (layer === 'base' && !canWriteToBase(currentDatabaseId)) {
       return fail(403, { error: 'Cannot write to base layer without personal access token' });
     }
 
-    const result = await removeLidarrNaming({
-      databaseId: currentDatabaseId,
-      cache,
-      layer,
-      current,
-    });
+    let result;
+    try {
+      result = await removeLidarrNaming({
+        databaseId: currentDatabaseId,
+        cache,
+        layer,
+        current,
+      });
+    } catch (err) {
+      await logger.error('Failed to delete Lidarr naming config', {
+        source: 'naming-delete',
+        meta: {
+          databaseId: currentDatabaseId,
+          name: resolved.resolvedName,
+          error: err instanceof Error ? err.message : String(err),
+        },
+      });
+      return fail(500, { error: err instanceof Error ? err.message : 'Failed to delete naming config' });
+    }
 
     if (!result.success) {
       return fail(500, { error: result.error || 'Failed to delete naming config' });

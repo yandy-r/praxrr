@@ -9,6 +9,7 @@ import { logSettingsQueries } from '$db/queries/logSettings.ts';
 import { calculateNextRun } from '$lib/server/sync/utils.ts';
 import { calculateNextRunFromMinutes, calculateNextRunFromSchedule } from './scheduleUtils.ts';
 import { jobDispatcher } from './dispatcher.ts';
+import { scheduleTrashGuideSyncSources } from './helpers/trashGuideSchedule.ts';
 
 function notify(runAt: string | null): void {
   if (!runAt) return;
@@ -170,6 +171,13 @@ export function scheduleLogCleanup(): void {
   notify(job.runAt);
 }
 
+export function scheduleTrashGuideSyncJobs(): void {
+  const runAts = scheduleTrashGuideSyncSources();
+  for (const runAt of runAts) {
+    notify(runAt);
+  }
+}
+
 export function scheduleAllJobs(): void {
   const arrInstances = arrInstancesQueries.getAll();
   for (const instance of arrInstances) {
@@ -183,6 +191,7 @@ export function scheduleAllJobs(): void {
     schedulePcdSyncForDatabase(database.id);
   }
 
+  scheduleTrashGuideSyncJobs();
   scheduleBackupJobs();
   scheduleLogCleanup();
 }

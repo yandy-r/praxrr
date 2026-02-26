@@ -101,7 +101,7 @@
 				>
 			</p>
 			<a
-				href="/databases/new?name={encodeURIComponent(
+				href="/databases/new/custom?name={encodeURIComponent(
 					data.formData.name
 				)}&branch={encodeURIComponent(data.formData.branch)}&sync_strategy={encodeURIComponent(
 					data.formData.syncStrategy

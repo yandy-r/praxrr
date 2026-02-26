@@ -14,6 +14,7 @@ import { reconcileEnvInstances } from '$arr/envInstances.ts';
 import { initializeJobs } from '$jobs/init.ts';
 import { upsertScheduledJob } from '$jobs/queueService.ts';
 import { pcdManager } from '$pcd/index.ts';
+import { trashGuideManager } from '$trashguide/index.ts';
 import { getAuthState, isPublicPath, maybeExtendSession, cleanupExpiredSessions } from '$auth/middleware.ts';
 import { getClientIp } from '$auth/network.ts';
 import { setupStateQueries } from '$db/queries/setupState.ts';
@@ -48,17 +49,25 @@ await logContainerConfig();
 
 // Initialize PCD caches (must be after migrations and log settings)
 await pcdManager.initialize();
+await trashGuideManager.initialize();
 
 // Auto-link default database on first startup (only once)
 if (!setupStateQueries.isDefaultDatabaseLinked()) {
   const defaultDatabaseUrlFromEnv = Deno.env.get('PRAXRR_DEFAULT_DB_URL');
   const defaultDatabaseUrl =
     defaultDatabaseUrlFromEnv === undefined ? 'https://github.com/yandy-r/praxrr-db' : defaultDatabaseUrlFromEnv.trim();
-  const defaultDatabaseBranch = Deno.env.get('PRAXRR_DEFAULT_DB_BRANCH')?.trim() || 'v2';
+  const defaultDatabaseBranch = Deno.env.get('PRAXRR_DEFAULT_DB_BRANCH')?.trim() || 'main';
   const defaultDatabaseName = Deno.env.get('PRAXRR_DEFAULT_DB_NAME')?.trim() || 'Praxrr-DB';
   const defaultDatabaseToken = Deno.env.get('PRAXRR_DEFAULT_DB_TOKEN')?.trim() || undefined;
   const defaultDatabaseGitUserName = Deno.env.get('PRAXRR_DEFAULT_DB_GIT_USERNAME')?.trim() || undefined;
   const defaultDatabaseGitUserEmail = Deno.env.get('PRAXRR_DEFAULT_DB_GIT_EMAIL')?.trim() || undefined;
+  const isLocalDefaultDatabasePath =
+    defaultDatabaseUrl.startsWith('file://') ||
+    defaultDatabaseUrl.startsWith('/') ||
+    defaultDatabaseUrl.startsWith('./') ||
+    defaultDatabaseUrl.startsWith('../') ||
+    /^[A-Za-z]:[\\/]/.test(defaultDatabaseUrl);
+  const defaultDatabaseAutoPull = isLocalDefaultDatabasePath ? false : true;
   const hasCompleteGitIdentity = !!defaultDatabaseGitUserName && !!defaultDatabaseGitUserEmail;
   const hasPartialGitIdentity =
     (!!defaultDatabaseGitUserName || !!defaultDatabaseGitUserEmail) && !hasCompleteGitIdentity;
@@ -66,6 +75,15 @@ if (!setupStateQueries.isDefaultDatabaseLinked()) {
   if (hasPartialGitIdentity) {
     await logger.warn('Default database git identity is incomplete; skipping git author configuration', {
       source: 'Setup',
+    });
+  }
+  if (isLocalDefaultDatabasePath) {
+    await logger.info('Using local path override for default database auto-link', {
+      source: 'Setup',
+      meta: {
+        url: defaultDatabaseUrl,
+        autoPull: defaultDatabaseAutoPull,
+      },
     });
   }
 
@@ -80,9 +98,9 @@ if (!setupStateQueries.isDefaultDatabaseLinked()) {
       await pcdManager.link({
         name: defaultDatabaseName,
         repositoryUrl: defaultDatabaseUrl,
-        branch: defaultDatabaseBranch,
+        branch: isLocalDefaultDatabasePath ? undefined : defaultDatabaseBranch,
         syncStrategy: 60,
-        autoPull: true,
+        autoPull: defaultDatabaseAutoPull,
         personalAccessToken: defaultDatabaseToken,
         gitUserName: hasCompleteGitIdentity ? defaultDatabaseGitUserName : undefined,
         gitUserEmail: hasCompleteGitIdentity ? defaultDatabaseGitUserEmail : undefined,

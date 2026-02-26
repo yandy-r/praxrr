@@ -217,11 +217,7 @@ export async function serializeLidarrNaming(cache: PCDCache, name: string): Prom
 
   const standardTrackFormat = requireLidarrNamingField(name, 'standard_track_format', row.standard_track_format);
   const artistName = requireLidarrNamingField(name, 'artist_name', row.artist_name);
-  const multiDiscTrackFormat = requireLidarrNamingField(
-    name,
-    'multi_disc_track_format',
-    row.multi_disc_track_format
-  );
+  const multiDiscTrackFormat = requireLidarrNamingField(name, 'multi_disc_track_format', row.multi_disc_track_format);
   const artistFolderFormat = requireLidarrNamingField(name, 'artist_folder_format', row.artist_folder_format);
 
   return {

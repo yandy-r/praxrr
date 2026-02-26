@@ -80,6 +80,8 @@ type ParsedMetadata = {
   group_id?: string;
 };
 
+const EXPORTED_SQL_DIR = 'ops';
+
 function isCleanEnough(status: ExportPreflightStatus): boolean {
   if (!status.isDirty) return true;
   // Staged files indicate a manual git operation in progress — block export
@@ -188,7 +190,8 @@ async function runPreflight(databaseId: number): Promise<ExportPreflight> {
   try {
     personalAccessToken = await getDecryptedDatabasePersonalAccessToken(databaseId);
   } catch (error) {
-    errors.push('Failed to load personal access token.');
+    const detail = error instanceof Error ? error.message : String(error);
+    errors.push(`Failed to load personal access token: ${detail}`);
   }
 
   if (!database) {
@@ -261,7 +264,12 @@ async function runPreflight(databaseId: number): Promise<ExportPreflight> {
       }
     }
   } catch (error) {
-    errors.push('Failed to reach remote repository.');
+    const details = error instanceof Error ? error.message : String(error);
+    errors.push(`Failed to reach remote repository: ${details}`);
+    await logger.warn('Remote repository preflight check failed', {
+      source: 'PCDExporter',
+      meta: { databaseId, path: database.local_path, error: details },
+    });
   }
 
   return {
@@ -370,13 +378,15 @@ async function buildExportPlan(
 
   const maxOpNumber = await getMaxOpNumber(repoPath);
   const opNumber = maxOpNumber + 1;
+  // Export numbering is based on committed export-artifact history in ops/ only.
+  // Import no longer reads ops/ as a source; these files are retained for audit history.
   const filename = `${opNumber}.${entityNameToSlug(trimmedMessage)}.sql`;
 
   return {
     success: true,
     plan: {
       filename,
-      filepath: `ops/${filename}`,
+      filepath: `${EXPORTED_SQL_DIR}/${filename}`,
       fileContent,
       dbSql,
       metadataJson,
@@ -533,7 +543,15 @@ export async function exportDraftOps(
     let sourcePath = database.local_path;
     try {
       sourcePath = await Deno.realPath(database.local_path);
-    } catch {
+    } catch (error) {
+      await logger.warn('Falling back to stored repository path after realPath resolution failure', {
+        source: 'PCDExporter',
+        meta: {
+          databaseId,
+          path: database.local_path,
+          error: error instanceof Error ? error.message : String(error),
+        },
+      });
       // fall back to the stored path
     }
 
@@ -545,8 +563,8 @@ export async function exportDraftOps(
 
       // Write SQL file if there are ops
       if (plan) {
-        const filepath = `${repoDir}/ops/${plan.filename}`;
-        await Deno.mkdir(`${repoDir}/ops`, { recursive: true });
+        const filepath = `${repoDir}/${EXPORTED_SQL_DIR}/${plan.filename}`;
+        await Deno.mkdir(`${repoDir}/${EXPORTED_SQL_DIR}`, { recursive: true });
         await Deno.writeTextFile(filepath, plan.fileContent);
         toStage.push(filepath);
       }

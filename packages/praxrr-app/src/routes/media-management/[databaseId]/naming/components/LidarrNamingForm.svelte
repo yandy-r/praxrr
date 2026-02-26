@@ -30,24 +30,9 @@
   export let databaseName: string;
   export let canWriteToBase: boolean = false;
   export let actionUrl: string = '';
-  export let initialData: LidarrNamingRow | null;
+  export let initialData: LidarrNamingRow;
 
-  const defaults: LidarrNamingFormData = {
-    name: '',
-    rename: true,
-    standardTrackFormat:
-      '{Artist Name} - {Album Type} - {Album Title}  - {(Album Disambiguation)}/{Artist Name}_{Album Title}_{track:00}_{Track Title}',
-    artistName: '{Artist Name}',
-    multiDiscTrackFormat:
-      '{Artist Name} - {Album Type} - {Album Title}  - {(Album Disambiguation)}/{Artist Name}_{Album Title}_{medium:00}-{track:00}_{Track Title}',
-    artistFolderFormat: '{Artist Name} ({Artist MbId})',
-    replaceIllegalCharacters: true,
-    colonReplacementFormat: 'smart',
-    customColonReplacementFormat: '',
-  };
-
-  function mapToFormData(data: LidarrNamingRow | null): LidarrNamingFormData {
-    if (!data) return defaults;
+  function mapToFormData(data: LidarrNamingRow): LidarrNamingFormData {
     return {
       name: data.name,
       rename: data.rename,

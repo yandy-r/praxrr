@@ -1,7 +1,7 @@
 import { error, redirect, fail } from '@sveltejs/kit';
 import type { ServerLoad, Actions } from '@sveltejs/kit';
 import { pcdManager } from '$pcd/index.ts';
-import { canWriteToBase, type OperationLayer } from '$pcd/index.ts';
+import { canWriteToBase, parseOperationLayer } from '$pcd/index.ts';
 import * as customFormatQueries from '$pcd/entities/customFormats/index.ts';
 
 export const load: ServerLoad = async ({ params, url }) => {
@@ -75,7 +75,11 @@ export const actions: Actions = {
     const formatName = formData.get('formatName') as string;
     const currentTitle = formData.get('currentTitle') as string;
     const currentType = formData.get('currentType') as string;
-    const layer = (formData.get('layer') as OperationLayer) || 'user';
+    const layerResult = parseOperationLayer(formData.get('layer'));
+    if ('error' in layerResult) {
+      return fail(400, { error: layerResult.error });
+    }
+    const layer = layerResult.value;
 
     if (!formatName || !currentTitle || !currentType) {
       return fail(400, { error: 'Format name, current title and type are required' });
@@ -159,7 +163,11 @@ export const actions: Actions = {
     const formatName = formData.get('formatName') as string;
     const testTitle = formData.get('testTitle') as string;
     const testType = formData.get('testType') as string;
-    const layer = (formData.get('layer') as OperationLayer) || 'user';
+    const layerResult = parseOperationLayer(formData.get('layer'));
+    if ('error' in layerResult) {
+      return fail(400, { error: layerResult.error });
+    }
+    const layer = layerResult.value;
 
     if (!formatName || !testTitle || !testType) {
       return fail(400, { error: 'Format name, test title and type are required' });

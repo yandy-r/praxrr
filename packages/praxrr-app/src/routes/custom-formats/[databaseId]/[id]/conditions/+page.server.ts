@@ -5,7 +5,7 @@ import { canWriteToBase } from '$pcd/index.ts';
 import * as customFormatQueries from '$pcd/entities/customFormats/index.ts';
 import * as regularExpressionQueries from '$pcd/entities/regularExpressions/index.ts';
 import { getLanguagesWithSupport } from '$lib/server/sync/mappings.ts';
-import type { OperationLayer } from '$pcd/index.ts';
+import { parseOperationLayer } from '$pcd/index.ts';
 import type { ConditionData } from '$shared/pcd/display.ts';
 import { isArrType } from '$shared/pcd/types.ts';
 
@@ -98,7 +98,11 @@ export const actions: Actions = {
 
     // Parse form data
     const conditionsJson = formData.get('conditions') as string;
-    const layer = (formData.get('layer') as OperationLayer) || 'user';
+    const layerResult = parseOperationLayer(formData.get('layer'));
+    if ('error' in layerResult) {
+      return fail(400, { error: layerResult.error });
+    }
+    const layer = layerResult.value;
 
     let conditions: ConditionData[] = [];
     try {

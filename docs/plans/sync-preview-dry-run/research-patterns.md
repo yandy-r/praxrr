@@ -147,10 +147,13 @@ try {
   return { success: true, itemsSynced: N };
 } catch (error) {
   const errorMsg = error instanceof Error ? error.message : 'Unknown error';
-  await logger.error(`Failed ${this.syncType} sync for "${this.instanceName}"`, {
-    source: 'Sync:SectionName',
-    meta: { instanceId: this.instanceId, error: errorMsg },
-  });
+  await logger.error(
+    `Failed ${this.syncType} sync for "${this.instanceName}"`,
+    {
+      source: 'Sync:SectionName',
+      meta: { instanceId: this.instanceId, error: errorMsg },
+    }
+  );
   return { success: false, itemsSynced: 0, error: errorMsg };
 }
 ```

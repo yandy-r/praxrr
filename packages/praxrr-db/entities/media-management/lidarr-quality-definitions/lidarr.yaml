@@ -14,8 +14,8 @@ entries:
     preferred_size: 95
   - quality_name: AAC-320
     min_size: 0
-    max_size: 350
-    preferred_size: 195
+    max_size: 1000
+    preferred_size: 350
   - quality_name: AAC-VBR
     min_size: 0
     max_size: 350
@@ -78,8 +78,8 @@ entries:
     preferred_size: 35
   - quality_name: MP3-320
     min_size: 0
-    max_size: 350
-    preferred_size: 195
+    max_size: 1000
+    preferred_size: 350
   - quality_name: MP3-40
     min_size: 0
     max_size: 45
@@ -116,10 +116,6 @@ entries:
     min_size: 0
     max_size: 280
     preferred_size: 95
-  - quality_name: OGG Vorbis Q10
-    min_size: 0
-    max_size: 550
-    preferred_size: 295
   - quality_name: OGG Vorbis Q5
     min_size: 0
     max_size: 175
@@ -138,8 +134,12 @@ entries:
     preferred_size: 95
   - quality_name: OGG Vorbis Q9
     min_size: 0
-    max_size: 350
-    preferred_size: 195
+    max_size: 1000
+    preferred_size: 350
+  - quality_name: OGG Vorbis Q10
+    min_size: 0
+    max_size: 1000
+    preferred_size: 450
   - quality_name: Unknown
     min_size: 0
     max_size: 350

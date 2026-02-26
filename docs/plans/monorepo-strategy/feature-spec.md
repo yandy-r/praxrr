@@ -231,7 +231,7 @@ praxrr/                              # Repository root
 | File                                                                | Line | Reference                                    | Proposed Change                                            |
 | ------------------------------------------------------------------- | ---- | -------------------------------------------- | ---------------------------------------------------------- |
 | `packages/praxrr-app/src/hooks.server.ts`                           | 54   | `'https://github.com/yandy-r/praxrr-db'`     | Read from `PRAXRR_DEFAULT_DB_URL` env var                  |
-| `packages/praxrr-app/src/hooks.server.ts`                           | 55   | `'v2'`                                       | Read from `PRAXRR_DEFAULT_DB_BRANCH` env var               |
+| `packages/praxrr-app/src/hooks.server.ts`                           | 55   | `'main'`                                     | Read from `PRAXRR_DEFAULT_DB_BRANCH` env var               |
 | `scripts/generate-pcd-types.ts`                                     | 19   | `'yandy-r/praxrr-schema'`                    | Default to local `packages/praxrr-schema/ops/0.schema.sql` |
 | `packages/praxrr-app/src/routes/databases/[id]/config/+page.svelte` | 316  | `'https://github.com/yandy-r/praxrr-schema'` | Use configurable schema URL                                |
 | `packages/praxrr-app/src/lib/shared/pcd/types.ts`                   | 6    | Generated comment with schema URL            | Cosmetic, auto-regenerated                                 |
@@ -251,7 +251,7 @@ praxrr/                              # Repository root
 // packages/praxrr-db/deno.json
 {
   "name": "@yandy-r/praxrr-db",
-  "version": "2.0.0",
+  "version": "0.1.0",
 }
 ```
 
@@ -260,7 +260,11 @@ praxrr/                              # Repository root
 ```jsonc
 // deno.json (root) - add new members to existing workspace array
 {
-  "workspace": ["packages/praxrr-api", "packages/praxrr-db", "packages/praxrr-schema"],
+  "workspace": [
+    "packages/praxrr-api",
+    "packages/praxrr-db",
+    "packages/praxrr-schema",
+  ],
 }
 ```
 
@@ -291,9 +295,11 @@ No new API endpoints. The existing `/api/v1/*` endpoints are unaffected. The PCD
 #### Files to Modify
 
 - `deno.json` (root): Expand workspace array to include `praxrr-db` and `praxrr-schema`
-- `packages/praxrr-app/src/hooks.server.ts`: Replace hardcoded auto-link URL/branch with configurable env vars
+- `packages/praxrr-app/src/hooks.server.ts`: Replace hardcoded auto-link URL/branch with
+  configurable env vars
 - `scripts/generate-pcd-types.ts`: Default to local schema path with `--remote` fallback
-- `packages/praxrr-app/src/routes/databases/[id]/config/+page.svelte`: Make locked schema dependency URL configurable
+- `packages/praxrr-app/src/routes/databases/[id]/config/+page.svelte`: Make locked schema dependency
+  URL configurable
 - `CLAUDE.md`: Update env vars section, add workspace layout documentation
 - `README.md`: Add monorepo structure overview
 

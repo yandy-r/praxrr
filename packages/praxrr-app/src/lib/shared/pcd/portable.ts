@@ -104,21 +104,21 @@ export const PORTABLE_MIGRATION_MIN_VERSION = 1;
 export const PORTABLE_MIGRATION_SOURCE_EXPORT = 'pcd-export';
 
 /**
- * Optional migration metadata for hybrid JSON/YAML ingestion.
+ * Optional portable metadata for YAML/JSON entity import and export.
  *
  * Keep as runtime-facing metadata only. Existing payloads remain valid when omitted.
  */
 export interface PortableMigrationMetadata {
-  /** Ingestion format marker for hybrid imports/exports. */
+  /** Format marker for portable import/export payloads. */
   format: PortableMigrationFormat;
-  /** Schema version marker for migration payload format compatibility checks. */
+  /** Schema version marker for portable payload format compatibility checks. */
   version: number;
-  /** Source marker used to distinguish migration ingestion origin. */
+  /** Source marker used to distinguish payload origin. */
   source: string;
 }
 
 export interface PortableExportMetadata {
-  /** Optional migration metadata included on export responses. */
+  /** Optional portable metadata included on export responses. */
   migration?: PortableMigrationMetadata;
 }
 
@@ -196,7 +196,7 @@ export function validatePortableMigrationMetadata(migration: unknown): string | 
 
   return null;
 }
- 
+
 // ============================================================================
 // ENTITY TYPE ENUM
 // ============================================================================

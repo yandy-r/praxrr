@@ -14,6 +14,7 @@ import {
 
 const TEST_ARR_MASTER_KEY = 'AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=';
 const TEST_ARR_MASTER_KEY_VERSION = 'v-task-3-2';
+const TEST_ARR_PREVIOUS_KEY_VERSION = 'v2';
 // 32-byte key (44 chars with padding); must differ from TEST_ARR_MASTER_KEY
 const TEST_ARR_PREVIOUS_KEY_V2 = 'CQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=';
 
@@ -103,7 +104,7 @@ Deno.test(
     __resetArrCredentialKeyRingForTest();
     mutableConfig.arrCredentialMasterKey = TEST_ARR_MASTER_KEY;
     mutableConfig.arrCredentialMasterKeyVersion = TEST_ARR_MASTER_KEY_VERSION;
-    const previousKeysJson = JSON.stringify({ v2: TEST_ARR_PREVIOUS_KEY_V2 });
+    const previousKeysJson = JSON.stringify({ [TEST_ARR_PREVIOUS_KEY_VERSION]: TEST_ARR_PREVIOUS_KEY_V2 });
     mutableConfig.arrCredentialPreviousKeys = previousKeysJson;
     Deno.env.set('ARR_CREDENTIAL_MASTER_KEY', TEST_ARR_MASTER_KEY);
     Deno.env.set('ARR_CREDENTIAL_MASTER_KEY_VERSION', TEST_ARR_MASTER_KEY_VERSION);
@@ -113,11 +114,11 @@ Deno.test(
       const versions = getAllArrCredentialKeyVersions();
       assertEquals(versions.length, 2);
       assertEquals(versions.includes(TEST_ARR_MASTER_KEY_VERSION), true);
-      assertEquals(versions.includes('v2'), true);
+      assertEquals(versions.includes(TEST_ARR_PREVIOUS_KEY_VERSION), true);
 
       const plaintext = 'same-api-key-across-versions';
       const fpActive = await deriveArrInstanceApiKeyFingerprint(plaintext, TEST_ARR_MASTER_KEY_VERSION);
-      const fpV2 = await deriveArrInstanceApiKeyFingerprint(plaintext, 'v2');
+      const fpV2 = await deriveArrInstanceApiKeyFingerprint(plaintext, TEST_ARR_PREVIOUS_KEY_VERSION);
       assertEquals(fpActive.value !== fpV2.value, true);
     } finally {
       mutableConfig.arrCredentialMasterKey = originalMasterKey;

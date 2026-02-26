@@ -3,6 +3,7 @@
  */
 
 import { arrSyncQueries } from '$db/queries/arrSync.ts';
+import { trashGuideSyncQueries } from '$db/queries/trashGuideSync.ts';
 import type { BaseArrClient } from '$arr/base.ts';
 import type { ArrInstance } from '$db/queries/arrInstances.ts';
 import { QualityProfileSyncer } from './syncer.ts';
@@ -50,7 +51,13 @@ export const qualityProfilesHandler: SectionHandler = {
 
   hasConfig(instanceId: number): boolean {
     const config = arrSyncQueries.getQualityProfilesSync(instanceId);
-    return config.selections.length > 0;
+    if (config.selections.length > 0) {
+      return true;
+    }
+
+    // Also check TRaSH Guide quality profile selections
+    const trashHydrations = trashGuideSyncQueries.getQualityProfileSourceHydrationByInstance(instanceId);
+    return trashHydrations.some((h) => h.selectedQualityProfiles.length > 0);
   },
 };
 

@@ -30,6 +30,15 @@ export function getNamespaceSuffix(index: number): string {
   return '\u200B'.repeat(index - NAMESPACE_CHARS.length + 1);
 }
 
+/**
+ * TRaSH Guide namespaces intentionally use a zero-width non-joiner prefix
+ * to remain disjoint from database namespaces while preserving matching behavior.
+ */
+export function getTrashGuideNamespaceSuffix(index: number): string {
+  if (index < 1) throw new Error(`Invalid TRaSH namespace index: ${index}`);
+  return `\u200C${'\u200B'.repeat(index)}`;
+}
+
 /** Removes any trailing namespace suffix characters from a name. */
 export function stripNamespaceSuffix(name: string): string {
   return name.replace(SUFFIX_PATTERN, '');

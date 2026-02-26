@@ -10,6 +10,7 @@ import {
 } from '../../lib/server/sync/processor.ts';
 import { processInstance } from '../../lib/server/pull/startup/orchestrator.ts';
 import type { ArrInstance } from '../../lib/server/db/queries/arrInstances.ts';
+import type { JobQueueRecord } from '../../lib/server/jobs/queueTypes.ts';
 
 type Restore = () => void;
 
@@ -107,7 +108,7 @@ Deno.test('triggerSyncs skips instances marked active in startup pull', async ()
         jobType: job.jobType,
         status: 'queued',
         runAt: '2026-01-01T00:00:00Z',
-        payload: job.payload ?? {},
+        payload: (job.payload ?? {}) as JobQueueRecord['payload'],
         source: job.source ?? 'system',
         dedupeKey: job.dedupeKey ?? null,
         cooldownUntil: job.cooldownUntil ?? null,

@@ -1,23 +1,20 @@
 <script lang="ts">
-	import { ExternalLink, Unlink, Lock, Code } from 'lucide-svelte';
+	import { ExternalLink, Unlink, Lock, Code, AlertTriangle } from 'lucide-svelte';
 	import Table from '$ui/table/Table.svelte';
 	import TableActionButton from '$ui/table/TableActionButton.svelte';
 	import Badge from '$ui/badge/Badge.svelte';
 	import type { Column } from '$ui/table/types';
-	import type { DatabaseInstance } from '$db/queries/databaseInstances.ts';
 	import { parseUTC } from '$shared/utils/dates';
 	import { createEventDispatcher } from 'svelte';
 	import DatabaseAvatar from '../components/DatabaseAvatar.svelte';
+	import type { UnifiedDatabaseItem } from '../types';
 
-	export let databases: DatabaseInstance[];
+	export let items: UnifiedDatabaseItem[];
 
 	const dispatch = createEventDispatcher<{
-		unlink: DatabaseInstance;
+		unlink: UnifiedDatabaseItem;
 	}>();
 
-	// Avatar handled by DatabaseAvatar component
-
-	// Format sync strategy for display
 	function formatSyncStrategy(minutes: number): string {
 		if (minutes === 0) return 'Manual';
 		if (minutes < 60) return `Every ${minutes} min`;
@@ -26,7 +23,6 @@
 		return `Every ${minutes / 1440}d`;
 	}
 
-	// Format last synced date
 	function formatLastSynced(date: string | null): string {
 		const d = parseUTC(date);
 		if (!d) return 'Never';
@@ -38,56 +34,73 @@
 		});
 	}
 
-	function getRowHref(database: DatabaseInstance): string {
-		return `/databases/${database.id}`;
+	function getRowHref(item: UnifiedDatabaseItem): string {
+		return item.type === 'trash' ? `/databases/trash/${item.id}` : `/databases/${item.id}`;
 	}
 
-	// Handle unlink click
-	function handleUnlinkClick(e: Event, database: DatabaseInstance) {
+	function handleUnlinkClick(e: Event, item: UnifiedDatabaseItem) {
 		e.stopPropagation();
 		e.preventDefault();
-		dispatch('unlink', database);
+		dispatch('unlink', item);
 	}
 
-	// Handle external link click
 	function handleExternalClick(e: Event, url: string) {
 		e.stopPropagation();
 		e.preventDefault();
 		window.open(url, '_blank');
 	}
 
-	// Define table columns
-	const columns: Column<DatabaseInstance>[] = [
+	const columns: Column<UnifiedDatabaseItem>[] = [
 		{ key: 'name', header: 'Name', align: 'left' },
-		{ key: 'repository_url', header: 'Repository', align: 'left' },
-		{ key: 'sync_strategy', header: 'Sync', align: 'left', width: 'w-32' },
-		{ key: 'last_synced_at', header: 'Last Synced', align: 'left', width: 'w-40' }
+		{ key: 'type', header: 'Type', align: 'left', width: 'w-24' },
+		{ key: 'repositoryUrl', header: 'Repository', align: 'left' },
+		{ key: 'syncStrategy', header: 'Sync', align: 'left', width: 'w-32' },
+		{ key: 'lastSyncedAt', header: 'Last Synced', align: 'left', width: 'w-40' }
 	];
 </script>
 
-<Table {columns} data={databases} hoverable={true} rowHref={getRowHref}>
+<Table {columns} data={items} hoverable={true} rowHref={getRowHref}>
 	<svelte:fragment slot="cell" let:row let:column>
 		{#if column.key === 'name'}
 			<div class="flex items-center gap-3">
-				<DatabaseAvatar name={row.name} repoUrl={row.repository_url} size="sm" />
+				<DatabaseAvatar name={row.name} repoUrl={row.repositoryUrl} size="sm" />
 				<div class="flex items-center gap-2">
 					<div class="font-medium text-neutral-900 dark:text-neutral-50">
 						{row.name}
 					</div>
-					{#if row.is_private}
+					{#if row.type === 'trash' && row.arrType}
+						<Badge
+							variant={row.arrType === 'radarr' ? 'radarr' : 'sonarr'}
+							size="sm"
+						>
+							{row.arrType === 'radarr' ? 'Radarr' : 'Sonarr'}
+						</Badge>
+					{/if}
+					{#if row.type === 'pcd' && row.isPrivate}
 						<Badge variant="neutral" icon={Lock} mono>Private</Badge>
 					{/if}
-					{#if row.has_personal_access_token || row.personal_access_token}
+					{#if row.type === 'pcd' && row.hasPersonalAccessToken}
 						<Badge variant="info" icon={Code} mono>Dev</Badge>
+					{/if}
+					{#if row.type === 'pcd' && !row.cacheAvailable}
+						<Badge variant="warning" icon={AlertTriangle} mono>Cache Unavailable</Badge>
 					{/if}
 				</div>
 			</div>
-		{:else if column.key === 'repository_url'}
-			<Badge variant="neutral" mono>{row.repository_url.replace('https://github.com/', '')}</Badge>
-		{:else if column.key === 'sync_strategy'}
-			<Badge variant="neutral" mono>{formatSyncStrategy(row.sync_strategy)}</Badge>
-		{:else if column.key === 'last_synced_at'}
-			<Badge variant="neutral" mono>{formatLastSynced(row.last_synced_at)}</Badge>
+		{:else if column.key === 'type'}
+			{#if row.type === 'trash'}
+				<Badge variant="accent" size="sm">TRaSH</Badge>
+			{:else}
+				<Badge variant="neutral" size="sm">PCD</Badge>
+			{/if}
+		{:else if column.key === 'repositoryUrl'}
+			<Badge variant="neutral" mono>
+				{row.repositoryUrl.replace('https://github.com/', '')}
+			</Badge>
+		{:else if column.key === 'syncStrategy'}
+			<Badge variant="neutral" mono>{formatSyncStrategy(row.syncStrategy)}</Badge>
+		{:else if column.key === 'lastSyncedAt'}
+			<Badge variant="neutral" mono>{formatLastSynced(row.lastSyncedAt)}</Badge>
 		{/if}
 	</svelte:fragment>
 
@@ -96,11 +109,11 @@
 			<TableActionButton
 				icon={ExternalLink}
 				title="View on GitHub"
-				on:click={(e) => handleExternalClick(e, row.repository_url)}
+				on:click={(e) => handleExternalClick(e, row.repositoryUrl)}
 			/>
 			<TableActionButton
 				icon={Unlink}
-				title="Unlink database"
+				title="Unlink"
 				variant="danger"
 				on:click={(e) => handleUnlinkClick(e, row)}
 			/>

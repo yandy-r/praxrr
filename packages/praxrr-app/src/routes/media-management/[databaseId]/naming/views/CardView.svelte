@@ -4,17 +4,23 @@
 	import CardGrid from '$ui/card/CardGrid.svelte';
 	import Card from '$ui/card/Card.svelte';
 	import Label from '$ui/label/Label.svelte';
+	import SourceBadge from '$ui/badge/SourceBadge.svelte';
 	import Button from '$ui/button/Button.svelte';
 	import { Copy, Download } from 'lucide-svelte';
-	import type { NamingListItem } from '$shared/pcd/display.ts';
+	import type { SourcedNamingListItem } from '$shared/pcd/display.ts';
+	import type { SourceRef } from '$shared/sources/types.ts';
 	import type { ArrAppType } from '$shared/arr/capabilities.ts';
 	import radarrLogo from '$lib/client/assets/Radarr.svg';
 	import sonarrLogo from '$lib/client/assets/Sonarr.svg';
 	import lidarrLogo from '$lib/client/assets/Lidarr.png';
 	import { getMediaManagementDisplayName, getMediaManagementRouteName } from '$shared/arr/displayName.ts';
 
-	export let configs: NamingListItem[];
+	export let configs: SourcedNamingListItem[];
 	export let databaseId: number;
+	export let currentDatabaseId: number;
+	export let currentDatabaseName: string;
+	export let sources: SourceRef[] = [];
+	export let showSourceBadges = false;
 
 	const dispatch = createEventDispatcher<{
 		clone: { name: string; arr_type: string };
@@ -28,6 +34,19 @@
 		sonarr: sonarrLogo,
 		lidarr: lidarrLogo
 	};
+	$: sourceLookup = new Map(sources.map((source) => [`${source.type}:${source.id}`, source] as const));
+	$: fallbackSource = {
+		type: 'pcd' as const,
+		id: currentDatabaseId,
+		name: currentDatabaseName
+	};
+
+	interface ResolvedSource {
+		type: SourceRef['type'];
+		id: number;
+		name: string;
+		arrType: ArrAppType | null;
+	}
 
 	let loadedImages = new SvelteSet<string>();
 
@@ -39,16 +58,65 @@
 		return supportedArrTypes.includes(arrType as ArrAppType);
 	}
 
-	function getConfigHref(config: NamingListItem): string {
-		const routeName = getMediaManagementRouteName(config.name, config.arr_type).trim();
-		if (!routeName || !isSupportedArrType(config.arr_type)) {
-			return `/media-management/${databaseId}/naming`;
+	function resolveSource(config: SourcedNamingListItem): ResolvedSource {
+		if (config.sourceType && typeof config.sourceDatabaseId === 'number') {
+			const matched = sourceLookup.get(`${config.sourceType}:${config.sourceDatabaseId}`);
+			if (matched) {
+				return {
+					type: matched.type,
+					id: matched.id,
+					name: matched.name,
+					arrType: matched.type === 'trash' ? matched.arrType : null
+				};
+			}
+
+			return {
+				type: config.sourceType,
+				id: config.sourceDatabaseId,
+				name: config.sourceDatabaseName ?? `Source ${config.sourceDatabaseId}`,
+				arrType: null
+			};
 		}
 
-		return `/media-management/${databaseId}/naming/${config.arr_type}/${encodeURIComponent(routeName)}`;
+		return {
+			type: fallbackSource.type,
+			id: fallbackSource.id,
+			name: fallbackSource.name,
+			arrType: null
+		};
 	}
 
-	function getLogo(config: NamingListItem): string {
+	function resolveSourceDatabaseId(config: SourcedNamingListItem): number {
+		if (config.sourceType === 'pcd' && typeof config.sourceDatabaseId === 'number') {
+			return config.sourceDatabaseId;
+		}
+
+		return databaseId;
+	}
+
+	function isTrashRow(config: SourcedNamingListItem): boolean {
+		return config.sourceType === 'trash';
+	}
+
+	function isEditableRow(config: SourcedNamingListItem): boolean {
+		return !isTrashRow(config) && resolveSourceDatabaseId(config) === currentDatabaseId;
+	}
+
+	function getConfigHref(config: SourcedNamingListItem): string | undefined {
+		if (isTrashRow(config)) {
+			return undefined;
+		}
+
+		const sourceDatabaseId = resolveSourceDatabaseId(config);
+		const routeName = getMediaManagementRouteName(config.name, config.arr_type).trim();
+		if (!routeName || !isSupportedArrType(config.arr_type)) {
+			return `/media-management/${sourceDatabaseId}/naming`;
+		}
+
+		return `/media-management/${sourceDatabaseId}/naming/${config.arr_type}/${encodeURIComponent(routeName)}`;
+	}
+
+	function getLogo(config: SourcedNamingListItem): string {
 		if (!isSupportedArrType(config.arr_type)) {
 			return '';
 		}
@@ -94,9 +162,18 @@
 					</div>
 					<div class="min-w-0">
 						<h3 class="truncate text-sm font-semibold text-neutral-900 dark:text-neutral-100">
-							{getMediaManagementDisplayName(config.name, config.arr_type)}
+							{getMediaManagementDisplayName(config.name, config.arr_type, config.sourceType)}
 						</h3>
-						<div class="mt-1">
+						<div class="mt-1 flex flex-wrap items-center gap-1.5">
+							{#if showSourceBadges}
+								{@const source = resolveSource(config)}
+								<SourceBadge
+									sourceType={source.type}
+									sourceName={source.name}
+									arrType={source.arrType}
+									size="sm"
+								/>
+							{/if}
 							{#if config.rename}
 								<Label variant="success" size="sm" rounded="md">Rename Enabled</Label>
 							{:else}
@@ -107,22 +184,24 @@
 				</div>
 
 				<!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
-				<div class="flex items-center gap-0.5" on:click|stopPropagation|preventDefault>
-					<Button
-						icon={Download}
-						size="xs"
-						variant="ghost"
-						tooltip="Export"
-						on:click={() => dispatch('export', { name: config.name, arr_type: config.arr_type })}
-					/>
-					<Button
-						icon={Copy}
-						size="xs"
-						variant="ghost"
-						tooltip="Clone"
-						on:click={() => dispatch('clone', { name: config.name, arr_type: config.arr_type })}
-					/>
-				</div>
+				{#if isEditableRow(config)}
+					<div class="flex items-center gap-0.5" on:click|stopPropagation|preventDefault>
+						<Button
+							icon={Download}
+							size="xs"
+							variant="ghost"
+							tooltip="Export"
+							on:click={() => dispatch('export', { name: config.name, arr_type: config.arr_type })}
+						/>
+						<Button
+							icon={Copy}
+							size="xs"
+							variant="ghost"
+							tooltip="Clone"
+							on:click={() => dispatch('clone', { name: config.name, arr_type: config.arr_type })}
+						/>
+					</div>
+				{/if}
 			</div>
 		</Card>
 	{/each}

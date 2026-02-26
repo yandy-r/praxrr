@@ -1,14 +1,15 @@
 import { error, redirect, fail } from '@sveltejs/kit';
-import type { PageServerLoad, Actions } from './$types';
+import type { Actions, ServerLoad } from '@sveltejs/kit';
 import { pcdManager } from '$pcd/index.ts';
 import { canWriteToBase } from '$pcd/index.ts';
-import type { OperationLayer } from '$pcd/index.ts';
+import { parseOperationLayer } from '$pcd/index.ts';
 import { getSonarrByName, updateSonarrNaming, removeSonarrNaming } from '$pcd/entities/mediaManagement/naming/index.ts';
 import { arrSyncQueries } from '$db/queries/arrSync.ts';
+import { logger } from '$logger/logger.ts';
 import type { SonarrNamingRow } from '$shared/pcd/display.ts';
 import { validateNamingFormat } from '$shared/pcd/namingTokens.ts';
 
-export const load: PageServerLoad = async ({ params, parent }) => {
+export const load: ServerLoad = async ({ params, parent }) => {
   const { databaseId, name } = params;
 
   if (!databaseId || !name) {
@@ -66,7 +67,11 @@ export const actions: Actions = {
 
     const formData = await request.formData();
     const newName = formData.get('name') as string;
-    const layer = (formData.get('layer') as OperationLayer) || 'user';
+    const layerResult = parseOperationLayer(formData.get('layer'));
+    if ('error' in layerResult) {
+      return fail(400, { error: layerResult.error });
+    }
+    const layer = layerResult.value;
 
     if (!newName?.trim()) {
       return fail(400, { error: 'Name is required' });
@@ -103,6 +108,13 @@ export const actions: Actions = {
       }
     }
 
+    if (!colonReplacementFormat) {
+      return fail(400, { error: 'Colon replacement format is required' });
+    }
+    if (!multiEpisodeStyle) {
+      return fail(400, { error: 'Multi-episode style is required' });
+    }
+
     let result;
     try {
       result = await updateSonarrNaming({
@@ -119,9 +131,9 @@ export const actions: Actions = {
           seriesFolderFormat: seriesFolderFormat || '',
           seasonFolderFormat: seasonFolderFormat || '',
           replaceIllegalCharacters,
-          colonReplacementFormat: colonReplacementFormat || 'smart',
+          colonReplacementFormat,
           customColonReplacementFormat: customColonReplacementFormat || null,
-          multiEpisodeStyle: multiEpisodeStyle || 'extend',
+          multiEpisodeStyle,
         },
       });
     } catch (err) {
@@ -137,10 +149,22 @@ export const actions: Actions = {
     }
 
     if (newName.trim() !== decodedName) {
-      arrSyncQueries.updateNamingConfigName(decodedName, newName.trim(), {
-        arrType: 'sonarr',
-        databaseId: currentDatabaseId,
-      });
+      try {
+        arrSyncQueries.updateNamingConfigName(decodedName, newName.trim(), {
+          arrType: 'sonarr',
+          databaseId: currentDatabaseId,
+        });
+      } catch (err) {
+        await logger.error('Failed to sync updated Sonarr naming config name', {
+          source: 'naming-update',
+          meta: {
+            databaseId: currentDatabaseId,
+            oldName: decodedName,
+            newName: newName.trim(),
+            error: err instanceof Error ? err.message : String(err),
+          },
+        });
+      }
     }
 
     throw redirect(303, `/media-management/${databaseId}/naming`);
@@ -170,18 +194,35 @@ export const actions: Actions = {
     }
 
     const formData = await request.formData();
-    const layer = (formData.get('layer') as OperationLayer) || 'user';
+    const layerResult = parseOperationLayer(formData.get('layer'));
+    if ('error' in layerResult) {
+      return fail(400, { error: layerResult.error });
+    }
+    const layer = layerResult.value;
 
     if (layer === 'base' && !canWriteToBase(currentDatabaseId)) {
       return fail(403, { error: 'Cannot write to base layer without personal access token' });
     }
 
-    const result = await removeSonarrNaming({
-      databaseId: currentDatabaseId,
-      cache,
-      layer,
-      current,
-    });
+    let result;
+    try {
+      result = await removeSonarrNaming({
+        databaseId: currentDatabaseId,
+        cache,
+        layer,
+        current,
+      });
+    } catch (err) {
+      await logger.error('Failed to delete Sonarr naming config', {
+        source: 'naming-delete',
+        meta: {
+          databaseId: currentDatabaseId,
+          name: decodedName,
+          error: err instanceof Error ? err.message : String(err),
+        },
+      });
+      return fail(500, { error: err instanceof Error ? err.message : 'Failed to delete naming config' });
+    }
 
     if (!result.success) {
       return fail(500, { error: result.error || 'Failed to delete naming config' });

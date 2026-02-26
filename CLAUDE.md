@@ -137,10 +137,13 @@ Defined in `packages/praxrr-app/svelte.config.js` and mirrored in `deno.json`:
 
 ### PCD (Praxrr Config Database)
 
-Configuration is stored as append-only **ops** (SQL operations) in `pcd_ops`. Ops are replayed into an in-memory SQLite cache on each compile. Two layers exist:
+Configuration is stored as append-only **ops** in `pcd_ops`. Base ops are derived from YAML entity
+imports during runtime ingestion and compiled to SQL before persistence. Two layers exist:
 
 - **Base ops**: published canonical state (from repo)
 - **User ops**: local overrides that persist across syncs
+- SQL schema and tweak inputs remain file-based in `deps/schema/ops` and repo `tweaks/`; they are not the
+  YAML base-data ingestion path.
 
 Writer pipeline: Kysely query -> SQL compile -> validate against cache -> write to `pcd_ops` -> recompile cache.
 
@@ -219,11 +222,13 @@ and mirrored external distribution.
 ### Environment Variables
 
 - [ ] `PRAXRR_DEFAULT_DB_URL` configures the default PCD repository used for first-run auto-link.
+- [ ] `PRAXRR_DEFAULT_DB_URL` also accepts local filesystem paths (or `file://` paths) for development.
 - [ ] Unset default resolves to `https://github.com/yandy-r/praxrr-db`.
 - [ ] Explicitly set to empty string to disable default auto-linking.
-- [ ] `PRAXRR_DEFAULT_DB_BRANCH` defaults to `v2`.
+- [ ] `PRAXRR_DEFAULT_DB_BRANCH` defaults to `main`.
 - [ ] `PRAXRR_DEFAULT_DB_NAME` defaults to `Praxrr-DB`.
 - [ ] `PRAXRR_SCHEMA_REF` optionally overrides schema dependency ref resolution using either a tag or branch name.
+- [ ] `PRAXRR_SCHEMA_LOCAL_PATH` optionally overrides schema dependency resolution to use a local folder containing `ops/` + `pcd.json` for development.
 - [ ] `PRAXRR_DEFAULT_DB_TOKEN`, `PRAXRR_DEFAULT_DB_GIT_USERNAME`, and `PRAXRR_DEFAULT_DB_GIT_EMAIL` remain supported.
 
 ### Empty URL Behavior

@@ -215,7 +215,12 @@ microdiff does not support key-based array matching. Arrays are compared by inde
 #### API
 
 ```typescript
-import { diff, applyChangeset, revertChangeset, atomizeChangeset } from 'json-diff-ts';
+import {
+  diff,
+  applyChangeset,
+  revertChangeset,
+  atomizeChangeset,
+} from 'json-diff-ts';
 
 const changeset: IChange[] = diff(oldObject, newObject, {
   embeddedObjKeys: { formatItems: 'name', items: 'name' },
@@ -481,7 +486,9 @@ export const GET: RequestHandler = async ({ url }) => {
     async start(controller) {
       const encoder = new TextEncoder();
       const send = (event: string, data: unknown) => {
-        controller.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`));
+        controller.enqueue(
+          encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`)
+        );
       };
 
       try {
@@ -519,7 +526,9 @@ export const GET: RequestHandler = async ({ url }) => {
 
 ```typescript
 // Client-side consumption
-const eventSource = new EventSource(`/api/v1/sync/preview?instanceId=${instanceId}`);
+const eventSource = new EventSource(
+  `/api/v1/sync/preview?instanceId=${instanceId}`
+);
 
 eventSource.addEventListener('progress', (e) => {
   const { phase, section } = JSON.parse(e.data);

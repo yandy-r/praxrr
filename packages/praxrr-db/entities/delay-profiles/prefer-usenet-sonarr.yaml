@@ -1,0 +1,11 @@
+migration:
+  format: yaml
+  version: 1
+  source: pcd-export
+name: Prefer Usenet (Sonarr)
+preferredProtocol: prefer_usenet
+usenetDelay: 10
+torrentDelay: 0
+bypassIfHighestQuality: false
+bypassIfAboveCfScore: false
+minimumCfScore: 0

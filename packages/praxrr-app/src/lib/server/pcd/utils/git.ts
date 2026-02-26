@@ -2,6 +2,9 @@ import { execGitSafe } from '$utils/git/exec.ts';
 
 /**
  * Get the highest operation number from COMMITTED files in ops/
+ *
+ * This is intentionally export-history-only: import now loads repo base ops via
+ * entity reads and does not depend on `ops/` filesystem reads.
  */
 export async function getMaxOpNumber(repoPath: string): Promise<number> {
   let maxNum = 0;

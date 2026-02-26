@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - dev
-      - v2
+      - main
     tags:
       - 'schema/v*'
   workflow_dispatch:
@@ -46,9 +46,9 @@ jobs:
             TARGET_REF="refs/heads/${TARGET_BRANCH}"
             TARGET_AUX_REFS=""
             IS_RELEASE_TAG="false"
-          elif [[ "${GITHUB_REF}" == "refs/heads/v2" ]]; then
-            TARGET_BRANCH="v2"
-            TARGET_REF="refs/heads/v2"
+          elif [[ "${GITHUB_REF}" == "refs/heads/main" ]]; then
+            TARGET_BRANCH="main"
+            TARGET_REF="refs/heads/main"
             TARGET_AUX_REFS="refs/heads/develop,refs/tags/develop"
             IS_RELEASE_TAG="false"
           elif [[ "${GITHUB_REF}" == "refs/heads/dev" ]]; then

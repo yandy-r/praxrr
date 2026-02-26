@@ -78,10 +78,7 @@ export async function getArrInstanceClient(
     try {
       instance = arrInstancesQueries.getById(instanceId);
     } catch (error) {
-      if (
-        error instanceof Error &&
-        error.message.includes('Database not initialized')
-      ) {
+      if (error instanceof Error && error.message.includes('Database not initialized')) {
         throw new Error(`No Arr credentials found for instance ${instanceId}`);
       }
 

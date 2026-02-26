@@ -2,7 +2,7 @@ import { error, redirect, fail } from '@sveltejs/kit';
 import type { Actions, ServerLoad } from '@sveltejs/kit';
 import { pcdManager } from '$pcd/index.ts';
 import { canWriteToBase } from '$pcd/index.ts';
-import type { OperationLayer } from '$pcd/index.ts';
+import { parseOperationLayer } from '$pcd/index.ts';
 import { getLidarrByName } from '$pcd/entities/mediaManagement/media-settings/read.ts';
 import { updateLidarrMediaSettings } from '$pcd/entities/mediaManagement/media-settings/update.ts';
 import { removeLidarrMediaSettings } from '$pcd/entities/mediaManagement/media-settings/index.ts';
@@ -79,7 +79,11 @@ export const actions: Actions = {
 
     const formData = await request.formData();
     const newName = formData.get('name') as string;
-    const layer = (formData.get('layer') as OperationLayer) || 'user';
+    const layerResult = parseOperationLayer(formData.get('layer'));
+    if ('error' in layerResult) {
+      return fail(400, { error: layerResult.error });
+    }
+    const layer = layerResult.value;
 
     if (!newName?.trim()) {
       return fail(400, { error: 'Name is required' });
@@ -151,7 +155,11 @@ export const actions: Actions = {
     const current = resolved.config;
 
     const formData = await request.formData();
-    const layer = (formData.get('layer') as OperationLayer) || 'user';
+    const layerResult = parseOperationLayer(formData.get('layer'));
+    if ('error' in layerResult) {
+      return fail(400, { error: layerResult.error });
+    }
+    const layer = layerResult.value;
 
     if (layer === 'base' && !canWriteToBase(currentDatabaseId)) {
       return fail(403, { error: 'Cannot write to base layer without personal access token' });

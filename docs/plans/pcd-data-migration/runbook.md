@@ -1,10 +1,74 @@
 # PCD Data Migration Runbook
 
-This runbook documents rollout and operator checks for the `pcd-data-migration` effort.
-Use it for staged production rollout of YAML-first migration inputs while preserving
-`pcd_ops` observability and value-guard safety checks.
+This runbook documents operator checks for the completed YAML-only PCD ingestion model.
+Runtime base data ingestion is now YAML-only (`entities/`), with SQL used only for schema/tweak bootstrap
+layers (`deps/schema/ops`, repo `tweaks/`).
 
-## Objectives
+## Post-cutover operator verification (current)
+
+- Confirm startup/build and sync behavior after cutover are stable.
+- Confirm schema/tweak SQL inputs still load and compile with legacy compatibility.
+- Confirm no rollback signals appear in `pcd_op_history` after startup and manual checks.
+
+### Preconditions
+
+- A writable app database backup is available.
+- Deployed runtime includes YAML-only ingestion changes.
+- Logging and admin access to the app DB is available for direct queries.
+- At least one linked Arr instance has a known-good baseline sync.
+
+### Verification checklist
+
+1. Confirm linked databases are enabled and discoverable:
+
+   ```sql
+   SELECT id, name, enabled
+   FROM database_instances
+   WHERE enabled = 1
+   ORDER BY id;
+   ```
+
+2. Confirm operation and history health is stable after startup:
+
+   ```sql
+   SELECT database_id, origin, source, state, COUNT(*) AS op_count
+   FROM pcd_ops
+   GROUP BY database_id, origin, source, state
+   ORDER BY database_id, origin, source, state;
+   ```
+
+   ```sql
+   SELECT h.batch_id,
+     h.status,
+     COUNT(*) AS status_count
+   FROM pcd_op_history h
+   WHERE h.applied_at >= datetime('now', '-30 minutes')
+   GROUP BY h.batch_id, h.status
+   ORDER BY h.batch_id, h.status;
+   ```
+
+3. Confirm queue and run health is healthy:
+
+   ```sql
+   SELECT job_type, status, COUNT(*) AS job_count
+   FROM job_queue
+   GROUP BY job_type, status;
+
+   SELECT job_type, status, COUNT(*) AS run_count
+   FROM job_run_history
+   GROUP BY job_type, status;
+   ```
+
+4. Execute one controlled startup + sync roundtrip for a low-risk database and confirm results are bounded and successful.
+
+5. If sustained `error` / `failed` / conflict spikes appear after startup or sync, stop expanding scope and open an incident before enabling additional instances.
+
+## Historical migration-mode guidance (archival)
+
+The sections below are preserved for historical context only. They describe the pre-cutover
+`PRAXRR_PCD_MIGRATION_MODE` / SQL fallback process and should not be used for current operations.
+
+### Historical objectives
 
 - Make YAML entity files the canonical base data source at startup.
 - Keep SQL ops available as transitional artifacts and fallback-only input.
@@ -12,21 +76,20 @@ Use it for staged production rollout of YAML-first migration inputs while preser
 - Make migration outcomes visible through `pcd_ops`, `pcd_op_history`, and job tables.
 - Define explicit guard-failure and rollback behavior before broad rollout.
 
-## Preconditions
+### Historical preconditions
 
 - A writable app database backup is available.
 - Feature branch/commit containing migration changes is deployed in staging first.
 - Operators know the active conflict strategy (`override`, `align`, or `ask`) for the target instances.
-- Runtime default mode is `PRAXRR_PCD_MIGRATION_MODE=hybrid` (unless explicitly overridden).
 - Logging and admin access to the app DB is available for direct queries.
 
-## Runtime mode controls
+### Historical runtime mode controls
 
 - Default rollout mode: `PRAXRR_PCD_MIGRATION_MODE=hybrid`
 - Transitional fallback (optional): `PRAXRR_PCD_MIGRATION_ALLOW_LEGACY_FALLBACK=true`
 - SQL-only emergency override: `PRAXRR_PCD_MIGRATION_MODE=sql-only`
 
-## Preflight checks (before each rollout phase)
+### Historical preflight checks (before each rollout phase)
 
 1. Backup each environment database
 
@@ -75,9 +138,9 @@ Use it for staged production rollout of YAML-first migration inputs while preser
    GROUP BY job_type, status;
    ```
 
-## Phased rollout
+### Historical phased rollout
 
-### Phase 1 — Staging validation
+#### Historical phase 1 — Staging validation
 
 1. Run migration path in staging only.
 2. Execute a small representative portable import/export pair in staging.
@@ -85,13 +148,13 @@ Use it for staged production rollout of YAML-first migration inputs while preser
 4. Promote to production only if all checkpoints pass for at least one full
    `pcd.sync` cycle.
 
-### Phase 2 — One-database canary
+#### Historical phase 2 — One-database canary
 
 1. Enable migration inputs for a single non-critical PCD database.
 2. Run a full startup/import/build cycle and one manual sync for one Arr instance.
 3. Pause before additional databases until guard checks pass.
 
-### Phase 3 — Controlled pilot
+#### Historical phase 3 — Controlled pilot
 
 1. Extend to 10-20% of databases or one low-risk tenant group.
 2. Confirm no spike in:
@@ -100,15 +163,15 @@ Use it for staged production rollout of YAML-first migration inputs while preser
    - in-flight sync failures.
 3. Keep rollback artifact available (current backup and previous release image).
 
-### Phase 4 — General rollout
+#### Historical phase 4 — General rollout
 
 1. Enable migration inputs across remaining databases.
 2. Continue monitoring every hour for the first three cycles.
 3. If any blocker is hit, pause and revert to rollback path immediately.
 
-## Validation checkpoints
+### Historical validation checkpoints
 
-### Checkpoint A — Compile and import health
+#### Historical Checkpoint A — Compile and import health
 
 - Confirm imports/builds for the target database produce expected statuses:
 
@@ -126,7 +189,7 @@ Use it for staged production rollout of YAML-first migration inputs while preser
 - Any unexpected `error` rows require immediate block.
 - Conflicts should be reviewed at the batch level before proceeding.
 
-### Checkpoint B — Value-guard confirmation
+#### Historical Checkpoint B — Value-guard confirmation
 
 1. Inspect blocking conflicts:
 
@@ -151,7 +214,7 @@ Use it for staged production rollout of YAML-first migration inputs while preser
 3. For any new `error`, correlate with the same operation `filename` and migration metadata
    and decide whether it is a migration input bug or existing data divergence.
 
-### Checkpoint C — Sync and queue behavior
+#### Historical Checkpoint C — Sync and queue behavior
 
 1. Ensure one-time sync enqueue behavior remains bounded:
 
@@ -189,7 +252,7 @@ Use it for staged production rollout of YAML-first migration inputs while preser
 
 4. Treat any sustained rise in `failed`/`running` queues or `arr.sync` failures as a rollback signal.
 
-## Guard failure handling
+### Historical guard failure handling
 
 If any of these conditions appear, stop new migration enablement and execute rollback
 immediately for the affected release scope:
@@ -211,9 +274,9 @@ When handling blocked operations:
 3. Capture operation payload, metadata, and payload names in the incident thread.
 4. If not correctable within rollout window, move to rollback path.
 
-## Rollback
+### Historical rollback
 
-### App-level / partial rollback
+#### Historical App-level / partial rollback
 
 1. Disable migration input path/flag used for this rollout window.
 2. Restore `pcd_ops` and queue state from the latest baseline backup:
@@ -227,13 +290,13 @@ When handling blocked operations:
    - `SELECT COUNT(*) FROM database_instances WHERE enabled = 0;`
    - `SELECT status, COUNT(*) FROM pcd_op_history WHERE applied_at >= datetime('now','-1 hour') GROUP BY status;`
 
-### Version rollback
+#### Historical Version rollback
 
 1. Keep same DB backup in place and revert to prior application version.
 2. Restart with migration disabled.
 3. Re-run preflight checks and confirm `arr.sync`/`pcd.sync` jobs return to baseline rates.
 
-## Ongoing monitoring (first 48 hours)
+### Historical ongoing monitoring (first 48 hours)
 
 Run hourly during rollout and then daily for 1 week:
 

@@ -635,7 +635,8 @@ their payload is wrong.
 - **Agents:** type-design
 
 ```typescript
-const conflictStrategy = (instance?.conflict_strategy ?? 'override') as ConflictStrategy;
+const conflictStrategy = (instance?.conflict_strategy ??
+  'override') as ConflictStrategy;
 ```
 
 Database value is cast without validation. A corrupted row produces incorrect type at runtime.

@@ -250,14 +250,28 @@ File: `/home/yandy/Projects/github.com/yandy-r/praxrr/packages/praxrr-app/src/li
 **Creation**:
 
 ```typescript
-import { getArrInstanceClient, createArrInstanceClientCache } from '$arr/arrInstanceClients.ts';
+import {
+  getArrInstanceClient,
+  createArrInstanceClientCache,
+} from '$arr/arrInstanceClients.ts';
 
 // For single-instance operations (like cleanup and preview):
-const client = await getArrInstanceClient(instance.type as ArrType, instance.id, instance.url, { retries: 0 });
+const client = await getArrInstanceClient(
+  instance.type as ArrType,
+  instance.id,
+  instance.url,
+  { retries: 0 }
+);
 
 // For multi-instance batch operations (like sync processor):
 const clientCache = createArrInstanceClientCache();
-const client = await getArrInstanceClient(type, id, url, undefined, clientCache);
+const client = await getArrInstanceClient(
+  type,
+  id,
+  url,
+  undefined,
+  clientCache
+);
 ```
 
 **Key behaviors**:

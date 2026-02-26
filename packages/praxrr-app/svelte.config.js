@@ -23,6 +23,7 @@ const config = {
       $api: './src/lib/api',
       $config: './src/lib/server/utils/config/config.ts',
       $logger: './src/lib/server/utils/logger',
+      $trashguide: './src/lib/server/trashguide',
       $shared: './src/lib/shared',
       $stores: './src/lib/client/stores',
       $ui: './src/lib/client/ui',

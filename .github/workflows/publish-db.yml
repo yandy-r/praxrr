@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - dev
-      - v2
+      - main
     tags:
       - 'db/v*'
   workflow_dispatch:
@@ -33,6 +33,17 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
+      - name: Validate legacy ops SQL artifacts are absent
+        run: |
+          set -euo pipefail
+
+          if [ -d "packages/praxrr-db/ops" ]; then
+            if [ -n "$(find "packages/praxrr-db/ops" -maxdepth 1 -name '*.sql' -print -quit)" ]; then
+              echo "Legacy SQL base-op files were found in packages/praxrr-db/ops; this package now publishes YAML-only seeds." >&2
+              exit 1
+            fi
+          fi
+
       - name: Determine publish target
         id: publish
         run: |
@@ -45,11 +56,11 @@ jobs:
             echo "target_aux_refs=" >> "$GITHUB_OUTPUT"
             echo "target_is_tag=false" >> "$GITHUB_OUTPUT"
             echo "target_is_release_tag=false" >> "$GITHUB_OUTPUT"
-          elif [[ "${GITHUB_REF}" == "refs/heads/v2" ]]; then
+          elif [[ "${GITHUB_REF}" == "refs/heads/main" ]]; then
             echo "dry_run=false" >> "$GITHUB_OUTPUT"
-            echo "target_ref=refs/heads/v2" >> "$GITHUB_OUTPUT"
+            echo "target_ref=refs/heads/main" >> "$GITHUB_OUTPUT"
             echo "target_aux_refs=refs/heads/develop,refs/tags/develop" >> "$GITHUB_OUTPUT"
-            echo "target_branch=v2" >> "$GITHUB_OUTPUT"
+            echo "target_branch=main" >> "$GITHUB_OUTPUT"
             echo "target_is_tag=false" >> "$GITHUB_OUTPUT"
             echo "target_is_release_tag=false" >> "$GITHUB_OUTPUT"
           elif [[ "${GITHUB_REF}" == "refs/heads/dev" ]]; then

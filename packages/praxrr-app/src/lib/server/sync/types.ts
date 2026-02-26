@@ -18,6 +18,7 @@ export interface SyncResult {
   success: boolean;
   itemsSynced: number;
   error?: string;
+  failedProfiles?: string[];
 }
 
 /**
