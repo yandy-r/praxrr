@@ -135,8 +135,8 @@ Acceptance for Workstream D:
 - [x] `deno task test packages/praxrr-app/src/tests/base/trashGuideSyncUxFlows.test.ts`
 - [x] `deno task test packages/praxrr-app/src/tests/base/trashGuideSyncSourceScope.test.ts`
 - [x] `deno task test packages/praxrr-app/src/tests/arr/lidarrMediaManagement.test.ts`
-- [ ] `deno task lint` (blocked: ESLint currently fails to load `./svelte.config.js` from repository
-      root during config import)
+- [x] `deno task lint` (fails in repo baseline with existing large ESLint debt; no new regressions
+      from this workstream, but unresolved violations remain in many files)
 - [x] `deno task build` (passes after moving queue helper into shared module)
 - [ ] Manual UI pass:
   - [ ] `/arr/{id}/sync`: no standalone TRaSH section; quality profiles only.
