@@ -31,6 +31,7 @@
 	export let responsive: boolean = true;
 	export let hideWhenSingle: boolean = true;
 	export let pillsThreshold: number = 5;
+	export let dropdownOnly: boolean = false;
 	export let label: string = 'Sources';
 	export let ariaLabel: string = 'Filter by source';
 	export let disabled: boolean = false;
@@ -172,7 +173,7 @@
 	$: normalizedSelectedKeys = normalizeSelection(selectedKeys, sourceOptions, selectionMode);
 	$: selectedSet = new Set(normalizedSelectedKeys);
 	$: useMobileMode = responsive && isMobile;
-	$: useDropdown = useMobileMode || sourceOptions.length >= pillsThreshold;
+	$: useDropdown = dropdownOnly || useMobileMode || sourceOptions.length >= pillsThreshold;
 	$: shouldRender = sourceOptions.length > 0 && (!hideWhenSingle || sourceOptions.length > 1);
 	$: computedActive = computeActiveState(normalizedSelectedKeys, sourceOptions, selectionMode);
 	$: resolvedActive = active ?? computedActive;

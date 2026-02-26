@@ -294,6 +294,7 @@
 				disabled={Boolean(sourceFilterDisabledReason)}
 				label="Sources"
 				ariaLabel="Filter custom formats by source"
+				dropdownOnly
 				responsive
 			/>
 		</div>

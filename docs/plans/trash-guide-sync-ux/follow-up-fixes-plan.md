@@ -70,14 +70,14 @@ Acceptance for Workstream A:
 
 ### Workstream B: Source filter UX scalability (dropdown-first)
 
-- [ ] B1. Update `SourceFilterAction` to support an explicit dropdown-only mode (no horizontal
+- [x] B1. Update `SourceFilterAction` to support an explicit dropdown-only mode (no horizontal
       pills).
   - Files:
     - `packages/praxrr-app/src/lib/client/ui/actions/SourceFilterAction.svelte`
-- [ ] B2. Apply dropdown mode to dedicated pages:
+- [x] B2. Apply dropdown mode to dedicated pages:
   - `packages/praxrr-app/src/routes/custom-formats/[databaseId]/+page.svelte`
   - `packages/praxrr-app/src/routes/quality-profiles/[databaseId]/+page.svelte`
-- [ ] B3. Ensure selected-state remains visible (count and/or label summary in trigger).
+- [x] B3. Ensure selected-state remains visible (count and/or label summary in trigger).
 
 Acceptance for Workstream B:
 

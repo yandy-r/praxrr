@@ -216,6 +216,7 @@
 			bind:selectedKeys={selectedSourceKeys}
 			disabled={Boolean(data.sourceContext.filterDisabledReason)}
 			ariaLabel="Filter quality profiles by source"
+			dropdownOnly
 		/>
 		<ActionButton
 			icon={Plus}
