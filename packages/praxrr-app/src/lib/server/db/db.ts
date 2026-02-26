@@ -3,6 +3,13 @@ import type { RestBindParameters } from '@jsr/db__sqlite';
 import { config } from '$config';
 import { logger } from '$logger/logger.ts';
 
+export class DatabaseNotInitializedError extends Error {
+  constructor() {
+    super('Database not initialized. Call initialize() first.');
+    this.name = 'DatabaseNotInitializedError';
+  }
+}
+
 /**
  * Database singleton for SQLite
  */
@@ -95,13 +102,13 @@ class DatabaseManager {
    */
   getDatabase(): Database {
     if (!this.db) {
-      throw new Error('Database not initialized. Call initialize() first.');
+      throw new DatabaseNotInitializedError();
     }
     return this.db;
   }
 
   private isDatabaseNotInitializedError(error: unknown): boolean {
-    return error instanceof Error && error.message.includes('Database not initialized');
+    return error instanceof DatabaseNotInitializedError;
   }
 
   /**

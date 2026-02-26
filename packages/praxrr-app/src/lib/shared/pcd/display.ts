@@ -50,6 +50,7 @@ export type PreferredProtocol = DelayProfilesRow['preferred_protocol'];
 
 import type { ArrType } from './types.ts';
 import type { ArrAppType, ArrConditionTargetType } from '../arr/capabilities.ts';
+import type { SourcedDisplayRow } from '../sources/types.ts';
 
 // Naming
 export type { LidarrNamingRow, RadarrNamingRow, SonarrNamingRow } from './types.ts';
@@ -60,6 +61,8 @@ export interface NamingListItem {
   rename: boolean;
   updated_at: string;
 }
+
+export type SourcedNamingListItem = NamingListItem & SourcedDisplayRow;
 
 // Media Settings
 export type { LidarrMediaSettingsRow, RadarrMediaSettingsRow, SonarrMediaSettingsRow } from './types.ts';
@@ -81,6 +84,8 @@ export interface QualityDefinitionListItem {
   quality_count: number;
   updated_at: string;
 }
+
+export type SourcedQualityDefinitionListItem = QualityDefinitionListItem & SourcedDisplayRow;
 
 /** Single quality entry (Row without the config name) */
 export interface QualityDefinitionEntry {
@@ -141,7 +146,7 @@ export type CustomFormatTableRow = Omit<CustomFormatsRow, 'include_in_rename' | 
   conditions: ConditionRef[];
   arrTargets: ArrConditionTargetType[];
   testCount: number;
-};
+} & SourcedDisplayRow;
 
 /** Custom format general information (for general tab) */
 export type CustomFormatGeneral = Omit<CustomFormatsRow, 'description' | 'created_at' | 'updated_at'> & {
@@ -261,7 +266,7 @@ export type QualityProfileTableRow = Omit<
   custom_formats: CustomFormatCounts;
   qualities: QualityItem[];
   language?: ProfileLanguage;
-};
+} & SourcedDisplayRow;
 
 // --- General Tab ---
 

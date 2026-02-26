@@ -2,20 +2,88 @@
 	import { createEventDispatcher } from 'svelte';
 	import Table from '$ui/table/Table.svelte';
 	import Button from '$ui/button/Button.svelte';
+	import SourceBadge from '$ui/badge/SourceBadge.svelte';
 	import type { Column } from '$ui/table/types';
 	import type { QualityProfileTableRow } from '$shared/pcd/display.ts';
+	import type { SourceRef } from '$shared/sources/types.ts';
 	import { ARR_APP_TYPES, getArrAppMetadata } from '$shared/arr/capabilities.ts';
-	import { Tag, FileText, Layers, BookOpenText, Gauge, Earth, Copy, Download } from 'lucide-svelte';
+	import {
+		Tag,
+		FileText,
+		Layers,
+		BookOpenText,
+		Gauge,
+		Earth,
+		Database,
+		Copy,
+		Download
+	} from 'lucide-svelte';
 	import { page } from '$app/stores';
 
 	export let profiles: QualityProfileTableRow[];
+	export let availableSources: SourceRef[] = [];
+	export let showSourceBadges = false;
+	export let currentDatabaseId: number;
 
 	const dispatch = createEventDispatcher<{ clone: { name: string }; export: { name: string } }>();
 
 	$: databaseId = $page.params.databaseId;
+	$: sourceMap = new Map(availableSources.map((source) => [`${source.type}:${source.id}`, source]));
 
-	function getRowHref(row: QualityProfileTableRow): string {
-		return `/quality-profiles/${databaseId}/${row.id}/general`;
+	function resolveSourceDatabaseId(row: QualityProfileTableRow): number {
+		if (row.sourceType === 'pcd' && typeof row.sourceDatabaseId === 'number') {
+			return row.sourceDatabaseId;
+		}
+
+		const fallbackDatabaseId = Number(databaseId);
+		if (Number.isInteger(fallbackDatabaseId)) {
+			return fallbackDatabaseId;
+		}
+
+		return currentDatabaseId;
+	}
+
+	function isTrashRow(row: QualityProfileTableRow): boolean {
+		return row.sourceType === 'trash';
+	}
+
+	function isEditableRow(row: QualityProfileTableRow): boolean {
+		return !isTrashRow(row) && resolveSourceDatabaseId(row) === currentDatabaseId;
+	}
+
+	function getRowHref(row: QualityProfileTableRow): string | null {
+		if (isTrashRow(row)) {
+			return null;
+		}
+
+		return `/quality-profiles/${resolveSourceDatabaseId(row)}/${row.id}/general`;
+	}
+
+	function resolveSource(row: QualityProfileTableRow): SourceRef | null {
+		const fallbackDatabaseId = Number(databaseId);
+		const sourceType = row.sourceType ?? 'pcd';
+		const sourceDatabaseId =
+			row.sourceDatabaseId != null
+				? row.sourceDatabaseId
+				: Number.isFinite(fallbackDatabaseId)
+					? fallbackDatabaseId
+					: null;
+
+		if (sourceDatabaseId == null) return null;
+
+		const sourceKey = `${sourceType}:${sourceDatabaseId}`;
+		const matchedSource = sourceMap.get(sourceKey);
+		if (matchedSource) return matchedSource;
+
+		if (sourceType === 'pcd' && row.sourceDatabaseName) {
+			return {
+				type: 'pcd',
+				id: sourceDatabaseId,
+				name: row.sourceDatabaseName
+			};
+		}
+
+		return null;
 	}
 
 	const qualitySecondary =
@@ -27,8 +95,16 @@
 	const labelSecondaryNoMono =
 		'inline-flex items-center leading-none font-medium px-2 py-1 text-[10px] rounded-md bg-neutral-100 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300';
 
+	const sourceColumn: Column<QualityProfileTableRow> = {
+		key: 'source',
+		header: 'Source',
+		headerIcon: Database,
+		align: 'left',
+		width: 'w-44'
+	};
+
 	// Define table columns for quality profiles
-	const columns: Column<QualityProfileTableRow>[] = [
+	const baseColumns: Column<QualityProfileTableRow>[] = [
 		{
 			key: 'name',
 			header: 'Name',
@@ -151,6 +227,8 @@
 			}
 		}
 	];
+
+	$: columns = showSourceBadges ? [sourceColumn, ...baseColumns] : baseColumns;
 </script>
 
 <Table
@@ -162,23 +240,40 @@
 	rowHref={getRowHref}
 	pageSize={50}
 >
+	<svelte:fragment slot="cell" let:row let:column>
+		{#if column.key === 'source'}
+			{@const source = resolveSource(row)}
+			{#if source}
+				<SourceBadge
+					sourceType={source.type}
+					sourceName={source.name}
+					arrType={source.type === 'trash' ? source.arrType : null}
+				/>
+			{:else}
+				<span class="text-xs text-neutral-400">-</span>
+			{/if}
+		{/if}
+	</svelte:fragment>
+
 	<!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
 	<svelte:fragment slot="actions" let:row>
-		<div class="flex items-center justify-end gap-0.5" on:click|stopPropagation>
-			<Button
-				icon={Download}
-				size="xs"
-				variant="ghost"
-				tooltip="Export"
-				on:click={() => dispatch('export', { name: row.name })}
-			/>
-			<Button
-				icon={Copy}
-				size="xs"
-				variant="ghost"
-				tooltip="Clone"
-				on:click={() => dispatch('clone', { name: row.name })}
-			/>
-		</div>
+		{#if isEditableRow(row)}
+			<div class="flex items-center justify-end gap-0.5" on:click|stopPropagation>
+				<Button
+					icon={Download}
+					size="xs"
+					variant="ghost"
+					tooltip="Export"
+					on:click={() => dispatch('export', { name: row.name })}
+				/>
+				<Button
+					icon={Copy}
+					size="xs"
+					variant="ghost"
+					tooltip="Clone"
+					on:click={() => dispatch('clone', { name: row.name })}
+				/>
+			</div>
+		{/if}
 	</svelte:fragment>
 </Table>

@@ -1,26 +1,42 @@
 /**
  * Quality profile syncer
- * Syncs quality profiles from PCD to arr instances
+ * Syncs quality profiles from PCD and TRaSH Guide sources to arr instances.
  *
  * Each database's CFs and QPs are synced with an invisible namespace suffix
- * so multiple databases can coexist in the same arr instance.
+ * so multiple databases can coexist in the same arr instance. TRaSH Guide profiles
+ * are transformed and synced from source-aware TRaSH caches using the same
+ * namespacing strategy.
  *
  * Sync order:
  * 1. Group sync selections by database, assign namespace suffixes
  * 2. For each database: sync its custom formats (suffixed) → build per-DB formatIdMap
  * 3. Refresh full CF list from arr → build allFormatIdMap
- * 4. For each database: sync its quality profiles (suffixed) using both maps
+ * 4. Resolve TRaSH and PCD source batches
+ * 5. For each source batch: sync quality profiles (suffixed) using the right lookup maps
  */
 
 import { BaseSyncer, type SyncResult } from '../base.ts';
 import { arrSyncQueries, type ProfileSelection } from '$db/queries/arrSync.ts';
 import { arrNamespaceQueries } from '$db/queries/arrNamespaces.ts';
+import { trashGuideSyncQueries, type TrashGuideSyncQualityProfileSourceHydration } from '$db/queries/trashGuideSync.ts';
+import { trashGuideEntityCacheQueries } from '$db/queries/trashGuideEntityCache.ts';
+import { trashGuideSourcesQueries } from '$db/queries/trashGuideSources.ts';
 import { getCache, getCachedDatabaseIds } from '$pcd/index.ts';
 import { databaseInstancesQueries } from '$db/queries/databaseInstances.ts';
 import { logger } from '$logger/logger.ts';
 import type { SyncArrType } from '../mappings.ts';
-import { getNamespaceSuffix } from '../namespace.ts';
+import { getNamespaceSuffix, getTrashGuideNamespaceSuffix } from '../namespace.ts';
 import type { SyncPreviewSectionResult, QualityProfilesPreview } from '../preview/types.ts';
+import { transformTrashGuideEntities } from '$lib/server/trashguide/transformer.ts';
+import type {
+  TrashGuideCustomFormatEntity,
+  TrashGuideNamingEntity,
+  TrashGuideParsedEntity,
+  TrashGuideParseResult,
+  TrashGuideQualityProfileEntity,
+  TrashGuideQualitySizeEntity,
+} from '$lib/server/trashguide/types.ts';
+import type { PortableCustomFormat, PortableQualityProfile } from '$shared/pcd/portable.ts';
 import {
   CUSTOM_FORMAT_ARRAY_KEY_STRATEGIES,
   QUALITY_PROFILE_ARRAY_KEY_STRATEGIES,
@@ -54,6 +70,8 @@ interface QualityProfilesPreviewConfig {
 
 /** Per-database batch of profiles and CFs to sync. */
 interface DatabaseSyncBatch {
+  sourceKind: 'pcd' | 'trash';
+  sourceLabel: string;
   databaseId: number;
   suffix: string;
   profiles: ProfileSyncData[];
@@ -232,7 +250,7 @@ export class QualityProfileSyncer extends BaseSyncer {
       });
 
       // 1. Fetch profiles and CFs grouped by database
-      const batches = await this.fetchSyncBatchByDatabase();
+      const batches = await this.fetchSyncBatches();
 
       const totalProfiles = batches.reduce((sum, b) => sum + b.profiles.length, 0);
       if (totalProfiles === 0) {
@@ -268,6 +286,7 @@ export class QualityProfileSyncer extends BaseSyncer {
       const existingMap = new Map(existingProfiles.map((p) => [p.name, p.id]));
 
       const allSyncedProfiles: SyncedProfileSummary[] = [];
+      const failedProfiles = new Set<string>();
       for (const batch of batches) {
         const synced = await this.syncQualityProfiles(
           batch.profiles,
@@ -275,9 +294,19 @@ export class QualityProfileSyncer extends BaseSyncer {
           batch.pcdFormatIdMap,
           allFormatIdMap,
           qualityMappings,
-          existingMap
+          existingMap,
+          failedProfiles
         );
         allSyncedProfiles.push(...synced);
+      }
+
+      if (failedProfiles.size > 0) {
+        return {
+          success: false,
+          itemsSynced: allSyncedProfiles.length,
+          failedProfiles: [...failedProfiles],
+          error: `Failed to sync ${failedProfiles.size} quality profile(s)`,
+        };
       }
 
       await logger.info(`Completed quality profile sync for "${this.instanceName}"`, {
@@ -316,7 +345,7 @@ export class QualityProfileSyncer extends BaseSyncer {
         meta: { instanceId: this.instanceId, instanceType: this.instanceType },
       });
 
-      const batches = await this.fetchSyncBatchByDatabase();
+      const batches = await this.fetchSyncBatches();
       const totalProfiles = batches.reduce((sum, batch) => sum + batch.profiles.length, 0);
       if (totalProfiles === 0) {
         return {
@@ -426,20 +455,16 @@ export class QualityProfileSyncer extends BaseSyncer {
   /**
    * Fetch profiles and CFs grouped by database, each with a namespace suffix.
    */
-  private async fetchSyncBatchByDatabase(): Promise<DatabaseSyncBatch[]> {
+  private async fetchSyncBatches(): Promise<DatabaseSyncBatch[]> {
     const syncConfig = this.getQualityProfilesSyncConfig();
-
-    if (syncConfig.selections.length === 0) return [];
-
-    // Group selections by database
+    const batches: DatabaseSyncBatch[] = [];
     const byDatabase = new Map<number, typeof syncConfig.selections>();
+
     for (const selection of syncConfig.selections) {
       const existing = byDatabase.get(selection.databaseId) || [];
       existing.push(selection);
       byDatabase.set(selection.databaseId, existing);
     }
-
-    const batches: DatabaseSyncBatch[] = [];
 
     for (const [databaseId, selections] of byDatabase) {
       // Skip stale references to deleted databases
@@ -528,6 +553,8 @@ export class QualityProfileSyncer extends BaseSyncer {
 
       if (profiles.length > 0) {
         batches.push({
+          sourceKind: 'pcd',
+          sourceLabel: dbInstance?.name ?? `database:${databaseId}`,
           databaseId,
           suffix,
           profiles,
@@ -535,6 +562,183 @@ export class QualityProfileSyncer extends BaseSyncer {
           pcdFormatIdMap: new Map(),
         });
       }
+    }
+
+    const trashBatches = await this.fetchTrashSyncBatches(
+      trashGuideSyncQueries.getQualityProfileSourceHydrationByInstance(this.instanceId)
+    );
+    batches.push(...trashBatches);
+
+    return batches;
+  }
+
+  private async fetchTrashSyncBatches(
+    sourceHydrations: TrashGuideSyncQualityProfileSourceHydration[]
+  ): Promise<DatabaseSyncBatch[]> {
+    const batches: DatabaseSyncBatch[] = [];
+    let trashNamespaceIndex = 0;
+
+    for (const sourceHydration of sourceHydrations) {
+      if (sourceHydration.selectedQualityProfiles.length === 0) {
+        continue;
+      }
+
+      const source = trashGuideSourcesQueries.getById(sourceHydration.sourceId);
+      if (!source || source.arr_type !== this.instanceType) {
+        continue;
+      }
+
+      const cachedRows = trashGuideEntityCacheQueries.getBySource(source.id);
+      if (cachedRows.length === 0) {
+        continue;
+      }
+
+      const parsedEntities: TrashGuideParsedEntity[] = [];
+      let malformedRows = 0;
+      for (const row of cachedRows) {
+        try {
+          const parsed = JSON.parse(row.jsonData) as TrashGuideParsedEntity;
+          parsedEntities.push(parsed);
+        } catch (error) {
+          malformedRows += 1;
+          await logger.warn('Failed to parse TRaSH cache row while building quality profile sync batches', {
+            source: 'Sync:QualityProfiles',
+            meta: {
+              instanceId: this.instanceId,
+              sourceId: source.id,
+              sourceName: source.name,
+              trashId: row.trashId,
+              filePath: row.filePath,
+              error: error instanceof Error ? error.message : String(error),
+            },
+          });
+        }
+      }
+
+      if (parsedEntities.length === 0) {
+        const message = `Failed to parse all TRaSH cache rows for source "${source.name}" during quality profile batch build`;
+        await logger.error(message, {
+          source: 'Sync:QualityProfiles',
+          meta: {
+            instanceId: this.instanceId,
+            sourceId: source.id,
+            sourceName: source.name,
+            totalRows: cachedRows.length,
+            malformedRows,
+          },
+        });
+        throw new Error(message);
+      }
+      if (malformedRows > 0) {
+        await logger.warn('Some TRaSH cache rows were malformed while building quality profile sync batches', {
+          source: 'Sync:QualityProfiles',
+          meta: {
+            instanceId: this.instanceId,
+            sourceId: source.id,
+            sourceName: source.name,
+            totalRows: cachedRows.length,
+            malformedRows,
+          },
+        });
+      }
+
+      const parsedResult: TrashGuideParseResult = {
+        arr_type: source.arr_type,
+        status: 'success',
+        entities: {
+          custom_formats: parsedEntities.filter(
+            (entity): entity is TrashGuideCustomFormatEntity => entity.entity_type === 'custom_format'
+          ),
+          quality_profiles: parsedEntities.filter(
+            (entity): entity is TrashGuideQualityProfileEntity => entity.entity_type === 'quality_profile'
+          ),
+          quality_sizes: parsedEntities.filter((entity): entity is TrashGuideQualitySizeEntity => entity.entity_type === 'quality_size'),
+          naming: parsedEntities.filter((entity): entity is TrashGuideNamingEntity => entity.entity_type === 'naming'),
+        },
+        ordered_entities: parsedEntities,
+        issues: [],
+        parsed_files: parsedEntities.length,
+        failed_files: 0,
+      };
+
+      let transformed;
+      try {
+        transformed = transformTrashGuideEntities({
+          sourceId: source.id,
+          arrType: source.arr_type,
+          parsed: parsedResult,
+        });
+      } catch (error) {
+        await logger.warn(`Skipping TRaSH quality profiles due to transform failure for source "${source.name}"`, {
+          source: 'Sync:QualityProfiles',
+          meta: {
+            instanceId: this.instanceId,
+            sourceId: source.id,
+            sourceName: source.name,
+            error: error instanceof Error ? error.message : String(error),
+          },
+        });
+        continue;
+      }
+
+      const rawProfilesByName = new Map(parsedResult.entities.quality_profiles.map((profile) => [profile.name, profile]));
+      const portableProfilesByName = new Map<string, PortableQualityProfile>();
+      const portableFormatsByName = new Map<string, PortableCustomFormat>();
+
+      for (const operation of transformed.activeOperations) {
+        if (operation.portableEntityType === 'quality_profile') {
+          portableProfilesByName.set(operation.data.name, operation.data);
+        } else if (operation.portableEntityType === 'custom_format') {
+          portableFormatsByName.set(operation.data.name, operation.data);
+        }
+      }
+
+      const selectedProfiles: ProfileSyncData[] = [];
+      const selectedFormatNames = new Set<string>();
+      for (const profileName of sourceHydration.selectedQualityProfiles) {
+        const portable = portableProfilesByName.get(profileName);
+        if (!portable) {
+          continue;
+        }
+
+        const rawProfile = rawProfilesByName.get(profileName);
+        const pcdProfile = this.mapTrashPortableQualityProfileToPcd(portable, rawProfile?.upgrade_allowed ?? true);
+        const referencedFormatNames = pcdProfile.customFormats.map((format) => format.formatName);
+        for (const formatName of referencedFormatNames) {
+          selectedFormatNames.add(formatName);
+        }
+
+        selectedProfiles.push({
+          pcdProfile,
+          referencedFormatNames,
+        });
+      }
+
+      if (selectedProfiles.length === 0) {
+        continue;
+      }
+
+      const customFormats = new Map<string, PcdCustomFormat>();
+      for (const formatName of selectedFormatNames) {
+        const portableFormat = portableFormatsByName.get(formatName);
+        if (!portableFormat) {
+          continue;
+        }
+
+        customFormats.set(formatName, this.mapTrashPortableCustomFormatToPcd(portableFormat));
+      }
+
+      trashNamespaceIndex += 1;
+      batches.push({
+        sourceKind: 'trash',
+        sourceLabel: source.name,
+        databaseId: -source.id,
+        // Keep TRaSH namespaces disjoint from DB namespaces while still using strip-compatible chars.
+        suffix: getTrashGuideNamespaceSuffix(trashNamespaceIndex),
+        profiles: selectedProfiles,
+        customFormats,
+        pcdFormatIdMap: new Map(),
+      });
     }
 
     return batches;
@@ -556,14 +760,73 @@ export class QualityProfileSyncer extends BaseSyncer {
    * All databases should have the same quality mappings from the schema PCD.
    */
   private async getQualityMappings(batches: DatabaseSyncBatch[]): Promise<Map<string, string>> {
+    let hasPcdBatch = false;
     for (const batch of batches) {
+      if (batch.sourceKind !== 'pcd' || batch.databaseId <= 0) {
+        continue;
+      }
+      hasPcdBatch = true;
+
       const cache = getCache(batch.databaseId);
       if (cache) {
         return getQualityApiMappings(cache, this.instanceType);
       }
     }
 
-    throw new Error('No PCD cache available for quality API mappings');
+    if (hasPcdBatch) {
+      throw new Error('No PCD cache available for quality API mappings');
+    }
+
+    return new Map();
+  }
+
+  private mapTrashPortableCustomFormatToPcd(format: PortableCustomFormat): PcdCustomFormat {
+    return {
+      id: 0,
+      name: format.name,
+      includeInRename: format.includeInRename,
+      conditions: format.conditions.map((condition) => ({
+        ...condition,
+        arrType: condition.arrType && condition.arrType.length > 0 ? condition.arrType : 'all',
+      })),
+    };
+  }
+
+  private mapTrashPortableQualityProfileToPcd(
+    profile: PortableQualityProfile,
+    upgradesAllowed: boolean
+  ): PcdQualityProfile {
+    return {
+      id: 0,
+      name: profile.name,
+      upgradesAllowed,
+      minimumCustomFormatScore: profile.minimumScore,
+      upgradeUntilScore: profile.upgradeUntilScore,
+      upgradeScoreIncrement: profile.upgradeScoreIncrement,
+      qualities: profile.orderedItems.map((item, index) => ({
+        type: item.type,
+        referenceId: index + 1,
+        name: item.name,
+        position: item.position,
+        enabled: item.enabled,
+        upgradeUntil: item.upgradeUntil,
+        members: item.members?.map((member, memberIndex) => ({ id: memberIndex + 1, name: member.name })),
+      })),
+      language: profile.language
+        ? {
+            id: 1,
+            name: profile.language,
+            type: 'simple',
+          }
+        : null,
+      customFormats: profile.customFormatScores
+        .filter((score) => score.arrType === this.instanceType || score.arrType === 'all')
+        .map((score, index) => ({
+          formatId: index + 1,
+          formatName: score.customFormatName,
+          score: score.score,
+        })),
+    };
   }
 
   /**
@@ -575,7 +838,8 @@ export class QualityProfileSyncer extends BaseSyncer {
     pcdFormatIdMap: Map<string, number>,
     allFormatIdMap: Map<string, number>,
     qualityMappings: Map<string, string>,
-    existingMap: Map<string, number>
+    existingMap: Map<string, number>,
+    failedProfiles: Set<string>
   ): Promise<SyncedProfileSummary[]> {
     const syncedProfiles: SyncedProfileSummary[] = [];
 
@@ -644,6 +908,7 @@ export class QualityProfileSyncer extends BaseSyncer {
             ...errorDetails,
           },
         });
+        failedProfiles.add(pcdProfile.name);
       }
     }
 

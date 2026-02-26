@@ -212,3 +212,38 @@ Deno.test('bottom nav ordering is deterministic by priority and sidebar traversa
     false
   );
 });
+
+Deno.test('arr navigation remains scope-compatible while feature-gated routes stay constrained', () => {
+  const shell = resolveNavShell({ user: scopeUser });
+  const shellWithoutDev = shell.groups.filter((group) => group.id !== 'dev');
+  const scopes: ArrType[] = ['all', 'radarr', 'sonarr', 'lidarr'];
+
+  for (const scope of scopes) {
+    const scopedEntries = resolveScopeEntries(scope, { ...shell, groups: shellWithoutDev });
+    const bottomOrder = buildBottomNavOrder({ ...shell, groups: shellWithoutDev }, scope);
+
+    assertEquals(scopedEntries.visible.includes('apps.arrs'), true);
+    assertEquals(bottomOrder.includes('/arr'), true);
+    assertEquals(bottomOrder.includes('/quality-profiles'), true);
+    assertEquals(bottomOrder.includes('/custom-formats'), true);
+  }
+
+  assertEquals(
+    buildBottomNavOrder({ ...shell, groups: shellWithoutDev }, 'radarr').includes('/metadata-profiles'),
+    false
+  );
+  assertEquals(
+    buildBottomNavOrder({ ...shell, groups: shellWithoutDev }, 'sonarr').includes('/metadata-profiles'),
+    false
+  );
+  assertEquals(
+    buildBottomNavOrder({ ...shell, groups: shellWithoutDev }, 'lidarr').includes('/metadata-profiles'),
+    true
+  );
+
+  const visibleTopLevelHrefs = shellWithoutDev.flatMap((group) => group.items.map((item) => item.href));
+  assertEquals(
+    visibleTopLevelHrefs.some((href) => href.includes('/sync')),
+    false
+  );
+});

@@ -12,7 +12,7 @@
 	export let compact: boolean = false;
 	export let emptyMessage: string = 'No data available';
 	export let onRowClick: ((row: T) => void) | undefined = undefined;
-	export let rowHref: ((row: T) => string) | undefined = undefined;
+	export let rowHref: ((row: T) => string | null | undefined) | undefined = undefined;
 	export let initialSort: SortState | null = null;
 	export let onSortChange: ((sort: SortState | null) => void) | undefined = undefined;
 	export let actionsHeader: string = 'Actions';
@@ -158,13 +158,14 @@
 			</div>
 		{:else}
 			{#each displayData as row, rowIndex}
+				{@const rowUrl = rowHref?.(row) ?? null}
 				<!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
 				<div
-					class="group/row relative overflow-hidden rounded-xl border border-neutral-300 bg-white dark:border-neutral-700/60 dark:bg-neutral-800/50 {onRowClick || rowHref ? 'cursor-pointer' : ''}"
+					class="group/row relative overflow-hidden rounded-xl border border-neutral-300 bg-white dark:border-neutral-700/60 dark:bg-neutral-800/50 {onRowClick || rowUrl ? 'cursor-pointer' : ''}"
 					on:click={() => onRowClick && onRowClick(row)}
 				>
-					{#if rowHref}
-						<a href={rowHref(row)} class="absolute inset-0 z-10" aria-label="Open {columns[0]?.header || 'item'}"></a>
+					{#if rowUrl}
+						<a href={rowUrl} class="absolute inset-0 z-10" aria-label="Open {columns[0]?.header || 'item'}"></a>
 					{/if}
 					<!-- Primary row: first column as title + actions -->
 					<div class="flex items-center justify-between gap-3 px-4 py-3">
@@ -305,18 +306,19 @@
 					</tr>
 				{:else}
 					{#each displayData as row, rowIndex}
+						{@const rowUrl = rowHref?.(row) ?? null}
 						<tr
 							class="group/row {hoverable
 								? 'transition-colors hover:bg-neutral-50 dark:hover:bg-neutral-800'
-								: ''} {onRowClick || rowHref ? 'cursor-pointer' : ''}"
+								: ''} {onRowClick || rowUrl ? 'cursor-pointer' : ''}"
 							on:click={() => onRowClick && onRowClick(row)}
 						>
 							{#each columns as column, colIndex}
 								<td
-									class={`${compact ? 'px-4 py-2' : 'px-6 py-4'} text-sm text-neutral-900 dark:text-neutral-100 ${getAlignClass(column.align)} ${column.width || ''} ${rowHref ? 'relative' : ''}`}
+									class={`${compact ? 'px-4 py-2' : 'px-6 py-4'} text-sm text-neutral-900 dark:text-neutral-100 ${getAlignClass(column.align)} ${column.width || ''} ${rowUrl ? 'relative' : ''}`}
 								>
-									{#if rowHref}
-										<a href={rowHref(row)} class="cell-link" aria-label="Open row"></a>
+									{#if rowUrl}
+										<a href={rowUrl} class="cell-link" aria-label="Open row"></a>
 									{/if}
 									{#if column.cell}
 										{@const rendered = column.cell(row)}

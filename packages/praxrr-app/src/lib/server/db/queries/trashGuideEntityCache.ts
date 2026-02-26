@@ -1,21 +1,10 @@
 import { db } from '../db.ts';
-
-export type TrashGuideEntityType = 'custom_format' | 'quality_profile' | 'quality_size' | 'naming';
-
-const VALID_ENTITY_TYPES: ReadonlySet<string> = new Set<TrashGuideEntityType>([
-  'custom_format',
-  'quality_profile',
-  'quality_size',
-  'naming',
-]);
-
-function parseEntityType(raw: string): TrashGuideEntityType {
-  if (VALID_ENTITY_TYPES.has(raw)) {
-    return raw as TrashGuideEntityType;
-  }
-
-  throw new Error(`Invalid TRaSH entity type: ${raw}`);
-}
+import {
+  parseTrashGuideEntityType,
+  parseTrashGuideSourceArrType,
+  type TrashGuideEntityType,
+  type TrashGuideSourceArrType,
+} from '$shared/trashguide/types.ts';
 
 interface TrashGuideEntityCacheRow {
   id: number;
@@ -29,6 +18,11 @@ interface TrashGuideEntityCacheRow {
   fetched_at: string;
 }
 
+interface TrashGuideEntityCacheWithSourceRow extends TrashGuideEntityCacheRow {
+  source_name: string;
+  source_arr_type: string;
+}
+
 export interface TrashGuideEntityCache {
   id: number;
   sourceId: number;
@@ -39,6 +33,17 @@ export interface TrashGuideEntityCache {
   filePath: string;
   contentHash: string;
   fetchedAt: string;
+}
+
+export interface TrashGuideEntitySourceMetadata {
+  type: 'trash';
+  id: number;
+  name: string;
+  arrType: TrashGuideSourceArrType;
+}
+
+export interface TrashGuideEntityCacheWithSource extends TrashGuideEntityCache {
+  source: TrashGuideEntitySourceMetadata;
 }
 
 export interface TrashGuideEntityCacheInput {
@@ -69,7 +74,7 @@ function rowToCache(row: TrashGuideEntityCacheRow): TrashGuideEntityCache {
     id: row.id,
     sourceId: row.source_id,
     trashId: row.trash_id,
-    entityType: parseEntityType(row.entity_type),
+    entityType: parseTrashGuideEntityType(row.entity_type),
     name: row.name,
     jsonData: row.json_data,
     filePath: row.file_path,
@@ -78,10 +83,22 @@ function rowToCache(row: TrashGuideEntityCacheRow): TrashGuideEntityCache {
   };
 }
 
+function rowToCacheWithSource(row: TrashGuideEntityCacheWithSourceRow): TrashGuideEntityCacheWithSource {
+  return {
+    ...rowToCache(row),
+    source: {
+      type: 'trash',
+      id: row.source_id,
+      name: row.source_name,
+      arrType: parseTrashGuideSourceArrType(row.source_arr_type),
+    },
+  };
+}
+
 function rowToHash(row: TrashGuideEntityCacheRow): TrashGuideEntityCacheHash {
   return {
     trashId: row.trash_id,
-    entityType: parseEntityType(row.entity_type),
+    entityType: parseTrashGuideEntityType(row.entity_type),
     contentHash: row.content_hash,
     filePath: row.file_path,
   };
@@ -191,6 +208,24 @@ export const trashGuideEntityCacheQueries = {
   },
 
   /**
+   * Get all cached entities for a source with normalized source metadata.
+   */
+  getBySourceWithMetadata(sourceId: number): TrashGuideEntityCacheWithSource[] {
+    return db
+      .query<TrashGuideEntityCacheWithSourceRow>(
+        `SELECT c.*,
+                s.name AS source_name,
+                s.arr_type AS source_arr_type
+           FROM trash_guide_entity_cache c
+           JOIN trash_guide_sources s ON s.id = c.source_id
+          WHERE c.source_id = ?
+          ORDER BY c.entity_type ASC, c.name ASC`,
+        sourceId
+      )
+      .map(rowToCacheWithSource);
+  },
+
+  /**
    * Get cached entities by source and section.
    */
   getBySourceAndType(sourceId: number, entityType: TrashGuideEntityType): TrashGuideEntityCache[] {
@@ -277,6 +312,10 @@ export const trashGuideEntityCacheQueries = {
       entityType
     );
 
-    return row?.content_hash !== contentHash;
+    if (!row) {
+      return false;
+    }
+
+    return row.content_hash !== contentHash;
   },
 };

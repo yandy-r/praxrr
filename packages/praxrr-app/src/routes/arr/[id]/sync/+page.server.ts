@@ -2,6 +2,14 @@ import { error, fail } from '@sveltejs/kit';
 import type { ServerLoad, Actions } from '@sveltejs/kit';
 import { arrInstancesQueries } from '$db/queries/arrInstances.ts';
 import { arrSyncQueries, type SyncTrigger, type ProfileSelection } from '$db/queries/arrSync.ts';
+import { trashGuideEntityCacheQueries } from '$db/queries/trashGuideEntityCache.ts';
+import {
+  trashGuideSyncQueries,
+  TrashGuideSyncScopeError,
+  TrashGuideSyncValidationError,
+  type TrashGuideSyncSelectionInput,
+  type TrashGuideSyncTrigger,
+} from '$db/queries/trashGuideSync.ts';
 import { pcdManager } from '$pcd/index.ts';
 import { logger } from '$logger/logger.ts';
 import * as qualityProfileQueries from '$pcd/entities/qualityProfiles/index.ts';
@@ -16,6 +24,8 @@ import { enqueueJob } from '$lib/server/jobs/queueService.ts';
 import { buildJobDisplayName } from '$lib/server/jobs/display.ts';
 import { isSyncSectionSupported } from '$lib/server/sync/mappings.ts';
 import { isArrAppType, supportsArrSyncSurface, type ArrSyncSurface } from '$shared/arr/capabilities.ts';
+import { TrashGuideSourceNotFoundError } from '$lib/server/trashguide/manager.ts';
+import { enqueueManualTrashGuideSourceSync } from '$jobs/helpers/trashGuideSyncQueue.ts';
 import {
   previewStore,
   PREVIEW_STATUS_APPLYING,
@@ -30,6 +40,13 @@ import type { SyncPreviewSummary } from '$sync/preview/types.ts';
 const METADATA_PROFILES_SURFACE: ArrSyncSurface = 'metadata_profiles';
 const METADATA_PROFILES_SECTION = 'metadataProfiles';
 const METADATA_PROFILE_UNSUPPORTED_ERROR = 'Metadata profile sync is supported only for Lidarr instances';
+const VALID_TRASH_GUIDE_SYNC_TRIGGERS: ReadonlySet<string> = new Set<TrashGuideSyncTrigger>([
+  'none',
+  'manual',
+  'on_pull',
+  'on_change',
+  'schedule',
+]);
 const EMPTY_PREVIEW_SUMMARY: SyncPreviewSummary = {
   totalCreates: 0,
   totalUpdates: 0,
@@ -44,6 +61,26 @@ type SyncPreviewRouteState = {
   summary: SyncPreviewSummary | null;
   error: string | null;
 };
+
+function buildTrashGuideAvailableSelections(sourceId: number, selectedQualityProfiles: string[]): string[] {
+  const names = new Set<string>();
+  const cachedProfiles = trashGuideEntityCacheQueries.getBySourceAndType(sourceId, 'quality_profile');
+  for (const profile of cachedProfiles) {
+    const normalized = profile.name.trim();
+    if (normalized.length > 0) {
+      names.add(normalized);
+    }
+  }
+
+  for (const selected of selectedQualityProfiles) {
+    const normalized = selected.trim();
+    if (normalized.length > 0) {
+      names.add(normalized);
+    }
+  }
+
+  return [...names].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+}
 
 function getSyncPreviewRouteState(instanceId: number, previewId: string | null): SyncPreviewRouteState {
   if (!previewId) {
@@ -98,6 +135,107 @@ function supportsMetadataProfiles(instanceType: string): boolean {
     supportsArrSyncSurface(instanceType, METADATA_PROFILES_SURFACE) &&
     isSyncSectionSupported(instanceType, METADATA_PROFILES_SECTION)
   );
+}
+
+function parseSourceIdFromForm(value: FormDataEntryValue | null): { value: number } | { error: string } {
+  if (typeof value !== 'string' || !value.trim()) {
+    return { error: 'sourceId is required' };
+  }
+
+  const sourceId = Number.parseInt(value, 10);
+  if (!Number.isInteger(sourceId) || sourceId <= 0) {
+    return { error: 'Invalid sourceId' };
+  }
+
+  return { value: sourceId };
+}
+
+function parseTrashGuideTriggerFromForm(
+  value: FormDataEntryValue | null
+): { value: TrashGuideSyncTrigger } | { error: string } {
+  if (value === null || value === '') {
+    return { value: 'manual' };
+  }
+
+  if (typeof value !== 'string') {
+    return { error: 'trigger must be a string' };
+  }
+
+  if (!VALID_TRASH_GUIDE_SYNC_TRIGGERS.has(value)) {
+    return { error: `Invalid TRaSH sync trigger: ${value}` };
+  }
+
+  return { value: value as TrashGuideSyncTrigger };
+}
+
+function parseTrashGuideSelectionsFromForm(
+  value: FormDataEntryValue | null
+): { value: TrashGuideSyncSelectionInput[] } | { error: string } {
+  if (value === null || value === '') {
+    return { value: [] };
+  }
+
+  if (typeof value !== 'string') {
+    return { error: 'selections must be a JSON string array' };
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(value);
+  } catch {
+    return { error: 'selections must be valid JSON' };
+  }
+
+  if (!Array.isArray(parsed)) {
+    return { error: 'selections must be an array' };
+  }
+
+  const selections: TrashGuideSyncSelectionInput[] = [];
+  for (let i = 0; i < parsed.length; i += 1) {
+    const item = parsed[i];
+    if (!item || typeof item !== 'object' || Array.isArray(item)) {
+      return { error: `selections[${i}] must be an object` };
+    }
+
+    const row = item as Record<string, unknown>;
+    if (typeof row.sectionType !== 'string') {
+      return { error: `selections[${i}].sectionType must be a string` };
+    }
+
+    if (typeof row.itemName !== 'string') {
+      return { error: `selections[${i}].itemName must be a string` };
+    }
+
+    selections.push({
+      sectionType: row.sectionType as TrashGuideSyncSelectionInput['sectionType'],
+      itemName: row.itemName,
+    });
+  }
+
+  return { value: selections };
+}
+
+function mapTrashGuideActionError(error: unknown): { status: number; message: string } {
+  if (error instanceof TrashGuideSyncScopeError) {
+    return {
+      status: error.code === 'arr_type_mismatch' ? 422 : 404,
+      message: error.message,
+    };
+  }
+
+  if (error instanceof TrashGuideSyncValidationError) {
+    return { status: 400, message: error.message };
+  }
+
+  if (error instanceof TrashGuideSourceNotFoundError) {
+    return { status: 404, message: error.message };
+  }
+
+  if (error instanceof Error) {
+    return { status: 500, message: error.message };
+  }
+
+  return { status: 500, message: 'TRaSH source sync request failed' };
 }
 
 export const load: ServerLoad = async ({ params, url }) => {
@@ -173,11 +311,18 @@ export const load: ServerLoad = async ({ params, url }) => {
 
   // Load existing sync data
   const syncData = arrSyncQueries.getFullSyncData(id);
+  const trashGuideQualityProfilesBySource = trashGuideSyncQueries
+    .getQualityProfileSourceHydrationByInstance(id)
+    .map((source) => ({
+      ...source,
+      availableQualityProfiles: buildTrashGuideAvailableSelections(source.sourceId, source.selectedQualityProfiles),
+    }));
 
   return {
     instance,
     databases: databasesWithProfiles,
     syncData,
+    trashGuideQualityProfilesBySource,
     metadataProfilesSupported: canLoadMetadataProfiles,
     syncPreview,
   };
@@ -360,6 +505,128 @@ export const actions: Actions = {
       });
 
       return fail(500, { error: `Failed to save metadata profiles sync config: ${errorMsg}` });
+    }
+  },
+
+  saveTrashGuideSource: async ({ params, request }) => {
+    const id = parseInt(params.id || '', 10);
+    if (isNaN(id)) {
+      return fail(400, { error: 'Invalid instance ID' });
+    }
+
+    const instance = arrInstancesQueries.getById(id);
+    if (!instance) {
+      return fail(404, { error: 'Instance not found' });
+    }
+
+    const formData = await request.formData();
+    const sourceIdResult = parseSourceIdFromForm(formData.get('sourceId'));
+    if ('error' in sourceIdResult) {
+      return fail(400, { error: sourceIdResult.error });
+    }
+
+    const triggerResult = parseTrashGuideTriggerFromForm(formData.get('trigger'));
+    if ('error' in triggerResult) {
+      return fail(400, { error: triggerResult.error });
+    }
+
+    const selectionsResult = parseTrashGuideSelectionsFromForm(formData.get('selections'));
+    if ('error' in selectionsResult) {
+      return fail(400, { error: selectionsResult.error });
+    }
+
+    const cronValue = formData.get('cron');
+    const cron = typeof cronValue === 'string' && cronValue.length > 0 ? cronValue : null;
+
+    try {
+      const trigger = triggerResult.value;
+      trashGuideSyncQueries.saveState({
+        instanceId: id,
+        sourceId: sourceIdResult.value,
+        trigger,
+        cron,
+        nextRunAt: trigger === 'schedule' ? calculateNextRun(cron) : null,
+        shouldSync: false,
+        selections: selectionsResult.value,
+      });
+
+      await logger.info(`TRaSH source sync config saved for "${instance.name}"`, {
+        source: 'sync',
+        meta: {
+          instanceId: id,
+          sourceId: sourceIdResult.value,
+          trigger,
+          selectionCount: selectionsResult.value.length,
+        },
+      });
+
+      return { success: true };
+    } catch (error) {
+      const mapped = mapTrashGuideActionError(error);
+      if (mapped.status >= 500) {
+        await logger.error('Failed to save TRaSH source sync config', {
+          source: 'sync',
+          meta: { instanceId: id, sourceId: sourceIdResult.value, error: mapped.message },
+        });
+      }
+      return fail(mapped.status, { error: mapped.message });
+    }
+  },
+
+  syncTrashGuideSource: async ({ params, request }) => {
+    const id = parseInt(params.id || '', 10);
+    if (isNaN(id)) {
+      return fail(400, { error: 'Invalid instance ID' });
+    }
+
+    const instance = arrInstancesQueries.getById(id);
+    if (!instance) {
+      return fail(404, { error: 'Instance not found' });
+    }
+
+    const formData = await request.formData();
+    const sourceIdResult = parseSourceIdFromForm(formData.get('sourceId'));
+    if ('error' in sourceIdResult) {
+      return fail(400, { error: sourceIdResult.error });
+    }
+
+    const sourceId = sourceIdResult.value;
+
+    try {
+      trashGuideSyncQueries.assertScope(id, sourceId);
+      const queued = enqueueManualTrashGuideSourceSync(sourceId);
+      if (queued.status === 'already_running') {
+        return fail(409, {
+          error: 'TRaSH sync is already running for this source',
+          run: queued.run,
+        });
+      }
+
+      await logger.info(`Queued TRaSH source sync for "${instance.name}"`, {
+        source: 'sync',
+        meta: {
+          instanceId: id,
+          sourceId,
+          jobId: queued.job.id,
+          jobStatus: queued.job.status,
+          runAt: queued.job.runAt,
+        },
+      });
+
+      return {
+        success: true,
+        message: 'TRaSH source sync queued',
+        job: queued.job,
+      };
+    } catch (error) {
+      const mapped = mapTrashGuideActionError(error);
+      if (mapped.status >= 500) {
+        await logger.error(`TRaSH source sync enqueue failed for "${instance.name}"`, {
+          source: 'sync',
+          meta: { instanceId: id, sourceId, error: mapped.message },
+        });
+      }
+      return fail(mapped.status, { error: mapped.message });
     }
   },
 

@@ -118,5 +118,8 @@ export async function list(cache: PCDCache): Promise<CustomFormatTableRow[]> {
     conditions: conditionsMap.get(format.name) || [],
     arrTargets: getArrTargets(format.name),
     testCount: testCountMap.get(format.name) || 0,
+    sourceType: 'pcd',
+    sourceDatabaseId: 0,
+    sourceDatabaseName: '',
   }));
 }

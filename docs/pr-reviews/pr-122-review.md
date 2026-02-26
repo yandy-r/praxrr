@@ -182,7 +182,10 @@ Status: ✅ Fixed.
 code-reviewer, type-design-analyzer
 
 ```typescript
-return ENTITY_TYPE_ORDER[a as TrashGuideEntityType] - ENTITY_TYPE_ORDER[b as TrashGuideEntityType];
+return (
+  ENTITY_TYPE_ORDER[a as TrashGuideEntityType] -
+  ENTITY_TYPE_ORDER[b as TrashGuideEntityType]
+);
 ```
 
 The `as TrashGuideEntityType` casts bypass type safety. If `TrashIdMappingEntityType` ever diverges,
@@ -204,7 +207,10 @@ Optional fields create an "anything goes" shape. `arrType` is typed as `string` 
 ```typescript
 type UnifiedDatabaseItem =
   | { type: 'pcd' /* PCD fields required */ }
-  | { type: 'trash'; arrType: TrashGuideSupportedArrType /* TRaSH fields required */ };
+  | {
+      type: 'trash';
+      arrType: TrashGuideSupportedArrType; /* TRaSH fields required */
+    };
 ```
 
 ### 11. `TrashGuideTransformedOperation` has uncorrelated `portableEntityType` and `data`

@@ -21,7 +21,7 @@ import { actions as qualityDefinitionsLidarrEditActions } from '../../routes/med
 import { PCDCache } from '$pcd/database/cache.ts';
 import { deleteCache, getCache, setCache } from '$pcd/database/registry.ts';
 import { arrSyncQueries } from '$db/queries/arrSync.ts';
-import { databaseInstancesQueries } from '$db/queries/databaseInstances.ts';
+import { databaseInstancesQueries, type DatabaseInstance } from '$db/queries/databaseInstances.ts';
 import { pcdOpsQueries, type PcdOp } from '$db/queries/pcdOps.ts';
 import { pcdOpHistoryQueries } from '$db/queries/pcdOpHistory.ts';
 import { pcdManager } from '$pcd/index.ts';
@@ -160,31 +160,34 @@ class LidarrMediaManagementTest extends BaseTest {
   private installDatabaseInstanceMock(): void {
     const now = new Date().toISOString();
 
+    const instance: DatabaseInstance = {
+      id: LidarrMediaManagementTest.DATABASE_ID,
+      uuid: 'lidarr-media-management-fixture',
+      name: 'lidarr-media-management-fixture',
+      repository_url: 'file:///tmp/lidarr-media-management-fixture',
+      local_path: this.pcdPath,
+      sync_strategy: 0,
+      auto_pull: 1,
+      enabled: 1,
+      personal_access_token: 'token',
+      is_private: 0,
+      local_ops_enabled: 0,
+      git_user_name: null,
+      git_user_email: null,
+      conflict_strategy: 'override',
+      last_synced_at: null,
+      created_at: now,
+      updated_at: now,
+    };
+
     this.patch(databaseInstancesQueries, 'getById', (id: number) => {
       if (id !== LidarrMediaManagementTest.DATABASE_ID) {
         return undefined;
       }
 
-      return {
-        id,
-        uuid: 'lidarr-media-management-fixture',
-        name: 'lidarr-media-management-fixture',
-        repository_url: 'file:///tmp/lidarr-media-management-fixture',
-        local_path: this.pcdPath,
-        sync_strategy: 0,
-        auto_pull: 1,
-        enabled: 1,
-        personal_access_token: 'token',
-        is_private: 0,
-        local_ops_enabled: 0,
-        git_user_name: null,
-        git_user_email: null,
-        conflict_strategy: 'override',
-        last_synced_at: null,
-        created_at: now,
-        updated_at: now,
-      };
+      return instance;
     });
+    this.patch(databaseInstancesQueries, 'getAll', () => [instance]);
   }
 
   private installPcdQueryMocks(): void {

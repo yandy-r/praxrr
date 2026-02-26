@@ -3,11 +3,7 @@ import { Database } from '@jsr/db__sqlite';
 import { DenoSqlite3Dialect } from '@soapbox/kysely-deno-sqlite';
 import { Kysely } from 'kysely';
 import type { PCDCache } from '$pcd/index.ts';
-import {
-  getLidarrDefaults,
-  getRadarrDefaults,
-  getSonarrDefaults,
-} from '$pcd/entities/mediaManagement/naming/read.ts';
+import { getLidarrDefaults, getRadarrDefaults, getSonarrDefaults } from '$pcd/entities/mediaManagement/naming/read.ts';
 import type { PCDDatabase } from '$shared/pcd/types.ts';
 
 type NamingArrType = 'radarr' | 'sonarr' | 'lidarr';
@@ -166,10 +162,7 @@ INSERT INTO lidarr_naming (
 );`;
 }
 
-async function getDefaultsByArrType(
-  cache: PCDCache,
-  arrType: NamingArrType
-): Promise<{ name: string } | null> {
+async function getDefaultsByArrType(cache: PCDCache, arrType: NamingArrType): Promise<{ name: string } | null> {
   if (arrType === 'radarr') {
     return await getRadarrDefaults(cache);
   }

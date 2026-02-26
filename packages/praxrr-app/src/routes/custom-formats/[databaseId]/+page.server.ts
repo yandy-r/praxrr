@@ -2,6 +2,17 @@ import { error } from '@sveltejs/kit';
 import type { ServerLoad } from '@sveltejs/kit';
 import { pcdManager, canWriteToBase } from '$pcd/index.ts';
 import * as customFormatQueries from '$pcd/entities/customFormats/index.ts';
+import { trashGuideManager } from '$lib/server/trashguide/manager.ts';
+import { trashGuideEntityCacheQueries } from '$db/queries/trashGuideEntityCache.ts';
+import type { CustomFormatTableRow } from '$shared/pcd/display.ts';
+import { toSourcedCustomFormatRow, type TrashGuideSourceRef } from '$lib/server/trashguide/displayTransform.ts';
+import { isTrashGuideSupportedArrType } from '$lib/server/trashguide/types.ts';
+import {
+  buildSourceContext,
+  isTrashSource,
+  sortRowsByNameAndSource,
+  withPcdSource,
+} from '$server/utils/sourceContext.ts';
 
 export const load: ServerLoad = async ({ params }) => {
   const { databaseId } = params;
@@ -27,19 +38,63 @@ export const load: ServerLoad = async ({ params }) => {
     throw error(404, 'Database not found');
   }
 
-  // Get the cache for the database
-  const cache = pcdManager.getCache(currentDatabaseId);
-  if (!cache) {
+  if (!pcdManager.getCache(currentDatabaseId)) {
     throw error(500, 'Database cache not available');
   }
 
-  // Load custom formats for the current database
-  const customFormats = await customFormatQueries.list(cache);
+  const sourceContext = buildSourceContext(
+    databases,
+    currentDatabase,
+    trashGuideManager.listSources(),
+    (source) => source.entityCounts.customFormats,
+    (source) => source.name,
+    'custom formats'
+  );
+  const pcdRows = (
+    await Promise.all(
+      databases.map(async (database) => {
+        const cache = pcdManager.getCache(database.id);
+        if (!cache) {
+          return [] as CustomFormatTableRow[];
+        }
+
+        const rows = await customFormatQueries.list(cache);
+        return withPcdSource(rows, database);
+      })
+    )
+  ).flat();
+
+  const trashRows = sourceContext.availableSources.filter(isTrashSource).flatMap((source) => {
+    if (!isTrashGuideSupportedArrType(source.arrType)) {
+      return [] as CustomFormatTableRow[];
+    }
+
+    const sourceRef: TrashGuideSourceRef = {
+      id: source.id,
+      name: source.name,
+      arrType: source.arrType,
+    };
+
+    return trashGuideEntityCacheQueries
+      .getBySourceAndType(source.id, 'custom_format')
+      .map((entity) => toSourcedCustomFormatRow(entity, sourceRef))
+      .filter((row): row is CustomFormatTableRow => row !== null);
+  });
+
+  const customFormats = sortRowsByNameAndSource([...pcdRows, ...trashRows], (a, b) => {
+    const sourceA = a.sourceDatabaseName ?? '';
+    const sourceB = b.sourceDatabaseName ?? '';
+    const bySource = sourceA.localeCompare(sourceB, undefined, { sensitivity: 'base' });
+    if (bySource !== 0) return bySource;
+
+    return a.id - b.id;
+  });
 
   return {
     databases,
     currentDatabase,
     customFormats,
     canWriteToBase: canWriteToBase(currentDatabaseId),
+    sourceContext,
   };
 };

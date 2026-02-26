@@ -283,6 +283,9 @@ export async function list(cache: PCDCache, arrType?: ArrAppType): Promise<Quali
       },
       qualities: qualitiesMap.get(profile.name) || [],
       language: languagesMap.get(profile.name),
+      sourceType: 'pcd',
+      sourceDatabaseId: 0,
+      sourceDatabaseName: '',
     };
 
     // Only include upgrade settings if upgrades are allowed

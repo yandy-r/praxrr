@@ -91,7 +91,7 @@ function getScheduledRescheduleAt(
   return calculateNextRunFromMinutes(new Date().toISOString(), scheduleMinutes);
 }
 
-function buildFailureResult(
+async function buildFailureResult(
   jobId: number,
   sourceId: number,
   message: string,
@@ -99,7 +99,7 @@ function buildFailureResult(
   trigger: TrashGuideSyncJobPayload['trigger'],
   enabled: number,
   scheduleMinutes: number
-): JobHandlerResult {
+): Promise<JobHandlerResult> {
   const scheduledRescheduleAt = getScheduledRescheduleAt(trigger, enabled, scheduleMinutes);
 
   if (
@@ -109,7 +109,7 @@ function buildFailureResult(
     attempts < MAX_TRANSIENT_RETRY_ATTEMPTS
   ) {
     const retryAt = calculateRetryAt(attempts);
-    void logger.warn('TRaSH sync job transient failure, scheduling retry', {
+    await logger.warn('TRaSH sync job transient failure, scheduling retry', {
       source: 'TrashGuideSyncJob',
       meta: {
         jobId,
@@ -189,7 +189,7 @@ const trashGuideSyncHandler: JobHandler = async (job) => {
     );
   }
 
-  if (!updates.hasUpdates) {
+  if (!updates.hasUpdates && payload.trigger !== 'manual') {
     trashGuideSourcesQueries.updateSyncMetadata(payload.sourceId, { lastSyncedAt: new Date().toISOString() });
     return {
       status: 'skipped',
@@ -207,7 +207,26 @@ const trashGuideSyncHandler: JobHandler = async (job) => {
     };
   }
 
-  const syncResult = await trashGuideManager.sync(payload.sourceId);
+  let syncResult: Awaited<ReturnType<typeof trashGuideManager.sync>>;
+  try {
+    syncResult = await trashGuideManager.sync(payload.sourceId);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    await logger.error('TRaSH source sync failed', {
+      source: 'TrashGuideSyncJob',
+      meta: { jobId: job.id, sourceId: payload.sourceId, sourceName: source.name, error: message },
+    });
+    return buildFailureResult(
+      job.id,
+      payload.sourceId,
+      message,
+      job.attempts,
+      payload.trigger,
+      source.enabled,
+      source.sync_strategy
+    );
+  }
+
   if (!syncResult.success) {
     const message = syncResult.error ?? 'TRaSH sync failed';
     await logger.error('TRaSH source sync failed', {

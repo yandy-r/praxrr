@@ -5,7 +5,13 @@
 import type { PCDCache } from '$pcd/index.ts';
 import type { LidarrNamingRow, NamingListItem, RadarrNamingRow, SonarrNamingRow } from '$shared/pcd/display.ts';
 import { colonReplacementFromDb, multiEpisodeStyleFromDb } from '$shared/pcd/mediaManagement.ts';
-import type { ArrAppType, LidarrNamingTable, PCDDatabase, RadarrNamingTable, SonarrNamingTable } from '$shared/pcd/types.ts';
+import type {
+  ArrAppType,
+  LidarrNamingTable,
+  PCDDatabase,
+  RadarrNamingTable,
+  SonarrNamingTable,
+} from '$shared/pcd/types.ts';
 import { LIDARR_NAMING_TABLE, RADARR_NAMING_TABLE, SONARR_NAMING_TABLE } from './constants.ts';
 import type { Selectable } from 'kysely';
 import { sql } from 'kysely';
@@ -103,10 +109,7 @@ function mapLidarrRow(row: Selectable<LidarrNamingTable>): LidarrNamingRow {
 
 type NamingDefaultsArrType = Exclude<ArrAppType, 'all'>;
 
-type NamingDefaultsTable =
-  | typeof RADARR_NAMING_TABLE
-  | typeof SONARR_NAMING_TABLE
-  | typeof LIDARR_NAMING_TABLE;
+type NamingDefaultsTable = typeof RADARR_NAMING_TABLE | typeof SONARR_NAMING_TABLE | typeof LIDARR_NAMING_TABLE;
 
 async function getDefaultNamingRow<T extends NamingDefaultsTable>(
   cache: PCDCache,
