@@ -38,6 +38,14 @@ export const PREVIEW_STATUS_TRANSITIONS: Record<SyncPreviewStatus, readonly Sync
   expired: [],
 };
 
+/**
+ * Derive the effective status of a preview snapshot, returning `expired` when the TTL has elapsed.
+ *
+ * @param snapshot - The stored preview snapshot
+ * @param nowMs - Current time in milliseconds (defaults to Date.now())
+ * @returns The resolved lifecycle status
+ * @throws {Error} When `snapshot.expiresAt` cannot be parsed as a date
+ */
 export function derivePreviewStatus(snapshot: SyncPreviewResult, nowMs: number = Date.now()): SyncPreviewStatus {
   const expiresAtMs = Date.parse(snapshot.expiresAt);
 
@@ -52,6 +60,13 @@ export function derivePreviewStatus(snapshot: SyncPreviewResult, nowMs: number =
   return snapshot.status;
 }
 
+/**
+ * Returns true when a preview snapshot has passed its expiry time.
+ *
+ * @param snapshot - The stored preview snapshot
+ * @param nowMs - Current time in milliseconds (defaults to Date.now())
+ * @returns Whether the snapshot is expired
+ */
 export function isPreviewExpired(snapshot: SyncPreviewResult, nowMs: number = Date.now()): boolean {
   return derivePreviewStatus(snapshot, nowMs) === PREVIEW_STATUS_EXPIRED;
 }
@@ -62,6 +77,13 @@ export interface PreviewStalenessState {
   shouldBlock: boolean;
 }
 
+/**
+ * Evaluate how stale a preview snapshot is relative to warn/block thresholds.
+ *
+ * @param snapshot - The stored preview snapshot
+ * @param nowMs - Current time in milliseconds (defaults to Date.now())
+ * @returns Age and staleness flags for warn/block decisions
+ */
 export function evaluatePreviewStaleness(
   snapshot: SyncPreviewResult,
   nowMs: number = Date.now()

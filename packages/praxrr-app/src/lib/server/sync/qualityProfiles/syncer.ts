@@ -114,6 +114,14 @@ interface PreviewFormatIdMapInput {
   };
 }
 
+/**
+ * Merge preview custom format ID entries into an existing format ID map.
+ * Entries without a numeric id are skipped.
+ *
+ * @param existingMap - The current name-to-ID map to extend
+ * @param preparedFormats - Prepared format payloads whose IDs should be merged in
+ * @returns A new map combining both inputs
+ */
 export function mergePreviewFormatIdMap(
   existingMap: ReadonlyMap<string, number>,
   preparedFormats: readonly PreviewFormatIdMapInput[]

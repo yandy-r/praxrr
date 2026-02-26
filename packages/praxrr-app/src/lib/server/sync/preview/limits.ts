@@ -14,6 +14,14 @@ function pruneWindow(entry: RateWindowEntry, nowMs: number): void {
   entry.timestamps = entry.timestamps.filter((timestamp) => timestamp > windowStart);
 }
 
+/**
+ * Register a preview creation attempt for an instance and enforce the rate limit.
+ * Returns false and does not record the attempt when the limit has been reached.
+ *
+ * @param instanceId - The Arr instance ID making the request
+ * @param nowMs - Current time in milliseconds
+ * @returns True when the attempt is allowed, false when rate-limited
+ */
 export function registerPreviewCreateAttempt(instanceId: number, nowMs: number): boolean {
   const entry = createPreviewRateWindows.get(instanceId) ?? { timestamps: [] };
   pruneWindow(entry, nowMs);
@@ -28,6 +36,9 @@ export function registerPreviewCreateAttempt(instanceId: number, nowMs: number):
   return true;
 }
 
+/**
+ * Clear all rate limit windows. Intended for use in tests only.
+ */
 export function resetPreviewCreateRateLimitForTests(): void {
   createPreviewRateWindows.clear();
 }

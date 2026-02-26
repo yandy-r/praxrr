@@ -190,6 +190,14 @@ function buildSectionPayloads(sectionOutcomes: readonly SectionOutcome[]): {
   return { qualityProfiles, delayProfiles, mediaManagement, metadataProfiles, summary };
 }
 
+/**
+ * Generate a read-only sync preview for a single Arr instance across the requested sections.
+ * Section failures are accumulated as partial errors rather than rejecting the entire result.
+ *
+ * @param input - Instance, optional section filter, and optional per-section config overrides
+ * @returns Aggregated preview result including per-section outcomes and a change summary
+ * @throws {Error} When the instance has an unsupported Arr type
+ */
 export async function generatePreview(input: GeneratePreviewInput): Promise<GeneratePreviewResult> {
   const arrType = toSyncArrType(input.instance.type);
   if (!arrType) {

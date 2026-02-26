@@ -40,10 +40,24 @@ const UNSUPPORTED_MEDIA_MANAGEMENT_SUBSECTION_REASONS: Partial<
   Record<SyncArrType, Partial<Record<MediaManagementSubsection, string>>>
 > = {};
 
+/**
+ * Returns true if the given sync section is supported for the specified Arr type.
+ *
+ * @param arrType - The target Arr instance type
+ * @param section - The sync section to check
+ * @returns Whether the section is supported
+ */
 export function isSyncSectionSupported(arrType: SyncArrType, section: SectionType): boolean {
   return SUPPORTED_SYNC_SECTIONS[arrType].includes(section);
 }
 
+/**
+ * Returns true if the given media management subsection is supported for the specified Arr type.
+ *
+ * @param arrType - The target Arr instance type
+ * @param subsection - The media management subsection to check
+ * @returns Whether the subsection is supported
+ */
 export function isMediaManagementSubsectionSupported(
   arrType: SyncArrType,
   subsection: MediaManagementSubsection
@@ -51,6 +65,13 @@ export function isMediaManagementSubsectionSupported(
   return SUPPORTED_MEDIA_MANAGEMENT_SUBSECTIONS[arrType].includes(subsection);
 }
 
+/**
+ * Returns a human-readable reason why a sync section is unsupported, or null if it is supported.
+ *
+ * @param arrType - The target Arr instance type
+ * @param section - The sync section to explain
+ * @returns Reason string when unsupported, null when supported
+ */
 export function getUnsupportedSyncSectionReason(arrType: SyncArrType, section: SectionType): string | null {
   if (isSyncSectionSupported(arrType, section)) {
     return null;
@@ -59,6 +80,13 @@ export function getUnsupportedSyncSectionReason(arrType: SyncArrType, section: S
   return UNSUPPORTED_SYNC_SECTION_REASONS[arrType]?.[section] ?? `Section ${section} is not supported for ${arrType}`;
 }
 
+/**
+ * Returns a human-readable reason why a media management subsection is unsupported, or null if it is supported.
+ *
+ * @param arrType - The target Arr instance type
+ * @param subsection - The media management subsection to explain
+ * @returns Reason string when unsupported, null when supported
+ */
 export function getUnsupportedMediaManagementSubsectionReason(
   arrType: SyncArrType,
   subsection: MediaManagementSubsection

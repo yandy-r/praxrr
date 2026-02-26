@@ -41,14 +41,30 @@ const CONCURRENCY_LIMIT = 3;
 // redundant sync work (the selections were just reconstructed from live Arr state).
 const startupPullActiveInstances = new Set<number>();
 
+/**
+ * Mark an instance as actively being processed by a startup pull to suppress redundant sync triggers.
+ *
+ * @param instanceId - The Arr instance ID to mark
+ */
 export function markInstanceStartupPullActive(instanceId: number): void {
   startupPullActiveInstances.add(instanceId);
 }
 
+/**
+ * Clear the startup pull active guard for an instance once the pull completes.
+ *
+ * @param instanceId - The Arr instance ID to unmark
+ */
 export function markInstanceStartupPullComplete(instanceId: number): void {
   startupPullActiveInstances.delete(instanceId);
 }
 
+/**
+ * Returns true if a startup pull is currently in progress for the given instance.
+ *
+ * @param instanceId - The Arr instance ID to check
+ * @returns Whether the instance startup pull is active
+ */
 export function isStartupPullInstanceActive(instanceId: number): boolean {
   return startupPullActiveInstances.has(instanceId);
 }
