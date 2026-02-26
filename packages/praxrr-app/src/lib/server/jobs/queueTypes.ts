@@ -8,6 +8,7 @@ export type JobType =
   | 'arr.sync.metadataProfiles'
   | 'arr.pull.startup'
   | 'pcd.sync'
+  | 'trashguide.sync'
   | 'backup.create'
   | 'backup.cleanup'
   | 'logs.cleanup';
@@ -18,12 +19,68 @@ export type JobSource = 'schedule' | 'manual' | 'system';
 
 export type JobRunStatus = 'success' | 'failure' | 'skipped' | 'cancelled';
 
+export type ArrSyncSection = 'qualityProfiles' | 'delayProfiles' | 'mediaManagement' | 'metadataProfiles';
+
+export interface ArrSyncJobPayload {
+  instanceId: number;
+  sections?: ArrSyncSection[];
+  section?: ArrSyncSection;
+}
+
+export interface ArrSyncSectionJobPayload {
+  instanceId: number;
+}
+
+export interface ArrRenameJobPayload {
+  instanceId: number;
+}
+
+export interface ArrUpgradeJobPayload {
+  instanceId: number;
+}
+
+export interface PcdSyncJobPayload {
+  databaseId: number;
+}
+
+export interface TrashGuideSyncJobPayload {
+  sourceId: number;
+  trigger: 'manual' | 'scheduled';
+  requestedAt?: string;
+}
+
+export interface ArrPullStartupJobPayload {
+  enqueuedAt?: string;
+}
+
+export interface ArrSyncCleanupOnlyPayload {}
+
+export interface JobPayloadByType {
+  'arr.sync': ArrSyncJobPayload;
+  'arr.sync.qualityProfiles': ArrSyncSectionJobPayload;
+  'arr.sync.delayProfiles': ArrSyncSectionJobPayload;
+  'arr.sync.mediaManagement': ArrSyncSectionJobPayload;
+  'arr.sync.metadataProfiles': ArrSyncSectionJobPayload;
+  'arr.upgrade': ArrUpgradeJobPayload;
+  'arr.rename': ArrRenameJobPayload;
+  'pcd.sync': PcdSyncJobPayload;
+  'trashguide.sync': TrashGuideSyncJobPayload;
+  'arr.pull.startup': ArrPullStartupJobPayload;
+  'backup.create': ArrSyncCleanupOnlyPayload;
+  'backup.cleanup': ArrSyncCleanupOnlyPayload;
+  'logs.cleanup': ArrSyncCleanupOnlyPayload;
+}
+
+export type JobPayload<T extends JobType = JobType> = T extends JobType ? JobPayloadByType[T] : never;
+
+export type AnyJobPayload = JobPayloadByType[JobType];
+
 export interface JobQueueRecord {
   id: number;
   jobType: JobType;
   status: JobStatus;
   runAt: string;
-  payload: Record<string, unknown>;
+  payload: AnyJobPayload & Record<string, unknown>;
   source: JobSource;
   dedupeKey: string | null;
   cooldownUntil: string | null;

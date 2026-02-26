@@ -21,6 +21,7 @@
     "$sync/": "./packages/praxrr-app/src/lib/server/sync/",
     "$cache/": "./packages/praxrr-app/src/lib/server/utils/cache/",
     "$auth/": "./packages/praxrr-app/src/lib/server/utils/auth/",
+    "$trashguide/": "./packages/praxrr-app/src/lib/server/trashguide/",
     "@soapbox/kysely-deno-sqlite": "jsr:@soapbox/kysely-deno-sqlite@^2.2.0",
     "@std/assert": "jsr:@std/assert@^1.0.0",
     "marked": "npm:marked@^15.0.6",

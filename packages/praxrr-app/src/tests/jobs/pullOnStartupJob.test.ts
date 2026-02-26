@@ -10,7 +10,6 @@ import {
   buildRunSummary,
   buildSuccessInstanceResult,
   buildFailedInstanceResult,
-  buildSkippedInstanceResult,
   buildRadarrInstance,
   buildSonarrInstance,
   buildLidarrInstance,
@@ -24,6 +23,7 @@ import '$jobs/handlers/arrPullStartup.ts';
 // =============================================================================
 
 type Restore = () => void;
+type StartupHandler = NonNullable<ReturnType<typeof jobQueueRegistry.get>>;
 
 function patchTarget<T extends object, K extends keyof T>(
   target: T,
@@ -36,6 +36,12 @@ function patchTarget<T extends object, K extends keyof T>(
   restores.push(() => {
     target[key] = original;
   });
+}
+
+function restoreAll(restores: Restore[]): void {
+  for (const restore of restores.reverse()) {
+    restore();
+  }
 }
 
 type MutableConfig = {
@@ -52,7 +58,9 @@ function patchConfig(overrides: Partial<MutableConfig>, restores: Restore[]): vo
     pullOnStartTimeoutMs: mutable.pullOnStartTimeoutMs,
   };
 
-  if (overrides.pullOnStart !== undefined) mutable.pullOnStart = overrides.pullOnStart;
+  if (overrides.pullOnStart !== undefined) {
+    mutable.pullOnStart = overrides.pullOnStart;
+  }
   if (overrides.pullOnStartMaxConcurrency !== undefined) {
     mutable.pullOnStartMaxConcurrency = overrides.pullOnStartMaxConcurrency;
   }
@@ -90,6 +98,12 @@ function createStartupJobRecord(): JobQueueRecord {
   };
 }
 
+function getStartupHandler(): StartupHandler {
+  const handler = jobQueueRegistry.get('arr.pull.startup');
+  assertExists(handler, 'arr.pull.startup handler should be registered');
+  return handler;
+}
+
 // =============================================================================
 // Handler registration test
 // =============================================================================
@@ -107,7 +121,7 @@ Deno.test({
   name: 'arr.pull.startup handler returns skipped when feature is disabled',
   sanitizeResources: false,
   fn: async () => {
-    const handler = jobQueueRegistry.get('arr.pull.startup')!;
+    const handler = getStartupHandler();
     const restores: Restore[] = [];
 
     patchConfig({ pullOnStart: false }, restores);
@@ -117,7 +131,7 @@ Deno.test({
       assertEquals(result.status, 'skipped');
       assertStringIncludes(result.output!, 'Startup pull disabled');
     } finally {
-      for (const restore of restores.reverse()) restore();
+      restoreAll(restores);
     }
   },
 });
@@ -130,7 +144,7 @@ Deno.test({
   name: 'arr.pull.startup handler returns skipped when no instances are enabled',
   sanitizeResources: false,
   fn: async () => {
-    const handler = jobQueueRegistry.get('arr.pull.startup')!;
+    const handler = getStartupHandler();
     const restores: Restore[] = [];
 
     patchConfig({ pullOnStart: true }, restores);
@@ -146,7 +160,7 @@ Deno.test({
       assertEquals(parsed.status, 'skipped');
       assertEquals(parsed.instances.length, 0);
     } finally {
-      for (const restore of restores.reverse()) restore();
+      restoreAll(restores);
     }
   },
 });
@@ -155,7 +169,7 @@ Deno.test({
   name: 'arr.pull.startup handler returns skipped when no databases are enabled',
   sanitizeResources: false,
   fn: async () => {
-    const handler = jobQueueRegistry.get('arr.pull.startup')!;
+    const handler = getStartupHandler();
     const restores: Restore[] = [];
 
     patchConfig({ pullOnStart: true }, restores);
@@ -173,7 +187,7 @@ Deno.test({
       assertEquals(parsed.status, 'skipped');
       assertEquals(parsed.instances.length, 0);
     } finally {
-      for (const restore of restores.reverse()) restore();
+      restoreAll(restores);
     }
   },
 });
@@ -182,7 +196,7 @@ Deno.test({
   name: 'arr.pull.startup handler isolates per-instance failures and returns failure with counters',
   sanitizeResources: false,
   fn: async () => {
-    const handler = jobQueueRegistry.get('arr.pull.startup')!;
+    const handler = getStartupHandler();
     const restores: Restore[] = [];
 
     patchConfig({ pullOnStart: true }, restores);
@@ -225,7 +239,7 @@ Deno.test({
       // Aggregate counters should reflect both failures
       assertEquals(parsed.failed, 2);
     } finally {
-      for (const restore of restores.reverse()) restore();
+      restoreAll(restores);
     }
   },
 });
@@ -234,7 +248,7 @@ Deno.test({
   name: 'arr.pull.startup handler returns structured output with instance-level counters',
   sanitizeResources: false,
   fn: async () => {
-    const handler = jobQueueRegistry.get('arr.pull.startup')!;
+    const handler = getStartupHandler();
     const restores: Restore[] = [];
 
     patchConfig({ pullOnStart: true }, restores);
@@ -284,7 +298,7 @@ Deno.test({
         assertEquals(typeof instanceResult.failed, 'number');
       }
     } finally {
-      for (const restore of restores.reverse()) restore();
+      restoreAll(restores);
     }
   },
 });

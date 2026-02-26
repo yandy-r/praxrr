@@ -117,6 +117,10 @@ function supportsDatabaseInstanceCredentials(): boolean {
   return (result?.table_present ?? 0) === 1;
 }
 
+function toDbBoolean(value: boolean): 0 | 1 {
+  return value ? 1 : 0;
+}
+
 function getDatabaseInstanceSelect(): string {
   return supportsDatabaseInstanceCredentials() ? databaseInstanceSelectWithCredentials : databaseInstanceSelectLegacy;
 }
@@ -130,10 +134,10 @@ export const databaseInstancesQueries = {
    */
   create(input: CreateDatabaseInstanceInput, credentialInput?: DatabaseInstanceCredentialWriteInput): number {
     const syncStrategy = input.syncStrategy ?? 0;
-    const autoPull = input.autoPull !== false ? 1 : 0;
-    const enabled = input.enabled !== false ? 1 : 0;
-    const isPrivate = input.isPrivate ? 1 : 0;
-    const localOpsEnabled = input.localOpsEnabled ? 1 : 0;
+    const autoPull = toDbBoolean(input.autoPull !== false);
+    const enabled = toDbBoolean(input.enabled !== false);
+    const isPrivate = toDbBoolean(!!input.isPrivate);
+    const localOpsEnabled = toDbBoolean(!!input.localOpsEnabled);
     const gitUserName = input.gitUserName || null;
     const gitUserEmail = input.gitUserEmail || null;
     const conflictStrategy = input.conflictStrategy ?? 'override';
@@ -272,11 +276,11 @@ export const databaseInstancesQueries = {
     }
     if (input.autoPull !== undefined) {
       updates.push('auto_pull = ?');
-      params.push(input.autoPull ? 1 : 0);
+      params.push(toDbBoolean(input.autoPull));
     }
     if (input.enabled !== undefined) {
       updates.push('enabled = ?');
-      params.push(input.enabled ? 1 : 0);
+      params.push(toDbBoolean(input.enabled));
     }
     if (input.personalAccessToken !== undefined) {
       updates.push('personal_access_token = ?');
@@ -284,7 +288,7 @@ export const databaseInstancesQueries = {
     }
     if (input.localOpsEnabled !== undefined) {
       updates.push('local_ops_enabled = ?');
-      params.push(input.localOpsEnabled ? 1 : 0);
+      params.push(toDbBoolean(input.localOpsEnabled));
     }
     if (input.gitUserName !== undefined) {
       updates.push('git_user_name = ?');
