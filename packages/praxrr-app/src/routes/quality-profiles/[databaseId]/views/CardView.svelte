@@ -14,6 +14,7 @@
 	export let profiles: QualityProfileTableRow[];
 	export let availableSources: SourceRef[] = [];
 	export let showSourceBadges = false;
+	export let currentDatabaseId: number;
 
 	const dispatch = createEventDispatcher<{ clone: { name: string }; export: { name: string } }>();
 
@@ -51,31 +52,62 @@
 
 		return null;
 	}
+
+	function resolveSourceDatabaseId(profile: QualityProfileTableRow): number {
+		if (profile.sourceType === 'pcd' && typeof profile.sourceDatabaseId === 'number') {
+			return profile.sourceDatabaseId;
+		}
+
+		const fallbackDatabaseId = Number(databaseId);
+		if (Number.isInteger(fallbackDatabaseId)) {
+			return fallbackDatabaseId;
+		}
+
+		return currentDatabaseId;
+	}
+
+	function isTrashRow(profile: QualityProfileTableRow): boolean {
+		return profile.sourceType === 'trash';
+	}
+
+	function isEditableRow(profile: QualityProfileTableRow): boolean {
+		return !isTrashRow(profile) && resolveSourceDatabaseId(profile) === currentDatabaseId;
+	}
+
+	function getCardHref(profile: QualityProfileTableRow): string | undefined {
+		if (isTrashRow(profile)) {
+			return undefined;
+		}
+
+		return `/quality-profiles/${resolveSourceDatabaseId(profile)}/${profile.id}/general`;
+	}
 </script>
 
 <CardGrid flush>
 	{#each visibleProfiles as profile}
-		<Card href="/quality-profiles/{databaseId}/{profile.id}/general" hoverable>
+		<Card href={getCardHref(profile)} hoverable>
 			<svelte:fragment slot="header">
 				<!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
 				<div class="flex items-start justify-between gap-2">
 					<h3 class="text-sm font-semibold text-neutral-900 dark:text-neutral-100">{profile.name}</h3>
-					<div class="flex shrink-0 items-center gap-0.5" on:click|stopPropagation|preventDefault>
-						<Button
-							icon={Download}
-							size="xs"
-							variant="ghost"
-							tooltip="Export"
-							on:click={() => dispatch('export', { name: profile.name })}
-						/>
-						<Button
-							icon={Copy}
-							size="xs"
-							variant="ghost"
-							tooltip="Clone"
-							on:click={() => dispatch('clone', { name: profile.name })}
-						/>
-					</div>
+					{#if isEditableRow(profile)}
+						<div class="flex shrink-0 items-center gap-0.5" on:click|stopPropagation|preventDefault>
+							<Button
+								icon={Download}
+								size="xs"
+								variant="ghost"
+								tooltip="Export"
+								on:click={() => dispatch('export', { name: profile.name })}
+							/>
+							<Button
+								icon={Copy}
+								size="xs"
+								variant="ghost"
+								tooltip="Clone"
+								on:click={() => dispatch('clone', { name: profile.name })}
+							/>
+						</div>
+					{/if}
 				</div>
 			</svelte:fragment>
 

@@ -2,17 +2,20 @@
 	import ActionsBar from '$ui/actions/ActionsBar.svelte';
 	import ActionButton from '$ui/actions/ActionButton.svelte';
 	import SearchAction from '$ui/actions/SearchAction.svelte';
+	import SourceFilterAction from '$ui/actions/SourceFilterAction.svelte';
 	import ViewToggle from '$ui/actions/ViewToggle.svelte';
 	import CloneModal from '$ui/modal/CloneModal.svelte';
 	import TableView from './views/TableView.svelte';
 	import CardView from './views/CardView.svelte';
 	import { createDataPageStore } from '$lib/client/stores/dataPage';
+	import { browser } from '$app/environment';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { alertStore } from '$alerts/store';
 	import { Plus } from 'lucide-svelte';
 	import type { EntityType } from '$shared/pcd/portable.ts';
 	import type { ArrAppType } from '$shared/arr/capabilities.ts';
+	import type { SourceRef } from '$shared/sources/types.ts';
 	import type { PageData } from './$types';
 
 	export let data: PageData;
@@ -23,13 +26,104 @@
 	let cloneArrType: ArrAppType | null = null;
 	const namingSearchKeys: Array<keyof PageData['namingConfigs'][number]> = ['name', 'arr_type'];
 	const supportedNamingArrTypes: ArrAppType[] = ['radarr', 'sonarr', 'lidarr'];
+	type SourceFilterKey = `${SourceRef['type']}:${number}`;
+	const SOURCE_FILTER_STORAGE_PREFIX = 'namingSourceFilter';
+	let selectedSourceKeys: SourceFilterKey[] = [];
+	let initializedSourceFilterKey = '';
 
 	function isSupportedArrType(arrType: string): arrType is ArrAppType {
 		return supportedNamingArrTypes.includes(arrType as ArrAppType);
 	}
 
+	function toSourceKey(source: Pick<SourceRef, 'type' | 'id'>): SourceFilterKey {
+		return `${source.type}:${source.id}`;
+	}
+
+	function sameSelection(a: SourceFilterKey[], b: SourceFilterKey[]): boolean {
+		return a.length === b.length && a.every((value, index) => value === b[index]);
+	}
+
+	function normalizeSourceSelection(
+		selection: string[],
+		sources: SourceRef[],
+		defaultKey: string
+	): SourceFilterKey[] {
+		if (sources.length === 0) return [];
+
+		const availableKeys = sources.map((source) => toSourceKey(source));
+		const availableSet = new Set(availableKeys);
+		const selected = [...new Set(selection.filter((key) => availableSet.has(key as SourceFilterKey)))];
+
+		if (selected.length > 0) {
+			return selected as SourceFilterKey[];
+		}
+
+		if (availableSet.has(defaultKey as SourceFilterKey)) {
+			return [defaultKey as SourceFilterKey];
+		}
+
+		return [availableKeys[0]];
+	}
+
+	function loadSourceSelection(storageKey: string, sources: SourceRef[], defaultKey: string): SourceFilterKey[] {
+		if (!browser) {
+			return normalizeSourceSelection([], sources, defaultKey);
+		}
+
+		try {
+			const saved = localStorage.getItem(storageKey);
+			if (saved) {
+				const parsed = JSON.parse(saved);
+				if (Array.isArray(parsed)) {
+					return normalizeSourceSelection(
+						parsed.filter((value) => typeof value === 'string'),
+						sources,
+						defaultKey
+					);
+				}
+			}
+		} catch {
+			// Ignore parse errors and use defaults.
+		}
+
+		return normalizeSourceSelection([], sources, defaultKey);
+	}
+
+	function resolveSourceKey(
+		config: PageData['namingConfigs'][number],
+		fallbackSourceKey: SourceFilterKey
+	): SourceFilterKey {
+		if (config.sourceType && typeof config.sourceDatabaseId === 'number') {
+			return `${config.sourceType}:${config.sourceDatabaseId}`;
+		}
+
+		return fallbackSourceKey;
+	}
+
+	function filterBySources(
+		configs: PageData['namingConfigs'],
+		selectedKeys: SourceFilterKey[],
+		fallbackSourceKey: SourceFilterKey
+	): PageData['namingConfigs'] {
+		if (selectedKeys.length === 0) return configs;
+		const selectedSet = new Set(selectedKeys);
+		return configs.filter((config) => selectedSet.has(resolveSourceKey(config, fallbackSourceKey)));
+	}
+
+	function isCurrentDatabasePcdConfig(config: PageData['namingConfigs'][number]): boolean {
+		const sourceType = config.sourceType ?? 'pcd';
+		const sourceDatabaseId = config.sourceDatabaseId ?? data.currentDatabase.id;
+		return sourceType === 'pcd' && sourceDatabaseId === data.currentDatabase.id;
+	}
+
+	function clearSourceFilters() {
+		selectedSourceKeys = availableSources.map((source) => toSourceKey(source));
+	}
+
 	$: cloneExistingNames = cloneArrType
-		? data.namingConfigs.filter((config) => config.arr_type === cloneArrType).map((config) => config.name)
+		? data.namingConfigs
+				.filter((config) => isCurrentDatabasePcdConfig(config) && config.arr_type === cloneArrType)
+				.map((config) => config.name)
 		: [];
 
 	function toEntityType(arrType: string): EntityType | null {
@@ -105,11 +199,59 @@
 
 	// Update items when data changes
 	$: setItems(data.namingConfigs);
+	$: availableSources = data.sourceContext.availableSources;
+	$: sourceFilterDisabledReason = data.sourceContext.filterDisabledReason;
+	$: sourceFilterStorageKey = `${SOURCE_FILTER_STORAGE_PREFIX}:${data.currentDatabase.id}`;
+	$: fallbackSourceKey = toSourceKey({ type: 'pcd', id: data.currentDatabase.id });
+
+	$: if (initializedSourceFilterKey !== sourceFilterStorageKey) {
+		initializedSourceFilterKey = sourceFilterStorageKey;
+		selectedSourceKeys = loadSourceSelection(
+			sourceFilterStorageKey,
+			availableSources,
+			data.sourceContext.defaultSourceKey
+		);
+	}
+
+	$: {
+		const normalized = normalizeSourceSelection(
+			selectedSourceKeys,
+			availableSources,
+			data.sourceContext.defaultSourceKey
+		);
+		if (!sameSelection(normalized, selectedSourceKeys)) {
+			selectedSourceKeys = normalized;
+		}
+	}
+
+	$: if (browser && initializedSourceFilterKey === sourceFilterStorageKey) {
+		localStorage.setItem(sourceFilterStorageKey, JSON.stringify(selectedSourceKeys));
+	}
+
+	$: sourceFiltered = filterBySources($filtered, selectedSourceKeys, fallbackSourceKey);
+	$: sourceFilterActive =
+		availableSources.length > 0 && selectedSourceKeys.length < availableSources.length;
+	$: hasSearchQuery = $search.query.trim().length > 0;
+	$: showSourceClearAction = sourceFilterActive && availableSources.length > 1;
+	$: emptyMessage = sourceFilterActive
+		? hasSearchQuery
+			? 'No naming configs match your search and selected sources'
+			: 'No naming configs match your selected sources'
+		: 'No naming configs match your search';
 </script>
 
 <!-- Actions Bar -->
 <ActionsBar>
 	<SearchAction searchStore={search} placeholder="Search naming configs..." responsive />
+	<div title={sourceFilterDisabledReason ?? undefined}>
+		<SourceFilterAction
+			sources={availableSources}
+			bind:selectedKeys={selectedSourceKeys}
+			disabled={Boolean(sourceFilterDisabledReason)}
+			ariaLabel="Filter naming configs by source"
+			responsive
+		/>
+	</div>
 	<ActionButton
 		icon={Plus}
 		on:click={() =>
@@ -128,16 +270,43 @@
 				No naming configs found for {data.currentDatabase.name}
 			</p>
 		</div>
-	{:else if $filtered.length === 0}
+	{:else if sourceFiltered.length === 0}
 		<div
 			class="rounded-lg border border-neutral-200 bg-white p-8 text-center dark:border-neutral-800 dark:bg-neutral-900"
 		>
-			<p class="text-neutral-600 dark:text-neutral-400">No naming configs match your search</p>
+			<p class="text-neutral-600 dark:text-neutral-400">{emptyMessage}</p>
+			{#if showSourceClearAction}
+				<button
+					type="button"
+					class="mt-3 text-sm font-medium text-accent-700 transition-colors hover:text-accent-600 dark:text-accent-300 dark:hover:text-accent-200"
+					on:click={clearSourceFilters}
+				>
+					Clear source filters
+				</button>
+			{/if}
 		</div>
 	{:else if $view === 'table'}
-		<TableView configs={$filtered} databaseId={data.currentDatabase.id} on:clone={handleClone} on:export={handleExport} />
+		<TableView
+			configs={sourceFiltered}
+			databaseId={data.currentDatabase.id}
+			currentDatabaseId={data.currentDatabase.id}
+			currentDatabaseName={data.currentDatabase.name}
+			sources={availableSources}
+			showSourceBadges={data.sourceContext.showAllSourcesTab}
+			on:clone={handleClone}
+			on:export={handleExport}
+		/>
 	{:else}
-		<CardView configs={$filtered} databaseId={data.currentDatabase.id} on:clone={handleClone} on:export={handleExport} />
+		<CardView
+			configs={sourceFiltered}
+			databaseId={data.currentDatabase.id}
+			currentDatabaseId={data.currentDatabase.id}
+			currentDatabaseName={data.currentDatabase.name}
+			sources={availableSources}
+			showSourceBadges={data.sourceContext.showAllSourcesTab}
+			on:clone={handleClone}
+			on:export={handleExport}
+		/>
 	{/if}
 </div>
 

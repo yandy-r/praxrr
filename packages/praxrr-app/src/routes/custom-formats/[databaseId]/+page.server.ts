@@ -3,10 +3,18 @@ import type { ServerLoad } from '@sveltejs/kit';
 import { pcdManager, canWriteToBase } from '$pcd/index.ts';
 import * as customFormatQueries from '$pcd/entities/customFormats/index.ts';
 import { trashGuideManager } from '$lib/server/trashguide/manager.ts';
+import { trashGuideEntityCacheQueries } from '$db/queries/trashGuideEntityCache.ts';
 import type { SourceRef } from '$shared/sources/types.ts';
+import type { CustomFormatTableRow } from '$shared/pcd/display.ts';
+import { toSourcedCustomFormatRow, type TrashGuideSourceRef } from '$lib/server/trashguide/displayTransform.ts';
+import { isTrashGuideSupportedArrType } from '$lib/server/trashguide/types.ts';
 
 function sourceKey(source: SourceRef): string {
   return `${source.type}:${source.id}`;
+}
+
+function isTrashSource(source: SourceRef): source is Extract<SourceRef, { type: 'trash' }> {
+  return source.type === 'trash';
 }
 
 function buildSourceContext(
@@ -57,6 +65,32 @@ function buildSourceContext(
   };
 }
 
+function withPcdSource(
+  rows: CustomFormatTableRow[],
+  database: ReturnType<typeof pcdManager.getAll>[number]
+): CustomFormatTableRow[] {
+  return rows.map((row) => ({
+    ...row,
+    sourceType: 'pcd',
+    sourceDatabaseId: database.id,
+    sourceDatabaseName: database.name,
+  }));
+}
+
+function sortRows(rows: CustomFormatTableRow[]): CustomFormatTableRow[] {
+  return [...rows].sort((a, b) => {
+    const byName = a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
+    if (byName !== 0) return byName;
+
+    const sourceA = a.sourceDatabaseName ?? '';
+    const sourceB = b.sourceDatabaseName ?? '';
+    const bySource = sourceA.localeCompare(sourceB, undefined, { sensitivity: 'base' });
+    if (bySource !== 0) return bySource;
+
+    return a.id - b.id;
+  });
+}
+
 export const load: ServerLoad = async ({ params }) => {
   const { databaseId } = params;
 
@@ -81,15 +115,43 @@ export const load: ServerLoad = async ({ params }) => {
     throw error(404, 'Database not found');
   }
 
-  // Get the cache for the database
-  const cache = pcdManager.getCache(currentDatabaseId);
-  if (!cache) {
+  if (!pcdManager.getCache(currentDatabaseId)) {
     throw error(500, 'Database cache not available');
   }
 
-  // Load custom formats for the current database
-  const customFormats = await customFormatQueries.list(cache);
   const sourceContext = buildSourceContext(databases, currentDatabase);
+  const pcdRows = (
+    await Promise.all(
+      databases.map(async (database) => {
+        const cache = pcdManager.getCache(database.id);
+        if (!cache) {
+          return [] as CustomFormatTableRow[];
+        }
+
+        const rows = await customFormatQueries.list(cache);
+        return withPcdSource(rows, database);
+      })
+    )
+  ).flat();
+
+  const trashRows = sourceContext.availableSources.filter(isTrashSource).flatMap((source) => {
+    if (!isTrashGuideSupportedArrType(source.arrType)) {
+      return [] as CustomFormatTableRow[];
+    }
+
+    const sourceRef: TrashGuideSourceRef = {
+      id: source.id,
+      name: source.name,
+      arrType: source.arrType,
+    };
+
+    return trashGuideEntityCacheQueries
+      .getBySourceAndType(source.id, 'custom_format')
+      .map((entity) => toSourcedCustomFormatRow(entity, sourceRef))
+      .filter((row): row is CustomFormatTableRow => row !== null);
+  });
+
+  const customFormats = sortRows([...pcdRows, ...trashRows]);
 
   return {
     databases,

@@ -143,6 +143,12 @@
 		return allKeys.some((key) => !selectedSet.has(key));
 	}
 
+	function isCurrentDatabasePcdProfile(profile: QualityProfileTableRow): boolean {
+		const sourceType = profile.sourceType ?? 'pcd';
+		const sourceDatabaseId = profile.sourceDatabaseId ?? data.currentDatabase.id;
+		return sourceType === 'pcd' && sourceDatabaseId === data.currentDatabase.id;
+	}
+
 	// Initialize data page store
 	const { search, view, filtered: searchFiltered, setItems } = createDataPageStore(
 		data.qualityProfiles.map((profile) => withSourceFallback(profile)),
@@ -245,6 +251,7 @@
 				profiles={filteredProfiles}
 				availableSources={data.sourceContext.availableSources}
 				showSourceBadges={data.sourceContext.showAllSourcesTab}
+				currentDatabaseId={data.currentDatabase.id}
 				on:clone={handleClone}
 				on:export={handleExport}
 			/>
@@ -253,6 +260,7 @@
 				profiles={filteredProfiles}
 				availableSources={data.sourceContext.availableSources}
 				showSourceBadges={data.sourceContext.showAllSourcesTab}
+				currentDatabaseId={data.currentDatabase.id}
 				on:clone={handleClone}
 				on:export={handleExport}
 			/>
@@ -265,6 +273,8 @@
 	databaseId={data.currentDatabase.id}
 	entityType="quality_profile"
 	sourceName={cloneSourceName}
-	existingNames={data.qualityProfiles.map((p) => p.name)}
+	existingNames={data.qualityProfiles
+		.filter((profile) => isCurrentDatabasePcdProfile(profile))
+		.map((profile) => profile.name)}
 	canWriteToBase={data.canWriteToBase}
 />

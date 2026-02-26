@@ -9,7 +9,6 @@
 	import { getArrAppMetadata, type ArrAppType, type ArrConditionTargetType } from '$shared/arr/capabilities.ts';
 	import { Tag, FileText, Layers, FlaskConical, Copy, Download, Database } from 'lucide-svelte';
 	import { marked } from 'marked';
-	import { page } from '$app/stores';
 	import { sortConditions } from '$shared/pcd/conditions';
 
 	export let formats: CustomFormatTableRow[];
@@ -20,7 +19,6 @@
 
 	const dispatch = createEventDispatcher<{ clone: { name: string }; export: { name: string } }>();
 
-	$: databaseId = $page.params.databaseId;
 	$: sourceLookup = new Map(sources.map((source) => [`${source.type}:${source.id}`, source] as const));
 	$: fallbackSource = {
 		type: 'pcd' as const,
@@ -35,8 +33,24 @@
 		arrType: ArrAppType | null;
 	}
 
-	function getRowHref(row: CustomFormatTableRow): string {
-		return `/custom-formats/${databaseId}/${row.id}`;
+	function resolveSourceDatabaseId(row: CustomFormatTableRow): number {
+		return typeof row.sourceDatabaseId === 'number' ? row.sourceDatabaseId : currentDatabaseId;
+	}
+
+	function isTrashRow(row: CustomFormatTableRow): boolean {
+		return row.sourceType === 'trash';
+	}
+
+	function isEditableRow(row: CustomFormatTableRow): boolean {
+		return !isTrashRow(row) && resolveSourceDatabaseId(row) === currentDatabaseId;
+	}
+
+	function getRowHref(row: CustomFormatTableRow): string | null {
+		if (isTrashRow(row)) {
+			return null;
+		}
+
+		return `/custom-formats/${resolveSourceDatabaseId(row)}/${row.id}`;
 	}
 
 	function resolveSource(row: CustomFormatTableRow): ResolvedSource {
@@ -230,22 +244,24 @@
 
 	<!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
 	<svelte:fragment slot="actions" let:row>
-		<div class="flex items-center justify-end gap-0.5" on:click|stopPropagation>
-			<Button
-				icon={Download}
-				size="xs"
-				variant="ghost"
-				tooltip="Export"
-				on:click={() => dispatch('export', { name: row.name })}
-			/>
-			<Button
-				icon={Copy}
-				size="xs"
-				variant="ghost"
-				tooltip="Clone"
-				on:click={() => dispatch('clone', { name: row.name })}
-			/>
-		</div>
+		{#if isEditableRow(row)}
+			<div class="flex items-center justify-end gap-0.5" on:click|stopPropagation>
+				<Button
+					icon={Download}
+					size="xs"
+					variant="ghost"
+					tooltip="Export"
+					on:click={() => dispatch('export', { name: row.name })}
+				/>
+				<Button
+					icon={Copy}
+					size="xs"
+					variant="ghost"
+					tooltip="Clone"
+					on:click={() => dispatch('clone', { name: row.name })}
+				/>
+			</div>
+		{/if}
 	</svelte:fragment>
 </Table>
 

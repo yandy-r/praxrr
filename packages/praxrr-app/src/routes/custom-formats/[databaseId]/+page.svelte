@@ -155,6 +155,12 @@
 		selectedSourceKeys = availableSources.map((source) => toSourceKey(source));
 	}
 
+	function isCurrentDatabasePcdFormat(item: CustomFormatTableRow): boolean {
+		const sourceType = item.sourceType ?? 'pcd';
+		const sourceDatabaseId = item.sourceDatabaseId ?? data.currentDatabase.id;
+		return sourceType === 'pcd' && sourceDatabaseId === data.currentDatabase.id;
+	}
+
 	// Save to localStorage when options change
 	$: if (browser) {
 		const enabledMap = searchOptions.map((opt) => [opt.key, opt.enabled] as [string, boolean]);
@@ -385,6 +391,8 @@
 	databaseId={data.currentDatabase.id}
 	entityType="custom_format"
 	sourceName={cloneSourceName}
-	existingNames={data.customFormats.map((f) => f.name)}
+	existingNames={data.customFormats
+		.filter((format) => isCurrentDatabasePcdFormat(format))
+		.map((format) => format.name)}
 	canWriteToBase={data.canWriteToBase}
 />
