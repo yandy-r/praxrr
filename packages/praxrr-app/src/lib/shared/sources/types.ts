@@ -24,15 +24,23 @@ export interface TrashSourceRef {
 /** Canonical source reference for source-aware routing, filters, and badges. */
 export type SourceRef = PcdSourceRef | TrashSourceRef;
 
+type SourceDisplayRowBase = {
+  sourceDatabaseId: number;
+  sourceDatabaseName: string;
+};
+
+type PcdSourcedDisplayRow = SourceDisplayRowBase & {
+  sourceType: 'pcd';
+};
+
+type TrashSourcedDisplayRow = SourceDisplayRowBase & {
+  sourceType: 'trash';
+};
+
 /**
- * Optional source metadata fields used by display rows while preserving
- * existing row contracts for single-source pages.
+ * Source metadata required by display rows while preserving existing row contracts.
  */
-export interface SourcedDisplayRow {
-  sourceType?: SourceKind;
-  sourceDatabaseId?: number;
-  sourceDatabaseName?: string;
-}
+export type SourcedDisplayRow = PcdSourcedDisplayRow | TrashSourcedDisplayRow;
 
 /** Generic wrapper for attaching source metadata to any entity payload. */
 export interface SourcedEntity<TEntity, TSource extends SourceRef = SourceRef> {

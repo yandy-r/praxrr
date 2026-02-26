@@ -5,11 +5,11 @@
   import Toggle from '$ui/toggle/Toggle.svelte';
   import SyncFooter from './SyncFooter.svelte';
   import { alertStore } from '$lib/client/alerts/store.ts';
-  import type { TrashGuideSourceArrType } from '$trashguide/types.ts';
+  import type { TrashGuideSourceArrType } from '$shared/trashguide/types.ts';
+  import type { TrashGuideSyncTrigger } from '$shared/trashguide/types.ts';
   import type { SectionType } from '$sync/types.ts';
   import { extractFormError } from '$lib/client/utils/extractFormError.ts';
 
-  type TrashGuideSyncTrigger = 'none' | 'manual' | 'on_pull' | 'on_change' | 'schedule';
   type UnifiedSourceType = 'pcd' | 'trash';
 
   interface DatabaseWithProfiles {

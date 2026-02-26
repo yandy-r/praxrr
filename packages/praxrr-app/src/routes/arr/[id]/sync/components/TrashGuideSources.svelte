@@ -5,18 +5,14 @@
   import Badge from '$ui/badge/Badge.svelte';
   import Button from '$ui/button/Button.svelte';
   import SourceBadge from '$ui/badge/SourceBadge.svelte';
-  import type { TrashGuideSourceArrType } from '$trashguide/types.ts';
+  import type { TrashGuideSourceArrType } from '$shared/trashguide/types.ts';
+  import type {
+    TrashGuideSyncSectionType,
+    TrashGuideSyncStatus,
+    TrashGuideSyncTrigger,
+  } from '$shared/trashguide/types.ts';
   import { parseUTC } from '$shared/utils/dates';
   import { extractFormError } from '$lib/client/utils/extractFormError.ts';
-
-  type TrashGuideSyncStatus = 'idle' | 'pending' | 'in_progress' | 'failed';
-  type TrashGuideSyncTrigger = 'none' | 'manual' | 'on_pull' | 'on_change' | 'schedule';
-  type TrashGuideSyncSectionType =
-    | 'qualityProfiles'
-    | 'customFormats'
-    | 'qualityDefinitions'
-    | 'naming'
-    | 'mediaManagement';
 
   type ViewState = 'loading' | 'server-error' | 'no-sources' | 'filtered-empty' | 'ready';
 

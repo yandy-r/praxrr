@@ -3,41 +3,59 @@
  */
 
 import type { ArrAppType } from '$shared/pcd/types.ts';
+import {
+  type TrashGuideEntityType,
+  type TrashGuideSyncConfig,
+  type TrashGuideSyncQualityProfileSourceHydration,
+  type TrashGuideSyncSectionType,
+  type TrashGuideSyncSelection,
+  type TrashGuideSyncSelectionInput,
+  type TrashGuideSyncSourceHydration,
+  type TrashGuideSyncStatus,
+  type TrashGuideSyncTrigger,
+  TRASHGUIDE_ENTITY_TYPES,
+  TRASHGUIDE_SUPPORTED_ARR_TYPES,
+  TRASHGUIDE_SYNC_SECTION_TYPES,
+  isTrashGuideEntityType,
+  isTrashGuideSupportedArrType,
+  parseTrashGuideEntityType,
+  parseTrashGuideSourceArrType,
+} from '$shared/trashguide/types.ts';
 
-/** TRaSH entity variants stored and synced by the TRaSH pipeline. */
-export const TRASHGUIDE_ENTITY_TYPES = ['custom_format', 'quality_profile', 'quality_size', 'naming'] as const;
-
-export type TrashGuideEntityType = (typeof TRASHGUIDE_ENTITY_TYPES)[number];
+export {
+  TRASHGUIDE_ENTITY_TYPES,
+  TRASHGUIDE_SUPPORTED_ARR_TYPES,
+  TRASHGUIDE_SYNC_SECTION_TYPES,
+  isTrashGuideEntityType,
+  isTrashGuideSupportedArrType,
+  parseTrashGuideEntityType,
+  parseTrashGuideSourceArrType,
+  type TrashGuideEntityType,
+  type TrashGuideSyncConfig,
+  type TrashGuideSyncQualityProfileSourceHydration,
+  type TrashGuideSyncSectionType,
+  type TrashGuideSyncSelection,
+  type TrashGuideSyncSelectionInput,
+  type TrashGuideSyncSourceHydration,
+  type TrashGuideSyncStatus,
+  type TrashGuideSyncTrigger,
+};
 
 /** Arr type values supported for TRaSH entities. */
-export type TrashGuideArrType = ArrAppType;
-export const TRASHGUIDE_SUPPORTED_ARR_TYPES = ['radarr', 'sonarr'] as const;
 export type TrashGuideSupportedArrType = (typeof TRASHGUIDE_SUPPORTED_ARR_TYPES)[number];
+export type TrashGuideSourceArrType = TrashGuideSupportedArrType;
+
+export type TrashGuideArrType = ArrAppType;
 
 /** TRaSH stable identity key. */
 export type TrashGuideId = string & {
   readonly __brand: 'TrashGuideId';
 };
 
-/** Identity shape shared by all TRaSH entities persisted in cache/mappings. */
-export type TrashGuideSourceArrType = TrashGuideSupportedArrType;
-
-export function parseTrashGuideSourceArrType(raw: string): TrashGuideSourceArrType {
-  if (isTrashGuideSupportedArrType(raw)) {
-    return raw;
-  }
-
-  throw new Error(`Invalid TRaSH source arr type: ${raw}`);
-}
-
 export interface TrashGuideEntityIdentity {
   readonly trash_id: TrashGuideId;
   readonly arr_type: TrashGuideSupportedArrType;
   readonly entity_type: TrashGuideEntityType;
-}
-
-export function isTrashGuideSupportedArrType(value: string): value is TrashGuideSupportedArrType {
-  return (TRASHGUIDE_SUPPORTED_ARR_TYPES as readonly string[]).includes(value);
 }
 
 export function isTrashGuideId(value: string): value is TrashGuideId {

@@ -360,6 +360,8 @@ the failure is silently discarded.
 
 ### 24. TRaSH sync types duplicated between client and server
 
+**Status:** ✅ Fixed
+
 **Files:** `TrashGuideSources.svelte:10-63`, `QualityProfiles.svelte:10-49` **Agent:**
 code-simplifier, type-design-analyzer
 
@@ -368,6 +370,8 @@ Components re-declare types that already exist in server query module. Risks dri
 **Fix:** Move to `$shared/trashguide/types.ts` and import from both sides.
 
 ### 25. `TrashGuideEntityType` defined independently in two files
+
+**Status:** ✅ Fixed
 
 **Files:** `trashguide/types.ts:10`, `trashGuideEntityCache.ts:4` **Agent:** type-design-analyzer
 
@@ -378,6 +382,8 @@ lockstep, but the compiler won't warn.
 
 ### 26. `SourcedDisplayRow` all-optional fields create partial-data hazard
 
+**Status:** ✅ Fixed
+
 **File:** `sources/types.ts` **Agent:** type-design-analyzer
 
 Three independently optional fields (`sourceType?`, `sourceDatabaseId?`, `sourceDatabaseName?`)
@@ -387,11 +393,15 @@ allow semantically invalid states (e.g., `sourceType = 'trash'` but missing `sou
 
 ### 27. `hasContentChanged` conflates "not found" with "changed"
 
+**Status:** ✅ Fixed
+
 **File:** `trashGuideEntityCache.ts:317-328` **Agent:** silent-failure-hunter
 
 Returns `true` when entity doesn't exist in cache. Callers must understand this implicit semantic.
 
 ### 28. `sync()` not wrapped in try-catch, bypasses retry logic
+
+**Status:** ✅ Fixed
 
 **File:** `trashGuideSync.ts (handler):210` **Agent:** silent-failure-hunter
 

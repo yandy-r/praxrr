@@ -1,22 +1,10 @@
 import { db } from '../db.ts';
-import { parseTrashGuideSourceArrType, type TrashGuideSourceArrType } from '$lib/server/trashguide/types.ts';
-
-export type TrashGuideEntityType = 'custom_format' | 'quality_profile' | 'quality_size' | 'naming';
-
-const VALID_ENTITY_TYPES: ReadonlySet<string> = new Set<TrashGuideEntityType>([
-  'custom_format',
-  'quality_profile',
-  'quality_size',
-  'naming',
-]);
-
-function parseEntityType(raw: string): TrashGuideEntityType {
-  if (VALID_ENTITY_TYPES.has(raw)) {
-    return raw as TrashGuideEntityType;
-  }
-
-  throw new Error(`Invalid TRaSH entity type: ${raw}`);
-}
+import {
+  parseTrashGuideEntityType,
+  parseTrashGuideSourceArrType,
+  type TrashGuideEntityType,
+  type TrashGuideSourceArrType,
+} from '$shared/trashguide/types.ts';
 
 interface TrashGuideEntityCacheRow {
   id: number;
@@ -86,7 +74,7 @@ function rowToCache(row: TrashGuideEntityCacheRow): TrashGuideEntityCache {
     id: row.id,
     sourceId: row.source_id,
     trashId: row.trash_id,
-    entityType: parseEntityType(row.entity_type),
+    entityType: parseTrashGuideEntityType(row.entity_type),
     name: row.name,
     jsonData: row.json_data,
     filePath: row.file_path,
@@ -110,7 +98,7 @@ function rowToCacheWithSource(row: TrashGuideEntityCacheWithSourceRow): TrashGui
 function rowToHash(row: TrashGuideEntityCacheRow): TrashGuideEntityCacheHash {
   return {
     trashId: row.trash_id,
-    entityType: parseEntityType(row.entity_type),
+    entityType: parseTrashGuideEntityType(row.entity_type),
     contentHash: row.content_hash,
     filePath: row.file_path,
   };
@@ -324,6 +312,10 @@ export const trashGuideEntityCacheQueries = {
       entityType
     );
 
-    return row?.content_hash !== contentHash;
+    if (!row) {
+      return false;
+    }
+
+    return row.content_hash !== contentHash;
   },
 };

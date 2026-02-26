@@ -207,7 +207,26 @@ const trashGuideSyncHandler: JobHandler = async (job) => {
     };
   }
 
-  const syncResult = await trashGuideManager.sync(payload.sourceId);
+  let syncResult: Awaited<ReturnType<typeof trashGuideManager.sync>>;
+  try {
+    syncResult = await trashGuideManager.sync(payload.sourceId);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    await logger.error('TRaSH source sync failed', {
+      source: 'TrashGuideSyncJob',
+      meta: { jobId: job.id, sourceId: payload.sourceId, sourceName: source.name, error: message },
+    });
+    return buildFailureResult(
+      job.id,
+      payload.sourceId,
+      message,
+      job.attempts,
+      payload.trigger,
+      source.enabled,
+      source.sync_strategy
+    );
+  }
+
   if (!syncResult.success) {
     const message = syncResult.error ?? 'TRaSH sync failed';
     await logger.error('TRaSH source sync failed', {
