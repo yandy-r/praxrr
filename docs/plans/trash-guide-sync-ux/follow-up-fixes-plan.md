@@ -112,13 +112,15 @@ Acceptance for Workstream C:
 
 ### Workstream D: Default source selection includes TRaSH quality definitions
 
-- [ ] D1. Change source default selection behavior to include all available sources when multiple
+- [x] D1. Change source default selection behavior to include all available sources when multiple
       exist.
   - Minimum scope:
     - `packages/praxrr-app/src/routes/media-management/[databaseId]/quality-definitions/+page.svelte`
-- [ ] D2. Align naming page default source selection behavior for consistency.
+- [x] D2. Align naming page default source selection behavior for consistency.
   - File:
     - `packages/praxrr-app/src/routes/media-management/[databaseId]/naming/+page.svelte`
+- [x] D2b. Extend default source behavior to custom formats for parity and reduced confusion.
+  - `packages/praxrr-app/src/routes/custom-formats/[databaseId]/+page.svelte`
 - [ ] D3. Keep persisted user preference precedence: saved selection still overrides default.
 
 Acceptance for Workstream D:
@@ -133,6 +135,9 @@ Acceptance for Workstream D:
 - [x] `deno task test packages/praxrr-app/src/tests/base/trashGuideSyncUxFlows.test.ts`
 - [x] `deno task test packages/praxrr-app/src/tests/base/trashGuideSyncSourceScope.test.ts`
 - [x] `deno task test packages/praxrr-app/src/tests/arr/lidarrMediaManagement.test.ts`
+- [ ] `deno task lint` (existing repo formatting violations in 8 files)
+- [ ] `deno task build` (existing route export validation failure: invalid export
+      `enqueueManualTrashGuideSourceSync` in `/api/v1/trash-guide/sources/[id]/sync`)
 - [ ] Manual UI pass:
   - [ ] `/arr/{id}/sync`: no standalone TRaSH section; quality profiles only.
   - [ ] `/custom-formats/{databaseId}`: source filter is dropdown and scalable.

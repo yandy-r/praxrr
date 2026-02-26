@@ -1,320 +1,332 @@
 <script lang="ts">
-	import ActionsBar from '$ui/actions/ActionsBar.svelte';
-	import ActionButton from '$ui/actions/ActionButton.svelte';
-	import SearchAction from '$ui/actions/SearchAction.svelte';
-	import SourceFilterAction from '$ui/actions/SourceFilterAction.svelte';
-	import ViewToggle from '$ui/actions/ViewToggle.svelte';
-	import CloneModal from '$ui/modal/CloneModal.svelte';
-	import TableView from './views/TableView.svelte';
-	import CardView from './views/CardView.svelte';
-	import { createDataPageStore } from '$lib/client/stores/dataPage';
-	import { browser } from '$app/environment';
-	import { goto } from '$app/navigation';
-	import { resolve } from '$app/paths';
-	import { alertStore } from '$alerts/store';
-	import { Plus } from 'lucide-svelte';
-	import type { EntityType } from '$shared/pcd/portable.ts';
-	import type { ArrAppType } from '$shared/arr/capabilities.ts';
-	import type { SourceRef } from '$shared/sources/types.ts';
-	import type { PageData } from './$types';
+  import ActionsBar from '$ui/actions/ActionsBar.svelte';
+  import ActionButton from '$ui/actions/ActionButton.svelte';
+  import SearchAction from '$ui/actions/SearchAction.svelte';
+  import SourceFilterAction from '$ui/actions/SourceFilterAction.svelte';
+  import ViewToggle from '$ui/actions/ViewToggle.svelte';
+  import CloneModal from '$ui/modal/CloneModal.svelte';
+  import TableView from './views/TableView.svelte';
+  import CardView from './views/CardView.svelte';
+  import { createDataPageStore } from '$lib/client/stores/dataPage';
+  import { browser } from '$app/environment';
+  import { goto } from '$app/navigation';
+  import { resolve } from '$app/paths';
+  import { alertStore } from '$alerts/store';
+  import { Plus } from 'lucide-svelte';
+  import type { EntityType } from '$shared/pcd/portable.ts';
+  import type { ArrAppType } from '$shared/arr/capabilities.ts';
+  import type { SourceRef } from '$shared/sources/types.ts';
+  import type { PageData } from './$types';
 
-	export let data: PageData;
+  export let data: PageData;
 
-	let cloneModalOpen = false;
-	let cloneSourceName = '';
-	let cloneEntityType: EntityType = 'radarr_naming';
-	let cloneArrType: ArrAppType | null = null;
-	const namingSearchKeys: Array<keyof PageData['namingConfigs'][number]> = ['name', 'arr_type'];
-	const supportedNamingArrTypes: ArrAppType[] = ['radarr', 'sonarr', 'lidarr'];
-	type SourceFilterKey = `${SourceRef['type']}:${number}`;
-	const SOURCE_FILTER_STORAGE_PREFIX = 'namingSourceFilter';
-	let selectedSourceKeys: SourceFilterKey[] = [];
-	let initializedSourceFilterKey = '';
+  let cloneModalOpen = false;
+  let cloneSourceName = '';
+  let cloneEntityType: EntityType = 'radarr_naming';
+  let cloneArrType: ArrAppType | null = null;
+  const namingSearchKeys: Array<keyof PageData['namingConfigs'][number]> = ['name', 'arr_type'];
+  const supportedNamingArrTypes: ArrAppType[] = ['radarr', 'sonarr', 'lidarr'];
+  type SourceFilterKey = `${SourceRef['type']}:${number}`;
+  const SOURCE_FILTER_STORAGE_PREFIX = 'namingSourceFilter';
+  let selectedSourceKeys: SourceFilterKey[] = [];
+  let initializedSourceFilterKey = '';
 
-	function isSupportedArrType(arrType: string): arrType is ArrAppType {
-		return supportedNamingArrTypes.includes(arrType as ArrAppType);
-	}
+  function isSupportedArrType(arrType: string): arrType is ArrAppType {
+    return supportedNamingArrTypes.includes(arrType as ArrAppType);
+  }
 
-	function toSourceKey(source: Pick<SourceRef, 'type' | 'id'>): SourceFilterKey {
-		return `${source.type}:${source.id}`;
-	}
+  function toSourceKey(source: Pick<SourceRef, 'type' | 'id'>): SourceFilterKey {
+    return `${source.type}:${source.id}`;
+  }
 
-	function sameSelection(a: SourceFilterKey[], b: SourceFilterKey[]): boolean {
-		return a.length === b.length && a.every((value, index) => value === b[index]);
-	}
+  function sameSelection(a: SourceFilterKey[], b: SourceFilterKey[]): boolean {
+    return a.length === b.length && a.every((value, index) => value === b[index]);
+  }
 
-	function normalizeSourceSelection(
-		selection: string[],
-		sources: SourceRef[],
-		defaultKey: string
-	): SourceFilterKey[] {
-		if (sources.length === 0) return [];
+  function normalizeSourceSelection(
+    selection: string[],
+    sources: SourceRef[],
+    defaultKey: string,
+    selectAllSourcesByDefault = false
+  ): SourceFilterKey[] {
+    if (sources.length === 0) return [];
 
-		const availableKeys = sources.map((source) => toSourceKey(source));
-		const availableSet = new Set(availableKeys);
-		const selected = [...new Set(selection.filter((key) => availableSet.has(key as SourceFilterKey)))];
+    const availableKeys = sources.map((source) => toSourceKey(source));
+    const availableSet = new Set(availableKeys);
+    const selected = [...new Set(selection.filter((key) => availableSet.has(key as SourceFilterKey)))];
 
-		if (selected.length > 0) {
-			return selected as SourceFilterKey[];
-		}
+    if (selected.length > 0) {
+      return selected as SourceFilterKey[];
+    }
 
-		if (availableSet.has(defaultKey as SourceFilterKey)) {
-			return [defaultKey as SourceFilterKey];
-		}
+    if (selectAllSourcesByDefault) {
+      return availableKeys;
+    }
 
-		return [availableKeys[0]];
-	}
+    if (availableSet.has(defaultKey as SourceFilterKey)) {
+      return [defaultKey as SourceFilterKey];
+    }
 
-	function loadSourceSelection(storageKey: string, sources: SourceRef[], defaultKey: string): SourceFilterKey[] {
-		if (!browser) {
-			return normalizeSourceSelection([], sources, defaultKey);
-		}
+    return [availableKeys[0]];
+  }
 
-		try {
-			const saved = localStorage.getItem(storageKey);
-			if (saved) {
-				const parsed = JSON.parse(saved);
-				if (Array.isArray(parsed)) {
-					return normalizeSourceSelection(
-						parsed.filter((value) => typeof value === 'string'),
-						sources,
-						defaultKey
-					);
-				}
-			}
-		} catch {
-			// Ignore parse errors and use defaults.
-		}
+  function loadSourceSelection(
+    storageKey: string,
+    sources: SourceRef[],
+    defaultKey: string,
+    selectAllSourcesByDefault = false
+  ): SourceFilterKey[] {
+    if (!browser) {
+      return normalizeSourceSelection([], sources, defaultKey, selectAllSourcesByDefault);
+    }
 
-		return normalizeSourceSelection([], sources, defaultKey);
-	}
+    try {
+      const saved = localStorage.getItem(storageKey);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          return normalizeSourceSelection(
+            parsed.filter((value) => typeof value === 'string'),
+            sources,
+            defaultKey,
+            selectAllSourcesByDefault
+          );
+        }
+      }
+    } catch {
+      // Ignore parse errors and use defaults.
+    }
 
-	function resolveSourceKey(
-		config: PageData['namingConfigs'][number],
-		fallbackSourceKey: SourceFilterKey
-	): SourceFilterKey {
-		if (config.sourceType && typeof config.sourceDatabaseId === 'number') {
-			return `${config.sourceType}:${config.sourceDatabaseId}`;
-		}
+    return normalizeSourceSelection([], sources, defaultKey, selectAllSourcesByDefault);
+  }
 
-		return fallbackSourceKey;
-	}
+  function resolveSourceKey(
+    config: PageData['namingConfigs'][number],
+    fallbackSourceKey: SourceFilterKey
+  ): SourceFilterKey {
+    if (config.sourceType && typeof config.sourceDatabaseId === 'number') {
+      return `${config.sourceType}:${config.sourceDatabaseId}`;
+    }
 
-	function filterBySources(
-		configs: PageData['namingConfigs'],
-		selectedKeys: SourceFilterKey[],
-		fallbackSourceKey: SourceFilterKey
-	): PageData['namingConfigs'] {
-		if (selectedKeys.length === 0) return configs;
-		const selectedSet = new Set(selectedKeys);
-		return configs.filter((config) => selectedSet.has(resolveSourceKey(config, fallbackSourceKey)));
-	}
+    return fallbackSourceKey;
+  }
 
-	function isCurrentDatabasePcdConfig(config: PageData['namingConfigs'][number]): boolean {
-		const sourceType = config.sourceType ?? 'pcd';
-		const sourceDatabaseId = config.sourceDatabaseId ?? data.currentDatabase.id;
-		return sourceType === 'pcd' && sourceDatabaseId === data.currentDatabase.id;
-	}
+  function filterBySources(
+    configs: PageData['namingConfigs'],
+    selectedKeys: SourceFilterKey[],
+    fallbackSourceKey: SourceFilterKey
+  ): PageData['namingConfigs'] {
+    if (selectedKeys.length === 0) return configs;
+    const selectedSet = new Set(selectedKeys);
+    return configs.filter((config) => selectedSet.has(resolveSourceKey(config, fallbackSourceKey)));
+  }
 
-	function clearSourceFilters() {
-		selectedSourceKeys = availableSources.map((source) => toSourceKey(source));
-	}
+  function isCurrentDatabasePcdConfig(config: PageData['namingConfigs'][number]): boolean {
+    const sourceType = config.sourceType ?? 'pcd';
+    const sourceDatabaseId = config.sourceDatabaseId ?? data.currentDatabase.id;
+    return sourceType === 'pcd' && sourceDatabaseId === data.currentDatabase.id;
+  }
 
-	$: cloneExistingNames = cloneArrType
-		? data.namingConfigs
-				.filter((config) => isCurrentDatabasePcdConfig(config) && config.arr_type === cloneArrType)
-				.map((config) => config.name)
-		: [];
+  function clearSourceFilters() {
+    selectedSourceKeys = availableSources.map((source) => toSourceKey(source));
+  }
 
-	function toEntityType(arrType: string): EntityType | null {
-		if (!isSupportedArrType(arrType)) {
-			return null;
-		}
+  $: cloneExistingNames = cloneArrType
+    ? data.namingConfigs
+        .filter((config) => isCurrentDatabasePcdConfig(config) && config.arr_type === cloneArrType)
+        .map((config) => config.name)
+    : [];
 
-		return `${arrType}_naming` as EntityType;
-	}
+  function toEntityType(arrType: string): EntityType | null {
+    if (!isSupportedArrType(arrType)) {
+      return null;
+    }
 
-	function handleClone(event: CustomEvent<{ name: string; arr_type: string }>) {
-		if (!event.detail.name?.trim()) {
-			alertStore.add('error', 'Missing naming config name');
-			return;
-		}
+    return `${arrType}_naming` as EntityType;
+  }
 
-		const arrType = event.detail.arr_type;
-		if (!isSupportedArrType(arrType)) {
-			alertStore.add('error', `Unknown naming type "${arrType}"`);
-			return;
-		}
+  function handleClone(event: CustomEvent<{ name: string; arr_type: string }>) {
+    if (!event.detail.name?.trim()) {
+      alertStore.add('error', 'Missing naming config name');
+      return;
+    }
 
-		const entityType = toEntityType(arrType);
-		if (!entityType) {
-			alertStore.add('error', `Unknown naming type "${event.detail.arr_type}"`);
-			return;
-		}
+    const arrType = event.detail.arr_type;
+    if (!isSupportedArrType(arrType)) {
+      alertStore.add('error', `Unknown naming type "${arrType}"`);
+      return;
+    }
 
-		cloneSourceName = event.detail.name;
-		cloneEntityType = entityType;
-		cloneArrType = arrType;
-		cloneModalOpen = true;
-	}
+    const entityType = toEntityType(arrType);
+    if (!entityType) {
+      alertStore.add('error', `Unknown naming type "${event.detail.arr_type}"`);
+      return;
+    }
 
-	async function handleExport(event: CustomEvent<{ name: string; arr_type: string }>) {
-		const { name, arr_type } = event.detail;
-		if (!name?.trim()) {
-			alertStore.add('error', 'Missing naming config name');
-			return;
-		}
+    cloneSourceName = event.detail.name;
+    cloneEntityType = entityType;
+    cloneArrType = arrType;
+    cloneModalOpen = true;
+  }
 
-		const entityType = toEntityType(arr_type);
-		if (!entityType) {
-			alertStore.add('error', `Unknown naming type "${arr_type}"`);
-			return;
-		}
+  async function handleExport(event: CustomEvent<{ name: string; arr_type: string }>) {
+    const { name, arr_type } = event.detail;
+    if (!name?.trim()) {
+      alertStore.add('error', 'Missing naming config name');
+      return;
+    }
 
-		try {
-			const params = new URLSearchParams({
-				databaseId: String(data.currentDatabase.id),
-				entityType,
-				name
-			});
-			const res = await fetch(`/api/v1/pcd/export?${params}`);
-			const json = await res.json();
-			if (!res.ok) {
-				alertStore.add('error', json.error || 'Export failed');
-				return;
-			}
-			await navigator.clipboard.writeText(JSON.stringify(json, null, 2));
-			alertStore.add('success', `Copied "${name}" to clipboard`);
-		} catch {
-			alertStore.add('error', 'Export failed');
-		}
-	}
+    const entityType = toEntityType(arr_type);
+    if (!entityType) {
+      alertStore.add('error', `Unknown naming type "${arr_type}"`);
+      return;
+    }
 
-	// Initialize data page store
-	const { search, view, filtered, setItems } = createDataPageStore(data.namingConfigs, {
-		storageKey: 'namingSettingsView',
-		searchKeys: namingSearchKeys,
-		searchKey: `namingConfigsSearch:${data.currentDatabase.id}`
-	});
+    try {
+      const params = new URLSearchParams({
+        databaseId: String(data.currentDatabase.id),
+        entityType,
+        name,
+      });
+      const res = await fetch(`/api/v1/pcd/export?${params}`);
+      const json = await res.json();
+      if (!res.ok) {
+        alertStore.add('error', json.error || 'Export failed');
+        return;
+      }
+      await navigator.clipboard.writeText(JSON.stringify(json, null, 2));
+      alertStore.add('success', `Copied "${name}" to clipboard`);
+    } catch {
+      alertStore.add('error', 'Export failed');
+    }
+  }
 
-	// Update items when data changes
-	$: setItems(data.namingConfigs);
-	$: availableSources = data.sourceContext.availableSources;
-	$: sourceFilterDisabledReason = data.sourceContext.filterDisabledReason;
-	$: sourceFilterStorageKey = `${SOURCE_FILTER_STORAGE_PREFIX}:${data.currentDatabase.id}`;
-	$: fallbackSourceKey = toSourceKey({ type: 'pcd', id: data.currentDatabase.id });
+  // Initialize data page store
+  const { search, view, filtered, setItems } = createDataPageStore(data.namingConfigs, {
+    storageKey: 'namingSettingsView',
+    searchKeys: namingSearchKeys,
+    searchKey: `namingConfigsSearch:${data.currentDatabase.id}`,
+  });
 
-	$: if (initializedSourceFilterKey !== sourceFilterStorageKey) {
-		initializedSourceFilterKey = sourceFilterStorageKey;
-		selectedSourceKeys = loadSourceSelection(
-			sourceFilterStorageKey,
-			availableSources,
-			data.sourceContext.defaultSourceKey
-		);
-	}
+  // Update items when data changes
+  $: setItems(data.namingConfigs);
+  $: availableSources = data.sourceContext.availableSources;
+  $: sourceFilterDisabledReason = data.sourceContext.filterDisabledReason;
+  $: sourceFilterStorageKey = `${SOURCE_FILTER_STORAGE_PREFIX}:${data.currentDatabase.id}`;
+  $: fallbackSourceKey = toSourceKey({ type: 'pcd', id: data.currentDatabase.id });
 
-	$: {
-		const normalized = normalizeSourceSelection(
-			selectedSourceKeys,
-			availableSources,
-			data.sourceContext.defaultSourceKey
-		);
-		if (!sameSelection(normalized, selectedSourceKeys)) {
-			selectedSourceKeys = normalized;
-		}
-	}
+  $: if (initializedSourceFilterKey !== sourceFilterStorageKey) {
+    initializedSourceFilterKey = sourceFilterStorageKey;
+    selectedSourceKeys = loadSourceSelection(
+      sourceFilterStorageKey,
+      availableSources,
+      data.sourceContext.defaultSourceKey,
+      true
+    );
+  }
 
-	$: if (browser && initializedSourceFilterKey === sourceFilterStorageKey) {
-		localStorage.setItem(sourceFilterStorageKey, JSON.stringify(selectedSourceKeys));
-	}
+  $: {
+    const normalized = normalizeSourceSelection(
+      selectedSourceKeys,
+      availableSources,
+      data.sourceContext.defaultSourceKey,
+      true
+    );
+    if (!sameSelection(normalized, selectedSourceKeys)) {
+      selectedSourceKeys = normalized;
+    }
+  }
 
-	$: sourceFiltered = filterBySources($filtered, selectedSourceKeys, fallbackSourceKey);
-	$: sourceFilterActive =
-		availableSources.length > 0 && selectedSourceKeys.length < availableSources.length;
-	$: hasSearchQuery = $search.query.trim().length > 0;
-	$: showSourceClearAction = sourceFilterActive && availableSources.length > 1;
-	$: emptyMessage = sourceFilterActive
-		? hasSearchQuery
-			? 'No naming configs match your search and selected sources'
-			: 'No naming configs match your selected sources'
-		: 'No naming configs match your search';
+  $: if (browser && initializedSourceFilterKey === sourceFilterStorageKey) {
+    localStorage.setItem(sourceFilterStorageKey, JSON.stringify(selectedSourceKeys));
+  }
+
+  $: sourceFiltered = filterBySources($filtered, selectedSourceKeys, fallbackSourceKey);
+  $: sourceFilterActive = availableSources.length > 0 && selectedSourceKeys.length < availableSources.length;
+  $: hasSearchQuery = $search.query.trim().length > 0;
+  $: showSourceClearAction = sourceFilterActive && availableSources.length > 1;
+  $: emptyMessage = sourceFilterActive
+    ? hasSearchQuery
+      ? 'No naming configs match your search and selected sources'
+      : 'No naming configs match your selected sources'
+    : 'No naming configs match your search';
 </script>
 
 <!-- Actions Bar -->
 <ActionsBar>
-	<SearchAction searchStore={search} placeholder="Search naming configs..." responsive />
-	<div title={sourceFilterDisabledReason ?? undefined}>
-		<SourceFilterAction
-			sources={availableSources}
-			bind:selectedKeys={selectedSourceKeys}
-			disabled={Boolean(sourceFilterDisabledReason)}
-			ariaLabel="Filter naming configs by source"
-			responsive
-		/>
-	</div>
-	<ActionButton
-		icon={Plus}
-		on:click={() =>
-			goto(resolve('/media-management/[databaseId]/naming/new', { databaseId: data.currentDatabase.id.toString() }))}
-	/>
-	<ViewToggle bind:value={$view} />
+  <SearchAction searchStore={search} placeholder="Search naming configs..." responsive />
+  <div title={sourceFilterDisabledReason ?? undefined}>
+    <SourceFilterAction
+      sources={availableSources}
+      bind:selectedKeys={selectedSourceKeys}
+      disabled={Boolean(sourceFilterDisabledReason)}
+      ariaLabel="Filter naming configs by source"
+      responsive
+    />
+  </div>
+  <ActionButton
+    icon={Plus}
+    on:click={() =>
+      goto(resolve('/media-management/[databaseId]/naming/new', { databaseId: data.currentDatabase.id.toString() }))}
+  />
+  <ViewToggle bind:value={$view} />
 </ActionsBar>
 
 <!-- Naming Configs Content -->
 <div class="mt-6">
-	{#if data.namingConfigs.length === 0}
-		<div
-			class="rounded-lg border border-neutral-200 bg-white p-8 text-center dark:border-neutral-800 dark:bg-neutral-900"
-		>
-			<p class="text-neutral-600 dark:text-neutral-400">
-				No naming configs found for {data.currentDatabase.name}
-			</p>
-		</div>
-	{:else if sourceFiltered.length === 0}
-		<div
-			class="rounded-lg border border-neutral-200 bg-white p-8 text-center dark:border-neutral-800 dark:bg-neutral-900"
-		>
-			<p class="text-neutral-600 dark:text-neutral-400">{emptyMessage}</p>
-			{#if showSourceClearAction}
-				<button
-					type="button"
-					class="mt-3 text-sm font-medium text-accent-700 transition-colors hover:text-accent-600 dark:text-accent-300 dark:hover:text-accent-200"
-					on:click={clearSourceFilters}
-				>
-					Clear source filters
-				</button>
-			{/if}
-		</div>
-	{:else if $view === 'table'}
-		<TableView
-			configs={sourceFiltered}
-			databaseId={data.currentDatabase.id}
-			currentDatabaseId={data.currentDatabase.id}
-			currentDatabaseName={data.currentDatabase.name}
-			sources={availableSources}
-			showSourceBadges={data.sourceContext.showAllSourcesTab}
-			on:clone={handleClone}
-			on:export={handleExport}
-		/>
-	{:else}
-		<CardView
-			configs={sourceFiltered}
-			databaseId={data.currentDatabase.id}
-			currentDatabaseId={data.currentDatabase.id}
-			currentDatabaseName={data.currentDatabase.name}
-			sources={availableSources}
-			showSourceBadges={data.sourceContext.showAllSourcesTab}
-			on:clone={handleClone}
-			on:export={handleExport}
-		/>
-	{/if}
+  {#if data.namingConfigs.length === 0}
+    <div
+      class="rounded-lg border border-neutral-200 bg-white p-8 text-center dark:border-neutral-800 dark:bg-neutral-900"
+    >
+      <p class="text-neutral-600 dark:text-neutral-400">
+        No naming configs found for {data.currentDatabase.name}
+      </p>
+    </div>
+  {:else if sourceFiltered.length === 0}
+    <div
+      class="rounded-lg border border-neutral-200 bg-white p-8 text-center dark:border-neutral-800 dark:bg-neutral-900"
+    >
+      <p class="text-neutral-600 dark:text-neutral-400">{emptyMessage}</p>
+      {#if showSourceClearAction}
+        <button
+          type="button"
+          class="mt-3 text-sm font-medium text-accent-700 transition-colors hover:text-accent-600 dark:text-accent-300 dark:hover:text-accent-200"
+          on:click={clearSourceFilters}
+        >
+          Clear source filters
+        </button>
+      {/if}
+    </div>
+  {:else if $view === 'table'}
+    <TableView
+      configs={sourceFiltered}
+      databaseId={data.currentDatabase.id}
+      currentDatabaseId={data.currentDatabase.id}
+      currentDatabaseName={data.currentDatabase.name}
+      sources={availableSources}
+      showSourceBadges={data.sourceContext.showAllSourcesTab}
+      on:clone={handleClone}
+      on:export={handleExport}
+    />
+  {:else}
+    <CardView
+      configs={sourceFiltered}
+      databaseId={data.currentDatabase.id}
+      currentDatabaseId={data.currentDatabase.id}
+      currentDatabaseName={data.currentDatabase.name}
+      sources={availableSources}
+      showSourceBadges={data.sourceContext.showAllSourcesTab}
+      on:clone={handleClone}
+      on:export={handleExport}
+    />
+  {/if}
 </div>
 
 <CloneModal
-	bind:open={cloneModalOpen}
-	databaseId={data.currentDatabase.id}
-	entityType={cloneEntityType}
-	sourceName={cloneSourceName}
-	existingNames={cloneExistingNames}
-	canWriteToBase={data.canWriteToBase}
+  bind:open={cloneModalOpen}
+  databaseId={data.currentDatabase.id}
+  entityType={cloneEntityType}
+  sourceName={cloneSourceName}
+  existingNames={cloneExistingNames}
+  canWriteToBase={data.canWriteToBase}
 />
