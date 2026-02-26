@@ -121,7 +121,7 @@ Acceptance for Workstream C:
     - `packages/praxrr-app/src/routes/media-management/[databaseId]/naming/+page.svelte`
 - [x] D2b. Extend default source behavior to custom formats for parity and reduced confusion.
   - `packages/praxrr-app/src/routes/custom-formats/[databaseId]/+page.svelte`
-- [ ] D3. Keep persisted user preference precedence: saved selection still overrides default.
+- [x] D3. Keep persisted user preference precedence: saved selection still overrides default.
 
 Acceptance for Workstream D:
 
@@ -135,9 +135,9 @@ Acceptance for Workstream D:
 - [x] `deno task test packages/praxrr-app/src/tests/base/trashGuideSyncUxFlows.test.ts`
 - [x] `deno task test packages/praxrr-app/src/tests/base/trashGuideSyncSourceScope.test.ts`
 - [x] `deno task test packages/praxrr-app/src/tests/arr/lidarrMediaManagement.test.ts`
-- [ ] `deno task lint` (existing repo formatting violations in 8 files)
-- [ ] `deno task build` (existing route export validation failure: invalid export
-      `enqueueManualTrashGuideSourceSync` in `/api/v1/trash-guide/sources/[id]/sync`)
+- [ ] `deno task lint` (blocked: ESLint currently fails to load `./svelte.config.js` from repository
+      root during config import)
+- [x] `deno task build` (passes after moving queue helper into shared module)
 - [ ] Manual UI pass:
   - [ ] `/arr/{id}/sync`: no standalone TRaSH section; quality profiles only.
   - [ ] `/custom-formats/{databaseId}`: source filter is dropdown and scalable.
