@@ -7,6 +7,8 @@ import {
   TrashGuideSourceValidationError,
   type TrashGuideSourceUpdateInput,
 } from '$lib/server/trashguide/manager.ts';
+import { TrashGuideFetcherError } from '$lib/server/trashguide/types.ts';
+import { TrashGuideTransformError } from '$lib/server/trashguide/transformer.ts';
 import { mapReadErrorStatus, parseSourceId, toErrorMessage } from './_helpers.ts';
 
 const UPDATE_ALLOWED_FIELDS = new Set([
@@ -198,6 +200,14 @@ function mapWriteErrorStatus(error: unknown): number {
   }
 
   if (error instanceof TrashGuideSourceValidationError) {
+    return 422;
+  }
+
+  if (error instanceof TrashGuideFetcherError) {
+    return error.retryable ? 502 : 422;
+  }
+
+  if (error instanceof TrashGuideTransformError) {
     return 422;
   }
 

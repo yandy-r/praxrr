@@ -107,6 +107,24 @@ network timeout) all return HTTP 500 "Internal Server Error."
 **Fix:** Add `TrashGuideFetcherError` handling -- non-retryable errors (bad URL, bad branch) -> 422,
 retryable (network, auth) -> 502. Add `TrashGuideTransformError` -> 422.
 
+### Validation update (2026-02-26)
+
+Implemented issue #5.
+
+- Added `TrashGuideFetcherError` and `TrashGuideTransformError` handling in both
+  `packages/praxrr-app/src/routes/api/v1/trash-guide/sources/+server.ts` and
+  `packages/praxrr-app/src/routes/api/v1/trash-guide/sources/[id]/+server.ts`.
+- Mapping now returns `422` for non-retryable fetcher errors and transform errors, and `502` for
+  retryable fetcher errors.
+- Added route-level tests in `packages/praxrr-app/src/tests/routes/trashGuideSources.test.ts` for:
+  - POST non-retryable fetcher -> `422`
+  - POST retryable fetcher -> `502`
+  - POST transform -> `422`
+  - PUT retryable fetcher -> `502`
+
+Targeted checks passed: `deno task check:server` and
+`deno task test packages/praxrr-app/src/tests/routes/trashGuideSources.test.ts`.
+
 ---
 
 ## Important Issues (8 found)

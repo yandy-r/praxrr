@@ -3,9 +3,11 @@ import { type CreateJobQueueInput, jobQueueQueries } from '$db/queries/jobQueue.
 import { jobRunHistoryQueries } from '$db/queries/jobRunHistory.ts';
 import { jobDispatcher } from '$jobs/dispatcher.ts';
 import { trashGuideManager } from '$lib/server/trashguide/manager.ts';
+import { TrashGuideFetcherError } from '$lib/server/trashguide/types.ts';
+import { TrashGuideTransformError } from '$lib/server/trashguide/transformer.ts';
 import type { JobQueueRecord } from '$jobs/queueTypes.ts';
 import { POST as sourcesPost } from '../../routes/api/v1/trash-guide/sources/+server.ts';
-import { GET as sourceByIdGet } from '../../routes/api/v1/trash-guide/sources/[id]/+server.ts';
+import { GET as sourceByIdGet, PUT as sourceByIdPut } from '../../routes/api/v1/trash-guide/sources/[id]/+server.ts';
 import { GET as sourceEntitiesGet } from '../../routes/api/v1/trash-guide/sources/[id]/entities/+server.ts';
 import { POST as sourceSyncPost } from '../../routes/api/v1/trash-guide/sources/[id]/sync/+server.ts';
 
@@ -32,6 +34,7 @@ function createSourceResponse(id: number, arrType: 'radarr' | 'sonarr') {
     branch: 'master',
     arrType,
     scoreProfile: 'default',
+    autoPull: true,
     enabled: true,
     syncStrategy: 60,
     lastSyncedAt: null,
@@ -103,6 +106,131 @@ Deno.test('trash guide sources POST rejects malformed JSON body', async () => {
   assertEquals(response.status, 400);
   const payload = (await response.json()) as { error: string };
   assertEquals(payload.error, 'Invalid JSON body');
+});
+
+Deno.test('trash guide sources POST maps non-retryable fetcher errors to 422', async () => {
+  const restores: Restore[] = [];
+  patchTarget(
+    trashGuideManager,
+    'createSource',
+    (() => {
+      throw new TrashGuideFetcherError('git_ref_error', 'Unknown branch', false);
+    }) as typeof trashGuideManager.createSource,
+    restores
+  );
+
+  try {
+    const response = await sourcesPost({
+      request: new Request('http://localhost/api/v1/trash-guide/sources', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          name: 'TRaSH Radarr',
+          repositoryUrl: 'https://example.com/radarr.git',
+          arrType: 'radarr',
+        }),
+      }),
+    } as unknown as Parameters<typeof sourcesPost>[0]);
+
+    assertEquals(response.status, 422);
+  } finally {
+    for (const restore of restores.reverse()) {
+      restore();
+    }
+  }
+});
+
+Deno.test('trash guide sources POST maps retryable fetcher errors to 502', async () => {
+  const restores: Restore[] = [];
+  patchTarget(
+    trashGuideManager,
+    'createSource',
+    (() => {
+      throw new TrashGuideFetcherError('git_network_error', 'Network failure', true);
+    }) as typeof trashGuideManager.createSource,
+    restores
+  );
+
+  try {
+    const response = await sourcesPost({
+      request: new Request('http://localhost/api/v1/trash-guide/sources', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          name: 'TRaSH Radarr',
+          repositoryUrl: 'https://example.com/radarr.git',
+          arrType: 'radarr',
+        }),
+      }),
+    } as unknown as Parameters<typeof sourcesPost>[0]);
+
+    assertEquals(response.status, 502);
+  } finally {
+    for (const restore of restores.reverse()) {
+      restore();
+    }
+  }
+});
+
+Deno.test('trash guide sources POST maps transform errors to 422', async () => {
+  const restores: Restore[] = [];
+  patchTarget(
+    trashGuideManager,
+    'createSource',
+    (() => {
+      throw new TrashGuideTransformError('ambiguous_mapping', 'transform failed');
+    }) as typeof trashGuideManager.createSource,
+    restores
+  );
+
+  try {
+    const response = await sourcesPost({
+      request: new Request('http://localhost/api/v1/trash-guide/sources', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          name: 'TRaSH Radarr',
+          repositoryUrl: 'https://example.com/radarr.git',
+          arrType: 'radarr',
+        }),
+      }),
+    } as unknown as Parameters<typeof sourcesPost>[0]);
+
+    assertEquals(response.status, 422);
+  } finally {
+    for (const restore of restores.reverse()) {
+      restore();
+    }
+  }
+});
+
+Deno.test('trash guide source PUT maps retryable fetcher errors to 502', async () => {
+  const restores: Restore[] = [];
+  patchTarget(
+    trashGuideManager,
+    'updateSource',
+    (() => {
+      throw new TrashGuideFetcherError('git_auth_error', 'Auth failure', true);
+    }) as typeof trashGuideManager.updateSource,
+    restores
+  );
+
+  try {
+    const response = await sourceByIdPut({
+      params: { id: '77' },
+      request: new Request('http://localhost/api/v1/trash-guide/sources/77', {
+        method: 'PUT',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ name: 'Updated' }),
+      }),
+    } as unknown as Parameters<typeof sourceByIdPut>[0]);
+
+    assertEquals(response.status, 502);
+  } finally {
+    for (const restore of restores.reverse()) {
+      restore();
+    }
+  }
 });
 
 Deno.test('trash guide source GET validates numeric source id', async () => {

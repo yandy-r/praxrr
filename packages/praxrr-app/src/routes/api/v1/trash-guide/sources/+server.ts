@@ -6,6 +6,8 @@ import {
   TrashGuideSourceValidationError,
   type TrashGuideSourceCreateInput,
 } from '$lib/server/trashguide/manager.ts';
+import { TrashGuideFetcherError } from '$lib/server/trashguide/types.ts';
+import { TrashGuideTransformError } from '$lib/server/trashguide/transformer.ts';
 
 const CREATE_ALLOWED_FIELDS = new Set([
   'name',
@@ -155,6 +157,14 @@ function mapWriteErrorStatus(error: unknown): number {
   }
 
   if (error instanceof TrashGuideSourceValidationError) {
+    return 422;
+  }
+
+  if (error instanceof TrashGuideFetcherError) {
+    return error.retryable ? 502 : 422;
+  }
+
+  if (error instanceof TrashGuideTransformError) {
     return 422;
   }
 
