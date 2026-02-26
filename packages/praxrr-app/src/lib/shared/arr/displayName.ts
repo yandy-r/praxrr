@@ -48,7 +48,6 @@ export function getMediaManagementDisplayName(name: string, arrType: string, sou
 /**
  * Raw name for route segments — never decorated.
  */
-export function getMediaManagementRouteName(name: string, arrType: string): string {
+export function getMediaManagementRouteName(name: string, _arrType: string): string {
   return name;
-  void arrType;
 }

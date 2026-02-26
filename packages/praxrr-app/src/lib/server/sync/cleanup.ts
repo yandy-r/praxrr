@@ -7,7 +7,12 @@
  */
 
 import type { BaseArrClient } from '$utils/arr/base.ts';
-import { hasNamespaceSuffix, stripNamespaceSuffix, getNamespaceSuffix } from './namespace.ts';
+import {
+  getTrashGuideNamespaceSuffix,
+  getNamespaceSuffix,
+  hasNamespaceSuffix,
+  stripNamespaceSuffix,
+} from './namespace.ts';
 import { arrSyncQueries } from '$db/queries/arrSync.ts';
 import { arrNamespaceQueries } from '$db/queries/arrNamespaces.ts';
 import { arrInstancesQueries } from '$db/queries/arrInstances.ts';
@@ -18,11 +23,11 @@ import { getCache } from '$pcd/index.ts';
 import { getReferencedCustomFormatNames } from './qualityProfiles/transformer.ts';
 import { transformTrashGuideEntities } from '$lib/server/trashguide/transformer.ts';
 import type {
-	TrashGuideCustomFormatEntity,
-	TrashGuideNamingEntity,
-	TrashGuideParsedEntity,
-	TrashGuideQualityProfileEntity,
-	TrashGuideQualitySizeEntity,
+  TrashGuideCustomFormatEntity,
+  TrashGuideNamingEntity,
+  TrashGuideParsedEntity,
+  TrashGuideQualityProfileEntity,
+  TrashGuideQualitySizeEntity,
 } from '$lib/server/trashguide/types.ts';
 import type { PortableCustomFormat, PortableQualityProfile } from '$shared/pcd/portable.ts';
 import type { SyncArrType } from './mappings.ts';
@@ -95,14 +100,51 @@ export async function scanForStaleItems(client: BaseArrClient, instanceId: numbe
     if (cachedRows.length === 0) continue;
 
     const parsedEntities: TrashGuideParsedEntity[] = [];
+    let malformedRows = 0;
     for (const row of cachedRows) {
       try {
         parsedEntities.push(JSON.parse(row.jsonData) as TrashGuideParsedEntity);
-      } catch {
-        // skip malformed
+      } catch (error) {
+        malformedRows += 1;
+        await logger.warn('Failed to parse TRaSH cache row during cleanup scan', {
+          source: SOURCE,
+          meta: {
+            instanceId,
+            sourceId: source.id,
+            sourceName: source.name,
+            trashId: row.trashId,
+            filePath: row.filePath,
+            error: error instanceof Error ? error.message : String(error),
+          },
+        });
       }
     }
-    if (parsedEntities.length === 0) continue;
+    if (parsedEntities.length === 0) {
+      const message = `Failed to parse all TRaSH cache rows for source "${source.name}" during cleanup scan`;
+      await logger.error(message, {
+        source: SOURCE,
+        meta: {
+          instanceId,
+          sourceId: source.id,
+          sourceName: source.name,
+          totalRows: cachedRows.length,
+          malformedRows,
+        },
+      });
+      throw new Error(message);
+    }
+    if (malformedRows > 0) {
+      await logger.warn('Some TRaSH cache rows were malformed during cleanup scan; using successfully parsed rows', {
+        source: SOURCE,
+        meta: {
+          instanceId,
+          sourceId: source.id,
+          sourceName: source.name,
+          totalRows: cachedRows.length,
+          malformedRows,
+        },
+      });
+    }
 
     let transformed;
     try {
@@ -122,9 +164,7 @@ export async function scanForStaleItems(client: BaseArrClient, instanceId: numbe
             quality_sizes: parsedEntities.filter(
               (e): e is TrashGuideQualitySizeEntity => e.entity_type === 'quality_size'
             ),
-            naming: parsedEntities.filter(
-              (e): e is TrashGuideNamingEntity => e.entity_type === 'naming'
-            ),
+            naming: parsedEntities.filter((e): e is TrashGuideNamingEntity => e.entity_type === 'naming'),
           },
           ordered_entities: parsedEntities,
           issues: [],
@@ -132,7 +172,16 @@ export async function scanForStaleItems(client: BaseArrClient, instanceId: numbe
           failed_files: 0,
         },
       });
-    } catch {
+    } catch (error) {
+      await logger.warn(`Skipping TRaSH quality profiles due to transform failure for source "${source.name}"`, {
+        source: SOURCE,
+        meta: {
+          instanceId,
+          sourceId: source.id,
+          sourceName: source.name,
+          error: error instanceof Error ? error.message : String(error),
+        },
+      });
       continue;
     }
 
@@ -147,7 +196,7 @@ export async function scanForStaleItems(client: BaseArrClient, instanceId: numbe
     }
 
     trashNamespaceIndex += 1;
-    const trashSuffix = `\u200C${'\u200B'.repeat(trashNamespaceIndex)}`;
+    const trashSuffix = getTrashGuideNamespaceSuffix(trashNamespaceIndex);
 
     for (const profileName of sourceHydration.selectedQualityProfiles) {
       const portable = portableProfilesByName.get(profileName);

@@ -22,7 +22,7 @@ import { getCache, getCachedDatabaseIds } from '$pcd/index.ts';
 import { databaseInstancesQueries } from '$db/queries/databaseInstances.ts';
 import { logger } from '$logger/logger.ts';
 import type { SyncArrType } from '../mappings.ts';
-import { getNamespaceSuffix } from '../namespace.ts';
+import { getNamespaceSuffix, getTrashGuideNamespaceSuffix } from '../namespace.ts';
 import type { SyncPreviewSectionResult, QualityProfilesPreview } from '../preview/types.ts';
 import { transformTrashGuideEntities } from '$lib/server/trashguide/transformer.ts';
 import type {
@@ -570,17 +570,52 @@ export class QualityProfileSyncer extends BaseSyncer {
         }
 
         const parsedEntities: TrashGuideParsedEntity[] = [];
+        let malformedRows = 0;
         for (const row of cachedRows) {
           try {
             const parsed = JSON.parse(row.jsonData) as TrashGuideParsedEntity;
             parsedEntities.push(parsed);
-          } catch {
-            // Ignore malformed cached row and continue with remaining entities.
+          } catch (error) {
+            malformedRows += 1;
+            await logger.warn('Failed to parse TRaSH cache row while building quality profile sync batches', {
+              source: 'Sync:QualityProfiles',
+              meta: {
+                instanceId: this.instanceId,
+                sourceId: source.id,
+                sourceName: source.name,
+                trashId: row.trashId,
+                filePath: row.filePath,
+                error: error instanceof Error ? error.message : String(error),
+              },
+            });
           }
         }
 
         if (parsedEntities.length === 0) {
-          continue;
+          const message = `Failed to parse all TRaSH cache rows for source "${source.name}" during quality profile batch build`;
+          await logger.error(message, {
+            source: 'Sync:QualityProfiles',
+            meta: {
+              instanceId: this.instanceId,
+              sourceId: source.id,
+              sourceName: source.name,
+              totalRows: cachedRows.length,
+              malformedRows,
+            },
+          });
+          throw new Error(message);
+        }
+        if (malformedRows > 0) {
+          await logger.warn('Some TRaSH cache rows were malformed while building quality profile sync batches', {
+            source: 'Sync:QualityProfiles',
+            meta: {
+              instanceId: this.instanceId,
+              sourceId: source.id,
+              sourceName: source.name,
+              totalRows: cachedRows.length,
+              malformedRows,
+            },
+          });
         }
 
         const parsedResult: TrashGuideParseResult = {
@@ -681,7 +716,7 @@ export class QualityProfileSyncer extends BaseSyncer {
           sourceLabel: source.name,
           databaseId: -source.id,
           // Keep TRaSH namespaces disjoint from DB namespaces while still using strip-compatible chars.
-          suffix: `\u200C${'\u200B'.repeat(trashNamespaceIndex)}`,
+          suffix: getTrashGuideNamespaceSuffix(trashNamespaceIndex),
           profiles: selectedProfiles,
           customFormats,
           pcdFormatIdMap: new Map(),
