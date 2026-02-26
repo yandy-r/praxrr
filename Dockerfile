@@ -35,18 +35,26 @@ ENV VITE_CHANNEL=${VITE_CHANNEL}
 
 ENV APP_BASE_PATH=/build/dist/build
 RUN cd packages/praxrr-app && deno run -A npm:vite build
-RUN deno compile \
-    --no-check \
-    --allow-net \
-    --allow-read \
-    --allow-write \
-    --allow-env \
-    --allow-ffi \
-    --allow-run \
-    --allow-sys \
-    --target x86_64-unknown-linux-gnu \
-    --output dist/build/praxrr \
-    dist/build/mod.ts
+RUN for i in 1 2 3; do \
+    deno compile \
+      --no-check \
+      --allow-net \
+      --allow-read \
+      --allow-write \
+      --allow-env \
+      --allow-ffi \
+      --allow-run \
+      --allow-sys \
+      --target x86_64-unknown-linux-gnu \
+      --output dist/build/praxrr \
+      dist/build/mod.ts && break; \
+    status=$?; \
+    if [ "$i" = "3" ]; then \
+      exit "$status"; \
+    fi; \
+    echo "deno compile failed (attempt $i); retrying in 5s..."; \
+    sleep 5; \
+  done
 
 # -----------------------------------------------------------------------------
 # Stage 2: Runtime
