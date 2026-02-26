@@ -25,6 +25,13 @@ export interface CreateRadarrNamingOptions {
   input: CreateRadarrNamingInput;
 }
 
+/**
+ * Create a Radarr naming config by writing an operation to the specified layer.
+ *
+ * @param options - Create options including databaseId, cache, layer, and input values
+ * @returns The write result from the create operation
+ * @throws {Error} When a naming config with the same name already exists
+ */
 export async function createRadarrNaming(options: CreateRadarrNamingOptions) {
   const { databaseId, cache, layer, input } = options;
   const db = cache.kb;
@@ -160,6 +167,13 @@ async function createSonarrNamingInternal(options: CreateSonarrNamingOptions, na
   });
 }
 
+/**
+ * Create a Sonarr naming config by writing an operation to the specified layer.
+ *
+ * @param options - Create options including databaseId, cache, layer, and input values
+ * @returns The write result from the create operation
+ * @throws {Error} When a naming config with the same name already exists
+ */
 export async function createSonarrNaming(options: CreateSonarrNamingOptions) {
   return createSonarrNamingInternal(options, 'sonarr');
 }
@@ -207,6 +221,13 @@ function normalizeLidarrNamingInput(input: CreateLidarrNamingInput) {
   };
 }
 
+/**
+ * Create a Lidarr naming config by writing an operation to the specified layer.
+ *
+ * @param options - Create options including databaseId, cache, layer, and input values
+ * @returns The write result from the create operation
+ * @throws {Error} When a naming config with the same name already exists
+ */
 export async function createLidarrNaming(options: CreateLidarrNamingOptions) {
   const { databaseId, cache, layer, input } = options;
   const db = cache.kb;

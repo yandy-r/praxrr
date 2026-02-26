@@ -19,6 +19,12 @@ import { sql } from 'kysely';
 // Note: name is PRIMARY KEY so never null, but Kysely types it as nullable
 // because the generator doesn't detect non-INTEGER primary keys
 
+/**
+ * List all naming configs across Radarr, Sonarr, and Lidarr.
+ *
+ * @param cache - The PCD cache containing the knowledge base
+ * @returns A combined list of all naming configs with their arr_type
+ */
 export async function list(cache: PCDCache): Promise<NamingListItem[]> {
   const db = cache.kb;
 
@@ -127,31 +133,70 @@ async function getDefaultNamingRow<T extends NamingDefaultsTable>(
   return (row as Selectable<PCDDatabase[T]> | undefined) ?? null;
 }
 
+/**
+ * Get a Radarr naming config by name.
+ *
+ * @param cache - The PCD cache containing the knowledge base
+ * @param name - The naming config name to look up
+ * @returns The Radarr naming row, or null if not found
+ */
 export async function getRadarrByName(cache: PCDCache, name: string): Promise<RadarrNamingRow | null> {
   const row = await cache.kb.selectFrom(RADARR_NAMING_TABLE).selectAll().where('name', '=', name).executeTakeFirst();
   return row ? mapRadarrRow(row) : null;
 }
 
+/**
+ * Get a Sonarr naming config by name.
+ *
+ * @param cache - The PCD cache containing the knowledge base
+ * @param name - The naming config name to look up
+ * @returns The Sonarr naming row, or null if not found
+ */
 export async function getSonarrByName(cache: PCDCache, name: string): Promise<SonarrNamingRow | null> {
   const row = await cache.kb.selectFrom(SONARR_NAMING_TABLE).selectAll().where('name', '=', name).executeTakeFirst();
   return row ? mapSonarrRow(row) : null;
 }
 
+/**
+ * Get a Lidarr naming config by name.
+ *
+ * @param cache - The PCD cache containing the knowledge base
+ * @param name - The naming config name to look up
+ * @returns The Lidarr naming row, or null if not found
+ */
 export async function getLidarrByName(cache: PCDCache, name: string): Promise<LidarrNamingRow | null> {
   const row = await cache.kb.selectFrom(LIDARR_NAMING_TABLE).selectAll().where('name', '=', name).executeTakeFirst();
   return row ? mapLidarrRow(row) : null;
 }
 
+/**
+ * Get the default Radarr naming config (the first row ordered by priority).
+ *
+ * @param cache - The PCD cache containing the knowledge base
+ * @returns The default Radarr naming row, or null if none exists
+ */
 export async function getRadarrDefaults(cache: PCDCache): Promise<RadarrNamingRow | null> {
   const row = await getDefaultNamingRow(cache, RADARR_NAMING_TABLE, 'radarr');
   return row ? mapRadarrRow(row) : null;
 }
 
+/**
+ * Get the default Sonarr naming config (the first row ordered by priority).
+ *
+ * @param cache - The PCD cache containing the knowledge base
+ * @returns The default Sonarr naming row, or null if none exists
+ */
 export async function getSonarrDefaults(cache: PCDCache): Promise<SonarrNamingRow | null> {
   const row = await getDefaultNamingRow(cache, SONARR_NAMING_TABLE, 'sonarr');
   return row ? mapSonarrRow(row) : null;
 }
 
+/**
+ * Get the default Lidarr naming config (the first row ordered by priority).
+ *
+ * @param cache - The PCD cache containing the knowledge base
+ * @returns The default Lidarr naming row, or null if none exists
+ */
 export async function getLidarrDefaults(cache: PCDCache): Promise<LidarrNamingRow | null> {
   const row = await getDefaultNamingRow(cache, LIDARR_NAMING_TABLE, 'lidarr');
   return row ? mapLidarrRow(row) : null;

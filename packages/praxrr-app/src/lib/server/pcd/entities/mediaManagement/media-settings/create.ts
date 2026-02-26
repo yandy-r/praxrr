@@ -20,6 +20,13 @@ export interface CreateMediaSettingsOptions {
   input: CreateMediaSettingsInput;
 }
 
+/**
+ * Create a Radarr media settings config by writing an operation to the specified layer.
+ *
+ * @param options - Create options including databaseId, cache, layer, and input values
+ * @returns The write result from the create operation
+ * @throws {Error} When a media settings config with the same name already exists
+ */
 export async function createRadarrMediaSettings(options: CreateMediaSettingsOptions) {
   const { databaseId, cache, layer, input } = options;
   const db = cache.kb;
@@ -65,6 +72,13 @@ export async function createRadarrMediaSettings(options: CreateMediaSettingsOpti
   });
 }
 
+/**
+ * Create a Sonarr media settings config by writing an operation to the specified layer.
+ *
+ * @param options - Create options including databaseId, cache, layer, and input values
+ * @returns The write result from the create operation
+ * @throws {Error} When a media settings config with the same name already exists
+ */
 export async function createSonarrMediaSettings(options: CreateMediaSettingsOptions) {
   const { databaseId, cache, layer, input } = options;
   const db = cache.kb;
@@ -110,6 +124,13 @@ export async function createSonarrMediaSettings(options: CreateMediaSettingsOpti
   });
 }
 
+/**
+ * Create a Lidarr media settings config by writing an operation to the specified layer.
+ *
+ * @param options - Create options including databaseId, cache, layer, and input values
+ * @returns The write result from the create operation
+ * @throws {Error} When a media settings config with the same name already exists
+ */
 export async function createLidarrMediaSettings(options: CreateMediaSettingsOptions) {
   const { databaseId, cache, layer, input } = options;
   const db = cache.kb;

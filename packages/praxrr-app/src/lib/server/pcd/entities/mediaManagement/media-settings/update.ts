@@ -21,6 +21,14 @@ export interface UpdateMediaSettingsOptions {
   input: UpdateMediaSettingsInput;
 }
 
+/**
+ * Update a Radarr media settings config by writing an operation to the specified layer.
+ * Uses value guards to detect conflicts with upstream changes.
+ *
+ * @param options - Update options including databaseId, cache, layer, current config, and new input values
+ * @returns The write result from the update operation
+ * @throws {Error} When a config with the new name already exists
+ */
 export async function updateRadarrMediaSettings(options: UpdateMediaSettingsOptions) {
   const { databaseId, cache, layer, current, input } = options;
   const db = cache.kb;
@@ -122,6 +130,14 @@ export interface UpdateLidarrMediaSettingsOptions {
   input: UpdateMediaSettingsInput;
 }
 
+/**
+ * Update a Sonarr media settings config by writing an operation to the specified layer.
+ * Uses value guards to detect conflicts with upstream changes.
+ *
+ * @param options - Update options including databaseId, cache, layer, current config, and new input values
+ * @returns The write result from the update operation
+ * @throws {Error} When a config with the new name already exists
+ */
 export async function updateSonarrMediaSettings(options: UpdateSonarrMediaSettingsOptions) {
   const { databaseId, cache, layer, current, input } = options;
   const db = cache.kb;
@@ -207,6 +223,14 @@ export async function updateSonarrMediaSettings(options: UpdateSonarrMediaSettin
   });
 }
 
+/**
+ * Update a Lidarr media settings config by writing an operation to the specified layer.
+ * Uses value guards to detect conflicts with upstream changes.
+ *
+ * @param options - Update options including databaseId, cache, layer, current config, and new input values
+ * @returns The write result from the update operation
+ * @throws {Error} When a config with the new name already exists
+ */
 export async function updateLidarrMediaSettings(options: UpdateLidarrMediaSettingsOptions) {
   const { databaseId, cache, layer, current, input } = options;
   const db = cache.kb;

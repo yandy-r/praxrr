@@ -16,6 +16,13 @@ const VALID_COLON_FORMATS = new Set(['delete', 'dash', 'spaceDash', 'spaceDashSp
 const VALID_MULTI_EPISODE_STYLES = new Set(['extend', 'duplicate', 'repeat', 'scene', 'range', 'prefixedRange']);
 const VALID_PROPERS_REPACKS = new Set(['doNotPrefer', 'preferAndUpgrade', 'doNotUpgradeAutomatically']);
 
+/**
+ * Validate portable entity data against the expected shape for the given entity type.
+ *
+ * @param entityType - The entity type to validate against
+ * @param data - The portable data object to validate
+ * @returns An error message string if invalid, or null if the data is valid
+ */
 export function validatePortableData(entityType: EntityType, data: Record<string, unknown>): string | null {
   switch (entityType) {
     case 'delay_profile':

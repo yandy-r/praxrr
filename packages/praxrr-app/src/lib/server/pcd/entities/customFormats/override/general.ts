@@ -37,6 +37,15 @@ function resolveTags(current: string[], desiredState: StoredDesiredState): strin
   return current;
 }
 
+/**
+ * Override the general fields (name, description, include_in_rename, tags) of a custom format.
+ * Creates the format if it does not exist; updates it if it does.
+ *
+ * @param databaseId - The PCD database ID
+ * @param metadata - Stored op metadata used to resolve the custom format name
+ * @param desiredState - The desired field values to apply
+ * @returns The write result from the create or update operation
+ */
 export async function overrideGeneral(
   databaseId: number,
   metadata: StoredOpMetadata | null,

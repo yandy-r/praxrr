@@ -219,6 +219,14 @@ async function overrideLidarr(
   });
 }
 
+/**
+ * Override a media settings create or update operation, dispatching to the correct Arr-specific handler.
+ *
+ * @param databaseId - The PCD database ID
+ * @param metadata - Stored op metadata indicating the target entity type (radarr/sonarr/lidarr)
+ * @param desiredState - The desired state to apply
+ * @returns The write result from the Arr-specific override handler
+ */
 export function overrideCreate(
   databaseId: number,
   metadata: StoredOpMetadata | null,
@@ -239,6 +247,14 @@ export function overrideCreate(
   }
 }
 
+/**
+ * Override a media settings update operation by delegating to overrideCreate.
+ *
+ * @param databaseId - The PCD database ID
+ * @param metadata - Stored op metadata indicating the target entity type
+ * @param desiredState - The desired state to apply
+ * @returns The write result from the override handler
+ */
 export function overrideUpdate(
   databaseId: number,
   metadata: StoredOpMetadata | null,

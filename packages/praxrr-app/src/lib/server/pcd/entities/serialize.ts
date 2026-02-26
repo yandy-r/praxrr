@@ -31,6 +31,14 @@ import * as qualityDefsQueries from './mediaManagement/quality-definitions/index
 // DELAY PROFILES
 // ============================================================================
 
+/**
+ * Serialize a delay profile from the PCD cache into portable format.
+ *
+ * @param cache - The PCD cache containing the knowledge base
+ * @param name - The delay profile name to serialize
+ * @returns The portable delay profile representation
+ * @throws {Error} When the delay profile is not found
+ */
 export async function serializeDelayProfile(cache: PCDCache, name: string): Promise<PortableDelayProfile> {
   const row = await delayProfileQueries.getByName(cache, name);
   if (!row) throw new Error(`Delay profile "${name}" not found`);
@@ -50,6 +58,14 @@ export async function serializeDelayProfile(cache: PCDCache, name: string): Prom
 // REGULAR EXPRESSIONS
 // ============================================================================
 
+/**
+ * Serialize a regular expression from the PCD cache into portable format.
+ *
+ * @param cache - The PCD cache containing the knowledge base
+ * @param name - The regular expression name to serialize
+ * @returns The portable regular expression representation
+ * @throws {Error} When the regular expression is not found
+ */
 export async function serializeRegularExpression(cache: PCDCache, name: string): Promise<PortableRegularExpression> {
   const db = cache.kb;
 
@@ -82,6 +98,14 @@ export async function serializeRegularExpression(cache: PCDCache, name: string):
 // CUSTOM FORMATS
 // ============================================================================
 
+/**
+ * Serialize a custom format with its conditions and tests from the PCD cache into portable format.
+ *
+ * @param cache - The PCD cache containing the knowledge base
+ * @param name - The custom format name to serialize
+ * @returns The portable custom format representation
+ * @throws {Error} When the custom format is not found
+ */
 export async function serializeCustomFormat(cache: PCDCache, name: string): Promise<PortableCustomFormat> {
   const db = cache.kb;
 
@@ -123,6 +147,14 @@ export async function serializeCustomFormat(cache: PCDCache, name: string): Prom
 // QUALITY PROFILES
 // ============================================================================
 
+/**
+ * Serialize a quality profile with its qualities, scoring, and tests from the PCD cache into portable format.
+ *
+ * @param cache - The PCD cache containing the knowledge base
+ * @param name - The quality profile name to serialize
+ * @returns The portable quality profile representation
+ * @throws {Error} When the quality profile is not found
+ */
 export async function serializeQualityProfile(cache: PCDCache, name: string): Promise<PortableQualityProfile> {
   const db = cache.kb;
 
@@ -178,6 +210,14 @@ export async function serializeQualityProfile(cache: PCDCache, name: string): Pr
 // NAMING
 // ============================================================================
 
+/**
+ * Serialize a Radarr naming config from the PCD cache into portable format.
+ *
+ * @param cache - The PCD cache containing the knowledge base
+ * @param name - The naming config name to serialize
+ * @returns The portable Radarr naming representation
+ * @throws {Error} When the naming config is not found
+ */
 export async function serializeRadarrNaming(cache: PCDCache, name: string): Promise<PortableRadarrNaming> {
   const row = await namingQueries.getRadarrByName(cache, name);
   if (!row) throw new Error(`Radarr naming "${name}" not found`);
@@ -192,6 +232,14 @@ export async function serializeRadarrNaming(cache: PCDCache, name: string): Prom
   };
 }
 
+/**
+ * Serialize a Sonarr naming config from the PCD cache into portable format.
+ *
+ * @param cache - The PCD cache containing the knowledge base
+ * @param name - The naming config name to serialize
+ * @returns The portable Sonarr naming representation
+ * @throws {Error} When the naming config is not found
+ */
 export async function serializeSonarrNaming(cache: PCDCache, name: string): Promise<PortableSonarrNaming> {
   const row = await namingQueries.getSonarrByName(cache, name);
   if (!row) throw new Error(`Sonarr naming "${name}" not found`);
@@ -211,6 +259,14 @@ export async function serializeSonarrNaming(cache: PCDCache, name: string): Prom
   };
 }
 
+/**
+ * Serialize a Lidarr naming config from the PCD cache into portable format.
+ *
+ * @param cache - The PCD cache containing the knowledge base
+ * @param name - The naming config name to serialize
+ * @returns The portable Lidarr naming representation
+ * @throws {Error} When the naming config is not found
+ */
 export async function serializeLidarrNaming(cache: PCDCache, name: string): Promise<PortableLidarrNaming> {
   const row = await namingQueries.getLidarrByName(cache, name);
   if (!row) throw new Error(`Lidarr naming "${name}" not found`);
@@ -245,6 +301,14 @@ function requireLidarrNamingField(name: string, field: string, value: string | n
 // MEDIA SETTINGS
 // ============================================================================
 
+/**
+ * Serialize a Radarr media settings config from the PCD cache into portable format.
+ *
+ * @param cache - The PCD cache containing the knowledge base
+ * @param name - The media settings config name to serialize
+ * @returns The portable media settings representation
+ * @throws {Error} When the media settings config is not found
+ */
 export async function serializeRadarrMediaSettings(cache: PCDCache, name: string): Promise<PortableMediaSettings> {
   const row = await mediaSettingsQueries.getRadarrByName(cache, name);
   if (!row) throw new Error(`Radarr media settings "${name}" not found`);
@@ -256,6 +320,14 @@ export async function serializeRadarrMediaSettings(cache: PCDCache, name: string
   };
 }
 
+/**
+ * Serialize a Sonarr media settings config from the PCD cache into portable format.
+ *
+ * @param cache - The PCD cache containing the knowledge base
+ * @param name - The media settings config name to serialize
+ * @returns The portable media settings representation
+ * @throws {Error} When the media settings config is not found
+ */
 export async function serializeSonarrMediaSettings(cache: PCDCache, name: string): Promise<PortableMediaSettings> {
   const row = await mediaSettingsQueries.getSonarrByName(cache, name);
   if (!row) throw new Error(`Sonarr media settings "${name}" not found`);
@@ -267,6 +339,14 @@ export async function serializeSonarrMediaSettings(cache: PCDCache, name: string
   };
 }
 
+/**
+ * Serialize a Lidarr media settings config from the PCD cache into portable format.
+ *
+ * @param cache - The PCD cache containing the knowledge base
+ * @param name - The media settings config name to serialize
+ * @returns The portable Lidarr media settings representation
+ * @throws {Error} When the media settings config is not found
+ */
 export async function serializeLidarrMediaSettings(
   cache: PCDCache,
   name: string
@@ -285,6 +365,14 @@ export async function serializeLidarrMediaSettings(
 // QUALITY DEFINITIONS
 // ============================================================================
 
+/**
+ * Serialize a Radarr quality definitions config from the PCD cache into portable format.
+ *
+ * @param cache - The PCD cache containing the knowledge base
+ * @param name - The quality definitions config name to serialize
+ * @returns The portable quality definitions representation
+ * @throws {Error} When the quality definitions config is not found
+ */
 export async function serializeRadarrQualityDefinitions(
   cache: PCDCache,
   name: string
@@ -298,6 +386,14 @@ export async function serializeRadarrQualityDefinitions(
   };
 }
 
+/**
+ * Serialize a Sonarr quality definitions config from the PCD cache into portable format.
+ *
+ * @param cache - The PCD cache containing the knowledge base
+ * @param name - The quality definitions config name to serialize
+ * @returns The portable quality definitions representation
+ * @throws {Error} When the quality definitions config is not found
+ */
 export async function serializeSonarrQualityDefinitions(
   cache: PCDCache,
   name: string
@@ -311,6 +407,14 @@ export async function serializeSonarrQualityDefinitions(
   };
 }
 
+/**
+ * Serialize a Lidarr quality definitions config from the PCD cache into portable format.
+ *
+ * @param cache - The PCD cache containing the knowledge base
+ * @param name - The quality definitions config name to serialize
+ * @returns The portable Lidarr quality definitions representation
+ * @throws {Error} When the quality definitions config is not found
+ */
 export async function serializeLidarrQualityDefinitions(
   cache: PCDCache,
   name: string
@@ -328,6 +432,14 @@ export async function serializeLidarrQualityDefinitions(
 // LIDARR METADATA PROFILES
 // ============================================================================
 
+/**
+ * Serialize a Lidarr metadata profile from the PCD cache into portable format.
+ *
+ * @param cache - The PCD cache containing the knowledge base
+ * @param name - The metadata profile name to serialize
+ * @returns The portable Lidarr metadata profile representation
+ * @throws {Error} When the metadata profile is not found
+ */
 export async function serializeLidarrMetadataProfile(
   cache: PCDCache,
   name: string

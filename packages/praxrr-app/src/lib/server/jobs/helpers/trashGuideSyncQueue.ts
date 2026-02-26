@@ -77,6 +77,13 @@ function toRunMetadata(queueId: number): TrashGuideSyncRunMetadata {
   };
 }
 
+/**
+ * Enqueues a manual TRaSH Guide source sync job.
+ * If a sync is already running for the source, returns its run metadata instead.
+ *
+ * @param sourceId - The TRaSH Guide source ID to sync
+ * @returns Result indicating whether the job was queued or already running
+ */
 export function enqueueManualTrashGuideSourceSync(sourceId: number): EnqueueManualTrashGuideSyncResult {
   const dedupeKey = getDedupeKey(sourceId);
   const existing = jobQueueQueries.getByDedupeKey(dedupeKey);

@@ -13,6 +13,13 @@ export interface RemoveMediaSettingsOptions {
   current: RadarrMediaSettingsRow;
 }
 
+/**
+ * Delete a Radarr media settings config by writing an operation to the specified layer.
+ * Uses value guards to detect conflicts with upstream changes.
+ *
+ * @param options - Delete options including databaseId, cache, layer, and current config data
+ * @returns The write result from the delete operation
+ */
 export async function removeRadarrMediaSettings(options: RemoveMediaSettingsOptions) {
   const { databaseId, cache, layer, current } = options;
   const db = cache.kb;
@@ -54,6 +61,13 @@ export interface RemoveSonarrMediaSettingsOptions {
   current: SonarrMediaSettingsRow;
 }
 
+/**
+ * Delete a Sonarr media settings config by writing an operation to the specified layer.
+ * Uses value guards to detect conflicts with upstream changes.
+ *
+ * @param options - Delete options including databaseId, cache, layer, and current config data
+ * @returns The write result from the delete operation
+ */
 export async function removeSonarrMediaSettings(options: RemoveSonarrMediaSettingsOptions) {
   const { databaseId, cache, layer, current } = options;
   const db = cache.kb;
@@ -95,6 +109,13 @@ export interface RemoveLidarrMediaSettingsOptions {
   current: LidarrMediaSettingsRow;
 }
 
+/**
+ * Delete a Lidarr media settings config by writing an operation to the specified layer.
+ * Uses value guards to detect conflicts with upstream changes.
+ *
+ * @param options - Delete options including databaseId, cache, layer, and current config data
+ * @returns The write result from the delete operation
+ */
 export async function removeLidarrMediaSettings(options: RemoveLidarrMediaSettingsOptions) {
   const { databaseId, cache, layer, current } = options;
   const db = cache.kb;

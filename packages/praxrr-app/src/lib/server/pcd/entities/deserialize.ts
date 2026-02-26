@@ -190,10 +190,22 @@ function asPortableData<T>(data: unknown): T {
   return data as unknown as T;
 }
 
+/**
+ * Look up the deserializer handler function for the given entity type.
+ *
+ * @param entityType - The entity type to retrieve the deserializer for
+ * @returns The entity deserializer function
+ */
 export function getEntityDeserializer(entityType: EntityType): EntityDeserializer {
   return ENTITY_DESERIALIZERS[entityType];
 }
 
+/**
+ * Deserialize a validated portable payload into the PCD layer by entity type.
+ *
+ * @param options - Options including databaseId, cache, layer, entityType, and portable data
+ * @returns The write result from the appropriate deserializer
+ */
 export async function deserializeByEntityType({
   databaseId,
   cache,
@@ -214,6 +226,12 @@ export async function deserializeByEntityType({
 // DELAY PROFILES
 // ============================================================================
 
+/**
+ * Deserialize a portable delay profile into the PCD layer by creating the entity.
+ *
+ * @param options - Deserialize options including databaseId, cache, layer, and portable data
+ * @returns The write result from the create operation
+ */
 export async function deserializeDelayProfile(options: DeserializeOptions<PortableDelayProfile>) {
   const { databaseId, cache, layer, portable } = options;
 
@@ -229,6 +247,12 @@ export async function deserializeDelayProfile(options: DeserializeOptions<Portab
 // REGULAR EXPRESSIONS
 // ============================================================================
 
+/**
+ * Deserialize a portable regular expression into the PCD layer by creating the entity.
+ *
+ * @param options - Deserialize options including databaseId, cache, layer, and portable data
+ * @returns The write result from the create operation
+ */
 export async function deserializeRegularExpression(options: DeserializeOptions<PortableRegularExpression>) {
   const { databaseId, cache, layer, portable } = options;
 
@@ -244,6 +268,12 @@ export async function deserializeRegularExpression(options: DeserializeOptions<P
 // CUSTOM FORMATS
 // ============================================================================
 
+/**
+ * Deserialize a portable custom format into the PCD layer, creating the format with its conditions and tests.
+ *
+ * @param options - Deserialize options including databaseId, cache, layer, and portable data
+ * @returns The write result from the create operation
+ */
 export async function deserializeCustomFormat(options: DeserializeOptions<PortableCustomFormat>) {
   const { databaseId, cache, layer, portable } = options;
 
@@ -297,6 +327,12 @@ export async function deserializeCustomFormat(options: DeserializeOptions<Portab
 // QUALITY PROFILES
 // ============================================================================
 
+/**
+ * Deserialize a portable quality profile into the PCD layer, creating it with qualities and scoring.
+ *
+ * @param options - Deserialize options including databaseId, cache, layer, and portable data
+ * @returns The write result from the create operation
+ */
 export async function deserializeQualityProfile(options: DeserializeOptions<PortableQualityProfile>) {
   const { databaseId, cache, layer, portable } = options;
 
@@ -349,6 +385,12 @@ export async function deserializeQualityProfile(options: DeserializeOptions<Port
 // NAMING
 // ============================================================================
 
+/**
+ * Deserialize a portable Radarr naming config into the PCD layer by creating the entity.
+ *
+ * @param options - Deserialize options including databaseId, cache, layer, and portable data
+ * @returns The write result from the create operation
+ */
 export async function deserializeRadarrNaming(options: DeserializeOptions<PortableRadarrNaming>) {
   const { databaseId, cache, layer, portable } = options;
 
@@ -360,6 +402,12 @@ export async function deserializeRadarrNaming(options: DeserializeOptions<Portab
   });
 }
 
+/**
+ * Deserialize a portable Sonarr naming config into the PCD layer by creating the entity.
+ *
+ * @param options - Deserialize options including databaseId, cache, layer, and portable data
+ * @returns The write result from the create operation
+ */
 export async function deserializeSonarrNaming(options: DeserializeOptions<PortableSonarrNaming>) {
   const { databaseId, cache, layer, portable } = options;
 
@@ -371,6 +419,12 @@ export async function deserializeSonarrNaming(options: DeserializeOptions<Portab
   });
 }
 
+/**
+ * Deserialize a portable Lidarr naming config into the PCD layer by creating the entity.
+ *
+ * @param options - Deserialize options including databaseId, cache, layer, and portable data
+ * @returns The write result from the create operation
+ */
 export async function deserializeLidarrNaming(options: DeserializeOptions<PortableLidarrNaming>) {
   const { databaseId, cache, layer, portable } = options;
 
@@ -386,6 +440,12 @@ export async function deserializeLidarrNaming(options: DeserializeOptions<Portab
 // MEDIA SETTINGS
 // ============================================================================
 
+/**
+ * Deserialize a portable Radarr media settings config into the PCD layer by creating the entity.
+ *
+ * @param options - Deserialize options including databaseId, cache, layer, and portable data
+ * @returns The write result from the create operation
+ */
 export async function deserializeRadarrMediaSettings(options: DeserializeOptions<PortableMediaSettings>) {
   const { databaseId, cache, layer, portable } = options;
 
@@ -397,6 +457,12 @@ export async function deserializeRadarrMediaSettings(options: DeserializeOptions
   });
 }
 
+/**
+ * Deserialize a portable Sonarr media settings config into the PCD layer by creating the entity.
+ *
+ * @param options - Deserialize options including databaseId, cache, layer, and portable data
+ * @returns The write result from the create operation
+ */
 export async function deserializeSonarrMediaSettings(options: DeserializeOptions<PortableMediaSettings>) {
   const { databaseId, cache, layer, portable } = options;
 
@@ -408,6 +474,12 @@ export async function deserializeSonarrMediaSettings(options: DeserializeOptions
   });
 }
 
+/**
+ * Deserialize a portable Lidarr media settings config into the PCD layer by creating the entity.
+ *
+ * @param options - Deserialize options including databaseId, cache, layer, and portable data
+ * @returns The write result from the create operation
+ */
 export async function deserializeLidarrMediaSettings(options: DeserializeOptions<PortableLidarrMediaSettings>) {
   const { databaseId, cache, layer, portable } = options;
 
@@ -423,6 +495,12 @@ export async function deserializeLidarrMediaSettings(options: DeserializeOptions
 // QUALITY DEFINITIONS
 // ============================================================================
 
+/**
+ * Deserialize a portable Radarr quality definitions config into the PCD layer by creating the entity.
+ *
+ * @param options - Deserialize options including databaseId, cache, layer, and portable data
+ * @returns The write result from the create operation
+ */
 export async function deserializeRadarrQualityDefinitions(options: DeserializeOptions<PortableQualityDefinitions>) {
   const { databaseId, cache, layer, portable } = options;
 
@@ -434,6 +512,12 @@ export async function deserializeRadarrQualityDefinitions(options: DeserializeOp
   });
 }
 
+/**
+ * Deserialize a portable Sonarr quality definitions config into the PCD layer by creating the entity.
+ *
+ * @param options - Deserialize options including databaseId, cache, layer, and portable data
+ * @returns The write result from the create operation
+ */
 export async function deserializeSonarrQualityDefinitions(options: DeserializeOptions<PortableQualityDefinitions>) {
   const { databaseId, cache, layer, portable } = options;
 
@@ -445,6 +529,12 @@ export async function deserializeSonarrQualityDefinitions(options: DeserializeOp
   });
 }
 
+/**
+ * Deserialize a portable Lidarr quality definitions config into the PCD layer by creating the entity.
+ *
+ * @param options - Deserialize options including databaseId, cache, layer, and portable data
+ * @returns The write result from the create operation
+ */
 export async function deserializeLidarrQualityDefinitions(
   options: DeserializeOptions<PortableLidarrQualityDefinitions>
 ) {
@@ -510,6 +600,12 @@ function normalizeLidarrMetadataProfileReleaseStatusRows(
   }));
 }
 
+/**
+ * Deserialize a portable Lidarr metadata profile into the PCD layer by creating the entity.
+ *
+ * @param options - Deserialize options including databaseId, cache, layer, and portable data
+ * @returns The write result from the create operation
+ */
 export async function deserializeLidarrMetadataProfile(options: DeserializeOptions<PortableLidarrMetadataProfile>) {
   const { databaseId, cache, layer, portable } = options;
 

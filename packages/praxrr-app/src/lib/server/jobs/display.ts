@@ -7,6 +7,12 @@ export type JobNameLookups = {
   databaseNameById?: Map<number, string>;
 };
 
+/**
+ * Returns a human-readable label for a given job type.
+ *
+ * @param jobType - The internal job type identifier
+ * @returns Formatted display label
+ */
 export function formatJobTypeLabel(jobType: JobType): string {
   const rawJobType: string = jobType;
 
@@ -68,6 +74,15 @@ function readIdList(raw: unknown): number[] {
   return ids;
 }
 
+/**
+ * Builds a descriptive display name for a job, appending the associated
+ * instance or database name when available.
+ *
+ * @param jobType - The internal job type identifier
+ * @param payload - The job payload containing `instanceId` or `databaseId`
+ * @param lookups - Optional pre-fetched name maps to avoid DB queries
+ * @returns Human-readable display name for the job
+ */
 export function buildJobDisplayName(
   jobType: JobType,
   payload: Record<string, unknown>,

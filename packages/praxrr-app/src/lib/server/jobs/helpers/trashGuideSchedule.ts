@@ -21,6 +21,13 @@ function getSourceRunAt(lastSyncedAt: string | null, scheduleMinutes: number, no
   return nextRunAt;
 }
 
+/**
+ * Schedules or unschedules sync jobs for all enabled TRaSH Guide sources.
+ * Sources with `sync_strategy <= 0` or disabled are unscheduled.
+ * Missed schedule windows are immediately enqueued as catch-up runs.
+ *
+ * @returns Array of `runAt` ISO timestamps for all jobs that were scheduled
+ */
 export function scheduleTrashGuideSyncSources(): string[] {
   const now = new Date();
   const nowIso = now.toISOString();

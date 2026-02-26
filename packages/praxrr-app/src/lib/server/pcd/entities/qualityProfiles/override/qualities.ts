@@ -103,6 +103,14 @@ function applyPatch(currentItems: OrderedItem[], patch: OrderedItemsPatch): Orde
   return Array.from(map.values()).sort((a, b) => a.position - b.position);
 }
 
+/**
+ * Override the ordered quality items of a quality profile to match the desired state.
+ *
+ * @param databaseId - The PCD database ID
+ * @param metadata - Stored op metadata used to resolve the profile name
+ * @param desiredState - The desired ordered items or patch to apply
+ * @returns The write result from the update operation
+ */
 export async function overrideQualities(
   databaseId: number,
   metadata: StoredOpMetadata | null,

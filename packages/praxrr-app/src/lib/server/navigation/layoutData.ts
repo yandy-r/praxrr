@@ -14,6 +14,13 @@ interface ResolveRootLayoutDataInput {
   authBypass: boolean;
 }
 
+/**
+ * Resolves the root layout data for the current request, including the navigation shell
+ * when the user is authenticated (or auth is bypassed) and the path is not an auth route.
+ *
+ * @param input - Request context including version, pathname, user, and auth bypass flag
+ * @returns Root layout data with optional navigation shell
+ */
 export function resolveRootLayoutData({
   version,
   pathname,

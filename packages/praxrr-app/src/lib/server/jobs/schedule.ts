@@ -16,6 +16,12 @@ function notify(runAt: string | null): void {
   jobDispatcher.notifyJobEnqueued(runAt);
 }
 
+/**
+ * Schedules or unschedules per-section Arr sync jobs for a single instance
+ * based on its current sync configuration. Removes legacy combined `arr.sync` jobs.
+ *
+ * @param instanceId - The Arr instance ID to schedule syncs for
+ */
 export function scheduleArrSyncForInstance(instanceId: number): void {
   const status = arrSyncQueries.getSyncConfigStatus(instanceId);
 
@@ -58,6 +64,12 @@ export function scheduleArrSyncForInstance(instanceId: number): void {
   }
 }
 
+/**
+ * Schedules or cancels the upgrade job for a single Arr instance
+ * based on its upgrade configuration.
+ *
+ * @param instanceId - The Arr instance ID to schedule upgrades for
+ */
 export function scheduleUpgradeForInstance(instanceId: number): void {
   const config = upgradeConfigsQueries.getByArrInstanceId(instanceId);
   if (!config || !config.enabled) {
@@ -79,6 +91,12 @@ export function scheduleUpgradeForInstance(instanceId: number): void {
   notify(job.runAt);
 }
 
+/**
+ * Schedules or cancels the rename job for a single Arr instance
+ * based on its rename settings.
+ *
+ * @param instanceId - The Arr instance ID to schedule renames for
+ */
 export function scheduleRenameForInstance(instanceId: number): void {
   const settings = arrRenameSettingsQueries.getByInstanceId(instanceId);
   if (!settings || !settings.enabled) {
@@ -100,6 +118,12 @@ export function scheduleRenameForInstance(instanceId: number): void {
   notify(job.runAt);
 }
 
+/**
+ * Schedules or unschedules the PCD sync job for a single database instance
+ * based on its sync strategy setting.
+ *
+ * @param databaseId - The database instance ID to schedule PCD sync for
+ */
 export function schedulePcdSyncForDatabase(databaseId: number): void {
   const instance = databaseInstancesQueries.getById(databaseId);
   if (!instance || instance.enabled === 0 || instance.sync_strategy <= 0) {
@@ -121,6 +145,10 @@ export function schedulePcdSyncForDatabase(databaseId: number): void {
   notify(job.runAt);
 }
 
+/**
+ * Schedules or cancels backup creation and cleanup jobs
+ * based on current backup settings.
+ */
 export function scheduleBackupJobs(): void {
   const settings = backupSettingsQueries.get();
   if (!settings || settings.enabled !== 1) {
@@ -152,6 +180,10 @@ export function scheduleBackupJobs(): void {
   notify(cleanupJob.runAt);
 }
 
+/**
+ * Schedules or cancels the daily log cleanup job
+ * based on current log settings.
+ */
 export function scheduleLogCleanup(): void {
   const settings = logSettingsQueries.get();
   if (!settings || settings.file_logging !== 1) {
@@ -171,6 +203,9 @@ export function scheduleLogCleanup(): void {
   notify(job.runAt);
 }
 
+/**
+ * Schedules sync jobs for all enabled TRaSH Guide sources and notifies the dispatcher.
+ */
 export function scheduleTrashGuideSyncJobs(): void {
   const runAts = scheduleTrashGuideSyncSources();
   for (const runAt of runAts) {
@@ -178,6 +213,10 @@ export function scheduleTrashGuideSyncJobs(): void {
   }
 }
 
+/**
+ * Schedules all recurring jobs for every Arr instance, database, TRaSH Guide source,
+ * backup, and log cleanup. Called once at startup and after configuration changes.
+ */
 export function scheduleAllJobs(): void {
   const arrInstances = arrInstancesQueries.getAll();
   for (const instance of arrInstances) {

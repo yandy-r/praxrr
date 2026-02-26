@@ -3,6 +3,10 @@ import { logger } from '$logger/logger.ts';
 import { jobDispatcher } from './dispatcher.ts';
 import { scheduleAllJobs } from './schedule.ts';
 
+/**
+ * Initializes the job queue system: recovers any interrupted running jobs,
+ * schedules all configured jobs, and starts the job dispatcher.
+ */
 export async function initializeJobs(): Promise<void> {
   await logger.debug('Initializing job queue', { source: 'JobQueue' });
 

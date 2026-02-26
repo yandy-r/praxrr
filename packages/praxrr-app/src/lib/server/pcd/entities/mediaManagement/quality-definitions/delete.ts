@@ -14,6 +14,13 @@ export interface RemoveQualityDefinitionsOptions {
   current: QualityDefinitionsConfig;
 }
 
+/**
+ * Delete a Radarr quality definitions config by writing an operation to the specified layer.
+ * Uses value guards on each entry to detect conflicts with upstream changes.
+ *
+ * @param options - Delete options including databaseId, cache, layer, and current config data
+ * @returns The write result from the delete operation
+ */
 export async function removeRadarrQualityDefinitions(options: RemoveQualityDefinitionsOptions) {
   const { databaseId, cache, layer, current } = options;
   const db = cache.kb;
@@ -51,6 +58,13 @@ export async function removeRadarrQualityDefinitions(options: RemoveQualityDefin
   });
 }
 
+/**
+ * Delete a Sonarr quality definitions config by writing an operation to the specified layer.
+ * Uses value guards on each entry to detect conflicts with upstream changes.
+ *
+ * @param options - Delete options including databaseId, cache, layer, and current config data
+ * @returns The write result from the delete operation
+ */
 export async function removeSonarrQualityDefinitions(options: RemoveQualityDefinitionsOptions) {
   const { databaseId, cache, layer, current } = options;
   const db = cache.kb;
@@ -88,6 +102,13 @@ export async function removeSonarrQualityDefinitions(options: RemoveQualityDefin
   });
 }
 
+/**
+ * Delete a Lidarr quality definitions config by writing an operation to the specified layer.
+ * Uses value guards on each entry to detect conflicts with upstream changes.
+ *
+ * @param options - Delete options including databaseId, cache, layer, and current config data
+ * @returns The write result from the delete operation
+ */
 export async function removeLidarrQualityDefinitions(options: RemoveQualityDefinitionsOptions) {
   const { databaseId, cache, layer, current } = options;
   const db = cache.kb;

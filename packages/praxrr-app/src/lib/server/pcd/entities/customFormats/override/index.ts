@@ -24,6 +24,14 @@ function hasTestChanges(metadata: StoredOpMetadata | null, desiredState: StoredD
   return false;
 }
 
+/**
+ * Override a custom format create operation by applying desired general fields and conditions.
+ *
+ * @param databaseId - The PCD database ID
+ * @param metadata - Stored op metadata used to identify the target entity
+ * @param desiredState - The desired state to apply for general fields and conditions
+ * @returns The write result from the applied override
+ */
 export async function overrideCreate(
   databaseId: number,
   metadata: StoredOpMetadata | null,
@@ -45,6 +53,14 @@ export async function overrideCreate(
   return generalResult;
 }
 
+/**
+ * Override a custom format update operation by routing to the appropriate sub-handler.
+ *
+ * @param databaseId - The PCD database ID
+ * @param metadata - Stored op metadata indicating which fields changed
+ * @param desiredState - The desired state to apply
+ * @returns The write result from the condition, general, or test override
+ */
 export async function overrideUpdate(
   databaseId: number,
   metadata: StoredOpMetadata | null,

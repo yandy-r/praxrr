@@ -39,14 +39,38 @@ export interface UpdateQualityDefinitionsOptions {
   input: UpdateQualityDefinitionsInput;
 }
 
+/**
+ * Update a Radarr quality definitions config by writing an operation to the specified layer.
+ * Uses value guards on each entry to detect conflicts with upstream changes.
+ *
+ * @param options - Update options including databaseId, cache, layer, current config, and new input entries
+ * @returns The write result from the update operation
+ * @throws {Error} When entries contain unmapped qualities
+ */
 export function updateRadarrQualityDefinitions(options: UpdateQualityDefinitionsOptions) {
   return updateQualityDefinitions(options, 'radarr');
 }
 
+/**
+ * Update a Sonarr quality definitions config by writing an operation to the specified layer.
+ * Uses value guards on each entry to detect conflicts with upstream changes.
+ *
+ * @param options - Update options including databaseId, cache, layer, current config, and new input entries
+ * @returns The write result from the update operation
+ * @throws {Error} When entries contain unmapped qualities
+ */
 export function updateSonarrQualityDefinitions(options: UpdateQualityDefinitionsOptions) {
   return updateQualityDefinitions(options, 'sonarr');
 }
 
+/**
+ * Update a Lidarr quality definitions config by writing an operation to the specified layer.
+ * Uses value guards on each entry to detect conflicts with upstream changes.
+ *
+ * @param options - Update options including databaseId, cache, layer, current config, and new input entries
+ * @returns The write result from the update operation
+ * @throws {Error} When entries contain unmapped qualities
+ */
 export function updateLidarrQualityDefinitions(options: UpdateQualityDefinitionsOptions) {
   return updateQualityDefinitions(options, 'lidarr');
 }

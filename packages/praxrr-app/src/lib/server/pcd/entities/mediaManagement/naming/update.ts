@@ -26,6 +26,14 @@ export interface UpdateRadarrNamingOptions {
   input: UpdateRadarrNamingInput;
 }
 
+/**
+ * Update a Radarr naming config by writing an operation to the specified layer.
+ * Uses value guards to detect conflicts with upstream changes.
+ *
+ * @param options - Update options including databaseId, cache, layer, current config, and new input values
+ * @returns The write result from the update operation
+ * @throws {Error} When a config with the new name already exists
+ */
 export async function updateRadarrNaming(options: UpdateRadarrNamingOptions) {
   const { databaseId, cache, layer, current, input } = options;
   const db = cache.kb;
@@ -407,6 +415,14 @@ async function updateSonarrNamingInternal(options: UpdateSonarrNamingOptions, na
   });
 }
 
+/**
+ * Update a Sonarr naming config by writing an operation to the specified layer.
+ * Uses value guards to detect conflicts with upstream changes.
+ *
+ * @param options - Update options including databaseId, cache, layer, current config, and new input values
+ * @returns The write result from the update operation
+ * @throws {Error} When a config with the new name already exists
+ */
 export async function updateSonarrNaming(options: UpdateSonarrNamingOptions) {
   return updateSonarrNamingInternal(options, 'sonarr');
 }
@@ -431,6 +447,14 @@ export interface UpdateLidarrNamingOptions {
   input: UpdateLidarrNamingInput;
 }
 
+/**
+ * Update a Lidarr naming config by writing an operation to the specified layer.
+ * Uses value guards to detect conflicts with upstream changes.
+ *
+ * @param options - Update options including databaseId, cache, layer, current config, and new input values
+ * @returns The write result from the update operation
+ * @throws {Error} When a config with the new name already exists
+ */
 export async function updateLidarrNaming(options: UpdateLidarrNamingOptions) {
   const { databaseId, cache, layer, current, input } = options;
   const db = cache.kb;

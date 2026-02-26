@@ -37,6 +37,14 @@ function resolveScoreChanges(desiredState: StoredDesiredState): Array<{
     .filter((e): e is NonNullable<typeof e> => e !== null);
 }
 
+/**
+ * Override the scoring settings of a quality profile to match the desired state.
+ *
+ * @param databaseId - The PCD database ID
+ * @param metadata - Stored op metadata used to resolve the profile name
+ * @param desiredState - The desired scoring values and custom format score overrides
+ * @returns The write result from the update operation
+ */
 export async function overrideScoring(
   databaseId: number,
   metadata: StoredOpMetadata | null,

@@ -38,14 +38,35 @@ export interface CreateQualityDefinitionsOptions {
   input: CreateQualityDefinitionsInput;
 }
 
+/**
+ * Create a Radarr quality definitions config by writing an operation to the specified layer.
+ *
+ * @param options - Create options including databaseId, cache, layer, and input entries
+ * @returns The write result from the create operation
+ * @throws {Error} When a config with the same name already exists or entries contain unmapped qualities
+ */
 export function createRadarrQualityDefinitions(options: CreateQualityDefinitionsOptions) {
   return createQualityDefinitions(options, 'radarr');
 }
 
+/**
+ * Create a Sonarr quality definitions config by writing an operation to the specified layer.
+ *
+ * @param options - Create options including databaseId, cache, layer, and input entries
+ * @returns The write result from the create operation
+ * @throws {Error} When a config with the same name already exists or entries contain unmapped qualities
+ */
 export function createSonarrQualityDefinitions(options: CreateQualityDefinitionsOptions) {
   return createQualityDefinitions(options, 'sonarr');
 }
 
+/**
+ * Create a Lidarr quality definitions config by writing an operation to the specified layer.
+ *
+ * @param options - Create options including databaseId, cache, layer, and input entries
+ * @returns The write result from the create operation
+ * @throws {Error} When a config with the same name already exists or entries contain unmapped qualities
+ */
 export function createLidarrQualityDefinitions(options: CreateQualityDefinitionsOptions) {
   return createQualityDefinitions(options, 'lidarr');
 }

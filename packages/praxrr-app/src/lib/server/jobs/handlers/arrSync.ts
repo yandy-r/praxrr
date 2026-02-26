@@ -52,10 +52,22 @@ function getSectionSyncStatus(instanceId: number, section: SectionType): string 
   }
 }
 
+/**
+ * Returns the list of sync sections currently in an `in_progress` state for the given instance.
+ *
+ * @param instanceId - The Arr instance ID to check
+ * @returns Array of section types that are currently running
+ */
 export function getSectionsInProgress(instanceId: number): SectionType[] {
   return SECTION_SYNC_ORDER.filter((section) => getSectionSyncStatus(instanceId, section) === 'in_progress');
 }
 
+/**
+ * Sets the sync status of a single section to `pending` for the given instance.
+ *
+ * @param instanceId - The Arr instance ID
+ * @param section - The sync section to mark as pending
+ */
 export function setSectionStatusPending(instanceId: number, section: SectionType): void {
   switch (section) {
     case 'qualityProfiles':
@@ -73,12 +85,28 @@ export function setSectionStatusPending(instanceId: number, section: SectionType
   }
 }
 
+/**
+ * Sets the sync status of multiple sections to `pending` for the given instance,
+ * deduplicating the provided section list before applying.
+ *
+ * @param instanceId - The Arr instance ID
+ * @param sections - The sync sections to mark as pending
+ */
 export function setSectionsStatusPending(instanceId: number, sections: readonly SectionType[]): void {
   for (const section of dedupeSections(sections)) {
     setSectionStatusPending(instanceId, section);
   }
 }
 
+/**
+ * Programmatically executes a sync job for the given instance and sections,
+ * bypassing the job queue. Useful for manual or startup-triggered syncs.
+ *
+ * @param instanceId - The Arr instance ID to sync
+ * @param sections - Sync sections to run; empty array runs all sections
+ * @param source - Origin of the sync request (default: `'manual'`)
+ * @returns Job run result including status, output, and optional reschedule time
+ */
 export async function executeSyncJob(
   instanceId: number,
   sections: readonly SectionType[],

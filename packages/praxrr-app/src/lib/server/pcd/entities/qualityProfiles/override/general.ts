@@ -37,6 +37,15 @@ function resolveLanguage(current: string | null, desiredState: StoredDesiredStat
   return current;
 }
 
+/**
+ * Override the general fields of a quality profile to match the desired state.
+ * Creates the profile if it does not exist; updates it if it does.
+ *
+ * @param databaseId - The PCD database ID
+ * @param metadata - Stored op metadata used to resolve the profile name
+ * @param desiredState - The desired field values for name, description, tags, language, etc.
+ * @returns The write result from the create or update operation
+ */
 export async function overrideGeneral(
   databaseId: number,
   metadata: StoredOpMetadata | null,

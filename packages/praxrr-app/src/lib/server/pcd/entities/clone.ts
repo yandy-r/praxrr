@@ -30,6 +30,13 @@ interface LidarrMetadataProfileTypeRow {
   allowed: boolean;
 }
 
+/**
+ * Clone an entity by serializing it from the source name, renaming, and deserializing into the PCD layer.
+ *
+ * @param options - Clone options including entity type, source name, new name, and operation layer
+ * @returns The write result from the deserialization step
+ * @throws {Error} When the source entity is not found or the database cache is unavailable
+ */
 export async function clone(options: CloneOptions) {
   const { databaseId, cache, layer, entityType, sourceName, newName } = options;
 

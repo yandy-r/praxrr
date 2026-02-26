@@ -15,6 +15,13 @@ export interface RemoveRadarrNamingOptions {
   current: RadarrNamingRow;
 }
 
+/**
+ * Delete a Radarr naming config by writing an operation to the specified layer.
+ * Uses value guards to detect conflicts with upstream changes.
+ *
+ * @param options - Delete options including databaseId, cache, layer, and current config data
+ * @returns The write result from the delete operation
+ */
 export async function removeRadarrNaming(options: RemoveRadarrNamingOptions) {
   const { databaseId, cache, layer, current } = options;
   const db = cache.kb;
@@ -62,6 +69,13 @@ export interface RemoveSonarrNamingOptions {
   current: SonarrNamingRow;
 }
 
+/**
+ * Delete a Sonarr naming config by writing an operation to the specified layer.
+ * Uses value guards to detect conflicts with upstream changes.
+ *
+ * @param options - Delete options including databaseId, cache, layer, and current config data
+ * @returns The write result from the delete operation
+ */
 export async function removeSonarrNaming(options: RemoveSonarrNamingOptions) {
   const { databaseId, cache, layer, current } = options;
   const db = cache.kb;
@@ -126,6 +140,13 @@ export interface RemoveLidarrNamingOptions {
   current: LidarrNamingRow;
 }
 
+/**
+ * Delete a Lidarr naming config by writing an operation to the specified layer.
+ * Uses value guards to detect conflicts with upstream changes.
+ *
+ * @param options - Delete options including databaseId, cache, layer, and current config data
+ * @returns The write result from the delete operation
+ */
 export async function removeLidarrNaming(options: RemoveLidarrNamingOptions) {
   const { databaseId, cache, layer, current } = options;
   const db = cache.kb;

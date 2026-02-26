@@ -10,6 +10,12 @@ import type {
   MediaSettingsListItem,
 } from '$shared/pcd/display.ts';
 import type { PCDDatabase } from '$shared/pcd/types.ts';
+/**
+ * List all media settings configs across Radarr, Sonarr, and Lidarr.
+ *
+ * @param cache - The PCD cache containing the knowledge base
+ * @returns A combined list of all media settings configs with their arr_type
+ */
 export async function list(cache: PCDCache): Promise<MediaSettingsListItem[]> {
   const db = cache.kb;
 
@@ -63,6 +69,13 @@ export async function list(cache: PCDCache): Promise<MediaSettingsListItem[]> {
   return items;
 }
 
+/**
+ * Get a Radarr media settings config by name.
+ *
+ * @param cache - The PCD cache containing the knowledge base
+ * @param name - The config name to look up
+ * @returns The Radarr media settings row, or null if not found
+ */
 export async function getRadarrByName(cache: PCDCache, name: string): Promise<RadarrMediaSettingsRow | null> {
   const db = cache.kb;
 
@@ -79,6 +92,13 @@ export async function getRadarrByName(cache: PCDCache, name: string): Promise<Ra
   };
 }
 
+/**
+ * Get a Sonarr media settings config by name.
+ *
+ * @param cache - The PCD cache containing the knowledge base
+ * @param name - The config name to look up
+ * @returns The Sonarr media settings row, or null if not found
+ */
 export async function getSonarrByName(cache: PCDCache, name: string): Promise<SonarrMediaSettingsRow | null> {
   const db = cache.kb;
 
@@ -95,6 +115,13 @@ export async function getSonarrByName(cache: PCDCache, name: string): Promise<So
   };
 }
 
+/**
+ * Get a Lidarr media settings config by name.
+ *
+ * @param cache - The PCD cache containing the knowledge base
+ * @param name - The config name to look up
+ * @returns The Lidarr media settings row, or null if not found
+ */
 export async function getLidarrByName(cache: PCDCache, name: string): Promise<LidarrMediaSettingsRow | null> {
   const db = cache.kb;
 

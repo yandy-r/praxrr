@@ -100,6 +100,14 @@ function emptyNavShell(): NavShell {
   };
 }
 
+/**
+ * Resolves the full navigation shell for the given user, filtering items by
+ * permissions, feature flags, and supported Arr app capabilities.
+ * Returns an empty shell when no user is provided.
+ *
+ * @param input - Object containing the authenticated user (or null)
+ * @returns Fully resolved navigation shell with sorted groups and items
+ */
 export function resolveNavShell({ user }: ResolveNavShellInput): NavShell {
   if (!user) {
     return emptyNavShell();

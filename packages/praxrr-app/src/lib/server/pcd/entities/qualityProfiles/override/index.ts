@@ -31,6 +31,14 @@ function hasScoringChanges(metadata: StoredOpMetadata | null, desiredState: Stor
   return false;
 }
 
+/**
+ * Override a quality profile create operation by applying general fields, qualities, and scoring.
+ *
+ * @param databaseId - The PCD database ID
+ * @param metadata - Stored op metadata used to identify the target profile
+ * @param desiredState - The desired state to apply
+ * @returns The write result from the applied override
+ */
 export async function overrideCreate(
   databaseId: number,
   metadata: StoredOpMetadata | null,
@@ -52,6 +60,14 @@ export async function overrideCreate(
   return generalResult;
 }
 
+/**
+ * Override a quality profile update operation by routing to the appropriate sub-handler.
+ *
+ * @param databaseId - The PCD database ID
+ * @param metadata - Stored op metadata indicating which fields changed
+ * @param desiredState - The desired state to apply
+ * @returns The write result from the qualities, scoring, or general override
+ */
 export async function overrideUpdate(
   databaseId: number,
   metadata: StoredOpMetadata | null,
