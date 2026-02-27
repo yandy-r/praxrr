@@ -5,6 +5,9 @@ on:
     branches:
       - dev
       - main
+    paths:
+      - 'packages/praxrr-db/**'
+      - '.github/workflows/publish-db.yml'
     tags:
       - 'db/v*'
   workflow_dispatch:

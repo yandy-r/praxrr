@@ -5,6 +5,11 @@ on:
     branches:
       - main
       - dev
+    paths-ignore:
+      - '**/*.md'
+      - '**/*.mdx'
+      - 'docs/**'
+      - '.github/ISSUE_TEMPLATE/**'
     tags:
       - 'app/v*'
 

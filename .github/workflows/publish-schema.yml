@@ -5,6 +5,9 @@ on:
     branches:
       - dev
       - main
+    paths:
+      - 'packages/praxrr-schema/**'
+      - '.github/workflows/publish-schema.yml'
     tags:
       - 'schema/v*'
   workflow_dispatch:
