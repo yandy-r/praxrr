@@ -71,7 +71,7 @@ services:
         - action: rebuild
           path: ./Dockerfile
         - action: restart
-          path: ./cmpose.dev.yml
+          path: ./compose.dev.yml
 
   parser:
     build:
