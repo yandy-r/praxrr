@@ -31,6 +31,13 @@ import { createLidarrNaming } from '$pcd/entities/mediaManagement/naming/create.
 import { validatePortableData } from '$pcd/entities/validate.ts';
 import { logger } from '$logger/logger.ts';
 
+/**
+ * Mapping of portable entity deserializers used during import.
+ *
+ * @remarks
+ * Each deserializer validates and materializes the portable payload for the target
+ * entity type. This map centralizes type-specific conversion paths for easy extension.
+ */
 export const _deserializeDependencies = {
   deserializeDelayProfile: deserialize.deserializeDelayProfile,
   deserializeRegularExpression: deserialize.deserializeRegularExpression,

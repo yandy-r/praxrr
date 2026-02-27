@@ -11,6 +11,14 @@ import {
 import type { PCDCache } from '$pcd/index.ts';
 import * as serialize from '$pcd/entities/serialize.ts';
 
+/**
+ * Mapping of portable entity serializers used during export.
+ *
+ * @remarks
+ * Each serializer receives a cache handle and an entity name, returning a portable payload.
+ * This object is intentionally shared across all supported entity types so
+ * `serializeEntity()` can stay exhaustive and type-safe.
+ */
 export const _serializeDependencies = {
   serializeDelayProfile: serialize.serializeDelayProfile,
   serializeRegularExpression: serialize.serializeRegularExpression,
