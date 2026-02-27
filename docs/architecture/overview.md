@@ -2,7 +2,8 @@
 
 ## Scope
 
-This page is the high-level map for the current repository architecture. It focuses on runtime behavior and where to find implementation entry points.
+This page is the high-level map for the current repository architecture. It focuses on runtime
+behavior and where to find implementation entry points.
 
 ## System Context
 
@@ -17,6 +18,8 @@ flowchart LR
     Jobs --> SQLite
     Sync --> Arr[Arr media-management apps]
     API --> Parser[C# Parser Service]
+    API --> TRaSH[TRaSH Guide Manager]
+    TRaSH --> Arr
     PCD --> DBPkg[praxrr-db ops repo]
     PCD --> SchemaPkg[praxrr-schema ops repo]
     API --> APIPkg[praxrr-api OpenAPI/types]
@@ -24,7 +27,8 @@ flowchart LR
 
 ## Runtime Layers
 
-`praxrr-app` is the primary runtime. Startup initializes config, encryption keys, DB/migrations, PCD caches, and jobs.
+`praxrr-app` is the primary runtime. Startup initializes config, encryption keys, DB/migrations, PCD
+caches, and jobs.
 
 Key references:
 
@@ -34,7 +38,8 @@ Key references:
 - `packages/praxrr-app/src/lib/server/pcd/core/manager.ts`
 - `packages/praxrr-app/src/lib/server/jobs/init.ts`
 
-API surface is under SvelteKit route handlers, with Arr, PCD import/export, health, and entity-testing endpoints.
+API surface is under SvelteKit route handlers, with Arr, PCD import/export, health, and
+entity-testing endpoints.
 
 Key references:
 
@@ -60,6 +65,8 @@ Key references:
 - PCD state is DB-first (`pcd_ops` and compiled in-memory cache), not file-first.
 - Sync behavior is Arr-aware and section-gated by app type.
 - Arr credentials are decrypted at runtime when constructing Arr clients.
+- TRaSH Guide sync is a separate entity source pipeline alongside PCD, importing community
+  configurations from TRaSH Guides git repositories and syncing them directly into Arr instances.
 
 Key references:
 
@@ -67,3 +74,4 @@ Key references:
 - `packages/praxrr-app/src/lib/server/pcd/ops/writer.ts`
 - `packages/praxrr-app/src/lib/server/sync/mappings.ts`
 - `packages/praxrr-app/src/lib/server/utils/arr/arrInstanceClients.ts`
+- `packages/praxrr-app/src/lib/server/trashguide/manager.ts`

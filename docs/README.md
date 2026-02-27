@@ -29,6 +29,7 @@ Welcome to the praxrr documentation for Arr-family workflows and implementation 
   - [Entity Testing](features/entity-testing.md)
   - [Link, Bridge, Sync](features/link-bridge-sync.md)
   - [Portable Import/Export](features/portable-import-export.md)
+  - [TRaSH Guide Sync](features/trash-guide-sync.md)
   - [Feature Guides](features/README.md)
 - **ideas/**
   - [Adaptive Backoff](ideas/adaptive-backoff.md)
@@ -260,6 +261,7 @@ Welcome to the praxrr documentation for Arr-family workflows and implementation 
 
 ## Recently Updated
 
+- [TRaSH Guide Sync](features/trash-guide-sync.md) - _2026-02-27_
 - [praxrr Documentation](README.md) - _2026-02-20_
 - [Portable Import/Export](features/portable-import-export.md) - _2026-02-20_
 - [Entity Testing](features/entity-testing.md) - _2026-02-20_

@@ -28,6 +28,13 @@ This page is a reader-oriented companion to `docs/api/v1/openapi.yaml`.
 | GET    | `/pcd/{databaseId}/lidarr-metadata-profiles/{id}` | Read metadata profile                |
 | PUT    | `/pcd/{databaseId}/lidarr-metadata-profiles/{id}` | Update metadata profile              |
 | DELETE | `/pcd/{databaseId}/lidarr-metadata-profiles/{id}` | Delete metadata profile              |
+| GET    | `/trash-guide/sources`                            | List all configured TRaSH sources    |
+| POST   | `/trash-guide/sources`                            | Create a new TRaSH source            |
+| GET    | `/trash-guide/sources/:id`                        | Get a specific TRaSH source          |
+| PUT    | `/trash-guide/sources/:id`                        | Update a TRaSH source                |
+| DELETE | `/trash-guide/sources/:id`                        | Delete a TRaSH source                |
+| POST   | `/trash-guide/sources/:id/sync`                   | Trigger manual sync for a source     |
+| GET    | `/trash-guide/sources/:id/entities`               | List cached entities for a source    |
 
 ## System
 
@@ -134,7 +141,8 @@ Semantics:
 
 ### `GET /arr/library`
 
-- Behavior applies to the selected arr app instance (`instanceId`), unless an endpoint/parameter explicitly notes Sonarr-only constraints.
+- Behavior applies to the selected arr app instance (`instanceId`), unless an endpoint/parameter
+  explicitly notes Sonarr-only constraints.
 
 Parameters:
 
@@ -147,9 +155,12 @@ Parameters:
 
 Sort keys by app type:
 
-- `radarr`: `id`, `title`, `year`, `qualityProfileName`, `qualityName`, `qualityScore`, `customFormatScore`, `progress`, `popularity`, `dateAdded`
-- `sonarr`: `id`, `title`, `year`, `qualityProfileName`, `status`, `percentOfEpisodes`, `episodeCount`, `seasonCount`, `dateAdded`
-- `lidarr`: `id`, `title`, `artistName`, `year`, `qualityProfileName`, `status`, `percentOfTracks`, `trackCount`, `dateAdded`
+- `radarr`: `id`, `title`, `year`, `qualityProfileName`, `qualityName`, `qualityScore`,
+  `customFormatScore`, `progress`, `popularity`, `dateAdded`
+- `sonarr`: `id`, `title`, `year`, `qualityProfileName`, `status`, `percentOfEpisodes`,
+  `episodeCount`, `seasonCount`, `dateAdded`
+- `lidarr`: `id`, `title`, `artistName`, `year`, `qualityProfileName`, `status`, `percentOfTracks`,
+  `trackCount`, `dateAdded`
 
 ```bash
 curl -sS \
@@ -161,9 +172,7 @@ curl -sS \
 {
   "type": "radarr",
   "items": [{ "id": 1, "title": "A Movie", "qualityProfileName": "Default" }],
-  "profilesByDatabase": [
-    { "databaseId": 1, "databaseName": "Praxrr-DB", "profiles": ["Default"] }
-  ],
+  "profilesByDatabase": [{ "databaseId": 1, "databaseName": "Praxrr-DB", "profiles": ["Default"] }],
   "page": 1,
   "pageSize": 2,
   "totalRecords": 245,
@@ -264,9 +273,7 @@ curl -sS \
 
 ```json
 {
-  "staleCustomFormats": [
-    { "id": 14, "name": "My CF [ns]", "strippedName": "My CF" }
-  ],
+  "staleCustomFormats": [{ "id": 14, "name": "My CF [ns]", "strippedName": "My CF" }],
   "staleQualityProfiles": []
 }
 ```
@@ -430,6 +437,306 @@ curl -sS -X DELETE \
 ```json
 { "success": true }
 ```
+
+## TRaSH Guide Sources
+
+### `GET /trash-guide/sources`
+
+Returns all configured TRaSH guide sources.
+
+```bash
+curl -sS \
+  -H 'X-Api-Key: <api-key>' \
+  http://localhost:5173/api/v1/trash-guide/sources | jq
+```
+
+```json
+{
+  "sources": [
+    {
+      "id": 1,
+      "name": "TRaSH Radarr",
+      "repositoryUrl": "https://github.com/TRaSH-Guides/Guides",
+      "branch": "master",
+      "arrType": "radarr",
+      "scoreProfile": "default",
+      "autoPull": true,
+      "enabled": true,
+      "syncStrategy": 360,
+      "lastSyncedAt": "2026-02-27T10:00:00Z",
+      "lastCommitHash": "abc123def456",
+      "entityCounts": {
+        "customFormats": 150,
+        "qualityProfiles": 12,
+        "qualitySizes": 3,
+        "naming": 2
+      }
+    }
+  ]
+}
+```
+
+### `POST /trash-guide/sources`
+
+Create a new TRaSH guide source.
+
+Request fields:
+
+- `name` (required string, case-insensitive unique)
+- `repositoryUrl` (required string)
+- `arrType` (required string: `radarr` or `sonarr`)
+- `branch` (optional string, default `master`)
+- `scoreProfile` (optional string)
+- `autoPull` (optional boolean)
+- `enabled` (optional boolean)
+- `syncStrategy` (optional integer, sync interval in minutes)
+
+```bash
+curl -sS \
+  -H 'Content-Type: application/json' \
+  -H 'X-Api-Key: <api-key>' \
+  -d '{
+    "name": "TRaSH Radarr",
+    "repositoryUrl": "https://github.com/TRaSH-Guides/Guides",
+    "arrType": "radarr",
+    "branch": "master",
+    "scoreProfile": "default",
+    "autoPull": true,
+    "enabled": true,
+    "syncStrategy": 360
+  }' \
+  http://localhost:5173/api/v1/trash-guide/sources | jq
+```
+
+```json
+{
+  "source": {
+    "id": 1,
+    "name": "TRaSH Radarr",
+    "repositoryUrl": "https://github.com/TRaSH-Guides/Guides",
+    "branch": "master",
+    "arrType": "radarr",
+    "scoreProfile": "default",
+    "autoPull": true,
+    "enabled": true,
+    "syncStrategy": 360,
+    "lastSyncedAt": null,
+    "lastCommitHash": null,
+    "entityCounts": {
+      "customFormats": 0,
+      "qualityProfiles": 0,
+      "qualitySizes": 0,
+      "naming": 0
+    }
+  }
+}
+```
+
+Semantics:
+
+- Returns `201` on success
+- Returns `409` if a source with the same name or repository URL already exists
+- Returns `422` for validation errors (invalid `arrType`, malformed URL)
+- Returns `502` for retryable git/network errors during initial clone
+
+### `GET /trash-guide/sources/:id`
+
+Path params:
+
+- `id` (required integer)
+
+Returns the full source object.
+
+```bash
+curl -sS \
+  -H 'X-Api-Key: <api-key>' \
+  http://localhost:5173/api/v1/trash-guide/sources/1 | jq
+```
+
+```json
+{
+  "source": {
+    "id": 1,
+    "name": "TRaSH Radarr",
+    "repositoryUrl": "https://github.com/TRaSH-Guides/Guides",
+    "branch": "master",
+    "arrType": "radarr",
+    "scoreProfile": "default",
+    "autoPull": true,
+    "enabled": true,
+    "syncStrategy": 360,
+    "lastSyncedAt": "2026-02-27T10:00:00Z",
+    "lastCommitHash": "abc123def456",
+    "entityCounts": {
+      "customFormats": 150,
+      "qualityProfiles": 12,
+      "qualitySizes": 3,
+      "naming": 2
+    }
+  }
+}
+```
+
+Semantics:
+
+- Returns `404` if the source does not exist
+
+### `PUT /trash-guide/sources/:id`
+
+Update a TRaSH guide source. At least one mutable field must be provided.
+
+Path params:
+
+- `id` (required integer)
+
+Request fields (all optional, at least one required):
+
+- `name` (string, case-insensitive unique)
+- `repositoryUrl` (string)
+- `branch` (string)
+- `scoreProfile` (string)
+- `autoPull` (boolean)
+- `enabled` (boolean)
+- `syncStrategy` (integer, sync interval in minutes)
+
+Note: `arrType` cannot be changed after creation.
+
+```bash
+curl -sS -X PUT \
+  -H 'Content-Type: application/json' \
+  -H 'X-Api-Key: <api-key>' \
+  -d '{
+    "scoreProfile": "anime",
+    "syncStrategy": 720
+  }' \
+  http://localhost:5173/api/v1/trash-guide/sources/1 | jq
+```
+
+```json
+{
+  "source": {
+    "id": 1,
+    "name": "TRaSH Radarr",
+    "repositoryUrl": "https://github.com/TRaSH-Guides/Guides",
+    "branch": "master",
+    "arrType": "radarr",
+    "scoreProfile": "anime",
+    "autoPull": true,
+    "enabled": true,
+    "syncStrategy": 720,
+    "lastSyncedAt": "2026-02-27T10:00:00Z",
+    "lastCommitHash": "abc123def456",
+    "entityCounts": {
+      "customFormats": 150,
+      "qualityProfiles": 12,
+      "qualitySizes": 3,
+      "naming": 2
+    }
+  }
+}
+```
+
+Semantics:
+
+- Returns `200` on success
+- Returns `400` if no mutable fields are provided or `arrType` change is attempted
+- Returns `404` if the source does not exist
+- Returns `409` if updated name or repository URL conflicts with another source
+- Returns `422` for validation errors
+
+### `DELETE /trash-guide/sources/:id`
+
+Path params:
+
+- `id` (required integer)
+
+```bash
+curl -sS -X DELETE \
+  -H 'X-Api-Key: <api-key>' \
+  http://localhost:5173/api/v1/trash-guide/sources/1
+```
+
+Semantics:
+
+- Returns `204` with no body on success
+- Returns `404` if the source does not exist
+
+### `POST /trash-guide/sources/:id/sync`
+
+Trigger a manual sync for a TRaSH guide source. No request body required.
+
+Path params:
+
+- `id` (required integer)
+
+```bash
+curl -sS -X POST \
+  -H 'X-Api-Key: <api-key>' \
+  http://localhost:5173/api/v1/trash-guide/sources/1/sync | jq
+```
+
+```json
+{
+  "success": true,
+  "queued": true,
+  "job": {
+    "id": "trash-sync-1-1709035200",
+    "type": "trash-guide-sync",
+    "sourceId": 1,
+    "status": "queued"
+  }
+}
+```
+
+Semantics:
+
+- Returns `200` when sync job is queued
+- Returns `404` if the source does not exist
+- Returns `409` if a sync is already running for this source
+
+### `GET /trash-guide/sources/:id/entities`
+
+List cached entities imported from a TRaSH guide source.
+
+Path params:
+
+- `id` (required integer)
+
+```bash
+curl -sS \
+  -H 'X-Api-Key: <api-key>' \
+  http://localhost:5173/api/v1/trash-guide/sources/1/entities | jq
+```
+
+```json
+{
+  "sourceId": 1,
+  "entities": {
+    "customFormats": [
+      { "name": "Repack/Proper", "trashId": "eb725d39...", "score": 5 },
+      { "name": "x265 (HD)", "trashId": "dc98083d...", "score": -10000 }
+    ],
+    "qualityProfiles": [{ "name": "SQP-1 (2160p)", "trashId": "a3d12b45..." }],
+    "qualitySizes": [{ "name": "Movie", "trashId": "c7e8f901..." }],
+    "naming": [{ "name": "Radarr Recommended", "trashId": "f1a2b3c4..." }]
+  }
+}
+```
+
+Semantics:
+
+- Returns `404` if the source does not exist
+
+### TRaSH Guide Sources Error Reference
+
+| Code | Cause                                                          |
+| ---- | -------------------------------------------------------------- |
+| 400  | Invalid request body, missing required fields, bad JSON        |
+| 404  | Source ID does not exist                                       |
+| 409  | Name or repository URL conflicts with existing source          |
+| 409  | Sync already running for the requested source (on `/sync`)     |
+| 422  | Validation error (invalid `arrType`, transform/schema failure) |
+| 502  | Retryable git clone/pull or network error                      |
 
 ## Related
 
