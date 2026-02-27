@@ -42,6 +42,12 @@ function resolveLocalRepositoryPath(repositoryUrl: string): string | null {
   return null;
 }
 
+/**
+ * Determine whether a repository URL points to a local repository source.
+ *
+ * @param repositoryUrl - Repository URL or path.
+ * @returns True if the value can be resolved as a local path.
+ */
 export function isLocalRepositorySource(repositoryUrl: string): boolean {
   return resolveLocalRepositoryPath(repositoryUrl) !== null;
 }
@@ -66,6 +72,13 @@ async function copyPathRecursive(sourcePath: string, targetPath: string): Promis
   }
 }
 
+/**
+ * Refresh an existing target directory with files from a local repository path.
+ *
+ * @param repositoryUrl - Local repository URL/path.
+ * @param targetPath - Destination directory to sync into.
+ * @throws Error when repository path is invalid or not a directory.
+ */
 export async function refreshLocalRepositoryClone(repositoryUrl: string, targetPath: string): Promise<void> {
   const localRepositoryPath = resolveLocalRepositoryPath(repositoryUrl);
   if (!localRepositoryPath) {

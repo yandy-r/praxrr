@@ -29,6 +29,11 @@ const CHANNEL_LABELS: Record<Channel, string> = {
   dev: 'Dev',
 };
 
+/**
+ * Resolve the platform from environment or browser runtime hints.
+ *
+ * @returns Best-effort detected platform string.
+ */
 function detectPlatform(): Platform {
   // Try to detect from navigator in browser
   if (typeof navigator !== 'undefined' && navigator.platform) {
@@ -45,11 +50,21 @@ function detectPlatform(): Platform {
   return 'linux-amd64';
 }
 
+/**
+ * Resolve the configured platform from Vite env or browser detection.
+ *
+ * @returns The normalized platform identifier.
+ */
 export function getPlatform(): Platform {
   const envPlatform = import.meta.env.VITE_PLATFORM as Platform | undefined;
   return envPlatform || detectPlatform();
 }
 
+/**
+ * Resolve the application update channel from environment or runtime mode.
+ *
+ * @returns The resolved channel.
+ */
 export function getChannel(): Channel {
   const envChannel = import.meta.env.VITE_CHANNEL as Channel | undefined;
   if (envChannel) return envChannel;
@@ -58,16 +73,31 @@ export function getChannel(): Channel {
   return import.meta.env.MODE === 'development' ? 'dev' : 'stable';
 }
 
+/**
+ * Return a display label for the current platform.
+ *
+ * @returns Human-readable platform label.
+ */
 export function getPlatformLabel(): string {
   const platform = getPlatform();
   return PLATFORM_LABELS[platform] || platform;
 }
 
+/**
+ * Return a display label for the current channel.
+ *
+ * @returns Human-readable channel label.
+ */
 export function getChannelLabel(): string {
   const channel = getChannel();
   return CHANNEL_LABELS[channel] || channel;
 }
 
+/**
+ * Whether version labels should be shown for the current channel.
+ *
+ * @returns False for dev channel, true for stable/beta.
+ */
 export function shouldShowVersion(): boolean {
   const channel = getChannel();
   return channel === 'stable' || channel === 'beta';

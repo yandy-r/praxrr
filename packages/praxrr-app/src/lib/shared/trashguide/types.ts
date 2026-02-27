@@ -7,10 +7,23 @@ export const TRASHGUIDE_SUPPORTED_ARR_TYPES = ['radarr', 'sonarr'] as const;
 export type TrashGuideSupportedArrType = (typeof TRASHGUIDE_SUPPORTED_ARR_TYPES)[number];
 export type TrashGuideSourceArrType = TrashGuideSupportedArrType;
 
+/**
+ * Check whether a value is a supported TRaSH-Guides entity type.
+ *
+ * @param value - Raw entity type value.
+ * @returns True when value is a valid TRaSH entity type.
+ */
 export function isTrashGuideEntityType(value: string): value is TrashGuideEntityType {
   return (TRASHGUIDE_ENTITY_TYPES as readonly string[]).includes(value);
 }
 
+/**
+ * Parse and validate a TRaSH-Guides entity type.
+ *
+ * @param value - Raw entity type value.
+ * @returns Parsed TRaSH entity type.
+ * @throws Error when the value is not a valid TRaSH entity type.
+ */
 export function parseTrashGuideEntityType(value: string): TrashGuideEntityType {
   if (isTrashGuideEntityType(value)) {
     return value;
@@ -19,10 +32,23 @@ export function parseTrashGuideEntityType(value: string): TrashGuideEntityType {
   throw new Error(`Invalid TRaSH entity type: ${value}`);
 }
 
+/**
+ * Check whether a value is a supported TRaSH-Guides arr type.
+ *
+ * @param value - Raw arr type value.
+ * @returns True when value is a valid TRaSH source arr type.
+ */
 export function isTrashGuideSupportedArrType(value: string): value is TrashGuideSupportedArrType {
   return (TRASHGUIDE_SUPPORTED_ARR_TYPES as readonly string[]).includes(value);
 }
 
+/**
+ * Parse and validate a TRaSH source Arr type.
+ *
+ * @param value - Raw arr type value.
+ * @returns Parsed Arr type used by TRaSH source records.
+ * @throws Error when the value is invalid.
+ */
 export function parseTrashGuideSourceArrType(value: string): TrashGuideSourceArrType {
   if (isTrashGuideSupportedArrType(value)) {
     return value;

@@ -13,10 +13,22 @@ export interface ArrLibraryCacheKey {
 
 export const LIBRARY_CACHE_KEY_PREFIX = 'library';
 
+/**
+ * Build a cache key namespace prefix for a specific Arr instance.
+ *
+ * @param instanceId - Arr instance identifier.
+ * @returns Cache key prefix for the instance library entries.
+ */
 export function buildArrLibraryCacheKey({ instanceId }: ArrLibraryCacheKey): string {
   return `${LIBRARY_CACHE_KEY_PREFIX}:${instanceId}:`;
 }
 
+/**
+ * Build the cache key prefix used for invalidating an Arr instance cache.
+ *
+ * @param instanceId - Arr instance identifier.
+ * @returns Cache key prefix string.
+ */
 export function getArrLibraryCachePrefix(instanceId: number): string {
   return `${LIBRARY_CACHE_KEY_PREFIX}:${instanceId}:`;
 }

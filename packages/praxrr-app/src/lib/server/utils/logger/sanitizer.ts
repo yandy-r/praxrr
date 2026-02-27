@@ -83,6 +83,12 @@ function sanitizeLogMetaInternal(value: unknown, seen: WeakSet<object>): unknown
   return sanitizedMeta;
 }
 
+/**
+ * Sanitize log metadata by redacting sensitive values and keys.
+ *
+ * @param meta - Value to sanitize.
+ * @returns A sanitized copy with sensitive material redacted.
+ */
 export function sanitizeLogMeta(meta: unknown): unknown {
   return sanitizeLogMetaInternal(meta, new WeakSet());
 }

@@ -81,12 +81,24 @@ export const LIDARR_MEDIA_MANAGEMENT_PORTABLE_MATRIX: Record<
   },
 } as const;
 
+/**
+ * Checks whether an entity type is a valid Lidarr-compatible portable media-management type.
+ *
+ * @param entityType - The entity type to validate.
+ * @returns True when the entity type is Lidarr media-management compatible.
+ */
 export function isLidarrMediaManagementPortableEntityType(
   entityType: string
 ): entityType is LidarrMediaManagementPortableEntityType {
   return (LIDARR_MEDIA_MANAGEMENT_PORTABLE_ENTITIES as readonly string[]).includes(entityType);
 }
 
+/**
+ * Resolves Lidarr media-management portability metadata for a portable entity type.
+ *
+ * @param entityType - Any portable entity type.
+ * @returns Matching portability entry, or null when unsupported.
+ */
 export function getLidarrMediaManagementPortableEntry(entityType: EntityType) {
   if (!isLidarrMediaManagementPortableEntityType(entityType)) {
     return null;
@@ -158,6 +170,12 @@ function formatMigrationRequiredMessage(path: string): string {
   return `${path}.format must be one of: ${PORTABLE_MIGRATION_FORMATS.join(', ')}`;
 }
 
+/**
+ * Validate optional migration metadata attached to portable payloads.
+ *
+ * @param migration - Unknown payload to validate.
+ * @returns Null when valid; otherwise a human-readable error string.
+ */
 export function validatePortableMigrationMetadata(migration: unknown): string | null {
   if (migration === null || typeof migration !== 'object' || Array.isArray(migration)) {
     return 'migration must be an object';

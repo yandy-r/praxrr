@@ -34,6 +34,13 @@ const COLON_REPLACEMENT_TO_DB: Record<SonarrColonReplacementFormat, number> = {
   custom: 5,
 };
 
+/**
+ * Convert a Sonarr colon replacement DB value to its API-facing string label.
+ *
+ * @param value - Integer enum value from Sonarr DB.
+ * @returns Human-readable Sonarr colon replacement format.
+ * @throws Error when the DB value has no mapped replacement format.
+ */
 export function colonReplacementFromDb(value: number): SonarrColonReplacementFormat {
   const mappedValue = COLON_REPLACEMENT_FROM_DB[value];
   if (mappedValue === undefined) {
@@ -42,6 +49,12 @@ export function colonReplacementFromDb(value: number): SonarrColonReplacementFor
   return mappedValue;
 }
 
+/**
+ * Convert a Sonarr colon replacement format into its DB integer value.
+ *
+ * @param value - Human-readable Sonarr colon replacement format.
+ * @returns Database integer value.
+ */
 export function colonReplacementToDb(value: SonarrColonReplacementFormat): number {
   return COLON_REPLACEMENT_TO_DB[value] ?? 0;
 }
@@ -59,6 +72,12 @@ export const SONARR_COLON_REPLACEMENT_OPTIONS: {
   { value: 'custom', label: 'Custom' },
 ];
 
+/**
+ * Resolve a UI label for a Sonarr colon replacement format.
+ *
+ * @param value - Colon replacement format enum.
+ * @returns Display label text.
+ */
 export function getColonReplacementLabel(value: SonarrColonReplacementFormat): string {
   const option = SONARR_COLON_REPLACEMENT_OPTIONS.find((o) => o.value === value);
   return option?.label ?? value;
@@ -90,6 +109,13 @@ const MULTI_EPISODE_TO_DB: Record<MultiEpisodeStyle, number> = {
   prefixedRange: 5,
 };
 
+/**
+ * Convert a Sonarr multi-episode style DB value to API-facing format.
+ *
+ * @param value - Integer enum value from DB.
+ * @returns Multi-episode style enum value.
+ * @throws Error when the DB value has no mapped style.
+ */
 export function multiEpisodeStyleFromDb(value: number): MultiEpisodeStyle {
   const mappedValue = MULTI_EPISODE_FROM_DB[value];
   if (mappedValue === undefined) {
@@ -98,6 +124,12 @@ export function multiEpisodeStyleFromDb(value: number): MultiEpisodeStyle {
   return mappedValue;
 }
 
+/**
+ * Convert a Sonarr multi-episode style enum into DB integer format.
+ *
+ * @param value - Multi-episode style value.
+ * @returns Integer representation used by Sonarr DB.
+ */
 export function multiEpisodeStyleToDb(value: MultiEpisodeStyle): number {
   return MULTI_EPISODE_TO_DB[value] ?? 0;
 }
@@ -115,6 +147,12 @@ export const MULTI_EPISODE_STYLE_OPTIONS: {
   { value: 'prefixedRange', label: 'Prefixed Range' },
 ];
 
+/**
+ * Resolve a UI label for a Sonarr multi-episode style.
+ *
+ * @param value - Multi-episode style value.
+ * @returns Display label text.
+ */
 export function getMultiEpisodeStyleLabel(value: MultiEpisodeStyle): string {
   const option = MULTI_EPISODE_STYLE_OPTIONS.find((o) => o.value === value);
   return option?.label ?? value;
@@ -138,6 +176,12 @@ export const RADARR_COLON_REPLACEMENT_OPTIONS: {
   { value: 'smart', label: 'Smart Replace' },
 ];
 
+/**
+ * Resolve a UI label for a Radarr colon replacement format.
+ *
+ * @param value - Radarr colon replacement format.
+ * @returns Display label text.
+ */
 export function getRadarrColonReplacementLabel(value: RadarrColonReplacementFormat): string {
   const option = RADARR_COLON_REPLACEMENT_OPTIONS.find((o) => o.value === value);
   return option?.label ?? value;
@@ -172,6 +216,12 @@ export const PROPERS_REPACKS_OPTIONS: {
   },
 ];
 
+/**
+ * Resolve a UI label for propers/repacks policy.
+ *
+ * @param value - Propers/repacks enum value.
+ * @returns Display label text.
+ */
 export function getPropersRepacksLabel(value: PropersRepacks): string {
   const option = PROPERS_REPACKS_OPTIONS.find((o) => o.value === value);
   return option?.label ?? value;
