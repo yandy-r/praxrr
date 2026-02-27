@@ -1,14 +1,31 @@
 <script lang="ts">
 	import ActionsBar from '$ui/actions/ActionsBar.svelte';
 	import SearchAction from '$ui/actions/SearchAction.svelte';
+	import SourceFilterAction from '$ui/actions/SourceFilterAction.svelte';
 	import Table from '$ui/table/Table.svelte';
 	import { createSearchStore } from '$lib/client/stores/search.ts';
 	import type { Column, SortState } from '$ui/table/types.ts';
 	import { browser } from '$app/environment';
 	import { page } from '$app/stores';
+	import type { PageData } from './$types';
+	import type { QualityProfileTableRow } from '$shared/pcd/display.ts';
+	import {
+		allSourceKeys,
+		filterBySourceSelection,
+		isSourceFilterActive,
+		loadSourceSelection,
+		normalizeSourceSelection,
+		sameSelection,
+		toSourceFilterKey,
+		type SourceFilterSelection,
+	} from '$lib/client/utils/sourceFilter.ts';
 
-	$: source = $page.data.source;
-	$: qualityProfiles = $page.data.qualityProfiles ?? [];
+	export let data: PageData;
+
+	const SOURCE_FILTER_STORAGE_PREFIX = 'trashQualityProfilesSourceFilter';
+	let selectedSourceKeys: SourceFilterSelection = [];
+	let initializedSourceFilterKey = '';
+	let sourceFilterStorageKey = '';
 
 	const search = createSearchStore();
 	const debouncedQuery = search.debouncedQuery;
@@ -16,19 +33,105 @@
 	let initialSort: SortState | null = null;
 	let sortState: SortState | null = null;
 
-	function readSortFromUrl(): SortState | null {
-		const key = $page.url.searchParams.get('sort')?.trim();
-		if (key !== 'name') return null;
+	$: qualityProfiles = data.qualityProfiles ?? [];
+	$: availableSources = data.sourceContext.availableSources;
+	$: sourceFilterDisabledReason = data.sourceContext.filterDisabledReason;
+	$: fallbackSourceKey = toSourceFilterKey({
+		type: 'trash',
+		id: data.source.id,
+	});
+	$: sourceFilterStorageKey = `${SOURCE_FILTER_STORAGE_PREFIX}:${data.source.id}`;
 
-		return {
-			key,
-			direction: $page.url.searchParams.get('dir') === 'desc' ? 'desc' : 'asc'
-		};
+	$: if (initializedSourceFilterKey !== sourceFilterStorageKey) {
+		initializedSourceFilterKey = sourceFilterStorageKey;
+		selectedSourceKeys = loadSourceSelection(
+			sourceFilterStorageKey,
+			availableSources,
+			data.sourceContext.defaultSourceKey,
+			true
+		);
 	}
 
-	function updateUrlState(query: string, sort: SortState | null): void {
+	$: {
+		const normalized = normalizeSourceSelection(
+			selectedSourceKeys,
+			availableSources,
+			data.sourceContext.defaultSourceKey,
+			true
+		);
+		if (!sameSelection(normalized, selectedSourceKeys)) {
+			selectedSourceKeys = normalized;
+		}
+	}
+
+	$: if (browser && initializedSourceFilterKey === sourceFilterStorageKey) {
+		localStorage.setItem(sourceFilterStorageKey, JSON.stringify(selectedSourceKeys));
+	}
+
+	$: filtered = $debouncedQuery
+		? qualityProfiles.filter((profile) =>
+				profile.name.toLowerCase().includes($debouncedQuery.toLowerCase())
+			)
+		: qualityProfiles;
+	$: sourceFiltered = filterBySourceSelection(filtered, selectedSourceKeys, fallbackSourceKey);
+	$: sourceFilterActive = isSourceFilterActive(selectedSourceKeys, availableSources);
+	$: hasSearchQuery = $debouncedQuery.trim().length > 0;
+	$: showSourceClearAction = sourceFilterActive && availableSources.length > 1;
+	$: emptyMessage = sourceFilterActive
+		? hasSearchQuery
+			? 'No quality profiles match your search and selected sources'
+			: 'No quality profiles match your selected sources'
+		: 'No quality profiles match your search';
+	$: columns = [
+		data.sourceContext.showAllSourcesTab
+			? {
+					key: 'sourceDatabaseName',
+					header: 'Source',
+					sortable: true
+				}
+			: null,
+		{
+			key: 'name',
+			header: 'Name',
+			sortable: true
+		},
+		{
+			key: 'upgrades_allowed',
+			header: 'Upgrades',
+			align: 'center' as const,
+			cell: (row: QualityProfileTableRow) => (row.upgrades_allowed ? 'Yes' : 'No')
+		},
+		{
+			key: 'custom_formats',
+			header: 'CF Scores',
+			align: 'center' as const,
+			cell: (row: QualityProfileTableRow) => String(row.custom_formats?.total ?? 0)
+		},
+		{
+			key: 'language',
+			header: 'Language',
+			cell: (row: QualityProfileTableRow) => row.language?.name ?? 'Any'
+		}
+	].filter(Boolean) as Column<QualityProfileTableRow>[];
+
+	$: if (!initializedFromUrl) {
+		const initialQuery = $page.url.searchParams.get('q')?.trim() ?? '';
+		if (initialQuery.length > 0) {
+			search.setQuery(initialQuery);
+		}
+
+		const key = $page.url.searchParams.get('sort')?.trim();
+		initialSort = key === 'name' || key === 'sourceDatabaseName' ? {
+			key,
+			direction: $page.url.searchParams.get('dir') === 'desc' ? 'desc' : 'asc'
+		} : null;
+		sortState = initialSort;
+		initializedFromUrl = true;
+	}
+
+	$: if (browser && initializedFromUrl) {
 		const url = new URL(window.location.href);
-		const nextQuery = query.trim();
+		const nextQuery = $debouncedQuery.trim();
 
 		if (nextQuery) {
 			url.searchParams.set('q', nextQuery);
@@ -36,9 +139,9 @@
 			url.searchParams.delete('q');
 		}
 
-		if (sort) {
-			url.searchParams.set('sort', sort.key);
-			url.searchParams.set('dir', sort.direction);
+		if (sortState) {
+			url.searchParams.set('sort', sortState.key);
+			url.searchParams.set('dir', sortState.direction);
 		} else {
 			url.searchParams.delete('sort');
 			url.searchParams.delete('dir');
@@ -55,69 +158,61 @@
 		sortState = nextSort;
 	}
 
-	$: if (!initializedFromUrl) {
-		const initialQuery = $page.url.searchParams.get('q')?.trim() ?? '';
-		if (initialQuery.length > 0) {
-			search.setQuery(initialQuery);
-		}
-
-		initialSort = readSortFromUrl();
-		sortState = initialSort;
-		initializedFromUrl = true;
+	function clearSourceFilters() {
+		selectedSourceKeys = allSourceKeys(availableSources);
 	}
-
-	$: if (browser && initializedFromUrl) {
-		updateUrlState($debouncedQuery, sortState);
-	}
-
-	$: filtered = $debouncedQuery
-		? qualityProfiles.filter(
-				(qp: any) => qp.name.toLowerCase().includes($debouncedQuery.toLowerCase())
-			)
-		: qualityProfiles;
-
-	$: columns = [
-		{
-			key: 'name',
-			header: 'Name',
-			sortable: true
-		},
-		{
-			key: 'upgrades_allowed',
-			header: 'Upgrades',
-			align: 'center' as const,
-			cell: (row: any) => (row.upgrades_allowed ? 'Yes' : 'No')
-		},
-		{
-			key: 'custom_formats',
-			header: 'CF Scores',
-			align: 'center' as const,
-			cell: (row: any) => String(row.custom_formats?.total ?? 0)
-		},
-		{
-			key: 'language',
-			header: 'Language',
-			cell: (row: any) => row.language?.name ?? 'Any'
-		}
-	] satisfies Column<any>[];
 </script>
 
 <svelte:head>
-	<title>Quality Profiles - {source?.name ?? 'TRaSH Source'} - Praxrr</title>
+	<title>Quality Profiles - {data.source?.name ?? 'TRaSH Source'} - Praxrr</title>
 </svelte:head>
 
 <div class="mt-6 space-y-4">
 	<ActionsBar>
 		<SearchAction searchStore={search} placeholder="Search quality profiles..." responsive />
+		<div title={sourceFilterDisabledReason ?? undefined}>
+			<SourceFilterAction
+				sources={availableSources}
+				bind:selectedKeys={selectedSourceKeys}
+				disabled={Boolean(sourceFilterDisabledReason)}
+				ariaLabel="Filter quality profiles by source"
+				responsive
+			/>
+		</div>
 	</ActionsBar>
 
-	<Table
-		{columns}
-		data={filtered}
-		rowHref={(row) => `/databases/trash/${source?.id}/quality-profiles/${row.trashId}/`}
-		emptyMessage="No quality profiles cached. Try syncing the source."
-		responsive
-		{initialSort}
-		onSortChange={handleSortChange}
-	/>
+	{#if qualityProfiles.length === 0}
+		<div
+			class="rounded-lg border border-neutral-200 bg-white p-8 text-center dark:border-neutral-800 dark:bg-neutral-900"
+		>
+			<p class="text-neutral-600 dark:text-neutral-400">No quality profiles cached. Try syncing sources.</p>
+		</div>
+	{:else if sourceFiltered.length === 0}
+		<div
+			class="rounded-lg border border-neutral-200 bg-white p-8 text-center dark:border-neutral-800 dark:bg-neutral-900"
+		>
+			<p class="text-neutral-600 dark:text-neutral-400">{emptyMessage}</p>
+			{#if showSourceClearAction}
+				<button
+					type="button"
+					class="mt-3 text-sm font-medium text-accent-700 transition-colors hover:text-accent-600 dark:text-accent-300 dark:hover:text-accent-200"
+					on:click={clearSourceFilters}
+				>
+					Clear source filters
+				</button>
+			{/if}
+		</div>
+	{:else}
+		<Table
+			{columns}
+			data={sourceFiltered}
+			rowHref={(row) =>
+				`/databases/trash/${row.sourceDatabaseId ?? data.source.id}/quality-profiles/${row.trashId}/`
+			}
+			emptyMessage="No quality profiles cached. Try syncing sources."
+			responsive
+			{initialSort}
+			onSortChange={handleSortChange}
+		/>
+	{/if}
 </div>

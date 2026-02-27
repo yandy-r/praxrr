@@ -3,24 +3,57 @@ import { trashGuideEntityCacheQueries } from '$db/queries/trashGuideEntityCache.
 import { toSourcedQualityProfileRow, type TrashGuideSourceRef } from '$lib/server/trashguide/displayTransform.ts';
 import { isTrashGuideSupportedArrType } from '$lib/server/trashguide/types.ts';
 import type { QualityProfileTableRow } from '$shared/pcd/display.ts';
+import { logger } from '$logger/logger.ts';
+import { buildSourceContext, listTrashSourcesSafely, sortRowsByNameAndSource } from '$server/utils/sourceContext.ts';
+import { type TrashGuideSourceResponse, trashGuideManager } from '$lib/server/trashguide/manager.ts';
 
 export const load: ServerLoad = async ({ parent }) => {
   const { source } = await parent();
 
-  if (!isTrashGuideSupportedArrType(source.arrType)) {
-    return { qualityProfiles: [] as QualityProfileTableRow[] };
-  }
+  const allTrashSources = listTrashSourcesSafely<TrashGuideSourceResponse>({
+    listSources: () => trashGuideManager.listSources(),
+    onDatabaseNotInitialized: (error) => {
+      void logger.warn('TRaSH sources not available: database is not initialized', {
+        source: 'databases/trash:quality-profiles',
+        meta: { error: error.message },
+      });
+    },
+  });
+  const supportedTrashSources = allTrashSources.filter((trashSource): trashSource is TrashGuideSourceResponse =>
+    isTrashGuideSupportedArrType(trashSource.arrType)
+  );
+  const sourceContext = buildSourceContext(
+    [],
+    source,
+    supportedTrashSources,
+    (trashSource) => trashSource.entityCounts.qualityProfiles,
+    (trashSource) => trashSource.name,
+    'quality profiles'
+  );
 
-  const sourceRef: TrashGuideSourceRef = {
-    id: source.id,
-    name: source.name,
-    arrType: source.arrType,
-  };
+  const rows = supportedTrashSources.flatMap((trashSource) => {
+    const sourceRef: TrashGuideSourceRef = {
+      id: trashSource.id,
+      name: trashSource.name,
+      arrType: trashSource.arrType,
+    };
 
-  const cacheRows = trashGuideEntityCacheQueries.getBySourceAndType(source.id, 'quality_profile');
-  const qualityProfiles = cacheRows
-    .map((cache) => toSourcedQualityProfileRow(cache, sourceRef))
-    .filter((row): row is QualityProfileTableRow => row !== null);
+    return trashGuideEntityCacheQueries
+      .getBySourceAndType(trashSource.id, 'quality_profile')
+      .map((cache) => toSourcedQualityProfileRow(cache, sourceRef))
+      .filter((row): row is QualityProfileTableRow => row !== null);
+  });
 
-  return { qualityProfiles };
+  const qualityProfiles = sortRowsByNameAndSource(rows, (a, b) => {
+    const sourceA = a.sourceDatabaseName ?? '';
+    const sourceB = b.sourceDatabaseName ?? '';
+    const bySource = sourceA.localeCompare(sourceB, undefined, { sensitivity: 'base' });
+    if (bySource !== 0) {
+      return bySource;
+    }
+
+    return a.id - b.id;
+  });
+
+  return { qualityProfiles, sourceContext };
 };
