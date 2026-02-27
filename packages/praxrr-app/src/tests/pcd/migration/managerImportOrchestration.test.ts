@@ -2,8 +2,10 @@ import { assertEquals, assertRejects } from '@std/assert';
 import { pcdOpsQueries } from '$db/queries/pcdOps.ts';
 import {
   __testOnly_resetCompile,
+  __testOnly_resetBuildPublishedRepoBaseOpIndex,
   __testOnly_resetGetCache,
   __testOnly_resetReadMigrationEntitySources,
+  __testOnly_setBuildPublishedRepoBaseOpIndex,
   __testOnly_resetWithRepoImportWriteContext,
   importBaseOps,
   __testOnly_setCompile,
@@ -93,6 +95,11 @@ Deno.test('pcdManager: import orchestration surfaces import failures directly', 
       },
       restores
     );
+    __testOnly_setBuildPublishedRepoBaseOpIndex(() => ({
+      stableIdentityToOpIds: new Map(),
+      legacyIdentityToOpIds: new Map(),
+    }));
+    restores.push(__testOnly_resetBuildPublishedRepoBaseOpIndex);
     __testOnly_setReadMigrationEntitySources(() => Promise.resolve({ candidates: [candidate], issues: [] }));
     restores.push(__testOnly_resetReadMigrationEntitySources);
     __testOnly_setCompile(() => Promise.resolve({ schema: 0, base: 0, tweaks: 0, user: 0, timing: 0 }));
@@ -149,6 +156,11 @@ Deno.test('pcdManager: successful migration import still continues orchestration
       },
       restores
     );
+    __testOnly_setBuildPublishedRepoBaseOpIndex(() => ({
+      stableIdentityToOpIds: new Map(),
+      legacyIdentityToOpIds: new Map(),
+    }));
+    restores.push(__testOnly_resetBuildPublishedRepoBaseOpIndex);
     __testOnly_setReadMigrationEntitySources(() => Promise.resolve({ candidates: [candidate], issues: [] }));
     restores.push(__testOnly_resetReadMigrationEntitySources);
     __testOnly_setCompile(() => Promise.resolve({ schema: 0, base: 0, tweaks: 0, user: 0, timing: 0 }));
