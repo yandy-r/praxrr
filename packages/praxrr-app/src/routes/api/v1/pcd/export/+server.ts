@@ -30,6 +30,16 @@ export const _serializeDependencies = {
 
 const VALID_ENTITY_TYPES: ReadonlySet<string> = new Set(ENTITY_TYPES);
 
+/**
+ * GET /api/v1/pcd/export
+ *
+ * Export a portable representation of a single PCD entity for migration/import workflows.
+ *
+ * Query params:
+ * - databaseId: target PCD database ID (required)
+ * - entityType: portable entity type (required)
+ * - name: entity name (required)
+ */
 export const GET: RequestHandler = async ({ url }) => {
   const databaseIdParam = url.searchParams.get('databaseId');
   const entityType = url.searchParams.get('entityType');

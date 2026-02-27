@@ -1,6 +1,8 @@
 /**
- * Generate a UUID v4, with fallback for non-secure contexts (HTTP)
- * crypto.randomUUID() requires HTTPS or localhost
+ * Generate a UUID v4.
+ *
+ * Uses `crypto.randomUUID()` when available and falls back to a pseudo-random
+ * formatter in non-secure contexts.
  */
 export function uuid(): string {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {

@@ -49,6 +49,18 @@ export const _deserializeDependencies = {
 
 const VALID_ENTITY_TYPES: ReadonlySet<string> = new Set(ENTITY_TYPES);
 
+/**
+ * POST /api/v1/pcd/import
+ *
+ * Import a portable PCD entity into a selected database and operation layer.
+ *
+ * Body (required):
+ * - databaseId: target PCD database ID
+ * - layer: 'base' or 'user'
+ * - entityType: portable entity type
+ * - data: portable entity payload
+ * - migration: optional migration metadata
+ */
 export const POST: RequestHandler = async ({ request }) => {
   let body: Record<string, unknown>;
   try {

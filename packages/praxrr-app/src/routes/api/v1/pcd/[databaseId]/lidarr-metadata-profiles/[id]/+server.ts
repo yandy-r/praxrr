@@ -333,6 +333,15 @@ function getReadErrorStatus(message: string): number {
   return 500;
 }
 
+/**
+ * GET /api/v1/pcd/{databaseId}/lidarr-metadata-profiles/{id}
+ *
+ * Fetch the details for a single Lidarr metadata profile.
+ *
+ * Path params:
+ * - databaseId: PCD database ID
+ * - id: numeric profile ID
+ */
 export const GET: RequestHandler = async ({ params }) => {
   const databaseIdResult = parseDatabaseId(params.databaseId, 'databaseId');
   if ('error' in databaseIdResult) {
@@ -377,6 +386,23 @@ export const GET: RequestHandler = async ({ params }) => {
   }
 };
 
+/**
+ * PUT /api/v1/pcd/{databaseId}/lidarr-metadata-profiles/{id}
+ *
+ * Update an existing Lidarr metadata profile.
+ *
+ * Path params:
+ * - databaseId: PCD database ID
+ * - id: numeric profile ID
+ *
+ * Body:
+ * - layer: 'base' or 'user' (required)
+ * - name: optional updated profile name
+ * - description: optional profile description
+ * - primaryTypes: optional updated primary types
+ * - secondaryTypes: optional updated secondary types
+ * - releaseStatuses: optional updated release statuses
+ */
 export const PUT: RequestHandler = async ({ params, request }) => {
   const databaseIdResult = parseDatabaseId(params.databaseId, 'databaseId');
   if ('error' in databaseIdResult) {
@@ -470,6 +496,19 @@ export const PUT: RequestHandler = async ({ params, request }) => {
   }
 };
 
+/**
+ * DELETE /api/v1/pcd/{databaseId}/lidarr-metadata-profiles/{id}
+ *
+ * Delete a Lidarr metadata profile after validating name match.
+ *
+ * Path params:
+ * - databaseId: PCD database ID
+ * - id: numeric profile ID
+ *
+ * Body:
+ * - layer: 'base' or 'user'
+ * - name: profile name to confirm deletion
+ */
 export const DELETE: RequestHandler = async ({ params, request }) => {
   const databaseIdResult = parseDatabaseId(params.databaseId, 'databaseId');
   if ('error' in databaseIdResult) {
