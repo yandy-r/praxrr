@@ -22,7 +22,13 @@ export const load: ServerLoad = async ({ params, parent }) => {
     error(500, 'Failed to parse quality profile data');
   }
 
-  const cfByTrashId = buildCustomFormatLookup(source.id);
+  const referencedCustomFormatIds: string[] = [];
+  for (const item of entity.format_items) {
+    if (item.custom_format_trash_id !== null) {
+      referencedCustomFormatIds.push(item.custom_format_trash_id);
+    }
+  }
+  const cfByTrashId = buildCustomFormatLookup(source.id, referencedCustomFormatIds);
   const scoreSet = entity.score_set?.trim() || 'default';
 
   const scoringItems = entity.format_items.map((item) => {
@@ -44,15 +50,24 @@ export const load: ServerLoad = async ({ params, parent }) => {
   return { entity, scoringItems };
 };
 
-function buildCustomFormatLookup(sourceId: number): Map<string, TrashGuideCustomFormatEntity> {
-  const cfCacheRows = trashGuideEntityCacheQueries.getBySourceAndType(sourceId, 'custom_format');
+function buildCustomFormatLookup(
+  sourceId: number,
+  referencedCustomFormatIds: string[]
+): Map<string, TrashGuideCustomFormatEntity> {
+  const cfCacheRows = trashGuideEntityCacheQueries.getBySourceTypeAndTrashIds(
+    sourceId,
+    'custom_format',
+    referencedCustomFormatIds
+  );
   const lookup = new Map<string, TrashGuideCustomFormatEntity>();
 
   for (const row of cfCacheRows) {
     const cf = parseCachedEntity(row, 'custom_format');
-    if (cf) {
-      lookup.set(row.trashId.toLowerCase(), cf);
+    if (!cf) {
+      throw new Error(`Malformed custom format cache row for TRaSH id "${row.trashId}"`);
     }
+
+    lookup.set(row.trashId, cf);
   }
 
   return lookup;

@@ -1,6 +1,7 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from '@sveltejs/kit';
 import { trashGuideEntityCacheQueries } from '$db/queries/trashGuideEntityCache.ts';
+import { parseCachedEntity } from '$lib/server/trashguide/displayTransform.ts';
 import { trashGuideManager } from '$lib/server/trashguide/manager.ts';
 import { isTrashGuideEntityType, type TrashGuideEntityType } from '$shared/trashguide/types.ts';
 import { logTrashGuideRouteError, mapReadErrorStatus, parseSourceId, toErrorMessage } from '../../_helpers.ts';
@@ -63,15 +64,9 @@ export const GET: RequestHandler = async ({ params, url }) => {
       return json({ error: `Entity not found: trashId=${trashId} type=${entityType}` }, { status: 404 });
     }
 
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(entity.jsonData);
-    } catch {
-      throw new Error(`Invalid TRaSH cached JSON for source=${sourceId} trashId=${trashId}`);
-    }
-
-    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-      throw new Error(`Unexpected TRaSH cached payload shape for source=${sourceId} trashId=${trashId}`);
+    const parsed = parseCachedEntity(entity, entityType);
+    if (!parsed) {
+      throw new Error(`Invalid TRaSH cached payload for source=${sourceId} trashId=${trashId} type=${entityType}`);
     }
 
     return json({
@@ -81,7 +76,7 @@ export const GET: RequestHandler = async ({ params, url }) => {
       name: entity.name,
       filePath: entity.filePath,
       fetchedAt: entity.fetchedAt,
-      entity: parsed as Record<string, unknown>,
+      entity: parsed,
     });
   } catch (error) {
     await logTrashGuideRouteError(error, `Failed to fetch TRaSH entity trashId=${trashId} source=${sourceId}`);

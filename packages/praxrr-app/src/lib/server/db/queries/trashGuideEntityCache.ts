@@ -63,6 +63,10 @@ export interface TrashGuideEntityCacheHash {
   filePath: string;
 }
 
+function normalizeTrashId(trashId: string): string {
+  return trashId.trim().toLowerCase();
+}
+
 function assertRowSource(entity: TrashGuideEntityCacheInput, expectedSourceId: number): void {
   if (entity.sourceId !== expectedSourceId) {
     throw new Error(`TRaSH entity source_id mismatch: expected ${expectedSourceId}, got ${entity.sourceId}`);
@@ -73,7 +77,7 @@ function rowToCache(row: TrashGuideEntityCacheRow): TrashGuideEntityCache {
   return {
     id: row.id,
     sourceId: row.source_id,
-    trashId: row.trash_id,
+    trashId: normalizeTrashId(row.trash_id),
     entityType: parseTrashGuideEntityType(row.entity_type),
     name: row.name,
     jsonData: row.json_data,
@@ -97,7 +101,7 @@ function rowToCacheWithSource(row: TrashGuideEntityCacheWithSourceRow): TrashGui
 
 function rowToHash(row: TrashGuideEntityCacheRow): TrashGuideEntityCacheHash {
   return {
-    trashId: row.trash_id,
+    trashId: normalizeTrashId(row.trash_id),
     entityType: parseTrashGuideEntityType(row.entity_type),
     contentHash: row.content_hash,
     filePath: row.file_path,
@@ -109,6 +113,11 @@ export const trashGuideEntityCacheQueries = {
    * Upsert a single parsed entity.
    */
   upsert(entity: TrashGuideEntityCacheInput): number {
+    const normalizedTrashId = normalizeTrashId(entity.trashId);
+    if (!normalizedTrashId) {
+      throw new Error('TRaSH entity trash_id must be non-empty');
+    }
+
     return db.execute(
       `INSERT INTO trash_guide_entity_cache (source_id, trash_id, entity_type, name, json_data, file_path, content_hash)
        VALUES (?, ?, ?, ?, ?, ?, ?)
@@ -119,7 +128,7 @@ export const trashGuideEntityCacheQueries = {
          file_path = excluded.file_path,
          content_hash = excluded.content_hash`,
       entity.sourceId,
-      entity.trashId,
+      normalizedTrashId,
       entity.entityType,
       entity.name,
       entity.jsonData,
@@ -242,15 +251,47 @@ export const trashGuideEntityCacheQueries = {
   },
 
   /**
+   * Get cached entities by source, section, and a scoped set of TRaSH ids.
+   */
+  getBySourceTypeAndTrashIds(
+    sourceId: number,
+    entityType: TrashGuideEntityType,
+    trashIds: string[]
+  ): TrashGuideEntityCache[] {
+    const normalizedTrashIds = [...new Set(trashIds.map(normalizeTrashId).filter((trashId) => trashId.length > 0))];
+    if (normalizedTrashIds.length === 0) {
+      return [];
+    }
+
+    const placeholders = normalizedTrashIds.map(() => '?').join(', ');
+    return db
+      .query<TrashGuideEntityCacheRow>(
+        `SELECT *
+         FROM trash_guide_entity_cache
+         WHERE source_id = ? AND entity_type = ? AND trash_id IN (${placeholders})
+         ORDER BY name ASC`,
+        sourceId,
+        entityType,
+        ...normalizedTrashIds
+      )
+      .map(rowToCache);
+  },
+
+  /**
    * Get a single cached entity by key.
    */
   getByKey(sourceId: number, trashId: string, entityType: TrashGuideEntityType): TrashGuideEntityCache | undefined {
+    const normalizedTrashId = normalizeTrashId(trashId);
+    if (!normalizedTrashId) {
+      return undefined;
+    }
+
     const row = db.queryFirst<TrashGuideEntityCacheRow>(
       `SELECT *
        FROM trash_guide_entity_cache
        WHERE source_id = ? AND trash_id = ? AND entity_type = ?`,
       sourceId,
-      trashId,
+      normalizedTrashId,
       entityType
     );
 
@@ -303,12 +344,17 @@ export const trashGuideEntityCacheQueries = {
    * Get change decision for a specific cached entity.
    */
   hasContentChanged(sourceId: number, trashId: string, entityType: TrashGuideEntityType, contentHash: string): boolean {
+    const normalizedTrashId = normalizeTrashId(trashId);
+    if (!normalizedTrashId) {
+      return false;
+    }
+
     const row = db.queryFirst<{ content_hash: string }>(
       `SELECT content_hash
        FROM trash_guide_entity_cache
        WHERE source_id = ? AND trash_id = ? AND entity_type = ?`,
       sourceId,
-      trashId,
+      normalizedTrashId,
       entityType
     );
 
