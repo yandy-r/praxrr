@@ -20,7 +20,7 @@ const VALID_ENTITY_TYPES: ReadonlySet<string> = new Set(['custom_format', 'quali
  *
  * @param {{ params: { id?: string }; url: URL }} event - Route event.
  * @param {string | undefined} event.params.id - Source id.
- * @param {URL} event.url - Query string with optional type/search/cursor/offset.
+ * @param {URL} event.url - Request URL with optional entity filters (`type`, `search`, `arrType`, `cursor`, `offset`).
  * @returns {Promise<Response>} JSON response with paged entity list.
  * @throws {never} Validation failures are returned as JSON error responses.
  */

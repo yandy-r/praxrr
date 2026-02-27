@@ -34,9 +34,7 @@ function formatBytes(bytes: number): string {
  *
  * Return system health status with component-level details.
  *
- * @param {{ url: URL }} event - Incoming request event containing query params.
- * @param {URL} event.url - Request URL.
- * @param {string | null} event.url.searchParams - Optional verbose query parameter.
+ * @param {URL} url - Request URL, including optional `verbose=true` query param.
  * @returns {Promise<Response>} JSON response with health status and details.
  * @throws {Error} Throws if component checks fail unexpectedly.
  */
