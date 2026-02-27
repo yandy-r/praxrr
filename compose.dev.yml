@@ -70,6 +70,8 @@ services:
           path: ./deno.json
         - action: rebuild
           path: ./Dockerfile
+        - action: restart
+          path: ./cmpose.dev.yml
 
   parser:
     build:
