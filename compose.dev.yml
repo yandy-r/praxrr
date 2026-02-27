@@ -1,5 +1,5 @@
 # Development compose - builds from source
-# Usage: docker compose -f compose.dev.yml up --build
+# Usage: docker compose -f compose.dev.yml up --build --watch
 
 services:
   praxrr:
@@ -8,9 +8,11 @@ services:
       dockerfile: Dockerfile
     container_name: praxrr-dev
     ports:
-      - '6970:6868'
+      - '6969:6868'
     volumes:
       - ./config:/config
+      - ./packages/praxrr-db:/praxrr-db # Optional: bind mount for local db development
+      - ./packages/praxrr-schema:/schema # Optional: bind mount for local schema development
     environment:
       - PUID=${PUID:-1000}
       - PGID=${PGID:-1000}
@@ -20,41 +22,54 @@ services:
       # - HOST=0.0.0.0
       - PARSER_HOST=parser
       - PARSER_PORT=5000
-      # - AUTH=off
-      - PRAXRR_DEFAULT_DB_URL=${PRAXRR_DEFAULT_DB_URL:-https://github.com/yandy-r/praxrr-db}
+      - AUTH=off
+      - PRAXRR_DEFAULT_DB_URL=/praxrr-db # Optional: can be set to a local path or remote URL
       - PRAXRR_DEFAULT_DB_BRANCH=${PRAXRR_DEFAULT_DB_BRANCH:-main}
       - PRAXRR_DEFAULT_DB_NAME=Praxrr-db
       - PRAXRR_DEFAULT_DB_TOKEN=${PRAXRR_DEFAULT_DB_TOKEN}
       - PRAXRR_DEFAULT_DB_GIT_USERNAME=${PRAXRR_DEFAULT_DB_GIT_USERNAME}
       - PRAXRR_DEFAULT_DB_GIT_EMAIL=${PRAXRR_DEFAULT_DB_GIT_EMAIL}
+      - PRAXRR_SCHEMA_LOCAL_PATH=/schema # Optional: can be set to a local path or remote URL
       - PRAXRR_SCHEMA_REF=main
       - ARR_CREDENTIAL_MASTER_KEY=${ARR_CREDENTIAL_MASTER_KEY}
       - ARR_CREDENTIAL_MASTER_KEY_VERSION=v1
       # ARR_CREDENTIAL_PREVIOUS_KEYS: ${ARR_CREDENTIAL_PREVIOUS_KEYS} # optional: JSON map
       # Optional Arr instances via environment at startup
       - LIDARR_INSTANCE_NAME_1=Lidarr # Optional (Generated if not provided)
-      - LIDARR_INSTANCE_URL_1=${PRAXRR_LIDARR_URL}
-      - LIDARR_INSTANCE_EXTERNAL_URL_1=${PRAXRR_LIDARR_EXTERNAL_URL} # Optional
+      - LIDARR_INSTANCE_URL_1=http://praxrr-lidarr:8686
+      # - LIDARR_INSTANCE_EXTERNAL_URL_1=${PRAXRR_LIDARR_EXTERNAL_URL} # Optional
       - LIDARR_INSTANCE_API_KEY_1=${PRAXRR_LIDARR_API_KEY}
       - LIDARR_INSTANCE_TAGS_1=music,flac,lossless
       - RADARR_INSTANCE_NAME_1=Radarr # Optional (Generated if not provided)
-      - RADARR_INSTANCE_URL_1=${PRAXRR_RADARR_URL}
-      - RADARR_INSTANCE_EXTERNAL_URL_1=${PRAXRR_RADARR_EXTERNAL_URL} # Optional
+      - RADARR_INSTANCE_URL_1=http://praxrr-radarr:7878
+      # - RADARR_INSTANCE_EXTERNAL_URL_1=${PRAXRR_RADARR_EXTERNAL_URL} # Optional
       - RADARR_INSTANCE_API_KEY_1=${PRAXRR_RADARR_API_KEY}
       - RADARR_INSTANCE_TAGS_1=movies,4k
       - SONARR_INSTANCE_NAME_1=Sonarr # Optional (Generated if not provided)
-      - SONARR_INSTANCE_URL_1=${PRAXRR_SONARR_URL}
-      - SONARR_INSTANCE_EXTERNAL_URL_1=${PRAXRR_SONARR_EXTERNAL_URL} # Optional
+      - SONARR_INSTANCE_URL_1=http://praxrr-sonarr:8989
+      # - SONARR_INSTANCE_EXTERNAL_URL_1=${PRAXRR_SONARR_EXTERNAL_URL} # Optional
       - SONARR_INSTANCE_API_KEY_1=${PRAXRR_SONARR_API_KEY}
       - SONARR_INSTANCE_TAGS_1=tv,4k
       - PRAXRR_VALIDATE_INSTANCES=false
       # Optional: pull sync selections from Arr instances on startup
-      # - PULL_ON_START=true
-      # - PULL_ON_START_MAX_CONCURRENCY=2
-      # - PULL_ON_START_TIMEOUT_MS=30000
+      - PULL_ON_START=true
+      - PULL_ON_START_MAX_CONCURRENCY=2
+      - PULL_ON_START_TIMEOUT_MS=30000
     depends_on:
       parser:
         condition: service_healthy
+    develop:
+      watch:
+        - action: rebuild
+          path: ./packages/praxrr-app
+        - action: rebuild
+          path: ./packages/praxrr-db
+        - action: rebuild
+          path: ./packages/praxrr-schema
+        - action: rebuild
+          path: ./deno.json
+        - action: rebuild
+          path: ./Dockerfile
 
   parser:
     build:
@@ -63,3 +78,9 @@ services:
     container_name: praxrr-parser-dev
     expose:
       - '5000'
+    develop:
+      watch:
+        - action: rebuild
+          path: ./packages/praxrr-parser
+        - action: rebuild
+          path: ./Dockerfile.parser
