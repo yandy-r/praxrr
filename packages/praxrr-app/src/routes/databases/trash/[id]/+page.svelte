@@ -83,38 +83,42 @@
 
 		<!-- Entity counts grid -->
 		<div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
-			<div
-				class="rounded-lg border border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-900"
+			<a
+				href="/databases/trash/{source.id}/custom-formats"
+				class="cursor-pointer rounded-lg border border-neutral-200 bg-white p-4 transition-colors hover:bg-neutral-50 dark:border-neutral-800 dark:bg-neutral-900 dark:hover:bg-neutral-50/5"
 			>
 				<div class="text-2xl font-bold text-neutral-900 dark:text-neutral-50">
 					{source.entityCounts.customFormats}
 				</div>
 				<div class="text-xs text-neutral-500 dark:text-neutral-400">Custom Formats</div>
-			</div>
-			<div
-				class="rounded-lg border border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-900"
+			</a>
+			<a
+				href="/databases/trash/{source.id}/quality-profiles"
+				class="cursor-pointer rounded-lg border border-neutral-200 bg-white p-4 transition-colors hover:bg-neutral-50 dark:border-neutral-800 dark:bg-neutral-900 dark:hover:bg-neutral-50/5"
 			>
 				<div class="text-2xl font-bold text-neutral-900 dark:text-neutral-50">
 					{source.entityCounts.qualityProfiles}
 				</div>
 				<div class="text-xs text-neutral-500 dark:text-neutral-400">Quality Profiles</div>
-			</div>
-			<div
-				class="rounded-lg border border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-900"
+			</a>
+			<a
+				href="/databases/trash/{source.id}/quality-sizes"
+				class="cursor-pointer rounded-lg border border-neutral-200 bg-white p-4 transition-colors hover:bg-neutral-50 dark:border-neutral-800 dark:bg-neutral-900 dark:hover:bg-neutral-50/5"
 			>
 				<div class="text-2xl font-bold text-neutral-900 dark:text-neutral-50">
 					{source.entityCounts.qualitySizes}
 				</div>
 				<div class="text-xs text-neutral-500 dark:text-neutral-400">Quality Sizes</div>
-			</div>
-			<div
-				class="rounded-lg border border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-900"
+			</a>
+			<a
+				href="/databases/trash/{source.id}/naming"
+				class="cursor-pointer rounded-lg border border-neutral-200 bg-white p-4 transition-colors hover:bg-neutral-50 dark:border-neutral-800 dark:bg-neutral-900 dark:hover:bg-neutral-50/5"
 			>
 				<div class="text-2xl font-bold text-neutral-900 dark:text-neutral-50">
 					{source.entityCounts.naming}
 				</div>
 				<div class="text-xs text-neutral-500 dark:text-neutral-400">Naming</div>
-			</div>
+			</a>
 		</div>
 
 		<!-- Source info -->
