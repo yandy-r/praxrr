@@ -29,13 +29,15 @@ interface SourcedResult {
   sourceType: 'trash';
   sourceDatabaseId: number;
   sourceDatabaseName: string;
+  trashId: string;
 }
 
-function toSourceFields(source: TrashGuideSourceRef): SourcedResult {
+function toSourceFields(source: TrashGuideSourceRef, trashId: string): SourcedResult {
   return {
     sourceType: 'trash',
     sourceDatabaseId: source.id,
     sourceDatabaseName: source.name,
+    trashId,
   };
 }
 
@@ -102,11 +104,7 @@ function isNamingEntity(value: unknown): value is ParsedTrashGuideEntityByType<'
     return false;
   }
 
-  return (
-    value.entity_type === 'naming' &&
-    typeof value.name === 'string' &&
-    typeof value.file_path === 'string'
-  );
+  return value.entity_type === 'naming' && typeof value.name === 'string' && typeof value.file_path === 'string';
 }
 
 function isExpectedEntity<T extends TrashGuideEntityType>(
@@ -140,7 +138,7 @@ function logMalformedCacheRow(cache: TrashGuideEntityCache, sourceType: TrashGui
   });
 }
 
-function parseCachedEntity<T extends TrashGuideEntityType>(
+export function parseCachedEntity<T extends TrashGuideEntityType>(
   cache: TrashGuideEntityCache,
   expectedEntityType: T
 ): ParsedTrashGuideEntityByType<T> | null {
@@ -192,7 +190,7 @@ export function toSourcedCustomFormatRow(
     conditions,
     arrTargets: [target],
     testCount: 0,
-    ...toSourceFields(source),
+    ...toSourceFields(source, cache.trashId),
   };
 }
 
@@ -247,7 +245,7 @@ export function toSourcedQualityProfileRow(
             type: 'simple',
           }
         : undefined,
-    ...toSourceFields(source),
+    ...toSourceFields(source, cache.trashId),
   };
 }
 
@@ -263,7 +261,7 @@ export function toSourcedQualityDefinitionListItem(
     arr_type: source.arrType,
     quality_count: Array.isArray(entity.qualities) ? entity.qualities.length : 0,
     updated_at: cache.fetchedAt,
-    ...toSourceFields(source),
+    ...toSourceFields(source, cache.trashId),
   };
 }
 
@@ -279,6 +277,6 @@ export function toSourcedNamingListItem(
     arr_type: source.arrType,
     rename: true,
     updated_at: cache.fetchedAt,
-    ...toSourceFields(source),
+    ...toSourceFields(source, cache.trashId),
   };
 }

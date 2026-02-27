@@ -47,7 +47,9 @@
 
 	function getRowHref(row: CustomFormatTableRow): string | null {
 		if (isTrashRow(row)) {
-			return null;
+			return row.trashId
+				? `/databases/trash/${row.sourceDatabaseId}/custom-formats/${row.trashId}/`
+				: null;
 		}
 
 		return `/custom-formats/${resolveSourceDatabaseId(row)}/${row.id}`;

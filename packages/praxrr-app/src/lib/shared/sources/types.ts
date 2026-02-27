@@ -27,6 +27,8 @@ export type SourceRef = PcdSourceRef | TrashSourceRef;
 type SourceDisplayRowBase = {
   sourceDatabaseId: number;
   sourceDatabaseName: string;
+  /** TRaSH entity identifier for linking to detail pages. Only set for TRaSH-sourced rows. */
+  trashId?: string;
 };
 
 type PcdSourcedDisplayRow = SourceDisplayRowBase & {

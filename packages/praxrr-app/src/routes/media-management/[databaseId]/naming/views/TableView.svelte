@@ -97,7 +97,9 @@
 
 	function getRowHref(config: SourcedNamingListItem): string | null {
 		if (isTrashRow(config)) {
-			return null;
+			return config.trashId
+				? `/databases/trash/${config.sourceDatabaseId}/naming/${config.trashId}/`
+				: null;
 		}
 
 		const sourceDatabaseId = resolveSourceDatabaseId(config);
