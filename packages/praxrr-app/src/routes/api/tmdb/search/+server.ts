@@ -4,6 +4,16 @@ import { TMDBClient } from '$lib/server/utils/tmdb/client.ts';
 import { tmdbSettingsQueries } from '$db/queries/tmdbSettings.ts';
 import { logger } from '$lib/server/utils/logger/logger.ts';
 
+/**
+ * GET /api/tmdb/search
+ *
+ * Search TMDB for movies and/or TV series.
+ *
+ * Query params:
+ * - query: search term (required)
+ * - type: `movie`, `tv`, or `both` (defaults to `both`)
+ * - page: page number (defaults to 1)
+ */
 export const GET: RequestHandler = async ({ url }) => {
   const query = url.searchParams.get('query');
   const type = url.searchParams.get('type') || 'both'; // 'movie', 'tv', or 'both'

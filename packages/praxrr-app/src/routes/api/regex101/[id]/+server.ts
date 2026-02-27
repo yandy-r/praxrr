@@ -22,7 +22,7 @@ export interface Regex101Response {
 }
 
 /**
- * Run regex tests using the parser service (.NET regex engine)
+ * Run regex tests using the parser service (.NET regex engine).
  */
 async function runRegexTests(pattern: string, tests: Regex101UnitTest[]): Promise<Regex101UnitTest[]> {
   if (tests.length === 0) return tests;
@@ -74,6 +74,12 @@ async function runRegexTests(pattern: string, tests: Regex101UnitTest[]): Promis
   }
 }
 
+/**
+ * GET /api/regex101/{id}
+ *
+ * Fetch a regex101 snippet by ID/version, run cached/embedded tests via parser,
+ * and return the normalized test result payload.
+ */
 export const GET: RequestHandler = async ({ params, fetch }) => {
   const { id } = params;
 

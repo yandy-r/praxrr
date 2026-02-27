@@ -1,6 +1,12 @@
 import { error, type RequestHandler } from '@sveltejs/kit';
 import { config } from '$config';
 
+/**
+ * GET /api/backups/download/{filename}
+ *
+ * Stream a generated backup tarball for download.
+ * Filename must match `backup-*.tar.gz`; otherwise returns 400.
+ */
 export const GET: RequestHandler = async ({ params }) => {
   const { filename } = params;
 

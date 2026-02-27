@@ -3,6 +3,12 @@ import type { RequestHandler } from '@sveltejs/kit';
 import { databaseInstancesQueries } from '$db/queries/databaseInstances.ts';
 import { getCommits, getStatus } from '$utils/git/index.ts';
 
+/**
+ * GET /api/databases/{id}/commits
+ *
+ * Return recent commits for the selected database repository.
+ * Uses remote commits when local branch is behind and no local unpushed changes exist.
+ */
 export const GET: RequestHandler = async ({ params, url }) => {
   const id = parseInt(params.id || '', 10);
   const database = databaseInstancesQueries.getById(id);

@@ -7,6 +7,12 @@ async function hashBytes(bytes: Uint8Array): Promise<string> {
   return hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
 }
 
+/**
+ * GET /api/github/avatar/{owner}
+ *
+ * Return a cached GitHub avatar for an owner.
+ * Supports conditional requests via `If-None-Match` using an ETag of the cached content.
+ */
 export const GET: RequestHandler = async ({ params, request, fetch }) => {
   const { owner } = params;
 

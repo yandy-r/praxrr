@@ -9,6 +9,12 @@ import { getClientIp } from '$auth/network.ts';
 import { parseUserAgent } from '$auth/userAgent.ts';
 import { logger } from '$logger/logger.ts';
 
+/**
+ * GET /auth/oidc/callback
+ *
+ * Complete OIDC authentication callback:
+ * validate state/code, exchange tokens, verify ID token, create session, and redirect home.
+ */
 export const GET: RequestHandler = async (event) => {
   const { url, cookies, request } = event;
 

@@ -5,6 +5,12 @@ import { getBranches, getIncomingChanges, getRepoInfo, getStatus } from '$utils/
 import { listDraftEntityChanges } from '$pcd/ops/draftChanges.ts';
 import { getDecryptedDatabasePersonalAccessToken } from '$server/utils/encryption/database-credentials.ts';
 
+/**
+ * GET /api/databases/{id}/changes
+ *
+ * Gather local git status, incoming changes, branch list, and repo metadata for a database.
+ * Includes draft entity changes when PAT-based developer access is present.
+ */
 export const GET: RequestHandler = async ({ params }) => {
   const id = parseInt(params.id || '', 10);
   const database = databaseInstancesQueries.getById(id);
