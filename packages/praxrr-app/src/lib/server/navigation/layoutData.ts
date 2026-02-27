@@ -14,6 +14,12 @@ interface ResolveRootLayoutDataInput {
   authBypass: boolean;
 }
 
+/**
+ * Build data for the root layout, including resolved navigation shell.
+ *
+ * @param input - Input including version, path, auth context, and user.
+ * @returns The layout payload consumed by the root layout data hook.
+ */
 export function resolveRootLayoutData({
   version,
   pathname,

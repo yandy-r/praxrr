@@ -31,6 +31,13 @@ import { createLidarrNaming } from '$pcd/entities/mediaManagement/naming/create.
 import { validatePortableData } from '$pcd/entities/validate.ts';
 import { logger } from '$logger/logger.ts';
 
+/**
+ * Mapping of portable entity deserializers used during import.
+ *
+ * @remarks
+ * Each deserializer validates and materializes the portable payload for the target
+ * entity type. This map centralizes type-specific conversion paths for easy extension.
+ */
 export const _deserializeDependencies = {
   deserializeDelayProfile: deserialize.deserializeDelayProfile,
   deserializeRegularExpression: deserialize.deserializeRegularExpression,
@@ -49,6 +56,18 @@ export const _deserializeDependencies = {
 
 const VALID_ENTITY_TYPES: ReadonlySet<string> = new Set(ENTITY_TYPES);
 
+/**
+ * POST /api/v1/pcd/import
+ *
+ * Import a portable PCD entity into a selected database and operation layer.
+ *
+ * Body (required):
+ * - databaseId: target PCD database ID
+ * - layer: 'base' or 'user'
+ * - entityType: portable entity type
+ * - data: portable entity payload
+ * - migration: optional migration metadata
+ */
 export const POST: RequestHandler = async ({ request }) => {
   let body: Record<string, unknown>;
   try {

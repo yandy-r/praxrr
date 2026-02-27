@@ -36,6 +36,11 @@ function isDocker(): boolean {
 /**
  * Log container configuration (only when running in Docker)
  */
+/**
+ * Log Docker runtime metadata when running inside a container.
+ *
+ * @returns A promise that resolves when container metadata is logged.
+ */
 export async function logContainerConfig(): Promise<void> {
   if (!isDocker()) return;
 
@@ -50,6 +55,9 @@ export async function logContainerConfig(): Promise<void> {
   });
 }
 
+/**
+ * Print the startup ASCII banner and version to stdout.
+ */
 export function printBanner(): void {
   const version = appInfoQueries.getVersion();
   const url = config.serverUrl;
@@ -67,6 +75,11 @@ export interface ServerInfo {
   hostname: string;
 }
 
+/**
+ * Resolve server info used by diagnostics and logs.
+ *
+ * @returns A structured snapshot of runtime environment details.
+ */
 export function getServerInfo(): ServerInfo {
   return {
     version: appInfoQueries.getVersion(),

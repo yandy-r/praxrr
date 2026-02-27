@@ -4,6 +4,12 @@ import { sessionsQueries } from '$db/queries/sessions.ts';
 import { usersQueries } from '$db/queries/users.ts';
 import { logger } from '$logger/logger.ts';
 
+/**
+ * GET /auth/logout
+ *
+ * Clear the current session cookie and remove the matching session from storage.
+ * Redirects the user to the login page afterward.
+ */
 export const GET: RequestHandler = async ({ cookies }) => {
   const sessionId = cookies.get('session');
 

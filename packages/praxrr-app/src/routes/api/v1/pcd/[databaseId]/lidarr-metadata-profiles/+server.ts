@@ -263,6 +263,12 @@ function getWriteErrorStatus(message: string): number {
   return 500;
 }
 
+/**
+ * GET /api/v1/pcd/{databaseId}/lidarr-metadata-profiles
+ *
+ * List Lidarr metadata profiles configured in a database.
+ * Returns profile summary rows including counts and updated timestamps.
+ */
 export const GET: RequestHandler = async ({ params }) => {
   const databaseIdResult = parseDatabaseId(params.databaseId);
   if ('error' in databaseIdResult) {
@@ -305,6 +311,19 @@ export const GET: RequestHandler = async ({ params }) => {
   }
 };
 
+/**
+ * POST /api/v1/pcd/{databaseId}/lidarr-metadata-profiles
+ *
+ * Create a new Lidarr metadata profile in the selected database.
+ *
+ * Body:
+ * - layer: 'base' or 'user'
+ * - name: profile name
+ * - description: optional textual description
+ * - primaryTypes: list of allowed primary album types
+ * - secondaryTypes: list of allowed secondary album types
+ * - releaseStatuses: list of allowed release statuses
+ */
 export const POST: RequestHandler = async ({ params, request }) => {
   const databaseIdResult = parseDatabaseId(params.databaseId);
   if ('error' in databaseIdResult) {

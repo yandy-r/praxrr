@@ -29,6 +29,15 @@ function formatBytes(bytes: number): string {
   return `${value.toFixed(i > 0 ? 1 : 0)} ${units[i]}`;
 }
 
+/**
+ * GET /api/v1/health
+ *
+ * Return system health status with component-level details.
+ *
+ * @param {URL} url - Request URL, including optional `verbose=true` query param.
+ * @returns {Promise<Response>} JSON response with health status and details.
+ * @throws {Error} Throws if component checks fail unexpectedly.
+ */
 export const GET: RequestHandler = async ({ url }) => {
   const verbose = url.searchParams.get('verbose') === 'true';
 

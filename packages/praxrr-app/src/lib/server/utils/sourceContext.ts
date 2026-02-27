@@ -34,14 +34,33 @@ export type ResolveDatabasesOptions<TDatabase> = {
   onDatabaseNotInitialized?: DatabaseNotInitializedHandler;
 };
 
+/**
+ * Build a stable source key from a source reference.
+ *
+ * @param source - Source object with `type` and `id`.
+ * @returns A stable key string for storage and routing.
+ */
 export function sourceKey(source: Pick<SourceRef, 'type' | 'id'> & { name?: string }): string {
   return `${source.type}:${source.id}`;
 }
 
+/**
+ * Type guard for TRaSH sources.
+ *
+ * @param source - Source reference to test.
+ * @returns True when source type is `trash`.
+ */
 export function isTrashSource(source: SourceRef): source is Extract<SourceRef, { type: 'trash' }> {
   return source.type === 'trash';
 }
 
+/**
+ * Attach PCD source metadata to database rows.
+ *
+ * @param rows - Rows returned from a query.
+ * @param database - Database owning the rows.
+ * @returns Rows enriched with source metadata.
+ */
 export function withPcdSource<TRow extends object, TDatabase extends DatabaseLike>(
   rows: readonly TRow[],
   database: TDatabase
@@ -58,6 +77,13 @@ export function withPcdSource<TRow extends object, TDatabase extends DatabaseLik
   }));
 }
 
+/**
+ * Sort rows by name, then delegate to a source-specific tie-breaker.
+ *
+ * @param rows - Unsorted rows.
+ * @param compareSource - Comparator for rows with equal names.
+ * @returns Sorted copy of rows.
+ */
 export function sortRowsByNameAndSource<T extends { name: string }>(
   rows: readonly T[],
   compareSource: (a: T, b: T) => number
@@ -70,6 +96,17 @@ export function sortRowsByNameAndSource<T extends { name: string }>(
   });
 }
 
+/**
+ * Build source context used by list/detail pages.
+ *
+ * @param databases - Available PCD databases.
+ * @param currentDatabase - Optional currently selected database.
+ * @param allTrashSources - All linked TRaSH sources.
+ * @param getTrashSourceEntityCount - Count accessor for source rows.
+ * @param getTrashSourceName - Name accessor for source rows.
+ * @param sourceLabel - Human-friendly label used for empty-state messages.
+ * @returns Source context object for UI filtering.
+ */
 export function buildSourceContext<TSource extends SourceForContext, TDatabase extends DatabaseLike>(
   databases: readonly TDatabase[],
   currentDatabase: TDatabase | undefined,
@@ -121,6 +158,12 @@ export function buildSourceContext<TSource extends SourceForContext, TDatabase e
   };
 }
 
+/**
+ * Call a source list accessor and handle uninitialized DB as an empty set.
+ *
+ * @param options - List callback and optional error handler.
+ * @returns Source list, or empty on initialization errors.
+ */
 export function listTrashSourcesSafely<TSource>(options: ListTrashSourcesOptions<TSource>): readonly TSource[] {
   try {
     return options.listSources();
@@ -134,6 +177,13 @@ export function listTrashSourcesSafely<TSource>(options: ListTrashSourcesOptions
   }
 }
 
+/**
+ * Call a database resolver and propagate errors.
+ *
+ * @param options - Resolver callback and optional error handler.
+ * @returns Resolved DB list.
+ * @throws Re-throws non-initialization errors from resolver.
+ */
 export function resolveDatabases<TDatabase extends DatabaseLike>(
   options: ResolveDatabasesOptions<TDatabase>
 ): readonly TDatabase[] {

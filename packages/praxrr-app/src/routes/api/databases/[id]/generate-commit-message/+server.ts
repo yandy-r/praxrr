@@ -4,6 +4,12 @@ import { databaseInstancesQueries } from '$db/queries/databaseInstances.ts';
 import { getDiff } from '$utils/git/index.ts';
 import { isAIEnabled, generateCommitMessage } from '$utils/ai/client.ts';
 
+/**
+ * POST /api/databases/{id}/generate-commit-message
+ *
+ * Generate a commit message from the current working-tree diff.
+ * Requires AI to be enabled and returns 400 if no diff exists.
+ */
 export const POST: RequestHandler = async ({ params, request }) => {
   if (!isAIEnabled()) {
     error(503, 'AI is not configured. Enable it in Settings > General.');

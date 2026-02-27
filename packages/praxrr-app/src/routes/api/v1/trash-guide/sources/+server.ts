@@ -26,10 +26,28 @@ const CREATE_ALLOWED_FIELDS = new Set([
   'syncStrategy',
 ]);
 
+/**
+ * GET /api/v1/trash-guide/sources
+ *
+ * List all configured TRaSH sources.
+ *
+ * @returns {Promise<Response>} JSON response with the list of sources.
+ * @throws {never} This handler returns error responses instead of throwing.
+ */
 export const GET: RequestHandler = () => {
   return json({ sources: trashGuideManager.listSources() });
 };
 
+/**
+ * POST /api/v1/trash-guide/sources
+ *
+ * Create a new TRaSH source record from provided payload.
+ *
+ * @param {{ request: Request }} event - Incoming request event.
+ * @param {Request} event.request - JSON payload for source creation.
+ * @returns {Promise<Response>} JSON response with created source or validation error.
+ * @throws {Error} Unexpected errors propagate as response JSON with 400/500 semantics.
+ */
 export const POST: RequestHandler = async ({ request }) => {
   let body: unknown;
   try {

@@ -5,6 +5,12 @@ import { getDiscoveryDocument, generateState, buildAuthorizationUrl } from '$aut
 import { getClientIp } from '$auth/network.ts';
 import { logger } from '$logger/logger.ts';
 
+/**
+ * GET /auth/oidc/login
+ *
+ * Start the OIDC login flow:
+ * validate configuration, generate state, and redirect to the provider authorization URL.
+ */
 export const GET: RequestHandler = async (event) => {
   const { cookies } = event;
   const ip = getClientIp(event);

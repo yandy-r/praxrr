@@ -11,6 +11,14 @@ import {
 import type { PCDCache } from '$pcd/index.ts';
 import * as serialize from '$pcd/entities/serialize.ts';
 
+/**
+ * Mapping of portable entity serializers used during export.
+ *
+ * @remarks
+ * Each serializer receives a cache handle and an entity name, returning a portable payload.
+ * This object is intentionally shared across all supported entity types so
+ * `serializeEntity()` can stay exhaustive and type-safe.
+ */
 export const _serializeDependencies = {
   serializeDelayProfile: serialize.serializeDelayProfile,
   serializeRegularExpression: serialize.serializeRegularExpression,
@@ -30,6 +38,16 @@ export const _serializeDependencies = {
 
 const VALID_ENTITY_TYPES: ReadonlySet<string> = new Set(ENTITY_TYPES);
 
+/**
+ * GET /api/v1/pcd/export
+ *
+ * Export a portable representation of a single PCD entity for migration/import workflows.
+ *
+ * Query params:
+ * - databaseId: target PCD database ID (required)
+ * - entityType: portable entity type (required)
+ * - name: entity name (required)
+ */
 export const GET: RequestHandler = async ({ url }) => {
   const databaseIdParam = url.searchParams.get('databaseId');
   const entityType = url.searchParams.get('entityType');

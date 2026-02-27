@@ -22,6 +22,7 @@ type RepoImportWriteContextRunner = (
 let withRepoImportWriteContextForTests: RepoImportWriteContextRunner =
   withRepoImportWriteContext as unknown as RepoImportWriteContextRunner;
 let readMigrationEntitySourcesForTests = readMigrationEntitySources;
+let buildPublishedRepoBaseOpIndexForTests = buildPublishedRepoBaseOpIndex;
 
 const ENTITY_OP_FILENAME_PREFIX = 'entities/';
 const ENTITY_TABLE_BY_STABLE_KEY = {
@@ -278,6 +279,14 @@ export function __testOnly_setReadMigrationEntitySources(
   readMigrationEntitySourcesForTests = reader;
 }
 
+export function __testOnly_setBuildPublishedRepoBaseOpIndex(builder: (databaseId: number) => RepoOpIndex): void {
+  buildPublishedRepoBaseOpIndexForTests = builder;
+}
+
+export function __testOnly_resetBuildPublishedRepoBaseOpIndex(): void {
+  buildPublishedRepoBaseOpIndexForTests = buildPublishedRepoBaseOpIndex;
+}
+
 export function __testOnly_resetReadMigrationEntitySources(): void {
   readMigrationEntitySourcesForTests = readMigrationEntitySources;
 }
@@ -343,7 +352,7 @@ export async function importBaseOps(databaseId: number, pcdPath: string): Promis
       }
 
       if (repoOpIndex === null) {
-        repoOpIndex = buildPublishedRepoBaseOpIndex(databaseId);
+        repoOpIndex = buildPublishedRepoBaseOpIndexForTests(databaseId);
       }
 
       const matchingRepoOpIds = matchingPublishedRepoBaseOpIds(repoOpIndex, candidate);

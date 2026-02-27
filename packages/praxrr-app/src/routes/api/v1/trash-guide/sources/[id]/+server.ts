@@ -28,6 +28,16 @@ const UPDATE_ALLOWED_FIELDS = new Set([
   'syncStrategy',
 ]);
 
+/**
+ * GET /api/v1/trash-guide/sources/[id]
+ *
+ * Fetch a TRaSH source by id.
+ *
+ * @param {{ params: { id?: string } }} event - Route parameters.
+ * @param {{ id?: string }} event.params - Route param object.
+ * @returns {Promise<Response>} JSON response with source record or error.
+ * @throws {never} This handler returns structured responses and does not throw.
+ */
 export const GET: RequestHandler = async ({ params }) => {
   const idResult = parseSourceId(params.id);
   if ('error' in idResult) {
@@ -45,6 +55,16 @@ export const GET: RequestHandler = async ({ params }) => {
   }
 };
 
+/**
+ * PUT /api/v1/trash-guide/sources/[id]
+ *
+ * Update a TRaSH source with partial patch payload.
+ *
+ * @param {{ params: { id?: string }; request: Request }} event - Route event.
+ * @param {Request} event.request - JSON payload containing updatable fields.
+ * @returns {Promise<Response>} JSON response with updated source or error.
+ * @throws {Error} Throws for parser/validation failures while applying update input.
+ */
 export const PUT: RequestHandler = async ({ params, request }) => {
   const idResult = parseSourceId(params.id);
   if ('error' in idResult) {
@@ -75,6 +95,15 @@ export const PUT: RequestHandler = async ({ params, request }) => {
   }
 };
 
+/**
+ * DELETE /api/v1/trash-guide/sources/[id]
+ *
+ * Remove a TRaSH source record.
+ *
+ * @param {{ params: { id?: string } }} event - Route parameters.
+ * @returns {Promise<Response>} Empty response when deletion succeeds.
+ * @throws {never} This handler returns error responses instead of throwing.
+ */
 export const DELETE: RequestHandler = async ({ params }) => {
   const idResult = parseSourceId(params.id);
   if ('error' in idResult) {

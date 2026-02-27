@@ -459,6 +459,11 @@ const SONARR_ORIGINAL_TOKENS: NamingToken[] = [
 // CATEGORIZED TOKEN LISTS
 // ============================================================================
 
+/**
+ * Build token categories for Radarr naming formats.
+ *
+ * @returns Ordered token categories used by Radarr naming forms/validators.
+ */
 export function getRadarrTokenCategories(): TokenCategory[] {
   return [
     { name: 'Movie', tokens: RADARR_MOVIE_TOKENS },
@@ -472,6 +477,11 @@ export function getRadarrTokenCategories(): TokenCategory[] {
   ];
 }
 
+/**
+ * Build token categories for Sonarr naming formats.
+ *
+ * @returns Ordered token categories used by Sonarr naming forms/validators.
+ */
 export function getSonarrTokenCategories(): TokenCategory[] {
   return [
     { name: 'Series', tokens: SONARR_SERIES_TOKENS },
@@ -614,10 +624,22 @@ export function resolveFormat(format: string, sampleValues: Record<string, strin
   return resolved.replace(/  +/g, ' ').trim();
 }
 
+/**
+ * Resolve a naming format against built-in Radarr sample values.
+ *
+ * @param format - Naming format string containing tokens.
+ * @returns Formatted sample output for Radarr.
+ */
 export function resolveRadarrFormat(format: string): string {
   return resolveFormat(format, RADARR_SAMPLE_VALUES);
 }
 
+/**
+ * Resolve a naming format against built-in Sonarr sample values.
+ *
+ * @param format - Naming format string containing tokens.
+ * @returns Formatted sample output for Sonarr.
+ */
 export function resolveSonarrFormat(format: string): string {
   return resolveFormat(format, SONARR_SAMPLE_VALUES);
 }

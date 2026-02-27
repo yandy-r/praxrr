@@ -100,6 +100,12 @@ function emptyNavShell(): NavShell {
   };
 }
 
+/**
+ * Resolve navigation groups and items visible for the current user context.
+ *
+ * @param input - Inputs controlling navigation visibility.
+ * @returns A fully resolved navigation shell.
+ */
 export function resolveNavShell({ user }: ResolveNavShellInput): NavShell {
   if (!user) {
     return emptyNavShell();

@@ -16,6 +16,12 @@ function sanitizePreviewId(previewId: string | undefined): string | null {
   return trimmed.length === 0 ? null : trimmed;
 }
 
+/**
+ * GET /api/v1/sync/preview/{previewId}
+ *
+ * Fetch a cached sync preview snapshot by ID.
+ * Returns the full preview result or 404 if missing/expired.
+ */
 export const GET: RequestHandler = async ({ params }) => {
   const previewId = sanitizePreviewId(params.previewId);
   if (!previewId) {
@@ -40,6 +46,12 @@ export const GET: RequestHandler = async ({ params }) => {
   }
 };
 
+/**
+ * DELETE /api/v1/sync/preview/{previewId}
+ *
+ * Remove a cached sync preview by ID.
+ * Deletes only if the preview exists and has not already expired.
+ */
 export const DELETE: RequestHandler = async ({ params }) => {
   const previewId = sanitizePreviewId(params.previewId);
   if (!previewId) {

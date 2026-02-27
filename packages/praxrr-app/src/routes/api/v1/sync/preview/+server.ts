@@ -197,6 +197,17 @@ async function parseRequestBody(
   }
 }
 
+/**
+ * POST /api/v1/sync/preview
+ *
+ * Generate a sync preview for a selected Arr instance.
+ * Accepts optional section selection and section-specific config overrides.
+ *
+ * Body:
+ * - instanceId: Arr instance ID (required)
+ * - sections: optional ordered list of sync sections to preview
+ * - sectionConfigs: optional config overrides per section
+ */
 export const POST: RequestHandler = async ({ request }) => {
   const requestBody = await parseRequestBody(request);
   if (!requestBody.ok) {

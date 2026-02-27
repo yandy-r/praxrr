@@ -5,6 +5,17 @@ import type { ArrType } from '$arr/types.ts';
 
 const VALID_TYPES = ['radarr', 'sonarr', 'lidarr'];
 
+/**
+ * POST /arr/test
+ *
+ * Validate Arr connection credentials by creating a client and testing
+ * connection reachability.
+ *
+ * Body:
+ * - type: `radarr`, `sonarr`, or `lidarr`
+ * - url: Arr base URL
+ * - apiKey: Arr API key
+ */
 export const POST: RequestHandler = async ({ request }) => {
   let client;
   try {

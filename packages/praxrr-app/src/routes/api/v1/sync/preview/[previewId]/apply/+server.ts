@@ -72,6 +72,15 @@ function resolveEligibleSections(snapshot: SyncPreviewResult): SectionType[] {
   return snapshot.sections.filter((section) => successful.has(section));
 }
 
+/**
+ * POST /api/v1/sync/preview/{previewId}/apply
+ *
+ * Apply selected sections from a generated preview to the target Arr instance.
+ * The request is rejected if the preview is not ready, stale, expired, or invalid for application.
+ *
+ * Body:
+ * - sections: optional explicit list of sections to apply. Defaults to eligible preview sections.
+ */
 export const POST: RequestHandler = async ({ params, request }) => {
   const previewId = params.previewId;
   if (!previewId) {

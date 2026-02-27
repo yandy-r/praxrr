@@ -20,6 +20,16 @@ type EvaluateResponse = components['schemas']['EvaluateResponse'];
 type ReleaseEvaluation = components['schemas']['ReleaseEvaluation'];
 type MediaType = components['schemas']['MediaType'];
 
+/**
+ * POST /api/v1/entity-testing/evaluate
+ *
+ * Evaluate a batch of release titles against configured custom formats.
+ *
+ * @param {{ request: Request }} event - Incoming request event.
+ * @param {Request} event.request - Request body containing the evaluate payload.
+ * @returns {Promise<Response>} JSON response with parser availability and match results.
+ * @throws {Error} Throws for invalid payloads or parsing/database lookup failures.
+ */
 export const POST: RequestHandler = async ({ request }) => {
   const body: EvaluateRequest = await request.json();
   const { databaseId, releases } = body;

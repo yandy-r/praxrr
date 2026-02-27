@@ -1,6 +1,13 @@
 import { TrashGuideSourceNotFoundError } from '$lib/server/trashguide/manager.ts';
 import { logger } from '$logger/logger.ts';
 
+/**
+ * Parse and validate a TRaSH source ID parameter.
+ *
+ * @param {string | undefined} raw - Raw source id from route params.
+ * @returns {{ value: number } | { error: string }} Parsed numeric id or an error object.
+ * @throws {never} This helper returns error values instead of throwing.
+ */
 export function parseSourceId(raw: string | undefined): { value: number } | { error: string } {
   if (!raw) {
     return { error: 'Missing source id' };
@@ -18,6 +25,13 @@ export function parseSourceId(raw: string | undefined): { value: number } | { er
   return { value: id };
 }
 
+/**
+ * Convert read path errors into route status codes.
+ *
+ * @param {unknown} error - Error thrown while reading TRaSH source data.
+ * @returns {number} HTTP status code to use for the response.
+ * @throws {never} This helper does not throw.
+ */
 export function mapReadErrorStatus(error: unknown): number {
   if (error instanceof TrashGuideSourceNotFoundError) {
     return 404;
@@ -26,6 +40,13 @@ export function mapReadErrorStatus(error: unknown): number {
   return 500;
 }
 
+/**
+ * Convert any TRaSH route error into a user-facing message.
+ *
+ * @param {unknown} error - Unknown thrown value.
+ * @returns {string} Error message for API responses.
+ * @throws {never} This helper does not throw.
+ */
 export function toErrorMessage(error: unknown): string {
   if (error instanceof Error) {
     return error.message;
@@ -34,6 +55,14 @@ export function toErrorMessage(error: unknown): string {
   return 'TRaSH source request failed';
 }
 
+/**
+ * Parse an optional string field from request payloads.
+ *
+ * @param {unknown} value - Raw input value.
+ * @param {string} field - Field name used in validation errors.
+ * @returns {{ value: string | undefined } | { error: string }} Parsed value or validation error.
+ * @throws {never} This helper does not throw.
+ */
 export function parseOptionalNonEmptyString(
   value: unknown,
   field: string
@@ -54,6 +83,13 @@ export function parseOptionalNonEmptyString(
   return { value: trimmed };
 }
 
+/**
+ * Validate a TRaSH source repository URL.
+ *
+ * @param {string} value - URL string to validate.
+ * @returns {string | null} Error message when invalid, otherwise null.
+ * @throws {never} This helper does not throw.
+ */
 export function validateRepositoryUrl(value: string): string | null {
   let parsed: URL;
   try {
@@ -69,6 +105,14 @@ export function validateRepositoryUrl(value: string): string | null {
   return null;
 }
 
+/**
+ * Log route-level TRaSH errors with context.
+ *
+ * @param {unknown} error - Error thrown while handling route logic.
+ * @param {string} context - Human-readable route context.
+ * @returns {Promise<void>} Resolves when the log entry is written.
+ * @throws {Error} May throw if the logger errors during write.
+ */
 export async function logTrashGuideRouteError(error: unknown, context: string): Promise<void> {
   await logger.error('TRaSH Guide API route error', {
     source: 'TRaSH Guide',

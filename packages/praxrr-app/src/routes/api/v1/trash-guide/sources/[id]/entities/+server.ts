@@ -13,6 +13,17 @@ const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 200;
 const VALID_ENTITY_TYPES: ReadonlySet<string> = new Set(['custom_format', 'quality_profile', 'quality_size', 'naming']);
 
+/**
+ * GET /api/v1/trash-guide/sources/[id]/entities
+ *
+ * List cached TRaSH entities for a specific source with filtering and paging.
+ *
+ * @param {{ params: { id?: string }; url: URL }} event - Route event.
+ * @param {string | undefined} event.params.id - Source id.
+ * @param {URL} event.url - Request URL with optional entity filters (`type`, `search`, `arrType`, `cursor`, `offset`).
+ * @returns {Promise<Response>} JSON response with paged entity list.
+ * @throws {never} Validation failures are returned as JSON error responses.
+ */
 export const GET: RequestHandler = async ({ params, url }) => {
   const sourceIdResult = parseSourceId(params.id);
   if ('error' in sourceIdResult) {

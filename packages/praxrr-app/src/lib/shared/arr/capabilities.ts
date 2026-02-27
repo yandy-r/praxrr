@@ -270,6 +270,12 @@ export const ARR_CONDITION_TARGET_OPTIONS: ArrConditionTargetOption[] = [
 // TYPE GUARDS
 // ============================================================================
 
+/**
+ * Check whether a value matches a supported Arr app type.
+ *
+ * @param value - Unknown value to test.
+ * @returns True when the value is a supported Arr app type.
+ */
 export function isArrAppType(value: string): value is ArrAppType {
   return Object.hasOwn(ARR_APPS, value);
 }

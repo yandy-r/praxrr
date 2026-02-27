@@ -10,8 +10,10 @@ type ErrorResponse = {
 /**
  * GET /api/v1/system/startup-pull/latest
  *
- * Returns the latest startup pull run with per-instance outcomes.
- * Returns 404 when no runs exist.
+ * Fetch the latest startup pull run and include per-instance outcome details.
+ *
+ * @returns {Promise<Response>} JSON response with latest run payload or 404/500 error.
+ * @throws {Error} Logs and returns 500 for unexpected failures while fetching runs.
  */
 export const GET: RequestHandler = async () => {
   try {
