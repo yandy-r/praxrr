@@ -16,6 +16,11 @@
 		? Object.entries(entity.scores).map(([profile, score]) => ({ profile, score }))
 		: [];
 
+	interface ScoreTableRow {
+		profile: string;
+		score: number;
+	}
+
 	$: scoreColumns = [
 		{
 			key: 'profile',
@@ -28,7 +33,7 @@
 			align: 'right' as const,
 			sortable: true
 		}
-	] satisfies Column<any>[];
+	] satisfies Column<ScoreTableRow>[];
 
 	function formatDate(date: string): string {
 		return new Date(date).toLocaleString(undefined, {

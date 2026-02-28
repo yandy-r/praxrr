@@ -186,8 +186,12 @@
 		selectedSourceKeys = allSourceKeys(availableSources);
 	}
 
-	function getRowHref(format: CustomFormatTableRow): string {
+	function getRowHref(format: CustomFormatTableRow): string | null {
 		const sourceId = format.sourceDatabaseId ?? data.source.id;
+		if (!format.trashId) {
+			return null;
+		}
+
 		return `/databases/trash/${sourceId}/custom-formats/${format.trashId}/`;
 	}
 </script>

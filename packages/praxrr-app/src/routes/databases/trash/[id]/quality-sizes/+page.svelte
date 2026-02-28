@@ -198,9 +198,12 @@
 		<Table
 			{columns}
 			data={sourceFiltered}
-			rowHref={(row) =>
-				`/databases/trash/${row.sourceDatabaseId ?? data.source.id}/quality-sizes/${row.trashId}/`
-			}
+			rowHref={(row) => {
+				if (!row.trashId) {
+					return null;
+				}
+				return `/databases/trash/${row.sourceDatabaseId ?? data.source.id}/quality-sizes/${row.trashId}/`;
+			}}
 			emptyMessage="No quality sizes cached. Try syncing sources."
 			responsive
 			{initialSort}

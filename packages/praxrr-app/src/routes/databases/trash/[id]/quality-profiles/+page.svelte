@@ -206,9 +206,12 @@
 		<Table
 			{columns}
 			data={sourceFiltered}
-			rowHref={(row) =>
-				`/databases/trash/${row.sourceDatabaseId ?? data.source.id}/quality-profiles/${row.trashId}/`
-			}
+			rowHref={(row) => {
+				if (!row.trashId) {
+					return null;
+				}
+				return `/databases/trash/${row.sourceDatabaseId ?? data.source.id}/quality-profiles/${row.trashId}/`;
+			}}
 			emptyMessage="No quality profiles cached. Try syncing sources."
 			responsive
 			{initialSort}

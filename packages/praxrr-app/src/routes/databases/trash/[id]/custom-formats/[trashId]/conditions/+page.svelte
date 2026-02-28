@@ -3,10 +3,20 @@
 	import Badge from '$ui/badge/Badge.svelte';
 	import CodeBlock from '$ui/display/CodeBlock.svelte';
 	import type { Column } from '$ui/table/types.ts';
+	import type { TrashGuideCustomFormatSpecification } from '$lib/server/trashguide/types.ts';
 	import { page } from '$app/stores';
 
 	$: entity = $page.data.entity;
-	$: specifications = entity?.specifications ?? [];
+	$: specifications = entity?.specifications
+		? ([...entity.specifications] as TrashGuideCustomFormatSpecification[])
+		: [];
+
+	interface ConditionTableRow {
+		name: string;
+		implementation: string;
+		negate: boolean;
+		required: boolean;
+	}
 
 	$: columns = [
 		{
@@ -23,7 +33,7 @@
 			key: 'negate',
 			header: 'Negate',
 			align: 'center' as const,
-			cell: (row: any) =>
+			cell: (row: ConditionTableRow) =>
 				row.negate
 					? {
 							html: '<span class="inline-flex items-center rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-800 dark:bg-amber-900 dark:text-amber-200">Yes</span>'
@@ -36,7 +46,7 @@
 			key: 'required',
 			header: 'Required',
 			align: 'center' as const,
-			cell: (row: any) =>
+			cell: (row: ConditionTableRow) =>
 				row.required
 					? {
 							html: '<span class="inline-flex items-center rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] font-medium text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200">Yes</span>'
@@ -45,7 +55,7 @@
 							html: '<span class="inline-flex items-center rounded bg-neutral-100 px-1.5 py-0.5 text-[10px] font-medium text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300">No</span>'
 						}
 		}
-	] satisfies Column<any>[];
+	] satisfies Column<ConditionTableRow>[];
 </script>
 
 <svelte:head>

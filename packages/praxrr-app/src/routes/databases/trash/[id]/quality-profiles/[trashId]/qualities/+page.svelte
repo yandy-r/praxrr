@@ -1,12 +1,23 @@
 <script lang="ts">
 	import Table from '$ui/table/Table.svelte';
 	import type { Column } from '$ui/table/types.ts';
+	import type { TrashGuideQualityProfileItem } from '$lib/server/trashguide/types.ts';
 	import { page } from '$app/stores';
 
 	$: entity = $page.data.entity;
-	$: items = entity?.items ?? [];
+	$: items = entity?.items
+		? ([...entity.items] as TrashGuideQualityProfileItem[])
+		: [];
 
-	$: tableData = items.map((item: any, index: number) => ({
+	interface QualityItemRow {
+		position: number;
+		name: string;
+		allowed: boolean;
+		qualities: string[];
+		isGroup: boolean;
+	}
+
+	$: tableData: QualityItemRow[] = items.map((item: TrashGuideQualityProfileItem, index: number) => ({
 		position: index + 1,
 		name: item.name,
 		allowed: item.allowed,
@@ -29,7 +40,7 @@
 			key: 'allowed',
 			header: 'Allowed',
 			align: 'center' as const,
-			cell: (row: any) =>
+			cell: (row: QualityItemRow) =>
 				row.allowed
 					? { html: '<span class="text-emerald-600 dark:text-emerald-400">&#10003;</span>' }
 					: { html: '<span class="text-neutral-400 dark:text-neutral-600">&#10007;</span>' }
@@ -37,9 +48,9 @@
 		{
 			key: 'qualities',
 			header: 'Sub-Qualities',
-			cell: (row: any) => (row.isGroup ? row.qualities.join(', ') : '-')
+			cell: (row: QualityItemRow) => (row.isGroup ? row.qualities.join(', ') : '-')
 		}
-	] satisfies Column<any>[];
+	] satisfies Column<QualityItemRow>[];
 </script>
 
 <svelte:head>

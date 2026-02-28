@@ -34,6 +34,7 @@ Empty `trashId` returns `undefined`, indistinguishable from "entity not found." 
 **Fix:** Throw an error for empty `trashId` and let callers handle invalid ID reporting.
 **Status:** Fixed.
 Validation: Added `assertThrows` coverage in `packages/praxrr-app/src/tests/db/trashGuideEntityCache.test.ts` for empty `trashId` input.
+
 ### C-3: Same silent-return pattern in `trashIdMappings.ts`
 
 **File:** `packages/praxrr-app/src/lib/server/db/queries/trashIdMappings.ts:220-223, 256-259`
@@ -60,6 +61,8 @@ Validation: Added `packages/praxrr-app/src/tests/db/trashIdMappings.test.ts` wit
 Uses `Column<any>[]` and `(row: any)` callback patterns. Directly violates CLAUDE.md: "NEVER use `any` type, use proper types." These are new files, not legacy code. Domain types already exist and should be used.
 
 **Fix:** Define local row-shape interfaces for each table and use them in `Column<T>` generics.
+**Status:** Implemented.
+**Validation:** Updated all 5 files listed above to remove `any` usage and added typed callbacks/column generics.
 
 ### I-2: `trashId` on wrong type in discriminated union
 
@@ -68,6 +71,8 @@ Uses `Column<any>[]` and `(row: any)` callback patterns. Directly violates CLAUD
 `trashId?: string` is placed on `SourceDisplayRowBase`, making it available on PCD-sourced rows. The JSDoc says "only set for TRaSH-sourced rows" but the type system does not enforce this. This is the "invariant enforced only through documentation" anti-pattern.
 
 **Fix:** Move `trashId` off `SourceDisplayRowBase` onto `TrashSourcedDisplayRow` only, making it required (not optional).
+**Status:** Implemented.
+**Validation:** Updated `packages/praxrr-app/src/lib/shared/sources/types.ts` so `trashId` is required on `TrashSourcedDisplayRow` and absent (`never`) on PCD rows.
 
 ### I-3: `getRowHref` functions don't guard against undefined `trashId`
 
@@ -76,6 +81,8 @@ Uses `Column<any>[]` and `(row: any)` callback patterns. Directly violates CLAUD
 `format.trashId` is typed as `string | undefined`. Missing trashId produces `".../custom-formats/undefined/"` -- a broken URL silently passed as a row link.
 
 **Fix:** Return `null` when `trashId` is missing to prevent linking.
+**Status:** Implemented.
+**Validation:** Added guard checks in all 4 list pages (`custom-formats/+page.svelte`, `quality-profiles/+page.svelte`, `quality-sizes/+page.svelte`, `naming/+page.svelte`) to skip links when `trashId` is missing.
 
 ### I-4: Raw HTML interpolation of `custom_format_trash_id` in scoring page
 
@@ -84,6 +91,13 @@ Uses `Column<any>[]` and `(row: any)` callback patterns. Directly violates CLAUD
 Interpolates data into `{@html}` without escaping. While TRaSH IDs are hex-validated at parse time and the `Column<any>` bypasses type checks, this could become an XSS vector if refactored.
 
 **Fix:** Use `escapeHtml()` utility when interpolating dynamic values into `{@html}` strings.
+**Status:** Implemented.
+**Validation:** Added `src/lib/client/utils/escapeHtml.ts` and applied it in `quality-profiles/[trashId]/scoring/+page.svelte` for `custom_format_trash_id`.
+
+### Targeted validation run
+
+- `DENO_DIR=/tmp/deno_cache deno test packages/praxrr-app/src/tests/routes/trashGuideQualityProfileScoringPage.test.ts --allow-read --allow-write --allow-env --allow-ffi --allow-run --allow-net` (passed: `1 passed`, `0 failed`)
+- `DENO_DIR=/tmp/deno_cache deno test packages/praxrr-app/src/tests/routes/trashGuideSourceEntityByTrashId.test.ts --allow-read --allow-write --allow-env --allow-ffi --allow-run --allow-net` (passed: `2 passed`, `0 failed`)
 
 ### I-5: `parseCachedEntity` catch block swallows all exceptions as "Malformed JSON"
 

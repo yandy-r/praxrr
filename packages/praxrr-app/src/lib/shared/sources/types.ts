@@ -25,18 +25,18 @@ export interface TrashSourceRef {
 export type SourceRef = PcdSourceRef | TrashSourceRef;
 
 type SourceDisplayRowBase = {
-  sourceDatabaseId: number;
-  sourceDatabaseName: string;
-  /** TRaSH entity identifier for linking to detail pages. Only set for TRaSH-sourced rows. */
-  trashId?: string;
+	sourceDatabaseId: number;
+	sourceDatabaseName: string;
 };
 
 type PcdSourcedDisplayRow = SourceDisplayRowBase & {
-  sourceType: 'pcd';
+	sourceType: 'pcd';
+	trashId?: never;
 };
 
 type TrashSourcedDisplayRow = SourceDisplayRowBase & {
-  sourceType: 'trash';
+	sourceType: 'trash';
+	trashId: string;
 };
 
 /**

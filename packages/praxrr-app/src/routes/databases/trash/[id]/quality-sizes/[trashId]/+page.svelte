@@ -4,6 +4,7 @@
 	import DetailField from '../../components/DetailField.svelte';
 	import Table from '$ui/table/Table.svelte';
 	import type { Column } from '$ui/table/types.ts';
+	import type { TrashGuideQualitySizeEntry } from '$lib/server/trashguide/types.ts';
 	import { page } from '$app/stores';
 
 	$: source = $page.data.source;
@@ -11,6 +12,7 @@
 	$: fetchedAt = $page.data.fetchedAt;
 
 	$: qualities = entity?.qualities ?? [];
+	$: qualityRows = qualities as TrashGuideQualitySizeEntry[];
 
 	function formatSize(mb: number): string {
 		if (mb >= 1000) {
@@ -30,23 +32,23 @@
 			header: 'Min',
 			align: 'right' as const,
 			sortable: true,
-			cell: (row: any) => formatSize(row.min)
+			cell: (row: TrashGuideQualitySizeEntry) => formatSize(row.min)
 		},
 		{
 			key: 'preferred',
 			header: 'Preferred',
 			align: 'right' as const,
 			sortable: true,
-			cell: (row: any) => formatSize(row.preferred)
+			cell: (row: TrashGuideQualitySizeEntry) => formatSize(row.preferred)
 		},
 		{
 			key: 'max',
 			header: 'Max',
 			align: 'right' as const,
 			sortable: true,
-			cell: (row: any) => formatSize(row.max)
+			cell: (row: TrashGuideQualitySizeEntry) => formatSize(row.max)
 		}
-	] satisfies Column<any>[];
+	] satisfies Column<TrashGuideQualitySizeEntry>[];
 
 	function formatDate(date: string): string {
 		return new Date(date).toLocaleString(undefined, {
@@ -80,7 +82,7 @@
 			</h3>
 			<Table
 				columns={columns}
-				data={qualities}
+				data={qualityRows}
 				compact
 				hoverable={false}
 				emptyMessage="No quality entries defined."

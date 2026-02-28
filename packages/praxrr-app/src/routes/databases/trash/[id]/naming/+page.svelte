@@ -196,9 +196,12 @@
 		<Table
 			{columns}
 			data={sourceFiltered}
-			rowHref={(row) =>
-				`/databases/trash/${row.sourceDatabaseId ?? data.source.id}/naming/${row.trashId}/`
-			}
+			rowHref={(row) => {
+				if (!row.trashId) {
+					return null;
+				}
+				return `/databases/trash/${row.sourceDatabaseId ?? data.source.id}/naming/${row.trashId}/`;
+			}}
 			emptyMessage="No naming configs cached. Try syncing sources."
 			responsive
 			{initialSort}
