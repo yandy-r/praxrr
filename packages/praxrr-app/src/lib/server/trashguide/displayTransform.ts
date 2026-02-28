@@ -16,6 +16,7 @@ import type {
   TrashGuideEntityType,
   TrashGuideSupportedArrType,
 } from './types.ts';
+import { normalizeTrashId } from './ids.ts';
 import { parseMarkdown } from '$utils/markdown/markdown.ts';
 import { logger } from '$logger/logger.ts';
 
@@ -42,7 +43,7 @@ function toSourceFields(source: TrashGuideSourceRef, trashId: string): SourcedRe
 }
 
 function toSyntheticId(sourceId: number, trashId: string): number {
-  const normalized = trashId.trim().toLowerCase();
+  const normalized = normalizeTrashId(trashId);
   let hash = 2_166_136_261; // FNV-1a offset basis
 
   for (let index = 0; index < normalized.length; index += 1) {
@@ -159,7 +160,11 @@ export function parseCachedEntity<T extends TrashGuideEntityType>(
     }
 
     return parsed;
-  } catch {
+  } catch (error) {
+    if (!(error instanceof SyntaxError)) {
+      throw error;
+    }
+
     logMalformedCacheRow(cache, expectedEntityType, 'Malformed JSON in TRaSH cache row');
     return null;
   }

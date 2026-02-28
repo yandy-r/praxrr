@@ -98,6 +98,7 @@ Interpolates data into `{@html}` without escaping. While TRaSH IDs are hex-valid
 
 - `DENO_DIR=/tmp/deno_cache deno test packages/praxrr-app/src/tests/routes/trashGuideQualityProfileScoringPage.test.ts --allow-read --allow-write --allow-env --allow-ffi --allow-run --allow-net` (passed: `1 passed`, `0 failed`)
 - `DENO_DIR=/tmp/deno_cache deno test packages/praxrr-app/src/tests/routes/trashGuideSourceEntityByTrashId.test.ts --allow-read --allow-write --allow-env --allow-ffi --allow-run --allow-net` (passed: `2 passed`, `0 failed`)
+- `DENO_DIR=/tmp/deno_cache deno test packages/praxrr-app/src/tests/db/trashGuideEntityCache.test.ts packages/praxrr-app/src/tests/db/trashIdMappings.test.ts packages/praxrr-app/src/tests/trashguide/displayTransform.test.ts packages/praxrr-app/src/tests/routes/trashGuideSourceEntityByTrashId.test.ts --allow-read --allow-write --allow-env --allow-ffi --allow-run --allow-net` (passed: `17 passed`, `0 failed`)
 
 ### I-5: `parseCachedEntity` catch block swallows all exceptions as "Malformed JSON"
 
@@ -106,6 +107,8 @@ Interpolates data into `{@html}` without escaping. While TRaSH IDs are hex-valid
 Bare `catch` catches every possible exception, not just `JSON.parse` `SyntaxError`. Type guard bugs, `TypeError`, or `RangeError` are all mislabeled as "Malformed JSON."
 
 **Fix:** Catch only `SyntaxError`; re-throw everything else.
+**Status:** Fixed.
+**Validation:** Added a `SyntaxError` narrowing guard in `parseCachedEntity`; covered by `packages/praxrr-app/src/tests/db/trashGuideEntityCache.test.ts` and `packages/praxrr-app/src/tests/routes/trashGuideSourceEntityByTrashId.test.ts`.
 
 ### I-6: List page loaders silently drop malformed entities without user notification
 
@@ -114,6 +117,8 @@ Bare `catch` catches every possible exception, not just `JSON.parse` `SyntaxErro
 `.map().filter(row !== null)` pattern removes malformed entities silently. Users see fewer entities than expected with no indication entries were skipped.
 
 **Fix:** Track skipped count and surface it in the page data.
+**Status:** Fixed.
+**Validation:** Added `skippedEntityCount` and warning banner rendering in all four list loaders/pages.
 
 ### I-7: Duplicated `normalizeTrashId` function across 3 locations
 
@@ -126,6 +131,8 @@ Bare `catch` catches every possible exception, not just `JSON.parse` `SyntaxErro
 Three independent implementations of `trashId.trim().toLowerCase()`. If normalization rules change, all three must update in lockstep.
 
 **Fix:** Extract to a shared utility module.
+**Status:** Fixed.
+**Validation:** Added shared `normalizeTrashId` utility in `packages/praxrr-app/src/lib/server/trashguide/ids.ts` and replaced local normalization functions in cache/mappings/types/display transform.
 
 ### I-8: API response type is inline with no contract
 
@@ -134,6 +141,8 @@ Three independent implementations of `trashId.trim().toLowerCase()`. If normaliz
 The response shape is defined inline in the `json()` call with no exported interface. CLAUDE.md requires "Contract-first API: Define OpenAPI spec first, generate types, then implement."
 
 **Fix:** Define a `TrashGuideEntityDetailResponse` interface and add OpenAPI spec entry.
+**Status:** Fixed.
+**Validation:** Added explicit response typing in `+server.ts` and new OpenAPI schemas/endpoint in `docs/api/v1/openapi.yaml`.
 
 ---
 

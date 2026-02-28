@@ -6,6 +6,25 @@ import { trashGuideManager } from '$lib/server/trashguide/manager.ts';
 import { isTrashGuideEntityType, type TrashGuideEntityType } from '$shared/trashguide/types.ts';
 import { logTrashGuideRouteError, mapReadErrorStatus, parseSourceId, toErrorMessage } from '../../_helpers.ts';
 
+interface TrashGuideSourceRef {
+  type: 'trash';
+  id: number;
+  name: string;
+  arrType: 'radarr' | 'sonarr';
+}
+
+interface TrashGuideEntityDetailResponse {
+  source: TrashGuideSourceRef;
+  trashId: string;
+  type: TrashGuideEntityType;
+  name: string;
+  filePath: string;
+  fetchedAt: string;
+  entity: Record<string, unknown>;
+  scores?: Record<string, number>;
+  group?: number | null;
+}
+
 /**
  * GET /api/v1/trash-guide/sources/[id]/entities/[trashId]
  *
@@ -69,17 +88,36 @@ export const GET: RequestHandler = async ({ params, url }) => {
       throw new Error(`Invalid TRaSH cached payload for source=${sourceId} trashId=${trashId} type=${entityType}`);
     }
 
-    return json({
-      source: { type: 'trash' as const, id: source.id, name: source.name, arrType: source.arrType },
+    const parsedRecord = parsed as unknown as Record<string, unknown>;
+    const response: TrashGuideEntityDetailResponse = {
+      source: { type: 'trash', id: source.id, name: source.name, arrType: source.arrType },
       trashId: entity.trashId,
       type: entity.entityType,
       name: entity.name,
       filePath: entity.filePath,
       fetchedAt: entity.fetchedAt,
-      entity: parsed,
-    });
+      entity: parsedRecord,
+    };
+
+    if (entity.entityType === 'custom_format' && isNumberRecord(parsedRecord.scores)) {
+      response.scores = parsedRecord.scores;
+    }
+
+    if (entity.entityType === 'quality_profile') {
+      response.group = typeof parsedRecord.group === 'number' ? parsedRecord.group : null;
+    }
+
+    return json(response satisfies TrashGuideEntityDetailResponse);
   } catch (error) {
     await logTrashGuideRouteError(error, `Failed to fetch TRaSH entity trashId=${trashId} source=${sourceId}`);
     return json({ error: toErrorMessage(error) }, { status: 500 });
   }
 };
+
+function isNumberRecord(value: unknown): value is Record<string, number> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return false;
+  }
+
+  return Object.values(value).every((entry) => typeof entry === 'number');
+}

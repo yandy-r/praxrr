@@ -31,6 +31,7 @@ export const load: ServerLoad = async ({ parent }) => {
     'naming configs'
   );
 
+  let skippedEntityCount = 0;
   const rows = supportedTrashSources.flatMap((trashSource) => {
     const sourceRef: TrashGuideSourceRef = {
       id: trashSource.id,
@@ -38,10 +39,15 @@ export const load: ServerLoad = async ({ parent }) => {
       arrType: trashSource.arrType,
     };
 
-    return trashGuideEntityCacheQueries
-      .getBySourceAndType(trashSource.id, 'naming')
-      .map((cache) => toSourcedNamingListItem(cache, sourceRef))
-      .filter((row): row is SourcedNamingListItem => row !== null);
+    return trashGuideEntityCacheQueries.getBySourceAndType(trashSource.id, 'naming').flatMap((cache) => {
+      const row = toSourcedNamingListItem(cache, sourceRef);
+      if (!row) {
+        skippedEntityCount += 1;
+        return [];
+      }
+
+      return [row];
+    });
   });
 
   const namingConfigs = sortRowsByNameAndSource(rows, (a, b) => {
@@ -50,5 +56,5 @@ export const load: ServerLoad = async ({ parent }) => {
     return sourceA.localeCompare(sourceB, undefined, { sensitivity: 'base' });
   });
 
-  return { namingConfigs, sourceContext };
+  return { namingConfigs, skippedEntityCount, sourceContext };
 };

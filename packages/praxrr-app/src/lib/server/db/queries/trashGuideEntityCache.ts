@@ -5,6 +5,7 @@ import {
   type TrashGuideEntityType,
   type TrashGuideSourceArrType,
 } from '$shared/trashguide/types.ts';
+import { normalizeTrashId } from '$trashguide/ids.ts';
 
 interface TrashGuideEntityCacheRow {
   id: number;
@@ -61,10 +62,6 @@ export interface TrashGuideEntityCacheHash {
   entityType: TrashGuideEntityType;
   contentHash: string;
   filePath: string;
-}
-
-function normalizeTrashId(trashId: string): string {
-  return trashId.trim().toLowerCase();
 }
 
 function assertRowSource(entity: TrashGuideEntityCacheInput, expectedSourceId: number): void {

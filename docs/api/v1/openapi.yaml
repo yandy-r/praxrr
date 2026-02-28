@@ -18,6 +18,8 @@ tags:
     description: Release parsing and custom format evaluation
   - name: Arr
     description: Arr instance library and release endpoints
+  - name: Trash Guide
+    description: TRaSH Guide cached entity and source management
   - name: PCD
     description: PCD entity export and portable format endpoints
 
@@ -38,6 +40,64 @@ paths:
     $ref: './paths/arr.yaml#/releases'
   /arr/cleanup:
     $ref: './paths/arr.yaml#/cleanup'
+  /trash-guide/sources/{id}/entities/{trashId}:
+    get:
+      operationId: getTrashGuideSourceEntity
+      summary: Get one TRaSH cached entity
+      description: |
+        Returns a single TRaSH entity from a synced source cache by trashId.
+      tags:
+        - Trash Guide
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: TRaSH source ID
+          schema:
+            type: integer
+        - name: trashId
+          in: path
+          required: true
+          description: TRaSH entity ID (32 lowercase hex chars)
+          schema:
+            type: string
+        - name: type
+          in: query
+          required: true
+          description: TRaSH entity type
+          schema:
+            $ref: '#/components/schemas/TrashGuideEntityType'
+      responses:
+        '200':
+          description: TRaSH cached entity
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TrashGuideEntityDetailResponse'
+        '400':
+          description: Missing or invalid source/id/type parameter
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PcdErrorResponse'
+        '404':
+          description: Source or TRaSH entity not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PcdErrorResponse'
+        '422':
+          description: Invalid entity type
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PcdErrorResponse'
+        '500':
+          description: Failed to read TRaSH entity cache
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PcdErrorResponse'
   /sync/preview:
     $ref: './paths/sync.yaml#/preview'
   /sync/preview/{previewId}:
@@ -410,6 +470,66 @@ components:
       $ref: './schemas/sync.yaml#/SyncPreviewSummary'
     SyncPreviewResult:
       $ref: './schemas/sync.yaml#/SyncPreviewResult'
+    TrashGuideEntityType:
+      type: string
+      enum:
+        - custom_format
+        - quality_profile
+        - quality_size
+        - naming
+    TrashGuideEntityDetailResponse:
+      type: object
+      required:
+        - source
+        - trashId
+        - type
+        - name
+        - filePath
+        - fetchedAt
+        - entity
+      properties:
+        source:
+          type: object
+          required:
+            - type
+            - id
+            - name
+            - arrType
+          properties:
+            type:
+              type: string
+              enum:
+                - trash
+            id:
+              type: integer
+            name:
+              type: string
+            arrType:
+              type: string
+              enum:
+                - radarr
+                - sonarr
+        trashId:
+          type: string
+        type:
+          $ref: '#/components/schemas/TrashGuideEntityType'
+        name:
+          type: string
+        filePath:
+          type: string
+        fetchedAt:
+          type: string
+          format: date-time
+        entity:
+          type: object
+          additionalProperties: true
+        scores:
+          type: object
+          additionalProperties:
+            type: number
+        group:
+          type: integer
+          nullable: true
     # PCD
     EntityType:
       $ref: './schemas/pcd.yaml#/EntityType'

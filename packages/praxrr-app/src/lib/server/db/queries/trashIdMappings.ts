@@ -1,5 +1,6 @@
 import { db } from '../db.ts';
 import { parseTrashGuideSourceArrType, type TrashGuideSourceArrType } from '$lib/server/trashguide/types.ts';
+import { normalizeTrashId } from '$trashguide/ids.ts';
 
 export type TrashIdMappingEntityType = 'custom_format' | 'quality_profile' | 'quality_size' | 'naming';
 
@@ -48,10 +49,6 @@ export interface TrashIdMappingDiff {
   renamed: TrashIdMappingRename[];
   unchanged: TrashIdMapping[];
   removed: TrashIdMapping[];
-}
-
-function normalizeTrashId(trashId: string): string {
-  return trashId.trim().toLowerCase();
 }
 
 function parseEntityType(raw: string): TrashIdMappingEntityType {

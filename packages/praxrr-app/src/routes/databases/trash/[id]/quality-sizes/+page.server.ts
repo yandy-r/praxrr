@@ -34,6 +34,7 @@ export const load: ServerLoad = async ({ parent }) => {
     'quality sizes'
   );
 
+  let skippedEntityCount = 0;
   const qualitySizes = supportedTrashSources.flatMap((trashSource) => {
     const sourceRef: TrashGuideSourceRef = {
       id: trashSource.id,
@@ -41,10 +42,15 @@ export const load: ServerLoad = async ({ parent }) => {
       arrType: trashSource.arrType,
     };
 
-    return trashGuideEntityCacheQueries
-      .getBySourceAndType(trashSource.id, 'quality_size')
-      .map((cache) => toSourcedQualityDefinitionListItem(cache, sourceRef))
-      .filter((row): row is SourcedQualityDefinitionListItem => row !== null);
+    return trashGuideEntityCacheQueries.getBySourceAndType(trashSource.id, 'quality_size').flatMap((cache) => {
+      const row = toSourcedQualityDefinitionListItem(cache, sourceRef);
+      if (!row) {
+        skippedEntityCount += 1;
+        return [];
+      }
+
+      return [row];
+    });
   });
   const sorted = sortRowsByNameAndSource(qualitySizes, (a, b) => {
     const sourceA = a.sourceDatabaseName ?? '';
@@ -52,5 +58,5 @@ export const load: ServerLoad = async ({ parent }) => {
     return sourceA.localeCompare(sourceB, undefined, { sensitivity: 'base' });
   });
 
-  return { qualitySizes: sorted, sourceContext };
+  return { qualitySizes: sorted, skippedEntityCount, sourceContext };
 };

@@ -31,6 +31,7 @@ export const load: ServerLoad = async ({ parent }) => {
     'quality profiles'
   );
 
+  let skippedEntityCount = 0;
   const rows = supportedTrashSources.flatMap((trashSource) => {
     const sourceRef: TrashGuideSourceRef = {
       id: trashSource.id,
@@ -38,10 +39,15 @@ export const load: ServerLoad = async ({ parent }) => {
       arrType: trashSource.arrType,
     };
 
-    return trashGuideEntityCacheQueries
-      .getBySourceAndType(trashSource.id, 'quality_profile')
-      .map((cache) => toSourcedQualityProfileRow(cache, sourceRef))
-      .filter((row): row is QualityProfileTableRow => row !== null);
+    return trashGuideEntityCacheQueries.getBySourceAndType(trashSource.id, 'quality_profile').flatMap((cache) => {
+      const row = toSourcedQualityProfileRow(cache, sourceRef);
+      if (!row) {
+        skippedEntityCount += 1;
+        return [];
+      }
+
+      return [row];
+    });
   });
 
   const qualityProfiles = sortRowsByNameAndSource(rows, (a, b) => {
@@ -55,5 +61,5 @@ export const load: ServerLoad = async ({ parent }) => {
     return a.id - b.id;
   });
 
-  return { qualityProfiles, sourceContext };
+  return { qualityProfiles, skippedEntityCount, sourceContext };
 };

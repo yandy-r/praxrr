@@ -36,6 +36,7 @@
 	$: qualityProfiles = data.qualityProfiles ?? [];
 	$: availableSources = data.sourceContext.availableSources;
 	$: sourceFilterDisabledReason = data.sourceContext.filterDisabledReason;
+	$: skippedEntityCount = data.skippedEntityCount ?? 0;
 	$: fallbackSourceKey = toSourceFilterKey({
 		type: 'trash',
 		id: data.source.id,
@@ -180,6 +181,14 @@
 			/>
 		</div>
 	</ActionsBar>
+
+	{#if skippedEntityCount > 0}
+		<div
+			class="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-900 dark:text-amber-200"
+		>
+			{skippedEntityCount} malformed row(s) were skipped because cached TRaSH data could not be parsed.
+		</div>
+	{/if}
 
 	{#if qualityProfiles.length === 0}
 		<div

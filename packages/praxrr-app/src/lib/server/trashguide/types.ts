@@ -3,6 +3,7 @@
  */
 
 import type { ArrAppType } from '$shared/pcd/types.ts';
+import { normalizeTrashId } from './ids.ts';
 import {
   isTrashGuideEntityType,
   isTrashGuideSupportedArrType,
@@ -59,11 +60,16 @@ export interface TrashGuideEntityIdentity {
 }
 
 export function isTrashGuideId(value: string): value is TrashGuideId {
-  return /^[a-f0-9]{32}$/i.test(value.trim());
+  const normalized = normalizeTrashId(value);
+  if (!normalized) {
+    return false;
+  }
+
+  return /^[a-f0-9]{32}$/.test(normalized);
 }
 
 export function toTrashGuideId(value: string): TrashGuideId {
-  const normalized = value.trim().toLowerCase();
+  const normalized = normalizeTrashId(value);
   if (!isTrashGuideId(normalized)) {
     throw new Error(`Invalid Trash Guide ID: ${value}`);
   }

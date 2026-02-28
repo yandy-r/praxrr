@@ -33,6 +33,7 @@ export const load: ServerLoad = async ({ parent }) => {
     'custom formats'
   );
 
+  let skippedEntityCount = 0;
   const customFormatRows = supportedTrashSources.flatMap((trashSource) => {
     const sourceRef: TrashGuideSourceRef = {
       id: trashSource.id,
@@ -40,10 +41,15 @@ export const load: ServerLoad = async ({ parent }) => {
       arrType: trashSource.arrType,
     };
 
-    return trashGuideEntityCacheQueries
-      .getBySourceAndType(trashSource.id, 'custom_format')
-      .map((cache) => toSourcedCustomFormatRow(cache, sourceRef))
-      .filter((row): row is CustomFormatTableRow => row !== null);
+    return trashGuideEntityCacheQueries.getBySourceAndType(trashSource.id, 'custom_format').flatMap((cache) => {
+      const row = toSourcedCustomFormatRow(cache, sourceRef);
+      if (!row) {
+        skippedEntityCount += 1;
+        return [];
+      }
+
+      return [row];
+    });
   });
 
   const customFormats = sortRowsByNameAndSource(customFormatRows, (a, b) => {
@@ -52,5 +58,5 @@ export const load: ServerLoad = async ({ parent }) => {
     return sourceA.localeCompare(sourceB, undefined, { sensitivity: 'base' });
   });
 
-  return { customFormats, sourceContext };
+  return { customFormats, skippedEntityCount, sourceContext };
 };
