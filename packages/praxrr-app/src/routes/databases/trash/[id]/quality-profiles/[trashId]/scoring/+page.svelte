@@ -44,7 +44,7 @@
 </svelte:head>
 
 <div class="mt-6">
-	{#if scoringItems.length === 0}
+	{#if scoringRows.length === 0}
 		<div
 			class="rounded-lg border border-neutral-200 bg-white p-8 text-center dark:border-neutral-800 dark:bg-neutral-900"
 		>

@@ -13,7 +13,7 @@
 		position: number;
 		name: string;
 		allowed: boolean;
-		qualities: string[];
+		qualities: readonly string[];
 		isGroup: boolean;
 	}
 

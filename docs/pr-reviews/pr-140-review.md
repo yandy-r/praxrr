@@ -99,6 +99,7 @@ Interpolates data into `{@html}` without escaping. While TRaSH IDs are hex-valid
 - `DENO_DIR=/tmp/deno_cache deno test packages/praxrr-app/src/tests/routes/trashGuideQualityProfileScoringPage.test.ts --allow-read --allow-write --allow-env --allow-ffi --allow-run --allow-net` (passed: `1 passed`, `0 failed`)
 - `DENO_DIR=/tmp/deno_cache deno test packages/praxrr-app/src/tests/routes/trashGuideSourceEntityByTrashId.test.ts --allow-read --allow-write --allow-env --allow-ffi --allow-run --allow-net` (passed: `2 passed`, `0 failed`)
 - `DENO_DIR=/tmp/deno_cache deno test packages/praxrr-app/src/tests/db/trashGuideEntityCache.test.ts packages/praxrr-app/src/tests/db/trashIdMappings.test.ts packages/praxrr-app/src/tests/trashguide/displayTransform.test.ts packages/praxrr-app/src/tests/routes/trashGuideSourceEntityByTrashId.test.ts --allow-read --allow-write --allow-env --allow-ffi --allow-run --allow-net` (passed: `17 passed`, `0 failed`)
+- `deno task test && deno task build` (passed: all tests/build succeeded)
 
 ### I-5: `parseCachedEntity` catch block swallows all exceptions as "Malformed JSON"
 
