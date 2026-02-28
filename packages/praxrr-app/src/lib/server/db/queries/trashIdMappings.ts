@@ -1,5 +1,6 @@
 import { db } from '../db.ts';
 import { parseTrashGuideSourceArrType, type TrashGuideSourceArrType } from '$lib/server/trashguide/types.ts';
+import { normalizeTrashId } from '$trashguide/ids.ts';
 
 export type TrashIdMappingEntityType = 'custom_format' | 'quality_profile' | 'quality_size' | 'naming';
 
@@ -61,7 +62,7 @@ function parseEntityType(raw: string): TrashIdMappingEntityType {
 function rowToMapping(row: TrashIdMappingRow): TrashIdMapping {
   return {
     sourceId: row.source_id,
-    trashId: row.trash_id,
+    trashId: normalizeTrashId(row.trash_id),
     arrType: parseTrashGuideSourceArrType(row.arr_type),
     entityType: parseEntityType(row.entity_type),
     entityName: row.entity_name,
@@ -85,7 +86,7 @@ function buildMappingKey(input: {
   readonly trashId: string;
   readonly entityType: TrashIdMappingEntityType;
 }): string {
-  return `${input.sourceId}:${input.entityType}:${input.trashId}`;
+  return `${input.sourceId}:${input.entityType}:${normalizeTrashId(input.trashId)}`;
 }
 
 function normalizeMappings(
@@ -97,17 +98,26 @@ function normalizeMappings(
   for (const mapping of mappings) {
     assertSource(mapping, sourceId);
     assertArrType(mapping, arrType);
+    const normalizedTrashId = normalizeTrashId(mapping.trashId);
+    if (!normalizedTrashId) {
+      throw new Error(`TRaSH mapping trash_id must be non-empty (source=${sourceId})`);
+    }
 
-    const key = buildMappingKey(mapping);
+    const normalizedMapping: TrashIdMappingInput = {
+      ...mapping,
+      trashId: normalizedTrashId,
+    };
+
+    const key = buildMappingKey(normalizedMapping);
     const existing = unique.get(key);
     if (!existing) {
-      unique.set(key, mapping);
+      unique.set(key, normalizedMapping);
       continue;
     }
 
-    if (existing.entityName !== mapping.entityName) {
+    if (existing.entityName !== normalizedMapping.entityName) {
       throw new Error(
-        `Conflicting TRaSH mapping rows for ${mapping.entityType}:${mapping.trashId} (source=${sourceId})`
+        `Conflicting TRaSH mapping rows for ${normalizedMapping.entityType}:${normalizedMapping.trashId} (source=${sourceId})`
       );
     }
   }
@@ -204,6 +214,11 @@ export const trashIdMappingsQueries = {
     trashId: string,
     entityType?: TrashIdMappingEntityType
   ): TrashIdMapping[] {
+    const normalizedTrashId = normalizeTrashId(trashId);
+    if (!normalizedTrashId) {
+      throw new Error('TRaSH mapping trash_id must be non-empty');
+    }
+
     const rows = entityType
       ? db.query<TrashIdMappingRow>(
           `SELECT source_id, trash_id, arr_type, entity_type, entity_name
@@ -211,7 +226,7 @@ export const trashIdMappingsQueries = {
 					 WHERE arr_type = ? AND trash_id = ? AND entity_type = ?
 					 ORDER BY source_id ASC`,
           arrType,
-          trashId,
+          normalizedTrashId,
           entityType
         )
       : db.query<TrashIdMappingRow>(
@@ -220,7 +235,7 @@ export const trashIdMappingsQueries = {
 					 WHERE arr_type = ? AND trash_id = ?
 					 ORDER BY source_id ASC, entity_type ASC`,
           arrType,
-          trashId
+          normalizedTrashId
         );
 
     return rows.map(rowToMapping);
@@ -235,6 +250,11 @@ export const trashIdMappingsQueries = {
     trashId: string,
     entityType: TrashIdMappingEntityType
   ): TrashIdMapping | undefined {
+    const normalizedTrashId = normalizeTrashId(trashId);
+    if (!normalizedTrashId) {
+      throw new Error(`TRaSH mapping trash_id must be non-empty (source=${sourceId})`);
+    }
+
     const row = db.queryFirst<TrashIdMappingRow>(
       `SELECT source_id, trash_id, arr_type, entity_type, entity_name
 			 FROM trash_id_mappings
@@ -242,7 +262,7 @@ export const trashIdMappingsQueries = {
 			 LIMIT 1`,
       sourceId,
       arrType,
-      trashId,
+      normalizedTrashId,
       entityType
     );
     return row ? rowToMapping(row) : undefined;
@@ -252,6 +272,11 @@ export const trashIdMappingsQueries = {
    * Upsert one mapping row.
    */
   upsert(mapping: TrashIdMappingInput): number {
+    const normalizedTrashId = normalizeTrashId(mapping.trashId);
+    if (!normalizedTrashId) {
+      throw new Error(`TRaSH mapping trash_id must be non-empty (source=${mapping.sourceId})`);
+    }
+
     return db.execute(
       `INSERT INTO trash_id_mappings (source_id, trash_id, arr_type, entity_type, entity_name)
 			 VALUES (?, ?, ?, ?, ?)
@@ -260,7 +285,7 @@ export const trashIdMappingsQueries = {
 			   arr_type = excluded.arr_type,
 			   entity_name = excluded.entity_name`,
       mapping.sourceId,
-      mapping.trashId,
+      normalizedTrashId,
       mapping.arrType,
       mapping.entityType,
       mapping.entityName

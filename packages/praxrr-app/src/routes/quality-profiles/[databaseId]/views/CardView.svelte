@@ -76,7 +76,9 @@
 
 	function getCardHref(profile: QualityProfileTableRow): string | undefined {
 		if (isTrashRow(profile)) {
-			return undefined;
+			return profile.trashId
+				? `/databases/trash/${profile.sourceDatabaseId}/quality-profiles/${profile.trashId}/`
+				: undefined;
 		}
 
 		return `/quality-profiles/${resolveSourceDatabaseId(profile)}/${profile.id}/general`;

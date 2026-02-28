@@ -143,7 +143,9 @@
 
 	function getRowHref(config: SourcedQualityDefinitionListItem): string | null {
 		if (isTrashRow(config)) {
-			return null;
+			return config.trashId
+				? `/databases/trash/${config.sourceDatabaseId}/quality-sizes/${config.trashId}/`
+				: null;
 		}
 
 		const sourceDatabaseId = resolveSourceDatabaseId(config);

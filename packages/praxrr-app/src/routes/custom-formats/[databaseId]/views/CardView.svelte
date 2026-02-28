@@ -55,7 +55,9 @@
 
 	function getCardHref(row: CustomFormatTableRow): string | undefined {
 		if (isTrashRow(row)) {
-			return undefined;
+			return row.trashId
+				? `/databases/trash/${row.sourceDatabaseId}/custom-formats/${row.trashId}/`
+				: undefined;
 		}
 
 		return `/custom-formats/${resolveSourceDatabaseId(row)}/${row.id}`;

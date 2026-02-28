@@ -64,6 +64,7 @@ import { migration as migration20260223CreateStartupPullRuns } from './migration
 import { migration as migration20260224NormalizeNamingCharacterReplacementDefaults } from './migrations/20260224_normalize_naming_character_replacement_defaults.ts';
 import { migration as migration20260225RemoveEmbeddedLidarrSeedOps } from './migrations/20260225_remove_embedded_lidarr_seed_ops.ts';
 import { migration as migration20260226CreateTrashGuideTables } from './migrations/20260226_create_trash_guide_tables.ts';
+import { migration as migration20260227NormalizeTrashGuideTrashIds } from './migrations/20260227_normalize_trash_guide_trash_ids.ts';
 
 export interface Migration {
   version: number;
@@ -357,6 +358,7 @@ export function loadMigrations(): Migration[] {
     migration20260224NormalizeNamingCharacterReplacementDefaults,
     migration20260225RemoveEmbeddedLidarrSeedOps,
     migration20260226CreateTrashGuideTables,
+    migration20260227NormalizeTrashGuideTrashIds,
   ];
 
   // Sort by version number

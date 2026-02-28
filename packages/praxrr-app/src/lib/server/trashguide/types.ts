@@ -3,7 +3,15 @@
  */
 
 import type { ArrAppType } from '$shared/pcd/types.ts';
+import { normalizeTrashId } from './ids.ts';
 import {
+  isTrashGuideEntityType,
+  isTrashGuideSupportedArrType,
+  parseTrashGuideEntityType,
+  parseTrashGuideSourceArrType,
+  TRASHGUIDE_ENTITY_TYPES,
+  TRASHGUIDE_SUPPORTED_ARR_TYPES,
+  TRASHGUIDE_SYNC_SECTION_TYPES,
   type TrashGuideEntityType,
   type TrashGuideSyncConfig,
   type TrashGuideSyncQualityProfileSourceHydration,
@@ -13,23 +21,16 @@ import {
   type TrashGuideSyncSourceHydration,
   type TrashGuideSyncStatus,
   type TrashGuideSyncTrigger,
-  TRASHGUIDE_ENTITY_TYPES,
-  TRASHGUIDE_SUPPORTED_ARR_TYPES,
-  TRASHGUIDE_SYNC_SECTION_TYPES,
-  isTrashGuideEntityType,
-  isTrashGuideSupportedArrType,
-  parseTrashGuideEntityType,
-  parseTrashGuideSourceArrType,
 } from '$shared/trashguide/types.ts';
 
 export {
-  TRASHGUIDE_ENTITY_TYPES,
-  TRASHGUIDE_SUPPORTED_ARR_TYPES,
-  TRASHGUIDE_SYNC_SECTION_TYPES,
   isTrashGuideEntityType,
   isTrashGuideSupportedArrType,
   parseTrashGuideEntityType,
   parseTrashGuideSourceArrType,
+  TRASHGUIDE_ENTITY_TYPES,
+  TRASHGUIDE_SUPPORTED_ARR_TYPES,
+  TRASHGUIDE_SYNC_SECTION_TYPES,
   type TrashGuideEntityType,
   type TrashGuideSyncConfig,
   type TrashGuideSyncQualityProfileSourceHydration,
@@ -59,15 +60,21 @@ export interface TrashGuideEntityIdentity {
 }
 
 export function isTrashGuideId(value: string): value is TrashGuideId {
-  return /^[a-f0-9]{32}$/i.test(value.trim());
+  const normalized = normalizeTrashId(value);
+  if (!normalized) {
+    return false;
+  }
+
+  return /^[a-f0-9]{32}$/.test(normalized);
 }
 
 export function toTrashGuideId(value: string): TrashGuideId {
-  if (!isTrashGuideId(value)) {
+  const normalized = normalizeTrashId(value);
+  if (!isTrashGuideId(normalized)) {
     throw new Error(`Invalid Trash Guide ID: ${value}`);
   }
 
-  return value as TrashGuideId;
+  return normalized as TrashGuideId;
 }
 
 export function asTrashGuideId(value: string): TrashGuideId {

@@ -141,6 +141,7 @@ Deno.test('toSourcedCustomFormatRow: maps specifications and source metadata', (
     sourceType: 'trash',
     sourceDatabaseId: 12,
     sourceDatabaseName: 'TRaSH Source',
+    trashId,
   });
 });
 

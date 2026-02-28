@@ -53,7 +53,9 @@
 
 	function getRowHref(row: QualityProfileTableRow): string | null {
 		if (isTrashRow(row)) {
-			return null;
+			return row.trashId
+				? `/databases/trash/${row.sourceDatabaseId}/quality-profiles/${row.trashId}/`
+				: null;
 		}
 
 		return `/quality-profiles/${resolveSourceDatabaseId(row)}/${row.id}/general`;

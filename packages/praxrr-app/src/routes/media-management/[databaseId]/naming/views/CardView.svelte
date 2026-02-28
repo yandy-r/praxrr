@@ -104,7 +104,9 @@
 
 	function getConfigHref(config: SourcedNamingListItem): string | undefined {
 		if (isTrashRow(config)) {
-			return undefined;
+			return config.trashId
+				? `/databases/trash/${config.sourceDatabaseId}/naming/${config.trashId}/`
+				: undefined;
 		}
 
 		const sourceDatabaseId = resolveSourceDatabaseId(config);

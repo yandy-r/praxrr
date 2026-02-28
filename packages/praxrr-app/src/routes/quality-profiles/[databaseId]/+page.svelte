@@ -61,17 +61,27 @@
     }
   }
 
-  function withSourceFallback(profile: QualityProfileTableRow): QualityProfileTableRow {
-    if (profile.sourceType && profile.sourceDatabaseId != null && profile.sourceDatabaseName) {
+  type QualityProfileTableRowWithOptionalTrashId = QualityProfileTableRow & {
+    trashId?: string;
+  };
+
+  function withSourceFallback(profile: QualityProfileTableRowWithOptionalTrashId): QualityProfileTableRow {
+    if (profile.sourceType === 'trash') {
       return profile;
     }
 
-    return {
-      ...profile,
-      sourceType: 'pcd',
-      sourceDatabaseId: data.currentDatabase.id,
-      sourceDatabaseName: data.currentDatabase.name,
-    };
+    const { trashId: _trashId, ...pcdProfile } = profile;
+
+    if (profile.sourceDatabaseId == null || !profile.sourceDatabaseName) {
+      return {
+        ...pcdProfile,
+        sourceType: 'pcd',
+        sourceDatabaseId: data.currentDatabase.id,
+        sourceDatabaseName: data.currentDatabase.name,
+      } as QualityProfileTableRow;
+    }
+
+    return pcdProfile as QualityProfileTableRow;
   }
 
   // Initialize data page store
