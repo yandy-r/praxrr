@@ -17,7 +17,9 @@
 		isGroup: boolean;
 	}
 
-	$: tableData: QualityItemRow[] = items.map((item: TrashGuideQualityProfileItem, index: number) => ({
+	let tableData: QualityItemRow[] = [];
+
+	$: tableData = items.map((item: TrashGuideQualityProfileItem, index: number) => ({
 		position: index + 1,
 		name: item.name,
 		allowed: item.allowed,

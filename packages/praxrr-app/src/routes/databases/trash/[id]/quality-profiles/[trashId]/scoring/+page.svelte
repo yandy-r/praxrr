@@ -1,7 +1,7 @@
 <script lang="ts">
 	import Table from '$ui/table/Table.svelte';
 	import type { Column } from '$ui/table/types.ts';
-	import { escapeHtml } from '$client/utils/escapeHtml.ts';
+	import { escapeHtml } from '$lib/client/utils/escapeHtml.ts';
 	import { page } from '$app/stores';
 
 	$: entity = $page.data.entity;
