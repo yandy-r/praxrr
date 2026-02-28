@@ -219,7 +219,7 @@ export const trashIdMappingsQueries = {
   ): TrashIdMapping[] {
     const normalizedTrashId = normalizeTrashId(trashId);
     if (!normalizedTrashId) {
-      return [];
+      throw new Error('TRaSH mapping trash_id must be non-empty');
     }
 
     const rows = entityType
@@ -255,7 +255,7 @@ export const trashIdMappingsQueries = {
   ): TrashIdMapping | undefined {
     const normalizedTrashId = normalizeTrashId(trashId);
     if (!normalizedTrashId) {
-      return undefined;
+      throw new Error(`TRaSH mapping trash_id must be non-empty (source=${sourceId})`);
     }
 
     const row = db.queryFirst<TrashIdMappingRow>(

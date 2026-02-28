@@ -283,7 +283,7 @@ export const trashGuideEntityCacheQueries = {
   getByKey(sourceId: number, trashId: string, entityType: TrashGuideEntityType): TrashGuideEntityCache | undefined {
     const normalizedTrashId = normalizeTrashId(trashId);
     if (!normalizedTrashId) {
-      return undefined;
+      throw new Error(`TRaSH cache trash_id must be non-empty (source=${sourceId})`);
     }
 
     const row = db.queryFirst<TrashGuideEntityCacheRow>(
@@ -346,7 +346,7 @@ export const trashGuideEntityCacheQueries = {
   hasContentChanged(sourceId: number, trashId: string, entityType: TrashGuideEntityType, contentHash: string): boolean {
     const normalizedTrashId = normalizeTrashId(trashId);
     if (!normalizedTrashId) {
-      return false;
+      throw new Error(`TRaSH cache trash_id must be non-empty (source=${sourceId})`);
     }
 
     const row = db.queryFirst<{ content_hash: string }>(

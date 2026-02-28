@@ -21,6 +21,8 @@ When `trashId` is empty/whitespace, the function returns `false` ("content has n
 Violates CLAUDE.md: "ALWAYS throw errors early and often. Do not use fallbacks."
 
 **Fix:** Throw an error for empty trashId on this write-path helper.
+**Status:** Fixed.
+Validation: Added `assertThrows` coverage in `packages/praxrr-app/src/tests/db/trashGuideEntityCache.test.ts` for empty `trashId` input.
 
 ### C-2: `getByKey` silently returns `undefined` on empty trashId
 
@@ -29,12 +31,17 @@ Violates CLAUDE.md: "ALWAYS throw errors early and often. Do not use fallbacks."
 Empty `trashId` returns `undefined`, indistinguishable from "entity not found." All page server load functions and the API endpoint inherit this deception. A URL like `/databases/trash/1/custom-formats/%20/general` shows "not found" instead of "invalid ID."
 
 **Systemic pattern:** Write operations (`upsert`) correctly throw on empty trashId, but read operations silently return "not found" values. This asymmetry means corrupted lookups produce wrong results silently.
-
+**Fix:** Throw an error for empty `trashId` and let callers handle invalid ID reporting.
+**Status:** Fixed.
+Validation: Added `assertThrows` coverage in `packages/praxrr-app/src/tests/db/trashGuideEntityCache.test.ts` for empty `trashId` input.
 ### C-3: Same silent-return pattern in `trashIdMappings.ts`
 
 **File:** `packages/praxrr-app/src/lib/server/db/queries/trashIdMappings.ts:220-223, 256-259`
 
 `getByArrTypeAndTrashId` returns `[]` and `getByIdentity` returns `undefined` on empty trashId, while `upsert` correctly throws. Inconsistent validation between read and write paths.
+**Fix:** Replace silent returns with consistent throw-fast validation and return typed results only when input is valid.
+**Status:** Fixed.
+Validation: Added `packages/praxrr-app/src/tests/db/trashIdMappings.test.ts` with throw assertions for empty `trashId` in `getByArrTypeAndTrashId` and `getByIdentity`.
 
 ---
 

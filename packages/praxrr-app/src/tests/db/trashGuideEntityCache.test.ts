@@ -1,4 +1,4 @@
-import { assertEquals } from '@std/assert';
+import { assertEquals, assertThrows } from '@std/assert';
 import { db } from '../../lib/server/db/db.ts';
 import { trashGuideEntityCacheQueries } from '../../lib/server/db/queries/trashGuideEntityCache.ts';
 
@@ -44,6 +44,16 @@ Deno.test('hasContentChanged returns false for missing cache rows', () => {
       restore();
     }
   }
+});
+
+Deno.test('hasContentChanged throws for empty trashId', () => {
+  assertThrows(
+    () => {
+      trashGuideEntityCacheQueries.hasContentChanged(11, '   ', 'quality_profile', 'abc');
+    },
+    Error,
+    'TRaSH cache trash_id must be non-empty (source=11)'
+  );
 });
 
 Deno.test('hasContentChanged returns false when row exists and content hash matches', () => {
@@ -116,6 +126,16 @@ Deno.test('getByKey normalizes trashId lookup to lowercase', () => {
       restore();
     }
   }
+});
+
+Deno.test('getByKey throws for empty trashId', () => {
+  assertThrows(
+    () => {
+      trashGuideEntityCacheQueries.getByKey(44, '   ', 'custom_format');
+    },
+    Error,
+    'TRaSH cache trash_id must be non-empty (source=44)'
+  );
 });
 
 Deno.test('getBySourceTypeAndTrashIds normalizes and deduplicates id list', () => {
