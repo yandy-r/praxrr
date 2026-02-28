@@ -62,10 +62,40 @@ services:
       watch:
         - action: rebuild
           path: ./packages/praxrr-app
+          ignore:
+            - node_modules
+            - dist
+            - ./**/*.md
+            - .github/**
+            - .vscode/**
+            - .dockerignore
+            - .gitignore
+            - .prettierignore
+            - .eslintignore
         - action: rebuild
           path: ./packages/praxrr-db
+          ignore:
+            - node_modules
+            - dist
+            - ./**/*.md
+            - .github/**
+            - .vscode/**
+            - .dockerignore
+            - .gitignore
+            - .prettierignore
+            - .eslintignore
         - action: rebuild
           path: ./packages/praxrr-schema
+          ignore:
+            - node_modules
+            - dist
+            - ./**/*.md
+            - .github/**
+            - .vscode/**
+            - .dockerignore
+            - .gitignore
+            - .prettierignore
+            - .eslintignore
         - action: rebuild
           path: ./deno.json
         - action: rebuild
@@ -84,5 +114,15 @@ services:
       watch:
         - action: rebuild
           path: ./packages/praxrr-parser
+          ignore:
+            - node_modules
+            - dist
+            - ./**/*.md
+            - .github/**
+            - .vscode/**
+            - .dockerignore
+            - .gitignore
+            - .prettierignore
+            - .eslintignore
         - action: rebuild
           path: ./Dockerfile.parser
