@@ -57,6 +57,7 @@ All four API catch blocks return HTTP 500 with raw `err.message` exposed to clie
 `createAutoSnapshot` already catches everything internally and returns `null`. The outer catch blocks in callers are dead code that will never execute. This confuses maintainers and fragments diagnostic context across two non-overlapping catch blocks.
 
 **Fix:** Remove the outer try/catch in `arrSync.ts` and `manager.ts` since `createAutoSnapshot` guarantees null-on-failure. If caller context is needed in logs, pass it via the input type.
+**Status:** Fixed (2026-03-01). Removed snapshot-specific outer `try/catch` blocks around `createAutoSnapshot` in both `arrSync.ts` and `pcd/core/manager.ts`.
 
 ### 5. Pre-pull snapshot errors logged as `warn` with no stack trace
 
@@ -67,6 +68,7 @@ All four API catch blocks return HTTP 500 with raw `err.message` exposed to clie
 Both catch blocks use `logger.warn` with `String(snapshotError)`, discarding the stack trace entirely. Failing to create a safety checkpoint before a destructive pull is an error-level condition, not a warning. `String()` coercion produces `[object Object]` for many error types.
 
 **Fix:** Use `logger.error`. Include `error.message` and `error.stack` when the error is an `Error` instance.
+**Status:** Fixed (2026-03-01). Pre-pull snapshot catch wrappers were removed in `manager.ts`; snapshot creation failures now log from `snapshotService` as `logger.error` with `error.message` and stack metadata.
 
 ---
 

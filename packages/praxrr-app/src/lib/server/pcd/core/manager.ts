@@ -171,18 +171,11 @@ class PCDManager {
     try {
       if (isLocalRepositorySource(instance.repository_url)) {
         // Pre-pull snapshot for local-path sources (best-effort, non-blocking)
-        try {
-          await snapshotService.createAutoSnapshot({
-            databaseId: id,
-            trigger: 'pull',
-            targetInstanceIds: null,
-          });
-        } catch (snapshotError) {
-          await logger.warn('Pre-pull snapshot failed', {
-            source: 'PCDManager',
-            meta: { databaseId: id, error: String(snapshotError) },
-          });
-        }
+        await snapshotService.createAutoSnapshot({
+          databaseId: id,
+          trigger: 'pull',
+          targetInstanceIds: null,
+        });
 
         await refreshLocalRepositoryClone(instance.repository_url, instance.local_path);
 
@@ -242,18 +235,11 @@ class PCDManager {
       }
 
       // Pre-pull snapshot for remote sources (best-effort, non-blocking)
-      try {
-        await snapshotService.createAutoSnapshot({
-          databaseId: id,
-          trigger: 'pull',
-          targetInstanceIds: null,
-        });
-      } catch (snapshotError) {
-        await logger.warn('Pre-pull snapshot failed', {
-          source: 'PCDManager',
-          meta: { databaseId: id, error: String(snapshotError) },
-        });
-      }
+      await snapshotService.createAutoSnapshot({
+        databaseId: id,
+        trigger: 'pull',
+        targetInstanceIds: null,
+      });
 
       // Pull updates
       await pull(instance.local_path);

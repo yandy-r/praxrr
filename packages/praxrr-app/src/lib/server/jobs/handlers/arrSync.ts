@@ -271,19 +271,12 @@ const arrSyncHandler: JobHandler = async (job) => {
   }
 
   // Pre-sync snapshots: capture PCD state before Arr sync writes
-  try {
-    const snapshotDatabaseIds = collectSnapshotDatabaseIds(instanceId, sectionsToRun);
-    for (const databaseId of snapshotDatabaseIds) {
-      await snapshotService.createAutoSnapshot({
-        databaseId,
-        trigger: 'sync',
-        targetInstanceIds: [instanceId],
-      });
-    }
-  } catch (snapshotError) {
-    await logger.warn('Pre-sync snapshot failed', {
-      source: 'ArrSyncJob',
-      meta: { jobId: job.id, instanceId, error: String(snapshotError) },
+  const snapshotDatabaseIds = collectSnapshotDatabaseIds(instanceId, sectionsToRun);
+  for (const databaseId of snapshotDatabaseIds) {
+    await snapshotService.createAutoSnapshot({
+      databaseId,
+      trigger: 'sync',
+      targetInstanceIds: [instanceId],
     });
   }
 

@@ -198,9 +198,9 @@ function isDuplicate(
   }
 
   // Check time window: interpret DB timestamp as UTC so elapsed time is environment-independent
-  const createdAtMs = parseCreatedAtUtc(latest.created_at);
-  const now = Date.now();
-  const elapsedSeconds = (now - createdAtMs) / 1000;
+    const createdAtMs = parseCreatedAtUtc(latest.created_at);
+    const now = Date.now();
+    const elapsedSeconds = (now - createdAtMs) / 1000;
 
   return elapsedSeconds <= DEDUP_WINDOW_SECONDS;
 }
@@ -274,12 +274,13 @@ async function createAutoSnapshot(input: CreateAutoSnapshotInput): Promise<PcdSn
 
     return snapshot;
   } catch (error) {
-    await logger.warn('Auto snapshot creation failed', {
+    await logger.error('Auto snapshot creation failed', {
       source: 'SnapshotService',
       meta: {
         databaseId: input.databaseId,
         trigger: input.trigger,
-        error: String(error),
+        error: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined,
       },
     });
     return null;
