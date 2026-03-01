@@ -51,37 +51,12 @@ Deno.test('collectSnapshotDatabaseIds ignores malformed quality selections', () 
     cron: null,
   })) as typeof arrSyncQueries.getMetadataProfilesSync;
 
-  patchTarget(
-    arrSyncQueries,
-    'getQualityProfilesSync',
-    getQualityProfilesSync,
-    restores
-  );
-  patchTarget(
-    arrSyncQueries,
-    'getDelayProfilesSync',
-    getDelayProfilesSync,
-    restores
-  );
-  patchTarget(
-    arrSyncQueries,
-    'getMediaManagementSync',
-    getMediaManagementSync,
-    restores
-  );
-  patchTarget(
-    arrSyncQueries,
-    'getMetadataProfilesSync',
-    getMetadataProfilesSync,
-    restores
-  );
+  patchTarget(arrSyncQueries, 'getQualityProfilesSync', getQualityProfilesSync, restores);
+  patchTarget(arrSyncQueries, 'getDelayProfilesSync', getDelayProfilesSync, restores);
+  patchTarget(arrSyncQueries, 'getMediaManagementSync', getMediaManagementSync, restores);
+  patchTarget(arrSyncQueries, 'getMetadataProfilesSync', getMetadataProfilesSync, restores);
 
-  patchTarget(
-    logger,
-    'warn',
-    (async () => undefined) as typeof logger.warn,
-    restores
-  );
+  patchTarget(logger, 'warn', (async () => undefined) as typeof logger.warn, restores);
 
   try {
     const databaseIds = arrSyncTestOnly
@@ -120,12 +95,7 @@ Deno.test('collectSnapshotDatabaseIds continues when a section query throws', ()
     restores
   );
 
-  patchTarget(
-    logger,
-    'warn',
-    (async () => undefined) as typeof logger.warn,
-    restores
-  );
+  patchTarget(logger, 'warn', (async () => undefined) as typeof logger.warn, restores);
 
   try {
     const databaseIds = arrSyncTestOnly
@@ -200,12 +170,7 @@ Deno.test('collectSnapshotDatabaseIds deduplicates database IDs across sections'
     restores
   );
 
-  patchTarget(
-    logger,
-    'warn',
-    (async () => undefined) as typeof logger.warn,
-    restores
-  );
+  patchTarget(logger, 'warn', (async () => undefined) as typeof logger.warn, restores);
 
   try {
     const databaseIds = arrSyncTestOnly

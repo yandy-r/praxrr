@@ -27,4 +27,3 @@ export function isNotGitRepositoryError(input: unknown): boolean {
   const message = getErrorMessage(input);
   return isNotGitRepositoryMessage(message);
 }
-

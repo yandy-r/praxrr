@@ -130,9 +130,13 @@ Deno.test('snapshotService.parseCreatedAtUtc treats SQLite UTC timestamps as UTC
 });
 
 Deno.test('snapshotService.parseCreatedAtUtc throws for invalid timestamps', () => {
-  assertThrows(() => {
-    __testOnly.parseCreatedAtUtc('not-a-timestamp');
-  }, Error, 'Invalid pcd snapshot created_at value');
+  assertThrows(
+    () => {
+      __testOnly.parseCreatedAtUtc('not-a-timestamp');
+    },
+    Error,
+    'Invalid pcd snapshot created_at value'
+  );
 });
 
 Deno.test('snapshotService.createAutoSnapshot skips duplicate snapshot within UTC dedupe window', async () => {
@@ -447,13 +451,14 @@ Deno.test('snapshotService.createAutoSnapshot returns null when database metadat
     logger,
     'error',
     ((message: string, payload?: unknown) => {
-      const payloadAsString = payload instanceof Error
-        ? payload.message
-        : typeof payload === 'string'
-        ? payload
-        : payload
-        ? JSON.stringify(payload)
-        : '';
+      const payloadAsString =
+        payload instanceof Error
+          ? payload.message
+          : typeof payload === 'string'
+            ? payload
+            : payload
+              ? JSON.stringify(payload)
+              : '';
       loggedErrorMessage = `${message} ${payloadAsString}`.trim();
     }) as typeof logger.error,
     restores
@@ -491,12 +496,7 @@ Deno.test('snapshotService.getFullDetail computes exact opsWrittenSince and keep
     createdAt: new Date().toISOString(),
   };
 
-  patchTarget(
-    pcdSnapshotQueries,
-    'getById',
-    (() => snapshot) as typeof pcdSnapshotQueries.getById,
-    restores
-  );
+  patchTarget(pcdSnapshotQueries, 'getById', (() => snapshot) as typeof pcdSnapshotQueries.getById, restores);
 
   patchTarget(
     db,

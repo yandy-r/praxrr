@@ -2,8 +2,14 @@ import { assertEquals } from '@std/assert';
 import { pcdManager, snapshotService } from '$pcd/index.ts';
 import type { PcdSnapshotDetail, PcdSnapshotFullDetail } from '$pcd/snapshots/types.ts';
 import type { DatabaseInstance } from '$db/queries/databaseInstances.ts';
-import { GET as listSnapshotsRoute, POST as createSnapshotRoute } from '../../../routes/api/v1/pcd/[databaseId]/snapshots/+server.ts';
-import { DELETE as deleteSnapshotRoute, GET as getSnapshotRoute } from '../../../routes/api/v1/pcd/[databaseId]/snapshots/[snapshotId]/+server.ts';
+import {
+  GET as listSnapshotsRoute,
+  POST as createSnapshotRoute,
+} from '../../../routes/api/v1/pcd/[databaseId]/snapshots/+server.ts';
+import {
+  DELETE as deleteSnapshotRoute,
+  GET as getSnapshotRoute,
+} from '../../../routes/api/v1/pcd/[databaseId]/snapshots/[snapshotId]/+server.ts';
 
 type Restore = () => void;
 type Restores = Restore[];
@@ -49,12 +55,7 @@ Deno.test('snapshot list route validates params and returns paginated results', 
   const dbInstance = buildDatabase(31);
   let capturedListInput: { databaseId: number; type?: string; limit?: number; offset?: number } | null = null;
 
-  patchTarget(
-    pcdManager,
-    'getById',
-    (() => dbInstance) as typeof pcdManager.getById,
-    restores
-  );
+  patchTarget(pcdManager, 'getById', (() => dbInstance) as typeof pcdManager.getById, restores);
 
   patchTarget(
     snapshotService,
@@ -97,12 +98,7 @@ Deno.test('snapshot create route trims description and delegates to manual snaps
   const dbInstance = buildDatabase(32);
   let capturedCreateInput: { databaseId: number; description?: string } | null = null;
 
-  patchTarget(
-    pcdManager,
-    'getById',
-    (() => dbInstance) as typeof pcdManager.getById,
-    restores
-  );
+  patchTarget(pcdManager, 'getById', (() => dbInstance) as typeof pcdManager.getById, restores);
 
   patchTarget(
     snapshotService,
@@ -166,12 +162,7 @@ Deno.test('snapshot detail route returns computed opsWrittenSince and never-rest
     createdAt: new Date().toISOString(),
   };
 
-  patchTarget(
-    pcdManager,
-    'getById',
-    (() => dbInstance) as typeof pcdManager.getById,
-    restores
-  );
+  patchTarget(pcdManager, 'getById', (() => dbInstance) as typeof pcdManager.getById, restores);
 
   patchTarget(
     snapshotService,
@@ -211,12 +202,7 @@ Deno.test('snapshot create route rejects descriptions over 1000 characters', asy
   const dbInstance = buildDatabase(32);
   let createCalled = false;
 
-  patchTarget(
-    pcdManager,
-    'getById',
-    (() => dbInstance) as typeof pcdManager.getById,
-    restores
-  );
+  patchTarget(pcdManager, 'getById', (() => dbInstance) as typeof pcdManager.getById, restores);
 
   patchTarget(
     snapshotService,
@@ -281,19 +267,9 @@ Deno.test('snapshot detail and delete routes enforce database ownership', async 
   };
   let deleteCalled = false;
 
-  patchTarget(
-    pcdManager,
-    'getById',
-    (() => dbInstance) as typeof pcdManager.getById,
-    restores
-  );
+  patchTarget(pcdManager, 'getById', (() => dbInstance) as typeof pcdManager.getById, restores);
 
-  patchTarget(
-    snapshotService,
-    'getDetail',
-    (() => snapshot) as typeof snapshotService.getDetail,
-    restores
-  );
+  patchTarget(snapshotService, 'getDetail', (() => snapshot) as typeof snapshotService.getDetail, restores);
 
   patchTarget(
     snapshotService,
@@ -310,10 +286,10 @@ Deno.test('snapshot detail and delete routes enforce database ownership', async 
   patchTarget(
     snapshotService,
     'deleteSnapshot',
-    ((() => {
+    (() => {
       deleteCalled = true;
       return true;
-    }) as typeof snapshotService.deleteSnapshot) as typeof snapshotService.deleteSnapshot,
+    }) as typeof snapshotService.deleteSnapshot as typeof snapshotService.deleteSnapshot,
     restores
   );
 

@@ -204,7 +204,7 @@ function isDuplicate(
     cache_state_hash: string | null;
     created_at: string;
   }>(
-		`SELECT id, ops_sequence_max_id, cache_state_hash, created_at
+    `SELECT id, ops_sequence_max_id, cache_state_hash, created_at
 		FROM pcd_snapshots
 		WHERE database_id = ?
 			AND "trigger" = ?
@@ -228,9 +228,9 @@ function isDuplicate(
   }
 
   // Check time window: interpret DB timestamp as UTC so elapsed time is environment-independent
-    const createdAtMs = parseCreatedAtUtc(latest.created_at);
-    const now = Date.now();
-    const elapsedSeconds = (now - createdAtMs) / 1000;
+  const createdAtMs = parseCreatedAtUtc(latest.created_at);
+  const now = Date.now();
+  const elapsedSeconds = (now - createdAtMs) / 1000;
 
   return elapsedSeconds <= DEDUP_WINDOW_SECONDS;
 }

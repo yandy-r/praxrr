@@ -248,7 +248,8 @@ function collectMetadataProfileIds(
 function collectSnapshotDatabaseIds(instanceId: number, sections: readonly SectionType[]): number[] {
   const ids = new Set<number>();
   const handleSectionError = (error: unknown, section: string): void => {
-    const details = error instanceof Error ? { message: error.message, stack: error.stack } : { message: String(error) };
+    const details =
+      error instanceof Error ? { message: error.message, stack: error.stack } : { message: String(error) };
     logger.warn('Failed to collect pre-sync snapshot database IDs for sync section', {
       source: 'ArrSyncJob',
       meta: {

@@ -73,9 +73,8 @@ export const pcdSnapshotQueries = {
    * Create a new PCD snapshot
    */
   create(input: CreateSnapshotInput): PcdSnapshotDetail {
-    const targetInstanceIds = input.type === 'auto' && input.targetInstanceIds
-      ? JSON.stringify(input.targetInstanceIds)
-      : null;
+    const targetInstanceIds =
+      input.type === 'auto' && input.targetInstanceIds ? JSON.stringify(input.targetInstanceIds) : null;
 
     db.execute(
       `INSERT INTO pcd_snapshots (
@@ -119,10 +118,7 @@ export const pcdSnapshotQueries = {
   /**
    * List snapshots for a database with optional filtering and pagination
    */
-  listByDatabase(
-    databaseId: number,
-    options?: PcdSnapshotListOptions
-  ): PcdSnapshotListResponse {
+  listByDatabase(databaseId: number, options?: PcdSnapshotListOptions): PcdSnapshotListResponse {
     const conditions: string[] = ['database_id = ?'];
     const params: (string | number)[] = [databaseId];
 
