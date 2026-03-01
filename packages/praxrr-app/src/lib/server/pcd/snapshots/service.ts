@@ -12,6 +12,7 @@ import type {
   PcdSnapshotDetail,
   PcdSnapshotListOptions,
   PcdSnapshotListResponse,
+  SnapshotTrigger,
 } from './types.ts';
 
 // ============================================================================
@@ -62,8 +63,9 @@ interface PublishedOpRow {
  * Compute a deterministic state fingerprint from published ops for a database.
  *
  * Algorithm:
- * 1. Query all published ops ordered by id
- * 2. For each row, build a canonical record string including deterministic fields
+ * 1. Query all ops with `state = 'published'` for the database, ordered by id
+ * 2. For each row, build a canonical record string including deterministic fields:
+ *    database row id, origin, sequence, state, source, and hash
  * 3. When content_hash is absent, compute a fallback hash from sql + metadata
  * 4. Serialize as newline-delimited canonical records
  * 5. SHA-256 the full serialized string
@@ -178,7 +180,7 @@ function parseCreatedAtUtc(createdAt: string): number {
  */
 function isDuplicate(
   databaseId: number,
-  trigger: string,
+  trigger: Exclude<SnapshotTrigger, 'manual'>,
   opsSequenceMaxId: number,
   cacheStateHash: string | null
 ): boolean {

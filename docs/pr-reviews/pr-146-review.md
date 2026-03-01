@@ -131,7 +131,7 @@ If `created_at` is unparseable, `getTime()` returns `NaN`. The dedup comparison 
 The `trigger` parameter is typed as `string` rather than `SnapshotTrigger` (or `Exclude<SnapshotTrigger, 'manual'>`). This is wider than necessary since only auto snapshots are deduplicated.
 
 **Fix:** Narrow to `Exclude<SnapshotTrigger, 'manual'>`.
-**Status:** Open
+**Status:** Fixed (2026-03-01). `isDuplicate` now accepts `Exclude<SnapshotTrigger, 'manual'>` and receives the correctly constrained trigger type.
 
 ### 12. `computeStateHash` JSDoc omits that fingerprint includes row `id` (auto-increment PK)
 
@@ -140,7 +140,7 @@ The `trigger` parameter is typed as `string` rather than `SnapshotTrigger` (or `
 The JSDoc says "build a canonical record including deterministic fields" but does not mention that `pcd_ops.id` is included. The fingerprint is sensitive to row identity, not just logical content -- backup restores or compaction would break deduplication silently.
 
 **Fix:** Update JSDoc to note PK inclusion and its implications. Also note that `state` is always `'published'` in this context.
-**Status:** Open
+**Status:** Fixed (2026-03-01). Updated the JSDoc to explicitly call out row `id` and `state = 'published'` participation in fingerprinting.
 
 ### 13. `state_hash_v1` label in OpenAPI schema is not implemented
 
@@ -149,7 +149,7 @@ The JSDoc says "build a canonical record including deterministic fields" but doe
 The `cacheStateHash` description references `(state_hash_v1)` as a version label, but no such version constant exists in the code. This implies a versioning contract that does not exist.
 
 **Fix:** Remove `(state_hash_v1)` label, or add a version constant in the code.
-**Status:** Open
+**Status:** Fixed (2026-03-01). Removed the stale `(state_hash_v1)` contract label from `cacheStateHash` docs.
 
 ---
 

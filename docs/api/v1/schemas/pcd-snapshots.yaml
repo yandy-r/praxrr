@@ -55,7 +55,7 @@ PcdSnapshotDetail:
     cacheStateHash:
       type: string
       nullable: true
-      description: SHA-256 state fingerprint (state_hash_v1)
+      description: SHA-256 state fingerprint
     targetInstanceIds:
       type: array
       items:
