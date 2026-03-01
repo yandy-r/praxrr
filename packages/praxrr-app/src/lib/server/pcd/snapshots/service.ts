@@ -365,3 +365,7 @@ export const snapshotService = {
   getDetail,
   deleteSnapshot,
 };
+
+export const __testOnly = {
+  parseCreatedAtUtc,
+};
