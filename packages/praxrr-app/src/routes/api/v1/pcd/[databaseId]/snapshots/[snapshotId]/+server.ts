@@ -3,6 +3,7 @@ import type { RequestHandler } from '@sveltejs/kit';
 import { pcdManager, snapshotService } from '$pcd/index.ts';
 import type { PcdSnapshotFullDetail } from '$pcd/index.ts';
 import { db } from '$db/db.ts';
+import { logger } from '$logger/logger.ts';
 
 const POSITIVE_INTEGER_ID = /^\d+$/;
 
@@ -87,8 +88,16 @@ export const GET: RequestHandler = async ({ params }) => {
 
     return json(fullDetail);
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Failed to fetch snapshot';
-    return json({ error: message }, { status: 500 });
+    await logger.error('Failed to fetch snapshot details', {
+      source: 'SnapshotApi',
+      meta: {
+        databaseId: databaseIdResult.value,
+        snapshotId: snapshotIdResult.value,
+        error: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined,
+      },
+    });
+    return json({ error: 'Failed to fetch snapshot details' }, { status: 500 });
   }
 };
 
@@ -132,7 +141,15 @@ export const DELETE: RequestHandler = async ({ params }) => {
 
     return new Response(null, { status: 204 });
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Failed to delete snapshot';
-    return json({ error: message }, { status: 500 });
+    await logger.error('Failed to delete snapshot', {
+      source: 'SnapshotApi',
+      meta: {
+        databaseId: databaseIdResult.value,
+        snapshotId: snapshotIdResult.value,
+        error: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined,
+      },
+    });
+    return json({ error: 'Failed to delete snapshot' }, { status: 500 });
   }
 };

@@ -2,6 +2,7 @@ import { json } from '@sveltejs/kit';
 import type { RequestHandler } from '@sveltejs/kit';
 import { pcdManager, snapshotService } from '$pcd/index.ts';
 import type { SnapshotType } from '$pcd/index.ts';
+import { logger } from '$logger/logger.ts';
 
 const POSITIVE_INTEGER_ID = /^\d+$/;
 const VALID_SNAPSHOT_TYPES: SnapshotType[] = ['auto', 'manual'];
@@ -96,8 +97,15 @@ export const GET: RequestHandler = async ({ params, url }) => {
     const result = snapshotService.list(databaseIdResult.value, { type, limit, offset });
     return json(result);
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Failed to list snapshots';
-    return json({ error: message }, { status: 500 });
+    await logger.error('Failed to list snapshots', {
+      source: 'SnapshotApi',
+      meta: {
+        databaseId: databaseIdResult.value,
+        error: err instanceof Error ? err.message : 'Unknown error',
+        stack: err instanceof Error ? err.stack : undefined,
+      },
+    });
+    return json({ error: 'Failed to list snapshots' }, { status: 500 });
   }
 };
 
@@ -164,7 +172,14 @@ export const POST: RequestHandler = async ({ params, request }) => {
     });
     return json(snapshot, { status: 201 });
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Failed to create snapshot';
-    return json({ error: message }, { status: 500 });
+    await logger.error('Failed to create manual snapshot', {
+      source: 'SnapshotApi',
+      meta: {
+        databaseId: databaseIdResult.value,
+        error: err instanceof Error ? err.message : 'Unknown error',
+        stack: err instanceof Error ? err.stack : undefined,
+      },
+    });
+    return json({ error: 'Failed to create snapshot' }, { status: 500 });
   }
 };

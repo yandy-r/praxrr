@@ -43,11 +43,11 @@ export const pcdSnapshotQueries = {
    * Create a new PCD snapshot
    */
   create(input: CreateSnapshotInput): PcdSnapshotDetail {
-    const targetInstanceIds = input.targetInstanceIds ? JSON.stringify(input.targetInstanceIds) : null;
+	const targetInstanceIds = input.targetInstanceIds ? JSON.stringify(input.targetInstanceIds) : null;
 
     db.execute(
       `INSERT INTO pcd_snapshots (
-				database_id, type, trigger, description,
+				database_id, type, "trigger", description,
 				ops_sequence_max_id, ops_count_base, ops_count_user,
 				cache_state_hash, target_instance_ids
 			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,

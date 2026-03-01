@@ -12,7 +12,7 @@ export const migration: Migration = {
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
 			database_id INTEGER NOT NULL,
 			type TEXT NOT NULL CHECK (type IN ('auto', 'manual')),
-			trigger TEXT CHECK (trigger IN ('pull', 'sync', 'manual')),
+			"trigger" TEXT NOT NULL CHECK ("trigger" IN ('pull', 'sync', 'manual')),
 			description TEXT,
 			ops_sequence_max_id INTEGER NOT NULL,
 			ops_count_base INTEGER NOT NULL DEFAULT 0,

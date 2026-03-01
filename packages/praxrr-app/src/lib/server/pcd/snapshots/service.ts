@@ -174,10 +174,10 @@ function isDuplicate(
     cache_state_hash: string | null;
     created_at: string;
   }>(
-    `SELECT id, ops_sequence_max_id, cache_state_hash, created_at
+		`SELECT id, ops_sequence_max_id, cache_state_hash, created_at
 		FROM pcd_snapshots
 		WHERE database_id = ?
-			AND trigger = ?
+			AND "trigger" = ?
 			AND type = 'auto'
 		ORDER BY created_at DESC
 		LIMIT 1`,
