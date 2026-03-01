@@ -81,6 +81,7 @@ Both catch blocks use `logger.warn` with `String(snapshotError)`, discarding the
 `toDetail()` calls `JSON.parse(row.target_instance_ids)` without try/catch or type validation. Corrupted JSON would throw a SyntaxError that propagates differently depending on context -- swallowed in auto snapshots (but the snapshot is already persisted), or 500 in list/detail routes.
 
 **Fix:** Wrap in try/catch with a safe default. Add `Array.isArray()` guard after parse.
+**Status:** Open
 
 ### 7. Duplicated `isNotGitRepositoryError` function across two files
 
@@ -92,6 +93,7 @@ Both catch blocks use `logger.warn` with `String(snapshotError)`, discarding the
 Identical function defined independently. Also uses fragile substring matching on English-language git error messages. Non-English git locales would bypass the check and produce 500 errors.
 
 **Fix:** Extract to a shared utility in `$utils/git/`. Consider checking error class in addition to message string.
+**Status:** Open
 
 ### 8. `collectSnapshotDatabaseIds` can throw errors masked as snapshot failures
 
@@ -100,6 +102,7 @@ Identical function defined independently. Also uses fragile substring matching o
 This function calls multiple query functions that can throw on schema drift or DB corruption. Those errors get caught by the outer snapshot try/catch and logged as "Pre-sync snapshot failed" -- completely masking what is actually a broken sync configuration.
 
 **Fix:** Add defensive null checks within `collectSnapshotDatabaseIds` for each section's selections.
+**Status:** Open
 
 ### 9. Pruning failures logged as `warn` instead of `error`
 
@@ -108,6 +111,7 @@ This function calls multiple query functions that can throw on schema drift or D
 Persistent pruning failures (SQLite lock contention, corruption, disk-full) cause auto snapshots to accumulate without bound. The `logger.warn` with `String(pruneError)` loses the stack trace and provides no alerting escalation.
 
 **Fix:** Use `logger.error`. Include stack trace. Consider a health check for persistent pruning failures.
+**Status:** Open
 
 ### 10. `parseCreatedAtUtc` silently returns NaN for unparseable timestamps
 
@@ -116,6 +120,7 @@ Persistent pruning failures (SQLite lock contention, corruption, disk-full) caus
 If `created_at` is unparseable, `getTime()` returns `NaN`. The dedup comparison `NaN <= 60` evaluates to `false`, meaning deduplication always fails for corrupted timestamps, generating excessive snapshots.
 
 **Fix:** Add `Number.isNaN()` check after parsing. Throw or log an error for unparseable values.
+**Status:** Open
 
 ### 11. `isDuplicate` function parameter typed as `string` instead of `SnapshotTrigger`
 
@@ -124,6 +129,7 @@ If `created_at` is unparseable, `getTime()` returns `NaN`. The dedup comparison 
 The `trigger` parameter is typed as `string` rather than `SnapshotTrigger` (or `Exclude<SnapshotTrigger, 'manual'>`). This is wider than necessary since only auto snapshots are deduplicated.
 
 **Fix:** Narrow to `Exclude<SnapshotTrigger, 'manual'>`.
+**Status:** Open
 
 ### 12. `computeStateHash` JSDoc omits that fingerprint includes row `id` (auto-increment PK)
 
@@ -132,6 +138,7 @@ The `trigger` parameter is typed as `string` rather than `SnapshotTrigger` (or `
 The JSDoc says "build a canonical record including deterministic fields" but does not mention that `pcd_ops.id` is included. The fingerprint is sensitive to row identity, not just logical content -- backup restores or compaction would break deduplication silently.
 
 **Fix:** Update JSDoc to note PK inclusion and its implications. Also note that `state` is always `'published'` in this context.
+**Status:** Open
 
 ### 13. `state_hash_v1` label in OpenAPI schema is not implemented
 
@@ -140,6 +147,7 @@ The JSDoc says "build a canonical record including deterministic fields" but doe
 The `cacheStateHash` description references `(state_hash_v1)` as a version label, but no such version constant exists in the code. This implies a versioning contract that does not exist.
 
 **Fix:** Remove `(state_hash_v1)` label, or add a version constant in the code.
+**Status:** Open
 
 ---
 
@@ -152,6 +160,7 @@ The `cacheStateHash` description references `(state_hash_v1)` as a version label
 Accepts any `SnapshotType` with any `SnapshotTrigger`. Nothing prevents `{ type: 'manual', trigger: 'pull' }` at the query layer.
 
 **Suggestion:** Make it a discriminated union encoding the type-trigger cross-constraint.
+**Status:** Open
 
 ### 15. No API route tests -- zero coverage for 308 lines of route code
 
@@ -187,6 +196,7 @@ No test verifies that `createAutoSnapshot` returns `null` without throwing when 
 The type and OpenAPI docs imply restore functionality exists. Neither documents that `isRestorable` is always `false` pending Issue #16.
 
 **Suggestion:** Add a doc comment noting MVP limitation.
+**Status:** Open
 
 ### 19. `opsWrittenSince` is an approximation, not an exact count
 
@@ -198,6 +208,7 @@ The type and OpenAPI docs imply restore functionality exists. Neither documents 
 The computation is `currentMaxId - snapshot.opsSequenceMaxId` which is an ID-gap approximation. Op deletions cause overcounting; restores cause undercounting. The OpenAPI schema says "Number of ops written" implying exactness.
 
 **Suggestion:** Update OpenAPI description to "Approximate number of ops written" or use `COUNT(*)` with `WHERE id > snapshot.opsSequenceMaxId`.
+**Status:** Open
 
 ### 20. No description length limit on manual snapshots
 
@@ -206,6 +217,7 @@ The computation is `currentMaxId - snapshot.opsSequenceMaxId` which is an ID-gap
 The POST route trims whitespace but does not enforce a max length. A multi-megabyte description would be persisted without complaint.
 
 **Suggestion:** Add a max length check (e.g., 500-1000 chars).
+**Status:** Open
 
 ### 21. `listByDatabase` returns anonymous structural type instead of `PcdSnapshotListResponse`
 
@@ -214,6 +226,7 @@ The POST route trims whitespace but does not enforce a max length. A multi-megab
 The return type is structurally identical to `PcdSnapshotListResponse` but not referenced by name. If the response type gains a field, the query method won't fail to compile.
 
 **Suggestion:** Use explicit `PcdSnapshotListResponse` return type.
+**Status:** Open
 
 ### 22. `computeOpsMetadata` JSDoc is misleading about MAX(id) scope
 
@@ -222,6 +235,7 @@ The return type is structurally identical to `PcdSnapshotListResponse` but not r
 JSDoc says "max pcd_ops id" without clarifying this includes ALL states (not just published), while the counts are limited to published ops only.
 
 **Suggestion:** Rewrite to "Returns the maximum pcd_ops row ID (across all states) and counts of published ops by origin."
+**Status:** Open
 
 ### 23. Move `opsWrittenSince`/`isRestorable` computation to service layer
 
@@ -230,6 +244,7 @@ JSDoc says "max pcd_ops id" without clarifying this includes ALL states (not jus
 The "full detail" enrichment lives in the route handler, not the service. Internal consumers needing these values would have to duplicate the computation.
 
 **Suggestion:** Add `getFullDetail(snapshotId, databaseId)` to the service.
+**Status:** Open
 
 ### 24. Redundant section-separator comments
 
@@ -238,6 +253,7 @@ The "full detail" enrichment lives in the route handler, not the service. Intern
 Comments like `// Compute ops metadata` immediately before `computeOpsMetadata()` calls are "what" comments that mirror the function name. The function names are descriptive enough.
 
 **Suggestion:** Remove or replace with "why" comments where needed.
+**Status:** Open
 
 ---
 
