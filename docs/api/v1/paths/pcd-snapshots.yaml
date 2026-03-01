@@ -1,0 +1,203 @@
+snapshots:
+  post:
+    operationId: createPcdSnapshot
+    summary: Create a manual PCD snapshot
+    description: |
+      Creates a manual snapshot of the current PCD database state. The snapshot
+      captures ops metadata and a state fingerprint for future restore operations.
+    tags:
+      - PCD Snapshots
+    parameters:
+      - name: databaseId
+        in: path
+        required: true
+        description: PCD database ID
+        schema:
+          type: integer
+    requestBody:
+      required: false
+      content:
+        application/json:
+          schema:
+            $ref: '../schemas/pcd-snapshots.yaml#/CreateManualSnapshotRequest'
+    responses:
+      '201':
+        description: Snapshot created
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/pcd-snapshots.yaml#/PcdSnapshotDetail'
+      '400':
+        description: Invalid databaseId
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/pcd.yaml#/PcdErrorResponse'
+      '404':
+        description: Database not found
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/pcd.yaml#/PcdErrorResponse'
+      '500':
+        description: Snapshot creation failed
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/pcd.yaml#/PcdErrorResponse'
+  get:
+    operationId: listPcdSnapshots
+    summary: List PCD snapshots for a database
+    description: |
+      Returns a paginated list of snapshots for the specified database, ordered
+      by creation time descending.
+    tags:
+      - PCD Snapshots
+    parameters:
+      - name: databaseId
+        in: path
+        required: true
+        description: PCD database ID
+        schema:
+          type: integer
+      - name: type
+        in: query
+        required: false
+        description: Filter by snapshot type
+        schema:
+          type: string
+          enum:
+            - auto
+            - manual
+      - name: limit
+        in: query
+        required: false
+        description: Maximum number of results to return
+        schema:
+          type: integer
+          default: 50
+          minimum: 1
+          maximum: 200
+      - name: offset
+        in: query
+        required: false
+        description: Pagination offset
+        schema:
+          type: integer
+          default: 0
+          minimum: 0
+    responses:
+      '200':
+        description: Snapshot list
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/pcd-snapshots.yaml#/PcdSnapshotListResponse'
+      '400':
+        description: Invalid parameters
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/pcd.yaml#/PcdErrorResponse'
+      '404':
+        description: Database not found
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/pcd.yaml#/PcdErrorResponse'
+      '500':
+        description: Failed to list snapshots
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/pcd.yaml#/PcdErrorResponse'
+
+snapshotById:
+  get:
+    operationId: getPcdSnapshot
+    summary: Get PCD snapshot detail
+    description: |
+      Returns full snapshot detail including computed fields for restore context
+      (opsWrittenSince, isRestorable).
+    tags:
+      - PCD Snapshots
+    parameters:
+      - name: databaseId
+        in: path
+        required: true
+        description: PCD database ID
+        schema:
+          type: integer
+      - name: snapshotId
+        in: path
+        required: true
+        description: PCD snapshot ID
+        schema:
+          type: integer
+    responses:
+      '200':
+        description: Snapshot full detail
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/pcd-snapshots.yaml#/PcdSnapshotFullDetail'
+      '400':
+        description: Invalid parameters
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/pcd.yaml#/PcdErrorResponse'
+      '404':
+        description: Snapshot not found or doesn't belong to database
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/pcd.yaml#/PcdErrorResponse'
+      '500':
+        description: Failed to fetch snapshot
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/pcd.yaml#/PcdErrorResponse'
+  delete:
+    operationId: deletePcdSnapshot
+    summary: Delete a PCD snapshot
+    description: |
+      Deletes a snapshot. Ownership is enforced — the snapshot must belong to the
+      specified database.
+    tags:
+      - PCD Snapshots
+    parameters:
+      - name: databaseId
+        in: path
+        required: true
+        description: PCD database ID
+        schema:
+          type: integer
+      - name: snapshotId
+        in: path
+        required: true
+        description: PCD snapshot ID
+        schema:
+          type: integer
+    responses:
+      '204':
+        description: Snapshot deleted
+      '400':
+        description: Invalid parameters
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/pcd.yaml#/PcdErrorResponse'
+      '404':
+        description: Snapshot not found or doesn't belong to database
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/pcd.yaml#/PcdErrorResponse'
+      '500':
+        description: Delete failed
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/pcd.yaml#/PcdErrorResponse'
