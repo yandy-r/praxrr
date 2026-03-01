@@ -17,12 +17,12 @@
 
 ## Type of Change
 
-- [ ] Bug fix (`fix:`)
-- [ ] New feature (`feat:`)
-- [ ] Refactor (`refactor:`)
-- [ ] Documentation (`docs:`)
-- [ ] Chore / tooling (`chore:`)
-- [ ] Breaking change
+- Bug fix (`fix:`)
+- New feature (`feat:`)
+- Refactor (`refactor:`)
+- Documentation (`docs:`)
+- Chore / tooling (`chore:`)
+- Breaking change
 
 ## Labels
 
@@ -30,18 +30,18 @@
 
 **Area:**
 
-- [ ] `area:api`
-- [ ] `area:arr`
-- [ ] `area:sync`
-- [ ] `area:ui`
-- [ ] `area:auth`
+- `area:api`
+- `area:arr`
+- `area:sync`
+- `area:ui`
+- `area:auth`
 
 **Priority:**
 
-- [ ] `priority:critical`
-- [ ] `priority:high`
-- [ ] `priority:medium`
-- [ ] `priority:low`
+- `priority:critical`
+- `priority:high`
+- `priority:medium`
+- `priority:low`
 
 ## How to Test
 
@@ -53,17 +53,17 @@
 
 ## Checklist
 
-- [ ] Code follows project conventions
-- [ ] Self-reviewed
-- [ ] Tests added/updated (or not applicable)
-- [ ] No new warnings introduced
-- [ ] Correct labels applied
+- Code follows project conventions
+- Self-reviewed
+- Tests added/updated (or not applicable)
+- No new warnings introduced
+- Correct labels applied
 
 ### Arr-Touching Changes
 
 <!-- Remove this section if the PR does not touch Arr integration code. -->
 
-- [ ] API semantics verified per Arr app involved
-- [ ] Schema/field mappings validated per Arr app involved
-- [ ] Read/write/sync dispatch resolves by explicit `arr_type` (no implicit sibling fallback)
-- [ ] Migration/import/export mappings defined per Arr app and fail-fast on ambiguity
+- API semantics verified per Arr app involved
+- Schema/field mappings validated per Arr app involved
+- Read/write/sync dispatch resolves by explicit `arr_type` (no implicit sibling fallback)
+- Migration/import/export mappings defined per Arr app and fail-fast on ambiguity
