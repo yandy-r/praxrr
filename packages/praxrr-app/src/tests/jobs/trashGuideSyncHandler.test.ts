@@ -43,12 +43,7 @@ Deno.test('trashGuideSync handler maps sync() throw into failure retry flow', as
   };
   const errors: string[] = [];
 
-  patchTarget(
-    trashGuideSourcesQueries,
-    'getById',
-    (() => source) as typeof trashGuideSourcesQueries.getById,
-    restores
-  );
+  patchTarget(trashGuideSourcesQueries, 'getById', (() => source) as typeof trashGuideSourcesQueries.getById, restores);
   patchTarget(
     trashGuideManager,
     'checkForUpdates',

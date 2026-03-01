@@ -27,7 +27,9 @@ export function normalizeSourceSelection(
 
   const availableKeys = sources.map((source) => toSourceFilterKey(source));
   const availableSet = new Set(availableKeys);
-  const selected = [...new Set(selection.filter((key) => availableSet.has(key as SourceFilterKey)))] as SourceFilterSelection;
+  const selected = [
+    ...new Set(selection.filter((key) => availableSet.has(key as SourceFilterKey))),
+  ] as SourceFilterSelection;
 
   if (selected.length > 0) {
     return selected;

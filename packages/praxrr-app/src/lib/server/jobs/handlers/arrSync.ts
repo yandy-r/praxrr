@@ -9,6 +9,7 @@ import type { SectionType } from '$lib/server/sync/types.ts';
 import { getSection } from '$lib/server/sync/registry.ts';
 import { SYNC_SECTION_ORDER, getUnsupportedSyncSectionReason, type SyncArrType } from '$lib/server/sync/mappings.ts';
 import { logger } from '$logger/logger.ts';
+import { snapshotService } from '$pcd/snapshots/service.ts';
 
 // Register sync handlers
 import '$lib/server/sync/qualityProfiles/handler.ts';
@@ -177,6 +178,111 @@ function toSyncArrType(arrType: string): SyncArrType | null {
   return null;
 }
 
+function addPositiveDatabaseId(ids: Set<number>, databaseId: unknown): void {
+  if (typeof databaseId !== 'number' || !Number.isFinite(databaseId) || databaseId <= 0) {
+    return;
+  }
+  ids.add(databaseId);
+}
+
+function collectQualityProfileIds(
+  instanceId: number,
+  ids: Set<number>,
+  onError: (error: unknown, section: string) => void
+): void {
+  try {
+    const quality = arrSyncQueries.getQualityProfilesSync(instanceId);
+    if (!quality || !Array.isArray(quality.selections)) {
+      return;
+    }
+
+    for (const sel of quality.selections) {
+      addPositiveDatabaseId(ids, sel?.databaseId);
+    }
+  } catch (error) {
+    onError(error, 'qualityProfiles');
+  }
+}
+
+function collectDelayProfileIds(
+  instanceId: number,
+  ids: Set<number>,
+  onError: (error: unknown, section: string) => void
+): void {
+  try {
+    const delay = arrSyncQueries.getDelayProfilesSync(instanceId);
+    addPositiveDatabaseId(ids, delay?.databaseId);
+  } catch (error) {
+    onError(error, 'delayProfiles');
+  }
+}
+
+function collectMediaManagementDatabaseIds(
+  instanceId: number,
+  ids: Set<number>,
+  onError: (error: unknown, section: string) => void
+): void {
+  try {
+    const media = arrSyncQueries.getMediaManagementSync(instanceId);
+    addPositiveDatabaseId(ids, media?.namingDatabaseId);
+    addPositiveDatabaseId(ids, media?.qualityDefinitionsDatabaseId);
+    addPositiveDatabaseId(ids, media?.mediaSettingsDatabaseId);
+  } catch (error) {
+    onError(error, 'mediaManagement');
+  }
+}
+
+function collectMetadataProfileIds(
+  instanceId: number,
+  ids: Set<number>,
+  onError: (error: unknown, section: string) => void
+): void {
+  try {
+    const metadata = arrSyncQueries.getMetadataProfilesSync(instanceId);
+    addPositiveDatabaseId(ids, metadata?.databaseId);
+  } catch (error) {
+    onError(error, 'metadataProfiles');
+  }
+}
+
+function collectSnapshotDatabaseIds(instanceId: number, sections: readonly SectionType[]): number[] {
+  const ids = new Set<number>();
+  const handleSectionError = (error: unknown, section: string): void => {
+    const details =
+      error instanceof Error ? { message: error.message, stack: error.stack } : { message: String(error) };
+    logger.warn('Failed to collect pre-sync snapshot database IDs for sync section', {
+      source: 'ArrSyncJob',
+      meta: {
+        section,
+        instanceId,
+        ...details,
+      },
+    });
+  };
+
+  if (sections.includes('qualityProfiles')) {
+    collectQualityProfileIds(instanceId, ids, handleSectionError);
+  }
+
+  if (sections.includes('delayProfiles')) {
+    collectDelayProfileIds(instanceId, ids, handleSectionError);
+  }
+
+  if (sections.includes('mediaManagement')) {
+    collectMediaManagementDatabaseIds(instanceId, ids, handleSectionError);
+  }
+
+  if (sections.includes('metadataProfiles')) {
+    collectMetadataProfileIds(instanceId, ids, handleSectionError);
+  }
+
+  return [...ids];
+}
+
+export const __testOnly = {
+  collectSnapshotDatabaseIds,
+};
+
 const arrSyncHandler: JobHandler = async (job) => {
   const instanceId = Number(job.payload.instanceId);
   if (!Number.isFinite(instanceId)) {
@@ -238,6 +344,17 @@ const arrSyncHandler: JobHandler = async (job) => {
 
     return { status: 'failure', error: message };
   }
+
+  // Pre-sync snapshots: capture PCD state before Arr sync writes
+  const snapshotDatabaseIds = collectSnapshotDatabaseIds(instanceId, sectionsToRun);
+  for (const databaseId of snapshotDatabaseIds) {
+    await snapshotService.createAutoSnapshot({
+      databaseId,
+      trigger: 'sync',
+      targetInstanceIds: [instanceId],
+    });
+  }
+
   const results: string[] = [];
   let failures = 0;
   let ranSections = 0;

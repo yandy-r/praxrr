@@ -1,9 +1,30 @@
 import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from '@sveltejs/kit';
 import { databaseInstancesQueries } from '$db/queries/databaseInstances.ts';
-import { getBranches, getIncomingChanges, getRepoInfo, getStatus } from '$utils/git/index.ts';
+import { getBranches, getIncomingChanges, getRepoInfo, getStatus, isNotGitRepositoryError } from '$utils/git/index.ts';
+import type { GitStatus, IncomingChanges } from '$utils/git/types.ts';
 import { listDraftEntityChanges } from '$pcd/ops/draftChanges.ts';
 import { getDecryptedDatabasePersonalAccessToken } from '$server/utils/encryption/database-credentials.ts';
+
+function emptyGitStatus(): GitStatus {
+  return {
+    branch: '',
+    isDirty: false,
+    ahead: 0,
+    behind: 0,
+    untracked: [],
+    modified: [],
+    staged: [],
+  };
+}
+
+function emptyIncomingChanges(): IncomingChanges {
+  return {
+    hasUpdates: false,
+    commitsBehind: 0,
+    commits: [],
+  };
+}
 
 /**
  * GET /api/databases/{id}/changes
@@ -26,12 +47,28 @@ export const GET: RequestHandler = async ({ params }) => {
   } catch {
     personalAccessToken = undefined;
   }
-  const [status, incomingChanges, branches, repoInfo] = await Promise.all([
-    getStatus(database.local_path),
-    getIncomingChanges(database.local_path),
-    getBranches(database.local_path),
-    getRepoInfo(database.repository_url, personalAccessToken),
-  ]);
+  let status: GitStatus;
+  let incomingChanges: IncomingChanges;
+  let branches: string[];
+  let gitUnavailable = false;
+
+  try {
+    [status, incomingChanges, branches] = await Promise.all([
+      getStatus(database.local_path),
+      getIncomingChanges(database.local_path),
+      getBranches(database.local_path),
+    ]);
+  } catch (gitError) {
+    if (!isNotGitRepositoryError(gitError)) {
+      throw gitError;
+    }
+    status = emptyGitStatus();
+    incomingChanges = emptyIncomingChanges();
+    branches = [];
+    gitUnavailable = true;
+  }
+
+  const repoInfo = await getRepoInfo(database.repository_url, personalAccessToken);
 
   // Only fetch draft changes for developers
   let draftChanges = null;
@@ -76,5 +113,6 @@ export const GET: RequestHandler = async ({ params }) => {
     branches,
     repoInfo,
     draftChanges,
+    gitUnavailable,
   });
 };

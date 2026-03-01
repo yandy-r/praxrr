@@ -1,7 +1,5 @@
 # Lessons
 
-<<<<<<< HEAD
-
 ## 2026-02-22
 
 - When creating GitHub issue research references, always use markdown file-path links
@@ -64,3 +62,8 @@
 - For monorepo mirror workflows, always provide a local-path development override for both the
   primary PCD source and schema dependency before asking for mirror-merge validation; otherwise
   feature testing is blocked on publish/merge order.
+
+## 2026-03-01
+
+- For local-path PCD sources, never assume `database.local_path` is a Git repo. Any git-backed endpoint must detect/handle non-git local paths without returning 500.
+- In `importBaseOps`, refresh `last_seen_in_repo_at` for matched published repo base ops before cache/entity-exists skips; reversing this order can orphan all repo base ops and make PCD data appear missing across sync/config UIs.

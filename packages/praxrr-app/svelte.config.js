@@ -1,5 +1,12 @@
 import adapter from 'sveltekit-adapter-deno';
 import { vitePreprocess } from '@sveltejs/vite-plugin-svelte';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const packageRoot = path.dirname(fileURLToPath(import.meta.url));
+const repoRoot = path.resolve(packageRoot, '..', '..');
+const distBuildOutput = path.join(repoRoot, 'dist', 'build');
+const distSvelteKitOutput = path.join(repoRoot, 'dist', '.svelte-kit');
 
 /** @type {import('@sveltejs/kit').Config} */
 const config = {
@@ -11,14 +18,14 @@ const config = {
     },
     adapter: adapter({
       usage: 'deno-compile',
-      out: '../../dist/build',
+      out: distBuildOutput,
       buildOptions: {
         logOverride: {
           'ignored-bare-import': 'silent',
         },
       },
     }),
-    outDir: '../../dist/.svelte-kit',
+    outDir: distSvelteKitOutput,
     alias: {
       $api: './src/lib/api',
       $config: './src/lib/server/utils/config/config.ts',

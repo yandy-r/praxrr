@@ -339,17 +339,6 @@ export async function importBaseOps(databaseId: number, pcdPath: string): Promis
       if (!cache) {
         throw new Error(`Cache not available while importing migration entity "${candidate.relativePath}"`);
       }
-      if (hasBaseEntityByStableIdentity(cache, candidate.stableIdentity)) {
-        await logger.warn(`Skipping existing base import entity "${candidate.relativePath}"`, {
-          source: 'PCDImporter',
-          meta: {
-            databaseId,
-            entityType: candidate.entityType,
-            stableIdentity: `${candidate.stableIdentity.key}=${candidate.stableIdentity.value}`,
-          },
-        });
-        continue;
-      }
 
       if (repoOpIndex === null) {
         repoOpIndex = buildPublishedRepoBaseOpIndexForTests(databaseId);

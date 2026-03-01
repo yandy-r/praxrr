@@ -191,7 +191,7 @@ async function runGit(args: string[], cwd: string): Promise<string> {
 
 loadDotEnv();
 const options = parseArgs(Deno.args);
-const dbPath = path.resolve(Deno.env.get('DB_PATH') || 'dist/dev/data/praxrr.db');
+const dbPath = path.resolve(Deno.cwd(), Deno.env.get('DB_PATH') || 'dist/dev/data/praxrr.db');
 const dbRow = getDatabaseRow(dbPath, options);
 
 if (options.headOnly) {

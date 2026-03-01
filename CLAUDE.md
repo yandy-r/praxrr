@@ -204,6 +204,12 @@ Checklist (required for Arr-touching changes):
 - For Arr-scoped quality profile UI filtering, do not rely on `quality_profile_custom_formats.arr_type` alone because legacy or shared `arr_type='all'` scores can make incompatible profiles appear valid; enforce app compatibility from enabled quality names mapped via `quality_api_mappings` for the target `arr_type`.
 - For Arr-scoped quality profile compatibility, do not require `enabled=1` quality rows; profiles with all qualities disabled (or transitional defaults) must still be considered against app-compatible quality names, otherwise valid profiles can disappear from sync selection UI.
 
+### Local-Path Source Guardrails (Required)
+
+- Do not assume a local-path PCD source clone is a Git repository; local-path sources may intentionally contain entities/ops without `.git`.
+- Any Git-dependent API surface (for example `/api/databases/{id}/changes` and `/api/databases/{id}/commits`) must degrade gracefully for non-Git local-path sources and must not return 500 for this case.
+- In `importBaseOps`, refresh `last_seen_in_repo_at` on matching published repo base ops before cache/entity-existence short-circuits; never allow ordering that can orphan all repo base ops on a no-op import pass.
+
 ## Environment Variables
 
 Key variables for development: `APP_BASE_PATH` (default `./dist/dev` in dev), `PORT` (default 6969 in dev, 6868 in prod), `AUTH` (`on`|`local`|`off`|`oidc`), `PARSER_HOST`/`PARSER_PORT` (parser service location).

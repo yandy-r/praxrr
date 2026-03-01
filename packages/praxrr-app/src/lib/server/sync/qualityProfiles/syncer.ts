@@ -652,7 +652,9 @@ export class QualityProfileSyncer extends BaseSyncer {
           quality_profiles: parsedEntities.filter(
             (entity): entity is TrashGuideQualityProfileEntity => entity.entity_type === 'quality_profile'
           ),
-          quality_sizes: parsedEntities.filter((entity): entity is TrashGuideQualitySizeEntity => entity.entity_type === 'quality_size'),
+          quality_sizes: parsedEntities.filter(
+            (entity): entity is TrashGuideQualitySizeEntity => entity.entity_type === 'quality_size'
+          ),
           naming: parsedEntities.filter((entity): entity is TrashGuideNamingEntity => entity.entity_type === 'naming'),
         },
         ordered_entities: parsedEntities,
@@ -681,7 +683,9 @@ export class QualityProfileSyncer extends BaseSyncer {
         continue;
       }
 
-      const rawProfilesByName = new Map(parsedResult.entities.quality_profiles.map((profile) => [profile.name, profile]));
+      const rawProfilesByName = new Map(
+        parsedResult.entities.quality_profiles.map((profile) => [profile.name, profile])
+      );
       const portableProfilesByName = new Map<string, PortableQualityProfile>();
       const portableFormatsByName = new Map<string, PortableCustomFormat>();
 

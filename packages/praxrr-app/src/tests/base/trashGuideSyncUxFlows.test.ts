@@ -284,10 +284,7 @@ Deno.test('source filter persistence wiring remains stable for custom formats an
     qualityProfilesPage,
     '$: sourceFilterStorageKey = SOURCE_FILTER_STORAGE_KEY + `:${data.currentDatabase.id}`;'
   );
-  assertStringIncludes(
-    qualityProfilesPage,
-    'selectedSourceKeys = loadSourceSelection('
-  );
+  assertStringIncludes(qualityProfilesPage, 'selectedSourceKeys = loadSourceSelection(');
   assertStringIncludes(qualityProfilesPage, 'data.sourceContext.availableSources,');
   assertStringIncludes(qualityProfilesPage, 'data.sourceContext.defaultSourceKey,');
   assertStringIncludes(

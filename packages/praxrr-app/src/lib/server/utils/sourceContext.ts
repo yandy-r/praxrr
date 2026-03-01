@@ -64,11 +64,13 @@ export function isTrashSource(source: SourceRef): source is Extract<SourceRef, {
 export function withPcdSource<TRow extends object, TDatabase extends DatabaseLike>(
   rows: readonly TRow[],
   database: TDatabase
-): Array<TRow & {
-  sourceType: 'pcd';
-  sourceDatabaseId: number;
-  sourceDatabaseName: string;
-}> {
+): Array<
+  TRow & {
+    sourceType: 'pcd';
+    sourceDatabaseId: number;
+    sourceDatabaseName: string;
+  }
+> {
   return rows.map((row) => ({
     ...row,
     sourceType: 'pcd' as const,

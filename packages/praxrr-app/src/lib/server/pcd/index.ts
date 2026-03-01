@@ -77,6 +77,22 @@ export type {
 } from './core/types.ts';
 
 // ============================================================================
+// SNAPSHOTS
+// ============================================================================
+
+export { snapshotService } from './snapshots/service.ts';
+export type {
+  SnapshotType,
+  SnapshotTrigger,
+  CreateAutoSnapshotInput,
+  CreateManualSnapshotInput,
+  PcdSnapshotDetail,
+  PcdSnapshotFullDetail,
+  PcdSnapshotListResponse,
+  PcdSnapshotListOptions,
+} from './snapshots/types.ts';
+
+// ============================================================================
 // ERRORS
 // ============================================================================
 

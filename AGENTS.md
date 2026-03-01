@@ -205,6 +205,16 @@ Checklist (required for Arr-touching changes):
 
 Key variables for development: `APP_BASE_PATH` (default `./dist/dev` in dev), `PORT` (default 6969 in dev, 6868 in prod), `AUTH` (`on`|`local`|`off`|`oidc`), `PARSER_HOST`/`PARSER_PORT` (parser service location).
 
+### Build artifact location policy
+
+- Keep application runtime/build artifacts under the repo root `dist/` directory.
+- `APP_BASE_PATH` is set explicitly by task scripts/dev launcher to `<repo-root>/dist/...` (no `../dist` outputs).
+- `/dist` remains gitignored and is treated as ephemeral build output.
+- Run `deno task check:dist-paths` if you want a fast guardrail that validates:
+  - no sibling `../dist` output.
+  - no legacy `../../dist`/`./dist` configuration paths.
+  - `dist/dev` and `dist/test` overrides are resolved from repo-root context.
+
 ### Monorepo and PCD Contract Notes
 
 Praxrr now runs as a monorepo workspace with app runtime in `packages/praxrr-app/` plus package members:

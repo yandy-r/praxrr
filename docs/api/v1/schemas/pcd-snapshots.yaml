@@ -1,0 +1,104 @@
+SnapshotType:
+  type: string
+  enum:
+    - auto
+    - manual
+  description: Whether the snapshot was auto-created or user-initiated
+
+SnapshotTrigger:
+  type: string
+  enum:
+    - pull
+    - sync
+    - manual
+  description: |
+    What event triggered the snapshot creation.
+    - pull: before a PCD repository pull/refresh
+    - sync: before an Arr instance sync
+    - manual: user-initiated via API
+
+PcdSnapshotDetail:
+  type: object
+  required:
+    - id
+    - databaseId
+    - type
+    - trigger
+    - description
+    - opsSequenceMaxId
+    - opsCountBase
+    - opsCountUser
+    - cacheStateHash
+    - targetInstanceIds
+    - createdAt
+  properties:
+    id:
+      type: integer
+    databaseId:
+      type: integer
+    type:
+      $ref: '#/SnapshotType'
+    trigger:
+      $ref: '#/SnapshotTrigger'
+    description:
+      type: string
+      nullable: true
+    opsSequenceMaxId:
+      type: integer
+      description: Maximum pcd_ops ID at snapshot time
+    opsCountBase:
+      type: integer
+      description: Count of published base-origin ops
+    opsCountUser:
+      type: integer
+      description: Count of published user-origin ops
+    cacheStateHash:
+      type: string
+      nullable: true
+      description: SHA-256 state fingerprint
+    targetInstanceIds:
+      type: array
+      items:
+        type: integer
+      nullable: true
+      description: Arr instance IDs targeted by this operation
+    createdAt:
+      type: string
+      format: date-time
+
+PcdSnapshotFullDetail:
+  allOf:
+    - $ref: '#/PcdSnapshotDetail'
+    - type: object
+      required:
+        - opsWrittenSince
+        - isRestorable
+      properties:
+        opsWrittenSince:
+          type: integer
+          description: Number of ops written after this snapshot (count of pcd_ops rows with id greater than opsSequenceMaxId)
+        isRestorable:
+          type: boolean
+          description: Always false in this release. Restore support is not yet implemented.
+
+PcdSnapshotListResponse:
+  type: object
+  required:
+    - snapshots
+    - total
+  properties:
+    snapshots:
+      type: array
+      items:
+        $ref: '#/PcdSnapshotDetail'
+    total:
+      type: integer
+      description: Total count matching the query filters
+
+CreateManualSnapshotRequest:
+  type: object
+  description: Request body for creating a manual snapshot. All fields are optional.
+  properties:
+    description:
+      type: string
+      description: Optional description for the snapshot

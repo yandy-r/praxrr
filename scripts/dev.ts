@@ -16,6 +16,7 @@ const colors = {
   server: '\x1b[34m', // blue
   reset: '\x1b[0m',
 };
+const APP_BASE_PATH = `${Deno.cwd()}/dist/dev`;
 
 const PARSER_PROJECT_DIR = 'packages/praxrr-parser';
 
@@ -97,7 +98,7 @@ async function runServer() {
       DENO_ENV: 'development',
       PORT: '6969',
       HOST: '0.0.0.0',
-      APP_BASE_PATH: '../../dist/dev',
+      APP_BASE_PATH,
       PARSER_HOST: 'localhost',
       PARSER_PORT: '5000',
       VITE_PLATFORM: getPlatform(),

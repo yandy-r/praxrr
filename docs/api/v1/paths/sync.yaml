@@ -25,37 +25,37 @@ preview:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/SyncPreviewResult'
+              $ref: '../schemas/sync.yaml#/SyncPreviewResult'
       '400':
         description: Invalid instanceId, unsupported section, or request body
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/ErrorResponse'
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
       '404':
         description: Instance not found
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/ErrorResponse'
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
       '409':
         description: Preview for this instance is already generating
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/ErrorResponse'
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
       '429':
         description: Preview creation is rate-limited or preview-store capacity is exhausted
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/ErrorResponse'
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
       '500':
         description: Failed to generate preview
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/ErrorResponse'
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
 
 previewById:
   get:
@@ -84,19 +84,19 @@ previewById:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/SyncPreviewResult'
+              $ref: '../schemas/sync.yaml#/SyncPreviewResult'
       '404':
         description: Preview not found or expired
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/ErrorResponse'
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
       '500':
         description: Failed to fetch preview
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/ErrorResponse'
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
   delete:
     operationId: deleteSyncPreview
     summary: Discard a sync preview
@@ -122,13 +122,13 @@ previewById:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/ErrorResponse'
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
       '500':
         description: Failed to delete preview
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/ErrorResponse'
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
 
 previewApply:
   post:
@@ -164,34 +164,34 @@ previewApply:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/SyncPreviewResult'
+              $ref: '../schemas/sync.yaml#/SyncPreviewResult'
       '400':
         description: Invalid request body
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/ErrorResponse'
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
       '404':
         description: Preview not found or expired
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/ErrorResponse'
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
       '409':
         description: Preview is not in a ready state, contains failed sections, or instance is syncing
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/ErrorResponse'
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
       '422':
         description: Preview is stale beyond apply threshold
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/ErrorResponse'
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
       '500':
         description: Failed to apply preview
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/ErrorResponse'
+              $ref: '../schemas/arr.yaml#/ErrorResponse'

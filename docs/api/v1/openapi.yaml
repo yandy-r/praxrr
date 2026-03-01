@@ -22,6 +22,8 @@ tags:
     description: TRaSH Guide cached entity and source management
   - name: PCD
     description: PCD entity export and portable format endpoints
+  - name: PCD Snapshots
+    description: PCD state snapshot management endpoints
 
 paths:
   /health:
@@ -108,6 +110,10 @@ paths:
     $ref: './paths/pcd.yaml#/export'
   /pcd/import:
     $ref: './paths/pcd.yaml#/import'
+  /pcd/{databaseId}/snapshots:
+    $ref: './paths/pcd-snapshots.yaml#/snapshots'
+  /pcd/{databaseId}/snapshots/{snapshotId}:
+    $ref: './paths/pcd-snapshots.yaml#/snapshotById'
   /pcd/{databaseId}/lidarr-metadata-profiles:
     get:
       operationId: listLidarrMetadataProfiles
@@ -541,6 +547,19 @@ components:
       $ref: './schemas/pcd.yaml#/ImportRequest'
     ImportResponse:
       $ref: './schemas/pcd.yaml#/ImportResponse'
+    # PCD Snapshots
+    SnapshotType:
+      $ref: './schemas/pcd-snapshots.yaml#/SnapshotType'
+    SnapshotTrigger:
+      $ref: './schemas/pcd-snapshots.yaml#/SnapshotTrigger'
+    PcdSnapshotDetail:
+      $ref: './schemas/pcd-snapshots.yaml#/PcdSnapshotDetail'
+    PcdSnapshotFullDetail:
+      $ref: './schemas/pcd-snapshots.yaml#/PcdSnapshotFullDetail'
+    PcdSnapshotListResponse:
+      $ref: './schemas/pcd-snapshots.yaml#/PcdSnapshotListResponse'
+    CreateManualSnapshotRequest:
+      $ref: './schemas/pcd-snapshots.yaml#/CreateManualSnapshotRequest'
     LidarrMetadataProfileTypeToggle:
       type: object
       required:
