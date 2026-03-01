@@ -115,6 +115,8 @@
   let delayProfilesPreviewEnabled = false;
   let mediaManagementPreviewEnabled = false;
   let metadataProfilesPreviewEnabled = false;
+  let hasTrashNaming = false;
+  let hasTrashQualityDefinitions = false;
 
   let metadataProfileSaving = false;
   let metadataProfileSyncing = false;
@@ -160,10 +162,15 @@
   );
 
   $: hasMediaManagement =
-    typeof mediaManagementState.namingDatabaseId === 'number' &&
-    typeof mediaManagementState.namingConfigName === 'string' &&
-    typeof mediaManagementState.qualityDefinitionsDatabaseId === 'number' &&
-    typeof mediaManagementState.qualityDefinitionsConfigName === 'string' &&
+    // Naming: PCD or TRaSH
+    ((typeof mediaManagementState.namingDatabaseId === 'number' &&
+      typeof mediaManagementState.namingConfigName === 'string') ||
+      hasTrashNaming) &&
+    // Quality Definitions: PCD or TRaSH
+    ((typeof mediaManagementState.qualityDefinitionsDatabaseId === 'number' &&
+      typeof mediaManagementState.qualityDefinitionsConfigName === 'string') ||
+      hasTrashQualityDefinitions) &&
+    // Media Settings: PCD only
     typeof mediaManagementState.mediaSettingsDatabaseId === 'number' &&
     typeof mediaManagementState.mediaSettingsConfigName === 'string';
 
@@ -385,10 +392,13 @@
   <MediaManagement
     bind:this={mediaManagementSection}
     databases={data.databases}
+    trashGuideSources={data.trashGuideMediaManagementBySource}
     bind:state={mediaManagementState}
     bind:syncTrigger={mediaManagementTrigger}
     bind:cronExpression={mediaManagementCron}
     bind:isDirty={mediaManagementDirty}
+    bind:hasTrashNaming
+    bind:hasTrashQualityDefinitions
     lastSyncedAt={data.syncData.mediaManagement.lastSyncedAt ?? null}
     previewConfig={mediaManagementPreviewConfig}
     previewSection="mediaManagement"
@@ -442,7 +452,7 @@
           <p class="text-sm text-neutral-500 dark:text-neutral-400">No databases configured</p>
         {:else}
           <div class="space-y-6">
-            {#each data.databases as database}
+            {#each data.databases as database (database.id)}
               <div class="space-y-3">
                 <h3 class="text-sm font-semibold text-neutral-900 dark:text-neutral-50">
                   {database.name}
@@ -452,7 +462,7 @@
                   <p class="text-sm text-neutral-500 dark:text-neutral-400">No metadata profiles</p>
                 {:else}
                   <div class="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-5">
-                    {#each database.metadataProfiles as profile}
+                    {#each database.metadataProfiles as profile (profile.name)}
                       <Toggle
                         checked={isMetadataProfileSelected(database.id, profile.name)}
                         label={profile.name}

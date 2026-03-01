@@ -3,6 +3,7 @@ import type { ServerLoad, Actions } from '@sveltejs/kit';
 import { arrInstancesQueries } from '$db/queries/arrInstances.ts';
 import { arrSyncQueries, type SyncTrigger, type ProfileSelection } from '$db/queries/arrSync.ts';
 import { trashGuideEntityCacheQueries } from '$db/queries/trashGuideEntityCache.ts';
+import { trashGuideSourcesQueries } from '$db/queries/trashGuideSources.ts';
 import {
   trashGuideSyncQueries,
   TrashGuideSyncScopeError,
@@ -24,6 +25,7 @@ import { enqueueJob } from '$lib/server/jobs/queueService.ts';
 import { buildJobDisplayName } from '$lib/server/jobs/display.ts';
 import { isSyncSectionSupported } from '$lib/server/sync/mappings.ts';
 import { isArrAppType, supportsArrSyncSurface, type ArrSyncSurface } from '$shared/arr/capabilities.ts';
+import { isTrashGuideSupportedArrType } from '$lib/server/trashguide/types.ts';
 import { TrashGuideSourceNotFoundError } from '$lib/server/trashguide/manager.ts';
 import { enqueueManualTrashGuideSourceSync } from '$jobs/helpers/trashGuideSyncQueue.ts';
 import {
@@ -318,11 +320,80 @@ export const load: ServerLoad = async ({ params, url }) => {
       availableQualityProfiles: buildTrashGuideAvailableSelections(source.sourceId, source.selectedQualityProfiles),
     }));
 
+  const hydratedMediaManagementSources = trashGuideSyncQueries.getSourceHydrationByInstance(id);
+  const mediaManagementSourceHydrationById = new Map<number, (typeof hydratedMediaManagementSources)[number]>();
+  for (const source of hydratedMediaManagementSources) {
+    mediaManagementSourceHydrationById.set(source.sourceId, source);
+  }
+
+  if (isTrashGuideSupportedArrType(arrType)) {
+    for (const source of trashGuideSourcesQueries.getByArrType(arrType)) {
+      if (mediaManagementSourceHydrationById.has(source.id)) {
+        continue;
+      }
+
+      mediaManagementSourceHydrationById.set(source.id, {
+        sourceId: source.id,
+        sourceName: source.name,
+        sourceArrType: source.arr_type,
+        config: null,
+        selections: [],
+      });
+    }
+  }
+
+  const trashGuideMediaManagementBySource = [...mediaManagementSourceHydrationById.values()]
+    .map((source) => {
+      const namingSel = source.selections.find((s) => s.sectionType === 'naming');
+      const qdSel = source.selections.find((s) => s.sectionType === 'qualityDefinitions');
+      const selectedNaming = namingSel?.itemName?.trim() || null;
+      const selectedQualityDefinitions = qdSel?.itemName?.trim() || null;
+
+      const namingEntities = trashGuideEntityCacheQueries
+        .getBySourceAndType(source.sourceId, 'naming')
+        .map((entity) => entity.name.trim())
+        .filter((name) => name.length > 0);
+      if (selectedNaming) {
+        namingEntities.push(selectedNaming);
+      }
+
+      const qualitySizeEntities = trashGuideEntityCacheQueries
+        .getBySourceAndType(source.sourceId, 'quality_size')
+        .map((entity) => entity.name.trim())
+        .filter((name) => name.length > 0);
+      if (selectedQualityDefinitions) {
+        qualitySizeEntities.push(selectedQualityDefinitions);
+      }
+
+      return {
+        sourceId: source.sourceId,
+        sourceName: source.sourceName,
+        sourceArrType: source.sourceArrType,
+        namingEntities: [...new Set(namingEntities)].sort((a, b) =>
+          a.localeCompare(b, undefined, { sensitivity: 'base' })
+        ),
+        qualitySizeEntities: [...new Set(qualitySizeEntities)].sort((a, b) =>
+          a.localeCompare(b, undefined, { sensitivity: 'base' })
+        ),
+        selectedNaming,
+        selectedQualityDefinitions,
+      };
+    })
+    .filter(
+      (source) =>
+        source.namingEntities.length > 0 ||
+        source.qualitySizeEntities.length > 0 ||
+        source.selectedNaming !== null ||
+        source.selectedQualityDefinitions !== null
+    )
+    .sort((a, b) => a.sourceName.localeCompare(b.sourceName, undefined, { sensitivity: 'base' }));
+
   return {
     instance,
     databases: databasesWithProfiles,
     syncData,
     trashGuideQualityProfilesBySource,
+    trashGuideMediaManagementBySource,
     metadataProfilesSupported: canLoadMetadataProfiles,
     syncPreview,
   };

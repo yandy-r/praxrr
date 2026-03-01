@@ -16,6 +16,16 @@
 
 import { BaseSyncer, type SyncResult } from '../base.ts';
 import { arrSyncQueries } from '$db/queries/arrSync.ts';
+import { trashGuideSyncQueries } from '$db/queries/trashGuideSync.ts';
+import { trashGuideEntityCacheQueries } from '$db/queries/trashGuideEntityCache.ts';
+import { trashGuideSourcesQueries } from '$db/queries/trashGuideSources.ts';
+import { toPortableNaming } from '$lib/server/trashguide/transformers/mediaManagement.ts';
+import { toPortableQualityDefinitions } from '$lib/server/trashguide/transformers/qualityProfiles.ts';
+import type {
+  TrashGuideNamingEntity,
+  TrashGuideQualitySizeEntity,
+  TrashGuideSupportedArrType,
+} from '$lib/server/trashguide/types.ts';
 import { getCache, type PCDCache } from '$pcd/index.ts';
 import {
   getLidarrByName as getLidarrMediaSettings,
@@ -59,7 +69,6 @@ import type { EntityChange, MediaManagementPreview } from '../preview/types.ts';
 import {
   getUnsupportedMediaManagementSubsectionReason,
   getUnsupportedSyncSectionReason,
-  isMediaManagementSubsectionSupported,
   isSyncSectionSupported,
   type MediaManagementSubsection,
   type SyncArrType,
@@ -723,6 +732,10 @@ export class MediaManagementSyncer extends BaseSyncer {
     let totalSynced = 0;
     const errors: string[] = [];
 
+    const hasTrashNaming = !syncConfig.namingDatabaseId && !!this.getTrashNamingSelection();
+    const hasTrashQualityDefs =
+      !syncConfig.qualityDefinitionsDatabaseId && !!this.getTrashQualityDefinitionsSelection();
+
     await logger.info(`Starting media management sync for "${this.instanceName}"`, {
       source: 'Sync:MediaManagement',
       meta: {
@@ -730,6 +743,8 @@ export class MediaManagementSyncer extends BaseSyncer {
         hasMediaSettings: !!syncConfig.mediaSettingsDatabaseId && !!syncConfig.mediaSettingsConfigName,
         hasNaming: !!syncConfig.namingDatabaseId && !!syncConfig.namingConfigName,
         hasQualityDefs: !!syncConfig.qualityDefinitionsDatabaseId && !!syncConfig.qualityDefinitionsConfigName,
+        hasTrashNaming,
+        hasTrashQualityDefs,
       },
     });
 
@@ -751,7 +766,7 @@ export class MediaManagementSyncer extends BaseSyncer {
       }
     }
 
-    // Sync naming if configured (both database and config name required)
+    // Sync naming: PCD first, TRaSH fallback
     if (syncConfig.namingDatabaseId && syncConfig.namingConfigName) {
       try {
         const synced = await this.syncNaming(syncConfig.namingDatabaseId, syncConfig.namingConfigName);
@@ -764,9 +779,21 @@ export class MediaManagementSyncer extends BaseSyncer {
           meta: { instanceId: this.instanceId, error: msg },
         });
       }
+    } else {
+      try {
+        const synced = await this.syncTrashNaming();
+        if (synced) totalSynced++;
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : 'Unknown error';
+        errors.push(`Naming (TRaSH): ${msg}`);
+        await logger.error(`Failed to sync TRaSH naming`, {
+          source: 'Sync:MediaManagement',
+          meta: { instanceId: this.instanceId, error: msg },
+        });
+      }
     }
 
-    // Sync quality definitions if configured (both database and config name required)
+    // Sync quality definitions: PCD first, TRaSH fallback
     if (syncConfig.qualityDefinitionsDatabaseId && syncConfig.qualityDefinitionsConfigName) {
       try {
         const synced = await this.syncQualityDefinitions(
@@ -778,6 +805,18 @@ export class MediaManagementSyncer extends BaseSyncer {
         const msg = error instanceof Error ? error.message : 'Unknown error';
         errors.push(`Quality definitions: ${msg}`);
         await logger.error(`Failed to sync quality definitions`, {
+          source: 'Sync:MediaManagement',
+          meta: { instanceId: this.instanceId, error: msg },
+        });
+      }
+    } else {
+      try {
+        const synced = await this.syncTrashQualityDefinitions();
+        if (synced) totalSynced++;
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : 'Unknown error';
+        errors.push(`Quality definitions (TRaSH): ${msg}`);
+        await logger.error(`Failed to sync TRaSH quality definitions`, {
           source: 'Sync:MediaManagement',
           meta: { instanceId: this.instanceId, error: msg },
         });
@@ -1389,6 +1428,192 @@ export class MediaManagementSyncer extends BaseSyncer {
     return Object.keys(existingConfig)
       .filter((field) => !managed.has(field))
       .sort();
+  }
+
+  // =========================================================================
+  // TRaSH Guide Naming
+  // =========================================================================
+
+  private getTrashNamingSelection(): { sourceId: number; itemName: string } | null {
+    try {
+      const selections = trashGuideSyncQueries.getSelectionsByInstance(this.instanceId);
+      const namingSel = selections.find((s) => s.sectionType === 'naming');
+      if (!namingSel) return null;
+      return { sourceId: namingSel.sourceId, itemName: namingSel.itemName };
+    } catch {
+      return null;
+    }
+  }
+
+  private getTrashQualityDefinitionsSelection(): { sourceId: number; itemName: string } | null {
+    try {
+      const selections = trashGuideSyncQueries.getSelectionsByInstance(this.instanceId);
+      const qdSel = selections.find((s) => s.sectionType === 'qualityDefinitions');
+      if (!qdSel) return null;
+      return { sourceId: qdSel.sourceId, itemName: qdSel.itemName };
+    } catch {
+      return null;
+    }
+  }
+
+  private async syncTrashNaming(): Promise<boolean> {
+    const selection = this.getTrashNamingSelection();
+    if (!selection) return false;
+
+    const source = trashGuideSourcesQueries.getById(selection.sourceId);
+    if (!source) {
+      await logger.warn(`TRaSH source ${selection.sourceId} not found for naming sync`, {
+        source: 'Sync:Naming',
+        meta: { instanceId: this.instanceId, sourceId: selection.sourceId },
+      });
+      return false;
+    }
+
+    const cachedEntities = trashGuideEntityCacheQueries.getBySourceAndType(selection.sourceId, 'naming');
+    const cached = cachedEntities.find((e) => e.name === selection.itemName);
+    if (!cached) {
+      await logger.warn(`TRaSH naming entity "${selection.itemName}" not found in cache`, {
+        source: 'Sync:Naming',
+        meta: { instanceId: this.instanceId, sourceId: selection.sourceId, itemName: selection.itemName },
+      });
+      return false;
+    }
+
+    const entity = JSON.parse(cached.jsonData) as TrashGuideNamingEntity;
+    const arrType = source.arr_type as TrashGuideSupportedArrType;
+    const result = toPortableNaming(entity, arrType);
+
+    if (result.portableEntityType === 'radarr_naming') {
+      const portable = result.data;
+      const existingConfig = (await this.client.getNamingConfig()) as RadarrNamingConfig;
+      const updatedConfig: RadarrNamingConfig = {
+        ...existingConfig,
+        renameMovies: portable.rename,
+        replaceIllegalCharacters: portable.replaceIllegalCharacters,
+        colonReplacementFormat: portable.colonReplacementFormat,
+        standardMovieFormat: portable.movieFormat,
+        movieFolderFormat: portable.movieFolderFormat,
+      };
+
+      await logger.debug('Updating Radarr naming from TRaSH', {
+        source: 'Sync:Naming',
+        meta: { instanceId: this.instanceId, trashEntity: entity.name },
+      });
+
+      await this.client.updateNamingConfig(updatedConfig);
+      return true;
+    }
+
+    if (result.portableEntityType === 'sonarr_naming') {
+      const portable = result.data;
+      const existingConfig = (await this.client.getNamingConfig()) as SonarrNamingConfig;
+      const updatedConfig: SonarrNamingConfig = {
+        ...existingConfig,
+        renameEpisodes: portable.rename,
+        replaceIllegalCharacters: portable.replaceIllegalCharacters,
+        colonReplacementFormat: colonReplacementToDb(portable.colonReplacementFormat),
+        customColonReplacementFormat: portable.customColonReplacementFormat,
+        multiEpisodeStyle: multiEpisodeStyleToDb(portable.multiEpisodeStyle),
+        standardEpisodeFormat: portable.standardEpisodeFormat,
+        dailyEpisodeFormat: portable.dailyEpisodeFormat,
+        animeEpisodeFormat: portable.animeEpisodeFormat,
+        seriesFolderFormat: portable.seriesFolderFormat,
+        seasonFolderFormat: portable.seasonFolderFormat,
+      };
+
+      await logger.debug('Updating Sonarr naming from TRaSH', {
+        source: 'Sync:Naming',
+        meta: { instanceId: this.instanceId, trashEntity: entity.name },
+      });
+
+      await this.client.updateNamingConfig(updatedConfig);
+      return true;
+    }
+
+    return false;
+  }
+
+  // =========================================================================
+  // TRaSH Guide Quality Definitions
+  // =========================================================================
+
+  private async syncTrashQualityDefinitions(): Promise<boolean> {
+    const selection = this.getTrashQualityDefinitionsSelection();
+    if (!selection) return false;
+
+    const source = trashGuideSourcesQueries.getById(selection.sourceId);
+    if (!source) {
+      await logger.warn(`TRaSH source ${selection.sourceId} not found for quality definitions sync`, {
+        source: 'Sync:QualityDefinitions',
+        meta: { instanceId: this.instanceId, sourceId: selection.sourceId },
+      });
+      return false;
+    }
+
+    const cachedEntities = trashGuideEntityCacheQueries.getBySourceAndType(selection.sourceId, 'quality_size');
+    const cached = cachedEntities.find((e) => e.name === selection.itemName);
+    if (!cached) {
+      await logger.warn(`TRaSH quality_size entity "${selection.itemName}" not found in cache`, {
+        source: 'Sync:QualityDefinitions',
+        meta: { instanceId: this.instanceId, sourceId: selection.sourceId, itemName: selection.itemName },
+      });
+      return false;
+    }
+
+    const entity = JSON.parse(cached.jsonData) as TrashGuideQualitySizeEntity;
+    const arrType = source.arr_type as TrashGuideSupportedArrType;
+    const result = toPortableQualityDefinitions(entity, arrType);
+
+    if (result.data.entries.length === 0) {
+      await logger.debug(`TRaSH quality definitions "${entity.name}" has no entries`, {
+        source: 'Sync:QualityDefinitions',
+        meta: { instanceId: this.instanceId, entityName: entity.name },
+      });
+      return false;
+    }
+
+    // GET existing quality definitions from Arr
+    const arrDefinitions = await this.client.getQualityDefinitions();
+    const arrDefMap = new Map<string, (typeof arrDefinitions)[0]>();
+    for (const def of arrDefinitions) {
+      if (def.quality.name) {
+        arrDefMap.set(def.quality.name.toLowerCase(), def);
+      }
+    }
+
+    // TRaSH transformer already resolves quality names to canonical API names
+    let updatedCount = 0;
+    for (const entry of result.data.entries) {
+      const arrDef = arrDefMap.get(entry.quality_name.toLowerCase());
+      if (!arrDef) {
+        await logger.debug(`No Arr definition found for TRaSH quality "${entry.quality_name}"`, {
+          source: 'Sync:QualityDefinitions',
+          meta: { instanceId: this.instanceId, qualityName: entry.quality_name },
+        });
+        continue;
+      }
+
+      arrDef.minSize = entry.min_size;
+      arrDef.maxSize = entry.max_size === 0 ? null : entry.max_size;
+      arrDef.preferredSize = entry.preferred_size === 0 ? null : entry.preferred_size;
+      updatedCount++;
+    }
+
+    if (updatedCount === 0) {
+      await logger.debug('No TRaSH quality definitions matched for update', {
+        source: 'Sync:QualityDefinitions',
+        meta: { instanceId: this.instanceId, entityName: entity.name },
+      });
+      return false;
+    }
+
+    await logger.debug(`Updating ${updatedCount} quality definitions from TRaSH`, {
+      source: 'Sync:QualityDefinitions',
+      meta: { instanceId: this.instanceId, entityName: entity.name, updatedCount },
+    });
+
+    await this.client.updateQualityDefinitions(arrDefinitions);
+    return true;
   }
 
   // =========================================================================
