@@ -596,6 +596,43 @@ export const actions: Actions = {
       return fail(400, { error: sourceIdResult.error });
     }
 
+    const mergeMediaManagementSelections = formData.get('mergeMediaManagementSelections') === 'true';
+
+    if (mergeMediaManagementSelections) {
+      // Media Management only: merge naming/qualityDefinitions into existing selections; do not change trigger/cron or other section types
+      const selectionsResult = parseTrashGuideSelectionsFromForm(formData.get('selections'));
+      if ('error' in selectionsResult) {
+        return fail(400, { error: selectionsResult.error });
+      }
+      const sourceId = sourceIdResult.value;
+      try {
+        trashGuideSyncQueries.assertScope(id, sourceId);
+        const existing = trashGuideSyncQueries.getSelections(id, sourceId);
+        const otherSections = existing.filter(
+          (s) => s.sectionType !== 'naming' && s.sectionType !== 'qualityDefinitions'
+        );
+        const merged = [
+          ...otherSections.map((s) => ({ sectionType: s.sectionType, itemName: s.itemName })),
+          ...selectionsResult.value,
+        ];
+        trashGuideSyncQueries.setSelections(id, sourceId, merged);
+        await logger.info(`TRaSH media management selections merged for "${instance.name}"`, {
+          source: 'sync',
+          meta: { instanceId: id, sourceId, selectionCount: merged.length },
+        });
+        return { success: true };
+      } catch (error) {
+        const mapped = mapTrashGuideActionError(error);
+        if (mapped.status >= 500) {
+          await logger.error('Failed to merge TRaSH media management selections', {
+            source: 'sync',
+            meta: { instanceId: id, sourceId: sourceIdResult.value, error: mapped.message },
+          });
+        }
+        return fail(mapped.status, { error: mapped.message });
+      }
+    }
+
     const triggerResult = parseTrashGuideTriggerFromForm(formData.get('trigger'));
     if ('error' in triggerResult) {
       return fail(400, { error: triggerResult.error });

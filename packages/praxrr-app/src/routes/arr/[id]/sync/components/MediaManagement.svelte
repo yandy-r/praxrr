@@ -81,6 +81,15 @@
 		}
 	}
 
+	// Capture savedState after hydration so initial load is not reported as dirty
+	let savedStateCaptured = false;
+	$: {
+		if (!savedStateCaptured) {
+			savedState = buildCurrentState();
+			savedStateCaptured = true;
+		}
+	}
+
 	// Expose TRaSH selection state for parent validation
 	export let hasTrashNaming = false;
 	export let hasTrashQualityDefinitions = false;
@@ -357,7 +366,7 @@
 
 			const formData = new FormData();
 			formData.set('sourceId', String(source.sourceId));
-			formData.set('trigger', 'manual');
+			formData.set('mergeMediaManagementSelections', 'true');
 			formData.set('selections', JSON.stringify(newSelections ?? []));
 
 			const response = await fetch('?/saveTrashGuideSource', {
