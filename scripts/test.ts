@@ -26,6 +26,7 @@ const aliases: Record<string, string> = {
 // Get the test target from args
 const target = Deno.args[0];
 const testPath = target ? (aliases[target] ?? target) : 'packages/praxrr-app/src/tests';
+const repoRoot = Deno.cwd();
 
 // Check if it's a valid path
 if (target && !aliases[target]) {
@@ -48,7 +49,7 @@ const cmd = new Deno.Command('deno', {
   args: ['test', testPath, '--allow-read', '--allow-write', '--allow-env', '--allow-ffi', '--allow-run'],
   env: {
     ...Deno.env.toObject(),
-    APP_BASE_PATH: './dist/test',
+    APP_BASE_PATH: `${repoRoot}/dist/test`,
   },
   stdout: 'inherit',
   stderr: 'inherit',

@@ -99,7 +99,7 @@ jobs:
       - name: Build SvelteKit
         run: cd packages/praxrr-app && deno run -A npm:vite build
         env:
-          APP_BASE_PATH: ../../dist/build
+          APP_BASE_PATH: ${{ github.workspace }}/dist/build
           VITE_PLATFORM: ${{ matrix.vite_platform }}
           VITE_CHANNEL: stable
 
