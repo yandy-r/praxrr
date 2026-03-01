@@ -2,6 +2,8 @@
  * Git command execution helper
  */
 
+import { NotGitRepositoryError, isNotGitRepositoryMessage } from './errors.ts';
+
 /**
  * Execute a git command with sandboxed environment
  */
@@ -25,6 +27,10 @@ export async function execGit(args: string[], cwd: string): Promise<string> {
 
   if (code !== 0) {
     const errorMessage = new TextDecoder().decode(stderr);
+    if (isNotGitRepositoryMessage(errorMessage)) {
+      throw new NotGitRepositoryError(`Git command failed: ${errorMessage}`);
+    }
+
     throw new Error(`Git command failed: ${errorMessage}`);
   }
 

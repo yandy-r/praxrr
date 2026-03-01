@@ -81,6 +81,7 @@ Both catch blocks use `logger.warn` with `String(snapshotError)`, discarding the
 `toDetail()` calls `JSON.parse(row.target_instance_ids)` without try/catch or type validation. Corrupted JSON would throw a SyntaxError that propagates differently depending on context -- swallowed in auto snapshots (but the snapshot is already persisted), or 500 in list/detail routes.
 
 **Fix:** Wrap in try/catch with a safe default. Add `Array.isArray()` guard after parse.
+**Status:** Fixed (2026-03-01). Added safe JSON parsing and array validation for `target_instance_ids`.
 **Status:** Open
 
 ### 7. Duplicated `isNotGitRepositoryError` function across two files
@@ -93,6 +94,7 @@ Both catch blocks use `logger.warn` with `String(snapshotError)`, discarding the
 Identical function defined independently. Also uses fragile substring matching on English-language git error messages. Non-English git locales would bypass the check and produce 500 errors.
 
 **Fix:** Extract to a shared utility in `$utils/git/`. Consider checking error class in addition to message string.
+**Status:** Fixed (2026-03-01). Added shared git repository error helper and reused it from both database API routes.
 **Status:** Open
 
 ### 8. `collectSnapshotDatabaseIds` can throw errors masked as snapshot failures

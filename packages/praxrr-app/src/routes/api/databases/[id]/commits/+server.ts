@@ -1,12 +1,7 @@
 import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from '@sveltejs/kit';
 import { databaseInstancesQueries } from '$db/queries/databaseInstances.ts';
-import { getCommits, getStatus } from '$utils/git/index.ts';
-
-function isNotGitRepositoryError(input: unknown): boolean {
-  const message = input instanceof Error ? input.message : String(input);
-  return message.toLowerCase().includes('not a git repository');
-}
+import { getCommits, getStatus, isNotGitRepositoryError } from '$utils/git/index.ts';
 
 /**
  * GET /api/databases/{id}/commits

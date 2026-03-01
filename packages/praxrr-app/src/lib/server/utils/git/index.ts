@@ -4,6 +4,7 @@
 
 export * from './types.ts';
 export type { GetStatusOptions } from './read.ts';
+export * from './errors.ts';
 
 // Read helpers
 export { getBranch, getBranches, getStatus, checkForUpdates, getIncomingChanges, getCommits, getDiff } from './read.ts';

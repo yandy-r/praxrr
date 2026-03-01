@@ -1,15 +1,10 @@
 import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from '@sveltejs/kit';
 import { databaseInstancesQueries } from '$db/queries/databaseInstances.ts';
-import { getBranches, getIncomingChanges, getRepoInfo, getStatus } from '$utils/git/index.ts';
+import { getBranches, getIncomingChanges, getRepoInfo, getStatus, isNotGitRepositoryError } from '$utils/git/index.ts';
 import type { GitStatus, IncomingChanges } from '$utils/git/types.ts';
 import { listDraftEntityChanges } from '$pcd/ops/draftChanges.ts';
 import { getDecryptedDatabasePersonalAccessToken } from '$server/utils/encryption/database-credentials.ts';
-
-function isNotGitRepositoryError(input: unknown): boolean {
-  const message = input instanceof Error ? input.message : String(input);
-  return message.toLowerCase().includes('not a git repository');
-}
 
 function emptyGitStatus(): GitStatus {
   return {

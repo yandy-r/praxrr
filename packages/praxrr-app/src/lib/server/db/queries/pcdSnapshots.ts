@@ -19,6 +19,23 @@ interface CreateSnapshotInput {
   targetInstanceIds?: number[] | null;
 }
 
+function parseTargetInstanceIds(targetInstanceIds: string | null): number[] | null {
+  if (!targetInstanceIds) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(targetInstanceIds);
+    if (!Array.isArray(parsed)) {
+      return null;
+    }
+
+    return parsed.filter((id): id is number => typeof id === 'number');
+  } catch {
+    return null;
+  }
+}
+
 function toDetail(row: PcdSnapshotRow): PcdSnapshotDetail {
   return {
     id: row.id,
@@ -30,7 +47,7 @@ function toDetail(row: PcdSnapshotRow): PcdSnapshotDetail {
     opsCountBase: row.ops_count_base,
     opsCountUser: row.ops_count_user,
     cacheStateHash: row.cache_state_hash,
-    targetInstanceIds: row.target_instance_ids ? JSON.parse(row.target_instance_ids) : null,
+    targetInstanceIds: parseTargetInstanceIds(row.target_instance_ids),
     createdAt: row.created_at,
   };
 }
