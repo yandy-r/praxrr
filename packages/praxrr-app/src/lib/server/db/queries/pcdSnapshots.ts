@@ -2,6 +2,7 @@ import { db } from '../db.ts';
 import type {
   PcdSnapshotRow,
   PcdSnapshotDetail,
+  PcdSnapshotListResponse,
   PcdSnapshotListOptions,
   SnapshotType,
   SnapshotTrigger,
@@ -121,7 +122,7 @@ export const pcdSnapshotQueries = {
   listByDatabase(
     databaseId: number,
     options?: PcdSnapshotListOptions
-  ): { snapshots: PcdSnapshotDetail[]; total: number } {
+  ): PcdSnapshotListResponse {
     const conditions: string[] = ['database_id = ?'];
     const params: (string | number)[] = [databaseId];
 

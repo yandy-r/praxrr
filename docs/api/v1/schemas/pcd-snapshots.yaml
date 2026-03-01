@@ -76,7 +76,7 @@ PcdSnapshotFullDetail:
       properties:
         opsWrittenSince:
           type: integer
-          description: Number of ops written after this snapshot
+          description: Number of ops written after this snapshot (count of pcd_ops rows with id greater than opsSequenceMaxId)
     isRestorable:
       type: boolean
       description: Always false in this release. Restore support is not yet implemented.

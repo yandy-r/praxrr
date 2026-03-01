@@ -10,6 +10,7 @@ import type {
   CreateAutoSnapshotInput,
   CreateManualSnapshotInput,
   PcdSnapshotDetail,
+  PcdSnapshotFullDetail,
   PcdSnapshotListOptions,
   PcdSnapshotListResponse,
   SnapshotTrigger,
@@ -115,7 +116,8 @@ interface OpsMetadata {
 
 /**
  * Compute ops metadata for a database snapshot.
- * Returns the max pcd_ops id and counts of published ops by origin.
+ * Returns the maximum pcd_ops row ID across all states and counts of published
+ * ops by origin.
  */
 function computeOpsMetadata(databaseId: number): OpsMetadata {
   const maxIdResult = db.queryFirst<{ max_id: number | null }>(
@@ -139,6 +141,18 @@ function computeOpsMetadata(databaseId: number): OpsMetadata {
   const opsCountUser = userCountResult?.count ?? 0;
 
   return { opsSequenceMaxId, opsCountBase, opsCountUser };
+}
+
+/**
+ * Count all ops written after a snapshot sequence marker.
+ */
+function computeOpsWrittenSince(databaseId: number, opsSequenceMaxId: number): number {
+  const countResult = db.queryFirst<{ count: number }>(
+    'SELECT COUNT(*) as count FROM pcd_ops WHERE database_id = ? AND id > ?',
+    databaseId,
+    opsSequenceMaxId
+  );
+  return countResult?.count ?? 0;
 }
 
 // ============================================================================
@@ -235,10 +249,7 @@ async function createAutoSnapshot(input: CreateAutoSnapshotInput): Promise<PcdSn
   try {
     const { databaseId, trigger, targetInstanceIds } = input;
 
-    // Compute ops metadata
     const { opsSequenceMaxId, opsCountBase, opsCountUser } = computeOpsMetadata(databaseId);
-
-    // Compute state fingerprint
     const cacheStateHash = await computeStateHash(databaseId);
 
     // Check deduplication
@@ -250,7 +261,6 @@ async function createAutoSnapshot(input: CreateAutoSnapshotInput): Promise<PcdSn
       return null;
     }
 
-    // Persist snapshot
     const snapshot = pcdSnapshotQueries.create({
       databaseId,
       type: 'auto',
@@ -272,7 +282,6 @@ async function createAutoSnapshot(input: CreateAutoSnapshotInput): Promise<PcdSn
       },
     });
 
-    // Run retention pruning
     try {
       const pruned = pcdSnapshotQueries.pruneAutoSnapshots(databaseId, MAX_AUTO_SNAPSHOTS, MAX_AUTO_AGE_DAYS);
       if (pruned > 0) {
@@ -320,13 +329,8 @@ async function createAutoSnapshot(input: CreateAutoSnapshotInput): Promise<PcdSn
 async function createManualSnapshot(input: CreateManualSnapshotInput): Promise<PcdSnapshotDetail> {
   const { databaseId, description } = input;
 
-  // Compute ops metadata
   const { opsSequenceMaxId, opsCountBase, opsCountUser } = computeOpsMetadata(databaseId);
-
-  // Compute state fingerprint
   const cacheStateHash = await computeStateHash(databaseId);
-
-  // Persist snapshot (no deduplication, no pruning)
   const snapshot = pcdSnapshotQueries.create({
     databaseId,
     type: 'manual',
@@ -369,6 +373,24 @@ function getDetail(snapshotId: number): PcdSnapshotDetail | undefined {
 }
 
 /**
+ * Get a snapshot with computed restore-context fields.
+ */
+function getFullDetail(snapshotId: number): PcdSnapshotFullDetail | undefined {
+  const snapshot = getDetail(snapshotId);
+  if (!snapshot) {
+    return undefined;
+  }
+
+  const opsWrittenSince = computeOpsWrittenSince(snapshot.databaseId, snapshot.opsSequenceMaxId);
+
+  return {
+    ...snapshot,
+    opsWrittenSince,
+    isRestorable: false,
+  };
+}
+
+/**
  * Delete a snapshot by ID
  */
 function deleteSnapshot(snapshotId: number): boolean {
@@ -384,6 +406,7 @@ export const snapshotService = {
   createManualSnapshot,
   list,
   getDetail,
+  getFullDetail,
   deleteSnapshot,
 };
 

@@ -1,7 +1,6 @@
 import { assertEquals } from '@std/assert';
 import { pcdManager, snapshotService } from '$pcd/index.ts';
-import type { PcdSnapshotDetail } from '$pcd/snapshots/types.ts';
-import { db } from '$db/db.ts';
+import type { PcdSnapshotDetail, PcdSnapshotFullDetail } from '$pcd/snapshots/types.ts';
 import type { DatabaseInstance } from '$db/queries/databaseInstances.ts';
 import { GET as listSnapshotsRoute, POST as createSnapshotRoute } from '../../../routes/api/v1/pcd/[databaseId]/snapshots/+server.ts';
 import { DELETE as deleteSnapshotRoute, GET as getSnapshotRoute } from '../../../routes/api/v1/pcd/[databaseId]/snapshots/[snapshotId]/+server.ts';
@@ -176,15 +175,13 @@ Deno.test('snapshot detail route returns computed opsWrittenSince and never-rest
 
   patchTarget(
     snapshotService,
-    'getDetail',
-    (() => snapshot) as typeof snapshotService.getDetail,
-    restores
-  );
-
-  patchTarget(
-    db,
-    'queryFirst',
-    (() => ({ max_id: 45 })) as typeof db.queryFirst,
+    'getFullDetail',
+    (() =>
+      ({
+        ...snapshot,
+        opsWrittenSince: 15,
+        isRestorable: false,
+      }) as PcdSnapshotFullDetail) as typeof snapshotService.getFullDetail,
     restores
   );
 
@@ -202,6 +199,63 @@ Deno.test('snapshot detail route returns computed opsWrittenSince and never-rest
     assertEquals(payload.id, 7);
     assertEquals(payload.opsWrittenSince, 15);
     assertEquals(payload.isRestorable, false);
+  } finally {
+    for (const restore of restores.reverse()) {
+      restore();
+    }
+  }
+});
+
+Deno.test('snapshot create route rejects descriptions over 1000 characters', async () => {
+  const restores: Restores = [];
+  const dbInstance = buildDatabase(32);
+  let createCalled = false;
+
+  patchTarget(
+    pcdManager,
+    'getById',
+    (() => dbInstance) as typeof pcdManager.getById,
+    restores
+  );
+
+  patchTarget(
+    snapshotService,
+    'createManualSnapshot',
+    (() => {
+      createCalled = true;
+      return Promise.resolve({
+        id: 9010,
+        databaseId: 32,
+        type: 'manual',
+        trigger: 'manual',
+        description: 'should-not-run',
+        opsSequenceMaxId: 100,
+        opsCountBase: 1,
+        opsCountUser: 2,
+        cacheStateHash: null,
+        targetInstanceIds: null,
+        createdAt: new Date().toISOString(),
+      });
+    }) as typeof snapshotService.createManualSnapshot,
+    restores
+  );
+
+  try {
+    const response = await createSnapshotRoute({
+      params: { databaseId: '32' },
+      request: new Request('http://localhost/api/v1/pcd/32/snapshots', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({ description: 'a'.repeat(1001) }),
+      }),
+    } as unknown as Parameters<typeof createSnapshotRoute>[0]);
+
+    assertEquals(response.status, 400);
+    const payload = (await response.json()) as { error: string };
+    assertEquals(payload.error, 'Description must be 1000 characters or fewer');
+    assertEquals(createCalled, false);
   } finally {
     for (const restore of restores.reverse()) {
       restore();
@@ -238,6 +292,18 @@ Deno.test('snapshot detail and delete routes enforce database ownership', async 
     snapshotService,
     'getDetail',
     (() => snapshot) as typeof snapshotService.getDetail,
+    restores
+  );
+
+  patchTarget(
+    snapshotService,
+    'getFullDetail',
+    (() =>
+      ({
+        ...snapshot,
+        opsWrittenSince: 0,
+        isRestorable: false,
+      }) as PcdSnapshotFullDetail) as typeof snapshotService.getFullDetail,
     restores
   );
 

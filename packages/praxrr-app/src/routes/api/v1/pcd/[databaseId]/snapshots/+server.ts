@@ -10,6 +10,7 @@ const DEFAULT_LIMIT = 50;
 const MIN_LIMIT = 1;
 const MAX_LIMIT = 200;
 const DEFAULT_OFFSET = 0;
+const MAX_DESCRIPTION_LENGTH = 1000;
 
 function parseDatabaseId(rawId: string | undefined): { value: number } | { error: string } {
   if (!rawId) {
@@ -157,7 +158,16 @@ export const POST: RequestHandler = async ({ params, request }) => {
             return json({ error: 'Description must be a string' }, { status: 400 });
           }
           const trimmed = root.description.trim();
-          if (trimmed) {
+          if (!trimmed) {
+            description = undefined;
+          } else {
+            if (trimmed.length > MAX_DESCRIPTION_LENGTH) {
+              return json(
+                { error: `Description must be ${MAX_DESCRIPTION_LENGTH} characters or fewer` },
+                { status: 400 }
+              );
+            }
+
             description = trimmed;
           }
         }

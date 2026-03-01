@@ -211,7 +211,7 @@ The type and OpenAPI docs imply restore functionality exists. Neither documents 
 The computation is `currentMaxId - snapshot.opsSequenceMaxId` which is an ID-gap approximation. Op deletions cause overcounting; restores cause undercounting. The OpenAPI schema says "Number of ops written" implying exactness.
 
 **Suggestion:** Update OpenAPI description to "Approximate number of ops written" or use `COUNT(*)` with `WHERE id > snapshot.opsSequenceMaxId`.
-**Status:** Open
+**Status:** Fixed (2026-03-01). `snapshotService.getFullDetail()` computes `opsWrittenSince` using `SELECT COUNT(*) FROM pcd_ops WHERE database_id = ? AND id > ?`, and OpenAPI schema text now matches this exact count behavior.
 
 ### 20. No description length limit on manual snapshots
 
@@ -220,7 +220,7 @@ The computation is `currentMaxId - snapshot.opsSequenceMaxId` which is an ID-gap
 The POST route trims whitespace but does not enforce a max length. A multi-megabyte description would be persisted without complaint.
 
 **Suggestion:** Add a max length check (e.g., 500-1000 chars).
-**Status:** Open
+**Status:** Fixed (2026-03-01). Added a 1000-character `MAX_DESCRIPTION_LENGTH` guard in `packages/praxrr-app/src/routes/api/v1/pcd/[databaseId]/snapshots/+server.ts`.
 
 ### 21. `listByDatabase` returns anonymous structural type instead of `PcdSnapshotListResponse`
 
@@ -229,7 +229,7 @@ The POST route trims whitespace but does not enforce a max length. A multi-megab
 The return type is structurally identical to `PcdSnapshotListResponse` but not referenced by name. If the response type gains a field, the query method won't fail to compile.
 
 **Suggestion:** Use explicit `PcdSnapshotListResponse` return type.
-**Status:** Open
+**Status:** Fixed (2026-03-01). `pcdSnapshots.listByDatabase()` now returns `PcdSnapshotListResponse` explicitly.
 
 ### 22. `computeOpsMetadata` JSDoc is misleading about MAX(id) scope
 
@@ -238,7 +238,7 @@ The return type is structurally identical to `PcdSnapshotListResponse` but not r
 JSDoc says "max pcd_ops id" without clarifying this includes ALL states (not just published), while the counts are limited to published ops only.
 
 **Suggestion:** Rewrite to "Returns the maximum pcd_ops row ID (across all states) and counts of published ops by origin."
-**Status:** Open
+**Status:** Fixed (2026-03-01). Updated docs around `computeOpsMetadata` in `snapshotService` to call out MAX(id) across all states.
 
 ### 23. Move `opsWrittenSince`/`isRestorable` computation to service layer
 
@@ -247,7 +247,7 @@ JSDoc says "max pcd_ops id" without clarifying this includes ALL states (not jus
 The "full detail" enrichment lives in the route handler, not the service. Internal consumers needing these values would have to duplicate the computation.
 
 **Suggestion:** Add `getFullDetail(snapshotId, databaseId)` to the service.
-**Status:** Open
+**Status:** Fixed (2026-03-01). Added `snapshotService.getFullDetail()` and refactored route to return service-provided full detail.
 
 ### 24. Redundant section-separator comments
 
@@ -256,7 +256,7 @@ The "full detail" enrichment lives in the route handler, not the service. Intern
 Comments like `// Compute ops metadata` immediately before `computeOpsMetadata()` calls are "what" comments that mirror the function name. The function names are descriptive enough.
 
 **Suggestion:** Remove or replace with "why" comments where needed.
-**Status:** Open
+**Status:** Fixed (2026-03-01). Removed redundant `Compute ...` inline section comments from `snapshotService` auto/manual snapshot creation paths.
 
 ---
 

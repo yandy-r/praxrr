@@ -1,8 +1,6 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from '@sveltejs/kit';
 import { pcdManager, snapshotService } from '$pcd/index.ts';
-import type { PcdSnapshotFullDetail } from '$pcd/index.ts';
-import { db } from '$db/db.ts';
 import { logger } from '$logger/logger.ts';
 
 const POSITIVE_INTEGER_ID = /^\d+$/;
@@ -59,32 +57,15 @@ export const GET: RequestHandler = async ({ params }) => {
   }
 
   try {
-    const snapshot = snapshotService.getDetail(snapshotIdResult.value);
-    if (!snapshot) {
+    const fullDetail = snapshotService.getFullDetail(snapshotIdResult.value);
+    if (!fullDetail) {
       return json({ error: 'Snapshot not found' }, { status: 404 });
     }
 
     // Ownership enforcement: snapshot must belong to the requested database
-    if (snapshot.databaseId !== databaseIdResult.value) {
+    if (fullDetail.databaseId !== databaseIdResult.value) {
       return json({ error: 'Snapshot not found' }, { status: 404 });
     }
-
-    // Compute opsWrittenSince
-    const maxIdResult = db.queryFirst<{ max_id: number | null }>(
-      'SELECT MAX(id) as max_id FROM pcd_ops WHERE database_id = ?',
-      databaseIdResult.value
-    );
-    const currentMaxId = maxIdResult?.max_id ?? 0;
-    const opsWrittenSince = currentMaxId > 0 ? Math.max(0, currentMaxId - snapshot.opsSequenceMaxId) : 0;
-
-    // isRestorable: always false for MVP (restore not implemented)
-    const isRestorable = false;
-
-    const fullDetail: PcdSnapshotFullDetail = {
-      ...snapshot,
-      opsWrittenSince,
-      isRestorable,
-    };
 
     return json(fullDetail);
   } catch (error) {

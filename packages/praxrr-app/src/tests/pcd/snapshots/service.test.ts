@@ -474,3 +474,51 @@ Deno.test('snapshotService.createAutoSnapshot returns null when database metadat
     }
   }
 });
+
+Deno.test('snapshotService.getFullDetail computes exact opsWrittenSince and keeps isRestorable false', () => {
+  const restores: Restores = [];
+  const snapshot: PcdSnapshotDetail = {
+    id: 601,
+    databaseId: 77,
+    type: 'auto',
+    trigger: 'pull',
+    description: null,
+    opsSequenceMaxId: 40,
+    opsCountBase: 4,
+    opsCountUser: 7,
+    cacheStateHash: null,
+    targetInstanceIds: null,
+    createdAt: new Date().toISOString(),
+  };
+
+  patchTarget(
+    pcdSnapshotQueries,
+    'getById',
+    (() => snapshot) as typeof pcdSnapshotQueries.getById,
+    restores
+  );
+
+  patchTarget(
+    db,
+    'queryFirst',
+    ((sql: string, ..._params: unknown[]) => {
+      if (sql.includes('SELECT COUNT(*) as count FROM pcd_ops WHERE database_id = ? AND id > ?')) {
+        return { count: 15 };
+      }
+
+      return undefined;
+    }) as typeof db.queryFirst,
+    restores
+  );
+
+  try {
+    const fullDetail = snapshotService.getFullDetail(601);
+    assertEquals(fullDetail?.id, 601);
+    assertEquals(fullDetail?.opsWrittenSince, 15);
+    assertEquals(fullDetail?.isRestorable, false);
+  } finally {
+    for (const restore of restores.reverse()) {
+      restore();
+    }
+  }
+});
