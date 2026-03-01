@@ -731,10 +731,36 @@ export class MediaManagementSyncer extends BaseSyncer {
     const syncConfig = arrSyncQueries.getMediaManagementSync(this.instanceId);
     let totalSynced = 0;
     const errors: string[] = [];
+    let trashNamingSelection: { sourceId: number; itemName: string } | null = null;
+    let trashQualityDefinitionsSelection: { sourceId: number; itemName: string } | null = null;
+    let hasTrashNaming = false;
+    let hasTrashQualityDefs = false;
 
-    const hasTrashNaming = !syncConfig.namingDatabaseId && !!this.getTrashNamingSelection();
-    const hasTrashQualityDefs =
-      !syncConfig.qualityDefinitionsDatabaseId && !!this.getTrashQualityDefinitionsSelection();
+    if (!syncConfig.namingDatabaseId) {
+      try {
+        trashNamingSelection = this.getTrashNamingSelection();
+        hasTrashNaming = !!trashNamingSelection;
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : 'Unknown error';
+        await logger.error(`Failed to load TRaSH naming selection`, {
+          source: 'Sync:MediaManagement',
+          meta: { instanceId: this.instanceId, error: msg },
+        });
+      }
+    }
+
+    if (!syncConfig.qualityDefinitionsDatabaseId) {
+      try {
+        trashQualityDefinitionsSelection = this.getTrashQualityDefinitionsSelection();
+        hasTrashQualityDefs = !!trashQualityDefinitionsSelection;
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : 'Unknown error';
+        await logger.error(`Failed to load TRaSH quality-definition selection`, {
+          source: 'Sync:MediaManagement',
+          meta: { instanceId: this.instanceId, error: msg },
+        });
+      }
+    }
 
     await logger.info(`Starting media management sync for "${this.instanceName}"`, {
       source: 'Sync:MediaManagement',
@@ -781,7 +807,7 @@ export class MediaManagementSyncer extends BaseSyncer {
       }
     } else {
       try {
-        const synced = await this.syncTrashNaming();
+        const synced = await this.syncTrashNaming(trashNamingSelection);
         if (synced) totalSynced++;
       } catch (error) {
         const msg = error instanceof Error ? error.message : 'Unknown error';
@@ -811,7 +837,7 @@ export class MediaManagementSyncer extends BaseSyncer {
       }
     } else {
       try {
-        const synced = await this.syncTrashQualityDefinitions();
+        const synced = await this.syncTrashQualityDefinitions(trashQualityDefinitionsSelection);
         if (synced) totalSynced++;
       } catch (error) {
         const msg = error instanceof Error ? error.message : 'Unknown error';
@@ -1435,29 +1461,20 @@ export class MediaManagementSyncer extends BaseSyncer {
   // =========================================================================
 
   private getTrashNamingSelection(): { sourceId: number; itemName: string } | null {
-    try {
-      const selections = trashGuideSyncQueries.getSelectionsByInstance(this.instanceId);
-      const namingSel = selections.find((s) => s.sectionType === 'naming');
-      if (!namingSel) return null;
-      return { sourceId: namingSel.sourceId, itemName: namingSel.itemName };
-    } catch {
-      return null;
-    }
+    const selections = trashGuideSyncQueries.getSelectionsByInstance(this.instanceId);
+    const namingSel = selections.find((s) => s.sectionType === 'naming');
+    if (!namingSel) return null;
+    return { sourceId: namingSel.sourceId, itemName: namingSel.itemName };
   }
 
   private getTrashQualityDefinitionsSelection(): { sourceId: number; itemName: string } | null {
-    try {
-      const selections = trashGuideSyncQueries.getSelectionsByInstance(this.instanceId);
-      const qdSel = selections.find((s) => s.sectionType === 'qualityDefinitions');
-      if (!qdSel) return null;
-      return { sourceId: qdSel.sourceId, itemName: qdSel.itemName };
-    } catch {
-      return null;
-    }
+    const selections = trashGuideSyncQueries.getSelectionsByInstance(this.instanceId);
+    const qdSel = selections.find((s) => s.sectionType === 'qualityDefinitions');
+    if (!qdSel) return null;
+    return { sourceId: qdSel.sourceId, itemName: qdSel.itemName };
   }
 
-  private async syncTrashNaming(): Promise<boolean> {
-    const selection = this.getTrashNamingSelection();
+  private async syncTrashNaming(selection: { sourceId: number; itemName: string } | null): Promise<boolean> {
     if (!selection) return false;
 
     const source = trashGuideSourcesQueries.getById(selection.sourceId);
@@ -1537,8 +1554,9 @@ export class MediaManagementSyncer extends BaseSyncer {
   // TRaSH Guide Quality Definitions
   // =========================================================================
 
-  private async syncTrashQualityDefinitions(): Promise<boolean> {
-    const selection = this.getTrashQualityDefinitionsSelection();
+  private async syncTrashQualityDefinitions(
+    selection: { sourceId: number; itemName: string } | null
+  ): Promise<boolean> {
     if (!selection) return false;
 
     const source = trashGuideSourcesQueries.getById(selection.sourceId);
