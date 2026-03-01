@@ -30,6 +30,7 @@ import {
   encryptDatabasePersonalAccessToken,
   getDecryptedDatabasePersonalAccessToken,
 } from '$server/utils/encryption/database-credentials.ts';
+import { snapshotService } from '../snapshots/service.ts';
 
 /**
  * PCD Manager - Manages the lifecycle of Praxrr Compliant Databases
@@ -169,6 +170,20 @@ class PCDManager {
 
     try {
       if (isLocalRepositorySource(instance.repository_url)) {
+        // Pre-pull snapshot for local-path sources (best-effort, non-blocking)
+        try {
+          await snapshotService.createAutoSnapshot({
+            databaseId: id,
+            trigger: 'pull',
+            targetInstanceIds: null,
+          });
+        } catch (snapshotError) {
+          await logger.warn('Pre-pull snapshot failed', {
+            source: 'PCDManager',
+            meta: { databaseId: id, error: String(snapshotError) },
+          });
+        }
+
         await refreshLocalRepositoryClone(instance.repository_url, instance.local_path);
 
         const personalAccessToken = await getDecryptedDatabasePersonalAccessToken(instance.id);
@@ -224,6 +239,20 @@ class PCDManager {
           success: true,
           commitsBehind: 0,
         };
+      }
+
+      // Pre-pull snapshot for remote sources (best-effort, non-blocking)
+      try {
+        await snapshotService.createAutoSnapshot({
+          databaseId: id,
+          trigger: 'pull',
+          targetInstanceIds: null,
+        });
+      } catch (snapshotError) {
+        await logger.warn('Pre-pull snapshot failed', {
+          source: 'PCDManager',
+          meta: { databaseId: id, error: String(snapshotError) },
+        });
       }
 
       // Pull updates
