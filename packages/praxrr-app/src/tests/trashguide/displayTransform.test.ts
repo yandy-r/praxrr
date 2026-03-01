@@ -203,88 +203,91 @@ Deno.test('toSourcedQualityProfileRow: maps upgrade-until matching across group 
   assertEquals(row?.language, undefined);
 });
 
-Deno.test('toSourcedNamingListItem/toSourcedQualityDefinitionListItem: parse malformed cache as null and valid cache keeps source fields', () => {
-  const badNaming = toSourcedNamingListItem(
-    entityCache({
-      entityType: 'naming',
-      name: 'Bad Name',
-      trashId: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
-      jsonData: '[]',
-    }),
-    SOURCE
-  );
-  assertEquals(badNaming, null);
+Deno.test(
+  'toSourcedNamingListItem/toSourcedQualityDefinitionListItem: parse malformed cache as null and valid cache keeps source fields',
+  () => {
+    const badNaming = toSourcedNamingListItem(
+      entityCache({
+        entityType: 'naming',
+        name: 'Bad Name',
+        trashId: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+        jsonData: '[]',
+      }),
+      SOURCE
+    );
+    assertEquals(badNaming, null);
 
-  const naming = toSourcedNamingListItem(
-    entityCache({
-      entityType: 'naming',
-      name: 'Good Name',
-      trashId: 'cccccccccccccccccccccccccccccccc',
-      jsonData: JSON.stringify({
-        entity_type: 'naming',
-        arr_type: 'radarr',
-        trash_id: 'cccccccccccccccccccccccccccccccc',
-        file_path: 'naming.json',
+    const naming = toSourcedNamingListItem(
+      entityCache({
+        entityType: 'naming',
         name: 'Good Name',
-        language: null,
-        source_url: null,
-        episode_format: '{Series Title}',
-        movie_format: null,
-        series_folder_format: null,
+        trashId: 'cccccccccccccccccccccccccccccccc',
+        jsonData: JSON.stringify({
+          entity_type: 'naming',
+          arr_type: 'radarr',
+          trash_id: 'cccccccccccccccccccccccccccccccc',
+          file_path: 'naming.json',
+          name: 'Good Name',
+          language: null,
+          source_url: null,
+          episode_format: '{Series Title}',
+          movie_format: null,
+          series_folder_format: null,
+        }),
       }),
-    }),
-    SOURCE
-  );
+      SOURCE
+    );
 
-  assertEquals(naming?.name, 'Good Name');
-  assertEquals(naming?.sourceType, 'trash');
-  assertEquals(naming?.arr_type, 'radarr');
+    assertEquals(naming?.name, 'Good Name');
+    assertEquals(naming?.sourceType, 'trash');
+    assertEquals(naming?.arr_type, 'radarr');
 
-  const badQualityDefinition = toSourcedQualityDefinitionListItem(
-    entityCache({
-      entityType: 'quality_size',
-      name: 'Bad Sizes',
-      trashId: 'dddddddddddddddddddddddddddddddd',
-      jsonData: '{broken',
-    }),
-    SOURCE
-  );
-  assertEquals(badQualityDefinition, null);
+    const badQualityDefinition = toSourcedQualityDefinitionListItem(
+      entityCache({
+        entityType: 'quality_size',
+        name: 'Bad Sizes',
+        trashId: 'dddddddddddddddddddddddddddddddd',
+        jsonData: '{broken',
+      }),
+      SOURCE
+    );
+    assertEquals(badQualityDefinition, null);
 
-  const qualityDefinition = toSourcedQualityDefinitionListItem(
-    entityCache({
-      entityType: 'quality_size',
-      name: 'Good Sizes',
-      trashId: 'eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee',
-      jsonData: JSON.stringify({
-        entity_type: 'quality_size',
-        arr_type: 'radarr',
-        trash_id: 'eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee',
-        file_path: 'qualities.json',
+    const qualityDefinition = toSourcedQualityDefinitionListItem(
+      entityCache({
+        entityType: 'quality_size',
         name: 'Good Sizes',
-        profile_type: 'series',
-        qualities: [
-          {
-            quality: '1080p',
-            min: 0,
-            preferred: 2000,
-            max: 5000,
-          },
-          {
-            quality: '2160p',
-            min: 0,
-            preferred: 2000,
-            max: 5000,
-          },
-        ],
+        trashId: 'eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee',
+        jsonData: JSON.stringify({
+          entity_type: 'quality_size',
+          arr_type: 'radarr',
+          trash_id: 'eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee',
+          file_path: 'qualities.json',
+          name: 'Good Sizes',
+          profile_type: 'series',
+          qualities: [
+            {
+              quality: '1080p',
+              min: 0,
+              preferred: 2000,
+              max: 5000,
+            },
+            {
+              quality: '2160p',
+              min: 0,
+              preferred: 2000,
+              max: 5000,
+            },
+          ],
+        }),
       }),
-    }),
-    SOURCE
-  );
+      SOURCE
+    );
 
-  assertEquals(qualityDefinition?.name, 'Good Sizes');
-  assertEquals(qualityDefinition?.quality_count, 2);
-});
+    assertEquals(qualityDefinition?.name, 'Good Sizes');
+    assertEquals(qualityDefinition?.quality_count, 2);
+  }
+);
 
 Deno.test('toSyntheticId: distinguishes malformed TRaSH IDs', () => {
   const malformedA = toSourcedCustomFormatRow(

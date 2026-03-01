@@ -172,7 +172,9 @@ curl -sS \
 {
   "type": "radarr",
   "items": [{ "id": 1, "title": "A Movie", "qualityProfileName": "Default" }],
-  "profilesByDatabase": [{ "databaseId": 1, "databaseName": "Praxrr-DB", "profiles": ["Default"] }],
+  "profilesByDatabase": [
+    { "databaseId": 1, "databaseName": "Praxrr-DB", "profiles": ["Default"] }
+  ],
   "page": 1,
   "pageSize": 2,
   "totalRecords": 245,
@@ -273,7 +275,9 @@ curl -sS \
 
 ```json
 {
-  "staleCustomFormats": [{ "id": 14, "name": "My CF [ns]", "strippedName": "My CF" }],
+  "staleCustomFormats": [
+    { "id": 14, "name": "My CF [ns]", "strippedName": "My CF" }
+  ],
   "staleQualityProfiles": []
 }
 ```

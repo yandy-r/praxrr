@@ -30,9 +30,7 @@ function throwNotInitialized(): never {
 }
 
 Deno.test('source context builds default key and source metadata for mixed sources', () => {
-  const databases: FakeDatabase[] = [
-    { id: 1, name: 'Praxrr-DB' },
-  ];
+  const databases: FakeDatabase[] = [{ id: 1, name: 'Praxrr-DB' }];
 
   const context = buildSourceContext(
     databases,

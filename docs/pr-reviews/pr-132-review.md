@@ -331,7 +331,6 @@ entity sets. Non-hex trash IDs silently produce `suffix = 0`, causing all unpars
 same source to collide.
 **Status:** ✅ Fixed in `packages/praxrr-app/src/lib/server/trashguide/displayTransform.ts` using full-string hash synthesis with source-isolated negative IDs.
 
-
 ### 21. Nested ternary in `viewState` derivation (CLAUDE.md violation)
 
 **File:** `TrashGuideSources.svelte:460-468` **Agent:** code-simplifier
@@ -348,7 +347,6 @@ transformation, entity extraction, and namespace construction.
 
 **Fix:** Extract TRaSH batch building into a separate private method.
 **Status:** ✅ Fixed in `packages/praxrr-app/src/lib/server/sync/qualityProfiles/syncer.ts` via dedicated `fetchTrashSyncBatches` method.
-
 
 ### 23. `void logger.warn(...)` drops the promise
 
