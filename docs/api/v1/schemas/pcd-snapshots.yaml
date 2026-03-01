@@ -77,9 +77,9 @@ PcdSnapshotFullDetail:
         opsWrittenSince:
           type: integer
           description: Number of ops written after this snapshot
-        isRestorable:
-          type: boolean
-          description: Whether this snapshot can theoretically be restored
+    isRestorable:
+      type: boolean
+      description: Always false in this release. Restore support is not yet implemented.
 
 PcdSnapshotListResponse:
   type: object

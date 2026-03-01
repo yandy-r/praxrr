@@ -82,7 +82,6 @@ Both catch blocks use `logger.warn` with `String(snapshotError)`, discarding the
 
 **Fix:** Wrap in try/catch with a safe default. Add `Array.isArray()` guard after parse.
 **Status:** Fixed (2026-03-01). Added safe JSON parsing and array validation for `target_instance_ids`.
-**Status:** Open
 
 ### 7. Duplicated `isNotGitRepositoryError` function across two files
 
@@ -95,7 +94,6 @@ Identical function defined independently. Also uses fragile substring matching o
 
 **Fix:** Extract to a shared utility in `$utils/git/`. Consider checking error class in addition to message string.
 **Status:** Fixed (2026-03-01). Added shared git repository error helper and reused it from both database API routes.
-**Status:** Open
 
 ### 8. `collectSnapshotDatabaseIds` can throw errors masked as snapshot failures
 
@@ -162,7 +160,7 @@ The `cacheStateHash` description references `(state_hash_v1)` as a version label
 Accepts any `SnapshotType` with any `SnapshotTrigger`. Nothing prevents `{ type: 'manual', trigger: 'pull' }` at the query layer.
 
 **Suggestion:** Make it a discriminated union encoding the type-trigger cross-constraint.
-**Status:** Open
+**Status:** Fixed (2026-03-01)
 
 ### 15. No API route tests -- zero coverage for 308 lines of route code
 
@@ -172,6 +170,7 @@ Accepts any `SnapshotType` with any `SnapshotTrigger`. Nothing prevents `{ type:
 - `packages/praxrr-app/src/routes/api/v1/pcd/[databaseId]/snapshots/[snapshotId]/+server.ts` (138 lines)
 
 Ownership enforcement, parameter validation, pagination, POST body parsing, and `opsWrittenSince` computation are untested. The project already has route-level test patterns (see `localPathGitFallbackRoutes.test.ts`).
+**Status:** Fixed (2026-03-01)
 
 ### 16. Pre-risk hook integrations (pre-pull and pre-sync) are untested
 
@@ -188,6 +187,8 @@ No tests verify that `collectSnapshotDatabaseIds` correctly aggregates/deduplica
 
 No test verifies that `createAutoSnapshot` returns `null` without throwing when an internal error occurs. This is the core non-blocking contract.
 
+**Status:** Fixed (2026-03-01)
+
 ### 18. `isRestorable` is hardcoded to `false` with no documentation
 
 **Files:**
@@ -198,7 +199,7 @@ No test verifies that `createAutoSnapshot` returns `null` without throwing when 
 The type and OpenAPI docs imply restore functionality exists. Neither documents that `isRestorable` is always `false` pending Issue #16.
 
 **Suggestion:** Add a doc comment noting MVP limitation.
-**Status:** Open
+**Status:** Fixed (2026-03-01)
 
 ### 19. `opsWrittenSince` is an approximation, not an exact count
 

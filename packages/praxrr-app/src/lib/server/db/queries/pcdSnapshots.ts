@@ -7,17 +7,29 @@ import type {
   SnapshotTrigger,
 } from '$pcd/snapshots/types.ts';
 
-interface CreateSnapshotInput {
+type CreateManualSnapshotInsertInput = {
   databaseId: number;
-  type: SnapshotType;
-  trigger: SnapshotTrigger;
+  type: 'manual';
+  trigger: 'manual';
   description?: string | null;
+};
+
+type CreateAutoSnapshotInput = {
+  databaseId: number;
+  type: 'auto';
+  trigger: Exclude<SnapshotTrigger, 'manual'>;
+  description?: string | null;
+  targetInstanceIds?: number[] | null;
+};
+
+interface CreateSnapshotInputBase {
   opsSequenceMaxId: number;
   opsCountBase: number;
   opsCountUser: number;
   cacheStateHash?: string | null;
-  targetInstanceIds?: number[] | null;
 }
+
+type CreateSnapshotInput = (CreateAutoSnapshotInput | CreateManualSnapshotInsertInput) & CreateSnapshotInputBase;
 
 function parseTargetInstanceIds(targetInstanceIds: string | null): number[] | null {
   if (!targetInstanceIds) {
@@ -60,7 +72,9 @@ export const pcdSnapshotQueries = {
    * Create a new PCD snapshot
    */
   create(input: CreateSnapshotInput): PcdSnapshotDetail {
-	const targetInstanceIds = input.targetInstanceIds ? JSON.stringify(input.targetInstanceIds) : null;
+    const targetInstanceIds = input.type === 'auto' && input.targetInstanceIds
+      ? JSON.stringify(input.targetInstanceIds)
+      : null;
 
     db.execute(
       `INSERT INTO pcd_snapshots (

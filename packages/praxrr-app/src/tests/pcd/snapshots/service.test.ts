@@ -428,3 +428,49 @@ Deno.test('snapshotService.createManualSnapshot does not invoke auto pruning and
     }
   }
 });
+
+Deno.test('snapshotService.createAutoSnapshot returns null when database metadata retrieval fails', async () => {
+  const restores: Restores = [];
+  patchLoggerForTest(restores);
+  let loggedErrorMessage = '';
+
+  patchTarget(
+    db,
+    'queryFirst',
+    ((..._args: unknown[]) => {
+      throw new Error('metadata query failed');
+    }) as typeof db.queryFirst,
+    restores
+  );
+
+  patchTarget(
+    logger,
+    'error',
+    ((message: string, payload?: unknown) => {
+      const payloadAsString = payload instanceof Error
+        ? payload.message
+        : typeof payload === 'string'
+        ? payload
+        : payload
+        ? JSON.stringify(payload)
+        : '';
+      loggedErrorMessage = `${message} ${payloadAsString}`.trim();
+    }) as typeof logger.error,
+    restores
+  );
+
+  try {
+    const snapshot = await snapshotService.createAutoSnapshot({
+      databaseId: 45,
+      trigger: 'pull',
+    });
+
+    assertEquals(snapshot, null);
+    assertEquals(loggedErrorMessage.includes('Auto snapshot creation failed'), true);
+    assertEquals(loggedErrorMessage.includes('metadata query failed'), true);
+  } finally {
+    for (const restore of restores.reverse()) {
+      restore();
+    }
+  }
+});

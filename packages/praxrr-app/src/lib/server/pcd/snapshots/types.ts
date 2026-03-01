@@ -95,7 +95,11 @@ export interface PcdSnapshotDetail {
 export interface PcdSnapshotFullDetail extends PcdSnapshotDetail {
   /** Number of ops written after this snapshot was taken */
   opsWrittenSince: number;
-  /** Whether this snapshot can theoretically be restored */
+  /**
+   * Whether this snapshot can theoretically be restored.
+   * Restore support is intentionally disabled in this milestone; this remains
+   * false for all snapshots.
+   */
   isRestorable: boolean;
 }
 

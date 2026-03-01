@@ -139,3 +139,83 @@ Deno.test('collectSnapshotDatabaseIds continues when a section query throws', ()
     }
   }
 });
+
+Deno.test('collectSnapshotDatabaseIds deduplicates database IDs across sections', () => {
+  const restores: Restores = [];
+
+  patchTarget(
+    arrSyncQueries,
+    'getQualityProfilesSync',
+    (() => ({
+      selections: [
+        { databaseId: 11, profileName: 'Profile A' },
+        { databaseId: 11, profileName: 'Profile B' },
+        { databaseId: 14, profileName: 'Profile C' },
+      ],
+      config: {
+        trigger: 'manual',
+        cron: null,
+      },
+    })) as typeof arrSyncQueries.getQualityProfilesSync,
+    restores
+  );
+
+  patchTarget(
+    arrSyncQueries,
+    'getDelayProfilesSync',
+    (() => ({
+      databaseId: 14,
+      profileName: 'Delay',
+      trigger: 'manual',
+      cron: null,
+    })) as typeof arrSyncQueries.getDelayProfilesSync,
+    restores
+  );
+
+  patchTarget(
+    arrSyncQueries,
+    'getMediaManagementSync',
+    (() => ({
+      namingDatabaseId: 11,
+      namingConfigName: 'Name',
+      qualityDefinitionsDatabaseId: 31,
+      qualityDefinitionsConfigName: null,
+      mediaSettingsDatabaseId: null,
+      mediaSettingsConfigName: null,
+      trigger: 'manual',
+      cron: null,
+    })) as typeof arrSyncQueries.getMediaManagementSync,
+    restores
+  );
+
+  patchTarget(
+    arrSyncQueries,
+    'getMetadataProfilesSync',
+    (() => ({
+      databaseId: null,
+      profileName: null,
+      trigger: 'manual',
+      cron: null,
+    })) as typeof arrSyncQueries.getMetadataProfilesSync,
+    restores
+  );
+
+  patchTarget(
+    logger,
+    'warn',
+    (async () => undefined) as typeof logger.warn,
+    restores
+  );
+
+  try {
+    const databaseIds = arrSyncTestOnly
+      .collectSnapshotDatabaseIds(12, ['qualityProfiles', 'delayProfiles', 'mediaManagement', 'metadataProfiles'])
+      .sort((a, b) => a - b);
+
+    assertEquals(databaseIds, [11, 14, 31]);
+  } finally {
+    for (const restore of restores.reverse()) {
+      restore();
+    }
+  }
+});
