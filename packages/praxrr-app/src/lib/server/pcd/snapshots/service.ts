@@ -144,6 +144,18 @@ function computeOpsMetadata(databaseId: number): OpsMetadata {
 // ============================================================================
 
 /**
+ * Parse a SQLite datetime string (no timezone) as UTC and return epoch ms.
+ * SQLite CURRENT_TIMESTAMP is stored in UTC; without a suffix JS may parse as local time.
+ */
+function parseCreatedAtUtc(createdAt: string): number {
+  const s = createdAt.trim();
+  if (/Z$|[+-]\d{2}:?\d{2}$/.test(s)) {
+    return new Date(s).getTime();
+  }
+  return new Date(s.replace(' ', 'T') + 'Z').getTime();
+}
+
+/**
  * Check whether an auto snapshot should be skipped as a duplicate.
  *
  * A snapshot is considered duplicate when the latest auto snapshot for the same
@@ -185,10 +197,10 @@ function isDuplicate(
     return false;
   }
 
-  // Check time window
-  const createdAt = new Date(latest.created_at).getTime();
+  // Check time window: interpret DB timestamp as UTC so elapsed time is environment-independent
+  const createdAtMs = parseCreatedAtUtc(latest.created_at);
   const now = Date.now();
-  const elapsedSeconds = (now - createdAt) / 1000;
+  const elapsedSeconds = (now - createdAtMs) / 1000;
 
   return elapsedSeconds <= DEDUP_WINDOW_SECONDS;
 }
