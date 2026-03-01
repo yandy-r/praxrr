@@ -104,7 +104,7 @@ Identical function defined independently. Also uses fragile substring matching o
 This function calls multiple query functions that can throw on schema drift or DB corruption. Those errors get caught by the outer snapshot try/catch and logged as "Pre-sync snapshot failed" -- completely masking what is actually a broken sync configuration.
 
 **Fix:** Add defensive null checks within `collectSnapshotDatabaseIds` for each section's selections.
-**Status:** Open
+**Status:** Fixed (2026-03-01)
 
 ### 9. Pruning failures logged as `warn` instead of `error`
 
@@ -113,7 +113,7 @@ This function calls multiple query functions that can throw on schema drift or D
 Persistent pruning failures (SQLite lock contention, corruption, disk-full) cause auto snapshots to accumulate without bound. The `logger.warn` with `String(pruneError)` loses the stack trace and provides no alerting escalation.
 
 **Fix:** Use `logger.error`. Include stack trace. Consider a health check for persistent pruning failures.
-**Status:** Open
+**Status:** Fixed (2026-03-01)
 
 ### 10. `parseCreatedAtUtc` silently returns NaN for unparseable timestamps
 
@@ -122,7 +122,7 @@ Persistent pruning failures (SQLite lock contention, corruption, disk-full) caus
 If `created_at` is unparseable, `getTime()` returns `NaN`. The dedup comparison `NaN <= 60` evaluates to `false`, meaning deduplication always fails for corrupted timestamps, generating excessive snapshots.
 
 **Fix:** Add `Number.isNaN()` check after parsing. Throw or log an error for unparseable values.
-**Status:** Open
+**Status:** Fixed (2026-03-01)
 
 ### 11. `isDuplicate` function parameter typed as `string` instead of `SnapshotTrigger`
 

@@ -178,35 +178,109 @@ function toSyncArrType(arrType: string): SyncArrType | null {
   return null;
 }
 
+function addPositiveDatabaseId(ids: Set<number>, databaseId: unknown): void {
+  if (typeof databaseId !== 'number' || !Number.isFinite(databaseId) || databaseId <= 0) {
+    return;
+  }
+  ids.add(databaseId);
+}
+
+function collectQualityProfileIds(
+  instanceId: number,
+  ids: Set<number>,
+  onError: (error: unknown, section: string) => void
+): void {
+  try {
+    const quality = arrSyncQueries.getQualityProfilesSync(instanceId);
+    if (!quality || !Array.isArray(quality.selections)) {
+      return;
+    }
+
+    for (const sel of quality.selections) {
+      addPositiveDatabaseId(ids, sel?.databaseId);
+    }
+  } catch (error) {
+    onError(error, 'qualityProfiles');
+  }
+}
+
+function collectDelayProfileIds(
+  instanceId: number,
+  ids: Set<number>,
+  onError: (error: unknown, section: string) => void
+): void {
+  try {
+    const delay = arrSyncQueries.getDelayProfilesSync(instanceId);
+    addPositiveDatabaseId(ids, delay?.databaseId);
+  } catch (error) {
+    onError(error, 'delayProfiles');
+  }
+}
+
+function collectMediaManagementDatabaseIds(
+  instanceId: number,
+  ids: Set<number>,
+  onError: (error: unknown, section: string) => void
+): void {
+  try {
+    const media = arrSyncQueries.getMediaManagementSync(instanceId);
+    addPositiveDatabaseId(ids, media?.namingDatabaseId);
+    addPositiveDatabaseId(ids, media?.qualityDefinitionsDatabaseId);
+    addPositiveDatabaseId(ids, media?.mediaSettingsDatabaseId);
+  } catch (error) {
+    onError(error, 'mediaManagement');
+  }
+}
+
+function collectMetadataProfileIds(
+  instanceId: number,
+  ids: Set<number>,
+  onError: (error: unknown, section: string) => void
+): void {
+  try {
+    const metadata = arrSyncQueries.getMetadataProfilesSync(instanceId);
+    addPositiveDatabaseId(ids, metadata?.databaseId);
+  } catch (error) {
+    onError(error, 'metadataProfiles');
+  }
+}
+
 function collectSnapshotDatabaseIds(instanceId: number, sections: readonly SectionType[]): number[] {
   const ids = new Set<number>();
+  const handleSectionError = (error: unknown, section: string): void => {
+    const details = error instanceof Error ? { message: error.message, stack: error.stack } : { message: String(error) };
+    logger.warn('Failed to collect pre-sync snapshot database IDs for sync section', {
+      source: 'ArrSyncJob',
+      meta: {
+        section,
+        instanceId,
+        ...details,
+      },
+    });
+  };
 
   if (sections.includes('qualityProfiles')) {
-    const quality = arrSyncQueries.getQualityProfilesSync(instanceId);
-    for (const sel of quality.selections) {
-      if (sel.databaseId > 0) ids.add(sel.databaseId);
-    }
+    collectQualityProfileIds(instanceId, ids, handleSectionError);
   }
 
   if (sections.includes('delayProfiles')) {
-    const delay = arrSyncQueries.getDelayProfilesSync(instanceId);
-    if (delay.databaseId && delay.databaseId > 0) ids.add(delay.databaseId);
+    collectDelayProfileIds(instanceId, ids, handleSectionError);
   }
 
   if (sections.includes('mediaManagement')) {
-    const media = arrSyncQueries.getMediaManagementSync(instanceId);
-    for (const id of [media.namingDatabaseId, media.qualityDefinitionsDatabaseId, media.mediaSettingsDatabaseId]) {
-      if (id && id > 0) ids.add(id);
-    }
+    collectMediaManagementDatabaseIds(instanceId, ids, handleSectionError);
   }
 
   if (sections.includes('metadataProfiles')) {
-    const metadata = arrSyncQueries.getMetadataProfilesSync(instanceId);
-    if (metadata.databaseId && metadata.databaseId > 0) ids.add(metadata.databaseId);
+    collectMetadataProfileIds(instanceId, ids, handleSectionError);
   }
 
   return [...ids];
 }
+
+export const __testOnly = {
+  collectSnapshotDatabaseIds,
+};
 
 const arrSyncHandler: JobHandler = async (job) => {
   const instanceId = Number(job.payload.instanceId);

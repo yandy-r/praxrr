@@ -1,4 +1,4 @@
-import { assertEquals } from '@std/assert';
+import { assertEquals, assertThrows } from '@std/assert';
 import { db } from '$db/db.ts';
 import { pcdSnapshotQueries } from '$db/queries/pcdSnapshots.ts';
 import { __testOnly, snapshotService } from '$pcd/snapshots/service.ts';
@@ -127,6 +127,12 @@ function setDbForAutoSnapshotMetadata(
 Deno.test('snapshotService.parseCreatedAtUtc treats SQLite UTC timestamps as UTC', () => {
   assertEquals(__testOnly.parseCreatedAtUtc('2026-03-01 12:34:56'), Date.UTC(2026, 2, 1, 12, 34, 56));
   assertEquals(__testOnly.parseCreatedAtUtc('2026-03-01T12:34:56Z'), Date.UTC(2026, 2, 1, 12, 34, 56));
+});
+
+Deno.test('snapshotService.parseCreatedAtUtc throws for invalid timestamps', () => {
+  assertThrows(() => {
+    __testOnly.parseCreatedAtUtc('not-a-timestamp');
+  }, Error, 'Invalid pcd snapshot created_at value');
 });
 
 Deno.test('snapshotService.createAutoSnapshot skips duplicate snapshot within UTC dedupe window', async () => {
@@ -271,6 +277,79 @@ Deno.test(
     }
   }
 );
+
+Deno.test('snapshotService.createAutoSnapshot logs prune failures as errors and keeps snapshot', async () => {
+  const restores: Restores = [];
+  patchLoggerForTest(restores);
+  let loggedError = false;
+  let errorMessage = '';
+
+  setDbForAutoSnapshotMetadata(restores, {
+    latestSnapshot: undefined,
+    metadataMaxId: 101,
+    opsCountBase: 3,
+    opsCountUser: 7,
+  });
+
+  patchTarget(
+    logger,
+    'error',
+    ((..._args: unknown[]) => {
+      loggedError = true;
+      const payload = _args[1];
+      if (payload && typeof payload === 'object' && 'meta' in payload) {
+        const meta = (payload as { meta?: { error?: unknown } }).meta;
+        if (meta && 'error' in meta) {
+          errorMessage = String(meta.error);
+        }
+      }
+    }) as typeof logger.error,
+    restores
+  );
+
+  patchTarget(
+    pcdSnapshotQueries,
+    'create',
+    (() => ({
+      id: 501,
+      databaseId: 43,
+      type: 'auto',
+      trigger: 'sync',
+      description: null,
+      opsSequenceMaxId: 101,
+      opsCountBase: 3,
+      opsCountUser: 7,
+      cacheStateHash: null,
+      targetInstanceIds: null,
+      createdAt: '2026-03-01 00:00:00',
+    })) as typeof pcdSnapshotQueries.create,
+    restores
+  );
+
+  patchTarget(
+    pcdSnapshotQueries,
+    'pruneAutoSnapshots',
+    (() => {
+      throw new Error('prune failed');
+    }) as typeof pcdSnapshotQueries.pruneAutoSnapshots,
+    restores
+  );
+
+  try {
+    const snapshot = await snapshotService.createAutoSnapshot({
+      databaseId: 43,
+      trigger: 'sync',
+    });
+
+    assertEquals(snapshot?.id, 501);
+    assertEquals(loggedError, true);
+    assertEquals(errorMessage, 'prune failed');
+  } finally {
+    for (const restore of restores.reverse()) {
+      restore();
+    }
+  }
+});
 
 Deno.test('snapshotService.createManualSnapshot does not invoke auto pruning and stores manual trigger', async () => {
   const restores: Restores = [];

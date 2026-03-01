@@ -149,10 +149,24 @@ function computeOpsMetadata(databaseId: number): OpsMetadata {
  */
 function parseCreatedAtUtc(createdAt: string): number {
   const s = createdAt.trim();
-  if (/Z$|[+-]\d{2}:?\d{2}$/.test(s)) {
-    return new Date(s).getTime();
+  if (!s) {
+    throw new Error('Invalid pcd snapshot created_at value: missing timestamp');
   }
-  return new Date(s.replace(' ', 'T') + 'Z').getTime();
+
+  if (/Z$|[+-]\d{2}:?\d{2}$/.test(s)) {
+    const createdAtMs = new Date(s).getTime();
+    if (Number.isNaN(createdAtMs)) {
+      throw new Error(`Invalid pcd snapshot created_at value: ${createdAt}`);
+    }
+    return createdAtMs;
+  }
+
+  const createdAtMs = new Date(s.replace(' ', 'T') + 'Z').getTime();
+  if (Number.isNaN(createdAtMs)) {
+    throw new Error(`Invalid pcd snapshot created_at value: ${createdAt}`);
+  }
+
+  return createdAtMs;
 }
 
 /**
@@ -266,9 +280,13 @@ async function createAutoSnapshot(input: CreateAutoSnapshotInput): Promise<PcdSn
         });
       }
     } catch (pruneError) {
-      await logger.warn('Failed to prune auto snapshots', {
+      await logger.error('Failed to prune auto snapshots', {
         source: 'SnapshotService',
-        meta: { databaseId, error: String(pruneError) },
+        meta: {
+          databaseId,
+          error: pruneError instanceof Error ? pruneError.message : String(pruneError),
+          stack: pruneError instanceof Error ? pruneError.stack : undefined,
+        },
       });
     }
 
