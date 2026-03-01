@@ -3,7 +3,9 @@
 	import SearchDropdown from '$ui/form/SearchDropdown.svelte';
 	import SyncFooter from './SyncFooter.svelte';
 	import { alertStore } from '$lib/client/alerts/store.ts';
+	import { extractFormError } from '$lib/client/utils/extractFormError.ts';
 	import type { SectionType } from '$sync/types.ts';
+	import type { TrashGuideSourceArrType } from '$shared/trashguide/types.ts';
 
 	interface ConfigOption {
 		name: string;
@@ -17,7 +19,25 @@
 		mediaSettingsConfigs: ConfigOption[];
 	}
 
+	interface TrashGuideMediaManagementSource {
+		sourceId: number;
+		sourceName: string;
+		sourceArrType: TrashGuideSourceArrType;
+		namingEntities: string[];
+		qualitySizeEntities: string[];
+		selectedNaming: string | null;
+		selectedQualityDefinitions: string | null;
+	}
+
+	type SourceType = 'pcd' | 'trash';
+
+	type ParsedSelection =
+		| { sourceType: 'pcd'; databaseId: number; configName: string }
+		| { sourceType: 'trash'; sourceId: number; itemName: string }
+		| null;
+
 	export let databases: Database[];
+	export let trashGuideSources: TrashGuideMediaManagementSource[] = [];
 	export let state: {
 		namingDatabaseId: number | null;
 		namingConfigName: string | null;
@@ -34,18 +54,72 @@
 		mediaSettingsConfigName: null
 	};
 
+	// TRaSH selection state
+	let trashNamingSelection: { sourceId: number; itemName: string } | null = null;
+	let trashQualityDefinitionsSelection: { sourceId: number; itemName: string } | null = null;
+
+	// Initialize TRaSH selections from server data
+	$: {
+		if (trashNamingSelection === null) {
+			for (const source of trashGuideSources) {
+				if (source.selectedNaming) {
+					trashNamingSelection = { sourceId: source.sourceId, itemName: source.selectedNaming };
+					break;
+				}
+			}
+		}
+		if (trashQualityDefinitionsSelection === null) {
+			for (const source of trashGuideSources) {
+				if (source.selectedQualityDefinitions) {
+					trashQualityDefinitionsSelection = {
+						sourceId: source.sourceId,
+						itemName: source.selectedQualityDefinitions,
+					};
+					break;
+				}
+			}
+		}
+	}
+
+	// Capture savedState after hydration so initial load is not reported as dirty
+	let savedStateCaptured = false;
+	$: {
+		if (!savedStateCaptured) {
+			savedState = buildCurrentState();
+			savedStateCaptured = true;
+		}
+	}
+
+	// Expose TRaSH selection state for parent validation
+	export let hasTrashNaming = false;
+	export let hasTrashQualityDefinitions = false;
+	$: hasTrashNaming = trashNamingSelection !== null;
+	$: hasTrashQualityDefinitions = trashQualityDefinitionsSelection !== null;
+
 	type SelectionOption = {
 		value: string;
 		label: string;
 	};
+
+	function encodeValue(sourceType: SourceType, id: number, name: string): string {
+		return JSON.stringify([sourceType, id, name]);
+	}
 
 	function getNamingOptions(): SelectionOption[] {
 		const options: SelectionOption[] = [];
 		for (const db of databases) {
 			for (const config of db.namingConfigs) {
 				options.push({
-					value: JSON.stringify([db.id, config.name]),
+					value: encodeValue('pcd', db.id, config.name),
 					label: `${db.name} / ${config.name}`
+				});
+			}
+		}
+		for (const source of trashGuideSources) {
+			for (const name of source.namingEntities) {
+				options.push({
+					value: encodeValue('trash', source.sourceId, name),
+					label: `${source.sourceName} / ${name}`
 				});
 			}
 		}
@@ -57,8 +131,16 @@
 		for (const db of databases) {
 			for (const config of db.qualityDefinitionsConfigs) {
 				options.push({
-					value: JSON.stringify([db.id, config.name]),
+					value: encodeValue('pcd', db.id, config.name),
 					label: `${db.name} / ${config.name}`
+				});
+			}
+		}
+		for (const source of trashGuideSources) {
+			for (const name of source.qualitySizeEntities) {
+				options.push({
+					value: encodeValue('trash', source.sourceId, name),
+					label: `${source.sourceName} / ${name}`
 				});
 			}
 		}
@@ -70,7 +152,7 @@
 		for (const db of databases) {
 			for (const config of db.mediaSettingsConfigs) {
 				options.push({
-					value: JSON.stringify([db.id, config.name]),
+					value: encodeValue('pcd', db.id, config.name),
 					label: `${db.name} / ${config.name}`
 				});
 			}
@@ -78,64 +160,129 @@
 		return options;
 	}
 
-	$: namingOptions = getNamingOptions();
-	$: qualityDefinitionsOptions = getQualityDefinitionsOptions();
-	$: mediaSettingsOptions = getMediaSettingsOptions();
+	$: namingOptions = databases && trashGuideSources && getNamingOptions();
+	$: qualityDefinitionsOptions = databases && trashGuideSources && getQualityDefinitionsOptions();
+	$: mediaSettingsOptions = databases && getMediaSettingsOptions();
 
-	function parseSelectionValue(value: string): { databaseId: number | null; configName: string | null } {
-		if (!value) return { databaseId: null, configName: null };
+	function parseSelectionValue(value: string): ParsedSelection {
+		if (!value) return null;
 		try {
 			const parsed = JSON.parse(value);
-			if (Array.isArray(parsed) && parsed.length === 2) {
+			if (!Array.isArray(parsed)) return null;
+
+			// New 3-element format: [sourceType, id, name]
+			if (parsed.length === 3) {
+				const sourceType = parsed[0] as SourceType;
+				const id = Number(parsed[1]);
+				const name = String(parsed[2]);
+				if (Number.isNaN(id) || !name) return null;
+
+				if (sourceType === 'pcd') {
+					return { sourceType: 'pcd', databaseId: id, configName: name };
+				}
+				if (sourceType === 'trash') {
+					return { sourceType: 'trash', sourceId: id, itemName: name };
+				}
+				return null;
+			}
+
+			// Legacy 2-element format: [databaseId, configName]
+			if (parsed.length === 2) {
 				const databaseId = Number(parsed[0]);
 				const configName = String(parsed[1]);
 				if (!Number.isNaN(databaseId) && configName) {
-					return { databaseId, configName };
+					return { sourceType: 'pcd', databaseId, configName };
 				}
 			}
 		} catch {
 			// Ignore malformed values and clear selection.
 		}
-		return { databaseId: null, configName: null };
+		return null;
 	}
 
-	$: namingValue =
-		state.namingDatabaseId !== null && state.namingConfigName
-			? JSON.stringify([state.namingDatabaseId, state.namingConfigName])
-			: '';
-	$: qualityDefinitionsValue =
-		state.qualityDefinitionsDatabaseId !== null && state.qualityDefinitionsConfigName
-			? JSON.stringify([state.qualityDefinitionsDatabaseId, state.qualityDefinitionsConfigName])
-			: '';
+	$: namingValue = (() => {
+		if (trashNamingSelection) {
+			return encodeValue('trash', trashNamingSelection.sourceId, trashNamingSelection.itemName);
+		}
+		if (state.namingDatabaseId !== null && state.namingConfigName) {
+			return encodeValue('pcd', state.namingDatabaseId, state.namingConfigName);
+		}
+		return '';
+	})();
+
+	$: qualityDefinitionsValue = (() => {
+		if (trashQualityDefinitionsSelection) {
+			return encodeValue(
+				'trash',
+				trashQualityDefinitionsSelection.sourceId,
+				trashQualityDefinitionsSelection.itemName,
+			);
+		}
+		if (state.qualityDefinitionsDatabaseId !== null && state.qualityDefinitionsConfigName) {
+			return encodeValue('pcd', state.qualityDefinitionsDatabaseId, state.qualityDefinitionsConfigName);
+		}
+		return '';
+	})();
+
 	$: mediaSettingsValue =
 		state.mediaSettingsDatabaseId !== null && state.mediaSettingsConfigName
-			? JSON.stringify([state.mediaSettingsDatabaseId, state.mediaSettingsConfigName])
+			? encodeValue('pcd', state.mediaSettingsDatabaseId, state.mediaSettingsConfigName)
 			: '';
 
 	function selectNaming(value: string) {
 		const parsed = parseSelectionValue(value);
-		state = {
-			...state,
-			namingDatabaseId: parsed.databaseId,
-			namingConfigName: parsed.configName
-		};
+		if (!parsed) {
+			state = { ...state, namingDatabaseId: null, namingConfigName: null };
+			trashNamingSelection = null;
+			return;
+		}
+		if (parsed.sourceType === 'pcd') {
+			state = { ...state, namingDatabaseId: parsed.databaseId, namingConfigName: parsed.configName };
+			trashNamingSelection = null;
+		} else {
+			state = { ...state, namingDatabaseId: null, namingConfigName: null };
+			trashNamingSelection = { sourceId: parsed.sourceId, itemName: parsed.itemName };
+		}
 	}
 
 	function selectQuality(value: string) {
 		const parsed = parseSelectionValue(value);
-		state = {
-			...state,
-			qualityDefinitionsDatabaseId: parsed.databaseId,
-			qualityDefinitionsConfigName: parsed.configName
-		};
+		if (!parsed) {
+			state = {
+				...state,
+				qualityDefinitionsDatabaseId: null,
+				qualityDefinitionsConfigName: null,
+			};
+			trashQualityDefinitionsSelection = null;
+			return;
+		}
+		if (parsed.sourceType === 'pcd') {
+			state = {
+				...state,
+				qualityDefinitionsDatabaseId: parsed.databaseId,
+				qualityDefinitionsConfigName: parsed.configName,
+			};
+			trashQualityDefinitionsSelection = null;
+		} else {
+			state = {
+				...state,
+				qualityDefinitionsDatabaseId: null,
+				qualityDefinitionsConfigName: null,
+			};
+			trashQualityDefinitionsSelection = { sourceId: parsed.sourceId, itemName: parsed.itemName };
+		}
 	}
 
 	function selectMedia(value: string) {
 		const parsed = parseSelectionValue(value);
+		if (!parsed || parsed.sourceType !== 'pcd') {
+			state = { ...state, mediaSettingsDatabaseId: null, mediaSettingsConfigName: null };
+			return;
+		}
 		state = {
 			...state,
 			mediaSettingsDatabaseId: parsed.databaseId,
-			mediaSettingsConfigName: parsed.configName
+			mediaSettingsConfigName: parsed.configName,
 		};
 	}
 
@@ -153,16 +300,34 @@
 	let saving = false;
 	let syncing = false;
 
+	function buildCurrentState(): string {
+		return JSON.stringify({
+			state,
+			syncTrigger,
+			cronExpression,
+			trashNaming: trashNamingSelection,
+			trashQualityDefinitions: trashQualityDefinitionsSelection,
+		});
+	}
+
 	// Track saved state for dirty detection
-	let savedState = JSON.stringify({ state, syncTrigger, cronExpression });
-	$: currentState = JSON.stringify({ state, syncTrigger, cronExpression });
+	let savedState = buildCurrentState();
+	$: currentState = JSON.stringify({
+		state,
+		syncTrigger,
+		cronExpression,
+		trashNaming: trashNamingSelection,
+		trashQualityDefinitions: trashQualityDefinitionsSelection,
+	});
 	export let isDirty = false;
 	$: isDirty = currentState !== savedState;
 
 	$: {
 		const hasAnySelection =
 			(state.namingDatabaseId !== null && state.namingConfigName !== null) ||
+			trashNamingSelection !== null ||
 			(state.qualityDefinitionsDatabaseId !== null && state.qualityDefinitionsConfigName !== null) ||
+			trashQualityDefinitionsSelection !== null ||
 			(state.mediaSettingsDatabaseId !== null && state.mediaSettingsConfigName !== null);
 
 		if (!hasAnySelection) {
@@ -171,6 +336,48 @@
 			previewEnabled = true;
 		} else {
 			previewEnabled = lastSyncedAt === null;
+		}
+	}
+
+	async function saveTrashGuideMediaManagementSelections(): Promise<void> {
+		// Collect which sources need naming/qualityDefinitions selections saved
+		const sourceSelections: Record<number, { sectionType: string; itemName: string }[]> = {};
+
+		if (trashNamingSelection) {
+			const list = sourceSelections[trashNamingSelection.sourceId] ?? [];
+			list.push({ sectionType: 'naming', itemName: trashNamingSelection.itemName });
+			sourceSelections[trashNamingSelection.sourceId] = list;
+		}
+
+		if (trashQualityDefinitionsSelection) {
+			const list = sourceSelections[trashQualityDefinitionsSelection.sourceId] ?? [];
+			list.push({ sectionType: 'qualityDefinitions', itemName: trashQualityDefinitionsSelection.itemName });
+			sourceSelections[trashQualityDefinitionsSelection.sourceId] = list;
+		}
+
+		// Save for each TRaSH source that has or had naming/qualityDefinitions selections
+		for (const source of trashGuideSources) {
+			const hasExistingSelections = source.selectedNaming !== null || source.selectedQualityDefinitions !== null;
+			const newSelections = sourceSelections[source.sourceId];
+
+			if (!newSelections && !hasExistingSelections) {
+				continue;
+			}
+
+			const formData = new FormData();
+			formData.set('sourceId', String(source.sourceId));
+			formData.set('mergeMediaManagementSelections', 'true');
+			formData.set('selections', JSON.stringify(newSelections ?? []));
+
+			const response = await fetch('?/saveTrashGuideSource', {
+				method: 'POST',
+				body: formData,
+			});
+
+			if (!response.ok) {
+				const payload = await extractFormError(response, 'Failed to save TRaSH media management selections');
+				throw new Error(payload);
+			}
 		}
 	}
 
@@ -195,16 +402,20 @@
 				body: formData
 			});
 
-				if (response.ok) {
-					alertStore.add('success', 'Media management sync config saved');
-					// Update saved state to current
-					savedState = JSON.stringify({ state, syncTrigger, cronExpression });
-					await invalidateAll().catch(() => undefined);
-				} else {
-					alertStore.add('error', 'Failed to save media management sync config');
-				}
-		} catch {
-			alertStore.add('error', 'Failed to save media management sync config');
+			if (!response.ok) {
+				alertStore.add('error', 'Failed to save media management sync config');
+				return;
+			}
+
+			await saveTrashGuideMediaManagementSelections();
+			alertStore.add('success', 'Media management sync config saved');
+			savedState = buildCurrentState();
+			await invalidateAll().catch(() => undefined);
+		} catch (error) {
+			alertStore.add(
+				'error',
+				error instanceof Error ? error.message : 'Failed to save media management sync config',
+			);
 		} finally {
 			saving = false;
 		}
@@ -218,13 +429,13 @@
 				body: new FormData()
 			});
 
-				if (response.ok) {
-					const data = await response.json();
-					alertStore.add('success', data?.message ?? 'Sync queued');
-					await invalidateAll().catch(() => undefined);
-				} else {
-					alertStore.add('error', 'Sync failed');
-				}
+			if (response.ok) {
+				const data = await response.json();
+				alertStore.add('success', data?.message ?? 'Sync queued');
+				await invalidateAll().catch(() => undefined);
+			} else {
+				alertStore.add('error', 'Sync failed');
+			}
 		} catch {
 			alertStore.add('error', 'Sync failed');
 		} finally {

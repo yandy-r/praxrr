@@ -6,6 +6,7 @@ import type { PCDDatabase } from '$shared/pcd/types.ts';
 import type { PCDCache } from '$pcd/index.ts';
 import { deleteCache, setCache } from '$pcd/database/registry.ts';
 import { arrSyncQueries, type MediaManagementSyncData } from '$db/queries/arrSync.ts';
+import { trashGuideSyncQueries } from '$db/queries/trashGuideSync.ts';
 import { logger } from '$logger/logger.ts';
 import type { LogOptions } from '$logger/types.ts';
 import { BaseArrClient } from '$arr/base.ts';
@@ -365,6 +366,7 @@ Deno.test({
     const originalDebug = logger.debug;
     const originalInfo = logger.info;
     const originalGetMediaManagementSync = arrSyncQueries.getMediaManagementSync;
+    const originalGetSelectionsByInstance = trashGuideSyncQueries.getSelectionsByInstance;
 
     let activeDatabaseId = 1701;
     let activeConfigName = 'Lidarr-Sync-Mixed';
@@ -392,6 +394,7 @@ Deno.test({
       trigger: 'manual',
       cron: null,
     });
+    trashGuideSyncQueries.getSelectionsByInstance = (() => []) as typeof trashGuideSyncQueries.getSelectionsByInstance;
 
     const mappedFixture = createCacheFixture(`
 CREATE TABLE quality_api_mappings (
@@ -590,6 +593,7 @@ INSERT INTO sonarr_quality_definitions (name, quality_name, min_size, max_size, 
       logger.debug = originalDebug;
       logger.info = originalInfo;
       arrSyncQueries.getMediaManagementSync = originalGetMediaManagementSync;
+      trashGuideSyncQueries.getSelectionsByInstance = originalGetSelectionsByInstance;
 
       deleteCache(1701);
       deleteCache(1702);
@@ -600,4 +604,55 @@ INSERT INTO sonarr_quality_definitions (name, quality_name, min_size, max_size, 
 
     assert(warnLogs.length > 0);
   },
+});
+
+Deno.test('media management sync: TRaSH selection lookup failures are surfaced in sync result', async () => {
+  const errorLogs: CapturedLog[] = [];
+  const originalError = logger.error;
+  const originalWarn = logger.warn;
+  const originalGetSync = arrSyncQueries.getMediaManagementSync;
+  const originalInfo = logger.info;
+  const originalGetSelectionsByInstance = trashGuideSyncQueries.getSelectionsByInstance;
+
+  logger.error = (message: string, options?: LogOptions) => {
+    errorLogs.push({ message, options });
+    return Promise.resolve();
+  };
+  logger.warn = (message: string, options?: LogOptions) => {
+    errorLogs.push({ message, options });
+    return Promise.resolve();
+  };
+  logger.info = () => Promise.resolve();
+  arrSyncQueries.getMediaManagementSync = (() =>
+    ({
+      namingDatabaseId: null,
+      namingConfigName: null,
+      qualityDefinitionsDatabaseId: null,
+      qualityDefinitionsConfigName: null,
+      mediaSettingsDatabaseId: null,
+      mediaSettingsConfigName: null,
+      trigger: 'manual',
+      cron: null,
+      lastSyncedAt: null,
+    }) as MediaManagementSyncData) as typeof arrSyncQueries.getMediaManagementSync;
+  trashGuideSyncQueries.getSelectionsByInstance = (() => {
+    throw new Error('selection query failed');
+  }) as typeof trashGuideSyncQueries.getSelectionsByInstance;
+
+  try {
+    const client = new MockQualityDefinitionsClient([]);
+    const syncer = new MediaManagementSyncer(client, 7701, 'TRaSH Sync Test', 'radarr');
+    const result = await syncer.sync();
+
+    assertEquals(result.success, true);
+    assert(errorLogs.length >= 2);
+    assert(errorLogs.some((entry) => entry.message === 'Failed to load TRaSH naming selection'));
+    assert(errorLogs.some((entry) => entry.message === 'Failed to load TRaSH quality-definition selection'));
+  } finally {
+    logger.error = originalError;
+    logger.warn = originalWarn;
+    logger.info = originalInfo;
+    arrSyncQueries.getMediaManagementSync = originalGetSync;
+    trashGuideSyncQueries.getSelectionsByInstance = originalGetSelectionsByInstance;
+  }
 });
