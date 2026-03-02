@@ -94,7 +94,7 @@ class Logger {
     return levelIndex >= minIndex;
   }
 
-  private async log(level: LogLevel, color: string, message: string, options?: LogOptions): Promise<void> {
+  private log(level: LogLevel, color: string, message: string, options?: LogOptions): void {
     const sanitizedMeta = options?.meta ? sanitizeLogMeta(options.meta) : undefined;
 
     // Check if this log level should be logged
@@ -132,13 +132,12 @@ class Logger {
 
         // Ensure logs directory exists
         try {
-          await Deno.mkdir(this.config.logsDir, { recursive: true });
+          Deno.mkdirSync(this.config.logsDir, { recursive: true });
         } catch {
-          // Directory might already exist
+          // Directory may already exist.
         }
 
-        // Write to log file
-        await Deno.writeTextFile(filePath, JSON.stringify(logEntry) + '\n', {
+        Deno.writeTextFileSync(filePath, JSON.stringify(logEntry) + '\n', {
           append: true,
         });
       } catch (error) {
@@ -149,23 +148,23 @@ class Logger {
   }
 
   async debug(message: string, options?: LogOptions): Promise<void> {
-    await this.log('DEBUG', colors.cyan, message, options);
+    this.log('DEBUG', colors.cyan, message, options);
   }
 
   async info(message: string, options?: LogOptions): Promise<void> {
-    await this.log('INFO', colors.green, message, options);
+    this.log('INFO', colors.green, message, options);
   }
 
   async warn(message: string, options?: LogOptions): Promise<void> {
-    await this.log('WARN', colors.yellow, message, options);
+    this.log('WARN', colors.yellow, message, options);
   }
 
   async error(message: string, options?: LogOptions): Promise<void> {
-    await this.log('ERROR', colors.red, message, options);
+    this.log('ERROR', colors.red, message, options);
   }
 
   async errorWithTrace(message: string, error?: Error, options?: LogOptions): Promise<void> {
-    await this.log('ERROR', colors.red, message, options);
+    this.log('ERROR', colors.red, message, options);
 
     // Print stack trace to console
     if (error?.stack && this.isConsoleLoggingEnabled()) {
@@ -183,7 +182,7 @@ class Logger {
 
       try {
         const filePath = this.getLogFilePath();
-        await Deno.writeTextFile(filePath, JSON.stringify(traceEntry) + '\n', {
+        Deno.writeTextFileSync(filePath, JSON.stringify(traceEntry) + '\n', {
           append: true,
         });
       } catch (writeError) {

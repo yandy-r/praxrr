@@ -11,30 +11,32 @@ This page is a reader-oriented companion to `docs/api/v1/openapi.yaml`.
 
 ## Endpoint index
 
-| Method | Path                                              | Purpose                              |
-| ------ | ------------------------------------------------- | ------------------------------------ |
-| GET    | `/health`                                         | Service/component health check       |
-| GET    | `/openapi.json`                                   | Runtime OpenAPI JSON                 |
-| POST   | `/entity-testing/evaluate`                        | Parse titles and evaluate CF matches |
-| GET    | `/arr/library`                                    | Paginated arr app library view       |
-| DELETE | `/arr/library`                                    | Invalidate Arr library cache         |
-| GET    | `/arr/library/episodes`                           | Sonarr-only series episode details   |
-| GET    | `/arr/releases`                                   | Interactive release search           |
-| POST   | `/arr/cleanup`                                    | Scan/execute stale config cleanup    |
-| GET    | `/pcd/export`                                     | Export portable entity payload       |
-| POST   | `/pcd/import`                                     | Import portable entity payload       |
-| GET    | `/pcd/{databaseId}/lidarr-metadata-profiles`      | List metadata profiles               |
-| POST   | `/pcd/{databaseId}/lidarr-metadata-profiles`      | Create metadata profile              |
-| GET    | `/pcd/{databaseId}/lidarr-metadata-profiles/{id}` | Read metadata profile                |
-| PUT    | `/pcd/{databaseId}/lidarr-metadata-profiles/{id}` | Update metadata profile              |
-| DELETE | `/pcd/{databaseId}/lidarr-metadata-profiles/{id}` | Delete metadata profile              |
-| GET    | `/trash-guide/sources`                            | List all configured TRaSH sources    |
-| POST   | `/trash-guide/sources`                            | Create a new TRaSH source            |
-| GET    | `/trash-guide/sources/:id`                        | Get a specific TRaSH source          |
-| PUT    | `/trash-guide/sources/:id`                        | Update a TRaSH source                |
-| DELETE | `/trash-guide/sources/:id`                        | Delete a TRaSH source                |
-| POST   | `/trash-guide/sources/:id/sync`                   | Trigger manual sync for a source     |
-| GET    | `/trash-guide/sources/:id/entities`               | List cached entities for a source    |
+| Method | Path                                              | Purpose                               |
+| ------ | ------------------------------------------------- | ------------------------------------- |
+| GET    | `/health`                                         | Service/component health check        |
+| GET    | `/openapi.json`                                   | Runtime OpenAPI JSON                  |
+| GET    | `/ui-preferences`                                 | Read per-user section disclosure mode |
+| PATCH  | `/ui-preferences`                                 | Save per-user section disclosure mode |
+| POST   | `/entity-testing/evaluate`                        | Parse titles and evaluate CF matches  |
+| GET    | `/arr/library`                                    | Paginated arr app library view        |
+| DELETE | `/arr/library`                                    | Invalidate Arr library cache          |
+| GET    | `/arr/library/episodes`                           | Sonarr-only series episode details    |
+| GET    | `/arr/releases`                                   | Interactive release search            |
+| POST   | `/arr/cleanup`                                    | Scan/execute stale config cleanup     |
+| GET    | `/pcd/export`                                     | Export portable entity payload        |
+| POST   | `/pcd/import`                                     | Import portable entity payload        |
+| GET    | `/pcd/{databaseId}/lidarr-metadata-profiles`      | List metadata profiles                |
+| POST   | `/pcd/{databaseId}/lidarr-metadata-profiles`      | Create metadata profile               |
+| GET    | `/pcd/{databaseId}/lidarr-metadata-profiles/{id}` | Read metadata profile                 |
+| PUT    | `/pcd/{databaseId}/lidarr-metadata-profiles/{id}` | Update metadata profile               |
+| DELETE | `/pcd/{databaseId}/lidarr-metadata-profiles/{id}` | Delete metadata profile               |
+| GET    | `/trash-guide/sources`                            | List all configured TRaSH sources     |
+| POST   | `/trash-guide/sources`                            | Create a new TRaSH source             |
+| GET    | `/trash-guide/sources/:id`                        | Get a specific TRaSH source           |
+| PUT    | `/trash-guide/sources/:id`                        | Update a TRaSH source                 |
+| DELETE | `/trash-guide/sources/:id`                        | Delete a TRaSH source                 |
+| POST   | `/trash-guide/sources/:id/sync`                   | Trigger manual sync for a source      |
+| GET    | `/trash-guide/sources/:id/entities`               | List cached entities for a source     |
 
 ## System
 
@@ -83,6 +85,92 @@ Returns the parsed OpenAPI document served by the app.
 
 ```bash
 curl -sS -H 'X-Api-Key: <api-key>' http://localhost:5173/api/v1/openapi.json | jq '.info'
+```
+
+## User Interface Preferences
+
+The UI persistence endpoints store **end-user display state** for media app setup workflows.
+They are intentionally scoped to section visibility (`basic` vs `advanced`) and are not part of
+developer configuration or API auth token administration.
+
+### `GET /ui-preferences`
+
+Query params:
+
+- `section_key` (required string): deterministic section key, e.g. `media-management:media-settings:naming`
+  - must match `^[a-z0-9-]+:[a-z0-9-]+:[a-z0-9-]+$`
+  - max length 96
+- `strict` (optional boolean, default `false`): when `true`, missing saved state returns `404`
+
+Response shape:
+
+```json
+{
+  "section_key": "media-management:media-settings:naming",
+  "mode": "basic",
+  "updated_at": null,
+  "persisted": false
+}
+```
+
+Semantics:
+
+- Missing row (default path) returns `mode: "basic"`, `persisted: false`, and
+  `updated_at: null`.
+- Unknown or malformed `section_key` returns `400`.
+- `strict=true` and missing row returns `404`.
+
+```bash
+curl -sS \
+  'http://localhost:5173/api/v1/ui-preferences?section_key=media-management%3Amedia-settings%3Anaming' |
+  jq
+```
+
+### `PATCH /ui-preferences`
+
+Request body:
+
+- `section_key` (required): deterministic section key
+  - must match `^[a-z0-9-]+:[a-z0-9-]+:[a-z0-9-]+$`
+  - max length 96
+- `mode` (required): `basic` or `advanced`
+- `expected_updated_at` (optional): timestamp for optimistic concurrency
+
+```json
+{
+  "section_key": "media-management:media-settings:naming",
+  "mode": "advanced",
+  "expected_updated_at": "2026-02-27T10:00:00.000Z"
+}
+```
+
+```bash
+curl -sS -X PATCH \
+  -H 'X-Api-Key: <api-key>' \
+  -H 'Content-Type: application/json' \
+  -d '{ "section_key": "media-management:media-settings:naming", "mode": "advanced" }' \
+  http://localhost:5173/api/v1/ui-preferences | jq
+```
+
+Semantics:
+
+- Only authenticated sessions can read/write (unauthenticated sessions receive `401`).
+- Unknown/invalid keys return `400` before persistence.
+- Persisted values are per-user and per-section.
+- Unknown `mode` returns `400`.
+- Stale `expected_updated_at` values return `409`.
+- Rapid successive updates are rate-limited: more than 8 updates per section within 30s returns `429`.
+- Returns the same payload shape as `GET`.
+
+Response shape on success:
+
+```json
+{
+  "section_key": "media-management:media-settings:naming",
+  "mode": "advanced",
+  "updated_at": "2026-02-27T10:00:00.000Z",
+  "persisted": true
+}
 ```
 
 ## Entity Testing

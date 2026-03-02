@@ -7,6 +7,8 @@ relevant API behavior.
 
 - [Link, Bridge, Sync](./link-bridge-sync.md): connect a PCD, connect Arr apps, configure sync
   triggers, run sync, and clean up stale configs.
+- [Progressive Disclosure](./progressive-disclosure.md): show optional advanced settings only when
+  you request them while keeping media-app setup pages clean.
 - [Entity Testing](./entity-testing.md): build test entities/releases, evaluate custom format
   matches, and score against a selected quality profile.
 - [Portable Import/Export](./portable-import-export.md): move entities between databases using the
@@ -17,9 +19,10 @@ relevant API behavior.
 ## Recommended reading order
 
 1. [Link, Bridge, Sync](./link-bridge-sync.md)
-2. [Entity Testing](./entity-testing.md)
-3. [Portable Import/Export](./portable-import-export.md)
-4. [TRaSH Guide Sync](./trash-guide-sync.md)
+2. [Progressive Disclosure](./progressive-disclosure.md)
+3. [Entity Testing](./entity-testing.md)
+4. [Portable Import/Export](./portable-import-export.md)
+5. [TRaSH Guide Sync](./trash-guide-sync.md)
 
 ## Related documentation
 

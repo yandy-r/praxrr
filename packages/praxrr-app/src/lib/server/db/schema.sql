@@ -889,6 +889,26 @@ CREATE TABLE users (
 );
 
 -- ==============================================================================
+-- TABLE: user_interface_preferences
+-- Purpose: Store per-user UI disclosure preferences for progressive disclosure sections
+-- Migration: 050_create_user_interface_preferences.ts
+-- ==============================================================================
+
+CREATE TABLE user_interface_preferences (
+    user_id INTEGER NOT NULL,
+    section_key TEXT NOT NULL CHECK (LENGTH(TRIM(section_key)) > 0 AND LENGTH(TRIM(section_key)) <= 96),
+    mode TEXT NOT NULL CHECK (mode IN ('basic', 'advanced')),
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE UNIQUE INDEX idx_user_interface_preferences_user_section
+    ON user_interface_preferences(user_id, section_key);
+CREATE INDEX idx_user_interface_preferences_user_id
+    ON user_interface_preferences(user_id);
+
+-- ==============================================================================
 -- TABLE: sessions
 -- Purpose: Store user sessions (allows login from multiple devices)
 -- Migration: 036_create_auth_tables.ts, 037_add_session_metadata.ts

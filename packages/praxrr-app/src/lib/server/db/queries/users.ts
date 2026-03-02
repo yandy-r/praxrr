@@ -1,4 +1,5 @@
 import { db } from '../db.ts';
+import { userInterfacePreferencesQueries } from './user_interface_preferences.ts';
 
 /**
  * Types for users table
@@ -110,3 +111,5 @@ export const usersQueries = {
     return result?.id ?? 0;
   },
 };
+
+export { userInterfacePreferencesQueries };

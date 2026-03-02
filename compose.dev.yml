@@ -22,7 +22,9 @@ services:
       # - HOST=0.0.0.0
       - PARSER_HOST=parser
       - PARSER_PORT=5000
-      - AUTH=off
+      - AUTH=on
+      - E2E_USERNAME=${E2E_USERNAME:-praxrr-e2e}
+      - E2E_PASSWORD=${E2E_PASSWORD:-praxrr123}
       - PRAXRR_DEFAULT_DB_URL=/praxrr-db # Optional: can be set to a local path or remote URL
       - PRAXRR_DEFAULT_DB_BRANCH=${PRAXRR_DEFAULT_DB_BRANCH:-main}
       - PRAXRR_DEFAULT_DB_NAME=Praxrr-db
@@ -61,17 +63,28 @@ services:
     develop:
       watch:
         - action: rebuild
-          path: ./packages/praxrr-app
+          path: ./packages/praxrr-app/src
           ignore:
             - node_modules
             - dist
-            - ./**/*.md
+            - dist/**
+            - .svelte-kit
+            - .svelte-kit/**
             - .github/**
             - .vscode/**
             - .dockerignore
             - .gitignore
             - .prettierignore
             - .eslintignore
+            - ./**/*.md
+        - action: rebuild
+          path: ./packages/praxrr-app/svelte.config.js
+        - action: rebuild
+          path: ./packages/praxrr-app/vite.config.ts
+        - action: rebuild
+          path: ./packages/praxrr-app/package.json
+        - action: rebuild
+          path: ./packages/praxrr-app/deno.json
         - action: rebuild
           path: ./packages/praxrr-db
           ignore:
