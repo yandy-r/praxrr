@@ -107,17 +107,26 @@ function buildGetRequest(sectionKey: string, userId?: number): GetEvent {
   return event as GetEvent;
 }
 
-function buildPatchRequest(sectionKey: string, mode: 'basic' | 'advanced', userId?: number): PatchEvent {
+function buildPatchRequest(
+  sectionKey: string,
+  mode: 'basic' | 'advanced',
+  userId?: number,
+  expectedUpdatedAt?: string | null
+): PatchEvent {
+  const body: Record<string, unknown> = {
+    section_key: sectionKey,
+    mode,
+  };
+  if (expectedUpdatedAt !== undefined) {
+    body.expected_updated_at = expectedUpdatedAt;
+  }
   const event: Partial<PatchEvent> = {
     request: new Request('http://localhost/api/v1/ui-preferences', {
       method: 'PATCH',
       headers: {
         'content-type': 'application/json',
       },
-      body: JSON.stringify({
-        section_key: sectionKey,
-        mode,
-      }),
+      body: JSON.stringify(body),
     }),
     locals: {
       user: null,
@@ -260,6 +269,29 @@ Deno.test('first-visit preference defaults to basic', async () => {
     assertEquals(payload.mode, 'basic');
     assertEquals(payload.persisted, false);
     assertEquals(payload.updated_at, null);
+  } finally {
+    requestScope.restoreAll();
+  }
+});
+
+Deno.test('PATCH with expected_updated_at null when row exists is allowed (no spurious 409)', async () => {
+  const requestScope = withInMemoryStore();
+
+  try {
+    const sectionKey = 'media-management:media-settings:naming';
+    const userId = 99;
+
+    // Create a row first
+    const createRes = await PATCH(
+      buildPatchRequest(sectionKey, 'basic', userId, undefined /* no expected_updated_at */)
+    );
+    assertEquals(createRes.status, 200);
+
+    // Client sends null before hydration or after read failure; server should accept the write
+    const res = await PATCH(buildPatchRequest(sectionKey, 'advanced', userId, null));
+    assertEquals(res.status, 200);
+    const body = (await res.json()) as { mode: 'basic' | 'advanced' };
+    assertEquals(body.mode, 'advanced');
   } finally {
     requestScope.restoreAll();
   }

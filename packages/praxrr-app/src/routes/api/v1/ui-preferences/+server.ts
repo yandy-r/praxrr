@@ -158,11 +158,9 @@ function detectConcurrencyConflict(
     return null;
   }
 
+  // Do not treat null as conflict when a row exists: client may send null before hydration
+  // or after a transient read failure; allow the write and let the client catch up.
   if (expectedUpdatedAt === null) {
-    if (existing) {
-      return 'Concurrency conflict: preference already exists';
-    }
-
     return null;
   }
 
@@ -295,11 +293,13 @@ function applyConcurrentUpsert({
   mode: UiMode;
   expectedUpdatedAt: string;
 }): UserInterfacePreference | null {
+  const now = new Date().toISOString();
   const updatedRows = db.execute(
     `UPDATE user_interface_preferences
-		 SET mode = ?, updated_at = CURRENT_TIMESTAMP
+		 SET mode = ?, updated_at = ?
 		 WHERE user_id = ? AND section_key = ? AND updated_at = ?`,
     mode,
+    now,
     userId,
     sectionKey,
     expectedUpdatedAt

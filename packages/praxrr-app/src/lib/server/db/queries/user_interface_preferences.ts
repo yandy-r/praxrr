@@ -80,6 +80,7 @@ export const userInterfacePreferencesQueries = {
   /**
    * Create or update a preference value.
    * Writes are idempotent: if mode matches current state, no DB write occurs.
+   * Uses application-set updated_at with millisecond precision for conflict detection.
    */
   upsert(input: UserInterfacePreferenceInput): UserInterfacePreference {
     assertSectionKey(input.sectionKey);
@@ -89,19 +90,23 @@ export const userInterfacePreferencesQueries = {
       return existing;
     }
 
+    const now = new Date().toISOString();
+
     if (existing) {
       db.execute(
-        `UPDATE user_interface_preferences SET mode = ?, updated_at = CURRENT_TIMESTAMP WHERE user_id = ? AND section_key = ?`,
+        `UPDATE user_interface_preferences SET mode = ?, updated_at = ? WHERE user_id = ? AND section_key = ?`,
         input.mode,
+        now,
         input.userId,
         input.sectionKey
       );
     } else {
       db.execute(
-        'INSERT INTO user_interface_preferences (user_id, section_key, mode) VALUES (?, ?, ?)',
+        'INSERT INTO user_interface_preferences (user_id, section_key, mode, updated_at) VALUES (?, ?, ?, ?)',
         input.userId,
         input.sectionKey,
-        input.mode
+        input.mode,
+        now
       );
     }
 

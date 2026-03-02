@@ -20,6 +20,8 @@ export interface UserInterfacePreferenceStore {
   section: (sectionKey: string, defaultMode?: UiPreferenceMode) => UserInterfaceSectionPreferenceStore;
   authRequired: Readable<boolean>;
   clearAuthRequired: () => void;
+  /** Clear all section cache and timers. Call on logout or when auth identity changes so another user does not inherit cached preferences. */
+  clearOnAuthChange: () => void;
 }
 
 export interface UserInterfaceSectionPreferenceStore {
@@ -73,6 +75,18 @@ interface SectionState {
 
 const authRequired = writable(false);
 const sectionStates = new Map<string, SectionState>();
+
+/** Clear all section cache and timers so another user does not inherit stale preferences (e.g. after logout without full reload). */
+function clearSectionCacheOnAuthChange(): void {
+  for (const state of sectionStates.values()) {
+    if (state.flushTimer !== null) {
+      clearTimeout(state.flushTimer);
+      state.flushTimer = null;
+    }
+  }
+  sectionStates.clear();
+  authRequired.set(false);
+}
 
 const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -151,6 +165,7 @@ const hydrateSection = async (state: SectionState): Promise<void> => {
 
     if (response.status === 401) {
       authRequired.set(true);
+      clearSectionCacheOnAuthChange();
       return;
     }
 
@@ -204,6 +219,7 @@ const writeSectionPreference = async (
 
   if (response.status === 401) {
     authRequired.set(true);
+    clearSectionCacheOnAuthChange();
     throw new AuthRequiredError();
   }
 
@@ -421,6 +437,7 @@ const createUserInterfacePreferencesStore = (): UserInterfacePreferenceStore => 
     subscribe: authRequired.subscribe,
   },
   clearAuthRequired: () => authRequired.set(false),
+  clearOnAuthChange: clearSectionCacheOnAuthChange,
 });
 
 export const userInterfacePreferencesStore = createUserInterfacePreferencesStore();
