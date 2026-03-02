@@ -24,6 +24,8 @@ tags:
     description: PCD entity export and portable format endpoints
   - name: PCD Snapshots
     description: PCD state snapshot management endpoints
+  - name: User Preferences
+    description: Durable UI preference storage for progressive disclosure
 
 paths:
   /health:
@@ -32,6 +34,108 @@ paths:
     $ref: './paths/system.yaml#/openapi'
   /system/startup-pull/latest:
     $ref: './paths/system.yaml#/startup-pull-latest'
+  /ui-preferences:
+    get:
+      operationId: getUiPreference
+      summary: Read one UI preference
+      description: |
+        Returns the preferred disclosure mode for a section key.
+
+        Missing persisted values are returned as default `basic` unless `strict`
+        is enabled.
+      tags:
+        - User Preferences
+      parameters:
+        - name: section_key
+          in: query
+          required: true
+          description: Canonical section key for progressive disclosure state
+          schema:
+            $ref: '#/components/schemas/UiSectionKey'
+        - name: strict
+          in: query
+          required: false
+          description: When true, missing rows return 404 instead of default response
+          schema:
+            type: boolean
+            default: false
+      responses:
+        '200':
+          description: UI preference record
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UiPreferenceRecord'
+        '400':
+          description: Invalid query parameter
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PcdErrorResponse'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PcdErrorResponse'
+        '404':
+          description: Preference not found for strict read
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PcdErrorResponse'
+        '500':
+          description: Failed to read preference
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PcdErrorResponse'
+    patch:
+      operationId: upsertUiPreference
+      summary: Upsert one UI preference
+      description: |
+        Creates or updates the stored disclosure mode for a section key.
+
+        Payloads include optional concurrency token `expected_updated_at`.
+      tags:
+        - User Preferences
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UiPreferenceUpsertRequest'
+      responses:
+        '200':
+          description: UI preference persisted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UiPreferenceRecord'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PcdErrorResponse'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PcdErrorResponse'
+        '409':
+          description: Concurrency conflict
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PcdErrorResponse'
+        '500':
+          description: Failed to save preference
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PcdErrorResponse'
   /entity-testing/evaluate:
     $ref: './paths/entity-testing.yaml#/evaluate'
   /arr/library:
@@ -543,6 +647,49 @@ components:
       $ref: './schemas/pcd.yaml#/ExportResponse'
     PcdErrorResponse:
       $ref: './schemas/pcd.yaml#/PcdErrorResponse'
+    UiSectionKey:
+      type: string
+      pattern: '^[a-z0-9-]+:[a-z0-9-]+:[a-z0-9-]+$'
+      description: Canonical progressive disclosure section key
+    UiPreferenceMode:
+      type: string
+      enum:
+        - basic
+        - advanced
+      description: Disclosure visibility mode for the section
+    UiPreferenceRecord:
+      type: object
+      required:
+        - section_key
+        - mode
+        - updated_at
+        - persisted
+      properties:
+        section_key:
+          $ref: '#/components/schemas/UiSectionKey'
+        mode:
+          $ref: '#/components/schemas/UiPreferenceMode'
+        updated_at:
+          type: string
+          format: date-time
+          nullable: true
+        persisted:
+          type: boolean
+    UiPreferenceUpsertRequest:
+      type: object
+      required:
+        - section_key
+        - mode
+      properties:
+        section_key:
+          $ref: '#/components/schemas/UiSectionKey'
+        mode:
+          $ref: '#/components/schemas/UiPreferenceMode'
+        expected_updated_at:
+          type: string
+          nullable: true
+          format: date-time
+          description: Optional optimistic concurrency token
     ImportRequest:
       $ref: './schemas/pcd.yaml#/ImportRequest'
     ImportResponse:

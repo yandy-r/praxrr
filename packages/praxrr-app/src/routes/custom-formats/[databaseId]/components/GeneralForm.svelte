@@ -1,7 +1,9 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
-	import { tick } from 'svelte';
+	import { page } from '$app/stores';
+	import { onDestroy, tick } from 'svelte';
 	import { Save, Loader2, Trash2 } from 'lucide-svelte';
+	import AdvancedSection from '$ui/form/AdvancedSection.svelte';
 	import FormInput from '$ui/form/FormInput.svelte';
 	import MarkdownInput from '$ui/form/MarkdownInput.svelte';
 	import TagInput from '$ui/form/TagInput.svelte';
@@ -9,8 +11,18 @@
 	import Modal from '$ui/modal/Modal.svelte';
 	import StickyCard from '$ui/card/StickyCard.svelte';
 	import Button from '$ui/button/Button.svelte';
+	import {
+		getUserInterfacePreferenceSectionStore,
+		type UiPreferenceMode
+	} from '$stores/userInterfacePreferences.ts';
 	import { alertStore } from '$alerts/store';
 	import { current, isDirty, initEdit, initCreate, update } from '$lib/client/stores/dirty';
+
+	interface CustomFormatSectionModes {
+		conditions: UiPreferenceMode;
+		scoring: UiPreferenceMode;
+		negationAndGroups: UiPreferenceMode;
+	}
 
 	// Form data shape
 	interface GeneralFormData {
@@ -29,6 +41,84 @@
 
 	// Event handlers
 	export let onCancel: (() => void) | undefined = undefined;
+
+	const sectionModeDefaults: CustomFormatSectionModes = {
+		conditions: 'basic',
+		scoring: 'basic',
+		negationAndGroups: 'basic',
+	};
+
+	const customFormatConditionsSection = getUserInterfacePreferenceSectionStore(
+		'custom-formats:general:conditions'
+	);
+	const customFormatScoringSection = getUserInterfacePreferenceSectionStore(
+		'custom-formats:general:scoring'
+	);
+	const customFormatNegationAndGroupsSection = getUserInterfacePreferenceSectionStore(
+		'custom-formats:general:negation-and-groups'
+	);
+
+	let customFormatConditionsMode: UiPreferenceMode = sectionModeDefaults.conditions;
+	let customFormatConditionsModeSynced: UiPreferenceMode = sectionModeDefaults.conditions;
+	let customFormatScoringMode: UiPreferenceMode = sectionModeDefaults.scoring;
+	let customFormatScoringModeSynced: UiPreferenceMode = sectionModeDefaults.scoring;
+	let customFormatNegationAndGroupsMode: UiPreferenceMode = sectionModeDefaults.negationAndGroups;
+	let customFormatNegationAndGroupsModeSynced: UiPreferenceMode = sectionModeDefaults.negationAndGroups;
+
+	const serverSectionModes = ($page.data.customFormatSectionModes ??
+		sectionModeDefaults) as CustomFormatSectionModes;
+
+	let hasHydratedSectionModes = false;
+
+	const unsubscribeConditionsMode = customFormatConditionsSection.mode.subscribe((mode) => {
+		customFormatConditionsModeSynced = mode;
+		if (customFormatConditionsMode !== mode) {
+			customFormatConditionsMode = mode;
+		}
+	});
+	const unsubscribeScoringMode = customFormatScoringSection.mode.subscribe((mode) => {
+		customFormatScoringModeSynced = mode;
+		if (customFormatScoringMode !== mode) {
+			customFormatScoringMode = mode;
+		}
+	});
+	const unsubscribeNegationAndGroupsMode = customFormatNegationAndGroupsSection.mode.subscribe((mode) => {
+		customFormatNegationAndGroupsModeSynced = mode;
+		if (customFormatNegationAndGroupsMode !== mode) {
+			customFormatNegationAndGroupsMode = mode;
+		}
+	});
+
+	$: if (!hasHydratedSectionModes) {
+		customFormatConditionsMode = serverSectionModes.conditions;
+		customFormatConditionsModeSynced = serverSectionModes.conditions;
+		customFormatScoringMode = serverSectionModes.scoring;
+		customFormatScoringModeSynced = serverSectionModes.scoring;
+		customFormatNegationAndGroupsMode = serverSectionModes.negationAndGroups;
+		customFormatNegationAndGroupsModeSynced = serverSectionModes.negationAndGroups;
+		hasHydratedSectionModes = true;
+	}
+
+	$: if (customFormatConditionsMode !== customFormatConditionsModeSynced) {
+		customFormatConditionsModeSynced = customFormatConditionsMode;
+		customFormatConditionsSection.mode.set(customFormatConditionsMode);
+	}
+
+	$: if (customFormatScoringMode !== customFormatScoringModeSynced) {
+		customFormatScoringModeSynced = customFormatScoringMode;
+		customFormatScoringSection.mode.set(customFormatScoringMode);
+	}
+
+	$: if (customFormatNegationAndGroupsMode !== customFormatNegationAndGroupsModeSynced) {
+		customFormatNegationAndGroupsModeSynced = customFormatNegationAndGroupsMode;
+		customFormatNegationAndGroupsSection.mode.set(customFormatNegationAndGroupsMode);
+	}
+
+	onDestroy(() => {
+		unsubscribeConditionsMode();
+		unsubscribeScoringMode();
+		unsubscribeNegationAndGroupsMode();
+	});
 
 	const defaults: GeneralFormData = {
 		name: '',
@@ -198,6 +288,69 @@
 					on:change={(e) => update('includeInRename', e.detail)}
 				/>
 			</div>
+
+			<AdvancedSection
+				sectionId="custom-formats:general:conditions"
+				sectionTitle="Conditions"
+				sectionHint="Advanced match-condition builder controls."
+				bind:mode={customFormatConditionsMode}
+			>
+				<div slot="advanced" class="space-y-2">
+					<p class="text-sm text-neutral-600 dark:text-neutral-400">
+						Define required and optional criteria, including negated and grouped condition strategies.
+					</p>
+					{#if $page.params.id}
+						<a
+							class="inline-flex rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm font-medium text-neutral-700 transition-colors hover:bg-neutral-100 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-200 dark:hover:bg-neutral-700"
+							href={`/custom-formats/${$page.params.databaseId}/${$page.params.id}/conditions`}
+						>
+							Open Conditions
+						</a>
+					{/if}
+				</div>
+			</AdvancedSection>
+
+			<AdvancedSection
+				sectionId="custom-formats:general:scoring"
+				sectionTitle="Scoring"
+				sectionHint="Score application and weighting controls."
+				bind:mode={customFormatScoringMode}
+			>
+				<div slot="advanced" class="space-y-2">
+					<p class="text-sm text-neutral-600 dark:text-neutral-400">
+						Adjust score impact and weighting by managing custom format rules in quality profiles.
+					</p>
+					{#if $page.params.id}
+						<a
+							class="inline-flex rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm font-medium text-neutral-700 transition-colors hover:bg-neutral-100 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-200 dark:hover:bg-neutral-700"
+							href={`/quality-profiles/${$page.params.databaseId}`}
+						>
+							Open Quality Profiles
+						</a>
+					{/if}
+				</div>
+			</AdvancedSection>
+
+			<AdvancedSection
+				sectionId="custom-formats:general:negation-and-groups"
+				sectionTitle="Negation and Groups"
+				sectionHint="Negation/grouping and nested condition controls."
+				bind:mode={customFormatNegationAndGroupsMode}
+			>
+				<div slot="advanced" class="space-y-2">
+					<p class="text-sm text-neutral-600 dark:text-neutral-400">
+						Configure advanced negations and nested condition groups for precise matching.
+					</p>
+					{#if $page.params.id}
+						<a
+							class="inline-flex rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm font-medium text-neutral-700 transition-colors hover:bg-neutral-100 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-200 dark:hover:bg-neutral-700"
+							href={`/custom-formats/${$page.params.databaseId}/${$page.params.id}/conditions`}
+						>
+							Configure Condition Groups
+						</a>
+					{/if}
+				</div>
+			</AdvancedSection>
 		</div>
 	</form>
 
@@ -242,5 +395,3 @@
 		on:cancel={() => (showDeleteConfirmModal = false)}
 	/>
 {/if}
-
-<!-- Save Target Modal -->

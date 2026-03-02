@@ -2,6 +2,20 @@
 
 Praxrr’s UI stack is route-driven (`+page.svelte`/`+page.server.ts`) with reusable client components, so progressive disclosure should be implemented as a shared UI pattern then applied consistently across high-complexity forms. The core integration path is explicit `Show Advanced`/`Hide Advanced` controls in section-level form components, with server-backed per-user persistence so state survives devices and sessions. Existing architecture already supports this split: Svelte stores and shared UI components for immediate interaction, plus auth/session-aware DB queries and API routes for durable preference state. For this feature, the key UX rule is clarity for non-developer users, meaning advanced controls must be visually distinct, clearly labeled, and never hidden behind ambiguous icon-only disclosure affordances.
 
+## Feature Lock (Task 1.1)
+
+Canonical section-key and behavior assumptions are locked in [`requirements.md`](requirements.md):
+
+- Section-key regex: `^[a-z0-9-]+:[a-z0-9-]+:[a-z0-9-]+$`
+- Canonical keys:
+  - `media-management:media-settings:naming`
+  - `media-management:media-settings:folder-management`
+  - `media-management:media-settings:importing`
+  - `quality-profiles:general:custom-format-scoring`
+  - `quality-profiles:general:upgrade-settings`
+  - `custom-formats:general:conditions`
+  - `custom-formats:general:scoring`
+
 ## Relevant Files
 
 - packages/praxrr-app/src/routes/+layout.server.ts: Provides request-scoped layout context for global UI state wiring.
@@ -24,7 +38,7 @@ Praxrr’s UI stack is route-driven (`+page.svelte`/`+page.server.ts`) with reus
 - users: User identities for scoping disclosure preferences.
 - sessions: Session linkage used to resolve active user context.
 - auth_settings: Auth mode/session duration context that can affect preference retrieval behavior.
-- user_interface_preferences (proposed): Per-user, per-section progressive disclosure state (`beginner`/`advanced`).
+- user_interface_preferences (proposed): Per-user, per-section progressive disclosure state (`basic`/`advanced`).
 
 ## Relevant Patterns
 

@@ -116,6 +116,8 @@
 	<ViewToggle bind:value={$view} />
 </ActionsBar>
 
+<!-- Advanced disclosure behavior for media settings forms is configured in the route family create/edit screens. -->
+
 <!-- Media Settings Content -->
 <div class="mt-6">
 	{#if data.mediaSettingsConfigs.length === 0}
