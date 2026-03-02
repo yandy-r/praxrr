@@ -95,6 +95,9 @@
 		unsubscribeMediaSettingsNamingMode();
 		unsubscribeMediaSettingsFolderManagementMode();
 		unsubscribeMediaSettingsImportingMode();
+		mediaSettingsNamingSection.cleanup();
+		mediaSettingsFolderManagementSection.cleanup();
+		mediaSettingsImportingSection.cleanup();
 	});
 
 	function mapToFormData(data: RadarrMediaSettingsRow | null): RadarrMediaSettingsRowFormData {

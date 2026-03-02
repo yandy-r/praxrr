@@ -5,6 +5,7 @@ const UI_PREFERENCE_ENDPOINT = '/api/v1/ui-preferences';
 const DEBOUNCE_MS = 300;
 const RETRY_DELAYS_MS = [300, 600, 1200];
 const SECTION_KEY_PATTERN = /^[a-z0-9-]+:[a-z0-9-]+:[a-z0-9-]+$/;
+const SECTION_KEY_MAX_LENGTH = 96;
 
 export type UiPreferenceMode = 'basic' | 'advanced';
 
@@ -27,6 +28,7 @@ export interface UserInterfaceSectionPreferenceStore {
   readonly isSyncing: Readable<boolean>;
   readonly updatedAt: Readable<string | null>;
   readonly refresh: () => Promise<void>;
+  readonly cleanup: () => void;
 }
 
 type UiPreferencePayload = {
@@ -66,6 +68,7 @@ interface SectionState {
   flushTimer: ReturnType<typeof setTimeout> | null;
   inflight: boolean;
   hydration: Promise<void> | null;
+  refCount: number;
 }
 
 const authRequired = writable(false);
@@ -108,6 +111,10 @@ const parseSectionKey = (sectionKey: string): string => {
   const normalized = sectionKey.trim();
   if (!SECTION_KEY_PATTERN.test(normalized)) {
     throw new Error('Invalid section key format');
+  }
+
+  if (normalized.length > SECTION_KEY_MAX_LENGTH) {
+    throw new Error('Invalid section key length');
   }
 
   return normalized;
@@ -166,8 +173,11 @@ const hydrateSection = async (state: SectionState): Promise<void> => {
   };
 
   state.hydration = hydrate()
-    .catch(() => {
-      // keep defaults on hydration failure and let writes drive recovery
+    .catch((error) => {
+      console.warn('Failed to hydrate UI preference section', {
+        sectionKey: state.sectionKey,
+        error: error instanceof Error ? error.message : String(error),
+      });
     })
     .finally(() => {
       state.hydration = null;
@@ -224,16 +234,16 @@ const persistSection = async (state: SectionState, requestRevision: number, mode
       }
 
       return;
-  } catch (error) {
-    lastError = error instanceof Error ? error : new Error(String(error));
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
 
-    if (error instanceof AuthRequiredError) {
-      if (requestRevision === state.pendingRevision) {
-        state.pendingMode = null;
+      if (error instanceof AuthRequiredError) {
+        if (requestRevision === state.pendingRevision) {
+          state.pendingMode = null;
+        }
+
+        throw error;
       }
-
-      throw error;
-    }
 
       if (!isRetryableFailure(error) || attempt >= RETRY_DELAYS_MS.length) {
         break;
@@ -335,11 +345,14 @@ const createSectionStore = (
       flushTimer: null,
       inflight: false,
       hydration: null,
+      refCount: 0,
     };
     sectionStates.set(resolved, state);
 
     void hydrateSection(state);
   }
+
+  state.refCount += 1;
 
   const setMode = (mode: UiPreferenceMode): void => {
     if (get(state.modeStore) === mode) {
@@ -370,6 +383,22 @@ const createSectionStore = (
     update: updateMode,
   };
 
+  const cleanup = (): void => {
+    if (state.refCount > 0) {
+      state.refCount -= 1;
+    }
+
+    if (state.refCount !== 0) {
+      return;
+    }
+
+    if (state.flushTimer !== null) {
+      clearTimeout(state.flushTimer);
+    }
+    state.flushTimer = null;
+    sectionStates.delete(resolved);
+  };
+
   return {
     mode: writablePreference,
     persisted: {
@@ -382,6 +411,7 @@ const createSectionStore = (
       subscribe: state.updatedAt.subscribe,
     },
     refresh,
+    cleanup,
   };
 };
 

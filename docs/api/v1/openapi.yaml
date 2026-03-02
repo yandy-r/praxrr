@@ -130,6 +130,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/PcdErrorResponse'
+        '429':
+          description: Preference updates are being rate-limited
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PcdErrorResponse'
         '500':
           description: Failed to save preference
           content:
@@ -650,6 +656,7 @@ components:
     UiSectionKey:
       type: string
       pattern: '^[a-z0-9-]+:[a-z0-9-]+:[a-z0-9-]+$'
+      maxLength: 96
       description: Canonical progressive disclosure section key
     UiPreferenceMode:
       type: string

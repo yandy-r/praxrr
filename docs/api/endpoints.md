@@ -98,6 +98,8 @@ developer configuration or API auth token administration.
 Query params:
 
 - `section_key` (required string): deterministic section key, e.g. `media-management:media-settings:naming`
+  - must match `^[a-z0-9-]+:[a-z0-9-]+:[a-z0-9-]+$`
+  - max length 96
 - `strict` (optional boolean, default `false`): when `true`, missing saved state returns `404`
 
 Response shape:
@@ -129,6 +131,8 @@ curl -sS \
 Request body:
 
 - `section_key` (required): deterministic section key
+  - must match `^[a-z0-9-]+:[a-z0-9-]+:[a-z0-9-]+$`
+  - max length 96
 - `mode` (required): `basic` or `advanced`
 - `expected_updated_at` (optional): timestamp for optimistic concurrency
 
@@ -155,6 +159,7 @@ Semantics:
 - Persisted values are per-user and per-section.
 - Unknown `mode` returns `400`.
 - Stale `expected_updated_at` values return `409`.
+- Rapid successive updates are rate-limited: more than 8 updates per section within 30s returns `429`.
 - Returns the same payload shape as `GET`.
 
 Response shape on success:

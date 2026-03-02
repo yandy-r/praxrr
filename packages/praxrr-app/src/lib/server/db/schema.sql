@@ -896,7 +896,7 @@ CREATE TABLE users (
 
 CREATE TABLE user_interface_preferences (
     user_id INTEGER NOT NULL,
-    section_key TEXT NOT NULL CHECK (LENGTH(TRIM(section_key)) > 0),
+    section_key TEXT NOT NULL CHECK (LENGTH(TRIM(section_key)) > 0 AND LENGTH(TRIM(section_key)) <= 96),
     mode TEXT NOT NULL CHECK (mode IN ('basic', 'advanced')),
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 

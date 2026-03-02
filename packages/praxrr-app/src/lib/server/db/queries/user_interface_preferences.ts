@@ -21,6 +21,7 @@ interface UserInterfacePreferenceRow {
 }
 
 const SECTION_KEY_PATTERN = /^[a-z0-9-]+:[a-z0-9-]+:[a-z0-9-]+$/;
+const SECTION_KEY_MAX_LENGTH = 96;
 
 function rowToPreference(row: UserInterfacePreferenceRow): UserInterfacePreference {
   return {
@@ -32,6 +33,10 @@ function rowToPreference(row: UserInterfacePreferenceRow): UserInterfacePreferen
 }
 
 function assertSectionKey(sectionKey: string): void {
+  if (sectionKey.length > SECTION_KEY_MAX_LENGTH) {
+    throw new Error(`Invalid disclosure section key format: ${sectionKey}`);
+  }
+
   if (!SECTION_KEY_PATTERN.test(sectionKey)) {
     throw new Error(`Invalid disclosure section key format: ${sectionKey}`);
   }

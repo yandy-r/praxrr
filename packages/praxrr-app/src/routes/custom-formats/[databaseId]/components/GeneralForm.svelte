@@ -118,6 +118,9 @@
 		unsubscribeConditionsMode();
 		unsubscribeScoringMode();
 		unsubscribeNegationAndGroupsMode();
+		customFormatConditionsSection.cleanup();
+		customFormatScoringSection.cleanup();
+		customFormatNegationAndGroupsSection.cleanup();
 	});
 
 	const defaults: GeneralFormData = {

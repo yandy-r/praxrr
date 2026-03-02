@@ -292,3 +292,46 @@ Deno.test('media-management and custom-format route families are key-isolated', 
     requestScope.restoreAll();
   }
 });
+
+Deno.test('invalid section keys are rejected by server validation', async () => {
+  const requestScope = withInMemoryStore();
+
+  try {
+    const response = await PATCH(buildPatchRequest('invalid_section_key', 'advanced', 66));
+    assertEquals(response.status, 400);
+  } finally {
+    requestScope.restoreAll();
+  }
+});
+
+Deno.test('excessively long section keys are rejected by server validation', async () => {
+  const requestScope = withInMemoryStore();
+
+  try {
+    const longSegment = 'a'.repeat(50);
+    const longSectionKey = `x:${longSegment}:${longSegment}`;
+
+    const response = await PATCH(buildPatchRequest(longSectionKey, 'advanced', 77));
+    assertEquals(response.status, 400);
+  } finally {
+    requestScope.restoreAll();
+  }
+});
+
+Deno.test('ui preference writes are rate limited per user and section', async () => {
+  const requestScope = withInMemoryStore();
+
+  try {
+    const sectionKey = 'media-management:media-settings:importing';
+    const userId = 88;
+    for (let i = 0; i < 8; i += 1) {
+      const response = await PATCH(buildPatchRequest(sectionKey, i % 2 === 0 ? 'advanced' : 'basic', userId));
+      assertEquals(response.status, 200);
+    }
+
+    const blockedResponse = await PATCH(buildPatchRequest(sectionKey, 'advanced', userId));
+    assertEquals(blockedResponse.status, 429);
+  } finally {
+    requestScope.restoreAll();
+  }
+});

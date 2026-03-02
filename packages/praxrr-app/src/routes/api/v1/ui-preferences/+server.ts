@@ -20,6 +20,16 @@ type UiPreferenceRecord = {
 const DEFAULT_MODE: UiMode = 'basic';
 const STRICT_TRUE = 'true';
 const STRICT_FALSE = 'false';
+const MAX_SECTION_KEY_LENGTH = 96;
+const RATE_LIMIT_WINDOW_MS = 30_000;
+const RATE_LIMIT_MAX_REQUESTS = 8;
+
+type RateLimitState = {
+  windowStart: number;
+  count: number;
+};
+
+const rateLimitState = new Map<string, RateLimitState>();
 
 export const GET: RequestHandler = async ({ locals, url }) => {
   if (!locals.user) {
@@ -84,6 +94,11 @@ export const PATCH: RequestHandler = async ({ locals, request }) => {
     expectedUpdatedAt = parseExpectedUpdatedAt(body.expected_updated_at);
   } catch (error) {
     return json({ error: error instanceof Error ? error.message : 'Invalid request body' }, { status: 400 });
+  }
+
+  const rateLimitError = checkWriteRateLimit(locals.user.id, sectionKey);
+  if (rateLimitError) {
+    return json({ error: rateLimitError }, { status: 429 });
   }
 
   let existing: UserInterfacePreference | undefined;
@@ -168,11 +183,35 @@ function parseSectionKey(raw: unknown): string {
   }
 
   const sectionKey = raw.trim();
+  if (sectionKey.length > MAX_SECTION_KEY_LENGTH) {
+    throw new Error('Invalid section_key format');
+  }
   if (!userInterfacePreferencesQueries.isValidSectionKey(sectionKey)) {
     throw new Error('Invalid section_key format');
   }
 
   return sectionKey;
+}
+
+function checkWriteRateLimit(userId: number, sectionKey: string): string | null {
+  const now = Date.now();
+  const stateKey = `${userId}:${sectionKey}`;
+  const existing = rateLimitState.get(stateKey);
+
+  if (!existing || now - existing.windowStart >= RATE_LIMIT_WINDOW_MS) {
+    rateLimitState.set(stateKey, {
+      windowStart: now,
+      count: 1,
+    });
+    return null;
+  }
+
+  if (existing.count >= RATE_LIMIT_MAX_REQUESTS) {
+    return 'Too many preference updates in a short period. Please retry later.';
+  }
+
+  existing.count += 1;
+  return null;
 }
 
 function parseStrictParam(raw: string | null): boolean {
