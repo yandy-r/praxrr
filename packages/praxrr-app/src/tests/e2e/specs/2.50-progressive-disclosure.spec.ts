@@ -14,6 +14,15 @@ function getAdvancedPanel(page: Page, sectionKey: string): Locator {
   return page.locator(`[id="${sectionKey}-panel"]`);
 }
 
+async function waitForSessionCookie(context: BrowserContext, origin: string): Promise<void> {
+  await expect
+    .poll(async () => {
+      const cookies = await context.cookies(origin);
+      return cookies.some((cookie) => cookie.name === 'session' && !!cookie.value);
+    }, { timeout: 10_000, interval: 250 })
+    .toBeTruthy();
+}
+
 async function ensureAuthenticated(page: Page): Promise<void> {
   await page.goto('/settings/general');
   await page.waitForLoadState('networkidle');
@@ -27,11 +36,20 @@ async function ensureAuthenticated(page: Page): Promise<void> {
       test.skip('AUTH is required. Set E2E_USERNAME and E2E_PASSWORD to run auth-gated UI e2e tests.');
     }
 
+    const setupResponse = page.waitForResponse(
+      (response) => response.url().includes('/auth/setup') && response.request().method() === 'POST'
+    );
     await page.getByRole('textbox', { name: 'Username' }).fill(E2E_USERNAME!);
     await page.getByLabel('Password').fill(E2E_PASSWORD!);
     await page.getByLabel('Confirm Password').fill(E2E_PASSWORD!);
     await page.getByRole('button', { name: 'Create Account' }).click();
-    await page.waitForLoadState('networkidle');
+    const setupResult = await setupResponse;
+    if (setupResult.status() >= 400) {
+      const payload = await setupResult.text();
+      throw new Error(`Setup authentication request failed: ${setupResult.status()} ${payload}`);
+    }
+
+    await page.goto('/settings/general', { waitUntil: 'networkidle' });
   }
 
   if (page.url().includes('/auth/login')) {
@@ -39,14 +57,26 @@ async function ensureAuthenticated(page: Page): Promise<void> {
       test.skip('AUTH is required. Set E2E_USERNAME and E2E_PASSWORD to run auth-gated UI e2e tests.');
     }
 
+    const loginResponse = page.waitForResponse(
+      (response) => response.url().includes('/auth/login') && response.request().method() === 'POST'
+    );
     await page.getByRole('textbox', { name: 'Username' }).fill(E2E_USERNAME!);
     await page.getByLabel('Password').fill(E2E_PASSWORD!);
     await page.getByRole('button', { name: 'Sign In' }).click();
-    await page.waitForLoadState('networkidle');
+    const loginResult = await loginResponse;
+    if (loginResult.status() >= 400) {
+      const payload = await loginResult.text();
+      throw new Error(`Login request failed: ${loginResult.status()} ${payload}`);
+    }
+
+    await page.goto('/settings/general', { waitUntil: 'networkidle' });
   }
 
+  const origin = new URL(page.url()).origin;
+  await waitForSessionCookie(page.context(), origin);
+
   if (page.url().includes('/auth/login') || page.url().includes('/auth/setup')) {
-    test.fail('Authentication flow did not complete for e2e tests.');
+    throw new Error('Authentication flow did not complete for e2e tests.');
   }
 }
 
@@ -63,6 +93,30 @@ async function getDatabaseIdFromRoot(
   }
 
   return Number(match[1]);
+}
+
+async function ensureUiPreferenceApiAccess(page: Page): Promise<void> {
+  const origin = page.url() ? new URL(page.url()).origin : 'http://localhost:6969';
+  const cookies = await page.context().cookies(origin);
+  const cookieHeader = cookies.map((cookie) => `${cookie.name}=${cookie.value}`).join('; ');
+
+  const response = await page.request.fetch(
+    `${origin}/api/v1/ui-preferences?section_key=${encodeURIComponent(CUSTOM_CONDITIONS_KEY)}&strict=false`,
+    {
+      headers: cookieHeader ? { Cookie: cookieHeader } : undefined,
+    }
+  );
+
+  if (response.status() === 401) {
+    test.skip(
+      'UI preference APIs require authenticated user context. Set E2E_USERNAME and E2E_PASSWORD and run with AUTH=on.'
+    );
+  }
+
+  if (!response.ok()) {
+    const payload = await response.text();
+    throw new Error(`Unable to initialize UI preference API: ${response.status()} ${payload}`);
+  }
 }
 
 async function setUiPreference(page: Page, sectionKey: string, mode: 'basic' | 'advanced'): Promise<void> {
@@ -107,6 +161,7 @@ test.describe('Progressive disclosure persistence and UX', () => {
 
   test.beforeEach(async ({ page }) => {
     await ensureAuthenticated(page);
+    await ensureUiPreferenceApiAccess(page);
   });
 
   test('Show/Hide advanced labels reflect aria-expanded state on first visit defaults', async ({ page }) => {
