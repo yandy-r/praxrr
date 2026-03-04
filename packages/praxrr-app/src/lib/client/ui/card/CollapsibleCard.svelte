@@ -3,8 +3,8 @@
   import { slide } from 'svelte/transition';
   import { quintOut } from 'svelte/easing';
   import { ChevronDown } from 'lucide-svelte';
-  import { getUserInterfacePreferenceSectionStore, type UiPreferenceMode } from '$stores/userInterfacePreferences';
-  import type { SectionKey } from '$shared/disclosure/sectionKeys.ts';
+  import { getUserInterfacePreferenceSectionStore } from '$stores/userInterfacePreferences';
+  import type { SectionKey, UiPreferenceMode } from '$shared/disclosure/sectionKeys.ts';
 
   export let title: string;
   export let description: string = '';

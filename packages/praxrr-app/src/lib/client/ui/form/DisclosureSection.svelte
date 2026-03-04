@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onDestroy } from 'svelte';
-  import { getUserInterfacePreferenceSectionStore, type UiPreferenceMode } from '$stores/userInterfacePreferences';
-  import type { SectionKey } from '$shared/disclosure/sectionKeys.ts';
+  import { getUserInterfacePreferenceSectionStore } from '$stores/userInterfacePreferences';
+  import type { SectionKey, UiPreferenceMode } from '$shared/disclosure/sectionKeys.ts';
   import AdvancedSection from './AdvancedSection.svelte';
 
   export let sectionKey: SectionKey;

@@ -67,3 +67,7 @@
 
 - For local-path PCD sources, never assume `database.local_path` is a Git repo. Any git-backed endpoint must detect/handle non-git local paths without returning 500.
 - In `importBaseOps`, refresh `last_seen_in_repo_at` for matched published repo base ops before cache/entity-exists skips; reversing this order can orphan all repo base ops and make PCD data appear missing across sync/config UIs.
+
+## 2026-03-04
+
+- When introducing generic key-preserving return types (for example `Record<K, ...>` on disclosure helpers), update consumer signatures to `SectionKey` and import shared types from `$shared/disclosure/sectionKeys.ts` instead of store-local type imports to avoid `svelte-check` export/type widening regressions.

@@ -453,7 +453,7 @@ const createUserInterfacePreferencesStore = (): UserInterfacePreferenceStore => 
 export const userInterfacePreferencesStore = createUserInterfacePreferencesStore();
 
 export const getUserInterfacePreferenceSectionStore = (
-  sectionKey: string,
+  sectionKey: SectionKey,
   defaultMode: UiPreferenceMode = 'basic'
 ): UserInterfaceSectionPreferenceStore => {
   return userInterfacePreferencesStore.section(sectionKey, defaultMode);
