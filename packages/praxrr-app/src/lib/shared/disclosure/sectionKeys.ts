@@ -2,7 +2,8 @@
  * Canonical registry of all disclosure section keys.
  *
  * Keys follow the pattern `route-family:page:section` and must match
- * the validation regex `^[a-z0-9-]+:[a-z0-9-]+:[a-z0-9-]+$` with
+ * the validation regex (enforced on both client and server)
+ * `^[a-z0-9-]+:[a-z0-9-]+:[a-z0-9-]+$` with
  * a max length of 96 characters.
  */
 

@@ -79,60 +79,71 @@ The PR implements a well-architected progressive disclosure system with canonica
 
 - **Agent:** type-design-analyzer
 - **Fix:** Define once in `$shared/disclosure/sectionKeys.ts` as `Record<SectionKey, UiPreferenceMode>`.
+- **Status (2026-03-04):** Validated fixed. Consumers now import and use shared `SectionModeMap` from `sectionKeys.ts` instead of redefining inline map types.
 
 ### 9. `loadSectionModes` should use generic signature to preserve key info
 
 - **Agent:** type-design-analyzer
 - **Fix:** `function loadSectionModes<K extends SectionKey>(userId: number | undefined, sectionKeys: readonly K[]): Record<K, UiPreferenceMode>` -- eliminates `?? 'basic'` fallbacks at consumption sites.
+- **Status (2026-03-04):** Fixed. `loadSectionModes` now uses `K extends SectionKey` and returns `Record<K, UiPreferenceMode>`.
 
 ### 10. `CollapsibleCard` `{#if isOpen}` destroys slot DOM -- no test for form data survival
 
 - **Agent:** pr-test-analyzer
 - **Impact:** If someone wraps multiple cards in a single parent form, collapsed cards silently drop form fields from submission.
 - **Fix:** Add E2E test or document that each card's form submits independently.
+- **Status (2026-03-04):** Addressed via documentation. Added explicit component note that collapsed state unmounts slot DOM and that cards should use independent forms (no parent form wrapping multiple cards).
 
 ### 11. `GET` with `strict=true` returns 404 -- untested
 
 - **Agent:** pr-test-analyzer
 - **Fix:** Add unit test for the `strict=true` code path.
+- **Status (2026-03-04):** Fixed. Added `strict GET returns 404 when preference is missing` test in `uiPreferencesApi.test.ts`.
 
 ### 12. Concurrency conflict (stale `expected_updated_at`) -- untested
 
 - **Agent:** pr-test-analyzer
 - **Fix:** Add unit test that PATCHing with a stale `expected_updated_at` returns 409.
+- **Status (2026-03-04):** Fixed. Added stale `expected_updated_at` conflict test asserting `409` in `uiPreferencesApi.test.ts`.
 
 ### 13. Invalid `mode` values rejected -- untested
 
 - **Agent:** pr-test-analyzer
 - **Fix:** Add unit test sending invalid mode value (e.g., `'expanded'`) returns 400.
+- **Status (2026-03-04):** Fixed. Added invalid mode request test asserting `400` in `uiPreferencesApi.test.ts`.
 
 ### 14. JSDoc says "server-side regex" but validation is also client-side
 
 - **Agent:** comment-analyzer
 - **File:** `$shared/disclosure/sectionKeys.ts:1-7`
 - **Fix:** Change to "must match the validation regex (enforced on both client and server)".
+- **Status (2026-03-04):** Fixed. JSDoc now explicitly states regex validation is enforced on both client and server.
 
 ### 15. `onMinBlocked` message says "at least 0.1.0" but `min={2}`
 
 - **Agent:** comment-analyzer
 - **File:** `databases/[id]/config/+page.svelte:293`
 - **Fix:** Update message to match the actual `min` constraint.
+- **Status (2026-03-04):** Fixed. Warning text now says "Minimum Praxrr version must be at least 2.0.0".
 
 ### 16. `CollapsibleCard` `sectionKey: string = ''` uses empty string as sentinel
 
 - **Agent:** type-design-analyzer
 - **Fix:** Use `sectionKey: SectionKey | undefined = undefined` for explicit intent.
+- **Status (2026-03-04):** Validated fixed. `CollapsibleCard` now uses `sectionKey: SectionKey | undefined = undefined`.
 
 ### 17. `$page.data.arrSettingsSectionModes ?? {}` hides missing server data
 
 - **Agent:** silent-failure-hunter
 - **File:** `InstanceForm.svelte:424`
 - **Fix:** Log a warning when `arrSettingsSectionModes` is nullish to distinguish "not yet loaded" from "property missing after refactor".
+- **Status (2026-03-04):** Fixed. Added one-time warning when `arrSettingsSectionModes` is nullish and removed silent fallback at `initialMode` read site.
 
 ### 18. `temp/temp.md` included in PR
 
 - **Agent:** code-reviewer
 - **Fix:** Remove from the PR or add to `.gitignore`.
+- **Status (2026-03-04):** Fixed. Removed `temp/temp.md` and removed `.gitignore` exception that force-included it.
 
 ---
 
@@ -155,8 +166,8 @@ The PR implements a well-architected progressive disclosure system with canonica
 4. **Remove** `temp/temp.md` from the PR
 
 ## Validation Log
-- `deno task test packages/praxrr-app/src/tests/routes/uiPreferencesApi.test.ts` passed (12/12), confirming disclosure preference API behavior remains unchanged after fixes.
-- `deno test --allow-env --allow-read --allow-ffi packages/praxrr-app/src/tests/disclosure/loadSectionModes.test.ts` passed, validating issues 6 and 7 fixes.
+- `deno task test packages/praxrr-app/src/tests/routes/uiPreferencesApi.test.ts packages/praxrr-app/src/tests/disclosure/loadSectionModes.test.ts` passed for `uiPreferencesApi.test.ts` (15/15), validating strict/invalid/concurrency API coverage additions.
+- `deno test --allow-env --allow-read --allow-ffi packages/praxrr-app/src/tests/disclosure/loadSectionModes.test.ts` passed (4/4), validating generic `loadSectionModes` behavior and fallback resilience.
 
 ---
 

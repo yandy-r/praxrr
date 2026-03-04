@@ -420,7 +420,15 @@
   $: urlDescription = selectedAppType
     ? `Use container name if on the same Docker network, e.g. http://${selectedAppType}:${appPorts[selectedAppType]}`
     : defaultUrlHint;
-  $: arrSectionModes = ($page.data.arrSettingsSectionModes ?? {}) as SectionModeMap;
+  let didWarnMissingArrSettingsSectionModes = false;
+  $: {
+    const maybeSectionModes = ($page.data as { arrSettingsSectionModes?: SectionModeMap }).arrSettingsSectionModes;
+    if (!didWarnMissingArrSettingsSectionModes && maybeSectionModes == null) {
+      console.warn('arrSettingsSectionModes is missing from page data; default hydration may have regressed');
+      didWarnMissingArrSettingsSectionModes = true;
+    }
+  }
+  $: arrSectionModes = $page.data.arrSettingsSectionModes;
   $: title = mode === 'create' ? 'Add Instance' : 'Settings';
   $: description =
     mode === 'create'
@@ -466,7 +474,7 @@
     sectionKey={ARR_CONNECTION_DETAILS}
     sectionTitle="Connection Details"
     sectionHint="Optional connection and organization settings."
-    initialMode={arrSectionModes[ARR_CONNECTION_DETAILS] ?? 'basic'}
+    initialMode={arrSectionModes[ARR_CONNECTION_DETAILS]}
   >
     <div class="space-y-4">
       <!-- Type Row -->

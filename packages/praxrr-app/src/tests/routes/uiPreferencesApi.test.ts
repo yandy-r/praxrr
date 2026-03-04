@@ -82,9 +82,10 @@ function createInMemoryPreferenceStore(restores: Restore[]): Map<string, StorePr
   return store;
 }
 
-function buildGetRequest(sectionKey: string, userId?: number): GetEvent {
+function buildGetRequest(sectionKey: string, userId?: number, strict: boolean = false): GetEvent {
+  const strictQuery = strict ? '&strict=true' : '';
   const event: Partial<GetEvent> = {
-    url: new URL(`http://localhost/api/v1/ui-preferences?section_key=${encodeURIComponent(sectionKey)}`),
+    url: new URL(`http://localhost/api/v1/ui-preferences?section_key=${encodeURIComponent(sectionKey)}${strictQuery}`),
     locals: {
       user: null,
       session: null,
@@ -275,6 +276,20 @@ Deno.test('first-visit preference defaults to basic', async () => {
   }
 });
 
+Deno.test('strict GET returns 404 when preference is missing', async () => {
+  const requestScope = withInMemoryStore();
+
+  try {
+    const sectionKey = 'media-management:media-settings:importing';
+    const userId = 54;
+    const response = await GET(buildGetRequest(sectionKey, userId, true));
+
+    assertEquals(response.status, 404);
+  } finally {
+    requestScope.restoreAll();
+  }
+});
+
 Deno.test('PATCH with expected_updated_at null when row exists is allowed (no spurious 409)', async () => {
   const requestScope = withInMemoryStore();
 
@@ -293,6 +308,48 @@ Deno.test('PATCH with expected_updated_at null when row exists is allowed (no sp
     assertEquals(res.status, 200);
     const body = (await res.json()) as { mode: 'basic' | 'advanced' };
     assertEquals(body.mode, 'advanced');
+  } finally {
+    requestScope.restoreAll();
+  }
+});
+
+Deno.test('PATCH returns 409 when expected_updated_at is stale', async () => {
+  const requestScope = withInMemoryStore();
+
+  try {
+    const sectionKey = 'media-management:media-settings:naming';
+    const userId = 109;
+
+    const createRes = await PATCH(buildPatchRequest(sectionKey, 'basic', userId));
+    assertEquals(createRes.status, 200);
+
+    const staleExpectedUpdatedAt = '2000-01-01T00:00:00.000Z';
+    const conflictRes = await PATCH(buildPatchRequest(sectionKey, 'advanced', userId, staleExpectedUpdatedAt));
+    assertEquals(conflictRes.status, 409);
+  } finally {
+    requestScope.restoreAll();
+  }
+});
+
+Deno.test('invalid mode values are rejected with 400', async () => {
+  const requestScope = withInMemoryStore();
+
+  try {
+    const userId = 110;
+    const invalidRequest = buildPatchRequest('media-management:media-settings:naming', 'basic', userId);
+    invalidRequest.request = new Request('http://localhost/api/v1/ui-preferences', {
+      method: 'PATCH',
+      headers: {
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        section_key: 'media-management:media-settings:naming',
+        mode: 'expanded',
+      }),
+    });
+
+    const response = await PATCH(invalidRequest);
+    assertEquals(response.status, 400);
   } finally {
     requestScope.restoreAll();
   }

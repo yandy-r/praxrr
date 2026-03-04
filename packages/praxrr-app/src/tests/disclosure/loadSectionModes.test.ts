@@ -22,7 +22,7 @@ Deno.test('loadSectionModes returns basic for all keys when userId is undefined'
   });
 
   try {
-    const keys: readonly SectionKey[] = [CF_CONDITIONS, CF_SCORING];
+    const keys = [CF_CONDITIONS, CF_SCORING] as const;
     const sectionModes = loadSectionModes(undefined, keys);
 
     assertEquals(sectionModes, {

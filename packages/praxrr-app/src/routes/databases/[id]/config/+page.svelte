@@ -290,7 +290,7 @@
                     font="mono"
                     onchange={(v) =>
                       updatePraxrr('minimum_version', updateVersionPart(manifest!.praxrr.minimum_version, 0, v))}
-                    onMinBlocked={() => alertStore.add('warning', 'Minimum Praxrr version must be at least 0.1.0')}
+                    onMinBlocked={() => alertStore.add('warning', 'Minimum Praxrr version must be at least 2.0.0')}
                   />
                 </div>
                 <span class="text-lg font-medium text-neutral-400 dark:text-neutral-500">.</span>

@@ -1,16 +1,16 @@
 import { userInterfacePreferencesQueries } from '$db/queries/user_interface_preferences.ts';
-import type { SectionKey, SectionModeMap } from '$shared/disclosure/sectionKeys.ts';
+import type { SectionKey, UiPreferenceMode } from '$shared/disclosure/sectionKeys.ts';
 
 /**
  * Load persisted section modes for a set of disclosure keys.
  * Returns a record mapping each key to its stored mode, defaulting
  * absent rows to `'basic'`.
  */
-export function loadSectionModes(
+export function loadSectionModes<K extends SectionKey>(
   userId: number | undefined,
-  sectionKeys: readonly SectionKey[]
-): SectionModeMap {
-  const modes: SectionModeMap = {};
+  sectionKeys: readonly K[]
+): Record<K, UiPreferenceMode> {
+  const modes = {} as Record<K, UiPreferenceMode>;
 
   for (const key of sectionKeys) {
     modes[key] = 'basic';

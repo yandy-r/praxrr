@@ -70,6 +70,7 @@
   </button>
 
   {#if isOpen}
+    <!-- Note: Collapsed state unmounts slot DOM. Use independent forms per card; do not wrap multiple cards in one parent form. -->
     <div class="p-6" transition:slide={{ duration: slideDuration, easing: quintOut }}>
       <slot />
     </div>
