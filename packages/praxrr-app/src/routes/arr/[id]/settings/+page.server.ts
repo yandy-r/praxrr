@@ -2,6 +2,8 @@ import { error, fail, redirect, type ServerLoad } from '@sveltejs/kit';
 import type { Actions } from '@sveltejs/kit';
 import { arrInstancesQueries, type ArrInstance, type ArrInstanceSource } from '$db/queries/arrInstances.ts';
 import { arrInstanceCredentialsQueries } from '$db/queries/arrInstanceCredentials.ts';
+import { loadSectionModes } from '$lib/server/disclosure/loadSectionModes.ts';
+import { ARR_CONNECTION_DETAILS } from '$shared/disclosure/sectionKeys.ts';
 import { cleanupJobsForArrInstance } from '$lib/server/jobs/cleanup.ts';
 import { logger } from '$logger/logger.ts';
 import { parseOptionalAbsoluteHttpUrl } from '$utils/validation/url.ts';
@@ -54,7 +56,7 @@ async function getInstanceApiKeyState(instanceId: number): Promise<{ hasApiKey: 
   }
 }
 
-export const load: ServerLoad = async ({ parent }) => {
+export const load: ServerLoad = async ({ parent, locals }) => {
   const parentData = await parent();
   const rawInstance = parentData.instance;
 
@@ -65,6 +67,7 @@ export const load: ServerLoad = async ({ parent }) => {
   const instance = rawInstance as ArrInstance;
   const source: ArrInstanceSource = instance.source ?? 'ui';
   const apiKeyState = await getInstanceApiKeyState(instance.id);
+  const arrSettingsSectionModes = loadSectionModes(locals.user?.id, [ARR_CONNECTION_DETAILS]);
 
   return {
     instance: {
@@ -75,6 +78,7 @@ export const load: ServerLoad = async ({ parent }) => {
     canEditCoreConnectionFields: source === 'ui',
     hasApiKey: apiKeyState.hasApiKey,
     apiKeyMasked: apiKeyState.apiKeyMasked,
+    arrSettingsSectionModes,
   };
 };
 

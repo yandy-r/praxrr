@@ -5,11 +5,13 @@
 	import { RefreshCw, LogOut, Check, Globe, Monitor, Smartphone, Network, Clock } from 'lucide-svelte';
 	import { parseUTC } from '$shared/utils/dates';
 	import Button from '$ui/button/Button.svelte';
+	import CollapsibleCard from '$ui/card/CollapsibleCard.svelte';
 	import FormInput from '$ui/form/FormInput.svelte';
 	import MaskedApiKey from '$ui/form/MaskedApiKey.svelte';
 	import Table from '$ui/table/Table.svelte';
 	import TableActionButton from '$ui/table/TableActionButton.svelte';
 	import { alertStore } from '$alerts/store';
+	import { SETTINGS_SECURITY_SESSIONS } from '$shared/disclosure/sectionKeys';
 	import type { Column } from '$ui/table/types';
 
 	export let data: PageData;
@@ -404,15 +406,13 @@
 		</div>
 
 		<!-- Active Sessions -->
-		<div class="rounded-lg border border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900">
-			<div class="flex flex-col gap-3 border-b border-neutral-200 px-6 py-4 md:flex-row md:items-start md:justify-between dark:border-neutral-800">
-				<div>
-					<h2 class="text-lg font-semibold text-neutral-900 md:text-xl dark:text-neutral-50">Active Sessions</h2>
-					<p class="mt-1 text-sm text-neutral-600 dark:text-neutral-400">
-						Manage your logged-in sessions across devices
-					</p>
-				</div>
-				{#if data.sessions.length > 1}
+		<CollapsibleCard
+			title="Active Sessions"
+			description="Manage your logged-in sessions across devices"
+			sectionKey={SETTINGS_SECURITY_SESSIONS}
+		>
+			{#if data.sessions.length > 1}
+				<div class="mb-4 flex justify-end">
 					<form method="POST" action="?/revokeOtherSessions" use:enhance={() => {
 						return async ({ update }) => {
 							await update();
@@ -428,43 +428,41 @@
 							text="Revoke Others"
 						/>
 					</form>
-				{/if}
-			</div>
-			<div class="p-6">
-				{#if data.sessions.length > 0}
-					<Table
-						columns={sessionColumns}
-						data={data.sessions}
-						compact
-						responsive
-						actionsHeader="Status"
-					>
-						<svelte:fragment slot="actions" let:row>
-							{#if row.isCurrent}
-								<span class="inline-flex items-center rounded px-2 py-0.5 text-xs font-medium bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200">Current</span>
-							{:else}
-								<form method="POST" action="?/revokeSession" use:enhance={() => {
-									return async ({ update }) => {
-										await update();
-										await invalidateAll();
-									};
-								}}>
-									<input type="hidden" name="sessionId" value={row.id} />
-									<TableActionButton
-										icon={LogOut}
-										title="Revoke session"
-										variant="danger"
-										size="sm"
-										type="submit"
-									/>
-								</form>
-							{/if}
-						</svelte:fragment>
-					</Table>
-				{:else}
-					<p class="text-sm text-neutral-500 dark:text-neutral-400">No active sessions</p>
-				{/if}
-			</div>
-		</div>
+				</div>
+			{/if}
+			{#if data.sessions.length > 0}
+				<Table
+					columns={sessionColumns}
+					data={data.sessions}
+					compact
+					responsive
+					actionsHeader="Status"
+				>
+					<svelte:fragment slot="actions" let:row>
+						{#if row.isCurrent}
+							<span class="inline-flex items-center rounded px-2 py-0.5 text-xs font-medium bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200">Current</span>
+						{:else}
+							<form method="POST" action="?/revokeSession" use:enhance={() => {
+								return async ({ update }) => {
+									await update();
+									await invalidateAll();
+								};
+							}}>
+								<input type="hidden" name="sessionId" value={row.id} />
+								<TableActionButton
+									icon={LogOut}
+									title="Revoke session"
+									variant="danger"
+									size="sm"
+									type="submit"
+								/>
+							</form>
+						{/if}
+					</svelte:fragment>
+				</Table>
+			{:else}
+				<p class="text-sm text-neutral-500 dark:text-neutral-400">No active sessions</p>
+			{/if}
+		</CollapsibleCard>
 	</div>
 </div>

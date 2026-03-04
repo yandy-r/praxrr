@@ -3,12 +3,13 @@
 import { assertEquals } from '@std/assert';
 import { userInterfacePreferencesQueries } from '$db/queries/user_interface_preferences.ts';
 import { GET, PATCH } from '../../routes/api/v1/ui-preferences/+server.ts';
+import type { SectionKey } from '$shared/disclosure/sectionKeys.ts';
 
 type Restore = () => void;
 
 interface StorePreference {
   userId: number;
-  sectionKey: string;
+  sectionKey: SectionKey;
   mode: 'basic' | 'advanced';
   updatedAt: string;
 }
@@ -81,9 +82,10 @@ function createInMemoryPreferenceStore(restores: Restore[]): Map<string, StorePr
   return store;
 }
 
-function buildGetRequest(sectionKey: string, userId?: number): GetEvent {
+function buildGetRequest(sectionKey: string, userId?: number, strict: boolean = false): GetEvent {
+  const strictQuery = strict ? '&strict=true' : '';
   const event: Partial<GetEvent> = {
-    url: new URL(`http://localhost/api/v1/ui-preferences?section_key=${encodeURIComponent(sectionKey)}`),
+    url: new URL(`http://localhost/api/v1/ui-preferences?section_key=${encodeURIComponent(sectionKey)}${strictQuery}`),
     locals: {
       user: null,
       session: null,
@@ -274,6 +276,20 @@ Deno.test('first-visit preference defaults to basic', async () => {
   }
 });
 
+Deno.test('strict GET returns 404 when preference is missing', async () => {
+  const requestScope = withInMemoryStore();
+
+  try {
+    const sectionKey = 'media-management:media-settings:importing';
+    const userId = 54;
+    const response = await GET(buildGetRequest(sectionKey, userId, true));
+
+    assertEquals(response.status, 404);
+  } finally {
+    requestScope.restoreAll();
+  }
+});
+
 Deno.test('PATCH with expected_updated_at null when row exists is allowed (no spurious 409)', async () => {
   const requestScope = withInMemoryStore();
 
@@ -292,6 +308,48 @@ Deno.test('PATCH with expected_updated_at null when row exists is allowed (no sp
     assertEquals(res.status, 200);
     const body = (await res.json()) as { mode: 'basic' | 'advanced' };
     assertEquals(body.mode, 'advanced');
+  } finally {
+    requestScope.restoreAll();
+  }
+});
+
+Deno.test('PATCH returns 409 when expected_updated_at is stale', async () => {
+  const requestScope = withInMemoryStore();
+
+  try {
+    const sectionKey = 'media-management:media-settings:naming';
+    const userId = 109;
+
+    const createRes = await PATCH(buildPatchRequest(sectionKey, 'basic', userId));
+    assertEquals(createRes.status, 200);
+
+    const staleExpectedUpdatedAt = '2000-01-01T00:00:00.000Z';
+    const conflictRes = await PATCH(buildPatchRequest(sectionKey, 'advanced', userId, staleExpectedUpdatedAt));
+    assertEquals(conflictRes.status, 409);
+  } finally {
+    requestScope.restoreAll();
+  }
+});
+
+Deno.test('invalid mode values are rejected with 400', async () => {
+  const requestScope = withInMemoryStore();
+
+  try {
+    const userId = 110;
+    const invalidRequest = buildPatchRequest('media-management:media-settings:naming', 'basic', userId);
+    invalidRequest.request = new Request('http://localhost/api/v1/ui-preferences', {
+      method: 'PATCH',
+      headers: {
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        section_key: 'media-management:media-settings:naming',
+        mode: 'expanded',
+      }),
+    });
+
+    const response = await PATCH(invalidRequest);
+    assertEquals(response.status, 400);
   } finally {
     requestScope.restoreAll();
   }
@@ -345,6 +403,70 @@ Deno.test('excessively long section keys are rejected by server validation', asy
 
     const response = await PATCH(buildPatchRequest(longSectionKey, 'advanced', 77));
     assertEquals(response.status, 400);
+  } finally {
+    requestScope.restoreAll();
+  }
+});
+
+Deno.test('newly introduced rollout keys accept valid read/write cycles', async () => {
+  const requestScope = withInMemoryStore();
+
+  try {
+    const userId = 100;
+    const rolloutKeys = [
+      'regular-expressions:general:metadata',
+      'metadata-profiles:general:type-selection',
+      'arr:upgrades:filter-settings',
+    ];
+
+    for (const key of rolloutKeys) {
+      // Default read returns basic
+      const readDefault = await GET(buildGetRequest(key, userId));
+      const readDefaultBody = (await readDefault.json()) as { mode: 'basic' | 'advanced'; persisted: boolean };
+      assertEquals(readDefault.status, 200);
+      assertEquals(readDefaultBody.mode, 'basic');
+      assertEquals(readDefaultBody.persisted, false);
+
+      // Write advanced
+      const writeRes = await PATCH(buildPatchRequest(key, 'advanced', userId));
+      assertEquals(writeRes.status, 200);
+
+      // Read back advanced
+      const readBack = await GET(buildGetRequest(key, userId));
+      const readBackBody = (await readBack.json()) as { mode: 'basic' | 'advanced'; persisted: boolean };
+      assertEquals(readBack.status, 200);
+      assertEquals(readBackBody.mode, 'advanced');
+      assertEquals(readBackBody.persisted, true);
+
+      // Write basic
+      const resetRes = await PATCH(buildPatchRequest(key, 'basic', userId));
+      assertEquals(resetRes.status, 200);
+
+      // Read back basic
+      const readReset = await GET(buildGetRequest(key, userId));
+      const readResetBody = (await readReset.json()) as { mode: 'basic' | 'advanced' };
+      assertEquals(readReset.status, 200);
+      assertEquals(readResetBody.mode, 'basic');
+    }
+  } finally {
+    requestScope.restoreAll();
+  }
+});
+
+Deno.test('rollout keys are isolated from each other', async () => {
+  const requestScope = withInMemoryStore();
+
+  try {
+    const userId = 101;
+    const regexKey = 'regular-expressions:general:metadata';
+    const metadataKey = 'metadata-profiles:general:type-selection';
+
+    await PATCH(buildPatchRequest(regexKey, 'advanced', userId));
+
+    const readMetadata = await GET(buildGetRequest(metadataKey, userId));
+    const metadataBody = (await readMetadata.json()) as { mode: 'basic' | 'advanced' };
+    assertEquals(readMetadata.status, 200);
+    assertEquals(metadataBody.mode, 'basic');
   } finally {
     requestScope.restoreAll();
   }

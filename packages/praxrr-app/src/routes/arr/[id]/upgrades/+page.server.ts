@@ -13,6 +13,8 @@ import { upsertScheduledJob } from '$lib/server/jobs/queueService.ts';
 import { calculateCooldownUntil } from '$lib/server/jobs/scheduleUtils.ts';
 import { buildJobDisplayName } from '$lib/server/jobs/display.ts';
 import { isArrAppType, supportsArrWorkflow, ARR_APPS } from '$shared/arr/capabilities.ts';
+import { loadSectionModes } from '$lib/server/disclosure/loadSectionModes.ts';
+import { ARR_UPGRADES_FILTER } from '$shared/disclosure/sectionKeys.ts';
 
 function getUpgradeUnsupportedError(instanceType: string): string | null {
   if (!isArrAppType(instanceType)) {
@@ -42,7 +44,7 @@ function getUpgradeUnsupportedErrorAndCancel(instanceId: number, instanceType: s
   return unsupportedError;
 }
 
-export const load: ServerLoad = ({ params }) => {
+export const load: ServerLoad = ({ params, locals }) => {
   const id = parseInt(params.id || '', 10);
 
   if (isNaN(id)) {
@@ -60,10 +62,16 @@ export const load: ServerLoad = ({ params }) => {
   // Load upgrade runs from database
   const upgradeRuns = upgradeRunsQueries.getByInstanceId(id);
 
+  const arrUpgradesSectionModes = loadSectionModes(
+    locals.user?.id,
+    [ARR_UPGRADES_FILTER]
+  );
+
   return {
     instance,
     config: config ?? null,
     upgradeRuns,
+    arrUpgradesSectionModes,
   };
 };
 

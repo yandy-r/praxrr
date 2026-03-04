@@ -6,8 +6,10 @@ import * as delayProfileQueries from '$pcd/entities/delayProfiles/index.ts';
 import { parseOperationLayer } from '$pcd/index.ts';
 import type { PreferredProtocol } from '$shared/pcd/display.ts';
 import { logger } from '$logger/logger.ts';
+import { loadSectionModes } from '$lib/server/disclosure/loadSectionModes.ts';
+import { DP_BYPASS_CONDITIONS } from '$shared/disclosure/sectionKeys.ts';
 
-export const load: ServerLoad = ({ params }) => {
+export const load: ServerLoad = ({ params, locals }) => {
   const { databaseId } = params;
 
   if (!databaseId) {
@@ -24,9 +26,12 @@ export const load: ServerLoad = ({ params }) => {
     throw error(404, 'Database not found');
   }
 
+  const delayProfileSectionModes = loadSectionModes(locals.user?.id, [DP_BYPASS_CONDITIONS]);
+
   return {
     currentDatabase,
     canWriteToBase: canWriteToBase(currentDatabaseId),
+    delayProfileSectionModes,
   };
 };
 

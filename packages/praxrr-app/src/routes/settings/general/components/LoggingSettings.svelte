@@ -27,24 +27,9 @@
 	}
 </script>
 
-<div
-	class="rounded-lg border border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900"
->
-	<!-- Header -->
-	<div class="border-b border-neutral-200 px-6 py-4 dark:border-neutral-800">
-		<h2 class="text-lg font-semibold text-neutral-900 md:text-xl dark:text-neutral-50">
-			Logging Configuration
-		</h2>
-		<p class="mt-1 text-sm text-neutral-600 dark:text-neutral-400">
-			Configure how Praxrr handles application logs, rotation, and retention
-		</p>
-	</div>
-
-	<!-- Form -->
-	<form
-		method="POST"
-		action="?/updateLogs"
-		class="p-6"
+<form
+	method="POST"
+	action="?/updateLogs"
 		use:enhance={() => {
 			return async ({ result, update }) => {
 				if (result.type === 'failure' && result.data) {
@@ -209,5 +194,4 @@
 				Save Settings
 			</button>
 		</div>
-	</form>
-</div>
+</form>

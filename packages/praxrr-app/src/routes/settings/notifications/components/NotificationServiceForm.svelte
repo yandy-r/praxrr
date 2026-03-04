@@ -6,6 +6,8 @@
 	import { groupNotificationTypesByCategory } from '$shared/notifications/types';
 	import { Plus, Save, Check } from 'lucide-svelte';
 	import IconCheckbox from '$ui/form/IconCheckbox.svelte';
+	import DisclosureSection from '$ui/form/DisclosureSection.svelte';
+	import { SETTINGS_NOTIFICATION_EVENTS } from '$shared/disclosure/sectionKeys';
 
 	export let mode: 'create' | 'edit' = 'create';
 	export let initialData: {
@@ -136,42 +138,51 @@
 		<h2 class="mb-4 text-lg font-semibold text-neutral-900 dark:text-neutral-50">
 			Notification Types
 		</h2>
-		<p class="mb-4 text-sm text-neutral-600 dark:text-neutral-400">
-			Select which types of notifications should be sent to this service
-		</p>
 
-		<div class="space-y-4">
-			{#each Object.entries(groupedTypes) as [category, types]}
-				<div>
-					<h3 class="mb-2 text-sm font-semibold text-neutral-700 dark:text-neutral-300">
-						{category}
-					</h3>
-					<div class="space-y-2">
-						{#each types as type}
-							<div class="flex items-center gap-3">
-								<IconCheckbox
-									icon={Check}
-									checked={enabledTypesState[type.id]}
-									on:click={() => (enabledTypesState[type.id] = !enabledTypesState[type.id])}
-								/>
-								<input
-									type="hidden"
-									name={type.id}
-									value={enabledTypesState[type.id] ? 'on' : ''}
-								/>
-								<button
-									type="button"
-									class="text-sm text-neutral-700 dark:text-neutral-300"
-									on:click={() => (enabledTypesState[type.id] = !enabledTypesState[type.id])}
-								>
-									{type.label}
-								</button>
-							</div>
-						{/each}
-					</div>
-				</div>
+		<!-- Hidden inputs always in DOM for form submission -->
+		{#each Object.entries(groupedTypes) as [, types]}
+			{#each types as type}
+				<input type="hidden" name={type.id} value={enabledTypesState[type.id] ? 'on' : ''} />
 			{/each}
-		</div>
+		{/each}
+
+		<DisclosureSection
+			sectionKey={SETTINGS_NOTIFICATION_EVENTS}
+			sectionTitle="Event Types"
+			sectionHint="Configure which notification events trigger this service."
+		>
+			<p class="mb-4 text-sm text-neutral-600 dark:text-neutral-400">
+				Select which types of notifications should be sent to this service
+			</p>
+
+			<div class="space-y-4">
+				{#each Object.entries(groupedTypes) as [category, types]}
+					<div>
+						<h3 class="mb-2 text-sm font-semibold text-neutral-700 dark:text-neutral-300">
+							{category}
+						</h3>
+						<div class="space-y-2">
+							{#each types as type}
+								<div class="flex items-center gap-3">
+									<IconCheckbox
+										icon={Check}
+										checked={enabledTypesState[type.id]}
+										on:click={() => (enabledTypesState[type.id] = !enabledTypesState[type.id])}
+									/>
+									<button
+										type="button"
+										class="text-sm text-neutral-700 dark:text-neutral-300"
+										on:click={() => (enabledTypesState[type.id] = !enabledTypesState[type.id])}
+									>
+										{type.label}
+									</button>
+								</div>
+							{/each}
+						</div>
+					</div>
+				{/each}
+			</div>
+		</DisclosureSection>
 	</div>
 
 	<!-- Actions -->

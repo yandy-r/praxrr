@@ -1,16 +1,19 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import { tick } from 'svelte';
+	import { page } from '$app/stores';
 	import NumberInput from '$ui/form/NumberInput.svelte';
 	import FormInput from '$ui/form/FormInput.svelte';
 	import Toggle from '$ui/toggle/Toggle.svelte';
 	import StickyCard from '$ui/card/StickyCard.svelte';
-	import Card from '$ui/card/Card.svelte';
+	import DisclosureSection from '$ui/form/DisclosureSection.svelte';
 	import Button from '$ui/button/Button.svelte';
 	import Modal from '$ui/modal/Modal.svelte';
 	import { alertStore } from '$alerts/store';
 	import { Save, Trash2, Loader2 } from 'lucide-svelte';
 	import type { PreferredProtocol } from '$shared/pcd/display.ts';
+	import { DP_BYPASS_CONDITIONS } from '$shared/disclosure/sectionKeys.ts';
+	import type { SectionModeMap } from '$shared/disclosure/sectionKeys.ts';
 	import { current, isDirty, initEdit, initCreate, update } from '$lib/client/stores/dirty';
 
 	// Form data shape
@@ -44,6 +47,8 @@
 		bypassIfAboveCfScore: false,
 		minimumCfScore: 0
 	};
+
+	$: sectionModes = ($page.data.delayProfileSectionModes ?? {}) as SectionModeMap;
 
 	if (mode === 'create') {
 		initCreate(initialData ?? defaults);
@@ -185,97 +190,95 @@
 		<input type="hidden" name="minimumCfScore" value={formData.minimumCfScore} />
 		<input type="hidden" name="layer" value={selectedLayer} />
 
-		<Card flush padding="lg">
+		<DisclosureSection
+			sectionKey={DP_BYPASS_CONDITIONS}
+			sectionTitle="Bypass Conditions"
+			sectionHint="Skip the delay when specific conditions are met."
+			initialMode={sectionModes[DP_BYPASS_CONDITIONS] ?? 'basic'}
+		>
 			<div class="space-y-6">
-			<!-- Name -->
-			<FormInput
-				label="Name"
-				name="name"
-				placeholder="e.g., Standard Delay"
-				required
-				value={formData.name}
-				on:input={(e) => update('name', e.detail)}
-			/>
+				<!-- Name -->
+				<FormInput
+					label="Name"
+					name="name"
+					placeholder="e.g., Standard Delay"
+					required
+					value={formData.name}
+					on:input={(e) => update('name', e.detail)}
+				/>
 
-			<!-- Protocol Preference -->
-			<div>
-				<h3 class="text-sm font-semibold text-neutral-900 dark:text-neutral-100">
-					Protocol Preference
-				</h3>
-				<div class="mt-2 grid gap-2">
-					{#each protocolOptions as option}
+				<!-- Protocol Preference -->
+				<div>
+					<h3 class="text-sm font-semibold text-neutral-900 dark:text-neutral-100">
+						Protocol Preference
+					</h3>
+					<div class="mt-2 grid gap-2">
+						{#each protocolOptions as option}
+							<div>
+								<Toggle
+									label={option.label}
+									checked={formData.preferredProtocol === option.value}
+									on:change={() => update('preferredProtocol', option.value)}
+								/>
+								<p class="mt-1 px-3 text-xs text-neutral-500 dark:text-neutral-400">
+									{option.description}
+								</p>
+							</div>
+						{/each}
+					</div>
+				</div>
+
+				<!-- Delays -->
+				<div>
+					<h3 class="text-sm font-semibold text-neutral-900 dark:text-neutral-100">Delays</h3>
+					<p class="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
+						Time to wait before downloading from each source. Set to 0 for no delay.
+					</p>
+					<div class="mt-3 grid gap-4 sm:grid-cols-2">
 						<div>
-							<Toggle
-								label={option.label}
-								checked={formData.preferredProtocol === option.value}
-								on:change={() => update('preferredProtocol', option.value)}
-							/>
-							<p class="mt-1 px-3 text-xs text-neutral-500 dark:text-neutral-400">
-								{option.description}
-							</p>
+							<label
+								for="usenet-delay"
+								class="block text-sm font-medium text-neutral-700 dark:text-neutral-300"
+							>
+								Usenet Delay (minutes)
+							</label>
+							<div class="mt-1">
+								<NumberInput
+									name="usenet-delay"
+									id="usenet-delay"
+									value={formData.usenetDelay}
+									onchange={(v) => update('usenetDelay', v)}
+									min={0}
+									font="mono"
+									disabled={!usenetEnabled}
+								/>
+							</div>
 						</div>
-					{/each}
-				</div>
-			</div>
 
-			<!-- Delays -->
-			<div>
-				<h3 class="text-sm font-semibold text-neutral-900 dark:text-neutral-100">Delays</h3>
-				<p class="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
-					Time to wait before downloading from each source. Set to 0 for no delay.
-				</p>
-				<div class="mt-3 grid gap-4 sm:grid-cols-2">
-					<div>
-						<label
-							for="usenet-delay"
-							class="block text-sm font-medium text-neutral-700 dark:text-neutral-300"
-						>
-							Usenet Delay (minutes)
-						</label>
-						<div class="mt-1">
-							<NumberInput
-								name="usenet-delay"
-								id="usenet-delay"
-								value={formData.usenetDelay}
-								onchange={(v) => update('usenetDelay', v)}
-								min={0}
-								font="mono"
-								disabled={!usenetEnabled}
-							/>
-						</div>
-					</div>
-
-					<div>
-						<label
-							for="torrent-delay"
-							class="block text-sm font-medium text-neutral-700 dark:text-neutral-300"
-						>
-							Torrent Delay (minutes)
-						</label>
-						<div class="mt-1">
-							<NumberInput
-								name="torrent-delay"
-								id="torrent-delay"
-								value={formData.torrentDelay}
-								onchange={(v) => update('torrentDelay', v)}
-								min={0}
-								font="mono"
-								disabled={!torrentEnabled}
-							/>
+						<div>
+							<label
+								for="torrent-delay"
+								class="block text-sm font-medium text-neutral-700 dark:text-neutral-300"
+							>
+								Torrent Delay (minutes)
+							</label>
+							<div class="mt-1">
+								<NumberInput
+									name="torrent-delay"
+									id="torrent-delay"
+									value={formData.torrentDelay}
+									onchange={(v) => update('torrentDelay', v)}
+									min={0}
+									font="mono"
+									disabled={!torrentEnabled}
+								/>
+							</div>
 						</div>
 					</div>
 				</div>
 			</div>
-
-			<!-- Bypass Conditions -->
-			<div>
-				<h3 class="text-sm font-semibold text-neutral-900 dark:text-neutral-100">
-					Bypass Conditions
-				</h3>
-				<p class="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
-					Skip the delay when these conditions are met.
-				</p>
-				<div class="mt-3 space-y-3">
+			<svelte:fragment slot="advanced">
+				<div class="space-y-3">
 					<div>
 						<Toggle
 							label="Bypass if Highest Quality"
@@ -308,9 +311,8 @@
 						</p>
 					</div>
 				</div>
-			</div>
-		</div>
-		</Card>
+			</svelte:fragment>
+		</DisclosureSection>
 	</form>
 
 	<!-- Hidden delete form -->

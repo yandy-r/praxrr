@@ -5,9 +5,11 @@
 	import FormInput from '$ui/form/FormInput.svelte';
 	import MarkdownInput from '$ui/form/MarkdownInput.svelte';
 	import TagInput from '$ui/form/TagInput.svelte';
+	import DisclosureSection from '$ui/form/DisclosureSection.svelte';
 	import Modal from '$ui/modal/Modal.svelte';
 	import Button from '$ui/button/Button.svelte';
 	import StickyCard from '$ui/card/StickyCard.svelte';
+	import { QP_METADATA } from '$shared/disclosure/sectionKeys';
 	import { alertStore } from '$alerts/store';
 	import { current, isDirty, initEdit, initCreate, update } from '$lib/client/stores/dirty';
 
@@ -213,101 +215,117 @@
 		<input type="hidden" name="language" value={selectedLanguageName ?? ''} />
 		<input type="hidden" name="layer" value={selectedLayer} />
 
-		<div class="space-y-6">
-			<!-- Name -->
-			<FormInput
-				label="Name"
-				name="name"
-				value={name}
-				required
-				description="The name of this quality profile"
-				placeholder="Enter quality profile name"
-				on:input={(e) => update('name', e.detail)}
-			/>
-
-			<!-- Description -->
-			<MarkdownInput
-				id="description"
-				label="Description"
-				description="Add any notes or details about this profile's purpose and configuration."
-				value={description}
-				onchange={(v) => update('description', v)}
-			/>
-
-			<!-- Tags -->
-			<div class="space-y-2">
-				<div class="block text-sm font-medium text-neutral-900 dark:text-neutral-100">Tags</div>
-				<p class="text-xs text-neutral-600 dark:text-neutral-400">
-					Add tags to organize and categorize this quality profile.
-				</p>
-				<TagInput {tags} onchange={(newTags) => update('tags', newTags)} />
+		<DisclosureSection
+			sectionKey={QP_METADATA}
+			sectionTitle="Metadata"
+			sectionHint="Optional description, tags, and language settings."
+		>
+			<div class="space-y-6">
+				<!-- Name -->
+				<FormInput
+					label="Name"
+					name="name"
+					value={name}
+					required
+					description="The name of this quality profile"
+					placeholder="Enter quality profile name"
+					on:input={(e) => update('name', e.detail)}
+				/>
 			</div>
+			<svelte:fragment slot="advanced">
+				<div class="space-y-6">
+					<!-- Description -->
+					<MarkdownInput
+						id="description"
+						label="Description"
+						description="Add any notes or details about this profile's purpose and configuration."
+						value={description}
+						onchange={(v) => update('description', v)}
+					/>
 
-			<!-- Language -->
-			{#if availableLanguages.length > 0}
-				<div class="space-y-2">
-					<div class="relative">
-						{#if selectedLanguageName}
-							<FormInput
-								label="Language"
-								name="language-search"
-								value={languageSearchQuery}
-								description={`Set the preferred language for this profile. Leave empty for "Any". Radarr only. Sonarr uses custom formats for language filtering.`}
-								placeholder="Search for a language..."
-								on:input={(e) => handleLanguageInput(e.detail)}
-								on:focus={handleLanguageFocus}
-								on:blur={handleLanguageBlur}
-							>
-								<svelte:fragment slot="suffix">
-									<button
-										type="button"
-										onclick={clearLanguage}
-										aria-label="Clear language"
-										class="text-neutral-400 hover:text-neutral-600 dark:text-neutral-500 dark:hover:text-neutral-300"
-									>
-										<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-											<path
-												stroke-linecap="round"
-												stroke-linejoin="round"
-												stroke-width="2"
-												d="M6 18L18 6M6 6l12 12"
-											/>
-										</svg>
-									</button>
-								</svelte:fragment>
-							</FormInput>
-						{:else}
-							<FormInput
-								label="Language"
-								name="language-search"
-								value={languageSearchQuery}
-								description={`Set the preferred language for this profile. Leave empty for "Any". Radarr only. Sonarr uses custom formats for language filtering.`}
-								placeholder="Search for a language..."
-								on:input={(e) => handleLanguageInput(e.detail)}
-								on:focus={handleLanguageFocus}
-								on:blur={handleLanguageBlur}
-							/>
-						{/if}
-
-						{#if showLanguageDropdown && filteredLanguages.length > 0}
-							<div
-								class="absolute top-full z-50 mt-1 max-h-60 w-full overflow-y-auto rounded-lg border border-neutral-200 bg-white py-1 shadow-lg dark:border-neutral-700 dark:bg-neutral-800"
-							>
-								{#each filteredLanguages as language}
-									<button
-										type="button"
-										onmousedown={() => selectLanguage(language)}
-										class="w-full px-3 py-2 text-left text-sm text-neutral-900 transition-colors hover:bg-neutral-100 dark:text-neutral-100 dark:hover:bg-neutral-700"
-									>
-										{language.name}
-									</button>
-								{/each}
-							</div>
-						{/if}
+					<!-- Tags -->
+					<div class="space-y-2">
+						<div class="block text-sm font-medium text-neutral-900 dark:text-neutral-100">
+							Tags
+						</div>
+						<p class="text-xs text-neutral-600 dark:text-neutral-400">
+							Add tags to organize and categorize this quality profile.
+						</p>
+						<TagInput {tags} onchange={(newTags) => update('tags', newTags)} />
 					</div>
+
+					<!-- Language -->
+					{#if availableLanguages.length > 0}
+						<div class="space-y-2">
+							<div class="relative">
+								{#if selectedLanguageName}
+									<FormInput
+										label="Language"
+										name="language-search"
+										value={languageSearchQuery}
+										description={`Set the preferred language for this profile. Leave empty for "Any". Radarr only. Sonarr uses custom formats for language filtering.`}
+										placeholder="Search for a language..."
+										on:input={(e) => handleLanguageInput(e.detail)}
+										on:focus={handleLanguageFocus}
+										on:blur={handleLanguageBlur}
+									>
+										<svelte:fragment slot="suffix">
+											<button
+												type="button"
+												onclick={clearLanguage}
+												aria-label="Clear language"
+												class="text-neutral-400 hover:text-neutral-600 dark:text-neutral-500 dark:hover:text-neutral-300"
+											>
+												<svg
+													class="h-4 w-4"
+													fill="none"
+													viewBox="0 0 24 24"
+													stroke="currentColor"
+												>
+													<path
+														stroke-linecap="round"
+														stroke-linejoin="round"
+														stroke-width="2"
+														d="M6 18L18 6M6 6l12 12"
+													/>
+												</svg>
+											</button>
+										</svelte:fragment>
+									</FormInput>
+								{:else}
+									<FormInput
+										label="Language"
+										name="language-search"
+										value={languageSearchQuery}
+										description={`Set the preferred language for this profile. Leave empty for "Any". Radarr only. Sonarr uses custom formats for language filtering.`}
+										placeholder="Search for a language..."
+										on:input={(e) => handleLanguageInput(e.detail)}
+										on:focus={handleLanguageFocus}
+										on:blur={handleLanguageBlur}
+									/>
+								{/if}
+
+								{#if showLanguageDropdown && filteredLanguages.length > 0}
+									<div
+										class="absolute top-full z-50 mt-1 max-h-60 w-full overflow-y-auto rounded-lg border border-neutral-200 bg-white py-1 shadow-lg dark:border-neutral-700 dark:bg-neutral-800"
+									>
+										{#each filteredLanguages as language}
+											<button
+												type="button"
+												onmousedown={() => selectLanguage(language)}
+												class="w-full px-3 py-2 text-left text-sm text-neutral-900 transition-colors hover:bg-neutral-100 dark:text-neutral-100 dark:hover:bg-neutral-700"
+											>
+												{language.name}
+											</button>
+										{/each}
+									</div>
+								{/if}
+							</div>
+						</div>
+					{/if}
 				</div>
-			{/if}
-		</div>
+			</svelte:fragment>
+		</DisclosureSection>
 	</form>
 
 	<!-- Hidden delete form -->

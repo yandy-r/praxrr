@@ -17,8 +17,6 @@ node_modules
 *.out.exit
 
 # Application
-/temp
-/temp/**
 /config
 .deno-cache/
 
@@ -73,3 +71,7 @@ tasks/todo.md
 # Out files
 *.out
 *.out.exit
+
+# Temp files
+/temp/**
+!/temp/temp.md

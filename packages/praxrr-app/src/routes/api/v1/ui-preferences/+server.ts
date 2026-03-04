@@ -3,12 +3,18 @@ import { userInterfacePreferencesQueries } from '$db/queries/user_interface_pref
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from '@sveltejs/kit';
 import type { UserInterfacePreference } from '$db/queries/user_interface_preferences.ts';
+import {
+  SECTION_KEY_MAX_LENGTH,
+  SECTION_KEY_PATTERN,
+  type SectionKey,
+  type UiPreferenceMode,
+} from '$shared/disclosure/sectionKeys.ts';
 
 type ErrorResponse = {
   error: string;
 };
 
-type UiMode = UserInterfacePreference['mode'];
+type UiMode = UiPreferenceMode;
 
 type UiPreferenceRecord = {
   section_key: string;
@@ -20,7 +26,6 @@ type UiPreferenceRecord = {
 const DEFAULT_MODE: UiMode = 'basic';
 const STRICT_TRUE = 'true';
 const STRICT_FALSE = 'false';
-const MAX_SECTION_KEY_LENGTH = 96;
 const RATE_LIMIT_WINDOW_MS = 30_000;
 const RATE_LIMIT_MAX_REQUESTS = 8;
 
@@ -36,7 +41,7 @@ export const GET: RequestHandler = async ({ locals, url }) => {
     return json({ error: 'Unauthorized' } satisfies ErrorResponse, { status: 401 });
   }
 
-  let sectionKey: string;
+  let sectionKey: SectionKey;
   try {
     sectionKey = parseSectionKey(url.searchParams.get('section_key'));
   } catch (error) {
@@ -84,7 +89,7 @@ export const PATCH: RequestHandler = async ({ locals, request }) => {
     return json({ error: 'Invalid request body' }, { status: 400 });
   }
 
-  let sectionKey: string;
+  let sectionKey: SectionKey;
   let mode: UiMode;
   let expectedUpdatedAt: string | null | undefined;
 
@@ -175,20 +180,20 @@ function detectConcurrencyConflict(
   return null;
 }
 
-function parseSectionKey(raw: unknown): string {
+function parseSectionKey(raw: unknown): SectionKey {
   if (typeof raw !== 'string' || raw.trim().length === 0) {
     throw new Error('section_key is required');
   }
 
   const sectionKey = raw.trim();
-  if (sectionKey.length > MAX_SECTION_KEY_LENGTH) {
+  if (sectionKey.length > SECTION_KEY_MAX_LENGTH) {
     throw new Error('Invalid section_key format');
   }
-  if (!userInterfacePreferencesQueries.isValidSectionKey(sectionKey)) {
+  if (!SECTION_KEY_PATTERN.test(sectionKey)) {
     throw new Error('Invalid section_key format');
   }
 
-  return sectionKey;
+  return sectionKey as SectionKey;
 }
 
 function checkWriteRateLimit(userId: number, sectionKey: string): string | null {
@@ -265,7 +270,7 @@ function toUiPreferenceRecord(preference: UserInterfacePreference): UiPreference
   };
 }
 
-function defaultPreference(sectionKey: string): UiPreferenceRecord {
+function defaultPreference(sectionKey: SectionKey): UiPreferenceRecord {
   return {
     section_key: sectionKey,
     mode: DEFAULT_MODE,
@@ -274,7 +279,7 @@ function defaultPreference(sectionKey: string): UiPreferenceRecord {
   };
 }
 
-function upsertPreference(userId: number, sectionKey: string, mode: UiMode): UserInterfacePreference {
+function upsertPreference(userId: number, sectionKey: SectionKey, mode: UiMode): UserInterfacePreference {
   return userInterfacePreferencesQueries.upsert({
     userId,
     sectionKey,
@@ -289,7 +294,7 @@ function applyConcurrentUpsert({
   expectedUpdatedAt,
 }: {
   userId: number;
-  sectionKey: string;
+  sectionKey: SectionKey;
   mode: UiMode;
   expectedUpdatedAt: string;
 }): UserInterfacePreference | null {

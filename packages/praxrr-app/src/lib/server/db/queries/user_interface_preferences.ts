@@ -1,32 +1,35 @@
 import { db } from '../db.ts';
+import {
+  SECTION_KEY_MAX_LENGTH,
+  SECTION_KEY_PATTERN,
+  type SectionKey,
+  type UiPreferenceMode,
+} from '$shared/disclosure/sectionKeys.ts';
 
 export interface UserInterfacePreference {
   userId: number;
-  sectionKey: string;
-  mode: 'basic' | 'advanced';
+  sectionKey: SectionKey;
+  mode: UiPreferenceMode;
   updatedAt: string;
 }
 
 export interface UserInterfacePreferenceInput {
   userId: number;
-  sectionKey: string;
-  mode: 'basic' | 'advanced';
+  sectionKey: SectionKey;
+  mode: UiPreferenceMode;
 }
 
 interface UserInterfacePreferenceRow {
   user_id: number;
   section_key: string;
-  mode: 'basic' | 'advanced';
+  mode: UiPreferenceMode;
   updated_at: string;
 }
-
-const SECTION_KEY_PATTERN = /^[a-z0-9-]+:[a-z0-9-]+:[a-z0-9-]+$/;
-const SECTION_KEY_MAX_LENGTH = 96;
 
 function rowToPreference(row: UserInterfacePreferenceRow): UserInterfacePreference {
   return {
     userId: row.user_id,
-    sectionKey: row.section_key,
+    sectionKey: row.section_key as SectionKey,
     mode: row.mode,
     updatedAt: row.updated_at,
   };
@@ -53,7 +56,10 @@ export const userInterfacePreferencesQueries = {
   /**
    * Get a single preference for a user and section key.
    */
-  getByUserIdAndSectionKey(userId: number, sectionKey: string): UserInterfacePreference | undefined {
+  getByUserIdAndSectionKey(
+    userId: number,
+    sectionKey: SectionKey
+  ): UserInterfacePreference | undefined {
     assertSectionKey(sectionKey);
 
     const row = db.queryFirst<UserInterfacePreferenceRow>(

@@ -3,16 +3,9 @@ import type { ServerLoad, Actions } from '@sveltejs/kit';
 import { pcdManager } from '$pcd/index.ts';
 import { canWriteToBase } from '$pcd/index.ts';
 import * as customFormatQueries from '$pcd/entities/customFormats/index.ts';
-import { userInterfacePreferencesQueries } from '$db/queries/user_interface_preferences.ts';
+import { loadSectionModes } from '$lib/server/disclosure/loadSectionModes.ts';
+import { CUSTOM_FORMAT_KEYS } from '$shared/disclosure/sectionKeys.ts';
 import { parseOperationLayer } from '$pcd/index.ts';
-
-type UiPreferenceMode = 'basic' | 'advanced';
-
-interface CustomFormatSectionModes {
-  conditions: UiPreferenceMode;
-  scoring: UiPreferenceMode;
-  negationAndGroups: UiPreferenceMode;
-}
 
 export const load: ServerLoad = async ({ params, locals }) => {
   const { databaseId, id } = params;
@@ -52,32 +45,13 @@ export const load: ServerLoad = async ({ params, locals }) => {
     throw error(404, 'Custom format not found');
   }
 
-  const sectionModes: CustomFormatSectionModes = {
-    conditions: 'basic',
-    scoring: 'basic',
-    negationAndGroups: 'basic',
-  };
-
-  if (locals.user) {
-    const sectionKeys = [
-      ['custom-formats:general:conditions', 'conditions'],
-      ['custom-formats:general:scoring', 'scoring'],
-      ['custom-formats:general:negation-and-groups', 'negationAndGroups'],
-    ] as const;
-
-    for (const [sectionKey, modeKey] of sectionKeys) {
-      const preference = userInterfacePreferencesQueries.getByUserIdAndSectionKey(locals.user.id, sectionKey);
-      if (preference?.mode) {
-        sectionModes[modeKey] = preference.mode;
-      }
-    }
-  }
+  const customFormatSectionModes = loadSectionModes(locals.user?.id, CUSTOM_FORMAT_KEYS);
 
   return {
     currentDatabase,
     format,
     canWriteToBase: canWriteToBase(currentDatabaseId),
-    customFormatSectionModes: sectionModes,
+    customFormatSectionModes,
   };
 };
 
