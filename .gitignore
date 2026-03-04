@@ -74,3 +74,4 @@ tasks/todo.md
 
 # Temp files
 /temp/**
+!/temp/temp.md
