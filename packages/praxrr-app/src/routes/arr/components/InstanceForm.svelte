@@ -7,9 +7,13 @@
   import { isDirty, initEdit, update, current, clear } from '$lib/client/stores/dirty';
   import { isValidExternalUrl } from '$lib/client/validation/arrUrls.ts';
   import type { ArrInstance } from '$db/queries/arrInstances.ts';
+  import { page } from '$app/stores';
   import FormInput from '$ui/form/FormInput.svelte';
+  import DisclosureSection from '$ui/form/DisclosureSection.svelte';
   import DropdownSelect from '$ui/dropdown/DropdownSelect.svelte';
   import TagInput from '$ui/form/TagInput.svelte';
+  import { ARR_CONNECTION_DETAILS } from '$shared/disclosure/sectionKeys.ts';
+  import type { UiPreferenceMode } from '$stores/userInterfacePreferences.ts';
   import Modal from '$ui/modal/Modal.svelte';
   import DirtyModal from '$ui/modal/DirtyModal.svelte';
   import Button from '$ui/button/Button.svelte';
@@ -416,6 +420,8 @@
   $: urlDescription = selectedAppType
     ? `Use container name if on the same Docker network, e.g. http://${selectedAppType}:${appPorts[selectedAppType]}`
     : defaultUrlHint;
+  type SectionModeMap = Record<string, UiPreferenceMode>;
+  $: arrSectionModes = ($page.data.arrSettingsSectionModes ?? {}) as SectionModeMap;
   $: title = mode === 'create' ? 'Add Instance' : 'Settings';
   $: description =
     mode === 'create'
@@ -457,163 +463,176 @@
     </svelte:fragment>
   </StickyCard>
 
-  <div class="space-y-4 rounded-lg border border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-900">
-    <!-- Type Row -->
-    <div class="space-y-2">
-      <span class="block text-sm font-medium text-neutral-900 dark:text-neutral-100">
-        Type{#if mode === 'create'}<span class="text-red-500">*</span>{/if}
-      </span>
-      {#if mode === 'edit'}
-        <p class="text-xs text-neutral-500 dark:text-neutral-400">Type cannot be changed after creation</p>
-      {/if}
-      <DropdownSelect
-        value={type}
-        options={typeOptions}
-        placeholder="Select type..."
-        disabled={mode === 'edit' || lockCoreFields}
-        on:change={(e) => update('type', e.detail)}
-      />
-      {#if unsupportedWorkflowMessage}
-        <p class="text-xs text-amber-600 dark:text-amber-400" role="status">
-          {unsupportedWorkflowMessage}
-        </p>
-      {/if}
-      {#if unsupportedSyncMessage}
-        <p class="text-xs text-amber-600 dark:text-amber-400" role="status">
-          {unsupportedSyncMessage}
-        </p>
-      {/if}
-    </div>
-    <!-- Name + Status Row -->
-    <div class="flex flex-col gap-4 md:flex-row md:items-end">
-      <div class="flex-1">
-        <FormInput
-          label="Name"
-          name="name"
-          value={name}
-          placeholder="e.g., Movies, TV, Music"
-          required
-          disabled={lockCoreFields}
-          on:input={(e) => update('name', e.detail)}
-        />
-      </div>
-      <div class="space-y-1">
-        <span class="block text-sm font-medium text-neutral-700 dark:text-neutral-300">Status</span>
-        <DropdownSelect value={enabled} options={enabledOptions} on:change={(e) => update('enabled', e.detail)} />
-      </div>
-    </div>
-    {#if enabled === 'false'}
-      <p class="text-xs text-amber-600 dark:text-amber-400">Disabled instances are excluded from sync operations</p>
-    {/if}
-    <!-- URL Row -->
-    <FormInput
-      label="URL"
-      name="url"
-      type="url"
-      value={url}
-      placeholder={urlPlaceholder}
-      description={urlDescription}
-      required
-      disabled={lockCoreFields}
-      on:input={(e) => update('url', e.detail)}
-    />
-    <div class="space-y-2">
-      <FormInput
-        label="External URL (optional)"
-        name="external_url"
-        type="url"
-        value={externalUrl}
-        placeholder={externalUrlPlaceholder}
-        description="Used for Open in links. API calls still use URL."
-        on:input={(e) => update('externalUrl', e.detail)}
-      />
-      {#if externalUrlValidationError}
-        <p class="text-xs text-red-600 dark:text-red-400" role="status">{externalUrlValidationError}</p>
-      {/if}
-    </div>
-    <!-- API Key + Test Connection Row -->
-    <div class="flex flex-col gap-4 md:flex-row md:items-end">
-      <div class="flex-1">
+  <DisclosureSection
+    sectionKey={ARR_CONNECTION_DETAILS}
+    sectionTitle="Connection Details"
+    sectionHint="Optional connection and organization settings."
+    initialMode={arrSectionModes[ARR_CONNECTION_DETAILS] ?? 'basic'}
+  >
+    <div class="space-y-4">
+      <!-- Type Row -->
+      <div class="space-y-2">
+        <span class="block text-sm font-medium text-neutral-900 dark:text-neutral-100">
+          Type{#if mode === 'create'}<span class="text-red-500">*</span>{/if}
+        </span>
         {#if mode === 'edit'}
-          <div class="mb-3">
-            <FormInput
-              label="Stored API Key"
-              name="stored_api_key"
-              value={storedApiKeyDisplayValue}
-              placeholder={hasStoredApiKey ? '••••••••' : 'No API key configured'}
-              description={hasStoredApiKey
-                ? 'Stored key is masked by default. Use the icons to reveal/hide or copy.'
-                : 'No API key configured'}
-              readonly
-              mono
-              inputClass="pr-24"
-            >
-              <svelte:fragment slot="suffix">
-                <div class="flex items-center gap-1">
-                  <button
-                    type="button"
-                    class="inline-flex h-6 w-6 items-center justify-center rounded text-neutral-500 hover:bg-neutral-100 hover:text-neutral-700 disabled:cursor-not-allowed disabled:opacity-50 dark:text-neutral-400 dark:hover:bg-neutral-800 dark:hover:text-neutral-200"
-                    aria-label="Copy stored API key"
-                    title="Copy"
-                    disabled={!hasStoredApiKey || revealInProgress}
-                    on:click={copyStoredApiKey}
-                  >
-                    <Copy size={14} />
-                  </button>
-                  <button
-                    type="button"
-                    class="inline-flex h-6 w-6 items-center justify-center rounded text-neutral-500 hover:bg-neutral-100 hover:text-neutral-700 disabled:cursor-not-allowed disabled:opacity-50 dark:text-neutral-400 dark:hover:bg-neutral-800 dark:hover:text-neutral-200"
-                    aria-label={isStoredApiKeyRevealed ? 'Hide stored API key' : 'Reveal stored API key'}
-                    title={isStoredApiKeyRevealed ? 'Hide' : 'Reveal'}
-                    disabled={!hasStoredApiKey || revealInProgress}
-                    on:click={toggleStoredApiKeyReveal}
-                  >
-                    {#if isStoredApiKeyRevealed}
-                      <EyeOff size={14} />
-                    {:else}
-                      <Eye size={14} />
-                    {/if}
-                  </button>
-                </div>
-              </svelte:fragment>
-            </FormInput>
-          </div>
+          <p class="text-xs text-neutral-500 dark:text-neutral-400">Type cannot be changed after creation</p>
         {/if}
-        <FormInput
-          label={mode === 'edit' ? 'New API Key' : 'API Key'}
-          name="api_key"
-          value={apiKey}
-          placeholder={
-            mode === 'create'
-              ? 'Enter API key'
-              : '••••••••'
-          }
-          description={mode === 'edit'
-            ? canEditCoreConnectionFields
-              ? 'Re-enter API key to save changes'
-              : 'API key is managed by environment variables and cannot be edited'
-            : ''}
-          required
-          private_={canEditCoreConnectionFields}
-          showPrivateToggle={canEditCoreConnectionFields}
-          disabled={lockCoreFields}
-          on:input={(e) => update('apiKey', e.detail)}
+        <DropdownSelect
+          value={type}
+          options={typeOptions}
+          placeholder="Select type..."
+          disabled={mode === 'edit' || lockCoreFields}
+          on:change={(e) => update('type', e.detail)}
+        />
+        {#if unsupportedWorkflowMessage}
+          <p class="text-xs text-amber-600 dark:text-amber-400" role="status">
+            {unsupportedWorkflowMessage}
+          </p>
+        {/if}
+        {#if unsupportedSyncMessage}
+          <p class="text-xs text-amber-600 dark:text-amber-400" role="status">
+            {unsupportedSyncMessage}
+          </p>
+        {/if}
+      </div>
+      <!-- Name + Status Row -->
+      <div class="flex flex-col gap-4 md:flex-row md:items-end">
+        <div class="flex-1">
+          <FormInput
+            label="Name"
+            name="name"
+            value={name}
+            placeholder="e.g., Movies, TV, Music"
+            required
+            disabled={lockCoreFields}
+            on:input={(e) => update('name', e.detail)}
+          />
+        </div>
+        <div class="space-y-1">
+          <span class="block text-sm font-medium text-neutral-700 dark:text-neutral-300">Status</span>
+          <DropdownSelect value={enabled} options={enabledOptions} on:change={(e) => update('enabled', e.detail)} />
+        </div>
+      </div>
+      {#if enabled === 'false'}
+        <p class="text-xs text-amber-600 dark:text-amber-400">Disabled instances are excluded from sync operations</p>
+      {/if}
+      <!-- URL Row -->
+      <FormInput
+        label="URL"
+        name="url"
+        type="url"
+        value={url}
+        placeholder={urlPlaceholder}
+        description={urlDescription}
+        required
+        disabled={lockCoreFields}
+        on:input={(e) => update('url', e.detail)}
+      />
+      <!-- API Key + Test Connection Row -->
+      <div class="flex flex-col gap-4 md:flex-row md:items-end">
+        <div class="flex-1">
+          {#if mode === 'edit'}
+            <div class="mb-3">
+              <FormInput
+                label="Stored API Key"
+                name="stored_api_key"
+                value={storedApiKeyDisplayValue}
+                placeholder={hasStoredApiKey ? '••••••••' : 'No API key configured'}
+                description={hasStoredApiKey
+                  ? 'Stored key is masked by default. Use the icons to reveal/hide or copy.'
+                  : 'No API key configured'}
+                readonly
+                mono
+                inputClass="pr-24"
+              >
+                <svelte:fragment slot="suffix">
+                  <div class="flex items-center gap-1">
+                    <button
+                      type="button"
+                      class="inline-flex h-6 w-6 items-center justify-center rounded text-neutral-500 hover:bg-neutral-100 hover:text-neutral-700 disabled:cursor-not-allowed disabled:opacity-50 dark:text-neutral-400 dark:hover:bg-neutral-800 dark:hover:text-neutral-200"
+                      aria-label="Copy stored API key"
+                      title="Copy"
+                      disabled={!hasStoredApiKey || revealInProgress}
+                      on:click={copyStoredApiKey}
+                    >
+                      <Copy size={14} />
+                    </button>
+                    <button
+                      type="button"
+                      class="inline-flex h-6 w-6 items-center justify-center rounded text-neutral-500 hover:bg-neutral-100 hover:text-neutral-700 disabled:cursor-not-allowed disabled:opacity-50 dark:text-neutral-400 dark:hover:bg-neutral-800 dark:hover:text-neutral-200"
+                      aria-label={isStoredApiKeyRevealed ? 'Hide stored API key' : 'Reveal stored API key'}
+                      title={isStoredApiKeyRevealed ? 'Hide' : 'Reveal'}
+                      disabled={!hasStoredApiKey || revealInProgress}
+                      on:click={toggleStoredApiKeyReveal}
+                    >
+                      {#if isStoredApiKeyRevealed}
+                        <EyeOff size={14} />
+                      {:else}
+                        <Eye size={14} />
+                      {/if}
+                    </button>
+                  </div>
+                </svelte:fragment>
+              </FormInput>
+            </div>
+          {/if}
+          <FormInput
+            label={mode === 'edit' ? 'New API Key' : 'API Key'}
+            name="api_key"
+            value={apiKey}
+            placeholder={
+              mode === 'create'
+                ? 'Enter API key'
+                : '••••••••'
+            }
+            description={mode === 'edit'
+              ? canEditCoreConnectionFields
+                ? 'Re-enter API key to save changes'
+                : 'API key is managed by environment variables and cannot be edited'
+              : ''}
+            required
+            private_={canEditCoreConnectionFields}
+            showPrivateToggle={canEditCoreConnectionFields}
+            disabled={lockCoreFields}
+            on:input={(e) => update('apiKey', e.detail)}
+          />
+        </div>
+        <Button
+          text={testing ? 'Testing...' : 'Test Connection'}
+          icon={testing ? Loader2 : Wifi}
+          disabled={testing || lockCoreFields || !apiKey || !url || (mode === 'create' && !type)}
+          on:click={testConnection}
         />
       </div>
-      <Button
-        text={testing ? 'Testing...' : 'Test Connection'}
-        icon={testing ? Loader2 : Wifi}
-        disabled={testing || lockCoreFields || !apiKey || !url || (mode === 'create' && !type)}
-        on:click={testConnection}
-      />
     </div>
-    <!-- Tags Row -->
-    <div class="space-y-2">
-      <span class="block text-sm font-medium text-neutral-900 dark:text-neutral-100"> Tags </span>
-      <p class="text-xs text-neutral-500 dark:text-neutral-400">Press Enter to add a tag, Backspace to remove</p>
-      <TagInput {tags} onchange={(newTags) => update('tags', JSON.stringify(newTags))} />
-    </div>
-  </div>
+
+    <svelte:fragment slot="advanced">
+      <div class="space-y-4">
+        <!-- External URL -->
+        <div class="space-y-2">
+          <FormInput
+            label="External URL (optional)"
+            name="external_url"
+            type="url"
+            value={externalUrl}
+            placeholder={externalUrlPlaceholder}
+            description="Used for Open in links. API calls still use URL."
+            on:input={(e) => update('externalUrl', e.detail)}
+          />
+          {#if externalUrlValidationError}
+            <p class="text-xs text-red-600 dark:text-red-400" role="status">{externalUrlValidationError}</p>
+          {/if}
+        </div>
+        <!-- Tags Row -->
+        <div class="space-y-2">
+          <span class="block text-sm font-medium text-neutral-900 dark:text-neutral-100"> Tags </span>
+          <p class="text-xs text-neutral-500 dark:text-neutral-400">Press Enter to add a tag, Backspace to remove</p>
+          <TagInput {tags} onchange={(newTags) => update('tags', JSON.stringify(newTags))} />
+        </div>
+      </div>
+    </svelte:fragment>
+  </DisclosureSection>
 </div>
 
 {#if mode === 'edit'}

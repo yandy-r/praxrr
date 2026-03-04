@@ -1,22 +1,21 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
-	import { onDestroy, tick } from 'svelte';
+	import { page } from '$app/stores';
+	import { tick } from 'svelte';
 	import StickyCard from '$ui/card/StickyCard.svelte';
 	import Button from '$ui/button/Button.svelte';
 	import Modal from '$ui/modal/Modal.svelte';
 	import FormInput from '$ui/form/FormInput.svelte';
 	import Toggle from '$ui/toggle/Toggle.svelte';
-	import AdvancedSection from '$ui/form/AdvancedSection.svelte';
-	import {
-		getUserInterfacePreferenceSectionStore,
-		type UiPreferenceMode
-	} from '$stores/userInterfacePreferences.ts';
+	import DisclosureSection from '$ui/form/DisclosureSection.svelte';
+	import type { UiPreferenceMode } from '$stores/userInterfacePreferences.ts';
 	import { alertStore } from '$alerts/store';
 	import { Save, Trash2 } from 'lucide-svelte';
 	import { current, isDirty, initEdit, initCreate, update } from '$lib/client/stores/dirty';
 	import type { RadarrMediaSettingsRow } from '$shared/pcd/display.ts';
 	import type { ArrType } from '$shared/pcd/types.ts';
 	import { PROPERS_REPACKS_OPTIONS, type PropersRepacks } from '$shared/pcd/mediaManagement.ts';
+	import { MM_NAMING, MM_FOLDER_MANAGEMENT, MM_IMPORTING } from '$shared/disclosure/sectionKeys.ts';
 
 	interface RadarrMediaSettingsRowFormData {
 		name: string;
@@ -38,67 +37,8 @@
 		enableMediaInfo: true
 	};
 
-	const mediaSettingsNamingSection = getUserInterfacePreferenceSectionStore(
-		'media-management:media-settings:naming'
-	);
-	const mediaSettingsFolderManagementSection = getUserInterfacePreferenceSectionStore(
-		'media-management:media-settings:folder-management'
-	);
-	const mediaSettingsImportingSection = getUserInterfacePreferenceSectionStore(
-		'media-management:media-settings:importing'
-	);
-
-	let mediaSettingsNamingMode: UiPreferenceMode = 'basic';
-	let mediaSettingsFolderManagementMode: UiPreferenceMode = 'basic';
-	let mediaSettingsImportingMode: UiPreferenceMode = 'basic';
-	let mediaSettingsNamingModeSynced: UiPreferenceMode = 'basic';
-	let mediaSettingsFolderManagementModeSynced: UiPreferenceMode = 'basic';
-	let mediaSettingsImportingModeSynced: UiPreferenceMode = 'basic';
-
-	const unsubscribeMediaSettingsNamingMode = mediaSettingsNamingSection.mode.subscribe((mode) => {
-		mediaSettingsNamingModeSynced = mode;
-		if (mediaSettingsNamingMode !== mode) {
-			mediaSettingsNamingMode = mode;
-		}
-	});
-	const unsubscribeMediaSettingsFolderManagementMode = mediaSettingsFolderManagementSection.mode.subscribe(
-		(mode) => {
-			mediaSettingsFolderManagementModeSynced = mode;
-			if (mediaSettingsFolderManagementMode !== mode) {
-				mediaSettingsFolderManagementMode = mode;
-			}
-		}
-	);
-	const unsubscribeMediaSettingsImportingMode = mediaSettingsImportingSection.mode.subscribe((mode) => {
-		mediaSettingsImportingModeSynced = mode;
-		if (mediaSettingsImportingMode !== mode) {
-			mediaSettingsImportingMode = mode;
-		}
-	});
-
-	$: if (mediaSettingsNamingMode !== mediaSettingsNamingModeSynced) {
-		mediaSettingsNamingModeSynced = mediaSettingsNamingMode;
-		mediaSettingsNamingSection.mode.set(mediaSettingsNamingMode);
-	}
-
-	$: if (mediaSettingsFolderManagementMode !== mediaSettingsFolderManagementModeSynced) {
-		mediaSettingsFolderManagementModeSynced = mediaSettingsFolderManagementMode;
-		mediaSettingsFolderManagementSection.mode.set(mediaSettingsFolderManagementMode);
-	}
-
-	$: if (mediaSettingsImportingMode !== mediaSettingsImportingModeSynced) {
-		mediaSettingsImportingModeSynced = mediaSettingsImportingMode;
-		mediaSettingsImportingSection.mode.set(mediaSettingsImportingMode);
-	}
-
-	onDestroy(() => {
-		unsubscribeMediaSettingsNamingMode();
-		unsubscribeMediaSettingsFolderManagementMode();
-		unsubscribeMediaSettingsImportingMode();
-		mediaSettingsNamingSection.cleanup();
-		mediaSettingsFolderManagementSection.cleanup();
-		mediaSettingsImportingSection.cleanup();
-	});
+	type SectionModeMap = Record<string, UiPreferenceMode>;
+	$: sectionModes = (($page.data.mediaSettingsSectionModes ?? {}) as SectionModeMap);
 
 	function mapToFormData(data: RadarrMediaSettingsRow | null): RadarrMediaSettingsRowFormData {
 		if (!data) return defaults;
@@ -243,11 +183,11 @@
 		<hr class="border-neutral-200 dark:border-neutral-700" />
 
 		<!-- Propers and Repacks -->
-		<AdvancedSection
-			sectionId="media-management:media-settings:naming"
+		<DisclosureSection
+			sectionKey={MM_NAMING}
 			sectionTitle="Naming"
 			sectionHint="Rename token controls and naming strategy options."
-			bind:mode={mediaSettingsNamingMode}
+			initialMode={sectionModes[MM_NAMING] ?? 'basic'}
 		>
 			<div slot="advanced" class="space-y-4">
 				<h2 class="text-base font-semibold text-neutral-900 dark:text-neutral-100">Propers and Repacks</h2>
@@ -266,24 +206,24 @@
 					{/each}
 				</div>
 			</div>
-		</AdvancedSection>
+		</DisclosureSection>
 
-		<AdvancedSection
-			sectionId="media-management:media-settings:folder-management"
+		<DisclosureSection
+			sectionKey={MM_FOLDER_MANAGEMENT}
 			sectionTitle="Folder Management"
 			sectionHint="Folder and organization tuning options."
-			bind:mode={mediaSettingsFolderManagementMode}
+			initialMode={sectionModes[MM_FOLDER_MANAGEMENT] ?? 'basic'}
 		>
 			<div slot="advanced" class="space-y-1 text-sm text-neutral-600 dark:text-neutral-400">
 				No dedicated folder-management controls are available in this form yet.
 			</div>
-		</AdvancedSection>
+		</DisclosureSection>
 
-		<AdvancedSection
-			sectionId="media-management:media-settings:importing"
+		<DisclosureSection
+			sectionKey={MM_IMPORTING}
 			sectionTitle="Importing"
 			sectionHint="Import behavior toggles and advanced import rules."
-			bind:mode={mediaSettingsImportingMode}
+			initialMode={sectionModes[MM_IMPORTING] ?? 'basic'}
 		>
 			<div slot="advanced" class="space-y-4">
 				<div>
@@ -297,7 +237,7 @@
 					</p>
 				</div>
 			</div>
-		</AdvancedSection>
+		</DisclosureSection>
 	</div>
 	</div>
 

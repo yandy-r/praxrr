@@ -1,9 +1,9 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import { page } from '$app/stores';
-	import { onDestroy, tick } from 'svelte';
+	import { tick } from 'svelte';
 	import { Save, Loader2, Trash2 } from 'lucide-svelte';
-	import AdvancedSection from '$ui/form/AdvancedSection.svelte';
+	import DisclosureSection from '$ui/form/DisclosureSection.svelte';
 	import FormInput from '$ui/form/FormInput.svelte';
 	import MarkdownInput from '$ui/form/MarkdownInput.svelte';
 	import TagInput from '$ui/form/TagInput.svelte';
@@ -11,18 +11,10 @@
 	import Modal from '$ui/modal/Modal.svelte';
 	import StickyCard from '$ui/card/StickyCard.svelte';
 	import Button from '$ui/button/Button.svelte';
-	import {
-		getUserInterfacePreferenceSectionStore,
-		type UiPreferenceMode
-	} from '$stores/userInterfacePreferences.ts';
+	import type { UiPreferenceMode } from '$stores/userInterfacePreferences.ts';
+	import { CF_CONDITIONS, CF_SCORING, CF_NEGATION_AND_GROUPS } from '$shared/disclosure/sectionKeys.ts';
 	import { alertStore } from '$alerts/store';
 	import { current, isDirty, initEdit, initCreate, update } from '$lib/client/stores/dirty';
-
-	interface CustomFormatSectionModes {
-		conditions: UiPreferenceMode;
-		scoring: UiPreferenceMode;
-		negationAndGroups: UiPreferenceMode;
-	}
 
 	// Form data shape
 	interface GeneralFormData {
@@ -42,86 +34,8 @@
 	// Event handlers
 	export let onCancel: (() => void) | undefined = undefined;
 
-	const sectionModeDefaults: CustomFormatSectionModes = {
-		conditions: 'basic',
-		scoring: 'basic',
-		negationAndGroups: 'basic',
-	};
-
-	const customFormatConditionsSection = getUserInterfacePreferenceSectionStore(
-		'custom-formats:general:conditions'
-	);
-	const customFormatScoringSection = getUserInterfacePreferenceSectionStore(
-		'custom-formats:general:scoring'
-	);
-	const customFormatNegationAndGroupsSection = getUserInterfacePreferenceSectionStore(
-		'custom-formats:general:negation-and-groups'
-	);
-
-	let customFormatConditionsMode: UiPreferenceMode = sectionModeDefaults.conditions;
-	let customFormatConditionsModeSynced: UiPreferenceMode = sectionModeDefaults.conditions;
-	let customFormatScoringMode: UiPreferenceMode = sectionModeDefaults.scoring;
-	let customFormatScoringModeSynced: UiPreferenceMode = sectionModeDefaults.scoring;
-	let customFormatNegationAndGroupsMode: UiPreferenceMode = sectionModeDefaults.negationAndGroups;
-	let customFormatNegationAndGroupsModeSynced: UiPreferenceMode = sectionModeDefaults.negationAndGroups;
-
-	const serverSectionModes = ($page.data.customFormatSectionModes ??
-		sectionModeDefaults) as CustomFormatSectionModes;
-
-	let hasHydratedSectionModes = false;
-
-	const unsubscribeConditionsMode = customFormatConditionsSection.mode.subscribe((mode) => {
-		customFormatConditionsModeSynced = mode;
-		if (customFormatConditionsMode !== mode) {
-			customFormatConditionsMode = mode;
-		}
-	});
-	const unsubscribeScoringMode = customFormatScoringSection.mode.subscribe((mode) => {
-		customFormatScoringModeSynced = mode;
-		if (customFormatScoringMode !== mode) {
-			customFormatScoringMode = mode;
-		}
-	});
-	const unsubscribeNegationAndGroupsMode = customFormatNegationAndGroupsSection.mode.subscribe((mode) => {
-		customFormatNegationAndGroupsModeSynced = mode;
-		if (customFormatNegationAndGroupsMode !== mode) {
-			customFormatNegationAndGroupsMode = mode;
-		}
-	});
-
-	$: if (!hasHydratedSectionModes) {
-		customFormatConditionsMode = serverSectionModes.conditions;
-		customFormatConditionsModeSynced = serverSectionModes.conditions;
-		customFormatScoringMode = serverSectionModes.scoring;
-		customFormatScoringModeSynced = serverSectionModes.scoring;
-		customFormatNegationAndGroupsMode = serverSectionModes.negationAndGroups;
-		customFormatNegationAndGroupsModeSynced = serverSectionModes.negationAndGroups;
-		hasHydratedSectionModes = true;
-	}
-
-	$: if (customFormatConditionsMode !== customFormatConditionsModeSynced) {
-		customFormatConditionsModeSynced = customFormatConditionsMode;
-		customFormatConditionsSection.mode.set(customFormatConditionsMode);
-	}
-
-	$: if (customFormatScoringMode !== customFormatScoringModeSynced) {
-		customFormatScoringModeSynced = customFormatScoringMode;
-		customFormatScoringSection.mode.set(customFormatScoringMode);
-	}
-
-	$: if (customFormatNegationAndGroupsMode !== customFormatNegationAndGroupsModeSynced) {
-		customFormatNegationAndGroupsModeSynced = customFormatNegationAndGroupsMode;
-		customFormatNegationAndGroupsSection.mode.set(customFormatNegationAndGroupsMode);
-	}
-
-	onDestroy(() => {
-		unsubscribeConditionsMode();
-		unsubscribeScoringMode();
-		unsubscribeNegationAndGroupsMode();
-		customFormatConditionsSection.cleanup();
-		customFormatScoringSection.cleanup();
-		customFormatNegationAndGroupsSection.cleanup();
-	});
+	type SectionModeMap = Record<string, UiPreferenceMode>;
+	const sectionModes: SectionModeMap = $page.data.customFormatSectionModes ?? {};
 
 	const defaults: GeneralFormData = {
 		name: '',
@@ -292,11 +206,11 @@
 				/>
 			</div>
 
-			<AdvancedSection
-				sectionId="custom-formats:general:conditions"
+			<DisclosureSection
+				sectionKey={CF_CONDITIONS}
 				sectionTitle="Conditions"
 				sectionHint="Advanced match-condition builder controls."
-				bind:mode={customFormatConditionsMode}
+				initialMode={sectionModes[CF_CONDITIONS] ?? 'basic'}
 			>
 				<div slot="advanced" class="space-y-2">
 					<p class="text-sm text-neutral-600 dark:text-neutral-400">
@@ -311,13 +225,13 @@
 						</a>
 					{/if}
 				</div>
-			</AdvancedSection>
+			</DisclosureSection>
 
-			<AdvancedSection
-				sectionId="custom-formats:general:scoring"
+			<DisclosureSection
+				sectionKey={CF_SCORING}
 				sectionTitle="Scoring"
 				sectionHint="Score application and weighting controls."
-				bind:mode={customFormatScoringMode}
+				initialMode={sectionModes[CF_SCORING] ?? 'basic'}
 			>
 				<div slot="advanced" class="space-y-2">
 					<p class="text-sm text-neutral-600 dark:text-neutral-400">
@@ -332,13 +246,13 @@
 						</a>
 					{/if}
 				</div>
-			</AdvancedSection>
+			</DisclosureSection>
 
-			<AdvancedSection
-				sectionId="custom-formats:general:negation-and-groups"
+			<DisclosureSection
+				sectionKey={CF_NEGATION_AND_GROUPS}
 				sectionTitle="Negation and Groups"
 				sectionHint="Negation/grouping and nested condition controls."
-				bind:mode={customFormatNegationAndGroupsMode}
+				initialMode={sectionModes[CF_NEGATION_AND_GROUPS] ?? 'basic'}
 			>
 				<div slot="advanced" class="space-y-2">
 					<p class="text-sm text-neutral-600 dark:text-neutral-400">
@@ -353,7 +267,7 @@
 						</a>
 					{/if}
 				</div>
-			</AdvancedSection>
+			</DisclosureSection>
 		</div>
 	</form>
 

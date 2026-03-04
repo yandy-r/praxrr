@@ -7,8 +7,10 @@ import { parseOperationLayer } from '$pcd/index.ts';
 import type { PreferredProtocol } from '$shared/pcd/display.ts';
 import { logger } from '$logger/logger.ts';
 import { arrSyncQueries } from '$db/queries/arrSync.ts';
+import { loadSectionModes } from '$lib/server/disclosure/loadSectionModes.ts';
+import { DP_BYPASS_CONDITIONS } from '$shared/disclosure/sectionKeys.ts';
 
-export const load: ServerLoad = async ({ params }) => {
+export const load: ServerLoad = async ({ params, locals }) => {
   const { databaseId, name } = params;
 
   if (!databaseId || !name) {
@@ -36,10 +38,13 @@ export const load: ServerLoad = async ({ params }) => {
     throw error(404, 'Delay profile not found');
   }
 
+  const delayProfileSectionModes = loadSectionModes(locals.user?.id, [DP_BYPASS_CONDITIONS]);
+
   return {
     currentDatabase,
     delayProfile,
     canWriteToBase: canWriteToBase(currentDatabaseId),
+    delayProfileSectionModes,
   };
 };
 

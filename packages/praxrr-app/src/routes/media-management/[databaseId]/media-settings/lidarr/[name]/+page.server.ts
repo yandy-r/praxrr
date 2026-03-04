@@ -8,6 +8,8 @@ import { updateLidarrMediaSettings } from '$pcd/entities/mediaManagement/media-s
 import { removeLidarrMediaSettings } from '$pcd/entities/mediaManagement/media-settings/index.ts';
 import { arrSyncQueries } from '$db/queries/arrSync.ts';
 import type { PropersRepacks } from '$shared/pcd/mediaManagement.ts';
+import { loadSectionModes } from '$lib/server/disclosure/loadSectionModes.ts';
+import { MEDIA_SETTINGS_KEYS } from '$shared/disclosure/sectionKeys.ts';
 
 async function resolveLidarrMediaSettingsByRouteName(cache: ReturnType<typeof pcdManager.getCache>, routeName: string) {
   if (!cache) {
@@ -22,7 +24,7 @@ async function resolveLidarrMediaSettingsByRouteName(cache: ReturnType<typeof pc
   return null;
 }
 
-export const load: ServerLoad = async ({ params, parent }) => {
+export const load: ServerLoad = async ({ params, parent, locals }) => {
   const { databaseId, name } = params;
 
   if (!databaseId || !name) {
@@ -45,10 +47,12 @@ export const load: ServerLoad = async ({ params, parent }) => {
   }
 
   const parentData = await parent();
+  const mediaSettingsSectionModes = loadSectionModes(locals.user?.id, MEDIA_SETTINGS_KEYS);
 
   return {
     mediaSettingsConfig: resolved.config,
     canWriteToBase: parentData.canWriteToBase,
+    mediaSettingsSectionModes,
   };
 };
 

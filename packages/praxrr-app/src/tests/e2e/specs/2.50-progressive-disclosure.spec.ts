@@ -16,10 +16,13 @@ function getAdvancedPanel(page: Page, sectionKey: string): Locator {
 
 async function waitForSessionCookie(context: BrowserContext, origin: string): Promise<void> {
   await expect
-    .poll(async () => {
-      const cookies = await context.cookies(origin);
-      return cookies.some((cookie) => cookie.name === 'session' && !!cookie.value);
-    }, { timeout: 10_000, interval: 250 })
+    .poll(
+      async () => {
+        const cookies = await context.cookies(origin);
+        return cookies.some((cookie) => cookie.name === 'session' && !!cookie.value);
+      },
+      { timeout: 10_000, interval: 250 }
+    )
     .toBeTruthy();
 }
 
