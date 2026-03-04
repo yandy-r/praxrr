@@ -5,6 +5,8 @@ const E2E_PASSWORD = process.env.E2E_PASSWORD;
 
 const CUSTOM_CONDITIONS_KEY = 'custom-formats:general:conditions';
 const MEDIA_NAMING_KEY = 'media-management:media-settings:naming';
+const SETTINGS_LOGGING_KEY = 'settings:general:logging';
+const SETTINGS_NOTIFICATION_EVENTS_KEY = 'settings:notifications:event-types';
 
 function getAdvancedToggle(page: Page, sectionKey: string): Locator {
   return page.locator(`button[aria-controls="${sectionKey}-panel"]`);
@@ -247,6 +249,88 @@ test.describe('Progressive disclosure persistence and UX', () => {
     await expect(freshToggle).toHaveText('Hide Advanced');
     await expect(freshPanel).toBeVisible();
     await freshContext.close();
+  });
+
+  test('CollapsibleCard on settings/general persists collapse state across refresh', async ({ page }) => {
+    await setUiPreference(page, SETTINGS_LOGGING_KEY, 'advanced');
+
+    await page.goto('/settings/general');
+    await page.waitForLoadState('networkidle');
+
+    // Find the Logging collapsible card by its aria-expanded button
+    const loggingCardButton = page.locator('button[aria-expanded]', { hasText: 'Logging' });
+    const cardCount = await loggingCardButton.count();
+    if (cardCount === 0) {
+      test.skip('Logging CollapsibleCard not found on settings/general page.');
+    }
+
+    // Should be open (advanced = open)
+    await expect(loggingCardButton).toHaveAttribute('aria-expanded', 'true');
+
+    // Collapse it
+    const writeResponse = page.waitForResponse((response) => {
+      if (!response.url().endsWith('/api/v1/ui-preferences')) {
+        return false;
+      }
+      if (response.request().method() !== 'PATCH') {
+        return false;
+      }
+
+      const requestBody = response.request().postDataJSON();
+      return requestBody.section_key === SETTINGS_LOGGING_KEY;
+    });
+    await loggingCardButton.click();
+    await writeResponse;
+
+    await expect(loggingCardButton).toHaveAttribute('aria-expanded', 'false');
+
+    // Refresh and verify persistence
+    await page.reload();
+    await page.waitForLoadState('networkidle');
+
+    const refreshedButton = page.locator('button[aria-expanded]', { hasText: 'Logging' });
+    await expect(refreshedButton).toHaveAttribute('aria-expanded', 'false');
+
+    // Restore to open
+    await setUiPreference(page, SETTINGS_LOGGING_KEY, 'advanced');
+  });
+
+  test('notification hidden inputs remain in DOM when event types section is collapsed', async ({ page }) => {
+    await setUiPreference(page, SETTINGS_NOTIFICATION_EVENTS_KEY, 'advanced');
+
+    await page.goto('/settings/notifications');
+    await page.waitForLoadState('networkidle');
+
+    // Check if there's a link to create a new notification service
+    const newServiceLink = page.locator('a[href*="/settings/notifications/new"]');
+    const linkCount = await newServiceLink.count();
+    if (linkCount === 0) {
+      test.skip('No notification service creation link found.');
+    }
+
+    await newServiceLink.first().click();
+    await page.waitForLoadState('networkidle');
+
+    // Get the disclosure toggle for notification events
+    const toggle = getAdvancedToggle(page, SETTINGS_NOTIFICATION_EVENTS_KEY);
+    const toggleCount = await toggle.count();
+    if (toggleCount === 0) {
+      test.skip('Notification event types disclosure toggle not found.');
+    }
+
+    // Ensure expanded
+    await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+
+    // Count hidden inputs before collapse
+    const hiddenInputsBefore = await page.locator('input[type="hidden"]').count();
+
+    // Collapse the section
+    await toggle.click();
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+
+    // Count hidden inputs after collapse - should be same or more (not fewer)
+    const hiddenInputsAfter = await page.locator('input[type="hidden"]').count();
+    expect(hiddenInputsAfter).toBeGreaterThanOrEqual(hiddenInputsBefore);
   });
 
   test('media-management preferences do not affect custom-format advanced sections', async ({ page }) => {

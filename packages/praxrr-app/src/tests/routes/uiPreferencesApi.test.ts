@@ -350,6 +350,70 @@ Deno.test('excessively long section keys are rejected by server validation', asy
   }
 });
 
+Deno.test('newly introduced rollout keys accept valid read/write cycles', async () => {
+  const requestScope = withInMemoryStore();
+
+  try {
+    const userId = 100;
+    const rolloutKeys = [
+      'regular-expressions:general:metadata',
+      'metadata-profiles:general:type-selection',
+      'arr:upgrades:filter-settings',
+    ];
+
+    for (const key of rolloutKeys) {
+      // Default read returns basic
+      const readDefault = await GET(buildGetRequest(key, userId));
+      const readDefaultBody = (await readDefault.json()) as { mode: 'basic' | 'advanced'; persisted: boolean };
+      assertEquals(readDefault.status, 200);
+      assertEquals(readDefaultBody.mode, 'basic');
+      assertEquals(readDefaultBody.persisted, false);
+
+      // Write advanced
+      const writeRes = await PATCH(buildPatchRequest(key, 'advanced', userId));
+      assertEquals(writeRes.status, 200);
+
+      // Read back advanced
+      const readBack = await GET(buildGetRequest(key, userId));
+      const readBackBody = (await readBack.json()) as { mode: 'basic' | 'advanced'; persisted: boolean };
+      assertEquals(readBack.status, 200);
+      assertEquals(readBackBody.mode, 'advanced');
+      assertEquals(readBackBody.persisted, true);
+
+      // Write basic
+      const resetRes = await PATCH(buildPatchRequest(key, 'basic', userId));
+      assertEquals(resetRes.status, 200);
+
+      // Read back basic
+      const readReset = await GET(buildGetRequest(key, userId));
+      const readResetBody = (await readReset.json()) as { mode: 'basic' | 'advanced' };
+      assertEquals(readReset.status, 200);
+      assertEquals(readResetBody.mode, 'basic');
+    }
+  } finally {
+    requestScope.restoreAll();
+  }
+});
+
+Deno.test('rollout keys are isolated from each other', async () => {
+  const requestScope = withInMemoryStore();
+
+  try {
+    const userId = 101;
+    const regexKey = 'regular-expressions:general:metadata';
+    const metadataKey = 'metadata-profiles:general:type-selection';
+
+    await PATCH(buildPatchRequest(regexKey, 'advanced', userId));
+
+    const readMetadata = await GET(buildGetRequest(metadataKey, userId));
+    const metadataBody = (await readMetadata.json()) as { mode: 'basic' | 'advanced' };
+    assertEquals(readMetadata.status, 200);
+    assertEquals(metadataBody.mode, 'basic');
+  } finally {
+    requestScope.restoreAll();
+  }
+});
+
 Deno.test('ui preference writes are rate limited per user and section', async () => {
   const requestScope = withInMemoryStore();
 
