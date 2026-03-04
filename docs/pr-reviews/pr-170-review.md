@@ -40,32 +40,36 @@ The PR implements a well-architected progressive disclosure system with canonica
 
 - **Agent:** type-design-analyzer
 - **Impact:** The type `'basic' | 'advanced'` is independently defined in: client store, `loadSectionModes.ts`, DB queries, `AdvancedSection.svelte`, and the API endpoint. If a third mode is added, all 5 must be updated in lockstep.
-- **Fix:** Export a single `UiPreferenceMode` from `$shared/disclosure/sectionKeys.ts` and import everywhere.
+- **Status (2026-03-04):** Fixed. Added `UiPreferenceMode` to `$shared/disclosure/sectionKeys.ts` and replaced local ad-hoc definitions in the client store, DB query layer, API endpoint, `loadSectionModes`, and `AdvancedSection`.
 
 ### 4. Validation constants (regex, max-length) triplicated
 
 - **Agent:** type-design-analyzer
 - **Impact:** `SECTION_KEY_PATTERN` and max-length `96` are defined independently in the client store, DB queries, and API endpoint. Documented in JSDoc of `sectionKeys.ts` but not exported as actual constants.
-- **Fix:** Export `SECTION_KEY_PATTERN` and `SECTION_KEY_MAX_LENGTH` from `sectionKeys.ts` and import in all three consumers.
+- **Status (2026-03-04):** Fixed. Moved both constants to `sectionKeys.ts` and wired client store, DB queries, and API parsing to those shared constants.
 
 ### 5. No `SectionKey` union type -- keys typed as `string` everywhere
 
 - **Agent:** type-design-analyzer
 - **Impact:** The registry exports 17+ string constants but never derives a union type. Every consumer accepts plain `string`, meaning the compiler cannot catch misspelled or unregistered keys.
-- **Fix:** Derive `type SectionKey = typeof CF_CONDITIONS | typeof CF_SCORING | ...` from the registry and use it in component props, `loadSectionModes`, and `SectionModeMap`.
+- **Status (2026-03-04):** Fixed. Added `SectionKey` and `SectionModeMap` in `sectionKeys.ts`; updated section key usage in `DisclosureSection`, `CollapsibleCard`, `loadSectionModes`, and form consumers.
 
 ### 6. `loadSectionModes` has no error handling around DB queries
 
 - **Agent:** silent-failure-hunter
 - **File:** `$lib/server/disclosure/loadSectionModes.ts:24-29`
 - **Impact:** DB queries can throw (`SQLITE_BUSY`, `SQLITE_CORRUPT`, assertion failures). If the first key query throws, remaining keys are never queried and the SSR load function crashes with an opaque 500.
-- **Fix:** Either wrap the loop in try-catch with logging and return defaults on failure, or document that it throws and add try-catch in page server `load` functions.
+- **Status (2026-03-04):** Fixed. Added per-key `try/catch` in the query loop with `console.warn` and default fallback (`'basic'`) so a single query failure no longer fails SSR hydration.
 
 ### 7. `loadSectionModes` has zero unit tests
 
 - **Agent:** pr-test-analyzer
 - **Impact:** Called in 8+ `+page.server.ts` load functions. If it regresses (e.g., throws on `undefined` userId), every page with disclosure sections breaks.
-- **Fix:** Add unit tests for: `undefined` userId returns all `'basic'`, valid userId returns persisted modes + `'basic'` defaults, empty key list returns empty record.
+- **Status (2026-03-04):** Fixed. Added `packages/praxrr-app/src/tests/disclosure/loadSectionModes.test.ts` covering:
+  - `undefined` userId defaults to basic
+  - valid userId merges persisted values with basic defaults
+  - empty key list returns an empty record
+  - DB query exception degrades to safe basic defaults
 
 ---
 
@@ -151,8 +155,8 @@ The PR implements a well-architected progressive disclosure system with canonica
 4. **Remove** `temp/temp.md` from the PR
 
 ## Validation Log
-
 - `deno task test packages/praxrr-app/src/tests/routes/uiPreferencesApi.test.ts` passed (12/12), confirming disclosure preference API behavior remains unchanged after fixes.
+- `deno test --allow-env --allow-read --allow-ffi packages/praxrr-app/src/tests/disclosure/loadSectionModes.test.ts` passed, validating issues 6 and 7 fixes.
 
 ---
 

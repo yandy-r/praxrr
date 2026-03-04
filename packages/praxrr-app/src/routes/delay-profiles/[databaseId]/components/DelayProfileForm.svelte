@@ -13,7 +13,7 @@
 	import { Save, Trash2, Loader2 } from 'lucide-svelte';
 	import type { PreferredProtocol } from '$shared/pcd/display.ts';
 	import { DP_BYPASS_CONDITIONS } from '$shared/disclosure/sectionKeys.ts';
-	import type { UiPreferenceMode } from '$stores/userInterfacePreferences';
+	import type { SectionModeMap } from '$shared/disclosure/sectionKeys.ts';
 	import { current, isDirty, initEdit, initCreate, update } from '$lib/client/stores/dirty';
 
 	// Form data shape
@@ -48,7 +48,6 @@
 		minimumCfScore: 0
 	};
 
-	type SectionModeMap = Record<string, UiPreferenceMode>;
 	$: sectionModes = ($page.data.delayProfileSectionModes ?? {}) as SectionModeMap;
 
 	if (mode === 'create') {

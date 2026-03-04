@@ -13,7 +13,7 @@
   import DropdownSelect from '$ui/dropdown/DropdownSelect.svelte';
   import TagInput from '$ui/form/TagInput.svelte';
   import { ARR_CONNECTION_DETAILS } from '$shared/disclosure/sectionKeys.ts';
-  import type { UiPreferenceMode } from '$stores/userInterfacePreferences.ts';
+  import type { SectionModeMap } from '$shared/disclosure/sectionKeys.ts';
   import Modal from '$ui/modal/Modal.svelte';
   import DirtyModal from '$ui/modal/DirtyModal.svelte';
   import Button from '$ui/button/Button.svelte';
@@ -420,7 +420,6 @@
   $: urlDescription = selectedAppType
     ? `Use container name if on the same Docker network, e.g. http://${selectedAppType}:${appPorts[selectedAppType]}`
     : defaultUrlHint;
-  type SectionModeMap = Record<string, UiPreferenceMode>;
   $: arrSectionModes = ($page.data.arrSettingsSectionModes ?? {}) as SectionModeMap;
   $: title = mode === 'create' ? 'Add Instance' : 'Settings';
   $: description =

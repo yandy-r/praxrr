@@ -4,10 +4,11 @@
   import { quintOut } from 'svelte/easing';
   import { ChevronDown } from 'lucide-svelte';
   import { getUserInterfacePreferenceSectionStore, type UiPreferenceMode } from '$stores/userInterfacePreferences';
+  import type { SectionKey } from '$shared/disclosure/sectionKeys.ts';
 
   export let title: string;
   export let description: string = '';
-  export let sectionKey: string = '';
+  export let sectionKey: SectionKey | undefined = undefined;
   export let defaultOpen: boolean = true;
 
   const reducedMotion = typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;

@@ -16,13 +16,14 @@
   import { quintOut } from 'svelte/easing';
   import { ChevronDown } from 'lucide-svelte';
   import ActionsBar from '$ui/actions/ActionsBar.svelte';
+  import type { UiPreferenceMode } from '$shared/disclosure/sectionKeys.ts';
 
   export let sectionId: string = '';
   export let sectionTitle = 'Advanced settings';
   export let sectionHint = 'These options are hidden by default and are optional.';
   export let showAdvancedLabel = 'Show Advanced';
   export let hideAdvancedLabel = 'Hide Advanced';
-  export let mode: 'basic' | 'advanced' = 'basic';
+  export let mode: UiPreferenceMode = 'basic';
 
   const fallbackSectionId = createDefaultSectionId();
   const reducedMotion = typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;

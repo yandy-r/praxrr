@@ -1,6 +1,5 @@
 import { userInterfacePreferencesQueries } from '$db/queries/user_interface_preferences.ts';
-
-type UiPreferenceMode = 'basic' | 'advanced';
+import type { SectionKey, SectionModeMap } from '$shared/disclosure/sectionKeys.ts';
 
 /**
  * Load persisted section modes for a set of disclosure keys.
@@ -9,9 +8,9 @@ type UiPreferenceMode = 'basic' | 'advanced';
  */
 export function loadSectionModes(
   userId: number | undefined,
-  sectionKeys: readonly string[]
-): Record<string, UiPreferenceMode> {
-  const modes: Record<string, UiPreferenceMode> = {};
+  sectionKeys: readonly SectionKey[]
+): SectionModeMap {
+  const modes: SectionModeMap = {};
 
   for (const key of sectionKeys) {
     modes[key] = 'basic';
@@ -22,9 +21,17 @@ export function loadSectionModes(
   }
 
   for (const key of sectionKeys) {
-    const preference = userInterfacePreferencesQueries.getByUserIdAndSectionKey(userId, key);
-    if (preference?.mode) {
-      modes[key] = preference.mode;
+    try {
+      const preference = userInterfacePreferencesQueries.getByUserIdAndSectionKey(userId, key);
+      if (preference?.mode) {
+        modes[key] = preference.mode;
+      }
+    } catch (error) {
+      console.warn('Failed to load UI preference section mode', {
+        userId,
+        sectionKey: key,
+        error: error instanceof Error ? error.message : String(error),
+      });
     }
   }
 

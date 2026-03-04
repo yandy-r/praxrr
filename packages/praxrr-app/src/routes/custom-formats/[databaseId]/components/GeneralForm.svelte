@@ -11,8 +11,7 @@
 	import Modal from '$ui/modal/Modal.svelte';
 	import StickyCard from '$ui/card/StickyCard.svelte';
 	import Button from '$ui/button/Button.svelte';
-	import type { UiPreferenceMode } from '$stores/userInterfacePreferences.ts';
-	import { CF_CONDITIONS, CF_SCORING, CF_NEGATION_AND_GROUPS } from '$shared/disclosure/sectionKeys.ts';
+	import { CF_CONDITIONS, CF_SCORING, CF_NEGATION_AND_GROUPS, type SectionModeMap } from '$shared/disclosure/sectionKeys.ts';
 	import { alertStore } from '$alerts/store';
 	import { current, isDirty, initEdit, initCreate, update } from '$lib/client/stores/dirty';
 
@@ -34,7 +33,6 @@
 	// Event handlers
 	export let onCancel: (() => void) | undefined = undefined;
 
-	type SectionModeMap = Record<string, UiPreferenceMode>;
 	const sectionModes: SectionModeMap = $page.data.customFormatSectionModes ?? {};
 
 	const defaults: GeneralFormData = {

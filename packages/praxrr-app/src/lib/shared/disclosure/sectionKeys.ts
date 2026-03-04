@@ -2,9 +2,15 @@
  * Canonical registry of all disclosure section keys.
  *
  * Keys follow the pattern `route-family:page:section` and must match
- * the server-side regex `^[a-z0-9-]+:[a-z0-9-]+:[a-z0-9-]+$` with
+ * the validation regex `^[a-z0-9-]+:[a-z0-9-]+:[a-z0-9-]+$` with
  * a max length of 96 characters.
  */
+
+export const SECTION_KEY_PATTERN = /^[a-z0-9-]+:[a-z0-9-]+:[a-z0-9-]+$/;
+export const SECTION_KEY_MAX_LENGTH = 96;
+export const UI_PREFERENCE_MODES = ['basic', 'advanced'] as const;
+
+export type UiPreferenceMode = (typeof UI_PREFERENCE_MODES)[number];
 
 // -- Custom Formats --
 export const CF_CONDITIONS = 'custom-formats:general:conditions' as const;
@@ -46,6 +52,31 @@ export const REGEX_METADATA = 'regular-expressions:general:metadata' as const;
 
 // -- Metadata Profiles --
 export const MP_TYPE_SELECTION = 'metadata-profiles:general:type-selection' as const;
+
+export const SECTION_KEYS = [
+  CF_CONDITIONS,
+  CF_SCORING,
+  CF_NEGATION_AND_GROUPS,
+  MM_NAMING,
+  MM_FOLDER_MANAGEMENT,
+  MM_IMPORTING,
+  ARR_CONNECTION_DETAILS,
+  ARR_UPGRADES_FILTER,
+  DP_BYPASS_CONDITIONS,
+  QP_METADATA,
+  DB_MANIFEST_ADVANCED,
+  SETTINGS_NOTIFICATION_EVENTS,
+  SETTINGS_LOGGING,
+  SETTINGS_AI,
+  SETTINGS_TMDB,
+  SETTINGS_BACKUP,
+  SETTINGS_SECURITY_SESSIONS,
+  REGEX_METADATA,
+  MP_TYPE_SELECTION,
+] as const;
+
+export type SectionKey = (typeof SECTION_KEYS)[number];
+export type SectionModeMap = Partial<Record<SectionKey, UiPreferenceMode>>;
 
 // -- Route-family groups for SSR hydration helpers --
 

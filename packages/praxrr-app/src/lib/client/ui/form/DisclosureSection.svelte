@@ -1,9 +1,10 @@
 <script lang="ts">
   import { onDestroy } from 'svelte';
   import { getUserInterfacePreferenceSectionStore, type UiPreferenceMode } from '$stores/userInterfacePreferences';
+  import type { SectionKey } from '$shared/disclosure/sectionKeys.ts';
   import AdvancedSection from './AdvancedSection.svelte';
 
-  export let sectionKey: string;
+  export let sectionKey: SectionKey;
   export let sectionTitle = 'Advanced settings';
   export let sectionHint = 'These options are hidden by default and are optional.';
   export let initialMode: UiPreferenceMode = 'basic';

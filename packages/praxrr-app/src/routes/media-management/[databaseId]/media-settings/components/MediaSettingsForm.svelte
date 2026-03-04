@@ -8,14 +8,13 @@
 	import FormInput from '$ui/form/FormInput.svelte';
 	import Toggle from '$ui/toggle/Toggle.svelte';
 	import DisclosureSection from '$ui/form/DisclosureSection.svelte';
-	import type { UiPreferenceMode } from '$stores/userInterfacePreferences.ts';
 	import { alertStore } from '$alerts/store';
 	import { Save, Trash2 } from 'lucide-svelte';
 	import { current, isDirty, initEdit, initCreate, update } from '$lib/client/stores/dirty';
 	import type { RadarrMediaSettingsRow } from '$shared/pcd/display.ts';
 	import type { ArrType } from '$shared/pcd/types.ts';
 	import { PROPERS_REPACKS_OPTIONS, type PropersRepacks } from '$shared/pcd/mediaManagement.ts';
-	import { MM_NAMING, MM_FOLDER_MANAGEMENT, MM_IMPORTING } from '$shared/disclosure/sectionKeys.ts';
+	import { MM_NAMING, MM_FOLDER_MANAGEMENT, MM_IMPORTING, type SectionModeMap } from '$shared/disclosure/sectionKeys.ts';
 
 	interface RadarrMediaSettingsRowFormData {
 		name: string;
@@ -37,7 +36,6 @@
 		enableMediaInfo: true
 	};
 
-	type SectionModeMap = Record<string, UiPreferenceMode>;
 	$: sectionModes = (($page.data.mediaSettingsSectionModes ?? {}) as SectionModeMap);
 
 	function mapToFormData(data: RadarrMediaSettingsRow | null): RadarrMediaSettingsRowFormData {

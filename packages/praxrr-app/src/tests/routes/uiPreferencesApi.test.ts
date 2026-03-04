@@ -3,12 +3,13 @@
 import { assertEquals } from '@std/assert';
 import { userInterfacePreferencesQueries } from '$db/queries/user_interface_preferences.ts';
 import { GET, PATCH } from '../../routes/api/v1/ui-preferences/+server.ts';
+import type { SectionKey } from '$shared/disclosure/sectionKeys.ts';
 
 type Restore = () => void;
 
 interface StorePreference {
   userId: number;
-  sectionKey: string;
+  sectionKey: SectionKey;
   mode: 'basic' | 'advanced';
   updatedAt: string;
 }

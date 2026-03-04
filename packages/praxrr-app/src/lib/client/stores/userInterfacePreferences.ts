@@ -1,14 +1,11 @@
 import { browser } from '$app/environment';
 import { alertStore } from '$alerts/store';
 import { get, writable, type Readable, type Writable } from 'svelte/store';
+import { SECTION_KEY_MAX_LENGTH, SECTION_KEY_PATTERN, type SectionKey, type UiPreferenceMode } from '$shared/disclosure/sectionKeys.ts';
 
 const UI_PREFERENCE_ENDPOINT = '/api/v1/ui-preferences';
 const DEBOUNCE_MS = 300;
 const RETRY_DELAYS_MS = [300, 600, 1200];
-const SECTION_KEY_PATTERN = /^[a-z0-9-]+:[a-z0-9-]+:[a-z0-9-]+$/;
-const SECTION_KEY_MAX_LENGTH = 96;
-
-export type UiPreferenceMode = 'basic' | 'advanced';
 
 export interface UserInterfacePreferenceRecord {
   sectionKey: string;
@@ -18,7 +15,7 @@ export interface UserInterfacePreferenceRecord {
 }
 
 export interface UserInterfacePreferenceStore {
-  section: (sectionKey: string, defaultMode?: UiPreferenceMode) => UserInterfaceSectionPreferenceStore;
+  section: (sectionKey: SectionKey, defaultMode?: UiPreferenceMode) => UserInterfaceSectionPreferenceStore;
   authRequired: Readable<boolean>;
   clearAuthRequired: () => void;
   /** Clear all section cache and timers. Call on logout or when auth identity changes so another user does not inherit cached preferences. */
@@ -59,7 +56,7 @@ class RequestFailedError extends Error {
 }
 
 interface SectionState {
-  sectionKey: string;
+  sectionKey: SectionKey;
   modeStore: Writable<UiPreferenceMode>;
   persisted: Writable<boolean>;
   isSyncing: Writable<boolean>;
@@ -75,7 +72,7 @@ interface SectionState {
 }
 
 const authRequired = writable(false);
-const sectionStates = new Map<string, SectionState>();
+const sectionStates = new Map<SectionKey, SectionState>();
 
 /** Clear all section cache and timers so another user does not inherit stale preferences (e.g. after logout without full reload). */
 function clearSectionCacheOnAuthChange(): void {
@@ -117,12 +114,12 @@ const toRecord = (response: UiPreferencePayload): UserInterfacePreferenceRecord 
   persisted: response.persisted,
 });
 
-const buildQueryUrl = (sectionKey: string): string => {
+const buildQueryUrl = (sectionKey: SectionKey): string => {
   const params = new URLSearchParams({ section_key: sectionKey, strict: 'false' });
   return `${UI_PREFERENCE_ENDPOINT}?${params.toString()}`;
 };
 
-const parseSectionKey = (sectionKey: string): string => {
+const parseSectionKey = (sectionKey: string): SectionKey => {
   const normalized = sectionKey.trim();
   if (!SECTION_KEY_PATTERN.test(normalized)) {
     throw new Error('Invalid section key format');
@@ -132,7 +129,7 @@ const parseSectionKey = (sectionKey: string): string => {
     throw new Error('Invalid section key length');
   }
 
-  return normalized;
+  return normalized as SectionKey;
 };
 
 const parsePreferenceResponse = async (response: Response): Promise<UserInterfacePreferenceRecord> => {
