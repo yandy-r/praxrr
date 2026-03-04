@@ -52,7 +52,7 @@ jobs:
           elif [[ "${GITHUB_REF}" == "refs/heads/main" ]]; then
             TARGET_BRANCH="main"
             TARGET_REF="refs/heads/main"
-            TARGET_AUX_REFS="refs/heads/develop,refs/tags/develop"
+            TARGET_AUX_REFS="refs/heads/develop"
             IS_RELEASE_TAG="false"
           elif [[ "${GITHUB_REF}" == "refs/heads/dev" ]]; then
             TARGET_BRANCH="dev"
