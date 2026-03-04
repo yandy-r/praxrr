@@ -1,4 +1,5 @@
 import { browser } from '$app/environment';
+import { alertStore } from '$alerts/store';
 import { get, writable, type Readable, type Writable } from 'svelte/store';
 
 const UI_PREFERENCE_ENDPOINT = '/api/v1/ui-preferences';
@@ -170,6 +171,11 @@ const hydrateSection = async (state: SectionState): Promise<void> => {
     }
 
     if (!response.ok) {
+      console.warn('Failed to hydrate UI preference section', {
+        sectionKey: state.sectionKey,
+        status: response.status,
+        statusText: response.statusText,
+      });
       return;
     }
 
@@ -310,7 +316,14 @@ const flushSection = (state: SectionState): void => {
       }
 
       if (error instanceof Error) {
-        // errors are surfaced through local rollback and auth-required signal
+        console.error('Failed to persist UI preference section', {
+          sectionKey: state.sectionKey,
+          error: error.message,
+        });
+        alertStore.add(
+          'warning',
+          `Unable to sync disclosure preferences for section "${state.sectionKey}". Changes may revert if offline.`
+        );
       }
     })
     .finally(() => {
