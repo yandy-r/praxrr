@@ -9,24 +9,9 @@
 	export let settings: BackupSettings;
 </script>
 
-<div
-	class="rounded-lg border border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900"
->
-	<!-- Header -->
-	<div class="border-b border-neutral-200 px-6 py-4 dark:border-neutral-800">
-		<h2 class="text-lg font-semibold text-neutral-900 md:text-xl dark:text-neutral-50">
-			Backup Configuration
-		</h2>
-		<p class="mt-1 text-sm text-neutral-600 dark:text-neutral-400">
-			Configure automatic backups, schedule, and retention policy
-		</p>
-	</div>
-
-	<!-- Form -->
-	<form
-		method="POST"
-		action="?/updateBackups"
-		class="p-6"
+<form
+	method="POST"
+	action="?/updateBackups"
 		use:enhance={() => {
 			return async ({ result, update }) => {
 				if (result.type === 'failure' && result.data) {
@@ -152,5 +137,4 @@
 				</button>
 			</div>
 		</div>
-	</form>
-</div>
+</form>
