@@ -5,13 +5,15 @@
 	import { onMount } from 'svelte';
 	import { alertStore } from '$lib/client/alerts/store';
 	import { isDirty, initEdit, update, current, clear } from '$lib/client/stores/dirty';
-	import { Info, Save, Play, RotateCcw, Settings, SlidersHorizontal, History } from 'lucide-svelte';
+	import { Info, Save, Play, RotateCcw, Settings, History } from 'lucide-svelte';
 	import CoreSettings from './components/CoreSettings.svelte';
 	import FilterSettings from './components/FilterSettings.svelte';
 	import RunHistory from './components/RunHistory.svelte';
 	import DirtyModal from '$ui/modal/DirtyModal.svelte';
 	import StickyCard from '$ui/card/StickyCard.svelte';
+	import CollapsibleCard from '$ui/card/CollapsibleCard.svelte';
 	import Button from '$ui/button/Button.svelte';
+	import { ARR_UPGRADES_FILTER } from '$shared/disclosure/sectionKeys';
 
 	export let data: PageData;
 	export let form: ActionData;
@@ -155,16 +157,12 @@
 	</section>
 
 	<section>
-		<h2
-			class="mb-3 flex items-center gap-2 text-lg font-semibold text-neutral-900 dark:text-neutral-100"
-		>
-			<SlidersHorizontal size={18} class="text-neutral-500 dark:text-neutral-400" />
-			Filters
-		</h2>
-		<FilterSettings
-			{filters}
-			onFiltersChange={(v) => update('filters', JSON.stringify(v))}
-		/>
+		<CollapsibleCard title="Filters" sectionKey={ARR_UPGRADES_FILTER} defaultOpen={true}>
+			<FilterSettings
+				{filters}
+				onFiltersChange={(v) => update('filters', JSON.stringify(v))}
+			/>
+		</CollapsibleCard>
 	</section>
 </div>
 

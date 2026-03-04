@@ -8,6 +8,8 @@
 	import StickyCard from '$ui/card/StickyCard.svelte';
 	import Button from '$ui/button/Button.svelte';
 	import RegexPatternField from './RegexPatternField.svelte';
+	import DisclosureSection from '$ui/form/DisclosureSection.svelte';
+	import { REGEX_METADATA } from '$shared/disclosure/sectionKeys';
 	import { alertStore } from '$alerts/store';
 	import { Save, Trash2, Loader2 } from 'lucide-svelte';
 	import { current, isDirty, initEdit, initCreate, update } from '$lib/client/stores/dirty';
@@ -152,51 +154,59 @@
 		<input type="hidden" name="layer" value={selectedLayer} />
 
 		<div class="space-y-6 pb-12">
-			<!-- Name -->
-			<FormInput
-				label="Name"
-				name="name"
-				required
-				value={formData.name}
-				placeholder="e.g., Release Group - SPARKS"
-				on:input={(e) => update('name', e.detail)}
-			/>
-
-			<!-- Tags -->
-			<div>
-				<div class="block text-sm font-medium text-neutral-700 dark:text-neutral-300">Tags</div>
-				<p class="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
-					Categorize this pattern for easier filtering
-				</p>
-				<div class="mt-2">
-					<TagInput
-						tags={formData.tags}
-						onchange={(newTags) => update('tags', newTags)}
-						placeholder="Add tags..."
-					/>
-				</div>
-			</div>
-
-			<!-- Description -->
-			<div>
-				<MarkdownInput
-					id="description"
-					name="description"
-					label="Description"
-					description="Describe what this pattern matches"
-					value={formData.description}
-					onchange={(v) => update('description', v)}
-					rows={3}
-					placeholder="What does this pattern match?"
+			<DisclosureSection
+				sectionKey={REGEX_METADATA}
+				sectionTitle="Pattern Metadata"
+				sectionHint="Tags, description, and additional pattern details."
+			>
+				<!-- Name -->
+				<FormInput
+					label="Name"
+					name="name"
+					required
+					value={formData.name}
+					placeholder="e.g., Release Group - SPARKS"
+					on:input={(e) => update('name', e.detail)}
 				/>
-			</div>
 
-			<RegexPatternField
-				pattern={formData.pattern}
-				regex101Id={formData.regex101Id}
-				onPatternChange={(v) => update('pattern', v)}
-				onRegex101IdChange={(v) => update('regex101Id', v)}
-			/>
+				<RegexPatternField
+					pattern={formData.pattern}
+					regex101Id={formData.regex101Id}
+					onPatternChange={(v) => update('pattern', v)}
+					onRegex101IdChange={(v) => update('regex101Id', v)}
+				/>
+
+				<svelte:fragment slot="advanced">
+					<!-- Tags -->
+					<div>
+						<div class="block text-sm font-medium text-neutral-700 dark:text-neutral-300">Tags</div>
+						<p class="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
+							Categorize this pattern for easier filtering
+						</p>
+						<div class="mt-2">
+							<TagInput
+								tags={formData.tags}
+								onchange={(newTags) => update('tags', newTags)}
+								placeholder="Add tags..."
+							/>
+						</div>
+					</div>
+
+					<!-- Description -->
+					<div>
+						<MarkdownInput
+							id="description"
+							name="description"
+							label="Description"
+							description="Describe what this pattern matches"
+							value={formData.description}
+							onchange={(v) => update('description', v)}
+							rows={3}
+							placeholder="What does this pattern match?"
+						/>
+					</div>
+				</svelte:fragment>
+			</DisclosureSection>
 		</div>
 	</form>
 

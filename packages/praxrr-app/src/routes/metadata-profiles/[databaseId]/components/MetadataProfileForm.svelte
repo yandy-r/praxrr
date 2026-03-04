@@ -7,6 +7,8 @@
 	import Card from '$ui/card/Card.svelte';
 	import Button from '$ui/button/Button.svelte';
 	import Toggle from '$ui/toggle/Toggle.svelte';
+	import DisclosureSection from '$ui/form/DisclosureSection.svelte';
+	import { MP_TYPE_SELECTION } from '$shared/disclosure/sectionKeys';
 	import { alertStore } from '$alerts/store';
 	import { current, isDirty, initCreate, initEdit, update } from '$lib/client/stores/dirty';
 	import { Save, Trash2, Loader2 } from 'lucide-svelte';
@@ -233,138 +235,150 @@
 		<input type="hidden" name="layer" value={selectedLayer} />
 
 		<Card flush padding="lg">
-			<div class="space-y-8">
-				<div class="space-y-2">
-					<FormInput
-						label="Name"
-						name="name"
-						value={name}
-						required
-						description="Display name used for Lidarr metadata profile sync selection"
-						placeholder="e.g., Discography profile"
-						on:input={(event) => update('name', event.detail)}
-					/>
+			<DisclosureSection
+				sectionKey={MP_TYPE_SELECTION}
+				sectionTitle="Type Selection"
+				sectionHint="Configure which primary, secondary, and release status types are allowed."
+			>
+				<div class="space-y-8">
+					<!-- Name field -->
+					<div class="space-y-2">
+						<FormInput
+							label="Name"
+							name="name"
+							value={name}
+							required
+							description="Display name used for Lidarr metadata profile sync selection"
+							placeholder="e.g., Discography profile"
+							on:input={(event) => update('name', event.detail)}
+						/>
 
-					{#if name.length === 0}
-						<p class="text-xs text-red-600 dark:text-red-400">Profile name is required.</p>
-					{/if}
+						{#if name.length === 0}
+							<p class="text-xs text-red-600 dark:text-red-400">Profile name is required.</p>
+						{/if}
+					</div>
+
+					<!-- Description field -->
+					<div class="space-y-2">
+						<h3 class="text-sm font-semibold text-neutral-900 dark:text-neutral-100">Description</h3>
+						<input
+							class="w-full rounded-xl border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-900 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-200"
+							name="description"
+							type="text"
+							value={descriptionText}
+							on:change={(event) => {
+								update('description', event.currentTarget.value);
+							}}
+						/>
+					</div>
 				</div>
 
-				<div class="space-y-2">
-					<h3 class="text-sm font-semibold text-neutral-900 dark:text-neutral-100">Description</h3>
-					<input
-						class="w-full rounded-xl border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-900 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-200"
-						name="description"
-						type="text"
-						value={descriptionText}
-						on:change={(event) => {
-							update('description', event.currentTarget.value);
-						}}
-					/>
-				</div>
-
-					<div class="space-y-2">
-						<div class="flex items-center justify-between gap-3">
-							<h3 class="text-sm font-semibold text-neutral-900 dark:text-neutral-100">Primary Types</h3>
-							<div class="flex flex-col items-end gap-1">
-								<p class="text-xs {toggleErrorMessage(primaryValidation)}">
-									{primaryValidation ?? `${primaryAllowedCount}/${primaryTypes.length} allowed`}
-								</p>
-								<Toggle
-									label="Select all primary types"
-									disabled={primaryTypes.length === 0}
-									checked={primaryAllAllowed}
-									on:change={(event: CustomEvent<boolean>) =>
-										setAllTypes('primaryTypes', event.detail)
-									}
-								/>
-							</div>
-						</div>
-						<div class="grid gap-2">
-							{#if primaryTypes.length === 0}
-								<p class="text-xs text-neutral-500 dark:text-neutral-400">No primary types available.</p>
-							{:else}
-								{#each primaryTypes as typeEntry, index (typeEntry.id)}
+				<svelte:fragment slot="advanced">
+					<div class="space-y-8">
+						<div class="space-y-2">
+							<div class="flex items-center justify-between gap-3">
+								<h3 class="text-sm font-semibold text-neutral-900 dark:text-neutral-100">Primary Types</h3>
+								<div class="flex flex-col items-end gap-1">
+									<p class="text-xs {toggleErrorMessage(primaryValidation)}">
+										{primaryValidation ?? `${primaryAllowedCount}/${primaryTypes.length} allowed`}
+									</p>
 									<Toggle
-										label={typeEntry.name}
-										checked={typeEntry.allowed}
+										label="Select all primary types"
+										disabled={primaryTypes.length === 0}
+										checked={primaryAllAllowed}
 										on:change={(event: CustomEvent<boolean>) =>
-											updateType('primaryTypes', index, event.detail)
+											setAllTypes('primaryTypes', event.detail)
 										}
 									/>
-								{/each}
-							{/if}
-						</div>
-					</div>
-
-					<div class="space-y-2">
-						<div class="flex items-center justify-between gap-3">
-							<h3 class="text-sm font-semibold text-neutral-900 dark:text-neutral-100">Secondary Types</h3>
-							<div class="flex flex-col items-end gap-1">
-								<p class="text-xs {toggleErrorMessage(secondaryValidation)}">
-									{secondaryValidation ?? `${secondaryAllowedCount}/${secondaryTypes.length} allowed`}
-								</p>
-								<Toggle
-									label="Select all secondary types"
-									disabled={secondaryTypes.length === 0}
-									checked={secondaryAllAllowed}
-									on:change={(event: CustomEvent<boolean>) =>
-										setAllTypes('secondaryTypes', event.detail)
-									}
-								/>
+								</div>
+							</div>
+							<div class="grid gap-2">
+								{#if primaryTypes.length === 0}
+									<p class="text-xs text-neutral-500 dark:text-neutral-400">No primary types available.</p>
+								{:else}
+									{#each primaryTypes as typeEntry, index (typeEntry.id)}
+										<Toggle
+											label={typeEntry.name}
+											checked={typeEntry.allowed}
+											on:change={(event: CustomEvent<boolean>) =>
+												updateType('primaryTypes', index, event.detail)
+											}
+										/>
+									{/each}
+								{/if}
 							</div>
 						</div>
-						<div class="grid gap-2">
-							{#if secondaryTypes.length === 0}
-								<p class="text-xs text-neutral-500 dark:text-neutral-400">No secondary types available.</p>
-							{:else}
-								{#each secondaryTypes as typeEntry, index (typeEntry.id)}
+
+						<div class="space-y-2">
+							<div class="flex items-center justify-between gap-3">
+								<h3 class="text-sm font-semibold text-neutral-900 dark:text-neutral-100">Secondary Types</h3>
+								<div class="flex flex-col items-end gap-1">
+									<p class="text-xs {toggleErrorMessage(secondaryValidation)}">
+										{secondaryValidation ?? `${secondaryAllowedCount}/${secondaryTypes.length} allowed`}
+									</p>
 									<Toggle
-										label={typeEntry.name}
-										checked={typeEntry.allowed}
+										label="Select all secondary types"
+										disabled={secondaryTypes.length === 0}
+										checked={secondaryAllAllowed}
 										on:change={(event: CustomEvent<boolean>) =>
-											updateType('secondaryTypes', index, event.detail)
+											setAllTypes('secondaryTypes', event.detail)
 										}
 									/>
-								{/each}
-							{/if}
-						</div>
-					</div>
-
-					<div class="space-y-2">
-						<div class="flex items-center justify-between gap-3">
-							<h3 class="text-sm font-semibold text-neutral-900 dark:text-neutral-100">Release Statuses</h3>
-							<div class="flex flex-col items-end gap-1">
-								<p class="text-xs {toggleErrorMessage(releaseValidation)}">
-									{releaseValidation ?? `${releaseAllowedCount}/${releaseStatuses.length} allowed`}
-								</p>
-								<Toggle
-									label="Select all release statuses"
-									disabled={releaseStatuses.length === 0}
-									checked={releaseAllAllowed}
-									on:change={(event: CustomEvent<boolean>) =>
-										setAllTypes('releaseStatuses', event.detail)
-									}
-								/>
+								</div>
+							</div>
+							<div class="grid gap-2">
+								{#if secondaryTypes.length === 0}
+									<p class="text-xs text-neutral-500 dark:text-neutral-400">No secondary types available.</p>
+								{:else}
+									{#each secondaryTypes as typeEntry, index (typeEntry.id)}
+										<Toggle
+											label={typeEntry.name}
+											checked={typeEntry.allowed}
+											on:change={(event: CustomEvent<boolean>) =>
+												updateType('secondaryTypes', index, event.detail)
+											}
+										/>
+									{/each}
+								{/if}
 							</div>
 						</div>
-						<div class="grid gap-2">
-							{#if releaseStatuses.length === 0}
-								<p class="text-xs text-neutral-500 dark:text-neutral-400">No release statuses available.</p>
-							{:else}
-								{#each releaseStatuses as typeEntry, index (typeEntry.id)}
+
+						<div class="space-y-2">
+							<div class="flex items-center justify-between gap-3">
+								<h3 class="text-sm font-semibold text-neutral-900 dark:text-neutral-100">Release Statuses</h3>
+								<div class="flex flex-col items-end gap-1">
+									<p class="text-xs {toggleErrorMessage(releaseValidation)}">
+										{releaseValidation ?? `${releaseAllowedCount}/${releaseStatuses.length} allowed`}
+									</p>
 									<Toggle
-										label={typeEntry.name}
-										checked={typeEntry.allowed}
+										label="Select all release statuses"
+										disabled={releaseStatuses.length === 0}
+										checked={releaseAllAllowed}
 										on:change={(event: CustomEvent<boolean>) =>
-											updateType('releaseStatuses', index, event.detail)
+											setAllTypes('releaseStatuses', event.detail)
 										}
 									/>
-								{/each}
-							{/if}
+								</div>
+							</div>
+							<div class="grid gap-2">
+								{#if releaseStatuses.length === 0}
+									<p class="text-xs text-neutral-500 dark:text-neutral-400">No release statuses available.</p>
+								{:else}
+									{#each releaseStatuses as typeEntry, index (typeEntry.id)}
+										<Toggle
+											label={typeEntry.name}
+											checked={typeEntry.allowed}
+											on:change={(event: CustomEvent<boolean>) =>
+												updateType('releaseStatuses', index, event.detail)
+											}
+										/>
+									{/each}
+								{/if}
+							</div>
 						</div>
 					</div>
-			</div>
+				</svelte:fragment>
+			</DisclosureSection>
 		</Card>
 	</form>
 
