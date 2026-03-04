@@ -56,10 +56,7 @@ export const userInterfacePreferencesQueries = {
   /**
    * Get a single preference for a user and section key.
    */
-  getByUserIdAndSectionKey(
-    userId: number,
-    sectionKey: SectionKey
-  ): UserInterfacePreference | undefined {
+  getByUserIdAndSectionKey(userId: number, sectionKey: SectionKey): UserInterfacePreference | undefined {
     assertSectionKey(sectionKey);
 
     const row = db.queryFirst<UserInterfacePreferenceRow>(

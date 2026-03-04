@@ -62,10 +62,7 @@ export const load: ServerLoad = ({ params, locals }) => {
   // Load upgrade runs from database
   const upgradeRuns = upgradeRunsQueries.getByInstanceId(id);
 
-  const arrUpgradesSectionModes = loadSectionModes(
-    locals.user?.id,
-    [ARR_UPGRADES_FILTER]
-  );
+  const arrUpgradesSectionModes = loadSectionModes(locals.user?.id, [ARR_UPGRADES_FILTER]);
 
   return {
     instance,

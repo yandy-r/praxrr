@@ -1,7 +1,12 @@
 import { browser } from '$app/environment';
 import { alertStore } from '$alerts/store';
 import { get, writable, type Readable, type Writable } from 'svelte/store';
-import { SECTION_KEY_MAX_LENGTH, SECTION_KEY_PATTERN, type SectionKey, type UiPreferenceMode } from '$shared/disclosure/sectionKeys.ts';
+import {
+  SECTION_KEY_MAX_LENGTH,
+  SECTION_KEY_PATTERN,
+  type SectionKey,
+  type UiPreferenceMode,
+} from '$shared/disclosure/sectionKeys.ts';
 
 const UI_PREFERENCE_ENDPOINT = '/api/v1/ui-preferences';
 const DEBOUNCE_MS = 300;
