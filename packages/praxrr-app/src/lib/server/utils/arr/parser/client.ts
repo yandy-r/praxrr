@@ -261,7 +261,15 @@ export async function parseWithCache(title: string, type: MediaType): Promise<Pa
     parsedReleaseCacheQueries.set(cacheKey, parserVersion, JSON.stringify(result));
 
     return result;
-  } catch {
+  } catch (err) {
+    await logger.warn('Failed to parse release title for parser cache', {
+      source: 'ParserCache',
+      meta: {
+        title,
+        type,
+        error: err instanceof Error ? err.message : 'Unknown error',
+      },
+    });
     // Parser error
     return null;
   }
@@ -315,7 +323,15 @@ export async function parseWithCacheBatch(
         // Store in cache
         parsedReleaseCacheQueries.set(item.cacheKey, parserVersion, JSON.stringify(result));
         return { cacheKey: item.cacheKey, result };
-      } catch {
+      } catch (err) {
+        await logger.warn('Failed to parse release title in batch parser cache', {
+          source: 'ParserCache',
+          meta: {
+            title: item.title,
+            type: item.type,
+            error: err instanceof Error ? err.message : 'Unknown error',
+          },
+        });
         return { cacheKey: item.cacheKey, result: null };
       }
     });

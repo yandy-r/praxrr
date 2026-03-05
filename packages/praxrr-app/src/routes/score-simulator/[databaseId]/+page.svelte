@@ -75,16 +75,19 @@
       alertStore.add('warning', 'Parser service unavailable...', 0);
     }
 
-    restorePersistedState();
-    mounted = true;
-    void refreshParserAvailability();
-    void simulate();
+    const initialize = async () => {
+      await restorePersistedState();
+      mounted = true;
+      await refreshParserAvailability();
+      await simulate();
 
-    parserHealthInterval = setInterval(() => {
-      if (!parserAvailable) {
-        void refreshParserAvailability();
-      }
-    }, 3000);
+      parserHealthInterval = setInterval(() => {
+        if (!parserAvailable) {
+          void refreshParserAvailability();
+        }
+      }, 3000);
+    };
+    void initialize();
   });
 
   onDestroy(() => {
@@ -166,7 +169,8 @@
       if (typeof payload.parserAvailable === 'boolean') {
         parserAvailable = payload.parserAvailable;
       }
-    } catch {
+    } catch (err) {
+      console.debug('Parser health check failed:', err);
       // Keep current availability state and retry on interval.
     }
   }
@@ -188,7 +192,7 @@
     void simulate();
   }
 
-  function restorePersistedState() {
+  async function restorePersistedState() {
     const storedTitle = localStorage.getItem(titleStorageKey);
     if (storedTitle) {
       releaseTitle = storedTitle;

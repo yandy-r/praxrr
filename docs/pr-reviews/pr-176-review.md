@@ -1,21 +1,22 @@
 # PR #176 Review: feat: score simulator phase 1
 
-**Branch:** `feat/score-simulator` → `main`
-**Date:** 2026-03-05
-**Scope:** 10,555 additions, 2,853 deletions across 37 files
-**Closes:** #171, #172, #173, #174, #175
+**Branch:** `feat/score-simulator` → `main` **Date:** 2026-03-05 **Scope:** 10,555 additions, 2,853
+deletions across 37 files **Closes:** #171, #172, #173, #174, #175
 
 ---
 
 ## Critical Issues (must fix before merge)
 
-> **Status: All four critical issues resolved** in commit `fix(score-simulator): harden input validation and error handling`. Tests added for issues 1, 3, and 4.
+> **Status: All four critical issues resolved** in commit
+> `fix(score-simulator): harden input validation and error handling`. Tests added for issues 1, 3,
+> and 4.
 
 ### 1. ~~Unprotected `request.json()` — malformed JSON yields 500~~ RESOLVED
 
 **File:** `packages/praxrr-app/src/routes/api/v1/simulate/score/+server.ts:92`
 
-`await request.json()` is called without a try-catch. Malformed or empty request bodies produce an unhandled `SyntaxError` surfaced as a generic 500 instead of a clear 400.
+`await request.json()` is called without a try-catch. Malformed or empty request bodies produce an
+unhandled `SyntaxError` surfaced as a generic 500 instead of a clear 400.
 
 **Fix:**
 
@@ -41,7 +42,9 @@ try {
 }
 ```
 
-Database corruption, lock contention, schema drift, OOM — all silently re-classified as a missing profile. The user gets a misleading 404 "Quality profiles not found" when the real problem is a server error. Violates CLAUDE.md: "ALWAYS throw errors early and often."
+Database corruption, lock contention, schema drift, OOM — all silently re-classified as a missing
+profile. The user gets a misleading 404 "Quality profiles not found" when the real problem is a
+server error. Violates CLAUDE.md: "ALWAYS throw errors early and often."
 
 **Fix:** Catch only the specific "not found" case:
 
@@ -59,7 +62,9 @@ Database corruption, lock contention, schema drift, OOM — all silently re-clas
 
 **File:** `packages/praxrr-app/src/routes/api/v1/simulate/score/+server.ts:92-93`
 
-`databaseId` is destructured from the request body and passed to `pcdManager.getCache()` without any validation. `arrType`, `profileNames`, and `releases` all have explicit validation — `databaseId` is skipped entirely.
+`databaseId` is destructured from the request body and passed to `pcdManager.getCache()` without any
+validation. `arrType`, `profileNames`, and `releases` all have explicit validation — `databaseId` is
+skipped entirely.
 
 **Fix:**
 
@@ -79,7 +84,9 @@ if (!match) {
 }
 ```
 
-A selector starting with `trash:` that doesn't match the regex falls back to treating the entire string (including prefix) as a PCD profile name. This produces a misleading "profile not found" error instead of a 400.
+A selector starting with `trash:` that doesn't match the regex falls back to treating the entire
+string (including prefix) as a PCD profile name. This produces a misleading "profile not found"
+error instead of a 400.
 
 **Fix:**
 
@@ -96,23 +103,31 @@ if (!match) {
 
 ## Important Issues (should fix)
 
-> **Status: Issues 5-7 resolved. Issue 8 deferred** — the entire UI codebase uses Svelte 4 event patterns; migrating one component would create inconsistent mixed patterns.
+> **Status: Issues 5-7 resolved. Issue 8 deferred** — the entire UI codebase uses Svelte 4 event
+> patterns; migrating one component would create inconsistent mixed patterns.
 
 ### 5. ~~`fallbackParsedInfo()` masks parse failures with fake data~~ RESOLVED
 
 **File:** `packages/praxrr-app/src/routes/api/v1/simulate/score/+server.ts:51-62, 218-249`
 
-When `parseResults.get(cacheKey)` returns null, the code returns `fallbackParsedInfo()` with `source: 'Unknown'`, zero scores, and all CFs non-matching. The user sees what looks like a valid-but-empty result with no indication that parsing failed. Violates CLAUDE.md: "Do not use fallbacks."
+When `parseResults.get(cacheKey)` returns null, the code returns `fallbackParsedInfo()` with
+`source: 'Unknown'`, zero scores, and all CFs non-matching. The user sees what looks like a
+valid-but-empty result with no indication that parsing failed. Violates CLAUDE.md: "Do not use
+fallbacks."
 
-**Fix:** Return `parsed: null` (schema already had `nullable: true`). Deleted `fallbackParsedInfo()`. Client shows a parse failure warning banner when `parsed === null`.
+**Fix:** Return `parsed: null` (schema already had `nullable: true`). Deleted
+`fallbackParsedInfo()`. Client shows a parse failure warning banner when `parsed === null`.
 
 ### 6. ~~Generic error alert discards server error details~~ RESOLVED
 
 **File:** `packages/praxrr-app/src/routes/score-simulator/[databaseId]/+page.svelte:131-148`
 
-When `response.ok` is false, the response body (which contains structured errors like `{ error: 'Quality profiles not found', missing: [...] }`) is discarded. The user always sees "Failed to run score simulation." regardless of the actual error.
+When `response.ok` is false, the response body (which contains structured errors like
+`{ error: 'Quality profiles not found', missing: [...] }`) is discarded. The user always sees
+"Failed to run score simulation." regardless of the actual error.
 
-**Fix:** Reads server error body before throwing; catch block now surfaces `err.message` in the alert.
+**Fix:** Reads server error body before throwing; catch block now surfaces `err.message` in the
+alert.
 
 ### 7. ~~Parser health endpoint missing formatting and OpenAPI contract~~ RESOLVED
 
@@ -121,13 +136,16 @@ When `response.ok` is false, the response body (which contains structured errors
 - Missing semicolons throughout (violates Prettier conventions)
 - No OpenAPI spec definition exists for this new `/api/v1/` endpoint (violates "Contract-first API")
 
-**Fix:** Formatted with Prettier. Added OpenAPI spec in `system.yaml` and `openapi.yaml`. Regenerated API types.
+**Fix:** Formatted with Prettier. Added OpenAPI spec in `system.yaml` and `openapi.yaml`.
+Regenerated API types.
 
 ### 8. `on:click` / `on:input` used instead of `onclick` / `oninput` — DEFERRED
 
 **Files:** `ReleaseInput.svelte`, `[databaseId]/+page.svelte`
 
-CLAUDE.md: "Svelte 5, no runes. Use `onclick` handlers." New components use `on:click`, `on:input`, and `createEventDispatcher` (Svelte 4 pattern). Deferred to a codebase-wide migration — the entire UI component library uses Svelte 4 event forwarding patterns.
+CLAUDE.md: "Svelte 5, no runes. Use `onclick` handlers." New components use `on:click`, `on:input`,
+and `createEventDispatcher` (Svelte 4 pattern). Deferred to a codebase-wide migration — the entire
+UI component library uses Svelte 4 event forwarding patterns.
 
 ---
 
@@ -163,36 +181,52 @@ CLAUDE.md: "Svelte 5, no runes. Use `onclick` handlers." New components use `on:
 
 ## Suggestions (nice to have)
 
-### 9. Empty catch in `refreshParserAvailability()`
+### 9. ~~Empty catch in `refreshParserAvailability()`~~ RESOLVED
 
 **File:** `+page.svelte:167-169`
 
-The catch block swallows all errors silently. At minimum, `console.debug('Parser health check failed:', err)` would help diagnose persistent failures (e.g., endpoint returning HTML instead of JSON).
+The catch block swallows all errors silently. At minimum,
+`console.debug('Parser health check failed:', err)` would help diagnose persistent failures (e.g.,
+endpoint returning HTML instead of JSON).
 
-### 10. Parse failures logged nowhere in batch cache functions
+Resolved: added debug logging in the catch block.
+
+### 10. ~~Parse failures logged nowhere in batch cache functions~~ RESOLVED
 
 **File:** `packages/praxrr-app/src/lib/server/utils/arr/parser/client.ts:264, 318`
 
-Both `parseWithCache` and `parseWithCacheBatch` catch blocks discard the error entirely. A parse failure cascades to `fallbackParsedInfo()` with no logging anywhere in the chain.
+Both `parseWithCache` and `parseWithCacheBatch` catch blocks discard the error entirely. A parse
+failure cascades to `fallbackParsedInfo()` with no logging anywhere in the chain.
 
-### 11. Simulation fires on mount before guaranteed state restore
+Resolved: added warning logs in both cache parse error paths so parse failures are now captured in
+server logs.
+
+### 11. ~~Simulation fires on mount before guaranteed state restore~~ RESOLVED
 
 **File:** `+page.svelte:78-81`
 
-`restorePersistedState()` then `void simulate()` — works synchronously now, but fragile if restore logic ever becomes async.
+`restorePersistedState()` then `void simulate()` — works synchronously now, but fragile if restore
+logic ever becomes async.
+
+Resolved: `onMount` now awaits `restorePersistedState()` before triggering `simulate()`.
 
 ---
 
 ## Strengths
 
-- **Clean architecture**: Good separation between server endpoint, page load, helper functions, and UI components
+- **Clean architecture**: Good separation between server endpoint, page load, helper functions, and
+  UI components
 - **Type safety**: All types derived from OpenAPI-generated `v1.d.ts` — no `any` usage
-- **Race condition handling**: Request token pattern in `simulate()` correctly prevents stale responses
-- **Input validation**: Thorough validation of `arrType`, `profileNames`, `releases` with clear error messages
-- **Dual profile source support**: PCD and TRaSH guide profiles handled through discriminated union (`ResolvedPcdProfile | ResolvedTrashProfile`)
+- **Race condition handling**: Request token pattern in `simulate()` correctly prevents stale
+  responses
+- **Input validation**: Thorough validation of `arrType`, `profileNames`, `releases` with clear
+  error messages
+- **Dual profile source support**: PCD and TRaSH guide profiles handled through discriminated union
+  (`ResolvedPcdProfile | ResolvedTrashProfile`)
 - **Parser resilience**: Health polling with interval, graceful degradation when parser unavailable
 - **UI polish**: Proper `aria-live`, loading states, empty states, dark mode support
-- **Test infrastructure**: Parser stub server and in-memory PCD cache fixture are well-designed and reusable
+- **Test infrastructure**: Parser stub server and in-memory PCD cache fixture are well-designed and
+  reusable
 
 ---
 
