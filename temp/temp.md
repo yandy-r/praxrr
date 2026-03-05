@@ -33,10 +33,10 @@ feature implementation.
 
 ## PR Review Correction
 
-Let's validate and fix suggestion issues 8-18
+Let's validate and fix important issues 5-8
 
-- file: [@pr-170-review.md](file://docs/pr-reviews/pr-170-review.md)
+- file: [@pr-176-review.md](file://docs/pr-reviews/pr-176-review.md)
 - validate before implementing
 - run targeted tests
-- update doc when complete ([@pr-170-review.md](file://docs/pr-reviews/pr-170-review.md))
+- update doc when complete ([@pr-176-review.md](file://docs/pr-reviews/pr-176-review.md))
 - when confirmed fix, commit progress
