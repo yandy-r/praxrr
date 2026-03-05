@@ -76,3 +76,5 @@
 
 - For browser-side IDs in Svelte routes, do not assume `crypto.randomUUID()` exists in all runtime contexts (dev containers/webviews); always guard it and provide a deterministic fallback string generator.
 - Do not gate client actions on one-time `PageData` health flags for external services (like parser); treat initial server health as advisory and keep runtime retries enabled so UI recovers after dependency restarts.
+- When debugging dev-container issues, distinguish page reload behavior from Docker watch hot-rebuild behavior; validate recovery across container restart events, not just route navigation.
+- For compose watch flows, verify dependency containers are in `Up` state (not `Created`); if parser is required for app runtime, start it explicitly before launching watch so app rebuilds do not silently run without parser.

@@ -9,6 +9,10 @@ import {
   extractAllPatterns,
 } from '$pcd/entities/customFormats/index.ts';
 import { scoring } from '$pcd/entities/qualityProfiles/index.ts';
+import { trashGuideManager } from '$lib/server/trashguide/manager.ts';
+import { trashGuideEntityCacheQueries } from '$db/queries/trashGuideEntityCache.ts';
+import { parseCachedEntity } from '$lib/server/trashguide/displayTransform.ts';
+import type { TrashGuideQualityProfileEntity } from '$lib/server/trashguide/types.ts';
 import type { components } from '$api/v1.d.ts';
 
 type SimulateScoreRequest = components['schemas']['SimulateScoreRequest'];
@@ -18,6 +22,24 @@ type SimulateCfMatch = components['schemas']['SimulateCfMatch'];
 type SimulateProfileScore = components['schemas']['SimulateProfileScore'];
 type SimulateScoreContribution = components['schemas']['SimulateScoreContribution'];
 type ParsedInfo = components['schemas']['ParsedInfo'];
+type PcdProfileScoreData = Awaited<ReturnType<typeof scoring>>;
+
+interface ResolvedPcdProfile {
+  kind: 'pcd';
+  requestKey: string;
+  pcdName: string;
+  scoreData: PcdProfileScoreData;
+}
+
+interface ResolvedTrashProfile {
+  kind: 'trash';
+  requestKey: string;
+  sourceId: number;
+  trashName: string;
+  entity: TrashGuideQualityProfileEntity;
+}
+
+type ResolvedProfile = ResolvedPcdProfile | ResolvedTrashProfile;
 
 function isArrType(value: string): value is SimulateScoreRequest['arrType'] {
   return value === 'radarr' || value === 'sonarr';
@@ -34,6 +56,31 @@ function fallbackParsedInfo(): ParsedInfo {
     edition: null,
     releaseType: null,
   };
+}
+
+function parseProfileSelector(selector: string): { kind: 'pcd'; name: string } | { kind: 'trash'; sourceId: number; name: string } {
+  if (selector.startsWith('pcd:')) {
+    return {
+      kind: 'pcd',
+      name: decodeURIComponent(selector.slice(4)),
+    };
+  }
+
+  if (selector.startsWith('trash:')) {
+    const match = /^trash:(\d+):(.*)$/.exec(selector);
+    if (!match) {
+      return { kind: 'pcd', name: selector };
+    }
+
+    return {
+      kind: 'trash',
+      sourceId: Number.parseInt(match[1], 10),
+      name: decodeURIComponent(match[2]),
+    };
+  }
+
+  // Backward compatibility with plain profile names.
+  return { kind: 'pcd', name: selector };
 }
 
 export const POST: RequestHandler = async ({ request }) => {
@@ -79,9 +126,57 @@ export const POST: RequestHandler = async ({ request }) => {
     throw error(404, 'Database not found or cache not available');
   }
 
-  const existingProfiles = await cache.kb.selectFrom('quality_profiles').select(['name']).execute();
-  const existingProfileNames = new Set(existingProfiles.map((profile) => profile.name));
-  const missingProfiles = profileNames.filter((profileName) => !existingProfileNames.has(profileName));
+  const sourceById = new Map(trashGuideManager.listSources().map((source) => [source.id, source]));
+  const resolvedProfiles: ResolvedProfile[] = [];
+  const missingProfiles: string[] = [];
+
+  for (const profileSelector of profileNames) {
+    const parsedSelector = parseProfileSelector(profileSelector);
+
+    if (parsedSelector.kind === 'pcd') {
+      try {
+        const scoreData = await scoring(cache, databaseId, parsedSelector.name);
+        resolvedProfiles.push({
+          kind: 'pcd',
+          requestKey: profileSelector,
+          pcdName: parsedSelector.name,
+          scoreData,
+        });
+      } catch {
+        missingProfiles.push(profileSelector);
+      }
+      continue;
+    }
+
+    const source = sourceById.get(parsedSelector.sourceId);
+    if (!source || source.arrType !== arrType) {
+      missingProfiles.push(profileSelector);
+      continue;
+    }
+
+    const cachedEntity = trashGuideEntityCacheQueries
+      .getBySourceAndType(parsedSelector.sourceId, 'quality_profile')
+      .find((entity) => entity.name === parsedSelector.name);
+
+    if (!cachedEntity) {
+      missingProfiles.push(profileSelector);
+      continue;
+    }
+
+    const parsedEntity = parseCachedEntity(cachedEntity, 'quality_profile');
+    if (!parsedEntity) {
+      missingProfiles.push(profileSelector);
+      continue;
+    }
+
+    resolvedProfiles.push({
+      kind: 'trash',
+      requestKey: profileSelector,
+      sourceId: parsedSelector.sourceId,
+      trashName: parsedSelector.name,
+      entity: parsedEntity,
+    });
+  }
 
   if (missingProfiles.length > 0) {
     return json(
@@ -91,30 +186,6 @@ export const POST: RequestHandler = async ({ request }) => {
       },
       { status: 404 }
     );
-  }
-
-  const profileScoresByName = new Map<string, Awaited<ReturnType<typeof scoring>>>();
-
-  try {
-    for (const profileName of profileNames) {
-      const profileScoreData = await scoring(cache, databaseId, profileName);
-      profileScoresByName.set(profileName, profileScoreData);
-    }
-  } catch (err) {
-    if (err instanceof Error) {
-      const match = /^Quality profile (.+) not found$/.exec(err.message);
-      if (match) {
-        return json(
-          {
-            error: err.message,
-            missing: [match[1]],
-          },
-          { status: 404 }
-        );
-      }
-    }
-
-    throw err;
   }
 
   const customFormats = await getAllConditionsForEvaluation(cache);
@@ -127,17 +198,22 @@ export const POST: RequestHandler = async ({ request }) => {
     const parsed = parseResults.get(cacheKey);
 
     if (!parsed) {
-      const profileScores: SimulateProfileScore[] = profileNames.map((profileName) => {
-        const profileData = profileScoresByName.get(profileName);
-        if (!profileData) {
-          throw error(500, `Score data unavailable for profile ${profileName}`);
+      const profileScores: SimulateProfileScore[] = resolvedProfiles.map((profile) => {
+        if (profile.kind === 'pcd') {
+          return {
+            profileName: profile.requestKey,
+            totalScore: 0,
+            minimumScore: profile.scoreData.minimum_custom_format_score,
+            upgradeUntilScore: profile.scoreData.upgrade_until_score,
+            contributions: [],
+          };
         }
 
         return {
-          profileName,
+          profileName: profile.requestKey,
           totalScore: 0,
-          minimumScore: profileData.minimum_custom_format_score,
-          upgradeUntilScore: profileData.upgrade_until_score,
+          minimumScore: profile.entity.min_format_score,
+          upgradeUntilScore: profile.entity.cutoff_format_score,
           contributions: [],
         };
       });
@@ -175,13 +251,7 @@ export const POST: RequestHandler = async ({ request }) => {
       };
     });
 
-    const profileScores: SimulateProfileScore[] = profileNames.map((profileName) => {
-      const profileData = profileScoresByName.get(profileName);
-
-      if (!profileData) {
-        throw error(500, `Score data unavailable for profile ${profileName}`);
-      }
-
+    const profileScores: SimulateProfileScore[] = resolvedProfiles.map((profile) => {
       let totalScore = 0;
       const contributions: SimulateScoreContribution[] = [];
 
@@ -190,8 +260,14 @@ export const POST: RequestHandler = async ({ request }) => {
           continue;
         }
 
-        const cfScoring = profileData.customFormats.find((customFormat) => customFormat.name === cfMatch.name);
-        const score = cfScoring?.scores[arrType] ?? 0;
+        let score = 0;
+        if (profile.kind === 'pcd') {
+          const cfScoring = profile.scoreData.customFormats.find((customFormat) => customFormat.name === cfMatch.name);
+          score = cfScoring?.scores[arrType] ?? 0;
+        } else {
+          const formatItem = profile.entity.format_items.find((customFormat) => customFormat.name === cfMatch.name);
+          score = formatItem?.score ?? 0;
+        }
 
         if (score !== 0) {
           contributions.push({
@@ -203,11 +279,21 @@ export const POST: RequestHandler = async ({ request }) => {
         totalScore += score;
       }
 
+      if (profile.kind === 'pcd') {
+        return {
+          profileName: profile.requestKey,
+          totalScore,
+          minimumScore: profile.scoreData.minimum_custom_format_score,
+          upgradeUntilScore: profile.scoreData.upgrade_until_score,
+          contributions,
+        };
+      }
+
       return {
-        profileName,
+        profileName: profile.requestKey,
         totalScore,
-        minimumScore: profileData.minimum_custom_format_score,
-        upgradeUntilScore: profileData.upgrade_until_score,
+        minimumScore: profile.entity.min_format_score,
+        upgradeUntilScore: profile.entity.cutoff_format_score,
         contributions,
       };
     });

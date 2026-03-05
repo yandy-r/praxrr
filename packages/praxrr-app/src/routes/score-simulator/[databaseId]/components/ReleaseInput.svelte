@@ -6,22 +6,20 @@
 	import DropdownItem from '$ui/dropdown/DropdownItem.svelte';
 
 	type MediaType = 'movie' | 'series';
-	type ArrType = 'radarr' | 'sonarr' | null;
-
 	interface QualityProfileOption {
 		id: number;
 		name: string;
+		value: string;
+		displayName?: string;
 	}
 
 	interface ReleaseInputEvents {
 		input: { title: string };
 		profileChange: { profileName: string | null };
-		arrTypeChange: { arrType: ArrType };
 	}
 
 	export let title: string;
 	export let mediaType: MediaType;
-	export let arrType: ArrType;
 	export let qualityProfiles: QualityProfileOption[];
 	export let selectedProfileName: string | null;
 	export let isSimulating: boolean;
@@ -32,7 +30,7 @@
 	let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 	let profileDropdownOpen = false;
 
-	$: canSimulate = arrType !== null && Boolean(selectedProfileName);
+	$: canSimulate = Boolean(selectedProfileName);
 
 	function scheduleInputDispatch() {
 		if (debounceTimer) {
@@ -51,11 +49,7 @@
 
 	function selectMediaType(nextMediaType: MediaType) {
 		mediaType = nextMediaType;
-	}
-
-	function selectArrType(nextArrType: Exclude<ArrType, null>) {
-		arrType = nextArrType;
-		dispatch('arrTypeChange', { arrType: nextArrType });
+		dispatch('input', { title });
 	}
 
 	function selectProfile(profileName: string | null) {
@@ -88,7 +82,7 @@
 	<div class="space-y-1">
 		<h2 class="text-sm font-semibold text-neutral-900 dark:text-neutral-100">Release Input</h2>
 		<p class="text-xs text-neutral-500 dark:text-neutral-400">
-			Enter a release title, then choose media type, arr type, and quality profile.
+			Enter a release title, then choose media type and quality profile.
 		</p>
 	</div>
 
@@ -116,7 +110,7 @@
 		></textarea>
 	</div>
 
-	<div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+	<div class="space-y-1.5">
 		<div class="space-y-1.5">
 			<p class="text-xs font-medium text-neutral-700 dark:text-neutral-300">Media Type</p>
 			<div class="grid grid-cols-2 gap-2">
@@ -144,35 +138,6 @@
 				</button>
 			</div>
 		</div>
-
-		<div class="space-y-1.5">
-			<p class="text-xs font-medium text-neutral-700 dark:text-neutral-300">Arr Type</p>
-			<div class="grid grid-cols-2 gap-2">
-				<button
-					type="button"
-					class="rounded-lg border px-3 py-2 text-xs font-medium transition-colors {arrType ===
-					'radarr'
-						? 'border-accent-500 bg-accent-50 text-accent-700 dark:border-accent-400 dark:bg-accent-900/30 dark:text-accent-200'
-						: 'border-neutral-300 text-neutral-700 hover:bg-neutral-50 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800'}"
-					on:click={() => selectArrType('radarr')}
-				>
-					Radarr
-				</button>
-				<button
-					type="button"
-					class="rounded-lg border px-3 py-2 text-xs font-medium transition-colors {arrType ===
-					'sonarr'
-						? 'border-accent-500 bg-accent-50 text-accent-700 dark:border-accent-400 dark:bg-accent-900/30 dark:text-accent-200'
-						: 'border-neutral-300 text-neutral-700 hover:bg-neutral-50 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800'}"
-					on:click={() => selectArrType('sonarr')}
-				>
-					Sonarr
-				</button>
-			</div>
-			{#if arrType === null}
-				<p class="text-[11px] text-amber-700 dark:text-amber-300">Select an arr type to continue.</p>
-			{/if}
-		</div>
 	</div>
 
 	<div class="space-y-1.5">
@@ -184,25 +149,28 @@
 				on:click={() => (profileDropdownOpen = !profileDropdownOpen)}
 			>
 				<span class={selectedProfileName ? '' : 'text-neutral-400 dark:text-neutral-500'}>
-					{selectedProfileName ?? 'Select quality profile...'}
+					{qualityProfiles.find((profile) => profile.value === selectedProfileName)?.displayName ??
+						'Select quality profile...'}
 				</span>
 				<ChevronDown size={14} class="text-neutral-500 dark:text-neutral-400" />
 			</button>
 
 			{#if profileDropdownOpen}
 				<Dropdown position="left" minWidth="100%">
-					<DropdownItem
-						label="No Profile"
-						selected={selectedProfileName === null}
-						on:click={() => selectProfile(null)}
-					/>
-					{#each qualityProfiles as profile (profile.id)}
+					<div class="max-h-80 overflow-y-auto py-1">
 						<DropdownItem
-							label={profile.name}
-							selected={selectedProfileName === profile.name}
-							on:click={() => selectProfile(profile.name)}
+							label="No Profile"
+							selected={selectedProfileName === null}
+							on:click={() => selectProfile(null)}
 						/>
-					{/each}
+						{#each qualityProfiles as profile (profile.id)}
+							<DropdownItem
+								label={profile.displayName ?? profile.name}
+								selected={selectedProfileName === profile.value}
+								on:click={() => selectProfile(profile.value)}
+							/>
+						{/each}
+					</div>
 				</Dropdown>
 			{/if}
 		</div>

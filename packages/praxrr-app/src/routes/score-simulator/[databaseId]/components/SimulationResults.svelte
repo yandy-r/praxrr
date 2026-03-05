@@ -40,6 +40,7 @@
 
 	export let result: SimulateScoreResponse | null = null;
 	export let selectedProfileName: string | null = null;
+	export let selectedProfileLabel: string | null = null;
 	export let isSimulating: boolean = false;
 
 	let expandedRows: Set<string | number> = new Set();
@@ -215,8 +216,8 @@
 			<section class="space-y-3">
 				<div class="flex items-center justify-between">
 					<h3 class="text-sm font-semibold text-neutral-900 dark:text-neutral-100">Custom Format Matches</h3>
-					{#if selectedProfileName}
-						<Badge variant="neutral" size="sm">{selectedProfileName}</Badge>
+					{#if selectedProfileLabel ?? selectedProfileName}
+						<Badge variant="neutral" size="sm">{selectedProfileLabel ?? selectedProfileName}</Badge>
 					{/if}
 				</div>
 

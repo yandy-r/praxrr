@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onMount, onDestroy } from 'svelte';
 	import { browser } from '$app/environment';
 	import Tabs from '$ui/navigation/tabs/Tabs.svelte';
 	import { alertStore } from '$lib/client/alerts/store';
@@ -13,22 +13,27 @@
 	type SimulateProfileScore = components['schemas']['SimulateProfileScore'];
 	type MediaType = components['schemas']['MediaType'];
 	type ArrType = components['schemas']['SimulateScoreRequest']['arrType'];
+	interface SimulatorProfileOption {
+		id: number;
+		name: string;
+		value: string;
+		displayName: string;
+	}
 
 	export let data: PageData;
 
 	const databaseStorageKey = 'scoreSimulatorDatabase';
 	const titleStorageKey = 'scoreSimulator.lastTitle';
 	const profileStorageKey = 'scoreSimulator.lastProfileName';
-	const arrTypeStorageKey = 'scoreSimulator.lastArrType';
 
 	let releaseTitle = '';
 	let mediaType: MediaType = 'movie';
-	let selectedArrType: ArrType | null = null;
 	let selectedProfileName: string | null = null;
 	let simulationResult: SimulateScoreResponse | null = null;
 	let isSimulating = false;
 	let simulationRequestToken = 0;
 	let parserAvailable = data.parserAvailable;
+	let parserHealthInterval: ReturnType<typeof setInterval> | null = null;
 
 	$: tabs = data.databases.map((db) => ({
 		label: db.name,
@@ -36,10 +41,24 @@
 		active: db.id === data.currentDatabase.id
 	}));
 
-	$: qualityProfileOptions = data.qualityProfiles.map((profile) => ({
-		id: profile.id,
-		name: profile.name
-	}));
+	$: qualityProfileOptions = (data.qualityProfiles as Array<{
+		id: number;
+		name: string;
+		value?: string;
+		displayName?: string;
+	}>).map(
+		(profile): SimulatorProfileOption => ({
+			id: profile.id,
+			name: profile.name,
+			value: profile.value ?? `pcd:${encodeURIComponent(profile.name)}`,
+			displayName: profile.displayName ?? profile.name
+		})
+	);
+	$: selectedProfileLabel =
+		selectedProfileName === null
+			? null
+			: qualityProfileOptions.find((profile) => profile.value === selectedProfileName)?.displayName ??
+				selectedProfileName;
 
 	$: selectedProfileScore = getSelectedProfileScore(simulationResult, selectedProfileName);
 
@@ -53,7 +72,21 @@
 		}
 
 		restorePersistedState();
+		void refreshParserAvailability();
 		void simulate();
+
+		parserHealthInterval = setInterval(() => {
+			if (!parserAvailable) {
+				void refreshParserAvailability();
+			}
+		}, 3000);
+	});
+
+	onDestroy(() => {
+		if (parserHealthInterval) {
+			clearInterval(parserHealthInterval);
+			parserHealthInterval = null;
+		}
 	});
 
 	$: if (browser) {
@@ -65,23 +98,18 @@
 		} else {
 			localStorage.removeItem(profileStorageKey);
 		}
-
-		if (selectedArrType) {
-			localStorage.setItem(arrTypeStorageKey, selectedArrType);
-		} else {
-			localStorage.removeItem(arrTypeStorageKey);
-		}
 	}
 
 	async function simulate() {
 		const title = releaseTitle.trim();
-		if (!title || !selectedProfileName || !selectedArrType) {
+		if (!title || !selectedProfileName) {
 			simulationResult = null;
 			return;
 		}
 
 		const requestToken = ++simulationRequestToken;
 		isSimulating = true;
+		const arrType: ArrType = mediaType === 'movie' ? 'radarr' : 'sonarr';
 
 		try {
 			const response = await fetch('/api/v1/simulate/score', {
@@ -91,7 +119,7 @@
 					databaseId: data.currentDatabase.id,
 					releases: [{ id: generateReleaseId(), title, type: mediaType }],
 					profileNames: [selectedProfileName],
-					arrType: selectedArrType
+					arrType
 				})
 			});
 
@@ -120,6 +148,22 @@
 		}
 	}
 
+	async function refreshParserAvailability() {
+		try {
+			const response = await fetch('/api/v1/parser/health');
+			if (!response.ok) {
+				return;
+			}
+
+			const payload = (await response.json()) as { parserAvailable?: boolean };
+			if (typeof payload.parserAvailable === 'boolean') {
+				parserAvailable = payload.parserAvailable;
+			}
+		} catch {
+			// Keep current availability state and retry on interval.
+		}
+	}
+
 	function generateReleaseId(): string {
 		if (typeof globalThis.crypto !== 'undefined' && typeof globalThis.crypto.randomUUID === 'function') {
 			return globalThis.crypto.randomUUID();
@@ -137,24 +181,14 @@
 		void simulate();
 	}
 
-	function handleArrTypeChange(event: CustomEvent<{ arrType: ArrType | null }>) {
-		selectedArrType = event.detail.arrType;
-		void simulate();
-	}
-
 	function restorePersistedState() {
 		const storedTitle = localStorage.getItem(titleStorageKey);
 		if (storedTitle) {
 			releaseTitle = storedTitle;
 		}
 
-		const storedArrType = localStorage.getItem(arrTypeStorageKey);
-		if (storedArrType === 'radarr' || storedArrType === 'sonarr') {
-			selectedArrType = storedArrType;
-		}
-
 		const storedProfileName = localStorage.getItem(profileStorageKey);
-		if (storedProfileName && data.qualityProfiles.some((profile) => profile.name === storedProfileName)) {
+		if (storedProfileName && qualityProfileOptions.some((profile) => profile.value === storedProfileName)) {
 			selectedProfileName = storedProfileName;
 		}
 	}
@@ -188,21 +222,24 @@
 			<ReleaseInput
 				bind:title={releaseTitle}
 				bind:mediaType
-				bind:arrType={selectedArrType}
 				bind:selectedProfileName
 				qualityProfiles={qualityProfileOptions}
 				{isSimulating}
 				{parserAvailable}
 				on:input={handleReleaseInput}
 				on:profileChange={handleProfileChange}
-				on:arrTypeChange={handleArrTypeChange}
 			/>
 
 			<ScoreBreakdown profileScore={selectedProfileScore} />
 		</div>
 
 		<div>
-			<SimulationResults result={simulationResult} {selectedProfileName} {isSimulating} />
+			<SimulationResults
+				result={simulationResult}
+				{selectedProfileName}
+				{selectedProfileLabel}
+				{isSimulating}
+			/>
 		</div>
 	</div>
 </div>
