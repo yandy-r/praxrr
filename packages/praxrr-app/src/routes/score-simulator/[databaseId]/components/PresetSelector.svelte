@@ -74,7 +74,11 @@
               </p>
             {/if}
           </div>
-          <DropdownItem label="{group.titles.length} titles — Load all" compact on:click={() => selectPreset(group)} />
+          <DropdownItem
+            label={`${group.titles.length} titles - Load all`}
+            compact
+            onSelect={() => selectPreset(group)}
+          />
         {/each}
       </div>
     </Dropdown>

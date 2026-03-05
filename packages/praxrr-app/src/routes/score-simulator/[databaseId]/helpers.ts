@@ -100,6 +100,16 @@ export function sortScoreContributionsByMagnitude(
 
 const MAX_BATCH_TITLES = 50;
 const MAX_TITLE_LENGTH = 500;
+let releaseIdCounter = 0;
+
+function createReleaseId(): string {
+  if (typeof globalThis.crypto !== 'undefined' && typeof globalThis.crypto.randomUUID === 'function') {
+    return globalThis.crypto.randomUUID();
+  }
+
+  releaseIdCounter += 1;
+  return `release-${Date.now()}-${releaseIdCounter}-${Math.random().toString(36).slice(2, 10)}`;
+}
 
 export function parseBatchTitles(rawText: string, mediaType: MediaType): SimulateReleaseInput[] {
   if (!rawText.trim()) {
@@ -120,7 +130,7 @@ export function parseBatchTitles(rawText: string, mediaType: MediaType): Simulat
     }
 
     results.push({
-      id: crypto.randomUUID(),
+      id: createReleaseId(),
       title: trimmed,
       type: mediaType,
     });

@@ -67,7 +67,7 @@
               <DropdownItem
                 label={profile.displayName ?? profile.name}
                 selected={comparisonProfileName === profile.value}
-                on:click={() => selectProfile(profile.value)}
+                onSelect={() => selectProfile(profile.value)}
               />
             {/each}
           </div>
