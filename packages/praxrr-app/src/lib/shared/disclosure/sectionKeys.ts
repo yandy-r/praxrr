@@ -54,6 +54,9 @@ export const REGEX_METADATA = 'regular-expressions:general:metadata' as const;
 // -- Metadata Profiles --
 export const MP_TYPE_SELECTION = 'metadata-profiles:general:type-selection' as const;
 
+// -- Score Simulator --
+export const SS_ADVANCED_OPTIONS = 'score-simulator:simulator:advanced-options' as const;
+
 export const SECTION_KEYS = [
   CF_CONDITIONS,
   CF_SCORING,
@@ -74,6 +77,7 @@ export const SECTION_KEYS = [
   SETTINGS_SECURITY_SESSIONS,
   REGEX_METADATA,
   MP_TYPE_SELECTION,
+  SS_ADVANCED_OPTIONS,
 ] as const;
 
 export type SectionKey = (typeof SECTION_KEYS)[number];
