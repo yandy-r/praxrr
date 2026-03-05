@@ -43,6 +43,27 @@ openapi:
             schema:
               type: object
 
+parser-health:
+  get:
+    operationId: getParserHealth
+    summary: Parser health check
+    description: Returns the availability status of the release title parser service.
+    tags:
+      - System
+    responses:
+      '200':
+        description: Parser health status
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - parserAvailable
+              properties:
+                parserAvailable:
+                  type: boolean
+                  description: Whether the parser service is reachable and healthy
+
 startup-pull-latest:
   get:
     operationId: getLatestStartupPull

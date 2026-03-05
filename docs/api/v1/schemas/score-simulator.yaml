@@ -1,0 +1,165 @@
+SimulateConditionResult:
+  type: object
+  required:
+    - conditionName
+    - conditionType
+    - matched
+    - required
+    - negate
+    - passes
+    - expected
+    - actual
+  properties:
+    conditionName:
+      type: string
+    conditionType:
+      type: string
+    matched:
+      type: boolean
+    required:
+      type: boolean
+    negate:
+      type: boolean
+    passes:
+      type: boolean
+    expected:
+      type: string
+    actual:
+      type: string
+
+SimulateCfMatch:
+  type: object
+  required:
+    - name
+    - matches
+    - conditions
+  properties:
+    name:
+      type: string
+    matches:
+      type: boolean
+    conditions:
+      type: array
+      items:
+        $ref: '#/SimulateConditionResult'
+
+SimulateScoreContribution:
+  type: object
+  required:
+    - cfName
+    - score
+  properties:
+    cfName:
+      type: string
+    score:
+      type: integer
+
+SimulateProfileScore:
+  type: object
+  required:
+    - profileName
+    - totalScore
+    - minimumScore
+    - upgradeUntilScore
+    - contributions
+  properties:
+    profileName:
+      type: string
+    totalScore:
+      type: integer
+    minimumScore:
+      type: integer
+    upgradeUntilScore:
+      type: integer
+    contributions:
+      type: array
+      items:
+        $ref: '#/SimulateScoreContribution'
+
+SimulateReleaseResult:
+  type: object
+  required:
+    - id
+    - title
+    - parsed
+    - cfMatches
+    - profileScores
+  properties:
+    id:
+      type: string
+    title:
+      type: string
+    parsed:
+      oneOf:
+        - $ref: '../schemas/entity-testing.yaml#/ParsedInfo'
+        - type: 'null'
+    cfMatches:
+      type: array
+      items:
+        $ref: '#/SimulateCfMatch'
+    profileScores:
+      type: array
+      items:
+        $ref: '#/SimulateProfileScore'
+
+SimulateReleaseInput:
+  type: object
+  required:
+    - id
+    - title
+    - type
+  properties:
+    id:
+      type: string
+      description: Client-generated correlation ID
+    title:
+      type: string
+      description: Release title to parse and evaluate
+    type:
+      type: string
+      enum:
+        - movie
+        - series
+
+SimulateScoreRequest:
+  type: object
+  required:
+    - databaseId
+    - releases
+    - profileNames
+    - arrType
+  properties:
+    databaseId:
+      type: integer
+      description: PCD database instance ID
+    releases:
+      type: array
+      maxItems: 50
+      description: Release titles to simulate (max 50)
+      items:
+        $ref: '#/SimulateReleaseInput'
+    profileNames:
+      type: array
+      maxItems: 10
+      description: Quality profile names to score against (max 10)
+      items:
+        type: string
+    arrType:
+      type: string
+      enum:
+        - radarr
+        - sonarr
+      description: Arr type for score column resolution
+
+SimulateScoreResponse:
+  type: object
+  required:
+    - parserAvailable
+    - results
+  properties:
+    parserAvailable:
+      type: boolean
+    results:
+      type: array
+      items:
+        $ref: '#/SimulateReleaseResult'

@@ -16,6 +16,8 @@ tags:
     description: System health and status endpoints
   - name: Entity Testing
     description: Release parsing and custom format evaluation
+  - name: Score Simulator
+    description: Interactive release scoring playground
   - name: Arr
     description: Arr instance library and release endpoints
   - name: Trash Guide
@@ -32,6 +34,8 @@ paths:
     $ref: './paths/system.yaml#/health'
   /openapi.json:
     $ref: './paths/system.yaml#/openapi'
+  /parser/health:
+    $ref: './paths/system.yaml#/parser-health'
   /system/startup-pull/latest:
     $ref: './paths/system.yaml#/startup-pull-latest'
   /ui-preferences:
@@ -144,6 +148,8 @@ paths:
                 $ref: '#/components/schemas/PcdErrorResponse'
   /entity-testing/evaluate:
     $ref: './paths/entity-testing.yaml#/evaluate'
+  /simulate/score:
+    $ref: './paths/score-simulator.yaml#/score'
   /arr/library:
     $ref: './paths/arr.yaml#/library'
   /arr/library/episodes:
@@ -505,6 +511,23 @@ components:
       $ref: './schemas/entity-testing.yaml#/EvaluateRequest'
     EvaluateResponse:
       $ref: './schemas/entity-testing.yaml#/EvaluateResponse'
+    # Score Simulator
+    SimulateConditionResult:
+      $ref: './schemas/score-simulator.yaml#/SimulateConditionResult'
+    SimulateCfMatch:
+      $ref: './schemas/score-simulator.yaml#/SimulateCfMatch'
+    SimulateScoreContribution:
+      $ref: './schemas/score-simulator.yaml#/SimulateScoreContribution'
+    SimulateProfileScore:
+      $ref: './schemas/score-simulator.yaml#/SimulateProfileScore'
+    SimulateReleaseResult:
+      $ref: './schemas/score-simulator.yaml#/SimulateReleaseResult'
+    SimulateReleaseInput:
+      $ref: './schemas/score-simulator.yaml#/SimulateReleaseInput'
+    SimulateScoreRequest:
+      $ref: './schemas/score-simulator.yaml#/SimulateScoreRequest'
+    SimulateScoreResponse:
+      $ref: './schemas/score-simulator.yaml#/SimulateScoreResponse'
     # Arr - Shared
     ArrType:
       $ref: './schemas/arr.yaml#/ArrType'

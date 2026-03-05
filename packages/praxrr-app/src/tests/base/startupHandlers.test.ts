@@ -23,27 +23,26 @@ import type { StartupPullInstanceInput } from '../../lib/server/pull/startup/typ
 
 function createThrowingClient(error: unknown): BaseArrClient {
   return {
-    // eslint-disable-next-line @typescript-eslint/require-await
     getQualityProfiles: async () => {
       throw error;
     },
-    // eslint-disable-next-line @typescript-eslint/require-await
+
     getDelayProfiles: async () => {
       throw error;
     },
-    // eslint-disable-next-line @typescript-eslint/require-await
+
     getNamingConfig: async () => {
       throw error;
     },
-    // eslint-disable-next-line @typescript-eslint/require-await
+
     getMediaManagementConfig: async () => {
       throw error;
     },
-    // eslint-disable-next-line @typescript-eslint/require-await
+
     getQualityDefinitions: async () => {
       throw error;
     },
-    // eslint-disable-next-line @typescript-eslint/require-await
+
     getMetadataProfiles: async () => {
       throw error;
     },

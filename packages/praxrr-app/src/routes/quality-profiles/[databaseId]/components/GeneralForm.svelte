@@ -263,7 +263,7 @@
 										label="Language"
 										name="language-search"
 										value={languageSearchQuery}
-										description={`Set the preferred language for this profile. Leave empty for "Any". Radarr only. Sonarr uses custom formats for language filtering.`}
+										description="Set the preferred language for this profile. Leave empty for &quot;Any&quot;. Radarr only. Sonarr uses custom formats for language filtering."
 										placeholder="Search for a language..."
 										on:input={(e) => handleLanguageInput(e.detail)}
 										on:focus={handleLanguageFocus}
@@ -297,7 +297,7 @@
 										label="Language"
 										name="language-search"
 										value={languageSearchQuery}
-										description={`Set the preferred language for this profile. Leave empty for "Any". Radarr only. Sonarr uses custom formats for language filtering.`}
+										description="Set the preferred language for this profile. Leave empty for &quot;Any&quot;. Radarr only. Sonarr uses custom formats for language filtering."
 										placeholder="Search for a language..."
 										on:input={(e) => handleLanguageInput(e.detail)}
 										on:focus={handleLanguageFocus}

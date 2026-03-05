@@ -4,9 +4,10 @@ import { databaseInstancesQueries } from '$db/queries/databaseInstances.ts';
 import { pcdOpsQueries } from '$db/queries/pcdOps.ts';
 import { pcdOpHistoryQueries } from '$db/queries/pcdOpHistory.ts';
 import { logger } from '$logger/logger.ts';
-import { compile, pcdManager } from '$pcd/index.ts';
+import { compile } from '$pcd/index.ts';
 import { listDraftEntityChanges } from '$pcd/ops/draftChanges.ts';
 import { exportDraftOps, previewDraftOps } from '$pcd/ops/exporter.ts';
+import { enqueueManualPcdSync } from '$jobs/helpers/pcdSyncQueue.ts';
 import { uuid } from '$shared/utils/uuid.ts';
 
 export const load: PageServerLoad = async ({ parent }) => {
@@ -222,16 +223,29 @@ export const actions: Actions = {
     }
 
     try {
-      const result = await pcdManager.sync(id);
+      const result = enqueueManualPcdSync(id);
 
-      if (result.success) {
-        await logger.info('Database synced', {
-          source: 'changes',
-          meta: { databaseId: id, commitsPulled: result.commitsBehind },
-        });
+      if (result.status === 'already_running') {
+        return {
+          success: true,
+          alreadyRunning: true,
+          queued: false,
+          message: 'Sync already running',
+          job: result.job,
+        };
       }
 
-      return result;
+      await logger.info('Database sync queued', {
+        source: 'changes',
+        meta: { databaseId: id, queueId: result.job.id },
+      });
+
+      return {
+        success: true,
+        queued: true,
+        message: 'Sync queued',
+        job: result.job,
+      };
     } catch (err) {
       await logger.error('Failed to pull changes', {
         source: 'changes',

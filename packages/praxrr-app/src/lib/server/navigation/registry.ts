@@ -192,6 +192,18 @@ export const NAV_REGISTRY: ArrCapabilityAwareNavItem[] = [
     requiredFeature: 'metadata_profiles',
   },
   {
+    id: 'policies.score_simulator',
+    label: 'Score Simulator',
+    href: '/score-simulator',
+    groupId: ensureGroupId('policies'),
+    order: 6,
+    arrScope: scopeAll,
+    mobilePriority: 'medium',
+    iconKey: 'Calculator',
+    emoji: '🧮',
+    hasChildren: false,
+  },
+  {
     id: 'settings.settings',
     label: 'Settings',
     href: '/settings',

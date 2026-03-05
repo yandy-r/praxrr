@@ -16,6 +16,14 @@ conditions:
     languages:
       - name: English
         except: false
+  - name: Unknown
+    type: language
+    arrType: all
+    negate: true
+    required: true
+    languages:
+      - name: Unknown
+        except: false
   - name: Original
     type: language
     arrType: all

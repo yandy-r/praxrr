@@ -11,13 +11,41 @@ const dbSyncHandler: JobHandler = async (job) => {
     return { status: 'failure', error: 'Invalid database ID' };
   }
 
+  const isManualTrigger = job.source === 'manual';
+
   const instance = databaseInstancesQueries.getById(databaseId);
   if (!instance || instance.enabled === 0) {
     return { status: 'cancelled', output: 'Database sync disabled' };
   }
 
-  if (instance.sync_strategy <= 0) {
+  if (!isManualTrigger && instance.sync_strategy <= 0) {
     return { status: 'cancelled', output: 'Auto-sync disabled' };
+  }
+
+  if (isManualTrigger) {
+    try {
+      const syncResult = await pcdManager.sync(databaseId);
+      if (!syncResult.success) {
+        return {
+          status: 'failure',
+          error: syncResult.error ?? 'Sync failed',
+        };
+      }
+
+      return {
+        status: 'success',
+        output: `Pulled ${syncResult.commitsBehind} update(s)`,
+      };
+    } catch (error) {
+      await logger.error('Manual database sync job failed', {
+        source: 'DbSyncJob',
+        meta: { jobId: job.id, databaseId, databaseName: instance.name, error },
+      });
+      return {
+        status: 'failure',
+        error: error instanceof Error ? error.message : String(error),
+      };
+    }
   }
 
   const scheduledFromLastRun = calculateNextRunFromMinutes(instance.last_synced_at, instance.sync_strategy);

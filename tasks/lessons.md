@@ -71,3 +71,10 @@
 ## 2026-03-04
 
 - When introducing generic key-preserving return types (for example `Record<K, ...>` on disclosure helpers), update consumer signatures to `SectionKey` and import shared types from `$shared/disclosure/sectionKeys.ts` instead of store-local type imports to avoid `svelte-check` export/type widening regressions.
+
+## 2026-03-05
+
+- For browser-side IDs in Svelte routes, do not assume `crypto.randomUUID()` exists in all runtime contexts (dev containers/webviews); always guard it and provide a deterministic fallback string generator.
+- Do not gate client actions on one-time `PageData` health flags for external services (like parser); treat initial server health as advisory and keep runtime retries enabled so UI recovers after dependency restarts.
+- When debugging dev-container issues, distinguish page reload behavior from Docker watch hot-rebuild behavior; validate recovery across container restart events, not just route navigation.
+- For compose watch flows, verify dependency containers are in `Up` state (not `Created`); if parser is required for app runtime, start it explicitly before launching watch so app rebuilds do not silently run without parser.

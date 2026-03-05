@@ -51,6 +51,26 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/parser/health': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Parser health check
+     * @description Returns the availability status of the release title parser service.
+     */
+    get: operations['getParserHealth'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/system/startup-pull/latest': {
     parameters: {
       query?: never;
@@ -88,6 +108,35 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/ui-preferences': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Read one UI preference
+     * @description Returns the preferred disclosure mode for a section key.
+     *
+     *     Missing persisted values are returned as default `basic` unless `strict`
+     *     is enabled.
+     */
+    get: operations['getUiPreference'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    /**
+     * Upsert one UI preference
+     * @description Creates or updates the stored disclosure mode for a section key.
+     *
+     *     Payloads include optional concurrency token `expected_updated_at`.
+     */
+    patch: operations['upsertUiPreference'];
+    trace?: never;
+  };
   '/entity-testing/evaluate': {
     parameters: {
       query?: never;
@@ -110,6 +159,27 @@ export interface paths {
      *     Results are cached for performance - repeated requests with the same titles will be faster.
      */
     post: operations['evaluateReleases'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/simulate/score': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Simulate custom format scoring for releases
+     * @description Parses release titles, evaluates custom format matches, and calculates
+     *     per-profile scores for interactive score simulation.
+     */
+    post: operations['simulateScore'];
     delete?: never;
     options?: never;
     head?: never;
@@ -425,7 +495,8 @@ export interface paths {
     /**
      * Get PCD snapshot detail
      * @description Returns full snapshot detail including computed fields for restore context
-     *     (opsWrittenSince, isRestorable).
+     *     (opsWrittenSince, isRestorable). Restore support is not yet implemented,
+     *     so `isRestorable` is always false.
      */
     get: operations['getPcdSnapshot'];
     put?: never;
@@ -604,6 +675,64 @@ export interface components {
       parserAvailable: boolean;
       /** @description Evaluation results for each release */
       evaluations: components['schemas']['ReleaseEvaluation'][];
+    };
+    SimulateConditionResult: {
+      conditionName: string;
+      conditionType: string;
+      matched: boolean;
+      required: boolean;
+      negate: boolean;
+      passes: boolean;
+      expected: string;
+      actual: string;
+    };
+    SimulateCfMatch: {
+      name: string;
+      matches: boolean;
+      conditions: components['schemas']['SimulateConditionResult'][];
+    };
+    SimulateScoreContribution: {
+      cfName: string;
+      score: number;
+    };
+    SimulateProfileScore: {
+      profileName: string;
+      totalScore: number;
+      minimumScore: number;
+      upgradeUntilScore: number;
+      contributions: components['schemas']['SimulateScoreContribution'][];
+    };
+    SimulateReleaseResult: {
+      id: string;
+      title: string;
+      parsed: components['schemas']['ParsedInfo'] | null;
+      cfMatches: components['schemas']['SimulateCfMatch'][];
+      profileScores: components['schemas']['SimulateProfileScore'][];
+    };
+    SimulateReleaseInput: {
+      /** @description Client-generated correlation ID */
+      id: string;
+      /** @description Release title to parse and evaluate */
+      title: string;
+      /** @enum {string} */
+      type: 'movie' | 'series';
+    };
+    SimulateScoreRequest: {
+      /** @description PCD database instance ID */
+      databaseId: number;
+      /** @description Release titles to simulate (max 50) */
+      releases: components['schemas']['SimulateReleaseInput'][];
+      /** @description Quality profile names to score against (max 10) */
+      profileNames: string[];
+      /**
+       * @description Arr type for score column resolution
+       * @enum {string}
+       */
+      arrType: 'radarr' | 'sonarr';
+    };
+    SimulateScoreResponse: {
+      parserAvailable: boolean;
+      results: components['schemas']['SimulateReleaseResult'][];
     };
     /**
      * @description Type of Arr instance
@@ -1135,6 +1264,29 @@ export interface components {
     PcdErrorResponse: {
       error: string;
     };
+    /** @description Canonical progressive disclosure section key */
+    UiSectionKey: string;
+    /**
+     * @description Disclosure visibility mode for the section
+     * @enum {string}
+     */
+    UiPreferenceMode: 'basic' | 'advanced';
+    UiPreferenceRecord: {
+      section_key: components['schemas']['UiSectionKey'];
+      mode: components['schemas']['UiPreferenceMode'];
+      /** Format: date-time */
+      updated_at: string | null;
+      persisted: boolean;
+    };
+    UiPreferenceUpsertRequest: {
+      section_key: components['schemas']['UiSectionKey'];
+      mode: components['schemas']['UiPreferenceMode'];
+      /**
+       * Format: date-time
+       * @description Optional optimistic concurrency token
+       */
+      expected_updated_at?: string | null;
+    };
     ImportRequest: {
       /** @description The PCD database ID to import into */
       databaseId: number;
@@ -1196,7 +1348,7 @@ export interface components {
       opsCountBase: number;
       /** @description Count of published user-origin ops */
       opsCountUser: number;
-      /** @description SHA-256 state fingerprint (state_hash_v1) */
+      /** @description SHA-256 state fingerprint */
       cacheStateHash: string | null;
       /** @description Arr instance IDs targeted by this operation */
       targetInstanceIds: number[] | null;
@@ -1204,9 +1356,9 @@ export interface components {
       createdAt: string;
     };
     PcdSnapshotFullDetail: components['schemas']['PcdSnapshotDetail'] & {
-      /** @description Number of ops written after this snapshot */
+      /** @description Number of ops written after this snapshot (count of pcd_ops rows with id greater than opsSequenceMaxId) */
       opsWrittenSince: number;
-      /** @description Whether this snapshot can theoretically be restored */
+      /** @description Always false in this release. Restore support is not yet implemented. */
       isRestorable: boolean;
     };
     PcdSnapshotListResponse: {
@@ -1666,6 +1818,29 @@ export interface operations {
       };
     };
   };
+  getParserHealth: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Parser health status */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': {
+            /** @description Whether the parser service is reachable and healthy */
+            parserAvailable: boolean;
+          };
+        };
+      };
+    };
+  };
   getLatestStartupPull: {
     parameters: {
       query?: never;
@@ -1700,6 +1875,136 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+    };
+  };
+  getUiPreference: {
+    parameters: {
+      query: {
+        /** @description Canonical section key for progressive disclosure state */
+        section_key: components['schemas']['UiSectionKey'];
+        /** @description When true, missing rows return 404 instead of default response */
+        strict?: boolean;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description UI preference record */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['UiPreferenceRecord'];
+        };
+      };
+      /** @description Invalid query parameter */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PcdErrorResponse'];
+        };
+      };
+      /** @description Authentication required */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PcdErrorResponse'];
+        };
+      };
+      /** @description Preference not found for strict read */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PcdErrorResponse'];
+        };
+      };
+      /** @description Failed to read preference */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PcdErrorResponse'];
+        };
+      };
+    };
+  };
+  upsertUiPreference: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['UiPreferenceUpsertRequest'];
+      };
+    };
+    responses: {
+      /** @description UI preference persisted */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['UiPreferenceRecord'];
+        };
+      };
+      /** @description Validation error */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PcdErrorResponse'];
+        };
+      };
+      /** @description Authentication required */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PcdErrorResponse'];
+        };
+      };
+      /** @description Concurrency conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PcdErrorResponse'];
+        };
+      };
+      /** @description Preference updates are being rate-limited */
+      429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PcdErrorResponse'];
+        };
+      };
+      /** @description Failed to save preference */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PcdErrorResponse'];
         };
       };
     };
@@ -1739,6 +2044,64 @@ export interface operations {
           [name: string]: unknown;
         };
         content?: never;
+      };
+    };
+  };
+  simulateScore: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['SimulateScoreRequest'];
+      };
+    };
+    responses: {
+      /** @description Score simulation results */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['SimulateScoreResponse'];
+        };
+      };
+      /** @description Invalid request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': {
+            error: string;
+          };
+        };
+      };
+      /** @description Database or profile not found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': {
+            error: string;
+            missing: string[];
+          };
+        };
+      };
+      /** @description Internal server error */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': {
+            error: string;
+          };
+        };
       };
     };
   };
