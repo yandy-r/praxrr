@@ -98,6 +98,7 @@ Deno.test('pcdManager: import orchestration surfaces import failures directly', 
     __testOnly_setBuildPublishedRepoBaseOpIndex(() => ({
       stableIdentityToOpIds: new Map(),
       legacyIdentityToOpIds: new Map(),
+      filenamePrefixToOpIds: new Map(),
     }));
     restores.push(__testOnly_resetBuildPublishedRepoBaseOpIndex);
     __testOnly_setReadMigrationEntitySources(() => Promise.resolve({ candidates: [candidate], issues: [] }));
@@ -159,6 +160,7 @@ Deno.test('pcdManager: successful migration import still continues orchestration
     __testOnly_setBuildPublishedRepoBaseOpIndex(() => ({
       stableIdentityToOpIds: new Map(),
       legacyIdentityToOpIds: new Map(),
+      filenamePrefixToOpIds: new Map(),
     }));
     restores.push(__testOnly_resetBuildPublishedRepoBaseOpIndex);
     __testOnly_setReadMigrationEntitySources(() => Promise.resolve({ candidates: [candidate], issues: [] }));

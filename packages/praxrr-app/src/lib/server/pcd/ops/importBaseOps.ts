@@ -62,7 +62,21 @@ type ParsedPcdOpMetadata = {
 type RepoOpIndex = {
   stableIdentityToOpIds: Map<string, number[]>;
   legacyIdentityToOpIds: Map<string, number[]>;
+  filenamePrefixToOpIds: Map<string, number[]>;
 };
+
+function repoEntityFilenamePrefix(relativePath: string): string {
+  return `${ENTITY_OP_FILENAME_PREFIX}${relativePath}`;
+}
+
+function opFilenamePrefix(filename: string): string {
+  const hashIndex = filename.indexOf('#');
+  if (hashIndex === -1) {
+    return filename;
+  }
+
+  return filename.slice(0, hashIndex);
+}
 
 function stableIdentityLookupKey(identity: MigrationEntityStableIdentity): string {
   return `${identity.key}${ENTITY_KEY_SEPARATOR}${identity.value}`;
@@ -83,14 +97,24 @@ function parsePcdOpMetadata(rawMetadata: string | null): ParsedPcdOpMetadata | n
 
 function buildPublishedRepoBaseOpIndex(databaseId: number): RepoOpIndex {
   const ops = pcdOpsQueries.listByDatabaseAndOrigin(databaseId, 'base', {
-    source: 'repo',
     states: ['published'],
   });
 
   const stableIdentityToOpIds = new Map<string, number[]>();
   const legacyIdentityToOpIds = new Map<string, number[]>();
+  const filenamePrefixToOpIds = new Map<string, number[]>();
 
   for (const op of ops) {
+    if (op.filename && op.filename.startsWith(ENTITY_OP_FILENAME_PREFIX)) {
+      const prefix = opFilenamePrefix(op.filename);
+      const ids = filenamePrefixToOpIds.get(prefix);
+      if (ids) {
+        ids.push(op.id);
+      } else {
+        filenamePrefixToOpIds.set(prefix, [op.id]);
+      }
+    }
+
     const parsed = parsePcdOpMetadata(op.metadata);
     if (!parsed) continue;
 
@@ -120,12 +144,13 @@ function buildPublishedRepoBaseOpIndex(databaseId: number): RepoOpIndex {
     }
   }
 
-  return { stableIdentityToOpIds, legacyIdentityToOpIds };
+  return { stableIdentityToOpIds, legacyIdentityToOpIds, filenamePrefixToOpIds };
 }
 
 function matchingPublishedRepoBaseOpIds(index: RepoOpIndex, candidate: MigrationEntityCandidate): number[] {
   const stableKey = stableIdentityLookupKey(candidate.stableIdentity);
   const legacyKey = legacyIdentityLookupKey(candidate.entityType, candidate.stableIdentity.value);
+  const filenamePrefix = repoEntityFilenamePrefix(candidate.relativePath);
 
   const matched: number[] = [];
   const seen = new Set<number>();
@@ -143,6 +168,16 @@ function matchingPublishedRepoBaseOpIds(index: RepoOpIndex, candidate: Migration
   const legacyMatchIds = index.legacyIdentityToOpIds.get(legacyKey);
   if (legacyMatchIds) {
     for (const id of legacyMatchIds) {
+      if (!seen.has(id)) {
+        seen.add(id);
+        matched.push(id);
+      }
+    }
+  }
+
+  const filenameMatchIds = index.filenamePrefixToOpIds.get(filenamePrefix);
+  if (filenameMatchIds) {
+    for (const id of filenameMatchIds) {
       if (!seen.has(id)) {
         seen.add(id);
         matched.push(id);
@@ -329,33 +364,38 @@ export async function importBaseOps(databaseId: number, pcdPath: string): Promis
   let imported = 0;
 
   if (migrationCandidates.length > 0) {
-    await compileForTests(pcdPath, databaseId);
-    const sortedCandidates = sortMigrationCandidatesByImportOrder(migrationCandidates);
-    let repoOpIndex: RepoOpIndex | null = null;
+    const repoOpIndex = buildPublishedRepoBaseOpIndexForTests(databaseId);
+    const repoOpIdsToRefresh = new Set<number>();
 
-    for (let i = 0; i < sortedCandidates.length; i++) {
-      const candidate = sortedCandidates[i];
-      const cache = getCacheForTests(databaseId);
-      if (!cache) {
-        throw new Error(`Cache not available while importing migration entity "${candidate.relativePath}"`);
-      }
-
-      if (repoOpIndex === null) {
-        repoOpIndex = buildPublishedRepoBaseOpIndexForTests(databaseId);
-      }
-
+    for (const candidate of migrationCandidates) {
       const matchingRepoOpIds = matchingPublishedRepoBaseOpIds(repoOpIndex, candidate);
-      if (matchingRepoOpIds.length > 0) {
-        let refreshedAny = false;
+      for (const opId of matchingRepoOpIds) {
+        repoOpIdsToRefresh.add(opId);
+      }
+    }
 
-        for (const opId of matchingRepoOpIds) {
-          const updated = pcdOpsQueries.update(opId, { lastSeenInRepoAt: seenAt });
-          if (updated) {
-            refreshedAny = true;
-          }
+    const orphanedForRefresh: number[] = [];
+    if (repoOpIdsToRefresh.size > 0) {
+      for (const opId of repoOpIdsToRefresh) {
+        const updated = pcdOpsQueries.update(opId, { state: 'orphaned' });
+        if (updated) {
+          orphanedForRefresh.push(opId);
+        }
+      }
+    }
+
+    await compileForTests(pcdPath, databaseId);
+
+    const sortedCandidates = sortMigrationCandidatesByImportOrder(migrationCandidates);
+    try {
+      for (let i = 0; i < sortedCandidates.length; i++) {
+        const candidate = sortedCandidates[i];
+        const cache = getCacheForTests(databaseId);
+        if (!cache) {
+          throw new Error(`Cache not available while importing migration entity "${candidate.relativePath}"`);
         }
 
-        if (refreshedAny) {
+        if (hasBaseEntityByStableIdentity(cache, candidate.stableIdentity)) {
           await logger.warn(`Skipping existing base import entity "${candidate.relativePath}"`, {
             source: 'PCDImporter',
             meta: {
@@ -366,52 +406,50 @@ export async function importBaseOps(databaseId: number, pcdPath: string): Promis
           });
           continue;
         }
-      }
 
-      if (hasBaseEntityByStableIdentity(cache, candidate.stableIdentity)) {
-        await logger.warn(`Skipping existing base import entity "${candidate.relativePath}"`, {
-          source: 'PCDImporter',
-          meta: {
-            databaseId,
-            entityType: candidate.entityType,
-            stableIdentity: `${candidate.stableIdentity.key}=${candidate.stableIdentity.value}`,
+        await withRepoImportWriteContextForTests(
+          {
+            filenamePrefix: `${ENTITY_OP_FILENAME_PREFIX}${candidate.relativePath}`,
+            sequenceStart: YAML_SEQUENCE_BASE + i * YAML_SEQUENCE_STRIDE,
+            maxOperations: YAML_SEQUENCE_STRIDE,
+            lastSeenInRepoAt: seenAt,
           },
-        });
-        continue;
+          async () => {
+            const result = await candidate.deserialize({
+              databaseId,
+              cache,
+              layer: 'base',
+              data: candidate.portable,
+            });
+
+            if (!isDeserializeResult(result)) {
+              throw new Error(
+                `Failed to import migration entity "${candidate.relativePath}": invalid deserialize result`
+              );
+            }
+
+            if (result.success === false) {
+              const error = result.error ?? 'unknown write failure';
+              throw new Error(`Failed to import migration entity "${candidate.relativePath}": ${error}`);
+            }
+          }
+        );
+
+        imported += 1;
       }
 
-      await withRepoImportWriteContextForTests(
-        {
-          filenamePrefix: `${ENTITY_OP_FILENAME_PREFIX}${candidate.relativePath}`,
-          sequenceStart: YAML_SEQUENCE_BASE + i * YAML_SEQUENCE_STRIDE,
-          maxOperations: YAML_SEQUENCE_STRIDE,
-          lastSeenInRepoAt: seenAt,
-        },
-        async () => {
-          const result = await candidate.deserialize({
-            databaseId,
-            cache,
-            layer: 'base',
-            data: candidate.portable,
-          });
-
-          if (!isDeserializeResult(result)) {
-            throw new Error(
-              `Failed to import migration entity "${candidate.relativePath}": invalid deserialize result`
-            );
-          }
-
-          if (result.success === false) {
-            const error = result.error ?? 'unknown write failure';
-            throw new Error(`Failed to import migration entity "${candidate.relativePath}": ${error}`);
-          }
+      await compileForTests(pcdPath, databaseId);
+    } catch (error) {
+      if (orphanedForRefresh.length > 0) {
+        for (const opId of orphanedForRefresh) {
+          pcdOpsQueries.update(opId, { state: 'published' });
         }
-      );
 
-      imported += 1;
+        await compileForTests(pcdPath, databaseId);
+      }
+
+      throw error;
     }
-
-    await compileForTests(pcdPath, databaseId);
   }
 
   const orphaned = pcdOpsQueries.markBaseOrphaned(databaseId, seenAt);

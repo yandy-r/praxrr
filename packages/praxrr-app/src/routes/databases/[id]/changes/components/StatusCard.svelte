@@ -61,7 +61,7 @@
 
 		syncing = true;
 		try {
-			// Just refresh the data (fetches from remote to check for updates)
+			// Trigger a full sync/pull flow via parent handler.
 			if (onSync) await onSync();
 		} finally {
 			syncing = false;

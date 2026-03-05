@@ -676,3 +676,106 @@ Deno.test('simulate score: calculates correct scores with positive and negative 
     restore.restore();
   }
 });
+
+Deno.test('simulate score: Not Original or English does not penalize unknown language', async () => {
+  const originalListSources = trashGuideManager.listSources;
+  trashGuideManager.listSources = (() => []) as typeof trashGuideManager.listSources;
+  const databaseId = 6005;
+  const restore = installParserCacheStubs();
+  restore.reset();
+  parserClientModule.clearParserVersionCache();
+  parserParserState.setHealthAvailable(true);
+  parserParserState.setVersion('local-parser-v3');
+
+  const fixture = createPcdCacheFixture(`
+    INSERT OR IGNORE INTO languages (name)
+    VALUES ('Unknown'), ('English'), ('Original');
+
+    INSERT INTO quality_profiles (id, name, minimum_custom_format_score, upgrade_until_score)
+    VALUES (1, 'Language Profile', 0, 0);
+
+    INSERT INTO custom_formats (name)
+    VALUES ('Not Original or English');
+
+    INSERT INTO custom_format_conditions (custom_format_name, name, type, arr_type, negate, required)
+    VALUES ('Not Original or English', 'English', 'language', 'all', 1, 1);
+    INSERT INTO custom_format_conditions (custom_format_name, name, type, arr_type, negate, required)
+    VALUES ('Not Original or English', 'Unknown', 'language', 'all', 1, 1);
+    INSERT INTO custom_format_conditions (custom_format_name, name, type, arr_type, negate, required)
+    VALUES ('Not Original or English', 'Original', 'language', 'all', 1, 1);
+
+    INSERT INTO condition_languages (custom_format_name, condition_name, language_name, except_language)
+    VALUES ('Not Original or English', 'English', 'English', 0);
+    INSERT INTO condition_languages (custom_format_name, condition_name, language_name, except_language)
+    VALUES ('Not Original or English', 'Unknown', 'Unknown', 0);
+    INSERT INTO condition_languages (custom_format_name, condition_name, language_name, except_language)
+    VALUES ('Not Original or English', 'Original', 'Original', 0);
+
+    INSERT INTO quality_profile_custom_formats (quality_profile_name, custom_format_name, arr_type, score)
+    VALUES ('Language Profile', 'Not Original or English', 'radarr', -999999);
+  `);
+
+  setCache(databaseId, fixture.cache);
+
+  const releases = [
+    {
+      id: 'unknown-language-release',
+      title: 'Movie.2024.2160p.WEB-DL',
+      type: 'movie' as const,
+    },
+    {
+      id: 'foreign-language-release',
+      title: 'Movie.2024.FRENCH.2160p.WEB-DL',
+      type: 'movie' as const,
+    },
+  ];
+
+  const commonParse = {
+    ...BASE_PARSE_RESPONSE,
+    type: 'movie' as const,
+  };
+  parserParserState.setParseResponse('Movie.2024.2160p.WEB-DL', {
+    ...commonParse,
+    title: 'Movie.2024.2160p.WEB-DL',
+    languages: ['Unknown'],
+  });
+  parserParserState.setParseResponse('Movie.2024.FRENCH.2160p.WEB-DL', {
+    ...commonParse,
+    title: 'Movie.2024.FRENCH.2160p.WEB-DL',
+    languages: ['French'],
+  });
+
+  try {
+    const response = await scoreRouteModule.POST(
+      buildEvent({
+        databaseId,
+        arrType: 'radarr',
+        profileNames: ['pcd:Language Profile'],
+        releases,
+      })
+    );
+    const body = (await response.json()) as SimulatedScoreResponse;
+
+    assertEquals(response.status, 200);
+    assertEquals(body.parserAvailable, true);
+    assertEquals(body.results.length, 2);
+
+    const unknown = body.results.find((result) => result.id === 'unknown-language-release');
+    const foreign = body.results.find((result) => result.id === 'foreign-language-release');
+
+    assertEquals(unknown?.profileScores[0].totalScore, 0);
+    assertEquals(unknown?.profileScores[0].contributions, []);
+    assertEquals(unknown?.cfMatches.find((cf) => cf.name === 'Not Original or English')?.matches, false);
+
+    assertEquals(foreign?.profileScores[0].totalScore, -999999);
+    assertEquals(foreign?.profileScores[0].contributions, [{ cfName: 'Not Original or English', score: -999999 }]);
+    assertEquals(foreign?.cfMatches.find((cf) => cf.name === 'Not Original or English')?.matches, true);
+  } finally {
+    trashGuideManager.listSources = originalListSources;
+    deleteCache(databaseId);
+    await fixture.destroy();
+    parserParserState.clearResponses();
+    parserParserState.setVersion('local-parser-v1');
+    restore.restore();
+  }
+});

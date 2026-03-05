@@ -527,10 +527,21 @@
 			const isSuccess =
 				result.type === 'success' || result.type === 'redirect' || result.data?.success;
 			const errorMsg = result.data?.error || result.error;
+			const alreadyRunning = result.data?.alreadyRunning || result.alreadyRunning;
+			const queued = result.data?.queued || result.queued;
+			const queuedJobId = result.data?.job?.id ?? result.job?.id;
 
 			if (isSuccess && !errorMsg) {
-				const commits = result.data?.commitsBehind || incomingChanges?.commitsBehind || 0;
-				alertStore.add('success', `Pulled ${commits} commit${commits === 1 ? '' : 's'}`);
+				if (alreadyRunning) {
+					alertStore.add('info', 'Sync already running in background');
+				} else if (queued) {
+					alertStore.add(
+						'success',
+						`Sync queued${queuedJobId ? ` (job #${queuedJobId})` : ''}`
+					);
+				} else {
+					alertStore.add('success', 'Sync requested');
+				}
 			} else {
 				alertStore.add('error', `Pull failed: ${errorMsg || 'Unknown error'}`);
 			}
@@ -668,7 +679,7 @@
 			</div>
 		</div>
 	{:else}
-		<StatusCard {status} {repoInfo} {branches} database={data.database} onSync={fetchChanges} />
+		<StatusCard {status} {repoInfo} {branches} database={data.database} onSync={handlePull} />
 	{/if}
 
 	<!-- Incoming Changes Section -->
