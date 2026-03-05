@@ -2,8 +2,8 @@
 
 ### Issue Creation Template - Multiple
 
-Go through the @docs/plans/score-simulator plan and lets create github issues to track the feature
-implementation.
+Go through the @docs/plans/score-simulator-phase2 plan and lets create github issues to track the
+feature implementation.
 
 - group tasks together that logically fit (no need for an issue per task)
 - Make sure the issues are properly labeled
