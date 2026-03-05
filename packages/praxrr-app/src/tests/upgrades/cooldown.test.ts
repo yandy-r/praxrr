@@ -271,7 +271,7 @@ class CooldownTest extends BaseTest {
 
       // Step 1: Initial state - no tags exist, 3 matched items
       let allTags: RadarrTag[] = [];
-      let items = [
+      const items = [
         { id: 1, title: 'Movie A', _tags: [] as number[] },
         { id: 2, title: 'Movie B', _tags: [] as number[] },
         { id: 3, title: 'Movie C', _tags: [] as number[] },
