@@ -33,7 +33,7 @@ feature implementation.
 
 ## PR Review Correction
 
-Let's validate and fix important issues 5-8
+Let's validate and fix suggestion issues 9-11
 
 - file: [@pr-176-review.md](file://docs/pr-reviews/pr-176-review.md)
 - validate before implementing

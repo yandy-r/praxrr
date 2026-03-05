@@ -90,8 +90,9 @@ SimulateReleaseResult:
     title:
       type: string
     parsed:
-      $ref: '../schemas/entity-testing.yaml#/ParsedInfo'
-      nullable: true
+      oneOf:
+        - $ref: '../schemas/entity-testing.yaml#/ParsedInfo'
+        - type: 'null'
     cfMatches:
       type: array
       items:

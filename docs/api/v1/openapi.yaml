@@ -34,6 +34,8 @@ paths:
     $ref: './paths/system.yaml#/health'
   /openapi.json:
     $ref: './paths/system.yaml#/openapi'
+  /parser/health:
+    $ref: './paths/system.yaml#/parser-health'
   /system/startup-pull/latest:
     $ref: './paths/system.yaml#/startup-pull-latest'
   /ui-preferences:

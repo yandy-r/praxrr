@@ -9,7 +9,8 @@
 		Bookmark,
 		CircleCheck,
 		CircleX,
-		Loader2
+		Loader2,
+		TriangleAlert
 	} from 'lucide-svelte';
 	import type { ComponentType } from 'svelte';
 	import ExpandableTable from '$ui/table/ExpandableTable.svelte';
@@ -101,8 +102,10 @@
 		return a.name.localeCompare(b.name);
 	}
 
+	$: parseFailed = releaseResult !== null && releaseResult.parsed === null;
+
 	function buildMetadataBadges(release: SimulateReleaseResult | null): MetadataBadgeItem[] {
-		if (!release) return [];
+		if (!release || !release.parsed) return [];
 
 		const parsed = release.parsed;
 		return [
@@ -198,6 +201,16 @@
 				Select a quality profile to show scoring results.
 			</div>
 		{:else}
+			{#if parseFailed}
+				<div
+					class="flex items-center gap-2 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-300"
+				>
+					<TriangleAlert size={16} class="shrink-0" />
+					<span>Parser could not parse this release title. Metadata and custom format matching are unavailable.</span>
+				</div>
+			{/if}
+
+			{#if !parseFailed}
 			<section class="space-y-3">
 				<h3 class="text-sm font-semibold text-neutral-900 dark:text-neutral-100">Parsed Metadata</h3>
 				<div class="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
@@ -313,6 +326,7 @@
 					</svelte:fragment>
 				</ExpandableTable>
 			</section>
+			{/if}
 		{/if}
 	</div>
 </div>

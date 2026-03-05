@@ -96,43 +96,38 @@ if (!match) {
 
 ## Important Issues (should fix)
 
-### 5. `fallbackParsedInfo()` masks parse failures with fake data
+> **Status: Issues 5-7 resolved. Issue 8 deferred** — the entire UI codebase uses Svelte 4 event patterns; migrating one component would create inconsistent mixed patterns.
+
+### 5. ~~`fallbackParsedInfo()` masks parse failures with fake data~~ RESOLVED
 
 **File:** `packages/praxrr-app/src/routes/api/v1/simulate/score/+server.ts:51-62, 218-249`
 
 When `parseResults.get(cacheKey)` returns null, the code returns `fallbackParsedInfo()` with `source: 'Unknown'`, zero scores, and all CFs non-matching. The user sees what looks like a valid-but-empty result with no indication that parsing failed. Violates CLAUDE.md: "Do not use fallbacks."
 
-**Fix:** Add a `parseError` boolean field to `SimulateReleaseResult` so the client can display a warning distinguishing "parsed with no matches" from "parse failure."
+**Fix:** Return `parsed: null` (schema already had `nullable: true`). Deleted `fallbackParsedInfo()`. Client shows a parse failure warning banner when `parsed === null`.
 
-### 6. Generic error alert discards server error details
+### 6. ~~Generic error alert discards server error details~~ RESOLVED
 
 **File:** `packages/praxrr-app/src/routes/score-simulator/[databaseId]/+page.svelte:131-148`
 
 When `response.ok` is false, the response body (which contains structured errors like `{ error: 'Quality profiles not found', missing: [...] }`) is discarded. The user always sees "Failed to run score simulation." regardless of the actual error.
 
-**Fix:** Read the error response body and include specifics in the alert:
+**Fix:** Reads server error body before throwing; catch block now surfaces `err.message` in the alert.
 
-```typescript
-if (!response.ok) {
-  const errorBody = await response.json().catch(() => null);
-  const message =
-    errorBody?.error ?? `Simulation failed (HTTP ${response.status})`;
-  throw new Error(message);
-}
-```
-
-### 7. Parser health endpoint missing formatting and OpenAPI contract
+### 7. ~~Parser health endpoint missing formatting and OpenAPI contract~~ RESOLVED
 
 **File:** `packages/praxrr-app/src/routes/api/v1/parser/health/+server.ts`
 
 - Missing semicolons throughout (violates Prettier conventions)
 - No OpenAPI spec definition exists for this new `/api/v1/` endpoint (violates "Contract-first API")
 
-### 8. `on:click` / `on:input` used instead of `onclick` / `oninput`
+**Fix:** Formatted with Prettier. Added OpenAPI spec in `system.yaml` and `openapi.yaml`. Regenerated API types.
+
+### 8. `on:click` / `on:input` used instead of `onclick` / `oninput` — DEFERRED
 
 **Files:** `ReleaseInput.svelte`, `[databaseId]/+page.svelte`
 
-CLAUDE.md: "Svelte 5, no runes. Use `onclick` handlers." New components use `on:click`, `on:input`, and `createEventDispatcher` (Svelte 4 pattern). Lower priority given mixed codebase, but new code should follow the documented convention.
+CLAUDE.md: "Svelte 5, no runes. Use `onclick` handlers." New components use `on:click`, `on:input`, and `createEventDispatcher` (Svelte 4 pattern). Deferred to a codebase-wide migration — the entire UI component library uses Svelte 4 event forwarding patterns.
 
 ---
 

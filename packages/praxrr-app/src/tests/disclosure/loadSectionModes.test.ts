@@ -1,5 +1,8 @@
 import { assertEquals } from '@std/assert';
-import { userInterfacePreferencesQueries, type UserInterfacePreference } from '$db/queries/user_interface_preferences.ts';
+import {
+  userInterfacePreferencesQueries,
+  type UserInterfacePreference,
+} from '$db/queries/user_interface_preferences.ts';
 import { loadSectionModes } from '$lib/server/disclosure/loadSectionModes.ts';
 import { CF_CONDITIONS, CF_SCORING, type SectionKey, type UiPreferenceMode } from '$shared/disclosure/sectionKeys.ts';
 

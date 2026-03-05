@@ -129,7 +129,9 @@
       });
 
       if (!response.ok) {
-        throw new Error('Simulation request failed');
+        const errorBody = await response.json().catch(() => null);
+        const message = errorBody?.error ?? `Simulation failed (HTTP ${response.status})`;
+        throw new Error(message);
       }
 
       const result = (await response.json()) as SimulateScoreResponse;
@@ -145,7 +147,7 @@
       }
 
       console.error('Score simulation failed:', err);
-      alertStore.add('error', 'Failed to run score simulation.');
+      alertStore.add('error', err instanceof Error ? err.message : 'Failed to run score simulation.');
     } finally {
       if (requestToken === simulationRequestToken) {
         isSimulating = false;

@@ -20,7 +20,6 @@ type SimulateReleaseResult = components['schemas']['SimulateReleaseResult'];
 type SimulateCfMatch = components['schemas']['SimulateCfMatch'];
 type SimulateProfileScore = components['schemas']['SimulateProfileScore'];
 type SimulateScoreContribution = components['schemas']['SimulateScoreContribution'];
-type ParsedInfo = components['schemas']['ParsedInfo'];
 type PcdProfileScoreData = Awaited<ReturnType<typeof scoring>>;
 
 interface ResolvedPcdProfile {
@@ -48,19 +47,6 @@ function isReleaseType(value: unknown): value is 'movie' | 'series' {
   return value === 'movie' || value === 'series';
 }
 
-function fallbackParsedInfo(): ParsedInfo {
-  return {
-    source: 'Unknown',
-    resolution: 'Unknown',
-    modifier: 'None',
-    languages: [],
-    releaseGroup: null,
-    year: 0,
-    edition: null,
-    releaseType: null,
-  };
-}
-
 function parseProfileSelector(
   selector: string
 ): { kind: 'pcd'; name: string } | { kind: 'trash'; sourceId: number; name: string } {
@@ -74,10 +60,7 @@ function parseProfileSelector(
   if (selector.startsWith('trash:')) {
     const match = /^trash:(\d+):(.*)$/.exec(selector);
     if (!match) {
-      throw error(
-        400,
-        `Invalid trash profile selector format: "${selector}". Expected "trash:<sourceId>:<name>"`
-      );
+      throw error(400, `Invalid trash profile selector format: "${selector}". Expected "trash:<sourceId>:<name>"`);
     }
 
     return {
@@ -259,7 +242,7 @@ export const POST: RequestHandler = async ({ request }) => {
       return {
         id: release.id,
         title: release.title,
-        parsed: fallbackParsedInfo(),
+        parsed: null,
         cfMatches: customFormats.map((customFormat) => ({
           name: customFormat.name,
           matches: false,

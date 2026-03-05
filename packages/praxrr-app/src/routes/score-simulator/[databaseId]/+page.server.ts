@@ -51,7 +51,7 @@ export const load: ServerLoad = async ({ params }) => {
         id: row.id,
         name: row.name,
         value: `trash:${source.id}:${encodeURIComponent(row.name)}`,
-        displayName: `${row.name} (TRaSH ${source.name})`
+        displayName: `${row.name} (TRaSH ${source.name})`,
       }));
   });
 
@@ -60,7 +60,7 @@ export const load: ServerLoad = async ({ params }) => {
       id: profile.id,
       name: profile.name,
       value: `pcd:${encodeURIComponent(profile.name)}`,
-      displayName: profile.name
+      displayName: profile.name,
     })),
     ...trashProfiles,
   ];
