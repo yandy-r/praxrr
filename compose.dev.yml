@@ -57,9 +57,11 @@ services:
       - PULL_ON_START=true
       - PULL_ON_START_MAX_CONCURRENCY=2
       - PULL_ON_START_TIMEOUT_MS=30000
+    restart: unless-stopped
     depends_on:
       parser:
         condition: service_healthy
+        restart: true
     develop:
       watch:
         - action: rebuild
@@ -124,6 +126,7 @@ services:
     hostname: parser-dev
     expose:
       - '5000'
+    restart: unless-stopped
     develop:
       watch:
         - action: rebuild
