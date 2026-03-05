@@ -40,6 +40,12 @@
   function clearComparison() {
     selectProfile(null);
   }
+
+  function handleKeydown(event: KeyboardEvent) {
+    if (event.key === 'Escape') {
+      dropdownOpen = false;
+    }
+  }
 </script>
 
 <div class="space-y-1.5">
@@ -53,6 +59,7 @@
           : 'text-neutral-700 hover:bg-neutral-50 dark:text-neutral-300 dark:hover:bg-neutral-700'}"
         disabled={isDisabled}
         on:click={() => (dropdownOpen = !dropdownOpen)}
+        on:keydown={handleKeydown}
       >
         <span class={comparisonProfileName ? '' : 'text-neutral-400 dark:text-neutral-500'}>
           {selectedLabel ?? 'Select comparison profile...'}
