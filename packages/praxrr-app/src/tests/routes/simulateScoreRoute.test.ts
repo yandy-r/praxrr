@@ -161,6 +161,20 @@ function buildEvent(
   } as Parameters<typeof scoreRouteModule.POST>[0];
 }
 
+function buildRawEvent(
+  rawBody: string,
+): Parameters<typeof scoreRouteModule.POST>[0] {
+  return {
+    request: new Request("http://localhost/api/v1/simulate/score", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: rawBody,
+    }),
+  } as Parameters<typeof scoreRouteModule.POST>[0];
+}
+
 function createPcdCacheFixture(seedSql: string): InMemoryResponseCacheFixture {
   const sqlite = new Database(":memory:", { int64: true });
   const kb = new Kysely<PCDDatabase>({
@@ -466,6 +480,37 @@ Deno.test("simulate score: validates request limits", async (t) => {
             title: `Movie ${i}`,
             type: "movie" as const,
           })),
+        }),
+      )
+    );
+    assertEquals(getErrorStatus(error), 400);
+  });
+
+  await t.step("rejects malformed JSON body", async () => {
+    const error = await assertRejects(async () =>
+      scoreRouteModule.POST(buildRawEvent("{not valid json"))
+    );
+    assertEquals(getErrorStatus(error), 400);
+  });
+
+  await t.step("rejects non-number databaseId", async () => {
+    const error = await assertRejects(async () =>
+      scoreRouteModule.POST(
+        buildEvent({
+          ...basePayload,
+          databaseId: "abc" as unknown as number,
+        }),
+      )
+    );
+    assertEquals(getErrorStatus(error), 400);
+  });
+
+  await t.step("rejects malformed trash selector", async () => {
+    const error = await assertRejects(async () =>
+      scoreRouteModule.POST(
+        buildEvent({
+          ...basePayload,
+          profileNames: ["trash:abc:invalid"],
         }),
       )
     );

@@ -74,7 +74,10 @@ function parseProfileSelector(
   if (selector.startsWith('trash:')) {
     const match = /^trash:(\d+):(.*)$/.exec(selector);
     if (!match) {
-      return { kind: 'pcd', name: selector };
+      throw error(
+        400,
+        `Invalid trash profile selector format: "${selector}". Expected "trash:<sourceId>:<name>"`
+      );
     }
 
     return {
@@ -89,8 +92,17 @@ function parseProfileSelector(
 }
 
 export const POST: RequestHandler = async ({ request }) => {
-  const body: SimulateScoreRequest = await request.json();
+  let body: SimulateScoreRequest;
+  try {
+    body = await request.json();
+  } catch {
+    throw error(400, 'Invalid request body: expected valid JSON');
+  }
   const { databaseId, releases, profileNames, arrType } = body;
+
+  if (typeof databaseId !== 'number' || !Number.isFinite(databaseId)) {
+    throw error(400, 'databaseId must be a finite number');
+  }
 
   if (!isArrType(arrType)) {
     throw error(400, 'Invalid arrType. Expected one of: radarr, sonarr');
@@ -123,6 +135,10 @@ export const POST: RequestHandler = async ({ request }) => {
     if (!isReleaseType(release.type)) {
       throw error(400, `releases[${i}].type: must be one of "movie", "series"`);
     }
+  }
+
+  for (const selector of profileNames) {
+    parseProfileSelector(selector);
   }
 
   const parserAvailable = await isParserHealthy();
@@ -160,8 +176,12 @@ export const POST: RequestHandler = async ({ request }) => {
           pcdName: parsedSelector.name,
           scoreData,
         });
-      } catch {
-        missingProfiles.push(profileSelector);
+      } catch (err) {
+        if (err instanceof Error && err.message.includes('not found')) {
+          missingProfiles.push(profileSelector);
+        } else {
+          throw error(500, `Failed to load scoring data for profile "${parsedSelector.name}"`);
+        }
       }
       continue;
     }
