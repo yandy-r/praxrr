@@ -1,5 +1,4 @@
-import { json, error } from '@sveltejs/kit';
-import type { RequestHandler } from './$types';
+import { json, error, type RequestHandler } from '@sveltejs/kit';
 import { pcdManager } from '$pcd/index.ts';
 import { parseWithCacheBatch, isParserHealthy, matchPatternsBatch } from '$lib/server/utils/arr/parser/index.ts';
 import {
@@ -45,6 +44,10 @@ function isArrType(value: string): value is SimulateScoreRequest['arrType'] {
   return value === 'radarr' || value === 'sonarr';
 }
 
+function isReleaseType(value: unknown): value is 'movie' | 'series' {
+  return value === 'movie' || value === 'series';
+}
+
 function fallbackParsedInfo(): ParsedInfo {
   return {
     source: 'Unknown',
@@ -58,7 +61,9 @@ function fallbackParsedInfo(): ParsedInfo {
   };
 }
 
-function parseProfileSelector(selector: string): { kind: 'pcd'; name: string } | { kind: 'trash'; sourceId: number; name: string } {
+function parseProfileSelector(
+  selector: string
+): { kind: 'pcd'; name: string } | { kind: 'trash'; sourceId: number; name: string } {
   if (selector.startsWith('pcd:')) {
     return {
       kind: 'pcd',
@@ -105,6 +110,19 @@ export const POST: RequestHandler = async ({ request }) => {
 
   if (releases.length > 50) {
     throw error(400, 'releases exceeds maximum of 50');
+  }
+
+  for (let i = 0; i < releases.length; i++) {
+    const release = releases[i];
+    if (typeof release !== 'object' || release === null) {
+      throw error(400, `releases[${i}]: must be an object`);
+    }
+    if (typeof release.title !== 'string' || release.title.trim() === '') {
+      throw error(400, `releases[${i}].title: must be a non-empty string`);
+    }
+    if (!isReleaseType(release.type)) {
+      throw error(400, `releases[${i}].type: must be one of "movie", "series"`);
+    }
   }
 
   const parserAvailable = await isParserHealthy();

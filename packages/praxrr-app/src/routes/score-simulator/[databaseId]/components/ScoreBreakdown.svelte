@@ -3,39 +3,22 @@
 	import CustomFormatBadge from '$ui/arr/CustomFormatBadge.svelte';
 	import Badge from '$ui/badge/Badge.svelte';
 	import type { components } from '$api/v1.d.ts';
+	import { resolveScoreThresholdState, sortScoreContributionsByMagnitude, type ScoreThresholdState } from '../helpers.ts';
 
 	type SimulateProfileScore = components['schemas']['SimulateProfileScore'];
-	type SimulateScoreContribution = components['schemas']['SimulateScoreContribution'];
 
 	export let profileScore: SimulateProfileScore | null = null;
 
-	type ThresholdState = 'below' | 'accepted' | 'upgrade-reached';
-	let thresholdState: ThresholdState | null = null;
+	let thresholdState: ScoreThresholdState | null = null;
 
 	$: totalScore = profileScore?.totalScore ?? 0;
 	$: minimumScore = profileScore?.minimumScore ?? 0;
 	$: upgradeUntilScore = profileScore?.upgradeUntilScore ?? 0;
 
-	$: {
-		if (!profileScore) {
-			thresholdState = null;
-		} else if (totalScore < minimumScore) {
-			thresholdState = 'below';
-		} else if (totalScore < upgradeUntilScore) {
-			thresholdState = 'accepted';
-		} else {
-			thresholdState = 'upgrade-reached';
-		}
-	}
+	$: thresholdState = resolveScoreThresholdState(profileScore);
+	$: contributions = profileScore ? sortScoreContributionsByMagnitude(profileScore.contributions) : [];
 
-	$: contributions = profileScore
-		? [...profileScore.contributions].sort(
-				(a: SimulateScoreContribution, b: SimulateScoreContribution) =>
-					Math.abs(b.score) - Math.abs(a.score)
-			)
-		: [];
-
-	function thresholdLabel(state: ThresholdState): string {
+	function thresholdLabel(state: ScoreThresholdState): string {
 		if (state === 'below') return 'Below Minimum';
 		if (state === 'accepted') return 'Accepted - Upgrades Enabled';
 		return 'Upgrade Until Reached';
@@ -64,9 +47,9 @@
 					<Badge
 						variant={thresholdState === 'below' ? 'danger' : 'success'}
 						size="md"
-						><span class={thresholdState === 'upgrade-reached' ? 'opacity-70' : ''}
-							>{thresholdLabel(thresholdState)}</span
-						></Badge
+						><span class={thresholdState === 'upgrade-reached' ? 'opacity-70' : ''}>
+							{thresholdLabel(thresholdState)}
+						</span></Badge
 					>
 				{/if}
 			</div>
@@ -88,9 +71,7 @@
 					<ul class="space-y-2">
 						{#each contributions as contribution (contribution.cfName)}
 							<li
-								class="flex items-center justify-between gap-3 rounded-md border border-neutral-200 px-2.5 py-2 dark:border-neutral-800 {contribution.score === 0
-									? 'opacity-60'
-									: ''}"
+								class="flex items-center justify-between gap-3 rounded-md border border-neutral-200 px-2.5 py-2 dark:border-neutral-800"
 							>
 								<CustomFormatBadge
 									name={contribution.cfName}
