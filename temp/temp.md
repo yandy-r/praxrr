@@ -1,6 +1,7 @@
 ## Issue Creation Template - Multiple
 
-Go through the @docs/plans/enhance-progressive-disclosure plan and lets create github issues to track the feature implementation.
+Go through the @docs/plans/score-simulator plan and lets create github issues to track the feature
+implementation.
 
 - group tasks together that logically fit (no need for an issue per task)
 - Make sure the issues are properly labeled
@@ -11,11 +12,13 @@ Go through the @docs/plans/enhance-progressive-disclosure plan and lets create g
 - this will be read by AI agents so make it consumable and actionable for them to execute
 - no relative http(s) links, as those break inside the issue pointing to /issue/{#}/{link}
 - only relative directory links to files
-  - such as [@docs/plans/{feature-name}/parallel-plan.md](file:///home/yandy/Projects/github.com/yandy-r/praxrr/docs/plans/{feature-name}/parallel-plan.md)
+  - such as
+    [@docs/plans/{feature-name}/parallel-plan.md](file://docs/plans/{feature-name}/parallel-plan.md)
 
 ## Issue Creation Template - Single
 
-Go through the @docs/plans/progressive-disclosure plan and lets create a github issue to track the feature implementation.
+Go through the @docs/plans/progressive-disclosure plan and lets create a github issue to track the
+feature implementation.
 
 - Make sure the issue is properly labeled
 - Labels must include feat:{feature-name} additive of any other labels
@@ -25,7 +28,8 @@ Go through the @docs/plans/progressive-disclosure plan and lets create a github 
 - this will be read by AI agents so make it consumable and actionable for them to execute
 - no relative http(s) links, as those break inside the issue pointing to /issue/{#}/{link}
 - only relative directory links to files
-  - such as [@docs/plans/{feature-name}/parallel-plan.md](file:///home/yandy/Projects/github.com/yandy-r/praxrr/docs/plans/{feature-name}/parallel-plan.md)
+  - such as
+    [@docs/plans/{feature-name}/parallel-plan.md](file://docs/plans/{feature-name}/parallel-plan.md)
 
 ## PR Review Correction
 
