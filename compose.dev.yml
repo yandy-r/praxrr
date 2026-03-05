@@ -1,8 +1,14 @@
 # Development compose - builds from source
-# Usage: docker compose -f compose.dev.yml up --build --watch
+# Usage:
+#   docker compose -f compose.dev.yml --profile dev up --build --watch
+#   docker compose -f compose.dev.yml --profile arr up -d lidarr radarr sonarr
 
 services:
   praxrr:
+    profiles: ['dev']
+    container_name: praxrr-dev
+    hostname: praxrr-dev
+    restart: unless-stopped
     build:
       context: .
       dockerfile: Dockerfile
@@ -19,7 +25,7 @@ services:
       - TZ=Etc/UTC
       # - PORT=6868
       # - HOST=0.0.0.0
-      - PARSER_HOST=parser
+      - PARSER_HOST=parser-dev
       - PARSER_PORT=5000
       - AUTH=on
       - E2E_USERNAME=${E2E_USERNAME:-praxrr-e2e}
@@ -56,7 +62,6 @@ services:
       - PULL_ON_START=true
       - PULL_ON_START_MAX_CONCURRENCY=2
       - PULL_ON_START_TIMEOUT_MS=30000
-    restart: unless-stopped
     depends_on:
       parser:
         condition: service_healthy
@@ -117,12 +122,15 @@ services:
           path: ./compose.dev.yml
 
   parser:
+    profiles: ['dev']
+    container_name: parser-dev
+    hostname: parser-dev
+    restart: unless-stopped
     build:
       context: .
       dockerfile: Dockerfile.parser
     expose:
       - '5000'
-    restart: unless-stopped
     develop:
       watch:
         - action: rebuild
@@ -139,3 +147,51 @@ services:
             - .eslintignore
         - action: rebuild
           path: ./Dockerfile.parser
+
+  radarr:
+    profiles: ['arr']
+    container_name: praxrr-radarr
+    hostname: praxrr-radarr
+    image: lscr.io/linuxserver/radarr:latest
+    restart: unless-stopped
+    ports:
+      - 17878:7878
+    environment:
+      - PUID=${PUID:-1000}
+      - PGID=${PGID:-1000}
+      - TZ=Etc/UTC
+    volumes:
+      - ./.arr/radarr:/config
+      - ./.arr/radarr/data:/data
+
+  sonarr:
+    profiles: ['arr']
+    container_name: praxrr-sonarr
+    hostname: praxrr-sonarr
+    image: lscr.io/linuxserver/sonarr:latest
+    restart: unless-stopped
+    ports:
+      - 18989:8989
+    environment:
+      - PUID=${PUID:-1000}
+      - PGID=${PGID:-1000}
+      - TZ=Etc/UTC
+    volumes:
+      - ./.arr/sonarr:/config
+      - ./.arr/sonarr/data:/data
+
+  lidarr:
+    profiles: ['arr']
+    container_name: praxrr-lidarr
+    hostname: praxrr-lidarr
+    image: lscr.io/linuxserver/lidarr:latest
+    restart: unless-stopped
+    ports:
+      - 18686:8686
+    environment:
+      - PUID=${PUID:-1000}
+      - PGID=${PGID:-1000}
+      - TZ=Etc/UTC
+    volumes:
+      - ./.arr/lidarr:/config
+      - ./.arr/lidarr/data:/data
