@@ -10,7 +10,9 @@
 		CircleCheck,
 		CircleX,
 		Loader2,
-		TriangleAlert
+		TriangleAlert,
+		ChevronLeft,
+		ChevronRight
 	} from 'lucide-svelte';
 	import type { ComponentType } from 'svelte';
 	import ExpandableTable from '$ui/table/ExpandableTable.svelte';
@@ -43,14 +45,24 @@
 	export let selectedProfileName: string | null = null;
 	export let selectedProfileLabel: string | null = null;
 	export let isSimulating: boolean = false;
+	export let releaseId: string | null = null;
 
 	let expandedRows: Set<string | number> = new Set();
 
-	$: releaseResult = result?.results?.[0] ?? null;
+	$: releaseResult = releaseId
+		? (result?.results?.find((r) => r.id === releaseId) ?? null)
+		: (result?.results?.[0] ?? null);
 	$: profileScore = getProfileScore(releaseResult, selectedProfileName);
 	$: scoreByCfName = new Map(profileScore?.contributions.map((item) => [item.cfName, item.score]) ?? []);
 	$: customFormatRows = mapCustomFormatRows(releaseResult, scoreByCfName);
 	$: sortedCustomFormatRows = [...customFormatRows].sort(compareCustomFormatRows);
+
+	const CF_PAGE_SIZE = 15;
+	let cfPage = 0;
+	$: totalCfPages = Math.max(1, Math.ceil(sortedCustomFormatRows.length / CF_PAGE_SIZE));
+	$: cfPage = Math.min(cfPage, totalCfPages - 1);
+	$: paginatedCfRows = sortedCustomFormatRows.slice(cfPage * CF_PAGE_SIZE, (cfPage + 1) * CF_PAGE_SIZE);
+	$: if (sortedCustomFormatRows) cfPage = 0;
 
 	const tableColumns: Column<CustomFormatRow>[] = [
 		{ key: 'name', header: 'Custom Format', sortable: true },
@@ -181,7 +193,7 @@
 
 <div aria-live="polite" class="relative rounded-xl border border-neutral-200 p-4 dark:border-neutral-700/60">
 	{#if isSimulating}
-		<div class="absolute inset-0 z-10 flex items-start justify-end p-3">
+		<div class="pointer-events-none absolute inset-0 z-10 flex items-start justify-end p-3">
 			<span
 				class="inline-flex items-center gap-1.5 rounded-md bg-white/90 px-2 py-1 text-xs text-neutral-600 shadow-sm dark:bg-neutral-900/90 dark:text-neutral-300"
 			>
@@ -236,7 +248,7 @@
 
 				<ExpandableTable
 					columns={tableColumns}
-					data={sortedCustomFormatRows}
+					data={paginatedCfRows}
 					{getRowId}
 					compact={true}
 					emptyMessage="No custom formats available"
@@ -325,6 +337,35 @@
 						</div>
 					</svelte:fragment>
 				</ExpandableTable>
+
+				{#if totalCfPages > 1}
+					<div class="flex items-center justify-between pt-2">
+						<span class="text-xs text-neutral-500 dark:text-neutral-400">
+							{cfPage * CF_PAGE_SIZE + 1}–{Math.min((cfPage + 1) * CF_PAGE_SIZE, sortedCustomFormatRows.length)} of {sortedCustomFormatRows.length}
+						</span>
+						<div class="flex items-center gap-1">
+							<button
+								type="button"
+								class="inline-flex items-center justify-center rounded-md border border-neutral-300 p-1.5 text-neutral-600 transition-colors hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-neutral-700 dark:text-neutral-400 dark:hover:bg-neutral-800"
+								disabled={cfPage === 0}
+								on:click={() => (cfPage = Math.max(0, cfPage - 1))}
+							>
+								<ChevronLeft size={14} />
+							</button>
+							<span class="px-2 text-xs text-neutral-600 dark:text-neutral-300">
+								{cfPage + 1} / {totalCfPages}
+							</span>
+							<button
+								type="button"
+								class="inline-flex items-center justify-center rounded-md border border-neutral-300 p-1.5 text-neutral-600 transition-colors hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-neutral-700 dark:text-neutral-400 dark:hover:bg-neutral-800"
+								disabled={cfPage >= totalCfPages - 1}
+								on:click={() => (cfPage = Math.min(totalCfPages - 1, cfPage + 1))}
+							>
+								<ChevronRight size={14} />
+							</button>
+						</div>
+					</div>
+				{/if}
 			</section>
 			{/if}
 		{/if}
