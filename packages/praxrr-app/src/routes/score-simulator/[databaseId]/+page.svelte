@@ -1,7 +1,11 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
   import { browser } from '$app/environment';
+  import { ChevronDown } from 'lucide-svelte';
+  import { clickOutside } from '$lib/client/utils/clickOutside';
   import Tabs from '$ui/navigation/tabs/Tabs.svelte';
+  import Dropdown from '$ui/dropdown/Dropdown.svelte';
+  import DropdownItem from '$ui/dropdown/DropdownItem.svelte';
   import DisclosureSection from '$ui/form/DisclosureSection.svelte';
   import { SS_ADVANCED_OPTIONS } from '$shared/disclosure/sectionKeys.ts';
   import { alertStore } from '$lib/client/alerts/store';
@@ -55,6 +59,9 @@
 
   // Phase 2 state
   let batchRawText = '';
+  let batchMediaType: MediaType = 'movie';
+  let batchSelectedProfileName: string | null = null;
+  let batchPrimaryProfileDropdownOpen = false;
   let comparisonProfileName: string | null = null;
   let selectedReleaseId: string | null = null;
 
@@ -90,6 +97,11 @@
       ? null
       : (qualityProfileOptions.find((profile) => profile.value === comparisonProfileName)?.displayName ??
         comparisonProfileName);
+  $: batchSelectedProfileLabel =
+    batchSelectedProfileName === null
+      ? null
+      : (qualityProfileOptions.find((profile) => profile.value === batchSelectedProfileName)?.displayName ??
+        batchSelectedProfileName);
 
   $: selectedProfileScore = getSelectedProfileScore(singleSimulationResult, selectedProfileName);
   $: canClearMainSection =
@@ -99,18 +111,23 @@
     singleSimulationResult !== null;
   $: canClearAdvancedSection =
     batchRawText.trim().length > 0 ||
+    batchMediaType !== 'movie' ||
+    batchSelectedProfileName !== null ||
     comparisonProfileName !== null ||
     batchSimulationResult !== null;
 
   // Batch reactive state
-  $: batchTitles = parseBatchTitles(batchRawText, mediaType);
+  $: batchTitles = parseBatchTitles(batchRawText, batchMediaType);
   $: rankedReleases = batchSimulationResult
-    ? buildRankingFromResults(batchSimulationResult.results, selectedProfileName ?? '')
+    ? buildRankingFromResults(batchSimulationResult.results, batchSelectedProfileName ?? '', comparisonProfileName)
     : ([] as RankedRelease[]);
   $: comparisonResult = comparisonProfileName && singleSimulationResult?.results?.[0] && selectedProfileName
     ? buildComparisonResult(singleSimulationResult.results[0], selectedProfileName, comparisonProfileName)
     : (null as ComparisonResult | null);
-  $: profileNames = [selectedProfileName, comparisonProfileName].filter(
+  $: singleProfileNames = [selectedProfileName, comparisonProfileName].filter(
+    (name): name is string => name !== null
+  );
+  $: batchProfileNames = [batchSelectedProfileName, comparisonProfileName].filter(
     (name): name is string => name !== null
   );
 
@@ -163,7 +180,7 @@
         body: JSON.stringify({
           databaseId: data.currentDatabase.id,
           releases: [{ id: generateReleaseId(), title, type: mediaType }],
-          profileNames,
+          profileNames: singleProfileNames,
           arrType,
         }),
       });
@@ -198,7 +215,7 @@
   }
 
   async function simulateBatch() {
-    if (!selectedProfileName || batchTitles.length === 0) {
+    if (!batchSelectedProfileName || batchTitles.length === 0) {
       cancelBatchSimulationRequest();
       isSimulatingBatch = false;
       batchSimulationResult = null;
@@ -207,7 +224,7 @@
 
     const { requestToken, abortController, timeout } = createBatchSimulationRequestContext();
     selectedReleaseId = null;
-    const arrType: ArrType = mediaType === 'movie' ? 'radarr' : 'sonarr';
+    const arrType: ArrType = batchMediaType === 'movie' ? 'radarr' : 'sonarr';
 
     try {
       const response = await fetch('/api/v1/simulate/score', {
@@ -217,7 +234,7 @@
         body: JSON.stringify({
           databaseId: data.currentDatabase.id,
           releases: batchTitles,
-          profileNames,
+          profileNames: batchProfileNames,
           arrType,
         }),
       });
@@ -365,8 +382,6 @@
 
   function handleProfileChange(event: CustomEvent<{ profileName: string | null }>) {
     selectedProfileName = event.detail.profileName;
-    batchSimulationResult = null;
-    selectedReleaseId = null;
     void simulateSingle();
   }
 
@@ -376,9 +391,30 @@
 
   function handlePresetSelected(event: CustomEvent<{ titles: string[]; category: PresetCategory; mediaType: MediaType }>) {
     batchRawText = event.detail.titles.join('\n');
-    mediaType = event.detail.mediaType;
+    batchMediaType = event.detail.mediaType;
     selectedReleaseId = null;
     void simulateBatch();
+  }
+
+  function handleBatchMediaTypeChange(nextMediaType: MediaType) {
+    if (batchMediaType === nextMediaType) {
+      return;
+    }
+
+    batchMediaType = nextMediaType;
+    selectedReleaseId = null;
+    if (batchSimulationResult) {
+      void simulateBatch();
+    }
+  }
+
+  function selectBatchPrimaryProfile(profileName: string | null) {
+    batchSelectedProfileName = profileName;
+    batchPrimaryProfileDropdownOpen = false;
+    selectedReleaseId = null;
+    if (batchSimulationResult) {
+      void simulateBatch();
+    }
   }
 
   function handleComparisonProfileChange(event: CustomEvent<{ profileName: string | null }>) {
@@ -409,6 +445,8 @@
   function clearAdvancedSection() {
     cancelBatchSimulationRequest();
     batchRawText = '';
+    batchMediaType = 'movie';
+    batchSelectedProfileName = null;
     comparisonProfileName = null;
     batchSimulationResult = null;
     selectedReleaseId = null;
@@ -449,7 +487,7 @@
             />
           </div>
           <div class="pt-1">
-            <PresetSelector {mediaType} compact on:presetSelected={handlePresetSelected} />
+            <PresetSelector mediaType={batchMediaType} compact on:presetSelected={handlePresetSelected} />
           </div>
         </div>
 
@@ -487,10 +525,73 @@
           />
 
           <div class="space-y-4">
-            <PresetSelector {mediaType} on:presetSelected={handlePresetSelected} />
+            <div class="space-y-1.5">
+              <p class="text-xs font-medium text-neutral-700 dark:text-neutral-300">Batch Media Type</p>
+              <div class="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  class="inline-flex items-center justify-center rounded-lg border px-3 py-2 text-xs font-medium transition-colors {batchMediaType ===
+                  'movie'
+                    ? 'border-accent-500 bg-accent-50 text-accent-700 dark:border-accent-400 dark:bg-accent-900/30 dark:text-accent-200'
+                    : 'border-neutral-300 text-neutral-700 hover:bg-neutral-50 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800'}"
+                  on:click={() => handleBatchMediaTypeChange('movie')}
+                >
+                  Movie
+                </button>
+                <button
+                  type="button"
+                  class="inline-flex items-center justify-center rounded-lg border px-3 py-2 text-xs font-medium transition-colors {batchMediaType ===
+                  'series'
+                    ? 'border-accent-500 bg-accent-50 text-accent-700 dark:border-accent-400 dark:bg-accent-900/30 dark:text-accent-200'
+                    : 'border-neutral-300 text-neutral-700 hover:bg-neutral-50 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800'}"
+                  on:click={() => handleBatchMediaTypeChange('series')}
+                >
+                  Series
+                </button>
+              </div>
+            </div>
+
+            <div class="space-y-1.5">
+              <p class="text-xs font-medium text-neutral-700 dark:text-neutral-300">
+                Batch Primary Profile
+              </p>
+              <div class="relative" use:clickOutside={() => (batchPrimaryProfileDropdownOpen = false)}>
+                <button
+                  type="button"
+                  class="inline-flex w-full items-center justify-between rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-700 transition-colors hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-700"
+                  on:click={() => (batchPrimaryProfileDropdownOpen = !batchPrimaryProfileDropdownOpen)}
+                >
+                  <span class={batchSelectedProfileName ? '' : 'text-neutral-400 dark:text-neutral-500'}>
+                    {batchSelectedProfileLabel ?? 'Select quality profile...'}
+                  </span>
+                  <ChevronDown size={14} class="text-neutral-500 dark:text-neutral-400" />
+                </button>
+
+                {#if batchPrimaryProfileDropdownOpen}
+                  <Dropdown position="left" minWidth="100%">
+                    <div class="max-h-80 overflow-y-auto py-1">
+                      <DropdownItem
+                        label="No Profile"
+                        selected={batchSelectedProfileName === null}
+                        onSelect={() => selectBatchPrimaryProfile(null)}
+                      />
+                      {#each qualityProfileOptions as profile (profile.id)}
+                        <DropdownItem
+                          label={profile.displayName ?? profile.name}
+                          selected={batchSelectedProfileName === profile.value}
+                          onSelect={() => selectBatchPrimaryProfile(profile.value)}
+                        />
+                      {/each}
+                    </div>
+                  </Dropdown>
+                {/if}
+              </div>
+            </div>
+
+            <PresetSelector mediaType={batchMediaType} on:presetSelected={handlePresetSelected} />
             <ProfileComparison
               qualityProfiles={qualityProfileOptions}
-              primaryProfileName={selectedProfileName}
+              primaryProfileName={batchSelectedProfileName}
               bind:comparisonProfileName
               on:comparisonProfileChange={handleComparisonProfileChange}
             />
@@ -511,8 +612,8 @@
               comparisonActive={comparisonProfileName !== null}
               isSimulating={isSimulatingBatch}
               simulationResult={batchSimulationResult}
-              {selectedProfileName}
-              {selectedProfileLabel}
+              selectedProfileName={batchSelectedProfileName}
+              selectedProfileLabel={batchSelectedProfileLabel}
               on:releaseSelect={handleReleaseSelect}
             />
           </div>

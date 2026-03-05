@@ -139,24 +139,43 @@ export function parseBatchTitles(rawText: string, mediaType: MediaType): Simulat
   return results;
 }
 
-export function buildRankingFromResults(results: SimulateReleaseResult[], profileName: string): RankedRelease[] {
+export function buildRankingFromResults(
+  results: SimulateReleaseResult[],
+  profileAName: string,
+  profileBName: string | null = null
+): RankedRelease[] {
   const ranked: RankedRelease[] = [];
 
   for (const result of results) {
-    const profileScore = result.profileScores.find((p) => p.profileName === profileName);
-    if (!profileScore) {
+    const profileAScore = result.profileScores.find((p) => p.profileName === profileAName);
+    if (!profileAScore) {
       return [];
+    }
+
+    let comparisonScore: number | undefined;
+    let scoreDelta: number | undefined;
+
+    if (profileBName) {
+      const profileBScore = result.profileScores.find((p) => p.profileName === profileBName);
+      if (!profileBScore) {
+        return [];
+      }
+
+      comparisonScore = profileBScore.totalScore;
+      scoreDelta = profileBScore.totalScore - profileAScore.totalScore;
     }
 
     ranked.push({
       id: result.id,
       title: result.title,
       rank: 0,
-      totalScore: profileScore.totalScore,
-      thresholdState: resolveScoreThresholdState(profileScore),
-      matchedCfCount: profileScore.contributions.filter((c) => c.score !== 0).length,
-      totalCfCount: profileScore.contributions.length,
+      totalScore: profileAScore.totalScore,
+      thresholdState: resolveScoreThresholdState(profileAScore),
+      matchedCfCount: profileAScore.contributions.filter((c) => c.score !== 0).length,
+      totalCfCount: profileAScore.contributions.length,
       parsed: result.parsed,
+      comparisonScore,
+      scoreDelta,
     });
   }
 
