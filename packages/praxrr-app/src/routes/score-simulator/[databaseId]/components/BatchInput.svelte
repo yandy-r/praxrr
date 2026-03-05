@@ -5,11 +5,13 @@
   interface BatchInputEvents {
     batchSimulate: { titles: string[] };
     titlesChange: { rawText: string };
+    clear: undefined;
   }
 
   export let rawText: string;
   export let isSimulating: boolean;
   export let parserAvailable: boolean;
+  export let canClear: boolean = false;
 
   const dispatch = createEventDispatcher<BatchInputEvents>();
 
@@ -57,6 +59,11 @@
     if (!hasValidTitles || isSimulating) return;
     const titles = validLines.map((line) => line.trim()).slice(0, MAX_TITLES);
     dispatch('batchSimulate', { titles });
+  }
+
+  function handleClear() {
+    if (isSimulating || !canClear) return;
+    dispatch('clear');
   }
 </script>
 
@@ -124,6 +131,16 @@
   {/if}
 
   <div class="flex items-center justify-end gap-2 border-t border-neutral-200 pt-3 dark:border-neutral-800">
+    <button
+      type="button"
+      class="inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-100 {canClear
+        ? 'border-neutral-300 bg-white text-neutral-700 hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-200 dark:hover:bg-neutral-700'
+        : 'pointer-events-none cursor-default border-neutral-200 bg-neutral-50 text-neutral-400 dark:border-neutral-800 dark:bg-neutral-900 dark:text-neutral-500'}"
+      disabled={isSimulating || !canClear}
+      on:click={handleClear}
+    >
+      Clear
+    </button>
     <button
       type="button"
       class="inline-flex items-center gap-1.5 rounded-lg border border-neutral-300 bg-white px-3 py-2 text-xs font-medium text-neutral-700 transition-colors hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-200 dark:hover:bg-neutral-700"
