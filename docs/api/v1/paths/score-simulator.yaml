@@ -1,0 +1,60 @@
+score:
+  post:
+    operationId: simulateScore
+    summary: Simulate custom format scoring for releases
+    description: |
+      Parses release titles, evaluates custom format matches, and calculates
+      per-profile scores for interactive score simulation.
+    tags:
+      - Score Simulator
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../schemas/score-simulator.yaml#/SimulateScoreRequest'
+    responses:
+      '200':
+        description: Score simulation results
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/score-simulator.yaml#/SimulateScoreResponse'
+      '400':
+        description: Invalid request
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - error
+              properties:
+                error:
+                  type: string
+      '404':
+        description: Database or profile not found
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - error
+                - missing
+              properties:
+                error:
+                  type: string
+                missing:
+                  type: array
+                  items:
+                    type: string
+      '500':
+        description: Internal server error
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - error
+              properties:
+                error:
+                  type: string
