@@ -2,7 +2,7 @@
 
 ### Issue Creation Template - Multiple
 
-Go through the @docs/plans/score-simulator-phase2 plan and lets create github issues to track the
+Go through the docs/plans/score-simulator-phase3 plan and lets create github issues to track the
 feature implementation.
 
 - group tasks together that logically fit (no need for an issue per task)
@@ -19,7 +19,7 @@ feature implementation.
 
 ### Issue Creation Template - Single
 
-Go through the @docs/plans/progressive-disclosure plan and lets create a github issue to track the
+Go through the docs/plans/progressive-disclosure plan and lets create a github issue to track the
 feature implementation.
 
 - Make sure the issue is properly labeled
@@ -49,7 +49,7 @@ Let's validate and fix suggestion issues 9-11
 
 ### Issue Creation Template - Multiple
 
-Go through the @docs/plans/score-simulator plan and lets create github issues to track the feature
+Go through the docs/plans/score-simulator plan and lets create github issues to track the feature
 implementation.
 
 - group tasks together that logically fit (no need for an issue per task)
@@ -66,7 +66,7 @@ implementation.
 
 ### Issue Creation Template - Single
 
-Go through the @docs/plans/progressive-disclosure plan and lets create a github issue to track the
+Go through the docs/plans/progressive-disclosure plan and lets create a github issue to track the
 feature implementation.
 
 - Make sure the issue is properly labeled
