@@ -117,6 +117,7 @@ Deno.test(
     const restores: Restore[] = [];
     const trashSource = createTrashSource(91, 'TRaSH Radarr', 'radarr', {
       customFormats: 12,
+      customFormatGroups: 0,
       qualityProfiles: 0,
       qualitySizes: 0,
       naming: 0,
@@ -163,6 +164,7 @@ Deno.test(
     const restores: Restore[] = [];
     const trashSource = createTrashSource(92, 'TRaSH Sonarr', 'sonarr', {
       customFormats: 0,
+      customFormatGroups: 0,
       qualityProfiles: 8,
       qualitySizes: 0,
       naming: 0,
@@ -226,6 +228,7 @@ Deno.test('quality profiles source context enables all-sources visibility for mi
   const restores: Restore[] = [];
   const trashSource = createTrashSource(33, 'TRaSH Sonarr', 'sonarr', {
     customFormats: 0,
+    customFormatGroups: 0,
     qualityProfiles: 5,
     qualitySizes: 0,
     naming: 0,

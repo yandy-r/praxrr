@@ -49,6 +49,33 @@ function normalize(value: string): string {
   return value.toLowerCase().replace(/[-_\s]/g, '');
 }
 
+function normalizeConditionToken(
+  value: string,
+  options: { stripLeadingNot?: boolean; stripLanguageSuffix?: boolean } = {}
+): string {
+  let normalized = value.trim().toLowerCase();
+  if (options.stripLeadingNot) {
+    normalized = normalized.replace(/^not\s+/i, '');
+  }
+  if (options.stripLanguageSuffix) {
+    normalized = normalized.replace(/\s+language$/i, '');
+  }
+  return normalized.replace(/[^a-z0-9]/g, '');
+}
+
+function normalizeConditionValue(value: string): string {
+  return normalizeConditionToken(value, { stripLeadingNot: true });
+}
+
+function sourceMatchesExpected(expected: string, actual: string): boolean {
+  const expectedNormalized = normalizeConditionValue(expected);
+  const actualNormalized = normalize(actual);
+  if (expectedNormalized === 'web') {
+    return actualNormalized === 'webdl' || actualNormalized === 'webrip';
+  }
+  return expectedNormalized === actualNormalized;
+}
+
 // Canonical value mappings (matches packages/praxrr-app/src/lib/shared/conditions.ts)
 const sourceNames: Record<QualitySource, string> = {
   [QualitySource.Unknown]: 'unknown',
@@ -151,6 +178,35 @@ const languageNames: Record<Language, string> = {
   [Language.Georgian]: 'Georgian',
   [Language.Original]: 'Original',
 };
+
+const languageByNormalizedName = (() => {
+  const map = new Map<string, Language>();
+  for (const [enumName, enumValue] of Object.entries(Language)) {
+    if (typeof enumValue !== 'number') {
+      continue;
+    }
+
+    const language = enumValue as Language;
+    map.set(
+      normalizeConditionToken(enumName, { stripLeadingNot: true, stripLanguageSuffix: true }),
+      language
+    );
+    map.set(
+      normalizeConditionToken(languageNames[language], { stripLeadingNot: true, stripLanguageSuffix: true }),
+      language
+    );
+  }
+
+  return map;
+})();
+
+function resolveLanguageEnum(value: string): Language | null {
+  const normalized = normalizeConditionToken(value, { stripLeadingNot: true, stripLanguageSuffix: true });
+  if (normalized.length === 0) {
+    return null;
+  }
+  return languageByNormalizedName.get(normalized) ?? null;
+}
 
 /**
  * Get serializable parsed info for frontend display
@@ -281,8 +337,8 @@ function evaluateLanguage(condition: ConditionData, parsed: ParseResult): Condit
   const expected = expectedParts.join(' OR ');
 
   for (const lang of condition.languages) {
-    const langEnum = Language[lang.name as keyof typeof Language];
-    if (langEnum === undefined) continue;
+    const langEnum = resolveLanguageEnum(lang.name);
+    if (langEnum === null) continue;
 
     const hasLanguage = parsed.languages.includes(langEnum);
 
@@ -309,7 +365,7 @@ function evaluateSource(condition: ConditionData, parsed: ParseResult): Conditio
 
   const actual = sourceNames[parsed.source] || 'unknown';
   const expected = condition.sources.join(' OR ');
-  const matched = condition.sources.some((s) => normalize(s) === normalize(actual));
+  const matched = condition.sources.some((s) => sourceMatchesExpected(s, actual));
 
   return { matched, expected, actual };
 }
@@ -324,7 +380,7 @@ function evaluateResolution(condition: ConditionData, parsed: ParseResult): Cond
 
   const actual = resolutionNames[parsed.resolution] || 'unknown';
   const expected = condition.resolutions.join(' OR ');
-  const matched = condition.resolutions.some((r) => normalize(r) === normalize(actual));
+  const matched = condition.resolutions.some((r) => normalizeConditionValue(r) === normalize(actual));
 
   return { matched, expected, actual };
 }
@@ -339,7 +395,7 @@ function evaluateQualityModifier(condition: ConditionData, parsed: ParseResult):
 
   const actual = modifierNames[parsed.modifier] || 'none';
   const expected = condition.qualityModifiers.join(' OR ');
-  const matched = condition.qualityModifiers.some((m) => normalize(m) === normalize(actual));
+  const matched = condition.qualityModifiers.some((m) => normalizeConditionValue(m) === normalize(actual));
 
   return { matched, expected, actual };
 }
@@ -359,7 +415,7 @@ function evaluateReleaseType(condition: ConditionData, parsed: ParseResult): Con
   }
 
   const actual = releaseTypeNames[parsed.episode.releaseType] || 'unknown';
-  const matched = condition.releaseTypes.some((t) => normalize(t) === normalize(actual));
+  const matched = condition.releaseTypes.some((t) => normalizeConditionValue(t) === normalize(actual));
 
   return { matched, expected, actual };
 }

@@ -47,10 +47,10 @@
   </div>
 
   <div
-    class="overflow-hidden rounded-xl border border-neutral-300 bg-neutral-50 dark:border-neutral-700/60 dark:bg-neutral-900/50"
+    class="rounded-xl border border-neutral-300 bg-neutral-50 dark:border-neutral-700/60 dark:bg-neutral-900/50"
   >
     <div
-      class="flex flex-wrap items-center justify-between gap-3 border-b border-neutral-200 bg-white px-4 py-2.5 dark:border-neutral-700/60 dark:bg-neutral-950/40"
+      class="flex flex-wrap items-center justify-between gap-3 rounded-t-xl border-b border-neutral-200 bg-white px-4 py-2.5 dark:border-neutral-700/60 dark:bg-neutral-950/40"
     >
       <div class="min-w-0">
         <p id={advancedHeadingId} class="text-sm font-semibold text-neutral-900 dark:text-neutral-100">

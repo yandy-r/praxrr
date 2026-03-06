@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { createEventDispatcher } from 'svelte';
 	import type { ComponentType } from 'svelte';
 	import { Check } from 'lucide-svelte';
 
@@ -8,6 +9,9 @@
 	export let danger: boolean = false;
 	export let selected: boolean = false;
 	export let compact: boolean = false;
+	export let onSelect: (() => void) | null = null;
+
+	const dispatch = createEventDispatcher<{ click: MouseEvent }>();
 
 	$: sizeClasses = compact
 		? 'gap-2 px-2 py-1 text-xs first:rounded-t-lg last:rounded-b-lg'
@@ -22,12 +26,17 @@
 	$: baseSurfaceClass = 'bg-white dark:bg-neutral-800';
 
 	$: iconSize = compact ? 12 : 16;
+
+	function handleClick(event: MouseEvent) {
+		onSelect?.();
+		dispatch('click', event);
+	}
 </script>
 
 <button
 	class="flex w-full items-center border-b border-neutral-200 text-left transition-colors last:border-b-0 dark:border-neutral-700/60 {baseSurfaceClass} {sizeClasses} {stateClasses}"
 	{disabled}
-	on:click
+	onclick={handleClick}
 >
 	{#if icon}
 		<svelte:component this={icon} size={iconSize} />

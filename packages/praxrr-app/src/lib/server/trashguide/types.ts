@@ -83,6 +83,7 @@ export function asTrashGuideId(value: string): TrashGuideId {
 
 export const TRASHGUIDE_METADATA_ENTITY_PATH_KEYS = {
   custom_formats: 'custom_format',
+  custom_format_groups: 'custom_format_group',
   quality_profiles: 'quality_profile',
   qualities: 'quality_size',
   naming: 'naming',
@@ -264,8 +265,27 @@ export interface TrashGuideNamingEntity extends TrashGuideEntityIdentity {
   readonly templates: Readonly<Record<string, unknown>>;
 }
 
+export interface TrashGuideCfGroupFormatItem {
+  readonly name: string;
+  readonly trash_id: TrashGuideId;
+  readonly required: boolean;
+}
+
+export interface TrashGuideCfGroupEntity extends TrashGuideEntityIdentity {
+  readonly entity_type: 'custom_format_group';
+  readonly file_path: string;
+  readonly name: string;
+  readonly description: string | null;
+  readonly default: boolean;
+  readonly custom_formats: readonly TrashGuideCfGroupFormatItem[];
+  readonly quality_profiles: {
+    readonly include: Readonly<Record<string, string>>;
+  };
+}
+
 export interface TrashGuideParsedEntities {
   readonly custom_formats: readonly TrashGuideCustomFormatEntity[];
+  readonly custom_format_groups: readonly TrashGuideCfGroupEntity[];
   readonly quality_profiles: readonly TrashGuideQualityProfileEntity[];
   readonly quality_sizes: readonly TrashGuideQualitySizeEntity[];
   readonly naming: readonly TrashGuideNamingEntity[];
@@ -273,6 +293,7 @@ export interface TrashGuideParsedEntities {
 
 export type TrashGuideParsedEntity =
   | TrashGuideCustomFormatEntity
+  | TrashGuideCfGroupEntity
   | TrashGuideQualityProfileEntity
   | TrashGuideQualitySizeEntity
   | TrashGuideNamingEntity;

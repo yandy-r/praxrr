@@ -23,6 +23,7 @@ import { getCache } from '$pcd/index.ts';
 import { getReferencedCustomFormatNames } from './qualityProfiles/transformer.ts';
 import { transformTrashGuideEntities } from '$lib/server/trashguide/transformer.ts';
 import type {
+  TrashGuideCfGroupEntity,
   TrashGuideCustomFormatEntity,
   TrashGuideNamingEntity,
   TrashGuideParsedEntity,
@@ -158,6 +159,9 @@ export async function scanForStaleItems(client: BaseArrClient, instanceId: numbe
           entities: {
             custom_formats: parsedEntities.filter(
               (e): e is TrashGuideCustomFormatEntity => e.entity_type === 'custom_format'
+            ),
+            custom_format_groups: parsedEntities.filter(
+              (e): e is TrashGuideCfGroupEntity => e.entity_type === 'custom_format_group'
             ),
             quality_profiles: parsedEntities.filter(
               (e): e is TrashGuideQualityProfileEntity => e.entity_type === 'quality_profile'

@@ -45,6 +45,7 @@ function createSourceResponse(id: number, arrType: 'radarr' | 'sonarr') {
     lastCommitHash: null,
     entityCounts: {
       customFormats: 0,
+      customFormatGroups: 0,
       qualityProfiles: 0,
       qualitySizes: 0,
       naming: 0,

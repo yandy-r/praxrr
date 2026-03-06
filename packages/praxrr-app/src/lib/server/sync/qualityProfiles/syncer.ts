@@ -29,6 +29,7 @@ import { getNamespaceSuffix, getTrashGuideNamespaceSuffix } from '../namespace.t
 import type { SyncPreviewSectionResult, QualityProfilesPreview } from '../preview/types.ts';
 import { transformTrashGuideEntities } from '$lib/server/trashguide/transformer.ts';
 import type {
+  TrashGuideCfGroupEntity,
   TrashGuideCustomFormatEntity,
   TrashGuideNamingEntity,
   TrashGuideParsedEntity,
@@ -648,6 +649,9 @@ export class QualityProfileSyncer extends BaseSyncer {
         entities: {
           custom_formats: parsedEntities.filter(
             (entity): entity is TrashGuideCustomFormatEntity => entity.entity_type === 'custom_format'
+          ),
+          custom_format_groups: parsedEntities.filter(
+            (entity): entity is TrashGuideCfGroupEntity => entity.entity_type === 'custom_format_group'
           ),
           quality_profiles: parsedEntities.filter(
             (entity): entity is TrashGuideQualityProfileEntity => entity.entity_type === 'quality_profile'

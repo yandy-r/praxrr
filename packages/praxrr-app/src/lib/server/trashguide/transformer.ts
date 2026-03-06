@@ -115,6 +115,7 @@ interface UniqueEntityEntry {
 
 const TRANSFORMABLE_ENTITY_TYPES: ReadonlySet<TrashGuideEntityType> = new Set<TrashGuideEntityType>([
   'custom_format',
+  'custom_format_group',
   'quality_profile',
   'quality_size',
   'naming',
@@ -122,9 +123,10 @@ const TRANSFORMABLE_ENTITY_TYPES: ReadonlySet<TrashGuideEntityType> = new Set<Tr
 
 const ENTITY_TYPE_ORDER: Record<TrashGuideEntityType, number> = {
   custom_format: 0,
-  quality_profile: 1,
-  quality_size: 2,
-  naming: 3,
+  custom_format_group: 1,
+  quality_profile: 2,
+  quality_size: 3,
+  naming: 4,
 };
 
 export function transformTrashGuideEntities(input: TrashGuideTransformInput): TrashGuideTransformResult {
@@ -231,6 +233,10 @@ export function transformTrashGuideEntities(input: TrashGuideTransformInput): Tr
             portableEntityType: 'custom_format',
             data: toPortableCustomFormat(entity),
           });
+          break;
+        case 'custom_format_group':
+          // CF groups are metadata-only entities used by the score simulator.
+          // They don't produce portable operations but are cached for runtime use.
           break;
         case 'quality_profile':
           activeOperations.push({
@@ -378,6 +384,7 @@ function toMappingInput(
 function toMappingEntityType(entityType: TrashGuideEntityType): TrashIdMappingEntityType {
   if (
     entityType === 'custom_format' ||
+    entityType === 'custom_format_group' ||
     entityType === 'quality_profile' ||
     entityType === 'quality_size' ||
     entityType === 'naming'
