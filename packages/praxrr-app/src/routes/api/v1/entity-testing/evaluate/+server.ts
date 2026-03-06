@@ -4,12 +4,13 @@
  */
 
 import { json, error } from '@sveltejs/kit';
-import type { RequestHandler } from './$types';
+import type { RequestHandler } from '@sveltejs/kit';
 import { pcdManager } from '$pcd/index.ts';
 import { parseWithCacheBatch, isParserHealthy, matchPatternsBatch } from '$lib/server/utils/arr/parser/index.ts';
 import {
   getAllConditionsForEvaluation,
   evaluateCustomFormat,
+  evaluateCustomFormatWithoutParse,
   getParsedInfo,
   extractAllPatterns,
 } from '$pcd/entities/customFormats/index.ts';
@@ -92,15 +93,7 @@ export const POST: RequestHandler = async ({ request }) => {
   // Evaluate each release against all custom formats
   const evaluations: ReleaseEvaluation[] = releases.map((release) => {
     const cacheKey = `${release.title}:${release.type}`;
-    const parsed = parseResults.get(cacheKey);
-
-    if (!parsed) {
-      return {
-        releaseId: release.id,
-        title: release.title,
-        cfMatches: {},
-      };
-    }
+    const parsed = parseResults.get(cacheKey) ?? null;
 
     // Get pattern matches for this release title
     const patternMatches = patternMatchResults?.get(release.title);
@@ -114,14 +107,16 @@ export const POST: RequestHandler = async ({ request }) => {
         continue;
       }
 
-      const result = evaluateCustomFormat(cf.conditions, parsed, release.title, patternMatches);
+      const result = parsed
+        ? evaluateCustomFormat(cf.conditions, parsed, release.title, patternMatches)
+        : evaluateCustomFormatWithoutParse(cf.conditions, release.title, patternMatches);
       cfMatches[cf.name] = result.matches;
     }
 
     return {
       releaseId: release.id,
       title: release.title,
-      parsed: getParsedInfo(parsed),
+      parsed: parsed ? getParsedInfo(parsed) : undefined,
       cfMatches,
     };
   });

@@ -4,6 +4,7 @@ import { parseWithCacheBatch, isParserHealthy, matchPatternsBatch } from '$lib/s
 import {
   getAllConditionsForEvaluation,
   evaluateCustomFormat,
+  evaluateCustomFormatWithoutParse,
   getParsedInfo,
   extractAllPatterns,
 } from '$pcd/entities/customFormats/index.ts';
@@ -770,55 +771,7 @@ export const POST: RequestHandler = async ({ request }) => {
 
   const results: SimulateReleaseResult[] = releases.map((release) => {
     const cacheKey = `${release.title}:${release.type}`;
-    const parsed = parseResults.get(cacheKey);
-
-    if (!parsed) {
-      const profileScores: SimulateProfileScore[] = resolvedProfiles.map((profile) => {
-        if (profile.kind === 'pcd') {
-          return {
-            profileName: profile.requestKey,
-            totalScore: 0,
-            minimumScore: profile.scoreData.minimum_custom_format_score,
-            upgradeUntilScore: profile.scoreData.upgrade_until_score,
-            contributions: [],
-          };
-        }
-
-        return {
-          profileName: profile.requestKey,
-          totalScore: 0,
-          minimumScore: profile.entity.min_format_score,
-          upgradeUntilScore: profile.entity.cutoff_format_score,
-          contributions: [],
-        };
-      });
-
-      // Emit empty cfMatches per profile so the client always sees the right
-      // set of format names for that profile's source.
-      const cfMatchesByProfile = new Map<string, SimulateCfMatch[]>();
-      for (const profile of resolvedProfiles) {
-        const profileFormats =
-          profile.kind === 'pcd'
-            ? pcdCustomFormats
-            : [...(trashCustomFormatsByKeyBySource.get(profile.sourceId)?.values() ?? [])].sort((a, b) =>
-                a.name.localeCompare(b.name)
-              );
-        cfMatchesByProfile.set(
-          profile.requestKey,
-          profileFormats.map((cf) => ({ name: cf.name, matches: false, conditions: [] }))
-        );
-      }
-
-      return {
-        id: release.id,
-        title: release.title,
-        parsed: null,
-        // Legacy top-level cfMatches: use PCD formats (or the first available
-        // set) so the response shape remains backward-compatible.
-        cfMatches: cfMatchesByProfile.get(resolvedProfiles[0]?.requestKey ?? '') ?? [],
-        profileScores,
-      };
-    }
+    const parsed = parseResults.get(cacheKey) ?? null;
 
     const patternMatches = patternMatchResults?.get(release.title);
 
@@ -837,7 +790,9 @@ export const POST: RequestHandler = async ({ request }) => {
           return { name: customFormat.name, matches: false, conditions: [] };
         }
 
-        const evaluation = evaluateCustomFormat(customFormat.conditions, parsed, release.title, patternMatches);
+        const evaluation = parsed
+          ? evaluateCustomFormat(customFormat.conditions, parsed, release.title, patternMatches)
+          : evaluateCustomFormatWithoutParse(customFormat.conditions, release.title, patternMatches);
         return {
           name: customFormat.name,
           matches: evaluation.matches,
@@ -906,14 +861,16 @@ export const POST: RequestHandler = async ({ request }) => {
       if (customFormat.conditions.length === 0) {
         return { name: customFormat.name, matches: false, conditions: [] };
       }
-      const evaluation = evaluateCustomFormat(customFormat.conditions, parsed, release.title, patternMatches);
+      const evaluation = parsed
+        ? evaluateCustomFormat(customFormat.conditions, parsed, release.title, patternMatches)
+        : evaluateCustomFormatWithoutParse(customFormat.conditions, release.title, patternMatches);
       return { name: customFormat.name, matches: evaluation.matches, conditions: evaluation.conditions };
     });
 
     return {
       id: release.id,
       title: release.title,
-      parsed: getParsedInfo(parsed),
+      parsed: parsed ? getParsedInfo(parsed) : null,
       cfMatches: topLevelCfMatches,
       profileScores,
     };

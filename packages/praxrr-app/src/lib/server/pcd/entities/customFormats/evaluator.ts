@@ -5,18 +5,18 @@
 
 import type { ParseResult } from '$lib/server/utils/arr/parser/types.ts';
 import {
-  QualitySource,
-  QualityModifier,
-  Resolution,
-  ReleaseType,
   Language,
+  QualityModifier,
+  QualitySource,
+  ReleaseType,
+  Resolution,
 } from '$lib/server/utils/arr/parser/types.ts';
 import type {
   ConditionData,
   ConditionResult,
+  CustomFormatWithConditions,
   EvaluationResult,
   ParsedInfo,
-  CustomFormatWithConditions,
 } from '$shared/pcd/display.ts';
 
 /**
@@ -188,11 +188,17 @@ const languageByNormalizedName = (() => {
 
     const language = enumValue as Language;
     map.set(
-      normalizeConditionToken(enumName, { stripLeadingNot: true, stripLanguageSuffix: true }),
+      normalizeConditionToken(enumName, {
+        stripLeadingNot: true,
+        stripLanguageSuffix: true,
+      }),
       language
     );
     map.set(
-      normalizeConditionToken(languageNames[language], { stripLeadingNot: true, stripLanguageSuffix: true }),
+      normalizeConditionToken(languageNames[language], {
+        stripLeadingNot: true,
+        stripLanguageSuffix: true,
+      }),
       language
     );
   }
@@ -201,7 +207,10 @@ const languageByNormalizedName = (() => {
 })();
 
 function resolveLanguageEnum(value: string): Language | null {
-  const normalized = normalizeConditionToken(value, { stripLeadingNot: true, stripLanguageSuffix: true });
+  const normalized = normalizeConditionToken(value, {
+    stripLeadingNot: true,
+    stripLanguageSuffix: true,
+  });
   if (normalized.length === 0) {
     return null;
   }
@@ -235,7 +244,7 @@ interface ConditionEvalResult {
  */
 function evaluateCondition(
   condition: ConditionData,
-  parsed: ParseResult,
+  parsed: ParseResult | null,
   title: string,
   patternMatches?: Map<string, boolean>
 ): ConditionEvalResult {
@@ -262,16 +271,24 @@ function evaluateCondition(
       return evaluateYear(condition, parsed);
 
     case 'edition':
-      return evaluateEdition(condition, parsed);
+      return evaluateEdition(condition, parsed, title, patternMatches);
 
     case 'release_group':
-      return evaluateReleaseGroup(condition, parsed);
+      return evaluateReleaseGroup(condition, parsed, title, patternMatches);
 
     // These require additional data we don't have
     case 'indexer_flag':
-      return { matched: false, expected: 'Indexer flags', actual: 'N/A (no indexer data)' };
+      return {
+        matched: false,
+        expected: 'Indexer flags',
+        actual: 'N/A (no indexer data)',
+      };
     case 'size':
-      return { matched: false, expected: 'File size range', actual: 'N/A (no file data)' };
+      return {
+        matched: false,
+        expected: 'File size range',
+        actual: 'N/A (no file data)',
+      };
 
     default:
       return { matched: false, expected: 'Unknown', actual: 'Unknown' };
@@ -297,19 +314,30 @@ function evaluatePattern(
     // Use pre-computed pattern matches if available
     if (patternMatches) {
       const matched = patternMatches.get(pattern.pattern);
-      if (matched) {
-        return { matched: true, expected, actual: `Matched: ${pattern.pattern}` };
+      if (matched === true) {
+        return {
+          matched: true,
+          expected,
+          actual: `Matched: ${pattern.pattern}`,
+        };
       }
-    } else {
-      // Fallback to JS regex (may not work for .NET-specific patterns)
-      try {
-        const regex = new RegExp(pattern.pattern, 'i');
-        if (regex.test(title)) {
-          return { matched: true, expected, actual: `Matched: ${pattern.pattern}` };
-        }
-      } catch {
-        // Invalid JS regex - skip this pattern
+      if (matched === false) {
+        continue;
       }
+    }
+
+    // Fallback to JS regex (may not work for .NET-specific patterns)
+    try {
+      const regex = new RegExp(pattern.pattern, 'i');
+      if (regex.test(title)) {
+        return {
+          matched: true,
+          expected,
+          actual: `Matched: ${pattern.pattern}`,
+        };
+      }
+    } catch {
+      // Invalid JS regex - skip this pattern
     }
   }
   return { matched: false, expected, actual: 'No match' };
@@ -318,9 +346,14 @@ function evaluatePattern(
 /**
  * Evaluate language condition
  */
-function evaluateLanguage(condition: ConditionData, parsed: ParseResult): ConditionEvalResult {
+function evaluateLanguage(condition: ConditionData, parsed: ParseResult | null): ConditionEvalResult {
   if (!condition.languages || condition.languages.length === 0) {
     return { matched: false, expected: 'No languages defined', actual: 'N/A' };
+  }
+
+  if (!parsed) {
+    const expected = condition.languages.map((lang) => (lang.except ? `NOT ${lang.name}` : lang.name)).join(' OR ');
+    return { matched: false, expected, actual: 'N/A (parse unavailable)' };
   }
 
   const parsedLangNames = parsed.languages.map((l) => languageNames[l] || 'Unknown');
@@ -358,9 +391,17 @@ function evaluateLanguage(condition: ConditionData, parsed: ParseResult): Condit
 /**
  * Evaluate source condition (Bluray, WebDL, etc.)
  */
-function evaluateSource(condition: ConditionData, parsed: ParseResult): ConditionEvalResult {
+function evaluateSource(condition: ConditionData, parsed: ParseResult | null): ConditionEvalResult {
   if (!condition.sources || condition.sources.length === 0) {
     return { matched: false, expected: 'No sources defined', actual: 'N/A' };
+  }
+
+  if (!parsed) {
+    return {
+      matched: false,
+      expected: condition.sources.join(' OR '),
+      actual: 'N/A (parse unavailable)',
+    };
   }
 
   const actual = sourceNames[parsed.source] || 'unknown';
@@ -373,9 +414,21 @@ function evaluateSource(condition: ConditionData, parsed: ParseResult): Conditio
 /**
  * Evaluate resolution condition
  */
-function evaluateResolution(condition: ConditionData, parsed: ParseResult): ConditionEvalResult {
+function evaluateResolution(condition: ConditionData, parsed: ParseResult | null): ConditionEvalResult {
   if (!condition.resolutions || condition.resolutions.length === 0) {
-    return { matched: false, expected: 'No resolutions defined', actual: 'N/A' };
+    return {
+      matched: false,
+      expected: 'No resolutions defined',
+      actual: 'N/A',
+    };
+  }
+
+  if (!parsed) {
+    return {
+      matched: false,
+      expected: condition.resolutions.join(' OR '),
+      actual: 'N/A (parse unavailable)',
+    };
   }
 
   const actual = resolutionNames[parsed.resolution] || 'unknown';
@@ -388,9 +441,17 @@ function evaluateResolution(condition: ConditionData, parsed: ParseResult): Cond
 /**
  * Evaluate quality modifier condition (Remux, etc.)
  */
-function evaluateQualityModifier(condition: ConditionData, parsed: ParseResult): ConditionEvalResult {
+function evaluateQualityModifier(condition: ConditionData, parsed: ParseResult | null): ConditionEvalResult {
   if (!condition.qualityModifiers || condition.qualityModifiers.length === 0) {
     return { matched: false, expected: 'No modifiers defined', actual: 'N/A' };
+  }
+
+  if (!parsed) {
+    return {
+      matched: false,
+      expected: condition.qualityModifiers.join(' OR '),
+      actual: 'N/A (parse unavailable)',
+    };
   }
 
   const actual = modifierNames[parsed.modifier] || 'none';
@@ -403,14 +464,18 @@ function evaluateQualityModifier(condition: ConditionData, parsed: ParseResult):
 /**
  * Evaluate release type condition (single_episode, season_pack, etc.)
  */
-function evaluateReleaseType(condition: ConditionData, parsed: ParseResult): ConditionEvalResult {
+function evaluateReleaseType(condition: ConditionData, parsed: ParseResult | null): ConditionEvalResult {
   if (!condition.releaseTypes || condition.releaseTypes.length === 0) {
-    return { matched: false, expected: 'No release types defined', actual: 'N/A' };
+    return {
+      matched: false,
+      expected: 'No release types defined',
+      actual: 'N/A',
+    };
   }
 
   const expected = condition.releaseTypes.join(' OR ');
 
-  if (!parsed.episode) {
+  if (!parsed?.episode) {
     return { matched: false, expected, actual: 'N/A (not a series)' };
   }
 
@@ -423,9 +488,21 @@ function evaluateReleaseType(condition: ConditionData, parsed: ParseResult): Con
 /**
  * Evaluate year condition
  */
-function evaluateYear(condition: ConditionData, parsed: ParseResult): ConditionEvalResult {
+function evaluateYear(condition: ConditionData, parsed: ParseResult | null): ConditionEvalResult {
   if (!condition.years) {
     return { matched: false, expected: 'No year range defined', actual: 'N/A' };
+  }
+
+  if (!parsed) {
+    const { minYear, maxYear } = condition.years;
+    const expectedParts: string[] = [];
+    if (minYear !== null) expectedParts.push(`>= ${minYear}`);
+    if (maxYear !== null) expectedParts.push(`<= ${maxYear}`);
+    return {
+      matched: false,
+      expected: expectedParts.join(' AND ') || 'Any year',
+      actual: 'N/A (parse unavailable)',
+    };
   }
 
   const { minYear, maxYear } = condition.years;
@@ -441,8 +518,12 @@ function evaluateYear(condition: ConditionData, parsed: ParseResult): ConditionE
 
   const actual = String(year);
 
-  if (minYear !== null && year < minYear) return { matched: false, expected, actual };
-  if (maxYear !== null && year > maxYear) return { matched: false, expected, actual };
+  if (minYear !== null && year < minYear) {
+    return { matched: false, expected, actual };
+  }
+  if (maxYear !== null && year > maxYear) {
+    return { matched: false, expected, actual };
+  }
 
   return { matched: true, expected, actual };
 }
@@ -451,64 +532,110 @@ function evaluateYear(condition: ConditionData, parsed: ParseResult): ConditionE
  * Evaluate edition condition
  * Matches patterns against the PARSED edition only (not full title)
  */
-function evaluateEdition(condition: ConditionData, parsed: ParseResult): ConditionEvalResult {
+function evaluateEdition(
+  condition: ConditionData,
+  parsed: ParseResult | null,
+  title: string,
+  patternMatches?: Map<string, boolean>
+): ConditionEvalResult {
   if (!condition.patterns || condition.patterns.length === 0) {
     return { matched: false, expected: 'No patterns defined', actual: 'N/A' };
   }
 
-  const actual = parsed.edition || 'None detected';
+  const actual = parsed?.edition || 'None detected';
   const patternStrs = condition.patterns.map((p) => p.pattern);
   const expected = patternStrs.join(' OR ');
 
-  // If no edition was parsed, can't match
-  if (!parsed.edition) {
-    return { matched: false, expected, actual };
-  }
-
-  // Match patterns against parsed edition only
-  for (const pattern of condition.patterns) {
-    try {
-      const regex = new RegExp(pattern.pattern, 'i');
-      if (regex.test(parsed.edition)) {
-        return { matched: true, expected, actual };
+  // Primary behavior: parsed edition check
+  if (parsed?.edition) {
+    for (const pattern of condition.patterns) {
+      try {
+        const regex = new RegExp(pattern.pattern, 'i');
+        if (regex.test(parsed.edition)) {
+          return { matched: true, expected, actual };
+        }
+      } catch {
+        // Invalid regex - skip
       }
-    } catch {
-      // Invalid regex - skip
     }
   }
+
+  // Fallback: when edition is unavailable, attempt title pattern matching.
+  const fallback = evaluatePattern(condition, title, patternMatches);
+  if (fallback.matched) {
+    return {
+      matched: true,
+      expected,
+      actual: `Fallback title match (${fallback.actual})`,
+    };
+  }
+
+  if (!parsed) {
+    return {
+      matched: false,
+      expected,
+      actual: 'N/A (parse unavailable)',
+    };
+  }
+
   return { matched: false, expected, actual };
 }
 
-/**
- * Evaluate release group condition
- * Matches patterns against the PARSED release group only (not full title)
- */
-function evaluateReleaseGroup(condition: ConditionData, parsed: ParseResult): ConditionEvalResult {
+function evaluateReleaseGroup(
+  condition: ConditionData,
+  parsed: ParseResult | null,
+  title: string,
+  patternMatches?: Map<string, boolean>
+): ConditionEvalResult {
   if (!condition.patterns || condition.patterns.length === 0) {
     return { matched: false, expected: 'No patterns defined', actual: 'N/A' };
   }
 
-  const actual = parsed.releaseGroup || 'None detected';
+  const actual = parsed?.releaseGroup || 'None detected';
   const patternStrs = condition.patterns.map((p) => p.pattern);
   const expected = patternStrs.join(' OR ');
 
-  // If no release group was parsed, can't match
-  if (!parsed.releaseGroup) {
-    return { matched: false, expected, actual };
-  }
-
-  // Match patterns against parsed release group only
-  for (const pattern of condition.patterns) {
-    try {
-      const regex = new RegExp(pattern.pattern, 'i');
-      if (regex.test(parsed.releaseGroup)) {
-        return { matched: true, expected, actual };
+  // Primary behavior: parsed release-group check
+  if (parsed?.releaseGroup) {
+    for (const pattern of condition.patterns) {
+      try {
+        const regex = new RegExp(pattern.pattern, 'i');
+        if (regex.test(parsed.releaseGroup)) {
+          return { matched: true, expected, actual };
+        }
+      } catch {
+        // Invalid regex - skip
       }
-    } catch {
-      // Invalid regex - skip
     }
   }
+
+  // Fallback: when release-group is unavailable, attempt title pattern matching.
+  const fallback = evaluatePattern(condition, title, patternMatches);
+  if (fallback.matched) {
+    return {
+      matched: true,
+      expected,
+      actual: `Fallback title match (${fallback.actual})`,
+    };
+  }
+
+  if (!parsed) {
+    return {
+      matched: false,
+      expected,
+      actual: 'N/A (parse unavailable)',
+    };
+  }
+
   return { matched: false, expected, actual };
+}
+
+export function evaluateCustomFormatWithoutParse(
+  conditions: ConditionData[],
+  title: string,
+  patternMatches?: Map<string, boolean>
+): EvaluationResult {
+  return evaluateCustomFormatInternal(conditions, null, title, patternMatches);
 }
 
 /**
@@ -529,6 +656,15 @@ function evaluateReleaseGroup(condition: ConditionData, parsed: ParseResult): Co
 export function evaluateCustomFormat(
   conditions: ConditionData[],
   parsed: ParseResult,
+  title: string,
+  patternMatches?: Map<string, boolean>
+): EvaluationResult {
+  return evaluateCustomFormatInternal(conditions, parsed, title, patternMatches);
+}
+
+function evaluateCustomFormatInternal(
+  conditions: ConditionData[],
+  parsed: ParseResult | null,
   title: string,
   patternMatches?: Map<string, boolean>
 ): EvaluationResult {

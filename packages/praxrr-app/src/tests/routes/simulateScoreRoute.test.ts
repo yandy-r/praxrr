@@ -783,6 +783,104 @@ Deno.test('simulate score: Not Original or English does not penalize unknown lan
   }
 });
 
+Deno.test('simulate score: parser-missing releases still evaluate pattern-based conditions', async () => {
+  const originalListSources = trashGuideManager.listSources;
+  trashGuideManager.listSources = (() => []) as typeof trashGuideManager.listSources;
+  const databaseId = 6006;
+  const restore = installParserCacheStubs();
+  restore.reset();
+  parserClientModule.clearParserVersionCache();
+  parserParserState.setHealthAvailable(true);
+  parserParserState.setVersion('local-parser-v4');
+
+  const fixture = createPcdCacheFixture(`
+    INSERT INTO quality_profiles (id, name, minimum_custom_format_score, upgrade_until_score)
+    VALUES (1, 'Anime Profile', 0, 0);
+
+    INSERT INTO custom_formats (name) VALUES ('CF-TitleFallback');
+    INSERT INTO custom_formats (name) VALUES ('CF-GroupFallback');
+    INSERT INTO custom_formats (name) VALUES ('CF-ParseDependentYear');
+
+    INSERT INTO regular_expressions (name, pattern)
+    VALUES ('title-fallback-regex', 'PROPER');
+    INSERT INTO regular_expressions (name, pattern)
+    VALUES ('group-fallback-regex', 'Scene');
+
+    INSERT INTO custom_format_conditions (custom_format_name, name, type, arr_type, negate, required)
+    VALUES ('CF-TitleFallback', 'title-pattern', 'release_title', 'all', 0, 1);
+    INSERT INTO custom_format_conditions (custom_format_name, name, type, arr_type, negate, required)
+    VALUES ('CF-GroupFallback', 'group-pattern', 'release_group', 'all', 0, 1);
+    INSERT INTO custom_format_conditions (custom_format_name, name, type, arr_type, negate, required)
+    VALUES ('CF-ParseDependentYear', 'year-range', 'year', 'all', 0, 1);
+
+    INSERT INTO condition_patterns (custom_format_name, condition_name, regular_expression_name)
+    VALUES ('CF-TitleFallback', 'title-pattern', 'title-fallback-regex');
+    INSERT INTO condition_patterns (custom_format_name, condition_name, regular_expression_name)
+    VALUES ('CF-GroupFallback', 'group-pattern', 'group-fallback-regex');
+
+    INSERT INTO condition_years (custom_format_name, condition_name, min_year, max_year)
+    VALUES ('CF-ParseDependentYear', 'year-range', 2023, 2026);
+
+    INSERT INTO quality_profile_custom_formats (quality_profile_name, custom_format_name, arr_type, score)
+    VALUES ('Anime Profile', 'CF-TitleFallback', 'sonarr', 5);
+    INSERT INTO quality_profile_custom_formats (quality_profile_name, custom_format_name, arr_type, score)
+    VALUES ('Anime Profile', 'CF-GroupFallback', 'sonarr', 9);
+    INSERT INTO quality_profile_custom_formats (quality_profile_name, custom_format_name, arr_type, score)
+    VALUES ('Anime Profile', 'CF-ParseDependentYear', 'sonarr', 50);
+  `);
+
+  setCache(databaseId, fixture.cache);
+
+  const title = '[Scene] Frieren - Beyond Journeys End - 01 PROPER REPACK REAL PROPER 1080p x264.mkv';
+  parserParserState.setMatchResponse(title, {
+    PROPER: true,
+    Scene: true,
+  });
+
+  try {
+    const response = await scoreRouteModule.POST(
+      buildEvent({
+        databaseId,
+        arrType: 'sonarr',
+        profileNames: ['pcd:Anime Profile'],
+        releases: [
+          {
+            id: 'anime-release',
+            title,
+            type: 'series' as const,
+          },
+        ],
+      })
+    );
+    const body = (await response.json()) as SimulatedScoreResponse;
+
+    assertEquals(response.status, 200);
+    assertEquals(body.parserAvailable, true);
+    assertEquals(body.results.length, 1);
+
+    const [release] = body.results;
+    assertEquals(release.parsed, null);
+
+    const score = release.profileScores[0];
+    assertEquals(score.profileName, 'pcd:Anime Profile');
+    assertEquals(score.totalScore, 14);
+    assertEquals(score.contributions.some((row) => row.cfName === 'CF-TitleFallback' && row.score === 5), true);
+    assertEquals(score.contributions.some((row) => row.cfName === 'CF-GroupFallback' && row.score === 9), true);
+    assertEquals(score.contributions.some((row) => row.cfName === 'CF-ParseDependentYear'), false);
+
+    assertEquals(release.cfMatches.find((row) => row.name === 'CF-TitleFallback')?.matches, true);
+    assertEquals(release.cfMatches.find((row) => row.name === 'CF-GroupFallback')?.matches, true);
+    assertEquals(release.cfMatches.find((row) => row.name === 'CF-ParseDependentYear')?.matches, false);
+  } finally {
+    trashGuideManager.listSources = originalListSources;
+    deleteCache(databaseId);
+    await fixture.destroy();
+    parserParserState.clearResponses();
+    parserParserState.setVersion('local-parser-v1');
+    restore.restore();
+  }
+});
+
 Deno.test('simulate score: mixed pcd and TRaSH profiles produce non-zero TRaSH totals', async () => {
   const sourceId = 9101;
   const customFormatTrashId = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
