@@ -2,7 +2,7 @@
   import { onMount, onDestroy } from 'svelte';
   import { browser } from '$app/environment';
   import { page } from '$app/stores';
-  import { ChevronDown } from 'lucide-svelte';
+  import { ChevronDown, Link, RotateCcw } from 'lucide-svelte';
   import { clickOutside } from '$lib/client/utils/clickOutside';
   import Tabs from '$ui/navigation/tabs/Tabs.svelte';
   import Dropdown from '$ui/dropdown/Dropdown.svelte';
@@ -10,8 +10,14 @@
   import DisclosureSection from '$ui/form/DisclosureSection.svelte';
   import { SS_ADVANCED_OPTIONS } from '$shared/disclosure/sectionKeys.ts';
   import { alertStore } from '$lib/client/alerts/store';
-  import { getSelectedProfileScore, parseBatchTitles, buildRankingFromResults, buildComparisonResult } from './helpers';
+  import {
+    getSelectedProfileScore,
+    parseBatchTitles,
+    buildRankingFromResults,
+    buildComparisonResult,
+  } from './helpers';
   import type { ComparisonResult, RankedRelease } from './helpers';
+  import type { ScoreOverrideMap } from './helpers';
   import ReleaseInput from './components/ReleaseInput.svelte';
   import SimulationResults from './components/SimulationResults.svelte';
   import ScoreBreakdown from './components/ScoreBreakdown.svelte';
@@ -23,7 +29,8 @@
   import type { PageData } from './$types';
   import type { components } from '$api/v1.d.ts';
   import type { PresetCategory } from './helpers';
-  import { parseUrlState } from './urlState';
+  import { copyShareLink, parseUrlState } from './urlState';
+  import type { SimulatorUrlState } from './urlState';
 
   type SimulateScoreResponse = components['schemas']['SimulateScoreResponse'];
   type SimulateProfileScore = components['schemas']['SimulateProfileScore'];
@@ -61,6 +68,7 @@
   let batchPrimaryProfileDropdownOpen = false;
   let comparisonProfileName: string | null = null;
   let selectedReleaseId: string | null = null;
+  let scoreOverrides: ScoreOverrideMap = {};
 
   $: tabs = data.databases.map((db) => ({
     label: db.name,
@@ -116,12 +124,24 @@
   // Batch reactive state
   $: batchTitles = parseBatchTitles(batchRawText, batchMediaType);
   $: rankedReleases = batchSimulationResult
-    ? buildRankingFromResults(batchSimulationResult.results, batchSelectedProfileName ?? '', comparisonProfileName)
+    ? buildRankingFromResults(
+        batchSimulationResult.results,
+        batchSelectedProfileName ?? '',
+        comparisonProfileName,
+        scoreOverrides
+      )
     : ([] as RankedRelease[]);
   $: comparisonResult =
     comparisonProfileName && singleSimulationResult?.results?.[0] && selectedProfileName
-      ? buildComparisonResult(singleSimulationResult.results[0], selectedProfileName, comparisonProfileName)
+      ? buildComparisonResult(
+          singleSimulationResult.results[0],
+          selectedProfileName,
+          comparisonProfileName,
+          scoreOverrides
+        )
       : (null as ComparisonResult | null);
+  $: overrideCount = Object.keys(scoreOverrides).length;
+  $: hasActiveOverrides = overrideCount > 0;
   $: singleProfileNames = [selectedProfileName, comparisonProfileName].filter((name): name is string => name !== null);
   $: batchProfileNames = [batchSelectedProfileName, comparisonProfileName].filter(
     (name): name is string => name !== null
@@ -176,7 +196,10 @@
       batchMediaType = urlState.batchMediaType;
     }
 
-    // TODO(T7): Apply urlState.overrides to scoreOverrides once T7 introduces override state.
+    if (urlState.overrides) {
+      scoreOverrides = { ...urlState.overrides };
+    }
+
     const shouldSimulateFromUrl = hasTitleFromUrl && hasProfileFromUrl;
 
     if (!parserAvailable) {
@@ -494,6 +517,61 @@
     selectedReleaseId = event.detail.id;
   }
 
+  function handleOverrideChange(cfName: string, score: number) {
+    if (!Number.isFinite(score)) {
+      handleOverrideReset(cfName);
+      return;
+    }
+
+    scoreOverrides = {
+      ...scoreOverrides,
+      [cfName]: Math.round(score),
+    };
+  }
+
+  function handleOverrideReset(cfName: string) {
+    if (!Object.hasOwn(scoreOverrides, cfName)) {
+      return;
+    }
+
+    const { [cfName]: _removedOverride, ...remainingOverrides } = scoreOverrides;
+    scoreOverrides = remainingOverrides;
+  }
+
+  function handleOverrideResetAll() {
+    if (!hasActiveOverrides) {
+      return;
+    }
+
+    scoreOverrides = {};
+  }
+
+  async function handleCopyLink() {
+    const shareState: SimulatorUrlState = {
+      title: releaseTitle.trim() || undefined,
+      mediaType,
+      profile: selectedProfileName ?? undefined,
+      compare: comparisonProfileName ?? undefined,
+      arrType: mediaType === 'movie' ? 'radarr' : 'sonarr',
+      batch: batchTitles.map((title) => title.title),
+      batchMediaType,
+      overrides: hasActiveOverrides ? scoreOverrides : undefined,
+    };
+
+    const { success, truncated } = await copyShareLink(shareState, $page.url.pathname);
+    if (!success) {
+      alertStore.add('info', 'Unable to copy link automatically. Copy the URL from your browser address bar.');
+      return;
+    }
+
+    if (truncated) {
+      alertStore.add('warning', 'Link copied to clipboard, but some state was omitted because the URL was too long.');
+      return;
+    }
+
+    alertStore.add('success', 'Link copied to clipboard.');
+  }
+
   function clearMainSection() {
     cancelSingleSimulationRequest();
     releaseTitle = '';
@@ -521,7 +599,17 @@
 </svelte:head>
 
 <div class="space-y-6 px-4 pt-4 pb-8 md:px-8">
-  <Tabs {tabs} responsive />
+  <div class="flex flex-wrap items-center justify-between gap-2">
+    <Tabs {tabs} responsive />
+    <button
+      type="button"
+      class="inline-flex items-center gap-1.5 rounded-md border border-neutral-300 bg-white px-3 py-1.5 text-xs font-medium text-neutral-700 transition-colors hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-200 dark:hover:bg-neutral-800"
+      on:click={handleCopyLink}
+    >
+      <Link size={14} />
+      Copy Link
+    </button>
+  </div>
 
   <DisclosureSection
     sectionKey={SS_ADVANCED_OPTIONS}
@@ -553,13 +641,36 @@
           </div>
         </div>
 
-        <ScoreBreakdown profileScore={selectedProfileScore} />
+        {#if hasActiveOverrides}
+          <div
+            class="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-200"
+          >
+            <p>{overrideCount} override{overrideCount === 1 ? '' : 's'} active.</p>
+            <button
+              type="button"
+              class="inline-flex items-center gap-1 rounded-md border border-amber-300 bg-white px-2 py-1 font-medium text-amber-900 transition-colors hover:bg-amber-100 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-100 dark:hover:bg-amber-900/70"
+              on:click={handleOverrideResetAll}
+            >
+              <RotateCcw size={12} />
+              Reset All
+            </button>
+          </div>
+        {/if}
+
+        <ScoreBreakdown
+          profileScore={selectedProfileScore}
+          overrides={scoreOverrides}
+          onOverrideChange={handleOverrideChange}
+          onOverrideReset={handleOverrideReset}
+          onOverrideResetAll={handleOverrideResetAll}
+        />
 
         {#if comparisonResult && comparisonProfileLabel && selectedProfileLabel}
           <ComparisonView
             {comparisonResult}
             profileALabel={selectedProfileLabel}
             profileBLabel={comparisonProfileLabel}
+            overrides={scoreOverrides}
           />
         {/if}
       </div>
@@ -674,6 +785,7 @@
               simulationResult={batchSimulationResult}
               selectedProfileName={batchSelectedProfileName}
               selectedProfileLabel={batchSelectedProfileLabel}
+              overrides={scoreOverrides}
               on:releaseSelect={handleReleaseSelect}
             />
           </div>

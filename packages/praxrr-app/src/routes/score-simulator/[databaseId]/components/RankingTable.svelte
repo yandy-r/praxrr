@@ -5,7 +5,7 @@
 	import Badge from '$ui/badge/Badge.svelte';
 	import Score from '$ui/arr/Score.svelte';
 	import SimulationResults from './SimulationResults.svelte';
-	import type { RankedRelease, ScoreThresholdState } from '../helpers';
+	import type { RankedRelease, ScoreOverrideMap, ScoreThresholdState } from '../helpers';
 	import type { components } from '$api/v1.d.ts';
 
 	type SimulateScoreResponse = components['schemas']['SimulateScoreResponse'];
@@ -16,6 +16,7 @@
 	export let simulationResult: SimulateScoreResponse | null = null;
 	export let selectedProfileName: string | null = null;
 	export let selectedProfileLabel: string | null = null;
+	export let overrides: ScoreOverrideMap = {};
 
 	const dispatch = createEventDispatcher<{ releaseSelect: { id: string } }>();
 
@@ -91,6 +92,8 @@
 
 	$: showSkeleton = isSimulating && rankedReleases.length === 0;
 	$: showEmpty = !isSimulating && rankedReleases.length === 0;
+	$: overrideCount = Object.keys(overrides).length;
+	$: hasActiveOverrides = overrideCount > 0;
 
 	function getRowId(row: RankedRelease): string {
 		return row.id;
@@ -149,67 +152,82 @@
 			Run a batch simulation to see ranked results
 		</div>
 	{:else}
-		<div class="min-w-0 overflow-x-auto">
-			<ExpandableTable
-				{columns}
-				data={rankedReleases}
-				{getRowId}
-				compact={true}
-				emptyMessage="No ranked results"
-				chevronPosition="right"
-				responsive={true}
-				pageSize={20}
-				defaultSort={{ key: 'rank', direction: 'asc' }}
-				onRowClick={handleRowClick}
-				bind:expandedRows
-			>
-				<svelte:fragment slot="cell" let:row let:column>
-					{#if column.key === 'rank'}
-						<span class="font-mono text-xs font-medium text-neutral-600 dark:text-neutral-300">
-							{row.rank}
-						</span>
-					{:else if column.key === 'title'}
-						<div class="min-w-0 max-w-full">
-							<span
-								class="block max-w-full break-words text-xs sm:max-w-[36rem] sm:truncate sm:text-sm"
-								title={row.title}
-							>
-								{row.title}
+		<div class="space-y-2">
+			{#if hasActiveOverrides}
+				<div class="flex items-center justify-end">
+					<Badge variant="warning" size="sm">
+						Overrides Active ({overrideCount})
+					</Badge>
+				</div>
+			{/if}
+			<div class="min-w-0 overflow-x-auto">
+				<ExpandableTable
+					{columns}
+					data={rankedReleases}
+					{getRowId}
+					compact={true}
+					emptyMessage="No ranked results"
+					chevronPosition="right"
+					responsive={true}
+					pageSize={20}
+					defaultSort={{ key: 'rank', direction: 'asc' }}
+					onRowClick={handleRowClick}
+					bind:expandedRows
+				>
+					<svelte:fragment slot="cell" let:row let:column>
+						{#if column.key === 'rank'}
+							<span class="font-mono text-xs font-medium text-neutral-600 dark:text-neutral-300">
+								{row.rank}
 							</span>
-						</div>
-					{:else if column.key === 'totalScore'}
-						<Score score={row.totalScore} showSign={true} />
-					{:else if column.key === 'matchedCfCount'}
-						<span class="text-xs text-neutral-600 dark:text-neutral-300">
-							{row.matchedCfCount} / {row.totalCfCount}
-						</span>
-					{:else if column.key === 'thresholdState'}
-						{#if row.thresholdState}
-							<Badge variant={getThresholdBadgeVariant(row.thresholdState)} size="sm">
-								{getThresholdLabel(row.thresholdState)}
-							</Badge>
-						{:else}
-							<span class="text-xs text-neutral-400">—</span>
+						{:else if column.key === 'title'}
+							<div class="min-w-0 max-w-full">
+								<span
+									class="block max-w-full break-words text-xs sm:max-w-[36rem] sm:truncate sm:text-sm"
+									title={row.title}
+								>
+									{row.title}
+								</span>
+							</div>
+						{:else if column.key === 'totalScore'}
+							<span
+								class="inline-flex rounded px-1 py-0.5 {hasActiveOverrides
+									? 'bg-amber-50 text-amber-900 dark:bg-amber-950/40 dark:text-amber-100'
+									: ''}"
+							>
+								<Score score={row.totalScore} showSign={true} />
+							</span>
+						{:else if column.key === 'matchedCfCount'}
+							<span class="text-xs text-neutral-600 dark:text-neutral-300">
+								{row.matchedCfCount} / {row.totalCfCount}
+							</span>
+						{:else if column.key === 'thresholdState'}
+							{#if row.thresholdState}
+								<Badge variant={getThresholdBadgeVariant(row.thresholdState)} size="sm">
+									{getThresholdLabel(row.thresholdState)}
+								</Badge>
+							{:else}
+								<span class="text-xs text-neutral-400">—</span>
+							{/if}
+						{:else if column.key === 'comparisonScore'}
+							<Score score={row.comparisonScore ?? null} showSign={true} />
+						{:else if column.key === 'scoreDelta'}
+							<Score score={row.scoreDelta ?? null} showSign={true} />
 						{/if}
-					{:else if column.key === 'comparisonScore'}
-						<Score score={row.comparisonScore ?? null} showSign={true} />
-					{:else if column.key === 'scoreDelta'}
-						<Score score={row.scoreDelta ?? null} showSign={true} />
-					{/if}
-				</svelte:fragment>
+					</svelte:fragment>
 
-				<svelte:fragment slot="expanded" let:row>
-					<div class="min-w-0 overflow-hidden border-t border-neutral-100 dark:border-neutral-800">
-						<SimulationResults
-							result={simulationResult}
-							releaseId={row.id}
-							{selectedProfileName}
-							{selectedProfileLabel}
-							isSimulating={false}
-						/>
-					</div>
-				</svelte:fragment>
-			</ExpandableTable>
+					<svelte:fragment slot="expanded" let:row>
+						<div class="min-w-0 overflow-hidden border-t border-neutral-100 dark:border-neutral-800">
+							<SimulationResults
+								result={simulationResult}
+								releaseId={row.id}
+								{selectedProfileName}
+								{selectedProfileLabel}
+								isSimulating={false}
+							/>
+						</div>
+					</svelte:fragment>
+				</ExpandableTable>
+			</div>
 		</div>
 	{/if}
 </div>

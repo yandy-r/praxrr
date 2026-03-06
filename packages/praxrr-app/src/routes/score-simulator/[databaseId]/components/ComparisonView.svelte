@@ -2,11 +2,12 @@
   import { onMount, onDestroy } from 'svelte';
   import Score from '$ui/arr/Score.svelte';
   import CustomFormatBadge from '$ui/arr/CustomFormatBadge.svelte';
-  import type { ComparisonResult } from '../helpers.ts';
+  import type { ComparisonResult, ScoreOverrideMap } from '../helpers.ts';
 
   export let comparisonResult: ComparisonResult | null = null;
   export let profileALabel: string;
   export let profileBLabel: string;
+  export let overrides: ScoreOverrideMap = {};
 
   let isMobile = false;
   let activeTab: 'a' | 'b' = 'a';
@@ -39,9 +40,14 @@
     return delta.toLocaleString();
   }
 
+  function isOverriddenInProfileA(originalScoreA?: number): boolean {
+    return originalScoreA !== undefined;
+  }
+
   $: sortedContributions = comparisonResult
     ? [...comparisonResult.contributions].sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta))
     : [];
+  $: hasAnyOverrides = Object.keys(overrides).length > 0;
 </script>
 
 {#if comparisonResult}
@@ -122,6 +128,18 @@
                 <CustomFormatBadge name={row.cfName} score={row.scoreA} />
                 <span class="w-20 text-right">
                   <Score score={row.scoreA} size="sm" />
+                  {#if hasAnyOverrides && isOverriddenInProfileA(row.originalScoreA)}
+                    <span
+                      class="mt-0.5 inline-flex items-center justify-end gap-1 text-[11px] text-amber-700 dark:text-amber-300"
+                    >
+                      <span class="h-1.5 w-1.5 rounded-full bg-amber-500"></span>
+                      {#if row.originalScoreA !== undefined}
+                        <span class="font-mono">was {row.originalScoreA.toLocaleString()}</span>
+                      {:else}
+                        <span class="font-mono">overridden</span>
+                      {/if}
+                    </span>
+                  {/if}
                 </span>
                 <span class="w-20 text-right">
                   <Score score={row.scoreB} size="sm" />
@@ -152,6 +170,16 @@
                 </div>
                 <div class="flex items-center gap-3">
                   <Score score={activeTab === 'a' ? row.scoreA : row.scoreB} size="sm" />
+                  {#if activeTab === 'a' && hasAnyOverrides && isOverriddenInProfileA(row.originalScoreA)}
+                    <span class="inline-flex items-center gap-1 text-[11px] text-amber-700 dark:text-amber-300">
+                      <span class="h-1.5 w-1.5 rounded-full bg-amber-500"></span>
+                      {#if row.originalScoreA !== undefined}
+                        <span class="font-mono">was {row.originalScoreA.toLocaleString()}</span>
+                      {:else}
+                        <span class="font-mono">overridden</span>
+                      {/if}
+                    </span>
+                  {/if}
                   <span class="font-mono text-xs font-medium {deltaColorClass(row.delta)}">
                     {formatDelta(row.delta)}
                   </span>
