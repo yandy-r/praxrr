@@ -156,7 +156,7 @@
 			{#if hasActiveOverrides}
 				<div class="flex items-center justify-end">
 					<Badge variant="warning" size="sm">
-						Overrides Active ({overrideCount})
+						Ranked with {overrideCount} overrides
 					</Badge>
 				</div>
 			{/if}
@@ -209,9 +209,21 @@
 								<span class="text-xs text-neutral-400">—</span>
 							{/if}
 						{:else if column.key === 'comparisonScore'}
-							<Score score={row.comparisonScore ?? null} showSign={true} />
+							<span
+								class="inline-flex rounded px-1 py-0.5 {hasActiveOverrides
+									? 'bg-amber-50 text-amber-900 dark:bg-amber-950/40 dark:text-amber-100'
+									: ''}"
+							>
+								<Score score={row.comparisonScore ?? null} showSign={true} />
+							</span>
 						{:else if column.key === 'scoreDelta'}
-							<Score score={row.scoreDelta ?? null} showSign={true} />
+							<span
+								class="inline-flex rounded px-1 py-0.5 {hasActiveOverrides
+									? 'bg-amber-50 text-amber-900 dark:bg-amber-950/40 dark:text-amber-100'
+									: ''}"
+							>
+								<Score score={row.scoreDelta ?? null} showSign={true} />
+							</span>
 						{/if}
 					</svelte:fragment>
 

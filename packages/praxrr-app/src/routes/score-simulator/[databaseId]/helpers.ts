@@ -147,7 +147,6 @@ export function buildRankingFromResults(
   overrides: ScoreOverrideMap = {}
 ): RankedRelease[] {
   const ranked: RankedRelease[] = [];
-  const hasOverrides = Object.keys(overrides).length > 0;
 
   for (const result of results) {
     const profileAScore = result.profileScores.find((p) => p.profileName === profileAName);
@@ -155,12 +154,8 @@ export function buildRankingFromResults(
       return [];
     }
 
-    const profileATotal = hasOverrides
-      ? computeOverriddenTotal(profileAScore.contributions, overrides)
-      : profileAScore.totalScore;
-    const thresholdState = hasOverrides
-      ? resolveThresholdWithOverrides(profileAScore, overrides)
-      : resolveScoreThresholdState(profileAScore);
+    const profileATotal = computeOverriddenTotal(profileAScore.contributions, overrides);
+    const thresholdState = resolveThresholdWithOverrides(profileAScore, overrides);
 
     let comparisonScore: number | undefined;
     let scoreDelta: number | undefined;
@@ -219,7 +214,13 @@ export function buildComparisonResult(
     return null;
   }
 
-  const overriddenContributionsA = applyScoreOverrides(profileA.contributions, overrides);
+  const hasOverrides = Object.keys(overrides).length > 0;
+  const overriddenContributionsA: Array<{ cfName: string; score: number; originalScore?: number }> = hasOverrides
+    ? applyScoreOverrides(profileA.contributions, overrides)
+    : profileA.contributions.map((contribution) => ({
+        cfName: contribution.cfName,
+        score: contribution.score,
+      }));
   const cfScoresA = new Map(overriddenContributionsA.map((c) => [c.cfName, c.score]));
   const originalCfScoresA = new Map(
     overriddenContributionsA
@@ -244,7 +245,7 @@ export function buildComparisonResult(
   }
 
   contributions.sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta));
-  const profileATotal = computeOverriddenTotal(profileA.contributions, overrides);
+  const profileATotal = hasOverrides ? computeOverriddenTotal(profileA.contributions, overrides) : profileA.totalScore;
 
   return {
     profileAName,

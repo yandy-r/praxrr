@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { createEventDispatcher, onDestroy } from 'svelte';
-	import { AlertTriangle, ChevronDown, Clapperboard, Loader2, Film, Tv } from 'lucide-svelte';
+	import { AlertTriangle, BookOpen, ChevronDown, Clapperboard, Loader2, Film, Tv } from 'lucide-svelte';
 	import { clickOutside } from '$lib/client/utils/clickOutside';
 	import Dropdown from '$ui/dropdown/Dropdown.svelte';
 	import DropdownItem from '$ui/dropdown/DropdownItem.svelte';
@@ -16,6 +16,7 @@
 	interface ReleaseInputEvents {
 		input: { title: string };
 		profileChange: { profileName: string | null };
+		tryExampleRelease: undefined;
 		clear: undefined;
 	}
 
@@ -26,6 +27,7 @@
 	export let isSimulating: boolean;
 	export let parserAvailable: boolean;
 	export let canClear: boolean = false;
+	export let showQuickStart: boolean = false;
 
 	const dispatch = createEventDispatcher<ReleaseInputEvents>();
 
@@ -91,9 +93,35 @@
 	<div class="space-y-1">
 		<h2 class="text-sm font-semibold text-neutral-900 dark:text-neutral-100">Release Input</h2>
 		<p class="text-xs text-neutral-500 dark:text-neutral-400">
-			Enter a release title, then choose media type and quality profile.
+			Enter a release title, then choose app type and quality profile.
 		</p>
 	</div>
+
+	{#if showQuickStart}
+		<div
+			class="space-y-3 rounded-lg border border-dashed border-neutral-300 bg-neutral-50 p-3 dark:border-neutral-700 dark:bg-neutral-800/40"
+		>
+			<div class="space-y-1">
+				<h3 class="text-xs font-semibold text-neutral-900 dark:text-neutral-100">Start in 3 steps</h3>
+				<ol class="space-y-1 text-xs text-neutral-600 dark:text-neutral-300">
+					<li>1. Choose profile</li>
+					<li>2. Paste release title</li>
+					<li>3. Run simulation</li>
+				</ol>
+			</div>
+			<button
+				type="button"
+				class="inline-flex items-center gap-1.5 rounded-lg border border-neutral-300 bg-white px-3 py-1.5 text-xs font-medium text-neutral-700 transition-colors hover:bg-neutral-100 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-200 dark:hover:bg-neutral-700"
+				on:click={() => dispatch('tryExampleRelease')}
+			>
+				<BookOpen size={14} />
+				Try example release
+			</button>
+			<p class="text-xs text-neutral-500 dark:text-neutral-400">
+				Simulation changes are temporary until you save on the scoring page.
+			</p>
+		</div>
+	{/if}
 
 	{#if !parserAvailable}
 		<div
@@ -121,7 +149,7 @@
 
 	<div class="space-y-1.5">
 		<div class="space-y-1.5">
-			<p class="text-xs font-medium text-neutral-700 dark:text-neutral-300">Media Type</p>
+			<p class="text-xs font-medium text-neutral-700 dark:text-neutral-300">App type</p>
 			<div class="grid grid-cols-2 gap-2">
 				<button
 					type="button"

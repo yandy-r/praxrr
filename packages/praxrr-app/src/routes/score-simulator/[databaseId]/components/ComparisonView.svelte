@@ -126,7 +126,11 @@
                   : 'border-l-2 border-transparent'}"
               >
                 <CustomFormatBadge name={row.cfName} score={row.scoreA} />
-                <span class="w-20 text-right">
+                <span
+                  class="w-20 text-right {hasAnyOverrides && isOverriddenInProfileA(row.originalScoreA)
+                    ? 'rounded bg-amber-50 px-1 py-0.5 dark:bg-amber-900/20'
+                    : ''}"
+                >
                   <Score score={row.scoreA} size="sm" />
                   {#if hasAnyOverrides && isOverriddenInProfileA(row.originalScoreA)}
                     <span
@@ -169,7 +173,13 @@
                   <CustomFormatBadge name={row.cfName} score={activeTab === 'a' ? row.scoreA : row.scoreB} />
                 </div>
                 <div class="flex items-center gap-3">
-                  <Score score={activeTab === 'a' ? row.scoreA : row.scoreB} size="sm" />
+                  <span
+                    class="{activeTab === 'a' && hasAnyOverrides && isOverriddenInProfileA(row.originalScoreA)
+                      ? 'rounded bg-amber-50 px-1 py-0.5 dark:bg-amber-900/20'
+                      : ''}"
+                  >
+                    <Score score={activeTab === 'a' ? row.scoreA : row.scoreB} size="sm" />
+                  </span>
                   {#if activeTab === 'a' && hasAnyOverrides && isOverriddenInProfileA(row.originalScoreA)}
                     <span class="inline-flex items-center gap-1 text-[11px] text-amber-700 dark:text-amber-300">
                       <span class="h-1.5 w-1.5 rounded-full bg-amber-500"></span>

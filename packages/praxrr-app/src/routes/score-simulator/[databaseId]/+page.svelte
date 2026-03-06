@@ -2,7 +2,8 @@
   import { onMount, onDestroy } from 'svelte';
   import { browser } from '$app/environment';
   import { page } from '$app/stores';
-  import { ChevronDown, Link, RotateCcw } from 'lucide-svelte';
+  import { ChevronDown, Link, RotateCcw, Shield } from 'lucide-svelte';
+  import Button from '$ui/button/Button.svelte';
   import { clickOutside } from '$lib/client/utils/clickOutside';
   import Tabs from '$ui/navigation/tabs/Tabs.svelte';
   import Dropdown from '$ui/dropdown/Dropdown.svelte';
@@ -26,11 +27,12 @@
   import ProfileComparison from './components/ProfileComparison.svelte';
   import ComparisonView from './components/ComparisonView.svelte';
   import RankingTable from './components/RankingTable.svelte';
+  import { getPresetsForCategory } from './presets';
   import type { PageData } from './$types';
   import type { components } from '$api/v1.d.ts';
   import type { PresetCategory } from './helpers';
   import { copyShareLink, parseUrlState } from './urlState';
-  import type { SimulatorUrlState } from './urlState';
+  import type { ShareLinkMode, SimulatorUrlState } from './urlState';
 
   type SimulateScoreResponse = components['schemas']['SimulateScoreResponse'];
   type SimulateProfileScore = components['schemas']['SimulateProfileScore'];
@@ -128,7 +130,7 @@
         batchSimulationResult.results,
         batchSelectedProfileName ?? '',
         comparisonProfileName,
-        scoreOverrides
+        Object.keys(scoreOverrides).length > 0 ? scoreOverrides : undefined
       )
     : ([] as RankedRelease[]);
   $: comparisonResult =
@@ -137,11 +139,13 @@
           singleSimulationResult.results[0],
           selectedProfileName,
           comparisonProfileName,
-          scoreOverrides
+          Object.keys(scoreOverrides).length > 0 ? scoreOverrides : undefined
         )
       : (null as ComparisonResult | null);
   $: overrideCount = Object.keys(scoreOverrides).length;
   $: hasActiveOverrides = overrideCount > 0;
+  $: showQuickStartPanel =
+    releaseTitle.trim().length === 0 && selectedProfileName === null && singleSimulationResult === null;
   $: singleProfileNames = [selectedProfileName, comparisonProfileName].filter((name): name is string => name !== null);
   $: batchProfileNames = [batchSelectedProfileName, comparisonProfileName].filter(
     (name): name is string => name !== null
@@ -155,19 +159,23 @@
     if (!browser) return;
 
     const urlState = parseUrlState($page.url.searchParams);
+    let hasAnyUrlState = false;
     let hasTitleFromUrl = false;
     let hasProfileFromUrl = false;
 
     if (urlState.title) {
       releaseTitle = urlState.title;
+      hasAnyUrlState = true;
       hasTitleFromUrl = true;
     }
 
     if (urlState.mediaType) {
       mediaType = urlState.mediaType;
+      hasAnyUrlState = true;
     }
 
     if (urlState.profile) {
+      hasAnyUrlState = true;
       if (hasQualityProfile(urlState.profile)) {
         selectedProfileName = urlState.profile;
         hasProfileFromUrl = true;
@@ -177,6 +185,7 @@
     }
 
     if (urlState.compare) {
+      hasAnyUrlState = true;
       if (hasQualityProfile(urlState.compare)) {
         comparisonProfileName = urlState.compare;
       } else {
@@ -185,18 +194,22 @@
     }
 
     if (urlState.arrType) {
+      hasAnyUrlState = true;
       mediaType = urlState.arrType === 'radarr' ? 'movie' : 'series';
     }
 
     if (urlState.batch) {
+      hasAnyUrlState = true;
       batchRawText = urlState.batch.join('\n');
     }
 
     if (urlState.batchMediaType) {
+      hasAnyUrlState = true;
       batchMediaType = urlState.batchMediaType;
     }
 
     if (urlState.overrides) {
+      hasAnyUrlState = true;
       scoreOverrides = { ...urlState.overrides };
     }
 
@@ -209,7 +222,8 @@
     const initialize = async () => {
       await refreshParserAvailability();
       const shouldSimulateFromCurrentState =
-        shouldSimulateFromUrl || (releaseTitle.trim().length > 0 && selectedProfileName !== null);
+        shouldSimulateFromUrl ||
+        (!hasAnyUrlState && releaseTitle.trim().length > 0 && selectedProfileName !== null);
       if (shouldSimulateFromCurrentState) {
         await simulateSingle();
       }
@@ -460,6 +474,26 @@
     void simulateSingle();
   }
 
+  function handleTryExampleRelease() {
+    const preferredCategory = mediaType as PresetCategory;
+    const candidateCategories: PresetCategory[] =
+      preferredCategory === 'movie' ? ['movie', 'series'] : ['series', 'movie'];
+    const selectedCategory = candidateCategories.find(
+      (category) => getPresetsForCategory(category).length > 0
+    );
+    if (!selectedCategory) {
+      return;
+    }
+
+    const firstExampleTitle = getPresetsForCategory(selectedCategory)[0]?.titles[0]?.title;
+    if (!firstExampleTitle) {
+      return;
+    }
+
+    mediaType = selectedCategory;
+    releaseTitle = firstExampleTitle;
+  }
+
   function handleBatchSimulate() {
     void simulateBatch();
   }
@@ -546,8 +580,8 @@
     scoreOverrides = {};
   }
 
-  async function handleCopyLink() {
-    const shareState: SimulatorUrlState = {
+  function buildShareState(): SimulatorUrlState {
+    return {
       title: releaseTitle.trim() || undefined,
       mediaType,
       profile: selectedProfileName ?? undefined,
@@ -557,19 +591,30 @@
       batchMediaType,
       overrides: hasActiveOverrides ? scoreOverrides : undefined,
     };
+  }
 
-    const { success, truncated } = await copyShareLink(shareState, $page.url.pathname);
+  async function handleCopyLink(mode: ShareLinkMode) {
+    const copyLabel = mode === 'safe' ? 'Safe link' : 'Full link';
+    const shareState: SimulatorUrlState = {
+      ...buildShareState(),
+    };
+
+    const { success, truncated } = await copyShareLink(
+      shareState,
+      `${window.location.origin}${$page.url.pathname}`,
+      { mode }
+    );
     if (!success) {
-      alertStore.add('info', 'Unable to copy link automatically. Copy the URL from your browser address bar.');
+      alertStore.add('info', 'Could not copy to clipboard. Copy URL from the address bar.');
       return;
     }
 
     if (truncated) {
-      alertStore.add('warning', 'Link copied to clipboard, but some state was omitted because the URL was too long.');
+      alertStore.add('warning', `${copyLabel} copied. Some state was omitted to fit URL limits.`);
       return;
     }
 
-    alertStore.add('success', 'Link copied to clipboard.');
+    alertStore.add('success', `${copyLabel} copied to clipboard.`);
   }
 
   function clearMainSection() {
@@ -598,17 +643,25 @@
   <title>Score Simulator - {data.currentDatabase.name} - Praxrr</title>
 </svelte:head>
 
-<div class="space-y-6 px-4 pt-4 pb-8 md:px-8">
+  <div class="space-y-6 px-4 pt-4 pb-8 md:px-8">
   <div class="flex flex-wrap items-center justify-between gap-2">
     <Tabs {tabs} responsive />
-    <button
-      type="button"
-      class="inline-flex items-center gap-1.5 rounded-md border border-neutral-300 bg-white px-3 py-1.5 text-xs font-medium text-neutral-700 transition-colors hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-200 dark:hover:bg-neutral-800"
-      on:click={handleCopyLink}
-    >
-      <Link size={14} />
-      Copy Link
-    </button>
+    <div class="flex items-center gap-2">
+      <Button
+        text="Copy Full Link"
+        variant="secondary"
+        size="xs"
+        icon={Link}
+        on:click={() => handleCopyLink('full')}
+      />
+      <Button
+        text="Copy Safe Link"
+        variant="secondary"
+        size="xs"
+        icon={Shield}
+        on:click={() => handleCopyLink('safe')}
+      />
+    </div>
   </div>
 
   <DisclosureSection
@@ -631,8 +684,10 @@
               isSimulating={isSimulatingSingle}
               {parserAvailable}
               canClear={canClearMainSection}
+              showQuickStart={showQuickStartPanel}
               on:input={handleReleaseInput}
               on:profileChange={handleProfileChange}
+              on:tryExampleRelease={handleTryExampleRelease}
               on:clear={clearMainSection}
             />
           </div>
@@ -643,17 +698,17 @@
 
         {#if hasActiveOverrides}
           <div
-            class="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-200"
+            class="flex flex-wrap items-center justify-between gap-2 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-700 dark:bg-amber-900/20 dark:text-amber-200"
           >
-            <p>{overrideCount} override{overrideCount === 1 ? '' : 's'} active.</p>
-            <button
-              type="button"
-              class="inline-flex items-center gap-1 rounded-md border border-amber-300 bg-white px-2 py-1 font-medium text-amber-900 transition-colors hover:bg-amber-100 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-100 dark:hover:bg-amber-900/70"
+            <span>{overrideCount} What-if change{overrideCount > 1 ? 's' : ''} active.</span>
+            <span class="text-neutral-500">Overrides are temporary and will not be saved.</span>
+            <Button
+              text="Reset All"
+              variant="ghost"
+              size="xs"
+              icon={RotateCcw}
               on:click={handleOverrideResetAll}
-            >
-              <RotateCcw size={12} />
-              Reset All
-            </button>
+            />
           </div>
         {/if}
 

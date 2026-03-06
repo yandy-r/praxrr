@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { tick } from 'svelte';
 	import Score from '$ui/arr/Score.svelte';
 	import CustomFormatBadge from '$ui/arr/CustomFormatBadge.svelte';
 	import Badge from '$ui/badge/Badge.svelte';
@@ -44,29 +43,30 @@
 	$: activeTotalScore = hasOverrides ? overriddenTotal : totalScore;
 	$: activeThresholdState = hasOverrides ? overriddenThresholdState : thresholdState;
 	$: totalDelta = overriddenTotal - totalScore;
+	$: overrideCount = Object.keys(overrides).length;
+	$: minimumGap = Math.max(minimumScore - activeTotalScore, 0);
+	$: upgradeGap = Math.max(upgradeUntilScore - activeTotalScore, 0);
+	$: summaryMessage = activeThresholdState ? decisionSummary(activeThresholdState) : '';
 
-	async function startEditing(cfName: string) {
-		editingCfName = cfName;
-		await tick();
-		const numberInput = document.getElementsByName(`override-${cfName}`).item(0) as
-			| HTMLInputElement
-			| null;
-		numberInput?.focus();
-		numberInput?.select();
-	}
+	function selectInputText(node: HTMLElement) {
+		const rafId = requestAnimationFrame(() => {
+			const input = node.querySelector('input') as HTMLInputElement | null;
+			input?.focus();
+			input?.select();
+		});
 
-	function handleOverrideInput(cfName: string, score: number) {
-		onOverrideChange?.(cfName, Math.round(score));
+		return {
+			destroy() {
+				cancelAnimationFrame(rafId);
+			},
+		};
 	}
 
 	function handleOverrideChangeEvent(cfName: string, event: CustomEvent<number | undefined>) {
 		if (event.detail === undefined) {
 			onOverrideReset?.(cfName);
 			editingCfName = null;
-			return;
 		}
-
-		onOverrideChange?.(cfName, Math.round(event.detail));
 	}
 
 	function handleOverrideKeydown(event: KeyboardEvent | CustomEvent<unknown>) {
@@ -83,6 +83,12 @@
 		if (state === 'below') return 'Below Minimum';
 		if (state === 'accepted') return 'Accepted - Upgrades Enabled';
 		return 'Upgrade Until Reached';
+	}
+
+	function decisionSummary(state: ScoreThresholdState): string {
+		if (state === 'below') return 'This release would not be grabbed.';
+		if (state === 'accepted') return 'This release is eligible to grab.';
+		return 'This release meets your upgrade target.';
 	}
 </script>
 
@@ -113,9 +119,7 @@
 					</div>
 				</div>
 				{#if activeThresholdState}
-					<Badge
-						variant={activeThresholdState === 'below' ? 'danger' : 'success'}
-						size="md"
+					<Badge variant={activeThresholdState === 'below' ? 'danger' : 'success'} size="md"
 						><span class={activeThresholdState === 'upgrade-reached' ? 'opacity-70' : ''}>
 							{thresholdLabel(activeThresholdState)}
 						</span></Badge
@@ -130,6 +134,37 @@
 				>
 			</div>
 
+			{#if activeThresholdState}
+				<div class="rounded-md border border-neutral-200 bg-neutral-50 p-3 dark:border-neutral-800 dark:bg-neutral-950/60">
+					<p class="text-sm font-medium text-neutral-900 dark:text-neutral-100">{summaryMessage}</p>
+					<div class="mt-2 flex flex-wrap gap-2 text-xs">
+						<span
+							class="rounded bg-white px-2 py-1 font-mono text-neutral-700 dark:bg-neutral-900 dark:text-neutral-300"
+						>
+							Current: {activeTotalScore.toLocaleString()}
+						</span>
+						<span
+							class="rounded bg-white px-2 py-1 font-mono text-neutral-700 dark:bg-neutral-900 dark:text-neutral-300"
+						>
+							Minimum Required: {minimumScore.toLocaleString()}
+						</span>
+						{#if activeThresholdState === 'below'}
+							<span
+								class="rounded bg-white px-2 py-1 font-mono text-neutral-700 dark:bg-neutral-900 dark:text-neutral-300"
+							>
+								Remaining to Minimum: {minimumGap.toLocaleString()}
+							</span>
+						{:else if activeThresholdState === 'accepted'}
+							<span
+								class="rounded bg-white px-2 py-1 font-mono text-neutral-700 dark:bg-neutral-900 dark:text-neutral-300"
+							>
+								Remaining to Upgrade Target: {upgradeGap.toLocaleString()}
+							</span>
+						{/if}
+					</div>
+				</div>
+			{/if}
+
 			<div>
 				<div class="mb-2 flex items-center justify-between gap-2">
 					<div class="text-xs font-medium uppercase tracking-wide text-neutral-500 dark:text-neutral-400">
@@ -139,14 +174,14 @@
 						<div class="flex items-center gap-2">
 							<span
 								class="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-amber-800 dark:bg-amber-900/40 dark:text-amber-200"
-								aria-label="Overrides active"
+								aria-label="{overrideCount} active overrides"
 							>
-								{Object.keys(overrides).length} override{Object.keys(overrides).length === 1 ? '' : 's'}
+								{overrideCount} override{overrideCount === 1 ? '' : 's'}
 							</span>
 							{#if onOverrideResetAll}
 								<button
 									type="button"
-									class="inline-flex items-center gap-1 rounded-md border border-amber-300 bg-white px-2 py-1 text-xs font-medium text-amber-900 transition-colors hover:bg-amber-100 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-100 dark:hover:bg-amber-900/70"
+									class="inline-flex items-center gap-1 rounded-md border border-amber-300 bg-white px-2 py-1 text-xs font-medium text-amber-900 transition-colors hover:bg-amber-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-400 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-100 dark:hover:bg-amber-900/70"
 									on:click={onOverrideResetAll}
 								>
 									<RotateCcw size={12} />
@@ -167,39 +202,43 @@
 								: 0}
 							<li
 								class="flex items-center justify-between gap-3 rounded-md border border-neutral-200 px-2.5 py-2 dark:border-neutral-800 {hasOverride
-									? 'border-amber-300 bg-amber-50 dark:border-amber-700/60 dark:bg-amber-900/20'
+									? 'dark:bg-amber-900/20'
 									: ''}"
+								class:bg-amber-50={hasOverride}
+								class:border-l-2={hasOverride}
+								class:border-amber-500={hasOverride}
 							>
-								<CustomFormatBadge
-									name={contribution.cfName}
-									score={contribution.score}
-								/>
+								<CustomFormatBadge name={contribution.cfName} score={contribution.score} />
 								<div class="flex items-center gap-2">
 									{#if editingCfName === contribution.cfName}
-										<div class="w-28">
+										<div class="w-28" use:selectInputText>
 											<NumberInput
 												name="override-{contribution.cfName}"
 												value={contribution.score}
 												step={1}
 												compact
 												font="mono"
-												on:keydown={handleOverrideKeydown}
-												onchange={(value) => handleOverrideInput(contribution.cfName, value)}
-												on:change={(event) => handleOverrideChangeEvent(contribution.cfName, event)}
+												on:keydown={(event) => handleOverrideKeydown(event)}
+												onchange={(value) => {
+													onOverrideChange?.(contribution.cfName, Math.round(value));
+													editingCfName = null;
+												}}
+												on:change={(event) =>
+													handleOverrideChangeEvent(contribution.cfName, event)}
 											/>
 										</div>
 									{:else}
 										<button
 											type="button"
 											class="rounded px-1 py-0.5 text-left transition-colors hover:bg-neutral-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-400 dark:hover:bg-neutral-800"
-											on:click={() => startEditing(contribution.cfName)}
+											on:click={() => (editingCfName = contribution.cfName)}
 										>
 											<Score score={contribution.score} size="sm" />
 										</button>
 									{/if}
 
 									{#if hasOverride}
-										<span class="text-xs font-mono text-neutral-500 line-through dark:text-neutral-400">
+										<span class="text-xs text-neutral-400 line-through dark:text-neutral-500">
 											{contribution.originalScore?.toLocaleString()}
 										</span>
 										<span
@@ -214,7 +253,7 @@
 										{#if onOverrideReset}
 											<button
 												type="button"
-												class="inline-flex items-center rounded border border-amber-300 bg-white p-1 text-amber-900 transition-colors hover:bg-amber-100 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-100 dark:hover:bg-amber-900/70"
+												class="inline-flex items-center rounded border border-amber-300 bg-white p-1 text-amber-900 transition-colors hover:bg-amber-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-400 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-100 dark:hover:bg-amber-900/70"
 												aria-label="Reset override for {contribution.cfName}"
 												on:click={() => onOverrideReset?.(contribution.cfName)}
 											>
