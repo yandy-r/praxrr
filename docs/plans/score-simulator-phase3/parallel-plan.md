@@ -7,14 +7,14 @@
 
 ## Plan Overview
 
-**Feature:** Deep-link integration, what-if score overrides, shareable URL state, and comprehensive
-testing for the Score Simulator.
+**Feature:** Deep-link integration, what-if score overrides, shareable URL state, user-first UX
+hardening, and comprehensive testing for the Score Simulator.
 
-**Scope:** 15 tasks across 6 parallel batches. No new API endpoints, no new dependencies, no
+**Scope:** 19 tasks across 7 parallel batches. No new API endpoints, no new dependencies, no
 database changes. One minor server load modification (return profile name).
 
-**Critical Path:** T3 -> T4 -> T7 -> T8 -> T13 (urlState -> URL mount reading -> override wiring ->
-ScoreBreakdown -> E2E tests) — 5 tasks across 5 batches
+**Critical Path:** T3 -> T4 -> T7 -> T8 -> T15 -> T18 (urlState -> URL mount reading -> override
+wiring -> ScoreBreakdown -> decision summary UX -> UX E2E tests) — 6 tasks across 6 batches
 
 ---
 
@@ -698,6 +698,108 @@ blocks, `page.goto()`, `page.locator()`, `expect()` assertions.
 
 ---
 
+### Batch 7 — User-First UX Hardening (4 tasks)
+
+These tasks close adoption gaps for normal users and are required for Phase 3 completion.
+
+---
+
+#### Task T15: Add plain-language decision summary in ScoreBreakdown
+
+- **Action**: Modify
+- **Files**:
+  - `packages/praxrr-app/src/routes/score-simulator/[databaseId]/components/ScoreBreakdown.svelte`
+  - `packages/praxrr-app/src/routes/score-simulator/[databaseId]/helpers.ts`
+- **Dependencies**: T6, T8
+- **Complexity**: M
+
+**Requirements:**
+
+- Add a summary card above the contribution list that translates threshold state into user-facing
+  language:
+  - `below` -> "This release would not be grabbed."
+  - `accepted` -> "This release is eligible to grab."
+  - `upgrade-reached` -> "This release meets your upgrade target."
+- Card must include:
+  - current total score
+  - minimum required score
+  - remaining gap to minimum or upgrade-until score (if applicable)
+- Summary must reflect overridden totals when what-if overrides are active
+- Do not remove advanced details; this is an additive quick-understanding layer
+
+---
+
+#### Task T16: Add first-run quick-start and empty-state guidance
+
+- **Action**: Modify
+- **Files**:
+  - `packages/praxrr-app/src/routes/score-simulator/[databaseId]/+page.svelte`
+  - `packages/praxrr-app/src/routes/score-simulator/[databaseId]/components/ReleaseInput.svelte`
+- **Dependencies**: T4, T7
+- **Complexity**: M
+
+**Requirements:**
+
+- When no profile/title is selected and no result exists, show a "Start in 3 steps" panel:
+  1. Choose profile
+  2. Paste release title
+  3. Run simulation
+- Add one-click "Try example release" action that reuses existing preset infrastructure
+- Include one plain-language note: "Simulation changes are temporary until you save on the scoring
+  page."
+- Keep this panel hidden once users have entered input or loaded results
+
+---
+
+#### Task T17: Add share-safe link action and beginner terminology polish
+
+- **Action**: Modify
+- **Files**:
+  - `packages/praxrr-app/src/routes/score-simulator/[databaseId]/urlState.ts`
+  - `packages/praxrr-app/src/routes/score-simulator/[databaseId]/+page.svelte`
+  - `packages/praxrr-app/src/routes/score-simulator/[databaseId]/components/ReleaseInput.svelte`
+- **Dependencies**: T3, T7
+- **Complexity**: M
+
+**Requirements:**
+
+- Extend sharing to two actions:
+  - "Copy Full Link" (existing behavior)
+  - "Copy Safe Link" (omits `title` and `batch`, preserves profile, arrType, compare, overrides)
+- Use explicit action labels in UI; avoid ambiguous single "Copy Link" text
+- Ensure both actions reuse truncation handling and clipboard fallback patterns from
+  `copyShareLink()`
+- Replace developer-heavy labels in visible UI copy:
+  - "App type" for Radarr/Sonarr selector label
+  - "What-if changes" for override summary text
+
+---
+
+#### Task T18: Add UX-focused E2E coverage (mobile + first-run + share safety)
+
+- **Action**: Create
+- **File**: `packages/praxrr-app/src/tests/e2e/specs/4.4-score-simulator-ux-basics.spec.ts`
+- **Dependencies**: T13, T15, T16, T17
+- **Complexity**: M
+
+**Requirements:**
+
+- First-run flow:
+  - open simulator with no params
+  - verify quick-start panel appears with 3 steps
+  - click "Try example release" and verify input/result state updates
+- Decision summary:
+  - run simulation and verify plain-language outcome text appears
+  - apply override and verify decision summary updates with overridden total
+- Share safety:
+  - generate full and safe links
+  - verify safe link does not include title/batch params
+- Mobile ergonomics:
+  - run test at narrow viewport (e.g., 390x844)
+  - verify edit and reset controls are visible and usable without horizontal scrolling
+
+---
+
 ## Validation Checklist
 
 ### Must-Fix Items (from analysis-validation.md + Phase 4 validation)
@@ -714,6 +816,10 @@ blocks, `page.goto()`, `page.locator()`, `expect()` assertions.
 - [ ] `ScoreOverrideMap` canonical location: defined in `helpers.ts` (T6), imported in `urlState.ts`
       (T3)
 - [ ] `$page` store import: add to simulator `+page.svelte` if not already present (T4)
+- [ ] Decision summary provides plain-language outcome + score gap math (T15)
+- [ ] First-run quick-start only appears when simulator is empty (T16)
+- [ ] "Copy Safe Link" excludes title and batch params (T17)
+- [ ] Mobile viewport (390x844) supports override edit/reset without layout break (T18)
 
 ### Integration Risks
 
@@ -723,6 +829,9 @@ blocks, `page.goto()`, `page.locator()`, `expect()` assertions.
 - [ ] Clipboard fallback follows InstanceForm.svelte pattern (T3)
 - [ ] API response is never mutated; overrides applied to copies (T6, T9, T10)
 - [ ] T9 and T10 both modify helpers.ts — coordinate if parallel to avoid merge conflicts
+- [ ] Decision summary wording remains consistent with threshold state mapping (T15)
+- [ ] Quick-start panel does not compete with loaded-result UI hierarchy (T16)
+- [ ] Full/safe share actions avoid duplicated serialization logic drift (T17)
 
 ---
 
@@ -734,30 +843,33 @@ This plan was validated by 3 independent agents (completeness, dependency orderi
 
 1. Added T0 (scoring page server load) — `data.scoring.name` doesn't exist; `QualityProfileScoring`
    has no `name` field
-2. Fixed critical path: was `T6→T8→T7→T13` (wrong order, wrong chain), now `T3→T4→T7→T8→T13` (5
-   tasks)
+2. Fixed critical path: was `T6→T8→T7→T13` (wrong order, wrong chain), now `T3→T4→T7→T8→T15→T18` (6
+   tasks with UX gate)
 3. Merged T5 into T7 — both modify `+page.svelte`, T7 updates `handleCopyLink` that T5 creates
 4. Made T9/T10 explicitly list `helpers.ts` as modified file with parallel conflict note
 5. Consolidated `ScoreOverrideMap` to canonical location in `helpers.ts`
-6. Removed vestigial Batch 6, reduced to 6 effective batches
+6. Removed vestigial batch drift and normalized to 7 effective batches with explicit UX hardening
+   batch
 7. Fixed `copyShareLink` return type to `{ success, truncated }` (shared.md says `boolean` — plan
    version is correct)
+8. Added explicit user-first completion tasks: decision summary, quick-start onboarding, safe link
+   sharing, and mobile UX E2E coverage
 
 ---
 
 ## Summary
 
-| Metric               | Value                                                                                                           |
-| -------------------- | --------------------------------------------------------------------------------------------------------------- |
-| Total tasks          | 15 (T0-T4, T6-T14; T5 merged into T7)                                                                           |
-| Parallel batches     | 6                                                                                                               |
-| Max parallelism      | 5 (Batch 1)                                                                                                     |
-| Critical path length | 5 tasks (T3→T4→T7→T8→T13)                                                                                       |
-| New files            | 5 (urlState.ts, SimulateButton.svelte, 3 test files)                                                            |
-| Modified files       | 8 (scoring +page.server.ts, helpers.ts, +page.svelte x2, ScoreBreakdown, RankingTable, ComparisonView, test.ts) |
-| API changes          | 0                                                                                                               |
-| New dependencies     | 0                                                                                                               |
-| Database changes     | 0                                                                                                               |
+| Metric               | Value                                                                                                                         |
+| -------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| Total tasks          | 19 (T0-T4, T6-T18; T5 merged into T7)                                                                                         |
+| Parallel batches     | 7                                                                                                                             |
+| Max parallelism      | 5 (Batch 1)                                                                                                                   |
+| Critical path length | 6 tasks (T3→T4→T7→T8→T15→T18)                                                                                                 |
+| New files            | 6 (urlState.ts, SimulateButton.svelte, 4 test files)                                                                          |
+| Modified files       | 9 (scoring +page.server.ts, helpers.ts, +page.svelte x2, ScoreBreakdown, ReleaseInput, RankingTable, ComparisonView, test.ts) |
+| API changes          | 0                                                                                                                             |
+| New dependencies     | 0                                                                                                                             |
+| Database changes     | 0                                                                                                                             |
 
 ### Next Step
 

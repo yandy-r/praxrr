@@ -13,6 +13,10 @@ resolved in the response. URL state uses search params for simple deep-links and
 for full shareable state. The Config Impact Simulator (#30) integration is limited to defining a
 shared `ScoreOverrideMap` type contract; full sandbox compilation is deferred.
 
+Phase 3 completion also requires a user-first UX layer for normal users: plain-language outcomes
+("would this be grabbed?"), guided first-run onboarding, and mobile-safe interactions. This is not a
+nice-to-have. It is a release gate for the final score simulator phase.
+
 ## External Dependencies
 
 ### APIs and Services
@@ -81,6 +85,19 @@ shared `ScoreOverrideMap` type contract; full sandbox compilation is deferred.
 - As a new user, I want clear visual distinction between "live" scores and "what-if" overrides in
   the simulator, so I am not confused about which scores are actually applied.
 
+### User-First Experience Principles
+
+1. **Plain language first**: Surface user-facing wording ("Grab eligibility", "Meets minimum")
+   before advanced terms ("threshold state", "CF contribution").
+2. **Decision-first output**: Every simulation result must answer "Will this release be accepted?"
+   within one screen, without requiring users to parse raw CF math.
+3. **Guided onboarding**: First-run and empty states must include a short checklist and one-click
+   starter actions.
+4. **Safe experimentation**: What-if mode must clearly communicate temporary changes and provide
+   easy reset paths.
+5. **Mobile usability**: Core actions (simulate, override, reset, copy link) must be fully usable on
+   small touch screens.
+
 ### Business Rules
 
 1. **"Simulate" Button Placement**: The button belongs on the quality profile scoring page
@@ -112,14 +129,39 @@ shared `ScoreOverrideMap` type contract; full sandbox compilation is deferred.
 7. **URL State Read-on-Mount**: URL params are read once during `onMount`. They populate reactive
    state but do not create continuous two-way binding.
 
-8. **URL State Write-on-Action**: A "Copy Link" button serializes current state to URL params and
-   copies the full URL to clipboard. This is the only action that writes state to URL.
+8. **URL State Write-on-Action**: Share actions serialize current state to URL params and copy the
+   URL to clipboard. This is the only path that writes state to URL.
 
 9. **URL Length Handling**: If encoded state exceeds ~2000 characters, degrade gracefully: omit
    batch titles and/or overrides from the URL, show a warning toast.
 
 10. **URL Backward Compatibility**: Unknown params are silently ignored. Missing params fall back to
     defaults. Malformed values silently discarded.
+
+11. **Decision Summary Requirement**: After every simulation, the page must display a plain-language
+    summary card:
+    - `Below minimum`: "This release would not be grabbed."
+    - `Accepted`: "This release is eligible to grab."
+    - `Upgrade reached`: "This release meets your upgrade target." The card must also show current
+      score, minimum required score, and remaining gap (if any).
+
+12. **Beginner-Friendly Labels**: UI copy must use user-facing wording:
+    - "App type" instead of "arrType"
+    - "Score rule" or "Rule score" instead of only "CF contribution" where space permits
+    - "What-if change" instead of only "override"
+
+13. **First-Run Guidance**: When no title/profile is selected, show a quick-start panel with:
+    - 3-step checklist (select profile, paste title, run simulation)
+    - "Try example" action wired to existing presets
+    - short note that changes are not saved until scoring page save action
+
+14. **Share Privacy Option**: Provide two share actions:
+    - "Copy Full Link" (includes titles, batch, overrides)
+    - "Copy Safe Link" (excludes titles/batch, keeps profile + app type + overrides) This protects
+      users who do not want media titles in shared URLs.
+
+15. **Mobile Interaction Rule**: On narrow screens, score editing must use full-width numeric inputs
+    and 44x44 minimum touch targets for edit/reset actions.
 
 ### Edge Cases
 
@@ -134,6 +176,10 @@ shared `ScoreOverrideMap` type contract; full sandbox compilation is deferred.
 | What-if with zero-score CF        | Override from 0 to N shows delta, CF still listed                    | Distinguish override from non-match      |
 | Dirty guard on scoring page       | Standard dirty warning before navigating to simulator                | Existing behavior, no change             |
 | Parser unavailable with overrides | Overrides still work on any cached/previous simulation results       | What-if is response-level                |
+| First-run user with empty state   | Show quick-start panel with guided steps and example action          | Avoid blank/confusing first screen       |
+| Copy link but user wants privacy  | "Copy Safe Link" omits titles and batch data                         | Reduces accidental media-title sharing   |
+| 20+ overrides active              | Show compact "N changes active" summary + sticky reset action        | Keep interface understandable            |
+| Mobile inline edit tap accuracy   | Full-row tap target enters edit mode, no clipped input               | Touch-friendly interaction               |
 
 ### Success Criteria
 
@@ -152,6 +198,11 @@ shared `ScoreOverrideMap` type contract; full sandbox compilation is deferred.
 - [ ] Existing Phase 1/2 tests continue to pass unchanged
 - [ ] E2E test covers QP scoring -> simulator -> what-if -> share flow
 - [ ] No API changes, no new dependencies, no new database tables
+- [ ] Decision summary card answers "would this be grabbed?" in plain language
+- [ ] First-run quick-start panel reduces empty-state confusion
+- [ ] "Copy Safe Link" excludes titles and batch state by default when user chooses it
+- [ ] Core simulator workflow is fully usable on 360px mobile width without horizontal scrolling
+- [ ] Keyboard-only and touch-only workflows both support edit, reset, and copy actions
 
 ## Technical Specifications
 
@@ -247,6 +298,7 @@ _which_ CFs match or _which_ score resolution path is used. Those are already re
 | `.../tests/e2e/specs/4.1-score-simulator-deep-link.spec.ts`                       | E2E: scoring page -> simulate -> pre-fill verification                                               |
 | `.../tests/e2e/specs/4.2-score-simulator-what-if.spec.ts`                         | E2E: override score -> verify recalculation                                                          |
 | `.../tests/e2e/specs/4.3-score-simulator-url-state.spec.ts`                       | E2E: copy link -> open in new context -> verify state                                                |
+| `.../tests/e2e/specs/4.4-score-simulator-ux-basics.spec.ts`                       | E2E: decision summary, quick-start, mobile-safe interactions                                         |
 
 #### Files to Modify
 
@@ -255,6 +307,7 @@ _which_ CFs match or _which_ score resolution path is used. Those are already re
 | `.../score-simulator/[databaseId]/+page.svelte`                     | Read URL state on mount, manage override state, pass overrides to ScoreBreakdown/RankingTable, add "Copy Link" button       |
 | `.../score-simulator/[databaseId]/helpers.ts`                       | Add `applyScoreOverrides()`, `computeOverriddenTotal()`, `resolveThresholdWithOverrides()`                                  |
 | `.../score-simulator/[databaseId]/components/ScoreBreakdown.svelte` | Inline-editable score cells, override visual indicators (amber border/background), original value annotation, delta display |
+| `.../score-simulator/[databaseId]/components/ReleaseInput.svelte`   | Beginner copy updates, app-type label clarity, first-run quick-start trigger hooks                                          |
 | `.../score-simulator/[databaseId]/components/RankingTable.svelte`   | Accept overrides prop, re-rank using overridden totals                                                                      |
 | `.../score-simulator/[databaseId]/components/ComparisonView.svelte` | Show overrides on primary profile, baseline on comparison                                                                   |
 | `.../quality-profiles/[databaseId]/[id]/scoring/+page.svelte`       | Import and render SimulateButton in StickyCard header                                                                       |
@@ -297,11 +350,21 @@ _which_ CFs match or _which_ score resolution path is used. Those are already re
 #### Workflow 3: Share Simulator State via URL
 
 1. **Configure simulation**: User has profile, titles, and optionally what-if overrides active.
-2. **Click "Copy Link"**: System serializes state to URL params, copies to clipboard.
+2. **Click share action**: User chooses "Copy Full Link" or "Copy Safe Link". System serializes
+   state and copies URL to clipboard.
 3. **Toast feedback**: "Link copied to clipboard" with `aria-live="polite"`.
 4. **If too large**: Warning toast with truncation info; omit overrides/batch from URL.
 5. **Recipient opens link**: Simulator loads, reads params, reconstructs state.
 6. **Graceful mismatch**: If profile not found, show warning, load with dropdown open.
+
+#### Workflow 4: First-Run User (No Existing Context)
+
+1. **Open simulator directly**: User lands on simulator without selected profile or title.
+2. **See quick-start panel**: UI shows "Start in 3 steps" with plain-language checklist.
+3. **Try example**: User clicks "Try example release", pre-filling one safe preset and media type.
+4. **Understand result quickly**: Decision summary card states acceptance outcome in plain language.
+5. **Explore details optionally**: User can expand contribution rows only if they want deeper
+   detail.
 
 ### UI Patterns
 
@@ -313,7 +376,10 @@ _which_ CFs match or _which_ score resolution path is used. Those are already re
 | Total delta          | "1750 -> 2050 (+300)" with green/red delta           | In ScoreBreakdown header         |
 | Override count badge | "N overrides active" next to results header          | Clickable to scroll to overrides |
 | Copy Link button     | Clipboard icon + "Copy Link" label                   | In simulator toolbar             |
+| Copy Safe Link       | Secondary action that omits titles/batch             | Privacy-preserving sharing       |
 | Reset All button     | "Reset All Overrides" with undo icon                 | Visible when overrides active    |
+| Decision summary     | Plain-language status card with score gap            | Visible above detailed breakdown |
+| Quick-start panel    | 3-step checklist + example action                    | First-run and empty states       |
 
 ### Accessibility Requirements
 
@@ -322,6 +388,8 @@ _which_ CFs match or _which_ score resolution path is used. Those are already re
 - Keyboard inline editing: Tab between cells, Enter to confirm, Escape to revert
 - Auto-select input content on activation for immediate replacement typing
 - Override count badge uses `aria-label` for screen readers
+- Minimum 44x44 tap targets for mobile edit/reset actions (WCAG 2.5.5 target size guidance)
+- Decision summary status text announced once after simulation completion (`aria-live="polite"`)
 
 ### Performance UX
 
@@ -335,8 +403,8 @@ _which_ CFs match or _which_ score resolution path is used. Those are already re
 
 ### Implementation Approach
 
-**Recommended Strategy**: Build as three incremental sub-phases that deliver value independently.
-The what-if overlay operates entirely on the existing API response -- no server changes needed.
+**Recommended Strategy**: Build as four incremental sub-phases that deliver value independently. The
+what-if overlay operates entirely on the existing API response -- no server changes needed.
 
 **Phasing:**
 
@@ -344,8 +412,10 @@ The what-if overlay operates entirely on the existing API response -- no server 
    reading on simulator mount, "Copy Link" serialization. Immediate discoverability improvement.
 2. **Phase B - What-If Scoring (Core Feature)**: Client-side override map, inline-editable score
    cells in ScoreBreakdown, override-aware ranking/comparison, Config Impact type contract.
-3. **Phase C - Testing + Integration (Quality)**: Unit tests for helpers and URL state, E2E tests
-   for full workflow, test alias registration.
+3. **Phase C - User-First UX Layer (Adoption)**: Plain-language decision summary, first-run
+   quick-start, privacy-safe share action, mobile touch ergonomics.
+4. **Phase D - Testing + Integration (Quality)**: Unit tests for helpers and URL state, E2E tests
+   for full workflow including user-first UX acceptance gates, test alias registration.
 
 ### Technology Decisions
 
@@ -357,6 +427,8 @@ The what-if overlay operates entirely on the existing API response -- no server 
 | URL compression        | None (no lz-string)                               | Typical state fits in ~3500-4000 chars; well within modern browser limits; avoids new dependency            |
 | Inline editing         | Click-to-edit in contribution cells               | Follows PatternFly/enterprise data table patterns; preserves row context                                    |
 | Override scope         | Per-CF globally (applies to all profiles equally) | A CF score override means "what if this CF contributed X?" -- applies regardless of profile                 |
+| Result explanation     | Plain-language decision summary card              | Non-expert users should not parse raw score internals to understand outcome                                 |
+| Share safety           | Full + safe link copy actions                     | Users can collaborate without always exposing release titles                                                |
 | Testing framework      | Deno test + Playwright (existing)                 | Matches `scoreSimulatorHelpers.test.ts` and Playwright spec patterns                                        |
 
 ### Quick Wins
@@ -376,6 +448,14 @@ The what-if overlay operates entirely on the existing API response -- no server 
   this.
 - **Score Distribution Chart**: Histogram of batch scores using lightweight chart library.
 - **Threshold Overrides**: Allow overriding `minimum_custom_format_score` and `upgrade_until_score`.
+
+### Plan Alignment Notes
+
+- The implementation plan is authoritative on URL strategy: query params + base64 JSON, no
+  `lz-string`.
+- URL updates are explicit on "Copy Link" action only; no continuous URL synchronization.
+- Research alternatives that mention hash-fragment compression remain documented as non-selected
+  options, not phase requirements.
 
 ## Risk Assessment
 
@@ -450,6 +530,8 @@ complete. **Tasks**:
 - E2E: Navigate from scoring page -> simulator, verify profile pre-fill
 - E2E: Apply override -> verify total recalculates -> verify ranking updates
 - E2E: Copy link -> open in new context -> verify state restoration
+- E2E: First-run quick-start flow and decision summary for non-expert users
+- E2E: Mobile viewport checks for inline edit/reset usability
 - Register test aliases in `scripts/test.ts`
 
 **Parallelization**: All unit test files are independent. E2E tests are sequential (Playwright
@@ -477,6 +559,12 @@ complete. **Tasks**:
 6. **What-if override visibility**: Always visible or behind disclosure toggle?
    - Recommendation: Override editing activates on click (not visible until first interaction).
      Keeps default view clean.
+
+7. **Share action defaults**: Should "Copy Full Link" or "Copy Safe Link" be the primary action?
+   - Recommendation: Keep "Copy Full Link" primary, expose "Copy Safe Link" adjacent.
+
+8. **Deep-link arrType behavior**: Hard default to `radarr` or prefer last used simulator app type?
+   - Recommendation: Use last used simulator app type when available; fallback to `radarr`.
 
 ## Research References
 
