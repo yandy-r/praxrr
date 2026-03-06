@@ -20,7 +20,13 @@ import { isRecord } from './utils.ts';
 
 const DEFAULT_BRANCH = 'master';
 
-const REQUIRED_METADATA_KEYS = Object.keys(TRASHGUIDE_METADATA_ENTITY_PATH_KEYS) as TrashGuideMetadataEntityPathKey[];
+const OPTIONAL_METADATA_KEYS: ReadonlySet<TrashGuideMetadataEntityPathKey> = new Set(['custom_format_groups']);
+
+const REQUIRED_METADATA_KEYS = (
+  Object.keys(TRASHGUIDE_METADATA_ENTITY_PATH_KEYS) as TrashGuideMetadataEntityPathKey[]
+).filter((key) => !OPTIONAL_METADATA_KEYS.has(key));
+
+const ALL_METADATA_KEYS = Object.keys(TRASHGUIDE_METADATA_ENTITY_PATH_KEYS) as TrashGuideMetadataEntityPathKey[];
 
 export async function fetchTrashGuideSource(options: TrashGuideFetchOptions): Promise<TrashGuideFetchResult> {
   const arrType = toSupportedArrType(options.arr_type);
@@ -55,10 +61,15 @@ export async function discoverTrashGuideFiles(params: {
   const arrPaths = resolveArrPaths(metadata, params.arr_type, params.local_path);
   const discovered = createEmptyDiscoveredFilesByEntity();
 
-  for (const metadataKey of REQUIRED_METADATA_KEYS) {
+  for (const metadataKey of ALL_METADATA_KEYS) {
     const entityType = TRASHGUIDE_METADATA_ENTITY_PATH_KEYS[metadataKey];
     const files = new Map<string, TrashGuideSourceFile>();
     const configuredPaths = arrPaths[metadataKey] ?? [];
+
+    if (configuredPaths.length === 0 && OPTIONAL_METADATA_KEYS.has(metadataKey)) {
+      discovered[entityType] = [];
+      continue;
+    }
 
     for (const configuredPath of configuredPaths) {
       const repoPath = normalizeMetadataPath(configuredPath);
@@ -383,6 +394,7 @@ function createEmptyDiscoveredFilesByEntity(): {
 } {
   return {
     custom_format: [],
+    custom_format_group: [],
     quality_profile: [],
     quality_size: [],
     naming: [],

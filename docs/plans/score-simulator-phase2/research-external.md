@@ -197,7 +197,9 @@ reveal batch input:
 
 ```typescript
 // Parse textarea into releases array
-function parseBatchInput(raw: string): Array<{ title: string; type: MediaType }> {
+function parseBatchInput(
+  raw: string
+): Array<{ title: string; type: MediaType }> {
   return raw
     .split('\n')
     .map((line) => line.trim())
@@ -260,7 +262,9 @@ const EXAMPLE_PRESETS: PresetCategory[] = [
     presets: [
       {
         label: 'Remux 2160p (Best Quality)',
-        titles: ['Movie.Title.2024.2160p.UHD.BluRay.REMUX.DV.HDR.DTS-HD.MA.7.1-GROUP'],
+        titles: [
+          'Movie.Title.2024.2160p.UHD.BluRay.REMUX.DV.HDR.DTS-HD.MA.7.1-GROUP',
+        ],
         type: 'movie',
       },
       {
@@ -298,7 +302,9 @@ const EXAMPLE_PRESETS: PresetCategory[] = [
       },
       {
         label: 'Multi-Language Release',
-        titles: ['Movie.Title.2024.MULTi.1080p.BluRay.x264.DTS-HD.MA.5.1-GROUP'],
+        titles: [
+          'Movie.Title.2024.MULTi.1080p.BluRay.x264.DTS-HD.MA.5.1-GROUP',
+        ],
         type: 'movie',
       },
       {
@@ -414,10 +420,15 @@ interface RankingRow {
 }
 
 // Build ranking from API response
-function buildRankingRows(results: SimulateReleaseResult[], profileName: string): RankingRow[] {
+function buildRankingRows(
+  results: SimulateReleaseResult[],
+  profileName: string
+): RankingRow[] {
   return results
     .map((result) => {
-      const profileScore = result.profileScores.find((p) => p.profileName === profileName);
+      const profileScore = result.profileScores.find(
+        (p) => p.profileName === profileName
+      );
       return {
         releaseId: result.id,
         title: result.title,
@@ -674,18 +685,24 @@ function parseBatchInput(raw: string): string[] {
 ### Basic Integration: Ranking Data Transformation
 
 ```typescript
-function buildRankingData(result: SimulateScoreResponse, profileName: string): RankingRow[] {
+function buildRankingData(
+  result: SimulateScoreResponse,
+  profileName: string
+): RankingRow[] {
   if (!result.parserAvailable || result.results.length === 0) return [];
 
   return result.results
     .map((releaseResult) => {
-      const profileScore = releaseResult.profileScores.find((p) => p.profileName === profileName);
+      const profileScore = releaseResult.profileScores.find(
+        (p) => p.profileName === profileName
+      );
       return {
         releaseId: releaseResult.id,
         title: releaseResult.title,
         totalScore: profileScore?.totalScore ?? 0,
         thresholdState: resolveScoreThresholdState(profileScore ?? null),
-        matchedCfCount: releaseResult.cfMatches.filter((cf) => cf.matches).length,
+        matchedCfCount: releaseResult.cfMatches.filter((cf) => cf.matches)
+          .length,
         totalCfCount: releaseResult.cfMatches.length,
         parsed: releaseResult.parsed,
       };

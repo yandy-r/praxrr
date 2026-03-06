@@ -1,5 +1,16 @@
 import type { ComponentType } from 'svelte';
-import { Calculator, Clock, FolderTree, Link, Microscope, Palette, Settings, Sliders, Tag, Wrench } from 'lucide-svelte';
+import {
+  Calculator,
+  Clock,
+  FolderTree,
+  Link,
+  Microscope,
+  Palette,
+  Settings,
+  Sliders,
+  Tag,
+  Wrench,
+} from 'lucide-svelte';
 
 export const NAV_ICON_MAP: Record<string, ComponentType> = {
   Calculator,

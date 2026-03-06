@@ -108,6 +108,19 @@ function isNamingEntity(value: unknown): value is ParsedTrashGuideEntityByType<'
   return value.entity_type === 'naming' && typeof value.name === 'string' && typeof value.file_path === 'string';
 }
 
+function isCfGroupEntity(value: unknown): value is ParsedTrashGuideEntityByType<'custom_format_group'> {
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  return (
+    value.entity_type === 'custom_format_group' &&
+    typeof value.name === 'string' &&
+    typeof value.file_path === 'string' &&
+    Array.isArray(value.custom_formats)
+  );
+}
+
 function isExpectedEntity<T extends TrashGuideEntityType>(
   value: unknown,
   expectedEntityType: T
@@ -115,6 +128,8 @@ function isExpectedEntity<T extends TrashGuideEntityType>(
   switch (expectedEntityType) {
     case 'custom_format':
       return isCustomFormatEntity(value);
+    case 'custom_format_group':
+      return isCfGroupEntity(value);
     case 'quality_profile':
       return isQualityProfileEntity(value);
     case 'quality_size':

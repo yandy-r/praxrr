@@ -9,12 +9,7 @@
   import DisclosureSection from '$ui/form/DisclosureSection.svelte';
   import { SS_ADVANCED_OPTIONS } from '$shared/disclosure/sectionKeys.ts';
   import { alertStore } from '$lib/client/alerts/store';
-  import {
-    getSelectedProfileScore,
-    parseBatchTitles,
-    buildRankingFromResults,
-    buildComparisonResult,
-  } from './helpers';
+  import { getSelectedProfileScore, parseBatchTitles, buildRankingFromResults, buildComparisonResult } from './helpers';
   import type { ComparisonResult, RankedRelease } from './helpers';
   import ReleaseInput from './components/ReleaseInput.svelte';
   import SimulationResults from './components/SimulationResults.svelte';
@@ -121,12 +116,11 @@
   $: rankedReleases = batchSimulationResult
     ? buildRankingFromResults(batchSimulationResult.results, batchSelectedProfileName ?? '', comparisonProfileName)
     : ([] as RankedRelease[]);
-  $: comparisonResult = comparisonProfileName && singleSimulationResult?.results?.[0] && selectedProfileName
-    ? buildComparisonResult(singleSimulationResult.results[0], selectedProfileName, comparisonProfileName)
-    : (null as ComparisonResult | null);
-  $: singleProfileNames = [selectedProfileName, comparisonProfileName].filter(
-    (name): name is string => name !== null
-  );
+  $: comparisonResult =
+    comparisonProfileName && singleSimulationResult?.results?.[0] && selectedProfileName
+      ? buildComparisonResult(singleSimulationResult.results[0], selectedProfileName, comparisonProfileName)
+      : (null as ComparisonResult | null);
+  $: singleProfileNames = [selectedProfileName, comparisonProfileName].filter((name): name is string => name !== null);
   $: batchProfileNames = [batchSelectedProfileName, comparisonProfileName].filter(
     (name): name is string => name !== null
   );
@@ -214,8 +208,11 @@
     }
   }
 
-  async function simulateBatch() {
-    if (!batchSelectedProfileName || batchTitles.length === 0) {
+  async function simulateBatch(override?: { titles: ReturnType<typeof parseBatchTitles>; mediaType: MediaType }) {
+    const titles = override?.titles ?? batchTitles;
+    const effectiveMediaType = override?.mediaType ?? batchMediaType;
+
+    if (!batchSelectedProfileName || titles.length === 0) {
       cancelBatchSimulationRequest();
       isSimulatingBatch = false;
       batchSimulationResult = null;
@@ -224,7 +221,7 @@
 
     const { requestToken, abortController, timeout } = createBatchSimulationRequestContext();
     selectedReleaseId = null;
-    const arrType: ArrType = batchMediaType === 'movie' ? 'radarr' : 'sonarr';
+    const arrType: ArrType = effectiveMediaType === 'movie' ? 'radarr' : 'sonarr';
 
     try {
       const response = await fetch('/api/v1/simulate/score', {
@@ -233,7 +230,7 @@
         signal: abortController.signal,
         body: JSON.stringify({
           databaseId: data.currentDatabase.id,
-          releases: batchTitles,
+          releases: titles,
           profileNames: batchProfileNames,
           arrType,
         }),
@@ -389,11 +386,18 @@
     void simulateBatch();
   }
 
-  function handlePresetSelected(event: CustomEvent<{ titles: string[]; category: PresetCategory; mediaType: MediaType }>) {
+  function handlePresetSelected(
+    event: CustomEvent<{ titles: string[]; category: PresetCategory; mediaType: MediaType }>
+  ) {
     batchRawText = event.detail.titles.join('\n');
     batchMediaType = event.detail.mediaType;
     selectedReleaseId = null;
-    void simulateBatch();
+    // batchTitles is a reactive declaration and won't recompute until after the
+    // current synchronous execution completes. Compute the fresh titles eagerly
+    // from the values we are about to set so simulateBatch() never reads stale
+    // data from the previous preset/media-type combination.
+    const freshTitles = parseBatchTitles(batchRawText, batchMediaType);
+    void simulateBatch({ titles: freshTitles, mediaType: batchMediaType });
   }
 
   function handleBatchMediaTypeChange(nextMediaType: MediaType) {
@@ -404,7 +408,10 @@
     batchMediaType = nextMediaType;
     selectedReleaseId = null;
     if (batchSimulationResult) {
-      void simulateBatch();
+      // batchTitles is reactive and won't have recomputed yet at this point,
+      // so compute the fresh titles eagerly and pass them as an override.
+      const freshTitles = parseBatchTitles(batchRawText, nextMediaType);
+      void simulateBatch({ titles: freshTitles, mediaType: nextMediaType });
     }
   }
 
@@ -552,9 +559,7 @@
             </div>
 
             <div class="space-y-1.5">
-              <p class="text-xs font-medium text-neutral-700 dark:text-neutral-300">
-                Batch Primary Profile
-              </p>
+              <p class="text-xs font-medium text-neutral-700 dark:text-neutral-300">Batch Primary Profile</p>
               <div class="relative" use:clickOutside={() => (batchPrimaryProfileDropdownOpen = false)}>
                 <button
                   type="button"
@@ -598,11 +603,11 @@
           </div>
         </div>
         {#if batchSimulationResult || isSimulatingBatch}
-          <div class="space-y-3 rounded-lg border border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-900">
+          <div
+            class="space-y-3 rounded-lg border border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-900"
+          >
             <div class="space-y-1">
-              <h3 class="text-sm font-semibold text-neutral-900 dark:text-neutral-100">
-                Batch Results
-              </h3>
+              <h3 class="text-sm font-semibold text-neutral-900 dark:text-neutral-100">Batch Results</h3>
               <p class="text-xs text-neutral-500 dark:text-neutral-400">
                 Ranked results for the release titles in the batch input.
               </p>

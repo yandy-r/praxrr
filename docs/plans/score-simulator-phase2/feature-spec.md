@@ -256,7 +256,10 @@ interface RankedRelease {
 
 ```typescript
 /** Parse batch textarea into validated title array */
-function parseBatchTitles(rawText: string, mediaType: MediaType): SimulateReleaseInput[];
+function parseBatchTitles(
+  rawText: string,
+  mediaType: MediaType
+): SimulateReleaseInput[];
 
 /** Build ranked release list from multi-release response */
 function buildRankingFromResults(

@@ -11,7 +11,13 @@ import { logTrashGuideRouteError, mapReadErrorStatus, parseSourceId, toErrorMess
 
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 200;
-const VALID_ENTITY_TYPES: ReadonlySet<string> = new Set(['custom_format', 'quality_profile', 'quality_size', 'naming']);
+const VALID_ENTITY_TYPES: ReadonlySet<string> = new Set([
+  'custom_format',
+  'custom_format_group',
+  'quality_profile',
+  'quality_size',
+  'naming',
+]);
 
 /**
  * GET /api/v1/trash-guide/sources/[id]/entities

@@ -342,7 +342,13 @@ const columns: Column<RankedRelease>[] = [
     sortable: true,
     sortAccessor: (row) => row.totalScore,
   },
-  { key: 'matchedCfCount', header: 'Matched CFs', width: 'w-28', align: 'center', sortable: true },
+  {
+    key: 'matchedCfCount',
+    header: 'Matched CFs',
+    width: 'w-28',
+    align: 'center',
+    sortable: true,
+  },
 ];
 ```
 
@@ -487,7 +493,10 @@ interface RankedRelease {
 
 ```typescript
 /** Parse batch textarea into validated title array */
-function parseBatchTitles(rawText: string, mediaType: MediaType): SimulateReleaseInput[];
+function parseBatchTitles(
+  rawText: string,
+  mediaType: MediaType
+): SimulateReleaseInput[];
 
 /** Build ranked release list from multi-release response */
 function buildRankingFromResults(
@@ -578,4 +587,4 @@ have unit tests since they contain sorting/ranking/delta logic.
 | Presets            | Static client-side constants    | Zero server overhead                             |
 | State shape        | Flat reactive variables         | Matches Phase 1 `$:` pattern                     |
 | Batch submit       | Explicit button                 | Manages parser load                              |
-| Advanced↔Basic     | Lossless round-trip             | Keep data in memory, just hide UI                |
+| Advanced↔Basic    | Lossless round-trip             | Keep data in memory, just hide UI                |

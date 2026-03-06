@@ -1,6 +1,8 @@
 import {
   TRASHGUIDE_ENTITY_TYPES,
   TRASHGUIDE_SUPPORTED_ARR_TYPES,
+  type TrashGuideCfGroupEntity,
+  type TrashGuideCfGroupFormatItem,
   type TrashGuideCustomFormatEntity,
   type TrashGuideCustomFormatSpecification,
   type TrashGuideNamingEntity,
@@ -36,6 +38,7 @@ export async function parseTrashGuideEntities(input: TrashGuideParseInput): Prom
 
   const issues: TrashGuideParseIssue[] = [];
   const customFormats: TrashGuideCustomFormatEntity[] = [];
+  const customFormatGroups: TrashGuideCfGroupEntity[] = [];
   const qualityProfiles: TrashGuideQualityProfileEntity[] = [];
   const qualitySizes: TrashGuideQualitySizeEntity[] = [];
   const naming: TrashGuideNamingEntity[] = [];
@@ -55,6 +58,9 @@ export async function parseTrashGuideEntities(input: TrashGuideParseInput): Prom
         case 'custom_format':
           customFormats.push(parsed);
           break;
+        case 'custom_format_group':
+          customFormatGroups.push(parsed);
+          break;
         case 'quality_profile':
           qualityProfiles.push(parsed);
           break;
@@ -70,6 +76,7 @@ export async function parseTrashGuideEntities(input: TrashGuideParseInput): Prom
 
   const entities: TrashGuideParsedEntities = {
     custom_formats: customFormats.sort((a, b) => sortByIdentity(a, b)),
+    custom_format_groups: customFormatGroups.sort((a, b) => sortByIdentity(a, b)),
     quality_profiles: qualityProfiles.sort((a, b) => sortByIdentity(a, b)),
     quality_sizes: qualitySizes.sort((a, b) => sortByIdentity(a, b)),
     naming: naming.sort((a, b) => sortByIdentity(a, b)),
@@ -77,6 +84,7 @@ export async function parseTrashGuideEntities(input: TrashGuideParseInput): Prom
 
   const orderedEntities: TrashGuideParsedEntity[] = [
     ...entities.custom_formats,
+    ...entities.custom_format_groups,
     ...entities.quality_profiles,
     ...entities.quality_sizes,
     ...entities.naming,
@@ -133,6 +141,8 @@ async function parseFile(
     switch (file.entity_type) {
       case 'custom_format':
         return parseCustomFormat(payload, arrType, file.relative_path);
+      case 'custom_format_group':
+        return parseCfGroup(payload, arrType, file.relative_path);
       case 'quality_profile':
         return parseQualityProfile(payload, arrType, file.relative_path);
       case 'quality_size':
@@ -211,6 +221,58 @@ function parseCustomFormatSpecification(
     negate: readRequiredBoolean(record, 'negate', `${filePath}: specifications[${index}]`),
     required: readRequiredBoolean(record, 'required', `${filePath}: specifications[${index}]`),
     fields: sortRecordDeep(fields),
+  };
+}
+
+function parseCfGroup(
+  payload: unknown,
+  arrType: TrashGuideSupportedArrType,
+  filePath: string
+): TrashGuideCfGroupEntity {
+  const record = asRecord(payload, `${filePath}: root`);
+  const trashId = readRequiredTrashId(record, `${filePath}: trash_id`);
+  const name = readRequiredString(record, 'name', filePath);
+
+  const qualityProfilesRaw = asRecord(
+    readRequiredValue(record, 'quality_profiles', filePath),
+    `${filePath}: quality_profiles`
+  );
+  const includeRaw = asRecord(
+    readRequiredValue(qualityProfilesRaw, 'include', `${filePath}: quality_profiles`),
+    `${filePath}: quality_profiles.include`
+  );
+  const include: Record<string, string> = {};
+  for (const [profileName, value] of Object.entries(includeRaw)) {
+    if (typeof value !== 'string' || !value.trim()) {
+      throw new Error(`${filePath}: quality_profiles.include["${profileName}"] must be a non-empty string`);
+    }
+    include[profileName] = value.trim();
+  }
+
+  const rawCustomFormats = asArray(
+    readRequiredValue(record, 'custom_formats', filePath),
+    `${filePath}: custom_formats`
+  );
+  const customFormats: TrashGuideCfGroupFormatItem[] = rawCustomFormats.map((value, index) => {
+    const context = `${filePath}: custom_formats[${index}]`;
+    const cfRecord = asRecord(value, context);
+    return {
+      name: readRequiredString(cfRecord, 'name', context),
+      trash_id: readRequiredTrashId(cfRecord, context),
+      required: typeof cfRecord.required === 'boolean' ? cfRecord.required : true,
+    };
+  });
+
+  return {
+    entity_type: 'custom_format_group',
+    arr_type: arrType,
+    trash_id: trashId,
+    file_path: filePath,
+    name,
+    description: readOptionalString(record, 'trash_description'),
+    default: typeof record.default === 'boolean' ? record.default : false,
+    custom_formats: customFormats,
+    quality_profiles: { include },
   };
 }
 

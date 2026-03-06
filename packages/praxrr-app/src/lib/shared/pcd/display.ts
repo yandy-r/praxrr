@@ -391,10 +391,8 @@ export interface MetadataProfileTypeToggle {
   allowed: boolean;
 }
 
-export interface LidarrMetadataProfileListItem extends Pick<
-  LidarrMetadataProfilesRow,
-  'id' | 'name' | 'description' | 'updated_at'
-> {
+export interface LidarrMetadataProfileListItem
+  extends Pick<LidarrMetadataProfilesRow, 'id' | 'name' | 'description' | 'updated_at'> {
   primaryTypeCount: number;
   secondaryTypeCount: number;
   releaseStatusCount: number;
@@ -403,10 +401,8 @@ export interface LidarrMetadataProfileListItem extends Pick<
   releaseStatusAllowedCount: number;
 }
 
-export interface LidarrMetadataProfileDetail extends Pick<
-  LidarrMetadataProfilesRow,
-  'id' | 'name' | 'description' | 'updated_at'
-> {
+export interface LidarrMetadataProfileDetail
+  extends Pick<LidarrMetadataProfilesRow, 'id' | 'name' | 'description' | 'updated_at'> {
   primaryTypes: Array<Pick<LidarrMetadataProfilePrimaryTypesRow, 'type_id' | 'name' | 'allowed'>>;
   secondaryTypes: Array<Pick<LidarrMetadataProfileSecondaryTypesRow, 'type_id' | 'name' | 'allowed'>>;
   releaseStatuses: Array<Pick<LidarrMetadataProfileReleaseStatusesRow, 'status_id' | 'name' | 'allowed'>>;

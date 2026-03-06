@@ -1168,7 +1168,7 @@ export interface components {
       summary: components['schemas']['SyncPreviewSummary'];
     };
     /** @enum {string} */
-    TrashGuideEntityType: 'custom_format' | 'quality_profile' | 'quality_size' | 'naming';
+    TrashGuideEntityType: 'custom_format' | 'custom_format_group' | 'quality_profile' | 'quality_size' | 'naming';
     TrashGuideEntityDetailResponse: {
       source: {
         /** @enum {string} */

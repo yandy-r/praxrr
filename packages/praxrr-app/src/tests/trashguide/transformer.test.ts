@@ -7,6 +7,7 @@ import {
   type TrashGuideTransformResult,
 } from '$trashguide/transformer.ts';
 import type {
+  TrashGuideCfGroupEntity,
   TrashGuideCustomFormatEntity,
   TrashGuideNamingEntity,
   TrashGuideParsedEntity,
@@ -91,6 +92,7 @@ function createParseResult(
   orderedEntities: readonly TrashGuideParsedEntity[]
 ): TrashGuideParseResult {
   const customFormats: TrashGuideCustomFormatEntity[] = [];
+  const customFormatGroups: TrashGuideCfGroupEntity[] = [];
   const qualityProfiles: TrashGuideQualityProfileEntity[] = [];
   const qualitySizes: TrashGuideQualitySizeEntity[] = [];
   const naming: TrashGuideNamingEntity[] = [];
@@ -99,6 +101,9 @@ function createParseResult(
     switch (entity.entity_type) {
       case 'custom_format':
         customFormats.push(entity);
+        break;
+      case 'custom_format_group':
+        customFormatGroups.push(entity);
         break;
       case 'quality_profile':
         qualityProfiles.push(entity);
@@ -117,6 +122,7 @@ function createParseResult(
     status: 'success',
     entities: {
       custom_formats: customFormats,
+      custom_format_groups: customFormatGroups,
       quality_profiles: qualityProfiles,
       quality_sizes: qualitySizes,
       naming,

@@ -613,6 +613,7 @@ components:
       type: string
       enum:
         - custom_format
+        - custom_format_group
         - quality_profile
         - quality_size
         - naming

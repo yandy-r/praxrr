@@ -209,7 +209,7 @@ type UnifiedDatabaseItem =
   | { type: 'pcd' /* PCD fields required */ }
   | {
       type: 'trash';
-      arrType: TrashGuideSupportedArrType; /* TRaSH fields required */
+      arrType: TrashGuideSupportedArrType /* TRaSH fields required */;
     };
 ```
 

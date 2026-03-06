@@ -1,6 +1,12 @@
 import type { ArrType } from '../pcd/types.ts';
 
-export const TRASHGUIDE_ENTITY_TYPES = ['custom_format', 'quality_profile', 'quality_size', 'naming'] as const;
+export const TRASHGUIDE_ENTITY_TYPES = [
+  'custom_format',
+  'custom_format_group',
+  'quality_profile',
+  'quality_size',
+  'naming',
+] as const;
 export type TrashGuideEntityType = (typeof TRASHGUIDE_ENTITY_TYPES)[number];
 
 export const TRASHGUIDE_SUPPORTED_ARR_TYPES = ['radarr', 'sonarr'] as const;

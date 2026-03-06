@@ -43,6 +43,7 @@ function createDiscovery(
 ): TrashGuideDiscoveryResult {
   const filesByEntity = {
     custom_format: files.custom_format ?? [],
+    custom_format_group: files.custom_format_group ?? [],
     quality_profile: files.quality_profile ?? [],
     quality_size: files.quality_size ?? [],
     naming: files.naming ?? [],
@@ -50,6 +51,7 @@ function createDiscovery(
 
   const totalFiles =
     filesByEntity.custom_format.length +
+    filesByEntity.custom_format_group.length +
     filesByEntity.quality_profile.length +
     filesByEntity.quality_size.length +
     filesByEntity.naming.length;

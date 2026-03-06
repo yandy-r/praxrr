@@ -2,10 +2,16 @@ import { db } from '../db.ts';
 import { parseTrashGuideSourceArrType, type TrashGuideSourceArrType } from '$lib/server/trashguide/types.ts';
 import { normalizeTrashId } from '$trashguide/ids.ts';
 
-export type TrashIdMappingEntityType = 'custom_format' | 'quality_profile' | 'quality_size' | 'naming';
+export type TrashIdMappingEntityType =
+  | 'custom_format'
+  | 'custom_format_group'
+  | 'quality_profile'
+  | 'quality_size'
+  | 'naming';
 
 const VALID_ENTITY_TYPES: ReadonlySet<string> = new Set<TrashIdMappingEntityType>([
   'custom_format',
+  'custom_format_group',
   'quality_profile',
   'quality_size',
   'naming',

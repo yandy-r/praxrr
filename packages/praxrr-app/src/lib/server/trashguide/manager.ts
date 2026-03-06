@@ -7,7 +7,7 @@ import { trashGuideSyncQueries } from '$db/queries/trashGuideSync.ts';
 import { trashIdMappingsQueries } from '$db/queries/trashIdMappings.ts';
 import { triggerSyncs } from '$sync/processor.ts';
 import { checkForUpdates as checkGitForUpdates, getCommits, type UpdateInfo } from '$utils/git/index.ts';
-import { fetchTrashGuideSource } from './fetcher.ts';
+import { discoverTrashGuideFiles, fetchTrashGuideSource } from './fetcher.ts';
 import { parseTrashGuideEntities } from './parser.ts';
 import { transformTrashGuideEntities } from './transformer.ts';
 import type {
@@ -47,6 +47,7 @@ export interface TrashGuideSyncResult {
 
 export interface TrashGuideSourceEntityCounts {
   customFormats: number;
+  customFormatGroups: number;
   qualityProfiles: number;
   qualitySizes: number;
   naming: number;
@@ -127,10 +128,12 @@ class TrashGuideManager {
     let missingLocalClones = 0;
 
     for (const source of sources) {
+      let localCloneAvailable = true;
       try {
         await Deno.stat(source.local_path);
       } catch (error) {
         if (error instanceof Deno.errors.NotFound) {
+          localCloneAvailable = false;
           missingLocalClones += 1;
           await logger.warn('TRaSH source clone directory missing', {
             source: 'TrashGuideManager',
@@ -142,6 +145,9 @@ class TrashGuideManager {
       }
 
       this.ensureSyncConfigRows(source);
+      if (localCloneAvailable) {
+        await this.backfillMissingCustomFormatGroups(source);
+      }
     }
 
     await logger.info('TRaSH guide manager initialized', {
@@ -569,6 +575,7 @@ class TrashGuideManager {
   private getEntityCounts(sourceId: number): TrashGuideSourceEntityCounts {
     const counts: TrashGuideSourceEntityCounts = {
       customFormats: 0,
+      customFormatGroups: 0,
       qualityProfiles: 0,
       qualitySizes: 0,
       naming: 0,
@@ -576,22 +583,23 @@ class TrashGuideManager {
 
     const entities = trashGuideEntityCacheQueries.getBySource(sourceId);
     for (const entity of entities) {
-      if (entity.entityType === 'custom_format') {
-        counts.customFormats += 1;
-        continue;
+      switch (entity.entityType) {
+        case 'custom_format':
+          counts.customFormats += 1;
+          break;
+        case 'custom_format_group':
+          counts.customFormatGroups += 1;
+          break;
+        case 'quality_profile':
+          counts.qualityProfiles += 1;
+          break;
+        case 'quality_size':
+          counts.qualitySizes += 1;
+          break;
+        case 'naming':
+          counts.naming += 1;
+          break;
       }
-
-      if (entity.entityType === 'quality_profile') {
-        counts.qualityProfiles += 1;
-        continue;
-      }
-
-      if (entity.entityType === 'quality_size') {
-        counts.qualitySizes += 1;
-        continue;
-      }
-
-      counts.naming += 1;
     }
 
     return counts;
@@ -631,6 +639,89 @@ class TrashGuideManager {
         trigger: 'on_pull',
       });
     }
+  }
+
+  private async backfillMissingCustomFormatGroups(source: TrashGuideSource): Promise<void> {
+    const existingGroups = trashGuideEntityCacheQueries.getBySourceAndType(source.id, 'custom_format_group');
+    if (existingGroups.length > 0) {
+      return;
+    }
+
+    let discovery;
+    try {
+      discovery = await discoverTrashGuideFiles({
+        local_path: source.local_path,
+        arr_type: source.arr_type,
+      });
+    } catch (error) {
+      await logger.warn('Failed to discover TRaSH files for custom format group backfill', {
+        source: 'TrashGuideManager',
+        meta: {
+          sourceId: source.id,
+          arrType: source.arr_type,
+          localPath: source.local_path,
+          error: error instanceof Error ? error.message : String(error),
+        },
+      });
+      return;
+    }
+
+    if (discovery.files_by_entity.custom_format_group.length === 0) {
+      return;
+    }
+
+    let parsed: TrashGuideParseResult;
+    try {
+      parsed = await parseTrashGuideEntities({
+        arr_type: source.arr_type,
+        discovery,
+      });
+    } catch (error) {
+      await logger.warn('Failed to parse TRaSH custom format groups for backfill', {
+        source: 'TrashGuideManager',
+        meta: {
+          sourceId: source.id,
+          arrType: source.arr_type,
+          error: error instanceof Error ? error.message : String(error),
+        },
+      });
+      return;
+    }
+
+    const groups = parsed.entities.custom_format_groups;
+    if (groups.length === 0) {
+      await logger.warn('TRaSH custom format group backfill found no parseable groups', {
+        source: 'TrashGuideManager',
+        meta: {
+          sourceId: source.id,
+          arrType: source.arr_type,
+          parseStatus: parsed.status,
+          failedFiles: parsed.failed_files,
+        },
+      });
+      return;
+    }
+
+    const cacheRows = await this.toCacheRows(source.id, groups);
+    trashGuideEntityCacheQueries.upsertMany(cacheRows);
+    trashIdMappingsQueries.upsertMany(
+      groups.map((group) => ({
+        sourceId: source.id,
+        arrType: source.arr_type,
+        entityType: 'custom_format_group',
+        trashId: group.trash_id,
+        entityName: group.name,
+      }))
+    );
+
+    await logger.info('Backfilled missing TRaSH custom format groups', {
+      source: 'TrashGuideManager',
+      meta: {
+        sourceId: source.id,
+        arrType: source.arr_type,
+        groupCount: groups.length,
+      },
+    });
   }
 
   private async persistSourceSyncData(source: TrashGuideSource, parsed: TrashGuideParseResult) {
