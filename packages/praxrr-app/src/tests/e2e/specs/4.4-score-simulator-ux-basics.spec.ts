@@ -215,7 +215,7 @@ test.describe("4.4 Score Simulator UX basics", () => {
 
     const releaseInputCard = page
       .locator("div.rounded-lg")
-      .filter({ has: page.getByRole("heading", { name: "Release Input" }) })
+      .filter({ has: page.getByRole("heading", { name: "Single Release Score Simulation" }) })
       .first();
     await releaseInputCard.getByRole("button", {
       name: "Select quality profile...",

@@ -52,7 +52,7 @@ export type RankedRelease = {
   scoreDelta?: number;
 };
 
-export type PresetCategory = 'movie' | 'series';
+export type PresetCategory = 'movie' | 'series' | 'anime';
 
 export type PresetGroup = {
   category: PresetCategory;

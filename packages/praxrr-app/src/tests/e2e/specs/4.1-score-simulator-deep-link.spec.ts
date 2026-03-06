@@ -109,7 +109,7 @@ test.describe('4.1 Score Simulator deep-link', () => {
 
 		const releaseInputCard = page
 			.locator('div.rounded-lg')
-			.filter({ has: page.getByRole('heading', { name: 'Release Input' }) })
+			.filter({ has: page.getByRole('heading', { name: 'Single Release Score Simulation' }) })
 			.first();
 		await expect(releaseInputCard.getByRole('button', { name: context!.profileName })).toBeVisible();
 

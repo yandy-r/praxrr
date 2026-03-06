@@ -27,7 +27,7 @@
   import ProfileComparison from './components/ProfileComparison.svelte';
   import ComparisonView from './components/ComparisonView.svelte';
   import RankingTable from './components/RankingTable.svelte';
-  import { getPresetsForCategory } from './presets';
+  import { getRandomPresetTitleForCategory } from './presets';
   import type { PageData } from './$types';
   import type { components } from '$api/v1.d.ts';
   import type { PresetCategory } from './helpers';
@@ -51,6 +51,7 @@
 
   let releaseTitle = '';
   let mediaType: MediaType = 'movie';
+  let singleSampleCategory: PresetCategory = 'movie';
   let selectedProfileName: string | null = null;
   let singleSimulationResult: SimulateScoreResponse | null = null;
   let batchSimulationResult: SimulateScoreResponse | null = null;
@@ -66,6 +67,7 @@
   // Phase 2 state
   let batchRawText = '';
   let batchMediaType: MediaType = 'movie';
+  let batchSampleCategory: PresetCategory = 'movie';
   let batchSelectedProfileName: string | null = null;
   let batchPrimaryProfileDropdownOpen = false;
   let comparisonProfileName: string | null = null;
@@ -171,6 +173,7 @@
 
     if (urlState.mediaType) {
       mediaType = urlState.mediaType;
+      singleSampleCategory = urlState.mediaType;
       hasAnyUrlState = true;
     }
 
@@ -196,6 +199,7 @@
     if (urlState.arrType) {
       hasAnyUrlState = true;
       mediaType = urlState.arrType === 'radarr' ? 'movie' : 'series';
+      singleSampleCategory = mediaType;
     }
 
     if (urlState.batch) {
@@ -206,6 +210,7 @@
     if (urlState.batchMediaType) {
       hasAnyUrlState = true;
       batchMediaType = urlState.batchMediaType;
+      batchSampleCategory = urlState.batchMediaType;
     }
 
     if (urlState.overrides) {
@@ -475,23 +480,14 @@
   }
 
   function handleTryExampleRelease() {
-    const preferredCategory = mediaType as PresetCategory;
-    const candidateCategories: PresetCategory[] =
-      preferredCategory === 'movie' ? ['movie', 'series'] : ['series', 'movie'];
-    const selectedCategory = candidateCategories.find(
-      (category) => getPresetsForCategory(category).length > 0
-    );
-    if (!selectedCategory) {
+    const selectedCategory = singleSampleCategory;
+    const randomExampleTitle = getRandomPresetTitleForCategory(selectedCategory);
+    if (!randomExampleTitle) {
       return;
     }
 
-    const firstExampleTitle = getPresetsForCategory(selectedCategory)[0]?.titles[0]?.title;
-    if (!firstExampleTitle) {
-      return;
-    }
-
-    mediaType = selectedCategory;
-    releaseTitle = firstExampleTitle;
+    mediaType = selectedCategory === 'movie' ? 'movie' : 'series';
+    releaseTitle = randomExampleTitle;
   }
 
   function handleBatchSimulate() {
@@ -502,6 +498,7 @@
     event: CustomEvent<{ titles: string[]; category: PresetCategory; mediaType: MediaType }>
   ) {
     batchRawText = event.detail.titles.join('\n');
+    batchSampleCategory = event.detail.category;
     batchMediaType = event.detail.mediaType;
     selectedReleaseId = null;
     // batchTitles is a reactive declaration and won't recompute until after the
@@ -518,6 +515,7 @@
     }
 
     batchMediaType = nextMediaType;
+    batchSampleCategory = nextMediaType;
     selectedReleaseId = null;
     if (batchSimulationResult) {
       // batchTitles is reactive and won't have recomputed yet at this point,
@@ -621,6 +619,7 @@
     cancelSingleSimulationRequest();
     releaseTitle = '';
     mediaType = 'movie';
+    singleSampleCategory = 'movie';
     selectedProfileName = null;
     singleSimulationResult = null;
     selectedReleaseId = null;
@@ -631,6 +630,7 @@
     cancelBatchSimulationRequest();
     batchRawText = '';
     batchMediaType = 'movie';
+    batchSampleCategory = 'movie';
     batchSelectedProfileName = null;
     comparisonProfileName = null;
     batchSimulationResult = null;
@@ -674,27 +674,21 @@
   >
     <div class="grid grid-cols-1 gap-6 lg:grid-cols-[2fr_3fr]">
       <div class="min-w-0 space-y-4">
-        <div class="flex items-start gap-2">
-          <div class="flex-1">
-            <ReleaseInput
-              bind:title={releaseTitle}
-              bind:mediaType
-              bind:selectedProfileName
-              qualityProfiles={qualityProfileOptions}
-              isSimulating={isSimulatingSingle}
-              {parserAvailable}
-              canClear={canClearMainSection}
-              showQuickStart={showQuickStartPanel}
-              on:input={handleReleaseInput}
-              on:profileChange={handleProfileChange}
-              on:tryExampleRelease={handleTryExampleRelease}
-              on:clear={clearMainSection}
-            />
-          </div>
-          <div class="pt-1">
-            <PresetSelector mediaType={batchMediaType} compact on:presetSelected={handlePresetSelected} />
-          </div>
-        </div>
+        <ReleaseInput
+          bind:title={releaseTitle}
+          bind:mediaType
+          bind:sampleCategory={singleSampleCategory}
+          bind:selectedProfileName
+          qualityProfiles={qualityProfileOptions}
+          isSimulating={isSimulatingSingle}
+          {parserAvailable}
+          canClear={canClearMainSection}
+          showQuickStart={showQuickStartPanel}
+          on:input={handleReleaseInput}
+          on:profileChange={handleProfileChange}
+          on:tryExampleRelease={handleTryExampleRelease}
+          on:clear={clearMainSection}
+        />
 
         {#if hasActiveOverrides}
           <div
@@ -814,7 +808,10 @@
               </div>
             </div>
 
-            <PresetSelector mediaType={batchMediaType} on:presetSelected={handlePresetSelected} />
+            <PresetSelector
+              sampleCategory={batchSampleCategory}
+              on:presetSelected={handlePresetSelected}
+            />
             <ProfileComparison
               qualityProfiles={qualityProfileOptions}
               primaryProfileName={batchSelectedProfileName}

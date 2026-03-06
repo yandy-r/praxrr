@@ -228,7 +228,7 @@ test.describe('4.3 Score Simulator URL state sharing', () => {
 
 		const freshReleaseInputCard = freshPage
 			.locator('div.rounded-lg')
-			.filter({ has: freshPage.getByRole('heading', { name: 'Release Input' }) })
+			.filter({ has: freshPage.getByRole('heading', { name: 'Single Release Score Simulation' }) })
 			.first();
 		await expect(freshReleaseInputCard.getByRole('button', { name: context!.profileName })).toBeVisible();
 
@@ -264,7 +264,7 @@ test.describe('4.3 Score Simulator URL state sharing', () => {
 
 		const releaseInputCard = page
 			.locator('div.rounded-lg')
-			.filter({ has: page.getByRole('heading', { name: 'Release Input' }) })
+			.filter({ has: page.getByRole('heading', { name: 'Single Release Score Simulation' }) })
 			.first();
 		await expect(releaseInputCard.getByRole('button', { name: 'Select quality profile...' })).toBeVisible();
 	});
