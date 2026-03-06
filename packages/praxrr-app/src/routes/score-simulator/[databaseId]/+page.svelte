@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
   import { browser } from '$app/environment';
+  import { page } from '$app/stores';
   import { ChevronDown } from 'lucide-svelte';
   import { clickOutside } from '$lib/client/utils/clickOutside';
   import Tabs from '$ui/navigation/tabs/Tabs.svelte';
@@ -22,6 +23,7 @@
   import type { PageData } from './$types';
   import type { components } from '$api/v1.d.ts';
   import type { PresetCategory } from './helpers';
+  import { parseUrlState } from './urlState';
 
   type SimulateScoreResponse = components['schemas']['SimulateScoreResponse'];
   type SimulateProfileScore = components['schemas']['SimulateProfileScore'];
@@ -125,8 +127,57 @@
     (name): name is string => name !== null
   );
 
+  function hasQualityProfile(profileName: string): boolean {
+    return qualityProfileOptions.some((profile) => profile.value === profileName);
+  }
+
   onMount(() => {
     if (!browser) return;
+
+    const urlState = parseUrlState($page.url.searchParams);
+    let hasTitleFromUrl = false;
+    let hasProfileFromUrl = false;
+
+    if (urlState.title) {
+      releaseTitle = urlState.title;
+      hasTitleFromUrl = true;
+    }
+
+    if (urlState.mediaType) {
+      mediaType = urlState.mediaType;
+    }
+
+    if (urlState.profile) {
+      if (hasQualityProfile(urlState.profile)) {
+        selectedProfileName = urlState.profile;
+        hasProfileFromUrl = true;
+      } else {
+        alertStore.add('warning', 'Profile from URL not found in this database.');
+      }
+    }
+
+    if (urlState.compare) {
+      if (hasQualityProfile(urlState.compare)) {
+        comparisonProfileName = urlState.compare;
+      } else {
+        alertStore.add('warning', 'Comparison profile from URL not found in this database.');
+      }
+    }
+
+    if (urlState.arrType) {
+      mediaType = urlState.arrType === 'radarr' ? 'movie' : 'series';
+    }
+
+    if (urlState.batch) {
+      batchRawText = urlState.batch.join('\n');
+    }
+
+    if (urlState.batchMediaType) {
+      batchMediaType = urlState.batchMediaType;
+    }
+
+    // TODO(T7): Apply urlState.overrides to scoreOverrides once T7 introduces override state.
+    const shouldSimulateFromUrl = hasTitleFromUrl && hasProfileFromUrl;
 
     if (!parserAvailable) {
       alertStore.add('warning', 'Parser service unavailable...', 0);
@@ -134,7 +185,11 @@
 
     const initialize = async () => {
       await refreshParserAvailability();
-      await simulateSingle();
+      const shouldSimulateFromCurrentState =
+        shouldSimulateFromUrl || (releaseTitle.trim().length > 0 && selectedProfileName !== null);
+      if (shouldSimulateFromCurrentState) {
+        await simulateSingle();
+      }
 
       parserHealthInterval = setInterval(() => {
         if (!parserAvailable) {
