@@ -19,6 +19,8 @@ import type {
   ParsedInfo,
 } from '$shared/pcd/display.ts';
 
+const warnedRegexPatterns = new Set<string>();
+
 /**
  * Extract all unique regex patterns from custom format conditions
  * These are patterns that need to be matched against release titles
@@ -337,7 +339,10 @@ function evaluatePattern(
         };
       }
     } catch {
-      // Invalid JS regex - skip this pattern
+      if (!warnedRegexPatterns.has(pattern.pattern)) {
+        warnedRegexPatterns.add(pattern.pattern);
+        console.warn(`[Evaluator] Invalid JS regex skipped: ${pattern.pattern}`);
+      }
     }
   }
   return { matched: false, expected, actual: 'No match' };
@@ -555,7 +560,10 @@ function evaluateEdition(
           return { matched: true, expected, actual };
         }
       } catch {
-        // Invalid regex - skip
+        if (!warnedRegexPatterns.has(pattern.pattern)) {
+          warnedRegexPatterns.add(pattern.pattern);
+          console.warn(`[Evaluator] Invalid JS regex skipped: ${pattern.pattern}`);
+        }
       }
     }
   }
@@ -604,7 +612,10 @@ function evaluateReleaseGroup(
           return { matched: true, expected, actual };
         }
       } catch {
-        // Invalid regex - skip
+        if (!warnedRegexPatterns.has(pattern.pattern)) {
+          warnedRegexPatterns.add(pattern.pattern);
+          console.warn(`[Evaluator] Invalid JS regex skipped: ${pattern.pattern}`);
+        }
       }
     }
   }
