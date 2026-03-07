@@ -18,6 +18,22 @@ function buildLongOverrides(size: number): Record<string, number> {
   return overrides;
 }
 
+async function withMockConsoleWarn(
+  run: (warnings: string[]) => Promise<void> | void,
+): Promise<void> {
+  const warnings: string[] = [];
+  const originalWarn = console.warn;
+  console.warn = (...args: unknown[]) => {
+    warnings.push(args.map((value) => String(value)).join(" "));
+  };
+
+  try {
+    await run(warnings);
+  } finally {
+    console.warn = originalWarn;
+  }
+}
+
 async function withMockClipboard(
   run: (writes: string[]) => Promise<void>,
 ): Promise<void> {
@@ -138,20 +154,30 @@ Deno.test("parseUrlState decodes valid batch arrays", () => {
 });
 
 Deno.test("parseUrlState returns undefined for malformed batch base64", () => {
-  const params = new URLSearchParams({ batch: "%%%not-base64%%%" });
-  assertEquals(parseUrlState(params).batch, undefined);
+  return withMockConsoleWarn((warnings) => {
+    const params = new URLSearchParams({ batch: "%%%not-base64%%%" });
+    assertEquals(parseUrlState(params).batch, undefined);
+    assertEquals(warnings.length, 1);
+    assert(warnings[0].includes('Ignoring invalid "batch" query param'));
+  });
 });
 
 Deno.test("parseUrlState returns undefined for batch values that are not valid JSON arrays", () => {
-  const invalidJsonParams = new URLSearchParams({
-    batch: btoa("{invalid-json"),
-  });
-  assertEquals(parseUrlState(invalidJsonParams).batch, undefined);
+  return withMockConsoleWarn((warnings) => {
+    const invalidJsonParams = new URLSearchParams({
+      batch: btoa("{invalid-json"),
+    });
+    assertEquals(parseUrlState(invalidJsonParams).batch, undefined);
 
-  const notArrayParams = new URLSearchParams({
-    batch: encodeJson({ title: "nope" }),
+    const notArrayParams = new URLSearchParams({
+      batch: encodeJson({ title: "nope" }),
+    });
+    assertEquals(parseUrlState(notArrayParams).batch, undefined);
+
+    assertEquals(warnings.length, 2);
+    assert(warnings[0].includes('Ignoring invalid "batch" query param'));
+    assert(warnings[1].includes('Ignoring invalid "batch" query param'));
   });
-  assertEquals(parseUrlState(notArrayParams).batch, undefined);
 });
 
 Deno.test("parseUrlState decodes overrides, rounds values, and filters non-finite values", () => {
@@ -163,8 +189,23 @@ Deno.test("parseUrlState decodes overrides, rounds values, and filters non-finit
 });
 
 Deno.test("parseUrlState returns undefined for malformed overrides base64", () => {
-  const params = new URLSearchParams({ overrides: "***bad-base64***" });
-  assertEquals(parseUrlState(params).overrides, undefined);
+  return withMockConsoleWarn((warnings) => {
+    const params = new URLSearchParams({ overrides: "***bad-base64***" });
+    assertEquals(parseUrlState(params).overrides, undefined);
+    assertEquals(warnings.length, 1);
+    assert(warnings[0].includes('Ignoring invalid "overrides" query param'));
+  });
+});
+
+Deno.test("parseUrlState warns when overrides decode to a non-object value", () => {
+  return withMockConsoleWarn((warnings) => {
+    const params = new URLSearchParams({
+      overrides: encodeJson(["not", "an", "object"]),
+    });
+    assertEquals(parseUrlState(params).overrides, undefined);
+    assertEquals(warnings.length, 1);
+    assert(warnings[0].includes('Ignoring invalid "overrides" query param'));
+  });
 });
 
 Deno.test("serializeUrlState serializes full state", () => {

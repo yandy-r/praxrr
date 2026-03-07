@@ -29,6 +29,16 @@ function fromBase64(value: string): string {
 type MediaType = PresetCategory;
 type ArrType = 'radarr' | 'sonarr';
 
+function warnInvalidUrlStateParam(paramName: 'batch' | 'overrides', reason: string, error?: unknown): void {
+  const message = `[score-simulator:urlState] Ignoring invalid "${paramName}" query param: ${reason}`;
+  if (error) {
+    console.warn(message, error);
+    return;
+  }
+
+  console.warn(message);
+}
+
 export interface SimulatorUrlState {
   title?: string;
   mediaType?: MediaType;
@@ -73,12 +83,19 @@ function parseBatchParam(value: string | undefined): string[] | undefined {
 
   try {
     const parsed = JSON.parse(fromBase64(value));
-    if (!Array.isArray(parsed) || !parsed.every((entry) => typeof entry === 'string')) {
+    if (!Array.isArray(parsed)) {
+      warnInvalidUrlStateParam('batch', 'decoded value is not an array');
+      return undefined;
+    }
+
+    if (!parsed.every((entry) => typeof entry === 'string')) {
+      warnInvalidUrlStateParam('batch', 'decoded array contains non-string entries');
       return undefined;
     }
 
     return parsed.length > 0 ? parsed : undefined;
-  } catch {
+  } catch (error) {
+    warnInvalidUrlStateParam('batch', 'failed to decode or parse value', error);
     return undefined;
   }
 }
@@ -91,6 +108,7 @@ function parseOverridesParam(value: string | undefined): ScoreOverrideMap | unde
   try {
     const parsed = JSON.parse(fromBase64(value));
     if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      warnInvalidUrlStateParam('overrides', 'decoded value is not an object');
       return undefined;
     }
 
@@ -104,7 +122,8 @@ function parseOverridesParam(value: string | undefined): ScoreOverrideMap | unde
     }
 
     return Object.keys(normalized).length > 0 ? normalized : undefined;
-  } catch {
+  } catch (error) {
+    warnInvalidUrlStateParam('overrides', 'failed to decode or parse value', error);
     return undefined;
   }
 }
