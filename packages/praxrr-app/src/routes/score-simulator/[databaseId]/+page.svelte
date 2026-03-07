@@ -2,7 +2,7 @@
   import { onMount, onDestroy } from 'svelte';
   import { browser } from '$app/environment';
   import { page } from '$app/stores';
-  import { ChevronDown, Link, RotateCcw, Shield } from 'lucide-svelte';
+  import { ChevronDown, Film, Link, RotateCcw, Shield, Tv } from 'lucide-svelte';
   import Button from '$ui/button/Button.svelte';
   import { clickOutside } from '$lib/client/utils/clickOutside';
   import Tabs from '$ui/navigation/tabs/Tabs.svelte';
@@ -16,6 +16,7 @@
     parseBatchTitles,
     buildRankingFromResults,
     buildComparisonResult,
+    resolveReleaseTypeForPresetCategory,
   } from './helpers';
   import type { ComparisonResult, RankedRelease } from './helpers';
   import type { ScoreOverrideMap } from './helpers';
@@ -36,7 +37,6 @@
 
   type SimulateScoreResponse = components['schemas']['SimulateScoreResponse'];
   type SimulateProfileScore = components['schemas']['SimulateProfileScore'];
-  type MediaType = components['schemas']['MediaType'];
   type ArrType = components['schemas']['SimulateScoreRequest']['arrType'];
   interface SimulatorProfileOption {
     id: number;
@@ -50,7 +50,6 @@
   const SIMULATION_REQUEST_TIMEOUT_MS = 15000;
 
   let releaseTitle = '';
-  let mediaType: MediaType = 'movie';
   let singleSampleCategory: PresetCategory = 'movie';
   let selectedProfileName: string | null = null;
   let singleSimulationResult: SimulateScoreResponse | null = null;
@@ -66,7 +65,6 @@
 
   // Phase 2 state
   let batchRawText = '';
-  let batchMediaType: MediaType = 'movie';
   let batchSampleCategory: PresetCategory = 'movie';
   let batchSelectedProfileName: string | null = null;
   let batchPrimaryProfileDropdownOpen = false;
@@ -115,18 +113,18 @@
   $: selectedProfileScore = getSelectedProfileScore(singleSimulationResult, selectedProfileName);
   $: canClearMainSection =
     releaseTitle.trim().length > 0 ||
-    mediaType !== 'movie' ||
+    singleSampleCategory !== 'movie' ||
     selectedProfileName !== null ||
     singleSimulationResult !== null;
   $: canClearAdvancedSection =
     batchRawText.trim().length > 0 ||
-    batchMediaType !== 'movie' ||
+    batchSampleCategory !== 'movie' ||
     batchSelectedProfileName !== null ||
     comparisonProfileName !== null ||
     batchSimulationResult !== null;
 
   // Batch reactive state
-  $: batchTitles = parseBatchTitles(batchRawText, batchMediaType);
+  $: batchTitles = parseBatchTitles(batchRawText, batchSampleCategory);
   $: rankedReleases = batchSimulationResult
     ? buildRankingFromResults(
         batchSimulationResult.results,
@@ -172,7 +170,6 @@
     }
 
     if (urlState.mediaType) {
-      mediaType = urlState.mediaType;
       singleSampleCategory = urlState.mediaType;
       hasAnyUrlState = true;
     }
@@ -196,10 +193,9 @@
       }
     }
 
-    if (urlState.arrType) {
+    if (urlState.arrType && !urlState.mediaType) {
       hasAnyUrlState = true;
-      mediaType = urlState.arrType === 'radarr' ? 'movie' : 'series';
-      singleSampleCategory = mediaType;
+      singleSampleCategory = urlState.arrType === 'radarr' ? 'movie' : 'series';
     }
 
     if (urlState.batch) {
@@ -209,7 +205,6 @@
 
     if (urlState.batchMediaType) {
       hasAnyUrlState = true;
-      batchMediaType = urlState.batchMediaType;
       batchSampleCategory = urlState.batchMediaType;
     }
 
@@ -261,7 +256,8 @@
     }
 
     const { requestToken, abortController, timeout } = createSingleSimulationRequestContext();
-    const arrType: ArrType = mediaType === 'movie' ? 'radarr' : 'sonarr';
+    const releaseType = resolveReleaseTypeForPresetCategory(singleSampleCategory);
+    const arrType: ArrType = singleSampleCategory === 'movie' ? 'radarr' : 'sonarr';
 
     try {
       const response = await fetch('/api/v1/simulate/score', {
@@ -270,7 +266,7 @@
         signal: abortController.signal,
         body: JSON.stringify({
           databaseId: data.currentDatabase.id,
-          releases: [{ id: generateReleaseId(), title, type: mediaType }],
+          releases: [{ id: generateReleaseId(), title, type: releaseType }],
           profileNames: singleProfileNames,
           arrType,
         }),
@@ -305,9 +301,9 @@
     }
   }
 
-  async function simulateBatch(override?: { titles: ReturnType<typeof parseBatchTitles>; mediaType: MediaType }) {
+  async function simulateBatch(override?: { titles: ReturnType<typeof parseBatchTitles>; category: PresetCategory }) {
     const titles = override?.titles ?? batchTitles;
-    const effectiveMediaType = override?.mediaType ?? batchMediaType;
+    const effectiveMediaType = override?.category ?? batchSampleCategory;
 
     if (!batchSelectedProfileName || titles.length === 0) {
       cancelBatchSimulationRequest();
@@ -486,7 +482,6 @@
       return;
     }
 
-    mediaType = selectedCategory === 'movie' ? 'movie' : 'series';
     releaseTitle = randomExampleTitle;
   }
 
@@ -494,34 +489,30 @@
     void simulateBatch();
   }
 
-  function handlePresetSelected(
-    event: CustomEvent<{ titles: string[]; category: PresetCategory; mediaType: MediaType }>
-  ) {
+  function handlePresetSelected(event: CustomEvent<{ titles: string[]; category: PresetCategory }>) {
     batchRawText = event.detail.titles.join('\n');
     batchSampleCategory = event.detail.category;
-    batchMediaType = event.detail.mediaType;
     selectedReleaseId = null;
     // batchTitles is a reactive declaration and won't recompute until after the
     // current synchronous execution completes. Compute the fresh titles eagerly
     // from the values we are about to set so simulateBatch() never reads stale
     // data from the previous preset/media-type combination.
-    const freshTitles = parseBatchTitles(batchRawText, batchMediaType);
-    void simulateBatch({ titles: freshTitles, mediaType: batchMediaType });
+    const freshTitles = parseBatchTitles(batchRawText, batchSampleCategory);
+    void simulateBatch({ titles: freshTitles, category: batchSampleCategory });
   }
 
-  function handleBatchMediaTypeChange(nextMediaType: MediaType) {
-    if (batchMediaType === nextMediaType) {
+  function handleBatchMediaTypeChange(nextMediaType: PresetCategory) {
+    if (batchSampleCategory === nextMediaType) {
       return;
     }
 
-    batchMediaType = nextMediaType;
     batchSampleCategory = nextMediaType;
     selectedReleaseId = null;
     if (batchSimulationResult) {
       // batchTitles is reactive and won't have recomputed yet at this point,
       // so compute the fresh titles eagerly and pass them as an override.
       const freshTitles = parseBatchTitles(batchRawText, nextMediaType);
-      void simulateBatch({ titles: freshTitles, mediaType: nextMediaType });
+      void simulateBatch({ titles: freshTitles, category: nextMediaType });
     }
   }
 
@@ -581,12 +572,12 @@
   function buildShareState(): SimulatorUrlState {
     return {
       title: releaseTitle.trim() || undefined,
-      mediaType,
+      mediaType: singleSampleCategory,
       profile: selectedProfileName ?? undefined,
       compare: comparisonProfileName ?? undefined,
-      arrType: mediaType === 'movie' ? 'radarr' : 'sonarr',
+      arrType: singleSampleCategory === 'movie' ? 'radarr' : 'sonarr',
       batch: batchTitles.map((title) => title.title),
-      batchMediaType,
+      batchMediaType: batchSampleCategory,
       overrides: hasActiveOverrides ? scoreOverrides : undefined,
     };
   }
@@ -618,7 +609,6 @@
   function clearMainSection() {
     cancelSingleSimulationRequest();
     releaseTitle = '';
-    mediaType = 'movie';
     singleSampleCategory = 'movie';
     selectedProfileName = null;
     singleSimulationResult = null;
@@ -629,7 +619,6 @@
   function clearAdvancedSection() {
     cancelBatchSimulationRequest();
     batchRawText = '';
-    batchMediaType = 'movie';
     batchSampleCategory = 'movie';
     batchSelectedProfileName = null;
     comparisonProfileName = null;
@@ -676,7 +665,6 @@
       <div class="min-w-0 space-y-4">
         <ReleaseInput
           bind:title={releaseTitle}
-          bind:mediaType
           bind:sampleCategory={singleSampleCategory}
           bind:selectedProfileName
           qualityProfiles={qualityProfileOptions}
@@ -749,26 +737,39 @@
           <div class="space-y-4">
             <div class="space-y-1.5">
               <p class="text-xs font-medium text-neutral-700 dark:text-neutral-300">Batch Media Type</p>
-              <div class="grid grid-cols-2 gap-2">
+              <div class="grid grid-cols-3 gap-2">
                 <button
                   type="button"
-                  class="inline-flex items-center justify-center rounded-lg border px-3 py-2 text-xs font-medium transition-colors {batchMediaType ===
+                  class="inline-flex items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium transition-colors {batchSampleCategory ===
                   'movie'
                     ? 'border-accent-500 bg-accent-50 text-accent-700 dark:border-accent-400 dark:bg-accent-900/30 dark:text-accent-200'
                     : 'border-neutral-300 text-neutral-700 hover:bg-neutral-50 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800'}"
                   on:click={() => handleBatchMediaTypeChange('movie')}
                 >
+                  <Film size={14} />
                   Movie
                 </button>
                 <button
                   type="button"
-                  class="inline-flex items-center justify-center rounded-lg border px-3 py-2 text-xs font-medium transition-colors {batchMediaType ===
+                  class="inline-flex items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium transition-colors {batchSampleCategory ===
                   'series'
                     ? 'border-accent-500 bg-accent-50 text-accent-700 dark:border-accent-400 dark:bg-accent-900/30 dark:text-accent-200'
                     : 'border-neutral-300 text-neutral-700 hover:bg-neutral-50 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800'}"
                   on:click={() => handleBatchMediaTypeChange('series')}
                 >
+                  <Tv size={14} />
                   Series
+                </button>
+                <button
+                  type="button"
+                  class="inline-flex items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium transition-colors {batchSampleCategory ===
+                  'anime'
+                    ? 'border-accent-500 bg-accent-50 text-accent-700 dark:border-accent-400 dark:bg-accent-900/30 dark:text-accent-200'
+                    : 'border-neutral-300 text-neutral-700 hover:bg-neutral-50 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800'}"
+                  on:click={() => handleBatchMediaTypeChange('anime')}
+                >
+                  <Tv size={14} />
+                  Anime
                 </button>
               </div>
             </div>

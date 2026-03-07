@@ -91,7 +91,7 @@ Deno.test("parseUrlState validates mediaType and arrType values", () => {
   );
   assertEquals(
     parseUrlState(new URLSearchParams({ mediaType: "anime" })).mediaType,
-    undefined,
+    "anime",
   );
   assertEquals(
     parseUrlState(new URLSearchParams({ arrType: "radarr" })).arrType,
@@ -175,7 +175,7 @@ Deno.test("serializeUrlState serializes full state", () => {
     compare: "pcd:beta profile",
     arrType: "radarr",
     batch: ["A", "B"],
-    batchMediaType: "series",
+    batchMediaType: "anime",
     overrides: { CF_A: 10, CF_B: 20 },
   };
 
@@ -187,7 +187,7 @@ Deno.test("serializeUrlState serializes full state", () => {
   assertEquals(params.get("compare"), "pcd:beta profile");
   assertEquals(params.get("arrType"), "radarr");
   assertEquals(JSON.parse(atob(params.get("batch") ?? "null")), ["A", "B"]);
-  assertEquals(params.get("batchMediaType"), "series");
+  assertEquals(params.get("batchMediaType"), "anime");
   assertEquals(JSON.parse(atob(params.get("overrides") ?? "null")), {
     CF_A: 10,
     CF_B: 20,
@@ -226,12 +226,12 @@ Deno.test("serializeUrlState rounds override values and omits non-finite values"
 Deno.test("parse/serialize round-trip preserves full state", () => {
   const original: SimulatorUrlState = {
     title: "Release.2026.2160p",
-    mediaType: "movie",
+    mediaType: "anime",
     profile: "pcd:alpha",
     compare: "pcd:beta",
     arrType: "sonarr",
     batch: ["One.Title", "Two.Title"],
-    batchMediaType: "series",
+    batchMediaType: "anime",
     overrides: { CF_A: 5, CF_B: -10 },
   };
 

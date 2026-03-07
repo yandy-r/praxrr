@@ -1,10 +1,11 @@
 import type { ScoreOverrideMap } from './helpers.ts';
+import type { PresetCategory } from './helpers.ts';
 
-const VALID_MEDIA_TYPES = new Set(['movie', 'series'] as const);
+const VALID_MEDIA_TYPES = new Set(['movie', 'series', 'anime'] as const);
 const VALID_ARR_TYPES = new Set(['radarr', 'sonarr'] as const);
 const MAX_SHARE_URL_LENGTH = 2000;
 
-type MediaType = 'movie' | 'series';
+type MediaType = PresetCategory;
 type ArrType = 'radarr' | 'sonarr';
 
 export interface SimulatorUrlState {

@@ -133,6 +133,11 @@ Deno.test('parseBatchTitles propagates mediaType to type field', () => {
   assertEquals(seriesResults[0].type, 'series');
 });
 
+Deno.test('parseBatchTitles maps anime context to series release type', () => {
+  const animeResults = parseBatchTitles('[SubsPlease] Title - 01 [1080p]', 'anime');
+  assertEquals(animeResults[0].type, 'series');
+});
+
 // ===========================================================================
 // buildRankingFromResults
 // ===========================================================================

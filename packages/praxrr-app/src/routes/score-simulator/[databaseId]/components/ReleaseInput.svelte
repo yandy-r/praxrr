@@ -6,7 +6,6 @@
 	import DropdownItem from '$ui/dropdown/DropdownItem.svelte';
 	import type { PresetCategory } from '../helpers.ts';
 
-	type MediaType = 'movie' | 'series';
 	interface QualityProfileOption {
 		id: number;
 		name: string;
@@ -22,7 +21,6 @@
 	}
 
 	export let title: string;
-	export let mediaType: MediaType;
 	export let sampleCategory: PresetCategory;
 	export let qualityProfiles: QualityProfileOption[];
 	export let selectedProfileName: string | null;
@@ -55,7 +53,6 @@
 
 	function selectAppType(nextCategory: PresetCategory) {
 		sampleCategory = nextCategory;
-		mediaType = nextCategory === 'movie' ? 'movie' : 'series';
 		dispatch('input', { title });
 	}
 
@@ -98,7 +95,7 @@
 			Single Release Score Simulation
 		</h2>
 		<p class="text-xs text-neutral-500 dark:text-neutral-400">
-			Enter a release title, then choose app type and quality profile.
+			Enter a release title, then choose media type and quality profile.
 		</p>
 	</div>
 
@@ -146,7 +143,7 @@
 
 	<div class="space-y-1.5">
 		<div class="space-y-1.5">
-			<p class="text-xs font-medium text-neutral-700 dark:text-neutral-300">App type</p>
+			<p class="text-xs font-medium text-neutral-700 dark:text-neutral-300">Media Type</p>
 			<div class="grid grid-cols-3 gap-2">
 				<button
 					type="button"

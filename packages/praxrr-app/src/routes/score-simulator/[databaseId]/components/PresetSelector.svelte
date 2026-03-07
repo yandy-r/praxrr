@@ -7,10 +7,8 @@
   import { getPresetsForCategory } from '../presets.ts';
   import type { PresetCategory } from '../helpers.ts';
 
-  type MediaType = 'movie' | 'series';
-
   interface PresetSelectorEvents {
-    presetSelected: { titles: string[]; category: PresetCategory; mediaType: MediaType };
+    presetSelected: { titles: string[]; category: PresetCategory };
   }
 
   export let sampleCategory: PresetCategory;
@@ -28,8 +26,7 @@
 
   function selectPreset(group: { label: string; titles: Array<{ label: string; title: string }> }) {
     const titles = group.titles.map((t) => t.title);
-    const nextMediaType: MediaType = selectedCategory === 'movie' ? 'movie' : 'series';
-    dispatch('presetSelected', { titles, category: selectedCategory, mediaType: nextMediaType });
+    dispatch('presetSelected', { titles, category: selectedCategory });
     dropdownOpen = false;
   }
 
@@ -73,7 +70,7 @@
       <div class="max-h-80 overflow-y-auto py-1" role="menu" tabindex="-1" on:keydown={handleKeydown}>
         <div class="px-3 pt-2 pb-1">
           <p class="text-[10px] font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">
-            App Type
+            Media Type
           </p>
           <div class="mt-1 grid grid-cols-2 gap-1">
             <button
@@ -130,7 +127,7 @@
 
         {#if presetGroups.length === 0}
           <p class="px-3 py-2 text-xs text-neutral-500 dark:text-neutral-400">
-            No sample groups available for this app type.
+            No sample groups available for this media type.
           </p>
         {/if}
       </div>

@@ -54,6 +54,10 @@ export type RankedRelease = {
 
 export type PresetCategory = 'movie' | 'series' | 'anime';
 
+export function resolveReleaseTypeForPresetCategory(category: PresetCategory): MediaType {
+  return category === 'movie' ? 'movie' : 'series';
+}
+
 export type PresetGroup = {
   category: PresetCategory;
   label: string;
@@ -112,13 +116,14 @@ function createReleaseId(): string {
   return `release-${Date.now()}-${releaseIdCounter}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
-export function parseBatchTitles(rawText: string, mediaType: MediaType): SimulateReleaseInput[] {
+export function parseBatchTitles(rawText: string, mediaType: PresetCategory): SimulateReleaseInput[] {
   if (!rawText.trim()) {
     return [];
   }
 
   const lines = rawText.split('\n');
   const results: SimulateReleaseInput[] = [];
+  const releaseType = resolveReleaseTypeForPresetCategory(mediaType);
 
   for (const line of lines) {
     if (results.length >= MAX_BATCH_TITLES) {
@@ -133,7 +138,7 @@ export function parseBatchTitles(rawText: string, mediaType: MediaType): Simulat
     results.push({
       id: createReleaseId(),
       title: trimmed,
-      type: mediaType,
+      type: releaseType,
     });
   }
 

@@ -228,6 +228,39 @@ test.describe("4.4 Score Simulator UX basics", () => {
     await expect(page.getByText("Current:").first()).toBeVisible();
   });
 
+  test("single and batch controls expose anime as a visible media type", async ({ page }) => {
+    const context = await findQualityProfileContext(page);
+    if (!context) {
+      test.skip("No quality profile context found for media type UX checks.");
+    }
+
+    await page.goto(`/score-simulator/${context!.databaseId}`);
+    await page.waitForLoadState("networkidle");
+
+    const releaseInputCard = page
+      .locator("div.rounded-lg")
+      .filter({ has: page.getByRole("heading", { name: "Single Release Score Simulation" }) })
+      .first();
+    await expect(releaseInputCard.getByText("Media Type")).toBeVisible();
+    await expect(releaseInputCard.getByRole("button", { name: "Movie" })).toBeVisible();
+    await expect(releaseInputCard.getByRole("button", { name: "Series" })).toBeVisible();
+    await expect(releaseInputCard.getByRole("button", { name: "Anime" })).toBeVisible();
+
+    await page.getByRole("button", { name: "Show Advanced" }).click();
+
+    const batchMediaTypeCard = page
+      .locator("div")
+      .filter({ has: page.getByText("Batch Media Type") })
+      .first();
+    await expect(batchMediaTypeCard.getByRole("button", { name: "Movie" })).toBeVisible();
+    await expect(batchMediaTypeCard.getByRole("button", { name: "Series" })).toBeVisible();
+    await expect(batchMediaTypeCard.getByRole("button", { name: "Anime" })).toBeVisible();
+
+    const animeButton = batchMediaTypeCard.getByRole("button", { name: "Anime" });
+    await animeButton.click();
+    await expect(animeButton).toHaveClass(/border-accent-500/);
+  });
+
   test("decision summary appears after simulation and updates when overrides change total", async ({ page }) => {
     const context = await findQualityProfileContext(page);
     if (!context) {
