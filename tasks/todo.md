@@ -119,3 +119,50 @@
   - `deno test -A src/tests/routes/scoreSimulatorUrlState.test.ts` ✅
   - `deno test -A src/tests/routes/scoreSimulatorPhase2Helpers.test.ts` ✅
   - `deno test -A src/tests/routes/scoreSimulatorPhase3Helpers.test.ts` ✅
+
+---
+
+# PR #190 Suggestions S6-S10 Validation And Fixes
+
+## Plan
+
+- [x] Validate suggestions S6-S10 against current score-simulator client/server behavior and existing targeted tests before implementing anything.
+- [x] Implement only the confirmed fixes, keeping clipboard handling, override normalization, and route error classification minimal and explicit.
+- [x] Add or update focused tests for clipboard warnings/failures, override normalization, readonly helper types, and route not-found classification as needed.
+- [x] Run targeted verification for the touched score-simulator and simulate-score route coverage.
+- [x] Update `docs/pr-reviews/pr-190-review.md` with final S6-S10 status and record the outcome below.
+- [ ] Commit verified progress once the fixes are confirmed.
+
+## Review
+
+- Validated before implementing:
+  - S6 was still valid: clipboard API and `execCommand` fallback failures were
+    still swallowed without any debugging signal.
+  - S7 was still valid: the simulate-score route still classified missing PCD
+    profiles via `err.message.includes('not found')`, which could misclassify
+    unrelated failures.
+  - S8 was still worth fixing: the earlier `btoa()` example was stale after the
+    UTF-8 share-link update, but `handleCopyLink` still allowed unexpected
+    copy-path exceptions to surface as unhandled rejections.
+  - S9 was still valid as low-risk type hardening: `ProfileScoreDelta` and
+    `ComparisonResult` fields were mutable after construction.
+  - S10 was still valid: override rounding/finite validation was duplicated
+    between the page handler and URL-state normalization paths.
+- Implemented:
+  - Added clipboard fallback warning logs in `urlState.ts` for
+    `navigator.clipboard.writeText` and `document.execCommand` failures.
+  - Replaced fragile string matching with a dedicated
+    `QualityProfileScoringNotFoundError` for PCD score loading.
+  - Wrapped `handleCopyLink` in try-catch so unexpected share-link failures show
+    an alert instead of becoming unhandled promise rejections.
+  - Marked `ProfileScoreDelta` and `ComparisonResult` fields as `readonly`.
+  - Added `createScoreOverrideEntry()` and reused it for page overrides plus
+    URL-state parse/serialize normalization.
+- Verification:
+  - `deno test -A packages/praxrr-app/src/tests/routes/scoreSimulatorUrlState.test.ts`
+    ✅
+  - `deno test -A packages/praxrr-app/src/tests/routes/scoreSimulatorPhase3Helpers.test.ts`
+    ✅
+  - `deno test -A packages/praxrr-app/src/tests/routes/simulateScoreRoute.test.ts`
+    ✅
+  - `deno task check:client` ✅

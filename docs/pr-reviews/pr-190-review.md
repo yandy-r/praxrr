@@ -157,7 +157,7 @@ threshold-state flips in ranked output, and comparison recalculation of
 
 ---
 
-## Suggestions (10 found — 0 Fixed)
+## Suggestions (10 found — 10 Fixed)
 
 ### S1. ~~Remove `arrType` from `SimulatorUrlState`~~
 
@@ -225,15 +225,21 @@ fields directly as `PresetCategory`.
 
 ### S6. Add `console.warn` to clipboard fallback catch blocks
 
-**Status:** Open **File:** `urlState.ts:204-206, 215-217`
+**Status:** Fixed **File:** `packages/praxrr-app/src/routes/score-simulator/[databaseId]/urlState.ts`
 
 The first catch discards clipboard API errors; the second discards `execCommand`
 errors. The caller does check `success: false`, but developers debugging
 clipboard issues get no console output.
 
+**Fix:** Added module-prefixed `console.warn` logging for both failed
+`navigator.clipboard.writeText` and failed `document.execCommand` fallback
+attempts. Added URL-state tests covering both warning paths.
+
 ### S7. Server route uses fragile string matching for error classification
 
-**Status:** Open **File:** `+server.ts:641-647`
+**Status:** Fixed **Files:**
+`packages/praxrr-app/src/routes/api/v1/simulate/score/+server.ts`,
+`packages/praxrr-app/src/lib/server/pcd/entities/qualityProfiles/scoring/read.ts`
 
 ```typescript
 if (err instanceof Error && err.message.includes('not found')) {
@@ -243,28 +249,50 @@ Uses `err.message.includes('not found')` to distinguish "profile not found" from
 other errors. An unrelated error containing "not found" would be misclassified.
 Consider a specific error type or error code.
 
+**Fix:** Introduced `QualityProfileScoringNotFoundError` in the scoring reader
+and changed the route to classify missing PCD profiles by error type instead of
+message substring matching. Added a route test proving a generic scoring error
+containing `not found` still surfaces as HTTP 500.
+
 ### S8. `handleCopyLink` has no try-catch for unhandled exceptions
 
-**Status:** Open **File:** `+page.svelte:585-607`
+**Status:** Fixed **Files:**
+`packages/praxrr-app/src/routes/score-simulator/[databaseId]/+page.svelte`,
+`packages/praxrr-app/src/routes/score-simulator/[databaseId]/urlState.ts`
 
-If `serializeUrlState` throws (e.g., `btoa()` fails on non-Latin1 characters in
-batch titles), the exception propagates as an unhandled promise rejection.
+The original `btoa()` example is no longer current after the UTF-8 share-link
+encoding fix, but the copy pipeline still had an unhandled-exception surface if
+share-link generation or copy setup threw unexpectedly.
 
-**Fix:** Wrap in try-catch that shows an alert.
+**Fix:** Wrapped `handleCopyLink` in try-catch so unexpected failures surface as
+an error alert instead of an unhandled rejection. `copyShareLink` now also logs
+clipboard fallback failures, making copy-path debugging visible.
 
 ### S9. Mark `ProfileScoreDelta` and `ComparisonResult` fields as `readonly`
 
-**Status:** Open
+**Status:** Fixed **File:**
+`packages/praxrr-app/src/routes/score-simulator/[databaseId]/helpers.ts`
 
 Low-cost change that prevents accidental mutation after construction.
 
+**Fix:** Marked all `ProfileScoreDelta` and `ComparisonResult` fields as
+`readonly`, including the `contributions` collection.
+
 ### S10. Create a factory for `ScoreOverrideMap` entries
 
-**Status:** Open
+**Status:** Fixed **Files:**
+`packages/praxrr-app/src/routes/score-simulator/[databaseId]/helpers.ts`,
+`packages/praxrr-app/src/routes/score-simulator/[databaseId]/urlState.ts`,
+`packages/praxrr-app/src/routes/score-simulator/[databaseId]/+page.svelte`
 
 Validation logic (rounding, finite check) is duplicated in
 `handleOverrideChange` and `parseOverridesParam`. A single factory function
 would centralize this.
+
+**Fix:** Added `createScoreOverrideEntry()` in `helpers.ts` and reused it from
+the page override handler plus URL-state parse/serialize normalization so
+rounding and finite-value validation live in one place. Added helper tests for
+the new normalization path.
 
 ---
 

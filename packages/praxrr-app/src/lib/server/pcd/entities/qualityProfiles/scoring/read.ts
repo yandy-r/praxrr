@@ -5,11 +5,21 @@
 import type { PCDCache } from '$pcd/index.ts';
 import { ARR_APP_TYPES } from '$shared/arr/capabilities.ts';
 import type {
-  QualityProfileScoring,
-  ProfileCfScores,
   AllCfScoresResult,
   CustomFormatScoresByArrType,
+  ProfileCfScores,
+  QualityProfileScoring,
 } from '$shared/pcd/display.ts';
+
+export class QualityProfileScoringNotFoundError extends Error {
+  readonly profileName: string;
+
+  constructor(profileName: string) {
+    super(`Quality profile ${profileName} not found`);
+    this.name = 'QualityProfileScoringNotFoundError';
+    this.profileName = profileName;
+  }
+}
 
 /**
  * Get quality profile scoring data
@@ -30,7 +40,7 @@ export async function scoring(
     .executeTakeFirst();
 
   if (!profile) {
-    throw new Error(`Quality profile ${profileName} not found`);
+    throw new QualityProfileScoringNotFoundError(profileName);
   }
 
   // 2. Define display arr types ('all' is not a column)
@@ -64,7 +74,11 @@ export async function scoring(
 
   // 6. Build scores map for quick lookup
   const scoresMap = new Map<string, Map<string, number>>();
-  for (const score of scores as { custom_format_name: string; arr_type: string; score: number }[]) {
+  for (const score of scores as {
+    custom_format_name: string;
+    arr_type: string;
+    score: number;
+  }[]) {
     if (!scoresMap.has(score.custom_format_name)) {
       scoresMap.set(score.custom_format_name, new Map());
     }

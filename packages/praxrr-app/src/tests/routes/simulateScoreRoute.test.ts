@@ -204,6 +204,28 @@ function createPcdCacheFixture(seedSql: string): InMemoryResponseCacheFixture {
   };
 }
 
+function createScoringFailureCache(errorMessage: string): PCDCache {
+  return {
+    kb: {
+      selectFrom() {
+        return {
+          select() {
+            return {
+              where() {
+                return {
+                  executeTakeFirst: async () => {
+                    throw new Error(errorMessage);
+                  },
+                };
+              },
+            };
+          },
+        };
+      },
+    },
+  } as unknown as PCDCache;
+}
+
 function installParserCacheStubs(): RestoreFunction {
   const parsedCache = new Map<string, string>();
   const patternCache = new Map<string, string>();
@@ -575,6 +597,56 @@ Deno.test("simulate score: returns missing profiles as 404", async () => {
   }
 });
 
+Deno.test("simulate score: generic scoring errors containing not found still surface as 500", async () => {
+  const originalListSources = trashGuideManager.listSources;
+  trashGuideManager.listSources =
+    (() => []) as typeof trashGuideManager.listSources;
+  const databaseId = 60031;
+  const restore = installParserCacheStubs();
+  restore.reset();
+  parserClientModule.clearParserVersionCache();
+  parserParserState.setHealthAvailable(true);
+  parserParserState.setVersion("local-parser-v1");
+
+  setCache(
+    databaseId,
+    createScoringFailureCache(
+      "adapter registry not found while loading scoring",
+    ),
+  );
+
+  parserParserState.setParseResponse("Movie.Failure.Path", {
+    ...BASE_PARSE_RESPONSE,
+    title: "Movie.Failure.Path",
+    type: "movie",
+  });
+
+  try {
+    const thrown = await assertRejects(async () =>
+      scoreRouteModule.POST(
+        buildEvent({
+          databaseId,
+          arrType: "radarr",
+          profileNames: ["pcd:Primary Profile"],
+          releases: [
+            {
+              id: "release-500",
+              title: "Movie.Failure.Path",
+              type: "movie",
+            },
+          ],
+        }),
+      )
+    );
+
+    assertEquals(getErrorStatus(thrown), 500);
+  } finally {
+    trashGuideManager.listSources = originalListSources;
+    deleteCache(databaseId);
+    restore.restore();
+  }
+});
+
 Deno.test("simulate score: calculates correct scores with positive and negative CF rows", async () => {
   const originalListSources = trashGuideManager.listSources;
   trashGuideManager.listSources =
@@ -808,10 +880,12 @@ Deno.test("simulate score: Not Original or English does not penalize unknown lan
     );
 
     assertEquals(foreign?.profileScores[0].totalScore, -999999);
-    assertEquals(foreign?.profileScores[0].contributions, [{
-      cfName: "Not Original or English",
-      score: -999999,
-    }]);
+    assertEquals(foreign?.profileScores[0].contributions, [
+      {
+        cfName: "Not Original or English",
+        score: -999999,
+      },
+    ]);
     assertEquals(
       foreign?.cfMatches.find((cf) => cf.name === "Not Original or English")
         ?.matches,
@@ -1023,10 +1097,12 @@ Deno.test("simulate score: sonarr anime PCD profiles infer WEB source from match
       "pcd:Anime Heuristic Profile",
     );
     assertEquals(release.profileScores[0].totalScore, 200);
-    assertEquals(release.profileScores[0].contributions, [{
-      cfName: "Anime WEB",
-      score: 200,
-    }]);
+    assertEquals(release.profileScores[0].contributions, [
+      {
+        cfName: "Anime WEB",
+        score: 200,
+      },
+    ]);
     assertEquals(
       release.cfMatches.find((row) => row.name === "Anime WEB")?.matches,
       true,
@@ -1241,10 +1317,12 @@ Deno.test("simulate score: mixed pcd and TRaSH profiles produce non-zero TRaSH t
     assertEquals(pcdScore?.totalScore, 10);
     assertEquals(trashScore?.totalScore, 25);
     assertEquals(pcdScore?.contributions, [{ cfName: "CF-Bonus", score: 10 }]);
-    assertEquals(trashScore?.contributions, [{
-      cfName: "CF-Bonus",
-      score: 25,
-    }]);
+    assertEquals(trashScore?.contributions, [
+      {
+        cfName: "CF-Bonus",
+        score: 25,
+      },
+    ]);
     assertEquals(
       release.cfMatches.find((row) => row.name === "CF-Bonus")?.matches,
       true,
@@ -1609,10 +1687,12 @@ Deno.test("simulate score: TRaSH CF-group fallback restores TRaSH matches withou
       );
 
       assertEquals(pcdScore?.totalScore, 7);
-      assertEquals(pcdScore?.contributions, [{
-        cfName: "PCD Bonus",
-        score: 7,
-      }]);
+      assertEquals(pcdScore?.contributions, [
+        {
+          cfName: "PCD Bonus",
+          score: 7,
+        },
+      ]);
 
       assertEquals(trashScore?.totalScore, 110);
       assertEquals(trashScore?.contributions, [
@@ -1624,7 +1704,10 @@ Deno.test("simulate score: TRaSH CF-group fallback restores TRaSH matches withou
         release.cfMatches.find((row) => row.name === "PCD Bonus")?.matches,
         true,
       );
-      assertEquals(release.cfMatches.some((row) => row.name === "HDR"), false);
+      assertEquals(
+        release.cfMatches.some((row) => row.name === "HDR"),
+        false,
+      );
       assertEquals(
         release.cfMatches.some((row) => row.name === "Web Tier 01"),
         false,
@@ -1646,259 +1729,265 @@ Deno.test("simulate score: TRaSH CF-group fallback restores TRaSH matches withou
   }
 });
 
-Deno.test("simulate score: TRaSH label-based numeric specs evaluate language and negated source correctly", async () => {
-  const sourceId = 9102;
-  const languageCfTrashId = "cccccccccccccccccccccccccccccccc";
-  const negatedSourceCfTrashId = "dddddddddddddddddddddddddddddddd";
-  const qualityProfileTrashId = "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
-  const nowIso = new Date().toISOString();
+Deno.test(
+  "simulate score: TRaSH label-based numeric specs evaluate language and negated source correctly",
+  async () => {
+    const sourceId = 9102;
+    const languageCfTrashId = "cccccccccccccccccccccccccccccccc";
+    const negatedSourceCfTrashId = "dddddddddddddddddddddddddddddddd";
+    const qualityProfileTrashId = "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
+    const nowIso = new Date().toISOString();
 
-  const originalListSources = trashGuideManager.listSources;
-  const originalGetBySourceAndType =
-    trashGuideEntityCacheQueries.getBySourceAndType;
-  const originalGetMappingsBySource = trashIdMappingsQueries.getBySource;
+    const originalListSources = trashGuideManager.listSources;
+    const originalGetBySourceAndType =
+      trashGuideEntityCacheQueries.getBySourceAndType;
+    const originalGetMappingsBySource = trashIdMappingsQueries.getBySource;
 
-  const languageCustomFormatEntity = {
-    trash_id: languageCfTrashId,
-    arr_type: "radarr",
-    entity_type: "custom_format",
-    file_path: "/trash/custom-format-language-original.json",
-    name: "TRaSH Language Original",
-    description: null,
-    regex_url: null,
-    include_in_rename: false,
-    scores: {
-      default: 20,
-    },
-    specifications: [
-      {
-        name: "language-original-title",
-        implementation: "ReleaseTitleSpecification",
-        negate: false,
-        required: true,
-        fields: {
-          value: "BONUS",
-        },
+    const languageCustomFormatEntity = {
+      trash_id: languageCfTrashId,
+      arr_type: "radarr",
+      entity_type: "custom_format",
+      file_path: "/trash/custom-format-language-original.json",
+      name: "TRaSH Language Original",
+      description: null,
+      regex_url: null,
+      include_in_rename: false,
+      scores: {
+        default: 20,
       },
-      {
-        name: "Original Language",
-        implementation: "LanguageSpecification",
-        negate: false,
-        required: true,
-        fields: {
-          value: -2,
-        },
-      },
-    ],
-  };
-
-  const negatedSourceCustomFormatEntity = {
-    trash_id: negatedSourceCfTrashId,
-    arr_type: "radarr",
-    entity_type: "custom_format",
-    file_path: "/trash/custom-format-not-webdl.json",
-    name: "TRaSH Not WEBDL",
-    description: null,
-    regex_url: null,
-    include_in_rename: false,
-    scores: {
-      default: 15,
-    },
-    specifications: [
-      {
-        name: "source-not-webdl-title",
-        implementation: "ReleaseTitleSpecification",
-        negate: false,
-        required: true,
-        fields: {
-          value: "BONUS",
-        },
-      },
-      {
-        name: "Not WEBDL",
-        implementation: "SourceSpecification",
-        negate: true,
-        required: true,
-        fields: {
-          value: 7,
-        },
-      },
-    ],
-  };
-
-  const qualityProfileEntity = {
-    trash_id: qualityProfileTrashId,
-    arr_type: "radarr",
-    entity_type: "quality_profile",
-    file_path: "/trash/quality-profile-language-source.json",
-    name: "TRaSH Label Profile",
-    description: null,
-    source_url: null,
-    score_set: null,
-    group: null,
-    upgrade_allowed: true,
-    cutoff: "WEBDL-1080p",
-    min_format_score: 0,
-    cutoff_format_score: 0,
-    min_upgrade_format_score: 0,
-    language: null,
-    items: [],
-    format_items: [
-      {
-        name: "TRaSH Language Original",
-        score: null,
-        custom_format_trash_id: languageCfTrashId,
-      },
-      {
-        name: "TRaSH Not WEBDL",
-        score: null,
-        custom_format_trash_id: negatedSourceCfTrashId,
-      },
-    ],
-  };
-
-  const languageCustomFormatCacheRow = {
-    id: 11,
-    sourceId,
-    trashId: languageCfTrashId,
-    entityType: "custom_format",
-    name: languageCustomFormatEntity.name,
-    jsonData: JSON.stringify(languageCustomFormatEntity),
-    filePath: languageCustomFormatEntity.file_path,
-    contentHash: "hash-cf-language",
-    fetchedAt: nowIso,
-  };
-
-  const negatedSourceCustomFormatCacheRow = {
-    id: 12,
-    sourceId,
-    trashId: negatedSourceCfTrashId,
-    entityType: "custom_format",
-    name: negatedSourceCustomFormatEntity.name,
-    jsonData: JSON.stringify(negatedSourceCustomFormatEntity),
-    filePath: negatedSourceCustomFormatEntity.file_path,
-    contentHash: "hash-cf-source",
-    fetchedAt: nowIso,
-  };
-
-  const qualityProfileCacheRow = {
-    id: 13,
-    sourceId,
-    trashId: qualityProfileTrashId,
-    entityType: "quality_profile",
-    name: qualityProfileEntity.name,
-    jsonData: JSON.stringify(qualityProfileEntity),
-    filePath: qualityProfileEntity.file_path,
-    contentHash: "hash-qp-labels",
-    fetchedAt: nowIso,
-  };
-
-  trashGuideManager.listSources = (() => [
-    {
-      id: sourceId,
-      name: "TRaSH Label Test",
-      arrType: "radarr",
-    },
-  ]) as typeof trashGuideManager.listSources;
-
-  trashGuideEntityCacheQueries.getBySourceAndType =
-    ((requestedSourceId, entityType) => {
-      if (requestedSourceId !== sourceId) {
-        return [];
-      }
-
-      if (entityType === "custom_format") {
-        return [
-          languageCustomFormatCacheRow,
-          negatedSourceCustomFormatCacheRow,
-        ];
-      }
-
-      if (entityType === "quality_profile") {
-        return [qualityProfileCacheRow];
-      }
-
-      return [];
-    }) as typeof trashGuideEntityCacheQueries.getBySourceAndType;
-
-  trashIdMappingsQueries.getBySource =
-    (() => []) as typeof trashIdMappingsQueries.getBySource;
-
-  const databaseId = 6007;
-  const restore = installParserCacheStubs();
-  restore.reset();
-  parserClientModule.clearParserVersionCache();
-  parserParserState.setHealthAvailable(true);
-  parserParserState.setVersion("local-parser-v5");
-
-  const fixture = createPcdCacheFixture("");
-
-  setCache(databaseId, fixture.cache);
-
-  parserParserState.setParseResponse("Movie.BONUS", {
-    ...BASE_PARSE_RESPONSE,
-    title: "Movie.BONUS",
-    type: "movie",
-    source: "WebDL",
-    languages: ["Original"],
-  });
-  parserParserState.setMatchResponse("Movie.BONUS", {
-    BONUS: true,
-  });
-
-  try {
-    const response = await scoreRouteModule.POST(
-      buildEvent({
-        databaseId,
-        arrType: "radarr",
-        profileNames: [`trash:${sourceId}:TRaSH%20Label%20Profile`],
-        releases: [
-          {
-            id: "release-labels",
-            title: "Movie.BONUS",
-            type: "movie",
+      specifications: [
+        {
+          name: "language-original-title",
+          implementation: "ReleaseTitleSpecification",
+          negate: false,
+          required: true,
+          fields: {
+            value: "BONUS",
           },
-        ],
-      }),
-    );
+        },
+        {
+          name: "Original Language",
+          implementation: "LanguageSpecification",
+          negate: false,
+          required: true,
+          fields: {
+            value: -2,
+          },
+        },
+      ],
+    };
 
-    const body = (await response.json()) as SimulatedScoreResponse;
-    assertEquals(response.status, 200);
-    assertEquals(body.parserAvailable, true);
-    assertEquals(body.results.length, 1);
+    const negatedSourceCustomFormatEntity = {
+      trash_id: negatedSourceCfTrashId,
+      arr_type: "radarr",
+      entity_type: "custom_format",
+      file_path: "/trash/custom-format-not-webdl.json",
+      name: "TRaSH Not WEBDL",
+      description: null,
+      regex_url: null,
+      include_in_rename: false,
+      scores: {
+        default: 15,
+      },
+      specifications: [
+        {
+          name: "source-not-webdl-title",
+          implementation: "ReleaseTitleSpecification",
+          negate: false,
+          required: true,
+          fields: {
+            value: "BONUS",
+          },
+        },
+        {
+          name: "Not WEBDL",
+          implementation: "SourceSpecification",
+          negate: true,
+          required: true,
+          fields: {
+            value: 7,
+          },
+        },
+      ],
+    };
 
-    const release = body.results[0];
-    const trashScore = release.profileScores.find(
-      (score) =>
-        score.profileName === `trash:${sourceId}:TRaSH%20Label%20Profile`,
-    );
+    const qualityProfileEntity = {
+      trash_id: qualityProfileTrashId,
+      arr_type: "radarr",
+      entity_type: "quality_profile",
+      file_path: "/trash/quality-profile-language-source.json",
+      name: "TRaSH Label Profile",
+      description: null,
+      source_url: null,
+      score_set: null,
+      group: null,
+      upgrade_allowed: true,
+      cutoff: "WEBDL-1080p",
+      min_format_score: 0,
+      cutoff_format_score: 0,
+      min_upgrade_format_score: 0,
+      language: null,
+      items: [],
+      format_items: [
+        {
+          name: "TRaSH Language Original",
+          score: null,
+          custom_format_trash_id: languageCfTrashId,
+        },
+        {
+          name: "TRaSH Not WEBDL",
+          score: null,
+          custom_format_trash_id: negatedSourceCfTrashId,
+        },
+      ],
+    };
 
-    assertEquals(trashScore?.totalScore, 20);
-    assertEquals(trashScore?.contributions, [{
-      cfName: "TRaSH Language Original",
-      score: 20,
-    }]);
-    assertEquals(
-      release.cfMatches.find((row) => row.name === "TRaSH Language Original")
-        ?.matches,
-      true,
-    );
-    assertEquals(
-      release.cfMatches.find((row) => row.name === "TRaSH Not WEBDL")?.matches,
-      false,
-    );
-  } finally {
-    trashGuideManager.listSources = originalListSources;
+    const languageCustomFormatCacheRow = {
+      id: 11,
+      sourceId,
+      trashId: languageCfTrashId,
+      entityType: "custom_format",
+      name: languageCustomFormatEntity.name,
+      jsonData: JSON.stringify(languageCustomFormatEntity),
+      filePath: languageCustomFormatEntity.file_path,
+      contentHash: "hash-cf-language",
+      fetchedAt: nowIso,
+    };
+
+    const negatedSourceCustomFormatCacheRow = {
+      id: 12,
+      sourceId,
+      trashId: negatedSourceCfTrashId,
+      entityType: "custom_format",
+      name: negatedSourceCustomFormatEntity.name,
+      jsonData: JSON.stringify(negatedSourceCustomFormatEntity),
+      filePath: negatedSourceCustomFormatEntity.file_path,
+      contentHash: "hash-cf-source",
+      fetchedAt: nowIso,
+    };
+
+    const qualityProfileCacheRow = {
+      id: 13,
+      sourceId,
+      trashId: qualityProfileTrashId,
+      entityType: "quality_profile",
+      name: qualityProfileEntity.name,
+      jsonData: JSON.stringify(qualityProfileEntity),
+      filePath: qualityProfileEntity.file_path,
+      contentHash: "hash-qp-labels",
+      fetchedAt: nowIso,
+    };
+
+    trashGuideManager.listSources = (() => [
+      {
+        id: sourceId,
+        name: "TRaSH Label Test",
+        arrType: "radarr",
+      },
+    ]) as typeof trashGuideManager.listSources;
+
     trashGuideEntityCacheQueries.getBySourceAndType =
-      originalGetBySourceAndType;
-    trashIdMappingsQueries.getBySource = originalGetMappingsBySource;
-    deleteCache(databaseId);
-    await fixture.destroy();
-    parserParserState.clearResponses();
-    parserParserState.setVersion("local-parser-v1");
-    restore.restore();
-  }
-});
+      ((requestedSourceId, entityType) => {
+        if (requestedSourceId !== sourceId) {
+          return [];
+        }
+
+        if (entityType === "custom_format") {
+          return [
+            languageCustomFormatCacheRow,
+            negatedSourceCustomFormatCacheRow,
+          ];
+        }
+
+        if (entityType === "quality_profile") {
+          return [qualityProfileCacheRow];
+        }
+
+        return [];
+      }) as typeof trashGuideEntityCacheQueries.getBySourceAndType;
+
+    trashIdMappingsQueries.getBySource =
+      (() => []) as typeof trashIdMappingsQueries.getBySource;
+
+    const databaseId = 6007;
+    const restore = installParserCacheStubs();
+    restore.reset();
+    parserClientModule.clearParserVersionCache();
+    parserParserState.setHealthAvailable(true);
+    parserParserState.setVersion("local-parser-v5");
+
+    const fixture = createPcdCacheFixture("");
+
+    setCache(databaseId, fixture.cache);
+
+    parserParserState.setParseResponse("Movie.BONUS", {
+      ...BASE_PARSE_RESPONSE,
+      title: "Movie.BONUS",
+      type: "movie",
+      source: "WebDL",
+      languages: ["Original"],
+    });
+    parserParserState.setMatchResponse("Movie.BONUS", {
+      BONUS: true,
+    });
+
+    try {
+      const response = await scoreRouteModule.POST(
+        buildEvent({
+          databaseId,
+          arrType: "radarr",
+          profileNames: [`trash:${sourceId}:TRaSH%20Label%20Profile`],
+          releases: [
+            {
+              id: "release-labels",
+              title: "Movie.BONUS",
+              type: "movie",
+            },
+          ],
+        }),
+      );
+
+      const body = (await response.json()) as SimulatedScoreResponse;
+      assertEquals(response.status, 200);
+      assertEquals(body.parserAvailable, true);
+      assertEquals(body.results.length, 1);
+
+      const release = body.results[0];
+      const trashScore = release.profileScores.find(
+        (score) =>
+          score.profileName === `trash:${sourceId}:TRaSH%20Label%20Profile`,
+      );
+
+      assertEquals(trashScore?.totalScore, 20);
+      assertEquals(trashScore?.contributions, [
+        {
+          cfName: "TRaSH Language Original",
+          score: 20,
+        },
+      ]);
+      assertEquals(
+        release.cfMatches.find((row) => row.name === "TRaSH Language Original")
+          ?.matches,
+        true,
+      );
+      assertEquals(
+        release.cfMatches.find((row) => row.name === "TRaSH Not WEBDL")
+          ?.matches,
+        false,
+      );
+    } finally {
+      trashGuideManager.listSources = originalListSources;
+      trashGuideEntityCacheQueries.getBySourceAndType =
+        originalGetBySourceAndType;
+      trashIdMappingsQueries.getBySource = originalGetMappingsBySource;
+      deleteCache(databaseId);
+      await fixture.destroy();
+      parserParserState.clearResponses();
+      parserParserState.setVersion("local-parser-v1");
+      restore.restore();
+    }
+  },
+);
 
 Deno.test("simulate score: sonarr anime TRaSH profiles infer WEB source from matched fansub groups", async () => {
   const sourceId = 9104;
@@ -2382,7 +2471,9 @@ Deno.test("simulate score: sonarr anime TRaSH profiles infer WEB source from mat
       sceneRelease?.profileScores.find((score) =>
         score.profileName === webProfileKey
       )?.contributions,
-      [{ cfName: "Repack Proper", score: 5 }],
+      [
+        { cfName: "Repack Proper", score: 5 },
+      ],
     );
 
     const subsPleaseRelease = body.results.find((result) =>

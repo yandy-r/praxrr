@@ -16,6 +16,7 @@
     parseBatchTitles,
     buildRankingFromResults,
     buildComparisonResult,
+    createScoreOverrideEntry,
     resolveReleaseTypeForPresetCategory,
   } from './helpers';
   import type { ComparisonResult, RankedRelease, SimulatorProfileOption } from './helpers';
@@ -523,14 +524,15 @@
   }
 
   function handleOverrideChange(cfName: string, score: number) {
-    if (!Number.isFinite(score)) {
+    const normalizedEntry = createScoreOverrideEntry(cfName, score);
+    if (!normalizedEntry) {
       handleOverrideReset(cfName);
       return;
     }
 
     scoreOverrides = {
       ...scoreOverrides,
-      [cfName]: Math.round(score),
+      [normalizedEntry[0]]: normalizedEntry[1],
     };
   }
 
@@ -565,26 +567,30 @@
 
   async function handleCopyLink(mode: ShareLinkMode) {
     const copyLabel = mode === 'safe' ? 'Safe link' : 'Full link';
-    const shareState: SimulatorUrlState = {
-      ...buildShareState(),
-    };
+    try {
+      const shareState: SimulatorUrlState = {
+        ...buildShareState(),
+      };
 
-    const { success, truncated } = await copyShareLink(
-      shareState,
-      `${window.location.origin}${$page.url.pathname}`,
-      { mode }
-    );
-    if (!success) {
-      alertStore.add('info', 'Could not copy to clipboard. Copy URL from the address bar.');
-      return;
+      const { success, truncated } = await copyShareLink(
+        shareState,
+        `${window.location.origin}${$page.url.pathname}`,
+        { mode }
+      );
+      if (!success) {
+        alertStore.add('info', 'Could not copy to clipboard. Copy URL from the address bar.');
+        return;
+      }
+
+      if (truncated) {
+        alertStore.add('warning', `${copyLabel} copied. Some state was omitted to fit URL limits.`);
+        return;
+      }
+
+      alertStore.add('success', `${copyLabel} copied to clipboard.`);
+    } catch {
+      alertStore.add('error', `Failed to generate ${copyLabel.toLowerCase()}.`);
     }
-
-    if (truncated) {
-      alertStore.add('warning', `${copyLabel} copied. Some state was omitted to fit URL limits.`);
-      return;
-    }
-
-    alertStore.add('success', `${copyLabel} copied to clipboard.`);
   }
 
   function clearMainSection() {

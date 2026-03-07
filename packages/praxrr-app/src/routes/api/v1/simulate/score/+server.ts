@@ -8,7 +8,7 @@ import {
   getParsedInfo,
   extractAllPatterns,
 } from '$pcd/entities/customFormats/index.ts';
-import { scoring } from '$pcd/entities/qualityProfiles/index.ts';
+import { scoring, QualityProfileScoringNotFoundError } from '$pcd/entities/qualityProfiles/index.ts';
 import { trashGuideManager } from '$lib/server/trashguide/manager.ts';
 import { trashGuideEntityCacheQueries } from '$db/queries/trashGuideEntityCache.ts';
 import { trashGuideSourcesQueries } from '$db/queries/trashGuideSources.ts';
@@ -132,7 +132,10 @@ function normalizeCfKey(value: string): string {
 }
 
 function normalizeSourceToken(value: string): string {
-  return value.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '');
 }
 
 function isLikelyAnimeReleaseTitle(title: string): boolean {
@@ -318,47 +321,123 @@ function readOptionalBooleanField(
 
 // Radarr QualitySource enum → canonical name (matches parser enum values)
 const radarrSourceById: Record<number, string> = {
-  0: 'unknown', 1: 'cam', 2: 'telesync', 3: 'telecine', 4: 'workprint',
-  5: 'dvd', 6: 'television', 7: 'webdl', 8: 'webrip', 9: 'bluray',
+  0: 'unknown',
+  1: 'cam',
+  2: 'telesync',
+  3: 'telecine',
+  4: 'workprint',
+  5: 'dvd',
+  6: 'television',
+  7: 'webdl',
+  8: 'webrip',
+  9: 'bluray',
 };
 
 // Sonarr QualitySource enum → canonical name (different numbering from Radarr)
 const sonarrSourceById: Record<number, string> = {
-  0: 'unknown', 1: 'television', 2: 'television',
-  3: 'webdl', 4: 'webrip', 5: 'dvd', 6: 'bluray', 7: 'bluray',
+  0: 'unknown',
+  1: 'television',
+  2: 'television',
+  3: 'webdl',
+  4: 'webrip',
+  5: 'dvd',
+  6: 'bluray',
+  7: 'bluray',
 };
 
 // Resolution enum → canonical name (same across Sonarr/Radarr, uses pixel counts)
 const resolutionById: Record<number, string> = {
-  0: 'unknown', 360: '360p', 480: '480p', 540: '540p',
-  576: '576p', 720: '720p', 1080: '1080p', 2160: '2160p',
+  0: 'unknown',
+  360: '360p',
+  480: '480p',
+  540: '540p',
+  576: '576p',
+  720: '720p',
+  1080: '1080p',
+  2160: '2160p',
 };
 
 // QualityModifier enum → canonical name (same across Sonarr/Radarr)
 const modifierById: Record<number, string> = {
-  0: 'none', 1: 'regional', 2: 'screener', 3: 'rawhd', 4: 'brdisk', 5: 'remux',
+  0: 'none',
+  1: 'regional',
+  2: 'screener',
+  3: 'rawhd',
+  4: 'brdisk',
+  5: 'remux',
 };
 
 // ReleaseType enum → canonical name (Sonarr-specific, Radarr doesn't use)
 const releaseTypeById: Record<number, string> = {
-  0: 'unknown', 1: 'single_episode', 2: 'multi_episode', 3: 'season_pack',
+  0: 'unknown',
+  1: 'single_episode',
+  2: 'multi_episode',
+  3: 'season_pack',
 };
 
 // Language enum → canonical name (same across Sonarr/Radarr, includes special IDs)
 const languageById: Record<number, string> = {
-  [-2]: 'Original', [-1]: 'Any',
-  0: 'Unknown', 1: 'English', 2: 'French', 3: 'Spanish', 4: 'German', 5: 'Italian',
-  6: 'Danish', 7: 'Dutch', 8: 'Japanese', 9: 'Icelandic', 10: 'Chinese', 11: 'Russian',
-  12: 'Polish', 13: 'Vietnamese', 14: 'Swedish', 15: 'Norwegian', 16: 'Finnish',
-  17: 'Turkish', 18: 'Portuguese', 19: 'Flemish', 20: 'Greek', 21: 'Korean',
-  22: 'Hungarian', 23: 'Hebrew', 24: 'Lithuanian', 25: 'Czech', 26: 'Hindi',
-  27: 'Romanian', 28: 'Thai', 29: 'Bulgarian', 30: 'Portuguese (BR)', 31: 'Arabic',
-  32: 'Ukrainian', 33: 'Persian', 34: 'Bengali', 35: 'Slovak', 36: 'Latvian',
-  37: 'Spanish (Latino)', 38: 'Catalan', 39: 'Croatian', 40: 'Serbian', 41: 'Bosnian',
-  42: 'Estonian', 43: 'Tamil', 44: 'Indonesian', 45: 'Telugu', 46: 'Macedonian',
-  47: 'Slovenian', 48: 'Malayalam', 49: 'Kannada', 50: 'Albanian', 51: 'Afrikaans',
-  52: 'Marathi', 53: 'Tagalog', 54: 'Urdu', 55: 'Romansh', 56: 'Mongolian',
-  57: 'Georgian', 58: 'Original',
+  [-2]: 'Original',
+  [-1]: 'Any',
+  0: 'Unknown',
+  1: 'English',
+  2: 'French',
+  3: 'Spanish',
+  4: 'German',
+  5: 'Italian',
+  6: 'Danish',
+  7: 'Dutch',
+  8: 'Japanese',
+  9: 'Icelandic',
+  10: 'Chinese',
+  11: 'Russian',
+  12: 'Polish',
+  13: 'Vietnamese',
+  14: 'Swedish',
+  15: 'Norwegian',
+  16: 'Finnish',
+  17: 'Turkish',
+  18: 'Portuguese',
+  19: 'Flemish',
+  20: 'Greek',
+  21: 'Korean',
+  22: 'Hungarian',
+  23: 'Hebrew',
+  24: 'Lithuanian',
+  25: 'Czech',
+  26: 'Hindi',
+  27: 'Romanian',
+  28: 'Thai',
+  29: 'Bulgarian',
+  30: 'Portuguese (BR)',
+  31: 'Arabic',
+  32: 'Ukrainian',
+  33: 'Persian',
+  34: 'Bengali',
+  35: 'Slovak',
+  36: 'Latvian',
+  37: 'Spanish (Latino)',
+  38: 'Catalan',
+  39: 'Croatian',
+  40: 'Serbian',
+  41: 'Bosnian',
+  42: 'Estonian',
+  43: 'Tamil',
+  44: 'Indonesian',
+  45: 'Telugu',
+  46: 'Macedonian',
+  47: 'Slovenian',
+  48: 'Malayalam',
+  49: 'Kannada',
+  50: 'Albanian',
+  51: 'Afrikaans',
+  52: 'Marathi',
+  53: 'Tagalog',
+  54: 'Urdu',
+  55: 'Romansh',
+  56: 'Mongolian',
+  57: 'Georgian',
+  58: 'Original',
 };
 
 function resolveNumericEnum(rawValue: string, map: Record<number, string>, fallback: string): string {
@@ -646,7 +725,7 @@ export const POST: RequestHandler = async ({ request }) => {
           scoreData,
         });
       } catch (err) {
-        if (err instanceof Error && err.message.includes('not found')) {
+        if (err instanceof QualityProfileScoringNotFoundError) {
           missingProfiles.push(profileSelector);
         } else {
           throw error(500, `Failed to load scoring data for profile "${parsedSelector.name}"`);

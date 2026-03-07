@@ -18,20 +18,20 @@ export type SimulatorProfileOption = {
 };
 
 export type ProfileScoreDelta = {
-  cfName: string;
-  scoreA: number;
-  originalScoreA?: number;
-  scoreB: number;
-  delta: number;
+  readonly cfName: string;
+  readonly scoreA: number;
+  readonly originalScoreA?: number;
+  readonly scoreB: number;
+  readonly delta: number;
 };
 
 export type ComparisonResult = {
-  profileAName: string;
-  profileBName: string;
-  profileATotal: number;
-  profileBTotal: number;
-  totalDelta: number;
-  contributions: ProfileScoreDelta[];
+  readonly profileAName: string;
+  readonly profileBName: string;
+  readonly profileATotal: number;
+  readonly profileBTotal: number;
+  readonly totalDelta: number;
+  readonly contributions: readonly ProfileScoreDelta[];
 };
 
 export type RankedRelease = {
@@ -151,7 +151,9 @@ export function buildRankingFromResults(
   for (const result of results) {
     const profileAScore = result.profileScores.find((p) => p.profileName === profileAName);
     if (!profileAScore) {
-      console.warn(`[buildRankingFromResults] Profile "${profileAName}" not found in result for "${result.title}", skipping`);
+      console.warn(
+        `[buildRankingFromResults] Profile "${profileAName}" not found in result for "${result.title}", skipping`
+      );
       continue;
     }
 
@@ -167,7 +169,9 @@ export function buildRankingFromResults(
     if (profileBName) {
       const profileBScore = result.profileScores.find((p) => p.profileName === profileBName);
       if (!profileBScore) {
-        console.warn(`[buildRankingFromResults] Profile "${profileBName}" not found in result for "${result.title}", skipping`);
+        console.warn(
+          `[buildRankingFromResults] Profile "${profileBName}" not found in result for "${result.title}", skipping`
+        );
         continue;
       }
 
@@ -263,6 +267,14 @@ export function buildComparisonResult(
 }
 
 export type ScoreOverrideMap = Record<string, number>;
+
+export function createScoreOverrideEntry(cfName: string, rawValue: unknown): [string, number] | undefined {
+  if (typeof rawValue !== 'number' || !Number.isFinite(rawValue)) {
+    return undefined;
+  }
+
+  return [cfName, Math.round(rawValue)];
+}
 
 export function applyScoreOverrides(
   contributions: ReadonlyArray<{ cfName: string; score: number }>,

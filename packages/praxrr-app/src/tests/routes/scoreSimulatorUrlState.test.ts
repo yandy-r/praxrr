@@ -62,6 +62,74 @@ async function withMockClipboard(
   }
 }
 
+async function withMockClipboardStub(
+  clipboard:
+    | {
+      writeText: (value: string) => Promise<void>;
+    }
+    | undefined,
+  run: () => Promise<void> | void,
+): Promise<void> {
+  const originalDescriptor = Object.getOwnPropertyDescriptor(
+    navigator,
+    "clipboard",
+  );
+
+  Object.defineProperty(navigator, "clipboard", {
+    value: clipboard,
+    configurable: true,
+  });
+
+  try {
+    await run();
+  } finally {
+    if (originalDescriptor) {
+      Object.defineProperty(navigator, "clipboard", originalDescriptor);
+    }
+  }
+}
+
+async function withMockExecCommand(
+  execCommand: (command: string) => boolean,
+  run: () => Promise<void> | void,
+): Promise<void> {
+  const originalDescriptor = Object.getOwnPropertyDescriptor(
+    globalThis,
+    "document",
+  );
+  const textArea = {
+    value: "",
+    style: {} as Record<string, string>,
+    setAttribute: (_name: string, _value: string) => {},
+    select: () => {},
+    setSelectionRange: (_start: number, _end: number) => {},
+  };
+  const documentStub = {
+    body: {
+      appendChild: (_node: unknown) => {},
+      removeChild: (_node: unknown) => {},
+    },
+    createElement: (_tagName: string) => textArea,
+    execCommand,
+  };
+
+  Object.defineProperty(globalThis, "document", {
+    value: documentStub,
+    configurable: true,
+  });
+
+  try {
+    await run();
+  } finally {
+    if (originalDescriptor) {
+      Object.defineProperty(globalThis, "document", originalDescriptor);
+      return;
+    }
+
+    Reflect.deleteProperty(globalThis, "document");
+  }
+}
+
 Deno.test("parseUrlState returns undefined fields for empty params", () => {
   assertEquals(parseUrlState(new URLSearchParams()), {
     title: undefined,
@@ -119,8 +187,9 @@ Deno.test("parseUrlState validates mediaType values and derives legacy arrType v
     undefined,
   );
   assertEquals(
-    parseUrlState(new URLSearchParams({ mediaType: "anime", arrType: "radarr" }))
-      .mediaType,
+    parseUrlState(
+      new URLSearchParams({ mediaType: "anime", arrType: "radarr" }),
+    ).mediaType,
     "anime",
   );
 });
@@ -339,5 +408,61 @@ Deno.test("copyShareLink drops batch after overrides when URL is still too long"
     assertEquals(shareUrl.searchParams.has("batch"), false);
     assert(shareUrl.toString().includes("mediaType=movie"));
     assertExists(shareUrl.searchParams.get("title"));
+  });
+});
+
+Deno.test("copyShareLink warns when navigator.clipboard.writeText fails before fallback copy succeeds", async () => {
+  await withMockConsoleWarn(async (warnings) => {
+    await withMockClipboardStub(
+      {
+        writeText: (_value: string): Promise<void> =>
+          Promise.reject(new Error("clipboard denied")),
+      },
+      async () => {
+        await withMockExecCommand(
+          () => true,
+          async () => {
+            const result = await copyShareLink(
+              {
+                title: "Release.2026",
+                mediaType: "movie",
+              },
+              "https://example.test/score-simulator/db-1",
+            );
+
+            assertEquals(result, { success: true, truncated: false });
+            assertEquals(warnings.length, 1);
+            assert(
+              warnings[0].includes("navigator.clipboard.writeText failed"),
+            );
+          },
+        );
+      },
+    );
+  });
+});
+
+Deno.test("copyShareLink warns when execCommand fallback throws and returns failure", async () => {
+  await withMockConsoleWarn(async (warnings) => {
+    await withMockClipboardStub(undefined, async () => {
+      await withMockExecCommand(
+        () => {
+          throw new Error("exec denied");
+        },
+        async () => {
+          const result = await copyShareLink(
+            {
+              title: "Release.2026",
+              mediaType: "movie",
+            },
+            "https://example.test/score-simulator/db-1",
+          );
+
+          assertEquals(result, { success: false, truncated: false });
+          assertEquals(warnings.length, 1);
+          assert(warnings[0].includes("document.execCommand failed"));
+        },
+      );
+    });
   });
 });

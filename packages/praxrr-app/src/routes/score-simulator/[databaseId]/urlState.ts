@@ -1,4 +1,4 @@
-import type { PresetCategory, ScoreOverrideMap } from './helpers.ts';
+import { createScoreOverrideEntry, type PresetCategory, type ScoreOverrideMap } from './helpers.ts';
 
 const VALID_MEDIA_TYPES = new Set<PresetCategory>(['movie', 'series', 'anime']);
 const MAX_SHARE_URL_LENGTH = 2000;
@@ -32,6 +32,13 @@ function warnInvalidUrlStateParam(paramName: 'batch' | 'overrides', reason: stri
   }
 
   console.warn(message);
+}
+
+function warnClipboardCopyFailure(
+  strategy: 'navigator.clipboard.writeText' | 'document.execCommand',
+  error: unknown
+): void {
+  console.warn(`[score-simulator:urlState] ${strategy} failed during share-link copy`, error);
 }
 
 export interface SimulatorUrlState {
@@ -111,11 +118,12 @@ function parseOverridesParam(value: string | undefined): ScoreOverrideMap | unde
 
     const normalized: ScoreOverrideMap = {};
     for (const [key, rawValue] of Object.entries(parsed as Record<string, unknown>)) {
-      if (typeof rawValue !== 'number' || !Number.isFinite(rawValue)) {
+      const normalizedEntry = createScoreOverrideEntry(key, rawValue);
+      if (!normalizedEntry) {
         continue;
       }
 
-      normalized[key] = Math.round(rawValue);
+      normalized[normalizedEntry[0]] = normalizedEntry[1];
     }
 
     return Object.keys(normalized).length > 0 ? normalized : undefined;
@@ -189,11 +197,12 @@ export function serializeUrlState(state: SimulatorUrlState): URLSearchParams {
   if (state.overrides) {
     const normalizedOverrides: ScoreOverrideMap = {};
     for (const [key, rawValue] of Object.entries(state.overrides) as Array<[string, number]>) {
-      if (!Number.isFinite(rawValue)) {
+      const normalizedEntry = createScoreOverrideEntry(key, rawValue);
+      if (!normalizedEntry) {
         continue;
       }
 
-      normalizedOverrides[key] = Math.round(rawValue);
+      normalizedOverrides[normalizedEntry[0]] = normalizedEntry[1];
     }
 
     if (Object.keys(normalizedOverrides).length > 0) {
@@ -240,8 +249,8 @@ export async function copyShareLink(
       await navigator.clipboard.writeText(fullUrl);
       return { success: true, truncated };
     }
-  } catch {
-    // Fall through to execCommand fallback.
+  } catch (error) {
+    warnClipboardCopyFailure('navigator.clipboard.writeText', error);
   }
 
   try {
@@ -251,7 +260,8 @@ export async function copyShareLink(
 
     const copied = copyUsingExecCommand(fullUrl);
     return { success: copied, truncated };
-  } catch {
+  } catch (error) {
+    warnClipboardCopyFailure('document.execCommand', error);
     return { success: false, truncated };
   }
 }
