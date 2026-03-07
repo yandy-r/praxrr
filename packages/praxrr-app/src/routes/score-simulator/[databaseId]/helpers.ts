@@ -156,7 +156,8 @@ export function buildRankingFromResults(
   for (const result of results) {
     const profileAScore = result.profileScores.find((p) => p.profileName === profileAName);
     if (!profileAScore) {
-      return [];
+      console.warn(`[buildRankingFromResults] Profile "${profileAName}" not found in result for "${result.title}", skipping`);
+      continue;
     }
 
     const hasOverrides = Object.keys(overrides).length > 0;
@@ -171,7 +172,8 @@ export function buildRankingFromResults(
     if (profileBName) {
       const profileBScore = result.profileScores.find((p) => p.profileName === profileBName);
       if (!profileBScore) {
-        return [];
+        console.warn(`[buildRankingFromResults] Profile "${profileBName}" not found in result for "${result.title}", skipping`);
+        continue;
       }
 
       comparisonScore = profileBScore.totalScore;
