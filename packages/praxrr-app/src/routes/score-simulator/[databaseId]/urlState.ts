@@ -5,6 +5,27 @@ const VALID_MEDIA_TYPES = new Set(['movie', 'series', 'anime'] as const);
 const VALID_ARR_TYPES = new Set(['radarr', 'sonarr'] as const);
 const MAX_SHARE_URL_LENGTH = 2000;
 
+/** Encode an arbitrary string to base64 using UTF-8, avoiding btoa's
+ *  InvalidCharacterError on non-Latin-1 characters (e.g. anime titles). */
+function toBase64(value: string): string {
+  const bytes = new TextEncoder().encode(value);
+  let binary = '';
+  for (const byte of bytes) {
+    binary += String.fromCharCode(byte);
+  }
+  return btoa(binary);
+}
+
+/** Decode a base64 string produced by {@link toBase64} back to UTF-8 text. */
+function fromBase64(value: string): string {
+  const binary = atob(value);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return new TextDecoder().decode(bytes);
+}
+
 type MediaType = PresetCategory;
 type ArrType = 'radarr' | 'sonarr';
 
@@ -51,7 +72,7 @@ function parseBatchParam(value: string | undefined): string[] | undefined {
   }
 
   try {
-    const parsed = JSON.parse(atob(value));
+    const parsed = JSON.parse(fromBase64(value));
     if (!Array.isArray(parsed) || !parsed.every((entry) => typeof entry === 'string')) {
       return undefined;
     }
@@ -68,7 +89,7 @@ function parseOverridesParam(value: string | undefined): ScoreOverrideMap | unde
   }
 
   try {
-    const parsed = JSON.parse(atob(value));
+    const parsed = JSON.parse(fromBase64(value));
     if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
       return undefined;
     }
@@ -144,7 +165,7 @@ export function serializeUrlState(state: SimulatorUrlState): URLSearchParams {
   setStringParam('batchMediaType', state.batchMediaType);
 
   if (state.batch && state.batch.length > 0) {
-    searchParams.set('batch', btoa(JSON.stringify(state.batch)));
+    searchParams.set('batch', toBase64(JSON.stringify(state.batch)));
   }
 
   if (state.overrides) {
@@ -158,7 +179,7 @@ export function serializeUrlState(state: SimulatorUrlState): URLSearchParams {
     }
 
     if (Object.keys(normalizedOverrides).length > 0) {
-      searchParams.set('overrides', btoa(JSON.stringify(normalizedOverrides)));
+      searchParams.set('overrides', toBase64(JSON.stringify(normalizedOverrides)));
     }
   }
 
