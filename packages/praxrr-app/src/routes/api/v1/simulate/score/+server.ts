@@ -16,6 +16,7 @@ import { trashIdMappingsQueries } from '$db/queries/trashIdMappings.ts';
 import { parseCachedEntity } from '$lib/server/trashguide/displayTransform.ts';
 import { discoverTrashGuideFiles } from '$lib/server/trashguide/fetcher.ts';
 import { parseTrashGuideEntities } from '$lib/server/trashguide/parser.ts';
+import { cache } from '$cache/cache.ts';
 import { logger } from '$logger/logger.ts';
 import { QualitySource, type ParseResult } from '$lib/server/utils/arr/parser/types.ts';
 import type {
@@ -35,7 +36,7 @@ type SimulateProfileScore = components['schemas']['SimulateProfileScore'];
 type SimulateScoreContribution = components['schemas']['SimulateScoreContribution'];
 type PcdProfileScoreData = Awaited<ReturnType<typeof scoring>>;
 
-const fallbackCfGroupsBySource = new Map<number, TrashGuideCfGroupEntity[]>();
+const FALLBACK_CF_GROUPS_TTL = 600; // 10 minutes
 
 interface ResolvedPcdProfile {
   kind: 'pcd';
@@ -497,7 +498,8 @@ async function loadFallbackCfGroups(
   sourceId: number,
   arrType: SimulateScoreRequest['arrType']
 ): Promise<TrashGuideCfGroupEntity[]> {
-  const cached = fallbackCfGroupsBySource.get(sourceId);
+  const cacheKey = `simulate:cfgroups:${sourceId}`;
+  const cached = cache.get<TrashGuideCfGroupEntity[]>(cacheKey);
   if (cached) {
     return cached;
   }
@@ -517,7 +519,7 @@ async function loadFallbackCfGroups(
   }
 
   if (!source || source.arr_type !== arrType) {
-    fallbackCfGroupsBySource.set(sourceId, []);
+    cache.set(cacheKey, [], FALLBACK_CF_GROUPS_TTL);
     return [];
   }
 
@@ -531,7 +533,7 @@ async function loadFallbackCfGroups(
       discovery,
     });
     const fallbackGroups = [...parsed.entities.custom_format_groups];
-    fallbackCfGroupsBySource.set(sourceId, fallbackGroups);
+    cache.set(cacheKey, fallbackGroups, FALLBACK_CF_GROUPS_TTL);
 
     if (fallbackGroups.length > 0) {
       await logger.info('Loaded fallback TRaSH CF groups for score simulation', {
@@ -554,7 +556,6 @@ async function loadFallbackCfGroups(
         error: err instanceof Error ? err.message : String(err),
       },
     });
-    fallbackCfGroupsBySource.set(sourceId, []);
     return [];
   }
 }
