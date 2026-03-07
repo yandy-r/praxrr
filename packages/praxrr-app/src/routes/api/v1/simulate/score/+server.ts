@@ -505,8 +505,14 @@ async function loadFallbackCfGroups(
   let source;
   try {
     source = trashGuideSourcesQueries.getById(sourceId);
-  } catch {
-    fallbackCfGroupsBySource.set(sourceId, []);
+  } catch (err) {
+    await logger.warn('TRaSH source lookup failed during score simulation', {
+      source: 'SimulateScoreRoute',
+      meta: {
+        sourceId,
+        error: err instanceof Error ? err.message : String(err),
+      },
+    });
     return [];
   }
 

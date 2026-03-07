@@ -5,10 +5,11 @@
 
 ---
 
-## Critical Issues (3 found)
+## Critical Issues (3 found — 3 Fixed)
 
-### C1. SimulateButton hardcodes `arrType: 'radarr'` -- Cross-Arr policy violation
+### C1. ~~SimulateButton hardcodes `arrType: 'radarr'`~~ — Cross-Arr policy violation
 
+**Status:** Fixed
 **File:**
 `packages/praxrr-app/src/routes/quality-profiles/[databaseId]/[id]/scoring/components/SimulateButton.svelte:12`
 
@@ -20,8 +21,9 @@ implicit sibling fallback)."
 **Fix:** Accept an `arrType` prop from the parent scoring page (which knows `data.scoring.arrTypes`)
 or derive it from profile metadata.
 
-### C2. Phase 2 tests broken by Phase 3 changes (live regression)
+### C2. ~~Phase 2 tests broken by Phase 3 changes~~
 
+**Status:** Fixed
 **File:** `packages/praxrr-app/src/tests/routes/scoreSimulatorPhase2Helpers.test.ts`
 
 Three existing tests fail:
@@ -38,8 +40,9 @@ sums an empty array and returns 0.
 **Fix:** Update the test factory `makeProfileScore` to supply contributions consistent with
 `totalScore`, or adjust the function to fall back to `totalScore` when overrides is empty.
 
-### C3. Silent swallow of TRaSH source lookup errors with permanent cache poisoning
+### C3. ~~Silent swallow of TRaSH source lookup errors with permanent cache poisoning~~
 
+**Status:** Fixed
 **File:** `packages/praxrr-app/src/routes/api/v1/simulate/score/+server.ts:508`
 
 ```typescript
@@ -61,10 +64,11 @@ successful empty discovery. Add TTL-based invalidation.
 
 ---
 
-## Important Issues (7 found)
+## Important Issues (7 found — 0 Fixed)
 
 ### I1. Module-level `fallbackCfGroupsBySource` cache grows unboundedly and never invalidates
 
+**Status:** Open
 **File:** `packages/praxrr-app/src/routes/api/v1/simulate/score/+server.ts:38`
 
 The `Map` caches TRaSH guide CF groups per source ID forever. If TRaSH guide data is updated, stale
@@ -74,6 +78,7 @@ groups are served indefinitely. Combined with C3, a transient error permanently 
 
 ### I2. Unsafe type cast: `'neutral' as 'danger'`
 
+**Status:** Open
 **File:**
 `packages/praxrr-app/src/routes/score-simulator/[databaseId]/components/RankingTable.svelte:115`
 
@@ -91,6 +96,7 @@ cast to `'danger'`. The Badge component receives `'neutral'` at runtime while Ty
 
 ### I3. `buildRankingFromResults` silently returns empty array on missing profile
 
+**Status:** Open
 **File:** `packages/praxrr-app/src/routes/score-simulator/[databaseId]/helpers.ts:157-160`
 
 When `profileAName` doesn't match any profile in results, the function silently returns `[]`,
@@ -102,6 +108,7 @@ releases rather than discarding entire rankings.
 
 ### I4. Evaluator regex catch blocks silently skip patterns
 
+**Status:** Open
 **File:**
 `packages/praxrr-app/src/lib/server/pcd/entities/customFormats/evaluator.ts:339-341, 557-559, 606-608`
 
@@ -113,6 +120,7 @@ condition result that indicates "evaluation failed" rather than "did not match."
 
 ### I5. URL state `parseBatchParam` / `parseOverridesParam` silently discard malformed data
 
+**Status:** Open
 **File:** `packages/praxrr-app/src/routes/score-simulator/[databaseId]/urlState.ts:60-62, 86-88`
 
 Malformed batch/override params (truncated URL, encoding error) silently return `undefined`,
@@ -124,6 +132,7 @@ provided" from "provided but invalid."
 
 ### I6. Missing test coverage for `trash_scores` optional acceptance
 
+**Status:** Open
 **File:** `packages/praxrr-app/src/lib/server/trashguide/parser.ts:176`
 
 The PR makes `trash_scores` optional (defaulting to `{}`), but existing parser tests always supply
@@ -133,6 +142,8 @@ The PR makes `trash_scores` optional (defaulting to `{}`), but existing parser t
 
 ### I7. No unit tests for `buildRankingFromResults`/`buildComparisonResult` with overrides
 
+**Status:** Open
+
 Phase 3 added `ScoreOverrideMap` params to both functions, but no unit test exercises ranking with
 overrides (re-ordering, threshold flips, comparison delta recalculation).
 
@@ -141,35 +152,46 @@ overrides (re-ordering, threshold flips, comparison delta recalculation).
 
 ---
 
-## Suggestions (10 found)
+## Suggestions (10 found — 0 Fixed)
 
 ### S1. Remove `arrType` from `SimulatorUrlState`
+
+**Status:** Open
 
 It is fully derivable from `mediaType` via `resolveReleaseTypeForPresetCategory`. Its presence
 creates a contradiction surface (e.g., `arrType: 'radarr'` with `mediaType: 'anime'`).
 
 ### S2. Remove dead types `BatchInputState` and `ComparisonState`
 
+**Status:** Open
+
 These are exported but never used as runtime objects. The page manages their fields as separate
 `let` bindings. `showDeltas` in `ComparisonState` is unused entirely.
 
 ### S3. Remove unused `comparisonRank` field from `RankedRelease`
+
+**Status:** Open
 
 Declared in the type but never assigned in `buildRankingFromResults`. Dead field that misleads
 consumers.
 
 ### S4. Move `SimulatorProfileOption` to `helpers.ts`
 
+**Status:** Open
+
 Currently defined inline in `+page.svelte`. Moving it alongside other shared types makes it
 referenceable by child components and eliminates the `as Array<{...}>` type safety escape hatch.
 
 ### S5. Rename local `MediaType` alias in `urlState.ts`
+
+**Status:** Open
 
 Collides with the OpenAPI-generated `MediaType` from `$api/v1.d.ts` (which is `'movie' | 'series'`
 without `'anime'`). Rename to `SimulatorMediaType` or inline `PresetCategory` directly.
 
 ### S6. Add `console.warn` to clipboard fallback catch blocks
 
+**Status:** Open
 **File:** `urlState.ts:204-206, 215-217`
 
 The first catch discards clipboard API errors; the second discards `execCommand` errors. The caller
@@ -177,6 +199,7 @@ does check `success: false`, but developers debugging clipboard issues get no co
 
 ### S7. Server route uses fragile string matching for error classification
 
+**Status:** Open
 **File:** `+server.ts:641-647`
 
 ```typescript
@@ -189,6 +212,7 @@ error code.
 
 ### S8. `handleCopyLink` has no try-catch for unhandled exceptions
 
+**Status:** Open
 **File:** `+page.svelte:585-607`
 
 If `serializeUrlState` throws (e.g., `btoa()` fails on non-Latin1 characters in batch titles), the
@@ -198,9 +222,13 @@ exception propagates as an unhandled promise rejection.
 
 ### S9. Mark `ProfileScoreDelta` and `ComparisonResult` fields as `readonly`
 
+**Status:** Open
+
 Low-cost change that prevents accidental mutation after construction.
 
 ### S10. Create a factory for `ScoreOverrideMap` entries
+
+**Status:** Open
 
 Validation logic (rounding, finite check) is duplicated in `handleOverrideChange` and
 `parseOverridesParam`. A single factory function would centralize this.
@@ -245,8 +273,8 @@ Validation logic (rounding, finite check) is duplicated in `handleOverrideChange
 
 ## Recommended Action
 
-1. **Fix critical issues** C1 (hardcoded arrType), C2 (broken tests), C3 (silent cache poisoning)
-   before merge
+1. ~~**Fix critical issues** C1 (hardcoded arrType), C2 (broken tests), C3 (silent cache poisoning)
+   before merge~~ — All fixed
 2. **Address important issues** I1-I7, prioritizing I1 (cache invalidation) and I3/I4 (silent
    failures)
 3. **Consider suggestions** S1-S10 for follow-up cleanup

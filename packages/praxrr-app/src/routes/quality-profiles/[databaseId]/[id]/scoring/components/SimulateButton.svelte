@@ -5,11 +5,18 @@
 
   export let databaseId: number;
   export let profileName: string;
+  export let arrTypes: string[] = [];
+
+  function resolveArrType(): string {
+    if (arrTypes.length === 1) return arrTypes[0];
+    if (arrTypes.includes('radarr')) return 'radarr';
+    return arrTypes[0] ?? 'radarr';
+  }
 
   function handleClick() {
     const params = new URLSearchParams({
       profile: `pcd:${encodeURIComponent(profileName)}`,
-      arrType: 'radarr',
+      arrType: resolveArrType(),
     });
     void goto(`/score-simulator/${databaseId}?${params.toString()}`);
   }

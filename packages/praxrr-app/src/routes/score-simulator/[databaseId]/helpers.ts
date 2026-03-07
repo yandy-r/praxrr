@@ -159,7 +159,10 @@ export function buildRankingFromResults(
       return [];
     }
 
-    const profileATotal = computeOverriddenTotal(profileAScore.contributions, overrides);
+    const hasOverrides = Object.keys(overrides).length > 0;
+    const profileATotal = hasOverrides
+      ? computeOverriddenTotal(profileAScore.contributions, overrides)
+      : profileAScore.totalScore;
     const thresholdState = resolveThresholdWithOverrides(profileAScore, overrides);
 
     let comparisonScore: number | undefined;

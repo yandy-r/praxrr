@@ -588,6 +588,7 @@
 					<SimulateButton
 						databaseId={Number($page.params.databaseId)}
 						profileName={data.profileName ?? ''}
+						arrTypes={data.scoring?.arrTypes ?? []}
 					/>
 				{/if}
         <Button
