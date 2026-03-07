@@ -18,7 +18,7 @@
     buildComparisonResult,
     resolveReleaseTypeForPresetCategory,
   } from './helpers';
-  import type { ComparisonResult, RankedRelease } from './helpers';
+  import type { ComparisonResult, RankedRelease, SimulatorProfileOption } from './helpers';
   import type { ScoreOverrideMap } from './helpers';
   import ReleaseInput from './components/ReleaseInput.svelte';
   import SimulationResults from './components/SimulationResults.svelte';
@@ -38,12 +38,6 @@
   type SimulateScoreResponse = components['schemas']['SimulateScoreResponse'];
   type SimulateProfileScore = components['schemas']['SimulateProfileScore'];
   type ArrType = components['schemas']['SimulateScoreRequest']['arrType'];
-  interface SimulatorProfileOption {
-    id: number;
-    name: string;
-    value: string;
-    displayName: string;
-  }
 
   export let data: PageData;
 
@@ -78,14 +72,7 @@
     active: db.id === data.currentDatabase.id,
   }));
 
-  $: qualityProfileOptions = (
-    data.qualityProfiles as Array<{
-      id: number;
-      name: string;
-      value?: string;
-      displayName?: string;
-    }>
-  ).map(
+  $: qualityProfileOptions = data.qualityProfiles.map(
     (profile): SimulatorProfileOption => ({
       id: profile.id,
       name: profile.name,
@@ -191,11 +178,6 @@
       } else {
         alertStore.add('warning', 'Comparison profile from URL not found in this database.');
       }
-    }
-
-    if (urlState.arrType && !urlState.mediaType) {
-      hasAnyUrlState = true;
-      singleSampleCategory = urlState.arrType === 'radarr' ? 'movie' : 'series';
     }
 
     if (urlState.batch) {
@@ -575,7 +557,6 @@
       mediaType: singleSampleCategory,
       profile: selectedProfileName ?? undefined,
       compare: comparisonProfileName ?? undefined,
-      arrType: singleSampleCategory === 'movie' ? 'radarr' : 'sonarr',
       batch: batchTitles.map((title) => title.title),
       batchMediaType: batchSampleCategory,
       overrides: hasActiveOverrides ? scoreOverrides : undefined,

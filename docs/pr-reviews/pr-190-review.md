@@ -159,44 +159,69 @@ threshold-state flips in ranked output, and comparison recalculation of
 
 ## Suggestions (10 found — 0 Fixed)
 
-### S1. Remove `arrType` from `SimulatorUrlState`
+### S1. ~~Remove `arrType` from `SimulatorUrlState`~~
 
-**Status:** Open
+**Status:** Fixed **Files:**
+`packages/praxrr-app/src/routes/score-simulator/[databaseId]/urlState.ts`,
+`packages/praxrr-app/src/routes/score-simulator/[databaseId]/+page.svelte`
 
 It is fully derivable from `mediaType` via
 `resolveReleaseTypeForPresetCategory`. Its presence creates a contradiction
 surface (e.g., `arrType: 'radarr'` with `mediaType: 'anime'`).
 
-### S2. Remove dead types `BatchInputState` and `ComparisonState`
+**Fix:** Removed `arrType` from the public URL-state shape and new share-link
+serialization. Legacy `arrType=radarr|sonarr` links still parse by deriving
+`mediaType` inside `parseUrlState`, so old links remain readable without
+preserving the contradictory field.
 
-**Status:** Open
+### S2. ~~Remove dead types `BatchInputState` and `ComparisonState`~~
+
+**Status:** Fixed **File:**
+`packages/praxrr-app/src/routes/score-simulator/[databaseId]/helpers.ts`
 
 These are exported but never used as runtime objects. The page manages their
 fields as separate `let` bindings. `showDeltas` in `ComparisonState` is unused
 entirely.
 
-### S3. Remove unused `comparisonRank` field from `RankedRelease`
+**Fix:** Deleted both unused exported types from `helpers.ts`.
 
-**Status:** Open
+### S3. ~~Remove unused `comparisonRank` field from `RankedRelease`~~
+
+**Status:** Fixed **File:**
+`packages/praxrr-app/src/routes/score-simulator/[databaseId]/helpers.ts`
 
 Declared in the type but never assigned in `buildRankingFromResults`. Dead field
 that misleads consumers.
 
-### S4. Move `SimulatorProfileOption` to `helpers.ts`
+**Fix:** Removed the unused `comparisonRank` property from `RankedRelease`.
 
-**Status:** Open
+### S4. ~~Move `SimulatorProfileOption` to `helpers.ts`~~
+
+**Status:** Fixed **Files:**
+`packages/praxrr-app/src/routes/score-simulator/[databaseId]/helpers.ts`,
+`packages/praxrr-app/src/routes/score-simulator/[databaseId]/+page.svelte`,
+`packages/praxrr-app/src/routes/score-simulator/[databaseId]/components/ReleaseInput.svelte`,
+`packages/praxrr-app/src/routes/score-simulator/[databaseId]/components/ProfileComparison.svelte`
 
 Currently defined inline in `+page.svelte`. Moving it alongside other shared
 types makes it referenceable by child components and eliminates the
 `as Array<{...}>` type safety escape hatch.
 
-### S5. Rename local `MediaType` alias in `urlState.ts`
+**Fix:** Exported a shared `SimulatorProfileOption` type from `helpers.ts` and
+updated the page plus child components to consume it. The page no longer uses
+the `data.qualityProfiles as Array<{...}>` cast.
 
-**Status:** Open
+### S5. ~~Rename local `MediaType` alias in `urlState.ts`~~
+
+**Status:** Fixed **File:**
+`packages/praxrr-app/src/routes/score-simulator/[databaseId]/urlState.ts`
 
 Collides with the OpenAPI-generated `MediaType` from `$api/v1.d.ts` (which is
 `'movie' | 'series'` without `'anime'`). Rename to `SimulatorMediaType` or
 inline `PresetCategory` directly.
+
+**Fix:** Removed the misleading local alias and typed simulator URL-state media
+fields directly as `PresetCategory`.
 
 ### S6. Add `console.warn` to clipboard fallback catch blocks
 

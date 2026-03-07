@@ -68,7 +68,6 @@ Deno.test("parseUrlState returns undefined fields for empty params", () => {
     mediaType: undefined,
     profile: undefined,
     compare: undefined,
-    arrType: undefined,
     batch: undefined,
     batchMediaType: undefined,
     overrides: undefined,
@@ -80,7 +79,6 @@ Deno.test("parseUrlState parses simple params and ignores unknown params", () =>
     title: "Release.2025.1080p",
     mediaType: "movie",
     profile: "pcd:main profile",
-    arrType: "radarr",
     unknown: "ignore-me",
   });
 
@@ -89,14 +87,13 @@ Deno.test("parseUrlState parses simple params and ignores unknown params", () =>
     mediaType: "movie",
     profile: "pcd:main profile",
     compare: undefined,
-    arrType: "radarr",
     batch: undefined,
     batchMediaType: undefined,
     overrides: undefined,
   });
 });
 
-Deno.test("parseUrlState validates mediaType and arrType values", () => {
+Deno.test("parseUrlState validates mediaType values and derives legacy arrType values", () => {
   assertEquals(
     parseUrlState(new URLSearchParams({ mediaType: "movie" })).mediaType,
     "movie",
@@ -110,16 +107,21 @@ Deno.test("parseUrlState validates mediaType and arrType values", () => {
     "anime",
   );
   assertEquals(
-    parseUrlState(new URLSearchParams({ arrType: "radarr" })).arrType,
-    "radarr",
+    parseUrlState(new URLSearchParams({ arrType: "radarr" })).mediaType,
+    "movie",
   );
   assertEquals(
-    parseUrlState(new URLSearchParams({ arrType: "sonarr" })).arrType,
-    "sonarr",
+    parseUrlState(new URLSearchParams({ arrType: "sonarr" })).mediaType,
+    "series",
   );
   assertEquals(
-    parseUrlState(new URLSearchParams({ arrType: "lidarr" })).arrType,
+    parseUrlState(new URLSearchParams({ arrType: "lidarr" })).mediaType,
     undefined,
+  );
+  assertEquals(
+    parseUrlState(new URLSearchParams({ mediaType: "anime", arrType: "radarr" }))
+      .mediaType,
+    "anime",
   );
 });
 
@@ -129,7 +131,6 @@ Deno.test("parseUrlState treats empty string params as absent", () => {
     mediaType: "",
     profile: "",
     compare: "",
-    arrType: "",
     batch: "",
     batchMediaType: "",
     overrides: "",
@@ -140,7 +141,6 @@ Deno.test("parseUrlState treats empty string params as absent", () => {
     mediaType: undefined,
     profile: undefined,
     compare: undefined,
-    arrType: undefined,
     batch: undefined,
     batchMediaType: undefined,
     overrides: undefined,
@@ -214,7 +214,6 @@ Deno.test("serializeUrlState serializes full state", () => {
     mediaType: "movie",
     profile: "pcd:alpha profile",
     compare: "pcd:beta profile",
-    arrType: "radarr",
     batch: ["A", "B"],
     batchMediaType: "anime",
     overrides: { CF_A: 10, CF_B: 20 },
@@ -226,7 +225,6 @@ Deno.test("serializeUrlState serializes full state", () => {
   assertEquals(params.get("mediaType"), "movie");
   assertEquals(params.get("profile"), "pcd:alpha profile");
   assertEquals(params.get("compare"), "pcd:beta profile");
-  assertEquals(params.get("arrType"), "radarr");
   assertEquals(JSON.parse(atob(params.get("batch") ?? "null")), ["A", "B"]);
   assertEquals(params.get("batchMediaType"), "anime");
   assertEquals(JSON.parse(atob(params.get("overrides") ?? "null")), {
@@ -241,7 +239,6 @@ Deno.test("serializeUrlState omits undefined and empty values", () => {
     profile: undefined,
     compare: "",
     mediaType: undefined,
-    arrType: undefined,
     batch: [],
     batchMediaType: undefined,
     overrides: {},
@@ -270,7 +267,6 @@ Deno.test("parse/serialize round-trip preserves full state", () => {
     mediaType: "anime",
     profile: "pcd:alpha",
     compare: "pcd:beta",
-    arrType: "sonarr",
     batch: ["One.Title", "Two.Title"],
     batchMediaType: "anime",
     overrides: { CF_A: 5, CF_B: -10 },

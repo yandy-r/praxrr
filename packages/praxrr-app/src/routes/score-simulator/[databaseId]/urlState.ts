@@ -1,8 +1,6 @@
-import type { ScoreOverrideMap } from './helpers.ts';
-import type { PresetCategory } from './helpers.ts';
+import type { PresetCategory, ScoreOverrideMap } from './helpers.ts';
 
-const VALID_MEDIA_TYPES = new Set(['movie', 'series', 'anime'] as const);
-const VALID_ARR_TYPES = new Set(['radarr', 'sonarr'] as const);
+const VALID_MEDIA_TYPES = new Set<PresetCategory>(['movie', 'series', 'anime']);
 const MAX_SHARE_URL_LENGTH = 2000;
 
 /** Encode an arbitrary string to base64 using UTF-8, avoiding btoa's
@@ -26,9 +24,6 @@ function fromBase64(value: string): string {
   return new TextDecoder().decode(bytes);
 }
 
-type MediaType = PresetCategory;
-type ArrType = 'radarr' | 'sonarr';
-
 function warnInvalidUrlStateParam(paramName: 'batch' | 'overrides', reason: string, error?: unknown): void {
   const message = `[score-simulator:urlState] Ignoring invalid "${paramName}" query param: ${reason}`;
   if (error) {
@@ -41,12 +36,11 @@ function warnInvalidUrlStateParam(paramName: 'batch' | 'overrides', reason: stri
 
 export interface SimulatorUrlState {
   title?: string;
-  mediaType?: MediaType;
+  mediaType?: PresetCategory;
   profile?: string;
   compare?: string;
-  arrType?: ArrType;
   batch?: string[];
-  batchMediaType?: MediaType;
+  batchMediaType?: PresetCategory;
   overrides?: ScoreOverrideMap;
 }
 export type ShareLinkMode = 'full' | 'safe';
@@ -60,20 +54,23 @@ function getNonEmptyParam(searchParams: URLSearchParams, key: string): string | 
   return value;
 }
 
-function validateMediaType(value: string | undefined): MediaType | undefined {
+function validateMediaType(value: string | undefined): PresetCategory | undefined {
   if (!value) {
     return undefined;
   }
 
-  return VALID_MEDIA_TYPES.has(value as MediaType) ? (value as MediaType) : undefined;
+  return VALID_MEDIA_TYPES.has(value as PresetCategory) ? (value as PresetCategory) : undefined;
 }
 
-function validateArrType(value: string | undefined): ArrType | undefined {
-  if (!value) {
-    return undefined;
+function resolveLegacyArrTypeToMediaType(value: string | undefined): PresetCategory | undefined {
+  switch (value) {
+    case 'radarr':
+      return 'movie';
+    case 'sonarr':
+      return 'series';
+    default:
+      return undefined;
   }
-
-  return VALID_ARR_TYPES.has(value as ArrType) ? (value as ArrType) : undefined;
 }
 
 function parseBatchParam(value: string | undefined): string[] | undefined {
@@ -155,12 +152,15 @@ function copyUsingExecCommand(text: string): boolean {
 }
 
 export function parseUrlState(searchParams: URLSearchParams): SimulatorUrlState {
+  const mediaType =
+    validateMediaType(getNonEmptyParam(searchParams, 'mediaType')) ??
+    resolveLegacyArrTypeToMediaType(getNonEmptyParam(searchParams, 'arrType'));
+
   return {
     title: getNonEmptyParam(searchParams, 'title'),
-    mediaType: validateMediaType(getNonEmptyParam(searchParams, 'mediaType')),
+    mediaType,
     profile: getNonEmptyParam(searchParams, 'profile'),
     compare: getNonEmptyParam(searchParams, 'compare'),
-    arrType: validateArrType(getNonEmptyParam(searchParams, 'arrType')),
     batch: parseBatchParam(getNonEmptyParam(searchParams, 'batch')),
     batchMediaType: validateMediaType(getNonEmptyParam(searchParams, 'batchMediaType')),
     overrides: parseOverridesParam(getNonEmptyParam(searchParams, 'overrides')),
@@ -180,7 +180,6 @@ export function serializeUrlState(state: SimulatorUrlState): URLSearchParams {
   setStringParam('mediaType', state.mediaType);
   setStringParam('profile', state.profile);
   setStringParam('compare', state.compare);
-  setStringParam('arrType', state.arrType);
   setStringParam('batchMediaType', state.batchMediaType);
 
   if (state.batch && state.batch.length > 0) {

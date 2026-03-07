@@ -4,14 +4,7 @@
 	import { clickOutside } from '$lib/client/utils/clickOutside';
 	import Dropdown from '$ui/dropdown/Dropdown.svelte';
 	import DropdownItem from '$ui/dropdown/DropdownItem.svelte';
-	import type { PresetCategory } from '../helpers.ts';
-
-	interface QualityProfileOption {
-		id: number;
-		name: string;
-		value: string;
-		displayName?: string;
-	}
+	import type { PresetCategory, SimulatorProfileOption } from '../helpers.ts';
 
 	interface ReleaseInputEvents {
 		input: { title: string };
@@ -22,7 +15,7 @@
 
 	export let title: string;
 	export let sampleCategory: PresetCategory;
-	export let qualityProfiles: QualityProfileOption[];
+	export let qualityProfiles: SimulatorProfileOption[];
 	export let selectedProfileName: string | null;
 	export let isSimulating: boolean;
 	export let parserAvailable: boolean;

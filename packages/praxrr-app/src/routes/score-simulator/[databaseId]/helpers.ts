@@ -10,15 +10,11 @@ type ParsedInfo = components['schemas']['ParsedInfo'];
 
 export type ScoreThresholdState = 'below' | 'accepted' | 'upgrade-reached';
 
-export type BatchInputState = {
-  rawText: string;
-  titles: string[];
-  active: boolean;
-};
-
-export type ComparisonState = {
-  comparisonProfileName: string | null;
-  showDeltas: boolean;
+export type SimulatorProfileOption = {
+  id: number;
+  name: string;
+  value: string;
+  displayName?: string;
 };
 
 export type ProfileScoreDelta = {
@@ -48,7 +44,6 @@ export type RankedRelease = {
   totalCfCount: number;
   parsed: ParsedInfo | null;
   comparisonScore?: number;
-  comparisonRank?: number;
   scoreDelta?: number;
 };
 
