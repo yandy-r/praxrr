@@ -35,14 +35,14 @@ feature implementation.
 
 ### PR Review Correction
 
-Let's validate and fix suggestion issues 9-11
+Let's validate and fix suggestion issues S6 - S10
 
 - file:
-  ([@pr-176-review.md](file:///home/yandy/Projects/github.com/yandy-r///home/yandy/Projects/github.com/yandy-r/praxrr/docs/pr-reviews/pr-176-review.md))
+  ([@pr-190-review.md](file:///home/yandy/Projects/github.com/yandy-r///home/yandy/Projects/github.com/yandy-r/praxrr/docs/pr-reviews/pr-190-review.md))
 - validate before implementing
 - run targeted tests
 - update doc when complete
-  ([@pr-176-review.md](file:///home/yandy/Projects/github.com/yandy-r///home/yandy/Projects/github.com/yandy-r/praxrr/docs/pr-reviews/pr-176-review.md))
+  ([@pr-190-review.md](file:///home/yandy/Projects/github.com/yandy-r///home/yandy/Projects/github.com/yandy-r/praxrr/docs/pr-reviews/pr-190-review.md))
 - when confirmed fix, commit progress
 
 ## Templates for Random Things - MacOS
@@ -85,9 +85,9 @@ feature implementation.
 Let's validate and fix suggestion issues 9-11
 
 - file:
-  ([@pr-176-review.md](file:///Users/yandy/Projects/github.com/yandy-r///home/yandy/Projects/github.com/yandy-r/praxrr/docs/pr-reviews/pr-176-review.md))
+  ([@pr-190-review.md](file:///Users/yandy/Projects/github.com/yandy-r///home/yandy/Projects/github.com/yandy-r/praxrr/docs/pr-reviews/pr-190-review.md))
 - validate before implementing
 - run targeted tests
 - update doc when complete
-  ([@pr-176-review.md](file:///Users/yandy/Projects/github.com/yandy-r///home/yandy/Projects/github.com/yandy-r/praxrr/docs/pr-reviews/pr-176-review.md))
+  ([@pr-190-review.md](file:///Users/yandy/Projects/github.com/yandy-r///home/yandy/Projects/github.com/yandy-r/praxrr/docs/pr-reviews/pr-190-review.md))
 - when confirmed fix, commit progress
