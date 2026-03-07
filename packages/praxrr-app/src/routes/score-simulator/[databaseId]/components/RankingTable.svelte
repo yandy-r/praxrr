@@ -103,7 +103,7 @@
 		dispatch('releaseSelect', { id: row.id });
 	}
 
-	function getThresholdBadgeVariant(state: ScoreThresholdState | null): 'danger' | 'success' | 'warning' {
+	function getThresholdBadgeVariant(state: ScoreThresholdState | null): 'danger' | 'success' | 'warning' | 'neutral' {
 		switch (state) {
 			case 'below':
 				return 'danger';
@@ -112,7 +112,7 @@
 			case 'upgrade-reached':
 				return 'success';
 			default:
-				return 'neutral' as 'danger';
+				return 'neutral';
 		}
 	}
 
