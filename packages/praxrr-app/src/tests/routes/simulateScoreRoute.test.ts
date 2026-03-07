@@ -1687,3 +1687,506 @@ Deno.test('simulate score: TRaSH label-based numeric specs evaluate language and
     restore.restore();
   }
 });
+
+Deno.test('simulate score: sonarr anime TRaSH profiles require both source and group-style title matches', async () => {
+  const sourceId = 9104;
+  const animeWebTier05TrashId = 'f1111111111111111111111111111111';
+  const animeWebTier01TrashId = 'f2222222222222222222222222222222';
+  const animeV2TrashId = 'f3333333333333333333333333333333';
+  const repackBonusTrashId = 'f4444444444444444444444444444444';
+  const animeProfileTrashId = 'f5555555555555555555555555555555';
+  const webProfileTrashId = 'f6666666666666666666666666666666';
+  const nowIso = new Date().toISOString();
+
+  const originalListSources = trashGuideManager.listSources;
+  const originalGetBySourceAndType = trashGuideEntityCacheQueries.getBySourceAndType;
+  const originalGetMappingsBySource = trashIdMappingsQueries.getBySource;
+
+  const animeWebTier05Entity = {
+    trash_id: animeWebTier05TrashId,
+    arr_type: 'sonarr',
+    entity_type: 'custom_format',
+    file_path: '/trash/sonarr/custom-format-anime-web-tier-05.json',
+    name: 'Anime Web Tier 05',
+    description: null,
+    regex_url: null,
+    include_in_rename: false,
+    scores: {
+      default: 200,
+      'anime-sonarr': 200,
+    },
+    specifications: [
+      {
+        name: 'WEBDL',
+        implementation: 'SourceSpecification',
+        negate: false,
+        required: false,
+        fields: {
+          value: 3,
+        },
+      },
+      {
+        name: 'WEBRIP',
+        implementation: 'SourceSpecification',
+        negate: false,
+        required: false,
+        fields: {
+          value: 4,
+        },
+      },
+      {
+        name: 'WEB',
+        implementation: 'SourceSpecification',
+        negate: false,
+        required: false,
+        fields: {
+          value: 1,
+        },
+      },
+      {
+        name: 'SubsPlease',
+        implementation: 'ReleaseTitleSpecification',
+        negate: false,
+        required: false,
+        fields: {
+          value: '\\b(SubsPlease)\\b',
+        },
+      },
+    ],
+  };
+
+  const animeWebTier01Entity = {
+    trash_id: animeWebTier01TrashId,
+    arr_type: 'sonarr',
+    entity_type: 'custom_format',
+    file_path: '/trash/sonarr/custom-format-anime-web-tier-01.json',
+    name: 'Anime Web Tier 01',
+    description: null,
+    regex_url: null,
+    include_in_rename: false,
+    scores: {
+      default: 600,
+      'anime-sonarr': 600,
+    },
+    specifications: [
+      {
+        name: 'WEBDL',
+        implementation: 'SourceSpecification',
+        negate: false,
+        required: false,
+        fields: {
+          value: 3,
+        },
+      },
+      {
+        name: 'WEBRIP',
+        implementation: 'SourceSpecification',
+        negate: false,
+        required: false,
+        fields: {
+          value: 4,
+        },
+      },
+      {
+        name: 'Arg0',
+        implementation: 'ReleaseTitleSpecification',
+        negate: false,
+        required: false,
+        fields: {
+          value: '\\b(Arg0)\\b',
+        },
+      },
+    ],
+  };
+
+  const animeV2Entity = {
+    trash_id: animeV2TrashId,
+    arr_type: 'sonarr',
+    entity_type: 'custom_format',
+    file_path: '/trash/sonarr/custom-format-anime-v2.json',
+    name: 'v2',
+    description: null,
+    regex_url: null,
+    include_in_rename: false,
+    scores: {
+      default: 1,
+    },
+    specifications: [
+      {
+        name: 'v2',
+        implementation: 'ReleaseTitleSpecification',
+        negate: false,
+        required: true,
+        fields: {
+          value: '(\\b|\\d)(v2)\\b',
+        },
+      },
+    ],
+  };
+
+  const repackBonusEntity = {
+    trash_id: repackBonusTrashId,
+    arr_type: 'sonarr',
+    entity_type: 'custom_format',
+    file_path: '/trash/sonarr/custom-format-repack-bonus.json',
+    name: 'Repack Proper',
+    description: null,
+    regex_url: null,
+    include_in_rename: false,
+    scores: {
+      default: 5,
+    },
+    specifications: [
+      {
+        name: 'repack-proper',
+        implementation: 'ReleaseTitleSpecification',
+        negate: false,
+        required: false,
+        fields: {
+          value: '\\b(PROPER|REPACK)\\b',
+        },
+      },
+    ],
+  };
+
+  const animeProfileEntity = {
+    trash_id: animeProfileTrashId,
+    arr_type: 'sonarr',
+    entity_type: 'quality_profile',
+    file_path: '/trash/sonarr/quality-profile-anime-remux-1080p.json',
+    name: '[Anime] Remux-1080p',
+    description: null,
+    source_url: null,
+    score_set: 'anime-sonarr',
+    group: null,
+    upgrade_allowed: true,
+    cutoff: 'Bluray-1080p',
+    min_format_score: 0,
+    cutoff_format_score: 0,
+    min_upgrade_format_score: 0,
+    language: null,
+    items: [],
+    format_items: [
+      {
+        name: 'Anime Web Tier 01',
+        score: null,
+        custom_format_trash_id: animeWebTier01TrashId,
+      },
+      {
+        name: 'Anime Web Tier 05',
+        score: null,
+        custom_format_trash_id: animeWebTier05TrashId,
+      },
+      {
+        name: 'v2',
+        score: null,
+        custom_format_trash_id: animeV2TrashId,
+      },
+    ],
+  };
+
+  const webAlternativeProfileEntity = {
+    trash_id: webProfileTrashId,
+    arr_type: 'sonarr',
+    entity_type: 'quality_profile',
+    file_path: '/trash/sonarr/quality-profile-web-1080p-alt.json',
+    name: 'WEB-1080p (Alternative)',
+    description: null,
+    source_url: null,
+    score_set: null,
+    group: null,
+    upgrade_allowed: true,
+    cutoff: 'WEBDL-1080p',
+    min_format_score: 0,
+    cutoff_format_score: 0,
+    min_upgrade_format_score: 0,
+    language: null,
+    items: [],
+    format_items: [
+      {
+        name: 'Repack Proper',
+        score: null,
+        custom_format_trash_id: repackBonusTrashId,
+      },
+    ],
+  };
+
+  const animeWebTier05CacheRow = {
+    id: 31,
+    sourceId,
+    trashId: animeWebTier05TrashId,
+    entityType: 'custom_format',
+    name: animeWebTier05Entity.name,
+    jsonData: JSON.stringify(animeWebTier05Entity),
+    filePath: animeWebTier05Entity.file_path,
+    contentHash: 'hash-cf-anime-web-tier-05',
+    fetchedAt: nowIso,
+  };
+
+  const animeWebTier01CacheRow = {
+    id: 32,
+    sourceId,
+    trashId: animeWebTier01TrashId,
+    entityType: 'custom_format',
+    name: animeWebTier01Entity.name,
+    jsonData: JSON.stringify(animeWebTier01Entity),
+    filePath: animeWebTier01Entity.file_path,
+    contentHash: 'hash-cf-anime-web-tier-01',
+    fetchedAt: nowIso,
+  };
+
+  const animeV2CacheRow = {
+    id: 33,
+    sourceId,
+    trashId: animeV2TrashId,
+    entityType: 'custom_format',
+    name: animeV2Entity.name,
+    jsonData: JSON.stringify(animeV2Entity),
+    filePath: animeV2Entity.file_path,
+    contentHash: 'hash-cf-anime-v2',
+    fetchedAt: nowIso,
+  };
+
+  const repackBonusCacheRow = {
+    id: 34,
+    sourceId,
+    trashId: repackBonusTrashId,
+    entityType: 'custom_format',
+    name: repackBonusEntity.name,
+    jsonData: JSON.stringify(repackBonusEntity),
+    filePath: repackBonusEntity.file_path,
+    contentHash: 'hash-cf-repack-bonus',
+    fetchedAt: nowIso,
+  };
+
+  const animeProfileCacheRow = {
+    id: 35,
+    sourceId,
+    trashId: animeProfileTrashId,
+    entityType: 'quality_profile',
+    name: animeProfileEntity.name,
+    jsonData: JSON.stringify(animeProfileEntity),
+    filePath: animeProfileEntity.file_path,
+    contentHash: 'hash-qp-anime-remux-1080p',
+    fetchedAt: nowIso,
+  };
+
+  const webAlternativeProfileCacheRow = {
+    id: 36,
+    sourceId,
+    trashId: webProfileTrashId,
+    entityType: 'quality_profile',
+    name: webAlternativeProfileEntity.name,
+    jsonData: JSON.stringify(webAlternativeProfileEntity),
+    filePath: webAlternativeProfileEntity.file_path,
+    contentHash: 'hash-qp-web-1080p-alt',
+    fetchedAt: nowIso,
+  };
+
+  trashGuideManager.listSources = (() => [
+    {
+      id: sourceId,
+      name: 'TRaSH Anime Test',
+      arrType: 'sonarr',
+    },
+  ]) as typeof trashGuideManager.listSources;
+
+  trashGuideEntityCacheQueries.getBySourceAndType = ((requestedSourceId, entityType) => {
+    if (requestedSourceId !== sourceId) {
+      return [];
+    }
+
+    if (entityType === 'custom_format') {
+      return [animeWebTier05CacheRow, animeWebTier01CacheRow, animeV2CacheRow, repackBonusCacheRow];
+    }
+
+    if (entityType === 'quality_profile') {
+      return [animeProfileCacheRow, webAlternativeProfileCacheRow];
+    }
+
+    return [];
+  }) as typeof trashGuideEntityCacheQueries.getBySourceAndType;
+
+  trashIdMappingsQueries.getBySource = (() => []) as typeof trashIdMappingsQueries.getBySource;
+
+  const databaseId = 6009;
+  const restore = installParserCacheStubs();
+  restore.reset();
+  parserClientModule.clearParserVersionCache();
+  parserParserState.setHealthAvailable(true);
+  parserParserState.setVersion('local-parser-v7');
+
+  const fixture = createPcdCacheFixture('');
+  setCache(databaseId, fixture.cache);
+
+  const sceneTitle = '[Scene] Frieren - Beyond Journeys End - 01 PROPER REPACK REAL PROPER 1080p x264.mkv';
+  const subsPleaseTitle = '[SubsPlease] Frieren - Beyond Journeys End - 01 (1080p) [A1B2C3D4].mkv';
+  const anonTitle = '[Anon] Frieren - Beyond Journeys End - 01 WEB-DL HDTVRip BluRay AAC.mkv';
+  const driveTitle = 'Drive.to.Survive.S06E01.1080p.NF.WEB-DL.DDP5.1.H.264-FLUX';
+  const subsPleaseWebTitle = '[SubsPlease] Frieren - Beyond Journeys End - 01 [WEB] (1080p) [A1B2C3D4].mkv';
+
+  parserParserState.setParseResponse(sceneTitle, {
+    ...BASE_PARSE_RESPONSE,
+    title: sceneTitle,
+    type: 'series',
+    releaseGroup: 'Scene',
+    resolution: 1080,
+    source: 'Unknown',
+    revision: {
+      version: 2,
+      real: 1,
+      isRepack: true,
+    },
+  });
+
+  parserParserState.setParseResponse(subsPleaseTitle, {
+    ...BASE_PARSE_RESPONSE,
+    title: subsPleaseTitle,
+    type: 'series',
+    releaseGroup: 'SubsPlease',
+    resolution: 1080,
+    source: 'Unknown',
+  });
+
+  parserParserState.setParseResponse(anonTitle, {
+    ...BASE_PARSE_RESPONSE,
+    title: anonTitle,
+    type: 'series',
+    releaseGroup: 'Anon',
+    resolution: 480,
+    source: 'WebDL',
+  });
+
+  parserParserState.setParseResponse(driveTitle, {
+    ...BASE_PARSE_RESPONSE,
+    title: driveTitle,
+    type: 'series',
+    releaseGroup: 'FLUX',
+    resolution: 1080,
+    source: 'WebDL',
+  });
+
+  parserParserState.setParseResponse(subsPleaseWebTitle, {
+    ...BASE_PARSE_RESPONSE,
+    title: subsPleaseWebTitle,
+    type: 'series',
+    releaseGroup: 'SubsPlease',
+    resolution: 1080,
+    source: 'WebDL',
+  });
+
+  parserParserState.setMatchResponse(sceneTitle, {
+    '\\b(PROPER|REPACK)\\b': true,
+    '\\b(SubsPlease)\\b': false,
+    '\\b(Arg0)\\b': false,
+    '(\\b|\\d)(v2)\\b': false,
+  });
+  parserParserState.setMatchResponse(subsPleaseTitle, {
+    '\\b(PROPER|REPACK)\\b': false,
+    '\\b(SubsPlease)\\b': true,
+    '\\b(Arg0)\\b': false,
+    '(\\b|\\d)(v2)\\b': false,
+  });
+  parserParserState.setMatchResponse(anonTitle, {
+    '\\b(PROPER|REPACK)\\b': false,
+    '\\b(SubsPlease)\\b': false,
+    '\\b(Arg0)\\b': false,
+    '(\\b|\\d)(v2)\\b': false,
+  });
+  parserParserState.setMatchResponse(driveTitle, {
+    '\\b(PROPER|REPACK)\\b': false,
+    '\\b(SubsPlease)\\b': false,
+    '\\b(Arg0)\\b': false,
+    '(\\b|\\d)(v2)\\b': false,
+  });
+  parserParserState.setMatchResponse(subsPleaseWebTitle, {
+    '\\b(PROPER|REPACK)\\b': false,
+    '\\b(SubsPlease)\\b': true,
+    '\\b(Arg0)\\b': false,
+    '(\\b|\\d)(v2)\\b': false,
+  });
+
+  try {
+    const response = await scoreRouteModule.POST(
+      buildEvent({
+        databaseId,
+        arrType: 'sonarr',
+        profileNames: [
+          `trash:${sourceId}:%5BAnime%5D%20Remux-1080p`,
+          `trash:${sourceId}:WEB-1080p%20(Alternative)`,
+        ],
+        releases: [
+          { id: 'release-scene', title: sceneTitle, type: 'series' },
+          { id: 'release-subsplease', title: subsPleaseTitle, type: 'series' },
+          { id: 'release-anon', title: anonTitle, type: 'series' },
+          { id: 'release-drive', title: driveTitle, type: 'series' },
+          { id: 'release-subsplease-web', title: subsPleaseWebTitle, type: 'series' },
+        ],
+      })
+    );
+
+    const body = (await response.json()) as SimulatedScoreResponse;
+    assertEquals(response.status, 200);
+    assertEquals(body.parserAvailable, true);
+    assertEquals(body.results.length, 5);
+
+    const animeProfileKey = `trash:${sourceId}:%5BAnime%5D%20Remux-1080p`;
+    const webProfileKey = `trash:${sourceId}:WEB-1080p%20(Alternative)`;
+
+    const sceneRelease = body.results.find((result) => result.id === 'release-scene');
+    assertEquals(sceneRelease?.parsed.source, 'unknown');
+    assertEquals(
+      sceneRelease?.profileScores.find((score) => score.profileName === animeProfileKey)?.totalScore,
+      0
+    );
+    assertEquals(
+      sceneRelease?.profileScores.find((score) => score.profileName === webProfileKey)?.totalScore,
+      5
+    );
+    assertEquals(
+      sceneRelease?.profileScores.find((score) => score.profileName === webProfileKey)?.contributions,
+      [{ cfName: 'Repack Proper', score: 5 }]
+    );
+
+    const subsPleaseRelease = body.results.find((result) => result.id === 'release-subsplease');
+    assertEquals(subsPleaseRelease?.parsed.source, 'unknown');
+    assertEquals(
+      subsPleaseRelease?.profileScores.find((score) => score.profileName === animeProfileKey)?.totalScore,
+      0
+    );
+
+    const anonRelease = body.results.find((result) => result.id === 'release-anon');
+    assertEquals(anonRelease?.parsed.source, 'webdl');
+    assertEquals(
+      anonRelease?.profileScores.find((score) => score.profileName === animeProfileKey)?.totalScore,
+      0
+    );
+
+    const driveRelease = body.results.find((result) => result.id === 'release-drive');
+    assertEquals(driveRelease?.parsed.source, 'webdl');
+    assertEquals(
+      driveRelease?.profileScores.find((score) => score.profileName === animeProfileKey)?.totalScore,
+      0
+    );
+
+    const subsPleaseWebRelease = body.results.find((result) => result.id === 'release-subsplease-web');
+    assertEquals(subsPleaseWebRelease?.parsed.source, 'webdl');
+    assertEquals(
+      subsPleaseWebRelease?.profileScores.find((score) => score.profileName === animeProfileKey)?.totalScore,
+      200
+    );
+    assertEquals(
+      subsPleaseWebRelease?.profileScores.find((score) => score.profileName === animeProfileKey)?.contributions,
+      [{ cfName: 'Anime Web Tier 05', score: 200 }]
+    );
+  } finally {
+    trashGuideManager.listSources = originalListSources;
+    trashGuideEntityCacheQueries.getBySourceAndType = originalGetBySourceAndType;
+    trashIdMappingsQueries.getBySource = originalGetMappingsBySource;
+    deleteCache(databaseId);
+    await fixture.destroy();
+    parserParserState.clearResponses();
+    parserParserState.setVersion('local-parser-v1');
+    restore.restore();
+  }
+});

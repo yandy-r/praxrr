@@ -132,13 +132,14 @@ function normalizeCfKey(value: string): string {
 function readOptionalStringField(fields: Readonly<Record<string, unknown>>, keys: readonly string[]): string | null {
   for (const key of keys) {
     const value = fields[key];
-    if (typeof value !== 'string') {
-      continue;
+    if (typeof value === 'string') {
+      const normalized = value.trim();
+      if (normalized.length > 0) {
+        return normalized;
+      }
     }
-
-    const normalized = value.trim();
-    if (normalized.length > 0) {
-      return normalized;
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      return String(value);
     }
   }
 
@@ -188,6 +189,62 @@ function readOptionalBooleanField(
   }
 
   return fallback;
+}
+
+// Radarr QualitySource enum → canonical name (matches parser enum values)
+const radarrSourceById: Record<number, string> = {
+  0: 'unknown', 1: 'cam', 2: 'telesync', 3: 'telecine', 4: 'workprint',
+  5: 'dvd', 6: 'television', 7: 'webdl', 8: 'webrip', 9: 'bluray',
+};
+
+// Sonarr QualitySource enum → canonical name (different numbering from Radarr)
+const sonarrSourceById: Record<number, string> = {
+  0: 'unknown', 1: 'television', 2: 'television',
+  3: 'webdl', 4: 'webrip', 5: 'dvd', 6: 'bluray', 7: 'bluray',
+};
+
+// Resolution enum → canonical name (same across Sonarr/Radarr, uses pixel counts)
+const resolutionById: Record<number, string> = {
+  0: 'unknown', 360: '360p', 480: '480p', 540: '540p',
+  576: '576p', 720: '720p', 1080: '1080p', 2160: '2160p',
+};
+
+// QualityModifier enum → canonical name (same across Sonarr/Radarr)
+const modifierById: Record<number, string> = {
+  0: 'none', 1: 'regional', 2: 'screener', 3: 'rawhd', 4: 'brdisk', 5: 'remux',
+};
+
+// ReleaseType enum → canonical name (Sonarr-specific, Radarr doesn't use)
+const releaseTypeById: Record<number, string> = {
+  0: 'unknown', 1: 'single_episode', 2: 'multi_episode', 3: 'season_pack',
+};
+
+// Language enum → canonical name (same across Sonarr/Radarr, includes special IDs)
+const languageById: Record<number, string> = {
+  [-2]: 'Original', [-1]: 'Any',
+  0: 'Unknown', 1: 'English', 2: 'French', 3: 'Spanish', 4: 'German', 5: 'Italian',
+  6: 'Danish', 7: 'Dutch', 8: 'Japanese', 9: 'Icelandic', 10: 'Chinese', 11: 'Russian',
+  12: 'Polish', 13: 'Vietnamese', 14: 'Swedish', 15: 'Norwegian', 16: 'Finnish',
+  17: 'Turkish', 18: 'Portuguese', 19: 'Flemish', 20: 'Greek', 21: 'Korean',
+  22: 'Hungarian', 23: 'Hebrew', 24: 'Lithuanian', 25: 'Czech', 26: 'Hindi',
+  27: 'Romanian', 28: 'Thai', 29: 'Bulgarian', 30: 'Portuguese (BR)', 31: 'Arabic',
+  32: 'Ukrainian', 33: 'Persian', 34: 'Bengali', 35: 'Slovak', 36: 'Latvian',
+  37: 'Spanish (Latino)', 38: 'Catalan', 39: 'Croatian', 40: 'Serbian', 41: 'Bosnian',
+  42: 'Estonian', 43: 'Tamil', 44: 'Indonesian', 45: 'Telugu', 46: 'Macedonian',
+  47: 'Slovenian', 48: 'Malayalam', 49: 'Kannada', 50: 'Albanian', 51: 'Afrikaans',
+  52: 'Marathi', 53: 'Tagalog', 54: 'Urdu', 55: 'Romansh', 56: 'Mongolian',
+  57: 'Georgian', 58: 'Original',
+};
+
+function resolveNumericEnum(rawValue: string, map: Record<number, string>, fallback: string): string {
+  if (/^-?\d+$/.test(rawValue)) {
+    return map[Number(rawValue)] ?? fallback;
+  }
+  return rawValue;
+}
+
+function getSourceMap(arrType: string): Record<number, string> {
+  return arrType === 'sonarr' ? sonarrSourceById : radarrSourceById;
 }
 
 function mapSpecificationImplementation(value: string): ConditionData['type'] {
@@ -246,36 +303,46 @@ function toConditionData(
           },
         ],
       };
-    case 'language':
+    case 'language': {
+      const rawLang = readRequiredStringField(spec.fields, ['value'], context, spec.name);
       return {
         ...base,
         languages: [
           {
-            name: readRequiredStringField(spec.fields, ['value'], context, spec.name),
+            name: resolveNumericEnum(rawLang, languageById, rawLang),
             except: readOptionalBooleanField(spec.fields, ['exceptLanguage'], false),
           },
         ],
       };
-    case 'source':
+    }
+    case 'source': {
+      const rawSource = readRequiredStringField(spec.fields, ['value'], context, spec.name);
       return {
         ...base,
-        sources: [readRequiredStringField(spec.fields, ['value'], context, spec.name)],
+        sources: [resolveNumericEnum(rawSource, getSourceMap(entity.arr_type), rawSource)],
       };
-    case 'resolution':
+    }
+    case 'resolution': {
+      const rawRes = readRequiredStringField(spec.fields, ['value'], context, spec.name);
       return {
         ...base,
-        resolutions: [readRequiredStringField(spec.fields, ['value'], context, spec.name)],
+        resolutions: [resolveNumericEnum(rawRes, resolutionById, rawRes)],
       };
-    case 'quality_modifier':
+    }
+    case 'quality_modifier': {
+      const rawMod = readRequiredStringField(spec.fields, ['value'], context, spec.name);
       return {
         ...base,
-        qualityModifiers: [readRequiredStringField(spec.fields, ['value'], context, spec.name)],
+        qualityModifiers: [resolveNumericEnum(rawMod, modifierById, rawMod)],
       };
-    case 'release_type':
+    }
+    case 'release_type': {
+      const rawRt = readRequiredStringField(spec.fields, ['value'], context, spec.name);
       return {
         ...base,
-        releaseTypes: [readRequiredStringField(spec.fields, ['value'], context, spec.name)],
+        releaseTypes: [resolveNumericEnum(rawRt, releaseTypeById, rawRt)],
       };
+    }
     case 'indexer_flag':
       return {
         ...base,
@@ -666,7 +733,7 @@ export const POST: RequestHandler = async ({ request }) => {
       }
 
       if (score === null || !Number.isFinite(score)) {
-        continue;
+        score = 0;
       }
 
       scoreByCfName.set(statedName.toLowerCase(), score);
@@ -722,10 +789,7 @@ export const POST: RequestHandler = async ({ request }) => {
         }
 
         const referencedCf = customFormatsByTrashId.get(groupCf.trash_id.toLowerCase()) ?? null;
-        const score = resolveTrashScoreFromCustomFormat(referencedCf, scoreSet);
-        if (score === null || !Number.isFinite(score)) {
-          continue;
-        }
+        const score = resolveTrashScoreFromCustomFormat(referencedCf, scoreSet) ?? 0;
 
         const displayName = referencedCf?.name?.trim() || groupCf.name;
         scoreByCfName.set(displayName.toLowerCase(), score);
