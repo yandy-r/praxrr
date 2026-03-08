@@ -261,6 +261,67 @@ test.describe("4.4 Score Simulator UX basics", () => {
     await expect(animeButton).toHaveClass(/border-accent-500/);
   });
 
+  test("auto-run after selecting a profile includes profileNames in the request", async ({ page }) => {
+    const context = await findQualityProfileContext(page);
+    if (!context) {
+      test.skip("No quality profile context found for auto-run request validation.");
+    }
+
+    const observedRequests: SimulateRequestBody[] = [];
+
+    await page.route("**/api/v1/simulate/score", async (route) => {
+      const requestBody = (route.request().postDataJSON() ?? {}) as SimulateRequestBody;
+      observedRequests.push(requestBody);
+
+      if (!(requestBody.profileNames && requestBody.profileNames.length > 0)) {
+        await route.fulfill({
+          status: 400,
+          contentType: "application/json",
+          body: JSON.stringify({ error: "Missing or empty profileNames array" }),
+        });
+        return;
+      }
+
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(buildSimulateResponse(requestBody)),
+      });
+    });
+
+    await page.goto(`/score-simulator/${context!.databaseId}`);
+    await page.waitForLoadState("networkidle");
+
+    const releaseInputCard = page
+      .locator("div.rounded-lg")
+      .filter({ has: page.getByRole("heading", { name: "Single Release Score Simulation" }) })
+      .first();
+
+    await page.locator("#score-simulator-title").fill(SINGLE_RELEASE_TITLE);
+    const simulateRequest = page.waitForRequest(
+      (request) =>
+        request.url().includes("/api/v1/simulate/score") &&
+        request.method() === "POST",
+    );
+
+    await releaseInputCard.getByRole("button", { name: "Select quality profile..." }).click();
+    await page.getByRole("button", { name: context!.profileName, exact: true }).click();
+
+    const request = await simulateRequest;
+    const response = await request.response();
+    expect(response).toBeTruthy();
+    expect(response!.status()).toBe(200);
+
+    const requestBody = (await request.postDataJSON()) as SimulateRequestBody;
+    expect(requestBody.profileNames).toBeTruthy();
+    expect(requestBody.profileNames?.length).toBeGreaterThan(0);
+
+    expect(observedRequests.length).toBeGreaterThan(0);
+    const firstRequest = observedRequests[0];
+    expect(firstRequest.profileNames).toBeTruthy();
+    expect(firstRequest.profileNames!.length).toBeGreaterThan(0);
+  });
+
   test("decision summary appears after simulation and updates when overrides change total", async ({ page }) => {
     const context = await findQualityProfileContext(page);
     if (!context) {

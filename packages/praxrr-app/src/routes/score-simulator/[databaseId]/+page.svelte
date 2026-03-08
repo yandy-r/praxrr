@@ -134,10 +134,13 @@
   $: hasActiveOverrides = overrideCount > 0;
   $: showQuickStartPanel =
     releaseTitle.trim().length === 0 && selectedProfileName === null && singleSimulationResult === null;
-  $: singleProfileNames = [selectedProfileName, comparisonProfileName].filter((name): name is string => name !== null);
-  $: batchProfileNames = [batchSelectedProfileName, comparisonProfileName].filter(
-    (name): name is string => name !== null
-  );
+  function resolveSingleProfileNames(): string[] {
+    return [selectedProfileName, comparisonProfileName].filter((name): name is string => name !== null);
+  }
+
+  function resolveBatchProfileNames(): string[] {
+    return [batchSelectedProfileName, comparisonProfileName].filter((name): name is string => name !== null);
+  }
 
   function hasQualityProfile(profileName: string): boolean {
     return qualityProfileOptions.some((profile) => profile.value === profileName);
@@ -231,6 +234,7 @@
 
   async function simulateSingle() {
     const title = releaseTitle.trim();
+    const profileNames = resolveSingleProfileNames();
     if (!title || !selectedProfileName) {
       cancelSingleSimulationRequest();
       isSimulatingSingle = false;
@@ -250,7 +254,7 @@
         body: JSON.stringify({
           databaseId: data.currentDatabase.id,
           releases: [{ id: generateReleaseId(), title, type: releaseType }],
-          profileNames: singleProfileNames,
+          profileNames,
           arrType,
         }),
       });
@@ -287,8 +291,9 @@
   async function simulateBatch(override?: { titles: ReturnType<typeof parseBatchTitles>; category: PresetCategory }) {
     const titles = override?.titles ?? batchTitles;
     const effectiveMediaType = override?.category ?? batchSampleCategory;
+    const profileNames = resolveBatchProfileNames();
 
-    if (!batchSelectedProfileName || titles.length === 0) {
+    if (profileNames.length === 0 || titles.length === 0) {
       cancelBatchSimulationRequest();
       isSimulatingBatch = false;
       batchSimulationResult = null;
@@ -307,7 +312,7 @@
         body: JSON.stringify({
           databaseId: data.currentDatabase.id,
           releases: titles,
-          profileNames: batchProfileNames,
+          profileNames,
           arrType,
         }),
       });
