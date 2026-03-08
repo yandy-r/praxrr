@@ -10,31 +10,28 @@ type ParsedInfo = components['schemas']['ParsedInfo'];
 
 export type ScoreThresholdState = 'below' | 'accepted' | 'upgrade-reached';
 
-export type BatchInputState = {
-  rawText: string;
-  titles: string[];
-  active: boolean;
-};
-
-export type ComparisonState = {
-  comparisonProfileName: string | null;
-  showDeltas: boolean;
+export type SimulatorProfileOption = {
+  id: number;
+  name: string;
+  value: string;
+  displayName?: string;
 };
 
 export type ProfileScoreDelta = {
-  cfName: string;
-  scoreA: number;
-  scoreB: number;
-  delta: number;
+  readonly cfName: string;
+  readonly scoreA: number;
+  readonly originalScoreA?: number;
+  readonly scoreB: number;
+  readonly delta: number;
 };
 
 export type ComparisonResult = {
-  profileAName: string;
-  profileBName: string;
-  profileATotal: number;
-  profileBTotal: number;
-  totalDelta: number;
-  contributions: ProfileScoreDelta[];
+  readonly profileAName: string;
+  readonly profileBName: string;
+  readonly profileATotal: number;
+  readonly profileBTotal: number;
+  readonly totalDelta: number;
+  readonly contributions: readonly ProfileScoreDelta[];
 };
 
 export type RankedRelease = {
@@ -47,11 +44,14 @@ export type RankedRelease = {
   totalCfCount: number;
   parsed: ParsedInfo | null;
   comparisonScore?: number;
-  comparisonRank?: number;
   scoreDelta?: number;
 };
 
-export type PresetCategory = 'movie' | 'series';
+export type PresetCategory = 'movie' | 'series' | 'anime';
+
+export function resolveReleaseTypeForPresetCategory(category: PresetCategory): MediaType {
+  return category === 'movie' ? 'movie' : 'series';
+}
 
 export type PresetGroup = {
   category: PresetCategory;
@@ -111,13 +111,14 @@ function createReleaseId(): string {
   return `release-${Date.now()}-${releaseIdCounter}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
-export function parseBatchTitles(rawText: string, mediaType: MediaType): SimulateReleaseInput[] {
+export function parseBatchTitles(rawText: string, mediaType: PresetCategory): SimulateReleaseInput[] {
   if (!rawText.trim()) {
     return [];
   }
 
   const lines = rawText.split('\n');
   const results: SimulateReleaseInput[] = [];
+  const releaseType = resolveReleaseTypeForPresetCategory(mediaType);
 
   for (const line of lines) {
     if (results.length >= MAX_BATCH_TITLES) {
@@ -132,7 +133,7 @@ export function parseBatchTitles(rawText: string, mediaType: MediaType): Simulat
     results.push({
       id: createReleaseId(),
       title: trimmed,
-      type: mediaType,
+      type: releaseType,
     });
   }
 
@@ -142,15 +143,25 @@ export function parseBatchTitles(rawText: string, mediaType: MediaType): Simulat
 export function buildRankingFromResults(
   results: SimulateReleaseResult[],
   profileAName: string,
-  profileBName: string | null = null
+  profileBName: string | null = null,
+  overrides: ScoreOverrideMap = {}
 ): RankedRelease[] {
   const ranked: RankedRelease[] = [];
 
   for (const result of results) {
     const profileAScore = result.profileScores.find((p) => p.profileName === profileAName);
     if (!profileAScore) {
-      return [];
+      console.warn(
+        `[buildRankingFromResults] Profile "${profileAName}" not found in result for "${result.title}", skipping`
+      );
+      continue;
     }
+
+    const hasOverrides = Object.keys(overrides).length > 0;
+    const profileATotal = hasOverrides
+      ? computeOverriddenTotal(profileAScore.contributions, overrides)
+      : profileAScore.totalScore;
+    const thresholdState = resolveThresholdWithOverrides(profileAScore, overrides);
 
     let comparisonScore: number | undefined;
     let scoreDelta: number | undefined;
@@ -158,19 +169,22 @@ export function buildRankingFromResults(
     if (profileBName) {
       const profileBScore = result.profileScores.find((p) => p.profileName === profileBName);
       if (!profileBScore) {
-        return [];
+        console.warn(
+          `[buildRankingFromResults] Profile "${profileBName}" not found in result for "${result.title}", skipping`
+        );
+        continue;
       }
 
       comparisonScore = profileBScore.totalScore;
-      scoreDelta = profileBScore.totalScore - profileAScore.totalScore;
+      scoreDelta = profileBScore.totalScore - profileATotal;
     }
 
     ranked.push({
       id: result.id,
       title: result.title,
       rank: 0,
-      totalScore: profileAScore.totalScore,
-      thresholdState: resolveScoreThresholdState(profileAScore),
+      totalScore: profileATotal,
+      thresholdState,
       matchedCfCount: profileAScore.contributions.filter((c) => c.score !== 0).length,
       totalCfCount: profileAScore.contributions.length,
       parsed: result.parsed,
@@ -199,7 +213,8 @@ export function buildRankingFromResults(
 export function buildComparisonResult(
   releaseResult: SimulateReleaseResult,
   profileAName: string,
-  profileBName: string
+  profileBName: string,
+  overrides: ScoreOverrideMap = {}
 ): ComparisonResult | null {
   const profileA = releaseResult.profileScores.find((p) => p.profileName === profileAName);
   const profileB = releaseResult.profileScores.find((p) => p.profileName === profileBName);
@@ -208,7 +223,19 @@ export function buildComparisonResult(
     return null;
   }
 
-  const cfScoresA = new Map(profileA.contributions.map((c) => [c.cfName, c.score]));
+  const hasOverrides = Object.keys(overrides).length > 0;
+  const overriddenContributionsA: Array<{ cfName: string; score: number; originalScore?: number }> = hasOverrides
+    ? applyScoreOverrides(profileA.contributions, overrides)
+    : profileA.contributions.map((contribution) => ({
+        cfName: contribution.cfName,
+        score: contribution.score,
+      }));
+  const cfScoresA = new Map(overriddenContributionsA.map((c) => [c.cfName, c.score]));
+  const originalCfScoresA = new Map(
+    overriddenContributionsA
+      .filter((c) => c.originalScore !== undefined)
+      .map((c) => [c.cfName, c.originalScore as number])
+  );
   const cfScoresB = new Map(profileB.contributions.map((c) => [c.cfName, c.score]));
 
   const allCfNames = new Set([...cfScoresA.keys(), ...cfScoresB.keys()]);
@@ -220,19 +247,92 @@ export function buildComparisonResult(
     contributions.push({
       cfName,
       scoreA,
+      originalScoreA: originalCfScoresA.get(cfName),
       scoreB,
       delta: scoreB - scoreA,
     });
   }
 
   contributions.sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta));
+  const profileATotal = hasOverrides ? computeOverriddenTotal(profileA.contributions, overrides) : profileA.totalScore;
 
   return {
     profileAName,
     profileBName,
-    profileATotal: profileA.totalScore,
+    profileATotal,
     profileBTotal: profileB.totalScore,
-    totalDelta: profileB.totalScore - profileA.totalScore,
+    totalDelta: profileB.totalScore - profileATotal,
     contributions,
   };
+}
+
+export type ScoreOverrideMap = Record<string, number>;
+
+export function createScoreOverrideEntry(cfName: string, rawValue: unknown): [string, number] | undefined {
+  if (typeof rawValue !== 'number' || !Number.isFinite(rawValue)) {
+    return undefined;
+  }
+
+  return [cfName, Math.round(rawValue)];
+}
+
+export function applyScoreOverrides(
+  contributions: ReadonlyArray<{ cfName: string; score: number }>,
+  overrides: ScoreOverrideMap
+): Array<{ cfName: string; score: number; originalScore?: number }> {
+  return contributions.map((contribution) => {
+    if (!Object.hasOwn(overrides, contribution.cfName)) {
+      return {
+        cfName: contribution.cfName,
+        score: contribution.score,
+      };
+    }
+
+    const overriddenScore = overrides[contribution.cfName];
+    if (overriddenScore === contribution.score) {
+      return {
+        cfName: contribution.cfName,
+        score: contribution.score,
+      };
+    }
+
+    return {
+      cfName: contribution.cfName,
+      score: overriddenScore,
+      originalScore: contribution.score,
+    };
+  });
+}
+
+export function computeOverriddenTotal(
+  contributions: ReadonlyArray<{ cfName: string; score: number }>,
+  overrides: ScoreOverrideMap
+): number {
+  return contributions.reduce((total, contribution) => {
+    if (!Object.hasOwn(overrides, contribution.cfName)) {
+      return total + contribution.score;
+    }
+
+    return total + overrides[contribution.cfName];
+  }, 0);
+}
+
+export function resolveThresholdWithOverrides(
+  profileScore: SimulateProfileScore | null,
+  overrides: ScoreOverrideMap
+): ScoreThresholdState | null {
+  if (!profileScore) {
+    return null;
+  }
+
+  const overriddenTotal = computeOverriddenTotal(profileScore.contributions, overrides);
+  if (overriddenTotal < profileScore.minimumScore) {
+    return 'below';
+  }
+
+  if (overriddenTotal < profileScore.upgradeUntilScore) {
+    return 'accepted';
+  }
+
+  return 'upgrade-reached';
 }

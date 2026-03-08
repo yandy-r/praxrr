@@ -1,173 +1,128 @@
 import type { PresetCategory, PresetGroup } from './helpers.ts';
+import rawPresetData from './presetSamples.json' with { type: 'json' };
 
-export const PRESET_GROUPS: PresetGroup[] = [
-  // Movie presets
-  {
-    category: 'movie',
-    label: '4K Remux vs Web-DL',
-    description: 'Compare how profiles score full remux against streaming sources',
-    titles: [
-      {
-        label: '4K Remux DTS-HD MA',
-        title: 'The.Dark.Knight.2008.2160p.UHD.BluRay.Remux.HDR.HEVC.DTS-HD.MA.5.1-FGT',
-      },
-      {
-        label: '4K Web-DL Atmos',
-        title: 'The.Dark.Knight.2008.2160p.WEB-DL.DDP5.1.Atmos.DV.HDR.H.265-FLUX',
-      },
-      {
-        label: '1080p Remux TrueHD',
-        title: 'The.Dark.Knight.2008.1080p.BluRay.Remux.AVC.TrueHD.5.1-FGT',
-      },
-      {
-        label: '1080p Web-DL DD5.1',
-        title: 'The.Dark.Knight.2008.1080p.WEB-DL.DD5.1.H.264-FLUX',
-      },
-      {
-        label: '720p BluRay',
-        title: 'The.Dark.Knight.2008.720p.BluRay.x264.DTS-FGT',
-      },
-    ],
-  },
-  {
-    category: 'movie',
-    label: 'HDR Formats',
-    description: 'Test scoring across Dolby Vision, HDR10+, HDR10, and SDR',
-    titles: [
-      {
-        label: 'DV + HDR10',
-        title: 'Dune.Part.Two.2024.2160p.UHD.BluRay.Remux.DV.HDR10.HEVC.TrueHD.7.1.Atmos-FGT',
-      },
-      {
-        label: 'HDR10+ Only',
-        title: 'Dune.Part.Two.2024.2160p.UHD.BluRay.Remux.HDR10Plus.HEVC.TrueHD.7.1.Atmos-FGT',
-      },
-      {
-        label: 'HDR10 Only',
-        title: 'Dune.Part.Two.2024.2160p.UHD.BluRay.Remux.HDR.HEVC.TrueHD.7.1.Atmos-FGT',
-      },
-      {
-        label: 'SDR 4K',
-        title: 'Dune.Part.Two.2024.2160p.BluRay.Remux.HEVC.TrueHD.7.1.Atmos-FGT',
-      },
-      {
-        label: 'DV Web-DL',
-        title: 'Dune.Part.Two.2024.2160p.WEB-DL.DDP5.1.Atmos.DV.H.265-FLUX',
-      },
-    ],
-  },
-  {
-    category: 'movie',
-    label: 'Audio Codecs',
-    description: 'Compare Atmos, TrueHD, DTS-HD MA, DTS-X, AAC, and lossy tracks',
-    titles: [
-      {
-        label: 'TrueHD 7.1 Atmos',
-        title: 'Oppenheimer.2023.2160p.UHD.BluRay.Remux.HDR.HEVC.TrueHD.7.1.Atmos-FGT',
-      },
-      {
-        label: 'DTS-X',
-        title: 'Oppenheimer.2023.2160p.UHD.BluRay.Remux.HDR.HEVC.DTS-X.7.1-FGT',
-      },
-      {
-        label: 'DTS-HD MA 5.1',
-        title: 'Oppenheimer.2023.2160p.UHD.BluRay.Remux.HDR.HEVC.DTS-HD.MA.5.1-FGT',
-      },
-      {
-        label: 'DD+ Atmos (Web)',
-        title: 'Oppenheimer.2023.2160p.WEB-DL.DDP5.1.Atmos.DV.HDR.H.265-FLUX',
-      },
-      {
-        label: 'AAC 2.0 (Web)',
-        title: 'Oppenheimer.2023.1080p.WEB-DL.AAC2.0.H.264-FLUX',
-      },
-    ],
-  },
+type PresetTitle = PresetGroup['titles'][number];
 
-  // Series presets
-  {
-    category: 'series',
-    label: 'Web-DL Quality Ladder',
-    description: 'See how profiles rank different resolutions and sources',
-    titles: [
-      {
-        label: '2160p Web-DL Atmos',
-        title: 'Shogun.S01E01.2160p.DSNP.WEB-DL.DDP5.1.Atmos.DV.H.265-NTb',
-      },
-      {
-        label: '1080p Web-DL',
-        title: 'Shogun.S01E01.1080p.DSNP.WEB-DL.DDP5.1.H.264-NTb',
-      },
-      {
-        label: '720p Web-DL',
-        title: 'Shogun.S01E01.720p.DSNP.WEB-DL.DDP5.1.H.264-NTb',
-      },
-      {
-        label: '1080p WEBRip x265',
-        title: 'Shogun.S01E01.1080p.WEBRip.x265-RARBG',
-      },
-      {
-        label: '480p WEB',
-        title: 'Shogun.S01E01.480p.WEB-DL.AAC2.0.H.264-NTb',
-      },
-    ],
-  },
-  {
-    category: 'series',
-    label: 'Season Packs vs Singles',
-    description: 'Compare season pack releases against individual episodes',
-    titles: [
-      {
-        label: 'S01 Pack BluRay Remux',
-        title: 'Breaking.Bad.S01.1080p.BluRay.Remux.AVC.DTS-HD.MA.5.1-FGT',
-      },
-      {
-        label: 'S01 Pack Web-DL',
-        title: 'Breaking.Bad.S01.1080p.NF.WEB-DL.DDP5.1.H.264-NTb',
-      },
-      {
-        label: 'S01E01 BluRay',
-        title: 'Breaking.Bad.S01E01.1080p.BluRay.x264.DTS-FGT',
-      },
-      {
-        label: 'S01E01 Web-DL',
-        title: 'Breaking.Bad.S01E01.1080p.NF.WEB-DL.DDP5.1.H.264-NTb',
-      },
-      {
-        label: 'S01 Pack 2160p',
-        title: 'Breaking.Bad.S01.2160p.UHD.BluRay.Remux.HDR.HEVC.DTS-HD.MA.5.1-FGT',
-      },
-    ],
-  },
-  {
-    category: 'series',
-    label: 'Anime Releases',
-    description: 'Typical anime release groups and naming patterns',
-    titles: [
-      {
-        label: 'Dual Audio BluRay',
-        title: '[SubsPlease] Frieren - Beyond Journeys End - 01 (1080p) [Dual-Audio][BluRay][FLAC].mkv',
-      },
-      {
-        label: 'Web Source HEVC',
-        title: '[SubsPlease] Frieren - Beyond Journeys End - 01 (1080p) [HEVC].mkv',
-      },
-      {
-        label: 'Mini Encode x265',
-        title: '[Judas] Frieren - Beyond Journeys End - S01E01.mkv',
-      },
-      {
-        label: 'Batch 1080p FLAC',
-        title: '[Erai-raws] Frieren - Beyond Journeys End S01 [1080p][FLAC][Multiple Subtitle].mkv',
-      },
-      {
-        label: '720p SubsPlease',
-        title: '[SubsPlease] Frieren - Beyond Journeys End - 01 (720p) [AAC].mkv',
-      },
-    ],
-  },
-];
+type PresetDataFile = {
+	groups: PresetGroup[];
+};
+
+const remainingRandomTitlesByCategory: Record<PresetCategory, string[]> = {
+	movie: [],
+	series: [],
+	anime: [],
+};
+
+function isPresetCategory(value: unknown): value is PresetCategory {
+	return value === 'movie' || value === 'series' || value === 'anime';
+}
+
+function isPresetTitle(value: unknown): value is PresetTitle {
+	if (!value || typeof value !== 'object') {
+		return false;
+	}
+
+	const maybeTitle = value as Record<string, unknown>;
+	return (
+		typeof maybeTitle.label === 'string' &&
+		maybeTitle.label.trim().length > 0 &&
+		typeof maybeTitle.title === 'string' &&
+		maybeTitle.title.trim().length > 0
+	);
+}
+
+function isPresetGroup(value: unknown): value is PresetGroup {
+	if (!value || typeof value !== 'object') {
+		return false;
+	}
+
+	const maybeGroup = value as Record<string, unknown>;
+	return (
+		isPresetCategory(maybeGroup.category) &&
+		typeof maybeGroup.label === 'string' &&
+		maybeGroup.label.trim().length > 0 &&
+		typeof maybeGroup.description === 'string' &&
+		maybeGroup.description.trim().length > 0 &&
+		Array.isArray(maybeGroup.titles) &&
+		maybeGroup.titles.length > 0 &&
+		maybeGroup.titles.every(isPresetTitle)
+	);
+}
+
+function parsePresetData(rawData: unknown): PresetDataFile {
+	if (!rawData || typeof rawData !== 'object') {
+		throw new Error('presetSamples.json must contain an object at the top level.');
+	}
+
+	const maybeDataFile = rawData as Record<string, unknown>;
+	if (!Array.isArray(maybeDataFile.groups)) {
+		throw new Error('presetSamples.json must contain a groups array.');
+	}
+
+	if (maybeDataFile.groups.length === 0) {
+		throw new Error('presetSamples.json groups array cannot be empty.');
+	}
+
+	if (!maybeDataFile.groups.every(isPresetGroup)) {
+		throw new Error('presetSamples.json has one or more invalid preset groups.');
+	}
+
+	return {
+		groups: maybeDataFile.groups,
+	};
+}
+
+function shuffleTitles(titles: readonly string[], random: () => number): string[] {
+	const shuffled = [...titles];
+
+	for (let index = shuffled.length - 1; index > 0; index -= 1) {
+		const randomIndex = Math.floor(random() * (index + 1));
+		const boundedIndex = Math.min(Math.max(randomIndex, 0), index);
+		const temporary = shuffled[index];
+		shuffled[index] = shuffled[boundedIndex];
+		shuffled[boundedIndex] = temporary;
+	}
+
+	return shuffled;
+}
+
+const parsedPresetData = parsePresetData(rawPresetData as unknown);
+
+export const PRESET_GROUPS: PresetGroup[] = parsedPresetData.groups;
 
 export function getPresetsForCategory(category: PresetCategory): PresetGroup[] {
-  return PRESET_GROUPS.filter((group) => group.category === category);
+	return PRESET_GROUPS.filter((group) => group.category === category);
+}
+
+export function getPresetTitlesForCategory(category: PresetCategory): string[] {
+	const titles = getPresetsForCategory(category).flatMap((group) => group.titles.map((title) => title.title));
+	const uniqueTitles = new Set(titles);
+	return [...uniqueTitles];
+}
+
+export function resetPresetRandomState(category?: PresetCategory): void {
+	if (category) {
+		remainingRandomTitlesByCategory[category] = [];
+		return;
+	}
+
+	remainingRandomTitlesByCategory.movie = [];
+	remainingRandomTitlesByCategory.series = [];
+	remainingRandomTitlesByCategory.anime = [];
+}
+
+export function getRandomPresetTitleForCategory(
+	category: PresetCategory,
+	random: () => number = Math.random
+): string | null {
+	const titles = getPresetTitlesForCategory(category);
+	if (titles.length === 0) {
+		return null;
+	}
+
+	if (remainingRandomTitlesByCategory[category].length === 0) {
+		remainingRandomTitlesByCategory[category] = shuffleTitles(titles, random);
+	}
+
+	return remainingRandomTitlesByCategory[category].pop() ?? null;
 }

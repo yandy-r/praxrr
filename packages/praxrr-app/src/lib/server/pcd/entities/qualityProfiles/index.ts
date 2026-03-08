@@ -12,7 +12,7 @@ export { general, languages } from './general/index.ts';
 export { updateGeneral, updateLanguages } from './general/index.ts';
 
 // Scoring queries and mutations
-export { scoring, allCfScores } from './scoring/index.ts';
+export { allCfScores, QualityProfileScoringNotFoundError, scoring } from './scoring/index.ts';
 export { updateScoring } from './scoring/index.ts';
 
 // Qualities queries and mutations

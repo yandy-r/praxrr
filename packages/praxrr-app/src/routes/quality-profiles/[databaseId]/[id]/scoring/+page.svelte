@@ -28,6 +28,7 @@
   import thanksGif from '$assets/thanks.gif';
   import nggyuGif from '$assets/nggyu.gif';
   import ScoringTable from './components/ScoringTable.svelte';
+  import SimulateButton from './components/SimulateButton.svelte';
   import { getPersistentSearchStore, type SearchStore } from '$lib/client/stores/search';
   import { onMount, tick } from 'svelte';
   import { page } from '$app/stores';
@@ -583,6 +584,13 @@
       <div class="flex items-center gap-2">
         <Button text="Scoring" icon={Info} on:click={() => (showInfoModal = true)} />
         <Button text="Options" icon={Info} on:click={() => (showOptionsInfoModal = true)} />
+				{#if data.profileName}
+					<SimulateButton
+						databaseId={Number($page.params.databaseId)}
+						profileName={data.profileName ?? ''}
+						arrTypes={data.scoring?.arrTypes ?? []}
+					/>
+				{/if}
         <Button
           disabled={isSaving || !$isDirty}
           icon={isSaving ? Loader2 : Save}

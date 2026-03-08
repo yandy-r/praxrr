@@ -1,0 +1,267 @@
+import { createScoreOverrideEntry, type PresetCategory, type ScoreOverrideMap } from './helpers.ts';
+
+const VALID_MEDIA_TYPES = new Set<PresetCategory>(['movie', 'series', 'anime']);
+const MAX_SHARE_URL_LENGTH = 2000;
+
+/** Encode an arbitrary string to base64 using UTF-8, avoiding btoa's
+ *  InvalidCharacterError on non-Latin-1 characters (e.g. anime titles). */
+function toBase64(value: string): string {
+  const bytes = new TextEncoder().encode(value);
+  let binary = '';
+  for (const byte of bytes) {
+    binary += String.fromCharCode(byte);
+  }
+  return btoa(binary);
+}
+
+/** Decode a base64 string produced by {@link toBase64} back to UTF-8 text. */
+function fromBase64(value: string): string {
+  const binary = atob(value);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return new TextDecoder().decode(bytes);
+}
+
+function warnInvalidUrlStateParam(paramName: 'batch' | 'overrides', reason: string, error?: unknown): void {
+  const message = `[score-simulator:urlState] Ignoring invalid "${paramName}" query param: ${reason}`;
+  if (error) {
+    console.warn(message, error);
+    return;
+  }
+
+  console.warn(message);
+}
+
+function warnClipboardCopyFailure(
+  strategy: 'navigator.clipboard.writeText' | 'document.execCommand',
+  error: unknown
+): void {
+  console.warn(`[score-simulator:urlState] ${strategy} failed during share-link copy`, error);
+}
+
+export interface SimulatorUrlState {
+  title?: string;
+  mediaType?: PresetCategory;
+  profile?: string;
+  compare?: string;
+  batch?: string[];
+  batchMediaType?: PresetCategory;
+  overrides?: ScoreOverrideMap;
+}
+export type ShareLinkMode = 'full' | 'safe';
+
+function getNonEmptyParam(searchParams: URLSearchParams, key: string): string | undefined {
+  const value = searchParams.get(key);
+  if (!value || value.length === 0) {
+    return undefined;
+  }
+
+  return value;
+}
+
+function validateMediaType(value: string | undefined): PresetCategory | undefined {
+  if (!value) {
+    return undefined;
+  }
+
+  return VALID_MEDIA_TYPES.has(value as PresetCategory) ? (value as PresetCategory) : undefined;
+}
+
+function resolveLegacyArrTypeToMediaType(value: string | undefined): PresetCategory | undefined {
+  switch (value) {
+    case 'radarr':
+      return 'movie';
+    case 'sonarr':
+      return 'series';
+    default:
+      return undefined;
+  }
+}
+
+function parseBatchParam(value: string | undefined): string[] | undefined {
+  if (!value) {
+    return undefined;
+  }
+
+  try {
+    const parsed = JSON.parse(fromBase64(value));
+    if (!Array.isArray(parsed)) {
+      warnInvalidUrlStateParam('batch', 'decoded value is not an array');
+      return undefined;
+    }
+
+    if (!parsed.every((entry) => typeof entry === 'string')) {
+      warnInvalidUrlStateParam('batch', 'decoded array contains non-string entries');
+      return undefined;
+    }
+
+    return parsed.length > 0 ? parsed : undefined;
+  } catch (error) {
+    warnInvalidUrlStateParam('batch', 'failed to decode or parse value', error);
+    return undefined;
+  }
+}
+
+function parseOverridesParam(value: string | undefined): ScoreOverrideMap | undefined {
+  if (!value) {
+    return undefined;
+  }
+
+  try {
+    const parsed = JSON.parse(fromBase64(value));
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      warnInvalidUrlStateParam('overrides', 'decoded value is not an object');
+      return undefined;
+    }
+
+    const normalized: ScoreOverrideMap = {};
+    for (const [key, rawValue] of Object.entries(parsed as Record<string, unknown>)) {
+      const normalizedEntry = createScoreOverrideEntry(key, rawValue);
+      if (!normalizedEntry) {
+        continue;
+      }
+
+      normalized[normalizedEntry[0]] = normalizedEntry[1];
+    }
+
+    return Object.keys(normalized).length > 0 ? normalized : undefined;
+  } catch (error) {
+    warnInvalidUrlStateParam('overrides', 'failed to decode or parse value', error);
+    return undefined;
+  }
+}
+
+function createUrl(baseUrl: string, searchParams: URLSearchParams): string {
+  const query = searchParams.toString();
+  if (!query) {
+    return baseUrl;
+  }
+
+  const separator = baseUrl.includes('?') ? '&' : '?';
+  return `${baseUrl}${separator}${query}`;
+}
+
+function copyUsingExecCommand(text: string): boolean {
+  const textArea = document.createElement('textarea');
+  textArea.value = text;
+  textArea.setAttribute('readonly', '');
+  textArea.style.position = 'fixed';
+  textArea.style.top = '-9999px';
+  textArea.style.left = '-9999px';
+  document.body.appendChild(textArea);
+  textArea.select();
+  textArea.setSelectionRange(0, textArea.value.length);
+
+  const copied = document.execCommand('copy');
+  document.body.removeChild(textArea);
+  return copied;
+}
+
+export function parseUrlState(searchParams: URLSearchParams): SimulatorUrlState {
+  const mediaType =
+    validateMediaType(getNonEmptyParam(searchParams, 'mediaType')) ??
+    resolveLegacyArrTypeToMediaType(getNonEmptyParam(searchParams, 'arrType'));
+
+  return {
+    title: getNonEmptyParam(searchParams, 'title'),
+    mediaType,
+    profile: getNonEmptyParam(searchParams, 'profile'),
+    compare: getNonEmptyParam(searchParams, 'compare'),
+    batch: parseBatchParam(getNonEmptyParam(searchParams, 'batch')),
+    batchMediaType: validateMediaType(getNonEmptyParam(searchParams, 'batchMediaType')),
+    overrides: parseOverridesParam(getNonEmptyParam(searchParams, 'overrides')),
+  };
+}
+
+export function serializeUrlState(state: SimulatorUrlState): URLSearchParams {
+  const searchParams = new URLSearchParams();
+
+  const setStringParam = (key: string, value: string | undefined): void => {
+    if (value && value.length > 0) {
+      searchParams.set(key, value);
+    }
+  };
+
+  setStringParam('title', state.title);
+  setStringParam('mediaType', state.mediaType);
+  setStringParam('profile', state.profile);
+  setStringParam('compare', state.compare);
+  setStringParam('batchMediaType', state.batchMediaType);
+
+  if (state.batch && state.batch.length > 0) {
+    searchParams.set('batch', toBase64(JSON.stringify(state.batch)));
+  }
+
+  if (state.overrides) {
+    const normalizedOverrides: ScoreOverrideMap = {};
+    for (const [key, rawValue] of Object.entries(state.overrides) as Array<[string, number]>) {
+      const normalizedEntry = createScoreOverrideEntry(key, rawValue);
+      if (!normalizedEntry) {
+        continue;
+      }
+
+      normalizedOverrides[normalizedEntry[0]] = normalizedEntry[1];
+    }
+
+    if (Object.keys(normalizedOverrides).length > 0) {
+      searchParams.set('overrides', toBase64(JSON.stringify(normalizedOverrides)));
+    }
+  }
+
+  return searchParams;
+}
+
+export async function copyShareLink(
+  state: SimulatorUrlState,
+  baseUrl: string,
+  options?: { mode?: ShareLinkMode }
+): Promise<{ success: boolean; truncated: boolean }> {
+  let truncated = false;
+  const mode = options?.mode ?? 'full';
+  let currentState: SimulatorUrlState = { ...state };
+  if (mode === 'safe') {
+    currentState = {
+      ...currentState,
+      title: undefined,
+      batch: undefined,
+    };
+  }
+  let fullUrl = createUrl(baseUrl, serializeUrlState(currentState));
+
+  if (fullUrl.length > MAX_SHARE_URL_LENGTH) {
+    if (currentState.overrides && Object.keys(currentState.overrides).length > 0) {
+      currentState = { ...currentState, overrides: undefined };
+      truncated = true;
+      fullUrl = createUrl(baseUrl, serializeUrlState(currentState));
+    }
+
+    if (fullUrl.length > MAX_SHARE_URL_LENGTH && currentState.batch && currentState.batch.length > 0) {
+      currentState = { ...currentState, batch: undefined };
+      truncated = true;
+      fullUrl = createUrl(baseUrl, serializeUrlState(currentState));
+    }
+  }
+
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(fullUrl);
+      return { success: true, truncated };
+    }
+  } catch (error) {
+    warnClipboardCopyFailure('navigator.clipboard.writeText', error);
+  }
+
+  try {
+    if (typeof document === 'undefined' || !document.body) {
+      return { success: false, truncated };
+    }
+
+    const copied = copyUsingExecCommand(fullUrl);
+    return { success: copied, truncated };
+  } catch (error) {
+    warnClipboardCopyFailure('document.execCommand', error);
+    return { success: false, truncated };
+  }
+}

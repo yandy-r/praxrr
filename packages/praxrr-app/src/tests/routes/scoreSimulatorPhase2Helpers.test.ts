@@ -133,6 +133,11 @@ Deno.test('parseBatchTitles propagates mediaType to type field', () => {
   assertEquals(seriesResults[0].type, 'series');
 });
 
+Deno.test('parseBatchTitles maps anime context to series release type', () => {
+  const animeResults = parseBatchTitles('[SubsPlease] Title - 01 [1080p]', 'anime');
+  assertEquals(animeResults[0].type, 'series');
+});
+
 // ===========================================================================
 // buildRankingFromResults
 // ===========================================================================
@@ -141,17 +146,21 @@ Deno.test('buildRankingFromResults returns empty array for empty results', () =>
   assertEquals(buildRankingFromResults([], 'pcd:alpha'), []);
 });
 
-Deno.test('buildRankingFromResults returns empty array when profile not found', () => {
+Deno.test('buildRankingFromResults returns empty array when profile not found in any result', () => {
   const results = [makeResult('1', 'Release A', [makeProfileScore('pcd:alpha', 10)])];
   assertEquals(buildRankingFromResults(results, 'pcd:missing'), []);
 });
 
-Deno.test('buildRankingFromResults returns empty if profile missing from any result', () => {
+Deno.test('buildRankingFromResults skips results missing the profile and ranks the rest', () => {
   const results = [
     makeResult('1', 'Release A', [makeProfileScore('pcd:alpha', 10)]),
     makeResult('2', 'Release B', [makeProfileScore('pcd:beta', 5)]),
   ];
-  assertEquals(buildRankingFromResults(results, 'pcd:alpha'), []);
+  const ranked = buildRankingFromResults(results, 'pcd:alpha');
+  assertEquals(ranked.length, 1);
+  assertEquals(ranked[0].title, 'Release A');
+  assertEquals(ranked[0].rank, 1);
+  assertEquals(ranked[0].totalScore, 10);
 });
 
 Deno.test('buildRankingFromResults ranks a single result as rank 1', () => {

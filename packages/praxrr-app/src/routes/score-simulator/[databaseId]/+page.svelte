@@ -1,7 +1,9 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
   import { browser } from '$app/environment';
-  import { ChevronDown } from 'lucide-svelte';
+  import { page } from '$app/stores';
+  import { ChevronDown, Film, Link, RotateCcw, Shield, Tv } from 'lucide-svelte';
+  import Button from '$ui/button/Button.svelte';
   import { clickOutside } from '$lib/client/utils/clickOutside';
   import Tabs from '$ui/navigation/tabs/Tabs.svelte';
   import Dropdown from '$ui/dropdown/Dropdown.svelte';
@@ -9,8 +11,16 @@
   import DisclosureSection from '$ui/form/DisclosureSection.svelte';
   import { SS_ADVANCED_OPTIONS } from '$shared/disclosure/sectionKeys.ts';
   import { alertStore } from '$lib/client/alerts/store';
-  import { getSelectedProfileScore, parseBatchTitles, buildRankingFromResults, buildComparisonResult } from './helpers';
-  import type { ComparisonResult, RankedRelease } from './helpers';
+  import {
+    getSelectedProfileScore,
+    parseBatchTitles,
+    buildRankingFromResults,
+    buildComparisonResult,
+    createScoreOverrideEntry,
+    resolveReleaseTypeForPresetCategory,
+  } from './helpers';
+  import type { ComparisonResult, RankedRelease, SimulatorProfileOption } from './helpers';
+  import type { ScoreOverrideMap } from './helpers';
   import ReleaseInput from './components/ReleaseInput.svelte';
   import SimulationResults from './components/SimulationResults.svelte';
   import ScoreBreakdown from './components/ScoreBreakdown.svelte';
@@ -19,27 +29,23 @@
   import ProfileComparison from './components/ProfileComparison.svelte';
   import ComparisonView from './components/ComparisonView.svelte';
   import RankingTable from './components/RankingTable.svelte';
+  import { getRandomPresetTitleForCategory } from './presets';
   import type { PageData } from './$types';
   import type { components } from '$api/v1.d.ts';
   import type { PresetCategory } from './helpers';
+  import { copyShareLink, parseUrlState } from './urlState';
+  import type { ShareLinkMode, SimulatorUrlState } from './urlState';
 
   type SimulateScoreResponse = components['schemas']['SimulateScoreResponse'];
   type SimulateProfileScore = components['schemas']['SimulateProfileScore'];
-  type MediaType = components['schemas']['MediaType'];
   type ArrType = components['schemas']['SimulateScoreRequest']['arrType'];
-  interface SimulatorProfileOption {
-    id: number;
-    name: string;
-    value: string;
-    displayName: string;
-  }
 
   export let data: PageData;
 
   const SIMULATION_REQUEST_TIMEOUT_MS = 15000;
 
   let releaseTitle = '';
-  let mediaType: MediaType = 'movie';
+  let singleSampleCategory: PresetCategory = 'movie';
   let selectedProfileName: string | null = null;
   let singleSimulationResult: SimulateScoreResponse | null = null;
   let batchSimulationResult: SimulateScoreResponse | null = null;
@@ -54,11 +60,12 @@
 
   // Phase 2 state
   let batchRawText = '';
-  let batchMediaType: MediaType = 'movie';
+  let batchSampleCategory: PresetCategory = 'movie';
   let batchSelectedProfileName: string | null = null;
   let batchPrimaryProfileDropdownOpen = false;
   let comparisonProfileName: string | null = null;
   let selectedReleaseId: string | null = null;
+  let scoreOverrides: ScoreOverrideMap = {};
 
   $: tabs = data.databases.map((db) => ({
     label: db.name,
@@ -66,14 +73,7 @@
     active: db.id === data.currentDatabase.id,
   }));
 
-  $: qualityProfileOptions = (
-    data.qualityProfiles as Array<{
-      id: number;
-      name: string;
-      value?: string;
-      displayName?: string;
-    }>
-  ).map(
+  $: qualityProfileOptions = data.qualityProfiles.map(
     (profile): SimulatorProfileOption => ({
       id: profile.id,
       name: profile.name,
@@ -101,32 +101,105 @@
   $: selectedProfileScore = getSelectedProfileScore(singleSimulationResult, selectedProfileName);
   $: canClearMainSection =
     releaseTitle.trim().length > 0 ||
-    mediaType !== 'movie' ||
+    singleSampleCategory !== 'movie' ||
     selectedProfileName !== null ||
     singleSimulationResult !== null;
   $: canClearAdvancedSection =
     batchRawText.trim().length > 0 ||
-    batchMediaType !== 'movie' ||
+    batchSampleCategory !== 'movie' ||
     batchSelectedProfileName !== null ||
     comparisonProfileName !== null ||
     batchSimulationResult !== null;
 
   // Batch reactive state
-  $: batchTitles = parseBatchTitles(batchRawText, batchMediaType);
+  $: batchTitles = parseBatchTitles(batchRawText, batchSampleCategory);
   $: rankedReleases = batchSimulationResult
-    ? buildRankingFromResults(batchSimulationResult.results, batchSelectedProfileName ?? '', comparisonProfileName)
+    ? buildRankingFromResults(
+        batchSimulationResult.results,
+        batchSelectedProfileName ?? '',
+        comparisonProfileName,
+        Object.keys(scoreOverrides).length > 0 ? scoreOverrides : undefined
+      )
     : ([] as RankedRelease[]);
   $: comparisonResult =
     comparisonProfileName && singleSimulationResult?.results?.[0] && selectedProfileName
-      ? buildComparisonResult(singleSimulationResult.results[0], selectedProfileName, comparisonProfileName)
+      ? buildComparisonResult(
+          singleSimulationResult.results[0],
+          selectedProfileName,
+          comparisonProfileName,
+          Object.keys(scoreOverrides).length > 0 ? scoreOverrides : undefined
+        )
       : (null as ComparisonResult | null);
-  $: singleProfileNames = [selectedProfileName, comparisonProfileName].filter((name): name is string => name !== null);
-  $: batchProfileNames = [batchSelectedProfileName, comparisonProfileName].filter(
-    (name): name is string => name !== null
-  );
+  $: overrideCount = Object.keys(scoreOverrides).length;
+  $: hasActiveOverrides = overrideCount > 0;
+  $: showQuickStartPanel =
+    releaseTitle.trim().length === 0 && selectedProfileName === null && singleSimulationResult === null;
+  function resolveSingleProfileNames(): string[] {
+    return [selectedProfileName, comparisonProfileName].filter((name): name is string => name !== null);
+  }
+
+  function resolveBatchProfileNames(): string[] {
+    return [batchSelectedProfileName, comparisonProfileName].filter((name): name is string => name !== null);
+  }
+
+  function hasQualityProfile(profileName: string): boolean {
+    return qualityProfileOptions.some((profile) => profile.value === profileName);
+  }
 
   onMount(() => {
     if (!browser) return;
+
+    const urlState = parseUrlState($page.url.searchParams);
+    let hasAnyUrlState = false;
+    let hasTitleFromUrl = false;
+    let hasProfileFromUrl = false;
+
+    if (urlState.title) {
+      releaseTitle = urlState.title;
+      hasAnyUrlState = true;
+      hasTitleFromUrl = true;
+    }
+
+    if (urlState.mediaType) {
+      singleSampleCategory = urlState.mediaType;
+      hasAnyUrlState = true;
+    }
+
+    if (urlState.profile) {
+      hasAnyUrlState = true;
+      if (hasQualityProfile(urlState.profile)) {
+        selectedProfileName = urlState.profile;
+        hasProfileFromUrl = true;
+      } else {
+        alertStore.add('warning', 'Profile from URL not found in this database.');
+      }
+    }
+
+    if (urlState.compare) {
+      hasAnyUrlState = true;
+      if (hasQualityProfile(urlState.compare)) {
+        comparisonProfileName = urlState.compare;
+      } else {
+        alertStore.add('warning', 'Comparison profile from URL not found in this database.');
+      }
+    }
+
+    if (urlState.batch) {
+      hasAnyUrlState = true;
+      batchRawText = urlState.batch.join('\n');
+    }
+
+    if (urlState.batchMediaType) {
+      hasAnyUrlState = true;
+      batchSampleCategory = urlState.batchMediaType;
+    }
+
+    if (urlState.overrides) {
+      hasAnyUrlState = true;
+      scoreOverrides = { ...urlState.overrides };
+    }
+
+    const shouldSimulateFromUrl = hasTitleFromUrl && hasProfileFromUrl;
 
     if (!parserAvailable) {
       alertStore.add('warning', 'Parser service unavailable...', 0);
@@ -134,7 +207,12 @@
 
     const initialize = async () => {
       await refreshParserAvailability();
-      await simulateSingle();
+      const shouldSimulateFromCurrentState =
+        shouldSimulateFromUrl ||
+        (!hasAnyUrlState && releaseTitle.trim().length > 0 && selectedProfileName !== null);
+      if (shouldSimulateFromCurrentState) {
+        await simulateSingle();
+      }
 
       parserHealthInterval = setInterval(() => {
         if (!parserAvailable) {
@@ -156,6 +234,7 @@
 
   async function simulateSingle() {
     const title = releaseTitle.trim();
+    const profileNames = resolveSingleProfileNames();
     if (!title || !selectedProfileName) {
       cancelSingleSimulationRequest();
       isSimulatingSingle = false;
@@ -164,7 +243,8 @@
     }
 
     const { requestToken, abortController, timeout } = createSingleSimulationRequestContext();
-    const arrType: ArrType = mediaType === 'movie' ? 'radarr' : 'sonarr';
+    const releaseType = resolveReleaseTypeForPresetCategory(singleSampleCategory);
+    const arrType: ArrType = singleSampleCategory === 'movie' ? 'radarr' : 'sonarr';
 
     try {
       const response = await fetch('/api/v1/simulate/score', {
@@ -173,8 +253,8 @@
         signal: abortController.signal,
         body: JSON.stringify({
           databaseId: data.currentDatabase.id,
-          releases: [{ id: generateReleaseId(), title, type: mediaType }],
-          profileNames: singleProfileNames,
+          releases: [{ id: generateReleaseId(), title, type: releaseType }],
+          profileNames,
           arrType,
         }),
       });
@@ -208,11 +288,12 @@
     }
   }
 
-  async function simulateBatch(override?: { titles: ReturnType<typeof parseBatchTitles>; mediaType: MediaType }) {
+  async function simulateBatch(override?: { titles: ReturnType<typeof parseBatchTitles>; category: PresetCategory }) {
     const titles = override?.titles ?? batchTitles;
-    const effectiveMediaType = override?.mediaType ?? batchMediaType;
+    const effectiveMediaType = override?.category ?? batchSampleCategory;
+    const profileNames = resolveBatchProfileNames();
 
-    if (!batchSelectedProfileName || titles.length === 0) {
+    if (profileNames.length === 0 || titles.length === 0) {
       cancelBatchSimulationRequest();
       isSimulatingBatch = false;
       batchSimulationResult = null;
@@ -231,7 +312,7 @@
         body: JSON.stringify({
           databaseId: data.currentDatabase.id,
           releases: titles,
-          profileNames: batchProfileNames,
+          profileNames,
           arrType,
         }),
       });
@@ -382,36 +463,44 @@
     void simulateSingle();
   }
 
+  function handleTryExampleRelease() {
+    const selectedCategory = singleSampleCategory;
+    const randomExampleTitle = getRandomPresetTitleForCategory(selectedCategory);
+    if (!randomExampleTitle) {
+      return;
+    }
+
+    releaseTitle = randomExampleTitle;
+  }
+
   function handleBatchSimulate() {
     void simulateBatch();
   }
 
-  function handlePresetSelected(
-    event: CustomEvent<{ titles: string[]; category: PresetCategory; mediaType: MediaType }>
-  ) {
+  function handlePresetSelected(event: CustomEvent<{ titles: string[]; category: PresetCategory }>) {
     batchRawText = event.detail.titles.join('\n');
-    batchMediaType = event.detail.mediaType;
+    batchSampleCategory = event.detail.category;
     selectedReleaseId = null;
     // batchTitles is a reactive declaration and won't recompute until after the
     // current synchronous execution completes. Compute the fresh titles eagerly
     // from the values we are about to set so simulateBatch() never reads stale
     // data from the previous preset/media-type combination.
-    const freshTitles = parseBatchTitles(batchRawText, batchMediaType);
-    void simulateBatch({ titles: freshTitles, mediaType: batchMediaType });
+    const freshTitles = parseBatchTitles(batchRawText, batchSampleCategory);
+    void simulateBatch({ titles: freshTitles, category: batchSampleCategory });
   }
 
-  function handleBatchMediaTypeChange(nextMediaType: MediaType) {
-    if (batchMediaType === nextMediaType) {
+  function handleBatchMediaTypeChange(nextMediaType: PresetCategory) {
+    if (batchSampleCategory === nextMediaType) {
       return;
     }
 
-    batchMediaType = nextMediaType;
+    batchSampleCategory = nextMediaType;
     selectedReleaseId = null;
     if (batchSimulationResult) {
       // batchTitles is reactive and won't have recomputed yet at this point,
       // so compute the fresh titles eagerly and pass them as an override.
       const freshTitles = parseBatchTitles(batchRawText, nextMediaType);
-      void simulateBatch({ titles: freshTitles, mediaType: nextMediaType });
+      void simulateBatch({ titles: freshTitles, category: nextMediaType });
     }
   }
 
@@ -439,10 +528,80 @@
     selectedReleaseId = event.detail.id;
   }
 
+  function handleOverrideChange(cfName: string, score: number) {
+    const normalizedEntry = createScoreOverrideEntry(cfName, score);
+    if (!normalizedEntry) {
+      handleOverrideReset(cfName);
+      return;
+    }
+
+    scoreOverrides = {
+      ...scoreOverrides,
+      [normalizedEntry[0]]: normalizedEntry[1],
+    };
+  }
+
+  function handleOverrideReset(cfName: string) {
+    if (!Object.hasOwn(scoreOverrides, cfName)) {
+      return;
+    }
+
+    const { [cfName]: _removedOverride, ...remainingOverrides } = scoreOverrides;
+    scoreOverrides = remainingOverrides;
+  }
+
+  function handleOverrideResetAll() {
+    if (!hasActiveOverrides) {
+      return;
+    }
+
+    scoreOverrides = {};
+  }
+
+  function buildShareState(): SimulatorUrlState {
+    return {
+      title: releaseTitle.trim() || undefined,
+      mediaType: singleSampleCategory,
+      profile: selectedProfileName ?? undefined,
+      compare: comparisonProfileName ?? undefined,
+      batch: batchTitles.map((title) => title.title),
+      batchMediaType: batchSampleCategory,
+      overrides: hasActiveOverrides ? scoreOverrides : undefined,
+    };
+  }
+
+  async function handleCopyLink(mode: ShareLinkMode) {
+    const copyLabel = mode === 'safe' ? 'Safe link' : 'Full link';
+    try {
+      const shareState: SimulatorUrlState = {
+        ...buildShareState(),
+      };
+
+      const { success, truncated } = await copyShareLink(
+        shareState,
+        `${window.location.origin}${$page.url.pathname}`,
+        { mode }
+      );
+      if (!success) {
+        alertStore.add('info', 'Could not copy to clipboard. Copy URL from the address bar.');
+        return;
+      }
+
+      if (truncated) {
+        alertStore.add('warning', `${copyLabel} copied. Some state was omitted to fit URL limits.`);
+        return;
+      }
+
+      alertStore.add('success', `${copyLabel} copied to clipboard.`);
+    } catch {
+      alertStore.add('error', `Failed to generate ${copyLabel.toLowerCase()}.`);
+    }
+  }
+
   function clearMainSection() {
     cancelSingleSimulationRequest();
     releaseTitle = '';
-    mediaType = 'movie';
+    singleSampleCategory = 'movie';
     selectedProfileName = null;
     singleSimulationResult = null;
     selectedReleaseId = null;
@@ -452,7 +611,7 @@
   function clearAdvancedSection() {
     cancelBatchSimulationRequest();
     batchRawText = '';
-    batchMediaType = 'movie';
+    batchSampleCategory = 'movie';
     batchSelectedProfileName = null;
     comparisonProfileName = null;
     batchSimulationResult = null;
@@ -465,8 +624,26 @@
   <title>Score Simulator - {data.currentDatabase.name} - Praxrr</title>
 </svelte:head>
 
-<div class="space-y-6 px-4 pt-4 pb-8 md:px-8">
-  <Tabs {tabs} responsive />
+  <div class="space-y-6 px-4 pt-4 pb-8 md:px-8">
+  <div class="flex flex-wrap items-center justify-between gap-2">
+    <Tabs {tabs} responsive />
+    <div class="flex items-center gap-2">
+      <Button
+        text="Copy Full Link"
+        variant="secondary"
+        size="xs"
+        icon={Link}
+        on:click={() => handleCopyLink('full')}
+      />
+      <Button
+        text="Copy Safe Link"
+        variant="secondary"
+        size="xs"
+        icon={Shield}
+        on:click={() => handleCopyLink('safe')}
+      />
+    </div>
+  </div>
 
   <DisclosureSection
     sectionKey={SS_ADVANCED_OPTIONS}
@@ -478,33 +655,51 @@
   >
     <div class="grid grid-cols-1 gap-6 lg:grid-cols-[2fr_3fr]">
       <div class="min-w-0 space-y-4">
-        <div class="flex items-start gap-2">
-          <div class="flex-1">
-            <ReleaseInput
-              bind:title={releaseTitle}
-              bind:mediaType
-              bind:selectedProfileName
-              qualityProfiles={qualityProfileOptions}
-              isSimulating={isSimulatingSingle}
-              {parserAvailable}
-              canClear={canClearMainSection}
-              on:input={handleReleaseInput}
-              on:profileChange={handleProfileChange}
-              on:clear={clearMainSection}
+        <ReleaseInput
+          bind:title={releaseTitle}
+          bind:sampleCategory={singleSampleCategory}
+          bind:selectedProfileName
+          qualityProfiles={qualityProfileOptions}
+          isSimulating={isSimulatingSingle}
+          {parserAvailable}
+          canClear={canClearMainSection}
+          showQuickStart={showQuickStartPanel}
+          on:input={handleReleaseInput}
+          on:profileChange={handleProfileChange}
+          on:tryExampleRelease={handleTryExampleRelease}
+          on:clear={clearMainSection}
+        />
+
+        {#if hasActiveOverrides}
+          <div
+            class="flex flex-wrap items-center justify-between gap-2 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-700 dark:bg-amber-900/20 dark:text-amber-200"
+          >
+            <span>{overrideCount} What-if change{overrideCount > 1 ? 's' : ''} active.</span>
+            <span class="text-neutral-500">Overrides are temporary and will not be saved.</span>
+            <Button
+              text="Reset All"
+              variant="ghost"
+              size="xs"
+              icon={RotateCcw}
+              on:click={handleOverrideResetAll}
             />
           </div>
-          <div class="pt-1">
-            <PresetSelector mediaType={batchMediaType} compact on:presetSelected={handlePresetSelected} />
-          </div>
-        </div>
+        {/if}
 
-        <ScoreBreakdown profileScore={selectedProfileScore} />
+        <ScoreBreakdown
+          profileScore={selectedProfileScore}
+          overrides={scoreOverrides}
+          onOverrideChange={handleOverrideChange}
+          onOverrideReset={handleOverrideReset}
+          onOverrideResetAll={handleOverrideResetAll}
+        />
 
         {#if comparisonResult && comparisonProfileLabel && selectedProfileLabel}
           <ComparisonView
             {comparisonResult}
             profileALabel={selectedProfileLabel}
             profileBLabel={comparisonProfileLabel}
+            overrides={scoreOverrides}
           />
         {/if}
       </div>
@@ -534,26 +729,39 @@
           <div class="space-y-4">
             <div class="space-y-1.5">
               <p class="text-xs font-medium text-neutral-700 dark:text-neutral-300">Batch Media Type</p>
-              <div class="grid grid-cols-2 gap-2">
+              <div class="grid grid-cols-3 gap-2">
                 <button
                   type="button"
-                  class="inline-flex items-center justify-center rounded-lg border px-3 py-2 text-xs font-medium transition-colors {batchMediaType ===
+                  class="inline-flex items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium transition-colors {batchSampleCategory ===
                   'movie'
                     ? 'border-accent-500 bg-accent-50 text-accent-700 dark:border-accent-400 dark:bg-accent-900/30 dark:text-accent-200'
                     : 'border-neutral-300 text-neutral-700 hover:bg-neutral-50 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800'}"
                   on:click={() => handleBatchMediaTypeChange('movie')}
                 >
+                  <Film size={14} />
                   Movie
                 </button>
                 <button
                   type="button"
-                  class="inline-flex items-center justify-center rounded-lg border px-3 py-2 text-xs font-medium transition-colors {batchMediaType ===
+                  class="inline-flex items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium transition-colors {batchSampleCategory ===
                   'series'
                     ? 'border-accent-500 bg-accent-50 text-accent-700 dark:border-accent-400 dark:bg-accent-900/30 dark:text-accent-200'
                     : 'border-neutral-300 text-neutral-700 hover:bg-neutral-50 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800'}"
                   on:click={() => handleBatchMediaTypeChange('series')}
                 >
+                  <Tv size={14} />
                   Series
+                </button>
+                <button
+                  type="button"
+                  class="inline-flex items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium transition-colors {batchSampleCategory ===
+                  'anime'
+                    ? 'border-accent-500 bg-accent-50 text-accent-700 dark:border-accent-400 dark:bg-accent-900/30 dark:text-accent-200'
+                    : 'border-neutral-300 text-neutral-700 hover:bg-neutral-50 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800'}"
+                  on:click={() => handleBatchMediaTypeChange('anime')}
+                >
+                  <Tv size={14} />
+                  Anime
                 </button>
               </div>
             </div>
@@ -593,7 +801,10 @@
               </div>
             </div>
 
-            <PresetSelector mediaType={batchMediaType} on:presetSelected={handlePresetSelected} />
+            <PresetSelector
+              sampleCategory={batchSampleCategory}
+              on:presetSelected={handlePresetSelected}
+            />
             <ProfileComparison
               qualityProfiles={qualityProfileOptions}
               primaryProfileName={batchSelectedProfileName}
@@ -619,6 +830,7 @@
               simulationResult={batchSimulationResult}
               selectedProfileName={batchSelectedProfileName}
               selectedProfileLabel={batchSelectedProfileLabel}
+              overrides={scoreOverrides}
               on:releaseSelect={handleReleaseSelect}
             />
           </div>

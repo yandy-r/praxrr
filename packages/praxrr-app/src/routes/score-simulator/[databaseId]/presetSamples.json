@@ -1,0 +1,355 @@
+{
+  "groups": [
+    {
+      "category": "movie",
+      "label": "4K Remux vs WEB-DL",
+      "description": "Compare full remux releases against streaming WEB-DL options.",
+      "titles": [
+        {
+          "label": "4K UHD Remux TrueHD Atmos",
+          "title": "Blade.Runner.2049.2017.2160p.UHD.BluRay.Remux.HDR.HEVC.TrueHD.7.1.Atmos-FraMeSToR"
+        },
+        {
+          "label": "4K WEB-DL DV Atmos",
+          "title": "Blade.Runner.2049.2017.2160p.WEB-DL.DDP5.1.Atmos.DV.H.265-FLUX"
+        },
+        {
+          "label": "1080p BluRay Remux DTS-HD MA",
+          "title": "Blade.Runner.2049.2017.1080p.BluRay.Remux.AVC.DTS-HD.MA.5.1-EPSiLON"
+        },
+        {
+          "label": "1080p WEB-DL DD+",
+          "title": "Blade.Runner.2049.2017.1080p.WEB-DL.DDP5.1.H.264-NTb"
+        },
+        {
+          "label": "720p WEBRip",
+          "title": "Blade.Runner.2049.2017.720p.WEBRip.x264-GalaxyRG"
+        }
+      ]
+    },
+    {
+      "category": "movie",
+      "label": "HDR and DV Variants",
+      "description": "Exercise profile scoring across DV, HDR10+, HDR10, and SDR variants.",
+      "titles": [
+        {
+          "label": "Hybrid DV HDR10",
+          "title": "Dune.Part.Two.2024.2160p.UHD.BluRay.Hybrid.DV.HDR10.HEVC.TrueHD.7.1.Atmos-BHDStudio"
+        },
+        {
+          "label": "HDR10+ UHD",
+          "title": "Dune.Part.Two.2024.2160p.UHD.BluRay.HDR10Plus.HEVC.TrueHD.7.1.Atmos-DON"
+        },
+        {
+          "label": "HDR10 WEB-DL",
+          "title": "Dune.Part.Two.2024.2160p.AMZN.WEB-DL.DDP5.1.HDR.H.265-TEPES"
+        },
+        {
+          "label": "DV WEB-DL",
+          "title": "Dune.Part.Two.2024.2160p.WEB-DL.DDP5.1.Atmos.DV.H.265-CiT"
+        },
+        {
+          "label": "SDR 4K BluRay",
+          "title": "Dune.Part.Two.2024.2160p.BluRay.x265.10bit-SWTYBLZ"
+        }
+      ]
+    },
+    {
+      "category": "movie",
+      "label": "Audio Mix Variety",
+      "description": "Compare Atmos, TrueHD, DTS:X, DTS-HD MA, AAC, and multi-channel WEB audio.",
+      "titles": [
+        {
+          "label": "TrueHD 7.1 Atmos",
+          "title": "Oppenheimer.2023.2160p.UHD.BluRay.Remux.HDR.HEVC.TrueHD.7.1.Atmos-CiNEPHiLES"
+        },
+        {
+          "label": "DTS:X 7.1",
+          "title": "Oppenheimer.2023.2160p.UHD.BluRay.Remux.HDR.HEVC.DTS-X.7.1-HDT"
+        },
+        {
+          "label": "DTS-HD MA 5.1",
+          "title": "Oppenheimer.2023.1080p.BluRay.Remux.AVC.DTS-HD.MA.5.1-EPSiLON"
+        },
+        {
+          "label": "DD+ 5.1 WEB",
+          "title": "Oppenheimer.2023.1080p.WEB-DL.DDP5.1.H.264-FLUX"
+        },
+        {
+          "label": "AAC 2.0 WEBRip",
+          "title": "Oppenheimer.2023.1080p.WEBRip.AAC2.0.x264-YIFY"
+        }
+      ]
+    },
+    {
+      "category": "movie",
+      "label": "Encode and Source Mix",
+      "description": "Test BluRay encodes, WEB encodes, scene-style, and remux-like naming mixes.",
+      "titles": [
+        {
+          "label": "2160p BluRay x265",
+          "title": "The.Batman.2022.2160p.BluRay.x265.10bit.HDR.DTS-HD.MA.5.1-TERMiNAL"
+        },
+        {
+          "label": "1080p BluRay x264",
+          "title": "The.Batman.2022.1080p.BluRay.x264.DTS-HD.MA.5.1-HiDt"
+        },
+        {
+          "label": "1080p WEB-DL",
+          "title": "The.Batman.2022.1080p.WEB-DL.DD5.1.H.264-NTG"
+        },
+        {
+          "label": "1080p WEBRip x265",
+          "title": "The.Batman.2022.1080p.WEBRip.x265.10bit.AAC5.1-PSA"
+        },
+        {
+          "label": "720p Scene",
+          "title": "The.Batman.2022.720p.BluRay.x264-DRONES"
+        }
+      ]
+    },
+    {
+      "category": "movie",
+      "label": "Proper, Repack, and Hybrid Cases",
+      "description": "Evaluate scoring behavior on PROPER, REPACK, and HYBRID naming.",
+      "titles": [
+        {
+          "label": "PROPER WEB-DL",
+          "title": "Top.Gun.Maverick.2022.PROPER.1080p.WEB-DL.DDP5.1.H.264-NTb"
+        },
+        {
+          "label": "REPACK BluRay",
+          "title": "Top.Gun.Maverick.2022.REPACK.1080p.BluRay.x264.DTS-HD.MA.7.1-CHD"
+        },
+        {
+          "label": "Hybrid DV HDR",
+          "title": "Top.Gun.Maverick.2022.2160p.UHD.BluRay.Hybrid.DV.HDR.HEVC.TrueHD.7.1.Atmos-NCmt"
+        },
+        {
+          "label": "IMAX WEB-DL",
+          "title": "Top.Gun.Maverick.2022.IMAX.2160p.WEB-DL.DDP5.1.Atmos.H.265-FLUX"
+        },
+        {
+          "label": "1080p Remux",
+          "title": "Top.Gun.Maverick.2022.1080p.BluRay.Remux.AVC.TrueHD.7.1-TRiToN"
+        }
+      ]
+    },
+    {
+      "category": "series",
+      "label": "Streaming WEB-DL Ladder",
+      "description": "Compare common streaming releases from 2160p to lower quality WEB sources.",
+      "titles": [
+        {
+          "label": "2160p WEB-DL Atmos",
+          "title": "Shogun.S01E01.2160p.DSNP.WEB-DL.DDP5.1.Atmos.DV.H.265-NTb"
+        },
+        {
+          "label": "1080p WEB-DL",
+          "title": "Shogun.S01E01.1080p.HULU.WEB-DL.DDP5.1.H.264-FLUX"
+        },
+        {
+          "label": "720p WEB-DL",
+          "title": "Shogun.S01E01.720p.WEB-DL.DDP5.1.H.264-KOGi"
+        },
+        {
+          "label": "1080p WEBRip x265",
+          "title": "Shogun.S01E01.1080p.WEBRip.x265.10bit.AAC5.1-SuccessfulCrab"
+        },
+        {
+          "label": "480p WEB",
+          "title": "Shogun.S01E01.480p.WEB-DL.AAC2.0.H.264-RUBiK"
+        }
+      ]
+    },
+    {
+      "category": "series",
+      "label": "Season Packs and Singles",
+      "description": "Compare full-season packs against single-episode releases.",
+      "titles": [
+        {
+          "label": "Season Pack WEB-DL",
+          "title": "Breaking.Bad.S01.1080p.NF.WEB-DL.DDP5.1.H.264-NTb"
+        },
+        {
+          "label": "Season Pack BluRay",
+          "title": "Breaking.Bad.S01.1080p.BluRay.x264.DTS-HD.MA.5.1-CTRLHD"
+        },
+        {
+          "label": "S01E01 WEB-DL",
+          "title": "Breaking.Bad.S01E01.1080p.NF.WEB-DL.DDP5.1.H.264-NTG"
+        },
+        {
+          "label": "S01E01 BluRay",
+          "title": "Breaking.Bad.S01E01.1080p.BluRay.x264.DTS-FSiHD"
+        },
+        {
+          "label": "2160p Season Pack",
+          "title": "Breaking.Bad.S01.2160p.UHD.BluRay.Remux.HDR.HEVC.TrueHD.7.1-CiNEPHiLES"
+        }
+      ]
+    },
+    {
+      "category": "anime",
+      "label": "Anime Release Styles",
+      "description": "Common fansub, mini encode, and batch naming patterns.",
+      "titles": [
+        {
+          "label": "SubsPlease WEB 1080p",
+          "title": "[SubsPlease] Frieren - Beyond Journeys End - 01 (1080p) [A1B2C3D4].mkv"
+        },
+        {
+          "label": "Dual Audio BluRay",
+          "title": "[Erai-raws] Frieren - Beyond Journeys End - 01 [1080p][Dual-Audio][Multiple Subtitle][FLAC].mkv"
+        },
+        {
+          "label": "Mini Encode x265",
+          "title": "[Judas] Frieren - Beyond Journeys End S01E01 [1080p][HEVC x265 10bit][Multi-Subs].mkv"
+        },
+        {
+          "label": "Batch Complete Season",
+          "title": "[Erai-raws] Frieren - Beyond Journeys End S01 [1080p][HEVC][AAC][Batch].mkv"
+        },
+        {
+          "label": "720p Episode",
+          "title": "[SubsPlease] Frieren - Beyond Journeys End - 01 (720p) [D5E6F7G8].mkv"
+        }
+      ]
+    },
+    {
+      "category": "series",
+      "label": "Scene and P2P TV Mix",
+      "description": "Blend scene-style TV releases with P2P WEB sources.",
+      "titles": [
+        {
+          "label": "1080p WEB h264 Scene",
+          "title": "The.Last.of.Us.S01E01.1080p.WEB.H264-CAKES"
+        },
+        {
+          "label": "1080p WEB h264 Scene",
+          "title": "The.Last.of.Us.S01E01.1080p.WEB.h264-ETHEL"
+        },
+        {
+          "label": "2160p WEB-DL P2P",
+          "title": "The.Last.of.Us.S01E01.2160p.MAX.WEB-DL.DDP5.1.Atmos.H.265-FLUX"
+        },
+        {
+          "label": "1080p WEB-DL P2P",
+          "title": "The.Last.of.Us.S01E01.1080p.MAX.WEB-DL.DDP5.1.H.264-NTb"
+        },
+        {
+          "label": "720p HDTV",
+          "title": "The.Last.of.Us.S01E01.720p.HDTV.x264-SYNCOPY"
+        }
+      ]
+    },
+    {
+      "category": "series",
+      "label": "Documentary and Reality Variety",
+      "description": "Non-fiction patterns with mixed WEB/HDTV source and codec formats.",
+      "titles": [
+        {
+          "label": "4K Documentary WEB",
+          "title": "Planet.Earth.III.S01E01.2160p.iP.WEB-DL.AAC2.0.H.265-HONEST"
+        },
+        {
+          "label": "1080p Documentary WEB",
+          "title": "Planet.Earth.III.S01E01.1080p.WEB-DL.AAC2.0.H.264-BTN"
+        },
+        {
+          "label": "1080p Reality WEB",
+          "title": "Drive.to.Survive.S06E01.1080p.NF.WEB-DL.DDP5.1.H.264-FLUX"
+        },
+        {
+          "label": "720p Reality WEBRip",
+          "title": "Drive.to.Survive.S06E01.720p.WEBRip.x264-BAE"
+        },
+        {
+          "label": "1080p HDTV",
+          "title": "Planet.Earth.III.S01E01.1080p.HDTV.x264-DARKFLiX"
+        }
+      ]
+    },
+    {
+      "category": "movie",
+      "label": "Intentional Bad Releases",
+      "description": "Deliberately noisy or low-quality movie examples for stress-testing profile rules.",
+      "titles": [
+        {
+          "label": "CAM with fake HDR tag",
+          "title": "Deadpool.And.Wolverine.2024.CAM.XViD.MP3.HDR.1080p-FAKE"
+        },
+        {
+          "label": "Tiny 480p WEBRip AAC",
+          "title": "Dune.Part.Two.2024.480p.WEBRip.x264.AAC-YIFY"
+        },
+        {
+          "label": "R5 line audio release",
+          "title": "Oppenheimer.2023.R5.LiNE.X264.AC3-RANDOM"
+        },
+        {
+          "label": "Compressed x265 low bitrate",
+          "title": "The.Batman.2022.1080p.BluRay.x265.AAC.700MB-LOWBITS"
+        },
+        {
+          "label": "TS source mis-tagged as WEB",
+          "title": "Top.Gun.Maverick.2022.TS.1080p.WEB-DL.H264-QUESTIONABLE"
+        }
+      ]
+    },
+    {
+      "category": "series",
+      "label": "Intentional Bad Releases",
+      "description": "Deliberately noisy or low-quality series examples for targeted negative testing.",
+      "titles": [
+        {
+          "label": "HDTV with low audio",
+          "title": "The.Last.of.Us.S01E01.HDTV.x264.MP3-BADTV"
+        },
+        {
+          "label": "480p WEBRip scene re-encode",
+          "title": "Shogun.S01E01.480p.WEBRip.x264.AAC2.0-RERIP"
+        },
+        {
+          "label": "Spam-tagged repack",
+          "title": "Breaking.Bad.S01E01.REPACK.PROPER.REAL.PROPER.720p.HDTV.x264-SPAM"
+        },
+        {
+          "label": "Mis-tagged source",
+          "title": "The.Last.of.Us.S01E01.WEB-DL.HDTVRip.x264.AAC2.0-CONFUSED"
+        },
+        {
+          "label": "WEB tag on cam-like source",
+          "title": "Drive.to.Survive.S06E01.WEB-DL.CAM.AAC2.0.x264-ODD"
+        }
+      ]
+    },
+    {
+      "category": "anime",
+      "label": "Intentional Bad Releases",
+      "description": "Deliberately noisy or low-quality anime examples for targeted negative testing.",
+      "titles": [
+        {
+          "label": "Tiny mini encode",
+          "title": "[Mini] Frieren - Beyond Journeys End - 01 [480p][HEVC][AAC].mkv"
+        },
+        {
+          "label": "Fake 10bit tag",
+          "title": "[SubsPlease] Frieren - Beyond Journeys End - 01 (1080p) [x264 10bit][AAC].mkv"
+        },
+        {
+          "label": "Cam-tagged anime upload",
+          "title": "[Random] Frieren - Beyond Journeys End - 01 CAMRip 720p AAC.mp4"
+        },
+        {
+          "label": "Spam proper repack",
+          "title": "[Scene] Frieren - Beyond Journeys End - 01 PROPER REPACK REAL PROPER 1080p x264.mkv"
+        },
+        {
+          "label": "Mislabeled source chain",
+          "title": "[Anon] Frieren - Beyond Journeys End - 01 WEB-DL HDTVRip BluRay AAC.mkv"
+        }
+      ]
+    }
+  ]
+}

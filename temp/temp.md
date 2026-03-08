@@ -2,7 +2,7 @@
 
 ### Issue Creation Template - Multiple
 
-Go through the @docs/plans/score-simulator-phase2 plan and lets create github issues to track the
+Go through the docs/plans/score-simulator-phase3 plan and lets create github issues to track the
 feature implementation.
 
 - group tasks together that logically fit (no need for an issue per task)
@@ -19,7 +19,7 @@ feature implementation.
 
 ### Issue Creation Template - Single
 
-Go through the @docs/plans/progressive-disclosure plan and lets create a github issue to track the
+Go through the docs/plans/progressive-disclosure plan and lets create a github issue to track the
 feature implementation.
 
 - Make sure the issue is properly labeled
@@ -35,21 +35,21 @@ feature implementation.
 
 ### PR Review Correction
 
-Let's validate and fix suggestion issues 9-11
+Let's validate and fix suggestion issues S6 - S10
 
 - file:
-  ([@pr-176-review.md](file:///home/yandy/Projects/github.com/yandy-r///home/yandy/Projects/github.com/yandy-r/praxrr/docs/pr-reviews/pr-176-review.md))
+  ([@pr-190-review.md](file:///home/yandy/Projects/github.com/yandy-r///home/yandy/Projects/github.com/yandy-r/praxrr/docs/pr-reviews/pr-190-review.md))
 - validate before implementing
 - run targeted tests
 - update doc when complete
-  ([@pr-176-review.md](file:///home/yandy/Projects/github.com/yandy-r///home/yandy/Projects/github.com/yandy-r/praxrr/docs/pr-reviews/pr-176-review.md))
+  ([@pr-190-review.md](file:///home/yandy/Projects/github.com/yandy-r///home/yandy/Projects/github.com/yandy-r/praxrr/docs/pr-reviews/pr-190-review.md))
 - when confirmed fix, commit progress
 
 ## Templates for Random Things - MacOS
 
 ### Issue Creation Template - Multiple
 
-Go through the @docs/plans/score-simulator plan and lets create github issues to track the feature
+Go through the docs/plans/score-simulator plan and lets create github issues to track the feature
 implementation.
 
 - group tasks together that logically fit (no need for an issue per task)
@@ -66,7 +66,7 @@ implementation.
 
 ### Issue Creation Template - Single
 
-Go through the @docs/plans/progressive-disclosure plan and lets create a github issue to track the
+Go through the docs/plans/progressive-disclosure plan and lets create a github issue to track the
 feature implementation.
 
 - Make sure the issue is properly labeled
@@ -85,9 +85,9 @@ feature implementation.
 Let's validate and fix suggestion issues 9-11
 
 - file:
-  ([@pr-176-review.md](file:///Users/yandy/Projects/github.com/yandy-r///home/yandy/Projects/github.com/yandy-r/praxrr/docs/pr-reviews/pr-176-review.md))
+  ([@pr-190-review.md](file:///Users/yandy/Projects/github.com/yandy-r///home/yandy/Projects/github.com/yandy-r/praxrr/docs/pr-reviews/pr-190-review.md))
 - validate before implementing
 - run targeted tests
 - update doc when complete
-  ([@pr-176-review.md](file:///Users/yandy/Projects/github.com/yandy-r///home/yandy/Projects/github.com/yandy-r/praxrr/docs/pr-reviews/pr-176-review.md))
+  ([@pr-190-review.md](file:///Users/yandy/Projects/github.com/yandy-r///home/yandy/Projects/github.com/yandy-r/praxrr/docs/pr-reviews/pr-190-review.md))
 - when confirmed fix, commit progress

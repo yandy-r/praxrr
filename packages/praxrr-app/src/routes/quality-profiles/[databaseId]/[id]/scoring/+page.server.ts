@@ -45,6 +45,7 @@ export const load: ServerLoad = async ({ params }) => {
   const scoringData = await qualityProfileQueries.scoring(cache, currentDatabaseId, profile.name);
 
   return {
+    profileName: profile.name,
     scoring: scoringData,
     canWriteToBase: canWriteToBase(currentDatabaseId),
   };

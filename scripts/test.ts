@@ -10,22 +10,30 @@
 
 const aliases: Record<string, string> = {
   // Individual test files
-  filters: 'packages/praxrr-app/src/tests/upgrades/filters.test.ts',
-  normalize: 'packages/praxrr-app/src/tests/upgrades/normalize.test.ts',
-  selectors: 'packages/praxrr-app/src/tests/upgrades/selectors.test.ts',
-  'env-instances': 'packages/praxrr-app/src/tests/base/envInstances.test.ts',
   backup: 'packages/praxrr-app/src/tests/jobs/createBackup.test.ts',
   cleanup: 'packages/praxrr-app/src/tests/logger/cleanupLogs.test.ts',
+  'env-instances': 'packages/praxrr-app/src/tests/base/envInstances.test.ts',
+  filters: 'packages/praxrr-app/src/tests/upgrades/filters.test.ts',
+  normalize: 'packages/praxrr-app/src/tests/upgrades/normalize.test.ts',
+  phase3:
+    'packages/praxrr-app/src/tests/routes/scoreSimulatorPhase3Helpers.test.ts,packages/praxrr-app/src/tests/routes/scoreSimulatorUrlState.test.ts',
+  selectors: 'packages/praxrr-app/src/tests/upgrades/selectors.test.ts',
+  'url-state': 'packages/praxrr-app/src/tests/routes/scoreSimulatorUrlState.test.ts',
+  'what-if': 'packages/praxrr-app/src/tests/routes/scoreSimulatorPhase3Helpers.test.ts',
 
   // Directories
-  upgrades: 'packages/praxrr-app/src/tests/upgrades',
   jobs: 'packages/praxrr-app/src/tests/jobs',
   logger: 'packages/praxrr-app/src/tests/logger',
+  upgrades: 'packages/praxrr-app/src/tests/upgrades',
 };
 
 // Get the test target from args
 const target = Deno.args[0];
 const testPath = target ? (aliases[target] ?? target) : 'packages/praxrr-app/src/tests';
+const testPaths = testPath
+  .split(',')
+  .map((path) => path.trim())
+  .filter((path) => path.length > 0);
 const repoRoot = Deno.cwd();
 
 // Check if it's a valid path
@@ -43,10 +51,19 @@ if (target && !aliases[target]) {
   }
 }
 
-console.log(`Running tests: ${testPath}\n`);
+console.log(`Running tests: ${testPaths.join(',')}\n`);
 
 const cmd = new Deno.Command('deno', {
-  args: ['test', testPath, '--allow-net', '--allow-read', '--allow-write', '--allow-env', '--allow-ffi', '--allow-run'],
+  args: [
+    'test',
+    ...testPaths,
+    '--allow-net',
+    '--allow-read',
+    '--allow-write',
+    '--allow-env',
+    '--allow-ffi',
+    '--allow-run',
+  ],
   env: {
     ...Deno.env.toObject(),
     APP_BASE_PATH: `${repoRoot}/dist/test`,

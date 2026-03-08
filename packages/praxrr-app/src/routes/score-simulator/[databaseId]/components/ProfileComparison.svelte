@@ -4,19 +4,13 @@
   import { clickOutside } from '$lib/client/utils/clickOutside';
   import Dropdown from '$ui/dropdown/Dropdown.svelte';
   import DropdownItem from '$ui/dropdown/DropdownItem.svelte';
-
-  interface QualityProfileOption {
-    id: number;
-    name: string;
-    value: string;
-    displayName?: string;
-  }
+  import type { SimulatorProfileOption } from '../helpers.ts';
 
   interface ProfileComparisonEvents {
     comparisonProfileChange: { profileName: string | null };
   }
 
-  export let qualityProfiles: QualityProfileOption[];
+  export let qualityProfiles: SimulatorProfileOption[];
   export let primaryProfileName: string | null;
   export let comparisonProfileName: string | null = null;
   export let disabled: boolean = false;

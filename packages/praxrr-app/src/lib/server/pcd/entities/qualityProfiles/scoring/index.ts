@@ -5,7 +5,7 @@
  */
 
 // Queries
-export { scoring, allCfScores } from './read.ts';
+export { allCfScores, QualityProfileScoringNotFoundError, scoring } from './read.ts';
 
 // Mutations
 export { updateScoring } from './update.ts';

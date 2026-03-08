@@ -4,10 +4,11 @@ import { parseWithCacheBatch, isParserHealthy, matchPatternsBatch } from '$lib/s
 import {
   getAllConditionsForEvaluation,
   evaluateCustomFormat,
+  evaluateCustomFormatWithoutParse,
   getParsedInfo,
   extractAllPatterns,
 } from '$pcd/entities/customFormats/index.ts';
-import { scoring } from '$pcd/entities/qualityProfiles/index.ts';
+import { scoring, QualityProfileScoringNotFoundError } from '$pcd/entities/qualityProfiles/index.ts';
 import { trashGuideManager } from '$lib/server/trashguide/manager.ts';
 import { trashGuideEntityCacheQueries } from '$db/queries/trashGuideEntityCache.ts';
 import { trashGuideSourcesQueries } from '$db/queries/trashGuideSources.ts';
@@ -15,7 +16,9 @@ import { trashIdMappingsQueries } from '$db/queries/trashIdMappings.ts';
 import { parseCachedEntity } from '$lib/server/trashguide/displayTransform.ts';
 import { discoverTrashGuideFiles } from '$lib/server/trashguide/fetcher.ts';
 import { parseTrashGuideEntities } from '$lib/server/trashguide/parser.ts';
+import { cache } from '$cache/cache.ts';
 import { logger } from '$logger/logger.ts';
+import { QualitySource, type ParseResult } from '$lib/server/utils/arr/parser/types.ts';
 import type {
   TrashGuideCfGroupEntity,
   TrashGuideCustomFormatEntity,
@@ -33,7 +36,7 @@ type SimulateProfileScore = components['schemas']['SimulateProfileScore'];
 type SimulateScoreContribution = components['schemas']['SimulateScoreContribution'];
 type PcdProfileScoreData = Awaited<ReturnType<typeof scoring>>;
 
-const fallbackCfGroupsBySource = new Map<number, TrashGuideCfGroupEntity[]>();
+const FALLBACK_CF_GROUPS_TTL = 600; // 10 minutes
 
 interface ResolvedPcdProfile {
   kind: 'pcd';
@@ -128,16 +131,143 @@ function normalizeCfKey(value: string): string {
     .replace(/[^a-z0-9]/g, '');
 }
 
-function readOptionalStringField(fields: Readonly<Record<string, unknown>>, keys: readonly string[]): string | null {
-  for (const key of keys) {
-    const value = fields[key];
-    if (typeof value !== 'string') {
+function normalizeSourceToken(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '');
+}
+
+function isLikelyAnimeReleaseTitle(title: string): boolean {
+  return /^\[[^\]]+\]/.test(title);
+}
+
+function isWebLikeSource(source: QualitySource): boolean {
+  return source === QualitySource.TV || source === QualitySource.WebDL || source === QualitySource.WebRip;
+}
+
+function inferRepresentativeAnimeSource(customFormat: CustomFormatWithConditions): QualitySource | null {
+  const hasPatternSignal = customFormat.conditions.some(
+    (condition) =>
+      (condition.type === 'release_title' || condition.type === 'release_group') &&
+      (condition.patterns?.length ?? 0) > 0
+  );
+  if (!hasPatternSignal) {
+    return null;
+  }
+
+  const normalizedSources = new Set(
+    customFormat.conditions
+      .filter((condition) => condition.type === 'source')
+      .flatMap((condition) => condition.sources ?? [])
+      .map(normalizeSourceToken)
+      .filter((value) => value.length > 0)
+  );
+
+  if (normalizedSources.size === 0) {
+    return null;
+  }
+
+  const hasBluray = normalizedSources.has('bluray');
+  const hasDvd = normalizedSources.has('dvd');
+  const hasWebDl = normalizedSources.has('webdl');
+  const hasWebRip = normalizedSources.has('webrip');
+  const hasTelevision = normalizedSources.has('television') || normalizedSources.has('tv');
+  const hasGenericWeb = normalizedSources.has('web');
+  const hasWebLike = hasWebDl || hasWebRip || hasTelevision || hasGenericWeb;
+
+  if (hasBluray && !hasWebLike && !hasDvd) {
+    return QualitySource.Bluray;
+  }
+
+  if (hasWebLike && !hasBluray && !hasDvd) {
+    if (hasWebDl || hasGenericWeb) {
+      return QualitySource.WebDL;
+    }
+    if (hasWebRip) {
+      return QualitySource.WebRip;
+    }
+    return QualitySource.TV;
+  }
+
+  if (hasDvd && !hasBluray && !hasWebLike) {
+    return QualitySource.DVD;
+  }
+
+  return null;
+}
+
+function inferAnimeSourceFromFormats(
+  parsed: ParseResult | null,
+  title: string,
+  formats: readonly CustomFormatWithConditions[],
+  patternMatches?: Map<string, boolean>
+): ParseResult | null {
+  if (parsed === null || parsed.source !== QualitySource.Unknown || !isLikelyAnimeReleaseTitle(title)) {
+    return parsed;
+  }
+
+  const inferredSources = new Set<QualitySource>();
+
+  for (const customFormat of formats) {
+    const candidateSource = inferRepresentativeAnimeSource(customFormat);
+    if (candidateSource === null) {
       continue;
     }
 
-    const normalized = value.trim();
-    if (normalized.length > 0) {
-      return normalized;
+    const evaluation = evaluateCustomFormat(
+      customFormat.conditions,
+      {
+        ...parsed,
+        source: candidateSource,
+      },
+      title,
+      patternMatches
+    );
+
+    if (evaluation.matches) {
+      inferredSources.add(candidateSource);
+    }
+  }
+
+  if (inferredSources.size === 0) {
+    return parsed;
+  }
+
+  const inferredSourceList = [...inferredSources];
+  const inferredFamilies = new Set(
+    inferredSourceList.map((source) => (isWebLikeSource(source) ? 'web' : String(source)))
+  );
+
+  if (inferredFamilies.size !== 1) {
+    return parsed;
+  }
+
+  const resolvedSource = inferredFamilies.has('web')
+    ? inferredSourceList.includes(QualitySource.WebDL)
+      ? QualitySource.WebDL
+      : inferredSourceList.includes(QualitySource.WebRip)
+        ? QualitySource.WebRip
+        : QualitySource.TV
+    : inferredSourceList[0];
+
+  return {
+    ...parsed,
+    source: resolvedSource,
+  };
+}
+
+function readOptionalStringField(fields: Readonly<Record<string, unknown>>, keys: readonly string[]): string | null {
+  for (const key of keys) {
+    const value = fields[key];
+    if (typeof value === 'string') {
+      const normalized = value.trim();
+      if (normalized.length > 0) {
+        return normalized;
+      }
+    }
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      return String(value);
     }
   }
 
@@ -187,6 +317,138 @@ function readOptionalBooleanField(
   }
 
   return fallback;
+}
+
+// Radarr QualitySource enum → canonical name (matches parser enum values)
+const radarrSourceById: Record<number, string> = {
+  0: 'unknown',
+  1: 'cam',
+  2: 'telesync',
+  3: 'telecine',
+  4: 'workprint',
+  5: 'dvd',
+  6: 'television',
+  7: 'webdl',
+  8: 'webrip',
+  9: 'bluray',
+};
+
+// Sonarr QualitySource enum → canonical name (different numbering from Radarr)
+const sonarrSourceById: Record<number, string> = {
+  0: 'unknown',
+  1: 'television',
+  2: 'television',
+  3: 'webdl',
+  4: 'webrip',
+  5: 'dvd',
+  6: 'bluray',
+  7: 'bluray',
+};
+
+// Resolution enum → canonical name (same across Sonarr/Radarr, uses pixel counts)
+const resolutionById: Record<number, string> = {
+  0: 'unknown',
+  360: '360p',
+  480: '480p',
+  540: '540p',
+  576: '576p',
+  720: '720p',
+  1080: '1080p',
+  2160: '2160p',
+};
+
+// QualityModifier enum → canonical name (same across Sonarr/Radarr)
+const modifierById: Record<number, string> = {
+  0: 'none',
+  1: 'regional',
+  2: 'screener',
+  3: 'rawhd',
+  4: 'brdisk',
+  5: 'remux',
+};
+
+// ReleaseType enum → canonical name (Sonarr-specific, Radarr doesn't use)
+const releaseTypeById: Record<number, string> = {
+  0: 'unknown',
+  1: 'single_episode',
+  2: 'multi_episode',
+  3: 'season_pack',
+};
+
+// Language enum → canonical name (same across Sonarr/Radarr, includes special IDs)
+const languageById: Record<number, string> = {
+  [-2]: 'Original',
+  [-1]: 'Any',
+  0: 'Unknown',
+  1: 'English',
+  2: 'French',
+  3: 'Spanish',
+  4: 'German',
+  5: 'Italian',
+  6: 'Danish',
+  7: 'Dutch',
+  8: 'Japanese',
+  9: 'Icelandic',
+  10: 'Chinese',
+  11: 'Russian',
+  12: 'Polish',
+  13: 'Vietnamese',
+  14: 'Swedish',
+  15: 'Norwegian',
+  16: 'Finnish',
+  17: 'Turkish',
+  18: 'Portuguese',
+  19: 'Flemish',
+  20: 'Greek',
+  21: 'Korean',
+  22: 'Hungarian',
+  23: 'Hebrew',
+  24: 'Lithuanian',
+  25: 'Czech',
+  26: 'Hindi',
+  27: 'Romanian',
+  28: 'Thai',
+  29: 'Bulgarian',
+  30: 'Portuguese (BR)',
+  31: 'Arabic',
+  32: 'Ukrainian',
+  33: 'Persian',
+  34: 'Bengali',
+  35: 'Slovak',
+  36: 'Latvian',
+  37: 'Spanish (Latino)',
+  38: 'Catalan',
+  39: 'Croatian',
+  40: 'Serbian',
+  41: 'Bosnian',
+  42: 'Estonian',
+  43: 'Tamil',
+  44: 'Indonesian',
+  45: 'Telugu',
+  46: 'Macedonian',
+  47: 'Slovenian',
+  48: 'Malayalam',
+  49: 'Kannada',
+  50: 'Albanian',
+  51: 'Afrikaans',
+  52: 'Marathi',
+  53: 'Tagalog',
+  54: 'Urdu',
+  55: 'Romansh',
+  56: 'Mongolian',
+  57: 'Georgian',
+  58: 'Original',
+};
+
+function resolveNumericEnum(rawValue: string, map: Record<number, string>, fallback: string): string {
+  if (/^-?\d+$/.test(rawValue)) {
+    return map[Number(rawValue)] ?? fallback;
+  }
+  return rawValue;
+}
+
+function getSourceMap(arrType: string): Record<number, string> {
+  return arrType === 'sonarr' ? sonarrSourceById : radarrSourceById;
 }
 
 function mapSpecificationImplementation(value: string): ConditionData['type'] {
@@ -245,36 +507,46 @@ function toConditionData(
           },
         ],
       };
-    case 'language':
+    case 'language': {
+      const rawLang = readRequiredStringField(spec.fields, ['value'], context, spec.name);
       return {
         ...base,
         languages: [
           {
-            name: readRequiredStringField(spec.fields, ['value'], context, spec.name),
+            name: resolveNumericEnum(rawLang, languageById, rawLang),
             except: readOptionalBooleanField(spec.fields, ['exceptLanguage'], false),
           },
         ],
       };
-    case 'source':
+    }
+    case 'source': {
+      const rawSource = readRequiredStringField(spec.fields, ['value'], context, spec.name);
       return {
         ...base,
-        sources: [readRequiredStringField(spec.fields, ['value'], context, spec.name)],
+        sources: [resolveNumericEnum(rawSource, getSourceMap(entity.arr_type), rawSource)],
       };
-    case 'resolution':
+    }
+    case 'resolution': {
+      const rawRes = readRequiredStringField(spec.fields, ['value'], context, spec.name);
       return {
         ...base,
-        resolutions: [readRequiredStringField(spec.fields, ['value'], context, spec.name)],
+        resolutions: [resolveNumericEnum(rawRes, resolutionById, rawRes)],
       };
-    case 'quality_modifier':
+    }
+    case 'quality_modifier': {
+      const rawMod = readRequiredStringField(spec.fields, ['value'], context, spec.name);
       return {
         ...base,
-        qualityModifiers: [readRequiredStringField(spec.fields, ['value'], context, spec.name)],
+        qualityModifiers: [resolveNumericEnum(rawMod, modifierById, rawMod)],
       };
-    case 'release_type':
+    }
+    case 'release_type': {
+      const rawRt = readRequiredStringField(spec.fields, ['value'], context, spec.name);
       return {
         ...base,
-        releaseTypes: [readRequiredStringField(spec.fields, ['value'], context, spec.name)],
+        releaseTypes: [resolveNumericEnum(rawRt, releaseTypeById, rawRt)],
       };
+    }
     case 'indexer_flag':
       return {
         ...base,
@@ -305,7 +577,8 @@ async function loadFallbackCfGroups(
   sourceId: number,
   arrType: SimulateScoreRequest['arrType']
 ): Promise<TrashGuideCfGroupEntity[]> {
-  const cached = fallbackCfGroupsBySource.get(sourceId);
+  const cacheKey = `simulate:cfgroups:${sourceId}`;
+  const cached = cache.get<TrashGuideCfGroupEntity[]>(cacheKey);
   if (cached) {
     return cached;
   }
@@ -313,13 +586,19 @@ async function loadFallbackCfGroups(
   let source;
   try {
     source = trashGuideSourcesQueries.getById(sourceId);
-  } catch {
-    fallbackCfGroupsBySource.set(sourceId, []);
+  } catch (err) {
+    await logger.warn('TRaSH source lookup failed during score simulation', {
+      source: 'SimulateScoreRoute',
+      meta: {
+        sourceId,
+        error: err instanceof Error ? err.message : String(err),
+      },
+    });
     return [];
   }
 
   if (!source || source.arr_type !== arrType) {
-    fallbackCfGroupsBySource.set(sourceId, []);
+    cache.set(cacheKey, [], FALLBACK_CF_GROUPS_TTL);
     return [];
   }
 
@@ -333,7 +612,7 @@ async function loadFallbackCfGroups(
       discovery,
     });
     const fallbackGroups = [...parsed.entities.custom_format_groups];
-    fallbackCfGroupsBySource.set(sourceId, fallbackGroups);
+    cache.set(cacheKey, fallbackGroups, FALLBACK_CF_GROUPS_TTL);
 
     if (fallbackGroups.length > 0) {
       await logger.info('Loaded fallback TRaSH CF groups for score simulation', {
@@ -356,7 +635,6 @@ async function loadFallbackCfGroups(
         error: err instanceof Error ? err.message : String(err),
       },
     });
-    fallbackCfGroupsBySource.set(sourceId, []);
     return [];
   }
 }
@@ -447,7 +725,7 @@ export const POST: RequestHandler = async ({ request }) => {
           scoreData,
         });
       } catch (err) {
-        if (err instanceof Error && err.message.includes('not found')) {
+        if (err instanceof QualityProfileScoringNotFoundError) {
           missingProfiles.push(profileSelector);
         } else {
           throw error(500, `Failed to load scoring data for profile "${parsedSelector.name}"`);
@@ -665,7 +943,7 @@ export const POST: RequestHandler = async ({ request }) => {
       }
 
       if (score === null || !Number.isFinite(score)) {
-        continue;
+        score = 0;
       }
 
       scoreByCfName.set(statedName.toLowerCase(), score);
@@ -721,10 +999,7 @@ export const POST: RequestHandler = async ({ request }) => {
         }
 
         const referencedCf = customFormatsByTrashId.get(groupCf.trash_id.toLowerCase()) ?? null;
-        const score = resolveTrashScoreFromCustomFormat(referencedCf, scoreSet);
-        if (score === null || !Number.isFinite(score)) {
-          continue;
-        }
+        const score = resolveTrashScoreFromCustomFormat(referencedCf, scoreSet) ?? 0;
 
         const displayName = referencedCf?.name?.trim() || groupCf.name;
         scoreByCfName.set(displayName.toLowerCase(), score);
@@ -770,57 +1045,9 @@ export const POST: RequestHandler = async ({ request }) => {
 
   const results: SimulateReleaseResult[] = releases.map((release) => {
     const cacheKey = `${release.title}:${release.type}`;
-    const parsed = parseResults.get(cacheKey);
-
-    if (!parsed) {
-      const profileScores: SimulateProfileScore[] = resolvedProfiles.map((profile) => {
-        if (profile.kind === 'pcd') {
-          return {
-            profileName: profile.requestKey,
-            totalScore: 0,
-            minimumScore: profile.scoreData.minimum_custom_format_score,
-            upgradeUntilScore: profile.scoreData.upgrade_until_score,
-            contributions: [],
-          };
-        }
-
-        return {
-          profileName: profile.requestKey,
-          totalScore: 0,
-          minimumScore: profile.entity.min_format_score,
-          upgradeUntilScore: profile.entity.cutoff_format_score,
-          contributions: [],
-        };
-      });
-
-      // Emit empty cfMatches per profile so the client always sees the right
-      // set of format names for that profile's source.
-      const cfMatchesByProfile = new Map<string, SimulateCfMatch[]>();
-      for (const profile of resolvedProfiles) {
-        const profileFormats =
-          profile.kind === 'pcd'
-            ? pcdCustomFormats
-            : [...(trashCustomFormatsByKeyBySource.get(profile.sourceId)?.values() ?? [])].sort((a, b) =>
-                a.name.localeCompare(b.name)
-              );
-        cfMatchesByProfile.set(
-          profile.requestKey,
-          profileFormats.map((cf) => ({ name: cf.name, matches: false, conditions: [] }))
-        );
-      }
-
-      return {
-        id: release.id,
-        title: release.title,
-        parsed: null,
-        // Legacy top-level cfMatches: use PCD formats (or the first available
-        // set) so the response shape remains backward-compatible.
-        cfMatches: cfMatchesByProfile.get(resolvedProfiles[0]?.requestKey ?? '') ?? [],
-        profileScores,
-      };
-    }
-
+    const parsed = parseResults.get(cacheKey) ?? null;
     const patternMatches = patternMatchResults?.get(release.title);
+    const effectiveParsed = inferAnimeSourceFromFormats(parsed, release.title, allFormatsForPatterns, patternMatches);
 
     const profileScores: SimulateProfileScore[] = resolvedProfiles.map((profile) => {
       // Resolve the format definitions that belong exclusively to this profile.
@@ -837,7 +1064,9 @@ export const POST: RequestHandler = async ({ request }) => {
           return { name: customFormat.name, matches: false, conditions: [] };
         }
 
-        const evaluation = evaluateCustomFormat(customFormat.conditions, parsed, release.title, patternMatches);
+        const evaluation = effectiveParsed
+          ? evaluateCustomFormat(customFormat.conditions, effectiveParsed, release.title, patternMatches)
+          : evaluateCustomFormatWithoutParse(customFormat.conditions, release.title, patternMatches);
         return {
           name: customFormat.name,
           matches: evaluation.matches,
@@ -906,14 +1135,16 @@ export const POST: RequestHandler = async ({ request }) => {
       if (customFormat.conditions.length === 0) {
         return { name: customFormat.name, matches: false, conditions: [] };
       }
-      const evaluation = evaluateCustomFormat(customFormat.conditions, parsed, release.title, patternMatches);
+      const evaluation = effectiveParsed
+        ? evaluateCustomFormat(customFormat.conditions, effectiveParsed, release.title, patternMatches)
+        : evaluateCustomFormatWithoutParse(customFormat.conditions, release.title, patternMatches);
       return { name: customFormat.name, matches: evaluation.matches, conditions: evaluation.conditions };
     });
 
     return {
       id: release.id,
       title: release.title,
-      parsed: getParsedInfo(parsed),
+      parsed: effectiveParsed ? getParsedInfo(effectiveParsed) : null,
       cfMatches: topLevelCfMatches,
       profileScores,
     };
