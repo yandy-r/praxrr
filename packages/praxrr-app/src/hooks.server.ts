@@ -18,6 +18,7 @@ import { trashGuideManager } from '$trashguide/index.ts';
 import { getAuthState, isPublicPath, maybeExtendSession, cleanupExpiredSessions } from '$auth/middleware.ts';
 import { getClientIp } from '$auth/network.ts';
 import { setupStateQueries } from '$db/queries/setupState.ts';
+import { appInfoQueries } from '$db/queries/appInfo.ts';
 
 // Initialize configuration on server startup
 await config.init();
@@ -40,6 +41,9 @@ await db.initialize();
 
 // Run database migrations
 await runMigrations();
+
+// Sync app version from build into database
+appInfoQueries.updateVersion(__APP_VERSION__);
 
 // Load log settings from database (must be after migrations)
 logSettings.load();

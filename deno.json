@@ -80,7 +80,9 @@
     "test:e2e:reset": "deno run -A scripts/e2e-reset.ts",
     "stats": "bash scripts/stats.sh",
     "bundle:api": "deno run -A scripts/bundle-api.ts",
-    "publish:api": "deno task bundle:api && cd packages/praxrr-api && deno publish"
+    "publish:api": "deno task bundle:api && cd packages/praxrr-api && deno publish",
+    "version": "deno run -A scripts/version.ts",
+    "publish:app": "deno run -A scripts/version.ts --create-git-tags --publish"
   },
   "compilerOptions": {
     "lib": ["deno.window", "dom"],
