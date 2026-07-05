@@ -15,7 +15,7 @@ import {
   parseSourceId,
   toErrorMessage,
   validateRepositoryUrl,
-} from './_helpers.ts';
+} from '../_helpers.ts';
 
 const UPDATE_ALLOWED_FIELDS = new Set([
   'name',

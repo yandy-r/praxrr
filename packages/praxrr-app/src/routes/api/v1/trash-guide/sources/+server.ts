@@ -13,7 +13,7 @@ import {
   parseOptionalNonEmptyString,
   toErrorMessage,
   validateRepositoryUrl,
-} from './[id]/_helpers.ts';
+} from './_helpers.ts';
 
 const CREATE_ALLOWED_FIELDS = new Set([
   'name',

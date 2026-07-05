@@ -1,21 +1,13 @@
 import { db } from '../db.ts';
-import { parseTrashGuideSourceArrType, type TrashGuideSourceArrType } from '$lib/server/trashguide/types.ts';
+import {
+  parseTrashGuideEntityType,
+  parseTrashGuideSourceArrType,
+  type TrashGuideEntityType,
+  type TrashGuideSourceArrType,
+} from '$lib/server/trashguide/types.ts';
 import { normalizeTrashId } from '$trashguide/ids.ts';
 
-export type TrashIdMappingEntityType =
-  | 'custom_format'
-  | 'custom_format_group'
-  | 'quality_profile'
-  | 'quality_size'
-  | 'naming';
-
-const VALID_ENTITY_TYPES: ReadonlySet<string> = new Set<TrashIdMappingEntityType>([
-  'custom_format',
-  'custom_format_group',
-  'quality_profile',
-  'quality_size',
-  'naming',
-]);
+export type TrashIdMappingEntityType = TrashGuideEntityType;
 
 interface TrashIdMappingRow {
   source_id: number;
@@ -57,20 +49,12 @@ export interface TrashIdMappingDiff {
   removed: TrashIdMapping[];
 }
 
-function parseEntityType(raw: string): TrashIdMappingEntityType {
-  if (VALID_ENTITY_TYPES.has(raw)) {
-    return raw as TrashIdMappingEntityType;
-  }
-
-  throw new Error(`Invalid TRaSH entity type mapping value: ${raw}`);
-}
-
 function rowToMapping(row: TrashIdMappingRow): TrashIdMapping {
   return {
     sourceId: row.source_id,
     trashId: normalizeTrashId(row.trash_id),
     arrType: parseTrashGuideSourceArrType(row.arr_type),
-    entityType: parseEntityType(row.entity_type),
+    entityType: parseTrashGuideEntityType(row.entity_type),
     entityName: row.entity_name,
   };
 }
