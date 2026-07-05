@@ -102,7 +102,6 @@ jobs:
     env:
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-      CLOUDFLARE_PAGES_PROJECT: ${{ vars.CLOUDFLARE_PAGES_PROJECT || 'praxrr-docs' }}
     steps:
       - name: Download static site artifact
         uses: actions/download-artifact@v4
@@ -110,12 +109,9 @@ jobs:
           name: praxrr-docs-site
           path: docs/site/dist
 
-      - name: Deploy to Cloudflare Pages
+      - name: Deploy to Cloudflare Workers
         if: ${{ env.CLOUDFLARE_ACCOUNT_ID != '' && env.CLOUDFLARE_API_TOKEN != '' }}
-        run: >
-          npx --yes wrangler@latest pages deploy docs/site/dist
-          --project-name "$CLOUDFLARE_PAGES_PROJECT"
-          --branch "${GITHUB_REF_NAME:-main}"
+        run: npx --yes wrangler@latest deploy
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ env.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ env.CLOUDFLARE_API_TOKEN }}
