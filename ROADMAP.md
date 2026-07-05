@@ -1,6 +1,6 @@
 # Praxrr Roadmap
 
-Reviewed: 2026-07-05 (updated after #196 merged)
+Reviewed: 2026-07-05 (updated after docs deploy CI and #195 merged)
 
 Source: open GitHub issues in `yandy-r/praxrr` as of this review.
 
@@ -32,7 +32,7 @@ are still respected, but they are not the only sorting rule.
 
 The best next order is:
 
-1. Ship documentation infrastructure and the highest-value docs.
+1. Ship documentation content starting with user guides and PCD database docs.
 2. Build onboarding and transparency features.
 3. Build configuration lifecycle safety.
 4. Add advanced automation, trust, and integration features.
@@ -41,8 +41,8 @@ The best next order is:
 
 Phase 1 safety work from the research backlog is complete: Sync Preview/Dry-Run, API Key Masking,
 Encrypted API Key Storage, PCD State Snapshots, Progressive Disclosure rollout, Score Simulator
-(phases 1–3), and TRaSH Guide Sync PR-122 hardening (#125, #126). The open roadmap should not
-restart those completed issues.
+(phases 1–3), TRaSH Guide Sync PR-122 hardening (#125, #126, #194), and docs infrastructure (#38).
+The open roadmap should not restart those completed issues.
 
 ## Recently Shipped
 
@@ -50,6 +50,8 @@ Merged work since the Score Simulator and TRaSH Guide Sync foundations landed.
 
 | Date       | PR / commit                                        | Summary                                                                                                                            | Closes / relates                                     |
 | ---------- | -------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
+| 2026-07-05 | `bf50467e`, `0f324ddd`, `56b359a9`                 | Docs deploy CI: Workers Assets deployment, wrangler config loading, and deploy trigger                                             | Relates to [#38](https://github.com/yandy-r/praxrr/issues/38) |
+| 2026-07-05 | [#195](https://github.com/yandy-r/praxrr/pull/195) | Reject NUL bytes in TRaSH metadata paths with typed `TrashGuideFetcherError`                                                       | [#194](https://github.com/yandy-r/praxrr/issues/194) |
 | 2026-07-05 | [#196](https://github.com/yandy-r/praxrr/pull/196) | Astro Starlight documentation site with OpenAPI generation, mirror-doc imports, docs CI, Cloudflare Pages wiring, and dispatches   | [#38](https://github.com/yandy-r/praxrr/issues/38)   |
 | 2026-07-05 | [#193](https://github.com/yandy-r/praxrr/pull/193) | Test coverage for 8 TRaSH modules (~137 tests): fetcher, sync job, manager, sources route, transformers, parser, trash-id mappings | [#125](https://github.com/yandy-r/praxrr/issues/125) |
 | 2026-07-05 | [#191](https://github.com/yandy-r/praxrr/pull/191) | Type design hardening: narrow `arr_type`, consolidate parse helpers, boolean `enabled`/`auto_pull` at query boundary               | [#126](https://github.com/yandy-r/praxrr/issues/126) |
@@ -63,12 +65,6 @@ Merged work since the Score Simulator and TRaSH Guide Sync foundations landed.
 | 2026-03-05 | [#176](https://github.com/yandy-r/praxrr/pull/176) | Score Simulator phase 1                                                                                                            | #171–#175                                            |
 | 2026-03-04 | [#170](https://github.com/yandy-r/praxrr/pull/170) | Progressive Disclosure rollout across form and settings pages                                                                      | Progressive Disclosure                               |
 | 2026-03-02 | [#164](https://github.com/yandy-r/praxrr/pull/164) | Persist advanced section visibility preferences                                                                                    | Progressive Disclosure                               |
-
-Follow-up surfaced by #193 tests (optional, low severity):
-
-| Issue                                                                                   | Priority | Decision                                                                               |
-| --------------------------------------------------------------------------------------- | -------- | -------------------------------------------------------------------------------------- |
-| [#194](https://github.com/yandy-r/praxrr/issues/194) Reject NUL bytes in metadata paths | Low      | Harden `normalizeMetadataPath` error contract; does not block docs or onboarding work. |
 
 ## P0 - Current Focus: Documentation Foundation
 
@@ -84,19 +80,21 @@ Goal: make Praxrr understandable enough for users and contributors to run, debug
 
 Notes:
 
-- #38 shipped the dependency gate. Keep follow-up content work inside the settled docs site shape.
+- #38 shipped the dependency gate and docs deploy CI is wired for Workers Assets. Keep follow-up content
+  work inside the settled docs site shape.
 - #74 should stay practical and task-oriented. Avoid turning it into an internal architecture guide.
 - #73 and #76 should stay separate: one documents schema structure, the other documents curated content.
-- Optional TRaSH tail work ([#194](https://github.com/yandy-r/praxrr/issues/194)) can land in parallel if someone is already in the fetcher module.
 
 ## Completed: TRaSH Guide Sync Stabilization
 
-Goal: make the TRaSH Guide Sync pipeline safe to keep building on. **Closed 2026-07-05.**
+Goal: make the TRaSH Guide Sync pipeline safe to keep building on. **Closed 2026-07-05** (#125, #126,
+#194).
 
 | Issue                                                                                  | PR   | Outcome                                                                                                                                                                     |
 | -------------------------------------------------------------------------------------- | ---- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | [#126](https://github.com/yandy-r/praxrr/issues/126) TRaSH Guide Sync type design gaps | #191 | `arr_type` narrowed to supported TRaSH apps, parse logic consolidated, boolean conversion normalized at the query boundary.                                                 |
 | [#125](https://github.com/yandy-r/praxrr/issues/125) TRaSH Guide Sync test gaps        | #193 | ~137 tests across fetcher, sync job, manager, sources route, transformers, parser, and trash-id mappings; git error classification, path security, and error paths covered. |
+| [#194](https://github.com/yandy-r/praxrr/issues/194) NUL-byte metadata path guard     | #195 | `normalizeMetadataPath` rejects embedded NUL bytes with typed `TrashGuideFetcherError` instead of surfacing raw filesystem errors.                                           |
 
 ## P1 - Core Product Differentiation: Onboarding and Transparency
 
@@ -202,8 +200,10 @@ Use this checklist when planning a sprint or milestone.
 ### Completed (2026-07-05)
 
 - [x] #38 - Docs site infrastructure ([#196](https://github.com/yandy-r/praxrr/pull/196))
+- [x] Docs deploy CI - Workers Assets deployment and wrangler config (`bf50467e`, `0f324ddd`, `56b359a9`)
 - [x] #126 - TRaSH Guide Sync type hardening ([#191](https://github.com/yandy-r/praxrr/pull/191))
 - [x] #125 - TRaSH Guide Sync test coverage ([#193](https://github.com/yandy-r/praxrr/pull/193))
+- [x] #194 - TRaSH fetcher NUL-byte guard ([#195](https://github.com/yandy-r/praxrr/pull/195))
 
 ### Current Focus
 
@@ -212,7 +212,6 @@ Use this checklist when planning a sprint or milestone.
 - [ ] #73 - PCD schema table reference
 - [ ] #77 - App technical docs
 - [ ] #75 - UI component reference
-- [ ] #194 - TRaSH fetcher NUL-byte guard (optional tail)
 
 ### Onboarding and Transparency
 
@@ -262,13 +261,13 @@ Use this checklist when planning a sprint or milestone.
 
 ## Next Sprint Recommendation
 
-Start with a documentation foundation sprint:
+Start with a documentation content sprint:
 
-1. Scope and begin #38 (Astro Starlight docs site with CI/deployment).
-2. Draft the #74 user guide outline so content can land as soon as the site skeleton exists.
-3. Optionally close #194 if already touching `fetcher.ts`; it is low severity and not a blocker.
-4. Update #6 so the parent research checklist points to this roadmap and no longer implies closed
+1. Draft the #74 user guide outline and publish the first install/configure/sync guides in the
+   Starlight site.
+2. Begin #76 PCD database content docs in parallel so curated config value is visible early.
+3. Update #6 so the parent research checklist points to this roadmap and no longer implies closed
    Phase 1 items are still active.
 
-TRaSH Guide Sync stabilization (#125, #126) is complete. The next milestone is making Praxrr
-documented enough for v2 users and contributors.
+Docs infrastructure (#38), deploy CI, and TRaSH Guide Sync stabilization (#125, #126, #194) are
+complete. The next milestone is making Praxrr documented enough for v2 users and contributors.
