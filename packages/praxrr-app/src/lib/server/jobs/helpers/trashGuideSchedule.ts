@@ -31,7 +31,7 @@ export function scheduleTrashGuideSyncSources(): string[] {
   for (const source of sources) {
     const dedupeKey = getTrashGuideSyncDedupeKey(source.id);
 
-    if (source.enabled !== 1 || source.sync_strategy <= 0) {
+    if (!source.enabled || source.sync_strategy <= 0) {
       jobQueueQueries.unscheduleByDedupeKey(dedupeKey);
       continue;
     }

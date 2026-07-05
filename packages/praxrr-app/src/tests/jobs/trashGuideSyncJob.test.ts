@@ -25,7 +25,7 @@ function createSourceFixture(
   id: number,
   options: {
     arrType: 'radarr' | 'sonarr';
-    enabled?: 0 | 1;
+    enabled?: boolean;
     syncStrategy?: number;
     lastSyncedAt?: string | null;
   }
@@ -39,8 +39,8 @@ function createSourceFixture(
     arr_type: options.arrType,
     score_profile: 'default',
     sync_strategy: options.syncStrategy ?? 60,
-    auto_pull: 1,
-    enabled: options.enabled ?? 1,
+    auto_pull: true,
+    enabled: options.enabled ?? true,
     last_synced_at: options.lastSyncedAt ?? null,
     last_commit_hash: null,
     created_at: '2026-02-25T00:00:00.000Z',
@@ -149,12 +149,12 @@ Deno.test('scheduleTrashGuideSyncJobs unschedules disabled and non-scheduled sou
     () => [
       createSourceFixture(71, {
         arrType: 'radarr',
-        enabled: 0,
+        enabled: false,
         syncStrategy: 60,
       }),
       createSourceFixture(72, {
         arrType: 'sonarr',
-        enabled: 1,
+        enabled: true,
         syncStrategy: 0,
       }),
     ],
