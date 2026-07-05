@@ -436,9 +436,11 @@ SONARR_QUALS=$(echo "$SONARR_QUALS" \
 
 1. Fork the repository on GitHub.
 2. Create a feature branch from `main`:
+
    ```bash
    git checkout -b feat/add-new-condition-type main
    ```
+
 3. Use a descriptive branch name. Prefix with the change type:
    - `feat/` -- new tables, columns, or seed data
    - `fix/` -- corrections to existing schema or data

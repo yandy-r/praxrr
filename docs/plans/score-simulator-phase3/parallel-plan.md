@@ -39,6 +39,7 @@ All tasks in this batch are independent with zero cross-dependencies.
 - The current server load resolves `profile.name` (line 39) but does not include it in the return
   value
 - Add `profileName: profile.name` to the return object (line 47-50):
+
   ```typescript
   return {
     profileName: profile.name,
@@ -46,6 +47,7 @@ All tasks in this batch are independent with zero cross-dependencies.
     canWriteToBase: canWriteToBase(currentDatabaseId),
   };
   ```
+
 - This is needed by SimulateButton (T1/T2) to construct the deep-link URL
 
 **Note:** This is a server load data shape change, not an API endpoint change. No OpenAPI spec
@@ -317,6 +319,7 @@ Template changes — override wiring:
 - Pass to RankingTable: `overrides={scoreOverrides}`
 - Pass to ComparisonView: `overrides={scoreOverrides}`
 - Add info banner when `hasActiveOverrides`:
+
   ```svelte
   {#if hasActiveOverrides}
     <div class="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-700 dark:bg-amber-900/20 dark:text-amber-200">
@@ -364,7 +367,8 @@ New props (add to script section):
 
 ```typescript
 export let overrides: ScoreOverrideMap = {};
-export let onOverrideChange: ((cfName: string, score: number) => void) | undefined = undefined;
+export let onOverrideChange:
+  ((cfName: string, score: number) => void) | undefined = undefined;
 export let onOverrideReset: ((cfName: string) => void) | undefined = undefined;
 export let onOverrideResetAll: (() => void) | undefined = undefined;
 ```
@@ -379,7 +383,10 @@ import {
 } from '../helpers';
 
 $: overriddenContributions = profileScore
-  ? applyScoreOverrides(sortScoreContributionsByMagnitude(profileScore.contributions), overrides)
+  ? applyScoreOverrides(
+      sortScoreContributionsByMagnitude(profileScore.contributions),
+      overrides
+    )
   : [];
 
 $: overriddenTotal = profileScore
@@ -400,6 +407,7 @@ Inline editing behavior:
 
 - Each contribution row: clicking the score area sets `editingCfName = cfName`
 - When `editingCfName === cfName`, render `<NumberInput>` instead of `<Score>`:
+
   ```svelte
   <NumberInput
     name="override-{cfName}"
@@ -413,6 +421,7 @@ Inline editing behavior:
     }}
   />
   ```
+
 - Handle blur-clear: also listen to `on:change` dispatched event to detect `undefined` and treat as
   reset
 - Auto-select input on mount (use `use:action` to select input text)
@@ -422,12 +431,14 @@ Inline editing behavior:
 Override visual indicators:
 
 - Row with active override (where `originalScore` is defined):
+
   ```
   class:bg-amber-50={hasOverride}
   class:dark:bg-amber-900/20={hasOverride}
   class:border-l-2={hasOverride}
   class:border-amber-500={hasOverride}
   ```
+
 - Original value annotation:
   `<span class="text-xs text-neutral-400 line-through">{originalScore}</span>`
 - Delta display:
@@ -473,6 +484,7 @@ Accessibility:
   `resolveScoreThresholdState()`
 - Existing callers without the param continue to work (default empty map = no change)
 - The parent `+page.svelte` reactive declaration becomes:
+
   ```typescript
   $: rankedReleases = batchSimulationResult
     ? buildRankingFromResults(
@@ -521,6 +533,7 @@ is only for visual indicator display:
   Profile B stays at baseline.
 - Existing callers without the param continue to work
 - Parent reactive declaration becomes:
+
   ```typescript
   $: comparisonResult = buildComparisonResult(
     singleSimulationResult?.results?.[0],
@@ -563,7 +576,10 @@ Follow patterns from `scoreSimulatorHelpers.test.ts` and `scoreSimulatorPhase2He
 
 ```typescript
 import { assertEquals, assertNotEquals } from '@std/assert';
-import type { SimulateProfileScore, SimulateScoreContribution } from '$api/v1.d.ts';
+import type {
+  SimulateProfileScore,
+  SimulateScoreContribution,
+} from '$api/v1.d.ts';
 ```
 
 Test cases for `applyScoreOverrides()`:

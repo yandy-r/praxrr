@@ -13,9 +13,9 @@ serialization via native `URLSearchParams` keeping state shareable.
 
 ### URL State Management in SvelteKit
 
-- **Documentation**: https://svelte.dev/docs/kit/$app-navigation
-- **Shallow Routing**: https://svelte.dev/docs/kit/shallow-routing
-- **State Management Guide**: https://svelte.dev/docs/kit/state-management
+- **Documentation**: <https://svelte.dev/docs/kit/$app-navigation>
+- **Shallow Routing**: <https://svelte.dev/docs/kit/shallow-routing>
+- **State Management Guide**: <https://svelte.dev/docs/kit/state-management>
 
 **Confidence**: High (official SvelteKit documentation, multiple community confirmations)
 
@@ -100,9 +100,9 @@ In components (Svelte 5, no runes -- matching project conventions):
 
 ### Deno Testing Framework
 
-- **Documentation**: https://docs.deno.com/runtime/fundamentals/testing/
-- **Mocking Tutorial**: https://docs.deno.com/examples/mocking_tutorial/
-- **Mock Module (JSR)**: https://jsr.io/@std/testing/doc/mock
+- **Documentation**: <https://docs.deno.com/runtime/fundamentals/testing/>
+- **Mocking Tutorial**: <https://docs.deno.com/examples/mocking_tutorial/>
+- **Mock Module (JSR)**: <https://jsr.io/@std/testing/doc/mock>
 
 **Confidence**: High (official Deno documentation)
 
@@ -192,8 +192,8 @@ descriptive names, `assertEquals`/`assertNotEquals` assertions.
 
 ### Playwright for SvelteKit E2E
 
-- **Documentation**: https://playwright.dev/docs/intro
-- **SvelteKit Guide**: https://www.okupter.com/blog/e2e-testing-with-sveltekit-and-playwright
+- **Documentation**: <https://playwright.dev/docs/intro>
+- **SvelteKit Guide**: <https://www.okupter.com/blog/e2e-testing-with-sveltekit-and-playwright>
 
 **Confidence**: High (official Playwright docs, established project configuration)
 
@@ -245,7 +245,9 @@ test('score simulator deep-link from quality profile', async ({ page }) => {
 
 test('URL state is shareable', async ({ page }) => {
   // Navigate directly with URL params
-  await page.goto('/score-simulator/1?arrType=radarr&profile=pcd:HD&titles=Movie.2024.1080p');
+  await page.goto(
+    '/score-simulator/1?arrType=radarr&profile=pcd:HD&titles=Movie.2024.1080p'
+  );
 
   // Verify state is restored from URL
   await expect(page.getByText('radarr')).toBeVisible();
@@ -273,7 +275,7 @@ For this project's requirements, native browser/SvelteKit APIs are sufficient an
 
 #### sveltekit-search-params
 
-- **URL**: https://github.com/paoloricciuti/sveltekit-search-params
+- **URL**: <https://github.com/paoloricciuti/sveltekit-search-params>
 - **Status**: Not recommended
 - **Reason**: Not yet updated for Svelte 5 runes; relies on deprecated `$page` store. The project
   convention is Svelte 5 without runes, so using `$page` from `$app/stores` is still valid, but
@@ -284,7 +286,7 @@ For this project's requirements, native browser/SvelteKit APIs are sufficient an
 
 #### kit-query-params
 
-- **URL**: https://github.com/beynar/kit-query-params
+- **URL**: <https://github.com/beynar/kit-query-params>
 - **Status**: Not recommended
 - **Reason**: Svelte 5 runes-based library. Project explicitly uses Svelte 5 without runes.
 
@@ -292,7 +294,7 @@ For this project's requirements, native browser/SvelteKit APIs are sufficient an
 
 #### pako (zlib compression)
 
-- **URL**: https://www.npmjs.com/package/pako
+- **URL**: <https://www.npmjs.com/package/pako>
 - **Status**: Not needed for Phase 3
 - **Analysis**: Pako achieves ~40-50% compression on JSON state. However, the score simulator state
   is small enough to fit in URL without compression (see Constraints section). Could be reconsidered
@@ -618,7 +620,9 @@ test.describe('Score Simulator Phase 3', () => {
     await page.reload();
 
     // Verify state is preserved
-    await expect(page.locator('[data-testid="profile-select"]')).toHaveValue('pcd:HD');
+    await expect(page.locator('[data-testid="profile-select"]')).toHaveValue(
+      'pcd:HD'
+    );
   });
 
   test('what-if override updates ranking in real-time', async ({ page }) => {

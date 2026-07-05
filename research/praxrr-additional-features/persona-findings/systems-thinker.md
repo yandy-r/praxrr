@@ -405,7 +405,7 @@ Praxrr's current feature set (custom formats, quality profiles, release profiles
 
 ### 4. Upstream Dependency is an Existential Risk (Stakeholder)
 
-Praxrr depends entirely on *Arr API stability. When Radarr V5 mandated authentication and obfuscated API responses, every downstream tool had to adapt. The *Arr developers have no obligation to maintain backward compatibility for third-party tools. Praxrr must architect for API instability: version-specific adapters, graceful degradation on API changes, and rapid response capability. Building features that deepen API coupling (e.g., live monitoring, real-time sync) increases this risk.
+Praxrr depends entirely on *Arr API stability. When Radarr V5 mandated authentication and obfuscated API responses, every downstream tool had to adapt. The*Arr developers have no obligation to maintain backward compatibility for third-party tools. Praxrr must architect for API instability: version-specific adapters, graceful degradation on API changes, and rapid response capability. Building features that deepen API coupling (e.g., live monitoring, real-time sync) increases this risk.
 
 ### 5. Maintainer Sustainability Limits Feature Ambition (Ecosystem)
 

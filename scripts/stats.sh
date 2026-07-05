@@ -181,7 +181,7 @@ for entry in "${MODULES[@]}"; do
   done
 
   stats="$(scc_totals "${abs_paths[@]}")"
-  IFS=',' read -r files lines code comment blank bytes <<< "$stats"
+  IFS=',' read -r files lines code comment blank _ <<< "$stats"
 
   mod_names+=("$name")
   mod_files+=("$files")

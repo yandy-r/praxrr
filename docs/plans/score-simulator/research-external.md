@@ -304,6 +304,7 @@ The recommended UX pattern for real-time scoring feedback:
 - **Source**: [trash-guides.info](https://trash-guides.info)
 - **Relevance**: Curated custom format collections with scoring recommendations. The JSON format used by TRaSH is the de facto standard for custom format interchange (also used by Praxrr PCD).
 - **Custom Format JSON Structure** (from [TRaSH Guides architecture](https://deepwiki.com/TRaSH-Guides/Guides/2-custom-formats-system-architecture)):
+
   ```json
   {
     "trash_id": "b6832f586342ef70d9c128d40c07b872",

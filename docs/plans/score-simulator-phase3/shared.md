@@ -238,7 +238,10 @@ export function parseUrlState(searchParams: URLSearchParams): SimulatorUrlState;
 export function serializeUrlState(state: SimulatorUrlState): URLSearchParams;
 
 /** Copy shareable URL to clipboard with graceful fallback. */
-export async function copyShareLink(state: SimulatorUrlState, baseUrl: string): Promise<boolean>;
+export async function copyShareLink(
+  state: SimulatorUrlState,
+  baseUrl: string
+): Promise<boolean>;
 ```
 
 ---
@@ -296,7 +299,10 @@ $: overrideCount = Object.keys(scoreOverrides).length;
 ### Reactive Declarations (Current)
 
 ```typescript
-$: selectedProfileScore = getSelectedProfileScore(singleSimulationResult, selectedProfileName);
+$: selectedProfileScore = getSelectedProfileScore(
+  singleSimulationResult,
+  selectedProfileName
+);
 $: batchTitles = parseBatchTitles(batchRawText, batchMediaType);
 $: rankedReleases = buildRankingFromResults(
   batchSimulationResult?.results,
@@ -308,8 +314,12 @@ $: comparisonResult = buildComparisonResult(
   selectedProfileName,
   comparisonProfileName
 );
-$: singleProfileNames = [selectedProfileName, comparisonProfileName].filter(Boolean);
-$: batchProfileNames = [batchSelectedProfileName, comparisonProfileName].filter(Boolean);
+$: singleProfileNames = [selectedProfileName, comparisonProfileName].filter(
+  Boolean
+);
+$: batchProfileNames = [batchSelectedProfileName, comparisonProfileName].filter(
+  Boolean
+);
 ```
 
 ### Key Functions (Current)
@@ -565,7 +575,9 @@ for (const cfMatch of cfMatches) {
 
   let score = 0;
   if (profile.kind === 'pcd') {
-    const cfScoring = profile.scoreData.customFormats.find((cf) => cf.name === cfMatch.name);
+    const cfScoring = profile.scoreData.customFormats.find(
+      (cf) => cf.name === cfMatch.name
+    );
     score = cfScoring?.scores[arrType] ?? 0;
   } else {
     // TRaSH score resolution (direct name match -> normalized key fallback)
@@ -695,7 +707,8 @@ md: px-2 py-0.5 text-xs
 
 ```typescript
 // Already registered in sectionKeys.ts line 58:
-export const SS_ADVANCED_OPTIONS = 'score-simulator:simulator:advanced-options' as const;
+export const SS_ADVANCED_OPTIONS =
+  'score-simulator:simulator:advanced-options' as const;
 // No new section keys needed for Phase 3
 ```
 

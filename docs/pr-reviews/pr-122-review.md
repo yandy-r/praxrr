@@ -79,7 +79,7 @@ auto-pull enabled and the actual DB value is invisible.
 **Fix:** Add `autoPull: boolean` to `TrashGuideSourceResponse`, map `source.auto_pull === 1` in
 `toSourceResponse()`, and use `String(source.autoPull)` in the form init.
 
-### Validation update (2026-02-26)
+### Validation update (2026-02-26) (#4)
 
 Implemented the first four issues from the review:
 
@@ -107,7 +107,7 @@ network timeout) all return HTTP 500 "Internal Server Error."
 **Fix:** Add `TrashGuideFetcherError` handling -- non-retryable errors (bad URL, bad branch) -> 422,
 retryable (network, auth) -> 502. Add `TrashGuideTransformError` -> 422.
 
-### Validation update (2026-02-26)
+### Validation update (2026-02-26) (#5)
 
 Implemented issue #5.
 

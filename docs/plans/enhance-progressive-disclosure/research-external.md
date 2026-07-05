@@ -8,7 +8,7 @@ The existing AdvancedSection component and server-synced userInterfacePreference
 
 ### 1. Svelte Built-in Transitions (`svelte/transition`)
 
-- **Documentation**: https://svelte.dev/docs/svelte/svelte-transition
+- **Documentation**: <https://svelte.dev/docs/svelte/svelte-transition>
 - **Authentication**: N/A (framework built-in)
 - **Key Patterns**:
   - `transition:slide` -- Animates element height from 0 to auto along the y-axis (or x-axis). Ideal for expanding/collapsing content panels.
@@ -22,10 +22,10 @@ The existing AdvancedSection component and server-synced userInterfacePreference
 
 ### 2. W3C ARIA Disclosure Widget Pattern
 
-- **Documentation**: https://www.w3.org/WAI/ARIA/apg/patterns/disclosure/
+- **Documentation**: <https://www.w3.org/WAI/ARIA/apg/patterns/disclosure/>
 - **Additional resources**:
-  - https://www.makethingsaccessible.com/guides/accessible-basic-disclosure-widgets/
-  - https://adrianroselli.com/2020/05/disclosure-widgets.html
+  - <https://www.makethingsaccessible.com/guides/accessible-basic-disclosure-widgets/>
+  - <https://adrianroselli.com/2020/05/disclosure-widgets.html>
 - **Key Requirements**:
   - Trigger element must have `role="button"` (or be a native `<button>`)
   - Trigger must have `aria-expanded="true|false"`
@@ -40,8 +40,8 @@ The existing AdvancedSection component and server-synced userInterfacePreference
 ### 3. CSS `grid-template-rows: 0fr/1fr` Animation Technique
 
 - **Documentation**:
-  - https://css-tricks.com/css-grid-can-do-auto-height-transitions/
-  - https://www.stefanjudis.com/snippets/how-to-animate-height-with-css-grid/
+  - <https://css-tricks.com/css-grid-can-do-auto-height-transitions/>
+  - <https://www.stefanjudis.com/snippets/how-to-animate-height-with-css-grid/>
 - **Key Pattern**:
   - Parent: `display: grid; grid-template-rows: 0fr; transition: grid-template-rows 300ms ease;`
   - Open state: `grid-template-rows: 1fr;`
@@ -57,15 +57,16 @@ The existing AdvancedSection component and server-synced userInterfacePreference
 ### 4. Tailwind CSS v4 Transition Utilities
 
 - **Documentation**:
-  - `transition-behavior`: https://tailwindcss.com/docs/transition-behavior
-  - `transition-property`: https://tailwindcss.com/docs/transition-property
-  - Animation: https://tailwindcss.com/docs/animation
+  - `transition-behavior`: <https://tailwindcss.com/docs/transition-behavior>
+  - `transition-property`: <https://tailwindcss.com/docs/transition-property>
+  - Animation: <https://tailwindcss.com/docs/animation>
 - **Key Utilities**:
   - `transition-all` / `transition-property` -- Standard transition utilities.
   - `transition-discrete` -- Enables transitions on discrete properties (`display`, `visibility`). Allows fade-out before `display: none` kicks in.
   - `starting:` variant -- Defines initial styles for entry animations using `@starting-style`. Enables CSS-only entrance animations without JS class toggling.
   - `duration-*`, `ease-*`, `delay-*` -- Timing control.
 - **Example** (fade in from hidden):
+
   ```html
   <div
     class="opacity-100 transition-all transition-discrete duration-300 starting:opacity-0"
@@ -73,16 +74,18 @@ The existing AdvancedSection component and server-synced userInterfacePreference
     Content fades in on mount
   </div>
   ```
+
 - **Browser Support**: `transition-discrete` requires CSS Transitions Level 2 (~89% support). `@starting-style` has ~80% support (Chrome 117+, Firefox 129+, Safari 17.5+).
 - **Confidence**: Medium -- `transition-discrete` is well-supported, but `@starting-style` is still maturing in Safari.
 
 ### 5. HTML `<details>` / `<summary>` with `::details-content`
 
 - **Documentation**:
-  - https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/details
-  - https://developer.mozilla.org/en-US/docs/Web/CSS/Reference/Selectors/::details-content
-  - https://developer.chrome.com/blog/styling-details
+  - <https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/details>
+  - <https://developer.mozilla.org/en-US/docs/Web/CSS/Reference/Selectors/::details-content>
+  - <https://developer.chrome.com/blog/styling-details>
 - **Key Pattern**:
+
   ```css
   details::details-content {
     opacity: 0;
@@ -99,6 +102,7 @@ The existing AdvancedSection component and server-synced userInterfacePreference
     interpolate-size: allow-keywords;
   }
   ```
+
 - **Benefits**: Native browser disclosure widget, no JS needed, inherently accessible, browser search works inside closed sections.
 - **Exclusive accordion**: Using the `name` attribute on multiple `<details>` elements forces only one to be open at a time (Chrome 120+, Firefox 130+, Safari 17.2+).
 - **Caveats**:
@@ -111,8 +115,8 @@ The existing AdvancedSection component and server-synced userInterfacePreference
 ### 6. `hidden="until-found"` Attribute
 
 - **Documentation**:
-  - https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Global_attributes/hidden
-  - https://developer.chrome.com/docs/css-ui/hidden-until-found
+  - <https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Global_attributes/hidden>
+  - <https://developer.chrome.com/docs/css-ui/hidden-until-found>
 - **Key Pattern**: Setting `hidden="until-found"` on a collapsed content panel allows the browser's "Find in Page" (Ctrl+F) to discover and auto-expand the content.
 - **Benefits**: Users can search for content inside collapsed sections without manually expanding each one.
 - **Event**: `beforematch` event fires on the element before it becomes visible, allowing state synchronization.
@@ -127,28 +131,28 @@ The following libraries were evaluated and determined to be unnecessary given th
 
 #### Bits UI
 
-- **Docs**: https://bits-ui.com/docs/components/collapsible
+- **Docs**: <https://bits-ui.com/docs/components/collapsible>
 - **What it offers**: Headless `Collapsible.Root` / `Collapsible.Trigger` / `Collapsible.Content` compound components with full ARIA support, Svelte 5 runes integration, CSS variables (`--bits-collapsible-content-height`), and `forceMount` for Svelte transition compatibility.
 - **Why not recommended**: The project already has `AdvancedSection` with server-synced preference persistence via `userInterfacePreferencesStore`. Adopting Bits UI would require rebuilding the persistence wiring. The ARIA attributes Bits UI provides are already implemented in the existing component.
 - **Confidence**: High -- Well-maintained, Svelte 5 native, but adds unnecessary dependency.
 
 #### shadcn-svelte
 
-- **Docs**: https://www.shadcn-svelte.com/docs/components/collapsible
+- **Docs**: <https://www.shadcn-svelte.com/docs/components/collapsible>
 - **What it offers**: Copy-paste Collapsible and Accordion components built on Bits UI. Install: `npx shadcn-svelte@latest add collapsible`.
 - **Why not recommended**: Same reasoning as Bits UI (it is a wrapper around Bits UI). Also introduces a CLI-driven code generation workflow that doesn't align with the project's manual component structure.
 - **Confidence**: High -- Excellent library, but introduces unnecessary complexity for this use case.
 
 #### Melt UI
 
-- **Docs**: https://melt-ui.com/docs
+- **Docs**: <https://melt-ui.com/docs>
 - **What it offers**: Headless builder pattern (`createCollapsible`) with `use:melt` directive attachment. Full WAI-ARIA compliance.
 - **Why not recommended**: Uses a builder pattern (`use:melt`) that differs from the project's component-prop pattern. Would require significant refactoring of existing AdvancedSection consumers. Also, Melt UI's Svelte 5 support status is less clear than Bits UI.
 - **Confidence**: Medium -- Good library but uncertain Svelte 5 rune support maturity.
 
 #### tw-animate-css
 
-- **Docs**: https://github.com/Wombosvideo/tw-animate-css
+- **Docs**: <https://github.com/Wombosvideo/tw-animate-css>
 - **What it offers**: Tailwind CSS v4 compatible animation utilities including `accordion-down`, `accordion-up`, `collapsible-down`, `collapsible-up`. Install: `npm install -D tw-animate-css`. Import: `@import "tw-animate-css";` in app.css.
 - **Why not recommended as primary**: These animations depend on CSS variables like `--radix-accordion-content-height` that are set by Radix/Bits UI components. Without those components, the variables aren't populated. However, the library could be used if CSS variables are set manually or via Svelte's `style:` directive.
 - **Potential use**: If the project later adopts Bits UI or needs keyframe-based accordion animations, this is the correct Tailwind v4 plugin.
@@ -156,9 +160,9 @@ The following libraries were evaluated and determined to be unnecessary given th
 
 #### svelte-persisted-store
 
-- **Docs**: https://github.com/joshnuss/svelte-persisted-store
+- **Docs**: <https://github.com/joshnuss/svelte-persisted-store>
 - **Install**: `npm i svelte-persisted-store`
-- **Why not recommended**: The project already has a superior server-synced persistence mechanism (`userInterfacePreferencesStore` that persists to SQLite via `/api/v1/ui-preferences`). A localStorage-only solution would be a downgrade. Svelte 5 compatibility is also uncertain (open discussion: https://github.com/joshnuss/svelte-persisted-store/discussions/251).
+- **Why not recommended**: The project already has a superior server-synced persistence mechanism (`userInterfacePreferencesStore` that persists to SQLite via `/api/v1/ui-preferences`). A localStorage-only solution would be a downgrade. Svelte 5 compatibility is also uncertain (open discussion: <https://github.com/joshnuss/svelte-persisted-store/discussions/251>).
 - **Confidence**: High -- Not needed; existing solution is better.
 
 ### Recommended: Zero New Dependencies
@@ -229,7 +233,7 @@ Replace `hidden={!isAdvanced}` with `{#if isAdvanced}` and apply `transition:sli
 
 - DOM elements destroyed on collapse -- form inputs inside lose state unless managed externally.
 - Triggers Svelte component lifecycle on each toggle (mount/destroy).
-- `min-height` on child elements breaks `transition:slide` (known issue: https://github.com/sveltejs/svelte/issues/8533).
+- `min-height` on child elements breaks `transition:slide` (known issue: <https://github.com/sveltejs/svelte/issues/8533>).
 
 #### Option B: CSS `grid-template-rows` (Alternative for DOM-persistent content)
 
@@ -330,6 +334,7 @@ Use **Option A** (`transition:slide`) as the primary pattern for the `AdvancedSe
 
 - **Impact**: Each AdvancedSection currently requires ~30 lines of subscription/sync boilerplate in the parent component (see `MediaSettingsForm.svelte` lines 41-101 and `GeneralForm.svelte` lines 51-124). This will worsen as more sections are added.
 - **Workaround**: Create a `useAdvancedSectionMode(sectionKey: string)` utility function that returns `{ mode, cleanup }` and handles all subscription/sync logic internally. Consumers would call it in `<script>` and pass to AdvancedSection. Example:
+
   ```typescript
   // In a utility module
   export function useAdvancedSectionMode(
@@ -364,13 +369,14 @@ Use **Option A** (`transition:slide`) as the primary pattern for the `AdvancedSe
     };
   }
   ```
+
 - **Confidence**: High -- Direct refactoring of existing pattern, no new APIs needed.
 
 ### 3. `transition:slide` and `min-height`
 
 - **Impact**: If any child element inside the collapsible panel has `min-height` set (via CSS or Tailwind), `transition:slide` will stop at that minimum height instead of animating to zero.
 - **Workaround**: Ensure no `min-h-*` Tailwind classes or CSS `min-height` declarations exist on elements inside the transition boundary.
-- **Reference**: https://github.com/sveltejs/svelte/issues/8533
+- **Reference**: <https://github.com/sveltejs/svelte/issues/8533>
 - **Confidence**: High -- Known Svelte issue, well-documented.
 
 ### 4. Form State Loss on `{#if}` Toggle
@@ -421,21 +427,21 @@ Use **Option A** (`transition:slide`) as the primary pattern for the `AdvancedSe
 
 ## Design System Best Practices
 
-### Nielsen Norman Group Guidelines (https://www.nngroup.com/articles/progressive-disclosure/)
+### Nielsen Norman Group Guidelines (<https://www.nngroup.com/articles/progressive-disclosure/>)
 
 - **Two-level max**: Designs beyond two disclosure levels have low usability. The project uses a single level (basic -> advanced) which is correct.
 - **Feature split**: Use task analysis and frequency-of-use data to determine what goes in basic vs. advanced. For Praxrr, the "basic" view should show the fields most users configure (name, core settings), and "advanced" should hold power-user options (conditions, scoring, import rules).
 - **Clear triggers**: The toggle button must clearly communicate that more options exist. Current "Show Advanced" / "Hide Advanced" labels are clear.
 - **Confidence**: High -- Established UX research from authoritative source.
 
-### GitLab Pajamas Design System (https://design.gitlab.com/patterns/progressive-disclosure/)
+### GitLab Pajamas Design System (<https://design.gitlab.com/patterns/progressive-disclosure/>)
 
 - **Limit nesting**: Three or more nested disclosure layers indicate overly complex design.
 - **Clear triggers**: Use established CTAs (links, buttons) that set expectations.
 - **Implementation patterns**: Accordion components, dropdown menus, skeleton loaders, step-by-step workflows.
 - **Confidence**: High -- Production design system used at scale.
 
-### GitHub Primer Design System (https://primer.style/ui-patterns/progressive-disclosure/)
+### GitHub Primer Design System (<https://primer.style/ui-patterns/progressive-disclosure/>)
 
 - **Pair icons with text**: Progressive disclosure triggers should combine icons (chevrons) with descriptive text.
 - **Chevron convention**: Down chevron = collapsed, up chevron = expanded.
@@ -447,7 +453,7 @@ Use **Option A** (`transition:slide`) as the primary pattern for the `AdvancedSe
 
 - **Disclosure controls**: Reveal and hide information related to specific controls.
 - **Progressive enhancement**: Content should be accessible even without JS.
-- **Documentation**: https://developer.apple.com/design/human-interface-guidelines/disclosure-controls
+- **Documentation**: <https://developer.apple.com/design/human-interface-guidelines/disclosure-controls>
 - **Confidence**: Medium -- Documentation requires JS rendering, content extracted from secondary sources.
 
 ## Code Examples

@@ -40,17 +40,17 @@ Evidence items are extracted from all 8 persona findings. Each item is numbered 
 
 ### From Contrarian
 
-| #   | Evidence Item                                                                                                                                                                          | Source Quality |
-| --- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------- |
-| E9  | Most \*Arr users run 1-2 instances; centralized config management may add more burden than it saves for them.                                                                          | Medium         |
-| E10 | Feature creep is a documented anti-pattern; the market is fragmenting, not consolidating, suggesting dissatisfaction with scope rather than hunger for more features.                  | Strong         |
-| E11 | Configuration sync is fundamentally fragile -- multiple tools document silent failures (Recyclarr #318, Prowlarr #912, Profilarr #230).                                                | Strong         |
-| E12 | Upstream *Arr API instability is the biggest risk. Radarr v5 obfuscated API keys, breaking Buildarr's idempotency model. *Arr maintainers explicitly stated "No plans to deobfuscate." | Strong         |
-| E13 | Centralizing API keys creates a high-value target that scales with adoption. Threat actors harvest credentials within five minutes of exposure.                                        | Strong         |
-| E14 | Custom format scoring is inherently domain-complex; a management layer cannot reduce the number of decisions, only present them differently.                                           | Medium         |
-| E15 | OIDC for single-user deployments adds complexity without proportional security gain. Encryption at rest is theater if the app can decrypt keys at runtime.                             | Medium         |
-| E16 | SQLite in Docker is a proven risk surface with documented silent corruption in Vaultwarden and n8n.                                                                                    | Strong         |
-| E17 | Running multiple config tools causes them to "fight over settings" in endless overwrite loops.                                                                                         | Medium         |
+| #   | Evidence Item                                                                                                                                                                         | Source Quality |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------- |
+| E9  | Most \*Arr users run 1-2 instances; centralized config management may add more burden than it saves for them.                                                                         | Medium         |
+| E10 | Feature creep is a documented anti-pattern; the market is fragmenting, not consolidating, suggesting dissatisfaction with scope rather than hunger for more features.                 | Strong         |
+| E11 | Configuration sync is fundamentally fragile -- multiple tools document silent failures (Recyclarr #318, Prowlarr #912, Profilarr #230).                                               | Strong         |
+| E12 | Upstream *Arr API instability is the biggest risk. Radarr v5 obfuscated API keys, breaking Buildarr's idempotency model.*Arr maintainers explicitly stated "No plans to deobfuscate." | Strong         |
+| E13 | Centralizing API keys creates a high-value target that scales with adoption. Threat actors harvest credentials within five minutes of exposure.                                       | Strong         |
+| E14 | Custom format scoring is inherently domain-complex; a management layer cannot reduce the number of decisions, only present them differently.                                          | Medium         |
+| E15 | OIDC for single-user deployments adds complexity without proportional security gain. Encryption at rest is theater if the app can decrypt keys at runtime.                            | Medium         |
+| E16 | SQLite in Docker is a proven risk surface with documented silent corruption in Vaultwarden and n8n.                                                                                   | Strong         |
+| E17 | Running multiple config tools causes them to "fight over settings" in endless overwrite loops.                                                                                        | Medium         |
 
 ### From Analogist
 
@@ -268,7 +268,7 @@ H4 accumulates the most inconsistencies of any hypothesis (10 items). The eviden
 - Feature creep is the most direct risk (E10)
 - Single-maintainer sustainability is already at risk (E5)
 
-**Critical disconfirmation**: The historian documents that Buildarr attempted broad *Arr coverage and struggled because "the scope of managing ALL *Arr application settings proved enormous." Expanding scope before perfecting core features directly contradicts the adoption pattern (E6) where power users adopt first through depth, not breadth.
+**Critical disconfirmation**: The historian documents that Buildarr attempted broad *Arr coverage and struggled because "the scope of managing ALL*Arr application settings proved enormous." Expanding scope before perfecting core features directly contradicts the adoption pattern (E6) where power users adopt first through depth, not breadth.
 
 **Verdict**: Eliminated. Selective expansion (maintaining existing Lidarr support) is prudent, but making expansion the primary strategy is untenable given resource constraints and historical precedent.
 

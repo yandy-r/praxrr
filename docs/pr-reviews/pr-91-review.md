@@ -53,7 +53,7 @@ private async seedBuiltInBaseOpsWithOrchestration(databaseId: number, contextLab
 **Fix:** Propagate the error. If design intent is partial success, return a success/failure
 indicator and require callers to check it.
 
-### Validation result
+### Validation result (C-1)
 
 - Updated `seedBuiltInBaseOpsWithOrchestration` to rethrow caught seeding failures after logging:
   - `packages/praxrr-app/src/lib/server/pcd/core/manager.ts` now throws the caught error instead of
@@ -85,7 +85,7 @@ return {
 **Fix:** Return `CacheBuildStats | null` or add an `error` field. For `link` (user-initiated), throw
 by default.
 
-### Validation result
+### Validation result (C-2)
 
 - Updated `compileIfEnabled` to default `failOnError` to `true`, so `link` and `sync` now fail fast
   on compilation errors and return the real error instead of fabricated zero stats.
@@ -108,7 +108,7 @@ silently loses all migration entity data on ANY error.
 `MigrationReaderError` class. Default is `false` so this only fires when explicitly enabled, but the
 blast radius when enabled is severe.
 
-### Validation result
+### Validation result (C-3)
 
 - Added a typed `MigrationReaderError` and switched import failure signaling to throw it when
   migration entity parsing yields issues, then updated orchestration to fallback only for that error
@@ -133,7 +133,7 @@ changes, content hashes from import vs. writer paths will silently diverge, caus
 **Fix:** Delete the local `hashContent()` and import `buildContentHash` from
 `$db/queries/pcdOps.ts`.
 
-### Validation result
+### Validation result (C-4)
 
 - Removed local `hashContent()` and now use shared `buildContentHash` from `pcdOps.ts` for both
   import and writer paths, preventing hash divergence risk.
@@ -175,7 +175,7 @@ function extractEntityName(portable: ReaderInputRecord): string | null {
 }
 ```
 
-### Validation result
+### Validation result (C-5)
 
 - Kept persisted `portable.name` values intact while rejecting blank/whitespace-only names.
   - `packages/praxrr-app/src/lib/server/pcd/migration/reader.ts:255-259`
@@ -205,7 +205,7 @@ An export/re-import cycle would corrupt the entity. Root cause: `PortableLidarrN
 
 **Fix:** Define a native `PortableLidarrNaming` type with Lidarr-correct field names.
 
-### Validation result
+### Validation result (C-6)
 
 - Introduced a native `PortableLidarrNaming` shape with Lidarr-native fields and removed
   `PortableSonarrNaming` aliasing.
@@ -233,7 +233,7 @@ added, the function silently returns `undefined`, and the export endpoint return
 
 **Fix:** Add return type annotation and exhaustive `never` check in the default case.
 
-### Validation result
+### Validation result (C-7)
 
 - Made `serializeEntity` return a concrete record type and added an exhaustive `default` branch that
   throws for unhandled `EntityType` values.
@@ -259,7 +259,7 @@ Double-cast bypasses TypeScript access control. If `PCDCache` renames `db`, this
 
 **Fix:** Add `getRawDb(): Database | null` public accessor to `PCDCache`.
 
-### Validation result
+### Validation result (H-1)
 
 - Added `PCDCache#getRawDb(): Database | null` and removed unsafe cache field casts in writer.
   - `packages/praxrr-app/src/lib/server/pcd/database/cache.ts:54`
@@ -281,7 +281,7 @@ accepted.
 **Fix:** When `runValueGuardGate` is `true` (explicitly requested), missing cache should return
 `{ ok: false, error: 'Value-guard validation unavailable: cache not built' }`.
 
-### Validation result
+### Validation result (H-2)
 
 - `runValueGuardGate` now returns `{ ok: false, error: ... }` when cache is missing or cache DB is
   unavailable.
@@ -303,7 +303,7 @@ continues. Seeding and compilation proceed without base ops, producing incomplet
 **Fix:** Propagate errors at minimum for `link`. Return partial-success indicator for
 `sync`/`switchBranch`.
 
-### Validation result
+### Validation result (H-3)
 
 - Link path now allows `importBaseOpsWithOrchestration` errors to fail the link operation.
 - Sync now returns `success: false` when base-op import fails while still completing other
@@ -335,7 +335,7 @@ function normalizeSql(sql: string): string {
 }
 ```
 
-### Validation result
+### Validation result (H-4)
 
 - Added empty-input guard in SQL normalization to return empty string before semicolon appending.
   - `packages/praxrr-app/src/lib/server/pcd/ops/writer.ts:83-86`
@@ -355,7 +355,7 @@ malformed metadata.
 
 **Fix:** Throw on malformed metadata JSON (per project mandate) or at minimum log a warning.
 
-### Validation result
+### Validation result (H-5)
 
 - `deriveSqlStableIdentity` now throws on malformed metadata JSON instead of returning `null` and
   bypassing conflict checks.
@@ -377,7 +377,7 @@ identity entirely.
 **Fix:** Log when JSON.parse fails on a string starting with `{` to surface malformed-but-intended
 JSON.
 
-### Validation result
+### Validation result (H-6)
 
 - Added warning logging for malformed JSON-like stable-identity strings while preserving fallback
   for non-JSON formats.
@@ -398,7 +398,7 @@ actionable detail.
 
 **Fix:** Bind the error and include `String(error)` in the message.
 
-### Validation result
+### Validation result (H-7)
 
 - Reader now captures caught error objects and includes `String(error)` in read/parse issue
   messages.
@@ -420,7 +420,7 @@ from unrecoverable failures.
 **Fix:** Rethrow unexpected errors (non-validation, non-conflict) and only return
 `{ success: false }` for expected business logic failures.
 
-### Validation result
+### Validation result (H-8)
 
 - Replaced broad failure flattening at the function boundary with rethrowing unexpected exceptions
   after logging, while retaining `{ success: false }` returns from explicit validation/conflict
@@ -444,7 +444,7 @@ duplicates.
 **Fix:** Extract shared stable key constants into a common module. The `importBaseOps.ts` mapping
 can extend the shared map with legacy keys.
 
-### Validation result
+### Validation result (H-9)
 
 - Added a shared stable key module and used it from both migration reader and import paths, with SQL
   legacy keys retained where needed.
@@ -471,7 +471,7 @@ portable types "defined per Arr app and fail-fast on ambiguity."
 
 **Fix:** Define `PortableLidarrNaming` as its own interface with Lidarr-appropriate field names.
 
-### Validation result
+### Validation result (H-10)
 
 - Confirmed `PortableLidarrNaming` is now defined as a Lidarr-specific interface in this branch.
   - `packages/praxrr-app/src/lib/shared/pcd/portable.ts:297-311`
@@ -501,7 +501,7 @@ skip existing-but-inaccessible directories with zero indication.
 
 **Fix:** Only catch `Deno.errors.NotFound`; rethrow all other errors.
 
-### Validation result
+### Validation result (H-11)
 
 - Updated both `pathExists` implementations to return `false` only for missing paths, and rethrow
   other filesystem errors.
@@ -531,7 +531,7 @@ with obscure errors deep in the call chain.
 **Fix:** Add JSDoc precondition documenting that `validatePortableData` must be called before this
 function. Long-term: typed validation results.
 
-### Validation result
+### Validation result (M-1)
 
 - Added precondition JSDoc to `asPortableData` and kept cast behavior unchanged to preserve existing
   runtime behavior.
@@ -553,7 +553,7 @@ otherwise.
 
 **Fix:** Refactor into a discriminated union keyed on `decision`.
 
-### Validation result
+### Validation result (M-2)
 
 - Converted `ValueGuardApplyDecisionResult` to a discriminated union by decision bucket, with
   `autoAlignReason`/ `autoAlignRule` required for `auto_align_*` variants and unavailable for
@@ -573,7 +573,7 @@ When `ok` is `false`, `error` may or may not be present.
 
 **Fix:** Make it a proper discriminated union: `{ ok: true } | { ok: false; error: string }`.
 
-### Validation result
+### Validation result (M-3)
 
 - Replaced ambiguous `ValueGuardGateResult` with a discriminated union and updated the value-guard
   gate caller to consume the guaranteed `error` when `ok` is `false`.
@@ -593,7 +593,7 @@ that should cancel out a prior create fails silently.
 
 **Fix:** Log at debug level when metadata parsing fails.
 
-### Validation result
+### Validation result (M-4)
 
 - Replaced silent `catch` fallthroughs with `DEBUG` logging for malformed metadata/desired-state
   JSON in both dependency checks inside `cancelOutCreate`.

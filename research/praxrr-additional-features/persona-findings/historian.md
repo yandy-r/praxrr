@@ -98,7 +98,7 @@ The history of media automation configuration management spans over two decades,
 - **What was tried**: Bobarr attempted to replace the entire \*Arr stack (Sonarr, Radarr, Jackett) with a single application running in Docker with a built-in VPN
 - **Why it failed**: The project appears to have stalled, with GitHub issues from years ago remaining unresolved. Replacing mature, community-maintained applications with a single monolithic alternative proved too ambitious for a small team. Users preferred the modularity and active development of individual \*Arr apps.
 - **When**: Created around 2020, showing signs of inactivity by 2022-2023
-- **Lessons**: The *Arr ecosystem's strength is in specialization with interoperability, not consolidation. Users want unified management of specialized tools, not a single tool that does everything poorly. This validates Praxrr's approach of being a management layer above the *Arr stack rather than a replacement for it.
+- **Lessons**: The *Arr ecosystem's strength is in specialization with interoperability, not consolidation. Users want unified management of specialized tools, not a single tool that does everything poorly. This validates Praxrr's approach of being a management layer above the*Arr stack rather than a replacement for it.
 - **Confidence**: Medium
 - **Sources**: [Bobarr GitHub](https://github.com/iam4x/bobarr), [Bobarr Issue #224](https://github.com/iam4x/bobarr/issues/224), [Bobarr Awesome Docker Compose](https://awesome-docker-compose.com/apps/arr/bobarr)
 
@@ -165,7 +165,7 @@ The history of media automation configuration management spans over two decades,
 
 ### Jackett's "Universal Adapter" Pattern (Before Prowlarr)
 
-- **Description**: Jackett solved indexer management by acting as a universal adapter -- translating between different indexer APIs and presenting a uniform interface to *Arr applications. Each *Arr app needed manual Jackett configuration, but the indexer definitions were centralized.
+- **Description**: Jackett solved indexer management by acting as a universal adapter -- translating between different indexer APIs and presenting a uniform interface to *Arr applications. Each*Arr app needed manual Jackett configuration, but the indexer definitions were centralized.
 - **Why forgotten**: Prowlarr replaced Jackett with tighter integration (automatic sync of indexer configurations to \*Arr apps), making Jackett feel clunky by comparison. But Jackett's core insight -- that a universal adapter layer can normalize heterogeneous APIs -- remains architecturally valuable.
 - **Worth revisiting?**: The "universal adapter" pattern could apply to configuration management across different \*Arr app versions. As Radarr and Sonarr evolve independently, their Custom Format schemas and quality profile structures may diverge. A normalization/compilation layer (which Profilarr and Praxrr both implement) prevents users from having to learn each app's configuration dialect.
 - **Modern relevance**: Praxrr's unified configuration language that compiles to app-specific formats is the modern realization of this pattern. Historical context validates this approach.
@@ -184,7 +184,7 @@ The history of media automation configuration management spans over two decades,
 ### MediaManager's Consolidation Vision
 
 - **Description**: MediaManager (3.1k GitHub stars, active development through v1.12.3 as of February 2026) positions itself as "the modern, easy-to-use successor to the fragmented Arr stack," consolidating Sonarr, Radarr, and related tools into a single Python/Svelte application with OAuth/OIDC authentication and TMDB/TVDB integration.
-- **Why potentially forgotten**: While still active, it competes against the deeply entrenched *Arr ecosystem. Most users have already invested time learning and configuring their *Arr stacks and are reluctant to migrate entirely.
+- **Why potentially forgotten**: While still active, it competes against the deeply entrenched *Arr ecosystem. Most users have already invested time learning and configuring their*Arr stacks and are reluctant to migrate entirely.
 - **Worth revisiting?**: MediaManager's existence validates the demand for simplification. However, its consolidation approach (replacing the Arr stack) differs from Praxrr's augmentation approach (managing the Arr stack). Both philosophies have merit for different user segments.
 - **Modern relevance**: If MediaManager or similar consolidation tools gain traction, Praxrr could either integrate with them or serve as a bridge tool during migration from \*Arr to consolidated platforms.
 - **Confidence**: Medium
@@ -306,7 +306,7 @@ Praxrr enters the market at a similar inflection point: users managing multiple 
 
 5. **NZBGet status contradiction**: Some sources describe NZBGet as having "ceased development" with the last stable release in 2021, while others describe it as a "rising star." This likely reflects a community fork or maintenance effort that differs from the original project.
 
-6. **Conflicting views on consolidation vs. specialization**: MediaManager argues the *Arr stack should be consolidated into a single app. The *Arr community largely disagrees, preferring specialized tools with interoperability. Both perspectives have merit for different user segments, and the market has not definitively resolved this debate.
+6. **Conflicting views on consolidation vs. specialization**: MediaManager argues the *Arr stack should be consolidated into a single app. The*Arr community largely disagrees, preferring specialized tools with interoperability. Both perspectives have merit for different user segments, and the market has not definitively resolved this debate.
 
 ## Search Queries Executed
 

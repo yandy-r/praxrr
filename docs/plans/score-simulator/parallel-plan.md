@@ -502,11 +502,12 @@ Build the score breakdown component with total score display, threshold indicato
    A. **Total Score** — `Score.svelte` with color-coded sign prefix (existing component)
 
    B. **Threshold Indicators** — Badge components showing:
-   | Condition | Label | Color |
-   |-----------|-------|-------|
-   | `totalScore < minimumScore` | "Below Minimum" | Red |
-   | `minimumScore <= totalScore < upgradeUntilScore` | "Accepted - Upgrades Enabled" | Green |
-   | `totalScore >= upgradeUntilScore` | "Upgrade Until Reached" | Green (muted) |
+
+   | Condition                                        | Label                         | Color         |
+   | ------------------------------------------------ | ----------------------------- | ------------- |
+   | `totalScore < minimumScore`                      | "Below Minimum"               | Red           |
+   | `minimumScore <= totalScore < upgradeUntilScore` | "Accepted - Upgrades Enabled" | Green         |
+   | `totalScore >= upgradeUntilScore`                | "Upgrade Until Reached"       | Green (muted) |
 
    C. **Contribution List** — sorted by `|score|` descending:
    - Each row: `CustomFormatBadge` + `Score.svelte` for the contribution amount
