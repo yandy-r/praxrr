@@ -1,0 +1,19 @@
+@import 'tailwindcss';
+
+:root {
+  --sl-color-accent-low: #dff7ef;
+  --sl-color-accent: #0f9b72;
+  --sl-color-accent-high: #0a4d3c;
+}
+
+:root[data-theme='dark'] {
+  --sl-color-accent-low: #143b31;
+  --sl-color-accent: #51d9aa;
+  --sl-color-accent-high: #b8f4dd;
+}
+
+.praxrr-docs-panel {
+  border: 1px solid var(--sl-color-gray-5);
+  border-radius: 0.5rem;
+  padding: 1rem;
+}

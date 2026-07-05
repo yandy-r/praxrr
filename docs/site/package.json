@@ -1,0 +1,28 @@
+{
+  "name": "@praxrr/docs-site",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "npm run sync:external-docs && astro dev --root .",
+    "build": "npm run sync:external-docs && astro build --root .",
+    "preview": "astro preview --root .",
+    "sync:external-docs": "node scripts/import-external-docs.mjs"
+  },
+  "dependencies": {
+    "@astrojs/starlight": "^0.41.3",
+    "@astrojs/svelte": "^9.0.1",
+    "@tailwindcss/vite": "^4.3.2",
+    "astro": "^7.0.6",
+    "starlight-openapi": "^0.26.0",
+    "svelte": "^5.39.5",
+    "tailwindcss": "^4.1.13"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.9.2"
+  },
+  "overrides": {
+    "form-data": "4.0.6"
+  }
+}

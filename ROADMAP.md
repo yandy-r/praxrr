@@ -1,6 +1,6 @@
 # Praxrr Roadmap
 
-Reviewed: 2026-07-05 (updated after #191–#193 merged)
+Reviewed: 2026-07-05 (updated after #196 merged)
 
 Source: open GitHub issues in `yandy-r/praxrr` as of this review.
 
@@ -50,6 +50,7 @@ Merged work since the Score Simulator and TRaSH Guide Sync foundations landed.
 
 | Date       | PR / commit                                        | Summary                                                                                                                            | Closes / relates                                     |
 | ---------- | -------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
+| 2026-07-05 | [#196](https://github.com/yandy-r/praxrr/pull/196) | Astro Starlight documentation site with OpenAPI generation, mirror-doc imports, docs CI, Cloudflare Pages wiring, and dispatches   | [#38](https://github.com/yandy-r/praxrr/issues/38)   |
 | 2026-07-05 | [#193](https://github.com/yandy-r/praxrr/pull/193) | Test coverage for 8 TRaSH modules (~137 tests): fetcher, sync job, manager, sources route, transformers, parser, trash-id mappings | [#125](https://github.com/yandy-r/praxrr/issues/125) |
 | 2026-07-05 | [#191](https://github.com/yandy-r/praxrr/pull/191) | Type design hardening: narrow `arr_type`, consolidate parse helpers, boolean `enabled`/`auto_pull` at query boundary               | [#126](https://github.com/yandy-r/praxrr/issues/126) |
 | 2026-07-05 | [#192](https://github.com/yandy-r/praxrr/pull/192) | Fix pre-existing CI failures: lint-docs, lint-shell, autofix workflow                                                              | Relates to #126                                      |
@@ -75,16 +76,15 @@ Goal: make Praxrr understandable enough for users and contributors to run, debug
 
 | Order | Issue                                                                               | Priority | Decision                                                                                               | Done When                                                                                                                    |
 | ----- | ----------------------------------------------------------------------------------- | -------- | ------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------- |
-| 1     | [#38](https://github.com/yandy-r/praxrr/issues/38) Astro Starlight docs site        | Medium   | Do before all docs content issues because #73-#78 depend on the site structure.                        | Docs site builds, renders seed content, includes OpenAPI docs, and has CI/deployment wiring.                                 |
-| 2     | [#74](https://github.com/yandy-r/praxrr/issues/74) User-facing guides and tutorials | Medium   | First content priority after #38 because it improves adoption and support load.                        | Users can install, configure, connect Arr instances, link a PCD, sync, upgrade, and troubleshoot from published docs.        |
-| 3     | [#76](https://github.com/yandy-r/praxrr/issues/76) PCD database content docs        | Medium   | Do with or soon after user guides because curated config content is the core value proposition.        | Users can understand available custom formats, quality profiles, release profiles, Lidarr status, and PCD data organization. |
-| 4     | [#73](https://github.com/yandy-r/praxrr/issues/73) PCD schema table reference       | Medium   | Do after docs infrastructure is stable. It is important, but more contributor-facing than #74 and #76. | All 36 PCD tables have reference pages with columns, relationships, constraints, and cross-links.                            |
-| 5     | [#77](https://github.com/yandy-r/praxrr/issues/77) App technical documentation      | Low      | Do after user-facing docs unless contributor onboarding becomes the bottleneck.                        | Job system, sync pipeline, PCD ops, tests, notifications, and startup sequence are documented.                               |
-| 6     | [#75](https://github.com/yandy-r/praxrr/issues/75) UI component library reference   | Low      | Do when UI contribution velocity needs it.                                                             | Reusable `$ui` components, alert patterns, dirty tracking, and Tailwind conventions are documented.                          |
+| 1     | [#74](https://github.com/yandy-r/praxrr/issues/74) User-facing guides and tutorials | Medium   | First content priority after #38 because it improves adoption and support load.                        | Users can install, configure, connect Arr instances, link a PCD, sync, upgrade, and troubleshoot from published docs.        |
+| 2     | [#76](https://github.com/yandy-r/praxrr/issues/76) PCD database content docs        | Medium   | Do with or soon after user guides because curated config content is the core value proposition.        | Users can understand available custom formats, quality profiles, release profiles, Lidarr status, and PCD data organization. |
+| 3     | [#73](https://github.com/yandy-r/praxrr/issues/73) PCD schema table reference       | Medium   | Do after docs infrastructure is stable. It is important, but more contributor-facing than #74 and #76. | All 36 PCD tables have reference pages with columns, relationships, constraints, and cross-links.                            |
+| 4     | [#77](https://github.com/yandy-r/praxrr/issues/77) App technical documentation      | Low      | Do after user-facing docs unless contributor onboarding becomes the bottleneck.                        | Job system, sync pipeline, PCD ops, tests, notifications, and startup sequence are documented.                               |
+| 5     | [#75](https://github.com/yandy-r/praxrr/issues/75) UI component library reference   | Low      | Do when UI contribution velocity needs it.                                                             | Reusable `$ui` components, alert patterns, dirty tracking, and Tailwind conventions are documented.                          |
 
 Notes:
 
-- #38 is the dependency gate. Do not scatter content work until the docs site shape is settled.
+- #38 shipped the dependency gate. Keep follow-up content work inside the settled docs site shape.
 - #74 should stay practical and task-oriented. Avoid turning it into an internal architecture guide.
 - #73 and #76 should stay separate: one documents schema structure, the other documents curated content.
 - Optional TRaSH tail work ([#194](https://github.com/yandy-r/praxrr/issues/194)) can land in parallel if someone is already in the fetcher module.
@@ -201,12 +201,12 @@ Use this checklist when planning a sprint or milestone.
 
 ### Completed (2026-07-05)
 
+- [x] #38 - Docs site infrastructure ([#196](https://github.com/yandy-r/praxrr/pull/196))
 - [x] #126 - TRaSH Guide Sync type hardening ([#191](https://github.com/yandy-r/praxrr/pull/191))
 - [x] #125 - TRaSH Guide Sync test coverage ([#193](https://github.com/yandy-r/praxrr/pull/193))
 
 ### Current Focus
 
-- [ ] #38 - Docs site infrastructure
 - [ ] #74 - User-facing guides
 - [ ] #76 - PCD database content docs
 - [ ] #73 - PCD schema table reference

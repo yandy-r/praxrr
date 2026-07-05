@@ -12,6 +12,8 @@ node_modules
 .netlify
 .wrangler
 /dist
+/docs/site/.astro
+/docs/site/dist
 /static
 *.out
 *.out.exit

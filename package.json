@@ -45,6 +45,10 @@
     "vite": "^7.1.7"
   },
   "scripts": {
+    "docs:dev": "npm --prefix docs/site run dev",
+    "docs:build": "npm --prefix docs/site run build",
+    "docs:preview": "npm --prefix docs/site run preview",
+    "docs:sync": "npm --prefix docs/site run sync:external-docs",
     "lint": "./scripts/style.sh lint --docs --shell",
     "lint:modified": "./scripts/style.sh lint --modified --docs --shell",
     "lint:staged": "./scripts/style.sh lint --staged --docs --shell",
