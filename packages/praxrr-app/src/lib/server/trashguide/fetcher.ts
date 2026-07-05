@@ -2,7 +2,6 @@ import { checkout, clone, pull } from '$utils/git/index.ts';
 import {
   TRASHGUIDE_ENTITY_TYPES,
   TRASHGUIDE_METADATA_ENTITY_PATH_KEYS,
-  TRASHGUIDE_SUPPORTED_ARR_TYPES,
   type TrashGuideDiscoveredFilesByEntity,
   type TrashGuideDiscoveryResult,
   type TrashGuideFetchAction,
@@ -14,7 +13,6 @@ import {
   type TrashGuideSourceFile,
   type TrashGuideSupportedArrType,
   TrashGuideFetcherError,
-  isTrashGuideSupportedArrType,
 } from './types.ts';
 import { isRecord } from './utils.ts';
 
@@ -29,7 +27,7 @@ const REQUIRED_METADATA_KEYS = (
 const ALL_METADATA_KEYS = Object.keys(TRASHGUIDE_METADATA_ENTITY_PATH_KEYS) as TrashGuideMetadataEntityPathKey[];
 
 export async function fetchTrashGuideSource(options: TrashGuideFetchOptions): Promise<TrashGuideFetchResult> {
-  const arrType = toSupportedArrType(options.arr_type);
+  const arrType = options.arr_type;
   const branch = normalizeBranch(options.branch);
   const action = await syncRepository({
     repository_url: options.repository_url,
@@ -427,20 +425,6 @@ function normalizeMetadataPath(path: string): string {
 
 function toAbsolutePath(rootPath: string, relativePath: string): string {
   return `${rootPath.replace(/\/+$/, '')}/${relativePath.replace(/^\/+/, '')}`;
-}
-
-function toSupportedArrType(value: string): TrashGuideSupportedArrType {
-  if (isTrashGuideSupportedArrType(value)) {
-    return value;
-  }
-  throw new TrashGuideFetcherError(
-    'arr_type_unsupported',
-    `Unsupported TRaSH arr_type "${value}". Supported values: ${TRASHGUIDE_SUPPORTED_ARR_TYPES.join(', ')}`,
-    false,
-    {
-      arr_type: value,
-    }
-  );
 }
 
 function classifyGitError(

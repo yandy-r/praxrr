@@ -13,8 +13,8 @@ export interface TrashGuideSource {
   arr_type: TrashGuideSourceArrType;
   score_profile: string;
   sync_strategy: number;
-  auto_pull: number;
-  enabled: number;
+  auto_pull: boolean;
+  enabled: boolean;
   last_synced_at: string | null;
   last_commit_hash: string | null;
   created_at: string;
@@ -96,8 +96,8 @@ function rowToSource(row: TrashGuideSourceRow): TrashGuideSource {
     arr_type: parseTrashGuideSourceArrType(row.arr_type),
     score_profile: row.score_profile,
     sync_strategy: row.sync_strategy,
-    auto_pull: row.auto_pull,
-    enabled: row.enabled,
+    auto_pull: row.auto_pull === 1,
+    enabled: row.enabled === 1,
     last_synced_at: row.last_synced_at,
     last_commit_hash: row.last_commit_hash,
     created_at: row.created_at,

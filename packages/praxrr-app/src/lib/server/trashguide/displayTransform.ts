@@ -19,6 +19,7 @@ import type {
 import { normalizeTrashId } from './ids.ts';
 import { parseMarkdown } from '$utils/markdown/markdown.ts';
 import { logger } from '$logger/logger.ts';
+import { isRecord } from './utils.ts';
 
 export interface TrashGuideSourceRef {
   id: number;
@@ -56,10 +57,6 @@ function toSyntheticId(sourceId: number, trashId: string): number {
 }
 
 type ParsedTrashGuideEntityByType<T extends TrashGuideEntityType> = Extract<TrashGuideParsedEntity, { entity_type: T }>;
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
 
 function isCustomFormatEntity(value: unknown): value is ParsedTrashGuideEntityByType<'custom_format'> {
   if (!isRecord(value)) {

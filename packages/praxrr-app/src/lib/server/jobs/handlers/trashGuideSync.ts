@@ -39,8 +39,8 @@ function parsePayload(
   };
 }
 
-function hasValidSchedule(enabled: number, scheduleMinutes: number): boolean {
-  return enabled === 1 && Number.isFinite(scheduleMinutes) && scheduleMinutes > 0;
+function hasValidSchedule(enabled: boolean, scheduleMinutes: number): boolean {
+  return enabled && Number.isFinite(scheduleMinutes) && scheduleMinutes > 0;
 }
 
 function isTransientGitOrNetworkError(message: string): boolean {
@@ -77,7 +77,7 @@ function buildSyncSummary(syncResult: TrashGuideSyncResult): string {
 
 function getScheduledRescheduleAt(
   trigger: TrashGuideSyncJobPayload['trigger'],
-  enabled: number,
+  enabled: boolean,
   scheduleMinutes: number
 ): string | null {
   if (trigger !== 'scheduled') {
@@ -97,7 +97,7 @@ async function buildFailureResult(
   message: string,
   attempts: number,
   trigger: TrashGuideSyncJobPayload['trigger'],
-  enabled: number,
+  enabled: boolean,
   scheduleMinutes: number
 ): Promise<JobHandlerResult> {
   const scheduledRescheduleAt = getScheduledRescheduleAt(trigger, enabled, scheduleMinutes);
@@ -145,7 +145,7 @@ const trashGuideSyncHandler: JobHandler = async (job) => {
     return { status: 'cancelled', output: 'TRaSH source not found' };
   }
 
-  if (source.enabled !== 1) {
+  if (!source.enabled) {
     return { status: 'cancelled', output: 'TRaSH source disabled' };
   }
 
@@ -198,7 +198,7 @@ const trashGuideSyncHandler: JobHandler = async (job) => {
     };
   }
 
-  if (source.auto_pull !== 1) {
+  if (!source.auto_pull) {
     trashGuideSourcesQueries.updateSyncMetadata(payload.sourceId, { lastSyncedAt: new Date().toISOString() });
     return {
       status: 'success',

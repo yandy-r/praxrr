@@ -1,7 +1,7 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from '@sveltejs/kit';
 import { trashGuideManager } from '$lib/server/trashguide/manager.ts';
-import { logTrashGuideRouteError, mapReadErrorStatus, parseSourceId, toErrorMessage } from '../_helpers.ts';
+import { logTrashGuideRouteError, mapReadErrorStatus, parseSourceId, toErrorMessage } from '../../_helpers.ts';
 import { enqueueManualTrashGuideSourceSync } from '$jobs/helpers/trashGuideSyncQueue.ts';
 
 /**

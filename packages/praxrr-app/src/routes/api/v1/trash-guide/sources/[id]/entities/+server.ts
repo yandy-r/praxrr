@@ -6,18 +6,15 @@ import {
   trashGuideEntityCacheQueries,
 } from '$db/queries/trashGuideEntityCache.ts';
 import { trashGuideManager } from '$lib/server/trashguide/manager.ts';
-import { isTrashGuideSupportedArrType, type TrashGuideEntityType } from '$lib/server/trashguide/types.ts';
-import { logTrashGuideRouteError, mapReadErrorStatus, parseSourceId, toErrorMessage } from '../_helpers.ts';
+import {
+  isTrashGuideEntityType,
+  isTrashGuideSupportedArrType,
+  type TrashGuideEntityType,
+} from '$lib/server/trashguide/types.ts';
+import { logTrashGuideRouteError, mapReadErrorStatus, parseSourceId, toErrorMessage } from '../../_helpers.ts';
 
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 200;
-const VALID_ENTITY_TYPES: ReadonlySet<string> = new Set([
-  'custom_format',
-  'custom_format_group',
-  'quality_profile',
-  'quality_size',
-  'naming',
-]);
 
 /**
  * GET /api/v1/trash-guide/sources/[id]/entities
@@ -105,11 +102,11 @@ function parseFilters(
       return { status: 400, error: 'type cannot be empty when provided' };
     }
 
-    if (!VALID_ENTITY_TYPES.has(trimmed)) {
+    if (!isTrashGuideEntityType(trimmed)) {
       return { status: 422, error: `Invalid type filter: ${trimmed}` };
     }
 
-    type = trimmed as TrashGuideEntityType;
+    type = trimmed;
   }
 
   const searchRaw = searchParams.get('search');

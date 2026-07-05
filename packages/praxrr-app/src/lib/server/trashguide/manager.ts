@@ -11,7 +11,6 @@ import { discoverTrashGuideFiles, fetchTrashGuideSource } from './fetcher.ts';
 import { parseTrashGuideEntities } from './parser.ts';
 import { transformTrashGuideEntities } from './transformer.ts';
 import type {
-  TrashGuideArrType,
   TrashGuideParsedEntity,
   TrashGuideParseResult,
   TrashGuideParseStatus,
@@ -26,7 +25,7 @@ export interface TrashGuideLinkOptions {
   name: string;
   repositoryUrl: string;
   branch?: string;
-  arrType: TrashGuideArrType;
+  arrType: TrashGuideSupportedArrType;
   scoreProfile?: string;
   syncStrategy?: number;
   autoPull?: boolean;
@@ -563,8 +562,8 @@ class TrashGuideManager {
       branch: source.branch,
       arrType: source.arr_type,
       scoreProfile: source.score_profile,
-      autoPull: source.auto_pull === 1,
-      enabled: source.enabled === 1,
+      autoPull: source.auto_pull,
+      enabled: source.enabled,
       syncStrategy: source.sync_strategy,
       lastSyncedAt: source.last_synced_at,
       lastCommitHash: source.last_commit_hash,

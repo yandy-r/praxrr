@@ -127,7 +127,7 @@ export interface TrashGuideFetchOptions {
   readonly local_path: string;
   readonly branch?: string;
   readonly personal_access_token?: string;
-  readonly arr_type: TrashGuideArrType;
+  readonly arr_type: TrashGuideSupportedArrType;
 }
 
 export type TrashGuideFetchAction = 'cloned' | 'updated';

@@ -4,7 +4,7 @@ import { trashGuideEntityCacheQueries } from '$db/queries/trashGuideEntityCache.
 import { parseCachedEntity } from '$lib/server/trashguide/displayTransform.ts';
 import { trashGuideManager } from '$lib/server/trashguide/manager.ts';
 import { isTrashGuideEntityType, type TrashGuideEntityType } from '$shared/trashguide/types.ts';
-import { logTrashGuideRouteError, mapReadErrorStatus, parseSourceId, toErrorMessage } from '../../_helpers.ts';
+import { logTrashGuideRouteError, mapReadErrorStatus, parseSourceId, toErrorMessage } from '../../../_helpers.ts';
 
 interface TrashGuideSourceRef {
   type: 'trash';
