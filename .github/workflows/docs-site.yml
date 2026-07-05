@@ -41,6 +41,7 @@ jobs:
         with:
           repository: yandy-r/praxrr-schema
           path: .external/praxrr-schema
+          token: ${{ secrets.MIRROR_PAT || github.token }}
           sparse-checkout: |
             README.md
             docs
@@ -51,6 +52,7 @@ jobs:
         with:
           repository: yandy-r/praxrr-db
           path: .external/praxrr-db
+          token: ${{ secrets.MIRROR_PAT || github.token }}
           sparse-checkout: |
             README.md
             docs
