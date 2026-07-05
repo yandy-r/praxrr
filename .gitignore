@@ -78,3 +78,6 @@ tasks/todo.md
 
 # Pinned shellcheck binary (downloaded by scripts/install-shellcheck.sh)
 /tools/shellcheck
+
+# graphify knowledge-graph output (large, machine-local, regenerated via `graphify update .`)
+graphify-out/
