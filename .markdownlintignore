@@ -32,6 +32,11 @@ logs/
 # Documentation builds
 _site/
 .jekyll-cache/
+docs/site/.astro/
+docs/site/dist/
+docs/site/src/content/docs/database/readme.md
+docs/site/src/content/docs/schema/manifest.md
+docs/site/src/content/docs/schema/structure.md
 
 # Package manager
 package-lock.json
@@ -39,4 +44,3 @@ yarn.lock
 pnpm-lock.yaml
 
 # Add your custom patterns below:
-

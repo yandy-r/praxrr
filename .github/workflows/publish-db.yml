@@ -166,6 +166,44 @@ jobs:
             attempt_push "$split_sha" "refs/tags/latest"
           fi
 
+      - name: Trigger docs rebuild
+        if: ${{ steps.publish.outputs.dry_run == 'false' }}
+        env:
+          MIRROR_PAT: ${{ secrets.MIRROR_PAT }}
+          EVENT_TYPE: praxrr-db-docs
+          TARGET_BRANCH: ${{ steps.publish.outputs.target_branch }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${MIRROR_PAT:-}" ]; then
+            echo "MIRROR_PAT secret is required to trigger docs rebuild." >&2
+            exit 1
+          fi
+
+          payload="$(
+            jq -n \
+              --arg event_type "${EVENT_TYPE}" \
+              --arg source_repo "yandy-r/praxrr-db" \
+              --arg source_ref "${TARGET_BRANCH:-${GITHUB_REF_NAME}}" \
+              --arg source_sha "${GITHUB_SHA}" \
+              '{
+                event_type: $event_type,
+                client_payload: {
+                  source_repo: $source_repo,
+                  source_ref: $source_ref,
+                  source_sha: $source_sha
+                }
+              }'
+          )"
+
+          curl -fsSL \
+            -X POST \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer ${MIRROR_PAT}" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            https://api.github.com/repos/yandy-r/praxrr/dispatches \
+            -d "${payload}"
+
       - name: Cleanup stale dry-run db branches
         if: always()
         env:

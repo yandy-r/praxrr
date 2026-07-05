@@ -1,0 +1,44 @@
+---
+title: Praxrr Documentation
+description: Unified documentation for the Praxrr application, PCD schema, and curated configuration database.
+template: splash
+hero:
+  tagline: Manage Radarr, Sonarr, and Lidarr configuration with a documented source of truth.
+  actions:
+    - text: Get Started
+      link: /getting-started/
+      icon: right-arrow
+    - text: API Reference
+      link: /api/
+      icon: external
+---
+
+import DocsStatus from '../../components/DocsStatus.svelte';
+
+Praxrr coordinates quality profiles, custom formats, release profiles, and sync behavior across Arr
+instances. This site is the documentation hub for the application runtime, the PCD schema, and the
+curated configuration database.
+
+<DocsStatus client:load />
+
+## Documentation Areas
+
+### Application
+
+Start with the [architecture overview](/app/architecture/) to understand the SvelteKit app, SQLite
+runtime database, PCD cache, job system, and Arr sync pipeline.
+
+### PCD Schema
+
+Use the [schema structure](/schema/structure/) and [manifest reference](/schema/manifest/) when
+working on portable config database format changes.
+
+### PCD Database
+
+Use the [database mirror section](/database/) when contributing curated custom formats, quality
+profiles, release profiles, and related data.
+
+### API
+
+The [API reference](/api/) is generated from the same OpenAPI document used for type generation in
+the app.
