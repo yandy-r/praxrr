@@ -1,0 +1,24 @@
+# Praxrr
+
+Praxrr manages quality profiles, custom formats, and release profiles for Radarr/Sonarr. It syncs curated configuration databases (PCDs) into Arr instances. V2 is under active development (not production-ready).
+
+Full agent rules live in [`CLAUDE.md`](../../CLAUDE.md). Key points surfaced for AI tooling:
+
+## Rules
+
+- Follow Conventional Commits for every commit: `feat|fix|docs|refactor|perf|test|build|ci|chore(scope): …`. Use `docs(internal): …` for files under `docs/plans`, `docs/research`, or `docs/internal`.
+- Never commit `.env`, `.env.encrypted`, `.env.keys`, secrets, or tokens.
+- Use `.github/ISSUE_TEMPLATE/*.yml` when present; follow `.github/PULL_REQUEST_TEMPLATE.md`; link `Closes #…` in every PR.
+- Keep files around ~500 lines (soft cap). Refactor meaningful overruns into smaller modules.
+- Modular code: small cohesive units, DRY, composition over inheritance, single responsibility.
+- Prefer working in a git worktree for non-trivial changes — `git worktree add ~/.claude-worktrees/<repo>-<branch>/`. Use the main checkout only for one-liners or when worktree creation is blocked.
+- Runtime is **Deno 2.x** — invoke tooling through `deno task …`, not npm. SvelteKit + Svelte 5.
+- **Svelte 5, no runes**: use `onclick` handlers, not `$state`/`$derived`.
+- TypeScript: strict typing, prefer `unknown` over `any`; validate inputs at boundaries and fail fast with typed errors.
+- Formatting: tabs, single quotes, no trailing commas, 100-char print width (Prettier + prettier-plugin-svelte + prettier-plugin-tailwindcss).
+- API work under `/api/v1/*`; contract-first (OpenAPI → generate types → implement).
+- Do not assume cross-Arr (Radarr/Sonarr/Lidarr) domain parity; validate behavior per `arr_type` and fail fast on ambiguous mappings.
+
+## Verification
+
+Run `deno task test`, `deno task lint`, and `deno task check` before marking work complete.

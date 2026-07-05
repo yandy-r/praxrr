@@ -75,3 +75,6 @@ tasks/todo.md
 # Temp files
 /temp/**
 !/temp/temp.md
+
+# Pinned shellcheck binary (downloaded by scripts/install-shellcheck.sh)
+/tools/shellcheck

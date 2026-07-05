@@ -43,5 +43,17 @@
     "typescript": "^5.9.2",
     "typescript-eslint": "^8.44.1",
     "vite": "^7.1.7"
+  },
+  "scripts": {
+    "lint": "./scripts/style.sh lint --docs --shell",
+    "lint:modified": "./scripts/style.sh lint --modified --docs --shell",
+    "lint:staged": "./scripts/style.sh lint --staged --docs --shell",
+    "lint:unstaged": "./scripts/style.sh lint --unstaged --docs --shell",
+    "lint:fix": "./scripts/style.sh lint --fix --docs --shell",
+    "lint:fix:modified": "./scripts/style.sh lint --fix --modified --docs --shell",
+    "format": "./scripts/style.sh format --docs --shell",
+    "format:modified": "./scripts/style.sh format --modified --docs --shell",
+    "format:staged": "./scripts/style.sh format --staged --docs --shell",
+    "format:unstaged": "./scripts/style.sh format --unstaged --docs --shell"
   }
 }
