@@ -1,6 +1,6 @@
 # Praxrr Roadmap
 
-Reviewed: 2026-07-05
+Reviewed: 2026-07-05 (updated after #191–#193 merged)
 
 Source: open GitHub issues in `yandy-r/praxrr` as of this review.
 
@@ -19,13 +19,12 @@ are still respected, but they are not the only sorting rule.
 ## Priority Legend
 
 - **P0 - Current focus:** Do next. These reduce near-term regression or release risk.
-- **P1 - v2 readiness:** Needed for a usable, supportable v2 experience.
-- **P2 - Core product differentiation:** High-value features that make Praxrr easier to understand
+- **P1 - Core product differentiation:** High-value features that make Praxrr easier to understand
   and trust.
-- **P3 - Lifecycle safety:** Features that make Praxrr safer as the number of managed instances
+- **P2 - Lifecycle safety:** Features that make Praxrr safer as the number of managed instances
   grows.
-- **P4 - Advanced capabilities:** Valuable after the core lifecycle is reliable.
-- **P5 - Maintenance and cost reduction:** Useful engineering work that should not block user-facing
+- **P3 - Advanced capabilities:** Valuable after the core lifecycle is reliable.
+- **P4 - Maintenance and cost reduction:** Useful engineering work that should not block user-facing
   priorities.
 - **Deferred:** Keep parked until explicit promotion criteria are met.
 
@@ -33,34 +32,44 @@ are still respected, but they are not the only sorting rule.
 
 The best next order is:
 
-1. Finish TRaSH Guide Sync hardening.
-2. Ship documentation infrastructure and the highest-value docs.
-3. Build onboarding and transparency features.
-4. Build configuration lifecycle safety.
-5. Add advanced automation, trust, and integration features.
-6. Handle parser migration and deferred ecosystem expansion only when they become release or
+1. Ship documentation infrastructure and the highest-value docs.
+2. Build onboarding and transparency features.
+3. Build configuration lifecycle safety.
+4. Add advanced automation, trust, and integration features.
+5. Handle parser migration and deferred ecosystem expansion only when they become release or
    maintenance blockers.
 
-Phase 1 safety work from the research backlog is already mostly complete: Sync Preview/Dry-Run,
-API Key Masking, Encrypted API Key Storage, PCD State Snapshots, Progressive Disclosure, and Score
-Simulator are closed. The open roadmap should not restart those completed issues.
+Phase 1 safety work from the research backlog is complete: Sync Preview/Dry-Run, API Key Masking,
+Encrypted API Key Storage, PCD State Snapshots, Progressive Disclosure rollout, Score Simulator
+(phases 1–3), and TRaSH Guide Sync PR-122 hardening (#125, #126). The open roadmap should not
+restart those completed issues.
 
-## P0 - Current Focus: TRaSH Guide Sync Stabilization
+## Recently Shipped
 
-Goal: make the new TRaSH Guide Sync pipeline safe to keep building on.
+Merged work since the Score Simulator and TRaSH Guide Sync foundations landed.
 
-| Order | Issue                                                                                  | Priority | Decision                                                                                      | Done When                                                                                                                                                                 |
-| ----- | -------------------------------------------------------------------------------------- | -------- | --------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1     | [#126](https://github.com/yandy-r/praxrr/issues/126) TRaSH Guide Sync type design gaps | Medium   | Do first in this group because it changes compile-time contracts that tests should lock in.   | `arr_type` is narrowed to supported TRaSH apps, parse logic is consolidated, boolean conversion is normalized, and consumers compile without runtime-only invalid states. |
-| 2     | [#125](https://github.com/yandy-r/praxrr/issues/125) TRaSH Guide Sync test gaps        | High     | Do immediately after or alongside #126. This is the most important open stabilization ticket. | Critical modules have coverage for git error classification, path security, metadata parsing, payload validation, error paths, and business logic.                        |
+| Date       | PR / commit | Summary                                                                                                      | Closes / relates |
+| ---------- | ----------- | ------------------------------------------------------------------------------------------------------------ | ---------------- |
+| 2026-07-05 | [#193](https://github.com/yandy-r/praxrr/pull/193) | Test coverage for 8 TRaSH modules (~137 tests): fetcher, sync job, manager, sources route, transformers, parser, trash-id mappings | [#125](https://github.com/yandy-r/praxrr/issues/125) |
+| 2026-07-05 | [#191](https://github.com/yandy-r/praxrr/pull/191) | Type design hardening: narrow `arr_type`, consolidate parse helpers, boolean `enabled`/`auto_pull` at query boundary | [#126](https://github.com/yandy-r/praxrr/issues/126) |
+| 2026-07-05 | [#192](https://github.com/yandy-r/praxrr/pull/192) | Fix pre-existing CI failures: lint-docs, lint-shell, autofix workflow                                        | Relates to #126  |
+| 2026-07-05 | `177451b3`  | Shared lint/format tooling (`scripts/style.sh`) with CI workflows                                            | —                |
+| 2026-07-05 | `6c9f75c0`  | Remove Claude review workflows                                                                             | —                |
+| 2026-07-05 | `e5b4e260`  | Add project roadmap                                                                                          | —                |
+| 2026-07-05 | `2bb21043`  | Version management script and UI version display fix                                                         | —                |
+| 2026-03-08 | [#190](https://github.com/yandy-r/praxrr/pull/190) | Score Simulator phase 3                                                                                      | Score Simulator  |
+| 2026-03-06 | [#184](https://github.com/yandy-r/praxrr/pull/184) | Score Simulator phase 2: batch input, profile comparison, ranking table                                        | Score Simulator  |
+| 2026-03-05 | [#176](https://github.com/yandy-r/praxrr/pull/176) | Score Simulator phase 1                                                                                      | #171–#175        |
+| 2026-03-04 | [#170](https://github.com/yandy-r/praxrr/pull/170) | Progressive Disclosure rollout across form and settings pages                                                | Progressive Disclosure |
+| 2026-03-02 | [#164](https://github.com/yandy-r/praxrr/pull/164) | Persist advanced section visibility preferences                                                              | Progressive Disclosure |
 
-Notes:
+Follow-up surfaced by #193 tests (optional, low severity):
 
-- Treat #125 as release-risk reduction, not optional cleanup.
-- If #126 changes behavior enough to invalidate existing expectations, update tests as part of #125.
-- Do not start another large feature until this group is closed or deliberately paused.
+| Issue                                                                                  | Priority | Decision                                                                                         |
+| -------------------------------------------------------------------------------------- | -------- | ------------------------------------------------------------------------------------------------ |
+| [#194](https://github.com/yandy-r/praxrr/issues/194) Reject NUL bytes in metadata paths | Low      | Harden `normalizeMetadataPath` error contract; does not block docs or onboarding work.         |
 
-## P1 - v2 Readiness: Documentation Foundation
+## P0 - Current Focus: Documentation Foundation
 
 Goal: make Praxrr understandable enough for users and contributors to run, debug, and extend it.
 
@@ -78,14 +87,24 @@ Notes:
 - #38 is the dependency gate. Do not scatter content work until the docs site shape is settled.
 - #74 should stay practical and task-oriented. Avoid turning it into an internal architecture guide.
 - #73 and #76 should stay separate: one documents schema structure, the other documents curated content.
+- Optional TRaSH tail work ([#194](https://github.com/yandy-r/praxrr/issues/194)) can land in parallel if someone is already in the fetcher module.
 
-## P2 - Core Product Differentiation: Onboarding and Transparency
+## Completed: TRaSH Guide Sync Stabilization
+
+Goal: make the TRaSH Guide Sync pipeline safe to keep building on. **Closed 2026-07-05.**
+
+| Issue                                                                                  | PR    | Outcome                                                                                                                                                                   |
+| -------------------------------------------------------------------------------------- | ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [#126](https://github.com/yandy-r/praxrr/issues/126) TRaSH Guide Sync type design gaps | #191  | `arr_type` narrowed to supported TRaSH apps, parse logic consolidated, boolean conversion normalized at the query boundary.                                             |
+| [#125](https://github.com/yandy-r/praxrr/issues/125) TRaSH Guide Sync test gaps        | #193  | ~137 tests across fetcher, sync job, manager, sources route, transformers, parser, and trash-id mappings; git error classification, path security, and error paths covered. |
+
+## P1 - Core Product Differentiation: Onboarding and Transparency
 
 Goal: help users understand what Praxrr will do before they trust it with their Arr instances.
 
 | Order | Issue                                                                                  | Priority | Decision                                                                                    | Done When                                                                                                             |
 | ----- | -------------------------------------------------------------------------------------- | -------- | ------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| 1     | [#29](https://github.com/yandy-r/praxrr/issues/29) Progressive Complexity Architecture | Medium   | Use as the UX architecture for this phase, not as a one-off screen.                         | Beginner and advanced surfaces have clear reveal rules, and new feature designs follow the same complexity model.     |
+| 1     | [#29](https://github.com/yandy-r/praxrr/issues/29) Progressive Complexity Architecture | Medium   | Use as the UX architecture for this phase, not as a one-off screen. Progressive Disclosure rollout (#164, #170) is shipped; close #29 once the architecture doc and reveal rules are formalized. | Beginner and advanced surfaces have clear reveal rules, and new feature designs follow the same complexity model.     |
 | 2     | [#12](https://github.com/yandy-r/praxrr/issues/12) Setup Wizard                        | High     | First user-facing feature in this phase. It addresses first-run abandonment directly.       | A new user can connect the first Arr instance, link a PCD, and reach the first successful sync through a guided flow. |
 | 3     | [#14](https://github.com/yandy-r/praxrr/issues/14) Cross-Arr Parity Map                | Medium   | Build before deeper cross-Arr automation so semantic differences are visible.               | Users can see app compatibility for config entities and understand Radarr/Sonarr/Lidarr differences before sync.      |
 | 4     | [#25](https://github.com/yandy-r/praxrr/issues/25) Resolved Config Viewer              | High     | Build as the desired-state visibility foundation.                                           | Users can inspect base ops + user ops + overrides as Praxrr's final desired state.                                    |
@@ -97,9 +116,12 @@ Notes:
 - #25, #26, and #30 should share model work where possible. Avoid three separate interpretations of
   "resolved config."
 - #14 is both UX and correctness work. It supports the cross-Arr semantic validation policy.
-- #29 should be treated as a design constraint for all new UI in this phase.
+- #29 should be treated as a design constraint for all new UI in this phase. Progressive Disclosure
+  UI rollout is shipped (#164, #170); remaining work is formalizing the architecture and closing #29.
+- Score Simulator (phases 1–3, #176/#184/#190) is shipped and can inform #30, but #30 still covers
+  broader profile/sync impact beyond release-title scoring.
 
-## P3 - Lifecycle Safety: Detect, Explain, Recover
+## P2 - Lifecycle Safety: Detect, Explain, Recover
 
 Goal: make Praxrr trustworthy after setup, especially when managing multiple Arr instances.
 
@@ -120,7 +142,7 @@ Notes:
   it unclear what will happen on the next sync.
 - #27 should be delayed until audit and rollback events exist as structured data.
 
-## P4 - Advanced Capabilities: Automation, Trust, and Integrations
+## P3 - Advanced Capabilities: Automation, Trust, and Integrations
 
 Goal: add higher-level intelligence after the core lifecycle is explainable and recoverable.
 
@@ -139,7 +161,7 @@ Notes:
 - #23 should wait for stable API contracts and clear authorization boundaries.
 - #28 should be threat-model driven. Avoid generic security scorecards that users cannot act on.
 
-## P5 - Maintenance and Cost Reduction
+## P4 - Maintenance and Cost Reduction
 
 Goal: reduce operational complexity without distracting from the v2 user journey.
 
@@ -177,12 +199,12 @@ Do not start these until the promotion criteria are met.
 
 Use this checklist when planning a sprint or milestone.
 
+### Completed (2026-07-05)
+
+- [x] #126 - TRaSH Guide Sync type hardening ([#191](https://github.com/yandy-r/praxrr/pull/191))
+- [x] #125 - TRaSH Guide Sync test coverage ([#193](https://github.com/yandy-r/praxrr/pull/193))
+
 ### Current Focus
-
-- [ ] #126 - TRaSH Guide Sync type hardening
-- [ ] #125 - TRaSH Guide Sync test coverage
-
-### v2 Readiness
 
 - [ ] #38 - Docs site infrastructure
 - [ ] #74 - User-facing guides
@@ -190,6 +212,7 @@ Use this checklist when planning a sprint or milestone.
 - [ ] #73 - PCD schema table reference
 - [ ] #77 - App technical docs
 - [ ] #75 - UI component reference
+- [ ] #194 - TRaSH fetcher NUL-byte guard (optional tail)
 
 ### Onboarding and Transparency
 
@@ -239,14 +262,13 @@ Use this checklist when planning a sprint or milestone.
 
 ## Next Sprint Recommendation
 
-Start with a focused stabilization sprint:
+Start with a documentation foundation sprint:
 
-1. Close #126.
-2. Close #125.
-3. Prepare #38 implementation scope and decide whether docs site work should land before the next
-   user-facing feature.
+1. Scope and begin #38 (Astro Starlight docs site with CI/deployment).
+2. Draft the #74 user guide outline so content can land as soon as the site skeleton exists.
+3. Optionally close #194 if already touching `fetcher.ts`; it is low severity and not a blocker.
 4. Update #6 so the parent research checklist points to this roadmap and no longer implies closed
    Phase 1 items are still active.
 
-This keeps the immediate work small, lowers regression risk, and sets up the project for clearer v2
-planning.
+TRaSH Guide Sync stabilization (#125, #126) is complete. The next milestone is making Praxrr
+documented enough for v2 users and contributors.
