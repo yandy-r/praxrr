@@ -76,6 +76,11 @@ jobs:
           --schema-source=../../.external/praxrr-schema
           --db-source=../../.external/praxrr-db
 
+      - name: Prepare monorepo TypeScript fallback
+        run: |
+          mkdir -p dist/.svelte-kit
+          printf '{"compilerOptions":{}}\n' > dist/.svelte-kit/tsconfig.json
+
       - name: Build docs site
         working-directory: docs/site
         env:
