@@ -50,7 +50,7 @@ Merged work since the Score Simulator and TRaSH Guide Sync foundations landed.
 
 | Date       | PR / commit                                        | Summary                                                                                                                            | Closes / relates                                     |
 | ---------- | -------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
-| 2026-07-05 | `bf50467e`, `0f324ddd`, `56b359a9`                 | Docs deploy CI: Workers Assets deployment, wrangler config loading, and deploy trigger                                             | Relates to [#38](https://github.com/yandy-r/praxrr/issues/38) |
+| 2026-07-05 | `bf50467e`, `0f324ddd`, `56b359a9`                 | Docs deploy CI: Workers Assets deployment, wrangler config loading, and deploy trigger                                             | [#38](https://github.com/yandy-r/praxrr/issues/38)   |
 | 2026-07-05 | [#195](https://github.com/yandy-r/praxrr/pull/195) | Reject NUL bytes in TRaSH metadata paths with typed `TrashGuideFetcherError`                                                       | [#194](https://github.com/yandy-r/praxrr/issues/194) |
 | 2026-07-05 | [#196](https://github.com/yandy-r/praxrr/pull/196) | Astro Starlight documentation site with OpenAPI generation, mirror-doc imports, docs CI, Cloudflare Pages wiring, and dispatches   | [#38](https://github.com/yandy-r/praxrr/issues/38)   |
 | 2026-07-05 | [#193](https://github.com/yandy-r/praxrr/pull/193) | Test coverage for 8 TRaSH modules (~137 tests): fetcher, sync job, manager, sources route, transformers, parser, trash-id mappings | [#125](https://github.com/yandy-r/praxrr/issues/125) |
@@ -87,14 +87,13 @@ Notes:
 
 ## Completed: TRaSH Guide Sync Stabilization
 
-Goal: make the TRaSH Guide Sync pipeline safe to keep building on. **Closed 2026-07-05** (#125, #126,
-#194).
+Goal: make the TRaSH Guide Sync pipeline safe to keep building on. **Closed 2026-07-05** (#125, #126, #194).
 
 | Issue                                                                                  | PR   | Outcome                                                                                                                                                                     |
 | -------------------------------------------------------------------------------------- | ---- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | [#126](https://github.com/yandy-r/praxrr/issues/126) TRaSH Guide Sync type design gaps | #191 | `arr_type` narrowed to supported TRaSH apps, parse logic consolidated, boolean conversion normalized at the query boundary.                                                 |
 | [#125](https://github.com/yandy-r/praxrr/issues/125) TRaSH Guide Sync test gaps        | #193 | ~137 tests across fetcher, sync job, manager, sources route, transformers, parser, and trash-id mappings; git error classification, path security, and error paths covered. |
-| [#194](https://github.com/yandy-r/praxrr/issues/194) NUL-byte metadata path guard     | #195 | `normalizeMetadataPath` rejects embedded NUL bytes with typed `TrashGuideFetcherError` instead of surfacing raw filesystem errors.                                           |
+| [#194](https://github.com/yandy-r/praxrr/issues/194) NUL-byte metadata path guard      | #195 | `normalizeMetadataPath` rejects embedded NUL bytes with typed `TrashGuideFetcherError` instead of surfacing raw filesystem errors.                                          |
 
 ## P1 - Core Product Differentiation: Onboarding and Transparency
 
