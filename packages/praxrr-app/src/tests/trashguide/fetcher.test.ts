@@ -1,4 +1,4 @@
-import { assertEquals, assertFalse, assertInstanceOf, assertRejects, assertStringIncludes } from '@std/assert';
+import { assertEquals, assertInstanceOf, assertRejects, assertStringIncludes } from '@std/assert';
 import { discoverTrashGuideFiles, fetchTrashGuideSource } from '$trashguide/fetcher.ts';
 import type { TrashGuideSupportedArrType } from '$trashguide/types.ts';
 import { TrashGuideFetcherError } from '$trashguide/types.ts';
@@ -358,21 +358,15 @@ Deno.test({
 });
 
 Deno.test({
-  name: 'discoverTrashGuideFiles surfaces a raw TypeError for NUL-byte metadata paths (current gap)',
+  name: 'discoverTrashGuideFiles rejects metadata paths containing NUL bytes',
   sanitizeResources: false,
   fn: async () => {
-    await withTempDir(async (root) => {
-      const nulPath = `media${String.fromCharCode(0)}.json`;
-      await Deno.writeTextFile(`${root}/metadata.json`, radarrMetadata({ custom_formats: [nulPath] }));
-
-      const error = await assertRejects(
-        () => discoverTrashGuideFiles({ local_path: root, arr_type: 'radarr' }),
-        TypeError,
-        'NUL byte'
-      );
-      // Documents the boundary gap: the null byte escapes the typed fetcher contract.
-      assertFalse(error instanceof TrashGuideFetcherError);
-    });
+    const nulPath = `media${String.fromCharCode(0)}.json`;
+    const error = await expectDiscoveryFetcherError(radarrMetadata({ custom_formats: [nulPath] }), 'radarr');
+    assertEquals(error.code, 'metadata_invalid');
+    assertEquals(error.retryable, false);
+    assertStringIncludes(error.message, 'contains a NUL byte');
+    assertStringIncludes(error.message, nulPath);
   },
 });
 
