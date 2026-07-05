@@ -6,12 +6,23 @@ import {
   type TrashGuideEntityCacheWithSource,
 } from '$db/queries/trashGuideEntityCache.ts';
 import { jobDispatcher } from '$jobs/dispatcher.ts';
-import { trashGuideManager } from '$lib/server/trashguide/manager.ts';
+import {
+  trashGuideManager,
+  TrashGuideSourceConflictError,
+  TrashGuideSourceNotFoundError,
+  TrashGuideSourceValidationError,
+  type TrashGuideSourceUpdateInput,
+} from '$lib/server/trashguide/manager.ts';
 import { TrashGuideFetcherError } from '$lib/server/trashguide/types.ts';
 import { TrashGuideTransformError } from '$lib/server/trashguide/transformer.ts';
+import { type TrashGuideSource, trashGuideSourcesQueries } from '$db/queries/trashGuideSources.ts';
 import type { JobQueueRecord, JobRunHistoryRecord } from '$jobs/queueTypes.ts';
 import { POST as sourcesPost } from '../../routes/api/v1/trash-guide/sources/+server.ts';
-import { GET as sourceByIdGet, PUT as sourceByIdPut } from '../../routes/api/v1/trash-guide/sources/[id]/+server.ts';
+import {
+  DELETE as sourceByIdDelete,
+  GET as sourceByIdGet,
+  PUT as sourceByIdPut,
+} from '../../routes/api/v1/trash-guide/sources/[id]/+server.ts';
 import { GET as sourceEntitiesGet } from '../../routes/api/v1/trash-guide/sources/[id]/entities/+server.ts';
 import { POST as sourceSyncPost } from '../../routes/api/v1/trash-guide/sources/[id]/sync/+server.ts';
 
@@ -718,4 +729,584 @@ Deno.test({
       }
     }
   },
+});
+
+function createTrashGuideSource(overrides: Partial<TrashGuideSource> = {}): TrashGuideSource {
+  return {
+    id: 7,
+    name: 'TRaSH radarr 7',
+    repository_url: 'https://example.com/radarr.git',
+    branch: 'master',
+    local_path: '/fake/clone/7',
+    arr_type: 'radarr',
+    score_profile: 'default',
+    sync_strategy: 60,
+    auto_pull: true,
+    enabled: true,
+    last_synced_at: null,
+    last_commit_hash: null,
+    created_at: '2026-02-26T00:00:00.000Z',
+    updated_at: '2026-02-26T00:00:00.000Z',
+    ...overrides,
+  };
+}
+
+// --- PUT field-level validation (parseUpdatePayload branches -> 400) ---
+
+async function invokePut(id: string, body: string) {
+  return await sourceByIdPut({
+    params: { id },
+    request: new Request(`http://localhost/api/v1/trash-guide/sources/${id}`, {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body,
+    }),
+  } as unknown as Parameters<typeof sourceByIdPut>[0]);
+}
+
+Deno.test('trash guide source PUT rejects unsupported update fields', async () => {
+  const response = await invokePut('5', JSON.stringify({ name: 'x', bogus: true }));
+  assertEquals(response.status, 400);
+  const payload = (await response.json()) as { error: string };
+  assertEquals(payload.error, 'Unsupported fields: bogus');
+});
+
+Deno.test('trash guide source PUT rejects empty update payload', async () => {
+  const response = await invokePut('5', '{}');
+  assertEquals(response.status, 400);
+  const payload = (await response.json()) as { error: string };
+  assertEquals(payload.error, 'At least one updatable field is required');
+});
+
+Deno.test('trash guide source PUT rejects non-object body', async () => {
+  const response = await invokePut('5', '[]');
+  assertEquals(response.status, 400);
+  const payload = (await response.json()) as { error: string };
+  assertEquals(payload.error, 'Request body must be an object');
+});
+
+Deno.test('trash guide source PUT rejects malformed JSON body', async () => {
+  const response = await invokePut('5', '{"name":');
+  assertEquals(response.status, 400);
+  const payload = (await response.json()) as { error: string };
+  assertEquals(payload.error, 'Invalid JSON body');
+});
+
+Deno.test('trash guide source PUT rejects empty name', async () => {
+  const response = await invokePut('5', JSON.stringify({ name: '   ' }));
+  assertEquals(response.status, 400);
+  const payload = (await response.json()) as { error: string };
+  assertEquals(payload.error, 'name cannot be empty');
+});
+
+Deno.test('trash guide source PUT rejects non-string name', async () => {
+  const response = await invokePut('5', JSON.stringify({ name: 123 }));
+  assertEquals(response.status, 400);
+  const payload = (await response.json()) as { error: string };
+  assertEquals(payload.error, 'name must be a string when provided');
+});
+
+Deno.test('trash guide source PUT rejects non-http repositoryUrl', async () => {
+  const response = await invokePut('5', JSON.stringify({ repositoryUrl: 'ftp://example.com' }));
+  assertEquals(response.status, 400);
+  const payload = (await response.json()) as { error: string };
+  assertEquals(payload.error, 'repositoryUrl must use http or https');
+});
+
+Deno.test('trash guide source PUT rejects malformed repositoryUrl', async () => {
+  const response = await invokePut('5', JSON.stringify({ repositoryUrl: 'not a url' }));
+  assertEquals(response.status, 400);
+  const payload = (await response.json()) as { error: string };
+  assertEquals(payload.error, 'repositoryUrl must be a valid URL');
+});
+
+Deno.test('trash guide source PUT rejects non-boolean enabled', async () => {
+  const response = await invokePut('5', JSON.stringify({ enabled: 'yes' }));
+  assertEquals(response.status, 400);
+  const payload = (await response.json()) as { error: string };
+  assertEquals(payload.error, 'enabled must be a boolean when provided');
+});
+
+Deno.test('trash guide source PUT rejects non-boolean autoPull', async () => {
+  const response = await invokePut('5', JSON.stringify({ autoPull: 1 }));
+  assertEquals(response.status, 400);
+  const payload = (await response.json()) as { error: string };
+  assertEquals(payload.error, 'autoPull must be a boolean when provided');
+});
+
+Deno.test('trash guide source PUT rejects non-integer syncStrategy', async () => {
+  const response = await invokePut('5', JSON.stringify({ syncStrategy: 1.5 }));
+  assertEquals(response.status, 400);
+  const payload = (await response.json()) as { error: string };
+  assertEquals(payload.error, 'syncStrategy must be an integer when provided');
+});
+
+Deno.test('trash guide source PUT rejects negative syncStrategy', async () => {
+  const response = await invokePut('5', JSON.stringify({ syncStrategy: -1 }));
+  assertEquals(response.status, 400);
+  const payload = (await response.json()) as { error: string };
+  assertEquals(payload.error, 'syncStrategy must be greater than or equal to 0');
+});
+
+Deno.test('trash guide source PUT validates numeric source id', async () => {
+  const response = await invokePut('abc', JSON.stringify({ name: 'x' }));
+  assertEquals(response.status, 400);
+  const payload = (await response.json()) as { error: string };
+  assertEquals(payload.error, 'Invalid source id');
+});
+
+// --- PUT partial-update success (200) ---
+
+Deno.test({
+  name: 'trash guide source PUT applies single-field partial update and returns 200',
+  sanitizeResources: false,
+  fn: async () => {
+    const restores: Restore[] = [];
+    let capturedId: number | undefined;
+    let capturedInput: TrashGuideSourceUpdateInput | undefined;
+
+    patchTarget(
+      trashGuideManager,
+      'updateSource',
+      ((id: number, input: TrashGuideSourceUpdateInput) => {
+        capturedId = id;
+        capturedInput = input;
+        return Promise.resolve(createSourceResponse(5, 'radarr'));
+      }) as typeof trashGuideManager.updateSource,
+      restores
+    );
+
+    try {
+      const response = await invokePut('5', JSON.stringify({ name: 'Renamed Source' }));
+
+      assertEquals(response.status, 200);
+      const payload = (await response.json()) as { source: unknown };
+      assertEquals(payload.source, createSourceResponse(5, 'radarr'));
+
+      assertEquals(capturedId, 5);
+      assertEquals(capturedInput?.name, 'Renamed Source');
+      assertEquals(capturedInput?.repositoryUrl, undefined);
+      assertEquals(capturedInput?.branch, undefined);
+      assertEquals(capturedInput?.arrType, undefined);
+      assertEquals(capturedInput?.scoreProfile, undefined);
+      assertEquals(capturedInput?.autoPull, undefined);
+      assertEquals(capturedInput?.enabled, undefined);
+      assertEquals(capturedInput?.syncStrategy, undefined);
+    } finally {
+      for (const restore of restores.reverse()) {
+        restore();
+      }
+    }
+  },
+});
+
+Deno.test({
+  name: 'trash guide source PUT forwards multi-field partial patch',
+  sanitizeResources: false,
+  fn: async () => {
+    const restores: Restore[] = [];
+    let capturedInput: TrashGuideSourceUpdateInput | undefined;
+
+    patchTarget(
+      trashGuideManager,
+      'updateSource',
+      ((_id: number, input: TrashGuideSourceUpdateInput) => {
+        capturedInput = input;
+        return Promise.resolve(createSourceResponse(6, 'sonarr'));
+      }) as typeof trashGuideManager.updateSource,
+      restores
+    );
+
+    try {
+      const response = await invokePut('6', JSON.stringify({ enabled: false, syncStrategy: 120, autoPull: true }));
+
+      assertEquals(response.status, 200);
+      const payload = (await response.json()) as { source: unknown };
+      assertEquals(payload.source, createSourceResponse(6, 'sonarr'));
+
+      assertEquals(capturedInput?.enabled, false);
+      assertEquals(capturedInput?.syncStrategy, 120);
+      assertEquals(capturedInput?.autoPull, true);
+      assertEquals(capturedInput?.name, undefined);
+    } finally {
+      for (const restore of restores.reverse()) {
+        restore();
+      }
+    }
+  },
+});
+
+// --- PUT arr_type immutability + conflict + 404 mapping ---
+
+Deno.test({
+  name: 'trash guide source PUT rejects arrType change with 422',
+  sanitizeResources: false,
+  fn: async () => {
+    const restores: Restore[] = [];
+    let reached = false;
+
+    patchTarget(
+      trashGuideManager,
+      'updateSource',
+      (() => {
+        reached = true;
+        throw new TrashGuideSourceValidationError(
+          'arr_type_mismatch',
+          'TRaSH source arrType cannot be changed once created'
+        );
+      }) as typeof trashGuideManager.updateSource,
+      restores
+    );
+
+    try {
+      const response = await invokePut('5', JSON.stringify({ arrType: 'sonarr' }));
+
+      assertEquals(response.status, 422);
+      const payload = (await response.json()) as { error: string };
+      assertEquals(payload.error, 'TRaSH source arrType cannot be changed once created');
+      assertEquals(reached, true);
+    } finally {
+      for (const restore of restores.reverse()) {
+        restore();
+      }
+    }
+  },
+});
+
+Deno.test({
+  name: 'trash guide source PUT maps name conflict to 409',
+  sanitizeResources: false,
+  fn: async () => {
+    const restores: Restore[] = [];
+
+    patchTarget(
+      trashGuideManager,
+      'updateSource',
+      (() => {
+        throw new TrashGuideSourceConflictError('name', 'TRaSH source name already exists: dup');
+      }) as typeof trashGuideManager.updateSource,
+      restores
+    );
+
+    try {
+      const response = await invokePut('5', JSON.stringify({ name: 'dup' }));
+
+      assertEquals(response.status, 409);
+      const payload = (await response.json()) as { error: string };
+      assertStringIncludes(payload.error, 'already exists');
+    } finally {
+      for (const restore of restores.reverse()) {
+        restore();
+      }
+    }
+  },
+});
+
+Deno.test({
+  name: 'trash guide source PUT returns 404 for missing source',
+  sanitizeResources: false,
+  fn: async () => {
+    const restores: Restore[] = [];
+
+    patchTarget(
+      trashGuideManager,
+      'updateSource',
+      (() => {
+        throw new TrashGuideSourceNotFoundError(999);
+      }) as typeof trashGuideManager.updateSource,
+      restores
+    );
+
+    try {
+      const response = await invokePut('999', JSON.stringify({ name: 'x' }));
+
+      assertEquals(response.status, 404);
+      const payload = (await response.json()) as { error: string };
+      assertEquals(payload.error, 'TRaSH source 999 not found');
+    } finally {
+      for (const restore of restores.reverse()) {
+        restore();
+      }
+    }
+  },
+});
+
+Deno.test({
+  name: 'trash guide source PUT returns 404 without mutating when source is missing',
+  sanitizeResources: false,
+  fn: async () => {
+    const restores: Restore[] = [];
+    let updateCalled = false;
+
+    patchTarget(
+      trashGuideSourcesQueries,
+      'getById',
+      (() => undefined) as typeof trashGuideSourcesQueries.getById,
+      restores
+    );
+    patchTarget(
+      trashGuideSourcesQueries,
+      'update',
+      (() => {
+        updateCalled = true;
+        throw new Error('did not expect update when source is missing');
+      }) as typeof trashGuideSourcesQueries.update,
+      restores
+    );
+
+    try {
+      const response = await invokePut('404', JSON.stringify({ name: 'x' }));
+
+      assertEquals(response.status, 404);
+      const payload = (await response.json()) as { error: string };
+      assertEquals(payload.error, 'TRaSH source 404 not found');
+      assertEquals(updateCalled, false);
+    } finally {
+      for (const restore of restores.reverse()) {
+        restore();
+      }
+    }
+  },
+});
+
+// --- GET 404 + positive-path contrast ---
+
+Deno.test({
+  name: 'trash guide source GET returns 404 for missing source',
+  sanitizeResources: false,
+  fn: async () => {
+    const restores: Restore[] = [];
+
+    patchTarget(
+      trashGuideManager,
+      'getSource',
+      (() => {
+        throw new TrashGuideSourceNotFoundError(321);
+      }) as typeof trashGuideManager.getSource,
+      restores
+    );
+
+    try {
+      const response = await sourceByIdGet({
+        params: { id: '321' },
+      } as unknown as Parameters<typeof sourceByIdGet>[0]);
+
+      assertEquals(response.status, 404);
+      const payload = (await response.json()) as { error: string };
+      assertEquals(payload.error, 'TRaSH source 321 not found');
+    } finally {
+      for (const restore of restores.reverse()) {
+        restore();
+      }
+    }
+  },
+});
+
+Deno.test({
+  name: 'trash guide source GET returns source payload',
+  sanitizeResources: false,
+  fn: async () => {
+    const restores: Restore[] = [];
+
+    patchTarget(
+      trashGuideManager,
+      'getSource',
+      ((id: number) => {
+        assertEquals(id, 8);
+        return createSourceResponse(8, 'sonarr');
+      }) as typeof trashGuideManager.getSource,
+      restores
+    );
+
+    try {
+      const response = await sourceByIdGet({
+        params: { id: '8' },
+      } as unknown as Parameters<typeof sourceByIdGet>[0]);
+
+      assertEquals(response.status, 200);
+      const payload = (await response.json()) as { source: unknown };
+      assertEquals(payload.source, createSourceResponse(8, 'sonarr'));
+    } finally {
+      for (const restore of restores.reverse()) {
+        restore();
+      }
+    }
+  },
+});
+
+// --- DELETE success, cascade delegation, 404, and id validation ---
+
+Deno.test({
+  name: 'trash guide source DELETE removes source and returns 204',
+  sanitizeResources: false,
+  fn: async () => {
+    const restores: Restore[] = [];
+    let capturedId: number | undefined;
+
+    patchTarget(
+      trashGuideManager,
+      'deleteSource',
+      ((id: number) => {
+        capturedId = id;
+        return Promise.resolve();
+      }) as typeof trashGuideManager.deleteSource,
+      restores
+    );
+
+    try {
+      const response = await sourceByIdDelete({
+        params: { id: '7' },
+      } as unknown as Parameters<typeof sourceByIdDelete>[0]);
+
+      assertEquals(response.status, 204);
+      assertEquals(await response.text(), '');
+      assertEquals(capturedId, 7);
+    } finally {
+      for (const restore of restores.reverse()) {
+        restore();
+      }
+    }
+  },
+});
+
+Deno.test({
+  name: 'trash guide source DELETE cascades clone cleanup via unlink',
+  sanitizeResources: false,
+  fn: async () => {
+    const restores: Restore[] = [];
+    const fakeSource = createTrashGuideSource({ id: 7, local_path: '/fake/clone/7' });
+    let deletedId: number | undefined;
+    let removedPath: string | undefined;
+
+    patchTarget(
+      trashGuideSourcesQueries,
+      'getById',
+      ((id: number) => (id === 7 ? fakeSource : undefined)) as typeof trashGuideSourcesQueries.getById,
+      restores
+    );
+    patchTarget(
+      trashGuideSourcesQueries,
+      'delete',
+      ((id: number) => {
+        deletedId = id;
+        return true;
+      }) as typeof trashGuideSourcesQueries.delete,
+      restores
+    );
+    patchTarget(
+      Deno,
+      'remove',
+      ((path: string | URL) => {
+        removedPath = String(path);
+        return Promise.resolve();
+      }) as typeof Deno.remove,
+      restores
+    );
+
+    try {
+      const response = await sourceByIdDelete({
+        params: { id: '7' },
+      } as unknown as Parameters<typeof sourceByIdDelete>[0]);
+
+      assertEquals(response.status, 204);
+      assertEquals(deletedId, 7);
+      assertEquals(removedPath, '/fake/clone/7');
+    } finally {
+      for (const restore of restores.reverse()) {
+        restore();
+      }
+    }
+  },
+});
+
+Deno.test({
+  name: 'trash guide source DELETE returns 404 for missing source',
+  sanitizeResources: false,
+  fn: async () => {
+    const restores: Restore[] = [];
+
+    patchTarget(
+      trashGuideManager,
+      'deleteSource',
+      (() => {
+        throw new TrashGuideSourceNotFoundError(404);
+      }) as typeof trashGuideManager.deleteSource,
+      restores
+    );
+
+    try {
+      const response = await sourceByIdDelete({
+        params: { id: '404' },
+      } as unknown as Parameters<typeof sourceByIdDelete>[0]);
+
+      assertEquals(response.status, 404);
+      const payload = (await response.json()) as { error: string };
+      assertEquals(payload.error, 'TRaSH source 404 not found');
+    } finally {
+      for (const restore of restores.reverse()) {
+        restore();
+      }
+    }
+  },
+});
+
+Deno.test({
+  name: 'trash guide source DELETE returns 404 without mutating when source is missing',
+  sanitizeResources: false,
+  fn: async () => {
+    const restores: Restore[] = [];
+    let deleteCalled = false;
+    let removeCalled = false;
+
+    patchTarget(
+      trashGuideSourcesQueries,
+      'getById',
+      (() => undefined) as typeof trashGuideSourcesQueries.getById,
+      restores
+    );
+    patchTarget(
+      trashGuideSourcesQueries,
+      'delete',
+      (() => {
+        deleteCalled = true;
+        throw new Error('did not expect delete when source is missing');
+      }) as typeof trashGuideSourcesQueries.delete,
+      restores
+    );
+    patchTarget(
+      Deno,
+      'remove',
+      ((_path: string | URL) => {
+        removeCalled = true;
+        throw new Error('did not expect Deno.remove when source is missing');
+      }) as typeof Deno.remove,
+      restores
+    );
+
+    try {
+      const response = await sourceByIdDelete({
+        params: { id: '404' },
+      } as unknown as Parameters<typeof sourceByIdDelete>[0]);
+
+      assertEquals(response.status, 404);
+      const payload = (await response.json()) as { error: string };
+      assertEquals(payload.error, 'TRaSH source 404 not found');
+      assertEquals(deleteCalled, false);
+      assertEquals(removeCalled, false);
+    } finally {
+      for (const restore of restores.reverse()) {
+        restore();
+      }
+    }
+  },
+});
+
+Deno.test('trash guide source DELETE validates numeric source id', async () => {
+  const response = await sourceByIdDelete({
+    params: { id: 'nope' },
+  } as unknown as Parameters<typeof sourceByIdDelete>[0]);
+
+  assertEquals(response.status, 400);
+  const payload = (await response.json()) as { error: string };
+  assertEquals(payload.error, 'Invalid source id');
 });
