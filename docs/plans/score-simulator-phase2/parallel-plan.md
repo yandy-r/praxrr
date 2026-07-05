@@ -303,11 +303,13 @@ client-side UI work over the existing API contract — no backend changes.
 
 1. Add new prop: `releaseId: string | null = null`
 2. Change line 49 from `$: releaseResult = result?.results?.[0] ?? null` to:
+
    ```typescript
    $: releaseResult = releaseId
      ? (result?.results?.find((r) => r.id === releaseId) ?? null)
      : (result?.results?.[0] ?? null);
    ```
+
 3. No other changes — rest of component works with any `releaseResult`
 
 **Acceptance criteria:**

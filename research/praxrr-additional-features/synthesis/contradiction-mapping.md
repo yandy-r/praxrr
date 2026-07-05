@@ -12,7 +12,7 @@ Eight research personas investigated new feature opportunities for Praxrr from r
 
 **Contrarian vs. Journalist vs. Futurist vs. Historian**
 
-- **Contrarian** argues the addressable audience is "smaller than assumed." Most *Arr users run 1-2 instances, configure via TRaSH Guides once in 15-30 minutes, and never revisit. The users who genuinely benefit from config management are those with 3+ instances -- a fraction of the total *Arr user base. Features should be evaluated against this "actual (smaller) audience."
+- **Contrarian** argues the addressable audience is "smaller than assumed." Most *Arr users run 1-2 instances, configure via TRaSH Guides once in 15-30 minutes, and never revisit. The users who genuinely benefit from config management are those with 3+ instances -- a fraction of the total*Arr user base. Features should be evaluated against this "actual (smaller) audience."
 - **Journalist** documents a fragmented competitive landscape where "no clear winner" exists, implying significant uncaptured demand. Multiple tools (Recyclarr, Profilarr, Configarr, Notifiarr, Buildarr) compete, collectively serving a meaningful user base that none fully satisfies.
 - **Futurist** cites market projections showing self-hosting reaching $85.2B by 2034, with Plex's monetization pushes and AI assistants making self-hosting accessible to newcomers. The growth vector is "10x more users."
 - **Historian** documents the cyclical pattern of streaming fragmentation driving self-hosting interest, positioning the current moment as a "fragmentation/innovation phase" -- the optimal time for Praxrr to establish its approach.

@@ -33,7 +33,7 @@ jobs:
           node-version: lts/*
 
       - name: Apply formatters
-        run: ./scripts/style.sh format --docs --shell
+        run: ./scripts/style.sh format --docs
 
       - name: Apply auto-fixable lint
         # Unfixable violations are reported by the check workflow (lint.yml); do not block the push-back here.

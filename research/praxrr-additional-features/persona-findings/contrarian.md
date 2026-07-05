@@ -146,7 +146,7 @@ Centralized configuration management tools for the \*Arr ecosystem face a fundam
    - **Alternative view**: Praxrr's PCD model (base ops + user ops) already addresses this partially, but the UX should make it clear that TRaSH Guides are a starting point, not the final word.
 
 5. **Assumption**: Custom format scoring is a solvable UX problem.
-   - **Why questionable**: Even *Arr developers acknowledged "Custom Formats is too complex." Users routinely have 100+ preferred words/formats with enormous permutations of scores. Debugging which regex matched takes significant time. This is inherent domain complexity that cannot be eliminated by better UI -- only managed. Adding a management layer on top does not reduce the number of decisions a user must make; it potentially increases them (now you must decide both the score AND whether to manage it in Praxrr vs. directly in the *Arr app).
+   - **Why questionable**: Even *Arr developers acknowledged "Custom Formats is too complex." Users routinely have 100+ preferred words/formats with enormous permutations of scores. Debugging which regex matched takes significant time. This is inherent domain complexity that cannot be eliminated by better UI -- only managed. Adding a management layer on top does not reduce the number of decisions a user must make; it potentially increases them (now you must decide both the score AND whether to manage it in Praxrr vs. directly in the*Arr app).
    - **Evidence status**: Medium - supported by developer acknowledgment and user experience reports
    - **Alternative view**: Perhaps the answer is not better management of existing complexity but opinionated presets that reduce the number of decisions (which Praxrr's PCD system partially provides).
 
@@ -212,7 +212,7 @@ The primary threat vectors for a tool like Praxrr are:
 
 3. **Centralizing API keys creates a security liability that scales with adoption.** As Praxrr manages more instances and services, the impact of a single breach grows. Rather than adding more services to manage (notification providers, indexers, download clients), Praxrr should consider whether each API key it stores is genuinely necessary and implement key rotation, scoped permissions, and breach containment strategies.
 
-4. **The target audience may be smaller than assumed.** Most *Arr users run a simple setup that TRaSH Guides covers in a one-time manual configuration. The users who genuinely benefit from config management tools are those with 3+ instances, multiple *Arr apps, or frequent configuration changes. Features should be evaluated against this actual (smaller) audience, not the theoretical total \*Arr user base.
+4. **The target audience may be smaller than assumed.** Most *Arr users run a simple setup that TRaSH Guides covers in a one-time manual configuration. The users who genuinely benefit from config management tools are those with 3+ instances, multiple*Arr apps, or frequent configuration changes. Features should be evaluated against this actual (smaller) audience, not the theoretical total \*Arr user base.
 
 5. **SQLite in Docker is a proven risk surface.** Praxrr uses SQLite as its primary database in Docker deployments. Multiple self-hosted applications have documented silent corruption, data loss from ungraceful shutdowns, and filesystem incompatibilities. Database integrity validation at startup and proper backup tooling should be treated as critical infrastructure, not nice-to-have features.
 

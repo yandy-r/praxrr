@@ -36,7 +36,7 @@ nice-to-have. It is a release gate for the final score simulator phase.
 - **`goto()`** from `$app/navigation`: Deep-link from scoring page to simulator
 - **`replaceState()`** from `$app/navigation`: URL state updates without history pollution
 - **`$page.url.searchParams`** from `$app/stores`: Read URL params reactively
-- **Documentation**: https://svelte.dev/docs/kit/$app-navigation
+- **Documentation**: <https://svelte.dev/docs/kit/$app-navigation>
 
 ### Libraries and SDKs
 

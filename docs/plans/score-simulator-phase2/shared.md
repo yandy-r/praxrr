@@ -587,4 +587,4 @@ have unit tests since they contain sorting/ranking/delta logic.
 | Presets            | Static client-side constants    | Zero server overhead                             |
 | State shape        | Flat reactive variables         | Matches Phase 1 `$:` pattern                     |
 | Batch submit       | Explicit button                 | Manages parser load                              |
-| Advanced↔Basic    | Lossless round-trip             | Keep data in memory, just hide UI                |
+| Advanced↔Basic     | Lossless round-trip             | Keep data in memory, just hide UI                |

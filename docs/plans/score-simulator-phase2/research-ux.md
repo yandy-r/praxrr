@@ -174,6 +174,7 @@ levels, make progression obvious, maintain strong information scent).
   - **Confidence**: Medium -- better for onboarding tutorials than inline use.
 
 - **Preset data structure**: Each preset should include:
+
   ```typescript
   interface ReleasePreset {
     id: string;
@@ -184,6 +185,7 @@ levels, make progression obvious, maintain strong information scent).
     tags: string[]; // e.g., ['remux', 'hdr', 'lossless-audio']
   }
   ```
+
   Store presets as a static JSON array in the client bundle (no API call needed). Keep the list
   curated (20-30 presets total).
   - **Confidence**: High -- static data avoids API complexity and keeps presets fast.

@@ -586,11 +586,13 @@ const comparisonRankingColumns: Column<ComparisonRankingRow>[] = [
 - **Impact**: Comparison mode requires tracking two selected profiles instead of one. localStorage
   persistence needs to handle the additional profile selection.
 - **Approach**: Extend the existing localStorage pattern:
+
   ```typescript
   const profileAStorageKey = 'scoreSimulator.comparisonProfileA';
   const profileBStorageKey = 'scoreSimulator.comparisonProfileB';
   const modeStorageKey = 'scoreSimulator.mode'; // 'single' | 'comparison' | 'batch'
   ```
+
 - **State shape**: Keep the existing `selectedProfileName` for single mode. Add `comparisonProfileA`
   and `comparisonProfileB` for comparison mode. The API call uses whichever is active.
 

@@ -32,9 +32,9 @@
 
 ---
 
-# PR #190 Issues I5-I7 Validation And Fixes
+## PR #190 Issues I5-I7 Validation And Fixes
 
-## Plan
+### Plan
 
 - [x] Validate I5 against current `urlState.ts` behavior and targeted URL-state
       tests before changing parse behavior.
@@ -48,7 +48,7 @@
       `docs/pr-reviews/pr-190-review.md`, and record the outcome below.
 - [x] Commit verified progress once the fixes are confirmed.
 
-## Review
+### Review
 
 - Validated before implementing:
   - I5 was still open: `parseBatchParam` and `parseOverridesParam` used silent
@@ -74,9 +74,9 @@
 
 ---
 
-# PR #190 Suggestions S1-S5 Validation And Fixes
+## PR #190 Suggestions S1-S5 Validation And Fixes
 
-## Plan
+### Plan
 
 - [x] Validate suggestions S1-S5 against the current score-simulator code and
       confirm which ones are still actionable.
@@ -90,7 +90,7 @@
       outcome below.
 - [x] Commit verified progress once the fixes are confirmed.
 
-## Review
+### Review
 
 - Validated before implementing:
   - S1 was still valid: `SimulatorUrlState` still exposed/serialized `arrType`
@@ -101,7 +101,7 @@
     references.
   - S4 was still valid: the quality-profile option shape was duplicated between
     the page and child components, and the page still relied on an `as
-    Array<{...}>` cast.
+Array<{...}>` cast.
   - S5 was still valid: `urlState.ts` used a local `MediaType` alias that
     actually meant `PresetCategory`, which is broader than the OpenAPI
     `MediaType`.
@@ -122,9 +122,9 @@
 
 ---
 
-# PR #190 Suggestions S6-S10 Validation And Fixes
+## PR #190 Suggestions S6-S10 Validation And Fixes
 
-## Plan
+### Plan
 
 - [x] Validate suggestions S6-S10 against current score-simulator client/server behavior and existing targeted tests before implementing anything.
 - [x] Implement only the confirmed fixes, keeping clipboard handling, override normalization, and route error classification minimal and explicit.
@@ -133,7 +133,7 @@
 - [x] Update `docs/pr-reviews/pr-190-review.md` with final S6-S10 status and record the outcome below.
 - [ ] Commit verified progress once the fixes are confirmed.
 
-## Review
+### Review
 
 - Validated before implementing:
   - S6 was still valid: clipboard API and `execCommand` fallback failures were

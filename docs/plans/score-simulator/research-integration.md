@@ -301,7 +301,7 @@ The PCD schema includes `test_entities` and `test_releases` tables designed for 
 ## Gotchas and Edge Cases
 
 - **`indexer_flag` and `size` conditions always return false**: The evaluator returns `{ matched: false, actual: 'N/A' }` for these because there is no indexer/file data available from title parsing alone. The score simulator will similarly miss these conditions.
-- **`.NET regex vs JS regex**: Pattern conditions use `.NET regex` via the parser's `/match/batch` endpoint. The evaluator has a JS regex fallback but it may not work for .NET-specific patterns. Always prefer parser-based matching when parser is available.
+- **`.NET regex vs JS regex**: Pattern conditions use`.NET regex`via the parser's`/match/batch` endpoint. The evaluator has a JS regex fallback but it may not work for .NET-specific patterns. Always prefer parser-based matching when parser is available.
 - **`edition` and `release_group` pattern matching**: Unlike `release_title` patterns (matched against full title via parser), `edition` and `release_group` patterns are matched against the PARSED field value using JS regex, not the full title. The parser's pattern match endpoint is only used for `release_title` type conditions.
 - **`allCfScores` returns all profiles**: No filtering by arr_type. The caller must apply arr_type filtering when calculating totals per profile.
 - **Score type is `number | null`**: A null score means no score is configured for that CF/profile/arrType combo. Treat as 0 for total calculation.
