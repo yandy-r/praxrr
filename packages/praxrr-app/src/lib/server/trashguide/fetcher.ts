@@ -411,6 +411,10 @@ function normalizeMetadataPath(path: string): string {
     throw new TrashGuideFetcherError('metadata_invalid', 'TRaSH metadata contains an empty path', false);
   }
 
+  if (path.includes('\0')) {
+    throw new TrashGuideFetcherError('metadata_invalid', `TRaSH metadata path contains a NUL byte: ${path}`, false);
+  }
+
   const segments = normalized.split('/');
   if (segments.some((segment) => segment === '..' || segment === '.')) {
     throw new TrashGuideFetcherError(
