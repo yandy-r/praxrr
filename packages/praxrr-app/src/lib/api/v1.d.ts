@@ -137,6 +137,38 @@ export interface paths {
     patch: operations['upsertUiPreference'];
     trace?: never;
   };
+  '/complexity-tiers': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Read one complexity tier
+     * @description Returns the preferred complexity tier and progression counters for a
+     *     section key.
+     *
+     *     Missing persisted values are returned as default `beginner` unless
+     *     `strict` is enabled.
+     */
+    get: operations['getComplexityTier'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    /**
+     * Upsert one complexity tier
+     * @description Creates or updates the stored complexity tier for a section key.
+     *
+     *     Payloads include optional concurrency token `expected_updated_at`.
+     *     Activity deltas are bounded and may be used to drive non-intrusive
+     *     progression suggestions.
+     */
+    patch: operations['upsertComplexityTier'];
+    trace?: never;
+  };
   '/entity-testing/evaluate': {
     parameters: {
       query?: never;
@@ -1287,6 +1319,39 @@ export interface components {
        */
       expected_updated_at?: string | null;
     };
+    /**
+     * @description Progressive complexity tier for the section
+     * @enum {string}
+     */
+    ComplexityTier: 'beginner' | 'intermediate' | 'advanced';
+    ComplexityTierRecord: {
+      section_key: components['schemas']['UiSectionKey'];
+      tier: components['schemas']['ComplexityTier'];
+      interaction_count: number;
+      advanced_toggle_count: number;
+      last_suggested_tier: components['schemas']['ComplexityTier'] | null;
+      /** Format: date-time */
+      suggestion_dismissed_at: string | null;
+      /** Format: date-time */
+      updated_at: string | null;
+      persisted: boolean;
+    };
+    ComplexityTierUpsertRequest: {
+      section_key: components['schemas']['UiSectionKey'];
+      tier: components['schemas']['ComplexityTier'];
+      /**
+       * Format: date-time
+       * @description Optional optimistic concurrency token
+       */
+      expected_updated_at?: string | null;
+      /** @description Optional bounded interaction counter increment */
+      interaction_delta?: number;
+      /** @description Optional bounded advanced-toggle counter increment */
+      advanced_toggle_delta?: number;
+      last_suggested_tier?: components['schemas']['ComplexityTier'] | null;
+      /** Format: date-time */
+      suggestion_dismissed_at?: string | null;
+    };
     ImportRequest: {
       /** @description The PCD database ID to import into */
       databaseId: number;
@@ -1999,6 +2064,136 @@ export interface operations {
         };
       };
       /** @description Failed to save preference */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PcdErrorResponse'];
+        };
+      };
+    };
+  };
+  getComplexityTier: {
+    parameters: {
+      query: {
+        /** @description Canonical section key for progressive complexity state */
+        section_key: components['schemas']['UiSectionKey'];
+        /** @description When true, missing rows return 404 instead of default response */
+        strict?: boolean;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Complexity tier record */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ComplexityTierRecord'];
+        };
+      };
+      /** @description Invalid query parameter */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PcdErrorResponse'];
+        };
+      };
+      /** @description Authentication required */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PcdErrorResponse'];
+        };
+      };
+      /** @description Complexity tier not found for strict read */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PcdErrorResponse'];
+        };
+      };
+      /** @description Failed to read complexity tier */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PcdErrorResponse'];
+        };
+      };
+    };
+  };
+  upsertComplexityTier: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ComplexityTierUpsertRequest'];
+      };
+    };
+    responses: {
+      /** @description Complexity tier persisted */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ComplexityTierRecord'];
+        };
+      };
+      /** @description Validation error */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PcdErrorResponse'];
+        };
+      };
+      /** @description Authentication required */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PcdErrorResponse'];
+        };
+      };
+      /** @description Concurrency conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PcdErrorResponse'];
+        };
+      };
+      /** @description Complexity tier updates are being rate-limited */
+      429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PcdErrorResponse'];
+        };
+      };
+      /** @description Failed to save complexity tier */
       500: {
         headers: {
           [name: string]: unknown;

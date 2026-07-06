@@ -17,6 +17,9 @@ This behavior is implemented per section, not globally, so you can keep advanced
 Key behaviors:
 
 - All sections load in `basic` mode by default.
+- If a section is wrapped in a complexity tier provider, its first-render default comes from the
+  section tier: `beginner` and `intermediate` default to `basic`; `advanced` defaults to
+  `advanced`.
 - Basic controls are visible first.
 - Advanced blocks are separated into distinct cards with a section label and short hint.
 - Toggling preserves the current form data and only changes visibility.
@@ -100,6 +103,49 @@ Endpoint behavior:
   - stores the preference for authenticated users
   - supports optimistic concurrency via `expected_updated_at`
 
+## Progressive complexity tiers
+
+Progressive complexity is a layer above disclosure mode. It stores a per-user, per-section tier:
+
+- `beginner`
+- `intermediate`
+- `advanced`
+
+The tier only chooses the **default** disclosure mode for a section. The existing
+`basic | advanced` mode remains the render source of truth after a user manually toggles a
+section, so manual overrides still win.
+
+Tier-to-mode defaults:
+
+| Tier           | Default disclosure mode |
+| -------------- | ----------------------- |
+| `beginner`     | `basic`                 |
+| `intermediate` | `basic`                 |
+| `advanced`     | `advanced`              |
+
+Progression behavior:
+
+- Activity counters are deterministic and bounded.
+- After the advanced-toggle threshold is reached, the UI can show a non-blocking suggestion to
+  move to the next tier.
+- Suggestions are dismissible and persisted; they never auto-switch the tier and never use a
+  modal.
+- Reset sets the section tier back to `beginner` only. It does not delete or change saved
+  `basic | advanced` disclosure mode overrides.
+
+Endpoint behavior:
+
+- `GET /api/v1/complexity-tiers?section_key=...`
+  - returns the current tier, counters, suggestion metadata, `persisted`, and `updated_at`
+  - `strict=false` (default): missing tier returns `beginner`
+  - `strict=true`: missing tier returns `404`
+- `PATCH /api/v1/complexity-tiers`
+  - body: `section_key`, `tier`, optional `expected_updated_at`
+  - may include bounded `interaction_delta`, `advanced_toggle_delta`, `last_suggested_tier`,
+    and `suggestion_dismissed_at`
+  - supports optimistic concurrency via `expected_updated_at`
+  - API-key synthetic user id `0` returns default state and does not persist
+
 ## Rollout guidance
 
 Current end-user pages using progressive disclosure:
@@ -112,6 +158,13 @@ Current end-user pages using progressive disclosure:
   - `custom-formats:general:conditions`
   - `custom-formats:general:scoring`
   - `custom-formats:general:negation-and-groups`
+
+Current reference progressive-complexity integration:
+
+- `/custom-formats/{databaseId}/{id}/general`
+  - selector and suggestion surface for `custom-formats:general:conditions`
+  - tier providers for `custom-formats:general:scoring`
+  - tier providers for `custom-formats:general:negation-and-groups`
 
 Planned/expandable sections for the quality profile workflow currently follow the same key format:
 

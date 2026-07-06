@@ -3,6 +3,7 @@ import type { ServerLoad, Actions } from '@sveltejs/kit';
 import { pcdManager } from '$pcd/index.ts';
 import { canWriteToBase } from '$pcd/index.ts';
 import * as customFormatQueries from '$pcd/entities/customFormats/index.ts';
+import { loadSectionTiers } from '$lib/server/complexity/loadSectionTiers.ts';
 import { loadSectionModes } from '$lib/server/disclosure/loadSectionModes.ts';
 import { CUSTOM_FORMAT_KEYS } from '$shared/disclosure/sectionKeys.ts';
 import { parseOperationLayer } from '$pcd/index.ts';
@@ -46,12 +47,14 @@ export const load: ServerLoad = async ({ params, locals }) => {
   }
 
   const customFormatSectionModes = loadSectionModes(locals.user?.id, CUSTOM_FORMAT_KEYS);
+  const customFormatSectionTiers = loadSectionTiers(locals.user?.id, CUSTOM_FORMAT_KEYS);
 
   return {
     currentDatabase,
     format,
     canWriteToBase: canWriteToBase(currentDatabaseId),
     customFormatSectionModes,
+    customFormatSectionTiers,
   };
 };
 
