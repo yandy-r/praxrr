@@ -257,3 +257,13 @@ and mirrored external distribution.
 - [ ] Cross-repo pushes target `yandy-r/praxrr-db` and `yandy-r/praxrr-schema` only; contributors should treat these as mirrors of monorepo source.
 - [ ] For package/API/PCD contract changes, update all affected workspace members in the same change set and document schema/operator compatibility implications.
 - [ ] Run contract compatibility checks and type generation before publish-related follow-ups.
+
+## graphify
+
+This project has a knowledge graph at graphify-out/ with god nodes, community structure, and cross-file relationships.
+
+Rules:
+- For codebase questions, first run `graphify query "<question>"` when graphify-out/graph.json exists. Use `graphify path "<A>" "<B>"` for relationships and `graphify explain "<concept>"` for focused concepts. These return a scoped subgraph, usually much smaller than GRAPH_REPORT.md or raw grep output.
+- If graphify-out/wiki/index.md exists, use it for broad navigation instead of raw source browsing.
+- Read graphify-out/GRAPH_REPORT.md only for broad architecture review or when query/path/explain do not surface enough context.
+- After modifying code, run `graphify update .` to keep the graph current (AST-only, no API cost).

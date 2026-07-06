@@ -178,6 +178,12 @@ Goal: reduce operational complexity without distracting from the v2 user journey
 | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | [#6](https://github.com/yandy-r/praxrr/issues/6) Research feature tracking | Keep as historical parent tracking. Update it to reflect closed Phase 1 issues and this roadmap, then close if all children are represented elsewhere. |
 
+### Architecture Hygiene
+
+| Issue | Priority | Decision | Done When |
+| ------------------------------------------------------------------------------------------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| [#197](https://github.com/yandy-r/praxrr/issues/197) Split `shared/pcd/display.ts` per entity | Low | Opportunistic. Highest-betweenness node (0.127, 185 imports across 30+ communities); set the per-entity module convention before the barrel grows. | `display.ts` is a re-export-only barrel over `display/<entity>.ts`, public `$shared/pcd/display` surface unchanged, `deno task check` green. Trigger: file crosses ~500 lines or next entity family is added. |
+
 ## Deferred
 
 Do not start these until the promotion criteria are met.
@@ -247,6 +253,7 @@ Use this checklist when planning a sprint or milestone.
 - [ ] #4 - Go HTTP orchestration
 - [ ] #5 - Go parser integration and cutover
 - [ ] #6 - Research feature tracking cleanup
+- [ ] #197 - Split `shared/pcd/display.ts` into per-entity re-exported modules
 
 ### Deferred Watchlist
 
