@@ -1,6 +1,6 @@
 # Praxrr Roadmap
 
-Reviewed: 2026-07-06 (updated after PCD database docs #76 shipped)
+Reviewed: 2026-07-06 (updated after PCD schema table reference #73 shipped)
 
 Source: open GitHub issues in `yandy-r/praxrr` as of this review.
 
@@ -32,7 +32,7 @@ are still respected, but they are not the only sorting rule.
 
 The best next order is:
 
-1. Finish remaining documentation content (#73 schema reference, then #77/#75 as needed).
+1. Finish remaining documentation content (#77/#75 as needed).
 2. Build onboarding and transparency features.
 3. Build configuration lifecycle safety.
 4. Add advanced automation, trust, and integration features.
@@ -50,6 +50,7 @@ Merged work since the Score Simulator and TRaSH Guide Sync foundations landed.
 
 | Date       | PR / commit                                        | Summary                                                                                                                                 | Closes / relates                                     |
 | ---------- | -------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
+| 2026-07-06 | [#200](https://github.com/yandy-r/praxrr/pull/200) | PCD schema per-table reference: 42 table pages with columns, relationships, constraints, and cross-links                                | [#73](https://github.com/yandy-r/praxrr/issues/73)   |
 | 2026-07-06 | [#199](https://github.com/yandy-r/praxrr/pull/199) | PCD database content docs: 253 custom formats, quality profile presets, release/delay profiles, Lidarr guide, changelog, sidebar wiring | [#76](https://github.com/yandy-r/praxrr/issues/76)   |
 | 2026-07-06 | [#198](https://github.com/yandy-r/praxrr/pull/198) | User-facing Getting Started and Guides (10 pages): install, configure, sync, upgrade, troubleshooting                                   | [#74](https://github.com/yandy-r/praxrr/issues/74)   |
 | 2026-07-05 | `bf50467e`, `0f324ddd`, `56b359a9`                 | Docs deploy CI: Workers Assets deployment, wrangler config loading, and deploy trigger                                                  | [#38](https://github.com/yandy-r/praxrr/issues/38)   |
@@ -76,7 +77,7 @@ Goal: make Praxrr understandable enough for users and contributors to run, debug
 | ----- | ----------------------------------------------------------------------------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
 | 1     | [#74](https://github.com/yandy-r/praxrr/issues/74) User-facing guides and tutorials | Medium   | **Done** — Getting Started and Guides pages shipped on docs.praxrr.dev.                                                                               | Users can install, configure, connect Arr instances, link a PCD, sync, upgrade, and troubleshoot from published docs.        |
 | 2     | [#76](https://github.com/yandy-r/praxrr/issues/76) PCD database content docs        | Medium   | **Done** — Custom formats catalog (253 CFs), quality profile presets, release/delay profiles, Lidarr guide, and changelog shipped on docs.praxrr.dev. | Users can understand available custom formats, quality profiles, release profiles, Lidarr status, and PCD data organization. |
-| 3     | [#73](https://github.com/yandy-r/praxrr/issues/73) PCD schema table reference       | Medium   | Do next. Contributor-facing schema reference after user-facing docs (#74, #76) shipped.                                                               | All 36 PCD tables have reference pages with columns, relationships, constraints, and cross-links.                            |
+| 3     | [#73](https://github.com/yandy-r/praxrr/issues/73) PCD schema table reference       | Medium   | **Done** — Per-table schema reference for all 42 PCD tables shipped on docs.praxrr.dev ([#200](https://github.com/yandy-r/praxrr/pull/200)).         | All 42 PCD tables have reference pages with columns, relationships, constraints, and cross-links.                            |
 | 4     | [#77](https://github.com/yandy-r/praxrr/issues/77) App technical documentation      | Low      | Do after user-facing docs unless contributor onboarding becomes the bottleneck.                                                                       | Job system, sync pipeline, PCD ops, tests, notifications, and startup sequence are documented.                               |
 | 5     | [#75](https://github.com/yandy-r/praxrr/issues/75) UI component library reference   | Low      | Do when UI contribution velocity needs it.                                                                                                            | Reusable `$ui` components, alert patterns, dirty tracking, and Tailwind conventions are documented.                          |
 
@@ -84,8 +85,7 @@ Notes:
 
 - #38 shipped the dependency gate and docs deploy CI is wired for Workers Assets. Keep follow-up content
   work inside the settled docs site shape.
-- #74 and #76 shipped user-facing and curated-content docs. Keep #73 separate: it documents schema
-  structure, not curated content.
+- #74, #76, and #73 shipped user-facing, curated-content, and schema reference docs respectively.
 
 ## Completed: TRaSH Guide Sync Stabilization
 
@@ -206,6 +206,7 @@ Use this checklist when planning a sprint or milestone.
 
 ### Completed (2026-07-06)
 
+- [x] #73 - PCD schema table reference ([#200](https://github.com/yandy-r/praxrr/pull/200))
 - [x] #74 - User-facing guides ([#198](https://github.com/yandy-r/praxrr/pull/198))
 - [x] #76 - PCD database content docs ([#199](https://github.com/yandy-r/praxrr/pull/199))
 
@@ -219,7 +220,6 @@ Use this checklist when planning a sprint or milestone.
 
 ### Current Focus
 
-- [ ] #73 - PCD schema table reference
 - [ ] #77 - App technical docs
 - [ ] #75 - UI component reference
 
@@ -274,13 +274,11 @@ Use this checklist when planning a sprint or milestone.
 
 Continue the documentation content sprint:
 
-1. Start #73 PCD schema table reference — per-table pages for all 36 PCD tables with columns,
-   relationships, and cross-links.
-2. Update #6 so the parent research checklist points to this roadmap and no longer implies closed
+1. Update #6 so the parent research checklist points to this roadmap and no longer implies closed
    Phase 1 items are still active.
-3. Schedule #77 app technical docs or #75 UI component reference when contributor onboarding becomes
+2. Schedule #77 app technical docs or #75 UI component reference when contributor onboarding becomes
    the bottleneck.
 
-Docs infrastructure (#38), user guides (#74), PCD database content (#76), deploy CI, and TRaSH
-Guide Sync stabilization (#125, #126, #194) are complete. The next milestone is contributor-facing
-schema reference (#73), then app and UI docs as needed.
+Docs infrastructure (#38), user guides (#74), PCD database content (#76), PCD schema table reference
+(#73), deploy CI, and TRaSH Guide Sync stabilization (#125, #126, #194) are complete. The next
+milestone is app and UI contributor docs (#77/#75) as needed.
