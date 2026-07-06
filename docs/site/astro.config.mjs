@@ -82,6 +82,132 @@ export default defineConfig({
             { label: 'Overview', link: '/schema/' },
             { label: 'Structure', link: '/schema/structure/' },
             { label: 'Manifest', link: '/schema/manifest/' },
+            { label: 'Condition Types', link: '/schema/condition-types/' },
+            { label: 'Migration Paths', link: '/schema/migrations/' },
+            {
+              label: 'Tables',
+              collapsed: true,
+              items: [
+                { label: 'Index', link: '/schema/tables/' },
+                {
+                  label: 'Core Entities',
+                  collapsed: true,
+                  items: [
+                    { label: 'tags', link: '/schema/tables/tags/' },
+                    { label: 'languages', link: '/schema/tables/languages/' },
+                    { label: 'regular_expressions', link: '/schema/tables/regular_expressions/' },
+                    { label: 'qualities', link: '/schema/tables/qualities/' },
+                    { label: 'quality_api_mappings', link: '/schema/tables/quality_api_mappings/' },
+                    { label: 'custom_formats', link: '/schema/tables/custom_formats/' },
+                  ],
+                },
+                {
+                  label: 'Profiles & Junctions',
+                  collapsed: true,
+                  items: [
+                    { label: 'quality_profiles', link: '/schema/tables/quality_profiles/' },
+                    { label: 'quality_groups', link: '/schema/tables/quality_groups/' },
+                    {
+                      label: 'custom_format_conditions',
+                      link: '/schema/tables/custom_format_conditions/',
+                    },
+                    {
+                      label: 'regular_expression_tags',
+                      link: '/schema/tables/regular_expression_tags/',
+                    },
+                    { label: 'custom_format_tags', link: '/schema/tables/custom_format_tags/' },
+                    { label: 'quality_profile_tags', link: '/schema/tables/quality_profile_tags/' },
+                    {
+                      label: 'quality_profile_languages',
+                      link: '/schema/tables/quality_profile_languages/',
+                    },
+                    { label: 'quality_group_members', link: '/schema/tables/quality_group_members/' },
+                    {
+                      label: 'quality_profile_qualities',
+                      link: '/schema/tables/quality_profile_qualities/',
+                    },
+                    {
+                      label: 'quality_profile_custom_formats',
+                      link: '/schema/tables/quality_profile_custom_formats/',
+                    },
+                  ],
+                },
+                {
+                  label: 'Condition Types',
+                  collapsed: true,
+                  items: [
+                    { label: 'condition_patterns', link: '/schema/tables/condition_patterns/' },
+                    { label: 'condition_languages', link: '/schema/tables/condition_languages/' },
+                    {
+                      label: 'condition_indexer_flags',
+                      link: '/schema/tables/condition_indexer_flags/',
+                    },
+                    { label: 'condition_sources', link: '/schema/tables/condition_sources/' },
+                    { label: 'condition_resolutions', link: '/schema/tables/condition_resolutions/' },
+                    {
+                      label: 'condition_quality_modifiers',
+                      link: '/schema/tables/condition_quality_modifiers/',
+                    },
+                    { label: 'condition_sizes', link: '/schema/tables/condition_sizes/' },
+                    {
+                      label: 'condition_release_types',
+                      link: '/schema/tables/condition_release_types/',
+                    },
+                    { label: 'condition_years', link: '/schema/tables/condition_years/' },
+                  ],
+                },
+                {
+                  label: 'Media Management',
+                  collapsed: true,
+                  items: [
+                    {
+                      label: 'radarr_quality_definitions',
+                      link: '/schema/tables/radarr_quality_definitions/',
+                    },
+                    {
+                      label: 'sonarr_quality_definitions',
+                      link: '/schema/tables/sonarr_quality_definitions/',
+                    },
+                    {
+                      label: 'lidarr_quality_definitions',
+                      link: '/schema/tables/lidarr_quality_definitions/',
+                    },
+                    { label: 'radarr_naming', link: '/schema/tables/radarr_naming/' },
+                    { label: 'sonarr_naming', link: '/schema/tables/sonarr_naming/' },
+                    { label: 'lidarr_naming', link: '/schema/tables/lidarr_naming/' },
+                    { label: 'radarr_media_settings', link: '/schema/tables/radarr_media_settings/' },
+                    { label: 'sonarr_media_settings', link: '/schema/tables/sonarr_media_settings/' },
+                    { label: 'lidarr_media_settings', link: '/schema/tables/lidarr_media_settings/' },
+                  ],
+                },
+                {
+                  label: 'Metadata, Delay & Testing',
+                  collapsed: true,
+                  items: [
+                    {
+                      label: 'lidarr_metadata_profiles',
+                      link: '/schema/tables/lidarr_metadata_profiles/',
+                    },
+                    {
+                      label: 'lidarr_metadata_profile_primary_types',
+                      link: '/schema/tables/lidarr_metadata_profile_primary_types/',
+                    },
+                    {
+                      label: 'lidarr_metadata_profile_secondary_types',
+                      link: '/schema/tables/lidarr_metadata_profile_secondary_types/',
+                    },
+                    {
+                      label: 'lidarr_metadata_profile_release_statuses',
+                      link: '/schema/tables/lidarr_metadata_profile_release_statuses/',
+                    },
+                    { label: 'delay_profiles', link: '/schema/tables/delay_profiles/' },
+                    { label: 'custom_format_tests', link: '/schema/tables/custom_format_tests/' },
+                    { label: 'test_entities', link: '/schema/tables/test_entities/' },
+                    { label: 'test_releases', link: '/schema/tables/test_releases/' },
+                  ],
+                },
+              ],
+            },
           ],
         },
         {

@@ -12,4 +12,8 @@ builds and from `packages/praxrr-schema` in the monorepo checkout.
 - [Structure](/schema/structure/) describes the schema layout and operation model.
 - [Manifest](/schema/manifest/) describes package metadata used by PCD repositories.
 
-Per-table reference pages are intentionally deferred to issue #73.
+## Per-Table Reference
+
+- [Tables index](/schema/tables/) — all 42 schema tables categorized by domain
+- [Condition Types](/schema/condition-types/) — the nine condition types and dispatch model
+- [Migration Paths](/schema/migrations/) — OSQL, layers, and value guards
