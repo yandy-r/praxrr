@@ -2,12 +2,14 @@
 import starlight from '@astrojs/starlight';
 import svelte from '@astrojs/svelte';
 import tailwindcss from '@tailwindcss/vite';
+import mermaid from 'astro-mermaid';
 import { defineConfig } from 'astro/config';
 import starlightOpenAPI, { openAPISidebarGroups } from 'starlight-openapi';
 
 export default defineConfig({
   site: 'https://docs.praxrr.dev',
   integrations: [
+    mermaid(),
     svelte(),
     starlight({
       title: 'Praxrr',
@@ -74,7 +76,16 @@ export default defineConfig({
         },
         {
           label: 'Application',
-          items: [{ label: 'Architecture', link: '/app/architecture/' }],
+          items: [
+            { label: 'Architecture', link: '/app/architecture/' },
+            { label: 'Startup Sequence', link: '/app/startup/' },
+            { label: 'Development Setup', link: '/app/development/' },
+            { label: 'PCD System', link: '/app/pcd-system/' },
+            { label: 'Job System', link: '/app/jobs/' },
+            { label: 'Sync Pipeline', link: '/app/sync-pipeline/' },
+            { label: 'Notifications', link: '/app/notifications/' },
+            { label: 'Testing', link: '/app/testing/' },
+          ],
         },
         {
           label: 'PCD Schema',

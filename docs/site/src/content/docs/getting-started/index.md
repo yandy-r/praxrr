@@ -26,6 +26,9 @@ configuration database, connect Arr instances, and sync quality profiles.
 ## Contributor Docs
 
 - [Application architecture](/app/architecture/) — runtime modules and sync pipeline
+- [Development setup](/app/development/) — Deno tasks, env vars, and local workflows
+- [Testing guide](/app/testing/) — unit test aliases and e2e prerequisites
+- [Startup sequence](/app/startup/) — server initialization order
 - [PCD schema structure](/schema/structure/) — portable database contracts
 - [API reference](/api/) — `/api/v1` OpenAPI endpoints
 
