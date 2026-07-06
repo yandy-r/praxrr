@@ -35,6 +35,6 @@ export const appInfoQueries = {
    * Called on startup so the DB stays in sync with __APP_VERSION__.
    */
   updateVersion(version: string): void {
-    db.execute('UPDATE app_info SET version = ?, updated_at = datetime(\'now\') WHERE id = 1', [version]);
+    db.execute("UPDATE app_info SET version = ?, updated_at = datetime('now') WHERE id = 1", [version]);
   },
 };

@@ -1,10 +1,10 @@
-import { assert, assertEquals, assertExists } from "@std/assert";
+import { assert, assertEquals, assertExists } from '@std/assert';
 import {
   copyShareLink,
   parseUrlState,
   serializeUrlState,
   type SimulatorUrlState,
-} from "../../routes/score-simulator/[databaseId]/urlState.ts";
+} from '../../routes/score-simulator/[databaseId]/urlState.ts';
 
 function encodeJson(value: unknown): string {
   return btoa(JSON.stringify(value));
@@ -18,13 +18,11 @@ function buildLongOverrides(size: number): Record<string, number> {
   return overrides;
 }
 
-async function withMockConsoleWarn(
-  run: (warnings: string[]) => Promise<void> | void,
-): Promise<void> {
+async function withMockConsoleWarn(run: (warnings: string[]) => Promise<void> | void): Promise<void> {
   const warnings: string[] = [];
   const originalWarn = console.warn;
   console.warn = (...args: unknown[]) => {
-    warnings.push(args.map((value) => String(value)).join(" "));
+    warnings.push(args.map((value) => String(value)).join(' '));
   };
 
   try {
@@ -34,16 +32,11 @@ async function withMockConsoleWarn(
   }
 }
 
-async function withMockClipboard(
-  run: (writes: string[]) => Promise<void>,
-): Promise<void> {
+async function withMockClipboard(run: (writes: string[]) => Promise<void>): Promise<void> {
   const writes: string[] = [];
-  const originalDescriptor = Object.getOwnPropertyDescriptor(
-    navigator,
-    "clipboard",
-  );
+  const originalDescriptor = Object.getOwnPropertyDescriptor(navigator, 'clipboard');
 
-  Object.defineProperty(navigator, "clipboard", {
+  Object.defineProperty(navigator, 'clipboard', {
     value: {
       writeText: (value: string): Promise<void> => {
         writes.push(value);
@@ -57,7 +50,7 @@ async function withMockClipboard(
     await run(writes);
   } finally {
     if (originalDescriptor) {
-      Object.defineProperty(navigator, "clipboard", originalDescriptor);
+      Object.defineProperty(navigator, 'clipboard', originalDescriptor);
     }
   }
 }
@@ -65,17 +58,14 @@ async function withMockClipboard(
 async function withMockClipboardStub(
   clipboard:
     | {
-      writeText: (value: string) => Promise<void>;
-    }
+        writeText: (value: string) => Promise<void>;
+      }
     | undefined,
-  run: () => Promise<void> | void,
+  run: () => Promise<void> | void
 ): Promise<void> {
-  const originalDescriptor = Object.getOwnPropertyDescriptor(
-    navigator,
-    "clipboard",
-  );
+  const originalDescriptor = Object.getOwnPropertyDescriptor(navigator, 'clipboard');
 
-  Object.defineProperty(navigator, "clipboard", {
+  Object.defineProperty(navigator, 'clipboard', {
     value: clipboard,
     configurable: true,
   });
@@ -84,21 +74,18 @@ async function withMockClipboardStub(
     await run();
   } finally {
     if (originalDescriptor) {
-      Object.defineProperty(navigator, "clipboard", originalDescriptor);
+      Object.defineProperty(navigator, 'clipboard', originalDescriptor);
     }
   }
 }
 
 async function withMockExecCommand(
   execCommand: (command: string) => boolean,
-  run: () => Promise<void> | void,
+  run: () => Promise<void> | void
 ): Promise<void> {
-  const originalDescriptor = Object.getOwnPropertyDescriptor(
-    globalThis,
-    "document",
-  );
+  const originalDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'document');
   const textArea = {
-    value: "",
+    value: '',
     style: {} as Record<string, string>,
     setAttribute: (_name: string, _value: string) => {},
     select: () => {},
@@ -113,7 +100,7 @@ async function withMockExecCommand(
     execCommand,
   };
 
-  Object.defineProperty(globalThis, "document", {
+  Object.defineProperty(globalThis, 'document', {
     value: documentStub,
     configurable: true,
   });
@@ -122,15 +109,15 @@ async function withMockExecCommand(
     await run();
   } finally {
     if (originalDescriptor) {
-      Object.defineProperty(globalThis, "document", originalDescriptor);
+      Object.defineProperty(globalThis, 'document', originalDescriptor);
       return;
     }
 
-    Reflect.deleteProperty(globalThis, "document");
+    Reflect.deleteProperty(globalThis, 'document');
   }
 }
 
-Deno.test("parseUrlState returns undefined fields for empty params", () => {
+Deno.test('parseUrlState returns undefined fields for empty params', () => {
   assertEquals(parseUrlState(new URLSearchParams()), {
     title: undefined,
     mediaType: undefined,
@@ -142,18 +129,18 @@ Deno.test("parseUrlState returns undefined fields for empty params", () => {
   });
 });
 
-Deno.test("parseUrlState parses simple params and ignores unknown params", () => {
+Deno.test('parseUrlState parses simple params and ignores unknown params', () => {
   const params = new URLSearchParams({
-    title: "Release.2025.1080p",
-    mediaType: "movie",
-    profile: "pcd:main profile",
-    unknown: "ignore-me",
+    title: 'Release.2025.1080p',
+    mediaType: 'movie',
+    profile: 'pcd:main profile',
+    unknown: 'ignore-me',
   });
 
   assertEquals(parseUrlState(params), {
-    title: "Release.2025.1080p",
-    mediaType: "movie",
-    profile: "pcd:main profile",
+    title: 'Release.2025.1080p',
+    mediaType: 'movie',
+    profile: 'pcd:main profile',
     compare: undefined,
     batch: undefined,
     batchMediaType: undefined,
@@ -161,48 +148,25 @@ Deno.test("parseUrlState parses simple params and ignores unknown params", () =>
   });
 });
 
-Deno.test("parseUrlState validates mediaType values and derives legacy arrType values", () => {
-  assertEquals(
-    parseUrlState(new URLSearchParams({ mediaType: "movie" })).mediaType,
-    "movie",
-  );
-  assertEquals(
-    parseUrlState(new URLSearchParams({ mediaType: "series" })).mediaType,
-    "series",
-  );
-  assertEquals(
-    parseUrlState(new URLSearchParams({ mediaType: "anime" })).mediaType,
-    "anime",
-  );
-  assertEquals(
-    parseUrlState(new URLSearchParams({ arrType: "radarr" })).mediaType,
-    "movie",
-  );
-  assertEquals(
-    parseUrlState(new URLSearchParams({ arrType: "sonarr" })).mediaType,
-    "series",
-  );
-  assertEquals(
-    parseUrlState(new URLSearchParams({ arrType: "lidarr" })).mediaType,
-    undefined,
-  );
-  assertEquals(
-    parseUrlState(
-      new URLSearchParams({ mediaType: "anime", arrType: "radarr" }),
-    ).mediaType,
-    "anime",
-  );
+Deno.test('parseUrlState validates mediaType values and derives legacy arrType values', () => {
+  assertEquals(parseUrlState(new URLSearchParams({ mediaType: 'movie' })).mediaType, 'movie');
+  assertEquals(parseUrlState(new URLSearchParams({ mediaType: 'series' })).mediaType, 'series');
+  assertEquals(parseUrlState(new URLSearchParams({ mediaType: 'anime' })).mediaType, 'anime');
+  assertEquals(parseUrlState(new URLSearchParams({ arrType: 'radarr' })).mediaType, 'movie');
+  assertEquals(parseUrlState(new URLSearchParams({ arrType: 'sonarr' })).mediaType, 'series');
+  assertEquals(parseUrlState(new URLSearchParams({ arrType: 'lidarr' })).mediaType, undefined);
+  assertEquals(parseUrlState(new URLSearchParams({ mediaType: 'anime', arrType: 'radarr' })).mediaType, 'anime');
 });
 
-Deno.test("parseUrlState treats empty string params as absent", () => {
+Deno.test('parseUrlState treats empty string params as absent', () => {
   const params = new URLSearchParams({
-    title: "",
-    mediaType: "",
-    profile: "",
-    compare: "",
-    batch: "",
-    batchMediaType: "",
-    overrides: "",
+    title: '',
+    mediaType: '',
+    profile: '',
+    compare: '',
+    batch: '',
+    batchMediaType: '',
+    overrides: '',
   });
 
   assertEquals(parseUrlState(params), {
@@ -216,30 +180,30 @@ Deno.test("parseUrlState treats empty string params as absent", () => {
   });
 });
 
-Deno.test("parseUrlState decodes valid batch arrays", () => {
-  const batch = ["one", "two", "three"];
+Deno.test('parseUrlState decodes valid batch arrays', () => {
+  const batch = ['one', 'two', 'three'];
   const params = new URLSearchParams({ batch: encodeJson(batch) });
   assertEquals(parseUrlState(params).batch, batch);
 });
 
-Deno.test("parseUrlState returns undefined for malformed batch base64", () => {
+Deno.test('parseUrlState returns undefined for malformed batch base64', () => {
   return withMockConsoleWarn((warnings) => {
-    const params = new URLSearchParams({ batch: "%%%not-base64%%%" });
+    const params = new URLSearchParams({ batch: '%%%not-base64%%%' });
     assertEquals(parseUrlState(params).batch, undefined);
     assertEquals(warnings.length, 1);
     assert(warnings[0].includes('Ignoring invalid "batch" query param'));
   });
 });
 
-Deno.test("parseUrlState returns undefined for batch values that are not valid JSON arrays", () => {
+Deno.test('parseUrlState returns undefined for batch values that are not valid JSON arrays', () => {
   return withMockConsoleWarn((warnings) => {
     const invalidJsonParams = new URLSearchParams({
-      batch: btoa("{invalid-json"),
+      batch: btoa('{invalid-json'),
     });
     assertEquals(parseUrlState(invalidJsonParams).batch, undefined);
 
     const notArrayParams = new URLSearchParams({
-      batch: encodeJson({ title: "nope" }),
+      batch: encodeJson({ title: 'nope' }),
     });
     assertEquals(parseUrlState(notArrayParams).batch, undefined);
 
@@ -249,7 +213,7 @@ Deno.test("parseUrlState returns undefined for batch values that are not valid J
   });
 });
 
-Deno.test("parseUrlState decodes overrides, rounds values, and filters non-finite values", () => {
+Deno.test('parseUrlState decodes overrides, rounds values, and filters non-finite values', () => {
   const params = new URLSearchParams({
     overrides: btoa('{"keep":4.6,"dropPositive":1e309,"dropNegative":-1e309}'),
   });
@@ -257,19 +221,19 @@ Deno.test("parseUrlState decodes overrides, rounds values, and filters non-finit
   assertEquals(parseUrlState(params).overrides, { keep: 5 });
 });
 
-Deno.test("parseUrlState returns undefined for malformed overrides base64", () => {
+Deno.test('parseUrlState returns undefined for malformed overrides base64', () => {
   return withMockConsoleWarn((warnings) => {
-    const params = new URLSearchParams({ overrides: "***bad-base64***" });
+    const params = new URLSearchParams({ overrides: '***bad-base64***' });
     assertEquals(parseUrlState(params).overrides, undefined);
     assertEquals(warnings.length, 1);
     assert(warnings[0].includes('Ignoring invalid "overrides" query param'));
   });
 });
 
-Deno.test("parseUrlState warns when overrides decode to a non-object value", () => {
+Deno.test('parseUrlState warns when overrides decode to a non-object value', () => {
   return withMockConsoleWarn((warnings) => {
     const params = new URLSearchParams({
-      overrides: encodeJson(["not", "an", "object"]),
+      overrides: encodeJson(['not', 'an', 'object']),
     });
     assertEquals(parseUrlState(params).overrides, undefined);
     assertEquals(warnings.length, 1);
@@ -277,46 +241,46 @@ Deno.test("parseUrlState warns when overrides decode to a non-object value", () 
   });
 });
 
-Deno.test("serializeUrlState serializes full state", () => {
+Deno.test('serializeUrlState serializes full state', () => {
   const state: SimulatorUrlState = {
-    title: "Release.2025",
-    mediaType: "movie",
-    profile: "pcd:alpha profile",
-    compare: "pcd:beta profile",
-    batch: ["A", "B"],
-    batchMediaType: "anime",
+    title: 'Release.2025',
+    mediaType: 'movie',
+    profile: 'pcd:alpha profile',
+    compare: 'pcd:beta profile',
+    batch: ['A', 'B'],
+    batchMediaType: 'anime',
     overrides: { CF_A: 10, CF_B: 20 },
   };
 
   const params = serializeUrlState(state);
 
-  assertEquals(params.get("title"), "Release.2025");
-  assertEquals(params.get("mediaType"), "movie");
-  assertEquals(params.get("profile"), "pcd:alpha profile");
-  assertEquals(params.get("compare"), "pcd:beta profile");
-  assertEquals(JSON.parse(atob(params.get("batch") ?? "null")), ["A", "B"]);
-  assertEquals(params.get("batchMediaType"), "anime");
-  assertEquals(JSON.parse(atob(params.get("overrides") ?? "null")), {
+  assertEquals(params.get('title'), 'Release.2025');
+  assertEquals(params.get('mediaType'), 'movie');
+  assertEquals(params.get('profile'), 'pcd:alpha profile');
+  assertEquals(params.get('compare'), 'pcd:beta profile');
+  assertEquals(JSON.parse(atob(params.get('batch') ?? 'null')), ['A', 'B']);
+  assertEquals(params.get('batchMediaType'), 'anime');
+  assertEquals(JSON.parse(atob(params.get('overrides') ?? 'null')), {
     CF_A: 10,
     CF_B: 20,
   });
 });
 
-Deno.test("serializeUrlState omits undefined and empty values", () => {
+Deno.test('serializeUrlState omits undefined and empty values', () => {
   const params = serializeUrlState({
-    title: "",
+    title: '',
     profile: undefined,
-    compare: "",
+    compare: '',
     mediaType: undefined,
     batch: [],
     batchMediaType: undefined,
     overrides: {},
   });
 
-  assertEquals(params.toString(), "");
+  assertEquals(params.toString(), '');
 });
 
-Deno.test("serializeUrlState rounds override values and omits non-finite values", () => {
+Deno.test('serializeUrlState rounds override values and omits non-finite values', () => {
   const params = serializeUrlState({
     overrides: {
       rounded: 4.5,
@@ -325,19 +289,19 @@ Deno.test("serializeUrlState rounds override values and omits non-finite values"
     },
   });
 
-  assertEquals(JSON.parse(atob(params.get("overrides") ?? "null")), {
+  assertEquals(JSON.parse(atob(params.get('overrides') ?? 'null')), {
     rounded: 5,
   });
 });
 
-Deno.test("parse/serialize round-trip preserves full state", () => {
+Deno.test('parse/serialize round-trip preserves full state', () => {
   const original: SimulatorUrlState = {
-    title: "Release.2026.2160p",
-    mediaType: "anime",
-    profile: "pcd:alpha",
-    compare: "pcd:beta",
-    batch: ["One.Title", "Two.Title"],
-    batchMediaType: "anime",
+    title: 'Release.2026.2160p',
+    mediaType: 'anime',
+    profile: 'pcd:alpha',
+    compare: 'pcd:beta',
+    batch: ['One.Title', 'Two.Title'],
+    batchMediaType: 'anime',
     overrides: { CF_A: 5, CF_B: -10 },
   };
 
@@ -345,33 +309,27 @@ Deno.test("parse/serialize round-trip preserves full state", () => {
   assertEquals(roundTrip, original);
 });
 
-Deno.test("parse/serialize round-trip preserves profile names with spaces, colons, and unicode", () => {
-  const withSpaces = parseUrlState(
-    serializeUrlState({ profile: "pcd:profile with spaces" }),
-  );
-  assertEquals(withSpaces.profile, "pcd:profile with spaces");
+Deno.test('parse/serialize round-trip preserves profile names with spaces, colons, and unicode', () => {
+  const withSpaces = parseUrlState(serializeUrlState({ profile: 'pcd:profile with spaces' }));
+  assertEquals(withSpaces.profile, 'pcd:profile with spaces');
 
-  const withColons = parseUrlState(
-    serializeUrlState({ profile: "trash:1234:HDR:DV" }),
-  );
-  assertEquals(withColons.profile, "trash:1234:HDR:DV");
+  const withColons = parseUrlState(serializeUrlState({ profile: 'trash:1234:HDR:DV' }));
+  assertEquals(withColons.profile, 'trash:1234:HDR:DV');
 
-  const withUnicode = parseUrlState(
-    serializeUrlState({ profile: "プロファイル:éxample" }),
-  );
-  assertEquals(withUnicode.profile, "プロファイル:éxample");
+  const withUnicode = parseUrlState(serializeUrlState({ profile: 'プロファイル:éxample' }));
+  assertEquals(withUnicode.profile, 'プロファイル:éxample');
 });
 
-Deno.test("copyShareLink drops overrides first when URL exceeds max length", async () => {
+Deno.test('copyShareLink drops overrides first when URL exceeds max length', async () => {
   await withMockClipboard(async (writes) => {
     const result = await copyShareLink(
       {
-        title: "short-title",
-        mediaType: "movie",
-        batch: ["batch title"],
+        title: 'short-title',
+        mediaType: 'movie',
+        batch: ['batch title'],
         overrides: buildLongOverrides(250),
       },
-      "https://example.test/score-simulator/db-1",
+      'https://example.test/score-simulator/db-1'
     );
 
     assertEquals(result.success, true);
@@ -379,24 +337,21 @@ Deno.test("copyShareLink drops overrides first when URL exceeds max length", asy
     assertEquals(writes.length, 1);
 
     const shareUrl = new URL(writes[0]);
-    assertEquals(shareUrl.searchParams.has("overrides"), false);
-    assertEquals(shareUrl.searchParams.has("batch"), true);
+    assertEquals(shareUrl.searchParams.has('overrides'), false);
+    assertEquals(shareUrl.searchParams.has('batch'), true);
   });
 });
 
-Deno.test("copyShareLink drops batch after overrides when URL is still too long", async () => {
+Deno.test('copyShareLink drops batch after overrides when URL is still too long', async () => {
   await withMockClipboard(async (writes) => {
     const result = await copyShareLink(
       {
-        title: "short-title",
-        mediaType: "movie",
-        batch: Array.from(
-          { length: 120 },
-          (_, i) => `very-long-batch-title-${i}-${"x".repeat(30)}`,
-        ),
+        title: 'short-title',
+        mediaType: 'movie',
+        batch: Array.from({ length: 120 }, (_, i) => `very-long-batch-title-${i}-${'x'.repeat(30)}`),
         overrides: buildLongOverrides(250),
       },
-      "https://example.test/score-simulator/db-1",
+      'https://example.test/score-simulator/db-1'
     );
 
     assertEquals(result.success, true);
@@ -404,19 +359,18 @@ Deno.test("copyShareLink drops batch after overrides when URL is still too long"
     assertEquals(writes.length, 1);
 
     const shareUrl = new URL(writes[0]);
-    assertEquals(shareUrl.searchParams.has("overrides"), false);
-    assertEquals(shareUrl.searchParams.has("batch"), false);
-    assert(shareUrl.toString().includes("mediaType=movie"));
-    assertExists(shareUrl.searchParams.get("title"));
+    assertEquals(shareUrl.searchParams.has('overrides'), false);
+    assertEquals(shareUrl.searchParams.has('batch'), false);
+    assert(shareUrl.toString().includes('mediaType=movie'));
+    assertExists(shareUrl.searchParams.get('title'));
   });
 });
 
-Deno.test("copyShareLink warns when navigator.clipboard.writeText fails before fallback copy succeeds", async () => {
+Deno.test('copyShareLink warns when navigator.clipboard.writeText fails before fallback copy succeeds', async () => {
   await withMockConsoleWarn(async (warnings) => {
     await withMockClipboardStub(
       {
-        writeText: (_value: string): Promise<void> =>
-          Promise.reject(new Error("clipboard denied")),
+        writeText: (_value: string): Promise<void> => Promise.reject(new Error('clipboard denied')),
       },
       async () => {
         await withMockExecCommand(
@@ -424,44 +378,42 @@ Deno.test("copyShareLink warns when navigator.clipboard.writeText fails before f
           async () => {
             const result = await copyShareLink(
               {
-                title: "Release.2026",
-                mediaType: "movie",
+                title: 'Release.2026',
+                mediaType: 'movie',
               },
-              "https://example.test/score-simulator/db-1",
+              'https://example.test/score-simulator/db-1'
             );
 
             assertEquals(result, { success: true, truncated: false });
             assertEquals(warnings.length, 1);
-            assert(
-              warnings[0].includes("navigator.clipboard.writeText failed"),
-            );
-          },
+            assert(warnings[0].includes('navigator.clipboard.writeText failed'));
+          }
         );
-      },
+      }
     );
   });
 });
 
-Deno.test("copyShareLink warns when execCommand fallback throws and returns failure", async () => {
+Deno.test('copyShareLink warns when execCommand fallback throws and returns failure', async () => {
   await withMockConsoleWarn(async (warnings) => {
     await withMockClipboardStub(undefined, async () => {
       await withMockExecCommand(
         () => {
-          throw new Error("exec denied");
+          throw new Error('exec denied');
         },
         async () => {
           const result = await copyShareLink(
             {
-              title: "Release.2026",
-              mediaType: "movie",
+              title: 'Release.2026',
+              mediaType: 'movie',
             },
-            "https://example.test/score-simulator/db-1",
+            'https://example.test/score-simulator/db-1'
           );
 
           assertEquals(result, { success: false, truncated: false });
           assertEquals(warnings.length, 1);
-          assert(warnings[0].includes("document.execCommand failed"));
-        },
+          assert(warnings[0].includes('document.execCommand failed'));
+        }
       );
     });
   });

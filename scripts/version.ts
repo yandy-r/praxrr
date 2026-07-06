@@ -18,11 +18,11 @@
 // ============================================================================
 
 const VERSION_FILES = {
-	packageJson: 'package.json',
-	appDenoJson: 'packages/praxrr-app/deno.json',
-	dbDenoJson: 'packages/praxrr-db/deno.json',
-	schemaDenoJson: 'packages/praxrr-schema/deno.json',
-	releaseManifest: '.release-please-manifest.json',
+  packageJson: 'package.json',
+  appDenoJson: 'packages/praxrr-app/deno.json',
+  dbDenoJson: 'packages/praxrr-db/deno.json',
+  schemaDenoJson: 'packages/praxrr-schema/deno.json',
+  releaseManifest: '.release-please-manifest.json',
 } as const;
 
 const SEMVER_RE = /^\d+\.\d+\.\d+$/;
@@ -32,49 +32,49 @@ const SEMVER_RE = /^\d+\.\d+\.\d+$/;
 // ============================================================================
 
 interface CliArgs {
-	version?: string;
-	dbVersion?: string;
-	schemaVersion?: string;
-	createGitTags: boolean;
-	publish: boolean;
-	dryRun: boolean;
-	help: boolean;
+  version?: string;
+  dbVersion?: string;
+  schemaVersion?: string;
+  createGitTags: boolean;
+  publish: boolean;
+  dryRun: boolean;
+  help: boolean;
 }
 
 function parseArgs(): CliArgs {
-	const args: CliArgs = {
-		createGitTags: false,
-		publish: false,
-		dryRun: false,
-		help: false,
-	};
+  const args: CliArgs = {
+    createGitTags: false,
+    publish: false,
+    dryRun: false,
+    help: false,
+  };
 
-	for (const arg of Deno.args) {
-		if (arg === '--help' || arg === '-h') {
-			args.help = true;
-		} else if (arg.startsWith('--db-version=')) {
-			args.dbVersion = arg.slice('--db-version='.length);
-		} else if (arg.startsWith('--schema-version=')) {
-			args.schemaVersion = arg.slice('--schema-version='.length);
-		} else if (arg === '--create-git-tags') {
-			args.createGitTags = true;
-		} else if (arg === '--publish' || arg === '--publish-to-gh') {
-			args.publish = true;
-		} else if (arg === '--dry-run') {
-			args.dryRun = true;
-		} else if (!arg.startsWith('-')) {
-			args.version = arg;
-		}
-	}
+  for (const arg of Deno.args) {
+    if (arg === '--help' || arg === '-h') {
+      args.help = true;
+    } else if (arg.startsWith('--db-version=')) {
+      args.dbVersion = arg.slice('--db-version='.length);
+    } else if (arg.startsWith('--schema-version=')) {
+      args.schemaVersion = arg.slice('--schema-version='.length);
+    } else if (arg === '--create-git-tags') {
+      args.createGitTags = true;
+    } else if (arg === '--publish' || arg === '--publish-to-gh') {
+      args.publish = true;
+    } else if (arg === '--dry-run') {
+      args.dryRun = true;
+    } else if (!arg.startsWith('-')) {
+      args.version = arg;
+    }
+  }
 
-	// --publish implies --create-git-tags
-	if (args.publish) args.createGitTags = true;
+  // --publish implies --create-git-tags
+  if (args.publish) args.createGitTags = true;
 
-	return args;
+  return args;
 }
 
 function printHelp(): void {
-	console.log(`
+  console.log(`
 Version Management Script
 
 Centralizes version bumps across the Praxrr monorepo.
@@ -122,123 +122,152 @@ EXAMPLES:
 // ============================================================================
 
 function stripVPrefix(version: string): string {
-	return version.startsWith('v') ? version.slice(1) : version;
+  return version.startsWith('v') ? version.slice(1) : version;
 }
 
 function validateSemver(version: string, label: string): string {
-	const cleaned = stripVPrefix(version);
-	if (!SEMVER_RE.test(cleaned)) {
-		throw new Error(`Invalid semver for ${label}: "${version}" (expected X.Y.Z)`);
-	}
-	return cleaned;
+  const cleaned = stripVPrefix(version);
+  if (!SEMVER_RE.test(cleaned)) {
+    throw new Error(`Invalid semver for ${label}: "${version}" (expected X.Y.Z)`);
+  }
+  return cleaned;
 }
 
 async function readJson(path: string): Promise<Record<string, unknown>> {
-	const text = await Deno.readTextFile(path);
-	return JSON.parse(text);
+  const text = await Deno.readTextFile(path);
+  return JSON.parse(text);
 }
 
 async function writeJson(path: string, data: Record<string, unknown>, dryRun: boolean): Promise<void> {
-	const text = JSON.stringify(data, null, 2) + '\n';
-	if (dryRun) return;
-	await Deno.writeTextFile(path, text);
+  const text = JSON.stringify(data, null, 2) + '\n';
+  if (dryRun) return;
+  await Deno.writeTextFile(path, text);
 }
 
 interface VersionChange {
-	file: string;
-	field: string;
-	oldVersion: string;
-	newVersion: string;
+  file: string;
+  field: string;
+  oldVersion: string;
+  newVersion: string;
 }
 
 // ============================================================================
 // VERSION UPDATE LOGIC
 // ============================================================================
 
-async function collectChanges(appVersion: string, dbVersion?: string, schemaVersion?: string): Promise<VersionChange[]> {
-	const changes: VersionChange[] = [];
+async function collectChanges(
+  appVersion: string,
+  dbVersion?: string,
+  schemaVersion?: string
+): Promise<VersionChange[]> {
+  const changes: VersionChange[] = [];
 
-	// package.json — app version
-	const pkg = await readJson(VERSION_FILES.packageJson);
-	const pkgOld = pkg.version as string;
-	if (pkgOld !== appVersion) {
-		changes.push({ file: VERSION_FILES.packageJson, field: 'version', oldVersion: pkgOld, newVersion: appVersion });
-	}
+  // package.json — app version
+  const pkg = await readJson(VERSION_FILES.packageJson);
+  const pkgOld = pkg.version as string;
+  if (pkgOld !== appVersion) {
+    changes.push({ file: VERSION_FILES.packageJson, field: 'version', oldVersion: pkgOld, newVersion: appVersion });
+  }
 
-	// praxrr-app/deno.json — tracks app version
-	const appDeno = await readJson(VERSION_FILES.appDenoJson);
-	const appDenoOld = appDeno.version as string;
-	if (appDenoOld !== appVersion) {
-		changes.push({ file: VERSION_FILES.appDenoJson, field: 'version', oldVersion: appDenoOld, newVersion: appVersion });
-	}
+  // praxrr-app/deno.json — tracks app version
+  const appDeno = await readJson(VERSION_FILES.appDenoJson);
+  const appDenoOld = appDeno.version as string;
+  if (appDenoOld !== appVersion) {
+    changes.push({ file: VERSION_FILES.appDenoJson, field: 'version', oldVersion: appDenoOld, newVersion: appVersion });
+  }
 
-	// .release-please-manifest.json — root entry
-	const manifest = await readJson(VERSION_FILES.releaseManifest);
-	const manifestRootOld = manifest['.'] as string;
-	if (manifestRootOld !== appVersion) {
-		changes.push({ file: VERSION_FILES.releaseManifest, field: '"."', oldVersion: manifestRootOld, newVersion: appVersion });
-	}
+  // .release-please-manifest.json — root entry
+  const manifest = await readJson(VERSION_FILES.releaseManifest);
+  const manifestRootOld = manifest['.'] as string;
+  if (manifestRootOld !== appVersion) {
+    changes.push({
+      file: VERSION_FILES.releaseManifest,
+      field: '"."',
+      oldVersion: manifestRootOld,
+      newVersion: appVersion,
+    });
+  }
 
-	// praxrr-db
-	if (dbVersion) {
-		const dbDeno = await readJson(VERSION_FILES.dbDenoJson);
-		const dbOld = dbDeno.version as string;
-		if (dbOld !== dbVersion) {
-			changes.push({ file: VERSION_FILES.dbDenoJson, field: 'version', oldVersion: dbOld, newVersion: dbVersion });
-		}
-		const manifestDbOld = manifest['packages/praxrr-db'] as string;
-		if (manifestDbOld !== dbVersion) {
-			changes.push({ file: VERSION_FILES.releaseManifest, field: '"packages/praxrr-db"', oldVersion: manifestDbOld, newVersion: dbVersion });
-		}
-	}
+  // praxrr-db
+  if (dbVersion) {
+    const dbDeno = await readJson(VERSION_FILES.dbDenoJson);
+    const dbOld = dbDeno.version as string;
+    if (dbOld !== dbVersion) {
+      changes.push({ file: VERSION_FILES.dbDenoJson, field: 'version', oldVersion: dbOld, newVersion: dbVersion });
+    }
+    const manifestDbOld = manifest['packages/praxrr-db'] as string;
+    if (manifestDbOld !== dbVersion) {
+      changes.push({
+        file: VERSION_FILES.releaseManifest,
+        field: '"packages/praxrr-db"',
+        oldVersion: manifestDbOld,
+        newVersion: dbVersion,
+      });
+    }
+  }
 
-	// praxrr-schema
-	if (schemaVersion) {
-		const schemaDeno = await readJson(VERSION_FILES.schemaDenoJson);
-		const schemaOld = schemaDeno.version as string;
-		if (schemaOld !== schemaVersion) {
-			changes.push({ file: VERSION_FILES.schemaDenoJson, field: 'version', oldVersion: schemaOld, newVersion: schemaVersion });
-		}
-		const manifestSchemaOld = manifest['packages/praxrr-schema'] as string;
-		if (manifestSchemaOld !== schemaVersion) {
-			changes.push({ file: VERSION_FILES.releaseManifest, field: '"packages/praxrr-schema"', oldVersion: manifestSchemaOld, newVersion: schemaVersion });
-		}
-	}
+  // praxrr-schema
+  if (schemaVersion) {
+    const schemaDeno = await readJson(VERSION_FILES.schemaDenoJson);
+    const schemaOld = schemaDeno.version as string;
+    if (schemaOld !== schemaVersion) {
+      changes.push({
+        file: VERSION_FILES.schemaDenoJson,
+        field: 'version',
+        oldVersion: schemaOld,
+        newVersion: schemaVersion,
+      });
+    }
+    const manifestSchemaOld = manifest['packages/praxrr-schema'] as string;
+    if (manifestSchemaOld !== schemaVersion) {
+      changes.push({
+        file: VERSION_FILES.releaseManifest,
+        field: '"packages/praxrr-schema"',
+        oldVersion: manifestSchemaOld,
+        newVersion: schemaVersion,
+      });
+    }
+  }
 
-	return changes;
+  return changes;
 }
 
-async function applyChanges(appVersion: string, dbVersion?: string, schemaVersion?: string, dryRun = false): Promise<void> {
-	// package.json
-	const pkg = await readJson(VERSION_FILES.packageJson);
-	pkg.version = appVersion;
-	await writeJson(VERSION_FILES.packageJson, pkg, dryRun);
+async function applyChanges(
+  appVersion: string,
+  dbVersion?: string,
+  schemaVersion?: string,
+  dryRun = false
+): Promise<void> {
+  // package.json
+  const pkg = await readJson(VERSION_FILES.packageJson);
+  pkg.version = appVersion;
+  await writeJson(VERSION_FILES.packageJson, pkg, dryRun);
 
-	// praxrr-app/deno.json
-	const appDeno = await readJson(VERSION_FILES.appDenoJson);
-	appDeno.version = appVersion;
-	await writeJson(VERSION_FILES.appDenoJson, appDeno, dryRun);
+  // praxrr-app/deno.json
+  const appDeno = await readJson(VERSION_FILES.appDenoJson);
+  appDeno.version = appVersion;
+  await writeJson(VERSION_FILES.appDenoJson, appDeno, dryRun);
 
-	// .release-please-manifest.json
-	const manifest = await readJson(VERSION_FILES.releaseManifest);
-	manifest['.'] = appVersion;
-	if (dbVersion) manifest['packages/praxrr-db'] = dbVersion;
-	if (schemaVersion) manifest['packages/praxrr-schema'] = schemaVersion;
-	await writeJson(VERSION_FILES.releaseManifest, manifest, dryRun);
+  // .release-please-manifest.json
+  const manifest = await readJson(VERSION_FILES.releaseManifest);
+  manifest['.'] = appVersion;
+  if (dbVersion) manifest['packages/praxrr-db'] = dbVersion;
+  if (schemaVersion) manifest['packages/praxrr-schema'] = schemaVersion;
+  await writeJson(VERSION_FILES.releaseManifest, manifest, dryRun);
 
-	// praxrr-db
-	if (dbVersion) {
-		const dbDeno = await readJson(VERSION_FILES.dbDenoJson);
-		dbDeno.version = dbVersion;
-		await writeJson(VERSION_FILES.dbDenoJson, dbDeno, dryRun);
-	}
+  // praxrr-db
+  if (dbVersion) {
+    const dbDeno = await readJson(VERSION_FILES.dbDenoJson);
+    dbDeno.version = dbVersion;
+    await writeJson(VERSION_FILES.dbDenoJson, dbDeno, dryRun);
+  }
 
-	// praxrr-schema
-	if (schemaVersion) {
-		const schemaDeno = await readJson(VERSION_FILES.schemaDenoJson);
-		schemaDeno.version = schemaVersion;
-		await writeJson(VERSION_FILES.schemaDenoJson, schemaDeno, dryRun);
-	}
+  // praxrr-schema
+  if (schemaVersion) {
+    const schemaDeno = await readJson(VERSION_FILES.schemaDenoJson);
+    schemaDeno.version = schemaVersion;
+    await writeJson(VERSION_FILES.schemaDenoJson, schemaDeno, dryRun);
+  }
 }
 
 // ============================================================================
@@ -246,37 +275,37 @@ async function applyChanges(appVersion: string, dbVersion?: string, schemaVersio
 // ============================================================================
 
 async function tagExists(tag: string): Promise<boolean> {
-	const cmd = new Deno.Command('git', { args: ['tag', '-l', tag], stdout: 'piped' });
-	const { stdout } = await cmd.output();
-	return new TextDecoder().decode(stdout).trim() === tag;
+  const cmd = new Deno.Command('git', { args: ['tag', '-l', tag], stdout: 'piped' });
+  const { stdout } = await cmd.output();
+  return new TextDecoder().decode(stdout).trim() === tag;
 }
 
 async function createTag(tag: string, dryRun: boolean): Promise<void> {
-	if (await tagExists(tag)) {
-		throw new Error(`Tag "${tag}" already exists. Remove it first or use a different version.`);
-	}
-	if (dryRun) {
-		console.log(`[DRY-RUN] git tag ${tag}`);
-		return;
-	}
-	const cmd = new Deno.Command('git', { args: ['tag', tag] });
-	const { success } = await cmd.output();
-	if (!success) throw new Error(`Failed to create tag: ${tag}`);
-	console.log(`  Created tag: ${tag}`);
+  if (await tagExists(tag)) {
+    throw new Error(`Tag "${tag}" already exists. Remove it first or use a different version.`);
+  }
+  if (dryRun) {
+    console.log(`[DRY-RUN] git tag ${tag}`);
+    return;
+  }
+  const cmd = new Deno.Command('git', { args: ['tag', tag] });
+  const { success } = await cmd.output();
+  if (!success) throw new Error(`Failed to create tag: ${tag}`);
+  console.log(`  Created tag: ${tag}`);
 }
 
 async function pushTags(tags: string[], dryRun: boolean): Promise<void> {
-	if (dryRun) {
-		console.log(`[DRY-RUN] git push origin ${tags.join(' ')}`);
-		return;
-	}
-	const cmd = new Deno.Command('git', { args: ['push', 'origin', ...tags], stdout: 'piped', stderr: 'piped' });
-	const { success, stderr } = await cmd.output();
-	if (!success) {
-		const err = new TextDecoder().decode(stderr);
-		throw new Error(`Failed to push tags: ${err}`);
-	}
-	console.log(`  Pushed tags to origin: ${tags.join(', ')}`);
+  if (dryRun) {
+    console.log(`[DRY-RUN] git push origin ${tags.join(' ')}`);
+    return;
+  }
+  const cmd = new Deno.Command('git', { args: ['push', 'origin', ...tags], stdout: 'piped', stderr: 'piped' });
+  const { success, stderr } = await cmd.output();
+  if (!success) {
+    const err = new TextDecoder().decode(stderr);
+    throw new Error(`Failed to push tags: ${err}`);
+  }
+  console.log(`  Pushed tags to origin: ${tags.join(', ')}`);
 }
 
 // ============================================================================
@@ -284,24 +313,24 @@ async function pushTags(tags: string[], dryRun: boolean): Promise<void> {
 // ============================================================================
 
 function printChangeSummary(changes: VersionChange[], dryRun: boolean): void {
-	const prefix = dryRun ? '[DRY-RUN] ' : '';
+  const prefix = dryRun ? '[DRY-RUN] ' : '';
 
-	if (changes.length === 0) {
-		console.log(`${prefix}All versions already at target. Nothing to do.`);
-		return;
-	}
+  if (changes.length === 0) {
+    console.log(`${prefix}All versions already at target. Nothing to do.`);
+    return;
+  }
 
-	console.log(`\n${prefix}Version changes:`);
-	console.log('─'.repeat(72));
+  console.log(`\n${prefix}Version changes:`);
+  console.log('─'.repeat(72));
 
-	const maxFile = Math.max(...changes.map((c) => c.file.length));
-	const maxField = Math.max(...changes.map((c) => c.field.length));
+  const maxFile = Math.max(...changes.map((c) => c.file.length));
+  const maxField = Math.max(...changes.map((c) => c.field.length));
 
-	for (const { file, field, oldVersion, newVersion } of changes) {
-		console.log(`  ${file.padEnd(maxFile)}  ${field.padEnd(maxField)}  ${oldVersion} → ${newVersion}`);
-	}
+  for (const { file, field, oldVersion, newVersion } of changes) {
+    console.log(`  ${file.padEnd(maxFile)}  ${field.padEnd(maxField)}  ${oldVersion} → ${newVersion}`);
+  }
 
-	console.log('─'.repeat(72));
+  console.log('─'.repeat(72));
 }
 
 // ============================================================================
@@ -309,68 +338,68 @@ function printChangeSummary(changes: VersionChange[], dryRun: boolean): void {
 // ============================================================================
 
 async function main(): Promise<void> {
-	const args = parseArgs();
+  const args = parseArgs();
 
-	if (args.help) {
-		printHelp();
-		Deno.exit(0);
-	}
+  if (args.help) {
+    printHelp();
+    Deno.exit(0);
+  }
 
-	// Resolve app version: CLI arg > env var
-	const rawVersion = args.version ?? Deno.env.get('APP_VERSION');
-	if (!rawVersion) {
-		console.error('Error: version argument required (e.g. deno task version 0.2.3)');
-		console.error('Run with --help for usage.');
-		Deno.exit(1);
-	}
+  // Resolve app version: CLI arg > env var
+  const rawVersion = args.version ?? Deno.env.get('APP_VERSION');
+  if (!rawVersion) {
+    console.error('Error: version argument required (e.g. deno task version 0.2.3)');
+    console.error('Run with --help for usage.');
+    Deno.exit(1);
+  }
 
-	const appVersion = validateSemver(rawVersion, 'app version');
-	const dbVersion = args.dbVersion ? validateSemver(args.dbVersion, 'db version') : undefined;
-	const schemaVersion = args.schemaVersion ? validateSemver(args.schemaVersion, 'schema version') : undefined;
+  const appVersion = validateSemver(rawVersion, 'app version');
+  const dbVersion = args.dbVersion ? validateSemver(args.dbVersion, 'db version') : undefined;
+  const schemaVersion = args.schemaVersion ? validateSemver(args.schemaVersion, 'schema version') : undefined;
 
-	// Collect and display changes
-	const changes = await collectChanges(appVersion, dbVersion, schemaVersion);
-	printChangeSummary(changes, args.dryRun);
+  // Collect and display changes
+  const changes = await collectChanges(appVersion, dbVersion, schemaVersion);
+  printChangeSummary(changes, args.dryRun);
 
-	if (changes.length === 0) {
-		if (args.createGitTags) {
-			console.log('\nCreating git tags...');
-		} else {
-			Deno.exit(0);
-		}
-	}
+  if (changes.length === 0) {
+    if (args.createGitTags) {
+      console.log('\nCreating git tags...');
+    } else {
+      Deno.exit(0);
+    }
+  }
 
-	// Apply file changes
-	if (changes.length > 0) {
-		await applyChanges(appVersion, dbVersion, schemaVersion, args.dryRun);
-		if (args.dryRun) {
-			console.log('\n[DRY-RUN] No files were modified.');
-		} else {
-			console.log(`\nUpdated ${changes.length} version entries.`);
-		}
-	}
+  // Apply file changes
+  if (changes.length > 0) {
+    await applyChanges(appVersion, dbVersion, schemaVersion, args.dryRun);
+    if (args.dryRun) {
+      console.log('\n[DRY-RUN] No files were modified.');
+    } else {
+      console.log(`\nUpdated ${changes.length} version entries.`);
+    }
+  }
 
-	// Create git tags
-	if (args.createGitTags) {
-		console.log(args.dryRun ? '\n[DRY-RUN] Tags that would be created:' : '\nCreating git tags...');
+  // Create git tags
+  if (args.createGitTags) {
+    console.log(args.dryRun ? '\n[DRY-RUN] Tags that would be created:' : '\nCreating git tags...');
 
-		const tags: string[] = [];
-		tags.push(`app/v${appVersion}`);
-		if (dbVersion) tags.push(`db/v${dbVersion}`);
-		if (schemaVersion) tags.push(`schema/v${schemaVersion}`);
+    const tags: string[] = [];
+    tags.push(`app/v${appVersion}`);
+    if (dbVersion) tags.push(`db/v${dbVersion}`);
+    if (schemaVersion) tags.push(`schema/v${schemaVersion}`);
 
-		for (const tag of tags) {
-			await createTag(tag, args.dryRun);
-		}
+    for (const tag of tags) {
+      await createTag(tag, args.dryRun);
+    }
 
-		// Push tags to origin
-		if (args.publish) {
-			console.log(args.dryRun ? '\n[DRY-RUN] Tags that would be pushed:' : '\nPushing tags to origin...');
-			await pushTags(tags, args.dryRun);
-		}
-	}
+    // Push tags to origin
+    if (args.publish) {
+      console.log(args.dryRun ? '\n[DRY-RUN] Tags that would be pushed:' : '\nPushing tags to origin...');
+      await pushTags(tags, args.dryRun);
+    }
+  }
 
-	console.log('\nDone.');
+  console.log('\nDone.');
 }
 
 main();

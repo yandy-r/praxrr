@@ -174,9 +174,7 @@ function parseCustomFormat(
   const includeInRename = readRequiredBoolean(record, 'includeCustomFormatWhenRenaming', filePath);
 
   const rawScoresValue = record.trash_scores;
-  const rawScores = rawScoresValue != null
-    ? asRecord(rawScoresValue, `${filePath}: trash_scores`)
-    : {};
+  const rawScores = rawScoresValue != null ? asRecord(rawScoresValue, `${filePath}: trash_scores`) : {};
   const scores: Record<string, number> = {};
   for (const [scoreName, value] of Object.entries(rawScores)) {
     if (typeof value !== 'number' || !Number.isFinite(value)) {
