@@ -46,9 +46,30 @@ export default defineConfig({
       sidebar: [
         {
           label: 'Start Here',
+          items: [{ label: 'Overview', link: '/' }],
+        },
+        {
+          label: 'Getting Started',
           items: [
-            { label: 'Overview', link: '/' },
-            { label: 'Getting Started', link: '/getting-started/' },
+            { label: 'Overview', link: '/getting-started/' },
+            { label: 'Installation', link: '/getting-started/installation/' },
+            { label: 'Quick Start', link: '/getting-started/quick-start/' },
+            { label: 'Docker', link: '/getting-started/docker/' },
+          ],
+        },
+        {
+          label: 'Guides',
+          items: [
+            { label: 'Configuration', link: '/guides/configuration/' },
+            {
+              label: 'Connecting Arr Instances',
+              link: '/guides/connecting-arr-instances/',
+            },
+            { label: 'Syncing Profiles', link: '/guides/syncing-profiles/' },
+            { label: 'Custom Formats', link: '/guides/custom-formats/' },
+            { label: 'Quality Profiles', link: '/guides/quality-profiles/' },
+            { label: 'Upgrading', link: '/guides/upgrading/' },
+            { label: 'Troubleshooting', link: '/guides/troubleshooting/' },
           ],
         },
         {

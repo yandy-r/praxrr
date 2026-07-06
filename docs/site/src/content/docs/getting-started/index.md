@@ -1,21 +1,33 @@
 ---
 title: Getting Started
-description: First steps for running Praxrr and finding the right documentation section.
+description: Install Praxrr, run your first sync, and find task-oriented guides.
 ---
 
-Praxrr v2 is under active development. Use this page as the entry point for local development and
-early setup flows while fuller user guides are written in follow-up documentation issues.
+Praxrr v2 is under active development. Use these pages to install the app, link a
+configuration database, connect Arr instances, and sync quality profiles.
 
-## Run the App Locally
+## Install and Run
 
-From the repository root:
+- [Installation](./installation/) — Docker, binary, and from-source setup
+- [Quick Start](./quick-start/) — link a PCD, bridge Arr, and sync end-to-end
+- [Docker](./docker/) — compose files, volumes, networking, parser opt-in
 
-```bash
-deno task dev:noauth
-```
+## Guides
 
-The development server starts the SvelteKit app on port `6969` with authentication disabled. Use
-`deno task dev` when you also want the parser service started by the development launcher.
+- [Configuration](../guides/configuration/) — environment variables and auth modes
+- [Connecting Arr Instances](../guides/connecting-arr-instances/) — URLs, API keys,
+  external links
+- [Syncing Profiles](../guides/syncing-profiles/) — preview, triggers, user ops
+- [Custom Formats](../guides/custom-formats/) — formats and shared regex entities
+- [Quality Profiles](../guides/quality-profiles/) — qualities and scoring
+- [Upgrading](../guides/upgrading/) — release channels and migrations
+- [Troubleshooting](../guides/troubleshooting/) — common errors
+
+## Contributor Docs
+
+- [Application architecture](/app/architecture/) — runtime modules and sync pipeline
+- [PCD schema structure](/schema/structure/) — portable database contracts
+- [API reference](/api/) — `/api/v1` OpenAPI endpoints
 
 ## Build the Docs Site
 
@@ -25,11 +37,5 @@ From the repository root:
 deno task docs:build
 ```
 
-The docs build imports available schema and database mirror documentation, renders Starlight pages,
-generates the OpenAPI reference, and emits the static site to `docs/site/dist`.
-
-## Where to Go Next
-
-- Read the [application architecture](/app/architecture/) before changing runtime behavior.
-- Read the [PCD schema structure](/schema/structure/) before changing portable database contracts.
-- Read the [API reference](/api/) before adding or consuming `/api/v1` endpoints.
+The build imports schema and database mirror docs, renders Starlight pages,
+generates the OpenAPI reference, and emits static output to `docs/site/dist`.
