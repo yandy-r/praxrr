@@ -110,10 +110,9 @@ async function withMockExecCommand(
   } finally {
     if (originalDescriptor) {
       Object.defineProperty(globalThis, 'document', originalDescriptor);
-      return;
+    } else {
+      Reflect.deleteProperty(globalThis, 'document');
     }
-
-    Reflect.deleteProperty(globalThis, 'document');
   }
 }
 

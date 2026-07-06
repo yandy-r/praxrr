@@ -217,9 +217,6 @@ export async function getAllConditionsForEvaluation(cache: PCDCache): Promise<Cu
     return formats.map((f) => ({ name: f.name, conditions: [] }));
   }
 
-  // Build composite keys for condition lookups
-  const conditionKeys = conditions.map((c) => `${c.custom_format_name}|${c.name}`);
-
   // Get all related data in parallel
   const [patterns, languages, sources, resolutions, qualityModifiers, releaseTypes, indexerFlags, sizes, years] =
     await Promise.all([

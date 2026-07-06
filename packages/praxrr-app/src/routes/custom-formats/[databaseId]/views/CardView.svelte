@@ -65,7 +65,10 @@
 
 	const { visibleCount, sentinel, reset, setTotalCount } = createProgressiveList({ pageSize: 30 });
 	$: setTotalCount(formats.length);
-	$: formats, reset();
+	$: {
+		void formats;
+		reset();
+	}
 	$: visibleFormats = formats.slice(0, $visibleCount);
 
 	function parseMarkdown(text: string | null): string {

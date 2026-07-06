@@ -6,7 +6,7 @@
  * envInstances.test.ts: save/restore env vars around each test case.
  */
 
-import { assertEquals, assertThrows } from '@std/assert';
+import { assertEquals } from '@std/assert';
 
 // ---------------------------------------------------------------------------
 // Env var save/restore helpers

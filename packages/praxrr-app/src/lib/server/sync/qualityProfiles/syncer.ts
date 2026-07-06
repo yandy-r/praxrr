@@ -263,7 +263,6 @@ export class QualityProfileSyncer extends BaseSyncer {
       }
 
       // 2. Sync custom formats per-database (each with its namespace suffix)
-      let totalFormatsSynced = 0;
       for (const batch of batches) {
         batch.pcdFormatIdMap = await syncCustomFormats(
           this.client,
@@ -272,7 +271,6 @@ export class QualityProfileSyncer extends BaseSyncer {
           batch.customFormats,
           batch.suffix
         );
-        totalFormatsSynced += batch.customFormats.size;
       }
 
       // 3. Refresh full CF list from arr (all databases' suffixed CFs)

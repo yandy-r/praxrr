@@ -1,3 +1,4 @@
+// eslint-disable-next-line @typescript-eslint/triple-slash-reference -- Deno module typings for @felix/bcrypt
 /// <reference path="../../../../deno.d.ts" />
 
 /**

@@ -136,15 +136,21 @@
 			if (data.error) {
 				alertStore.add('error', data.error);
 			} else {
-				libraryItems = (data.items || []).map((item: any) => ({
+				type LibraryApiItem = {
+					id: number;
+					title: string;
+					year?: number;
+					tmdbId?: number;
+					tvdbId?: number;
+					seasons?: Array<number | { seasonNumber: number }>;
+				};
+				libraryItems = (data.items || []).map((item: LibraryApiItem) => ({
 					id: item.id,
 					title: item.title,
 					year: item.year,
 					tmdbId: item.tmdbId,
 					tvdbId: item.tvdbId,
-					seasons: item.seasons?.map((s: any) =>
-						typeof s === 'number' ? s : s.seasonNumber
-					)
+					seasons: item.seasons?.map((s) => (typeof s === 'number' ? s : s.seasonNumber))
 				}));
 			}
 		} catch (err) {

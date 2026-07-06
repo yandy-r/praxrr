@@ -516,7 +516,7 @@ function readRequiredTrashId(record: Record<string, unknown>, context: string): 
 
 function readOptionalTrashGuideId(
   record: Record<string, unknown>,
-  context: string
+  _context: string
 ): ReturnType<typeof toTrashGuideId> | null {
   const value = readOptionalString(record, 'trash_id');
   if (value === null) {

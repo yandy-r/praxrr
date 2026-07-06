@@ -565,7 +565,6 @@ test.describe('2.46 QP real world use case — multi-surface conflict', () => {
   test('c) align strategy — conflicts auto-resolve, upstream wins', async ({ page }) => {
     const result = await setupDatabasesAndSync(page, devId, 'Align');
     localId = result.localId;
-    const { amznScore1, amznScore2 } = result;
 
     // ─── No conflicts should remain (align drops local ops during build) ──
 

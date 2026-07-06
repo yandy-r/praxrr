@@ -223,7 +223,6 @@ export const actions: Actions = {
     if (!resolved) {
       return fail(404, { error: 'Quality definitions config not found' });
     }
-    const current = resolved.config;
     const resolvedName = resolved.resolvedName;
 
     const storageCurrent = await getLidarrByName(cache, resolvedName);

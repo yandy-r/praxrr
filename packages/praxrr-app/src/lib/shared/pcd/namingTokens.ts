@@ -601,7 +601,7 @@ export function resolveFormat(format: string, sampleValues: Record<string, strin
   if (!format) return '';
 
   // Match tokens: {prefix token suffix} where prefix/suffix are optional [ ] - _ . space chars
-  const tokenRegex = /\{(?<prefix>[-\[( ._]*)(?<token>[A-Za-z][A-Za-z0-9 :+-]*)(?<suffix>[-\]) ._]*)\}/g;
+  const tokenRegex = /\{(?<prefix>[-[( ._]*)(?<token>[A-Za-z][A-Za-z0-9 :+-]*)(?<suffix>[-\]) ._]*)\}/g;
 
   const resolved = format.replace(tokenRegex, (_match, prefix: string, token: string, suffix: string) => {
     const trimmedToken = token.trim();
@@ -701,7 +701,7 @@ export function validateNamingFormat(format: string, arrType: 'radarr' | 'sonarr
 
   // Extract tokens and validate each one
   const validNames = getValidTokenNames(arrType);
-  const tokenRegex = /\{[-\[( ._]*([A-Za-z][A-Za-z0-9 :+-]*)[-\]) ._]*\}/g;
+  const tokenRegex = /\{[-[( ._]*([A-Za-z][A-Za-z0-9 :+-]*)[-\]) ._]*\}/g;
   let match;
 
   while ((match = tokenRegex.exec(format)) !== null) {

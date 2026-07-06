@@ -124,7 +124,7 @@
 		fetchChanges();
 	});
 
-	async function parseActionResult(response: Response): Promise<any> {
+	async function parseActionResult(response: Response): Promise<unknown> {
 		const text = await response.text();
 		if (!text) return null;
 		try {

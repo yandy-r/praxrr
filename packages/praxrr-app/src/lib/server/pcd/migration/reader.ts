@@ -342,9 +342,10 @@ function resolveStableEntityType(entityType: EntityType): keyof typeof STABLE_KE
     case 'lidarr_quality_definitions':
     case 'lidarr_metadata_profile':
       return entityType;
-    default:
+    default: {
       const _unreachable = entityType satisfies never;
       throw new Error(`Unsupported entity type: ${String(_unreachable)}`);
+    }
   }
 }
 

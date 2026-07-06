@@ -177,7 +177,7 @@ test.describe('2.28 QP qualities add group vs upstream reorder conflict', () => 
     await goToQualitiesMobile(page, devId, profileName);
     await moveQualityDown(page, 0);
     await moveQualityDown(page, 1);
-    const devOrder = await getQualityOrder(page);
+    await getQualityOrder(page);
     await page.getByRole('button', { name: 'Save' }).click();
     await page.waitForLoadState('networkidle');
     await restoreDesktop(page);

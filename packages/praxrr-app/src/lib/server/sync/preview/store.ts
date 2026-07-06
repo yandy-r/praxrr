@@ -74,7 +74,7 @@ export function evaluatePreviewStaleness(
   };
 }
 
-export interface SyncPreviewCreateInput extends Omit<SyncPreviewResult, 'createdAt' | 'expiresAt'> {}
+export type SyncPreviewCreateInput = Omit<SyncPreviewResult, 'createdAt' | 'expiresAt'>;
 
 export type SyncPreviewUpdatePatch = Omit<Partial<SyncPreviewResult>, 'createdAt' | 'expiresAt'>;
 

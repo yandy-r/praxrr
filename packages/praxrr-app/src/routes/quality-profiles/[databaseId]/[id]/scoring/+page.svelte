@@ -37,6 +37,7 @@
   import { current, isDirty, initEdit, update } from '$lib/client/stores/dirty';
   import { alertStore } from '$alerts/store';
   import { getArrAppMetadata, isArrAppType, type ArrAppType } from '$shared/arr/capabilities.ts';
+  import type { CustomFormatScoring } from '$shared/pcd/display.ts';
   import type { PageData } from './$types';
 
   export let data: PageData;
@@ -77,7 +78,7 @@
     const scores: Record<string, Record<string, number | null>> = {};
     const enabled: Record<string, Record<string, boolean>> = {};
 
-    scoring.customFormats.forEach((cf: any) => {
+    scoring.customFormats.forEach((cf: CustomFormatScoring) => {
       scores[cf.name] = { ...cf.scores };
       enabled[cf.name] = {};
       scoring.arrTypes.forEach((arrType: string) => {
@@ -236,7 +237,10 @@
     if (savedCustomGroups) {
       try {
         const parsed = JSON.parse(savedCustomGroups);
-        customGroups = parsed.map((g: any) => ({ ...g, custom: true }));
+        customGroups = (parsed as Array<{ name: string; key: string; tags: string[] }>).map((g) => ({
+          ...g,
+          custom: true,
+        }));
       } catch {
         customGroups = [];
       }
@@ -502,15 +506,15 @@
   }
 
   function sortFormats(
-    formats: any[],
+    formats: CustomFormatScoring[],
     scores: Record<string, Record<string, number | null>>,
     sortState: { key: SortKey; direction: SortDirection } | null
   ) {
     if (!sortState) return formats;
 
     const sorted = [...formats].sort((a, b) => {
-      let aVal: any;
-      let bVal: any;
+      let aVal: string | number | null;
+      let bVal: string | number | null;
 
       if (sortState.key === 'name') {
         aVal = a.name?.toLowerCase() || '';
@@ -533,13 +537,13 @@
     return sorted;
   }
 
-  function groupFormats(formats: any[], selectedGroups: Set<GroupKey>) {
+  function groupFormats(formats: CustomFormatScoring[], selectedGroups: Set<GroupKey>) {
     // If no groups selected, show all formats in one table
     if (selectedGroups.size === 0) {
       return [{ name: null, formats }];
     }
 
-    const result: { name: string | null; formats: any[] }[] = [];
+    const result: { name: string | null; formats: CustomFormatScoring[] }[] = [];
     const assigned = new Set<string>();
 
     // Process each group in order

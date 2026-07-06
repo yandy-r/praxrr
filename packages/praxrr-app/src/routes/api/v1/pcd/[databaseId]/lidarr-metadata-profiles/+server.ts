@@ -335,7 +335,6 @@ export const POST: RequestHandler = async ({ params, request }) => {
     return json({ error: database.error }, { status: database.status });
   }
 
-  let payload: CreateMetadataProfileRequest;
   const isSupported = await validateLidarrMetadataProfileSupport(database.value);
   if (!isSupported) {
     return json({ error: LIDARR_METADATA_PROFILE_SCHEMA_ERROR }, { status: 400 });
@@ -352,7 +351,7 @@ export const POST: RequestHandler = async ({ params, request }) => {
   if ('error' in result) {
     return json({ error: result.error }, { status: 400 });
   }
-  payload = result.value;
+  const payload = result.value;
 
   if (payload.layer === 'base' && !canWriteToBase(databaseIdResult.value)) {
     return json({ error: 'Cannot write to base layer without personal access token' }, { status: 403 });

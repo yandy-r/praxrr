@@ -15,7 +15,6 @@ const SOURCE = {
 } as const;
 
 const noopWarn = async () => Promise.resolve();
-const originalWarn = logger.warn;
 logger.warn = noopWarn;
 
 function syntheticId(sourceId: number, trashId: string): number {

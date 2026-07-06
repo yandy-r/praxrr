@@ -493,7 +493,9 @@
         const parsed = JSON.parse(stored) as RadarrToggleableColumn[];
         return new Set(parsed);
       }
-    } catch {}
+    } catch {
+      // Ignore invalid localStorage data
+    }
     return new Set(RADARR_TOGGLEABLE_COLUMNS);
   }
 
@@ -539,7 +541,9 @@
         const parsed = JSON.parse(stored) as SonarrToggleableColumn[];
         return new Set(parsed);
       }
-    } catch {}
+    } catch {
+      // Ignore invalid localStorage data
+    }
     return new Set(SONARR_TOGGLEABLE_COLUMNS);
   }
 
@@ -583,7 +587,9 @@
         const parsed = JSON.parse(stored) as LidarrToggleableColumn[];
         return new Set(parsed);
       }
-    } catch {}
+    } catch {
+      // Ignore invalid localStorage data
+    }
     return new Set(LIDARR_TOGGLEABLE_COLUMNS);
   }
 
@@ -672,7 +678,7 @@
     }
   }
 
-  function applyFilters<T extends { [key: string]: any }>(items: T[]): T[] {
+  function applyFilters<T extends Record<string, unknown>>(items: T[]): T[] {
     if (activeFilters.length === 0) return items;
 
     const filtersByField = new Map<FilterField, ActiveFilter[]>();

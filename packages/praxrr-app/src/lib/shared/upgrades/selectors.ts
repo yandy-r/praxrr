@@ -3,7 +3,7 @@
  * Defines all available selectors for upgrade item selection
  */
 
-export interface Selector<T = any> {
+export interface Selector<T = unknown> {
   id: string;
   label: string;
   description: string;

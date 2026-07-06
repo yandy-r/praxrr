@@ -1,7 +1,8 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
+	import type { CustomFormatScoring } from '$shared/pcd/display.ts';
 
-	export let formats: any[];
+	export let formats: CustomFormatScoring[];
 	export let arrTypes: string[];
 	export let customFormatScores: Record<string, Record<string, number | null>>;
 	export let customFormatEnabled: Record<string, Record<string, boolean>>;

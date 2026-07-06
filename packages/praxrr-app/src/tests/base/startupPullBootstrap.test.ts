@@ -8,7 +8,6 @@
 
 import { assertEquals, assertExists } from '@std/assert';
 import { config } from '$config';
-import { upsertScheduledJob } from '$jobs/queueService.ts';
 import type { JobQueueRecord } from '$jobs/queueTypes.ts';
 import type { CreateJobQueueInput } from '$db/queries/jobQueue.ts';
 
@@ -17,19 +16,6 @@ import type { CreateJobQueueInput } from '$db/queries/jobQueue.ts';
 // =============================================================================
 
 type Restore = () => void;
-
-function patchTarget<T extends object, K extends keyof T>(
-  target: T,
-  key: K,
-  replacement: T[K],
-  restores: Restore[]
-): void {
-  const original = target[key];
-  target[key] = replacement;
-  restores.push(() => {
-    target[key] = original;
-  });
-}
 
 type MutableConfig = {
   pullOnStart: boolean;
@@ -314,7 +300,7 @@ Deno.test('startup enqueue: dedupe prevents duplicate runs via upsertScheduledJo
     dedupeKey: 'arr.pull.startup:boot',
   });
 
-  const mockUpsert = (input: StartupJobInput): JobQueueRecord => {
+  const mockUpsert = (_input: StartupJobInput): JobQueueRecord => {
     upsertCallCount += 1;
     // Simulate upsert behavior: return existing record if dedupe key matches
     // (no new row created, same record returned)

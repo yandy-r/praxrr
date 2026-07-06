@@ -1,3 +1,4 @@
+// eslint-disable-next-line @typescript-eslint/triple-slash-reference -- SvelteKit app ambient types for route tests
 /// <reference path="../../app.d.ts" />
 
 import { assertEquals } from '@std/assert';

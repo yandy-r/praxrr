@@ -275,7 +275,7 @@ function resolveCustomFormatReference(
 }
 
 function resolveScoreFromCustomFormat(
-  entity: TrashGuideQualityProfileEntity,
+  _entity: TrashGuideQualityProfileEntity,
   customFormat: TrashGuideCustomFormatEntity | null,
   scoreSet: string,
   customFormatTrashId: string | null

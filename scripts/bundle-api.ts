@@ -5,6 +5,8 @@
  * Usage: deno run -A scripts/bundle-api.ts
  */
 
+/* eslint-disable @typescript-eslint/no-explicit-any -- OpenAPI bundle tree is dynamically shaped */
+
 import { parse } from '@std/yaml';
 import { join, dirname } from 'jsr:@std/path@^1';
 

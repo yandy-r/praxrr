@@ -1,12 +1,13 @@
 <script lang="ts">
+	import type { ComponentType } from 'svelte';
 	import { Plus } from 'lucide-svelte';
 
-	export let icon: any; // Lucide icon component
+	export let icon: ComponentType;
 	export let title: string;
 	export let description: string;
 	export let buttonText: string;
 	export let buttonHref: string;
-	export let buttonIcon: any = Plus; // Default to Plus icon
+	export let buttonIcon: ComponentType = Plus;
 </script>
 
 <div class="flex min-h-[calc(100vh-4rem)] items-center justify-center p-8">

@@ -14,7 +14,6 @@ import { unlinkPcdByName } from '../helpers/unlinkPcd';
 import { pullChanges, exportAndPush } from '../helpers/sync';
 import { goToConflicts, expectConflict, overrideConflict, alignConflict } from '../helpers/conflicts';
 import { goToCustomFormat, updateCfName } from '../helpers/entity';
-import { getConflicts, findOpByEntityName } from '../helpers/db';
 import { getHead, resetToCommit } from '../helpers/reset';
 
 const LOCAL_DB_NAME = 'E2E Local';

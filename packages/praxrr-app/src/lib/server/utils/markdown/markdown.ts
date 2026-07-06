@@ -75,7 +75,7 @@ function sanitizeHtml(html: string): string {
 
     const filteredAttrs = attrs.replace(
       /([a-z][a-z0-9-]*)\s*=\s*["']([^"']*)["']/gi,
-      (attrMatch: string, attrName: string, attrValue: string) => {
+      (_attrMatch: string, attrName: string, attrValue: string) => {
         if (allowedForTag.has(attrName.toLowerCase())) {
           return ` ${attrName}="${attrValue}"`;
         }

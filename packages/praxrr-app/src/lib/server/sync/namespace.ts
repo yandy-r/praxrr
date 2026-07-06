@@ -16,6 +16,7 @@ const NAMESPACE_CHARS = [
 ];
 
 /** Regex matching one or more trailing namespace characters. */
+// eslint-disable-next-line no-misleading-character-class -- intentional invisible namespace suffix characters
 const SUFFIX_PATTERN = new RegExp(`[${NAMESPACE_CHARS.join('')}]+$`);
 
 /**
@@ -79,7 +80,7 @@ export function getNamespaceIndex(name: string): number | null {
  * - Preserve suffixes when deciding exact identity.
  *
  * Acceptance example:
- * - stripNamespaceSuffix("Quality Profile​") === "Quality Profile"
+ * - stripNamespaceSuffix("Quality Profile" + zero-width suffix) === "Quality Profile"
  */
 export function normalizeNamespaceDisplayName(name: string): string {
   return stripNamespaceSuffix(name);
@@ -111,8 +112,8 @@ export interface NamespaceNameMatch {
  * 3. If multiple stripped matches, the shortest/lexicographically-first suffix is chosen.
  *
  * Acceptance examples:
- * - desired "Profile A", remote ["Profile A", "Profile A​", "Profile A‫"] => exact match.
- * - desired "Profile A", remote ["Profile A​", "Profile A‫"] => suffix-agnostic match, shortest suffix wins.
+ * - desired "Profile A", remote ["Profile A", "Profile A" + suffix variants] => exact match.
+ * - desired "Profile A", remote [suffixed variants only] => suffix-agnostic match, shortest suffix wins.
  */
 export function findNamespaceMatch(
   desiredName: string,

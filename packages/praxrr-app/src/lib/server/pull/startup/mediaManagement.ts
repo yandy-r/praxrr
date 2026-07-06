@@ -120,7 +120,7 @@ function buildMediaSettingsFingerprintFromArr(config: ArrMediaManagementConfig):
   } as const;
 }
 // NAMING_TOKEN_REGEX captures placeholders while preserving surrounding punctuation and spacing so only token identifiers are normalized.
-const NAMING_TOKEN_REGEX = /\{(?<prefix>[-\[( ._]*)(?<token>[A-Za-z][A-Za-z0-9 :+-]*)(?<suffix>[-\]) ._]*)\}/g;
+const NAMING_TOKEN_REGEX = /\{(?<prefix>[-[( ._]*)(?<token>[A-Za-z][A-Za-z0-9 :+-]*)(?<suffix>[-\]) ._]*)\}/g;
 
 function normalizeTokenIdentifier(value: string): string {
   return value.trim().replace(/\s+/g, ' ').toLocaleLowerCase();

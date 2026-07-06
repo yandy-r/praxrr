@@ -1,4 +1,4 @@
-<script lang="ts" generics="T extends Record<string, any>">
+<script lang="ts" generics="T extends Record<string, unknown>">
   import { onMount, onDestroy } from 'svelte';
   import type { Column, SortDirection, SortState } from './types';
   import { createProgressiveList } from '$lib/client/utils/progressiveList';
@@ -51,7 +51,7 @@
   /**
    * Get cell value by key path (supports nested properties like 'user.name')
    */
-  function getCellValue(row: T, key: string): any {
+  function getCellValue(row: T, key: string): unknown {
     return key.split('.').reduce((obj, k) => obj?.[k], row);
   }
 
@@ -90,7 +90,7 @@
     onSortChange?.(sortKey ? { key: sortKey, direction: sortDirection } : null);
   }
 
-  function compareValues(a: any, b: any): number {
+  function compareValues(a: unknown, b: unknown): number {
     if (a == null && b == null) return 0;
     if (a == null) return -1;
     if (b == null) return 1;
@@ -136,14 +136,20 @@
     return sortDirection === 'desc' ? sorted.reverse() : sorted;
   }
 
-  $: sortedData = sortKey ? sortData(data) : data;
-  $: (sortKey, sortDirection, (sortedData = sortData(data)));
+  $: {
+    void sortKey;
+    void sortDirection;
+    sortedData = sortData(data);
+  }
 
   // Progressive loading
   const progressive = pageSize ? createProgressiveList({ pageSize }) : null;
   const progressiveCount = progressive?.visibleCount;
   $: if (progressive) progressive.setTotalCount(sortedData.length);
-  $: if (progressive) (sortedData, progressive.reset());
+  $: if (progressive) {
+    void sortedData;
+    progressive.reset();
+  }
   $: displayData = progressiveCount ? sortedData.slice(0, $progressiveCount) : sortedData;
 </script>
 

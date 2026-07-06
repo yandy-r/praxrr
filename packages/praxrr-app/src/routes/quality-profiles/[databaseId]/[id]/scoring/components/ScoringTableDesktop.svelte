@@ -4,8 +4,9 @@
 	import IconCheckbox from '$ui/form/IconCheckbox.svelte';
 	import { Check } from 'lucide-svelte';
 	import { createVirtualList } from '$lib/client/utils/virtualList';
+	import type { CustomFormatScoring } from '$shared/pcd/display.ts';
 
-	export let formats: any[];
+	export let formats: CustomFormatScoring[];
 	export let arrTypes: string[];
 	export let customFormatScores: Record<string, Record<string, number | null>>;
 	export let customFormatEnabled: Record<string, Record<string, boolean>>;

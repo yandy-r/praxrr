@@ -53,7 +53,7 @@ export interface ArrPullStartupJobPayload {
   enqueuedAt?: string;
 }
 
-export interface ArrSyncCleanupOnlyPayload {}
+export type ArrSyncCleanupOnlyPayload = Record<string, never>;
 
 export interface JobPayloadByType {
   'arr.sync': ArrSyncJobPayload;

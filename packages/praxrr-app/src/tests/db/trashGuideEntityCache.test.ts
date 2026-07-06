@@ -23,7 +23,7 @@ Deno.test('hasContentChanged returns false for missing cache rows', () => {
   patchTarget(
     db,
     'queryFirst',
-    ((sql: string, ...params: unknown[]) => {
+    ((_sql: string, ...params: unknown[]) => {
       capturedParams = params;
       return undefined;
     }) as typeof db.queryFirst,
@@ -100,7 +100,7 @@ Deno.test('getByKey normalizes trashId lookup to lowercase', () => {
   patchTarget(
     db,
     'queryFirst',
-    ((sql: string, ...params: unknown[]) => {
+    ((_sql: string, ...params: unknown[]) => {
       capturedParams = params;
       return {
         id: 1,
@@ -145,7 +145,7 @@ Deno.test('getBySourceTypeAndTrashIds normalizes and deduplicates id list', () =
   patchTarget(
     db,
     'query',
-    ((sql: string, ...params: unknown[]) => {
+    ((_sql: string, ...params: unknown[]) => {
       capturedSql = sql;
       capturedParams = params;
       return [

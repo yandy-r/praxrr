@@ -1,4 +1,4 @@
-<script lang="ts" generics="T extends Record<string, any>">
+<script lang="ts" generics="T extends Record<string, unknown>">
   import { onMount, onDestroy } from 'svelte';
   import { ChevronDown, ChevronUp, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-svelte';
   import type { Column, SortState } from './types';
@@ -133,7 +133,10 @@
   const progressive = pageSize ? createProgressiveList({ pageSize }) : null;
   const progressiveCount = progressive?.visibleCount;
   $: if (progressive) progressive.setTotalCount(sortedData.length);
-  $: if (progressive) (sortedData, progressive.reset());
+  $: if (progressive) {
+    void sortedData;
+    progressive.reset();
+  }
   $: displayData = progressiveCount ? sortedData.slice(0, $progressiveCount) : sortedData;
 
   $: visibleColumns = columns.filter((column) => !column.hideOnMobile);

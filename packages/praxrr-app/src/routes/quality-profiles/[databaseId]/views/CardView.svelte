@@ -23,7 +23,10 @@
 
 	const { visibleCount, sentinel, reset, setTotalCount } = createProgressiveList({ pageSize: 30 });
 	$: setTotalCount(profiles.length);
-	$: profiles, reset();
+	$: {
+		void profiles;
+		reset();
+	}
 	$: visibleProfiles = profiles.slice(0, $visibleCount);
 
 	function resolveSource(profile: QualityProfileTableRow): SourceRef | null {

@@ -103,4 +103,4 @@ export interface StartupPullRunSummary extends StartupPullCounters {
   instances: readonly StartupPullInstanceResult[];
 }
 
-export interface StartupPullPayload extends StartupPullRunSummary {}
+export type StartupPullPayload = StartupPullRunSummary;

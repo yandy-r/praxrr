@@ -560,7 +560,7 @@ export interface LidarrMetadataProfile {
   releaseStatuses: LidarrProfileReleaseStatusItem[];
 }
 
-export interface LidarrMetadataProfileGetResponse extends LidarrMetadataProfile {}
+export type LidarrMetadataProfileGetResponse = LidarrMetadataProfile;
 
 export type LidarrMetadataProfileListResponse = ReadonlyArray<LidarrMetadataProfileGetResponse>;
 
@@ -575,7 +575,7 @@ export interface LidarrMetadataProfileUpdatePayload extends LidarrMetadataProfil
   id: number;
 }
 
-export interface LidarrMetadataProfileSchemaResponse extends Omit<LidarrMetadataProfile, 'id'> {}
+export type LidarrMetadataProfileSchemaResponse = Omit<LidarrMetadataProfile, 'id'>;
 
 export interface LidarrMetadataProfileSchema extends LidarrMetadataProfileSchemaResponse {
   id?: number;
