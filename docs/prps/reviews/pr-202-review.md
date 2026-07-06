@@ -30,11 +30,11 @@ None.
 
 ## Validation Results
 
-| Check      | Result |
-| ---------- | ------ |
-| Type check | Pass (`deno task check`) |
-| Lint       | Pass (`git diff --check`) |
-| Tests      | Pass (`deno task test`, 1020 passed) |
+| Check      | Result                                             |
+| ---------- | -------------------------------------------------- |
+| Type check | Pass (`deno task check`)                           |
+| Lint       | Pass (`git diff --check`)                          |
+| Tests      | Pass (`deno task test`, 1020 passed)               |
 | Build      | Skipped (not required for this type-only refactor) |
 
 ## Files Reviewed
