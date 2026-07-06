@@ -89,6 +89,30 @@ export default defineConfig({
           items: [
             { label: 'Overview', link: '/database/' },
             { label: 'Mirror README', link: '/database/readme/' },
+            {
+              label: 'Custom Formats',
+              items: [
+                { label: 'Catalog Overview', link: '/database/custom-formats/' },
+                { label: 'Resolution & Source', link: '/database/custom-formats/resolution-source/' },
+                { label: 'Audio', link: '/database/custom-formats/audio/' },
+                { label: 'Codecs & HDR', link: '/database/custom-formats/codecs-hdr/' },
+                { label: 'Release Groups', link: '/database/custom-formats/release-groups/' },
+                { label: 'Streaming Services', link: '/database/custom-formats/streaming-services/' },
+                { label: 'Editions & Flags', link: '/database/custom-formats/editions-flags/' },
+                { label: 'Language & Anime', link: '/database/custom-formats/language-anime/' },
+                { label: 'Unwanted & Banned', link: '/database/custom-formats/unwanted/' },
+              ],
+            },
+            {
+              label: 'Quality Profiles',
+              items: [
+                { label: 'Overview', link: '/database/quality-profiles/' },
+                { label: 'Video Presets', link: '/database/quality-profiles/presets/' },
+              ],
+            },
+            { label: 'Release & Delay Profiles', link: '/database/release-delay-profiles/' },
+            { label: 'Lidarr Support', link: '/database/lidarr/' },
+            { label: 'Changelog', link: '/database/changelog/' },
           ],
         },
         ...openAPISidebarGroups,
