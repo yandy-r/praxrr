@@ -1,6 +1,6 @@
 # Praxrr Roadmap
 
-Reviewed: 2026-07-05 (updated after docs deploy CI and #195 merged)
+Reviewed: 2026-07-06 (updated after user guides #74 shipped)
 
 Source: open GitHub issues in `yandy-r/praxrr` as of this review.
 
@@ -72,7 +72,7 @@ Goal: make Praxrr understandable enough for users and contributors to run, debug
 
 | Order | Issue                                                                               | Priority | Decision                                                                                               | Done When                                                                                                                    |
 | ----- | ----------------------------------------------------------------------------------- | -------- | ------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------- |
-| 1     | [#74](https://github.com/yandy-r/praxrr/issues/74) User-facing guides and tutorials | Medium   | First content priority after #38 because it improves adoption and support load.                        | Users can install, configure, connect Arr instances, link a PCD, sync, upgrade, and troubleshoot from published docs.        |
+| 1     | [#74](https://github.com/yandy-r/praxrr/issues/74) User-facing guides and tutorials | Medium   | **Done** — Getting Started and Guides pages shipped on docs.praxrr.dev.                                | Users can install, configure, connect Arr instances, link a PCD, sync, upgrade, and troubleshoot from published docs.        |
 | 2     | [#76](https://github.com/yandy-r/praxrr/issues/76) PCD database content docs        | Medium   | Do with or soon after user guides because curated config content is the core value proposition.        | Users can understand available custom formats, quality profiles, release profiles, Lidarr status, and PCD data organization. |
 | 3     | [#73](https://github.com/yandy-r/praxrr/issues/73) PCD schema table reference       | Medium   | Do after docs infrastructure is stable. It is important, but more contributor-facing than #74 and #76. | All 36 PCD tables have reference pages with columns, relationships, constraints, and cross-links.                            |
 | 4     | [#77](https://github.com/yandy-r/praxrr/issues/77) App technical documentation      | Low      | Do after user-facing docs unless contributor onboarding becomes the bottleneck.                        | Job system, sync pipeline, PCD ops, tests, notifications, and startup sequence are documented.                               |
@@ -180,9 +180,9 @@ Goal: reduce operational complexity without distracting from the v2 user journey
 
 ### Architecture Hygiene
 
-| Issue | Priority | Decision | Done When |
-| ------------------------------------------------------------------------------------------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| [#197](https://github.com/yandy-r/praxrr/issues/197) Split `shared/pcd/display.ts` per entity | Low | Opportunistic. Highest-betweenness node (0.127, 185 imports across 30+ communities); set the per-entity module convention before the barrel grows. | `display.ts` is a re-export-only barrel over `display/<entity>.ts`, public `$shared/pcd/display` surface unchanged, `deno task check` green. Trigger: file crosses ~500 lines or next entity family is added. |
+| Issue                                                                                         | Priority | Decision                                                                                                                                           | Done When                                                                                                                                                                                                     |
+| --------------------------------------------------------------------------------------------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [#197](https://github.com/yandy-r/praxrr/issues/197) Split `shared/pcd/display.ts` per entity | Low      | Opportunistic. Highest-betweenness node (0.127, 185 imports across 30+ communities); set the per-entity module convention before the barrel grows. | `display.ts` is a re-export-only barrel over `display/<entity>.ts`, public `$shared/pcd/display` surface unchanged, `deno task check` green. Trigger: file crosses ~500 lines or next entity family is added. |
 
 ## Deferred
 
