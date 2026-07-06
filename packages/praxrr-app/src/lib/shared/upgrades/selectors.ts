@@ -3,7 +3,15 @@
  * Defines all available selectors for upgrade item selection
  */
 
-export interface Selector<T = unknown> {
+export interface SelectableItem {
+  id?: string | number;
+  title?: string;
+  dateAdded?: string;
+  score?: number;
+  popularity?: number;
+}
+
+export interface Selector<T extends SelectableItem = SelectableItem> {
   id: string;
   label: string;
   description: string;
@@ -81,8 +89,8 @@ export const selectors: Selector[] = [
 /**
  * Get a selector by ID
  */
-export function getSelector(id: string): Selector | undefined {
-  return selectors.find((s) => s.id === id);
+export function getSelector<T extends SelectableItem = SelectableItem>(id: string): Selector<T> | undefined {
+  return selectors.find((s) => s.id === id) as Selector<T> | undefined;
 }
 
 /**

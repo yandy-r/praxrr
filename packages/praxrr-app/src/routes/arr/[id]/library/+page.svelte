@@ -678,7 +678,7 @@
     }
   }
 
-  function applyFilters<T extends Record<string, unknown>>(items: T[]): T[] {
+  function applyFilters<T extends object>(items: T[]): T[] {
     if (activeFilters.length === 0) return items;
 
     const filtersByField = new Map<FilterField, ActiveFilter[]>();
@@ -690,7 +690,7 @@
 
     return items.filter((item) => {
       return [...filtersByField.entries()].every(([field, filters]) => {
-        const itemValue = item[field];
+				const itemValue = (item as Record<string, unknown>)[field];
         return filters.some((filter) => {
           if (filter.operator === 'eq') return itemValue === filter.value;
           if (filter.operator === 'neq') return itemValue !== filter.value;

@@ -11,11 +11,11 @@ import type {
   QualityProfileFormatItem,
 } from '$arr/types.ts';
 import {
-  type SyncArrType,
-  type QualityDefinition,
   getAllQualities,
   getLanguageForProfile,
   mapQualityName,
+  type QualityDefinition,
+  type SyncArrType,
 } from '../mappings.ts';
 
 // =============================================================================
@@ -312,6 +312,8 @@ export async function fetchQualityProfileFromPcd(
     .executeTakeFirst();
 
   if (!profile) return null;
+
+  const allQualities = await db.selectFrom('qualities').select(['id', 'name']).execute();
 
   // Get quality groups for this profile
   const groups = await db
