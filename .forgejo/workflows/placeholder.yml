@@ -1,0 +1,12 @@
+# Forgejo reads .forgejo/workflows only (not .github/workflows) when this directory exists.
+# GitHub CI stays in .github/workflows/. Replace this file when adding real Forgejo workflows.
+name: Forgejo placeholder
+
+on:
+  workflow_dispatch:
+
+jobs:
+  noop:
+    runs-on: docker
+    steps:
+      - run: echo 'Placeholder; GitHub CI is in .github/workflows/'
