@@ -10,6 +10,7 @@
     "sync:external-docs": "node scripts/import-external-docs.mjs"
   },
   "dependencies": {
+    "astro-mermaid": "^2.1.0",
     "@astrojs/starlight": "^0.41.3",
     "@astrojs/svelte": "^9.0.1",
     "@tailwindcss/vite": "^4.3.2",

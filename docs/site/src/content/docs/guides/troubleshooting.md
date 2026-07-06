@@ -123,6 +123,10 @@ Sync and editing still work without the parser.
 ## Getting more help
 
 - [Architecture Overview](/app/architecture/) — module boundaries
+- [Startup Sequence](/app/startup/) — init order and fail-fast steps
+- [Sync Pipeline](/app/sync-pipeline/) — preview vs execution internals
+- [PCD System](/app/pcd-system/) — ops compiler and value guards
+- [Job System](/app/jobs/) — background queue and dispatcher
 - [Configuration](./configuration/) — environment reference
 - [GitHub issues](https://github.com/yandy-r/praxrr/issues) — bug reports
 
