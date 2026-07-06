@@ -1,6 +1,6 @@
 # Praxrr Roadmap
 
-Reviewed: 2026-07-06 (updated after PCD schema table reference #73 shipped)
+Reviewed: 2026-07-06 (updated after app technical documentation #77 shipped)
 
 Source: open GitHub issues in `yandy-r/praxrr` as of this review.
 
@@ -32,7 +32,7 @@ are still respected, but they are not the only sorting rule.
 
 The best next order is:
 
-1. Finish remaining documentation content (#77/#75 as needed).
+1. Finish remaining documentation content (#75 as needed).
 2. Build onboarding and transparency features.
 3. Build configuration lifecycle safety.
 4. Add advanced automation, trust, and integration features.
@@ -48,26 +48,27 @@ The open roadmap should not restart those completed issues.
 
 Merged work since the Score Simulator and TRaSH Guide Sync foundations landed.
 
-| Date       | PR / commit                                        | Summary                                                                                                                                 | Closes / relates                                     |
-| ---------- | -------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
-| 2026-07-06 | [#200](https://github.com/yandy-r/praxrr/pull/200) | PCD schema per-table reference: 42 table pages with columns, relationships, constraints, and cross-links                                | [#73](https://github.com/yandy-r/praxrr/issues/73)   |
-| 2026-07-06 | [#199](https://github.com/yandy-r/praxrr/pull/199) | PCD database content docs: 253 custom formats, quality profile presets, release/delay profiles, Lidarr guide, changelog, sidebar wiring | [#76](https://github.com/yandy-r/praxrr/issues/76)   |
-| 2026-07-06 | [#198](https://github.com/yandy-r/praxrr/pull/198) | User-facing Getting Started and Guides (10 pages): install, configure, sync, upgrade, troubleshooting                                   | [#74](https://github.com/yandy-r/praxrr/issues/74)   |
-| 2026-07-05 | `bf50467e`, `0f324ddd`, `56b359a9`                 | Docs deploy CI: Workers Assets deployment, wrangler config loading, and deploy trigger                                                  | [#38](https://github.com/yandy-r/praxrr/issues/38)   |
-| 2026-07-05 | [#195](https://github.com/yandy-r/praxrr/pull/195) | Reject NUL bytes in TRaSH metadata paths with typed `TrashGuideFetcherError`                                                            | [#194](https://github.com/yandy-r/praxrr/issues/194) |
-| 2026-07-05 | [#196](https://github.com/yandy-r/praxrr/pull/196) | Astro Starlight documentation site with OpenAPI generation, mirror-doc imports, docs CI, Cloudflare Pages wiring, and dispatches        | [#38](https://github.com/yandy-r/praxrr/issues/38)   |
-| 2026-07-05 | [#193](https://github.com/yandy-r/praxrr/pull/193) | Test coverage for 8 TRaSH modules (~137 tests): fetcher, sync job, manager, sources route, transformers, parser, trash-id mappings      | [#125](https://github.com/yandy-r/praxrr/issues/125) |
-| 2026-07-05 | [#191](https://github.com/yandy-r/praxrr/pull/191) | Type design hardening: narrow `arr_type`, consolidate parse helpers, boolean `enabled`/`auto_pull` at query boundary                    | [#126](https://github.com/yandy-r/praxrr/issues/126) |
-| 2026-07-05 | [#192](https://github.com/yandy-r/praxrr/pull/192) | Fix pre-existing CI failures: lint-docs, lint-shell, autofix workflow                                                                   | Relates to #126                                      |
-| 2026-07-05 | `177451b3`                                         | Shared lint/format tooling (`scripts/style.sh`) with CI workflows                                                                       | —                                                    |
-| 2026-07-05 | `6c9f75c0`                                         | Remove Claude review workflows                                                                                                          | —                                                    |
-| 2026-07-05 | `e5b4e260`                                         | Add project roadmap                                                                                                                     | —                                                    |
-| 2026-07-05 | `2bb21043`                                         | Version management script and UI version display fix                                                                                    | —                                                    |
-| 2026-03-08 | [#190](https://github.com/yandy-r/praxrr/pull/190) | Score Simulator phase 3                                                                                                                 | Score Simulator                                      |
-| 2026-03-06 | [#184](https://github.com/yandy-r/praxrr/pull/184) | Score Simulator phase 2: batch input, profile comparison, ranking table                                                                 | Score Simulator                                      |
-| 2026-03-05 | [#176](https://github.com/yandy-r/praxrr/pull/176) | Score Simulator phase 1                                                                                                                 | #171–#175                                            |
-| 2026-03-04 | [#170](https://github.com/yandy-r/praxrr/pull/170) | Progressive Disclosure rollout across form and settings pages                                                                           | Progressive Disclosure                               |
-| 2026-03-02 | [#164](https://github.com/yandy-r/praxrr/pull/164) | Persist advanced section visibility preferences                                                                                         | Progressive Disclosure                               |
+| Date       | PR / commit                                        | Summary                                                                                                                                     | Closes / relates                                     |
+| ---------- | -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
+| 2026-07-06 | [#201](https://github.com/yandy-r/praxrr/pull/201) | App technical documentation: 8 contributor pages (architecture, startup, development, PCD, jobs, sync, notifications, testing) with Mermaid | [#77](https://github.com/yandy-r/praxrr/issues/77)   |
+| 2026-07-06 | [#200](https://github.com/yandy-r/praxrr/pull/200) | PCD schema per-table reference: 42 table pages with columns, relationships, constraints, and cross-links                                    | [#73](https://github.com/yandy-r/praxrr/issues/73)   |
+| 2026-07-06 | [#199](https://github.com/yandy-r/praxrr/pull/199) | PCD database content docs: 253 custom formats, quality profile presets, release/delay profiles, Lidarr guide, changelog, sidebar wiring     | [#76](https://github.com/yandy-r/praxrr/issues/76)   |
+| 2026-07-06 | [#198](https://github.com/yandy-r/praxrr/pull/198) | User-facing Getting Started and Guides (10 pages): install, configure, sync, upgrade, troubleshooting                                       | [#74](https://github.com/yandy-r/praxrr/issues/74)   |
+| 2026-07-05 | `bf50467e`, `0f324ddd`, `56b359a9`                 | Docs deploy CI: Workers Assets deployment, wrangler config loading, and deploy trigger                                                      | [#38](https://github.com/yandy-r/praxrr/issues/38)   |
+| 2026-07-05 | [#195](https://github.com/yandy-r/praxrr/pull/195) | Reject NUL bytes in TRaSH metadata paths with typed `TrashGuideFetcherError`                                                                | [#194](https://github.com/yandy-r/praxrr/issues/194) |
+| 2026-07-05 | [#196](https://github.com/yandy-r/praxrr/pull/196) | Astro Starlight documentation site with OpenAPI generation, mirror-doc imports, docs CI, Cloudflare Pages wiring, and dispatches            | [#38](https://github.com/yandy-r/praxrr/issues/38)   |
+| 2026-07-05 | [#193](https://github.com/yandy-r/praxrr/pull/193) | Test coverage for 8 TRaSH modules (~137 tests): fetcher, sync job, manager, sources route, transformers, parser, trash-id mappings          | [#125](https://github.com/yandy-r/praxrr/issues/125) |
+| 2026-07-05 | [#191](https://github.com/yandy-r/praxrr/pull/191) | Type design hardening: narrow `arr_type`, consolidate parse helpers, boolean `enabled`/`auto_pull` at query boundary                        | [#126](https://github.com/yandy-r/praxrr/issues/126) |
+| 2026-07-05 | [#192](https://github.com/yandy-r/praxrr/pull/192) | Fix pre-existing CI failures: lint-docs, lint-shell, autofix workflow                                                                       | Relates to #126                                      |
+| 2026-07-05 | `177451b3`                                         | Shared lint/format tooling (`scripts/style.sh`) with CI workflows                                                                           | —                                                    |
+| 2026-07-05 | `6c9f75c0`                                         | Remove Claude review workflows                                                                                                              | —                                                    |
+| 2026-07-05 | `e5b4e260`                                         | Add project roadmap                                                                                                                         | —                                                    |
+| 2026-07-05 | `2bb21043`                                         | Version management script and UI version display fix                                                                                        | —                                                    |
+| 2026-03-08 | [#190](https://github.com/yandy-r/praxrr/pull/190) | Score Simulator phase 3                                                                                                                     | Score Simulator                                      |
+| 2026-03-06 | [#184](https://github.com/yandy-r/praxrr/pull/184) | Score Simulator phase 2: batch input, profile comparison, ranking table                                                                     | Score Simulator                                      |
+| 2026-03-05 | [#176](https://github.com/yandy-r/praxrr/pull/176) | Score Simulator phase 1                                                                                                                     | #171–#175                                            |
+| 2026-03-04 | [#170](https://github.com/yandy-r/praxrr/pull/170) | Progressive Disclosure rollout across form and settings pages                                                                               | Progressive Disclosure                               |
+| 2026-03-02 | [#164](https://github.com/yandy-r/praxrr/pull/164) | Persist advanced section visibility preferences                                                                                             | Progressive Disclosure                               |
 
 ## P0 - Current Focus: Documentation Foundation
 
@@ -78,14 +79,14 @@ Goal: make Praxrr understandable enough for users and contributors to run, debug
 | 1     | [#74](https://github.com/yandy-r/praxrr/issues/74) User-facing guides and tutorials | Medium   | **Done** — Getting Started and Guides pages shipped on docs.praxrr.dev.                                                                               | Users can install, configure, connect Arr instances, link a PCD, sync, upgrade, and troubleshoot from published docs.        |
 | 2     | [#76](https://github.com/yandy-r/praxrr/issues/76) PCD database content docs        | Medium   | **Done** — Custom formats catalog (253 CFs), quality profile presets, release/delay profiles, Lidarr guide, and changelog shipped on docs.praxrr.dev. | Users can understand available custom formats, quality profiles, release profiles, Lidarr status, and PCD data organization. |
 | 3     | [#73](https://github.com/yandy-r/praxrr/issues/73) PCD schema table reference       | Medium   | **Done** — Per-table schema reference for all 42 PCD tables shipped on docs.praxrr.dev ([#200](https://github.com/yandy-r/praxrr/pull/200)).          | All 42 PCD tables have reference pages with columns, relationships, constraints, and cross-links.                            |
-| 4     | [#77](https://github.com/yandy-r/praxrr/issues/77) App technical documentation      | Low      | Do after user-facing docs unless contributor onboarding becomes the bottleneck.                                                                       | Job system, sync pipeline, PCD ops, tests, notifications, and startup sequence are documented.                               |
+| 4     | [#77](https://github.com/yandy-r/praxrr/issues/77) App technical documentation      | Low      | **Done** — Eight contributor pages shipped on docs.praxrr.dev ([#201](https://github.com/yandy-r/praxrr/pull/201)).                                   | Job system, sync pipeline, PCD ops, tests, notifications, and startup sequence are documented.                               |
 | 5     | [#75](https://github.com/yandy-r/praxrr/issues/75) UI component library reference   | Low      | Do when UI contribution velocity needs it.                                                                                                            | Reusable `$ui` components, alert patterns, dirty tracking, and Tailwind conventions are documented.                          |
 
 Notes:
 
 - #38 shipped the dependency gate and docs deploy CI is wired for Workers Assets. Keep follow-up content
   work inside the settled docs site shape.
-- #74, #76, and #73 shipped user-facing, curated-content, and schema reference docs respectively.
+- #74, #76, #73, and #77 shipped user-facing, curated-content, schema reference, and app technical docs respectively.
 
 ## Completed: TRaSH Guide Sync Stabilization
 
@@ -206,6 +207,7 @@ Use this checklist when planning a sprint or milestone.
 
 ### Completed (2026-07-06)
 
+- [x] #77 - App technical docs ([#201](https://github.com/yandy-r/praxrr/pull/201))
 - [x] #73 - PCD schema table reference ([#200](https://github.com/yandy-r/praxrr/pull/200))
 - [x] #74 - User-facing guides ([#198](https://github.com/yandy-r/praxrr/pull/198))
 - [x] #76 - PCD database content docs ([#199](https://github.com/yandy-r/praxrr/pull/199))
@@ -220,7 +222,6 @@ Use this checklist when planning a sprint or milestone.
 
 ### Current Focus
 
-- [ ] #77 - App technical docs
 - [ ] #75 - UI component reference
 
 ### Onboarding and Transparency
@@ -276,9 +277,8 @@ Continue the documentation content sprint:
 
 1. Update #6 so the parent research checklist points to this roadmap and no longer implies closed
    Phase 1 items are still active.
-2. Schedule #77 app technical docs or #75 UI component reference when contributor onboarding becomes
-   the bottleneck.
+2. Schedule #75 UI component reference when contributor onboarding becomes the bottleneck.
 
 Docs infrastructure (#38), user guides (#74), PCD database content (#76), PCD schema table reference
-(#73), deploy CI, and TRaSH Guide Sync stabilization (#125, #126, #194) are complete. The next
-milestone is app and UI contributor docs (#77/#75) as needed.
+(#73), app technical docs (#77), deploy CI, and TRaSH Guide Sync stabilization (#125, #126, #194) are
+complete. The next documentation milestone is the UI component reference (#75) as needed.
