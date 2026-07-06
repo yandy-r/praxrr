@@ -1,4 +1,4 @@
-<script lang="ts" generics="T extends Record<string, unknown>">
+<script lang="ts" generics="T extends object">
   import { onMount, onDestroy } from 'svelte';
   import { ChevronDown, ChevronUp, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-svelte';
   import type { Column, SortState } from './types';

@@ -183,9 +183,9 @@ Goal: reduce operational complexity without distracting from the v2 user journey
 
 ### Architecture Hygiene
 
-| Issue                                                                                         | Priority | Decision                                                                                                                                           | Done When                                                                                                                                                                                                     |
-| --------------------------------------------------------------------------------------------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [#197](https://github.com/yandy-r/praxrr/issues/197) Split `shared/pcd/display.ts` per entity | Low      | Opportunistic. Highest-betweenness node (0.127, 185 imports across 30+ communities); set the per-entity module convention before the barrel grows. | `display.ts` is a re-export-only barrel over `display/<entity>.ts`, public `$shared/pcd/display` surface unchanged, `deno task check` green. Trigger: file crosses ~500 lines or next entity family is added. |
+| Issue | Priority | Decision                                          | Done When |
+| ----- | -------- | ------------------------------------------------- | --------- |
+| —     | —        | No active architecture hygiene maintenance items. | —         |
 
 ## Deferred
 
@@ -207,6 +207,7 @@ Use this checklist when planning a sprint or milestone.
 
 ### Completed (2026-07-06)
 
+- [x] #197 - PCD display type split ([#202](https://github.com/yandy-r/praxrr/pull/202))
 - [x] #77 - App technical docs ([#201](https://github.com/yandy-r/praxrr/pull/201))
 - [x] #73 - PCD schema table reference ([#200](https://github.com/yandy-r/praxrr/pull/200))
 - [x] #74 - User-facing guides ([#198](https://github.com/yandy-r/praxrr/pull/198))
@@ -259,7 +260,6 @@ Use this checklist when planning a sprint or milestone.
 - [ ] #4 - Go HTTP orchestration
 - [ ] #5 - Go parser integration and cutover
 - [ ] #6 - Research feature tracking cleanup
-- [ ] #197 - Split `shared/pcd/display.ts` into per-entity re-exported modules
 
 ### Deferred Watchlist
 

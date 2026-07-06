@@ -79,12 +79,12 @@
     const enabled: Record<string, Record<string, boolean>> = {};
 
     scoring.customFormats.forEach((cf: CustomFormatScoring) => {
-      scores[cf.name] = { ...cf.scores };
-      enabled[cf.name] = {};
-      scoring.arrTypes.forEach((arrType: string) => {
-        enabled[cf.name][arrType] = cf.scores[arrType] !== null;
-      });
-    });
+			scores[cf.name] = { ...cf.scores };
+			enabled[cf.name] = {};
+			scoring.arrTypes.forEach((arrType: string) => {
+				enabled[cf.name][arrType] = scores[cf.name][arrType] !== null;
+			});
+		});
 
     return {
       minimumScore: scoring.minimum_custom_format_score,

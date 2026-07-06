@@ -5,19 +5,19 @@
 
 import type { RadarrClient } from '$lib/server/utils/arr/clients/radarr.ts';
 import type { ArrInstance } from '$lib/server/db/queries/arrInstances.ts';
-import type { UpgradeConfig, FilterConfig } from '$shared/upgrades/filters.ts';
+import type { FilterConfig, UpgradeConfig } from '$shared/upgrades/filters.ts';
 import { evaluateGroup } from '$shared/upgrades/filters.ts';
 import { getSelector } from '$shared/upgrades/selectors.ts';
 import type { UpgradeItem, UpgradeJobLog, UpgradeSelectionItem } from './types.ts';
 import { normalizeRadarrItems } from './normalize.ts';
 import {
+  applyFilterTagToMovies,
   filterByFilterTag,
   getFilterTagLabel,
-  applyFilterTagToMovies,
   isFilterExhausted,
   resetFilterCooldown,
 } from './cooldown.ts';
-import { logUpgradeRun, logUpgradeError, logUpgradeSkipped } from './logger.ts';
+import { logUpgradeError, logUpgradeRun, logUpgradeSkipped } from './logger.ts';
 import { notifications } from '$lib/server/notifications/definitions/index.ts';
 import { notificationServicesQueries } from '$lib/server/db/queries/notificationServices.ts';
 import { getArrInstanceClient } from '$arr/arrInstanceClients.ts';
@@ -244,7 +244,7 @@ export async function processUpgradeConfig(
     }
 
     // Step 5: Apply selector
-    const selector = getSelector(filter.selector);
+    const selector = getSelector<UpgradeItem>(filter.selector);
     const selectedItems: UpgradeItem[] = selector
       ? selector.select(availableItems, filter.count)
       : availableItems.slice(0, filter.count);

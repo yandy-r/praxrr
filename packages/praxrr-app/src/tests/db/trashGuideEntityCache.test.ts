@@ -145,7 +145,7 @@ Deno.test('getBySourceTypeAndTrashIds normalizes and deduplicates id list', () =
   patchTarget(
     db,
     'query',
-    ((_sql: string, ...params: unknown[]) => {
+    ((sql: string, ...params: unknown[]) => {
       capturedSql = sql;
       capturedParams = params;
       return [

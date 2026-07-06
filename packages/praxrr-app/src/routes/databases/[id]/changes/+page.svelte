@@ -51,6 +51,28 @@
 		gitIdentity?: { name: string; email: string };
 	};
 
+	type ActionResult = {
+		type?: 'success' | 'redirect' | 'failure' | 'error';
+		success?: boolean;
+		error?: string;
+		preview?: ExportPreview;
+		dropped?: number;
+		alreadyRunning?: boolean;
+		queued?: boolean;
+		job?: { id?: string | number };
+		data?: {
+			success?: boolean;
+			error?: string;
+			preview?: ExportPreview;
+			dropped?: number;
+			fileCount?: number;
+			filename?: string;
+			alreadyRunning?: boolean;
+			queued?: boolean;
+			job?: { id?: string | number };
+		};
+	};
+
 	let loading = true;
 	let pulling = false;
 	let status: GitStatus | null = null;
@@ -124,14 +146,14 @@
 		fetchChanges();
 	});
 
-	async function parseActionResult(response: Response): Promise<unknown> {
+	async function parseActionResult(response: Response): Promise<ActionResult | null> {
 		const text = await response.text();
 		if (!text) return null;
 		try {
-			return deserialize(text);
+			return deserialize(text) as ActionResult;
 		} catch {
 			try {
-				return JSON.parse(text);
+				return JSON.parse(text) as ActionResult;
 			} catch {
 				return null;
 			}
@@ -525,11 +547,11 @@
 
 			const result = await parseActionResult(response);
 			const isSuccess =
-				result.type === 'success' || result.type === 'redirect' || result.data?.success;
-			const errorMsg = result.data?.error || result.error;
-			const alreadyRunning = result.data?.alreadyRunning || result.alreadyRunning;
-			const queued = result.data?.queued || result.queued;
-			const queuedJobId = result.data?.job?.id ?? result.job?.id;
+				result?.type === 'success' || result?.type === 'redirect' || result?.data?.success;
+			const errorMsg = result?.data?.error || result?.error;
+			const alreadyRunning = result?.data?.alreadyRunning || result?.alreadyRunning;
+			const queued = result?.data?.queued || result?.queued;
+			const queuedJobId = result?.data?.job?.id ?? result?.job?.id;
 
 			if (isSuccess && !errorMsg) {
 				if (alreadyRunning) {
