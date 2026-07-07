@@ -1,11 +1,15 @@
 <script lang="ts">
   import { browser } from '$app/environment';
+  import { AlertTriangle } from 'lucide-svelte';
   import type { components } from '$api/v1.d.ts';
   import JsonView from '$ui/meta/JsonView.svelte';
+  import Badge from '$ui/badge/Badge.svelte';
 
   type ResolvedEntityType = components['schemas']['ResolvedEntityState']['entityType'];
   type ArrAppType = components['schemas']['ResolvedInstanceState']['arrType'];
   type ResolvedEntityState = components['schemas']['ResolvedEntityState'];
+  type FieldChange = components['schemas']['FieldChange'];
+  type FieldChangeType = components['schemas']['SyncPreviewFieldChangeType'];
   type ErrorResponse = components['schemas']['ErrorResponse'];
   type Layer = 'resolved' | 'base' | 'user';
 
@@ -14,7 +18,19 @@
   export let arrType: ArrAppType | undefined = undefined;
   export let entityName: string | null;
 
-  const activeLayer: Layer = 'resolved';
+  const LAYER_OPTIONS: { id: Layer; label: string }[] = [
+    { id: 'resolved', label: 'Resolved' },
+    { id: 'base', label: 'Base' },
+    { id: 'user', label: 'User Overrides' },
+  ];
+
+  const FIELD_META: Record<FieldChangeType, { glyph: string; label: string; textClass: string }> = {
+    added: { glyph: '+', label: 'Added', textClass: 'text-emerald-700 dark:text-emerald-300' },
+    changed: { glyph: '~', label: 'Changed', textClass: 'text-amber-700 dark:text-amber-300' },
+    removed: { glyph: '-', label: 'Removed', textClass: 'text-red-700 dark:text-red-300' },
+  };
+
+  let activeLayer: Layer = 'resolved';
 
   let loading = false;
   let error: string | null = null;
@@ -72,7 +88,13 @@
     }
   }
 
+  function selectLayer(layer: Layer) {
+    if (loading || layer === activeLayer) return;
+    activeLayer = layer;
+  }
+
   $: fields = state?.entity ? Object.entries(state.entity) : [];
+  $: overrides = (state?.overrides ?? []) as FieldChange[];
 
   function formatValue(value: unknown): string {
     if (value === null || value === undefined) return '—';
@@ -85,47 +107,40 @@
   function isComplex(value: unknown): boolean {
     return typeof value === 'object' && value !== null;
   }
+
+  function formatFieldValue(value: unknown): string {
+    if (value === undefined) return 'undefined';
+    if (value === null) return 'null';
+    if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+      return String(value);
+    }
+    return JSON.stringify(value, null, 2);
+  }
 </script>
 
 <div class="space-y-4">
-  <!--
-    Layer segmented control: Resolved | Base | User overrides. Base/User are disabled
-    until Task 4.1 wires `layer=base|user` fetches into this panel.
-  -->
+  <!-- Layer segmented control: Resolved | Base | User overrides. -->
   <div
     class="inline-flex overflow-hidden rounded-lg border border-neutral-300 dark:border-neutral-700"
     role="tablist"
     aria-label="Resolved config layer"
   >
-    <button
-      type="button"
-      role="tab"
-      aria-selected={activeLayer === 'resolved'}
-      class="bg-accent-600 px-3 py-1.5 text-sm font-medium text-white"
-    >
-      Resolved
-    </button>
-    <!-- TODO(Task 4.1): enable Base/User segments via layer=base|user fetches. -->
-    <button
-      type="button"
-      role="tab"
-      aria-selected={false}
-      disabled
-      title="wired in a later task"
-      class="cursor-not-allowed border-l border-neutral-300 px-3 py-1.5 text-sm font-medium text-neutral-400 dark:border-neutral-700 dark:text-neutral-600"
-    >
-      Base
-    </button>
-    <button
-      type="button"
-      role="tab"
-      aria-selected={false}
-      disabled
-      title="wired in a later task"
-      class="cursor-not-allowed border-l border-neutral-300 px-3 py-1.5 text-sm font-medium text-neutral-400 dark:border-neutral-700 dark:text-neutral-600"
-    >
-      User Overrides
-    </button>
+    {#each LAYER_OPTIONS as layerOption, index (layerOption.id)}
+      <button
+        type="button"
+        role="tab"
+        aria-selected={activeLayer === layerOption.id}
+        disabled={loading}
+        class="px-3 py-1.5 text-sm font-medium transition-colors {index > 0
+          ? 'border-l border-neutral-300 dark:border-neutral-700'
+          : ''} {activeLayer === layerOption.id
+          ? 'bg-accent-600 text-white'
+          : 'text-neutral-600 hover:bg-neutral-100 disabled:cursor-not-allowed disabled:opacity-60 dark:text-neutral-300 dark:hover:bg-neutral-800'}"
+        on:click={() => selectLayer(layerOption.id)}
+      >
+        {layerOption.label}
+      </button>
+    {/each}
   </div>
 
   {#if entityName === null}
@@ -146,50 +161,119 @@
     >
       {error}
     </div>
-  {:else if state && !state.present}
-    <div
-      class="rounded-lg border border-dashed border-neutral-300 p-6 text-center text-sm text-neutral-500 dark:border-neutral-700 dark:text-neutral-400"
-    >
-      This entity does not exist in the resolved state.
-    </div>
   {:else if state}
-    <div class="overflow-hidden rounded-lg border border-neutral-200 dark:border-neutral-800">
-      <table class="w-full text-sm">
-        <thead class="bg-neutral-50 dark:bg-neutral-900">
-          <tr class="text-left text-xs font-medium tracking-wide text-neutral-500 uppercase dark:text-neutral-400">
-            <th class="px-4 py-2">Field</th>
-            <th class="px-4 py-2">Value</th>
-          </tr>
-        </thead>
-        <tbody>
-          {#each fields as [key, value] (key)}
-            <tr class="border-t border-neutral-200 dark:border-neutral-800">
-              <td class="px-4 py-2 font-mono text-xs text-neutral-500 dark:text-neutral-400">{key}</td>
-              <td class="px-4 py-2 text-neutral-900 dark:text-neutral-100">
-                {#if isComplex(value)}
-                  <span class="text-neutral-500 italic dark:text-neutral-400">{formatValue(value)}</span>
-                {:else}
-                  {formatValue(value)}
-                {/if}
-              </td>
-            </tr>
-          {/each}
-        </tbody>
-      </table>
-    </div>
-
-    <button
-      type="button"
-      class="text-xs font-medium text-accent-600 hover:underline dark:text-accent-500"
-      on:click={() => (showRaw = !showRaw)}
-    >
-      {showRaw ? 'Hide' : 'Show'} raw JSON
-    </button>
-
-    {#if showRaw}
-      <div class="rounded-lg border border-neutral-200 bg-neutral-50 p-4 dark:border-neutral-800 dark:bg-neutral-900">
-        <JsonView data={state.entity} />
+    {#if state.hasPendingConflict}
+      <div
+        class="flex flex-wrap items-center gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-900/60 dark:bg-amber-900/20 dark:text-amber-200"
+      >
+        <Badge variant="warning" icon={AlertTriangle}>Pending value-guard conflict</Badge>
+        <span>
+          A value-guard conflict is pending for this entity — the resolved value shown here is not unambiguous.
+          <a href={`/databases/${databaseId}/conflicts`} class="font-medium underline hover:no-underline">
+            Review conflicts
+          </a>
+        </span>
       </div>
+    {/if}
+
+    {#if activeLayer === 'user'}
+      {#if overrides.length === 0}
+        <div
+          class="rounded-lg border border-dashed border-neutral-300 p-6 text-center text-sm text-neutral-500 dark:border-neutral-700 dark:text-neutral-400"
+        >
+          No user overrides — resolved state matches base.
+        </div>
+      {:else}
+        <div class="overflow-hidden rounded-lg border border-neutral-200 dark:border-neutral-800">
+          <table class="w-full text-sm">
+            <thead class="bg-neutral-50 dark:bg-neutral-900">
+              <tr class="text-left text-xs font-medium tracking-wide text-neutral-500 uppercase dark:text-neutral-400">
+                <th class="px-4 py-2">Field</th>
+                <th class="px-4 py-2">Change</th>
+                <th class="px-4 py-2">Base value</th>
+                <th class="px-4 py-2">Resolved value</th>
+              </tr>
+            </thead>
+            <tbody>
+              {#each overrides as fieldChange (fieldChange.field)}
+                {@const fieldMeta = FIELD_META[fieldChange.type]}
+                <tr class="border-t border-neutral-200 dark:border-neutral-800">
+                  <td class="px-4 py-2 font-mono text-xs text-neutral-500 dark:text-neutral-400">
+                    {fieldChange.field}
+                  </td>
+                  <td class="px-4 py-2 align-top">
+                    <span
+                      class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold {fieldMeta.textClass}"
+                    >
+                      <span aria-hidden="true">{fieldMeta.glyph}</span>
+                      {fieldMeta.label}
+                    </span>
+                  </td>
+                  <td class="px-4 py-2 align-top">
+                    <pre
+                      class="max-w-xs overflow-x-auto rounded border border-neutral-200 bg-neutral-50 p-2 text-xs whitespace-pre-wrap text-neutral-700 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-200">{formatFieldValue(
+                        fieldChange.current
+                      )}</pre>
+                  </td>
+                  <td class="px-4 py-2 align-top">
+                    <pre
+                      class="max-w-xs overflow-x-auto rounded border border-neutral-200 bg-neutral-50 p-2 text-xs whitespace-pre-wrap text-neutral-700 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-200">{formatFieldValue(
+                        fieldChange.desired
+                      )}</pre>
+                  </td>
+                </tr>
+              {/each}
+            </tbody>
+          </table>
+        </div>
+      {/if}
+    {:else if !state.present}
+      <div
+        class="rounded-lg border border-dashed border-neutral-300 p-6 text-center text-sm text-neutral-500 dark:border-neutral-700 dark:text-neutral-400"
+      >
+        {activeLayer === 'base'
+          ? 'Does not exist in base — created by user ops.'
+          : 'This entity does not exist in the resolved state.'}
+      </div>
+    {:else}
+      <div class="overflow-hidden rounded-lg border border-neutral-200 dark:border-neutral-800">
+        <table class="w-full text-sm">
+          <thead class="bg-neutral-50 dark:bg-neutral-900">
+            <tr class="text-left text-xs font-medium tracking-wide text-neutral-500 uppercase dark:text-neutral-400">
+              <th class="px-4 py-2">Field</th>
+              <th class="px-4 py-2">Value</th>
+            </tr>
+          </thead>
+          <tbody>
+            {#each fields as [key, value] (key)}
+              <tr class="border-t border-neutral-200 dark:border-neutral-800">
+                <td class="px-4 py-2 font-mono text-xs text-neutral-500 dark:text-neutral-400">{key}</td>
+                <td class="px-4 py-2 text-neutral-900 dark:text-neutral-100">
+                  {#if isComplex(value)}
+                    <span class="text-neutral-500 italic dark:text-neutral-400">{formatValue(value)}</span>
+                  {:else}
+                    {formatValue(value)}
+                  {/if}
+                </td>
+              </tr>
+            {/each}
+          </tbody>
+        </table>
+      </div>
+
+      <button
+        type="button"
+        class="text-xs font-medium text-accent-600 hover:underline dark:text-accent-500"
+        on:click={() => (showRaw = !showRaw)}
+      >
+        {showRaw ? 'Hide' : 'Show'} raw JSON
+      </button>
+
+      {#if showRaw}
+        <div class="rounded-lg border border-neutral-200 bg-neutral-50 p-4 dark:border-neutral-800 dark:bg-neutral-900">
+          <JsonView data={state.entity} />
+        </div>
+      {/if}
     {/if}
   {/if}
 </div>

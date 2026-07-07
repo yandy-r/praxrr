@@ -12,18 +12,32 @@ import { PCDCache } from '$pcd/index.ts';
 import { setCache, deleteCache } from '$pcd/database/registry.ts';
 import { GET as GET_LIST } from '../../routes/api/v1/pcd/[databaseId]/resolved/[entityType]/+server.ts';
 import { GET as GET_NAMED } from '../../routes/api/v1/pcd/[databaseId]/resolved/[entityType]/[name]/+server.ts';
+import {
+  _liveDiffDependencies,
+  GET as GET_DIFF,
+} from '../../routes/api/v1/pcd/[databaseId]/resolved/[entityType]/[name]/diff/+server.ts';
 import type { components } from '$api/v1.d.ts';
 import { databaseInstancesQueries } from '$db/queries/databaseInstances.ts';
 import type { DatabaseInstance } from '$db/queries/databaseInstances.ts';
+import { arrInstancesQueries } from '$db/queries/arrInstances.ts';
+import type { ArrInstance } from '$db/queries/arrInstances.ts';
 import { pcdOpsQueries } from '$db/queries/pcdOps.ts';
 import type { PcdOp, UpdatePcdOpInput } from '$db/queries/pcdOps.ts';
 import { pcdOpHistoryQueries } from '$db/queries/pcdOpHistory.ts';
 import type { CreatePcdOpHistoryInput, PcdOpHistory, PcdOpHistoryWithOp } from '$db/queries/pcdOpHistory.ts';
+import {
+  PREVIEW_CREATE_RATE_LIMIT_MAX_REQUESTS,
+  registerPreviewCreateAttempt,
+  resetPreviewCreateRateLimitForTests,
+} from '$sync/preview/limits.ts';
+import { logger } from '$logger/logger.ts';
 
 type ListGetEvent = Parameters<typeof GET_LIST>[0];
 type NamedGetEvent = Parameters<typeof GET_NAMED>[0];
+type DiffGetEvent = Parameters<typeof GET_DIFF>[0];
 type ResolvedEntityListResponse = components['schemas']['ResolvedEntityListResponse'];
 type ResolvedEntityState = components['schemas']['ResolvedEntityState'];
+type ResolvedLiveDiffResponse = components['schemas']['ResolvedLiveDiffResponse'];
 type ErrorResponse = components['schemas']['ErrorResponse'];
 
 function buildLocals(authenticated: boolean) {
@@ -77,6 +91,55 @@ function buildNamedGetEvent(
   };
 
   return event as NamedGetEvent;
+}
+
+function buildDiffGetEvent(
+  databaseId: string,
+  entityType: string,
+  name: string,
+  query: string,
+  authenticated: boolean
+): DiffGetEvent {
+  const event: Partial<DiffGetEvent> = {
+    url: new URL(
+      `http://localhost/api/v1/pcd/${databaseId}/resolved/${entityType}/${encodeURIComponent(name)}/diff${query}`
+    ),
+    params: { databaseId, entityType, name },
+    locals: buildLocals(authenticated),
+  };
+
+  return event as DiffGetEvent;
+}
+
+// ============================================================================
+// LIVE DIFF FIXTURE (Task 3.2)
+// ============================================================================
+
+function buildArrInstanceFixture(overrides: Partial<ArrInstance> = {}): ArrInstance {
+  return {
+    id: 590001,
+    name: 'Radarr Live Diff Test',
+    type: 'radarr',
+    url: 'http://radarr.local',
+    external_url: null,
+    api_key_fingerprint: null,
+    api_key: '',
+    tags: null,
+    enabled: 1,
+    created_at: '2026-01-01 00:00:00',
+    updated_at: '2026-01-01 00:00:00',
+    ...overrides,
+  };
+}
+
+/** Patches `arrInstancesQueries.getById` to resolve only the given fixture instance. */
+function withArrInstanceFixture(instance: ArrInstance, restores: Restore[]): void {
+  patchTarget(
+    arrInstancesQueries,
+    'getById',
+    ((id: number) => (id === instance.id ? instance : undefined)) as typeof arrInstancesQueries.getById,
+    restores
+  );
 }
 
 interface CacheFixture {
@@ -708,3 +771,215 @@ Deno.test(
     );
   }
 );
+
+// ============================================================================
+// DIFF ENDPOINT (Task 3.2)
+// ============================================================================
+
+Deno.test('get resolved entity live diff: unauthenticated request returns 401', async () => {
+  const response = await GET_DIFF(
+    buildDiffGetEvent('909090', 'regularExpression', 'Sample RE', '?instanceId=1', false)
+  );
+  assertEquals(response.status, 401);
+});
+
+Deno.test('get resolved entity live diff: invalid databaseId returns 400', async () => {
+  const response = await GET_DIFF(buildDiffGetEvent('abc', 'regularExpression', 'Sample RE', '?instanceId=1', true));
+  assertEquals(response.status, 400);
+});
+
+Deno.test('get resolved entity live diff: unbuilt/unknown database returns 400', async () => {
+  const response = await GET_DIFF(buildDiffGetEvent('424242', 'regularExpression', 'Sample RE', '?instanceId=1', true));
+  assertEquals(response.status, 400);
+
+  const body = (await response.json()) as ErrorResponse;
+  assertEquals(body.error, 'Database not found');
+});
+
+Deno.test('get resolved entity live diff: unknown entityType returns 400', async () => {
+  await withFixture(async (databaseId) => {
+    const response = await GET_DIFF(
+      buildDiffGetEvent(String(databaseId), 'notAnEntityType', 'Sample RE', '?instanceId=1', true)
+    );
+    assertEquals(response.status, 400);
+  });
+});
+
+Deno.test('get resolved entity live diff: missing/invalid instanceId returns 400', async () => {
+  await withFixture(async (databaseId) => {
+    const response = await GET_DIFF(buildDiffGetEvent(String(databaseId), 'regularExpression', 'Sample RE', '', true));
+    assertEquals(response.status, 400);
+
+    const body = (await response.json()) as ErrorResponse;
+    assert(body.error.includes('instanceId'));
+  });
+});
+
+Deno.test('get resolved entity live diff: unknown instance returns 404', async () => {
+  await withFixture(async (databaseId) => {
+    const restores: Restore[] = [];
+    patchTarget(arrInstancesQueries, 'getById', (() => undefined) as typeof arrInstancesQueries.getById, restores);
+
+    try {
+      const response = await GET_DIFF(
+        buildDiffGetEvent(String(databaseId), 'regularExpression', 'Sample RE', '?instanceId=999999', true)
+      );
+      assertEquals(response.status, 404);
+
+      const body = (await response.json()) as ErrorResponse;
+      assert(typeof body.error === 'string' && body.error.length > 0);
+    } finally {
+      restores.reverse().forEach((restore) => restore());
+    }
+  });
+});
+
+// regularExpression has no sync-preview section counterpart -- computeLiveDiff
+// short-circuits it to `{ reason: 'unsupported' }` before any gating or preview call
+// (see liveDiff.ts), so this exercises the real (unstubbed) computeLiveDiff without
+// touching the network.
+Deno.test('get resolved entity live diff: unsupported entityType returns 400', async () => {
+  await withFixture(async (databaseId) => {
+    const instance = buildArrInstanceFixture({ id: 590002 });
+    const restores: Restore[] = [];
+    withArrInstanceFixture(instance, restores);
+
+    try {
+      const response = await GET_DIFF(
+        buildDiffGetEvent(String(databaseId), 'regularExpression', 'Sample RE', `?instanceId=${instance.id}`, true)
+      );
+      assertEquals(response.status, 400);
+
+      const body = (await response.json()) as ErrorResponse;
+      assert(body.error.includes('regularExpression'));
+    } finally {
+      restores.reverse().forEach((restore) => restore());
+      resetPreviewCreateRateLimitForTests();
+    }
+  });
+});
+
+Deno.test('get resolved entity live diff: 429 after the per-instance rate limit is exhausted', async () => {
+  await withFixture(async (databaseId) => {
+    const instance = buildArrInstanceFixture({ id: 590003 });
+    const restores: Restore[] = [];
+    withArrInstanceFixture(instance, restores);
+
+    try {
+      const nowMs = Date.now();
+      for (let attempt = 0; attempt < PREVIEW_CREATE_RATE_LIMIT_MAX_REQUESTS; attempt++) {
+        registerPreviewCreateAttempt(instance.id, nowMs);
+      }
+
+      const response = await GET_DIFF(
+        buildDiffGetEvent(String(databaseId), 'regularExpression', 'Sample RE', `?instanceId=${instance.id}`, true)
+      );
+      assertEquals(response.status, 429);
+
+      const body = (await response.json()) as ErrorResponse;
+      assert(typeof body.error === 'string' && body.error.length > 0);
+    } finally {
+      restores.reverse().forEach((restore) => restore());
+      resetPreviewCreateRateLimitForTests();
+    }
+  });
+});
+
+Deno.test('get resolved entity live diff: 200 returns the live diff for the named entity', async () => {
+  await withFixture(async (databaseId) => {
+    const instance = buildArrInstanceFixture({ id: 590004, type: 'radarr' });
+    const restores: Restore[] = [];
+    withArrInstanceFixture(instance, restores);
+
+    patchTarget(
+      _liveDiffDependencies,
+      'computeLiveDiff',
+      (async () => ({
+        found: true,
+        change: {
+          entityType: 'regularExpression',
+          name: 'Sample RE',
+          action: 'unchanged',
+          remoteId: null,
+          fields: [],
+        },
+      })) as typeof _liveDiffDependencies.computeLiveDiff,
+      restores
+    );
+
+    try {
+      const response = await GET_DIFF(
+        buildDiffGetEvent(String(databaseId), 'regularExpression', 'Sample RE', `?instanceId=${instance.id}`, true)
+      );
+      assertEquals(response.status, 200);
+
+      const body = (await response.json()) as ResolvedLiveDiffResponse;
+      assertEquals(body.databaseId, databaseId);
+      assertEquals(body.entityType, 'regularExpression');
+      assertEquals(body.name, 'Sample RE');
+      assertEquals(body.instanceId, instance.id);
+      assertEquals(body.arrType, 'radarr');
+      assertEquals(body.changes.length, 1);
+      assertEquals(body.changes[0].action, 'unchanged');
+      assertEquals(body.changes[0].fields, []);
+    } finally {
+      restores.reverse().forEach((restore) => restore());
+      resetPreviewCreateRateLimitForTests();
+    }
+  });
+});
+
+Deno.test('get resolved entity live diff: entity not found on the instance returns 404', async () => {
+  await withFixture(async (databaseId) => {
+    const instance = buildArrInstanceFixture({ id: 590005, type: 'radarr' });
+    const restores: Restore[] = [];
+    withArrInstanceFixture(instance, restores);
+
+    patchTarget(
+      _liveDiffDependencies,
+      'computeLiveDiff',
+      (async () => ({ found: false, reason: 'not_found' })) as typeof _liveDiffDependencies.computeLiveDiff,
+      restores
+    );
+
+    try {
+      const response = await GET_DIFF(
+        buildDiffGetEvent(String(databaseId), 'regularExpression', 'Missing RE', `?instanceId=${instance.id}`, true)
+      );
+      assertEquals(response.status, 404);
+    } finally {
+      restores.reverse().forEach((restore) => restore());
+      resetPreviewCreateRateLimitForTests();
+    }
+  });
+});
+
+Deno.test('get resolved entity live diff: sanitized infra failure reason maps to 500', async () => {
+  await withFixture(async (databaseId) => {
+    const instance = buildArrInstanceFixture({ id: 590006, type: 'radarr' });
+    const restores: Restore[] = [];
+    withArrInstanceFixture(instance, restores);
+    patchTarget(logger, 'error', (async () => undefined) as typeof logger.error, restores);
+
+    patchTarget(
+      _liveDiffDependencies,
+      'computeLiveDiff',
+      (async () => ({ found: false, reason: 'unreachable' })) as typeof _liveDiffDependencies.computeLiveDiff,
+      restores
+    );
+
+    try {
+      const response = await GET_DIFF(
+        buildDiffGetEvent(String(databaseId), 'regularExpression', 'Sample RE', `?instanceId=${instance.id}`, true)
+      );
+      assertEquals(response.status, 500);
+
+      const body = (await response.json()) as ErrorResponse;
+      // Raw reason strings never escape into the response body.
+      assert(!body.error.includes('unreachable'));
+    } finally {
+      restores.reverse().forEach((restore) => restore());
+      resetPreviewCreateRateLimitForTests();
+    }
+  });
+});
