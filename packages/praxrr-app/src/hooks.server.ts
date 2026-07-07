@@ -19,6 +19,7 @@ import { getAuthState, isPublicPath, maybeExtendSession, cleanupExpiredSessions 
 import { getClientIp } from '$auth/network.ts';
 import { setupStateQueries } from '$db/queries/setupState.ts';
 import { appInfoQueries } from '$db/queries/appInfo.ts';
+import { resolveWizardRedirect } from '$server/setup/progress.ts';
 
 // Initialize configuration on server startup
 await config.init();
@@ -220,6 +221,9 @@ export const handle: Handle = async ({ event, resolve }) => {
 
   // AUTH=off or AUTH=local with local IP - skip auth after setup
   if (auth.skipAuth) {
+    const wizardRedirect = resolveWizardRedirect(event);
+    if (wizardRedirect) throw redirect(303, wizardRedirect);
+
     return resolve(event);
   }
 
@@ -253,6 +257,9 @@ export const handle: Handle = async ({ event, resolve }) => {
   if (auth.session) {
     maybeExtendSession(auth.session);
   }
+
+  const wizardRedirect = resolveWizardRedirect(event);
+  if (wizardRedirect) throw redirect(303, wizardRedirect);
 
   // Authenticated - attach user to locals for use in routes
   return resolve(event);

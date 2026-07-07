@@ -9,8 +9,9 @@
 
   export let data;
 
-  // Hide navigation on auth pages (login, setup, etc.)
-  $: isAuthPage = $page.url.pathname.startsWith('/auth/');
+  // Hide navigation on auth pages and the first-run setup wizard.
+  $: isAuthPage =
+    $page.url.pathname.startsWith('/auth/') || $page.url.pathname.startsWith('/setup');
 </script>
 
 <svelte:head>
