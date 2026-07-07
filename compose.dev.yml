@@ -27,7 +27,7 @@ services:
       # - HOST=0.0.0.0
       - PARSER_HOST=parser-dev
       - PARSER_PORT=5000
-      - AUTH=on
+      - AUTH=off
       - E2E_USERNAME=${E2E_USERNAME:-praxrr-e2e}
       - E2E_PASSWORD=${E2E_PASSWORD:-praxrr123}
       - PRAXRR_DEFAULT_DB_URL=/praxrr-db # Optional: can be set to a local path or remote URL

@@ -6,7 +6,12 @@ import { arrInstancesQueries } from '$db/queries/arrInstances.ts';
 import { trashGuideSyncQueries } from '$db/queries/trashGuideSync.ts';
 import { trashIdMappingsQueries } from '$db/queries/trashIdMappings.ts';
 import { triggerSyncs } from '$sync/processor.ts';
-import { checkForUpdates as checkGitForUpdates, getCommits, type UpdateInfo } from '$utils/git/index.ts';
+import {
+  checkForUpdates as checkGitForUpdates,
+  getCommits,
+  isLocalRepositorySource,
+  type UpdateInfo,
+} from '$utils/git/index.ts';
 import { discoverTrashGuideFiles, fetchTrashGuideSource } from './fetcher.ts';
 import { parseTrashGuideEntities } from './parser.ts';
 import { transformTrashGuideEntities } from './transformer.ts';
@@ -286,7 +291,11 @@ class TrashGuideManager {
           if (!(cleanupError instanceof Deno.errors.NotFound)) {
             await logger.warn('Failed to cleanup temporary TRaSH clone path after update failure', {
               source: 'TrashGuideManager',
-              meta: { sourceId: id, clonePath: tempClonePath, error: String(cleanupError) },
+              meta: {
+                sourceId: id,
+                clonePath: tempClonePath,
+                error: String(cleanupError),
+              },
             });
           }
         }
@@ -406,27 +415,30 @@ class TrashGuideManager {
 
   async sync(id: number): Promise<TrashGuideSyncResult> {
     const source = this.getSourceOrThrow(id);
+    const isLocalSource = isLocalRepositorySource(source.repository_url);
 
     let updates: UpdateInfo = {
-      hasUpdates: true,
+      hasUpdates: !isLocalSource,
       commitsBehind: 0,
       commitsAhead: 0,
-      latestRemoteCommit: '',
-      currentLocalCommit: '',
+      latestRemoteCommit: isLocalSource ? 'local' : '',
+      currentLocalCommit: isLocalSource ? 'local' : '',
     };
 
-    try {
-      updates = await checkGitForUpdates(source.local_path);
-    } catch (error) {
-      await logger.warn('Failed TRaSH source pre-sync update check', {
-        source: 'TrashGuideManager',
-        meta: {
-          sourceId: source.id,
-          localPath: source.local_path,
-          error: error instanceof Error ? error.message : String(error),
-        },
-      });
-      // Continue with pull/parse sync flow even if pre-check cannot be resolved.
+    if (!isLocalSource) {
+      try {
+        updates = await checkGitForUpdates(source.local_path);
+      } catch (error) {
+        await logger.warn('Failed TRaSH source pre-sync update check', {
+          source: 'TrashGuideManager',
+          meta: {
+            sourceId: source.id,
+            localPath: source.local_path,
+            error: error instanceof Error ? error.message : String(error),
+          },
+        });
+        // Continue with fetch/parse sync flow even if pre-check cannot be resolved.
+      }
     }
 
     try {
@@ -480,6 +492,16 @@ class TrashGuideManager {
 
   async checkForUpdates(id: number): Promise<UpdateInfo> {
     const source = this.getSourceOrThrow(id);
+    if (isLocalRepositorySource(source.repository_url)) {
+      return {
+        hasUpdates: false,
+        commitsBehind: 0,
+        commitsAhead: 0,
+        latestRemoteCommit: 'local',
+        currentLocalCommit: 'local',
+      };
+    }
+
     return await checkGitForUpdates(source.local_path);
   }
 

@@ -1,10 +1,11 @@
-import { checkout, clone, pull } from '$utils/git/index.ts';
+import { clone, isLocalRepositorySource, refreshLocalRepositoryClone, resetToRemoteBranch } from '$utils/git/index.ts';
 import {
   TRASHGUIDE_ENTITY_TYPES,
   TRASHGUIDE_METADATA_ENTITY_PATH_KEYS,
   type TrashGuideDiscoveredFilesByEntity,
   type TrashGuideDiscoveryResult,
   type TrashGuideFetchAction,
+  TrashGuideFetcherError,
   type TrashGuideFetchOptions,
   type TrashGuideFetchResult,
   type TrashGuideMetadataArrPaths,
@@ -12,7 +13,6 @@ import {
   type TrashGuideMetadataEntityPathKey,
   type TrashGuideSourceFile,
   type TrashGuideSupportedArrType,
-  TrashGuideFetcherError,
 } from './types.ts';
 import { isRecord } from './utils.ts';
 
@@ -142,6 +142,20 @@ async function syncRepository(params: {
     );
   }
 
+  if (isLocalRepositorySource(repositoryUrl)) {
+    try {
+      await refreshLocalRepositoryClone(repositoryUrl, params.local_path);
+      return 'updated';
+    } catch (error) {
+      throw classifyGitError(error, {
+        operation: 'pull',
+        repository_url: repositoryUrl,
+        local_path: params.local_path,
+        branch: params.branch,
+      });
+    }
+  }
+
   const gitDirectory = await Deno.stat(toAbsolutePath(params.local_path, '.git')).catch((error) => {
     if (error instanceof Deno.errors.NotFound) {
       return null;
@@ -160,18 +174,7 @@ async function syncRepository(params: {
   }
 
   try {
-    await checkout(params.local_path, params.branch);
-  } catch (error) {
-    throw classifyGitError(error, {
-      operation: 'checkout',
-      repository_url: repositoryUrl,
-      local_path: params.local_path,
-      branch: params.branch,
-    });
-  }
-
-  try {
-    await pull(params.local_path);
+    await resetToRemoteBranch(params.local_path, params.branch);
   } catch (error) {
     throw classifyGitError(error, {
       operation: 'pull',
@@ -496,12 +499,6 @@ function classifyGitError(
     });
   }
 
-  if (details.operation === 'pull') {
-    return new TrashGuideFetcherError('git_pull_error', `Git pull failed: ${message}`, true, baseDetails, {
-      cause: error instanceof Error ? error : undefined,
-    });
-  }
-
   if (messageLower.includes('repository url must be a valid github repository')) {
     return new TrashGuideFetcherError(
       'repository_url_invalid',
@@ -510,6 +507,12 @@ function classifyGitError(
       baseDetails,
       { cause: error instanceof Error ? error : undefined }
     );
+  }
+
+  if (details.operation === 'pull') {
+    return new TrashGuideFetcherError('git_pull_error', `Git pull failed: ${message}`, true, baseDetails, {
+      cause: error instanceof Error ? error : undefined,
+    });
   }
 
   return new TrashGuideFetcherError(

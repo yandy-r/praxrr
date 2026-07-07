@@ -95,6 +95,10 @@ function makeCommandStub(handler: (args: readonly string[]) => StubCommandResult
   return StubCommand as unknown as typeof Deno.Command;
 }
 
+function makeFetchStub(response: Response): typeof globalThis.fetch {
+  return (() => Promise.resolve(response)) as typeof globalThis.fetch;
+}
+
 /**
  * Drive fetchTrashGuideSource through the update branch (existing .git repo) with a stubbed
  * git subprocess so classifyGitError classifies the failure. Returns the thrown fetcher error.
@@ -163,19 +167,27 @@ Deno.test({
     const pathspecError = await expectSyncGitError(
       (args) =>
         args[0] === 'checkout'
-          ? { code: 1, stderr: "error: pathspec 'nope' did not match any file(s) known to git" }
+          ? {
+              code: 1,
+              stderr: "error: pathspec 'nope' did not match any file(s) known to git",
+            }
           : { code: 0 },
       'nope'
     );
     assertEquals(pathspecError.code, 'git_ref_error');
     assertEquals(pathspecError.retryable, false);
     assertStringIncludes(pathspecError.message, 'Git branch/ref error for "nope"');
-    assertEquals(pathspecError.details?.operation, 'checkout');
+    assertEquals(pathspecError.details?.operation, 'pull');
     assertEquals(pathspecError.details?.branch, 'nope');
 
     const remoteRefError = await expectSyncGitError(
       (args) =>
-        args[0] === 'checkout' ? { code: 1, stderr: "fatal: couldn't find remote ref refs/heads/nope" } : { code: 0 },
+        args[0] === 'checkout'
+          ? {
+              code: 1,
+              stderr: "fatal: couldn't find remote ref refs/heads/nope",
+            }
+          : { code: 0 },
       'nope'
     );
     assertEquals(remoteRefError.code, 'git_ref_error');
@@ -189,7 +201,10 @@ Deno.test({
     const authError = await expectSyncGitError(
       (args) =>
         args[0] === 'checkout'
-          ? { code: 1, stderr: "fatal: Authentication failed for 'https://github.com/o/r.git/'" }
+          ? {
+              code: 1,
+              stderr: "fatal: Authentication failed for 'https://github.com/o/r.git/'",
+            }
           : { code: 0 },
       'main'
     );
@@ -212,7 +227,10 @@ Deno.test({
     const resolveHostError = await expectSyncGitError(
       (args) =>
         args[0] === 'checkout'
-          ? { code: 1, stderr: "fatal: unable to access 'https://github.com/o/r/': Could not resolve host: github.com" }
+          ? {
+              code: 1,
+              stderr: "fatal: unable to access 'https://github.com/o/r/': Could not resolve host: github.com",
+            }
           : { code: 0 },
       'main'
     );
@@ -223,7 +241,10 @@ Deno.test({
     const timeoutError = await expectSyncGitError(
       (args) =>
         args[0] === 'checkout'
-          ? { code: 1, stderr: 'ssh: connect to host github.com port 22: Connection timed out' }
+          ? {
+              code: 1,
+              stderr: 'ssh: connect to host github.com port 22: Connection timed out',
+            }
           : { code: 0 },
       'main'
     );
@@ -232,13 +253,16 @@ Deno.test({
 });
 
 Deno.test({
-  name: 'fetchTrashGuideSource classifies an unrecognized pull failure as git_pull_error',
+  name: 'fetchTrashGuideSource classifies an unrecognized remote refresh failure as git_pull_error',
   sanitizeResources: false,
   fn: async () => {
     const pullError = await expectSyncGitError(
       (args) =>
-        args[0] === 'pull'
-          ? { code: 1, stderr: 'error: Your local changes to the following files would be overwritten by merge' }
+        args[0] === 'fetch'
+          ? {
+              code: 1,
+              stderr: 'error: Your local changes to the following files would be overwritten by merge',
+            }
           : { code: 0 },
       'main'
     );
@@ -270,17 +294,47 @@ Deno.test({
 });
 
 Deno.test({
-  name: 'fetchTrashGuideSource classifies unrecognized git stderr as git_operation_failed',
+  name: 'fetchTrashGuideSource classifies unrecognized clone stderr as git_operation_failed',
   sanitizeResources: false,
   fn: async () => {
-    const genericError = await expectSyncGitError(
-      (args) =>
-        args[0] === 'checkout' ? { code: 1, stderr: 'fatal: something totally unexpected happened' } : { code: 0 },
-      'main'
+    const localPath = await Deno.makeTempDir();
+    const restores: Restore[] = [];
+    patchTarget(
+      globalThis as unknown as { fetch: typeof globalThis.fetch },
+      'fetch',
+      makeFetchStub(new Response(JSON.stringify({ private: false }), { status: 200 })),
+      restores
     );
-    assertEquals(genericError.code, 'git_operation_failed');
-    assertEquals(genericError.retryable, true);
-    assertStringIncludes(genericError.message, 'Git checkout failed:');
+    patchTarget(
+      Deno as unknown as { Command: typeof Deno.Command },
+      'Command',
+      makeCommandStub(() => ({
+        code: 1,
+        stderr: 'fatal: something totally unexpected happened',
+      })),
+      restores
+    );
+
+    try {
+      const genericError = await assertRejects(
+        () =>
+          fetchTrashGuideSource({
+            repository_url: 'https://github.com/o/r',
+            local_path: `${localPath}/repo`,
+            branch: 'main',
+            arr_type: 'radarr',
+          }),
+        TrashGuideFetcherError
+      );
+      assertEquals(genericError.code, 'git_operation_failed');
+      assertEquals(genericError.retryable, true);
+      assertStringIncludes(genericError.message, 'Git clone failed:');
+    } finally {
+      for (const restore of restores.reverse()) {
+        restore();
+      }
+      await Deno.remove(localPath, { recursive: true }).catch(() => undefined);
+    }
   },
 });
 
@@ -339,7 +393,9 @@ Deno.test({
     await withTempDir(async (root) => {
       await Deno.writeTextFile(
         `${root}/metadata.json`,
-        radarrMetadata({ custom_formats: ['./custom_formats//movie//cf.json'] })
+        radarrMetadata({
+          custom_formats: ['./custom_formats//movie//cf.json'],
+        })
       );
       await Deno.mkdir(`${root}/custom_formats/movie`, { recursive: true });
       await Deno.writeTextFile(`${root}/custom_formats/movie/cf.json`, '{}');
@@ -347,7 +403,10 @@ Deno.test({
       await Deno.mkdir(`${root}/qualities`);
       await Deno.mkdir(`${root}/naming`);
 
-      const result = await discoverTrashGuideFiles({ local_path: root, arr_type: 'radarr' });
+      const result = await discoverTrashGuideFiles({
+        local_path: root,
+        arr_type: 'radarr',
+      });
       const customFormats = result.files_by_entity.custom_format;
       assertEquals(customFormats.length, 1);
       assertEquals(customFormats[0].relative_path, 'custom_formats/movie/cf.json');
@@ -561,7 +620,7 @@ Deno.test({
 });
 
 Deno.test({
-  name: 'fetchTrashGuideSource pulls an existing git repository and reports action=updated',
+  name: 'fetchTrashGuideSource force-refreshes an existing git repository and reports action=updated',
   sanitizeResources: false,
   fn: async () => {
     const localPath = await Deno.makeTempDir();
@@ -591,12 +650,54 @@ Deno.test({
       assertEquals(result.action, 'updated');
       assertEquals(result.branch, 'main');
       assertEquals(result.discovery.total_files, 4);
-      assertEquals(invocations, [['checkout', 'main'], ['pull']]);
+      assertEquals(invocations, [
+        ['fetch', '--quiet', 'origin', 'main:refs/remotes/origin/main'],
+        ['reset', '--hard'],
+        ['clean', '-fdx'],
+        ['checkout', '-B', 'main', 'origin/main'],
+        ['reset', '--hard', 'origin/main'],
+        ['clean', '-fdx'],
+      ]);
     } finally {
       for (const restore of restores.reverse()) {
         restore();
       }
       await Deno.remove(localPath, { recursive: true }).catch(() => undefined);
+    }
+  },
+});
+
+Deno.test({
+  name: 'fetchTrashGuideSource refreshes local-path sources without requiring a git repository',
+  sanitizeResources: false,
+  fn: async () => {
+    const source = await Deno.makeTempDir();
+    const target = await Deno.makeTempDir();
+    await seedTrashGuideRepo(source);
+    await seedTrashGuideRepo(target);
+    await Deno.writeTextFile(`${target}/custom_formats/stale.json`, '{}');
+
+    try {
+      await Deno.writeTextFile(`${source}/custom_formats/cf1.json`, '{"name":"fresh"}');
+
+      const result = await fetchTrashGuideSource({
+        repository_url: source,
+        local_path: target,
+        arr_type: 'radarr',
+      });
+
+      assertEquals(result.action, 'updated');
+      assertEquals(await Deno.readTextFile(`${target}/custom_formats/cf1.json`), '{"name":"fresh"}');
+      const staleStat = await Deno.stat(`${target}/custom_formats/stale.json`).catch((error) => {
+        if (error instanceof Deno.errors.NotFound) {
+          return null;
+        }
+        throw error;
+      });
+      assertEquals(staleStat, null);
+    } finally {
+      await Deno.remove(source, { recursive: true }).catch(() => undefined);
+      await Deno.remove(target, { recursive: true }).catch(() => undefined);
     }
   },
 });
@@ -718,7 +819,10 @@ Deno.test({
       await Deno.mkdir(`${root}/qualities`);
       await Deno.mkdir(`${root}/naming`);
 
-      const result = await discoverTrashGuideFiles({ local_path: root, arr_type: 'radarr' });
+      const result = await discoverTrashGuideFiles({
+        local_path: root,
+        arr_type: 'radarr',
+      });
       const customFormats = result.files_by_entity.custom_format;
       assertEquals(
         customFormats.map((file) => file.relative_path),
@@ -769,7 +873,11 @@ Deno.test({
 
     try {
       const error = await assertRejects(
-        () => discoverTrashGuideFiles({ local_path: localPath, arr_type: 'radarr' }),
+        () =>
+          discoverTrashGuideFiles({
+            local_path: localPath,
+            arr_type: 'radarr',
+          }),
         TrashGuideFetcherError
       );
 

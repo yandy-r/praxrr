@@ -380,6 +380,17 @@ export async function checkout(repoPath: string, branch: string): Promise<void> 
 /**
  * Reset repository to match remote (discards local changes)
  */
+export async function resetToRemoteBranch(repoPath: string, branch: string): Promise<void> {
+  const remoteBranchRef = `origin/${branch}`;
+
+  await execGit(['fetch', '--quiet', 'origin', `${branch}:refs/remotes/origin/${branch}`], repoPath);
+  await execGit(['reset', '--hard'], repoPath);
+  await execGit(['clean', '-fdx'], repoPath);
+  await execGit(['checkout', '-B', branch, remoteBranchRef], repoPath);
+  await execGit(['reset', '--hard', remoteBranchRef], repoPath);
+  await execGit(['clean', '-fdx'], repoPath);
+}
+
 /**
  * Stage files
  */
