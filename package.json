@@ -2,7 +2,7 @@
   "name": "praxrr",
   "private": true,
   "description": "Media automation, perfected in practice.",
-  "version": "0.3.4",
+  "version": "0.3.5",
   "license": "AGPL-3.0-only",
   "type": "module",
   "dependencies": {

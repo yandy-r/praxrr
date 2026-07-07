@@ -1,6 +1,6 @@
 {
   "name": "@yandy-r/praxrr-schema",
   "exports": "./mod.ts",
-  "version": "0.3.4",
+  "version": "0.3.5",
   "description": "PCD schema definitions for Praxrr"
 }
