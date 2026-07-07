@@ -1,0 +1,149 @@
+---
+title: Badges & Labels
+description: Badge, source-badge, custom-format badge, score, and label components for compact status and metadata display.
+---
+
+import BadgeDemo from '../../../../components/demos/BadgeDemo.svelte';
+
+Badges and labels are compact pills for conveying status, provenance, and numeric metadata inline. They are reusable components under `$ui/` (source: `packages/praxrr-app/src/lib/client/ui/`), and follow the repo's Svelte convention of plain props and `onclick` handlers rather than runes.
+
+## Badge
+
+Small inline status/label pill with color variants, two sizes, an optional leading icon, and an optional monospace font. The Arr-brand variants (`radarr`/`sonarr`/`lidarr`) apply their brand color via CSS custom properties.
+
+```svelte
+import Badge from '$ui/badge/Badge.svelte';
+```
+
+| Prop      | Type                                                                                                                   | Default    | Required | Description                                                                                                                                                                        |
+| --------- | ---------------------------------------------------------------------------------------------------------------------- | ---------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `variant` | `'accent' \| 'trash' \| 'neutral' \| 'success' \| 'warning' \| 'danger' \| 'info' \| 'radarr' \| 'sonarr' \| 'lidarr'` | `'accent'` | No       | Color scheme. Standard variants use Tailwind light/dark class pairs; `radarr`/`sonarr`/`lidarr` set `background-color` via `--arr-{name}-color` CSS variables with `#111827` text. |
+| `size`    | `'sm' \| 'md'`                                                                                                         | `'sm'`     | No       | Padding + text size. `sm` = `px-1.5 py-0.5 text-[10px]`; `md` = `px-2 py-0.5 text-xs`. Also drives icon size (`sm`=10, `md`=12).                                                   |
+| `icon`    | `ComponentType \| null`                                                                                                | `null`     | No       | Optional Svelte icon component (e.g. lucide-svelte) rendered before the slot content via `svelte:component`, sized from `size`.                                                    |
+| `mono`    | `boolean`                                                                                                              | `false`    | No       | When `true`, applies `font-mono` to the badge text.                                                                                                                                |
+
+The default slot holds the badge label/content.
+
+Try the live variants and sizes below.
+
+<BadgeDemo client:load />
+
+```svelte
+<Badge variant="success" size="md" icon={Info} mono>v2.0.0</Badge>
+```
+
+### Variants and notes
+
+- Color variants: `accent`, `trash`, `neutral`, `success`, `warning`, `danger`, `info`, `radarr`, `sonarr`, `lidarr`.
+- Sizes: `sm`, `md`.
+- The dev showcase only demos `accent`/`neutral`/`success`/`warning`/`danger`/`info`, but `trash` and the three Arr-brand variants also exist.
+- Svelte 4 style component (`export let`, reactive `$:`, `<slot />`, `svelte:component`), not runes. Rendered as a single `<span>` whose inline `style` is only populated for the `radarr`/`sonarr`/`lidarr` variants.
+
+## SourceBadge
+
+Composite badge that pairs a source-type `Badge` (PCD database or TRaSH) — auto-selecting its icon and color — with an optional second `Badge` showing the Arr app (Radarr/Sonarr/Lidarr).
+
+```svelte
+import SourceBadge from '$ui/badge/SourceBadge.svelte';
+```
+
+| Prop         | Type                                       | Default | Required | Description                                                                                                                         |
+| ------------ | ------------------------------------------ | ------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `sourceType` | `'pcd' \| 'trash'`                         | —       | Yes      | Which source the entity came from. Maps to variant (`pcd`->`accent`, `trash`->`trash`) and icon (`pcd`->Database, `trash`->Trash2). |
+| `sourceName` | `string`                                   | —       | Yes      | Text shown inside the source `Badge` (e.g. the database name).                                                                      |
+| `size`       | `'sm' \| 'md'`                             | `'sm'`  | No       | Forwarded to both inner `Badge` components.                                                                                         |
+| `arrType`    | `'radarr' \| 'sonarr' \| 'lidarr' \| null` | `null`  | No       | When set, renders a second `Badge` using the matching Arr-brand variant with a capitalized label (e.g. `'Radarr'`).                 |
+| `mono`       | `boolean`                                  | `false` | No       | Forwarded to the source `Badge` only (the Arr badge is never mono).                                                                 |
+
+```svelte
+<SourceBadge sourceType="pcd" sourceName="Praxrr-DB" arrType="radarr" size="md" />
+```
+
+### Variants and notes
+
+- `sourceType`: `pcd` (accent + Database icon), `trash` (trash/sky + Trash2 icon).
+- Optional `arrType` adds a brand-colored Arr badge.
+- Wraps two `Badge` components in an inline-flex span with `gap-1.5`. `arrLabel` is derived by capitalizing the first letter of `arrType`.
+- Not shown in the dev showcase route. Svelte 4 style (`export let`).
+
+## CustomFormatBadge
+
+Pill that displays a custom-format name alongside its score, with the score color-coded (green positive, red negative, neutral zero) and formatted with a `+` sign and thousands separators.
+
+```svelte
+import CustomFormatBadge from '$ui/arr/CustomFormatBadge.svelte';
+```
+
+| Prop    | Type     | Default | Required | Description                                                                                                                                  |
+| ------- | -------- | ------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| `name`  | `string` | —       | Yes      | Custom format name, rendered in muted neutral text on the left.                                                                              |
+| `score` | `number` | —       | Yes      | Numeric score. Rendered mono; positive values get a `+` prefix and green, negative red, zero neutral gray. Formatted via `toLocaleString()`. |
+
+```svelte
+<CustomFormatBadge name="Remux" score={150} />
+```
+
+### Variants and notes
+
+- Score color states: positive (emerald), negative (red), zero (neutral-500). No size prop.
+- Bordered `rounded-md` pill (`border-neutral-200` / `bg-white`, plus dark variants). `displayScore = score > 0 ? '+' + score.toLocaleString() : score.toLocaleString()`.
+- Svelte 4 style (`export let`).
+
+## Score
+
+Standalone numeric score display with optional sign prefix and color coding. Renders an em-dash placeholder when the score is null.
+
+```svelte
+import Score from '$ui/arr/Score.svelte';
+```
+
+| Prop       | Type             | Default | Required | Description                                                                                                                                      |
+| ---------- | ---------------- | ------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `score`    | `number \| null` | `null`  | No       | The score value. When `null`, renders a muted `—` placeholder instead of a number.                                                               |
+| `showSign` | `boolean`        | `true`  | No       | When `true`, positive scores are prefixed with `+`. Negative/zero are unaffected by this flag.                                                   |
+| `size`     | `'sm' \| 'md'`   | `'md'`  | No       | Text size: `sm` = `text-xs`, `md` = `text-sm`.                                                                                                   |
+| `colored`  | `boolean`        | `true`  | No       | When `true`, positive=emerald / negative=red / zero=neutral-500. When `false`, the number uses default neutral. Null always renders neutral-400. |
+
+```svelte
+<Score score={150} size="sm" />
+<Score score={75} colored={false} />
+<Score score={null} />
+```
+
+### Variants and notes
+
+- `colored` on/off; sizes `sm`/`md`; null placeholder state.
+- Color states: positive green, negative red, zero neutral (only when `colored={true}`).
+- Always mono + `font-medium` for the numeric span. `displayValue` applies `+` only when `showSign && score > 0`.
+- Svelte 4 style (`export let`) with a JSDoc header comment describing the color behavior.
+
+## Label
+
+Flexible inline label/tag pill with nine color variants, three sizes, configurable border-radius, optional monospace font, and optional link mode (renders as an anchor when `href` is set).
+
+```svelte
+import Label from '$ui/label/Label.svelte';
+```
+
+| Prop      | Type                                                                                                                | Default     | Required | Description                                                                                                                                                                                                   |
+| --------- | ------------------------------------------------------------------------------------------------------------------- | ----------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `variant` | `'default' \| 'secondary' \| 'destructive' \| 'outline' \| 'ghost' \| 'success' \| 'warning' \| 'danger' \| 'info'` | `'default'` | No       | Color scheme. `default`=accent-600 solid; `secondary`=neutral; `destructive`=red-600 solid; `outline`=bordered; `ghost`=translucent neutral; `success`/`warning`/`danger`/`info` use soft tinted backgrounds. |
+| `size`    | `'sm' \| 'md' \| 'lg'`                                                                                              | `'md'`      | No       | Padding + text size. `sm`=`px-2 py-1 text-[10px]`; `md`=`px-2.5 py-1 text-xs`; `lg`=`px-3 py-1.5 text-sm`.                                                                                                    |
+| `rounded` | `'sm' \| 'md' \| 'full'`                                                                                            | `'full'`    | No       | Border radius: `sm`=`rounded`, `md`=`rounded-md`, `full`=`rounded-full`.                                                                                                                                      |
+| `mono`    | `boolean`                                                                                                           | `false`     | No       | When `true`, applies `font-mono`.                                                                                                                                                                             |
+| `href`    | `string \| undefined`                                                                                               | `undefined` | No       | When provided, the label renders as an `<a>` tag with the `href` instead of a `<span>`.                                                                                                                       |
+
+The default slot holds the label content.
+
+```svelte
+<Label variant="info" size="md" rounded="full">New</Label>
+<Label variant="ghost" mono>v2.0.0</Label>
+<Label variant="info" href="#label">Link label</Label>
+```
+
+### Variants and notes
+
+- Variants: `default`, `secondary`, `destructive`, `outline`, `ghost`, `success`, `warning`, `danger`, `info`.
+- Sizes: `sm`, `md`, `lg`. Rounded: `sm`, `md`, `full`. Optional `mono` and `href` (anchor) modes.
+- The dev showcase lists eight variants and omits `danger` from its demo, but both `danger` and `destructive` exist (`destructive`=solid red-600, `danger`=soft red-100 tint).
+- Base classes: `inline-flex items-center leading-none font-medium`. Svelte 4 style (`export let`, `<slot />`).
