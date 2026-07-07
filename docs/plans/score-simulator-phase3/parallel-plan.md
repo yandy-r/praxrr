@@ -368,8 +368,7 @@ New props (add to script section):
 ```typescript
 export let overrides: ScoreOverrideMap = {};
 export let onOverrideChange:
-  | ((cfName: string, score: number) => void)
-  | undefined = undefined;
+  ((cfName: string, score: number) => void) | undefined = undefined;
 export let onOverrideReset: ((cfName: string) => void) | undefined = undefined;
 export let onOverrideResetAll: (() => void) | undefined = undefined;
 ```

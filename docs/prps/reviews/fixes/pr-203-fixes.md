@@ -22,29 +22,29 @@
 
 ## Fixes Applied
 
-| ID   | Severity | File | Line | Status | Notes |
-| ---- | -------- | ---- | ---- | ------ | ----- |
-| F001 | HIGH | GeneralForm.svelte | 40 | Fixed | Wired `initialMode` from server-loaded `customFormatSectionModes` |
-| F002 | HIGH | 2.51-progressive-complexity.spec.ts | 59 | Fixed | E2E navigates to edit general route with tier/disclosure reset |
-| F003 | HIGH | feature-spec.md | 1 | Fixed | Prettier-formatted three failing docs files |
-| F004 | HIGH | complexity-tiers/+server.ts | 75 | Fixed | Replaced `console.error` with `$logger` |
-| F005 | HIGH | userComplexityTiers.ts | 1 | Fixed | Extracted `sectionDebouncedSync.ts` shared primitive |
-| F006 | MEDIUM | DisclosureSection.svelte | 50 | Fixed | Added error handling for `recordActivity` with alert warnings |
-| F007 | MEDIUM | complexityTiersApi.test.ts | 1 | Fixed | Added optimistic-lock edge-case tests |
-| F008 | MEDIUM | DisclosureSection.svelte | 1 | Fixed | Added precedence unit tests via `disclosureSectionLogic.ts` |
-| F009 | MEDIUM | complexity-tiers/+server.ts | 262 | Fixed | Rate-limit map pruning on each check |
-| F010 | MEDIUM | complexity-tiers/+server.ts | 45 | Fixed | Documented single-instance rate-limit assumption |
-| F011 | MEDIUM | userComplexityTiers.ts | 1 | Fixed | Reduced file from 547 to 275 lines (F005 extraction) |
-| F012 | MEDIUM | complexity-tiers/+server.ts | 400 | Fixed | Moved concurrent upsert to query module |
-| F013 | MEDIUM | complexity-tiers/+server.ts | 246 | Fixed | Extracted shared `section-preferences/_helpers.ts` |
-| F014 | MEDIUM | ComplexityTierSelector.svelte | 1 | Fixed | Normalized imports and indentation |
-| F015 | LOW | +page.server.ts | 49 | Fixed | Verified wiring complete via F001 (no edits needed) |
-| F016 | LOW | loadSectionTiers.ts | 30 | Fixed | Replaced `console.warn` with `$logger` |
-| F017 | LOW | loadSectionTiers.ts | 23 | Fixed | Batched via `getByUserId`; test mocks updated |
-| F018 | LOW | complexity-tiers/+server.ts | 341 | Fixed | Capped per-request counter deltas to ±100 |
-| F019 | LOW | complexity-tiers/+server.ts | 52 | Fixed | GET short-circuit for synthetic user id 0 |
-| F020 | LOW | 20260706_create_user_complexity_tiers.ts | 15 | Fixed | Added `interaction_count <= 1000000` CHECK |
-| F021 | LOW | ComplexityTierSelector.svelte | 29 | Fixed | Documented server-only reset semantics |
+| ID   | Severity | File                                     | Line | Status | Notes                                                             |
+| ---- | -------- | ---------------------------------------- | ---- | ------ | ----------------------------------------------------------------- |
+| F001 | HIGH     | GeneralForm.svelte                       | 40   | Fixed  | Wired `initialMode` from server-loaded `customFormatSectionModes` |
+| F002 | HIGH     | 2.51-progressive-complexity.spec.ts      | 59   | Fixed  | E2E navigates to edit general route with tier/disclosure reset    |
+| F003 | HIGH     | feature-spec.md                          | 1    | Fixed  | Prettier-formatted three failing docs files                       |
+| F004 | HIGH     | complexity-tiers/+server.ts              | 75   | Fixed  | Replaced `console.error` with `$logger`                           |
+| F005 | HIGH     | userComplexityTiers.ts                   | 1    | Fixed  | Extracted `sectionDebouncedSync.ts` shared primitive              |
+| F006 | MEDIUM   | DisclosureSection.svelte                 | 50   | Fixed  | Added error handling for `recordActivity` with alert warnings     |
+| F007 | MEDIUM   | complexityTiersApi.test.ts               | 1    | Fixed  | Added optimistic-lock edge-case tests                             |
+| F008 | MEDIUM   | DisclosureSection.svelte                 | 1    | Fixed  | Added precedence unit tests via `disclosureSectionLogic.ts`       |
+| F009 | MEDIUM   | complexity-tiers/+server.ts              | 262  | Fixed  | Rate-limit map pruning on each check                              |
+| F010 | MEDIUM   | complexity-tiers/+server.ts              | 45   | Fixed  | Documented single-instance rate-limit assumption                  |
+| F011 | MEDIUM   | userComplexityTiers.ts                   | 1    | Fixed  | Reduced file from 547 to 275 lines (F005 extraction)              |
+| F012 | MEDIUM   | complexity-tiers/+server.ts              | 400  | Fixed  | Moved concurrent upsert to query module                           |
+| F013 | MEDIUM   | complexity-tiers/+server.ts              | 246  | Fixed  | Extracted shared `section-preferences/_helpers.ts`                |
+| F014 | MEDIUM   | ComplexityTierSelector.svelte            | 1    | Fixed  | Normalized imports and indentation                                |
+| F015 | LOW      | +page.server.ts                          | 49   | Fixed  | Verified wiring complete via F001 (no edits needed)               |
+| F016 | LOW      | loadSectionTiers.ts                      | 30   | Fixed  | Replaced `console.warn` with `$logger`                            |
+| F017 | LOW      | loadSectionTiers.ts                      | 23   | Fixed  | Batched via `getByUserId`; test mocks updated                     |
+| F018 | LOW      | complexity-tiers/+server.ts              | 341  | Fixed  | Capped per-request counter deltas to ±100                         |
+| F019 | LOW      | complexity-tiers/+server.ts              | 52   | Fixed  | GET short-circuit for synthetic user id 0                         |
+| F020 | LOW      | 20260706_create_user_complexity_tiers.ts | 15   | Fixed  | Added `interaction_count <= 1000000` CHECK                        |
+| F021 | LOW      | ComplexityTierSelector.svelte            | 29   | Fixed  | Documented server-only reset semantics                            |
 
 ## Files Changed
 
@@ -74,10 +74,10 @@
 
 ## Validation Results
 
-| Check      | Result |
-| ---------- | ------ |
-| Type check | Pass   |
-| Tests      | Fail   |
+| Check            | Result       |
+| ---------------- | ------------ |
+| Type check       | Pass         |
+| Tests            | Fail         |
 | Complexity tests | Pass (18/18) |
 
 **Test failure detail**: Full `deno task test` reports 3 failures — `arrExternalUrlLayoutPropagation`, `lidarrOnboarding` ×2 — due to missing `ARR_CREDENTIAL_MASTER_KEY` env. These are pre-existing and unrelated to PR #203 (documented in source review). Complexity-scoped tests pass 18/18.
