@@ -127,3 +127,4 @@ export type {
 } from './resolved/types.ts';
 export { computeLiveDiff } from './resolved/liveDiff.ts';
 export type { ComputeLiveDiffInput, LiveDiffDeps, LiveDiffReason, LiveDiffResult } from './resolved/liveDiff.ts';
+export { COMPARE_MAX_INSTANCES, isInstanceCountWithinCap, registerCompareAttempt } from './resolved/limits.ts';

@@ -91,6 +91,18 @@ export const NAV_REGISTRY: ArrCapabilityAwareNavItem[] = [
     hasChildren: false,
   },
   {
+    id: 'overview.resolved_config',
+    label: 'Resolved Config',
+    href: '/resolved-config',
+    groupId: ensureGroupId('overview'),
+    order: 2,
+    arrScope: scopeAll,
+    mobilePriority: 'medium',
+    iconKey: 'LayoutGrid',
+    emoji: '🧩',
+    hasChildren: false,
+  },
+  {
     id: 'apps.arrs',
     label: 'Arrs',
     href: '/arr',
