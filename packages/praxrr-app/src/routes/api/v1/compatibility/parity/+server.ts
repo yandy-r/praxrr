@@ -4,9 +4,9 @@ import type { components } from '$api/v1.d.ts';
 import { pcdManager } from '$pcd/index.ts';
 import { computeProfileCompatibility } from '$pcd/entities/qualityProfiles/compatibility.ts';
 import { PARITY_ENTITIES } from '$shared/arr/parity.ts';
-import { ARR_APP_TYPES } from '$shared/pcd/types.ts';
+import { ARR_APP_TYPES } from '$shared/arr/capabilities.ts';
 import { ARR_SEMANTIC_DIFFERENCES } from '$shared/arr/semanticDifferences.ts';
-import { buildParityRows } from '../../../../parity-map/parityRows.ts';
+import { buildParityRows } from '$shared/arr/parityRows.ts';
 import { logger } from '$logger/logger.ts';
 
 type ParityMapResponse = components['schemas']['ParityMapResponse'];
@@ -43,7 +43,8 @@ function getStaticParityPayload(): StaticParityMapPayload {
  * - databaseId: optional PCD database ID; when present, adds `profiles`
  */
 export const GET: RequestHandler = async ({ locals, url }) => {
-  if (!locals.user) {
+  // Fail closed unless authenticated OR auth is explicitly bypassed (AUTH=off / local-subnet bypass).
+  if (!locals.user && !locals.authBypass) {
     return json({ error: 'Unauthorized' } satisfies ErrorResponse, { status: 401 });
   }
 
@@ -54,10 +55,12 @@ export const GET: RequestHandler = async ({ locals, url }) => {
     return json(staticPayload satisfies ParityMapResponse);
   }
 
-  const databaseId = Number.parseInt(databaseIdParam, 10);
-  if (Number.isNaN(databaseId) || databaseId < 0) {
+  // Strict digits-only: reject leading-numeric junk like "1e5"/"1abc"/" 1" outright
+  // per the fail-fast, no-ambiguous-ids policy for this endpoint.
+  if (!/^\d+$/.test(databaseIdParam)) {
     return json({ error: 'Invalid databaseId' } satisfies ErrorResponse, { status: 400 });
   }
+  const databaseId = Number.parseInt(databaseIdParam, 10);
 
   const cache = pcdManager.getCache(databaseId);
   if (!cache?.isBuilt()) {

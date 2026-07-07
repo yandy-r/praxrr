@@ -15,7 +15,7 @@ import {
   type ArrAppType,
 } from '$shared/arr/capabilities.ts';
 import { isMediaManagementSubsectionSupported } from '$sync/mappings.ts';
-import { buildParityRows } from '../../routes/parity-map/parityRows.ts';
+import { buildParityRows } from '$shared/arr/parityRows.ts';
 
 // ============================================================================
 // TRI-STATE TRUTH TABLE

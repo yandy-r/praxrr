@@ -1,6 +1,7 @@
 import type { ServerLoad } from '@sveltejs/kit';
 import { pcdManager } from '$pcd/index.ts';
 import { computeProfileCompatibility, type ProfileCompatibility } from '$pcd/entities/qualityProfiles/compatibility.ts';
+import { logger } from '$logger/logger.ts';
 
 /**
  * Cross-Arr Parity Map route load.
@@ -26,9 +27,8 @@ export const load: ServerLoad = async ({ url }) => {
     return { databases, selectedDatabaseId: null, profiles: null, error: undefined };
   }
 
-  const selectedDatabaseId = Number.parseInt(databaseIdParam, 10);
-
-  if (Number.isNaN(selectedDatabaseId) || selectedDatabaseId < 0) {
+  // Strict digits-only: reject leading-numeric junk like "1e5"/"1abc"/" 1" outright.
+  if (!/^\d+$/.test(databaseIdParam)) {
     return {
       databases,
       selectedDatabaseId: null,
@@ -36,6 +36,8 @@ export const load: ServerLoad = async ({ url }) => {
       error: 'Invalid database ID',
     };
   }
+
+  const selectedDatabaseId = Number.parseInt(databaseIdParam, 10);
 
   const selectedDatabase = databases.find((database) => database.id === selectedDatabaseId);
   if (!selectedDatabase) {
@@ -57,7 +59,14 @@ export const load: ServerLoad = async ({ url }) => {
     };
   }
 
-  const profiles: ProfileCompatibility[] = await computeProfileCompatibility(cache);
-
-  return { databases, selectedDatabaseId, profiles, error: undefined };
+  try {
+    const profiles: ProfileCompatibility[] = await computeProfileCompatibility(cache);
+    return { databases, selectedDatabaseId, profiles, error: undefined };
+  } catch (error) {
+    await logger.error('Failed to compute compatibility parity map', {
+      source: 'parity-map',
+      meta: { databaseId: selectedDatabaseId, error: error instanceof Error ? error.message : String(error) },
+    });
+    return { databases, selectedDatabaseId, profiles: null, error: 'Failed to compute compatibility' };
+  }
 };

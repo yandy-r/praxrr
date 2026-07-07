@@ -22,6 +22,19 @@ export const PARITY_ENTITIES = [
   'metadata_profiles',
 ] as const satisfies readonly ParityEntity[];
 
+/**
+ * Human-readable label per parity entity, in matrix row order. Single source of
+ * truth for entity labels — reused by the matrix row builder and the
+ * semantic-difference scope headings so the strings are never duplicated.
+ */
+export const PARITY_ENTITY_LABELS = {
+  custom_formats: 'Custom Formats',
+  quality_profiles: 'Quality Profiles',
+  quality_definitions: 'Quality Definitions',
+  delay_profiles: 'Delay Profiles',
+  metadata_profiles: 'Metadata Profiles',
+} as const satisfies Record<ParityEntity, string>;
+
 // ============================================================================
 // SYNC-SURFACE BRIDGE (derived, not duplicated)
 // ============================================================================

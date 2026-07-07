@@ -240,15 +240,27 @@ Deno.test('computeProfileCompatibility: summarizes per-profile compatibility acr
 });
 
 Deno.test(
-  'list(cache, arrType) delegates to computeCompatibleProfileNames() for both the enabled-qualities and score-fallback bases',
+  'list(cache, arrType) applies the extracted compatibility filter (independent expectations + delegation parity)',
   async () => {
     const fixture = createCacheFixture(SCHEMA_AND_DATA_SQL);
     try {
-      for (const arrType of ALL_ARR_TYPES) {
-        const compatibleNames = await computeCompatibleProfileNames(fixture.cache, arrType);
-        const listed = await list(fixture.cache, arrType);
+      // Independently-hardcoded expected filtered profile sets per arr type. This guards the
+      // algorithm's actual behavior — not merely that list() calls the same function it filters by.
+      const expectedByArrType: Record<string, string[]> = {
+        radarr: ['Score-Only-Profile', 'Video-Profile'], // video qualities + arr-specific radarr score
+        sonarr: ['Video-Profile'], // video qualities; no arr-specific sonarr score
+        lidarr: ['Audio-Profile'], // audio (FLAC) qualities; Legacy-Lidarr-Profile excluded (transitional row)
+      };
 
-        assertEquals(listed.map((row) => row.name).sort(), [...compatibleNames].sort());
+      for (const arrType of ALL_ARR_TYPES) {
+        const listed = (await list(fixture.cache, arrType)).map((row) => row.name).sort();
+
+        // Independent expectation — the algorithm produces the right set from the fixture.
+        assertEquals(listed, expectedByArrType[arrType]);
+
+        // Delegation parity — list() filters by exactly the extracted predicate's output.
+        const compatibleNames = [...(await computeCompatibleProfileNames(fixture.cache, arrType))].sort();
+        assertEquals(listed, compatibleNames);
       }
     } finally {
       await fixture.destroy();

@@ -93,7 +93,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/components/schemas/ErrorResponse"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -103,7 +103,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/components/schemas/ErrorResponse"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -113,7 +113,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/components/schemas/ErrorResponse"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -2319,6 +2319,18 @@
         "properties": {
           "scope": {
             "type": "string",
+            "enum": [
+              "custom_formats",
+              "quality_profiles",
+              "quality_definitions",
+              "delay_profiles",
+              "metadata_profiles",
+              "instances",
+              "library",
+              "releases",
+              "rename",
+              "upgrades"
+            ],
             "description": "Parity entity or workflow surface this semantic difference applies to"
           },
           "apps": {

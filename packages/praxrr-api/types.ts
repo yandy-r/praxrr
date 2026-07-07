@@ -835,8 +835,21 @@ export interface components {
       profiles?: components['schemas']['ProfileCompatibility'][];
     };
     ArrSemanticDifference: {
-      /** @description Parity entity or workflow surface this semantic difference applies to */
-      scope: string;
+      /**
+       * @description Parity entity or workflow surface this semantic difference applies to
+       * @enum {string}
+       */
+      scope:
+        | 'custom_formats'
+        | 'quality_profiles'
+        | 'quality_definitions'
+        | 'delay_profiles'
+        | 'metadata_profiles'
+        | 'instances'
+        | 'library'
+        | 'releases'
+        | 'rename'
+        | 'upgrades';
       /** @description Arr apps this entry applies to */
       apps: ('radarr' | 'sonarr' | 'lidarr')[];
       /** @description One-line summary of the semantic divergence */

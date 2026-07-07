@@ -17,7 +17,8 @@ const aliases: Record<string, string> = {
   'env-instances': 'packages/praxrr-app/src/tests/base/envInstances.test.ts',
   filters: 'packages/praxrr-app/src/tests/upgrades/filters.test.ts',
   normalize: 'packages/praxrr-app/src/tests/upgrades/normalize.test.ts',
-  parity: 'packages/praxrr-app/src/tests/arr/parityMap.test.ts',
+  parity:
+    'packages/praxrr-app/src/tests/arr/parityMap.test.ts,packages/praxrr-app/src/tests/pcd/qualityProfileCompatibility.test.ts,packages/praxrr-app/src/tests/routes/parityMapApi.test.ts',
   phase3:
     'packages/praxrr-app/src/tests/routes/scoreSimulatorPhase3Helpers.test.ts,packages/praxrr-app/src/tests/routes/scoreSimulatorUrlState.test.ts',
   selectors: 'packages/praxrr-app/src/tests/upgrades/selectors.test.ts',

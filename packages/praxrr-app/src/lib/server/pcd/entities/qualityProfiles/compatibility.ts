@@ -20,7 +20,11 @@ import { QUALITIES } from '$sync/mappings.ts';
  * - it has no enabled qualities but owns an arr-specific custom format score for
  *   `arrType` (never falls back to `arr_type = 'all'` scores).
  */
-export async function computeCompatibleProfileNames(cache: PCDCache, arrType: ArrAppType): Promise<Set<string>> {
+export async function computeCompatibleProfileNames(
+  cache: PCDCache,
+  arrType: ArrAppType,
+  knownProfileNames?: readonly string[]
+): Promise<Set<string>> {
   const db = cache.kb;
 
   const supportedRows = await db
@@ -51,9 +55,12 @@ export async function computeCompatibleProfileNames(cache: PCDCache, arrType: Ar
     return new Set();
   }
 
-  const allProfileNames = (await db.selectFrom('quality_profiles').select(['name']).execute()).map(
-    (profile) => profile.name
-  );
+  // Reuse a caller-provided profile-name list when available to avoid a redundant
+  // round trip (e.g. computeProfileCompatibility iterates all Arr types; list()
+  // has already fetched the profiles).
+  const allProfileNames = knownProfileNames
+    ? [...knownProfileNames]
+    : (await db.selectFrom('quality_profiles').select(['name']).execute()).map((profile) => profile.name);
 
   if (allProfileNames.length === 0) {
     return new Set();
@@ -148,10 +155,11 @@ export async function computeProfileCompatibility(cache: PCDCache): Promise<Prof
   const db = cache.kb;
 
   const profiles = await db.selectFrom('quality_profiles').select(['name']).orderBy('name').execute();
+  const profileNames = profiles.map((profile) => profile.name);
 
   const compatibleNamesByArrType = new Map<ArrAppType, Set<string>>();
   for (const arrType of ARR_APP_TYPES) {
-    compatibleNamesByArrType.set(arrType, await computeCompatibleProfileNames(cache, arrType));
+    compatibleNamesByArrType.set(arrType, await computeCompatibleProfileNames(cache, arrType, profileNames));
   }
 
   return profiles.map((profile) => ({

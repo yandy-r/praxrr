@@ -5,18 +5,19 @@
 		type ParityScope
 	} from '$shared/arr/semanticDifferences.ts';
 	import { getArrAppMetadata } from '$shared/arr/capabilities.ts';
+	import { PARITY_ENTITY_LABELS } from '$shared/arr/parity.ts';
 	import Badge from '$ui/badge/Badge.svelte';
 
 	/** Defaults to the full catalog; accepted as a prop so callers can filter/test in isolation. */
 	export let differences: ArrSemanticDifference[] = ARR_SEMANTIC_DIFFERENCES;
 
-	/** Group heading per scope. Exhaustive so a new `ParityScope` member fails to compile until labeled here. */
+	/**
+	 * Group heading per scope. Entity labels are reused from the single-source
+	 * `PARITY_ENTITY_LABELS`; only the workflow-surface labels are authored here.
+	 * Exhaustive so a new `ParityScope` member fails to compile until labeled.
+	 */
 	const SCOPE_LABELS = {
-		custom_formats: 'Custom Formats',
-		quality_profiles: 'Quality Profiles',
-		quality_definitions: 'Quality Definitions',
-		delay_profiles: 'Delay Profiles',
-		metadata_profiles: 'Metadata Profiles',
+		...PARITY_ENTITY_LABELS,
 		instances: 'Instances',
 		library: 'Library',
 		releases: 'Releases',

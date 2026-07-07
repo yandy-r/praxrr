@@ -1,5 +1,11 @@
-import { PARITY_ENTITIES, getEntitySupportStatus, type ParityEntity, type ParityStatus } from '$shared/arr/parity.ts';
-import { ARR_APP_TYPES, type ArrAppType } from '$shared/pcd/types.ts';
+import {
+  PARITY_ENTITIES,
+  PARITY_ENTITY_LABELS,
+  getEntitySupportStatus,
+  type ParityEntity,
+  type ParityStatus,
+} from '$shared/arr/parity.ts';
+import { ARR_APP_TYPES, type ArrAppType } from '$shared/arr/capabilities.ts';
 
 /** One row of the Cross-Arr Parity Map matrix: an entity plus its per-app support status. */
 export interface ParityRow {
@@ -9,15 +15,6 @@ export interface ParityRow {
   sonarr: ParityStatus;
   lidarr: ParityStatus;
 }
-
-/** Human-readable label per parity entity, in matrix row order. */
-const PARITY_ENTITY_LABELS = {
-  custom_formats: 'Custom Formats',
-  quality_profiles: 'Quality Profiles',
-  quality_definitions: 'Quality Definitions',
-  delay_profiles: 'Delay Profiles',
-  metadata_profiles: 'Metadata Profiles',
-} as const satisfies Record<ParityEntity, string>;
 
 /** Resolve one parity entity's per-app status columns, keyed by app type. */
 function buildAppColumns(entity: ParityEntity): Record<ArrAppType, ParityStatus> {
@@ -31,7 +28,7 @@ function buildAppColumns(entity: ParityEntity): Record<ArrAppType, ParityStatus>
 /**
  * Build the Cross-Arr Parity Map matrix rows: one row per `PARITY_ENTITIES` entry,
  * with each app column resolved via `getEntitySupportStatus`. Pure and Svelte-free
- * so it is unit-testable directly.
+ * so it is unit-testable directly and shareable between the UI page and the API endpoint.
  */
 export function buildParityRows(): ParityRow[] {
   return PARITY_ENTITIES.map((entity) => ({

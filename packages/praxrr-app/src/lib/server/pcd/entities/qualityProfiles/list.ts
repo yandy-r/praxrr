@@ -57,7 +57,11 @@ export async function list(cache: PCDCache, arrType?: ArrAppType): Promise<Quali
   if (profiles.length === 0) return [];
 
   if (arrType) {
-    const compatibleProfileNames = await computeCompatibleProfileNames(cache, arrType);
+    const compatibleProfileNames = await computeCompatibleProfileNames(
+      cache,
+      arrType,
+      profiles.map((profile) => profile.name)
+    );
     profiles = profiles.filter((profile) => compatibleProfileNames.has(profile.name));
     if (profiles.length === 0) {
       return [];
