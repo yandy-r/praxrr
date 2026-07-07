@@ -3,8 +3,9 @@
  *
  * Centralizes version bumps across the monorepo. Each package (app, db, schema)
  * is versioned independently; --target selects the scope. Updates the relevant
- * deno.json / package.json and .release-please-manifest.json entries, and
- * optionally creates and pushes the matching git tags.
+ * deno.json / package.json and .release-please-manifest.json entries, commits the
+ * bump as "chore(release): ...", then optionally creates and pushes the matching
+ * git tags (tag points at the release commit, working tree left clean).
  *
  * Usage:
  *   deno task version 0.3.0                      # app only
@@ -43,6 +44,7 @@ interface CliArgs {
   appVersion?: string;
   dbVersion?: string;
   schemaVersion?: string;
+  commit?: boolean;
   createGitTags: boolean;
   publish: boolean;
   dryRun: boolean;
@@ -75,6 +77,10 @@ function parseArgs(): CliArgs {
       args.schemaVersion = arg.slice('--schema-version='.length);
     } else if (arg === '--create-git-tags') {
       args.createGitTags = true;
+    } else if (arg === '--commit') {
+      args.commit = true;
+    } else if (arg === '--no-commit') {
+      args.commit = false;
     } else if (arg === '--publish' || arg === '--publish-to-gh') {
       args.publish = true;
     } else if (arg === '--dry-run') {
@@ -110,9 +116,17 @@ OPTIONS:
   --db-version=X.Y.Z         Override the db version (else the positional value)
   --schema-version=X.Y.Z     Override the schema version (else the positional value)
   --create-git-tags          Create git tags for the in-scope packages
-  --publish                  Push created tags to origin (implies --create-git-tags)
+  --commit                   Commit the version bump (auto-on with --create-git-tags)
+  --no-commit                Skip the commit; leaves the bump uncommitted (footgun)
+  --publish                  Push the commit + tags to origin (implies --create-git-tags)
   --dry-run                  Preview changes without writing
   --help, -h                 Show this help message
+
+ORDER OF OPERATIONS (with --create-git-tags):
+  1. Write version files    2. Commit "chore(release): ..." (bumped files only)
+  3. Create tag(s)          4. Push commit + tags (with --publish)
+  The commit lands before the tag so tags point at the release commit and the
+  working tree stays clean. Only bumped version files are staged.
 
 TARGET SCOPE:
   app     Bumps package.json, packages/praxrr-app/deno.json, manifest "."; tags app/v*
@@ -320,18 +334,45 @@ async function createTag(tag: string, dryRun: boolean): Promise<void> {
   console.log(`  Created tag: ${tag}`);
 }
 
-async function pushTags(tags: string[], dryRun: boolean): Promise<void> {
+async function commitChanges(files: string[], message: string, dryRun: boolean): Promise<void> {
   if (dryRun) {
-    console.log(`[DRY-RUN] git push origin ${tags.join(' ')}`);
+    console.log(`[DRY-RUN] git add ${files.join(' ')}`);
+    console.log(`[DRY-RUN] git commit -m "${message}"`);
     return;
   }
-  const cmd = new Deno.Command('git', { args: ['push', 'origin', ...tags], stdout: 'piped', stderr: 'piped' });
+  const add = new Deno.Command('git', { args: ['add', ...files], stderr: 'piped' });
+  const addResult = await add.output();
+  if (!addResult.success) {
+    throw new Error(`Failed to stage version files: ${new TextDecoder().decode(addResult.stderr)}`);
+  }
+  const commit = new Deno.Command('git', { args: ['commit', '-m', message], stdout: 'piped', stderr: 'piped' });
+  const { success, stderr } = await commit.output();
+  if (!success) {
+    throw new Error(`Failed to commit version bump: ${new TextDecoder().decode(stderr)}`);
+  }
+  console.log(`  Created commit: ${message}`);
+}
+
+async function pushToOrigin(refs: string[], dryRun: boolean): Promise<void> {
+  if (dryRun) {
+    console.log(`[DRY-RUN] git push origin ${refs.join(' ')}`);
+    return;
+  }
+  const cmd = new Deno.Command('git', { args: ['push', 'origin', ...refs], stdout: 'piped', stderr: 'piped' });
   const { success, stderr } = await cmd.output();
   if (!success) {
     const err = new TextDecoder().decode(stderr);
-    throw new Error(`Failed to push tags: ${err}`);
+    throw new Error(`Failed to push to origin: ${err}`);
   }
-  console.log(`  Pushed tags to origin: ${tags.join(', ')}`);
+  console.log(`  Pushed to origin: ${refs.join(', ')}`);
+}
+
+function buildReleaseMessage(appVersion?: string, dbVersion?: string, schemaVersion?: string): string {
+  const parts: string[] = [];
+  if (appVersion) parts.push(`v${appVersion}`);
+  if (dbVersion) parts.push(`db v${dbVersion}`);
+  if (schemaVersion) parts.push(`schema v${schemaVersion}`);
+  return `chore(release): ${parts.join(', ')}`;
 }
 
 // ============================================================================
@@ -438,23 +479,42 @@ async function main(): Promise<void> {
     }
   }
 
+  // Commit the version bump BEFORE tagging so tags point at the release commit and
+  // the working tree is left clean. Only the bumped version files are staged — any
+  // other unrelated working-tree changes are left untouched. Defaults on whenever
+  // tags are created (i.e. every publish:* task); opt out with --no-commit.
+  const doCommit = changes.length > 0 && (args.commit ?? args.createGitTags);
+  let didCommit = false;
+  if (doCommit) {
+    const message = buildReleaseMessage(appVersion, dbVersion, schemaVersion);
+    const files = [...new Set(changes.map((c) => c.file))];
+    console.log(args.dryRun ? '\n[DRY-RUN] Commit that would be created:' : '\nCommitting version bump...');
+    await commitChanges(files, message, args.dryRun);
+    didCommit = true;
+  } else if (changes.length > 0 && args.createGitTags && args.commit === false) {
+    console.warn(
+      '\nWarning: --no-commit set — version files remain uncommitted and tags will point at the ' +
+        'current (pre-bump) HEAD.'
+    );
+  }
+
   // Create git tags
   if (args.createGitTags) {
-    console.log(args.dryRun ? '\n[DRY-RUN] Tags that would be created:' : '\nCreating git tags...');
-
     const tags: string[] = [];
     if (appVersion) tags.push(`app/v${appVersion}`);
     if (dbVersion) tags.push(`db/v${dbVersion}`);
     if (schemaVersion) tags.push(`schema/v${schemaVersion}`);
 
+    console.log(args.dryRun ? '\n[DRY-RUN] Tags that would be created:' : '\nCreating git tags...');
     for (const tag of tags) {
       await createTag(tag, args.dryRun);
     }
 
-    // Push tags to origin
+    // Push the release commit (if any) and tags together so origin stays in sync.
     if (args.publish) {
-      console.log(args.dryRun ? '\n[DRY-RUN] Tags that would be pushed:' : '\nPushing tags to origin...');
-      await pushTags(tags, args.dryRun);
+      const refs = didCommit ? ['HEAD', ...tags] : tags;
+      console.log(args.dryRun ? '\n[DRY-RUN] Refs that would be pushed:' : '\nPushing to origin...');
+      await pushToOrigin(refs, args.dryRun);
     }
   }
 
