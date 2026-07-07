@@ -6,6 +6,7 @@
   import type { components } from '$api/v1.d.ts';
   import ResolvedStatePanel from './ResolvedStatePanel.svelte';
   import LiveDiffPanel from './LiveDiffPanel.svelte';
+  import CrossInstanceGrid from './CrossInstanceGrid.svelte';
   import type { PageData } from './$types';
 
   export let data: PageData;
@@ -57,6 +58,7 @@
   const panels: ConfigPanel[] = [
     { id: 'resolved-state', label: 'Resolved State', component: ResolvedStatePanel },
     { id: 'live-diff', label: 'Live Diff', component: LiveDiffPanel },
+    { id: 'cross-instance', label: 'Compare Instances', component: CrossInstanceGrid },
   ];
 
   let activePanelId = panels[0].id;
