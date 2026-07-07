@@ -59,9 +59,7 @@
         "operationId": "getHealth",
         "summary": "Health check",
         "description": "Returns the health status of the application and its components.\n\nStatus values:\n- `healthy`: All components functioning normally\n- `degraded`: Core functionality works but some components have issues\n- `unhealthy`: Core functionality is broken\n\nUse `?verbose=true` for detailed component information.\n",
-        "tags": [
-          "System"
-        ],
+        "tags": ["System"],
         "parameters": [
           {
             "name": "verbose",
@@ -92,9 +90,7 @@
         "operationId": "getOpenApiSpec",
         "summary": "OpenAPI specification",
         "description": "Returns the OpenAPI specification for this API",
-        "tags": [
-          "System"
-        ],
+        "tags": ["System"],
         "responses": {
           "200": {
             "description": "OpenAPI specification",
@@ -114,9 +110,7 @@
         "operationId": "getParserHealth",
         "summary": "Parser health check",
         "description": "Returns the availability status of the release title parser service.",
-        "tags": [
-          "System"
-        ],
+        "tags": ["System"],
         "responses": {
           "200": {
             "description": "Parser health status",
@@ -124,9 +118,7 @@
               "application/json": {
                 "schema": {
                   "type": "object",
-                  "required": [
-                    "parserAvailable"
-                  ],
+                  "required": ["parserAvailable"],
                   "properties": {
                     "parserAvailable": {
                       "type": "boolean",
@@ -145,9 +137,7 @@
         "operationId": "getLatestStartupPull",
         "summary": "Latest startup pull run",
         "description": "Returns the latest startup pull run with per-instance outcomes.\n\nThe startup pull feature reconstructs Arr sync selections from live Arr\nstate on application startup when `PULL_ON_START=true`. This endpoint\nprovides visibility into the most recent run for support and diagnostics.\n\nRun-level status values:\n- `success`: All instances completed without failures\n- `partial`: Some instances succeeded and some failed\n- `failed`: All instances failed\n- `skipped`: No instances were processed\n- `disabled`: Feature was disabled at run time\n\nPer-instance status values follow `JobRunStatus`:\n- `success`: Instance pull completed\n- `failure`: Instance pull failed\n- `skipped`: Instance was skipped\n- `cancelled`: Instance pull was cancelled\n",
-        "tags": [
-          "System"
-        ],
+        "tags": ["System"],
         "responses": {
           "200": {
             "description": "Latest startup pull run with per-instance outcomes",
@@ -187,9 +177,7 @@
         "operationId": "getUiPreference",
         "summary": "Read one UI preference",
         "description": "Returns the preferred disclosure mode for a section key.\n\nMissing persisted values are returned as default `basic` unless `strict`\nis enabled.\n",
-        "tags": [
-          "User Preferences"
-        ],
+        "tags": ["User Preferences"],
         "parameters": [
           {
             "name": "section_key",
@@ -268,9 +256,7 @@
         "operationId": "upsertUiPreference",
         "summary": "Upsert one UI preference",
         "description": "Creates or updates the stored disclosure mode for a section key.\n\nPayloads include optional concurrency token `expected_updated_at`.\n",
-        "tags": [
-          "User Preferences"
-        ],
+        "tags": ["User Preferences"],
         "requestBody": {
           "required": true,
           "content": {
@@ -350,9 +336,7 @@
         "operationId": "getComplexityTier",
         "summary": "Read one complexity tier",
         "description": "Returns the preferred complexity tier and progression counters for a\nsection key.\n\nMissing persisted values are returned as default `beginner` unless\n`strict` is enabled.\n",
-        "tags": [
-          "Complexity Tiers"
-        ],
+        "tags": ["Complexity Tiers"],
         "parameters": [
           {
             "name": "section_key",
@@ -431,9 +415,7 @@
         "operationId": "upsertComplexityTier",
         "summary": "Upsert one complexity tier",
         "description": "Creates or updates the stored complexity tier for a section key.\n\nPayloads include optional concurrency token `expected_updated_at`.\nActivity deltas are bounded and may be used to drive non-intrusive\nprogression suggestions.\n",
-        "tags": [
-          "Complexity Tiers"
-        ],
+        "tags": ["Complexity Tiers"],
         "requestBody": {
           "required": true,
           "content": {
@@ -513,9 +495,7 @@
         "operationId": "evaluateReleases",
         "summary": "Evaluate releases against custom formats",
         "description": "Parses release titles and evaluates them against all custom formats in the specified database.\n\nThis endpoint:\n- Parses each release title to extract metadata (resolution, source, languages, etc.)\n- Matches regex patterns using .NET-compatible regex via the parser service\n- Evaluates each release against all custom formats in the database\n- Returns which custom formats match each release\n\nResults are cached for performance - repeated requests with the same titles will be faster.\n",
-        "tags": [
-          "Entity Testing"
-        ],
+        "tags": ["Entity Testing"],
         "requestBody": {
           "required": true,
           "content": {
@@ -551,9 +531,7 @@
         "operationId": "simulateScore",
         "summary": "Simulate custom format scoring for releases",
         "description": "Parses release titles, evaluates custom format matches, and calculates\nper-profile scores for interactive score simulation.\n",
-        "tags": [
-          "Score Simulator"
-        ],
+        "tags": ["Score Simulator"],
         "requestBody": {
           "required": true,
           "content": {
@@ -581,9 +559,7 @@
               "application/json": {
                 "schema": {
                   "type": "object",
-                  "required": [
-                    "error"
-                  ],
+                  "required": ["error"],
                   "properties": {
                     "error": {
                       "type": "string"
@@ -599,10 +575,7 @@
               "application/json": {
                 "schema": {
                   "type": "object",
-                  "required": [
-                    "error",
-                    "missing"
-                  ],
+                  "required": ["error", "missing"],
                   "properties": {
                     "error": {
                       "type": "string"
@@ -624,9 +597,7 @@
               "application/json": {
                 "schema": {
                   "type": "object",
-                  "required": [
-                    "error"
-                  ],
+                  "required": ["error"],
                   "properties": {
                     "error": {
                       "type": "string"
@@ -644,9 +615,7 @@
         "operationId": "getLibrary",
         "summary": "Get Arr instance library",
         "description": "Fetches the full library from an Arr instance with quality profile,\nscore, and progress information.\n\n- For Radarr: Returns movies with file quality, custom format scores, and cutoff progress\n- For Sonarr: Returns series with season summaries and episode statistics\n- For Lidarr: Returns artists/albums (capability-gated; detailed payload fields deferred to later phases)\n\nResults include Praxrr profile matching to indicate which items use managed profiles.\nResponses are cached server-side for 5 minutes.\nSupports server-side filtering, sorting, and pagination.\n",
-        "tags": [
-          "Arr"
-        ],
+        "tags": ["Arr"],
         "parameters": [
           {
             "name": "instanceId",
@@ -695,10 +664,7 @@
             "required": false,
             "schema": {
               "type": "string",
-              "enum": [
-                "asc",
-                "desc"
-              ],
+              "enum": ["asc", "desc"],
               "default": "asc"
             },
             "description": "Sort order for the sortKey field."
@@ -760,9 +726,7 @@
         "operationId": "invalidateLibraryCache",
         "summary": "Invalidate library cache",
         "description": "Clears the server-side cache for an Arr instance's library data.\nThe next GET request will fetch fresh data from the Arr instance.\n",
-        "tags": [
-          "Arr"
-        ],
+        "tags": ["Arr"],
         "parameters": [
           {
             "name": "instanceId",
@@ -803,9 +767,7 @@
         "operationId": "getLibraryEpisodes",
         "summary": "Get episode details for a Sonarr series",
         "description": "Lazy-loads episode-level data for a specific series in a Sonarr instance.\nReturns episodes with quality, custom format scores, and cutoff progress.\n\nThis endpoint is designed for on-demand loading when a series row is expanded\nin the library view. Sonarr instances only.\n\nResults are cached server-side for 5 minutes per series.\n",
-        "tags": [
-          "Arr"
-        ],
+        "tags": ["Arr"],
         "parameters": [
           {
             "name": "instanceId",
@@ -875,9 +837,7 @@
         "operationId": "getReleases",
         "summary": "Search for releases",
         "description": "Triggers an interactive search on an Arr instance and returns grouped/deduplicated results.\n\nFor Radarr: Searches for releases for the specified movie.\nFor Sonarr: Searches for season pack releases for the specified series and season.\nFor Lidarr: Searches for releases for the specified album.\n\nResults are grouped by title, combining information from multiple indexers.\n",
-        "tags": [
-          "Arr"
-        ],
+        "tags": ["Arr"],
         "parameters": [
           {
             "name": "instanceId",
@@ -957,9 +917,7 @@
         "operationId": "arrCleanup",
         "summary": "Scan or execute cleanup of stale configs",
         "description": "Detects and deletes stale namespace-suffixed custom formats and quality profiles\nfrom an Arr instance that are no longer in the current sync selections.\n\nTwo actions are supported via the `action` field in the request body:\n- `scan`: Scans for stale items and returns what would be deleted.\n- `execute`: Deletes the stale items from a previous scan result.\n\nQuality profiles assigned to media will be skipped with a warning (Arr returns HTTP 500 \"in use\").\n",
-        "tags": [
-          "Arr"
-        ],
+        "tags": ["Arr"],
         "requestBody": {
           "required": true,
           "content": {
@@ -1033,9 +991,7 @@
         "operationId": "getTrashGuideSourceEntity",
         "summary": "Get one TRaSH cached entity",
         "description": "Returns a single TRaSH entity from a synced source cache by trashId.\n",
-        "tags": [
-          "Trash Guide"
-        ],
+        "tags": ["Trash Guide"],
         "parameters": [
           {
             "name": "id",
@@ -1124,9 +1080,7 @@
         "operationId": "createSyncPreview",
         "summary": "Generate a sync preview",
         "description": "Computes a read-only preview of the sync changes for an Arr instance.\n\nThis endpoint performs no writes. It only reads from PCD and Arr GET\nendpoints to compare desired versus current state, then stores a preview\nsnapshot for later retrieval or application.\n\nIf no `sections` are provided, all configured sections for the instance are\nincluded.\n",
-        "tags": [
-          "Arr"
-        ],
+        "tags": ["Arr"],
         "requestBody": {
           "required": true,
           "content": {
@@ -1206,9 +1160,7 @@
         "operationId": "getSyncPreview",
         "summary": "Get a sync preview",
         "description": "Retrieves a previously generated preview snapshot by ID.\n\nThis endpoint is read-only and is safe to call repeatedly while preview state\nchanges naturally over time.\n\nSnapshots are subject to staleness rules enforced by the preview TTL. A\npreview that has exceeded the TTL should be treated as expired.\n",
-        "tags": [
-          "Arr"
-        ],
+        "tags": ["Arr"],
         "parameters": [
           {
             "name": "previewId",
@@ -1257,9 +1209,7 @@
         "operationId": "deleteSyncPreview",
         "summary": "Discard a sync preview",
         "description": "Removes a stored preview snapshot.\n\nThis endpoint does not trigger any Arr sync action; it only removes the cached\npreview and does not change runtime configuration.\n",
-        "tags": [
-          "Arr"
-        ],
+        "tags": ["Arr"],
         "parameters": [
           {
             "name": "previewId",
@@ -1303,9 +1253,7 @@
         "operationId": "applySyncPreview",
         "summary": "Apply a sync preview",
         "description": "Applies a previously generated preview to the target Arr instance.\n\nPreview generation itself is read-only, but this operation runs the normal sync\nexecution path for the selected sections.\n\nApply rejects previews that are too stale based on policy:\n- warnings are returned when the preview is older than 5 minutes\n- apply is blocked when staleness exceeds the hard threshold\n",
-        "tags": [
-          "Arr"
-        ],
+        "tags": ["Arr"],
         "parameters": [
           {
             "name": "previewId",
@@ -1396,9 +1344,7 @@
         "operationId": "exportEntity",
         "summary": "Export a portable entity",
         "description": "Serializes a PCD entity into its portable JSON representation.\n\nThe portable format strips database IDs and timestamps, producing a\nself-contained snapshot suitable for clipboard copy, file export, or\ncross-database import.\n",
-        "tags": [
-          "PCD"
-        ],
+        "tags": ["PCD"],
         "parameters": [
           {
             "name": "databaseId",
@@ -1477,9 +1423,7 @@
         "operationId": "importEntity",
         "summary": "Import a portable entity",
         "description": "Deserializes a portable entity into PCD operations, creating the entity\nin the target database and layer.\n\nThe request body matches the export response format (`entityType` + `data`),\nplus `databaseId` and `layer` to specify the target.\nOptional `migration` metadata (`format`, `version`, `source`) can be provided\nfor hybrid JSON/YAML ingestion flows.\n\nName uniqueness is validated — importing an entity with a name that already\nexists will return a 400 error.\n",
-        "tags": [
-          "PCD"
-        ],
+        "tags": ["PCD"],
         "requestBody": {
           "required": true,
           "content": {
@@ -1539,9 +1483,7 @@
         "operationId": "createPcdSnapshot",
         "summary": "Create a manual PCD snapshot",
         "description": "Creates a manual snapshot of the current PCD database state. The snapshot\ncaptures ops metadata and a state fingerprint for future restore operations.\n",
-        "tags": [
-          "PCD Snapshots"
-        ],
+        "tags": ["PCD Snapshots"],
         "parameters": [
           {
             "name": "databaseId",
@@ -1610,9 +1552,7 @@
         "operationId": "listPcdSnapshots",
         "summary": "List PCD snapshots for a database",
         "description": "Returns a paginated list of snapshots for the specified database, ordered\nby creation time descending.\n",
-        "tags": [
-          "PCD Snapshots"
-        ],
+        "tags": ["PCD Snapshots"],
         "parameters": [
           {
             "name": "databaseId",
@@ -1630,10 +1570,7 @@
             "description": "Filter by snapshot type",
             "schema": {
               "type": "string",
-              "enum": [
-                "auto",
-                "manual"
-              ]
+              "enum": ["auto", "manual"]
             }
           },
           {
@@ -1709,9 +1646,7 @@
         "operationId": "getPcdSnapshot",
         "summary": "Get PCD snapshot detail",
         "description": "Returns full snapshot detail including computed fields for restore context\n(opsWrittenSince, isRestorable). Restore support is not yet implemented,\nso `isRestorable` is always false.\n",
-        "tags": [
-          "PCD Snapshots"
-        ],
+        "tags": ["PCD Snapshots"],
         "parameters": [
           {
             "name": "databaseId",
@@ -1779,9 +1714,7 @@
         "operationId": "deletePcdSnapshot",
         "summary": "Delete a PCD snapshot",
         "description": "Deletes a snapshot. Ownership is enforced — the snapshot must belong to the\nspecified database.\n",
-        "tags": [
-          "PCD Snapshots"
-        ],
+        "tags": ["PCD Snapshots"],
         "parameters": [
           {
             "name": "databaseId",
@@ -1844,9 +1777,7 @@
         "operationId": "listLidarrMetadataProfiles",
         "summary": "List Lidarr metadata profiles",
         "description": "Reads Lidarr metadata profiles from a PCD database.\n\nMetadata profiles are a Lidarr-only entity family and are not available\nfor Radarr or Sonarr entities.\n\nRead payloads are list DTOs that expose counts, not full type payloads.\n",
-        "tags": [
-          "PCD"
-        ],
+        "tags": ["PCD"],
         "parameters": [
           {
             "name": "databaseId",
@@ -1908,9 +1839,7 @@
         "operationId": "createLidarrMetadataProfile",
         "summary": "Create a Lidarr metadata profile",
         "description": "Creates a Lidarr metadata profile in the selected PCD database.\n\nRuntime validation enforces Lidarr-specific rules including:\n- case-insensitive unique profile name\n- reserved name `None` is rejected\n- all source categories include explicit `allowed` booleans\n- type/status rows in write payloads use `id`, `name`, and `allowed`.\n",
-        "tags": [
-          "PCD"
-        ],
+        "tags": ["PCD"],
         "parameters": [
           {
             "name": "databaseId",
@@ -1981,9 +1910,7 @@
         "operationId": "getLidarrMetadataProfile",
         "summary": "Get one Lidarr metadata profile",
         "description": "Returns a single Lidarr metadata profile by local profile id.\n\nPayloads are the PCD contract used by runtime sync and portable\noperations, not the Lidarr API payload shape.\n",
-        "tags": [
-          "PCD"
-        ],
+        "tags": ["PCD"],
         "parameters": [
           {
             "name": "databaseId",
@@ -2050,9 +1977,7 @@
         "operationId": "updateLidarrMetadataProfile",
         "summary": "Update a Lidarr metadata profile",
         "description": "Updates selected fields of an existing Lidarr metadata profile.\n\nPartial updates are supported for edit flows.\nUpdates remain Lidarr-only and validate value-guard constraints.\n\nAt least one mutable field must be provided.\nUpdates use stable-name/value-guard semantics for concurrency safety.\n",
-        "tags": [
-          "PCD"
-        ],
+        "tags": ["PCD"],
         "parameters": [
           {
             "name": "databaseId",
@@ -2129,9 +2054,7 @@
         "operationId": "deleteLidarrMetadataProfile",
         "summary": "Delete a Lidarr metadata profile",
         "description": "Deletes a Lidarr metadata profile by id.\n\nDeletes are rejected if runtime guard checks detect in-use rows or stale\nvalue guards.\nThis endpoint must only be invoked for Lidarr-backed databases.\nDelete payloads must include the current row name for value-guard safety.\n",
-        "tags": [
-          "PCD"
-        ],
+        "tags": ["PCD"],
         "parameters": [
           {
             "name": "databaseId",
@@ -2210,29 +2133,17 @@
     "schemas": {
       "ComponentStatus": {
         "type": "string",
-        "enum": [
-          "healthy",
-          "degraded",
-          "unhealthy"
-        ],
+        "enum": ["healthy", "degraded", "unhealthy"],
         "description": "Individual component health status"
       },
       "HealthStatus": {
         "type": "string",
-        "enum": [
-          "healthy",
-          "degraded",
-          "unhealthy"
-        ],
+        "enum": ["healthy", "degraded", "unhealthy"],
         "description": "Overall health status"
       },
       "SqliteHealth": {
         "type": "object",
-        "required": [
-          "status",
-          "responseTimeMs",
-          "migration"
-        ],
+        "required": ["status", "responseTimeMs", "migration"],
         "properties": {
           "status": {
             "$ref": "#/components/schemas/ComponentStatus"
@@ -2253,9 +2164,7 @@
       },
       "ReposHealth": {
         "type": "object",
-        "required": [
-          "status"
-        ],
+        "required": ["status"],
         "properties": {
           "status": {
             "$ref": "#/components/schemas/ComponentStatus"
@@ -2284,9 +2193,7 @@
       },
       "JobsHealth": {
         "type": "object",
-        "required": [
-          "status"
-        ],
+        "required": ["status"],
         "properties": {
           "status": {
             "$ref": "#/components/schemas/ComponentStatus"
@@ -2308,10 +2215,7 @@
       },
       "BackupsHealth": {
         "type": "object",
-        "required": [
-          "status",
-          "enabled"
-        ],
+        "required": ["status", "enabled"],
         "properties": {
           "status": {
             "$ref": "#/components/schemas/ComponentStatus"
@@ -2346,9 +2250,7 @@
       },
       "LogsHealth": {
         "type": "object",
-        "required": [
-          "status"
-        ],
+        "required": ["status"],
         "properties": {
           "status": {
             "$ref": "#/components/schemas/ComponentStatus"
@@ -2381,13 +2283,7 @@
       },
       "HealthResponse": {
         "type": "object",
-        "required": [
-          "status",
-          "timestamp",
-          "version",
-          "uptime",
-          "components"
-        ],
+        "required": ["status", "timestamp", "version", "uptime", "components"],
         "properties": {
           "status": {
             "$ref": "#/components/schemas/HealthStatus"
@@ -2407,13 +2303,7 @@
           },
           "components": {
             "type": "object",
-            "required": [
-              "sqlite",
-              "repos",
-              "jobs",
-              "backups",
-              "logs"
-            ],
+            "required": ["sqlite", "repos", "jobs", "backups", "logs"],
             "properties": {
               "sqlite": {
                 "$ref": "#/components/schemas/SqliteHealth"
@@ -2436,21 +2326,12 @@
       },
       "MediaType": {
         "type": "string",
-        "enum": [
-          "movie",
-          "series"
-        ],
+        "enum": ["movie", "series"],
         "description": "Type of media"
       },
       "ParsedInfo": {
         "type": "object",
-        "required": [
-          "source",
-          "resolution",
-          "modifier",
-          "languages",
-          "year"
-        ],
+        "required": ["source", "resolution", "modifier", "languages", "year"],
         "properties": {
           "source": {
             "type": "string",
@@ -2494,11 +2375,7 @@
       },
       "ReleaseInput": {
         "type": "object",
-        "required": [
-          "id",
-          "title",
-          "type"
-        ],
+        "required": ["id", "title", "type"],
         "properties": {
           "id": {
             "type": "integer",
@@ -2515,11 +2392,7 @@
       },
       "ReleaseEvaluation": {
         "type": "object",
-        "required": [
-          "releaseId",
-          "title",
-          "cfMatches"
-        ],
+        "required": ["releaseId", "title", "cfMatches"],
         "properties": {
           "releaseId": {
             "type": "integer",
@@ -2543,9 +2416,7 @@
       },
       "EvaluateRequest": {
         "type": "object",
-        "required": [
-          "releases"
-        ],
+        "required": ["releases"],
         "properties": {
           "databaseId": {
             "type": "integer",
@@ -2562,10 +2433,7 @@
       },
       "EvaluateResponse": {
         "type": "object",
-        "required": [
-          "parserAvailable",
-          "evaluations"
-        ],
+        "required": ["parserAvailable", "evaluations"],
         "properties": {
           "parserAvailable": {
             "type": "boolean",
@@ -2582,16 +2450,7 @@
       },
       "SimulateConditionResult": {
         "type": "object",
-        "required": [
-          "conditionName",
-          "conditionType",
-          "matched",
-          "required",
-          "negate",
-          "passes",
-          "expected",
-          "actual"
-        ],
+        "required": ["conditionName", "conditionType", "matched", "required", "negate", "passes", "expected", "actual"],
         "properties": {
           "conditionName": {
             "type": "string"
@@ -2621,11 +2480,7 @@
       },
       "SimulateCfMatch": {
         "type": "object",
-        "required": [
-          "name",
-          "matches",
-          "conditions"
-        ],
+        "required": ["name", "matches", "conditions"],
         "properties": {
           "name": {
             "type": "string"
@@ -2643,10 +2498,7 @@
       },
       "SimulateScoreContribution": {
         "type": "object",
-        "required": [
-          "cfName",
-          "score"
-        ],
+        "required": ["cfName", "score"],
         "properties": {
           "cfName": {
             "type": "string"
@@ -2658,13 +2510,7 @@
       },
       "SimulateProfileScore": {
         "type": "object",
-        "required": [
-          "profileName",
-          "totalScore",
-          "minimumScore",
-          "upgradeUntilScore",
-          "contributions"
-        ],
+        "required": ["profileName", "totalScore", "minimumScore", "upgradeUntilScore", "contributions"],
         "properties": {
           "profileName": {
             "type": "string"
@@ -2688,13 +2534,7 @@
       },
       "SimulateReleaseResult": {
         "type": "object",
-        "required": [
-          "id",
-          "title",
-          "parsed",
-          "cfMatches",
-          "profileScores"
-        ],
+        "required": ["id", "title", "parsed", "cfMatches", "profileScores"],
         "properties": {
           "id": {
             "type": "string"
@@ -2728,11 +2568,7 @@
       },
       "SimulateReleaseInput": {
         "type": "object",
-        "required": [
-          "id",
-          "title",
-          "type"
-        ],
+        "required": ["id", "title", "type"],
         "properties": {
           "id": {
             "type": "string",
@@ -2744,21 +2580,13 @@
           },
           "type": {
             "type": "string",
-            "enum": [
-              "movie",
-              "series"
-            ]
+            "enum": ["movie", "series"]
           }
         }
       },
       "SimulateScoreRequest": {
         "type": "object",
-        "required": [
-          "databaseId",
-          "releases",
-          "profileNames",
-          "arrType"
-        ],
+        "required": ["databaseId", "releases", "profileNames", "arrType"],
         "properties": {
           "databaseId": {
             "type": "integer",
@@ -2782,20 +2610,14 @@
           },
           "arrType": {
             "type": "string",
-            "enum": [
-              "radarr",
-              "sonarr"
-            ],
+            "enum": ["radarr", "sonarr"],
             "description": "Arr type for score column resolution"
           }
         }
       },
       "SimulateScoreResponse": {
         "type": "object",
-        "required": [
-          "parserAvailable",
-          "results"
-        ],
+        "required": ["parserAvailable", "results"],
         "properties": {
           "parserAvailable": {
             "type": "boolean"
@@ -2810,19 +2632,12 @@
       },
       "ArrType": {
         "type": "string",
-        "enum": [
-          "radarr",
-          "sonarr",
-          "lidarr"
-        ],
+        "enum": ["radarr", "sonarr", "lidarr"],
         "description": "Type of Arr instance"
       },
       "CustomFormatRef": {
         "type": "object",
-        "required": [
-          "id",
-          "name"
-        ],
+        "required": ["id", "name"],
         "properties": {
           "id": {
             "type": "integer",
@@ -2836,10 +2651,7 @@
       },
       "ScoreBreakdownItem": {
         "type": "object",
-        "required": [
-          "name",
-          "score"
-        ],
+        "required": ["name", "score"],
         "properties": {
           "name": {
             "type": "string",
@@ -2853,11 +2665,7 @@
       },
       "ProfileByDatabase": {
         "type": "object",
-        "required": [
-          "databaseId",
-          "databaseName",
-          "profiles"
-        ],
+        "required": ["databaseId", "databaseName", "profiles"],
         "properties": {
           "databaseId": {
             "type": "integer",
@@ -3220,9 +3028,7 @@
         "properties": {
           "type": {
             "type": "string",
-            "enum": [
-              "radarr"
-            ]
+            "enum": ["radarr"]
           },
           "items": {
             "type": "array",
@@ -3273,9 +3079,7 @@
         "properties": {
           "type": {
             "type": "string",
-            "enum": [
-              "sonarr"
-            ]
+            "enum": ["sonarr"]
           },
           "items": {
             "type": "array",
@@ -3326,9 +3130,7 @@
         "properties": {
           "type": {
             "type": "string",
-            "enum": [
-              "lidarr"
-            ]
+            "enum": ["lidarr"]
           },
           "items": {
             "type": "array",
@@ -3380,9 +3182,7 @@
       },
       "EpisodesResponse": {
         "type": "object",
-        "required": [
-          "episodes"
-        ],
+        "required": ["episodes"],
         "properties": {
           "episodes": {
             "type": "array",
@@ -3395,9 +3195,7 @@
       },
       "CacheInvalidatedResponse": {
         "type": "object",
-        "required": [
-          "success"
-        ],
+        "required": ["success"],
         "properties": {
           "success": {
             "type": "boolean",
@@ -3407,13 +3205,7 @@
       },
       "GroupedRelease": {
         "type": "object",
-        "required": [
-          "title",
-          "size",
-          "languages",
-          "indexers",
-          "flags"
-        ],
+        "required": ["title", "size", "languages", "indexers", "flags"],
         "properties": {
           "title": {
             "type": "string",
@@ -3448,11 +3240,7 @@
       },
       "ReleasesResponse": {
         "type": "object",
-        "required": [
-          "type",
-          "rawCount",
-          "releases"
-        ],
+        "required": ["type", "rawCount", "releases"],
         "properties": {
           "type": {
             "$ref": "#/components/schemas/ArrType"
@@ -3472,9 +3260,7 @@
       },
       "ErrorResponse": {
         "type": "object",
-        "required": [
-          "error"
-        ],
+        "required": ["error"],
         "properties": {
           "error": {
             "type": "string",
@@ -3484,11 +3270,7 @@
       },
       "StaleItem": {
         "type": "object",
-        "required": [
-          "id",
-          "name",
-          "strippedName"
-        ],
+        "required": ["id", "name", "strippedName"],
         "properties": {
           "id": {
             "type": "integer",
@@ -3506,10 +3288,7 @@
       },
       "CleanupScanRequest": {
         "type": "object",
-        "required": [
-          "instanceId",
-          "action"
-        ],
+        "required": ["instanceId", "action"],
         "properties": {
           "instanceId": {
             "type": "integer",
@@ -3517,19 +3296,13 @@
           },
           "action": {
             "type": "string",
-            "enum": [
-              "scan"
-            ]
+            "enum": ["scan"]
           }
         }
       },
       "CleanupExecuteRequest": {
         "type": "object",
-        "required": [
-          "instanceId",
-          "action",
-          "scanResult"
-        ],
+        "required": ["instanceId", "action", "scanResult"],
         "properties": {
           "instanceId": {
             "type": "integer",
@@ -3537,9 +3310,7 @@
           },
           "action": {
             "type": "string",
-            "enum": [
-              "execute"
-            ]
+            "enum": ["execute"]
           },
           "scanResult": {
             "$ref": "#/components/schemas/CleanupScanResult"
@@ -3548,10 +3319,7 @@
       },
       "CleanupScanResult": {
         "type": "object",
-        "required": [
-          "staleCustomFormats",
-          "staleQualityProfiles"
-        ],
+        "required": ["staleCustomFormats", "staleQualityProfiles"],
         "properties": {
           "staleCustomFormats": {
             "type": "array",
@@ -3571,10 +3339,7 @@
       },
       "SkippedItem": {
         "type": "object",
-        "required": [
-          "item",
-          "reason"
-        ],
+        "required": ["item", "reason"],
         "properties": {
           "item": {
             "$ref": "#/components/schemas/StaleItem"
@@ -3587,11 +3352,7 @@
       },
       "CleanupDeleteResult": {
         "type": "object",
-        "required": [
-          "deletedCustomFormats",
-          "deletedQualityProfiles",
-          "skippedQualityProfiles"
-        ],
+        "required": ["deletedCustomFormats", "deletedQualityProfiles", "skippedQualityProfiles"],
         "properties": {
           "deletedCustomFormats": {
             "type": "array",
@@ -3618,9 +3379,7 @@
       },
       "SyncPreviewCreateRequest": {
         "type": "object",
-        "required": [
-          "instanceId"
-        ],
+        "required": ["instanceId"],
         "properties": {
           "instanceId": {
             "type": "integer",
@@ -3649,51 +3408,25 @@
       },
       "SyncPreviewStatus": {
         "type": "string",
-        "enum": [
-          "generating",
-          "ready",
-          "applying",
-          "applied",
-          "failed",
-          "expired"
-        ],
+        "enum": ["generating", "ready", "applying", "applied", "failed", "expired"],
         "description": "Preview lifecycle state:\n- `generating`: build in progress\n- `ready`: preview fully materialized and runnable\n- `applying`: preview is being executed as sync\n- `applied`: execution succeeded\n- `failed`: generation or execution failed\n- `expired`: staleness TTL elapsed\n"
       },
       "SyncPreviewSection": {
         "type": "string",
-        "enum": [
-          "qualityProfiles",
-          "delayProfiles",
-          "mediaManagement",
-          "metadataProfiles"
-        ],
+        "enum": ["qualityProfiles", "delayProfiles", "mediaManagement", "metadataProfiles"],
         "description": "Sync section handled by preview generation"
       },
       "SyncPreviewAction": {
         "type": "string",
-        "enum": [
-          "create",
-          "update",
-          "delete",
-          "unchanged"
-        ]
+        "enum": ["create", "update", "delete", "unchanged"]
       },
       "SyncPreviewFieldChangeType": {
         "type": "string",
-        "enum": [
-          "added",
-          "changed",
-          "removed"
-        ]
+        "enum": ["added", "changed", "removed"]
       },
       "FieldChange": {
         "type": "object",
-        "required": [
-          "field",
-          "type",
-          "current",
-          "desired"
-        ],
+        "required": ["field", "type", "current", "desired"],
         "properties": {
           "field": {
             "type": "string",
@@ -3760,13 +3493,7 @@
       },
       "EntityChange": {
         "type": "object",
-        "required": [
-          "entityType",
-          "name",
-          "action",
-          "remoteId",
-          "fields"
-        ],
+        "required": ["entityType", "name", "action", "remoteId", "fields"],
         "properties": {
           "entityType": {
             "type": "string",
@@ -3795,17 +3522,11 @@
       },
       "QualityProfilesPreview": {
         "type": "object",
-        "required": [
-          "section",
-          "customFormats",
-          "qualityProfiles"
-        ],
+        "required": ["section", "customFormats", "qualityProfiles"],
         "properties": {
           "section": {
             "type": "string",
-            "enum": [
-              "qualityProfiles"
-            ]
+            "enum": ["qualityProfiles"]
           },
           "customFormats": {
             "type": "array",
@@ -3825,16 +3546,11 @@
       },
       "DelayProfilesPreview": {
         "type": "object",
-        "required": [
-          "section",
-          "profile"
-        ],
+        "required": ["section", "profile"],
         "properties": {
           "section": {
             "type": "string",
-            "enum": [
-              "delayProfiles"
-            ]
+            "enum": ["delayProfiles"]
           },
           "profile": {
             "oneOf": [
@@ -3851,18 +3567,11 @@
       },
       "MediaManagementPreview": {
         "type": "object",
-        "required": [
-          "section",
-          "naming",
-          "qualityDefinitions",
-          "mediaSettings"
-        ],
+        "required": ["section", "naming", "qualityDefinitions", "mediaSettings"],
         "properties": {
           "section": {
             "type": "string",
-            "enum": [
-              "mediaManagement"
-            ]
+            "enum": ["mediaManagement"]
           },
           "naming": {
             "oneOf": [
@@ -3897,16 +3606,11 @@
       },
       "MetadataProfilesPreview": {
         "type": "object",
-        "required": [
-          "section",
-          "profile"
-        ],
+        "required": ["section", "profile"],
         "properties": {
           "section": {
             "type": "string",
-            "enum": [
-              "metadataProfiles"
-            ]
+            "enum": ["metadataProfiles"]
           },
           "profile": {
             "oneOf": [
@@ -3923,12 +3627,7 @@
       },
       "SyncPreviewSummary": {
         "type": "object",
-        "required": [
-          "totalCreates",
-          "totalUpdates",
-          "totalDeletes",
-          "totalUnchanged"
-        ],
+        "required": ["totalCreates", "totalUpdates", "totalDeletes", "totalUnchanged"],
         "properties": {
           "totalCreates": {
             "type": "integer",
@@ -3954,11 +3653,7 @@
       },
       "SyncPreviewSectionOutcome": {
         "type": "object",
-        "required": [
-          "section",
-          "skipped",
-          "error"
-        ],
+        "required": ["section", "skipped", "error"],
         "properties": {
           "section": {
             "$ref": "#/components/schemas/SyncPreviewSection"
@@ -4013,11 +3708,7 @@
           },
           "arrType": {
             "type": "string",
-            "enum": [
-              "radarr",
-              "sonarr",
-              "lidarr"
-            ],
+            "enum": ["radarr", "sonarr", "lidarr"],
             "description": "Arr instance family"
           },
           "createdAt": {
@@ -4118,19 +3809,12 @@
       },
       "PortableMigrationMetadata": {
         "type": "object",
-        "required": [
-          "format",
-          "version",
-          "source"
-        ],
+        "required": ["format", "version", "source"],
         "additionalProperties": false,
         "properties": {
           "format": {
             "type": "string",
-            "enum": [
-              "json",
-              "yaml"
-            ],
+            "enum": ["json", "yaml"],
             "description": "Migration payload format marker (`json` for JSON payloads, `yaml` for YAML\nin future hybrid ingestion flows).\n"
           },
           "version": {
@@ -4147,10 +3831,7 @@
       },
       "ExportResponse": {
         "type": "object",
-        "required": [
-          "entityType",
-          "data"
-        ],
+        "required": ["entityType", "data"],
         "properties": {
           "entityType": {
             "$ref": "#/components/schemas/EntityType"
@@ -4203,12 +3884,7 @@
       },
       "ImportRequest": {
         "type": "object",
-        "required": [
-          "databaseId",
-          "layer",
-          "entityType",
-          "data"
-        ],
+        "required": ["databaseId", "layer", "entityType", "data"],
         "properties": {
           "databaseId": {
             "type": "integer",
@@ -4216,10 +3892,7 @@
           },
           "layer": {
             "type": "string",
-            "enum": [
-              "user",
-              "base"
-            ],
+            "enum": ["user", "base"],
             "description": "The operation layer to write to"
           },
           "entityType": {
@@ -4273,9 +3946,7 @@
       },
       "ImportResponse": {
         "type": "object",
-        "required": [
-          "success"
-        ],
+        "required": ["success"],
         "properties": {
           "success": {
             "type": "boolean"
@@ -4284,9 +3955,7 @@
       },
       "PcdErrorResponse": {
         "type": "object",
-        "required": [
-          "error"
-        ],
+        "required": ["error"],
         "properties": {
           "error": {
             "type": "string"
@@ -4310,12 +3979,7 @@
           },
           "preferredProtocol": {
             "type": "string",
-            "enum": [
-              "prefer_usenet",
-              "prefer_torrent",
-              "only_usenet",
-              "only_torrent"
-            ]
+            "enum": ["prefer_usenet", "prefer_torrent", "only_usenet", "only_torrent"]
           },
           "usenetDelay": {
             "type": "integer"
@@ -4336,13 +4000,7 @@
       },
       "PortableRegularExpression": {
         "type": "object",
-        "required": [
-          "name",
-          "pattern",
-          "tags",
-          "description",
-          "regex101Id"
-        ],
+        "required": ["name", "pattern", "tags", "description", "regex101Id"],
         "properties": {
           "name": {
             "type": "string"
@@ -4368,22 +4026,14 @@
       },
       "PortableCustomFormatTest": {
         "type": "object",
-        "required": [
-          "title",
-          "type",
-          "shouldMatch",
-          "description"
-        ],
+        "required": ["title", "type", "shouldMatch", "description"],
         "properties": {
           "title": {
             "type": "string"
           },
           "type": {
             "type": "string",
-            "enum": [
-              "movie",
-              "series"
-            ]
+            "enum": ["movie", "series"]
           },
           "shouldMatch": {
             "type": "boolean"
@@ -4396,14 +4046,7 @@
       },
       "PortableCustomFormat": {
         "type": "object",
-        "required": [
-          "name",
-          "description",
-          "includeInRename",
-          "tags",
-          "conditions",
-          "tests"
-        ],
+        "required": ["name", "description", "includeInRename", "tags", "conditions", "tests"],
         "properties": {
           "name": {
             "type": "string"
@@ -4438,23 +4081,14 @@
       },
       "PortableCustomFormatScore": {
         "type": "object",
-        "required": [
-          "customFormatName",
-          "arrType",
-          "score"
-        ],
+        "required": ["customFormatName", "arrType", "score"],
         "properties": {
           "customFormatName": {
             "type": "string"
           },
           "arrType": {
             "type": "string",
-            "enum": [
-              "radarr",
-              "sonarr",
-              "lidarr",
-              "all"
-            ],
+            "enum": ["radarr", "sonarr", "lidarr", "all"],
             "description": "Arr target for this score mapping. `lidarr` is a first-class value\nso quality profile custom-format scores can be scoped to a specific Arr\napp family. `all` applies the score to every supported family.\n\nNon-regression contract: existing `radarr`, `sonarr`, and `all`\nenum semantics are unchanged; `lidarr` is an explicit additional arr\ntarget value and does not introduce fallback alias behavior.\n"
           },
           "score": {
@@ -4519,11 +4153,7 @@
       },
       "PortableMetadataProfileType": {
         "type": "object",
-        "required": [
-          "id",
-          "name",
-          "allowed"
-        ],
+        "required": ["id", "name", "allowed"],
         "properties": {
           "id": {
             "type": "integer"
@@ -4538,13 +4168,7 @@
       },
       "PortableLidarrMetadataProfile": {
         "type": "object",
-        "required": [
-          "name",
-          "description",
-          "primaryTypes",
-          "secondaryTypes",
-          "releaseStatuses"
-        ],
+        "required": ["name", "description", "primaryTypes", "secondaryTypes", "releaseStatuses"],
         "properties": {
           "name": {
             "type": "string"
@@ -4668,11 +4292,7 @@
       "PortableMediaSettings": {
         "type": "object",
         "description": "Shared media-management settings payload shape used across Arr families.\n",
-        "required": [
-          "name",
-          "propersRepacks",
-          "enableMediaInfo"
-        ],
+        "required": ["name", "propersRepacks", "enableMediaInfo"],
         "properties": {
           "name": {
             "type": "string"
@@ -4696,10 +4316,7 @@
       "PortableQualityDefinitions": {
         "type": "object",
         "description": "Shared quality-definition payload shape used across Arr families.\n",
-        "required": [
-          "name",
-          "entries"
-        ],
+        "required": ["name", "entries"],
         "properties": {
           "name": {
             "type": "string"
@@ -4723,19 +4340,12 @@
       },
       "SnapshotType": {
         "type": "string",
-        "enum": [
-          "auto",
-          "manual"
-        ],
+        "enum": ["auto", "manual"],
         "description": "Whether the snapshot was auto-created or user-initiated"
       },
       "SnapshotTrigger": {
         "type": "string",
-        "enum": [
-          "pull",
-          "sync",
-          "manual"
-        ],
+        "enum": ["pull", "sync", "manual"],
         "description": "What event triggered the snapshot creation.\n- pull: before a PCD repository pull/refresh\n- sync: before an Arr instance sync\n- manual: user-initiated via API\n"
       },
       "PcdSnapshotDetail": {
@@ -4808,10 +4418,7 @@
           },
           {
             "type": "object",
-            "required": [
-              "opsWrittenSince",
-              "isRestorable"
-            ],
+            "required": ["opsWrittenSince", "isRestorable"],
             "properties": {
               "opsWrittenSince": {
                 "type": "integer",
@@ -4827,10 +4434,7 @@
       },
       "PcdSnapshotListResponse": {
         "type": "object",
-        "required": [
-          "snapshots",
-          "total"
-        ],
+        "required": ["snapshots", "total"],
         "properties": {
           "snapshots": {
             "type": "array",
