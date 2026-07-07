@@ -622,6 +622,31 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/compatibility/parity': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Cross-Arr compatibility parity map
+     * @description Returns the static cross-Arr entity/app support matrix and catalog of known
+     *     semantic differences between Arr apps.
+     *
+     *     When `databaseId` is provided, also computes per-profile compatibility for
+     *     that database's quality profiles against each Arr app's compatible quality
+     *     names, attached as `profiles`.
+     */
+    get: operations['getCompatibilityParity'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
 }
 /** Webhook event definitions. Currently unused. */
 export type webhooks = Record<string, never>;
@@ -774,6 +799,79 @@ export interface components {
      * @enum {string}
      */
     ArrType: 'radarr' | 'sonarr' | 'lidarr';
+    ParityMapResponse: {
+      /** @description PCD config entities tracked by the Cross-Arr Parity Map */
+      entities: ('custom_formats' | 'quality_profiles' | 'quality_definitions' | 'delay_profiles' | 'metadata_profiles')[];
+      /** @description Arr app types represented as matrix columns */
+      apps: ('radarr' | 'sonarr' | 'lidarr')[];
+      /** @description One row per parity entity, with a per-app support status column */
+      matrix: {
+        /**
+         * @description Parity entity this row describes
+         * @enum {string}
+         */
+        entity: 'custom_formats' | 'quality_profiles' | 'quality_definitions' | 'delay_profiles' | 'metadata_profiles';
+        /** @description Human-readable label for this entity row */
+        label: string;
+        /**
+         * @description Radarr support status for this entity
+         * @enum {string}
+         */
+        radarr: 'native' | 'shared' | 'unsupported';
+        /**
+         * @description Sonarr support status for this entity
+         * @enum {string}
+         */
+        sonarr: 'native' | 'shared' | 'unsupported';
+        /**
+         * @description Lidarr support status for this entity
+         * @enum {string}
+         */
+        lidarr: 'native' | 'shared' | 'unsupported';
+      }[];
+      /** @description Curated catalog of same-API-shape/different-domain-semantics divergences */
+      semanticDifferences: components['schemas']['ArrSemanticDifference'][];
+      /** @description Per-profile Arr-type compatibility, when quality profile data is available */
+      profiles?: components['schemas']['ProfileCompatibility'][];
+    };
+    ArrSemanticDifference: {
+      /**
+       * @description Parity entity or workflow surface this semantic difference applies to
+       * @enum {string}
+       */
+      scope:
+        | 'custom_formats'
+        | 'quality_profiles'
+        | 'quality_definitions'
+        | 'delay_profiles'
+        | 'metadata_profiles'
+        | 'instances'
+        | 'library'
+        | 'releases'
+        | 'rename'
+        | 'upgrades';
+      /** @description Arr apps this entry applies to */
+      apps: ('radarr' | 'sonarr' | 'lidarr')[];
+      /** @description One-line summary of the semantic divergence */
+      summary: string;
+      /** @description Full explanation of why the divergence exists */
+      detail: string;
+      /** @description Suggested alternative or mitigation, when applicable */
+      suggestion?: string;
+      /** @description Prose file/symbol anchors for drift audits, not imports */
+      sourceRefs: string[];
+    };
+    ProfileCompatibility: {
+      /** @description Quality profile name */
+      name: string;
+      /** @description Arr app types this profile's enabled qualities are compatible with */
+      compatibleArrTypes: ('radarr' | 'sonarr' | 'lidarr')[];
+      /**
+       * @description Algorithm basis used to compute this compatibility verdict
+       * @enum {string}
+       */
+      basis: 'enabled-qualities';
+    };
     CustomFormatRef: {
       /** @description Custom format ID */
       id: number;
@@ -1845,6 +1943,56 @@ export interface components {
 export type $defs = Record<string, never>;
 /** API operation definitions with typed parameters, request bodies, and responses. */
 export interface operations {
+  getCompatibilityParity: {
+    parameters: {
+      query?: {
+        /** @description PCD database ID to compute profile compatibility for */
+        databaseId?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Compatibility parity map */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ParityMapResponse'];
+        };
+      };
+      /** @description Invalid databaseId */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Authentication required */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Failed to compute compatibility parity map */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+    };
+  };
   getHealth: {
     parameters: {
       query?: {
