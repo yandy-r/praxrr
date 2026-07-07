@@ -14,7 +14,7 @@ Key findings that shape the design:
 
 - **Two distinct "setup" concepts already exist and must not be conflated.**
   - `/auth/setup` (existing) = local-account bootstrap (username/password). Gated by `AuthState.needsSetup` in `packages/praxrr-app/src/lib/server/utils/auth/middleware.ts:40`, redirected in `packages/praxrr-app/src/hooks.server.ts:214`.
-  - The **new wizard is a separate onboarding flow** that runs *after* auth is satisfied. It is orthogonal to account creation.
+  - The **new wizard is a separate onboarding flow** that runs _after_ auth is satisfied. It is orthogonal to account creation.
 - **`setup_state` today only tracks `default_database_linked`** (singleton row, `id=1`). Migration `039_create_setup_state.ts`. Query layer: `packages/praxrr-app/src/lib/server/db/queries/setupState.ts`. Wizard needs **new columns** (`wizard_completed`, `wizard_skipped`, `wizard_current_step`, timestamps) via a **new migration** — never edit `schema.sql`.
 - **There is NO `/api/v1` endpoint for creating an Arr instance or linking a PCD database.** Both flows exist only as **legacy SvelteKit form actions** (`/arr/new`, `/databases/new/custom`). Connection test is a legacy JSON route (`POST /arr/test`). The wizard is contract-first `/api/v1`, so we must introduce `/api/v1/setup/*` orchestration endpoints that **reuse the existing query/manager layer** (`arrInstancesQueries.create`, `pcdManager.link`, `BaseArrClient.testConnection`, `arrSyncQueries.saveQualityProfilesSync`) rather than duplicate business logic.
 - **Sync preview already has a first-class `/api/v1` endpoint**: `POST /api/v1/sync/preview` (`packages/praxrr-app/src/routes/api/v1/sync/preview/+server.ts`) returning `SyncPreviewResult` (`$sync/preview/types.ts`). The wizard reuses it verbatim.
@@ -68,9 +68,10 @@ Precedence (evaluated in `hooks.server.ts` `handle`, extending the existing midd
 `wizardShouldRun()` (new helper, colocated with setup state): returns `!(state.wizard_completed || state.wizard_skipped)`.
 
 Guardrails:
+
 - **Do not gate `/api/*`** on the wizard — API clients (and the wizard's own fetches) must not be redirected. The wizard UI calls `/api/v1/setup/*`.
 - **`AUTH=off`**: `skipAuth=true`, `needsSetup=false`. The wizard should still run for `AUTH=off` local installs (that is the primary first-run persona). Gate on `wizardShouldRun()` independent of auth mode, but **only for page navigations**, never API.
-- Keep the wizard redirect *below* the account-setup and login redirects so an unauthenticated user is never bounced into the wizard.
+- Keep the wizard redirect _below_ the account-setup and login redirects so an unauthenticated user is never bounced into the wizard.
 - Public paths list (`middleware.ts:27`) must include `/setup` so the wizard shell itself is reachable during the gate; add `'/setup'` to `PUBLIC_PATHS` OR special-case it in `handle` like `/auth/setup` is (recommended: mirror the `/auth/setup` special-case block rather than widening `PUBLIC_PATHS`, to keep auth semantics intact).
 
 ### 2.3 Component structure (Svelte 5, no runes)
@@ -127,6 +128,7 @@ export const migration: Migration = {
 ```
 
 Column semantics:
+
 - `wizard_completed` (0/1): user finished the wizard (reached Done, or explicitly finished after a successful sync).
 - `wizard_skipped` (0/1): user chose "Skip wizard". Distinct from completed so telemetry/analytics can differentiate, and so a future "resume onboarding" prompt can target skippers.
 - `wizard_current_step` (TEXT enum: `welcome|connect-arr|link-database|select-profiles|preview-sync|done`): resume point. Server-validated against the enum.
@@ -150,7 +152,13 @@ export interface SetupState {
   updated_at: string;
 }
 
-export type WizardStep = 'welcome' | 'connect-arr' | 'link-database' | 'select-profiles' | 'preview-sync' | 'done';
+export type WizardStep =
+  | 'welcome'
+  | 'connect-arr'
+  | 'link-database'
+  | 'select-profiles'
+  | 'preview-sync'
+  | 'done';
 
 // new methods:
 //   getWizardState(): { completed, skipped, currentStep, completedAt }
@@ -164,11 +172,11 @@ Fail-fast: `setWizardStep` rejects unknown step values (throws), consistent with
 
 ### 3.4 Reused tables (no new tables beyond `setup_state` columns)
 
-| Table | Written by | Via |
-|---|---|---|
-| `arr_instances` + `arr_instance_credentials` | Connect step | `arrInstancesQueries.create(input, credentialInput)` (`arrInstances.ts:181`) |
-| `database_instances` + `database_instance_credentials` | Link step | `pcdManager.link(options)` (`pcd/core/manager.ts:42`) |
-| `arr_sync_quality_profiles` + `arr_sync_quality_profiles_config` | Select step | `arrSyncQueries.saveQualityProfilesSync(instanceId, selections, config)` (`arrSync.ts:459`) |
+| Table                                                            | Written by   | Via                                                                                         |
+| ---------------------------------------------------------------- | ------------ | ------------------------------------------------------------------------------------------- |
+| `arr_instances` + `arr_instance_credentials`                     | Connect step | `arrInstancesQueries.create(input, credentialInput)` (`arrInstances.ts:181`)                |
+| `database_instances` + `database_instance_credentials`           | Link step    | `pcdManager.link(options)` (`pcd/core/manager.ts:42`)                                       |
+| `arr_sync_quality_profiles` + `arr_sync_quality_profiles_config` | Select step  | `arrSyncQueries.saveQualityProfilesSync(instanceId, selections, config)` (`arrSync.ts:459`) |
 
 ---
 
@@ -181,6 +189,7 @@ All wizard endpoints live under `/api/v1/setup/*`. Contract-first: add these pat
 Returns wizard + prerequisite state so the shell can decide the resume step and render prerequisite checkmarks.
 
 Response `200`:
+
 ```json
 {
   "wizard": {
@@ -201,6 +210,7 @@ Response `200`:
   }
 }
 ```
+
 - `prerequisites` derived from `arrInstancesQueries.getAll()`, `databaseInstancesQueries.getAll()`, `arrSyncQueries.getQualityProfilesSync(instanceId)`.
 - `defaultDatabase.configured=false` when `PRAXRR_DEFAULT_DB_URL=""` (intentional opt-out; do not substitute a fallback — see CLAUDE.md).
 
@@ -209,9 +219,11 @@ Response `200`:
 Persist step progression (and nothing else — this is not where domain writes happen).
 
 Request:
+
 ```json
 { "currentStep": "link-database" }
 ```
+
 Response `200`: same shape as `GET` `wizard` block. Errors: `400 { "error": "Invalid step: <x>" }`.
 
 ### 4.3 `POST /api/v1/setup/test-connection`
@@ -219,18 +231,25 @@ Response `200`: same shape as `GET` `wizard` block. Errors: `400 { "error": "Inv
 Thin wrapper over `createArrClient(type, url, apiKey).testConnection()` (`factory.ts:25` + `base.ts:68`). Mirrors legacy `POST /arr/test` but under `/api/v1` and returns richer info.
 
 Request:
+
 ```json
 { "type": "radarr", "url": "http://localhost:7878", "apiKey": "abc123" }
 ```
+
 Response `200` (reachable):
+
 ```json
 { "success": true, "appName": "Radarr", "version": "5.14.0.9383" }
 ```
+
 Response `200` (unreachable) or `400`:
+
 ```json
 { "success": false, "error": "Connection test failed" }
 ```
+
 Validation & cross-Arr:
+
 - `type` must be `radarr|sonarr|lidarr` (reject `chaptarr`/`all` → `400`).
 - Use short timeout / no retries for fast UX (legacy uses `{ timeout: 3000, retries: 0 }`).
 - **Per-arr note:** `testConnection` is uniform (`GET system/status`) across radarr/sonarr/lidarr, but the returned `appName`/`version` differ; do not infer capabilities from a sibling type. `testConnection()` currently returns only `boolean` — to surface `appName`/`version` the handler either (a) calls the underlying status fetch directly, or (b) we extend the client with a `getSystemStatus()` that returns the parsed status. **Recommendation:** add `getSystemStatus()` to `BaseArrClient` returning `{ appName, version, ... } | null` and keep `testConnection()` as the boolean convenience wrapper; the endpoint uses `getSystemStatus()`.
@@ -240,6 +259,7 @@ Validation & cross-Arr:
 Orchestration endpoint (net-new, because no `/api/v1` instance-create exists). Reuses `arrInstancesQueries.create` + `encryptArrInstanceApiKey` (same pipeline as legacy `/arr/new`). Optionally re-runs the connection test server-side before persisting.
 
 Request:
+
 ```json
 {
   "name": "Radarr",
@@ -250,11 +270,21 @@ Request:
   "tags": []
 }
 ```
+
 Response `201`:
+
 ```json
-{ "id": 3, "name": "Radarr", "type": "radarr", "url": "http://localhost:7878", "enabled": true }
+{
+  "id": 3,
+  "name": "Radarr",
+  "type": "radarr",
+  "url": "http://localhost:7878",
+  "enabled": true
+}
 ```
+
 Errors:
+
 - `400 { "error": "name is required" }` / invalid type / invalid url.
 - `409 { "error": "An instance named 'Radarr' already exists" }` (case-insensitive per repo entity-name rule; use `arrInstancesQueries.nameExists`).
 - `409 { "error": "An instance with this API key already exists" }` (`apiKeyExists` on fingerprint).
@@ -267,10 +297,13 @@ Note: the real key is stored encrypted in `arr_instance_credentials`; `arr_insta
 Orchestration endpoint (net-new). Reuses `pcdManager.link(options)` (`manager.ts:42`) — full clone → manifest → deps → encrypt PAT → `databaseInstancesQueries.create` → `importBaseOps` → seed → compile.
 
 Request (default DB):
+
 ```json
 { "mode": "default" }
 ```
+
 Request (custom):
+
 ```json
 {
   "mode": "custom",
@@ -283,11 +316,21 @@ Request (custom):
   "conflictStrategy": "override"
 }
 ```
+
 Response `201`:
+
 ```json
-{ "id": 2, "uuid": "…", "name": "My PCD", "repositoryUrl": "…", "enabled": true }
+{
+  "id": 2,
+  "uuid": "…",
+  "name": "My PCD",
+  "repositoryUrl": "…",
+  "enabled": true
+}
 ```
+
 Errors:
+
 - `400 { "error": "repositoryUrl is required" }` (custom mode).
 - `400 { "error": "Default database is disabled (PRAXRR_DEFAULT_DB_URL is empty)" }` when `mode=default` but env opts out.
 - `400 { "error": "Git identity required when using a personal access token" }` (mirrors `/databases/new/custom` validation).
@@ -300,6 +343,7 @@ Errors:
 Persists per-instance quality-profile selections. Reuses `arrSyncQueries.saveQualityProfilesSync` (`arrSync.ts:459`).
 
 Request:
+
 ```json
 {
   "instanceId": 3,
@@ -310,11 +354,15 @@ Request:
   "config": { "trigger": "manual", "cron": null }
 }
 ```
+
 Response `200`:
+
 ```json
 { "instanceId": 3, "savedCount": 2 }
 ```
+
 Errors:
+
 - `404 { "error": "Instance not found" }`.
 - `400 { "error": "Unsupported instance type: chaptarr" }` (must be `SyncPreviewArrType`).
 - `422 { "error": "Profile 'X' is not compatible with radarr" }` — per CLAUDE.md Arr-scoped compatibility: validate selected profiles against app-compatible quality names via `quality_api_mappings` for the target `arr_type`; **do not** rely on `arr_type='all'` scores alone, and **do not** require `enabled=1` quality rows.
@@ -326,9 +374,11 @@ Errors:
 Preview step calls the existing endpoint (`packages/praxrr-app/src/routes/api/v1/sync/preview/+server.ts`).
 
 Request:
+
 ```json
 { "instanceId": 3, "sections": ["qualityProfiles"] }
 ```
+
 Response `200`: `SyncPreviewResult` (`$sync/preview/types.ts:81`) — `summary.totalCreates/Updates/Deletes/Unchanged` + per-section `EntityChange[]`. The wizard renders the diff, then triggers the actual sync via the existing sync apply path (reuse whatever the current `arr/[id]/sync` page invokes — do not build a new sync executor).
 
 ### 4.8 `POST /api/v1/setup/complete` and `POST /api/v1/setup/skip`
@@ -350,7 +400,7 @@ Both idempotent; safe to call repeatedly.
 
 - **Svelte 5 without runes** — `onclick` handlers, no `$state`/`$derived`. All wizard interactivity uses plain handlers + stores.
 - **Startup ordering** (`hooks.server.ts`): `config.init` → `db.initialize` → `runMigrations` → … → `pcdManager.initialize` → auth middleware. The new migration slots into `runMigrations` automatically once registered. `setup_state` is read in the middleware, so the new columns must exist before the wizard gate runs — guaranteed by migration order.
-- **Auth-mode matrix:** wizard must function under `AUTH=off` (primary first-run), `AUTH=local`, `AUTH=on` (after account setup), and `AUTH=oidc`. Gate on `wizardShouldRun()`, layered strictly *after* account-setup/login gates. Never gate `/api/*`.
+- **Auth-mode matrix:** wizard must function under `AUTH=off` (primary first-run), `AUTH=local`, `AUTH=on` (after account setup), and `AUTH=oidc`. Gate on `wizardShouldRun()`, layered strictly _after_ account-setup/login gates. Never gate `/api/*`.
 - **Credential handling:** API keys/PATs are encrypted at rest (`arr_instance_credentials`, `database_instance_credentials`); base tables store `''` + fingerprint. Wizard endpoints must route through the same encryption helpers used by legacy routes — never persist plaintext.
 - **Cross-Arr fidelity:** supported wizard types `{radarr, sonarr, lidarr}`; reject `chaptarr`/`all`. Metadata profiles are lidarr-only (not part of the wizard's quality-profile step). Resolve every read/write by explicit `arr_type`; no sibling fallback.
 - **Preview limits:** `POST /api/v1/sync/preview` enforces rate limits, body-size, and a max-snapshot cap (`$sync/preview/limits.ts`); the wizard must surface `429` gracefully ("retry after previews expire").
@@ -362,6 +412,7 @@ Both idempotent; safe to call repeatedly.
 ## 6. Codebase Changes (files to create / modify)
 
 ### Create
+
 - `packages/praxrr-app/src/lib/server/db/migrations/20260707_add_setup_wizard_state.ts` — wizard columns.
 - `packages/praxrr-app/src/lib/server/setup/state.ts` (optional) — prerequisite derivation + `wizardShouldRun` gate helper (shared by hooks + endpoints).
 - `packages/praxrr-app/src/routes/api/v1/setup/state/+server.ts` — GET + PATCH.
@@ -375,6 +426,7 @@ Both idempotent; safe to call repeatedly.
 - Tests: `packages/praxrr-app/src/tests/setup/` — state query unit tests, gate-logic tests, and per-endpoint validation/cross-arr tests.
 
 ### Modify
+
 - `packages/praxrr-app/src/lib/server/db/queries/setupState.ts` — extend `SetupState` + add wizard methods.
 - `packages/praxrr-app/src/lib/server/db/migrations.ts` — `import` + register the new migration in `loadMigrations()` array.
 - `packages/praxrr-app/src/hooks.server.ts` — add wizard gate + reverse gate in `handle` (after account-setup/login gates, page-nav only).
@@ -383,6 +435,7 @@ Both idempotent; safe to call repeatedly.
 - (If adopting `getSystemStatus()`): `packages/praxrr-app/src/lib/server/utils/arr/base.ts` — add parsed status method used by test-connection.
 
 ### Explicitly NOT changed
+
 - `schema.sql` (reference only; schema changes go through migrations).
 - `seedBuiltInBaseOps.ts` (no PCD base-op migration involved).
 - Legacy `/arr/new`, `/arr/test`, `/databases/new/custom` (left intact; wizard does not remove them).
@@ -420,9 +473,9 @@ Recommendation: track `wizard_skipped` distinctly from `wizard_completed` so a f
 ## 8. Open Questions
 
 1. **Skip persistence scope:** Should "Skip" be permanent (never prompt again) or dismissible-until-next-launch? Current design = permanent (`wizard_skipped=1`). Confirm product intent; if "remind me later" is desired, add a `wizard_snoozed_until` column instead.
-2. **Multi-instance onboarding:** Does the wizard support connecting *multiple* Arr instances in one run, or exactly one before proceeding? Current design assumes one primary instance in the happy path (schema supports many). Confirm.
+2. **Multi-instance onboarding:** Does the wizard support connecting _multiple_ Arr instances in one run, or exactly one before proceeding? Current design assumes one primary instance in the happy path (schema supports many). Confirm.
 3. **Independent custom-format selection:** Is per-instance CF opt-in a requirement for #12, or is "CFs follow selected profiles" acceptable for v1? (Affects whether a net-new table/query is in scope.)
-4. **Sync execution in wizard:** After preview, does the wizard *apply* the sync inline, or just schedule it and hand off? Need to reuse the existing apply path from `arr/[id]/sync` — confirm which function/endpoint performs the apply (not covered by the preview endpoint).
+4. **Sync execution in wizard:** After preview, does the wizard _apply_ the sync inline, or just schedule it and hand off? Need to reuse the existing apply path from `arr/[id]/sync` — confirm which function/endpoint performs the apply (not covered by the preview endpoint).
 5. **AUTH=oidc first-run:** OIDC has `needsSetup=false` (no local account). Should the wizard still gate OIDC users on first login? Current design says yes (wizard is auth-mode-independent), but confirm that OIDC installs want the guided flow.
 6. **Default-DB already linked at startup:** When `PRAXRR_DEFAULT_DB_URL` auto-links on boot (`hooks.server.ts:59`), the wizard's link step should detect and present it as "already linked" rather than re-linking. Confirm UX: show as done vs allow relink/replace.
 7. **Version guard on migration:** Confirm the target SQLite build supports `ALTER TABLE … DROP COLUMN` (3.35+) for the `down` path; if not, the rollback must rebuild the table. Not blocking (down is optional), but note for the migration author.

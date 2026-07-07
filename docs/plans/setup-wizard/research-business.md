@@ -27,7 +27,7 @@ colliding with any of them:
    not a data-bootstrap layer. Its "first-run" signal must be **derived from actual entity state**
    (`arrInstancesQueries.getAll()`, `pcdManager.getAll()`), not from `setup_state.default_database_linked`,
    because that flag is already true after the first boot on every deployment and says nothing about
-   whether a *human* has connected anything.
+   whether a _human_ has connected anything.
 
 The good news: nearly every piece of business logic the wizard needs already exists and is production-tested
 — Arr connection validation (`/arr/test`), instance creation (`arrInstancesQueries.create` via `/arr/new`),
@@ -39,6 +39,7 @@ reimplementing them.
 ## User Stories
 
 ### 1. First-run new user (empty install)
+
 - **As** someone who just deployed Praxrr for the first time (no admin account, no Arr instances, no PCD
   linked),
 - **I want** a guided, linear flow that gets me from "nothing configured" to "my first sync previewed and
@@ -49,6 +50,7 @@ reimplementing them.
   there) instead of a mostly-empty dashboard.
 
 ### 2. Returning user (partially or fully configured)
+
 - **As** a user who already has at least one Arr instance and a linked PCD (via prior manual setup, env-var
   reconciliation, or a completed wizard run),
 - **I want** the wizard to never intercept my normal navigation again
@@ -58,6 +60,7 @@ reimplementing them.
   redirects existing users to `/` today (see `+page.server.ts` load in `routes/auth/setup/`).
 
 ### 3. Power user who wants to skip
+
 - **As** an experienced Radarr/Sonarr admin who already knows the tool (or is scripting/automating setup via
   env vars and API),
 - **I want** a visible "Skip wizard" action from step one
@@ -68,6 +71,7 @@ reimplementing them.
   intact).
 
 ### 4. Interrupted / partially-completed wizard user
+
 - **As** a user who connected an Arr instance in the wizard but closed the tab before finishing profile
   selection,
 - **I want** to resume roughly where I left off (or at minimum not be forced to re-enter the Arr URL/API key)
@@ -79,9 +83,10 @@ reimplementing them.
 ## Business Rules
 
 ### When is the wizard shown?
+
 - Shown only **after** auth setup is resolved (`needsSetup` is false, or `AUTH=off`/`local` bypass applies)
   — the wizard is a post-authentication concept. It must not run before or instead of `/auth/setup`.
-- Shown when "setup incomplete" for the *current deployment*, not per-user — Praxrr's app DB is a shared
+- Shown when "setup incomplete" for the _current deployment_, not per-user — Praxrr's app DB is a shared
   singleton store (mirrors the `setup_state` singleton-by-design pattern), so wizard completion is a
   deployment-wide flag, not a per-account preference. Any authenticated user landing on an incomplete
   deployment sees the wizard (or is capable of resuming it); this matches the existing single-admin-account
@@ -91,24 +96,27 @@ reimplementing them.
   Reusing it would mean the wizard almost never appears, defeating the feature.
 
 ### First-run detection semantics (the key design decision)
+
 Recommend introducing an explicit **"setup complete"** signal, computed as a small set of checks against
 real state rather than a single boolean flag written once:
+
 - At least one `arr_instances` row exists (any `source`, `ui` or `env`) — `arrInstancesQueries.getAll().length > 0`.
 - At least one `database_instances` row exists — `pcdManager.getAll().length > 0` (or
   `databaseInstancesQueries.getAll()`).
-- These two together answer "has *any* connection been made," which is the real prerequisite for a useful
+- These two together answer "has _any_ connection been made," which is the real prerequisite for a useful
   dashboard. Profile selection and sync are the wizard's later steps but are not required to consider setup
   "done" — a user can finish the wizard, decline to sync immediately, and still be a "configured" user.
 - A separate, explicit **"wizard dismissed" / "wizard completed"** flag is still needed to support the
   "Skip wizard" story cleanly and to avoid re-showing the wizard to a power user who connected everything
   manually via `/arr/new` + `/databases/new` outside the wizard (their state would already satisfy the
-  entity-existence check above, so no extra flag is strictly required for *them* — the entity check alone
+  entity-existence check above, so no extra flag is strictly required for _them_ — the entity check alone
   naturally suppresses the wizard once they've done manual setup).
 - Net rule: **show wizard if** `arr_instances` is empty **or** `database_instances` is empty **and** the
   user has not explicitly skipped. Once both collections are non-empty, treat setup as complete regardless
-  of *how* they became non-empty (wizard, manual routes, or env reconciliation).
+  of _how_ they became non-empty (wizard, manual routes, or env reconciliation).
 
 ### What counts as "setup complete"?
+
 - Minimum bar: ≥1 Arr instance connected AND ≥1 PCD database linked. This is the same bar implied by issue
   #12's own design considerations ("check app DB for existing instances/PCDs").
   Profile/format selection and the first sync are valuable but should not block "complete" — a user who
@@ -116,6 +124,7 @@ real state rather than a single boolean flag written once:
   be shown the wizard from scratch again; they should resume, not restart.
 
 ### Resume / abandon behavior
+
 - Because completion is derived from entity existence (not a single opaque flag), resuming is naturally
   supported: on wizard entry, compute which step's precondition is unmet and start there.
   - No Arr instance → start at "Connect Instance."
@@ -128,6 +137,7 @@ real state rather than a single boolean flag written once:
   `pcdManager.link`) is already transactional and atomic on its own.
 
 ### Skip persistence
+
 - Needs a new, explicit, durable flag (the `setup_state` table is the natural home — it is already the
   "one-time setup operations" singleton per its own migration comment in
   `packages/praxrr-app/src/lib/server/db/migrations/039_create_setup_state.ts`). Add a column such as
@@ -137,6 +147,7 @@ real state rather than a single boolean flag written once:
   again" link in Settings) since users may skip prematurely and want it back.
 
 ### Edge cases
+
 - **Env-reconciled instances already present**: if `reconcileEnvInstances()` created instance(s) before the
   human ever loads the UI, the "Connect Instance" step should detect this and either skip straight past it
   or show the env instance as already connected (read-only, since env-sourced instances are managed via
@@ -155,6 +166,7 @@ real state rather than a single boolean flag written once:
 ## Workflows
 
 ### Primary flow (happy path)
+
 1. **Welcome** (`/setup` or `/setup/welcome`) — static explainer. Actions: "Get Started," "Skip wizard."
 2. **Connect Instance** (`/setup/instance`) — form: name, type (radarr/sonarr/lidarr), URL, API key.
    - Inline validation reuses `POST /arr/test` (existing endpoint in
@@ -180,7 +192,7 @@ real state rather than a single boolean flag written once:
    — no shortcuts.
 5. **Preview & Sync** (`/setup/sync`) — reuses the sync-preview module wholesale: `POST /api/v1/sync/preview`
    to generate, `GET /api/v1/sync/preview/[previewId]` to poll status/summary, `POST
-   /api/v1/sync/preview/[previewId]/apply` to confirm. The existing `SyncPreviewPanel.svelte` /
+/api/v1/sync/preview/[previewId]/apply` to confirm. The existing `SyncPreviewPanel.svelte` /
    `SyncPreviewTrigger.svelte` components from `routes/arr/[id]/sync/components/` are candidates to embed or
    adapt directly rather than rebuilding preview UI.
 6. **Done** (`/setup/done`) — success state; marks setup as complete (in practice, a no-op beyond what steps
@@ -188,6 +200,7 @@ real state rather than a single boolean flag written once:
    issue #11).
 
 ### Error recovery
+
 - **Bad API key / unreachable Arr instance (step 2)**: `/arr/test` already returns
   `{ success: false, error }` with a 400 (auth/network failure) or 500 (unexpected) status and a message —
   the wizard step should surface that message inline and let the user retry without losing the
@@ -234,19 +247,19 @@ real state rather than a single boolean flag written once:
 
 ## Existing Codebase Integration
 
-| Wizard need | Existing implementation to reuse (not duplicate) |
-|---|---|
-| First-run vs returning-user detection | `arrInstancesQueries.getAll()` (`db/queries/arrInstances.ts:235`), `pcdManager.getAll()` / `databaseInstancesQueries.getAll()` (`db/queries/databaseInstances.ts:222`) — **not** `setupStateQueries.isDefaultDatabaseLinked()`, which is already `true` on nearly every boot per `hooks.server.ts:58-129` |
-| Skip persistence | Extend `setup_state` (`db/queries/setupState.ts`, migration `039_create_setup_state.ts`) with a new column (e.g. `wizard_dismissed_at`) rather than repurposing `default_database_linked` |
-| Auth gating / route precedence | `hooks.server.ts:207-259` `handle` — the wizard's redirect must be layered *after* the existing `auth.needsSetup` → `/auth/setup` redirect, not instead of it |
-| Arr connection inline validation | `POST /arr/test` (`routes/arr/test/+server.ts`) — `createArrClient(...).testConnection()`, 3s timeout, 0 retries |
-| Arr instance creation | `arrInstancesQueries.create()` + encryption/dedup pipeline exactly as `routes/arr/new/+page.server.ts` (name uniqueness via `nameExists`, API-key-fingerprint dedup via `getAllArrCredentialKeyVersions` + `arrInstanceCredentialsQueries.getByAnyFingerprint`, `encryptArrInstanceApiKey`) |
-| Env-reconciled instances | `reconcileEnvInstances()` (`utils/arr/envInstances.ts`), invoked at boot in `hooks.server.ts:131-151` — wizard must check for `source: 'env'` rows before prompting to add a new instance |
-| PCD database linking | `pcdManager.link()` (`pcd/core/manager.ts:42`) exactly as `routes/databases/new/custom/+page.server.ts` uses it, including its non-Git-URL redirect pattern (`/databases/bruh`) and rollback-on-failure behavior |
-| Default DB auto-link awareness | `hooks.server.ts:58-129` (`PRAXRR_DEFAULT_DB_URL`, `PRAXRR_DEFAULT_DB_BRANCH`, `PRAXRR_DEFAULT_DB_NAME`, local-path detection) — wizard's "Link Database" step should detect an already-auto-linked default DB and skip straight past linking |
-| Profile/format selection | `qualityProfileQueries.list(cache, arrType)` + `arrSyncQueries.saveQualityProfilesSync()` exactly as `routes/arr/[id]/sync/+page.server.ts` (`saveQualityProfiles` action) — including arr-type scoping per CLAUDE.md's Cross-Arr Semantic Validation Policy |
-| Sync preview & apply | `sync/preview/*` module (`store.ts`, `orchestrator.ts`, `diff.ts`, `types.ts`) + `POST /api/v1/sync/preview`, `GET /api/v1/sync/preview/[previewId]`, `POST /api/v1/sync/preview/[previewId]/apply` — issue #7 is already implemented; the wizard's "Preview & Sync" step should call these APIs and reuse `SyncPreviewPanel.svelte`/`SyncPreviewTrigger.svelte` from `routes/arr/[id]/sync/components/` rather than rebuild preview UI |
-| Startup sequence integration | `hooks.server.ts` full ordering: `config.init()` → `db.initialize()` → `runMigrations()` → `logSettings.load()` → `pcdManager.initialize()` → `trashGuideManager.initialize()` → auto-link default DB → `reconcileEnvInstances()` → `initializeJobs()` → auth middleware. The wizard is purely a post-startup, request-time UI concern; it does not belong in this sequence itself. |
+| Wizard need                           | Existing implementation to reuse (not duplicate)                                                                                                                                                                                                                                                                                                                                                                                        |
+| ------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| First-run vs returning-user detection | `arrInstancesQueries.getAll()` (`db/queries/arrInstances.ts:235`), `pcdManager.getAll()` / `databaseInstancesQueries.getAll()` (`db/queries/databaseInstances.ts:222`) — **not** `setupStateQueries.isDefaultDatabaseLinked()`, which is already `true` on nearly every boot per `hooks.server.ts:58-129`                                                                                                                               |
+| Skip persistence                      | Extend `setup_state` (`db/queries/setupState.ts`, migration `039_create_setup_state.ts`) with a new column (e.g. `wizard_dismissed_at`) rather than repurposing `default_database_linked`                                                                                                                                                                                                                                               |
+| Auth gating / route precedence        | `hooks.server.ts:207-259` `handle` — the wizard's redirect must be layered _after_ the existing `auth.needsSetup` → `/auth/setup` redirect, not instead of it                                                                                                                                                                                                                                                                           |
+| Arr connection inline validation      | `POST /arr/test` (`routes/arr/test/+server.ts`) — `createArrClient(...).testConnection()`, 3s timeout, 0 retries                                                                                                                                                                                                                                                                                                                        |
+| Arr instance creation                 | `arrInstancesQueries.create()` + encryption/dedup pipeline exactly as `routes/arr/new/+page.server.ts` (name uniqueness via `nameExists`, API-key-fingerprint dedup via `getAllArrCredentialKeyVersions` + `arrInstanceCredentialsQueries.getByAnyFingerprint`, `encryptArrInstanceApiKey`)                                                                                                                                             |
+| Env-reconciled instances              | `reconcileEnvInstances()` (`utils/arr/envInstances.ts`), invoked at boot in `hooks.server.ts:131-151` — wizard must check for `source: 'env'` rows before prompting to add a new instance                                                                                                                                                                                                                                               |
+| PCD database linking                  | `pcdManager.link()` (`pcd/core/manager.ts:42`) exactly as `routes/databases/new/custom/+page.server.ts` uses it, including its non-Git-URL redirect pattern (`/databases/bruh`) and rollback-on-failure behavior                                                                                                                                                                                                                        |
+| Default DB auto-link awareness        | `hooks.server.ts:58-129` (`PRAXRR_DEFAULT_DB_URL`, `PRAXRR_DEFAULT_DB_BRANCH`, `PRAXRR_DEFAULT_DB_NAME`, local-path detection) — wizard's "Link Database" step should detect an already-auto-linked default DB and skip straight past linking                                                                                                                                                                                           |
+| Profile/format selection              | `qualityProfileQueries.list(cache, arrType)` + `arrSyncQueries.saveQualityProfilesSync()` exactly as `routes/arr/[id]/sync/+page.server.ts` (`saveQualityProfiles` action) — including arr-type scoping per CLAUDE.md's Cross-Arr Semantic Validation Policy                                                                                                                                                                            |
+| Sync preview & apply                  | `sync/preview/*` module (`store.ts`, `orchestrator.ts`, `diff.ts`, `types.ts`) + `POST /api/v1/sync/preview`, `GET /api/v1/sync/preview/[previewId]`, `POST /api/v1/sync/preview/[previewId]/apply` — issue #7 is already implemented; the wizard's "Preview & Sync" step should call these APIs and reuse `SyncPreviewPanel.svelte`/`SyncPreviewTrigger.svelte` from `routes/arr/[id]/sync/components/` rather than rebuild preview UI |
+| Startup sequence integration          | `hooks.server.ts` full ordering: `config.init()` → `db.initialize()` → `runMigrations()` → `logSettings.load()` → `pcdManager.initialize()` → `trashGuideManager.initialize()` → auto-link default DB → `reconcileEnvInstances()` → `initializeJobs()` → auth middleware. The wizard is purely a post-startup, request-time UI concern; it does not belong in this sequence itself.                                                     |
 
 ## Success Criteria
 

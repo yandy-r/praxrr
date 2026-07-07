@@ -13,13 +13,7 @@ export interface SetupState {
   updated_at: string;
 }
 
-export type WizardStep =
-  | 'welcome'
-  | 'connect-arr'
-  | 'link-database'
-  | 'select-profiles'
-  | 'preview-sync'
-  | 'done';
+export type WizardStep = 'welcome' | 'connect-arr' | 'link-database' | 'select-profiles' | 'preview-sync' | 'done';
 
 const WIZARD_STEPS: WizardStep[] = [
   'welcome',

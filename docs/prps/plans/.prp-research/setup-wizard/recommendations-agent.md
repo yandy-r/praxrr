@@ -1,29 +1,29 @@
 # Setup Wizard (#12) — Cross-Cutting Recommendations Synthesis
 
-> Feeds the ycc:prp-plan synthesizer. Scope: what falls *between* the single-dimension
+> Feeds the ycc:prp-plan synthesizer. Scope: what falls _between_ the single-dimension
 > research tracks (security / technical / UX / business / practices). Does NOT restate
 > per-dimension findings — surfaces the seams where they interact.
 
 ## Notes
 
 - **Phase so `main` stays always-green: land the P0 gating spine first, before any reuse
-  phase.** The thinnest end-to-end slice is a wizard you can *enter, skip, and complete
-  with no real steps* — migration + `setupStateQueries` extensions + `getSetupProgress()`
-  + `hooks.server.ts` gate/reverse-gate + `/setup/welcome` + `/setup/done` + Skip action +
-  auth-mode matrix tests. Every later step folder (`connect-arr`, `link-database`,
-  `select-profiles`, `preview-sync`) is skipped by the server-side step resolver until it
-  exists, so partial merges never strand a first-run user. This is the single most
-  load-bearing sequencing decision in the plan.
+  phase.** The thinnest end-to-end slice is a wizard you can _enter, skip, and complete
+  with no real steps_ — migration + `setupStateQueries` extensions + `getSetupProgress()`
+  - `hooks.server.ts` gate/reverse-gate + `/setup/welcome` + `/setup/done` + Skip action +
+    auth-mode matrix tests. Every later step folder (`connect-arr`, `link-database`,
+    `select-profiles`, `preview-sync`) is skipped by the server-side step resolver until it
+    exists, so partial merges never strand a first-run user. This is the single most
+    load-bearing sequencing decision in the plan.
 - **Server-authoritative current step, everywhere.** The step is resolved from persisted
   facts (`wizard_completed` flag + `getSetupProgress()` derived from
   `arrInstancesQueries.getAll()` / `databaseInstancesQueries.getAll()` / `arrSyncQueries`),
-  computed *identically* in `hooks.server.ts` (gate) and `routes/setup/+layout.server.ts`
+  computed _identically_ in `hooks.server.ts` (gate) and `routes/setup/+layout.server.ts`
   (resolver). Factor the resolver into one pure `$server/setup/progress.ts` module and call
   it from both — two copies of the "which step" logic is the drift bug waiting to happen.
   The client store (`$stores/`) holds transient form values only, never the source of truth.
 - **Contract-first is a hard ordering constraint, not a preference.** Add the `Setup` tag +
   `/api/v1/setup/*` paths/schemas to `docs/api/v1/openapi.yaml`, run
-  `deno task generate:api-types`, then import from `$api/v1.d.ts` in the handlers — *before*
+  `deno task generate:api-types`, then import from `$api/v1.d.ts` in the handlers — _before_
   writing handler bodies. Reversing this order (hand-written types first) guarantees a
   `deno task check` failure later and a re-do. This is one task boundary, not a side note.
 - **The migration must be statically registered, not filesystem-scanned.** Create
@@ -35,7 +35,7 @@
   gets its columns). Verify by applying against a fresh DB.
 - **`getSystemStatus()` + `assertSafeArrUrl()` are shared surfaces — land them once, wire
   them into both callers in the same change.** `assertSafeArrUrl()` (new `$arr/urlSafety.ts`)
-  must be called by both the new `POST /api/v1/setup/test-connection` *and* the existing
+  must be called by both the new `POST /api/v1/setup/test-connection` _and_ the existing
   `routes/arr/test/+server.ts`; `getSystemStatus()` is added to `$utils/arr/base.ts` while
   keeping the boolean `testConnection()` wrapper for existing callers. Adding SSRF guarding
   to only the wizard path leaves the pre-existing hole open and violates the "hardens an
@@ -64,7 +64,7 @@
   read) without adding root-confinement scope to this feature.
 - **No widening of `PUBLIC_PATHS`** — `/setup` reachability is special-cased like
   `/auth/setup`, and every `/api/v1/setup/*` handler self-guards. Rationale: `PUBLIC_PATHS`
-  placement is *routing*, not *authorization*; conflating them is exactly security C1.
+  placement is _routing_, not _authorization_; conflating them is exactly security C1.
 - **No hard redirect from `/` for incomplete wizard** — reverse-gate `/setup` for
   done/skipped users and nudge via a dismissable banner instead. Rationale: a blanket
   redirect traps intentional skippers/power users (R7); only account-creation stays a hard gate.
@@ -82,16 +82,16 @@
 
 ## Risks (cross-cutting)
 
-| Risk | Why it's cross-cutting | Likelihood × Impact | Mitigation |
-| ---- | ---------------------- | ------------------- | ---------- |
-| Half-wired gate strands first-run users if a reuse phase merges before P0 is landed + test-covered | Gating (security/technical) × first-run detection (business) × always-green (practices) | Med × High | P0 spine lands first with auth-mode matrix + gate-redirect tests; unbuilt steps are resolver-skipped, never exposed |
-| Client/server step drift | Two copies of "which step" logic in `hooks.server.ts` and `+layout.server.ts` (technical × UX resume) | Med × Med | Single pure `getSetupProgress()` in `$server/setup/progress.ts`, imported by both; no client-owned step |
-| Migration/version collision or silent non-registration | Migration chain (technical) × fresh-deploy correctness (ops) — a wrong `version` or missing `loadMigrations()` entry fails silently | Med × High | Pick next unused integer `version`; register import + `loadMigrations()` entry; verify apply-on-fresh-DB in CI/test |
-| Simultaneous blast radius: touches auth middleware + migration chain + PCD manager + sync-preview at once | The four highest-risk subsystems in one feature (security × data × integration) | Med × High | Strict phase gating (P0 → P1 → P4; P2/P3 parallel only after P0); one subsystem-touching PR per phase |
-| SSRF guard scoped to wizard only, leaving `/arr/test` open | Security C3 × shared-surface (practices reuse) — guarding one caller misses the pre-existing hole | Med × High | Land `assertSafeArrUrl()` once, wire into *both* `test-connection` and `/arr/test` in the same change |
-| `wizard_completed` keyed to auth mode → never runs under `AUTH=off` (or over-runs) | First-run detection (business R3/W6) × auth-mode matrix (security) | Med × Med | Gate on `wizard_completed` flag independent of auth mode; never infer from `existsLocal()` or `default_database_linked` |
-| Gate accidentally intercepts `/api/*` | Nav-gate (UX) × API contract (technical) — a page-nav redirect firing on API calls breaks fetch flows | Low × High | Gate is page-navigation only, explicitly excludes `/api/*`; assert in `hooks.server.ts` gate test |
-| Env-preseeded state re-prompts duplicates | `reconcileEnvInstances()` / `PRAXRR_DEFAULT_DB_URL` auto-link (config) × idempotent resume (UX) | Med × Med | Steps detect existing entity rows and show "already done"; treat `PRAXRR_DEFAULT_DB_URL=""` as opt-out, not "nothing to link" |
+| Risk                                                                                                      | Why it's cross-cutting                                                                                                              | Likelihood × Impact | Mitigation                                                                                                                    |
+| --------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- | ------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| Half-wired gate strands first-run users if a reuse phase merges before P0 is landed + test-covered        | Gating (security/technical) × first-run detection (business) × always-green (practices)                                             | Med × High          | P0 spine lands first with auth-mode matrix + gate-redirect tests; unbuilt steps are resolver-skipped, never exposed           |
+| Client/server step drift                                                                                  | Two copies of "which step" logic in `hooks.server.ts` and `+layout.server.ts` (technical × UX resume)                               | Med × Med           | Single pure `getSetupProgress()` in `$server/setup/progress.ts`, imported by both; no client-owned step                       |
+| Migration/version collision or silent non-registration                                                    | Migration chain (technical) × fresh-deploy correctness (ops) — a wrong `version` or missing `loadMigrations()` entry fails silently | Med × High          | Pick next unused integer `version`; register import + `loadMigrations()` entry; verify apply-on-fresh-DB in CI/test           |
+| Simultaneous blast radius: touches auth middleware + migration chain + PCD manager + sync-preview at once | The four highest-risk subsystems in one feature (security × data × integration)                                                     | Med × High          | Strict phase gating (P0 → P1 → P4; P2/P3 parallel only after P0); one subsystem-touching PR per phase                         |
+| SSRF guard scoped to wizard only, leaving `/arr/test` open                                                | Security C3 × shared-surface (practices reuse) — guarding one caller misses the pre-existing hole                                   | Med × High          | Land `assertSafeArrUrl()` once, wire into _both_ `test-connection` and `/arr/test` in the same change                         |
+| `wizard_completed` keyed to auth mode → never runs under `AUTH=off` (or over-runs)                        | First-run detection (business R3/W6) × auth-mode matrix (security)                                                                  | Med × Med           | Gate on `wizard_completed` flag independent of auth mode; never infer from `existsLocal()` or `default_database_linked`       |
+| Gate accidentally intercepts `/api/*`                                                                     | Nav-gate (UX) × API contract (technical) — a page-nav redirect firing on API calls breaks fetch flows                               | Low × High          | Gate is page-navigation only, explicitly excludes `/api/*`; assert in `hooks.server.ts` gate test                             |
+| Env-preseeded state re-prompts duplicates                                                                 | `reconcileEnvInstances()` / `PRAXRR_DEFAULT_DB_URL` auto-link (config) × idempotent resume (UX)                                     | Med × Med           | Steps detect existing entity rows and show "already done"; treat `PRAXRR_DEFAULT_DB_URL=""` as opt-out, not "nothing to link" |
 
 ## Completion Checklist additions
 

@@ -34,13 +34,14 @@ All three targets (Radarr, Sonarr, Lidarr) share the same .NET "Servarr" backend
 auth/status contract, but the **API version differs by app** — this is a real gotcha, not a
 theoretical one, and the codebase already encodes it correctly.
 
-| App     | API root   | Status endpoint         | Docs |
-|---------|-----------|--------------------------|------|
-| Radarr  | `/api/v3` | `/api/v3/system/status`  | https://radarr.video/docs/api/ |
-| Sonarr  | `/api/v3` | `/api/v3/system/status`  | https://sonarr.tv/docs/api/ |
-| Lidarr  | `/api/v1` | `/api/v1/system/status`  | https://lidarr.audio/docs/api/ |
+| App    | API root  | Status endpoint         | Docs                           |
+| ------ | --------- | ----------------------- | ------------------------------ |
+| Radarr | `/api/v3` | `/api/v3/system/status` | https://radarr.video/docs/api/ |
+| Sonarr | `/api/v3` | `/api/v3/system/status` | https://sonarr.tv/docs/api/    |
+| Lidarr | `/api/v1` | `/api/v1/system/status` | https://lidarr.audio/docs/api/ |
 
 Community/mirror docs (useful when official sites don't render full schemas in a fetch):
+
 - Sonarr wiki API page: https://github.com/Sonarr/Sonarr/wiki/API
 - Lidarr wiki API page: https://github.com/lidarr/Lidarr/wiki/API
 - Servarr Wiki (shared conventions, API key requirements): https://wiki.servarr.com/
@@ -48,6 +49,7 @@ Community/mirror docs (useful when official sites don't render full schemas in a
 - Servarr Wiki — Lidarr system/API key notes: https://wiki.servarr.com/lidarr/system
 
 **Auth mechanism (identical across all three apps):**
+
 - Header: `X-Api-Key: <key>` — the header name and casing praxrr already uses in
   `BaseArrClient` (`base.ts:38`).
 - Alternative: `?apikey=<key>` query string (not used in this codebase; header is preferred and
@@ -58,6 +60,7 @@ Community/mirror docs (useful when official sites don't render full schemas in a
   a plausible first-run mistake).
 
 **Existing praxrr implementation to reuse, not duplicate:**
+
 - `BaseArrClient.testConnection()` (`packages/praxrr-app/src/lib/server/utils/arr/base.ts:68-91`)
   calls `GET /api/{apiVersion}/system/status`, logs, and returns a boolean. It has built-in retry
   logic (3 attempts) inherited from `BaseHttpClient`.
@@ -74,6 +77,7 @@ Community/mirror docs (useful when official sites don't render full schemas in a
   the instance record is persisted.
 
 **Failure-mode gotchas to surface in the UI (not just log):**
+
 - Wrong port/URL → connection refused / timeout (BaseHttpClient retries 3x before failing — the
   wizard should show a spinner covering that retry window, not just an instant error).
 - Wrong or too-short API key → typically a 401; some Servarr versions return 200 with an
@@ -92,6 +96,7 @@ No third-party stepper library is warranted — this is a 6-step linear flow wit
 validation at nearly every step (Arr connectivity, PCD link, profile/format selection), which maps
 naturally onto SvelteKit's existing form-action model rather than a client-side component wizard.
 Client-only stepper libraries surveyed for reference (not recommended as dependencies):
+
 - https://github.com/uduma-sonia/svelte-wizard
 - https://madewithsvelte.com/svelte-steps
 - Svelte's own "multisteps forms" playground example: https://svelte.dev/playground/7b05d57dcdc04f49be72844e4b2825b3
@@ -165,9 +170,14 @@ Example step action pattern (no runes, mirrors `routes/auth/setup/+page.svelte:7
 export const actions = {
   testAndSave: async ({ request }) => {
     const data = await request.formData();
-    const client = createArrClient(data.get('arr_type'), data.get('url'), data.get('apiKey'));
+    const client = createArrClient(
+      data.get('arr_type'),
+      data.get('url'),
+      data.get('apiKey')
+    );
     const ok = await client.testConnection();
-    if (!ok) return fail(400, { error: 'Could not connect. Check URL and API key.' });
+    if (!ok)
+      return fail(400, { error: 'Could not connect. Check URL and API key.' });
     // persist instance, redirect to next step
     throw redirect(303, '/setup/link-database');
   },

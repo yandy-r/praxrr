@@ -79,15 +79,15 @@ First run → redirected to /setup (resumes at wizard_current_step)
 
 ### Interaction Changes
 
-| Touchpoint | Before | After | Notes |
-| ---------- | ------ | ----- | ----- |
-| First-run landing | empty dashboard | redirect to `/setup` (page-nav only, never `/api/*`) | reverse-gate sends done/skipped users back to `/` |
-| Connection test | `/arr/test`, raw error | idle→testing→success/fail with distinct "unreachable" vs "key rejected" copy | ARIA live region announces result |
-| Add instance | `/arr/new` form | same `InstanceForm.svelte` embedded (`mode="create"`) | no duplicate form; `form.error`/`form.success` unchanged |
-| Link DB | `/databases/new/*` | default pre-selected; git-URL-only custom behind disclosure | local-path linking NOT offered (security C4) |
-| Preview/sync | `/arr/[id]/sync` | reuse `SyncPreviewPanel` / deep-link (D1) | no new preview format or executor |
-| Skip | none | one click → `wizard_dismissed_at`, reversible from Settings | frictionless (no confirm) |
-| Accessibility | n/a | focus to step heading on nav; per-step title "… — Step X of 6" | no wizard session timeout |
+| Touchpoint        | Before                 | After                                                                        | Notes                                                    |
+| ----------------- | ---------------------- | ---------------------------------------------------------------------------- | -------------------------------------------------------- |
+| First-run landing | empty dashboard        | redirect to `/setup` (page-nav only, never `/api/*`)                         | reverse-gate sends done/skipped users back to `/`        |
+| Connection test   | `/arr/test`, raw error | idle→testing→success/fail with distinct "unreachable" vs "key rejected" copy | ARIA live region announces result                        |
+| Add instance      | `/arr/new` form        | same `InstanceForm.svelte` embedded (`mode="create"`)                        | no duplicate form; `form.error`/`form.success` unchanged |
+| Link DB           | `/databases/new/*`     | default pre-selected; git-URL-only custom behind disclosure                  | local-path linking NOT offered (security C4)             |
+| Preview/sync      | `/arr/[id]/sync`       | reuse `SyncPreviewPanel` / deep-link (D1)                                    | no new preview format or executor                        |
+| Skip              | none                   | one click → `wizard_dismissed_at`, reversible from Settings                  | frictionless (no confirm)                                |
+| Accessibility     | n/a                    | focus to step heading on nav; per-step title "… — Step X of 6"               | no wizard session timeout                                |
 
 ---
 
@@ -95,33 +95,33 @@ First run → redirected to /setup (resumes at wizard_current_step)
 
 Files that MUST be read before implementing:
 
-| Priority | File | Lines | Why |
-| -------- | ---- | ----- | --- |
-| P0 | `packages/praxrr-app/src/lib/server/db/queries/setupState.ts` | all | Singleton raw-SQL query layer to extend (not Kysely) |
-| P0 | `packages/praxrr-app/src/lib/server/db/migrations/039_create_setup_state.ts` | all | Migration shape to mirror for the ALTER |
-| P0 | `packages/praxrr-app/src/lib/server/db/migrations.ts` | 60-75, 300-372 | Static import + `loadMigrations()` registration (two-line edit) |
-| P0 | `packages/praxrr-app/src/hooks.server.ts` | 207-259 | Gate order; wizard gate slots at skipAuth branch (223) AND auth tail (258) |
-| P0 | `packages/praxrr-app/src/lib/server/utils/auth/middleware.ts` | 27-124 | `PUBLIC_PATHS` (do not widen), `getAuthState()` AUTH-mode matrix |
-| P0 | `packages/praxrr-app/src/routes/auth/setup/+page.server.ts` | 11-28 | `load`+`action` double-guard model for setup-in-progress |
-| P0 | `packages/praxrr-app/src/routes/arr/test/+server.ts` | 1-56 | SSRF hole (line 41) + raw-error leak (53) to harden |
-| P1 | `packages/praxrr-app/src/lib/server/utils/arr/base.ts` | 60-90 | `testConnection()`; add `getSystemStatus()` here |
-| P1 | `packages/praxrr-app/src/routes/api/v1/sync/preview/+server.ts` | 200-235 | `/api/v1` handler shape (RequestHandler, body guard, ErrorResponse) |
-| P1 | `packages/praxrr-app/src/routes/arr/new/+page.server.ts` | 15-176 | Form action pattern (fail/redirect, dedupe, `arrInstancesQueries.create`) |
-| P1 | `packages/praxrr-app/src/routes/arr/components/InstanceForm.svelte` | 30-60 | Props for `mode="create"` embed |
-| P1 | `packages/praxrr-app/src/lib/server/pcd/entities/qualityProfiles/list.ts` | 61-159 | arr_type compat filter via `quality_api_mappings` |
-| P1 | `packages/praxrr-app/src/lib/server/utils/auth/network.ts` | 25-136 | `isLocalAddress`, metadata IPs, `getClientIp` for SSRF+rate-limit |
-| P1 | `packages/praxrr-app/src/routes/api/v1/section-preferences/_helpers.ts` | 58-83 | Rate-limit token-bucket to extract |
-| P2 | `packages/praxrr-app/src/tests/routes/uiPreferencesApi.test.ts` | 1-45 | Route-handler unit-test + query-patch pattern |
-| P2 | `packages/praxrr-app/src/tests/base/BaseTest.ts` | 130-250 | Test harness (`installPatch`, `test()`, tempDir) |
-| P2 | `scripts/test.ts` | all | Add `setup-wizard` alias |
-| P2 | `docs/plans/setup-wizard/feature-spec.md` | all | Full design context + decisions D1–D6 |
+| Priority | File                                                                         | Lines          | Why                                                                        |
+| -------- | ---------------------------------------------------------------------------- | -------------- | -------------------------------------------------------------------------- |
+| P0       | `packages/praxrr-app/src/lib/server/db/queries/setupState.ts`                | all            | Singleton raw-SQL query layer to extend (not Kysely)                       |
+| P0       | `packages/praxrr-app/src/lib/server/db/migrations/039_create_setup_state.ts` | all            | Migration shape to mirror for the ALTER                                    |
+| P0       | `packages/praxrr-app/src/lib/server/db/migrations.ts`                        | 60-75, 300-372 | Static import + `loadMigrations()` registration (two-line edit)            |
+| P0       | `packages/praxrr-app/src/hooks.server.ts`                                    | 207-259        | Gate order; wizard gate slots at skipAuth branch (223) AND auth tail (258) |
+| P0       | `packages/praxrr-app/src/lib/server/utils/auth/middleware.ts`                | 27-124         | `PUBLIC_PATHS` (do not widen), `getAuthState()` AUTH-mode matrix           |
+| P0       | `packages/praxrr-app/src/routes/auth/setup/+page.server.ts`                  | 11-28          | `load`+`action` double-guard model for setup-in-progress                   |
+| P0       | `packages/praxrr-app/src/routes/arr/test/+server.ts`                         | 1-56           | SSRF hole (line 41) + raw-error leak (53) to harden                        |
+| P1       | `packages/praxrr-app/src/lib/server/utils/arr/base.ts`                       | 60-90          | `testConnection()`; add `getSystemStatus()` here                           |
+| P1       | `packages/praxrr-app/src/routes/api/v1/sync/preview/+server.ts`              | 200-235        | `/api/v1` handler shape (RequestHandler, body guard, ErrorResponse)        |
+| P1       | `packages/praxrr-app/src/routes/arr/new/+page.server.ts`                     | 15-176         | Form action pattern (fail/redirect, dedupe, `arrInstancesQueries.create`)  |
+| P1       | `packages/praxrr-app/src/routes/arr/components/InstanceForm.svelte`          | 30-60          | Props for `mode="create"` embed                                            |
+| P1       | `packages/praxrr-app/src/lib/server/pcd/entities/qualityProfiles/list.ts`    | 61-159         | arr_type compat filter via `quality_api_mappings`                          |
+| P1       | `packages/praxrr-app/src/lib/server/utils/auth/network.ts`                   | 25-136         | `isLocalAddress`, metadata IPs, `getClientIp` for SSRF+rate-limit          |
+| P1       | `packages/praxrr-app/src/routes/api/v1/section-preferences/_helpers.ts`      | 58-83          | Rate-limit token-bucket to extract                                         |
+| P2       | `packages/praxrr-app/src/tests/routes/uiPreferencesApi.test.ts`              | 1-45           | Route-handler unit-test + query-patch pattern                              |
+| P2       | `packages/praxrr-app/src/tests/base/BaseTest.ts`                             | 130-250        | Test harness (`installPatch`, `test()`, tempDir)                           |
+| P2       | `scripts/test.ts`                                                            | all            | Add `setup-wizard` alias                                                   |
+| P2       | `docs/plans/setup-wizard/feature-spec.md`                                    | all            | Full design context + decisions D1–D6                                      |
 
 ## External Documentation
 
-| Topic | Source | Key Takeaway |
-| ----- | ------ | ------------ |
+| Topic                           | Source                                                           | Key Takeaway                                                                                             |
+| ------------------------------- | ---------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
 | Radarr/Sonarr/Lidarr status API | radarr.video/docs/api, sonarr.tv/docs/api, lidarr.audio/docs/api | `GET /api/vN/system/status` + `X-Api-Key`; Lidarr `v1`, Radarr/Sonarr `v3`; returns `appName`, `version` |
-| No new SaaS/library | — | Zero new dependencies; all primitives in-repo |
+| No new SaaS/library             | —                                                                | Zero new dependencies; all primitives in-repo                                                            |
 
 ---
 
@@ -133,8 +133,15 @@ Code patterns discovered in the codebase (HEAD-verified). Follow these exactly.
 
 ```ts
 // SOURCE: db/queries/setupState.ts:6,17 — singleton query object + colocated interface
-export interface SetupState { id: number; default_database_linked: number; /* +new cols */ }
-export const setupStateQueries = { get(): SetupState { /* db.queryFirst */ } };
+export interface SetupState {
+  id: number;
+  default_database_linked: number; /* +new cols */
+}
+export const setupStateQueries = {
+  get(): SetupState {
+    /* db.queryFirst */
+  },
+};
 // Migrations: YYYYMMDD_verb_noun.ts, `version: <YYYYMMDD>` (next = 20260707). Aliases: $db/ $api/ $sync/ $arr/ $ui/ $auth/.
 // Svelte 5 NO runes: onclick handlers, no $state/$derived; forms use dirty store + form.error/form.success.
 ```
@@ -142,25 +149,40 @@ export const setupStateQueries = { get(): SetupState { /* db.queryFirst */ } };
 ### Prettier (verified from `.prettierrc` — CLAUDE.md's "tabs/100w" note is STALE)
 
 ```json
-{ "tabWidth": 2, "useTabs": false, "printWidth": 120, "singleQuote": true, "trailingComma": "es5", "semi": true }
+{
+  "tabWidth": 2,
+  "useTabs": false,
+  "printWidth": 120,
+  "singleQuote": true,
+  "trailingComma": "es5",
+  "semi": true
+}
 ```
 
 ### ERROR_HANDLING
 
 ```ts
 // SOURCE: routes/arr/new/+page.server.ts:16 — form action: parse → fail-fast → query → redirect
-if (!name || !type || !url || !apiKey) return fail(400, { error: '…required', values: { name, type, url } });
-if (!VALID_TYPES.includes(type)) return fail(400, { error: 'Invalid arr type', values: { name, type, url } });
+if (!name || !type || !url || !apiKey)
+  return fail(400, { error: '…required', values: { name, type, url } });
+if (!VALID_TYPES.includes(type))
+  return fail(400, { error: 'Invalid arr type', values: { name, type, url } });
 // SOURCE: routes/api/v1/sync/preview/+server.ts:211 — JSON handler: body guard → 404 typed ErrorResponse
 const instance = arrInstancesQueries.getById(id);
-if (!instance) return json({ error: 'Instance not found' } satisfies ErrorResponse, { status: 404 });
+if (!instance)
+  return json({ error: 'Instance not found' } satisfies ErrorResponse, {
+    status: 404,
+  });
 ```
 
 ### AUTH_GUARD (model for the per-handler C1 guard — NOT `PUBLIC_PATHS`)
 
 ```ts
 // SOURCE: routes/auth/setup/+page.server.ts:14,26 — double-check in BOTH load and action (race protection)
-export const load: ServerLoad = () => { if (usersQueries.existsLocal()) throw redirect(303, '/'); return {}; };
+export const load: ServerLoad = () => {
+  if (usersQueries.existsLocal()) throw redirect(303, '/');
+  return {};
+};
 // Wizard: assertSetupInProgress() as FIRST statement of every /api/v1/setup/* handler → throw 403 (not redirect) once wizard_completed=1.
 // AUTH-mode matrix — middleware.ts:44-124: off→needsSetup:false,skipAuth:true; local+LAN→skipAuth:true; oidc→needsSetup:false; on→!hasLocalUsers.
 ```
@@ -169,10 +191,17 @@ export const load: ServerLoad = () => { if (usersQueries.existsLocal()) throw re
 
 ```ts
 // SOURCE: hooks.server.ts:214,222,227,258
-if (auth.needsSetup) { if (pathname === '/auth/setup') return resolve(event); throw redirect(303, '/auth/setup'); } // [1]
-if (auth.skipAuth) { /* CALL resolveWizardRedirect() HERE (223) before */ return resolve(event); }               // [2] W6
-if (event.url.pathname === '/auth/setup') { throw redirect(303, '/'); }                                            // [3] reverse-gate model
-/* CALL resolveWizardRedirect() before the final */ return resolve(event);                                        // [4] auth tail (258)
+if (auth.needsSetup) {
+  if (pathname === '/auth/setup') return resolve(event);
+  throw redirect(303, '/auth/setup');
+} // [1]
+if (auth.skipAuth) {
+  /* CALL resolveWizardRedirect() HERE (223) before */ return resolve(event);
+} // [2] W6
+if (event.url.pathname === '/auth/setup') {
+  throw redirect(303, '/');
+} // [3] reverse-gate model
+/* CALL resolveWizardRedirect() before the final */ return resolve(event); // [4] auth tail (258)
 // resolveWizardRedirect returns null when: pathname startsWith '/api' | isPublicPath | startsWith '/setup' | not a page GET.
 ```
 
@@ -180,7 +209,12 @@ if (event.url.pathname === '/auth/setup') { throw redirect(303, '/'); }         
 
 ```ts
 // SOURCE: db/migrations/039_create_setup_state.ts:10 & migrations.ts:70,367
-export const migration: Migration = { version: 20260707, name: 'Add setup wizard state', up: `ALTER TABLE setup_state ADD COLUMN …`, down: `…` };
+export const migration: Migration = {
+  version: 20260707,
+  name: 'Add setup wizard state',
+  up: `ALTER TABLE setup_state ADD COLUMN …`,
+  down: `…`,
+};
 // migrations.ts: import { migration as migration20260707AddSetupWizardState } from './migrations/20260707_add_setup_wizard_state.ts';
 // migrations.ts loadMigrations() array (append; runner sorts by version): migration20260707AddSetupWizardState,
 ```
@@ -214,37 +248,37 @@ import { GET, PATCH } from '../../routes/api/v1/ui-preferences/+server.ts';
 
 ## Files to Change
 
-| File | Action | Justification |
-| ---- | ------ | ------------- |
-| `db/migrations/20260707_add_setup_wizard_state.ts` | CREATE | ALTER `setup_state` +3 cols (`wizard_completed`, `wizard_dismissed_at`, `wizard_current_step`) |
-| `db/migrations.ts` | UPDATE | Static import (after ~L70) + `loadMigrations()` array entry (after ~L367) |
-| `db/queries/setupState.ts` | UPDATE | Extend `SetupState` + `getWizardState/setWizardStep(fail-fast enum)/markWizardCompleted/markWizardDismissed/wizardShouldRun` (raw-SQL style) |
-| `lib/server/setup/progress.ts` | CREATE | `getSetupProgress()` + `resolveWizardRedirect(event)` + `assertSetupInProgress()` — single gate source |
-| `hooks.server.ts` | UPDATE | Call `resolveWizardRedirect` before resolve at skipAuth branch (L223) AND auth tail (L258); page-nav only |
-| `lib/server/utils/arr/base.ts` | UPDATE | Add `getSystemStatus(): Promise<{appName,version}\|null>`; keep boolean `testConnection` wrapper |
-| `lib/server/utils/arr/urlSafety.ts` | CREATE | `assertSafeArrUrl(url)` deny-list (metadata/link-local/`0.0.0.0`; http(s) only) |
-| `lib/server/utils/http/client.ts` | UPDATE | Add `redirect: 'manual'` to `fetch` in `request()` (block redirect-based SSRF bypass) |
-| `lib/server/utils/rateLimit.ts` | CREATE | Extract IP-keyed token bucket from section-preferences `_helpers.ts` |
-| `routes/arr/test/+server.ts` | UPDATE | Call `assertSafeArrUrl` before `createArrClient` (L41); sanitized reason enum (replace raw error L53) |
-| `routes/api/v1/setup/state/+server.ts` | CREATE | GET (wizard+prereqs+defaultDb) + PATCH (persist currentStep); self-guard first statement |
-| `routes/api/v1/setup/test-connection/+server.ts` | CREATE | Guarded + IP-rate-limited; `assertSafeArrUrl` → `getSystemStatus`; sanitized enum |
-| `routes/api/v1/setup/complete/+server.ts` | CREATE | POST → `markWizardCompleted()` (idempotent) |
-| `routes/api/v1/setup/skip/+server.ts` | CREATE | POST → `markWizardDismissed()` (idempotent) |
-| `routes/setup/+layout.server.ts` | CREATE | Resolve current step; reverse-gate done/skipped → `/` |
-| `routes/setup/+layout.svelte` | CREATE | Stepper chrome + Skip button (reuse `$ui/*`, not `$ui/navigation/tabs`) |
-| `routes/setup/+page.server.ts` | CREATE | Index → redirect to `wizard_current_step` |
-| `routes/setup/welcome/+page.svelte` | CREATE | Step 1 intro |
-| `routes/setup/done/+page.svelte` | CREATE | Step 6 success + next steps |
-| `routes/setup/connect-arr/+page.{svelte,server.ts}` | CREATE | Embed `InstanceForm mode="create"`; call test-connection; `arrInstancesQueries.create` |
-| `routes/setup/link-database/+page.{svelte,server.ts}` | CREATE | Default vs custom (git-URL-only); detect already-linked; `pcdManager.link` |
-| `routes/setup/select-profiles/+page.{svelte,server.ts}` | CREATE | arr_type compat filter; `arrSyncQueries.saveQualityProfilesSync` |
-| `routes/setup/preview-sync/+page.{svelte,server.ts}` | CREATE | `POST /api/v1/sync/preview` + apply (or deep-link `/arr/[id]/sync` per D1); mark completed |
-| `docs/api/v1/openapi.yaml` | UPDATE | Add `Setup` tag + 4 paths/schemas (contract-first) |
-| `src/lib/api/v1.d.ts` | REGEN | `deno task generate:api-types` after openapi edit |
-| `scripts/test.ts` | UPDATE | Add `setup-wizard` alias |
-| `packages/praxrr-app/src/tests/routes/setupWizard.test.ts` | CREATE | Route/API unit tests |
-| `packages/praxrr-app/src/tests/base/setupProgress.test.ts` | CREATE | Progress + gate + guard + SSRF unit tests |
-| `packages/praxrr-app/src/tests/e2e/specs/N.NN-setup-wizard.spec.ts` | CREATE | One Playwright happy-path funnel |
+| File                                                                | Action | Justification                                                                                                                                |
+| ------------------------------------------------------------------- | ------ | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| `db/migrations/20260707_add_setup_wizard_state.ts`                  | CREATE | ALTER `setup_state` +3 cols (`wizard_completed`, `wizard_dismissed_at`, `wizard_current_step`)                                               |
+| `db/migrations.ts`                                                  | UPDATE | Static import (after ~L70) + `loadMigrations()` array entry (after ~L367)                                                                    |
+| `db/queries/setupState.ts`                                          | UPDATE | Extend `SetupState` + `getWizardState/setWizardStep(fail-fast enum)/markWizardCompleted/markWizardDismissed/wizardShouldRun` (raw-SQL style) |
+| `lib/server/setup/progress.ts`                                      | CREATE | `getSetupProgress()` + `resolveWizardRedirect(event)` + `assertSetupInProgress()` — single gate source                                       |
+| `hooks.server.ts`                                                   | UPDATE | Call `resolveWizardRedirect` before resolve at skipAuth branch (L223) AND auth tail (L258); page-nav only                                    |
+| `lib/server/utils/arr/base.ts`                                      | UPDATE | Add `getSystemStatus(): Promise<{appName,version}\|null>`; keep boolean `testConnection` wrapper                                             |
+| `lib/server/utils/arr/urlSafety.ts`                                 | CREATE | `assertSafeArrUrl(url)` deny-list (metadata/link-local/`0.0.0.0`; http(s) only)                                                              |
+| `lib/server/utils/http/client.ts`                                   | UPDATE | Add `redirect: 'manual'` to `fetch` in `request()` (block redirect-based SSRF bypass)                                                        |
+| `lib/server/utils/rateLimit.ts`                                     | CREATE | Extract IP-keyed token bucket from section-preferences `_helpers.ts`                                                                         |
+| `routes/arr/test/+server.ts`                                        | UPDATE | Call `assertSafeArrUrl` before `createArrClient` (L41); sanitized reason enum (replace raw error L53)                                        |
+| `routes/api/v1/setup/state/+server.ts`                              | CREATE | GET (wizard+prereqs+defaultDb) + PATCH (persist currentStep); self-guard first statement                                                     |
+| `routes/api/v1/setup/test-connection/+server.ts`                    | CREATE | Guarded + IP-rate-limited; `assertSafeArrUrl` → `getSystemStatus`; sanitized enum                                                            |
+| `routes/api/v1/setup/complete/+server.ts`                           | CREATE | POST → `markWizardCompleted()` (idempotent)                                                                                                  |
+| `routes/api/v1/setup/skip/+server.ts`                               | CREATE | POST → `markWizardDismissed()` (idempotent)                                                                                                  |
+| `routes/setup/+layout.server.ts`                                    | CREATE | Resolve current step; reverse-gate done/skipped → `/`                                                                                        |
+| `routes/setup/+layout.svelte`                                       | CREATE | Stepper chrome + Skip button (reuse `$ui/*`, not `$ui/navigation/tabs`)                                                                      |
+| `routes/setup/+page.server.ts`                                      | CREATE | Index → redirect to `wizard_current_step`                                                                                                    |
+| `routes/setup/welcome/+page.svelte`                                 | CREATE | Step 1 intro                                                                                                                                 |
+| `routes/setup/done/+page.svelte`                                    | CREATE | Step 6 success + next steps                                                                                                                  |
+| `routes/setup/connect-arr/+page.{svelte,server.ts}`                 | CREATE | Embed `InstanceForm mode="create"`; call test-connection; `arrInstancesQueries.create`                                                       |
+| `routes/setup/link-database/+page.{svelte,server.ts}`               | CREATE | Default vs custom (git-URL-only); detect already-linked; `pcdManager.link`                                                                   |
+| `routes/setup/select-profiles/+page.{svelte,server.ts}`             | CREATE | arr_type compat filter; `arrSyncQueries.saveQualityProfilesSync`                                                                             |
+| `routes/setup/preview-sync/+page.{svelte,server.ts}`                | CREATE | `POST /api/v1/sync/preview` + apply (or deep-link `/arr/[id]/sync` per D1); mark completed                                                   |
+| `docs/api/v1/openapi.yaml`                                          | UPDATE | Add `Setup` tag + 4 paths/schemas (contract-first)                                                                                           |
+| `src/lib/api/v1.d.ts`                                               | REGEN  | `deno task generate:api-types` after openapi edit                                                                                            |
+| `scripts/test.ts`                                                   | UPDATE | Add `setup-wizard` alias                                                                                                                     |
+| `packages/praxrr-app/src/tests/routes/setupWizard.test.ts`          | CREATE | Route/API unit tests                                                                                                                         |
+| `packages/praxrr-app/src/tests/base/setupProgress.test.ts`          | CREATE | Progress + gate + guard + SSRF unit tests                                                                                                    |
+| `packages/praxrr-app/src/tests/e2e/specs/N.NN-setup-wizard.spec.ts` | CREATE | One Playwright happy-path funnel                                                                                                             |
 
 > All route paths are under `packages/praxrr-app/src/`.
 
@@ -419,23 +453,23 @@ import { GET, PATCH } from '../../routes/api/v1/ui-preferences/+server.ts';
 
 ### Unit Tests
 
-| Test | Input | Expected Output | Edge Case? |
-| ---- | ----- | --------------- | ---------- |
-| `getSetupProgress` | no instance | `{hasArrInstance:false,…}` | Yes |
-| `getSetupProgress` | instance + DB | `{hasArrInstance:true,hasDatabase:true}` | No |
-| `setWizardStep` | unknown enum | throws | Yes |
-| wizard flags | complete/dismiss | `wizardShouldRun()` false | No |
-| `resolveWizardRedirect` | `/api/v1/foo` | `null` (never redirect) | Yes |
-| `resolveWizardRedirect` | `/` first-run | `/setup` | No |
-| `resolveWizardRedirect` | `/setup/*` done | `/` (reverse) | Yes |
-| `assertSetupInProgress` | `wizard_completed=1` | throws 403 | Yes |
-| `assertSafeArrUrl` | `http://169.254.169.254` | reject | Yes |
-| `assertSafeArrUrl` | `http://10.0.0.5:7878` | accept | Yes |
-| `assertSafeArrUrl` | `ftp://x` / `0.0.0.0` | reject | Yes |
-| auth-mode matrix | off/local/oidc/on | wizard gates on flag, not `existsLocal` | Yes |
-| test-connection | over rate limit | throttled | Yes |
-| select-profiles | `arr_type` compat | only compatible names | Yes |
-| setup endpoints | any | no `Access-Control-Allow-Origin` | Yes |
+| Test                    | Input                    | Expected Output                          | Edge Case? |
+| ----------------------- | ------------------------ | ---------------------------------------- | ---------- |
+| `getSetupProgress`      | no instance              | `{hasArrInstance:false,…}`               | Yes        |
+| `getSetupProgress`      | instance + DB            | `{hasArrInstance:true,hasDatabase:true}` | No         |
+| `setWizardStep`         | unknown enum             | throws                                   | Yes        |
+| wizard flags            | complete/dismiss         | `wizardShouldRun()` false                | No         |
+| `resolveWizardRedirect` | `/api/v1/foo`            | `null` (never redirect)                  | Yes        |
+| `resolveWizardRedirect` | `/` first-run            | `/setup`                                 | No         |
+| `resolveWizardRedirect` | `/setup/*` done          | `/` (reverse)                            | Yes        |
+| `assertSetupInProgress` | `wizard_completed=1`     | throws 403                               | Yes        |
+| `assertSafeArrUrl`      | `http://169.254.169.254` | reject                                   | Yes        |
+| `assertSafeArrUrl`      | `http://10.0.0.5:7878`   | accept                                   | Yes        |
+| `assertSafeArrUrl`      | `ftp://x` / `0.0.0.0`    | reject                                   | Yes        |
+| auth-mode matrix        | off/local/oidc/on        | wizard gates on flag, not `existsLocal`  | Yes        |
+| test-connection         | over rate limit          | throttled                                | Yes        |
+| select-profiles         | `arr_type` compat        | only compatible names                    | Yes        |
+| setup endpoints         | any                      | no `Access-Control-Allow-Origin`         | Yes        |
 
 ### Edge Cases Checklist
 
@@ -547,16 +581,16 @@ EXPECT: setup-wizard happy-path spec passes.
 
 ## Risks
 
-| Risk | Likelihood | Impact | Mitigation |
-| ---- | ---------- | ------ | ---------- |
-| C1 — unauthenticated `/api/v1/setup/*` | High | Critical | Per-handler auth+setup-in-progress guard as first statement; never `PUBLIC_PATHS` |
-| C3 — SSRF via connection test | High | Critical | `assertSafeArrUrl` deny-list + `redirect:'manual'`, shared with `/arr/test` |
-| C4 — local-path traversal on PCD link | Med | Critical | Git-URL-only in wizard; local-path stays in authenticated Databases UI |
-| W6 — wizard never fires under `AUTH=off` | Med | High | Gate on `wizard_completed` flag; call `resolveWizardRedirect` in BOTH skipAuth + auth-tail |
-| Half-wired gate strands first-run users | Med | High | B1–B3 (state+gate) land test-covered before step batches; unbuilt steps simply resolve forward |
-| Migration version collision | Low | Med | `20260707` verified next-unused; runner sorts by version |
-| C2/W3 — app-wide CSRF/HOST hardening deferred | Med | Med | This PR adds per-handler guard (+ optional local-IP restriction); full `csrf.trustedOrigins` narrowing tracked as follow-up (app-wide, out of scope) |
-| Client/server step drift | Low | Med | Server-authoritative current step; client store holds transient form state only |
+| Risk                                          | Likelihood | Impact   | Mitigation                                                                                                                                           |
+| --------------------------------------------- | ---------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| C1 — unauthenticated `/api/v1/setup/*`        | High       | Critical | Per-handler auth+setup-in-progress guard as first statement; never `PUBLIC_PATHS`                                                                    |
+| C3 — SSRF via connection test                 | High       | Critical | `assertSafeArrUrl` deny-list + `redirect:'manual'`, shared with `/arr/test`                                                                          |
+| C4 — local-path traversal on PCD link         | Med        | Critical | Git-URL-only in wizard; local-path stays in authenticated Databases UI                                                                               |
+| W6 — wizard never fires under `AUTH=off`      | Med        | High     | Gate on `wizard_completed` flag; call `resolveWizardRedirect` in BOTH skipAuth + auth-tail                                                           |
+| Half-wired gate strands first-run users       | Med        | High     | B1–B3 (state+gate) land test-covered before step batches; unbuilt steps simply resolve forward                                                       |
+| Migration version collision                   | Low        | Med      | `20260707` verified next-unused; runner sorts by version                                                                                             |
+| C2/W3 — app-wide CSRF/HOST hardening deferred | Med        | Med      | This PR adds per-handler guard (+ optional local-IP restriction); full `csrf.trustedOrigins` narrowing tracked as follow-up (app-wide, out of scope) |
+| Client/server step drift                      | Low        | Med      | Server-authoritative current step; client store holds transient form state only                                                                      |
 
 ## Notes
 

@@ -12,18 +12,18 @@ wizard is primarily a **thin orchestration/presentation layer** over existing,
 tested modules — not new backend capability. The three onboarding steps map almost
 one-to-one to code that already exists:
 
-| Wizard step | Reused primitive | Location |
-| --- | --- | --- |
-| Connect Arr | `InstanceForm.svelte` + `POST /arr/test` + `arrInstancesQueries.create` | `routes/arr/components/InstanceForm.svelte`, `routes/arr/test/+server.ts`, `db/queries/arrInstances.ts` |
-| Link PCD DB | `pcdManager.link(...)` (already driven by startup auto-link) | `hooks.server.ts:102`, `pcd/index.ts` |
-| Select profiles/CFs | quality-profiles / custom-formats read paths | `routes/quality-profiles/**`, `routes/custom-formats/**` |
-| Preview & Sync | `POST /api/v1/sync/preview` (#7, hardened) | `routes/api/v1/sync/preview/+server.ts` |
+| Wizard step         | Reused primitive                                                        | Location                                                                                                |
+| ------------------- | ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| Connect Arr         | `InstanceForm.svelte` + `POST /arr/test` + `arrInstancesQueries.create` | `routes/arr/components/InstanceForm.svelte`, `routes/arr/test/+server.ts`, `db/queries/arrInstances.ts` |
+| Link PCD DB         | `pcdManager.link(...)` (already driven by startup auto-link)            | `hooks.server.ts:102`, `pcd/index.ts`                                                                   |
+| Select profiles/CFs | quality-profiles / custom-formats read paths                            | `routes/quality-profiles/**`, `routes/custom-formats/**`                                                |
+| Preview & Sync      | `POST /api/v1/sync/preview` (#7, hardened)                              | `routes/api/v1/sync/preview/+server.ts`                                                                 |
 
 The real work is **wiring, gating, and state**, and there are two load-bearing
 decisions that must be made before any code is written:
 
 1. **Naming collision (CRITICAL to disambiguate).** `/auth/setup` already exists and
-   means "create the first admin account." The new wizard is a *different* concept:
+   means "create the first admin account." The new wizard is a _different_ concept:
    post-auth guided onboarding. They must not be conflated. Recommended route:
    `/setup/` (or `/onboarding/`), sequenced strictly **after** `/auth/setup`.
 2. **First-run detection cannot reuse `default_database_linked`.** The startup
@@ -33,7 +33,7 @@ decisions that must be made before any code is written:
 
 The two CRITICAL security concerns — **auth gating** and **SSRF on connection test /
 DB link** — are both real and both already partially latent in the codebase (the
-existing `/arr/test` route has no SSRF guard). The wizard does not *introduce* them,
+existing `/arr/test` route has no SSRF guard). The wizard does not _introduce_ them,
 but it makes them the first surface a brand-new operator touches, so they should be
 addressed as part of this work, not deferred.
 
@@ -93,7 +93,7 @@ survives refresh, avoids a client/server drift class of bugs, and makes "resume"
 free.
 
 **First-run trigger.** Add a lightweight nudge (banner or redirect) when
-`wizard_completed = 0` AND no enabled Arr instance exists — *not* a hard redirect from
+`wizard_completed = 0` AND no enabled Arr instance exists — _not_ a hard redirect from
 `/` that traps returning users. Prefer a dismissable top-of-app banner ("Finish
 setup") over a forced redirect, so power users are never locked out. The hard gate
 already exists for admin-account creation (`hooks.server.ts:213-219`); do **not** add
@@ -179,18 +179,18 @@ step resolver).
 
 ## Risk Assessment
 
-| # | Risk | Severity | Likelihood | Mitigation |
-| --- | --- | --- | --- | --- |
-| R1 | **Auth gating of `/setup/`** — if added to `PUBLIC_PATHS` (like `/auth/setup` is), the wizard's server actions (Arr test, DB link, sync) become an **unauthenticated** attack surface. | **CRITICAL** | Med | Do **not** add `/setup/` to `PUBLIC_PATHS` (`auth/middleware.ts:27`). Gate it behind `auth.user \|\| auth.skipAuth`. For `AUTH=oidc`/`AUTH=on`, require a session; for `AUTH=off`/`local`, `skipAuth` already covers it. Add an explicit auth-mode matrix test. |
-| R2 | **SSRF via connection test + DB link.** `/arr/test` (`routes/arr/test/+server.ts`) and `pcdManager.link` take an arbitrary user URL and make **server-side** requests. No SSRF guard exists today. First-run users pointing at `http://169.254.169.254/` or internal hosts. | **CRITICAL** | Med | Add URL validation before the outbound request: reject link-local (169.254/16, fd00::/8), loopback-by-name tricks, and cloud metadata IPs; consider DNS-rebinding protection. Note: this hardens an **existing** hole, so scope it deliberately. Keep behind auth (R1) as defense-in-depth. |
-| R3 | **First-run detection race / wrong signal.** `default_database_linked` is set on startup **even on link failure** (`hooks.server.ts:121`); reusing it as "onboarding done" mislabels users. Startup auto-link runs at module load, concurrent with early requests. | High | High | Add dedicated `wizard_completed` flag (never inferred from DB-link state). Compute "current step" from user-owned facts (enabled Arr instances, linked DBs) + the flag, not from startup side effects. |
-| R4 | **Naming/route collision** with existing `/auth/setup` (admin account). Conflation breaks both flows. | High | Med | Use a distinct namespace (`/setup/` or `/onboarding/`); document that `/auth/setup` = account creation, `/setup/` = onboarding; sequence onboarding strictly after account creation in the gate. |
-| R5 | **Duplicating vs reusing forms.** Re-implementing the Arr/DB/profile forms inside the wizard causes drift with the canonical routes. | Med | High | Reuse `InstanceForm.svelte`, the QP/CF read paths, and `POST /api/v1/sync/preview` directly. Wizard steps are wrappers, not forks. |
-| R6 | **Arr-semantic drift in profile step.** Assuming Sonarr/Radarr/Lidarr share profile/quality semantics violates the Cross-Arr policy; `arr_type='all'` scores can make incompatible profiles appear valid. | High | Med | Resolve compatibility per `arr_type` via `quality_api_mappings`; do not require `enabled=1`; fail fast on ambiguous mappings (CLAUDE.md Cross-Arr + Cutover guardrails). |
-| R7 | **Hard-redirect traps returning users.** A blanket redirect from `/` while `wizard_completed=0` locks power users who intentionally skipped. | Med | Med | Prefer dismissable banner + `wizard_dismissed_at`; only the admin-account gate stays a hard redirect. |
-| R8 | **Local-path / non-git DB source.** DB step assuming a git repo breaks for local-path sources. | Med | Med | Degrade gracefully; never 500 on non-git sources (CLAUDE.md "Local-Path Source Guardrails"). |
-| R9 | **Sync from wizard on unreachable instance** yields a confusing first failure. | Low | Med | Health-gate the final CTA; surface preview errors (the preview API already reports per-section errors). |
-| R10 | **Preview store capacity/rate limits** (429s) during rapid wizard retries. | Low | Low | Already mitigated server-side (`preview/limits.ts`); surface 429 as a friendly "retry shortly" message. |
+| #   | Risk                                                                                                                                                                                                                                                                        | Severity     | Likelihood | Mitigation                                                                                                                                                                                                                                                                                  |
+| --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------ | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| R1  | **Auth gating of `/setup/`** — if added to `PUBLIC_PATHS` (like `/auth/setup` is), the wizard's server actions (Arr test, DB link, sync) become an **unauthenticated** attack surface.                                                                                      | **CRITICAL** | Med        | Do **not** add `/setup/` to `PUBLIC_PATHS` (`auth/middleware.ts:27`). Gate it behind `auth.user \|\| auth.skipAuth`. For `AUTH=oidc`/`AUTH=on`, require a session; for `AUTH=off`/`local`, `skipAuth` already covers it. Add an explicit auth-mode matrix test.                             |
+| R2  | **SSRF via connection test + DB link.** `/arr/test` (`routes/arr/test/+server.ts`) and `pcdManager.link` take an arbitrary user URL and make **server-side** requests. No SSRF guard exists today. First-run users pointing at `http://169.254.169.254/` or internal hosts. | **CRITICAL** | Med        | Add URL validation before the outbound request: reject link-local (169.254/16, fd00::/8), loopback-by-name tricks, and cloud metadata IPs; consider DNS-rebinding protection. Note: this hardens an **existing** hole, so scope it deliberately. Keep behind auth (R1) as defense-in-depth. |
+| R3  | **First-run detection race / wrong signal.** `default_database_linked` is set on startup **even on link failure** (`hooks.server.ts:121`); reusing it as "onboarding done" mislabels users. Startup auto-link runs at module load, concurrent with early requests.          | High         | High       | Add dedicated `wizard_completed` flag (never inferred from DB-link state). Compute "current step" from user-owned facts (enabled Arr instances, linked DBs) + the flag, not from startup side effects.                                                                                      |
+| R4  | **Naming/route collision** with existing `/auth/setup` (admin account). Conflation breaks both flows.                                                                                                                                                                       | High         | Med        | Use a distinct namespace (`/setup/` or `/onboarding/`); document that `/auth/setup` = account creation, `/setup/` = onboarding; sequence onboarding strictly after account creation in the gate.                                                                                            |
+| R5  | **Duplicating vs reusing forms.** Re-implementing the Arr/DB/profile forms inside the wizard causes drift with the canonical routes.                                                                                                                                        | Med          | High       | Reuse `InstanceForm.svelte`, the QP/CF read paths, and `POST /api/v1/sync/preview` directly. Wizard steps are wrappers, not forks.                                                                                                                                                          |
+| R6  | **Arr-semantic drift in profile step.** Assuming Sonarr/Radarr/Lidarr share profile/quality semantics violates the Cross-Arr policy; `arr_type='all'` scores can make incompatible profiles appear valid.                                                                   | High         | Med        | Resolve compatibility per `arr_type` via `quality_api_mappings`; do not require `enabled=1`; fail fast on ambiguous mappings (CLAUDE.md Cross-Arr + Cutover guardrails).                                                                                                                    |
+| R7  | **Hard-redirect traps returning users.** A blanket redirect from `/` while `wizard_completed=0` locks power users who intentionally skipped.                                                                                                                                | Med          | Med        | Prefer dismissable banner + `wizard_dismissed_at`; only the admin-account gate stays a hard redirect.                                                                                                                                                                                       |
+| R8  | **Local-path / non-git DB source.** DB step assuming a git repo breaks for local-path sources.                                                                                                                                                                              | Med          | Med        | Degrade gracefully; never 500 on non-git sources (CLAUDE.md "Local-Path Source Guardrails").                                                                                                                                                                                                |
+| R9  | **Sync from wizard on unreachable instance** yields a confusing first failure.                                                                                                                                                                                              | Low          | Med        | Health-gate the final CTA; surface preview errors (the preview API already reports per-section errors).                                                                                                                                                                                     |
+| R10 | **Preview store capacity/rate limits** (429s) during rapid wizard retries.                                                                                                                                                                                                  | Low          | Low        | Already mitigated server-side (`preview/limits.ts`); surface 429 as a friendly "retry shortly" message.                                                                                                                                                                                     |
 
 **Integration challenges:** the wizard touches auth middleware, the DB migration
 chain, the PCD manager, and the sync preview subsystem simultaneously — so Phase 0
@@ -204,33 +204,33 @@ the only server-side cost is the preview generation, which is already bounded.
 
 ### A1 — Route-based steps vs single-page stepper
 
-| | Route-based (one route per step) | Single-page client stepper |
-| --- | --- | --- |
-| Pros | Idiomatic here (mirrors `arr/[id]/*`); free back/fwd + deep-link resume; each step reuses `load`/actions like standalone pages; honors "Routes over modals" | Fewer files; no per-step navigation; simplest client state |
-| Cons | More route files; shared chrome via `+layout` | Reinvents nav/back; resume needs manual client persistence; drifts from repo conventions; large single component (~500-line cap pressure) |
-| Effort | Med | Low-Med |
+|        | Route-based (one route per step)                                                                                                                            | Single-page client stepper                                                                                                                |
+| ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| Pros   | Idiomatic here (mirrors `arr/[id]/*`); free back/fwd + deep-link resume; each step reuses `load`/actions like standalone pages; honors "Routes over modals" | Fewer files; no per-step navigation; simplest client state                                                                                |
+| Cons   | More route files; shared chrome via `+layout`                                                                                                               | Reinvents nav/back; resume needs manual client persistence; drifts from repo conventions; large single component (~500-line cap pressure) |
+| Effort | Med                                                                                                                                                         | Low-Med                                                                                                                                   |
 
 **Recommendation: route-based.** It matches existing patterns, gives resume/deep-link
 for free, and keeps each step small and independently testable.
 
 ### A2 — Server-driven current step vs client store
 
-| | Server-authoritative (recommended) | Client store owns step |
-| --- | --- | --- |
-| Pros | Single source of truth; survives refresh; resume free; no drift; testable in `+layout.server.ts` | Snappier transitions; no server round-trip per step |
-| Cons | Round-trip per step (cheap) | Refresh/close loses progress unless persisted; client/server drift risk; harder to test |
-| Effort | Med | Med |
+|        | Server-authoritative (recommended)                                                               | Client store owns step                                                                  |
+| ------ | ------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------- |
+| Pros   | Single source of truth; survives refresh; resume free; no drift; testable in `+layout.server.ts` | Snappier transitions; no server round-trip per step                                     |
+| Cons   | Round-trip per step (cheap)                                                                      | Refresh/close loses progress unless persisted; client/server drift risk; harder to test |
+| Effort | Med                                                                                              | Med                                                                                     |
 
 **Recommendation: server-authoritative step resolution; client store for transient
 form state only.** Best resume behavior and lowest bug surface.
 
 ### A3 — Dedicated `wizard_completed` flag vs inferring completion
 
-| | Explicit flag (recommended) | Infer from instances/DB presence |
-| --- | --- | --- |
-| Pros | Unambiguous; supports skip/dismiss + re-run; no coupling to startup side effects | No migration |
-| Cons | One migration + query extensions | `default_database_linked` set on startup regardless (R3); can't distinguish "skipped" from "not started" |
-| Effort | Low | Low |
+|        | Explicit flag (recommended)                                                      | Infer from instances/DB presence                                                                         |
+| ------ | -------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| Pros   | Unambiguous; supports skip/dismiss + re-run; no coupling to startup side effects | No migration                                                                                             |
+| Cons   | One migration + query extensions                                                 | `default_database_linked` set on startup regardless (R3); can't distinguish "skipped" from "not started" |
+| Effort | Low                                                                              | Low                                                                                                      |
 
 **Recommendation: explicit flag.** The migration is trivial and it eliminates R3.
 
@@ -244,17 +244,17 @@ form state only.** Best resume behavior and lowest bug surface.
 
 ## Task Breakdown Preview (for PRP planning)
 
-| Phase | Scope | Depends on | Complexity | Notes |
-| --- | --- | --- | --- | --- |
-| **P0** | Migration (`wizard_completed`, `wizard_dismissed_at`) + `setupStateQueries` extensions | — | S | Migration in `db/migrations/*.ts`; register base-op change in `seedBuiltInBaseOps.ts` if seeding defaults |
-| **P0** | `routes/setup/` spine: `+layout.server.ts` gate, step resolver, welcome/done, Skip action | P0 migration | M | Auth-mode matrix test is mandatory here (R1) |
-| **P0** | Auth gating decision + `PUBLIC_PATHS` review + first-run banner (not hard redirect) | P0 spine | M | **CRITICAL** — R1/R7 |
-| **P1** | `/setup/connect` reusing `InstanceForm` + `/arr/test` + `arrInstancesQueries.create` | P0 | M | Highest value step |
-| **P1** | SSRF hardening for `/arr/test` (and shared with DB link) | P1 connect | M | **CRITICAL** — R2; hardens existing hole |
-| **P2** | `/setup/database` reusing `pcdManager.link`; default-vs-custom; non-git graceful | P0 | M | R8 local-path guardrail |
-| **P3** | `/setup/profiles` reusing QP/CF read paths; Arr-scoped compatibility via `quality_api_mappings` | P2 (DB linked) | M-L | R6 Cross-Arr policy — most nuanced step |
-| **P4** | `/setup/preview` reusing `POST /api/v1/sync/preview` + existing preview render; terminal marks `wizard_completed` | P1 + P3 | M | Reuses hardened #7 endpoint |
-| **P5** | Resume banner, re-run from settings, funnel telemetry, multi-instance loop | P4 | S-M | Non-blocking polish |
+| Phase  | Scope                                                                                                             | Depends on     | Complexity | Notes                                                                                                     |
+| ------ | ----------------------------------------------------------------------------------------------------------------- | -------------- | ---------- | --------------------------------------------------------------------------------------------------------- |
+| **P0** | Migration (`wizard_completed`, `wizard_dismissed_at`) + `setupStateQueries` extensions                            | —              | S          | Migration in `db/migrations/*.ts`; register base-op change in `seedBuiltInBaseOps.ts` if seeding defaults |
+| **P0** | `routes/setup/` spine: `+layout.server.ts` gate, step resolver, welcome/done, Skip action                         | P0 migration   | M          | Auth-mode matrix test is mandatory here (R1)                                                              |
+| **P0** | Auth gating decision + `PUBLIC_PATHS` review + first-run banner (not hard redirect)                               | P0 spine       | M          | **CRITICAL** — R1/R7                                                                                      |
+| **P1** | `/setup/connect` reusing `InstanceForm` + `/arr/test` + `arrInstancesQueries.create`                              | P0             | M          | Highest value step                                                                                        |
+| **P1** | SSRF hardening for `/arr/test` (and shared with DB link)                                                          | P1 connect     | M          | **CRITICAL** — R2; hardens existing hole                                                                  |
+| **P2** | `/setup/database` reusing `pcdManager.link`; default-vs-custom; non-git graceful                                  | P0             | M          | R8 local-path guardrail                                                                                   |
+| **P3** | `/setup/profiles` reusing QP/CF read paths; Arr-scoped compatibility via `quality_api_mappings`                   | P2 (DB linked) | M-L        | R6 Cross-Arr policy — most nuanced step                                                                   |
+| **P4** | `/setup/preview` reusing `POST /api/v1/sync/preview` + existing preview render; terminal marks `wizard_completed` | P1 + P3        | M          | Reuses hardened #7 endpoint                                                                               |
+| **P5** | Resume banner, re-run from settings, funnel telemetry, multi-instance loop                                        | P4             | S-M        | Non-blocking polish                                                                                       |
 
 **Critical path:** P0 (state+gate+auth) → P1 (connect + SSRF) → P4 (preview/sync).
 P2 and P3 can proceed in parallel once P0 lands. P5 is optional.
@@ -270,16 +270,16 @@ happy-path e2e for the full funnel.
 ## Key Decisions Needed
 
 1. **Route namespace:** `/setup/` vs `/onboarding/` (recommend `/setup/`, distinct
-   from `/auth/setup`). — *affects R4, all routing.*
+   from `/auth/setup`). — _affects R4, all routing._
 2. **First-run trigger UX:** dismissable banner (recommended) vs soft redirect from
-   `/`. — *affects R7.*
+   `/`. — _affects R7._
 3. **SSRF scope:** harden `/arr/test` + DB link now (recommended, since the wizard
-   fronts them) vs track as a separate security issue. — *affects R2, timeline.*
+   fronts them) vs track as a separate security issue. — _affects R2, timeline._
 4. **Profile-selection depth:** curated shortlist vs full QP/CF picker in-wizard.
    Recommend a curated default set with "customize later," to keep the funnel short.
 5. **Skip semantics:** does "Skip wizard" set `wizard_completed = 1` (never nag again)
    or only `wizard_dismissed_at` (nag-with-dismiss)? Recommend `wizard_dismissed_at`
-   + banner so users can return.
+   - banner so users can return.
 
 ## Open Questions
 
@@ -295,4 +295,7 @@ happy-path e2e for the full funnel.
   connect step entirely, or always show a confirm screen?
 - Is there an existing analytics/telemetry sink, or is structured logging the only
   funnel-measurement channel available today?
+
+```
+
 ```

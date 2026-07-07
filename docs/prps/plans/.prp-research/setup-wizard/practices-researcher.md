@@ -4,43 +4,51 @@ Discovery-only. All paths absolute-relative to repo root. Snippets ≤5 lines.
 
 ## NAMING_CONVENTION
 
-| Concern | Convention (MIRROR source) | Evidence |
-| --- | --- | --- |
-| Migration file name | `NNN_verb_noun.ts` (legacy int prefix) **now** `YYYYMMDD_verb_noun.ts` for all new migrations | `packages/.../db/migrations/20260706_create_user_complexity_tiers.ts`; setup wizard → `20260707_add_setup_wizard_state.ts` |
-| Migration `version` field | Integer; for dated files the version **equals the date** `YYYYMMDD` | `20260706_create_user_complexity_tiers.ts:8` → `version: 20260706,` — next unused: `version: 20260707` |
-| Migration object shape | `export const migration: Migration = { version, name, up, down }`; `up`/`down` are raw SQL template strings (tab-indented) | `039_create_setup_state.ts:10-28` |
-| Migration registration | Static `import { migration as migrationYYYYMMDD... }` + append to the array in `loadMigrations()` (array is `.sort((a,b)=>a.version-b.version)`, so append anywhere) | `migrations.ts:70` (import), `migrations.ts:301-368` (array), `migrations.ts:371` (sort) |
-| Query module file | `camelCase.ts` per table under `db/queries/` (e.g. `setupState.ts`, `arrInstances.ts`) | `db/queries/` listing |
-| Query export symbol | `export const <thing>Queries = { method(): T {...} }` object literal, methods use `db.queryFirst`/`db.execute` | `setupState.ts:17` → `export const setupStateQueries = {` |
-| Query type interface | `export interface <PascalTable>` colocated in same file | `setupState.ts:6` → `export interface SetupState {` |
-| Route folder | Route-per-concern folders under `src/routes/<feature>/`; nested `+page.server.ts` (load/actions) + `+page.svelte`; params as `[id]` | `routes/arr/new/`, `routes/databases/new/{custom,trash-guide}/`, `routes/auth/setup/{+page.server.ts,+page.svelte}` |
-| API route | `src/routes/api/v1/<name>/+server.ts` exporting `GET`/`PATCH`/`POST` | `routes/api/v1/ui-preferences/+server.ts` |
-| Path aliases | `$db/`, `$api/`, `$sync/`, `$arr/`, `$ui/`, `$shared/`, `$logger/`, `$auth/` (see CLAUDE.md table) — use `$db/queries/x.ts` not relative | test imports `$db/queries/user_interface_preferences.ts` (`uiPreferencesApi.test.ts:5`) |
-| Svelte 5 NO-runes | `onclick` handlers, no `$state`/`$derived`; forms use `dirty` store + `form.error`/`form.success` from actions | CLAUDE.md Conventions; dirty store below |
+| Concern                   | Convention (MIRROR source)                                                                                                                                           | Evidence                                                                                                                   |
+| ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| Migration file name       | `NNN_verb_noun.ts` (legacy int prefix) **now** `YYYYMMDD_verb_noun.ts` for all new migrations                                                                        | `packages/.../db/migrations/20260706_create_user_complexity_tiers.ts`; setup wizard → `20260707_add_setup_wizard_state.ts` |
+| Migration `version` field | Integer; for dated files the version **equals the date** `YYYYMMDD`                                                                                                  | `20260706_create_user_complexity_tiers.ts:8` → `version: 20260706,` — next unused: `version: 20260707`                     |
+| Migration object shape    | `export const migration: Migration = { version, name, up, down }`; `up`/`down` are raw SQL template strings (tab-indented)                                           | `039_create_setup_state.ts:10-28`                                                                                          |
+| Migration registration    | Static `import { migration as migrationYYYYMMDD... }` + append to the array in `loadMigrations()` (array is `.sort((a,b)=>a.version-b.version)`, so append anywhere) | `migrations.ts:70` (import), `migrations.ts:301-368` (array), `migrations.ts:371` (sort)                                   |
+| Query module file         | `camelCase.ts` per table under `db/queries/` (e.g. `setupState.ts`, `arrInstances.ts`)                                                                               | `db/queries/` listing                                                                                                      |
+| Query export symbol       | `export const <thing>Queries = { method(): T {...} }` object literal, methods use `db.queryFirst`/`db.execute`                                                       | `setupState.ts:17` → `export const setupStateQueries = {`                                                                  |
+| Query type interface      | `export interface <PascalTable>` colocated in same file                                                                                                              | `setupState.ts:6` → `export interface SetupState {`                                                                        |
+| Route folder              | Route-per-concern folders under `src/routes/<feature>/`; nested `+page.server.ts` (load/actions) + `+page.svelte`; params as `[id]`                                  | `routes/arr/new/`, `routes/databases/new/{custom,trash-guide}/`, `routes/auth/setup/{+page.server.ts,+page.svelte}`        |
+| API route                 | `src/routes/api/v1/<name>/+server.ts` exporting `GET`/`PATCH`/`POST`                                                                                                 | `routes/api/v1/ui-preferences/+server.ts`                                                                                  |
+| Path aliases              | `$db/`, `$api/`, `$sync/`, `$arr/`, `$ui/`, `$shared/`, `$logger/`, `$auth/` (see CLAUDE.md table) — use `$db/queries/x.ts` not relative                             | test imports `$db/queries/user_interface_preferences.ts` (`uiPreferencesApi.test.ts:5`)                                    |
+| Svelte 5 NO-runes         | `onclick` handlers, no `$state`/`$derived`; forms use `dirty` store + `form.error`/`form.success` from actions                                                       | CLAUDE.md Conventions; dirty store below                                                                                   |
 
 ### Prettier (verified from `.prettierrc`, NOT CLAUDE.md — CLAUDE.md note is STALE)
 
 ```json
-{ "tabWidth": 2, "useTabs": false, "printWidth": 120,
-  "singleQuote": true, "trailingComma": "es5", "semi": true,
-  "overrides": [{ "files": ["*.md","*.markdown"], "options": { "printWidth": 80 } }] }
+{
+  "tabWidth": 2,
+  "useTabs": false,
+  "printWidth": 120,
+  "singleQuote": true,
+  "trailingComma": "es5",
+  "semi": true,
+  "overrides": [
+    { "files": ["*.md", "*.markdown"], "options": { "printWidth": 80 } }
+  ]
+}
 ```
 
 **2-space, spaces (not tabs), semicolons, single quotes, es5 trailing commas, 120 print width.** CLAUDE.md's "Tabs / no trailing commas / 100 char" is wrong — match `.prettierrc`. (Matches project memory `prettier-config-vs-claudemd`.)
 
 ## TEST_STRUCTURE
 
-| Aspect | Convention (MIRROR source) | Evidence |
-| --- | --- | --- |
-| Route/query tests location | `packages/praxrr-app/src/tests/routes/*.test.ts` — import handlers directly, test `load`/`actions`/`GET`/`PATCH` in-process (no browser) | `tests/routes/uiPreferencesApi.test.ts`, `complexityTiersApi.test.ts`, `trashGuideSources.test.ts` |
-| Base/unit tests location | `packages/praxrr-app/src/tests/base/*.test.ts` for cross-cutting server logic | `tests/base/` (e.g. `syncPreviewRouteHardening.test.ts`, `envInstances.test.ts`) |
-| Ambient types header | Route tests need SvelteKit ambient types via triple-slash ref | `uiPreferencesApi.test.ts:1-2` → `/// <reference path="../../app.d.ts" />` |
-| Direct handler import | Import route handler + query module, patch queries with in-memory store | `uiPreferencesApi.test.ts:5-6` `import { GET, PATCH } from '../../routes/api/v1/ui-preferences/+server.ts'` |
-| Dependency patching | Local `patchTarget(target,key,replacement,restores)` + `restoreAll` OR `BaseTest.installPatch` (auto-restored) | `uiPreferencesApi.test.ts:26-43`; `BaseTest.ts:135-146` |
-| BaseTest harness | `class X extends BaseTest`; register via `this.test(name, fn)` (wraps `Deno.test`, gives `context.tempDir`, auto teardown + patch restore) | `BaseTest.ts:216-246`; helpers: `installPatch` (L135), `assertPayloadNoLeak` (L158), `waitFor` (L177) |
-| Assertions | `@std/assert` (`assertEquals`, `assertExists`) | `uiPreferencesApi.test.ts:4` |
-| Test runner + perms | `scripts/test.ts` runs `deno test <paths> --allow-net --allow-read --allow-write --allow-env --allow-ffi --allow-run`, sets `APP_BASE_PATH=<repo>/dist/test` | `scripts/test.ts` (env + Deno.Command) |
-| Alias map | `aliases: Record<string,string>` in `scripts/test.ts` — key → single file, comma-list, or directory | `scripts/test.ts` aliases block |
+| Aspect                     | Convention (MIRROR source)                                                                                                                                   | Evidence                                                                                                    |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------- |
+| Route/query tests location | `packages/praxrr-app/src/tests/routes/*.test.ts` — import handlers directly, test `load`/`actions`/`GET`/`PATCH` in-process (no browser)                     | `tests/routes/uiPreferencesApi.test.ts`, `complexityTiersApi.test.ts`, `trashGuideSources.test.ts`          |
+| Base/unit tests location   | `packages/praxrr-app/src/tests/base/*.test.ts` for cross-cutting server logic                                                                                | `tests/base/` (e.g. `syncPreviewRouteHardening.test.ts`, `envInstances.test.ts`)                            |
+| Ambient types header       | Route tests need SvelteKit ambient types via triple-slash ref                                                                                                | `uiPreferencesApi.test.ts:1-2` → `/// <reference path="../../app.d.ts" />`                                  |
+| Direct handler import      | Import route handler + query module, patch queries with in-memory store                                                                                      | `uiPreferencesApi.test.ts:5-6` `import { GET, PATCH } from '../../routes/api/v1/ui-preferences/+server.ts'` |
+| Dependency patching        | Local `patchTarget(target,key,replacement,restores)` + `restoreAll` OR `BaseTest.installPatch` (auto-restored)                                               | `uiPreferencesApi.test.ts:26-43`; `BaseTest.ts:135-146`                                                     |
+| BaseTest harness           | `class X extends BaseTest`; register via `this.test(name, fn)` (wraps `Deno.test`, gives `context.tempDir`, auto teardown + patch restore)                   | `BaseTest.ts:216-246`; helpers: `installPatch` (L135), `assertPayloadNoLeak` (L158), `waitFor` (L177)       |
+| Assertions                 | `@std/assert` (`assertEquals`, `assertExists`)                                                                                                               | `uiPreferencesApi.test.ts:4`                                                                                |
+| Test runner + perms        | `scripts/test.ts` runs `deno test <paths> --allow-net --allow-read --allow-write --allow-env --allow-ffi --allow-run`, sets `APP_BASE_PATH=<repo>/dist/test` | `scripts/test.ts` (env + Deno.Command)                                                                      |
+| Alias map                  | `aliases: Record<string,string>` in `scripts/test.ts` — key → single file, comma-list, or directory                                                          | `scripts/test.ts` aliases block                                                                             |
 
 ### Add `setup-wizard` alias (MIRROR the comma-list form)
 
@@ -71,21 +79,21 @@ Then `deno task test setup-wizard` resolves via `aliases[target] ?? target`.
 
 ## Reusable utilities to use
 
-| Utility | Location | Reuse in wizard |
-| --- | --- | --- |
-| Arr `InstanceForm.svelte` | `packages/praxrr-app/src/routes/arr/components/InstanceForm.svelte` | Connect-Arr step, `mode="create"`; owns test-connection, capability warnings, secret reveal, dirty init |
-| DB `InstanceForm.svelte` | `packages/praxrr-app/src/routes/databases/components/InstanceForm.svelte` | Link-DB step, `mode="create"` (git URL only) |
-| `arrInstancesQueries` | `$db/queries/arrInstances.ts` (`arrInstances.ts:177`) | `.create()` (write), `.getAll()`/`.getEnabled()` → `hasArrInstance` prereq |
-| `databaseInstancesQueries` | `$db/queries/databaseInstances.ts` | `.getAll()` → `hasLinkedDatabase` prereq; `.create()` via `pcdManager.link` |
-| `setupStateQueries` (extend) | `$db/queries/setupState.ts` | Add `getWizardState/setWizardStep/markWizardCompleted/markWizardDismissed/wizardShouldRun`; existing `get()` uses `db.queryFirst`, mutators `db.execute(... updated_at=CURRENT_TIMESTAMP ...)` (`setupState.ts:22,40`) |
-| dirty store | `$stores/dirty.ts` (`$lib/client/stores/dirty.ts`) | `initCreate` (L67), `update` (L76), `isDirty` (L46), `clear()` (L93) on unmount, `confirmNavigation()` (L104) |
-| `alertStore.add` | `$alerts/store` | All wizard success/error feedback (no separate wizard alert UI) |
-| `$ui/*` primitives | `$ui/form/FormInput`, `$ui/dropdown/DropdownSelect`, `$ui/button/Button`, `$ui/modal/{Modal,DirtyModal}`, `$ui/form/DisclosureSection`, `$ui/card/StickyCard`, `$ui/badge/Badge` | Only primitives needed for steps 1-2; do NOT add new form atoms. NOT `$ui/navigation/tabs` (section nav, not a stepper) |
-| Rate-limit pattern (MIRROR, per-key window) | `$sync/preview/limits.ts` | Mirror `registerPreviewCreateAttempt(key, nowMs): boolean` + prune-window into IP-keyed `$utils/rateLimit.ts` for `test-connection` (W2). Constants pattern L1-3; window map L10; check L17-29; `resetForTests()` L31 |
-| Encryption helpers (AES-GCM) | `$utils/encryption/arr-credentials.ts` | `encryptArrInstanceApiKey()` (L89) / `decryptArrInstanceApiKey()` (L120) — reuse for every secret; DB creds have parallel helper. No new crypto (advisory A4) |
-| `getSetupProgress()` single-source (NEW, small) | create `$server/setup/progress.ts` | Pure sync `{ hasArrInstance, hasDatabase }` from `arrInstancesQueries.getAll()` / `databaseInstancesQueries.getAll()`; ONE consumer pattern shared by `hooks.server.ts` gate + `/setup/+layout.server.ts` (research-practices Interface Design) |
-| Sync preview reuse (#7) | `$sync/preview/{orchestrator,types}.ts`, `POST /api/v1/sync/preview` + `/[previewId]/apply`, `routes/arr/[id]/sync/components/SyncPreviewPanel.svelte` | Preview-sync step; do NOT reimplement. Caveat: `SyncPreviewTrigger.svelte` reads `$page.params.id` → deep-link into `/arr/[id]/sync` (research-practices reuse table) |
-| Action return shape | `arr/new/+page.server.ts` / `databases/new/*/+page.server.ts` | Wizard `+page.server.ts` actions return `fail(400,{error,values})` / `redirect(...)` so embedded `InstanceForm` `form.error`/`form.success` works unmodified |
+| Utility                                         | Location                                                                                                                                                                         | Reuse in wizard                                                                                                                                                                                                                                 |
+| ----------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Arr `InstanceForm.svelte`                       | `packages/praxrr-app/src/routes/arr/components/InstanceForm.svelte`                                                                                                              | Connect-Arr step, `mode="create"`; owns test-connection, capability warnings, secret reveal, dirty init                                                                                                                                         |
+| DB `InstanceForm.svelte`                        | `packages/praxrr-app/src/routes/databases/components/InstanceForm.svelte`                                                                                                        | Link-DB step, `mode="create"` (git URL only)                                                                                                                                                                                                    |
+| `arrInstancesQueries`                           | `$db/queries/arrInstances.ts` (`arrInstances.ts:177`)                                                                                                                            | `.create()` (write), `.getAll()`/`.getEnabled()` → `hasArrInstance` prereq                                                                                                                                                                      |
+| `databaseInstancesQueries`                      | `$db/queries/databaseInstances.ts`                                                                                                                                               | `.getAll()` → `hasLinkedDatabase` prereq; `.create()` via `pcdManager.link`                                                                                                                                                                     |
+| `setupStateQueries` (extend)                    | `$db/queries/setupState.ts`                                                                                                                                                      | Add `getWizardState/setWizardStep/markWizardCompleted/markWizardDismissed/wizardShouldRun`; existing `get()` uses `db.queryFirst`, mutators `db.execute(... updated_at=CURRENT_TIMESTAMP ...)` (`setupState.ts:22,40`)                          |
+| dirty store                                     | `$stores/dirty.ts` (`$lib/client/stores/dirty.ts`)                                                                                                                               | `initCreate` (L67), `update` (L76), `isDirty` (L46), `clear()` (L93) on unmount, `confirmNavigation()` (L104)                                                                                                                                   |
+| `alertStore.add`                                | `$alerts/store`                                                                                                                                                                  | All wizard success/error feedback (no separate wizard alert UI)                                                                                                                                                                                 |
+| `$ui/*` primitives                              | `$ui/form/FormInput`, `$ui/dropdown/DropdownSelect`, `$ui/button/Button`, `$ui/modal/{Modal,DirtyModal}`, `$ui/form/DisclosureSection`, `$ui/card/StickyCard`, `$ui/badge/Badge` | Only primitives needed for steps 1-2; do NOT add new form atoms. NOT `$ui/navigation/tabs` (section nav, not a stepper)                                                                                                                         |
+| Rate-limit pattern (MIRROR, per-key window)     | `$sync/preview/limits.ts`                                                                                                                                                        | Mirror `registerPreviewCreateAttempt(key, nowMs): boolean` + prune-window into IP-keyed `$utils/rateLimit.ts` for `test-connection` (W2). Constants pattern L1-3; window map L10; check L17-29; `resetForTests()` L31                           |
+| Encryption helpers (AES-GCM)                    | `$utils/encryption/arr-credentials.ts`                                                                                                                                           | `encryptArrInstanceApiKey()` (L89) / `decryptArrInstanceApiKey()` (L120) — reuse for every secret; DB creds have parallel helper. No new crypto (advisory A4)                                                                                   |
+| `getSetupProgress()` single-source (NEW, small) | create `$server/setup/progress.ts`                                                                                                                                               | Pure sync `{ hasArrInstance, hasDatabase }` from `arrInstancesQueries.getAll()` / `databaseInstancesQueries.getAll()`; ONE consumer pattern shared by `hooks.server.ts` gate + `/setup/+layout.server.ts` (research-practices Interface Design) |
+| Sync preview reuse (#7)                         | `$sync/preview/{orchestrator,types}.ts`, `POST /api/v1/sync/preview` + `/[previewId]/apply`, `routes/arr/[id]/sync/components/SyncPreviewPanel.svelte`                           | Preview-sync step; do NOT reimplement. Caveat: `SyncPreviewTrigger.svelte` reads `$page.params.id` → deep-link into `/arr/[id]/sync` (research-practices reuse table)                                                                           |
+| Action return shape                             | `arr/new/+page.server.ts` / `databases/new/*/+page.server.ts`                                                                                                                    | Wizard `+page.server.ts` actions return `fail(400,{error,values})` / `redirect(...)` so embedded `InstanceForm` `form.error`/`form.success` works unmodified                                                                                    |
 
 ## Key facts for the plan
 

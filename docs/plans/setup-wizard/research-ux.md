@@ -6,9 +6,10 @@ Industry data consistently shows that **60–90% of new signups abandon a produc
 
 The `/setup/` wizard (Welcome → Connect Arr → Link PCD DB → Select profiles/formats → Preview & Sync → Done) maps cleanly onto the **6-step ceiling** that UX research recommends before completion rates degrade, and its final "Preview & Sync" step mirrors the **dry-run pattern** used by Terraform, rclone, and other tools that mutate external systems — a strong fit given Praxrr writes to a user's live Radarr/Sonarr/Lidarr instances.
 
-The most important finding for differentiation: **no *arr-ecosystem app (Radarr, Sonarr, Prowlarr) ships a first-run wizard.** Users configure everything manually through nested Settings menus, and community guides exist specifically to compensate for this gap. A guided wizard is a genuine differentiator, not table stakes — but it must not feel like it's hiding the power-user shortcuts these users already expect (see "Skip wizard" requirement).
+The most important finding for differentiation: *_no *arr-ecosystem app (Radarr, Sonarr, Prowlarr) ships a first-run wizard.*_ Users configure everything manually through nested Settings menus, and community guides exist specifically to compensate for this gap. A guided wizard is a genuine differentiator, not table stakes — but it must not feel like it's hiding the power-user shortcuts these users already expect (see "Skip wizard" requirement).
 
 Five design commitments emerge as highest-leverage:
+
 1. **Back-and-forth navigation is non-negotiable** — blocking backward movement increases anxiety and abandonment.
 2. **Every async/destructive action needs a distinct state machine** (idle → testing → success/fail) with specific, actionable error copy — never a generic "failed."
 3. **The Preview & Sync step should function as a dry run**, not a confirmation dialog — showing a diff of what will change, not just an "Are you sure?" modal.
@@ -44,7 +45,7 @@ Step count (6) sits at the upper bound of the recommended 3–6 step range — d
 
 ### Decision points needing explicit design attention
 
-- **What happens after "Test Connection" fails repeatedly?** Provide an escape hatch (e.g., "Save anyway and fix later" is *not* recommended here — an unreachable Arr instance blocks every downstream step, so failure should block forward progress but must give a specific, actionable reason, not just a red X).
+- **What happens after "Test Connection" fails repeatedly?** Provide an escape hatch (e.g., "Save anyway and fix later" is _not_ recommended here — an unreachable Arr instance blocks every downstream step, so failure should block forward progress but must give a specific, actionable reason, not just a red X).
 - **What if the user has zero quality profiles/custom formats available from the linked PCD?** This is an empty-state case (see UI/UX Best Practices) that must be designed explicitly, not left as a blank list.
 
 ---
@@ -61,12 +62,12 @@ Step count (6) sits at the upper bound of the recommended 3–6 step range — d
 ### Progressive disclosure & sensible defaults
 
 - **Step 3 (Link PCD database):** default to `Praxrr-DB` pre-selected; hide the custom-URL/branch/token fields behind a collapsed "Use a different source" disclosure. This mirrors the "guided start" pattern (sensible defaults + empty-state concierge) recommended for first-time users without cluttering the screen for the common case.
-- **Step 4 (Select profiles/formats):** do not present a blank multi-select against a cold empty state. Pre-check a recommended baseline set (if PCD metadata defines one) so the user's first action is *deselecting* rather than *building from nothing* — this is the single highest-risk step for cognitive overload given it's the most information-dense screen in the flow.
+- **Step 4 (Select profiles/formats):** do not present a blank multi-select against a cold empty state. Pre-check a recommended baseline set (if PCD metadata defines one) so the user's first action is _deselecting_ rather than _building from nothing_ — this is the single highest-risk step for cognitive overload given it's the most information-dense screen in the flow.
 - Advanced/rare options at every step (custom PCD source, non-default branch, alternate schema ref) should stay in conditional disclosure, not on the main path — consistent with the step-by-step + conditional variants of progressive disclosure.
 
 ### Empty states
 
-- If the linked PCD source has zero compatible quality profiles for the connected Arr's `arr_type` (a real scenario per this repo's Arr-parity rules), the empty state must explain *why* (e.g., "This database has no Sonarr-compatible profiles yet") rather than showing a silent blank list — generic empty states are a documented abandonment trigger (Hotjar: 84% of users hitting unexplained blank states abandon within the session).
+- If the linked PCD source has zero compatible quality profiles for the connected Arr's `arr_type` (a real scenario per this repo's Arr-parity rules), the empty state must explain _why_ (e.g., "This database has no Sonarr-compatible profiles yet") rather than showing a silent blank list — generic empty states are a documented abandonment trigger (Hotjar: 84% of users hitting unexplained blank states abandon within the session).
 
 ### Accessibility (WCAG)
 
@@ -88,14 +89,14 @@ Step count (6) sits at the upper bound of the recommended 3–6 step range — d
 
 ### Connection test state machine (Step 2: Connect Arr instance)
 
-| State | Trigger | UI | Copy pattern |
-|---|---|---|---|
-| Idle | Fields empty or untouched | Neutral, "Test Connection" button disabled until both fields have content | — |
-| Testing | User clicks "Test Connection" (or debounced 500ms–1s after typing pause) | Spinner inline next to button (not full-page — this is a <2s operation) | "Testing connection…" |
-| Success | 200 + valid API response from Arr instance | Green check, fields locked/confirmed, Next enabled | "Connected to Radarr v5.x" |
-| Fail — bad URL/unreachable | Network error, DNS failure, timeout | Red state on URL field specifically | "Could not reach this address — check the URL and that the instance is running" |
-| Fail — bad API key | 401/403 from Arr | Red state on API key field specifically | "Connected, but the API key was rejected — check it in Settings → General → Security" |
-| Fail — wrong arr_type mismatch | Instance responds but type doesn't match expected (if type is pre-selected) | Red state, blocks forward progress | "This looks like a Sonarr instance, but you selected Radarr — check your instance type" |
+| State                          | Trigger                                                                     | UI                                                                        | Copy pattern                                                                            |
+| ------------------------------ | --------------------------------------------------------------------------- | ------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| Idle                           | Fields empty or untouched                                                   | Neutral, "Test Connection" button disabled until both fields have content | —                                                                                       |
+| Testing                        | User clicks "Test Connection" (or debounced 500ms–1s after typing pause)    | Spinner inline next to button (not full-page — this is a <2s operation)   | "Testing connection…"                                                                   |
+| Success                        | 200 + valid API response from Arr instance                                  | Green check, fields locked/confirmed, Next enabled                        | "Connected to Radarr v5.x"                                                              |
+| Fail — bad URL/unreachable     | Network error, DNS failure, timeout                                         | Red state on URL field specifically                                       | "Could not reach this address — check the URL and that the instance is running"         |
+| Fail — bad API key             | 401/403 from Arr                                                            | Red state on API key field specifically                                   | "Connected, but the API key was rejected — check it in Settings → General → Security"   |
+| Fail — wrong arr_type mismatch | Instance responds but type doesn't match expected (if type is pre-selected) | Red state, blocks forward progress                                        | "This looks like a Sonarr instance, but you selected Radarr — check your instance type" |
 
 The distinction between "unreachable" and "reachable but rejected" is the single most valuable error-message improvement over a generic failure — it tells the user which of two completely different problems (network vs. credentials) to fix first, consistent with the general guidance that generic messages ("Validation error") leave users unable to act.
 
@@ -127,9 +128,10 @@ The distinction between "unreachable" and "reachable but rejected" is the single
 
 ## Competitive Analysis
 
-**No *arr-ecosystem tool has a first-run wizard.** Radarr, Sonarr, and Prowlarr all open directly to a settings-driven dashboard with no guided onboarding; users self-assemble the correct order of operations (root folders → download client → API key → cross-app connections) from community guides, because no in-app guidance exists. This is confirmed across multiple independent setup guides and forum threads — the standard advice pattern ("install → set root folders → add download client → get API keys → connect Prowlarr → sync") is itself evidence that this sequencing knowledge lives outside the product, in tribal documentation. **This is Praxrr's clearest differentiation opportunity** — a wizard here isn't catching up to a norm, it's introducing one to a tool category that has never had it.
+*_No *arr-ecosystem tool has a first-run wizard.*_ Radarr, Sonarr, and Prowlarr all open directly to a settings-driven dashboard with no guided onboarding; users self-assemble the correct order of operations (root folders → download client → API key → cross-app connections) from community guides, because no in-app guidance exists. This is confirmed across multiple independent setup guides and forum threads — the standard advice pattern ("install → set root folders → add download client → get API keys → connect Prowlarr → sync") is itself evidence that this sequencing knowledge lives outside the product, in tribal documentation. **This is Praxrr's clearest differentiation opportunity** — a wizard here isn't catching up to a norm, it's introducing one to a tool category that has never had it.
 
 **Home Assistant** is the closest self-hosted analog with a real wizard: create account → name home → set location → auto-discover devices → finish, completed in a few minutes in-browser. Two lessons transfer directly:
+
 - Auto-discovery ("scans your network and finds devices it recognizes") is the most-praised part of the flow — Praxrr's equivalent is the PCD default-source pre-fill and pre-selected baseline profiles, doing analogous work of reducing first decisions to confirmations.
 - The unresolved community criticism is that a **one-time wizard can't serve users who arrive later needing to reconfigure** (e.g., after adding new hardware) — Home Assistant currently has no way to re-run onboarding. Praxrr's wizard should avoid this dead end: keep `/setup/` reachable post-completion (e.g., via a "Connect another instance" action reusing the same steps) rather than gating it as one-time-only.
 
