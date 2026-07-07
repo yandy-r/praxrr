@@ -63,9 +63,7 @@
         "operationId": "getCompatibilityParity",
         "summary": "Cross-Arr compatibility parity map",
         "description": "Returns the static cross-Arr entity/app support matrix and catalog of known\nsemantic differences between Arr apps.\n\nWhen `databaseId` is provided, also computes per-profile compatibility for\nthat database's quality profiles against each Arr app's compatible quality\nnames, attached as `profiles`.\n",
-        "tags": [
-          "Compatibility"
-        ],
+        "tags": ["Compatibility"],
         "parameters": [
           {
             "name": "databaseId",
@@ -2200,12 +2198,7 @@
     "schemas": {
       "ParityMapResponse": {
         "type": "object",
-        "required": [
-          "entities",
-          "apps",
-          "matrix",
-          "semanticDifferences"
-        ],
+        "required": ["entities", "apps", "matrix", "semanticDifferences"],
         "properties": {
           "entities": {
             "type": "array",
@@ -2225,11 +2218,7 @@
             "type": "array",
             "items": {
               "type": "string",
-              "enum": [
-                "radarr",
-                "sonarr",
-                "lidarr"
-              ]
+              "enum": ["radarr", "sonarr", "lidarr"]
             },
             "description": "Arr app types represented as matrix columns"
           },
@@ -2237,13 +2226,7 @@
             "type": "array",
             "items": {
               "type": "object",
-              "required": [
-                "entity",
-                "label",
-                "radarr",
-                "sonarr",
-                "lidarr"
-              ],
+              "required": ["entity", "label", "radarr", "sonarr", "lidarr"],
               "properties": {
                 "entity": {
                   "type": "string",
@@ -2262,29 +2245,17 @@
                 },
                 "radarr": {
                   "type": "string",
-                  "enum": [
-                    "native",
-                    "shared",
-                    "unsupported"
-                  ],
+                  "enum": ["native", "shared", "unsupported"],
                   "description": "Radarr support status for this entity"
                 },
                 "sonarr": {
                   "type": "string",
-                  "enum": [
-                    "native",
-                    "shared",
-                    "unsupported"
-                  ],
+                  "enum": ["native", "shared", "unsupported"],
                   "description": "Sonarr support status for this entity"
                 },
                 "lidarr": {
                   "type": "string",
-                  "enum": [
-                    "native",
-                    "shared",
-                    "unsupported"
-                  ],
+                  "enum": ["native", "shared", "unsupported"],
                   "description": "Lidarr support status for this entity"
                 }
               }
@@ -2309,13 +2280,7 @@
       },
       "ArrSemanticDifference": {
         "type": "object",
-        "required": [
-          "scope",
-          "apps",
-          "summary",
-          "detail",
-          "sourceRefs"
-        ],
+        "required": ["scope", "apps", "summary", "detail", "sourceRefs"],
         "properties": {
           "scope": {
             "type": "string",
@@ -2337,11 +2302,7 @@
             "type": "array",
             "items": {
               "type": "string",
-              "enum": [
-                "radarr",
-                "sonarr",
-                "lidarr"
-              ]
+              "enum": ["radarr", "sonarr", "lidarr"]
             },
             "description": "Arr apps this entry applies to"
           },
@@ -2368,11 +2329,7 @@
       },
       "ProfileCompatibility": {
         "type": "object",
-        "required": [
-          "name",
-          "compatibleArrTypes",
-          "basis"
-        ],
+        "required": ["name", "compatibleArrTypes", "basis"],
         "properties": {
           "name": {
             "type": "string",
@@ -2382,19 +2339,13 @@
             "type": "array",
             "items": {
               "type": "string",
-              "enum": [
-                "radarr",
-                "sonarr",
-                "lidarr"
-              ]
+              "enum": ["radarr", "sonarr", "lidarr"]
             },
             "description": "Arr app types this profile's enabled qualities are compatible with"
           },
           "basis": {
             "type": "string",
-            "enum": [
-              "enabled-qualities"
-            ],
+            "enum": ["enabled-qualities"],
             "description": "Algorithm basis used to compute this compatibility verdict"
           }
         }
