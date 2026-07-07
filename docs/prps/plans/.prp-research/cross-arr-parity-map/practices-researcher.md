@@ -1,0 +1,48 @@
+## Patterns to Mirror → NAMING_CONVENTION
+
+| Category | File:Lines | Pattern | Key Snippet (≤5 lines) |
+| --- | --- | --- | --- |
+| Shared arr module location | `packages/praxrr-app/src/lib/shared/arr/capabilities.ts:1` | New `parity.ts`/`semanticDifferences.ts` go beside it under `$shared/arr/`; import via `$shared/arr/…`; type-only imports use `import { type X }` + `.ts` suffix | `import { type ArrType, ARR_APP_TYPES as SHARED_ARR_APP_TYPES } from '$shared/pcd/types.ts';` |
+| SCREAMING_SNAKE const registries | `capabilities.ts:143,243,246,248` | Exported const registries are SCREAMING_SNAKE (`ARR_APPS`, `ARR_APP_TYPES`, `ARR_TARGET_ORDER`, `ARR_APP_OPTIONS`) → mirror as `PARITY_ENTITIES`, `NATIVE_ENTITY_APPS`, `ARR_SEMANTIC_DIFFERENCES` | `export const ARR_APPS = { radarr: {…} } as const satisfies Record<ArrAppType, ArrAppMetadata>;` |
+| `as const satisfies` list literal | `capabilities.ts:35-50` | Ordered literal arrays are pinned with `as const satisfies readonly X[]` → mirror for `PARITY_ENTITIES` | `export const ARR_SYNC_SURFACES = [ 'quality_profiles', … ] as const satisfies readonly ArrSyncSurface[];` |
+| Non-regression `void` check block | `capabilities.ts:53-60,168-205,235-237` | Suffix `_NON_REGRESSION_CHECK` const typed `as const satisfies {literal}`, discarded with `void NAME;` → mirror as `PARITY_NON_REGRESSION_CHECK` | `const ARR_CAPABILITY_KEY_NON_REGRESSION_CHECK = {…} as const satisfies {…}; void ARR_CAPABILITY_KEY_NON_REGRESSION_CHECK;` |
+| Predicate naming (`supports*`) | `capabilities.ts:298-305,321` | Boolean predicates `supportsArrWorkflow`/`supportsArrSyncSurface`/`supportsFeature`; accessors `getArrAppMetadata`/`getArrCapabilities`; guards `isArrAppType` → mirror `getEntitySupportStatus` | `export function supportsArrSyncSurface(type: ArrAppType, surface: ArrSyncSurface): boolean {` |
+| Type alias re-export | `capabilities.ts:7,15,18` | Domain aliases via `export type X = SharedY` and inline `type` | `export type ArrAppType = SharedArrAppType;` |
+| Section banner comments | `capabilities.ts:9-11,65-67,293-295` | `// ===…===` uppercase banners separate TYPE ALIASES / INTERFACES / PREDICATES sections | `// ============================================================================\n// PREDICATES` |
+| Route dir naming | `packages/praxrr-app/src/routes/parity-map/` (design §6.4) | Top-level kebab-case route dir; files `+page.svelte`, `+page.server.ts`, plus co-located PascalCase `*.svelte` (`ParityMatrix.svelte`) and Svelte-free `parityRows.ts` | (see design File-Level Plan rows 10-15) |
+| Reusable UI component path | `packages/praxrr-app/src/lib/client/ui/{badge,table}/` | Reusable components live under `$ui/<kebab>/<PascalCase>.svelte` → new `$ui/parity/CompatibilityBadges.svelte` | `$lib/client/ui/badge/Badge.svelte` |
+
+## Patterns to Mirror → TEST_STRUCTURE
+
+| Category | File:Lines | Pattern | Key Snippet (≤5 lines) |
+| --- | --- | --- | --- |
+| Pure-module test (mirror for `parityMap.test.ts`) | `packages/praxrr-app/src/tests/arr/resolveArrTargets.test.ts:1-8` | `import { assertEquals } from '@std/assert';` + import SUT from `$shared/arr/…`; flat `Deno.test('name', () => {…})`; no framework/hooks | `import { assertEquals } from '@std/assert';\nimport { resolveArrTargets, ARR_TARGET_ORDER } from '$shared/arr/capabilities.ts';\nDeno.test('resolveArrTargets: …', () => { assertEquals(resolveArrTargets(undefined), ['all']); });` |
+| In-memory Kysely PCD fixture (mirror for `qualityProfileCompatibility.test.ts`) | `packages/praxrr-app/src/tests/arr/lidarrQualityMappingPrereqs.test.ts:1-49` | `@jsr/db__sqlite` `:memory:` + `Kysely<PCDDatabase>` via `DenoSqlite3Dialect`; `db.exec(sql)`; cache is `{ kb } as unknown as PCDCache`; `destroy()` calls `kb.destroy()` + `db.close()` | `const db = new Database(':memory:', { int64: true });\nconst kb = new Kysely<PCDDatabase>({ dialect: new DenoSqlite3Dialect({ database: db }) });\ndb.exec(schemaAndDataSql);\nreturn { cache: { kb } as unknown as PCDCache, destroy: async () => { await kb.destroy(); db.close(); } };` |
+| Inline `CREATE TABLE`+`INSERT` SQL + try/finally destroy | `lidarrQualityMappingPrereqs.test.ts:87-123` | Fixture built from a template-literal schema string per `arr_type`; body wrapped `try { … } finally { await fixture.destroy(); }` | `const fixture = createCacheFixture(\`\nCREATE TABLE quality_api_mappings ( quality_name TEXT, arr_type TEXT, api_name TEXT, PRIMARY KEY(quality_name, arr_type) );\nINSERT INTO quality_api_mappings VALUES ('Lossless','lidarr','FLAC'); \`);\ntry { … } finally { await fixture.destroy(); }` |
+| Endpoint handler test (mirror for `parityMapApi.test.ts`) | `packages/praxrr-app/src/tests/routes/uiPreferencesApi.test.ts:1-19,110,158-166` | Leading `eslint-disable-next-line` + `/// <reference path="../../app.d.ts" />`; `import { GET } from '../../routes/api/v1/…/+server.ts'`; `type GetEvent = Parameters<typeof GET>[0]`; build `event as GetEvent`; assert `response.status` + `await response.json()` | `import { GET } from '../../routes/api/v1/ui-preferences/+server.ts';\ntype GetEvent = Parameters<typeof GET>[0];\nconst response = await GET(buildGetRequest(…));\nassertEquals(response.status, 401);` |
+| Event/locals fixture builder | `uiPreferencesApi.test.ts:113-155` | Handler input built as `Partial<GetEvent>` with `request: new Request('http://localhost/…')` + `locals: { user, session, authBypass }`, cast `as GetEvent`; DB patched via `setCache`/`deleteCache` from `$pcd/database/registry.ts` (per design §9) | `const event: Partial<PatchEvent> = { request: new Request('http://localhost/api/v1/ui-preferences', { method:'PATCH', … }), locals: { user: null, session: null, authBypass: false } };` |
+| Descriptive `Deno.test` names | `lidarrQualityMappingPrereqs.test.ts:87-88,125` | Names are full sentences, often issue-tagged (`'issue #17: …'`, `'lidarr quality mapping: …'`) | `Deno.test('issue #17: quality mapping lookup is deterministic per arr type …', async () => {` |
+| Run command | `scripts/test.ts:5-22` + design §9 | `deno task test <alias|raw-path>`; raw path works without alias; optional `parity` alias in `aliases` map | `deno task test packages/praxrr-app/src/tests/arr/parityMap.test.ts` |
+
+## NOT Building (over-engineering risks)
+
+- Do NOT create a 4th boolean support map. Support MUST be *derived* from `supportsArrSyncSurface` (`capabilities.ts:303`); only `native`/`shared` (`NATIVE_ENTITY_APPS`) is authored — a copied support grid is drift-by-design.
+- Do NOT reimplement the profile-compatibility algorithm. Extract `list.ts:59-163` once into `compatibility.ts` and have `list.ts` delegate; two implementations is the failure mode the design's delegation-equivalence test guards.
+- Do NOT wire the inline quality-profile-editor "Usable by" badge or the apply-time `alertStore.add('warning',…)` sync-path hook — both explicitly deferred (design §3, §8). Ship the reusable `CompatibilityBadges.svelte` only.
+- Do NOT populate `UNSUPPORTED_SYNC_SECTION_REASONS`/`UNSUPPORTED_MEDIA_MANAGEMENT_SUBSECTION_REASONS` (`mappings.ts:37,39`) or consolidate server-side semantic facts (`transformer.ts`/`syncer.ts`) — deferred convergence, avoids camelCase↔snake_case bridge coupling now.
+- Do NOT reclassify Lidarr `quality_profiles`/`quality_definitions` as `native` on value (audio) grounds — status rubric is schema-shape-only; value divergence is a *semantic warning*, not a status change (OQ1).
+- Do NOT add `/parity-map` to `PUBLIC_PATHS`, add pagination, or build Readarr/Whisparr axis rows — all out of scope (design §3).
+- Do NOT introduce Svelte 5 runes / `onclick` attributes. Repo is legacy-event mode (`export let`, `$:`, `on:click`, `createEventDispatcher`, `$$slots`) — verified in `Badge.svelte`/`Table.svelte`. The task's runes note is wrong for this repo.
+- Do NOT copy tab indentation from older `.svelte` files; format with `deno task format` (Prettier: 2-space/single-quote/semi/es5/~120w). CLAUDE.md's tabs/100w note is wrong.
+
+## Reusable utilities to use
+
+| Utility | Location | Relevant for |
+| --- | --- | --- |
+| `supportsArrSyncSurface` / `supportsArrWorkflow` | `packages/praxrr-app/src/lib/shared/arr/capabilities.ts:298-305` | Sole source for `getEntitySupportStatus` `unsupported` derivation (parity axis) |
+| `ARR_APP_TYPES` / `ARR_TARGET_ORDER` / `isArrAppType` | `capabilities.ts:243,246,275` | Iterating apps, ordering columns, validating `arr_type` fail-fast in endpoint |
+| `getArrAppMetadata(type).label` + `conditionTargetCheckboxColor` | `capabilities.ts:78,284` | Matrix per-app column headers (label + `var(--arr-<type>-color)`) |
+| `Table.svelte` (`Column<T>`, named `slot="cell"` with `let:row let:column let:rowIndex`) | `packages/praxrr-app/src/lib/client/ui/table/Table.svelte:9,195` + `table/types.ts:12-35` | `ParityMatrix.svelte` — pass `Column<ParityRow>[]`; render status chips via `<svelte:fragment slot="cell" let:row let:column>` |
+| `Badge.svelte` (variants incl. `success`/`info`/`warning`) | `packages/praxrr-app/src/lib/client/ui/badge/Badge.svelte:4-14` | Tri-state status chips: success=native, info=shared, warning=unsupported; `CompatibilityBadges` uses `radarr`/`sonarr`/`lidarr` variants |
+| PCD cache registry `setCache`/`deleteCache`/`getCache` | `packages/praxrr-app/src/lib/server/pcd/database/registry.ts` | Endpoint/test DB-tier: patch `?databaseId=` cache in tests, resolve in `+server.ts` |
+| `createCacheFixture` pattern (`@jsr/db__sqlite` + `DenoSqlite3Dialect`) | `packages/praxrr-app/src/tests/arr/lidarrQualityMappingPrereqs.test.ts:32-49` | Copy verbatim for `qualityProfileCompatibility.test.ts` in-memory fixture |
