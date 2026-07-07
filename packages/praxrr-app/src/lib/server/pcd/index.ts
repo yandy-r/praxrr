@@ -128,3 +128,12 @@ export type {
 export { computeLiveDiff } from './resolved/liveDiff.ts';
 export type { ComputeLiveDiffInput, LiveDiffDeps, LiveDiffReason, LiveDiffResult } from './resolved/liveDiff.ts';
 export { COMPARE_MAX_INSTANCES, isInstanceCountWithinCap, registerCompareAttempt } from './resolved/limits.ts';
+export { ResolvedConfigDatabaseNotFoundError, withBaseOnlyCache } from './resolved/layers.ts';
+export { computeUserOverrides, PORTABLE_ARRAY_KEY_STRATEGIES, resolveLayerState } from './resolved/layerDiff.ts';
+export type {
+  ResolvedLayerBaseState,
+  ResolvedLayerResolvedState,
+  ResolvedLayerState,
+  ResolvedLayerUserState,
+  ResolveLayerStateInput,
+} from './resolved/layerDiff.ts';
