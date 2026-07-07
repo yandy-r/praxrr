@@ -11,7 +11,16 @@
 	import Modal from '$ui/modal/Modal.svelte';
 	import StickyCard from '$ui/card/StickyCard.svelte';
 	import Button from '$ui/button/Button.svelte';
-	import { CF_CONDITIONS, CF_SCORING, CF_NEGATION_AND_GROUPS, type SectionModeMap } from '$shared/disclosure/sectionKeys.ts';
+	import ComplexityProgressionHint from '$ui/complexity/ComplexityProgressionHint.svelte';
+	import ComplexityTierProvider from '$ui/complexity/ComplexityTierProvider.svelte';
+	import ComplexityTierSelector from '$ui/complexity/ComplexityTierSelector.svelte';
+	import {
+		CF_CONDITIONS,
+		CF_SCORING,
+		CF_NEGATION_AND_GROUPS,
+		type SectionModeMap
+	} from '$shared/disclosure/sectionKeys.ts';
+	import type { SectionTierMap } from '$shared/complexity/tiers.ts';
 	import { alertStore } from '$alerts/store';
 	import { current, isDirty, initEdit, initCreate, update } from '$lib/client/stores/dirty';
 
@@ -33,7 +42,8 @@
 	// Event handlers
 	export let onCancel: (() => void) | undefined = undefined;
 
-	const sectionModes: SectionModeMap = $page.data.customFormatSectionModes ?? {};
+	const sectionTiers: SectionTierMap = $page.data.customFormatSectionTiers ?? {};
+	$: sectionModes = ($page.data.customFormatSectionModes ?? {}) as SectionModeMap;
 
 	const defaults: GeneralFormData = {
 		name: '',
@@ -68,6 +78,7 @@
 			? `After saving, you'll be able to add conditions and tests.`
 			: `Update custom format settings`;
 	$: submitButtonText = mode === 'create' ? 'Create' : 'Save Changes';
+	$: enableComplexityTiers = mode === 'edit' && !!$page.data.customFormatSectionTiers;
 
 	// Reactive getters for current values
 	$: name = ($current.name ?? '') as string;
@@ -96,6 +107,7 @@
 	}
 </script>
 
+<ComplexityTierProvider sectionKey={CF_CONDITIONS} initialTier={sectionTiers[CF_CONDITIONS] ?? 'beginner'}>
 <div class="space-y-6">
 	<!-- Header with actions -->
 	<StickyCard position="top">
@@ -105,6 +117,9 @@
 		</svelte:fragment>
 		<svelte:fragment slot="right">
 			<div class="flex items-center gap-2">
+				{#if enableComplexityTiers}
+					<ComplexityTierSelector />
+				{/if}
 				{#if mode === 'edit'}
 					<Button
 						disabled={deleting}
@@ -157,6 +172,10 @@
 		<input type="hidden" name="includeInRename" value={includeInRename} />
 
 		<div class="space-y-6">
+			{#if enableComplexityTiers}
+				<ComplexityProgressionHint />
+			{/if}
+
 			<!-- Name -->
 			<FormInput
 				label="Name"
@@ -208,7 +227,7 @@
 				sectionKey={CF_CONDITIONS}
 				sectionTitle="Conditions"
 				sectionHint="Advanced match-condition builder controls."
-				initialMode={sectionModes[CF_CONDITIONS] ?? 'basic'}
+				initialMode={sectionModes[CF_CONDITIONS]}
 			>
 				<div slot="advanced" class="space-y-2">
 					<p class="text-sm text-neutral-600 dark:text-neutral-400">
@@ -225,47 +244,54 @@
 				</div>
 			</DisclosureSection>
 
-			<DisclosureSection
-				sectionKey={CF_SCORING}
-				sectionTitle="Scoring"
-				sectionHint="Score application and weighting controls."
-				initialMode={sectionModes[CF_SCORING] ?? 'basic'}
-			>
-				<div slot="advanced" class="space-y-2">
-					<p class="text-sm text-neutral-600 dark:text-neutral-400">
-						Adjust score impact and weighting by managing custom format rules in quality profiles.
-					</p>
-					{#if $page.params.id}
-						<a
-							class="inline-flex rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm font-medium text-neutral-700 transition-colors hover:bg-neutral-100 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-200 dark:hover:bg-neutral-700"
-							href={`/quality-profiles/${$page.params.databaseId}`}
-						>
-							Open Quality Profiles
-						</a>
-					{/if}
-				</div>
-			</DisclosureSection>
+			<ComplexityTierProvider sectionKey={CF_SCORING} initialTier={sectionTiers[CF_SCORING] ?? 'beginner'}>
+				<DisclosureSection
+					sectionKey={CF_SCORING}
+					sectionTitle="Scoring"
+					sectionHint="Score application and weighting controls."
+					initialMode={sectionModes[CF_SCORING]}
+				>
+					<div slot="advanced" class="space-y-2">
+						<p class="text-sm text-neutral-600 dark:text-neutral-400">
+							Adjust score impact and weighting by managing custom format rules in quality profiles.
+						</p>
+						{#if $page.params.id}
+							<a
+								class="inline-flex rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm font-medium text-neutral-700 transition-colors hover:bg-neutral-100 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-200 dark:hover:bg-neutral-700"
+								href={`/quality-profiles/${$page.params.databaseId}`}
+							>
+								Open Quality Profiles
+							</a>
+						{/if}
+					</div>
+				</DisclosureSection>
+			</ComplexityTierProvider>
 
-			<DisclosureSection
+			<ComplexityTierProvider
 				sectionKey={CF_NEGATION_AND_GROUPS}
-				sectionTitle="Negation and Groups"
-				sectionHint="Negation/grouping and nested condition controls."
-				initialMode={sectionModes[CF_NEGATION_AND_GROUPS] ?? 'basic'}
+				initialTier={sectionTiers[CF_NEGATION_AND_GROUPS] ?? 'beginner'}
 			>
-				<div slot="advanced" class="space-y-2">
-					<p class="text-sm text-neutral-600 dark:text-neutral-400">
-						Configure advanced negations and nested condition groups for precise matching.
-					</p>
-					{#if $page.params.id}
-						<a
-							class="inline-flex rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm font-medium text-neutral-700 transition-colors hover:bg-neutral-100 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-200 dark:hover:bg-neutral-700"
-							href={`/custom-formats/${$page.params.databaseId}/${$page.params.id}/conditions`}
-						>
-							Configure Condition Groups
-						</a>
-					{/if}
-				</div>
-			</DisclosureSection>
+				<DisclosureSection
+					sectionKey={CF_NEGATION_AND_GROUPS}
+					sectionTitle="Negation and Groups"
+					sectionHint="Negation/grouping and nested condition controls."
+					initialMode={sectionModes[CF_NEGATION_AND_GROUPS]}
+				>
+					<div slot="advanced" class="space-y-2">
+						<p class="text-sm text-neutral-600 dark:text-neutral-400">
+							Configure advanced negations and nested condition groups for precise matching.
+						</p>
+						{#if $page.params.id}
+							<a
+								class="inline-flex rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm font-medium text-neutral-700 transition-colors hover:bg-neutral-100 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-200 dark:hover:bg-neutral-700"
+								href={`/custom-formats/${$page.params.databaseId}/${$page.params.id}/conditions`}
+							>
+								Configure Condition Groups
+							</a>
+						{/if}
+					</div>
+				</DisclosureSection>
+			</ComplexityTierProvider>
 		</div>
 	</form>
 
@@ -296,6 +322,7 @@
 		</form>
 	{/if}
 </div>
+</ComplexityTierProvider>
 
 <!-- Delete Confirmation Modal -->
 {#if mode === 'edit'}

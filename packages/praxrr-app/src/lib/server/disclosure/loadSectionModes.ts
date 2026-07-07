@@ -3,18 +3,13 @@ import type { SectionKey, UiPreferenceMode } from '$shared/disclosure/sectionKey
 
 /**
  * Load persisted section modes for a set of disclosure keys.
- * Returns a record mapping each key to its stored mode, defaulting
- * absent rows to `'basic'`.
+ * Returns only keys with stored preferences (mirrors API `persisted: true`).
  */
 export function loadSectionModes<K extends SectionKey>(
   userId: number | undefined,
   sectionKeys: readonly K[]
-): Record<K, UiPreferenceMode> {
-  const modes = {} as Record<K, UiPreferenceMode>;
-
-  for (const key of sectionKeys) {
-    modes[key] = 'basic';
-  }
+): Partial<Record<K, UiPreferenceMode>> {
+  const modes = {} as Partial<Record<K, UiPreferenceMode>>;
 
   if (!userId) {
     return modes;

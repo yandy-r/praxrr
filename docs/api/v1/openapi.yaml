@@ -28,6 +28,8 @@ tags:
     description: PCD state snapshot management endpoints
   - name: User Preferences
     description: Durable UI preference storage for progressive disclosure
+  - name: Complexity Tiers
+    description: Per-section complexity tier storage for progressive complexity
 
 paths:
   /health:
@@ -142,6 +144,117 @@ paths:
                 $ref: '#/components/schemas/PcdErrorResponse'
         '500':
           description: Failed to save preference
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PcdErrorResponse'
+  /complexity-tiers:
+    get:
+      operationId: getComplexityTier
+      summary: Read one complexity tier
+      description: |
+        Returns the preferred complexity tier and progression counters for a
+        section key.
+
+        Missing persisted values are returned as default `beginner` unless
+        `strict` is enabled.
+      tags:
+        - Complexity Tiers
+      parameters:
+        - name: section_key
+          in: query
+          required: true
+          description: Canonical section key for progressive complexity state
+          schema:
+            $ref: '#/components/schemas/UiSectionKey'
+        - name: strict
+          in: query
+          required: false
+          description: When true, missing rows return 404 instead of default response
+          schema:
+            type: boolean
+            default: false
+      responses:
+        '200':
+          description: Complexity tier record
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ComplexityTierRecord'
+        '400':
+          description: Invalid query parameter
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PcdErrorResponse'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PcdErrorResponse'
+        '404':
+          description: Complexity tier not found for strict read
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PcdErrorResponse'
+        '500':
+          description: Failed to read complexity tier
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PcdErrorResponse'
+    patch:
+      operationId: upsertComplexityTier
+      summary: Upsert one complexity tier
+      description: |
+        Creates or updates the stored complexity tier for a section key.
+
+        Payloads include optional concurrency token `expected_updated_at`.
+        Activity deltas are bounded and may be used to drive non-intrusive
+        progression suggestions.
+      tags:
+        - Complexity Tiers
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ComplexityTierUpsertRequest'
+      responses:
+        '200':
+          description: Complexity tier persisted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ComplexityTierRecord'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PcdErrorResponse'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PcdErrorResponse'
+        '409':
+          description: Concurrency conflict
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PcdErrorResponse'
+        '429':
+          description: Complexity tier updates are being rate-limited
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PcdErrorResponse'
+        '500':
+          description: Failed to save complexity tier
           content:
             application/json:
               schema:
@@ -721,6 +834,78 @@ components:
           nullable: true
           format: date-time
           description: Optional optimistic concurrency token
+    ComplexityTier:
+      type: string
+      enum:
+        - beginner
+        - intermediate
+        - advanced
+      description: Progressive complexity tier for the section
+    ComplexityTierRecord:
+      type: object
+      required:
+        - section_key
+        - tier
+        - interaction_count
+        - advanced_toggle_count
+        - last_suggested_tier
+        - suggestion_dismissed_at
+        - updated_at
+        - persisted
+      properties:
+        section_key:
+          $ref: '#/components/schemas/UiSectionKey'
+        tier:
+          $ref: '#/components/schemas/ComplexityTier'
+        interaction_count:
+          type: integer
+          minimum: 0
+        advanced_toggle_count:
+          type: integer
+          minimum: 0
+        last_suggested_tier:
+          nullable: true
+          anyOf:
+            - $ref: '#/components/schemas/ComplexityTier'
+        suggestion_dismissed_at:
+          type: string
+          format: date-time
+          nullable: true
+        updated_at:
+          type: string
+          format: date-time
+          nullable: true
+        persisted:
+          type: boolean
+    ComplexityTierUpsertRequest:
+      type: object
+      required:
+        - section_key
+        - tier
+      properties:
+        section_key:
+          $ref: '#/components/schemas/UiSectionKey'
+        tier:
+          $ref: '#/components/schemas/ComplexityTier'
+        expected_updated_at:
+          type: string
+          nullable: true
+          format: date-time
+          description: Optional optimistic concurrency token
+        interaction_delta:
+          type: integer
+          description: Optional bounded interaction counter increment
+        advanced_toggle_delta:
+          type: integer
+          description: Optional bounded advanced-toggle counter increment
+        last_suggested_tier:
+          nullable: true
+          anyOf:
+            - $ref: '#/components/schemas/ComplexityTier'
+        suggestion_dismissed_at:
+          type: string
+          nullable: true
+          format: date-time
     ImportRequest:
       $ref: './schemas/pcd.yaml#/ImportRequest'
     ImportResponse:

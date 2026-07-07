@@ -12,6 +12,8 @@ const aliases: Record<string, string> = {
   // Individual test files
   backup: 'packages/praxrr-app/src/tests/jobs/createBackup.test.ts',
   cleanup: 'packages/praxrr-app/src/tests/logger/cleanupLogs.test.ts',
+  complexity:
+    'packages/praxrr-app/src/tests/complexity,packages/praxrr-app/src/tests/routes/complexityTiersApi.test.ts',
   'env-instances': 'packages/praxrr-app/src/tests/base/envInstances.test.ts',
   filters: 'packages/praxrr-app/src/tests/upgrades/filters.test.ts',
   normalize: 'packages/praxrr-app/src/tests/upgrades/normalize.test.ts',

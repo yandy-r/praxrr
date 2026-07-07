@@ -17,6 +17,8 @@ This page is a reader-oriented companion to `docs/api/v1/openapi.yaml`.
 | GET    | `/openapi.json`                                   | Runtime OpenAPI JSON                  |
 | GET    | `/ui-preferences`                                 | Read per-user section disclosure mode |
 | PATCH  | `/ui-preferences`                                 | Save per-user section disclosure mode |
+| GET    | `/complexity-tiers`                               | Read per-user section complexity tier |
+| PATCH  | `/complexity-tiers`                               | Save per-user section complexity tier |
 | POST   | `/entity-testing/evaluate`                        | Parse titles and evaluate CF matches  |
 | GET    | `/arr/library`                                    | Paginated arr app library view        |
 | DELETE | `/arr/library`                                    | Invalidate Arr library cache          |
@@ -172,6 +174,66 @@ Response shape on success:
   "persisted": true
 }
 ```
+
+## Complexity Tiers
+
+Complexity tier endpoints store a per-user, per-section tier used to choose the default
+disclosure mode for progressive complexity. The saved disclosure mode from `/ui-preferences`
+still wins after a user manually toggles a section.
+
+### `GET /complexity-tiers`
+
+Query params:
+
+- `section_key` (required string): deterministic section key
+  - must match `^[a-z0-9-]+:[a-z0-9-]+:[a-z0-9-]+$`
+  - max length 96
+- `strict` (optional boolean, default `false`): when `true`, missing saved state returns `404`
+
+Response shape:
+
+```json
+{
+  "section_key": "custom-formats:general:conditions",
+  "tier": "beginner",
+  "interaction_count": 0,
+  "advanced_toggle_count": 0,
+  "last_suggested_tier": null,
+  "suggestion_dismissed_at": null,
+  "updated_at": null,
+  "persisted": false
+}
+```
+
+### `PATCH /complexity-tiers`
+
+Request body:
+
+- `section_key` (required): deterministic section key
+- `tier` (required): `beginner`, `intermediate`, or `advanced`
+- `expected_updated_at` (optional): timestamp for optimistic concurrency
+- `interaction_delta` (optional): bounded counter increment
+- `advanced_toggle_delta` (optional): bounded counter increment
+- `last_suggested_tier` (optional): `null` or a valid tier
+- `suggestion_dismissed_at` (optional): `null` or datetime string
+
+```json
+{
+  "section_key": "custom-formats:general:conditions",
+  "tier": "advanced",
+  "expected_updated_at": "2026-07-06T10:00:00.000Z"
+}
+```
+
+Semantics:
+
+- Only authenticated sessions can read/write (unauthenticated sessions receive `401`).
+- API-key synthetic user id `0` returns default state and performs no DB write.
+- Values are per-user and per-section.
+- Unknown `tier` or malformed `section_key` returns `400`.
+- Stale `expected_updated_at` values return `409`.
+- Rapid successive updates are rate-limited: more than 8 updates per section within 30s returns `429`.
+- Internal SQL/error details are not included in `500` responses.
 
 ## Entity Testing
 
