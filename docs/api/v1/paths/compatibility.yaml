@@ -10,7 +10,7 @@ parity:
       that database's quality profiles against each Arr app's compatible quality
       names, attached as `profiles`.
     tags:
-      - compatibility
+      - Compatibility
     parameters:
       - name: databaseId
         in: query

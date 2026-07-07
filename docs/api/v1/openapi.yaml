@@ -32,7 +32,7 @@ tags:
     description: Per-section complexity tier storage for progressive complexity
   - name: Setup
     description: First-run setup wizard state and Arr connection testing
-  - name: compatibility
+  - name: Compatibility
     description: Cross-Arr compatibility parity map and semantic difference catalog
 
 paths:
