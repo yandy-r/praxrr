@@ -68,6 +68,7 @@ import { migration as migration20260226CreateTrashGuideTables } from './migratio
 import { migration as migration20260227NormalizeTrashGuideTrashIds } from './migrations/20260227_normalize_trash_guide_trash_ids.ts';
 import { migration as migration20260228CreatePcdSnapshots } from './migrations/20260228_create_pcd_snapshots.ts';
 import { migration as migration20260706CreateUserComplexityTiers } from './migrations/20260706_create_user_complexity_tiers.ts';
+import { migration as migration20260707AddSetupWizardState } from './migrations/20260707_add_setup_wizard_state.ts';
 
 export interface Migration {
   version: number;
@@ -365,6 +366,7 @@ export function loadMigrations(): Migration[] {
     migration20260227NormalizeTrashGuideTrashIds,
     migration20260228CreatePcdSnapshots,
     migration20260706CreateUserComplexityTiers,
+    migration20260707AddSetupWizardState,
   ];
 
   // Sort by version number

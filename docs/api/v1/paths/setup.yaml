@@ -1,0 +1,151 @@
+state:
+  get:
+    operationId: getSetupState
+    summary: Get setup wizard state
+    description: |
+      Returns the current wizard step, completion/dismissal status,
+      prerequisite progress, and default database auto-link info used to
+      render and resume the setup wizard.
+    tags:
+      - Setup
+    responses:
+      '200':
+        description: Setup state
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/setup.yaml#/SetupStateResponse'
+      '403':
+        description: Setup has already been completed or dismissed
+  patch:
+    operationId: updateSetupState
+    summary: Advance the wizard step
+    description: |
+      Advances the wizard to the given step. Rejects steps outside the known
+      wizard sequence.
+    tags:
+      - Setup
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../schemas/setup.yaml#/SetupStatePatchRequest'
+    responses:
+      '200':
+        description: Wizard state updated
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - wizard
+              properties:
+                wizard:
+                  $ref: '../schemas/setup.yaml#/WizardState'
+      '400':
+        description: Missing or invalid currentStep
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+      '403':
+        description: Setup has already been completed or dismissed
+
+testConnection:
+  post:
+    operationId: testSetupConnection
+    summary: Test an Arr connection during setup
+    description: |
+      Validates Arr connection credentials without persisting an instance.
+
+      This endpoint performs no writes. It is rate-limited per client IP and
+      rejects metadata/link-local URLs before attempting a connection, so it
+      cannot be used as an SSRF or port-scan oracle.
+    tags:
+      - Setup
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../schemas/setup.yaml#/TestConnectionRequest'
+    responses:
+      '200':
+        description: Connection test result
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/setup.yaml#/TestConnectionResponse'
+      '400':
+        description: Missing/invalid type, url, or apiKey, or an unsafe URL
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/setup.yaml#/TestConnectionResponse'
+      '403':
+        description: Setup has already been completed or dismissed
+      '429':
+        description: Connection test attempts are rate-limited
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/setup.yaml#/TestConnectionResponse'
+      '500':
+        description: Connection attempt failed unexpectedly
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/setup.yaml#/TestConnectionResponse'
+
+complete:
+  post:
+    operationId: completeSetup
+    summary: Mark setup wizard completed
+    description: |
+      Marks the setup wizard completed.
+
+      Terminal and idempotent by design: unlike `GET`/`PATCH /state`, this
+      endpoint does not require the wizard to still be in progress, so a
+      repeated call succeeds instead of rejecting once setup is already
+      completed.
+    tags:
+      - Setup
+    responses:
+      '200':
+        description: Wizard marked completed
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - wizard
+              properties:
+                wizard:
+                  $ref: '../schemas/setup.yaml#/WizardState'
+
+skip:
+  post:
+    operationId: skipSetup
+    summary: Mark setup wizard dismissed
+    description: |
+      Marks the setup wizard dismissed.
+
+      Terminal and idempotent by design: unlike `GET`/`PATCH /state`, this
+      endpoint does not require the wizard to still be in progress, so a
+      repeated call succeeds instead of rejecting once setup is already
+      dismissed.
+    tags:
+      - Setup
+    responses:
+      '200':
+        description: Wizard marked dismissed
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - wizard
+              properties:
+                wizard:
+                  $ref: '../schemas/setup.yaml#/WizardState'

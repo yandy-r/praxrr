@@ -1,6 +1,8 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from '@sveltejs/kit';
 import { createArrClient } from '$arr/factory.ts';
+import { assertSafeArrUrl } from '$arr/urlSafety.ts';
+import { toFailureReason } from '$arr/testConnectionReason.ts';
 import type { ArrType } from '$arr/types.ts';
 
 const VALID_TYPES = ['radarr', 'sonarr', 'lidarr'];
@@ -37,6 +39,9 @@ export const POST: RequestHandler = async ({ request }) => {
       return json({ success: false, error: 'Invalid arr type' }, { status: 400 });
     }
 
+    // Reject metadata/link-local targets before we ever construct a client.
+    assertSafeArrUrl(url);
+
     // Create client and test connection (3 second timeout, no retries for quick feedback)
     client = createArrClient(type as ArrType, url, apiKey, { timeout: 3000, retries: 0 });
     const isConnected = await client.testConnection();
@@ -50,7 +55,7 @@ export const POST: RequestHandler = async ({ request }) => {
     return json(
       {
         success: false,
-        error: error instanceof Error ? error.message : 'Unknown error',
+        error: toFailureReason(error),
       },
       { status: 500 }
     );

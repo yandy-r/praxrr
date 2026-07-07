@@ -19,6 +19,8 @@ import { getAuthState, isPublicPath, maybeExtendSession, cleanupExpiredSessions 
 import { getClientIp } from '$auth/network.ts';
 import { setupStateQueries } from '$db/queries/setupState.ts';
 import { appInfoQueries } from '$db/queries/appInfo.ts';
+import { resolveWizardRedirect } from '$server/setup/progress.ts';
+import { resolveDefaultDatabaseConfig } from '$server/setup/defaultDatabase.ts';
 
 // Initialize configuration on server startup
 await config.init();
@@ -57,11 +59,10 @@ await trashGuideManager.initialize();
 
 // Auto-link default database on first startup (only once)
 if (!setupStateQueries.isDefaultDatabaseLinked()) {
-  const defaultDatabaseUrlFromEnv = Deno.env.get('PRAXRR_DEFAULT_DB_URL');
-  const defaultDatabaseUrl =
-    defaultDatabaseUrlFromEnv === undefined ? 'https://github.com/yandy-r/praxrr-db' : defaultDatabaseUrlFromEnv.trim();
-  const defaultDatabaseBranch = Deno.env.get('PRAXRR_DEFAULT_DB_BRANCH')?.trim() || 'main';
-  const defaultDatabaseName = Deno.env.get('PRAXRR_DEFAULT_DB_NAME')?.trim() || 'Praxrr-DB';
+  const defaultDatabaseConfig = resolveDefaultDatabaseConfig();
+  const defaultDatabaseUrl = defaultDatabaseConfig.url ?? '';
+  const defaultDatabaseBranch = defaultDatabaseConfig.branch;
+  const defaultDatabaseName = defaultDatabaseConfig.name;
   const defaultDatabaseToken = Deno.env.get('PRAXRR_DEFAULT_DB_TOKEN')?.trim() || undefined;
   const defaultDatabaseGitUserName = Deno.env.get('PRAXRR_DEFAULT_DB_GIT_USERNAME')?.trim() || undefined;
   const defaultDatabaseGitUserEmail = Deno.env.get('PRAXRR_DEFAULT_DB_GIT_EMAIL')?.trim() || undefined;
@@ -220,6 +221,9 @@ export const handle: Handle = async ({ event, resolve }) => {
 
   // AUTH=off or AUTH=local with local IP - skip auth after setup
   if (auth.skipAuth) {
+    const wizardRedirect = resolveWizardRedirect(event);
+    if (wizardRedirect) throw redirect(303, wizardRedirect);
+
     return resolve(event);
   }
 
@@ -253,6 +257,9 @@ export const handle: Handle = async ({ event, resolve }) => {
   if (auth.session) {
     maybeExtendSession(auth.session);
   }
+
+  const wizardRedirect = resolveWizardRedirect(event);
+  if (wizardRedirect) throw redirect(303, wizardRedirect);
 
   // Authenticated - attach user to locals for use in routes
   return resolve(event);
