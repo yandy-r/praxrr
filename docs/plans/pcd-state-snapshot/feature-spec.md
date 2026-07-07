@@ -41,11 +41,11 @@ The output is the foundation for rollback work in Issue #16.
 ### `pcd_snapshots`
 
 | Column                | Type     | Constraint                | Notes                                     |
-| --------------------- | -------- | ------------------------- | ----------------------------------------- | ---------------- | ----------------------- |
+| --------------------- | -------- | ------------------------- | ----------------------------------------- |
 | `id`                  | INTEGER  | PK AUTOINCREMENT          | Snapshot ID                               |
 | `database_id`         | INTEGER  | NOT NULL FK CASCADE       | Ownership scope                           |
-| `type`                | TEXT     | `auto                     | manual`                                   | High-level class |
-| `trigger`             | TEXT     | `pull                     | sync                                      | manual`          | Pre-event trigger label |
+| `type`                | TEXT     | `auto \| manual`          | High-level class                          |
+| `trigger`             | TEXT     | `pull \| sync \| manual`  | Pre-event trigger label                   |
 | `description`         | TEXT     | nullable                  | Manual text or generated summary          |
 | `ops_sequence_max_id` | INTEGER  | NOT NULL                  | Published-op boundary                     |
 | `ops_count_base`      | INTEGER  | NOT NULL default 0        | Published base count                      |

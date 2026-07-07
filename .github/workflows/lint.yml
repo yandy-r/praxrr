@@ -25,5 +25,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: lts/*
-      - run: npx --yes markdownlint-cli "**/*.md" --ignore-path .markdownlintignore
-      - run: npx --yes prettier --check "**/*.{md,mdx,json,jsonc,yaml,yml}" --ignore-path .prettierignore
+      - run: npm ci
+      - run: npx markdownlint-cli "**/*.md" --ignore-path .markdownlintignore
+      - run: npx prettier --check "**/*.{md,mdx,json,jsonc,yaml,yml}" --ignore-path .prettierignore
