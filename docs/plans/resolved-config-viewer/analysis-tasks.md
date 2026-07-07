@@ -33,9 +33,9 @@ land first.
 
 ### Phase 0 -- Contract & type generation
 
-| Task | Files | blockedBy |
-| --- | --- | --- |
-| **P0-T1** -- Author OpenAPI contract, register, regenerate types | C: `docs/api/v1/paths/resolved-config.yaml`, `docs/api/v1/schemas/resolved-config.yaml`; M: `docs/api/v1/openapi.yaml` (register both via `$ref`, mirroring `compatibility.yaml`/`pcd-snapshots.yaml` lines); regenerated (do not hand-edit): `packages/praxrr-app/src/lib/api/v1.d.ts` (`deno task generate:api-types`), `packages/praxrr-api/{openapi.json,types.ts}` (`deno task bundle:api`) | -- |
+| Task                                                             | Files                                                                                                                                                                                                                                                                                                                                                                                            | blockedBy |
+| ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------- |
+| **P0-T1** -- Author OpenAPI contract, register, regenerate types | C: `docs/api/v1/paths/resolved-config.yaml`, `docs/api/v1/schemas/resolved-config.yaml`; M: `docs/api/v1/openapi.yaml` (register both via `$ref`, mirroring `compatibility.yaml`/`pcd-snapshots.yaml` lines); regenerated (do not hand-edit): `packages/praxrr-app/src/lib/api/v1.d.ts` (`deno task generate:api-types`), `packages/praxrr-api/{openapi.json,types.ts}` (`deno task bundle:api`) | --        |
 
 Author the **entire** contract in one pass (all 4 endpoints: list, named, compare, diff; all 6
 schemas: `ResolvedLayer`, `ResolvedEntityState`, `ResolvedEntityListResponse`,
@@ -45,10 +45,10 @@ never need a second contract commit or a second `generate:api-types`/`bundle:api
 
 ### Phase 1 -- Resolved reads (layer=resolved)
 
-| Task | Files | blockedBy |
-| --- | --- | --- |
-| **P1-T1** -- Resolved readers dispatch table | C: `packages/praxrr-app/src/lib/server/pcd/resolved/readers.ts`, `.../resolved/types.ts` (entity/layer dispatch key types); M: `packages/praxrr-app/src/lib/server/pcd/index.ts` (add `// RESOLVED CONFIG` export section), `scripts/test.ts` (add `resolvedConfig` alias, see below); T: `packages/praxrr-app/src/tests/pcd/resolved/readers.test.ts` | -- |
-| **P1-T2** -- List + named GET endpoints, `layer=resolved` only | C: `packages/praxrr-app/src/routes/api/v1/pcd/[databaseId]/resolved/[entityType]/+server.ts`, `.../[entityType]/[name]/+server.ts`, `packages/praxrr-app/src/tests/routes/resolvedConfigApi.test.ts` (route-test file; **canonical creator**, see Task Granularity Recommendations) | P0-T1, P1-T1 |
+| Task                                                           | Files                                                                                                                                                                                                                                                                                                                                                  | blockedBy    |
+| -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------ |
+| **P1-T1** -- Resolved readers dispatch table                   | C: `packages/praxrr-app/src/lib/server/pcd/resolved/readers.ts`, `.../resolved/types.ts` (entity/layer dispatch key types); M: `packages/praxrr-app/src/lib/server/pcd/index.ts` (add `// RESOLVED CONFIG` export section), `scripts/test.ts` (add `resolvedConfig` alias, see below); T: `packages/praxrr-app/src/tests/pcd/resolved/readers.test.ts` | --           |
+| **P1-T2** -- List + named GET endpoints, `layer=resolved` only | C: `packages/praxrr-app/src/routes/api/v1/pcd/[databaseId]/resolved/[entityType]/+server.ts`, `.../[entityType]/[name]/+server.ts`, `packages/praxrr-app/src/tests/routes/resolvedConfigApi.test.ts` (route-test file; **canonical creator**, see Task Granularity Recommendations)                                                                    | P0-T1, P1-T1 |
 
 `readers.ts` is a manual `(entityType, arrType) -> serializeFn` dispatch table delegating to
 `entities/serialize.ts`'s 15 existing `serialize*` functions (no re-derivation), throwing the same
@@ -58,7 +58,7 @@ databaseId -> `pcdManager.getCache(id)?.isBuilt()` guard, 400 not 404 -> try/cat
 `logger.error` -> generic 500 -> `satisfies components['schemas'][...]`).
 
 `scripts/test.ts` alias (added once, in P1-T1, never touched again -- the value is a
-directory-plus-file comma-joined string, so later tasks only need to add files *under* the already
+directory-plus-file comma-joined string, so later tasks only need to add files _under_ the already
 registered directory or append to the already-registered file):
 
 ```
@@ -67,13 +67,13 @@ resolvedConfig: 'packages/praxrr-app/src/tests/pcd/resolved,packages/praxrr-app/
 
 ### Phase 2 -- Layer breakdown (the hard part)
 
-| Task | Files | blockedBy |
-| --- | --- | --- |
-| **P2-T1** -- `buildReadOnly({ layers })` primitive | M: `packages/praxrr-app/src/lib/server/pcd/database/cache.ts` (extract the op-execution loop L98-274; add `buildReadOnly` that forces `trackHistory=false` for every op, skips `evaluateValueGuardApply/Error`, `pcdOpsQueries.update`, `pcdOpHistoryQueries.create`, never calls `setCache`, and its own catch path must not call `disableDatabaseInstance()`), `packages/praxrr-app/src/lib/server/pcd/ops/loadOps.ts` (add an option to skip the 4th/user-ops push -- must be skippable at the call site per Business Rule 3, not filtered post-hoc); T: `packages/praxrr-app/src/tests/pcd/resolved/cacheBuildReadOnly.test.ts` | -- |
-| **P2-T2** -- `layers.ts` + `layerDiff.ts` | C: `packages/praxrr-app/src/lib/server/pcd/resolved/layers.ts` (ephemeral base-only build/close wrapper over `buildReadOnly`), `.../resolved/layerDiff.ts` (`diffToFieldChanges(baseOnlyPortable, resolvedPortable, options)` wrapper reusing `sectionDiffs.ts` array-key strategies); M: `pcd/index.ts` (append export -- see Task Granularity Recommendations); T: `packages/praxrr-app/src/tests/pcd/resolved/{layers,layerDiff}.test.ts` | P1-T1, P2-T1 |
-| **P2-T3** -- Wire `layer=base\|user` into the Phase 1 endpoints; SSRF centralization landed by now (SEC-1) | M: **same two route files as P1-T2** (`[entityType]/+server.ts`, `[entityType]/[name]/+server.ts`), **same route test file as P1-T2** (`resolvedConfigApi.test.ts`, appended `layer=base`/`layer=user` cases) | P1-T2, P2-T2 |
+| Task                                                                                                       | Files                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               | blockedBy    |
+| ---------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------ |
+| **P2-T1** -- `buildReadOnly({ layers })` primitive                                                         | M: `packages/praxrr-app/src/lib/server/pcd/database/cache.ts` (extract the op-execution loop L98-274; add `buildReadOnly` that forces `trackHistory=false` for every op, skips `evaluateValueGuardApply/Error`, `pcdOpsQueries.update`, `pcdOpHistoryQueries.create`, never calls `setCache`, and its own catch path must not call `disableDatabaseInstance()`), `packages/praxrr-app/src/lib/server/pcd/ops/loadOps.ts` (add an option to skip the 4th/user-ops push -- must be skippable at the call site per Business Rule 3, not filtered post-hoc); T: `packages/praxrr-app/src/tests/pcd/resolved/cacheBuildReadOnly.test.ts` | --           |
+| **P2-T2** -- `layers.ts` + `layerDiff.ts`                                                                  | C: `packages/praxrr-app/src/lib/server/pcd/resolved/layers.ts` (ephemeral base-only build/close wrapper over `buildReadOnly`), `.../resolved/layerDiff.ts` (`diffToFieldChanges(baseOnlyPortable, resolvedPortable, options)` wrapper reusing `sectionDiffs.ts` array-key strategies); M: `pcd/index.ts` (append export -- see Task Granularity Recommendations); T: `packages/praxrr-app/src/tests/pcd/resolved/{layers,layerDiff}.test.ts`                                                                                                                                                                                        | P1-T1, P2-T1 |
+| **P2-T3** -- Wire `layer=base\|user` into the Phase 1 endpoints; SSRF centralization landed by now (SEC-1) | M: **same two route files as P1-T2** (`[entityType]/+server.ts`, `[entityType]/[name]/+server.ts`), **same route test file as P1-T2** (`resolvedConfigApi.test.ts`, appended `layer=base`/`layer=user` cases)                                                                                                                                                                                                                                                                                                                                                                                                                       | P1-T2, P2-T2 |
 
-`layerDiff.ts` calls `readers.ts`'s *same* serialize function against both the ephemeral base-only
+`layerDiff.ts` calls `readers.ts`'s _same_ serialize function against both the ephemeral base-only
 cache (from `layers.ts`) and the real resolved cache (via `pcdManager.getCache`) to get two
 comparable `Portable*` payloads before diffing -- this is why P2-T2 depends on P1-T1, not just
 P2-T1. P2-T1's test must assert **zero calls** to `pcdOpsQueries.update`/`pcdOpHistoryQueries.create`
@@ -83,10 +83,10 @@ patch-and-restore spies on those two query modules plus a small synthetic op lis
 
 ### Phase 3 -- Live diff (independent of Phase 2; can start Batch 1)
 
-| Task | Files | blockedBy |
-| --- | --- | --- |
-| **P3-T1** -- `liveDiff.ts` | C: `packages/praxrr-app/src/lib/server/pcd/resolved/liveDiff.ts` (calls `generatePreview()`, filters the returned `EntityChange[]` client-side by `entityType`+`name` -- no per-entity filter exists upstream -- namespace-aware via `findNamespaceMatch`; defines its own local closed reason union, e.g. `'unreachable'|'timeout'|'rate-limited'|'unsupported'|'not-found'`, following `testConnectionReason.ts`'s pattern rather than forwarding `error.message`); M: `pcd/index.ts` (append export); T: `packages/praxrr-app/src/tests/pcd/resolved/liveDiff.test.ts` | -- |
-| **P3-T2** -- `GET .../[name]/diff` endpoint | C: `packages/praxrr-app/src/routes/api/v1/pcd/[databaseId]/resolved/[entityType]/[name]/diff/+server.ts`; M: `resolvedConfigApi.test.ts` (appended diff cases) | P0-T1, P3-T1, P1-T2 (file-ordering only, see below) |
+| Task                                        | Files                                                                                                                                                                                                                                                                                                                     | blockedBy                                           |
+| ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------- |
+| **P3-T1** -- `liveDiff.ts`                  | C: `packages/praxrr-app/src/lib/server/pcd/resolved/liveDiff.ts` (calls `generatePreview()`, filters the returned `EntityChange[]` client-side by `entityType`+`name` -- no per-entity filter exists upstream -- namespace-aware via `findNamespaceMatch`; defines its own local closed reason union, e.g. `'unreachable' | 'timeout'                                           | 'rate-limited' | 'unsupported' | 'not-found'`, following `testConnectionReason.ts`'s pattern rather than forwarding `error.message`); M: `pcd/index.ts`(append export); T:`packages/praxrr-app/src/tests/pcd/resolved/liveDiff.test.ts` | --  |
+| **P3-T2** -- `GET .../[name]/diff` endpoint | C: `packages/praxrr-app/src/routes/api/v1/pcd/[databaseId]/resolved/[entityType]/[name]/diff/+server.ts`; M: `resolvedConfigApi.test.ts` (appended diff cases)                                                                                                                                                            | P0-T1, P3-T1, P1-T2 (file-ordering only, see below) |
 
 P3-T2's dependency on P1-T2 is **not functional** -- it exists solely because both tasks touch the
 shared `resolvedConfigApi.test.ts` file and P1-T2 is that file's canonical creator (see Task
@@ -97,25 +97,26 @@ signature).
 
 ### Phase 4 -- Cross-instance comparison
 
-| Task | Files | blockedBy |
-| --- | --- | --- |
-| **P4-T1** -- `compare.ts` | C: `packages/praxrr-app/src/lib/server/pcd/resolved/compare.ts` (per-instance transformed-desired payloads via `readers.ts`; `arr_type` gating via `isArrAppType()`/`isSyncSectionSupported()`, no sibling fallback; defines its own local reason union -- duplicated from, not imported from, `liveDiff.ts`'s, to preserve independence -- see Task Granularity Recommendations); M: `pcd/index.ts` (append export); T: `packages/praxrr-app/src/tests/pcd/resolved/compare.test.ts` | P1-T1, SEC-2 |
-| **P4-T2** -- `GET .../[name]/compare` endpoint | C: `packages/praxrr-app/src/routes/api/v1/pcd/[databaseId]/resolved/[entityType]/[name]/compare/+server.ts`; M: `resolvedConfigApi.test.ts` (appended compare cases) | P0-T1, P4-T1, P1-T2 (file-ordering only) |
+| Task                                           | Files                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | blockedBy                                |
+| ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------- |
+| **P4-T1** -- `compare.ts`                      | C: `packages/praxrr-app/src/lib/server/pcd/resolved/compare.ts` (per-instance transformed-desired payloads via `readers.ts`; `arr_type` gating via `isArrAppType()`/`isSyncSectionSupported()`, no sibling fallback; defines its own local reason union -- duplicated from, not imported from, `liveDiff.ts`'s, to preserve independence -- see Task Granularity Recommendations); M: `pcd/index.ts` (append export); T: `packages/praxrr-app/src/tests/pcd/resolved/compare.test.ts` | P1-T1, SEC-2                             |
+| **P4-T2** -- `GET .../[name]/compare` endpoint | C: `packages/praxrr-app/src/routes/api/v1/pcd/[databaseId]/resolved/[entityType]/[name]/compare/+server.ts`; M: `resolvedConfigApi.test.ts` (appended compare cases)                                                                                                                                                                                                                                                                                                                  | P0-T1, P4-T1, P1-T2 (file-ordering only) |
 
 Per the given ordering fact, compare's dependency set is explicitly **readers + per-arr transforms
-+ limits** -- not `liveDiff.ts`. `includeLive=true` may optionally reuse `liveDiff.ts`'s function
-as a soft, non-blocking integration (land after P3-T1 if taken; a small local
-`generatePreview()`-based fetch is an acceptable alternative that keeps P4-T1 fully independent of
-Phase 3).
+
+- limits** -- not `liveDiff.ts`. `includeLive=true` may optionally reuse `liveDiff.ts`'s function
+  as a soft, non-blocking integration (land after P3-T1 if taken; a small local
+  `generatePreview()`-based fetch is an acceptable alternative that keeps P4-T1 fully independent of
+  Phase 3).
 
 ### Phase 5 -- UI
 
-| Task | Files | blockedBy |
-| --- | --- | --- |
-| **P5-T1** -- Page shell + resolved view + nav entry | C: `packages/praxrr-app/src/routes/resolved-config/[databaseId]/+page.server.ts`, `+page.svelte` (**must define an extensible tab/section registry** -- see Task Granularity Recommendations), `ResolvedStatePanel.svelte` (resolved-layer-only content: `JsonView.svelte` raw mode + entity table, Layer segmented control present but Base/User disabled/stubbed); M: `packages/praxrr-app/src/lib/server/navigation/registry.ts` (append one `NAV_REGISTRY` entry, following `overview.parity_map`/`policies.score_simulator` shape) | P1-T2 |
-| **P5-T2** -- Layer toggle (Base / User overrides) wiring | M: `ResolvedStatePanel.svelte` (enable Base/User segments; render `FieldChange[]` table for `layer=user` using `SyncPreviewEntityDiff`'s `ACTION_META`/`FIELD_META` glyph+color+label triple-encoding -- escaped `{value}` text only, no `{@html}`/`marked.*`; explicit "resolved matches base" empty state) | P5-T1, P2-T3 |
-| **P5-T3** -- Live diff panel | C: `packages/praxrr-app/src/routes/resolved-config/[databaseId]/LiveDiffPanel.svelte` (instance selector, per-instance skeleton/error/retry states, sanitized reason display, "in sync" vs "check failed" distinct empty states); M: `+page.svelte` (one additive tab-registry entry) | P5-T1, P3-T2 |
-| **P5-T4** -- Cross-instance comparison grid | C: `packages/praxrr-app/src/routes/resolved-config/[databaseId]/CrossInstanceGrid.svelte` (`Table.svelte` + `Badge.svelte` + `Column<T>[]`, `ParityMatrix.svelte` idiom -- do not build a bespoke grid); M: `+page.svelte` (one additive tab-registry entry) | P5-T1, P4-T2 |
+| Task                                                     | Files                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | blockedBy    |
+| -------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------ |
+| **P5-T1** -- Page shell + resolved view + nav entry      | C: `packages/praxrr-app/src/routes/resolved-config/[databaseId]/+page.server.ts`, `+page.svelte` (**must define an extensible tab/section registry** -- see Task Granularity Recommendations), `ResolvedStatePanel.svelte` (resolved-layer-only content: `JsonView.svelte` raw mode + entity table, Layer segmented control present but Base/User disabled/stubbed); M: `packages/praxrr-app/src/lib/server/navigation/registry.ts` (append one `NAV_REGISTRY` entry, following `overview.parity_map`/`policies.score_simulator` shape) | P1-T2        |
+| **P5-T2** -- Layer toggle (Base / User overrides) wiring | M: `ResolvedStatePanel.svelte` (enable Base/User segments; render `FieldChange[]` table for `layer=user` using `SyncPreviewEntityDiff`'s `ACTION_META`/`FIELD_META` glyph+color+label triple-encoding -- escaped `{value}` text only, no `{@html}`/`marked.*`; explicit "resolved matches base" empty state)                                                                                                                                                                                                                            | P5-T1, P2-T3 |
+| **P5-T3** -- Live diff panel                             | C: `packages/praxrr-app/src/routes/resolved-config/[databaseId]/LiveDiffPanel.svelte` (instance selector, per-instance skeleton/error/retry states, sanitized reason display, "in sync" vs "check failed" distinct empty states); M: `+page.svelte` (one additive tab-registry entry)                                                                                                                                                                                                                                                   | P5-T1, P3-T2 |
+| **P5-T4** -- Cross-instance comparison grid              | C: `packages/praxrr-app/src/routes/resolved-config/[databaseId]/CrossInstanceGrid.svelte` (`Table.svelte` + `Badge.svelte` + `Column<T>[]`, `ParityMatrix.svelte` idiom -- do not build a bespoke grid); M: `+page.svelte` (one additive tab-registry entry)                                                                                                                                                                                                                                                                            | P5-T1, P4-T2 |
 
 All new components render values as escaped `{value}` text only -- **no `{@html}` / `marked.parse()`
 anywhere** (the security-critical C1 constraint; `FieldDiffTable.svelte` is the anti-pattern to not
@@ -124,16 +125,16 @@ codebase's actual convention, not CLAUDE.md's `onclick` wording.
 
 ### Phase 6 -- Cross-cutting verification (final gate)
 
-| Task | Files | blockedBy |
-| --- | --- | --- |
+| Task                                                                          | Files                                                                                                                                                                                                                                                                                                                                                                                                                                                   | blockedBy                  |
+| ----------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------- |
 | **P6-T1** -- Redaction + CORS + resolved/preview-equivalence regression sweep | M: `packages/praxrr-app/src/tests/base/arrCredentialRedactionRoutes.test.ts` (one `run...RedactionTest()` case per new route -- list, named, diff, compare -- asserting `assertPayloadNoLeak`/`assertFalse('api_key' in payload)`); C or M: a CORS-headers-absent assertion (A2) and a resolved-view-vs-sync-preview-desired-payload equivalence assertion (Success Criterion 1), placed alongside the redaction cases or in a small adjacent test file | P1-T2, P2-T3, P3-T2, P4-T2 |
 
 ### Cross-cutting security tasks (parallel track, Batch 1)
 
-| Task | Files | blockedBy |
-| --- | --- | --- |
-| **SEC-1** -- SSRF centralization (W1) | M: `packages/praxrr-app/src/lib/server/utils/arr/arrInstanceClients.ts` (call `assertSafeArrUrl(url)` inside `getArrInstanceClient()` before `createArrClient()`); T: new/extended unit test asserting the guard fires and existing legitimate LAN/RFC1918 URLs still pass | -- |
-| **SEC-2** -- `resolved/limits.ts` (W3) | C: `packages/praxrr-app/src/lib/server/pcd/resolved/limits.ts` (instance cap = 8; per-user/request window via `$utils/rateLimit.ts#registerRateLimitAttempt`); T: `packages/praxrr-app/src/tests/pcd/resolved/limits.test.ts` | -- |
+| Task                                   | Files                                                                                                                                                                                                                                                                      | blockedBy |
+| -------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------- |
+| **SEC-1** -- SSRF centralization (W1)  | M: `packages/praxrr-app/src/lib/server/utils/arr/arrInstanceClients.ts` (call `assertSafeArrUrl(url)` inside `getArrInstanceClient()` before `createArrClient()`); T: new/extended unit test asserting the guard fires and existing legitimate LAN/RFC1918 URLs still pass | --        |
+| **SEC-2** -- `resolved/limits.ts` (W3) | C: `packages/praxrr-app/src/lib/server/pcd/resolved/limits.ts` (instance cap = 8; per-user/request window via `$utils/rateLimit.ts#registerRateLimitAttempt`); T: `packages/praxrr-app/src/tests/pcd/resolved/limits.test.ts`                                              | --        |
 
 SEC-1 has zero call-site changes required anywhere else -- it's an internal guard inside the single
 existing choke point (`getArrInstanceClient()`), so it transparently protects `generatePreview()`
@@ -144,7 +145,7 @@ is recommended for defense-in-depth before any live-fetch code path goes live.
 
 1. **No separate "501 skeleton" phase.** The spec's Phase 0 preview lists route skeletons as a
    distinct step from Phase 1's real endpoints; this plan merges them because both would touch the
-   *same* `[entityType]/+server.ts` / `[entityType]/[name]/+server.ts` files, and per the
+   _same_ `[entityType]/+server.ts` / `[entityType]/[name]/+server.ts` files, and per the
    same-file-must-be-sequential-or-same-task rule, a skeleton-then-fill pass on identical files is
    pure churn. Building the real `layer=resolved` handler directly in P1-T2 is strictly cheaper.
 2. **`pcd/index.ts` treated as a low-risk trivial-append file, not a serialization point.** Four
@@ -154,7 +155,7 @@ is recommended for defense-in-depth before any live-fetch code path goes live.
    a conflict class that resolves in seconds via git. Recommendation: each task's commit touches
    only its own export line; rebase-on-conflict if two land in the same window.
 3. **`resolvedConfigApi.test.ts` is treated differently -- real file-creation ordering, not just
-   append-risk.** Unlike `pcd/index.ts`, this file must *exist* before anything can append to it, so
+   append-risk.** Unlike `pcd/index.ts`, this file must _exist_ before anything can append to it, so
    P1-T2 is designated the canonical creator; P2-T3 (already same-file-sequential with P1-T2 for
    the route handlers themselves), P3-T2, and P4-T2 each carry a **file-ordering-only** `blockedBy`
    edge on P1-T2 in addition to their real functional dependencies. This is the one place this plan
@@ -170,7 +171,7 @@ is recommended for defense-in-depth before any live-fetch code path goes live.
    array, e.g. `{ id, label, component }[]`) specifically so P5-T3 (live diff) and P5-T4
    (cross-instance) can each add one independent array entry in parallel rather than both editing
    the same conditional-render ladder. Without this, Phase 5 would serialize further than
-   necessary. `ResolvedStatePanel.svelte`'s P5-T1->P5-T2 relationship is a *real* sequential
+   necessary. `ResolvedStatePanel.svelte`'s P5-T1->P5-T2 relationship is a _real_ sequential
    dependency (P5-T2 enables logic P5-T1 stubbed, not an independent addition) and is not a
    candidate for this treatment.
 6. **Sanitized reason enums are intentionally duplicated, not shared**, between `liveDiff.ts`
@@ -219,43 +220,43 @@ sorting by the batch numbers below succeeds with no back-edges -- **no cycles**.
 Every file has exactly one **owning (creating) task**; files with more than one contributing task
 list the follow-on tasks as **(sequential append)**.
 
-| File | Owning task | Sequential appends |
-| --- | --- | --- |
-| `docs/api/v1/paths/resolved-config.yaml` | P0-T1 | -- |
-| `docs/api/v1/schemas/resolved-config.yaml` | P0-T1 | -- |
-| `docs/api/v1/openapi.yaml` | P0-T1 (registration lines) | -- |
-| `packages/praxrr-app/src/lib/api/v1.d.ts` | P0-T1 (generated) | -- |
-| `packages/praxrr-api/openapi.json`, `types.ts` | P0-T1 (generated) | -- |
-| `pcd/resolved/readers.ts` | P1-T1 | -- |
-| `pcd/resolved/types.ts` | P1-T1 | -- |
-| `pcd/index.ts` | P1-T1 (first section) | P2-T2, P3-T1, P4-T1 (own export lines) |
-| `scripts/test.ts` | P1-T1 | -- (never touched again) |
-| `tests/pcd/resolved/readers.test.ts` | P1-T1 | -- |
-| `routes/.../resolved/[entityType]/+server.ts` | P1-T2 | P2-T3 (adds layer=base\|user) |
-| `routes/.../resolved/[entityType]/[name]/+server.ts` | P1-T2 | P2-T3 (adds layer=base\|user) |
-| `tests/routes/resolvedConfigApi.test.ts` | P1-T2 (creates) | P2-T3, P3-T2, P4-T2 (append cases) |
-| `pcd/database/cache.ts` | P2-T1 | -- |
-| `pcd/ops/loadOps.ts` | P2-T1 | -- |
-| `tests/pcd/resolved/cacheBuildReadOnly.test.ts` | P2-T1 | -- |
-| `pcd/resolved/layers.ts` | P2-T2 | -- |
-| `pcd/resolved/layerDiff.ts` | P2-T2 | -- |
-| `tests/pcd/resolved/{layers,layerDiff}.test.ts` | P2-T2 | -- |
-| `pcd/resolved/liveDiff.ts` | P3-T1 | -- |
-| `tests/pcd/resolved/liveDiff.test.ts` | P3-T1 | -- |
-| `routes/.../[name]/diff/+server.ts` | P3-T2 | -- |
-| `pcd/resolved/compare.ts` | P4-T1 | -- |
-| `tests/pcd/resolved/compare.test.ts` | P4-T1 | -- |
-| `routes/.../[name]/compare/+server.ts` | P4-T2 | -- |
-| `resolved-config/[databaseId]/+page.server.ts` | P5-T1 | -- |
-| `resolved-config/[databaseId]/+page.svelte` | P5-T1 (shell + tab registry) | P5-T3, P5-T4 (one tab entry each) |
-| `resolved-config/[databaseId]/ResolvedStatePanel.svelte` | P5-T1 (resolved-only) | P5-T2 (enables base/user) |
-| `navigation/registry.ts` | P5-T1 | -- |
-| `resolved-config/[databaseId]/LiveDiffPanel.svelte` | P5-T3 | -- |
-| `resolved-config/[databaseId]/CrossInstanceGrid.svelte` | P5-T4 | -- |
-| `tests/base/arrCredentialRedactionRoutes.test.ts` | P6-T1 | -- |
-| `utils/arr/arrInstanceClients.ts` | SEC-1 | -- |
-| `pcd/resolved/limits.ts` | SEC-2 | -- |
-| `tests/pcd/resolved/limits.test.ts` | SEC-2 | -- |
+| File                                                     | Owning task                  | Sequential appends                     |
+| -------------------------------------------------------- | ---------------------------- | -------------------------------------- |
+| `docs/api/v1/paths/resolved-config.yaml`                 | P0-T1                        | --                                     |
+| `docs/api/v1/schemas/resolved-config.yaml`               | P0-T1                        | --                                     |
+| `docs/api/v1/openapi.yaml`                               | P0-T1 (registration lines)   | --                                     |
+| `packages/praxrr-app/src/lib/api/v1.d.ts`                | P0-T1 (generated)            | --                                     |
+| `packages/praxrr-api/openapi.json`, `types.ts`           | P0-T1 (generated)            | --                                     |
+| `pcd/resolved/readers.ts`                                | P1-T1                        | --                                     |
+| `pcd/resolved/types.ts`                                  | P1-T1                        | --                                     |
+| `pcd/index.ts`                                           | P1-T1 (first section)        | P2-T2, P3-T1, P4-T1 (own export lines) |
+| `scripts/test.ts`                                        | P1-T1                        | -- (never touched again)               |
+| `tests/pcd/resolved/readers.test.ts`                     | P1-T1                        | --                                     |
+| `routes/.../resolved/[entityType]/+server.ts`            | P1-T2                        | P2-T3 (adds layer=base\|user)          |
+| `routes/.../resolved/[entityType]/[name]/+server.ts`     | P1-T2                        | P2-T3 (adds layer=base\|user)          |
+| `tests/routes/resolvedConfigApi.test.ts`                 | P1-T2 (creates)              | P2-T3, P3-T2, P4-T2 (append cases)     |
+| `pcd/database/cache.ts`                                  | P2-T1                        | --                                     |
+| `pcd/ops/loadOps.ts`                                     | P2-T1                        | --                                     |
+| `tests/pcd/resolved/cacheBuildReadOnly.test.ts`          | P2-T1                        | --                                     |
+| `pcd/resolved/layers.ts`                                 | P2-T2                        | --                                     |
+| `pcd/resolved/layerDiff.ts`                              | P2-T2                        | --                                     |
+| `tests/pcd/resolved/{layers,layerDiff}.test.ts`          | P2-T2                        | --                                     |
+| `pcd/resolved/liveDiff.ts`                               | P3-T1                        | --                                     |
+| `tests/pcd/resolved/liveDiff.test.ts`                    | P3-T1                        | --                                     |
+| `routes/.../[name]/diff/+server.ts`                      | P3-T2                        | --                                     |
+| `pcd/resolved/compare.ts`                                | P4-T1                        | --                                     |
+| `tests/pcd/resolved/compare.test.ts`                     | P4-T1                        | --                                     |
+| `routes/.../[name]/compare/+server.ts`                   | P4-T2                        | --                                     |
+| `resolved-config/[databaseId]/+page.server.ts`           | P5-T1                        | --                                     |
+| `resolved-config/[databaseId]/+page.svelte`              | P5-T1 (shell + tab registry) | P5-T3, P5-T4 (one tab entry each)      |
+| `resolved-config/[databaseId]/ResolvedStatePanel.svelte` | P5-T1 (resolved-only)        | P5-T2 (enables base/user)              |
+| `navigation/registry.ts`                                 | P5-T1                        | --                                     |
+| `resolved-config/[databaseId]/LiveDiffPanel.svelte`      | P5-T3                        | --                                     |
+| `resolved-config/[databaseId]/CrossInstanceGrid.svelte`  | P5-T4                        | --                                     |
+| `tests/base/arrCredentialRedactionRoutes.test.ts`        | P6-T1                        | --                                     |
+| `utils/arr/arrInstanceClients.ts`                        | SEC-1                        | --                                     |
+| `pcd/resolved/limits.ts`                                 | SEC-2                        | --                                     |
+| `tests/pcd/resolved/limits.test.ts`                      | SEC-2                        | --                                     |
 
 Files explicitly marked "reuse, no change" per `shared.md` (`sync/preview/diff.ts`,
 `sectionDiffs.ts`, `orchestrator.ts`, `namespace.ts`, `mappings.ts`, `entities/serialize.ts`,
@@ -268,12 +269,12 @@ feature -- not listed above since they have no owning task.
 Four batches, given unlimited parallel capacity per batch (batch size = number of tasks with all
 `blockedBy` entries satisfied by the end of the previous batch):
 
-| Batch | Tasks (count) | Notes |
-| --- | --- | --- |
-| **1** | P0-T1, P1-T1, P2-T1, P3-T1, SEC-1, SEC-2 (**6**) | Zero cross-dependencies. This is the highest-leverage batch -- contract, readers, `buildReadOnly`, live-diff core, and both security hardenings all start day one. |
-| **2** | P1-T2, P2-T2, P4-T1 (**3**) | Each depends only on Batch-1 outputs; none share files with each other. |
-| **3** | P2-T3, P3-T2, P4-T2, P5-T1 (**4**) | P2-T3 is same-file-sequential with P1-T2 (expected); P3-T2/P4-T2 carry the file-order-only edge on P1-T2 explained above; P5-T1 starts as soon as the resolved-only endpoint exists. |
-| **4** | P5-T2, P5-T3, P5-T4, P6-T1 (**4**) | P5-T3/P5-T4 are parallel-safe *because* P5-T1 established the tab-registry extension point (Task Granularity Recommendation #5); P6-T1's dependencies are all satisfied by end of Batch 3. |
+| Batch | Tasks (count)                                    | Notes                                                                                                                                                                                      |
+| ----- | ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **1** | P0-T1, P1-T1, P2-T1, P3-T1, SEC-1, SEC-2 (**6**) | Zero cross-dependencies. This is the highest-leverage batch -- contract, readers, `buildReadOnly`, live-diff core, and both security hardenings all start day one.                         |
+| **2** | P1-T2, P2-T2, P4-T1 (**3**)                      | Each depends only on Batch-1 outputs; none share files with each other.                                                                                                                    |
+| **3** | P2-T3, P3-T2, P4-T2, P5-T1 (**4**)               | P2-T3 is same-file-sequential with P1-T2 (expected); P3-T2/P4-T2 carry the file-order-only edge on P1-T2 explained above; P5-T1 starts as soon as the resolved-only endpoint exists.       |
+| **4** | P5-T2, P5-T3, P5-T4, P6-T1 (**4**)               | P5-T3/P5-T4 are parallel-safe _because_ P5-T1 established the tab-registry extension point (Task Granularity Recommendation #5); P6-T1's dependencies are all satisfied by end of Batch 3. |
 
 **Critical path** (longest chain, 4 hops): `P1-T1 -> P4-T1 -> P4-T2 -> P5-T4` (or equivalently
 `P1-T1 -> P1-T2 -> P2-T3 -> P5-T2`) -- 4 batches is the minimum achievable regardless of engineer

@@ -72,22 +72,22 @@ Pushes exactly 4 stages, unconditionally, in this order (no early-exit param exi
 
 All 15 functions have signature `(cache: PCDCache, name: string) => Promise<Portable*>`, throw a plain `Error(...)` (not a typed error class) on miss, and are **not** grouped by any dispatcher today. Inventory:
 
-| Function | Return type | Arr-scoped? | Notes |
-|---|---|---|---|
-| `serializeDelayProfile` | `PortableDelayProfile` | no (shared) | delegates to `delayProfileQueries.getByName` |
-| `serializeRegularExpression` | `PortableRegularExpression` | no (shared) | direct `cache.kb` query + tag join |
-| `serializeCustomFormat` | `PortableCustomFormat` | no (shared) | conditions via `cfQueries.getConditionsForEvaluation`, tests via `cfQueries.listTests` |
-| `serializeQualityProfile` | `PortableQualityProfile` | no (shared) | `qpQueries.qualities(cache, 0, name)` — databaseId param unused per inline comment |
-| `serializeRadarrNaming` | `PortableRadarrNaming` | **radarr** | `namingQueries.getRadarrByName` |
-| `serializeSonarrNaming` | `PortableSonarrNaming` | **sonarr** | `namingQueries.getSonarrByName` |
-| `serializeLidarrNaming` | `PortableLidarrNaming` | **lidarr** | `namingQueries.getLidarrByName`; throws on any null required field via `requireLidarrNamingField` helper |
-| `serializeRadarrMediaSettings` | `PortableMediaSettings` | **radarr** | |
-| `serializeSonarrMediaSettings` | `PortableMediaSettings` | **sonarr** | |
-| `serializeLidarrMediaSettings` | `PortableLidarrMediaSettings` (= `PortableMediaSettings`) | **lidarr** | |
-| `serializeRadarrQualityDefinitions` | `PortableQualityDefinitions` | **radarr** | |
-| `serializeSonarrQualityDefinitions` | `PortableQualityDefinitions` | **sonarr** | |
-| `serializeLidarrQualityDefinitions` | `PortableLidarrQualityDefinitions` (= `PortableQualityDefinitions`) | **lidarr** | |
-| `serializeLidarrMetadataProfile` | `PortableLidarrMetadataProfile` | **lidarr only, no radarr/sonarr equivalent** | 3 parallel queries via `Promise.all` for primary/secondary/release-status types |
+| Function                            | Return type                                                         | Arr-scoped?                                  | Notes                                                                                                    |
+| ----------------------------------- | ------------------------------------------------------------------- | -------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| `serializeDelayProfile`             | `PortableDelayProfile`                                              | no (shared)                                  | delegates to `delayProfileQueries.getByName`                                                             |
+| `serializeRegularExpression`        | `PortableRegularExpression`                                         | no (shared)                                  | direct `cache.kb` query + tag join                                                                       |
+| `serializeCustomFormat`             | `PortableCustomFormat`                                              | no (shared)                                  | conditions via `cfQueries.getConditionsForEvaluation`, tests via `cfQueries.listTests`                   |
+| `serializeQualityProfile`           | `PortableQualityProfile`                                            | no (shared)                                  | `qpQueries.qualities(cache, 0, name)` — databaseId param unused per inline comment                       |
+| `serializeRadarrNaming`             | `PortableRadarrNaming`                                              | **radarr**                                   | `namingQueries.getRadarrByName`                                                                          |
+| `serializeSonarrNaming`             | `PortableSonarrNaming`                                              | **sonarr**                                   | `namingQueries.getSonarrByName`                                                                          |
+| `serializeLidarrNaming`             | `PortableLidarrNaming`                                              | **lidarr**                                   | `namingQueries.getLidarrByName`; throws on any null required field via `requireLidarrNamingField` helper |
+| `serializeRadarrMediaSettings`      | `PortableMediaSettings`                                             | **radarr**                                   |                                                                                                          |
+| `serializeSonarrMediaSettings`      | `PortableMediaSettings`                                             | **sonarr**                                   |                                                                                                          |
+| `serializeLidarrMediaSettings`      | `PortableLidarrMediaSettings` (= `PortableMediaSettings`)           | **lidarr**                                   |                                                                                                          |
+| `serializeRadarrQualityDefinitions` | `PortableQualityDefinitions`                                        | **radarr**                                   |                                                                                                          |
+| `serializeSonarrQualityDefinitions` | `PortableQualityDefinitions`                                        | **sonarr**                                   |                                                                                                          |
+| `serializeLidarrQualityDefinitions` | `PortableLidarrQualityDefinitions` (= `PortableQualityDefinitions`) | **lidarr**                                   |                                                                                                          |
+| `serializeLidarrMetadataProfile`    | `PortableLidarrMetadataProfile`                                     | **lidarr only, no radarr/sonarr equivalent** | 3 parallel queries via `Promise.all` for primary/secondary/release-status types                          |
 
 `quality_profiles`, `custom_formats`, `delay_profiles`, `regular_expressions` are **name-keyed, arr-agnostic**. `naming`, `media_settings`, `quality_definitions` are **name-keyed AND per-arr-app** (3 separate serialize functions each, 3 separate cache tables each: `{radarr,sonarr,lidarr}_naming` etc.). `lidarr_metadata_profiles` is **lidarr-only**. This maps directly onto the `(entityType, arrType) → fn` readers dispatch table the feature needs.
 
@@ -102,10 +102,25 @@ All 15 functions have signature `(cache: PCDCache, name: string) => Promise<Port
 **Where `EntityChange[]` actually lives** inside each section payload (`types.ts` L42-63):
 
 ```ts
-interface QualityProfilesPreview { section:'qualityProfiles'; customFormats: readonly EntityChange[]; qualityProfiles: readonly EntityChange[]; }
-interface DelayProfilesPreview   { section:'delayProfiles';   profile: EntityChange | null; }
-interface MediaManagementPreview { section:'mediaManagement'; naming: EntityChange | null; qualityDefinitions: readonly EntityChange[]; mediaSettings: EntityChange | null; }
-interface MetadataProfilesPreview{ section:'metadataProfiles';profile: EntityChange | null; }
+interface QualityProfilesPreview {
+  section: 'qualityProfiles';
+  customFormats: readonly EntityChange[];
+  qualityProfiles: readonly EntityChange[];
+}
+interface DelayProfilesPreview {
+  section: 'delayProfiles';
+  profile: EntityChange | null;
+}
+interface MediaManagementPreview {
+  section: 'mediaManagement';
+  naming: EntityChange | null;
+  qualityDefinitions: readonly EntityChange[];
+  mediaSettings: EntityChange | null;
+}
+interface MetadataProfilesPreview {
+  section: 'metadataProfiles';
+  profile: EntityChange | null;
+}
 ```
 
 `qualityProfiles`/`customFormats`/`qualityDefinitions` are **arrays** (collection diff via `diffEntityCollection`); `delayProfiles.profile`, `mediaManagement.naming`, `mediaManagement.mediaSettings`, `metadataProfiles.profile` are **singleton `EntityChange | null`** (via `diffSingletonEntity`). A liveDiff wrapper must know which shape applies per entity type — array-find-by-name vs direct-null-check.
@@ -132,20 +147,51 @@ interface MetadataProfilesPreview{ section:'metadataProfiles';profile: EntityCha
 ### `readers.ts` dispatch table shape (net-new, does not exist)
 
 ```ts
-type ResolvedEntityType = 'delayProfile' | 'regularExpression' | 'customFormat' | 'qualityProfile'
-  | 'naming' | 'mediaSettings' | 'qualityDefinitions' | 'lidarrMetadataProfile';
+type ResolvedEntityType =
+  | 'delayProfile'
+  | 'regularExpression'
+  | 'customFormat'
+  | 'qualityProfile'
+  | 'naming'
+  | 'mediaSettings'
+  | 'qualityDefinitions'
+  | 'lidarrMetadataProfile';
 
-const ARR_AGNOSTIC_READERS: Partial<Record<ResolvedEntityType, (cache: PCDCache, name: string) => Promise<unknown>>> = {
+const ARR_AGNOSTIC_READERS: Partial<
+  Record<
+    ResolvedEntityType,
+    (cache: PCDCache, name: string) => Promise<unknown>
+  >
+> = {
   delayProfile: serializeDelayProfile,
   regularExpression: serializeRegularExpression,
   customFormat: serializeCustomFormat,
   qualityProfile: serializeQualityProfile,
 };
 
-const PER_ARR_READERS: Partial<Record<ResolvedEntityType, Partial<Record<ArrAppType, (cache: PCDCache, name: string) => Promise<unknown>>>>> = {
-  naming: { radarr: serializeRadarrNaming, sonarr: serializeSonarrNaming, lidarr: serializeLidarrNaming },
-  mediaSettings: { radarr: serializeRadarrMediaSettings, sonarr: serializeSonarrMediaSettings, lidarr: serializeLidarrMediaSettings },
-  qualityDefinitions: { radarr: serializeRadarrQualityDefinitions, sonarr: serializeSonarrQualityDefinitions, lidarr: serializeLidarrQualityDefinitions },
+const PER_ARR_READERS: Partial<
+  Record<
+    ResolvedEntityType,
+    Partial<
+      Record<ArrAppType, (cache: PCDCache, name: string) => Promise<unknown>>
+    >
+  >
+> = {
+  naming: {
+    radarr: serializeRadarrNaming,
+    sonarr: serializeSonarrNaming,
+    lidarr: serializeLidarrNaming,
+  },
+  mediaSettings: {
+    radarr: serializeRadarrMediaSettings,
+    sonarr: serializeSonarrMediaSettings,
+    lidarr: serializeLidarrMediaSettings,
+  },
+  qualityDefinitions: {
+    radarr: serializeRadarrQualityDefinitions,
+    sonarr: serializeSonarrQualityDefinitions,
+    lidarr: serializeLidarrQualityDefinitions,
+  },
   lidarrMetadataProfile: { lidarr: serializeLidarrMetadataProfile }, // radarr/sonarr keys intentionally absent
 };
 ```
@@ -159,17 +205,34 @@ No "get or build" convenience exists for read-only ephemeral caches — every ca
 ### Route auth/validation/error triad (applies to all 4 new endpoints)
 
 ```ts
-if (!locals.user && !locals.authBypass) return json({ error: 'Unauthorized' } satisfies ErrorResponse, { status: 401 });
-if (!/^\d+$/.test(params.databaseId)) return json({ error: 'Invalid databaseId' } satisfies ErrorResponse, { status: 400 });
+if (!locals.user && !locals.authBypass)
+  return json({ error: 'Unauthorized' } satisfies ErrorResponse, {
+    status: 401,
+  });
+if (!/^\d+$/.test(params.databaseId))
+  return json({ error: 'Invalid databaseId' } satisfies ErrorResponse, {
+    status: 400,
+  });
 const databaseId = Number.parseInt(params.databaseId, 10);
 const cache = pcdManager.getCache(databaseId); // registered cache, existence/health gate only
-if (!cache?.isBuilt()) return json({ error: 'Database not found' } satisfies ErrorResponse, { status: 400 });
+if (!cache?.isBuilt())
+  return json({ error: 'Database not found' } satisfies ErrorResponse, {
+    status: 400,
+  });
 try {
   // "current" reads can use the registered cache directly (already fully-resolved);
   // layer-scoped reads need a fresh buildReadOnly ephemeral cache.
 } catch (error) {
-  await logger.error('...', { source: '...', meta: { databaseId, error: error instanceof Error ? error.message : String(error) } });
-  return json({ error: 'Generic sanitized message' } satisfies ErrorResponse, { status: 500 });
+  await logger.error('...', {
+    source: '...',
+    meta: {
+      databaseId,
+      error: error instanceof Error ? error.message : String(error),
+    },
+  });
+  return json({ error: 'Generic sanitized message' } satisfies ErrorResponse, {
+    status: 500,
+  });
 }
 ```
 
@@ -219,7 +282,7 @@ try {
 
 - `buildReadOnly` must build a fresh `Database`/`Kysely` per requested layer combination — there's no way to "un-apply" already-executed SQL, so comparing base-only vs base+tweaks requires two separate ephemeral builds, not one incrementally extended cache.
 - `opId` is `null` for schema/tweaks-layer ops (`parseOpId` only recognizes `pcd_ops:<id>` filepaths) — `trackHistory` is always `false` there even in real `build()`, so skipping history tracking in `buildReadOnly` loses no additional provenance for those layers.
-- `quality_profiles`/`custom_formats`/`delay_profiles` carry no arr-scoping on the profile row itself; per-arr compatibility is *computed* (via `computeProfileCompatibility` / `quality_api_mappings`), not stored — reuse `computeProfileCompatibility` from `$pcd/entities/qualityProfiles/compatibility.ts` rather than re-deriving.
+- `quality_profiles`/`custom_formats`/`delay_profiles` carry no arr-scoping on the profile row itself; per-arr compatibility is _computed_ (via `computeProfileCompatibility` / `quality_api_mappings`), not stored — reuse `computeProfileCompatibility` from `$pcd/entities/qualityProfiles/compatibility.ts` rather than re-deriving.
 - `SUPPORTED_SYNC_SECTIONS` in `mappings.ts` is module-private; only `isSyncSectionSupported`/`getUnsupportedSyncSectionReason` are exported. `metadataProfiles` is lidarr-only — liveDiff must call `isSyncSectionSupported` before `generatePreview`, else an unsupported section just silently returns `null` with no explicit "unsupported" signal.
 - The existing `*_ARRAY_KEY_STRATEGIES` constants in `sectionDiffs.ts` target **live-Arr-API field names** (e.g. `primaryAlbumTypes`), not `Portable*` field names (e.g. `PortableLidarrMetadataProfile.primaryTypes`/`secondaryTypes`/`releaseStatuses`) — a layerDiff over Portable objects needs its own strategy paths, not verbatim reuse.
 - `FieldDiffTable.svelte` renders diff values through unsanitized `marked.parse()` + `{@html}` (lines 19, 197, 251) — a real unpatched XSS vector. Do not copy; use plain `{value}` text interpolation.

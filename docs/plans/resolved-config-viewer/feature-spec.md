@@ -5,7 +5,7 @@
 The Resolved Config Viewer surfaces the fully computed PCD configuration state — the result of
 replaying schema → base → tweaks → user ops — for every managed entity, with a layer-breakdown
 toggle (base only / user overrides / resolved), cross-instance comparison, and a desired-vs-actual
-diff against live Arr state. The PCD in-memory cache (`PCDCache`) already *is* the resolved state
+diff against live Arr state. The PCD in-memory cache (`PCDCache`) already _is_ the resolved state
 and `$pcd/entities/serialize.ts` already reads it into arr-agnostic `Portable*` shapes, so the
 resolved view is a thin read surface; the live diff reuses the existing sync-preview pipeline
 (`$sync/preview/*`) and its `diffToFieldChanges()` engine verbatim. The single genuinely new server
@@ -39,9 +39,9 @@ unsanitized markdown diff pattern is copied, and fan-out load from multi-instanc
 
 ### Libraries and SDKs
 
-| Library | Version | Purpose | Installation |
-| ------- | ------- | ------- | ------------ |
-| *(none new)* | — | Diffing is hand-rolled and already exists (`$sync/preview/diff.ts`); JSON display uses existing `highlight.js` via `JsonView.svelte` | n/a |
+| Library      | Version | Purpose                                                                                                                              | Installation |
+| ------------ | ------- | ------------------------------------------------------------------------------------------------------------------------------------ | ------------ |
+| _(none new)_ | —       | Diffing is hand-rolled and already exists (`$sync/preview/diff.ts`); JSON display uses existing `highlight.js` via `JsonView.svelte` | n/a          |
 
 Decision: **no new dependencies**. `jsondiffpatch` is explicitly rejected (CVE-2026-8657 prototype
 pollution, CVE-2026-8656 XSS in its HTML formatter, supply-chain incident history). `microdiff` is
@@ -97,17 +97,17 @@ diff engine already exists in-repo.
 
 ### Edge Cases
 
-| Scenario | Expected Behavior | Notes |
-| -------- | ----------------- | ----- |
-| Cache not built / database disabled | 400 with explicit "database not ready" message | Mirrors parity endpoint convention (400, not 404) |
-| Entity absent in requested layer (e.g. user-op-created entity in base view) | 200 with `present: false` | 404 reserved for hard miss in the resolved layer |
-| No user overrides for entity | Explicit informational empty state ("resolved matches base") | Must be distinguishable from loading/error |
-| Instance unreachable during live diff | Per-instance error status; other instances still render | Sanitized reason enum, never raw `error.message` |
-| Empty live diff | Positive "in sync" state, visually distinct from "check failed" | Highest-stakes ambiguity for a debugging tool |
-| Live entity carries namespace suffix | Match via existing namespace-aware matching | Reuse `findNamespaceMatch`; read-only suffix lookup |
-| Cross-instance compare with mixed arr_type | Per-instance `compatible: false` with explicit reason | Fail fast per Cross-Arr policy |
-| Instance count above cap | 400 with clear message | Hard cap (8 instances/request) |
-| Sonarr v3 app instance (no custom formats) | Gate custom-format live/compare on app capability | Version skew inside "v3 API" |
+| Scenario                                                                    | Expected Behavior                                               | Notes                                               |
+| --------------------------------------------------------------------------- | --------------------------------------------------------------- | --------------------------------------------------- |
+| Cache not built / database disabled                                         | 400 with explicit "database not ready" message                  | Mirrors parity endpoint convention (400, not 404)   |
+| Entity absent in requested layer (e.g. user-op-created entity in base view) | 200 with `present: false`                                       | 404 reserved for hard miss in the resolved layer    |
+| No user overrides for entity                                                | Explicit informational empty state ("resolved matches base")    | Must be distinguishable from loading/error          |
+| Instance unreachable during live diff                                       | Per-instance error status; other instances still render         | Sanitized reason enum, never raw `error.message`    |
+| Empty live diff                                                             | Positive "in sync" state, visually distinct from "check failed" | Highest-stakes ambiguity for a debugging tool       |
+| Live entity carries namespace suffix                                        | Match via existing namespace-aware matching                     | Reuse `findNamespaceMatch`; read-only suffix lookup |
+| Cross-instance compare with mixed arr_type                                  | Per-instance `compatible: false` with explicit reason           | Fail fast per Cross-Arr policy                      |
+| Instance count above cap                                                    | 400 with clear message                                          | Hard cap (8 instances/request)                      |
+| Sonarr v3 app instance (no custom formats)                                  | Gate custom-format live/compare on app capability               | Version skew inside "v3 API"                        |
 
 ### Success Criteria
 
@@ -170,7 +170,7 @@ New OpenAPI wrapper schemas (in `docs/api/v1/schemas/resolved-config.yaml`):
   `layer=user`
 - `ResolvedEntityListResponse`: `{ databaseId, entityType, layer, entities[] }`
 - `ResolvedInstanceState`: `{ instanceId, instanceName, arrType, compatible, present, desired?,
-  actual?, error? }` (`error` is a sanitized reason enum, never raw message)
+actual?, error? }` (`error` is a sanitized reason enum, never raw message)
 - `CrossInstanceComparisonResponse`: `{ databaseId, entityType, name, instances[], diffs[] }`
 - `ResolvedLiveDiffResponse`: `{ databaseId, entityType, name, instanceId, arrType, changes[] }`
 
@@ -192,12 +192,12 @@ arr-specific readers.
 
 **Errors:**
 
-| Status | Condition |
-| ------ | --------- |
-| 400 | invalid databaseId, unknown entityType, missing required arrType, cache not built |
-| 401 | unauthenticated |
-| 404 | named entity absent from the resolved layer |
-| 500 | replay/read failure (logged; generic message) |
+| Status | Condition                                                                         |
+| ------ | --------------------------------------------------------------------------------- |
+| 400    | invalid databaseId, unknown entityType, missing required arrType, cache not built |
+| 401    | unauthenticated                                                                   |
+| 404    | named entity absent from the resolved layer                                       |
+| 500    | replay/read failure (logged; generic message)                                     |
 
 #### `GET /api/v1/pcd/{databaseId}/resolved/{entityType}/{name}/compare`
 
@@ -287,13 +287,13 @@ patterns, `$utils/rateLimit.ts`, `$arr/testConnectionReason.ts` (sanitized reaso
 
 ### UI Patterns
 
-| Component | Pattern | Notes |
-| --------- | ------- | ----- |
-| Layer switch | Segmented control (`ViewToggle`/`Toggle`) | Same content, different lens — not navigation |
-| Field diff | Triple-redundant indicators: color + glyph (`+ ~ - =`) + label | Extend `SyncPreviewEntityDiff` visual language |
-| Cross-instance | Table with per-instance columns (`Table`/`Badge`) | Parity-map idiom; column header shows instance name + status + last-fetched |
-| Raw view | `JsonView.svelte` | Existing highlight.js component |
-| Long payloads | Collapse unchanged fields with count | Terraform concise-diff pattern |
+| Component      | Pattern                                                        | Notes                                                                       |
+| -------------- | -------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| Layer switch   | Segmented control (`ViewToggle`/`Toggle`)                      | Same content, different lens — not navigation                               |
+| Field diff     | Triple-redundant indicators: color + glyph (`+ ~ - =`) + label | Extend `SyncPreviewEntityDiff` visual language                              |
+| Cross-instance | Table with per-instance columns (`Table`/`Badge`)              | Parity-map idiom; column header shows instance name + status + last-fetched |
+| Raw view       | `JsonView.svelte`                                              | Existing highlight.js component                                             |
+| Long payloads  | Collapse unchanged fields with count                           | Terraform concise-diff pattern                                              |
 
 ### Accessibility Requirements
 
@@ -329,17 +329,17 @@ server service, then routes, then UI; every phase independently testable.
 
 ### Technology Decisions
 
-| Decision | Recommendation | Rationale |
-| -------- | -------------- | --------- |
-| Base-only computation | Read-only layer-subset replay + diff | Matches replay semantics; op-metadata reconstruction is drift-prone |
-| Base-only cache lifetime | Build per request, close immediately | ms-scale build; memoize later only if timings warrant (KISS) |
-| Layer payload shape | Arr-agnostic `Portable*` | Published schemas; Portable Contract Fidelity |
-| Live diff | Reuse sync preview `generatePreview()` | Per-arr transforms, namespace handling, rate limiting already correct |
-| Cross-instance semantics | Compare per-instance transformed-desired; `includeLive` optional | The desired payload is what differs per instance; live drift is additive |
-| Diff engine | Existing `diffToFieldChanges` | No new dependency; `jsondiffpatch` rejected (CVEs) |
-| Diff rendering | Plain escaped text everywhere | Avoids C1 XSS trap; markdown rendering is not needed for a diff view |
-| Endpoint namespace | `/api/v1/pcd/{databaseId}/resolved/**` | Resolved state is a PCD-database property |
-| Placement | Standalone page now; embeddable panel component designed for editor reuse later | Controls scope; issue allows "page or panel" |
+| Decision                 | Recommendation                                                                  | Rationale                                                                |
+| ------------------------ | ------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| Base-only computation    | Read-only layer-subset replay + diff                                            | Matches replay semantics; op-metadata reconstruction is drift-prone      |
+| Base-only cache lifetime | Build per request, close immediately                                            | ms-scale build; memoize later only if timings warrant (KISS)             |
+| Layer payload shape      | Arr-agnostic `Portable*`                                                        | Published schemas; Portable Contract Fidelity                            |
+| Live diff                | Reuse sync preview `generatePreview()`                                          | Per-arr transforms, namespace handling, rate limiting already correct    |
+| Cross-instance semantics | Compare per-instance transformed-desired; `includeLive` optional                | The desired payload is what differs per instance; live drift is additive |
+| Diff engine              | Existing `diffToFieldChanges`                                                   | No new dependency; `jsondiffpatch` rejected (CVEs)                       |
+| Diff rendering           | Plain escaped text everywhere                                                   | Avoids C1 XSS trap; markdown rendering is not needed for a diff view     |
+| Endpoint namespace       | `/api/v1/pcd/{databaseId}/resolved/**`                                          | Resolved state is a PCD-database property                                |
+| Placement                | Standalone page now; embeddable panel component designed for editor reuse later | Controls scope; issue allows "page or panel"                             |
 
 ### Quick Wins
 
@@ -359,15 +359,15 @@ server service, then routes, then UI; every phase independently testable.
 
 ### Technical Risks
 
-| Risk | Likelihood | Impact | Mitigation |
-| ---- | ---------- | ------ | ---------- |
-| Base-only build reuses mutating path and corrupts `pcd_ops`/history | Medium | High | `buildReadOnly` skips value guards/history/state mutation; test asserts zero writes; never registered in registry |
-| Layer view disagrees with sync desired state | Medium | High | Same serializers/transformers for both; equivalence test |
-| Cross-Arr semantic drift (wrong payload for arr_type) | Medium | High | Canonical `isArrAppType` validation; `isSyncSectionSupported` gating; per-arr transformers only; per-arr tests |
-| Namespace suffix mismatch in live diff | Medium | Medium | Reuse `findNamespaceMatch`; read-only suffix lookup (no `getOrCreate` mutation) |
-| Fan-out load on home-server Arr instances | Medium | Medium | Instance cap (8), per-instance preview rate limit, per-user request window |
-| BigInt serialization failure (cache opened `int64: true`) | Low | Medium | JSON replacer coercing BigInt before `json()` |
-| Scope creep across 4 sub-features | High | Medium | Phased plan; UI kept to one page + shared components |
+| Risk                                                                | Likelihood | Impact | Mitigation                                                                                                        |
+| ------------------------------------------------------------------- | ---------- | ------ | ----------------------------------------------------------------------------------------------------------------- |
+| Base-only build reuses mutating path and corrupts `pcd_ops`/history | Medium     | High   | `buildReadOnly` skips value guards/history/state mutation; test asserts zero writes; never registered in registry |
+| Layer view disagrees with sync desired state                        | Medium     | High   | Same serializers/transformers for both; equivalence test                                                          |
+| Cross-Arr semantic drift (wrong payload for arr_type)               | Medium     | High   | Canonical `isArrAppType` validation; `isSyncSectionSupported` gating; per-arr transformers only; per-arr tests    |
+| Namespace suffix mismatch in live diff                              | Medium     | Medium | Reuse `findNamespaceMatch`; read-only suffix lookup (no `getOrCreate` mutation)                                   |
+| Fan-out load on home-server Arr instances                           | Medium     | Medium | Instance cap (8), per-instance preview rate limit, per-user request window                                        |
+| BigInt serialization failure (cache opened `int64: true`)           | Low        | Medium | JSON replacer coercing BigInt before `json()`                                                                     |
+| Scope creep across 4 sub-features                                   | High       | Medium | Phased plan; UI kept to one page + shared components                                                              |
 
 ### Integration Challenges
 
@@ -380,26 +380,26 @@ server service, then routes, then UI; every phase independently testable.
 
 #### Critical — Hard Stops
 
-| Finding | Risk | Required Mitigation |
-| ------- | ---- | ------------------- |
+| Finding                                                                                                                                                                                    | Risk                                                  | Required Mitigation                                                                       |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------- | ----------------------------------------------------------------------------------------- |
 | C1: existing diff components render markdown via unsanitized `marked.parse()` + `{@html}`; copying that pattern into new diff/tree views = stored XSS from PCD repos or live Arr responses | Session takeover via crafted description/notes fields | New components render all values as plain escaped text; no `{@html}`; no `marked.*` calls |
 
 #### Warnings — Must Address
 
-| Finding | Risk | Mitigation | Alternatives |
-| ------- | ---- | ---------- | ------------ |
-| W1: SSRF guard `assertSafeArrUrl` not wired into `getArrInstanceClient()` | Fan-out amplifies stored-URL SSRF probing | Centralize the guard in `getArrInstanceClient()` | Feature-local guard + follow-up issue |
-| W2: raw `error.message` in JSON error bodies leaks LAN topology | Internal host/port disclosure | Sanitized reason enum (extend `testConnectionReason.ts` pattern); full detail to server logs | Per-instance status enums |
-| W3: no multi-instance fan-out bound exists | Self-inflicted DoS on Arr instances | `resolved/limits.ts`: instance cap (8) + `$utils/rateLimit.ts` window + existing per-instance preview limiter | Configurable cap later |
-| W4: inconsistent arr_type validation across call sites | Wrong-app semantics disclosure | Canonical `isArrAppType()` at top of every handler; entity↔arr_type ownership validated | — |
-| W5: ad-hoc instance queries could leak `api_key` | Credential exposure | Only `arrInstancesQueries` accessors; extend `arrCredentialRedactionRoutes` test to new routes | — |
+| Finding                                                                   | Risk                                      | Mitigation                                                                                                    | Alternatives                          |
+| ------------------------------------------------------------------------- | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------- | ------------------------------------- |
+| W1: SSRF guard `assertSafeArrUrl` not wired into `getArrInstanceClient()` | Fan-out amplifies stored-URL SSRF probing | Centralize the guard in `getArrInstanceClient()`                                                              | Feature-local guard + follow-up issue |
+| W2: raw `error.message` in JSON error bodies leaks LAN topology           | Internal host/port disclosure             | Sanitized reason enum (extend `testConnectionReason.ts` pattern); full detail to server logs                  | Per-instance status enums             |
+| W3: no multi-instance fan-out bound exists                                | Self-inflicted DoS on Arr instances       | `resolved/limits.ts`: instance cap (8) + `$utils/rateLimit.ts` window + existing per-instance preview limiter | Configurable cap later                |
+| W4: inconsistent arr_type validation across call sites                    | Wrong-app semantics disclosure            | Canonical `isArrAppType()` at top of every handler; entity↔arr_type ownership validated                       | —                                     |
+| W5: ad-hoc instance queries could leak `api_key`                          | Credential exposure                       | Only `arrInstancesQueries` accessors; extend `arrCredentialRedactionRoutes` test to new routes                | —                                     |
 
 #### Advisories — Best Practices
 
 - A2 (no CORS): add regression test asserting no CORS headers on new routes (deferral not needed —
   test is trivial).
 - A4 (cache keying): if live-diff caching is ever added, key by `(instanceId, entityType, entity,
-  layer)` (defer: no caching in v1).
+layer)` (defer: no caching in v1).
 - A5 (pre-existing markdown gap in `FieldDiffTable.svelte`): out of scope; file a follow-up issue.
 
 ## Task Breakdown Preview

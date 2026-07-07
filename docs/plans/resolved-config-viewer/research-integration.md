@@ -157,6 +157,7 @@ CREATE TABLE pcd_ops (
   FOREIGN KEY (superseded_by_op_id) REFERENCES pcd_ops(id)
 );
 ```
+
 Indexes: `idx_pcd_ops_apply_order (database_id, origin, state, sequence, id)`,
 unique `idx_pcd_ops_base_filename (database_id, origin, filename) WHERE origin='base' AND filename IS NOT NULL`,
 `idx_pcd_ops_hash (database_id, origin, content_hash)`.
@@ -193,6 +194,7 @@ CREATE TABLE pcd_op_history (
   FOREIGN KEY (database_id) REFERENCES database_instances(id) ON DELETE CASCADE
 );
 ```
+
 Indexes: `idx_pcd_op_history_status (database_id, status, applied_at)`,
 `idx_pcd_op_history_op (op_id, applied_at)`.
 
@@ -205,6 +207,7 @@ per op_id" query), `listLatestConflictsByDatabase` (wraps the above with
 ### `PCDCache.build()` write/mutation surface (confirms spec's core risk)
 
 `packages/praxrr-app/src/lib/server/pcd/database/cache.ts` — `build()`:
+
 1. Reads `databaseInstancesQueries.getById()` for `conflict_strategy`.
 2. Reads `pcdOpsQueries.listByDatabaseAndOrigin(..., 'user', { states: ['published'] })`.
 3. Reads `pcdOpHistoryQueries.listLatestByDatabaseWithOps(..., ['conflicted','conflicted_pending'])`
@@ -311,7 +314,10 @@ In-memory Kysely schema (34 tables) exposed via `cache.kb`: `custom_formats`,
 
 - Generic limiter (`packages/praxrr-app/src/lib/server/utils/rateLimit.ts`):
   ```ts
-  export function registerRateLimitAttempt(key: string, opts?: { windowMs?: number; maxRequests?: number }): boolean
+  export function registerRateLimitAttempt(
+    key: string,
+    opts?: { windowMs?: number; maxRequests?: number }
+  ): boolean;
   ```
   Defaults: `DEFAULT_RATE_LIMIT_WINDOW_MS = 30_000`, `DEFAULT_RATE_LIMIT_MAX_REQUESTS = 8`.
   In-memory `Map<string, {windowStart, count}>`, capped at `MAX_TRACKED_KEYS = 10_000`
@@ -320,7 +326,10 @@ In-memory Kysely schema (34 tables) exposed via `cache.kb`: `custom_formats`,
   `resetRateLimitForTests()` exported for test cleanup.
 - Preview-specific limiter (`packages/praxrr-app/src/lib/server/sync/preview/limits.ts`):
   ```ts
-  export function registerPreviewCreateAttempt(instanceId: number, nowMs: number): boolean
+  export function registerPreviewCreateAttempt(
+    instanceId: number,
+    nowMs: number
+  ): boolean;
   ```
   Separate sliding-window implementation (own `Map<number, {timestamps:number[]}>`,
   filter-based pruning, **not** built on top of `registerRateLimitAttempt`).
@@ -340,6 +349,7 @@ In-memory Kysely schema (34 tables) exposed via `cache.kb`: `custom_formats`,
 ### Sync preview orchestrator
 
 `packages/praxrr-app/src/lib/server/sync/preview/orchestrator.ts`:
+
 ```ts
 export interface GeneratePreviewInput {
   instance: ArrInstance;
@@ -348,18 +358,26 @@ export interface GeneratePreviewInput {
   nowMs?: number;
 }
 export interface GeneratePreviewResult {
-  instanceId: number; instanceName: string; arrType: SyncPreviewArrType;
-  status: SyncPreviewStatus; createdAtMs: number;
-  sections: SectionType[]; sectionOutcomes: SyncPreviewSectionOutcome[];
+  instanceId: number;
+  instanceName: string;
+  arrType: SyncPreviewArrType;
+  status: SyncPreviewStatus;
+  createdAtMs: number;
+  sections: SectionType[];
+  sectionOutcomes: SyncPreviewSectionOutcome[];
   qualityProfiles: QualityProfilesPreview | null;
   delayProfiles: DelayProfilesPreview | null;
   mediaManagement: MediaManagementPreview | null;
   metadataProfiles: MetadataProfilesPreview | null;
   summary: SyncPreviewSummary;
-  errors: ReadonlyArray<string>; error?: string;
+  errors: ReadonlyArray<string>;
+  error?: string;
 }
-export async function generatePreview(input: GeneratePreviewInput): Promise<GeneratePreviewResult>
+export async function generatePreview(
+  input: GeneratePreviewInput
+): Promise<GeneratePreviewResult>;
 ```
+
 - Resolves `arrType` via `toSyncArrType()` (throws on unsupported type — no
   sibling-app fallback, matches Cross-Arr policy).
 - `resolveSections()`: if no `sections` requested, runs every section in
@@ -395,6 +413,7 @@ export interface EntityChange {
 }
 export type SyncPreviewArrType = Exclude<ArrType, 'all' | 'chaptarr'>;
 ```
+
 `SyncPreviewResult` wraps `id, instanceId, instanceName, arrType, createdAt,
 expiresAt, status, error?, sections, sectionOutcomes, qualityProfiles,
 delayProfiles, mediaManagement, metadataProfiles, summary`. Note
@@ -408,7 +427,11 @@ should keep these two vocabularies distinct and not conflate them.
 ### `diffToFieldChanges()` (`sync/preview/diff.ts`)
 
 ```ts
-export function diffToFieldChanges(current: unknown, desired: unknown, options: DiffOptions = {}): FieldChange[]
+export function diffToFieldChanges(
+  current: unknown,
+  desired: unknown,
+  options: DiffOptions = {}
+): FieldChange[];
 export interface DiffOptions {
   readonly ignoredFields?: readonly string[];
   readonly arrayKeyStrategies?: readonly PreviewArrayKeyStrategy[];
@@ -419,6 +442,7 @@ export interface PreviewArrayKeyStrategy {
   readonly selectKey: (item: Record<string, unknown>) => string;
 }
 ```
+
 Default ignored fields: `id, links, created, updated, createdAt, updatedAt,
 revision, lastExecution, lastExecutionTime, lastModified, dateAdded, dateUpdated`.
 `current` = existing/actual, `desired` = target — matches the spec's
@@ -445,19 +469,30 @@ diff.
 ### `isSyncSectionSupported` / `SUPPORTED_SYNC_SECTIONS` — **correction**
 
 `packages/praxrr-app/src/lib/server/sync/mappings.ts`:
+
 ```ts
 export type SyncArrType = Exclude<ArrType, 'all'>;
-export const SYNC_SECTION_ORDER: SectionType[] = [...BASE_SYNC_SECTION_ORDER, 'metadataProfiles'];
+export const SYNC_SECTION_ORDER: SectionType[] = [
+  ...BASE_SYNC_SECTION_ORDER,
+  'metadataProfiles',
+];
 const SUPPORTED_SYNC_SECTIONS: Record<SyncArrType, readonly SectionType[]> = {
-  radarr: BASE_SYNC_SECTION_ORDER,   // qualityProfiles, delayProfiles, mediaManagement
+  radarr: BASE_SYNC_SECTION_ORDER, // qualityProfiles, delayProfiles, mediaManagement
   sonarr: BASE_SYNC_SECTION_ORDER,
-  lidarr: SYNC_SECTION_ORDER,        // includes metadataProfiles
+  lidarr: SYNC_SECTION_ORDER, // includes metadataProfiles
 };
-export function isSyncSectionSupported(arrType: SyncArrType, section: SectionType): boolean {
+export function isSyncSectionSupported(
+  arrType: SyncArrType,
+  section: SectionType
+): boolean {
   return SUPPORTED_SYNC_SECTIONS[arrType].includes(section);
 }
-export function getUnsupportedSyncSectionReason(arrType: SyncArrType, section: SectionType): string | null
+export function getUnsupportedSyncSectionReason(
+  arrType: SyncArrType,
+  section: SectionType
+): string | null;
 ```
+
 **`SUPPORTED_SYNC_SECTIONS` itself is module-private (no `export`)** — only
 `isSyncSectionSupported()`, `SYNC_SECTION_ORDER`, and
 `getUnsupportedSyncSectionReason()` are exported. The feature spec lists
@@ -469,11 +504,13 @@ confirming the spec's cross-Arr gating requirement.
 ### `isArrAppType` location
 
 `packages/praxrr-app/src/lib/shared/arr/capabilities.ts:275`:
+
 ```ts
 export function isArrAppType(value: string): value is ArrAppType {
   return Object.hasOwn(ARR_APPS, value);
 }
 ```
+
 Also in this file: `ARR_APP_TYPES` (`:243`, re-exported from
 `$shared/pcd/types.ts`'s `ARR_APP_TYPES`), `getArrAppMetadata`,
 `getArrCapabilities`, `supportsArrWorkflow`, `supportsArrSyncSurface`,
@@ -485,6 +522,7 @@ resolved-config should use for `arrType` allowlist validation and any
 ### `getDesiredTo()` and value-guard op-metadata helpers
 
 `packages/praxrr-app/src/lib/server/pcd/conflicts/overrideUtils.ts`:
+
 ```ts
 export function isFromTo(value: unknown): value is { to: unknown }
 export function getDesiredTo<T = unknown>(value: unknown): T | undefined
@@ -493,6 +531,7 @@ export function normalizeOrderedItems(items: unknown): Array<{...}>
 export function orderedItemsEqual(a: unknown, b: unknown): boolean
 export function valuesEqual(expected: unknown, actual: unknown): boolean
 ```
+
 `StoredOpMetadata` shape includes `changed_fields?: string[]` — this is the field
 the spec's Business Rule 4 explicitly says NOT to rely on alone for "user
 overrides" reconstruction (value guards can drop ops silently, leaving

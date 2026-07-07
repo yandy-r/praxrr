@@ -53,7 +53,7 @@ UI's data model, since these are unversioned, source-of-truth-is-the-code APIs.
 5. **Comparable tools converge on the same architecture pattern**: fetch full live state → compute
    local "desired" state → structural diff (not raw JSON diff) → render categorized results
    (create/update/no-op/delete) → optional preview/dry-run gate before write. ArgoCD's server-side
-   diff and Flux's dry-run diff both emphasize *normalization before diffing* (defaults, ordering,
+   diff and Flux's dry-run diff both emphasize _normalization before diffing_ (defaults, ordering,
    computed fields) to avoid false-positive drift — directly relevant to Radarr/Sonarr since
    arrays like `items`/`formatItems`/`specifications` are order-sensitive in the API but should
    often be compared as sets. **Confidence: High** (ArgoCD/Flux official docs; Recyclarr/Profilarr
@@ -90,7 +90,7 @@ UI's data model, since these are unversioned, source-of-truth-is-the-code APIs.
     `getSystemStatus()`.
 - **Rate limiting**: Radarr/Sonarr do **not** rate-limit their own local REST API by API key —
   there is no documented 429/backoff contract for `/api/v3/*`. The only rate-limiting concerns in
-  the ecosystem are for *downstream indexer* calls (Torznab/Jackett), which is unrelated to this
+  the ecosystem are for _downstream indexer_ calls (Torznab/Jackett), which is unrelated to this
   feature. Practical implication: self-imposed client-side concurrency limiting is a courtesy
   (avoid saturating a small home-server instance with N parallel fan-out requests), not a
   contract requirement. **Confidence: Medium** (no rate-limit docs exist to confirm; inferred from
@@ -140,12 +140,12 @@ option) for transient network failures during fan-out compare-all-instances oper
 
 ### JSON/Object Diff Libraries (Deno + SvelteKit compatible)
 
-| Library | Size | Deno support | Patch/revert | Notes |
-|---|---|---|---|---|
-| [`microdiff`](https://github.com/AsyncBanana/microdiff) | <1kb min+gzip | Native (`deno.land/x/microdiff`, npm, JSR-installable via npm specifier) | No | Fastest in every published benchmark (up to ~4x faster than `deep-diff`, ~2x faster than `deep-object-diff`); output `{type: CREATE\|REMOVE\|CHANGE, path, value, oldValue}[]`; `cyclesFix` option (disable for parsed-JSON-only inputs, which is Praxrr's use case, for a further speed win); MIT license, v1.5.0 (Dec 2024). |
-| [`jsondiffpatch`](https://github.com/benjamine/jsondiffpatch) | ~15-20kb | Works via npm specifier (`npm:jsondiffpatch`) | Yes (diff/patch/unpatch/reverse) | Array diffing with `objectHash` for move-detection; ships an HTML/visual formatter (`formatters.html`) that could shortcut a "resolved vs base" visual diff UI; heavier and more configuration surface. |
-| [`deep-object-diff`](https://github.com/mattphillips/deep-object-diff) | small, higher npm downloads than microdiff | Works via npm specifier | No | Middle ground; `detailedDiff()` returns `{added, deleted, updated}` trees rather than a flat path list — arguably a more natural shape for a "layer breakdown" (base/user/resolved) UI than microdiff's flat array, at the cost of raw speed. |
-| [`diff`](https://www.npmjs.com/package/diff) (jsdiff) | small | Works | Line/text diff only | Not suited to structured JSON diffing (2000%+ slower than microdiff in benchmarks when abused for object diffing) — only relevant if Praxrr wants raw-text/JSON-string diffs as a secondary view. |
+| Library                                                                | Size                                       | Deno support                                                             | Patch/revert                     | Notes                                                                                                                                                                                                                                                                                                                          |
+| ---------------------------------------------------------------------- | ------------------------------------------ | ------------------------------------------------------------------------ | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| [`microdiff`](https://github.com/AsyncBanana/microdiff)                | <1kb min+gzip                              | Native (`deno.land/x/microdiff`, npm, JSR-installable via npm specifier) | No                               | Fastest in every published benchmark (up to ~4x faster than `deep-diff`, ~2x faster than `deep-object-diff`); output `{type: CREATE\|REMOVE\|CHANGE, path, value, oldValue}[]`; `cyclesFix` option (disable for parsed-JSON-only inputs, which is Praxrr's use case, for a further speed win); MIT license, v1.5.0 (Dec 2024). |
+| [`jsondiffpatch`](https://github.com/benjamine/jsondiffpatch)          | ~15-20kb                                   | Works via npm specifier (`npm:jsondiffpatch`)                            | Yes (diff/patch/unpatch/reverse) | Array diffing with `objectHash` for move-detection; ships an HTML/visual formatter (`formatters.html`) that could shortcut a "resolved vs base" visual diff UI; heavier and more configuration surface.                                                                                                                        |
+| [`deep-object-diff`](https://github.com/mattphillips/deep-object-diff) | small, higher npm downloads than microdiff | Works via npm specifier                                                  | No                               | Middle ground; `detailedDiff()` returns `{added, deleted, updated}` trees rather than a flat path list — arguably a more natural shape for a "layer breakdown" (base/user/resolved) UI than microdiff's flat array, at the cost of raw speed.                                                                                  |
+| [`diff`](https://www.npmjs.com/package/diff) (jsdiff)                  | small                                      | Works                                                                    | Line/text diff only              | Not suited to structured JSON diffing (2000%+ slower than microdiff in benchmarks when abused for object diffing) — only relevant if Praxrr wants raw-text/JSON-string diffs as a secondary view.                                                                                                                              |
 
 **Recommendation**: `microdiff` for the core diff computation (fast, tiny, Deno-native, and its
 `path`-based output composes cleanly with Praxrr's existing PCD ops/path conventions), with a thin
@@ -162,12 +162,12 @@ Sources: [microdiff GitHub](https://github.com/AsyncBanana/microdiff),
 
 ### Svelte Tree/Diff View Rendering
 
-| Library | Svelte 5 | Diff-aware | Notes |
-|---|---|---|---|
+| Library                                                                    | Svelte 5                                       | Diff-aware                                                                                                                                                  | Notes                                                                                                                                                                                                                                                                                                                                                                  |
+| -------------------------------------------------------------------------- | ---------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | [`svelte-tree-view` v2](https://github.com/TeemuKoivisto/svelte-tree-view) | Yes (v2 rewritten for Svelte 5 runes/snippets) | Yes — explicitly documents accepting diff data (e.g. `data={contentDiff}`) with a custom `valueComponent` for rendering per-node diff state, base16 theming | Best fit if the "layer breakdown toggle" needs a real interactive tree rather than a flat table. **Caveat**: Praxrr's CLAUDE.md convention is "Svelte 5, no runes" — v2 of this library is built around runes/snippets, so it needs a compatibility check before adoption; may require using it in "compat mode" or building a lighter bespoke tree component instead. |
-| [`svelte-json-view-lite`](https://jsonview.svelte.page/) | Yes (Svelte-5-native, zero deps) | No (view-only, no diff highlighting) | Good candidate for the plain "resolved state" viewer (no diff), simpler adoption risk than svelte-tree-view v2. |
-| [`git-diff-view`](https://mrwangjusttodo.github.io/git-diff-view/) | Yes (React/Vue/Solid/Svelte) | Yes — GitHub-style unified/split diff | Best fit if "diff against live Arr instance" should look like a code review diff rather than a tree; heavier dependency, multi-framework core.
-| [`svelte-json-tree`](https://github.com/tanhauhau/svelte-json-tree) | Predates Svelte 5 | No | Used in the Svelte REPL itself; lower risk historically but not confirmed Svelte-5-native. |
+| [`svelte-json-view-lite`](https://jsonview.svelte.page/)                   | Yes (Svelte-5-native, zero deps)               | No (view-only, no diff highlighting)                                                                                                                        | Good candidate for the plain "resolved state" viewer (no diff), simpler adoption risk than svelte-tree-view v2.                                                                                                                                                                                                                                                        |
+| [`git-diff-view`](https://mrwangjusttodo.github.io/git-diff-view/)         | Yes (React/Vue/Solid/Svelte)                   | Yes — GitHub-style unified/split diff                                                                                                                       | Best fit if "diff against live Arr instance" should look like a code review diff rather than a tree; heavier dependency, multi-framework core.                                                                                                                                                                                                                         |
+| [`svelte-json-tree`](https://github.com/tanhauhau/svelte-json-tree)        | Predates Svelte 5                              | No                                                                                                                                                          | Used in the Svelte REPL itself; lower risk historically but not confirmed Svelte-5-native.                                                                                                                                                                                                                                                                             |
 
 **Recommendation**: Given the "no runes" convention, a bespoke lightweight tree/table component
 built on top of `microdiff`'s flat path output (grouped by top-level field, rendered as
@@ -187,7 +187,7 @@ config" concept: it separates **`configuration`** (unevaluated, resolved express
 to Praxrr's "base ops + user ops" resolved definition), **`planned_values`** (a flattened
 values-only view — analogous to a "resolved" tab), and **`resource_drift`** (changes detected
 between prior recorded state and live infrastructure — directly analogous to bullet #4, "diff
-against live Arr instance"). Terraform's `resource_drift` uses the *same* diff structure as
+against live Arr instance"). Terraform's `resource_drift` uses the _same_ diff structure as
 `resource_changes` (before/after/before_sensitive/after_sensitive), which is a useful modeling
 idea: reuse one diff shape for both "user ops vs base" and "resolved vs live Arr" rather than
 building two bespoke diff renderers.
@@ -201,6 +201,7 @@ drift from defaulted/computed fields and object/array ordering
 ([diff strategies docs](https://argo-cd.readthedocs.io/en/stable/user-guide/diff-strategies/),
 [diffing customization](https://argo-cd.readthedocs.io/en/stable/user-guide/diffing/)). Two
 takeaways directly applicable to Radarr/Sonarr:
+
 1. **Normalize before diff.** Arr quality-profile `items[]`/`formatItems[]` and custom-format
    `specifications[]` arrays should be compared as ID-keyed sets (or hashed by stable identity),
    not by array index/order — otherwise a server-side reorder (which the Arr UI can produce) will
@@ -267,6 +268,7 @@ Recyclarr/Configarr/Profilarr already do).
 
 For "cross-instance comparison of resolved state for the same profile across instances," the
 established Deno/TS pattern is bounded concurrency, not raw `Promise.all`:
+
 - [`p_limit` for Deno](https://deno.land/x/p_limit) — direct Deno port of the npm `p-limit`
   API; wrap each per-instance fetch in `limit(() => client.getQualityProfiles())` and cap
   concurrent in-flight instance calls.
@@ -397,13 +399,14 @@ public class QualityProfileResource : RestResource
   ]
 }
 ```
+
 `value: 7` for `SourceSpecification` means different things in Radarr vs. Sonarr — never diff or
 copy this field cross-app without an explicit `arr_type`-scoped mapping table.
 
 ### `microdiff` usage sketch for a layered resolved-config diff
 
 ```ts
-import diff from "https://deno.land/x/microdiff@v1.5.0/index.ts";
+import diff from 'https://deno.land/x/microdiff@v1.5.0/index.ts';
 // or, with npm specifiers in deno.json: import diff from "npm:microdiff";
 
 type Layered<T> = { base: T; resolved: T; live?: T };
@@ -434,14 +437,14 @@ function byId<T extends { id: number }>(items: T[]): T[] {
 ### Bounded fan-out across instances (Deno)
 
 ```ts
-import pLimit from "https://deno.land/x/p_limit/mod.ts";
+import pLimit from 'https://deno.land/x/p_limit/mod.ts';
 
 const limit = pLimit(3); // cap concurrent in-flight instance calls
 
 const results = await Promise.allSettled(
   instances.map((instance) =>
     limit(() => arrClientFor(instance).getQualityProfiles())
-  ),
+  )
 );
 ```
 

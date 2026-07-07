@@ -69,7 +69,7 @@ below (rate-limiter signature, and DEFAULT/empty array-key-strategy behavior nua
   called today from `routes/api/v1/setup/test-connection/+server.ts#POST` and
   `routes/arr/test/+server.ts#POST` — verifies spec finding W1 exactly.
 - `packages/praxrr-app/src/lib/server/utils/arr/testConnectionReason.ts` — `TestConnectionReason =
-  'unreachable' | 'unauthorized' | 'invalid_response' | 'timeout'`; `toFailureReason()`, `reasonFromStatus()`.
+'unreachable' | 'unauthorized' | 'invalid_response' | 'timeout'`; `toFailureReason()`, `reasonFromStatus()`.
 - `packages/praxrr-app/src/lib/shared/arr/capabilities.ts` — `isArrAppType(value): value is ArrAppType`,
   `ARR_APP_TYPES`, `supportsFeature()`.
 - `packages/praxrr-app/src/lib/server/navigation/registry.ts` — `NAV_REGISTRY: ArrCapabilityAwareNavItem[]`,
@@ -122,7 +122,7 @@ below (rate-limiter signature, and DEFAULT/empty array-key-strategy behavior nua
    read-only/layer-subset build should execute ops but never touch `pcdOpsQueries.update`,
    `pcdOpHistoryQueries.create`, or the value-guard evaluators.
 7. Sets `this.built = true`, returns `stats`; on any thrown error, calls
-   `disableDatabaseInstance(this.databaseInstanceId)` (side effect on the *real* instance row — another
+   `disableDatabaseInstance(this.databaseInstanceId)` (side effect on the _real_ instance row — another
    reason `buildReadOnly` must not share this catch path for ephemeral/base-only builds) and `this.close()`.
 8. Back in `compile()`: `setCache(databaseInstanceId, cache)` registers the new cache and closes the
    old one; then `autoResolveOverrideConflicts()` runs post-swap (guarded by `autoOverrideLocks`).
@@ -173,7 +173,7 @@ the spec's Decision #2 assumes.
   `getArrInstanceClient()` protects `generatePreview()`-based live diff/compare for free since
   `orchestrator.ts` already routes all Arr client creation through that function.
 - **Rate limiting for `/compare`**: `sync/preview/limits.ts#registerPreviewCreateAttempt(instanceId, nowMs)`
-  is per-instance/6-per-60s and reusable for the `/diff` endpoint per spec; a *new* `resolved/limits.ts`
+  is per-instance/6-per-60s and reusable for the `/diff` endpoint per spec; a _new_ `resolved/limits.ts`
   is still needed for the instance-count cap (8) since no existing helper caps request-level fan-out —
   `utils/rateLimit.ts#registerRateLimitAttempt(key, opts?)` is the generic building block (window
   30s/max 8 by default, both overridable) for a per-user/per-request window if desired.

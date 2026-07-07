@@ -12,7 +12,7 @@ require either a second ephemeral cache build (base+schema+tweaks only, no user 
 diffing; (2) "diff against live Arr" and "cross-instance comparison" should reuse the sync-preview diff
 engine (`$sync/preview/*`) rather than inventing a new comparator, since it already produces
 current-vs-desired `EntityChange`/`FieldChange` structures with namespace-aware matching; (3) cross-instance
-comparison must account for instances pointing at *different* PCD databases (sync selections are
+comparison must account for instances pointing at _different_ PCD databases (sync selections are
 per-instance-per-section `{ databaseId, profileName }` pairs, not a single global database).
 
 ## User Stories
@@ -185,7 +185,7 @@ per-instance-per-section `{ databaseId, profileName }` pairs, not a single globa
   rendering.
 - **PCD Op History** (`pcd_op_history`) — per-cache-build execution record per op: `status` (applied/
   skipped/conflicted/conflicted_pending/error/dropped/superseded), `conflict_reason`, `rowcount`. This is
-  the audit trail explaining *why* resolved state ended up the way it did.
+  the audit trail explaining _why_ resolved state ended up the way it did.
 - **PCD Cache** (`PCDCache`, in-memory SQLite) — the resolved state itself; one per enabled database
   instance, held in a registry (`pcd/database/registry.ts`).
 - **Managed entities**: quality profiles, custom formats, delay profiles, media management (naming,
@@ -195,7 +195,7 @@ per-instance-per-section `{ databaseId, profileName }` pairs, not a single globa
 - **Arr Instance** (`arr_instances`) — a configured Radarr/Sonarr/Lidarr target; independent of any single
   PCD database.
 - **Sync selection** (`arrSync.ts`: `ProfileSelection`, `DelayProfilesSyncData`, `MediaManagementSyncData`,
-  `MetadataProfilesSyncData`) — per-instance, per-section binding of *which* PCD database and *which*
+  `MetadataProfilesSyncData`) — per-instance, per-section binding of _which_ PCD database and _which_
   named profile/config is the "desired" source for that instance. This is the join point cross-instance
   comparison must traverse.
 
@@ -209,7 +209,7 @@ per-instance-per-section `{ databaseId, profileName }` pairs, not a single globa
   guard blocked) / `error` (hard failure) / `dropped` (aligned) / `superseded` — resolved value is only
   "final" once no `conflicted_pending` history exists for the entity's ops.
 - Cache: `not built → built` (on database enable/pull/sync) → `built → rebuilt` on every op mutation
-  (create/update/delete write pipeline recompiles). The resolved viewer must always read the *current*
+  (create/update/delete write pipeline recompiles). The resolved viewer must always read the _current_
   cache, never a stale snapshot, unless explicitly viewing a historical snapshot (see adjacent
   `pcd-state-snapshot` plan — a different, complementary feature for point-in-time rewind, not currently
   overlapping this feature's live-resolved-state scope).
@@ -230,7 +230,7 @@ per-instance-per-section `{ databaseId, profileName }` pairs, not a single globa
   detail, and conversely, any entity in "conflicted_pending" state that the resolved viewer shows should
   link back here.
 - **Changes page** (`/databases/[id]/changes`, `pcd/ops/draftChanges.ts`, `pcd/ops/exporter.ts`) already
-  renders per-entity field-level diffs for *draft* ops (before commit/push) with a rich diff-row model
+  renders per-entity field-level diffs for _draft_ ops (before commit/push) with a rich diff-row model
   (`DraftEntitySectionRow`: field/quality_definition_entries/conditions/tests kinds). This is a strong
   existing UI pattern to imitate/reuse components from for the "layer breakdown" (user overrides) view.
 - **Parity Map** (PR #14, `routes/parity-map/`, `/api/v1/compatibility/parity`,
@@ -240,7 +240,7 @@ per-instance-per-section `{ databaseId, profileName }` pairs, not a single globa
   unbuilt cache, no sibling-Arr fallback). Follow this same API shape/auth-gating convention
   (`locals.user || locals.authBypass` check) for any new resolved-config API endpoints.
 - **Score Simulator** (`routes/score-simulator/[databaseId]/`, `routes/quality-profiles/entity-testing/
-  [databaseId]/`) is existing precedent for a dedicated computed/simulated-view page that reads from the
+[databaseId]/`) is existing precedent for a dedicated computed/simulated-view page that reads from the
   built cache and renders derived results distinct from the raw editable entity — a UI/IA precedent for
   where a standalone "Resolved Config Viewer" page could live in navigation.
 - **Sync selection queries** (`$db/queries/arrSync.ts`, `$db/queries/databaseInstances.ts`,
@@ -278,10 +278,10 @@ per-instance-per-section `{ databaseId, profileName }` pairs, not a single globa
 2. **Where does this live?** Standalone page (`/databases/[id]/resolved` or similar) vs. panel embedded in
    each entity editor (per issue's "could be a page or a panel" ambiguity) — affects nav registry changes
    (`server/navigation/`) and whether it's single-entity-scoped or database-wide from the start.
-3. **Should "diff against live" call the *existing* sync-preview generation path directly**, or does it
+3. **Should "diff against live" call the _existing_ sync-preview generation path directly**, or does it
    need a read-only/no-side-effect variant (preview generation already appears read-only/no side effects
    at the Arr-instance level, but confirm no preview-store persistence side effects — `sync/preview/
-   store.ts` — are undesirable for a pure "inspect" use case)?
+store.ts` — are undesirable for a pure "inspect" use case)?
 4. **`orphaned` op state semantics**: no code path found that sets `pcd_ops.state = 'orphaned'` in the
    files reviewed — confirm where/when this state is actually assigned before deciding how the resolved
    viewer should represent orphaned entities.

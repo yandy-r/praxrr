@@ -20,13 +20,17 @@ Verified shape, in order:
 3. Auth gate is the **first statement** in the handler:
    ```ts
    if (!locals.user && !locals.authBypass) {
-     return json({ error: 'Unauthorized' } satisfies ErrorResponse, { status: 401 });
+     return json({ error: 'Unauthorized' } satisfies ErrorResponse, {
+       status: 401,
+     });
    }
    ```
 4. Param validation with strict digit regex, not `parseInt` alone:
    ```ts
    if (!/^\d+$/.test(databaseIdParam)) {
-     return json({ error: 'Invalid databaseId' } satisfies ErrorResponse, { status: 400 });
+     return json({ error: 'Invalid databaseId' } satisfies ErrorResponse, {
+       status: 400,
+     });
    }
    ```
    (Rejects `"1e5"`, `"1abc"`, `" 1"` — `Number.parseInt` alone would silently accept these.)
@@ -35,7 +39,9 @@ Verified shape, in order:
    ```ts
    const cache = pcdManager.getCache(databaseId);
    if (!cache?.isBuilt()) {
-     return json({ error: 'Database not found' } satisfies ErrorResponse, { status: 400 });
+     return json({ error: 'Database not found' } satisfies ErrorResponse, {
+       status: 400,
+     });
    }
    ```
 6. try/catch around the actual compute, logging via `$logger/logger.ts` with `source` +
@@ -262,7 +268,7 @@ Confirmed throughout `parity-map/*.svelte` and `SyncPreviewEntityDiff.svelte`:
   (`parityMapApi.test.ts`, cheapest, scoped to exactly the tables under test), or (2)
   monkey-patch the `db`/query-module layer entirely and never touch a real `PCDCache`
   (`snapshots/service.test.ts`, appropriate when the code under test doesn't read
-  `cache.kb` directly). No test file observed builds a *real* `PCDCache.build()` from
+  `cache.kb` directly). No test file observed builds a _real_ `PCDCache.build()` from
   actual ops — all PCD-cache-dependent tests fabricate a minimal fixture cache instead;
   do the same for `pcd/resolved/*` tests rather than trying to run the full ops pipeline.
 

@@ -37,13 +37,13 @@ directly lays the foundation #7 (sync preview — already shares the diff engine
 The resolved state already exists in three accessible forms; pick the right one per
 sub-feature:
 
-| Need | Source | Cost |
-| --- | --- | --- |
-| Resolved (base+user merged) domain read | `getCache(dbId)` → `serialize.ts` / `entities/*/list.ts` | Free (already built) |
-| Resolved → Arr payload (namespaced, per `arr_type`) | `$sync/*/syncer.ts` `generatePreview()` | Built (sync preview) |
-| Live Arr actual state + field diff | `$sync/preview/orchestrator.ts` + `diff.ts` | Built (sync preview) |
-| Base-only resolved | **new** read-only layered compile pass | New work |
-| User-overrides delta | `$pcd/ops/draftChanges.ts` pattern (op metadata) OR diff(base-only, resolved) | Partly built |
+| Need                                                | Source                                                                        | Cost                 |
+| --------------------------------------------------- | ----------------------------------------------------------------------------- | -------------------- |
+| Resolved (base+user merged) domain read             | `getCache(dbId)` → `serialize.ts` / `entities/*/list.ts`                      | Free (already built) |
+| Resolved → Arr payload (namespaced, per `arr_type`) | `$sync/*/syncer.ts` `generatePreview()`                                       | Built (sync preview) |
+| Live Arr actual state + field diff                  | `$sync/preview/orchestrator.ts` + `diff.ts`                                   | Built (sync preview) |
+| Base-only resolved                                  | **new** read-only layered compile pass                                        | New work             |
+| User-overrides delta                                | `$pcd/ops/draftChanges.ts` pattern (op metadata) OR diff(base-only, resolved) | Partly built         |
 
 Cache access is centralized: `pcdManager.getCache(id)` / `getCache(id)` returns a
 `PCDCache` exposing `cache.kb` (typed Kysely over `PCDDatabase`) and `cache.query()`.
@@ -144,15 +144,15 @@ gate the resolved view on live fetches.
 
 ### Technical risks
 
-| Risk | Severity | Notes / Mitigation |
-| --- | --- | --- |
-| **Base-only compile mutates state/history.** `PCDCache.build()` writes `pcd_op_history` and can force-drop ops (`state='dropped'`). A naive base-only reuse would corrupt real data. | High | Add a read-only/dry build flag that disables history writes and `pcd_ops` mutation, and skips value-guard auto-drop. Build into a throwaway `:memory:` DB, never `setCache`. |
-| **Second compile cost.** Each base-only view = a full in-memory replay of schema+base ops (timing tracked in `CacheBuildStats.timing`, typically tens–hundreds ms). | Medium | Memoize keyed on `computeStateHash`; build lazily on first "base only" toggle; reuse for all entities in that DB. |
-| **"User overrides" correctness.** Trusting `metadata.changed_fields` can miss fields a user op actually changed or drop ops eliminated by value guards. | Medium | Derive overrides from `diff(baseOnly, resolved)` (ground truth), use op metadata only as provenance annotation. |
-| **Cross-Arr payload semantics.** Resolved PCD read is Arr-agnostic; the "desired" for live-diff is Arr-specific (namespace suffixes, `quality_api_mappings` per `arr_type`, per-app transforms in `transformer.ts`). Mixing them mislabels state. | High | Per CLAUDE.md Cross-Arr policy: label panels explicitly ("PCD domain state" vs "desired Arr payload for <type>"), dispatch by `arr_type`, no sibling fallback. |
-| **Namespace suffixes on live entities.** Live Arr entities carry invisible suffixes; naive name matching fails. | Medium | Reuse `normalizeNamespaceDisplayName` / `findNamespaceMatch` from `namespace.ts` (already used by preview). |
-| **Multi-instance live fetch load.** Cross-instance = N instances × sections live calls; rate limits and API pressure. | Medium | Reuse `$sync/preview/limits.ts` (`PREVIEW_MAX_SNAPSHOTS`, per-instance create rate limit) and the TTL `previewStore`. Fetch lazily, cache actual state per instance. |
-| **UI complexity across 4 sub-features.** Tree/table + layer toggle + diff + N-way matrix is a large surface. | Medium | Ship read-only resolved/layer first; treat matrix/live as separate phases. |
+| Risk                                                                                                                                                                                                                                              | Severity | Notes / Mitigation                                                                                                                                                           |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Base-only compile mutates state/history.** `PCDCache.build()` writes `pcd_op_history` and can force-drop ops (`state='dropped'`). A naive base-only reuse would corrupt real data.                                                              | High     | Add a read-only/dry build flag that disables history writes and `pcd_ops` mutation, and skips value-guard auto-drop. Build into a throwaway `:memory:` DB, never `setCache`. |
+| **Second compile cost.** Each base-only view = a full in-memory replay of schema+base ops (timing tracked in `CacheBuildStats.timing`, typically tens–hundreds ms).                                                                               | Medium   | Memoize keyed on `computeStateHash`; build lazily on first "base only" toggle; reuse for all entities in that DB.                                                            |
+| **"User overrides" correctness.** Trusting `metadata.changed_fields` can miss fields a user op actually changed or drop ops eliminated by value guards.                                                                                           | Medium   | Derive overrides from `diff(baseOnly, resolved)` (ground truth), use op metadata only as provenance annotation.                                                              |
+| **Cross-Arr payload semantics.** Resolved PCD read is Arr-agnostic; the "desired" for live-diff is Arr-specific (namespace suffixes, `quality_api_mappings` per `arr_type`, per-app transforms in `transformer.ts`). Mixing them mislabels state. | High     | Per CLAUDE.md Cross-Arr policy: label panels explicitly ("PCD domain state" vs "desired Arr payload for <type>"), dispatch by `arr_type`, no sibling fallback.               |
+| **Namespace suffixes on live entities.** Live Arr entities carry invisible suffixes; naive name matching fails.                                                                                                                                   | Medium   | Reuse `normalizeNamespaceDisplayName` / `findNamespaceMatch` from `namespace.ts` (already used by preview).                                                                  |
+| **Multi-instance live fetch load.** Cross-instance = N instances × sections live calls; rate limits and API pressure.                                                                                                                             | Medium   | Reuse `$sync/preview/limits.ts` (`PREVIEW_MAX_SNAPSHOTS`, per-instance create rate limit) and the TTL `previewStore`. Fetch lazily, cache actual state per instance.         |
+| **UI complexity across 4 sub-features.** Tree/table + layer toggle + diff + N-way matrix is a large surface.                                                                                                                                      | Medium   | Ship read-only resolved/layer first; treat matrix/live as separate phases.                                                                                                   |
 
 ### Integration challenges
 
@@ -217,12 +217,14 @@ gate the resolved view on live fetches.
 Sized for a parallel implementation plan. Dependencies noted.
 
 ### Phase 0 — Contract & scaffolding (S)
+
 - Define OpenAPI schemas: `ResolvedEntity`, `ResolvedConfigResponse`, `LayerBreakdown`
   (`baseOnly` / `userOverrides` / `resolved`), reuse `FieldChange`. Regenerate types.
 - New route skeleton `GET /api/v1/config/resolved` + auth/validation (copy parity).
 - Complexity: **Low**. Blocks all later phases.
 
-### Phase 1 — Resolved view (M) — *depends on Phase 0*
+### Phase 1 — Resolved view (M) — _depends on Phase 0_
+
 - **1a** Resolved read service: wrap `serialize.ts` / `entities/*/list.ts` into a
   per-entity + whole-database resolved reader. (Low)
 - **1b** Endpoint returns resolved entity(ies) as portable JSON. (Low)
@@ -230,28 +232,32 @@ Sized for a parallel implementation plan. Dependencies noted.
   embeddable panel component. (Med)
 - Quick win; no live calls.
 
-### Phase 2 — Layer breakdown (L) — *depends on Phase 1; highest new engineering*
+### Phase 2 — Layer breakdown (L) — _depends on Phase 1; highest new engineering_
+
 - **2a** Read-only/dry layered compile: `loadAllOperations` variant (schema+base only)
-  + `PCDCache` dry mode that disables history writes / state mutation / auto-drop. (High)
+  - `PCDCache` dry mode that disables history writes / state mutation / auto-drop. (High)
 - **2b** Memoized base-only cache keyed on `computeStateHash`. (Med)
 - **2c** `userOverrides = diffToFieldChanges(baseOnly, resolved)` per entity + optional
   op provenance from `pcd_ops`. (Med)
 - **2d** UI toggle: base only / user overrides / resolved. (Med)
 - Critical path; parallelizable internally after 2a lands.
 
-### Phase 3 — Live-diff surfacing (M) — *independent of Phase 2; reuses sync preview*
+### Phase 3 — Live-diff surfacing (M) — _independent of Phase 2; reuses sync preview_
+
 - **3a** Per-entity slice/adapter over `generatePreview()` payload → "Desired vs Actual"
   for one entity/instance. (Med)
 - **3b** UI: desired/actual diff view reusing `SyncPreviewPanel`/`diff` rendering, clear
   PCD-vs-Arr labeling per `arr_type`. (Med)
 - Can run in parallel with Phase 2.
 
-### Phase 4 — Cross-instance comparison (L) — *depends on Phases 1 & 3; deferrable*
+### Phase 4 — Cross-instance comparison (L) — _depends on Phases 1 & 3; deferrable_
+
 - **4a** N-instance orchestration reusing preview limits/store + `diff.ts`. (High)
 - **4b** Side-by-side/matrix UI reusing `ParityMatrix.svelte` patterns. (Med)
 - Ambiguous semantics (see Open Questions) — resolve before starting.
 
 ### Phase 5 — Foundation hooks for #7/#15/#26 (S, opportunistic)
+
 - Promote shared diff module; emit stable diff-summary shape; optional resolved-snapshot
   persistence; dependency edges during serialize. (Low–Med)
 
@@ -286,4 +292,7 @@ Sized for a parallel implementation plan. Dependencies noted.
   how should the resolved view aggregate/segment by source database?
 - **Non-supported Arr types:** `chaptarr`/`all` are excluded from preview
   (`SyncPreviewArrType`); confirm the viewer mirrors that exclusion.
+
+```
+
 ```

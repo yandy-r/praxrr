@@ -96,8 +96,8 @@ the comparison-page pattern (`parity-map/`) are all directly reusable.
   - custom formats → `entities/customFormats/list.ts#list(cache)`
   - quality profiles → `qualityProfiles/list.ts` + `sync/qualityProfiles/transformer.ts#fetchQualityProfileFromPcd(cache, name, arrType)`
   - delay / metadata / media-management → existing `entities/**/read.ts`
-  Dispatch **must** key on `entityType` (+ `arr_type` where the reader is arr-specific);
-  fail-fast on unknown/ambiguous type (Cross-Arr policy).
+    Dispatch **must** key on `entityType` (+ `arr_type` where the reader is arr-specific);
+    fail-fast on unknown/ambiguous type (Cross-Arr policy).
 - **`$pcd/resolved/layerDiff.ts`** — wraps `diffToFieldChanges()` (from
   `$sync/preview/diff.ts`) to compute the "user overrides" view as `FieldChange[]` between
   base-only and resolved payloads. Reuse the array-key strategies already defined in
@@ -140,9 +140,9 @@ the comparison-page pattern (`parity-map/`) are all directly reusable.
 App DB (`praxrr.db`, Kysely):
 
 - **`pcd_ops`** (`$db/queries/pcdOps.ts`): `id, database_id, origin('base'|'user'),
-  state('published'|'draft'|'superseded'|'dropped'|'orphaned'),
-  source('repo'|'local'|'import'), filename, op_number, sequence, sql, metadata,
-  desired_state, content_hash, last_seen_in_repo_at, superseded_by_op_id, …`.
+state('published'|'draft'|'superseded'|'dropped'|'orphaned'),
+source('repo'|'local'|'import'), filename, op_number, sequence, sql, metadata,
+desired_state, content_hash, last_seen_in_repo_at, superseded_by_op_id, …`.
   `desired_state` (per-op JSON snapshot) is useful metadata but is **not** the resolved
   entity — the cache replay is authoritative.
 - **`pcd_op_history`** (`$db/queries/pcdOpHistory.ts`): apply/conflict status per op; used
@@ -172,7 +172,7 @@ New wrapper schemas (add to `docs/api/v1/schemas/`):
 ```yaml
 ResolvedLayer:
   type: string
-  enum: [base, user, resolved]   # base-only | user-overrides | fully-resolved
+  enum: [base, user, resolved] # base-only | user-overrides | fully-resolved
 
 ResolvedEntityState:
   type: object
@@ -181,10 +181,24 @@ ResolvedEntityState:
     databaseId: { type: integer }
     entityType:
       type: string
-      enum: [custom_formats, quality_profiles, delay_profiles, metadata_profiles, regular_expressions, quality_definitions, naming, media_management]
+      enum:
+        [
+          custom_formats,
+          quality_profiles,
+          delay_profiles,
+          metadata_profiles,
+          regular_expressions,
+          quality_definitions,
+          naming,
+          media_management,
+        ]
     name: { type: string }
     layer: { $ref: '#/ResolvedLayer' }
-    present: { type: boolean, description: false when the entity does not exist in this layer }
+    present:
+      {
+        type: boolean,
+        description: false when the entity does not exist in this layer,
+      }
     # For layer=base|resolved: the canonical entity snapshot.
     entity:
       description: Canonical Portable* payload for the entity type (null when layer=user)
@@ -218,10 +232,19 @@ ResolvedInstanceState:
     instanceId: { type: integer }
     instanceName: { type: string }
     arrType: { type: string, enum: [radarr, sonarr, lidarr] }
-    compatible: { type: boolean, description: false when entity/section unsupported for this arrType }
+    compatible:
+      {
+        type: boolean,
+        description: false when entity/section unsupported for this arrType,
+      }
     present: { type: boolean }
-    desired:  { description: arr-type transformed desired payload, nullable: true }
-    actual:   { description: live Arr state (only when includeLive=true), nullable: true }
+    desired:
+      { description: arr-type transformed desired payload, nullable: true }
+    actual:
+      {
+        description: live Arr state (only when includeLive=true),
+        nullable: true,
+      }
 
 CrossInstanceComparisonResponse:
   type: object
@@ -270,8 +293,18 @@ Example `ResolvedEntityState` (layer=user, quality profile with an override):
   "present": true,
   "entity": null,
   "overrides": [
-    { "field": "minimumScore", "type": "changed", "current": 0, "desired": 100 },
-    { "field": "customFormatScores[\"Remux Tier 01\"].score", "type": "changed", "current": 0, "desired": 1500 }
+    {
+      "field": "minimumScore",
+      "type": "changed",
+      "current": 0,
+      "desired": 100
+    },
+    {
+      "field": "customFormatScores[\"Remux Tier 01\"].score",
+      "type": "changed",
+      "current": 0,
+      "desired": 1500
+    }
   ]
 }
 ```
@@ -296,12 +329,14 @@ GET /api/v1/pcd/{databaseId}/resolved/{entityType}/{name}
 ```
 
 Query params:
+
 - `layer` = `base | user | resolved` (default `resolved`).
 - `arrType` = `radarr | sonarr | lidarr` — **required** for arr-specific entity types
   (e.g. quality profiles whose CF scores/qualities are per-arr); rejected/ignored for
   arr-agnostic types. Fail-fast on missing when required.
 
 Responses:
+
 - `200` → `ResolvedEntityListResponse` (list form) or `ResolvedEntityState` (named form).
 - `400` — invalid/non-digit `databaseId`, unknown `entityType`, missing required `arrType`,
   or **cache not built/disabled** (mirror parity's deliberate 400-not-404 for unbuilt DB).
@@ -322,6 +357,7 @@ GET /api/v1/pcd/{databaseId}/resolved/{entityType}/{name}/compare
 ```
 
 Query params:
+
 - `instanceIds` = comma-separated Arr instance IDs (required; cap e.g. ≤ 8).
 - `includeLive` = `true|false` (default `false`). When `true`, performs rate-limited live
   fetches per instance.
@@ -520,7 +556,7 @@ Kysely, Arr clients all exist.
 - **Recommended:** compare each instance's **transformed-desired** payload (arr-type
   specific), with optional live actual behind `includeLive`. Group/annotate by `arr_type`
   and mark `compatible:false` for unsupported combos.
-- **Rationale:** the resolved *desired* is one per database; meaningful cross-instance
+- **Rationale:** the resolved _desired_ is one per database; meaningful cross-instance
   divergence is exactly the per-arr transform + live drift. Enforcing per-arr gating honors
   the Cross-Arr policy and avoids presenting a radarr-shaped profile as if valid for lidarr.
 
