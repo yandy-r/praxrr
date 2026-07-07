@@ -29,6 +29,49 @@ async function getDatabaseIdFromRoot(page: import('@playwright/test').Page): Pro
   return Number(match[1]);
 }
 
+async function setUiPreference(
+  page: import('@playwright/test').Page,
+  sectionKey: string,
+  mode: 'basic' | 'advanced'
+): Promise<void> {
+  const response = await page.request.fetch('/api/v1/ui-preferences', {
+    method: 'PATCH',
+    headers: { 'content-type': 'application/json' },
+    data: JSON.stringify({
+      section_key: sectionKey,
+      mode,
+    }),
+  });
+  if (!response.ok()) {
+    const payload = await response.text();
+    throw new Error(`Failed to set preference ${sectionKey}: ${response.status()} ${payload}`);
+  }
+}
+
+async function getFirstCustomFormatGeneralUrl(
+  page: import('@playwright/test').Page,
+  databaseId: number
+): Promise<string | null> {
+  await page.goto(`/custom-formats/${databaseId}`);
+  await page.waitForLoadState('networkidle');
+
+  const firstRow = page.locator('table tbody tr').first();
+  if ((await firstRow.count()) === 0) {
+    return null;
+  }
+
+  await expect(firstRow).toBeVisible();
+  await firstRow.click();
+  await page.waitForURL(/\/custom-formats\/\d+\/\d+/, { timeout: 15_000 });
+
+  const match = page.url().match(/\/custom-formats\/(\d+)\/(\d+)/);
+  if (!match) {
+    return null;
+  }
+
+  return `/custom-formats/${match[1]}/${match[2]}/general`;
+}
+
 test.describe('Progressive complexity reference integration', () => {
   test('advanced tier pre-expands the custom-format conditions section', async ({ page }) => {
     await ensureAuthenticated(page);
@@ -37,6 +80,8 @@ test.describe('Progressive complexity reference integration', () => {
     if (!databaseId) {
       test.skip('No linked custom format database found for progressive complexity checks.');
     }
+
+    await setUiPreference(page, CUSTOM_CONDITIONS_KEY, 'basic');
 
     const seedResponse = await page.request.fetch('/api/v1/complexity-tiers', {
       method: 'PATCH',
@@ -56,7 +101,15 @@ test.describe('Progressive complexity reference integration', () => {
       throw new Error(`Failed to seed complexity tier: ${seedResponse.status()} ${payload}`);
     }
 
-    await page.goto(`/custom-formats/${databaseId}/new`);
-    await expect(page.locator(`[id="${CUSTOM_CONDITIONS_KEY}-panel"]`)).toBeVisible();
+    const generalUrl = await getFirstCustomFormatGeneralUrl(page, databaseId);
+    if (!generalUrl) {
+      test.skip('No custom formats found for progressive complexity checks.');
+    }
+
+    await page.goto(generalUrl);
+    await page.waitForLoadState('networkidle');
+
+    const panel = page.locator(`[id="${CUSTOM_CONDITIONS_KEY}-panel"]`);
+    await expect(panel).toBeVisible({ timeout: 15_000 });
   });
 });

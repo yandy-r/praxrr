@@ -55,6 +55,30 @@ function withInMemoryStore(): { restoreAll: () => void; store: Map<string, UserC
     userComplexityTiersQueries.upsert = originalUpsert;
   });
 
+  const originalUpdateIfUpdatedAt = userComplexityTiersQueries.updateIfUpdatedAt;
+  userComplexityTiersQueries.updateIfUpdatedAt = (input) => {
+    const existing = store.get(mapKey(input.userId, input.sectionKey));
+    if (!existing || existing.updatedAt !== input.expectedUpdatedAt) {
+      return null;
+    }
+
+    const record: UserComplexityTier = {
+      userId: input.userId,
+      sectionKey: input.sectionKey,
+      tier: input.tier,
+      interactionCount: input.interactionCount,
+      advancedToggleCount: input.advancedToggleCount,
+      lastSuggestedTier: input.lastSuggestedTier,
+      suggestionDismissedAt: input.suggestionDismissedAt,
+      updatedAt: new Date().toISOString(),
+    };
+    store.set(mapKey(input.userId, input.sectionKey), record);
+    return record;
+  };
+  restores.push(() => {
+    userComplexityTiersQueries.updateIfUpdatedAt = originalUpdateIfUpdatedAt;
+  });
+
   return {
     store,
     restoreAll: () => restoreAll(restores),
@@ -215,6 +239,64 @@ Deno.test('api-key synthetic user id zero returns defaults and does not persist'
   try {
     const sectionKey = 'custom-formats:general:conditions';
     const response = await PATCH(buildPatchRequest(sectionKey, 'advanced', 0));
+    const body = (await response.json()) as { tier: ComplexityTier; persisted: boolean };
+
+    assertEquals(response.status, 200);
+    assertEquals(body.tier, 'beginner');
+    assertEquals(body.persisted, false);
+    assertEquals(requestScope.store.size, 0);
+  } finally {
+    requestScope.restoreAll();
+  }
+});
+
+Deno.test('complexity tier write returns 409 when expected_updated_at is set but no row exists', async () => {
+  const requestScope = withInMemoryStore();
+  try {
+    const sectionKey = 'custom-formats:general:conditions';
+    const conflict = await PATCH(
+      buildPatchRequest(sectionKey, 'advanced', 130, {
+        expected_updated_at: '2026-07-06T00:00:00.000Z',
+      })
+    );
+
+    assertEquals(conflict.status, 409);
+    const body = (await conflict.json()) as { error: string };
+    assertEquals(body.error, 'Concurrency conflict: complexity tier does not exist');
+  } finally {
+    requestScope.restoreAll();
+  }
+});
+
+Deno.test('complexity tier write uses updateIfUpdatedAt when expected_updated_at matches', async () => {
+  const requestScope = withInMemoryStore();
+  try {
+    const sectionKey = 'custom-formats:general:conditions';
+    const userId = 131;
+
+    const createRes = await PATCH(buildPatchRequest(sectionKey, 'beginner', userId));
+    assertEquals(createRes.status, 200);
+    const created = (await createRes.json()) as { updated_at: string };
+
+    const updateRes = await PATCH(
+      buildPatchRequest(sectionKey, 'advanced', userId, {
+        expected_updated_at: created.updated_at,
+      })
+    );
+    assertEquals(updateRes.status, 200);
+    const updated = (await updateRes.json()) as { tier: ComplexityTier; persisted: boolean };
+    assertEquals(updated.tier, 'advanced');
+    assertEquals(updated.persisted, true);
+  } finally {
+    requestScope.restoreAll();
+  }
+});
+
+Deno.test('api-key synthetic user id zero GET returns defaults and does not persist', async () => {
+  const requestScope = withInMemoryStore();
+  try {
+    const sectionKey = 'custom-formats:general:conditions';
+    const response = await GET(buildGetRequest(sectionKey, 0));
     const body = (await response.json()) as { tier: ComplexityTier; persisted: boolean };
 
     assertEquals(response.status, 200);

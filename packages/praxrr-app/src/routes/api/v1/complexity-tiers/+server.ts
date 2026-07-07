@@ -1,15 +1,19 @@
-import { db } from '$db/db.ts';
 import { MAX_COMPLEXITY_ACTIVITY_COUNT, userComplexityTiersQueries } from '$db/queries/user_complexity_tiers.ts';
+import { logger } from '$logger/logger.ts';
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from '@sveltejs/kit';
 import type { UserComplexityTier } from '$db/queries/user_complexity_tiers.ts';
 import {
   COMPLEXITY_TIERS,
-  SECTION_KEY_MAX_LENGTH,
-  SECTION_KEY_PATTERN,
   type ComplexityTier,
   type SectionKey,
 } from '$shared/complexity/tiers.ts';
+import {
+  checkWriteRateLimit,
+  detectConcurrencyConflict,
+  parseSectionKey,
+  parseStrictParam,
+} from '../section-preferences/_helpers.ts';
 
 type ErrorResponse = {
   error: string;
@@ -37,17 +41,8 @@ type ParsedPatchBody = {
 };
 
 const DEFAULT_TIER: ComplexityTier = 'beginner';
-const STRICT_TRUE = 'true';
-const STRICT_FALSE = 'false';
-const RATE_LIMIT_WINDOW_MS = 30_000;
-const RATE_LIMIT_MAX_REQUESTS = 8;
-
-type RateLimitState = {
-  windowStart: number;
-  count: number;
-};
-
-const rateLimitState = new Map<string, RateLimitState>();
+const MAX_COUNTER_DELTA_PER_REQUEST = 100;
+const RATE_LIMIT_EXCEEDED_MESSAGE = 'Too many complexity tier updates in a short period. Please retry later.';
 
 export const GET: RequestHandler = async ({ locals, url }) => {
   if (!locals.user) {
@@ -68,14 +63,21 @@ export const GET: RequestHandler = async ({ locals, url }) => {
     return json({ error: error instanceof Error ? error.message : 'Invalid strict query parameter' }, { status: 400 });
   }
 
+  if (locals.user.id <= 0) {
+    return json(defaultTierRecord(sectionKey));
+  }
+
   let tier: UserComplexityTier | undefined;
   try {
     tier = userComplexityTiersQueries.getByUserIdAndSectionKey(locals.user.id, sectionKey);
   } catch (error) {
-    console.error('Failed to read complexity tier', {
-      userId: locals.user.id,
-      sectionKey,
-      error: error instanceof Error ? error.message : String(error),
+    await logger.error('Failed to read complexity tier', {
+      source: 'complexity-tiers',
+      meta: {
+        userId: locals.user.id,
+        sectionKey,
+        error: error instanceof Error ? error.message : String(error),
+      },
     });
     return json({ error: 'Failed to read complexity tier' }, { status: 500 });
   }
@@ -118,7 +120,7 @@ export const PATCH: RequestHandler = async ({ locals, request }) => {
     return json(defaultTierRecord(parsed.sectionKey));
   }
 
-  const rateLimitError = checkWriteRateLimit(locals.user.id, parsed.sectionKey);
+  const rateLimitError = checkWriteRateLimit(locals.user.id, parsed.sectionKey, RATE_LIMIT_EXCEEDED_MESSAGE);
   if (rateLimitError) {
     return json({ error: rateLimitError }, { status: 429 });
   }
@@ -127,16 +129,23 @@ export const PATCH: RequestHandler = async ({ locals, request }) => {
   try {
     existing = userComplexityTiersQueries.getByUserIdAndSectionKey(locals.user.id, parsed.sectionKey);
   } catch (error) {
-    console.error('Failed to load current complexity tier', {
-      userId: locals.user.id,
-      sectionKey: parsed.sectionKey,
-      error: error instanceof Error ? error.message : String(error),
+    await logger.error('Failed to load current complexity tier', {
+      source: 'complexity-tiers',
+      meta: {
+        userId: locals.user.id,
+        sectionKey: parsed.sectionKey,
+        error: error instanceof Error ? error.message : String(error),
+      },
     });
     return json({ error: 'Failed to load current complexity tier' }, { status: 500 });
   }
 
   try {
-    const optimisticConflict = detectConcurrencyConflict(existing, parsed.expectedUpdatedAt);
+    const optimisticConflict = detectConcurrencyConflict(
+      existing,
+      parsed.expectedUpdatedAt,
+      'complexity tier'
+    );
     if (optimisticConflict) {
       return json({ error: optimisticConflict }, { status: 409 });
     }
@@ -167,7 +176,7 @@ export const PATCH: RequestHandler = async ({ locals, request }) => {
       existing &&
       hasTierChanged(existing, parsed)
     ) {
-      const updated = applyConcurrentUpsert({
+      const updated = userComplexityTiersQueries.updateIfUpdatedAt({
         userId: locals.user.id,
         sectionKey: parsed.sectionKey,
         tier: parsed.tier,
@@ -199,37 +208,17 @@ export const PATCH: RequestHandler = async ({ locals, request }) => {
       return json({ error: 'Complexity tier updated concurrently' }, { status: 409 });
     }
 
-    console.error('Unable to save complexity tier', {
-      userId: locals.user.id,
-      sectionKey: parsed.sectionKey,
-      error: error instanceof Error ? error.message : String(error),
+    await logger.error('Unable to save complexity tier', {
+      source: 'complexity-tiers',
+      meta: {
+        userId: locals.user.id,
+        sectionKey: parsed.sectionKey,
+        error: error instanceof Error ? error.message : String(error),
+      },
     });
     return json({ error: 'Unable to save complexity tier' }, { status: 500 });
   }
 };
-
-function detectConcurrencyConflict(
-  existing: UserComplexityTier | undefined,
-  expectedUpdatedAt: string | null | undefined
-): string | null {
-  if (expectedUpdatedAt === undefined) {
-    return null;
-  }
-
-  if (expectedUpdatedAt === null) {
-    return null;
-  }
-
-  if (!existing) {
-    return 'Concurrency conflict: complexity tier does not exist';
-  }
-
-  if (existing.updatedAt !== expectedUpdatedAt) {
-    return 'Concurrency conflict: expected_updated_at does not match';
-  }
-
-  return null;
-}
 
 function parsePatchBody(body: Record<string, unknown>): ParsedPatchBody {
   return {
@@ -241,56 +230,6 @@ function parsePatchBody(body: Record<string, unknown>): ParsedPatchBody {
     lastSuggestedTier: parseOptionalTier(body.last_suggested_tier, 'last_suggested_tier'),
     suggestionDismissedAt: parseOptionalNullableDate(body.suggestion_dismissed_at, 'suggestion_dismissed_at'),
   };
-}
-
-function parseSectionKey(raw: unknown): SectionKey {
-  if (typeof raw !== 'string' || raw.trim().length === 0) {
-    throw new Error('section_key is required');
-  }
-
-  const sectionKey = raw.trim();
-  if (sectionKey.length > SECTION_KEY_MAX_LENGTH) {
-    throw new Error('Invalid section_key format');
-  }
-  if (!SECTION_KEY_PATTERN.test(sectionKey)) {
-    throw new Error('Invalid section_key format');
-  }
-
-  return sectionKey as SectionKey;
-}
-
-function checkWriteRateLimit(userId: number, sectionKey: string): string | null {
-  const now = Date.now();
-  const stateKey = `${userId}:${sectionKey}`;
-  const existing = rateLimitState.get(stateKey);
-
-  if (!existing || now - existing.windowStart >= RATE_LIMIT_WINDOW_MS) {
-    rateLimitState.set(stateKey, {
-      windowStart: now,
-      count: 1,
-    });
-    return null;
-  }
-
-  if (existing.count >= RATE_LIMIT_MAX_REQUESTS) {
-    return 'Too many complexity tier updates in a short period. Please retry later.';
-  }
-
-  existing.count += 1;
-  return null;
-}
-
-function parseStrictParam(raw: string | null): boolean {
-  if (raw === null) {
-    return false;
-  }
-  if (raw === STRICT_TRUE) {
-    return true;
-  }
-  if (raw === STRICT_FALSE) {
-    return false;
-  }
-  throw new Error(`strict must be "${STRICT_TRUE}" or "${STRICT_FALSE}"`);
 }
 
 function parseTier(raw: unknown): ComplexityTier {
@@ -346,7 +285,11 @@ function parseOptionalCounterDelta(raw: unknown, field: string): number {
     throw new Error(`${field} must be a finite number`);
   }
 
-  return Math.trunc(raw);
+  const delta = Math.trunc(raw);
+  return Math.max(
+    -MAX_COUNTER_DELTA_PER_REQUEST,
+    Math.min(MAX_COUNTER_DELTA_PER_REQUEST, delta)
+  );
 }
 
 function clampCount(value: number): number {
@@ -395,47 +338,4 @@ function hasTierChanged(existing: UserComplexityTier, parsed: ParsedPatchBody): 
     parsed.lastSuggestedTier !== undefined ||
     parsed.suggestionDismissedAt !== undefined
   );
-}
-
-function applyConcurrentUpsert({
-  userId,
-  sectionKey,
-  tier,
-  interactionCount,
-  advancedToggleCount,
-  lastSuggestedTier,
-  suggestionDismissedAt,
-  expectedUpdatedAt,
-}: {
-  userId: number;
-  sectionKey: SectionKey;
-  tier: ComplexityTier;
-  interactionCount: number;
-  advancedToggleCount: number;
-  lastSuggestedTier: ComplexityTier | null;
-  suggestionDismissedAt: string | null;
-  expectedUpdatedAt: string;
-}): UserComplexityTier | null {
-  const now = new Date().toISOString();
-  const updatedRows = db.execute(
-    `UPDATE user_complexity_tiers
-		 SET tier = ?, interaction_count = ?, advanced_toggle_count = ?, last_suggested_tier = ?, suggestion_dismissed_at = ?, updated_at = ?
-		 WHERE user_id = ? AND section_key = ? AND updated_at = ?`,
-    tier,
-    interactionCount,
-    advancedToggleCount,
-    lastSuggestedTier,
-    suggestionDismissedAt,
-    now,
-    userId,
-    sectionKey,
-    expectedUpdatedAt
-  );
-
-  if (updatedRows === 0) {
-    return null;
-  }
-
-  const updated = userComplexityTiersQueries.getByUserIdAndSectionKey(userId, sectionKey);
-  return updated ?? null;
 }

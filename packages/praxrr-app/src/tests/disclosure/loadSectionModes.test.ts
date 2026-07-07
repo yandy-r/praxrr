@@ -19,7 +19,7 @@ function withGetByUserIdAndSectionKeyReplacement(replacement: PreferenceQuery): 
   };
 }
 
-Deno.test('loadSectionModes returns basic for all keys when userId is undefined', () => {
+Deno.test('loadSectionModes returns empty map when userId is undefined', () => {
   const restore = withGetByUserIdAndSectionKeyReplacement(() => {
     throw new Error('should not query preferences when no user is provided');
   });
@@ -28,16 +28,13 @@ Deno.test('loadSectionModes returns basic for all keys when userId is undefined'
     const keys = [CF_CONDITIONS, CF_SCORING] as const;
     const sectionModes = loadSectionModes(undefined, keys);
 
-    assertEquals(sectionModes, {
-      [CF_CONDITIONS]: 'basic',
-      [CF_SCORING]: 'basic',
-    });
+    assertEquals(sectionModes, {});
   } finally {
     restore();
   }
 });
 
-Deno.test('loadSectionModes returns persisted modes for valid userId with defaults for missing rows', () => {
+Deno.test('loadSectionModes returns only persisted modes for valid userId', () => {
   const storedMode: UiPreferenceMode = 'advanced';
 
   const restore = withGetByUserIdAndSectionKeyReplacement((userId, sectionKey) => {
@@ -58,7 +55,6 @@ Deno.test('loadSectionModes returns persisted modes for valid userId with defaul
 
     assertEquals(sectionModes, {
       [CF_CONDITIONS]: 'advanced',
-      [CF_SCORING]: 'basic',
     });
   } finally {
     restore();
@@ -70,7 +66,7 @@ Deno.test('loadSectionModes returns empty map for empty sectionKeys input', () =
   assertEquals(sectionModes, {});
 });
 
-Deno.test('loadSectionModes falls back to basic when preference query throws', () => {
+Deno.test('loadSectionModes returns empty map when preference query throws', () => {
   const restore = withGetByUserIdAndSectionKeyReplacement(() => {
     throw new Error('simulated database failure');
   });
@@ -78,9 +74,7 @@ Deno.test('loadSectionModes falls back to basic when preference query throws', (
   try {
     const sectionModes = loadSectionModes(1, [CF_SCORING]);
 
-    assertEquals(sectionModes, {
-      [CF_SCORING]: 'basic',
-    });
+    assertEquals(sectionModes, {});
   } finally {
     restore();
   }

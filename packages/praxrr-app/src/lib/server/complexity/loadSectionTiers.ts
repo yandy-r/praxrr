@@ -1,4 +1,5 @@
 import { userComplexityTiersQueries } from '$db/queries/user_complexity_tiers.ts';
+import { logger } from '$logger/logger.ts';
 import type { ComplexityTier, SectionKey } from '$shared/complexity/tiers.ts';
 
 /**
@@ -20,19 +21,24 @@ export function loadSectionTiers<K extends SectionKey>(
     return tiers;
   }
 
-  for (const key of sectionKeys) {
-    try {
-      const preference = userComplexityTiersQueries.getByUserIdAndSectionKey(userId, key);
-      if (preference?.tier) {
-        tiers[key] = preference.tier;
+  try {
+    const preferences = userComplexityTiersQueries.getByUserId(userId);
+    const tierByKey = new Map(preferences.map((preference) => [preference.sectionKey, preference.tier]));
+
+    for (const key of sectionKeys) {
+      const tier = tierByKey.get(key);
+      if (tier) {
+        tiers[key] = tier;
       }
-    } catch (error) {
-      console.warn('Failed to load complexity tier', {
-        userId,
-        sectionKey: key,
-        error: error instanceof Error ? error.message : String(error),
-      });
     }
+  } catch (error) {
+    void logger.warn('Failed to load complexity tier', {
+      source: 'loadSectionTiers',
+      meta: {
+        userId,
+        error: error instanceof Error ? error.message : String(error),
+      },
+    });
   }
 
   return tiers;

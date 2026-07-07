@@ -34,6 +34,17 @@ export interface UserComplexityActivityInput {
   advancedToggle?: number;
 }
 
+export interface UserComplexityTierUpdateIfUpdatedAtInput {
+  userId: number;
+  sectionKey: SectionKey;
+  tier: ComplexityTier;
+  interactionCount: number;
+  advancedToggleCount: number;
+  lastSuggestedTier: ComplexityTier | null;
+  suggestionDismissedAt: string | null;
+  expectedUpdatedAt: string;
+}
+
 interface UserComplexityTierRow {
   user_id: number;
   section_key: string;
@@ -188,6 +199,35 @@ export const userComplexityTiersQueries = {
     }
 
     return updated;
+  },
+
+  /**
+   * Update a tier only when the stored updated_at matches the expected value.
+   */
+  updateIfUpdatedAt(input: UserComplexityTierUpdateIfUpdatedAtInput): UserComplexityTier | null {
+    assertSectionKey(input.sectionKey);
+
+    const now = new Date().toISOString();
+    const updatedRows = db.execute(
+      `UPDATE user_complexity_tiers
+		 SET tier = ?, interaction_count = ?, advanced_toggle_count = ?, last_suggested_tier = ?, suggestion_dismissed_at = ?, updated_at = ?
+		 WHERE user_id = ? AND section_key = ? AND updated_at = ?`,
+      input.tier,
+      input.interactionCount,
+      input.advancedToggleCount,
+      input.lastSuggestedTier,
+      input.suggestionDismissedAt,
+      now,
+      input.userId,
+      input.sectionKey,
+      input.expectedUpdatedAt
+    );
+
+    if (updatedRows === 0) {
+      return null;
+    }
+
+    return this.getByUserIdAndSectionKey(input.userId, input.sectionKey) ?? null;
   },
 
   /**

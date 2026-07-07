@@ -12,7 +12,7 @@ export const migration: Migration = {
 			user_id INTEGER NOT NULL,
 			section_key TEXT NOT NULL CHECK (LENGTH(TRIM(section_key)) > 0 AND LENGTH(TRIM(section_key)) <= 96),
 			tier TEXT NOT NULL CHECK (tier IN ('beginner', 'intermediate', 'advanced')),
-			interaction_count INTEGER NOT NULL DEFAULT 0 CHECK (interaction_count >= 0),
+			interaction_count INTEGER NOT NULL DEFAULT 0 CHECK (interaction_count >= 0 AND interaction_count <= 1000000),
 			advanced_toggle_count INTEGER NOT NULL DEFAULT 0 CHECK (advanced_toggle_count >= 0),
 			last_suggested_tier TEXT CHECK (last_suggested_tier IS NULL OR last_suggested_tier IN ('beginner', 'intermediate', 'advanced')),
 			suggestion_dismissed_at DATETIME,

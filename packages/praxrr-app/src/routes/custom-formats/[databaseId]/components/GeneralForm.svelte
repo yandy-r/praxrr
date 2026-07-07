@@ -14,7 +14,12 @@
 	import ComplexityProgressionHint from '$ui/complexity/ComplexityProgressionHint.svelte';
 	import ComplexityTierProvider from '$ui/complexity/ComplexityTierProvider.svelte';
 	import ComplexityTierSelector from '$ui/complexity/ComplexityTierSelector.svelte';
-	import { CF_CONDITIONS, CF_SCORING, CF_NEGATION_AND_GROUPS } from '$shared/disclosure/sectionKeys.ts';
+	import {
+		CF_CONDITIONS,
+		CF_SCORING,
+		CF_NEGATION_AND_GROUPS,
+		type SectionModeMap
+	} from '$shared/disclosure/sectionKeys.ts';
 	import type { SectionTierMap } from '$shared/complexity/tiers.ts';
 	import { alertStore } from '$alerts/store';
 	import { current, isDirty, initEdit, initCreate, update } from '$lib/client/stores/dirty';
@@ -38,6 +43,7 @@
 	export let onCancel: (() => void) | undefined = undefined;
 
 	const sectionTiers: SectionTierMap = $page.data.customFormatSectionTiers ?? {};
+	$: sectionModes = ($page.data.customFormatSectionModes ?? {}) as SectionModeMap;
 
 	const defaults: GeneralFormData = {
 		name: '',
@@ -221,6 +227,7 @@
 				sectionKey={CF_CONDITIONS}
 				sectionTitle="Conditions"
 				sectionHint="Advanced match-condition builder controls."
+				initialMode={sectionModes[CF_CONDITIONS]}
 			>
 				<div slot="advanced" class="space-y-2">
 					<p class="text-sm text-neutral-600 dark:text-neutral-400">
@@ -242,6 +249,7 @@
 					sectionKey={CF_SCORING}
 					sectionTitle="Scoring"
 					sectionHint="Score application and weighting controls."
+					initialMode={sectionModes[CF_SCORING]}
 				>
 					<div slot="advanced" class="space-y-2">
 						<p class="text-sm text-neutral-600 dark:text-neutral-400">
@@ -267,6 +275,7 @@
 					sectionKey={CF_NEGATION_AND_GROUPS}
 					sectionTitle="Negation and Groups"
 					sectionHint="Negation/grouping and nested condition controls."
+					initialMode={sectionModes[CF_NEGATION_AND_GROUPS]}
 				>
 					<div slot="advanced" class="space-y-2">
 						<p class="text-sm text-neutral-600 dark:text-neutral-400">

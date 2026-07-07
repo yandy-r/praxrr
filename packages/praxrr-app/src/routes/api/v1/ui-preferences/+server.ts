@@ -3,12 +3,13 @@ import { userInterfacePreferencesQueries } from '$db/queries/user_interface_pref
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from '@sveltejs/kit';
 import type { UserInterfacePreference } from '$db/queries/user_interface_preferences.ts';
+import { type SectionKey, type UiPreferenceMode } from '$shared/disclosure/sectionKeys.ts';
 import {
-  SECTION_KEY_MAX_LENGTH,
-  SECTION_KEY_PATTERN,
-  type SectionKey,
-  type UiPreferenceMode,
-} from '$shared/disclosure/sectionKeys.ts';
+  checkWriteRateLimit,
+  detectConcurrencyConflict,
+  parseSectionKey,
+  parseStrictParam,
+} from '../section-preferences/_helpers.ts';
 
 type ErrorResponse = {
   error: string;
@@ -24,17 +25,7 @@ type UiPreferenceRecord = {
 };
 
 const DEFAULT_MODE: UiMode = 'basic';
-const STRICT_TRUE = 'true';
-const STRICT_FALSE = 'false';
-const RATE_LIMIT_WINDOW_MS = 30_000;
-const RATE_LIMIT_MAX_REQUESTS = 8;
-
-type RateLimitState = {
-  windowStart: number;
-  count: number;
-};
-
-const rateLimitState = new Map<string, RateLimitState>();
+const RATE_LIMIT_EXCEEDED_MESSAGE = 'Too many preference updates in a short period. Please retry later.';
 
 export const GET: RequestHandler = async ({ locals, url }) => {
   if (!locals.user) {
@@ -101,7 +92,7 @@ export const PATCH: RequestHandler = async ({ locals, request }) => {
     return json({ error: error instanceof Error ? error.message : 'Invalid request body' }, { status: 400 });
   }
 
-  const rateLimitError = checkWriteRateLimit(locals.user.id, sectionKey);
+  const rateLimitError = checkWriteRateLimit(locals.user.id, sectionKey, RATE_LIMIT_EXCEEDED_MESSAGE);
   if (rateLimitError) {
     return json({ error: rateLimitError }, { status: 429 });
   }
@@ -117,7 +108,7 @@ export const PATCH: RequestHandler = async ({ locals, request }) => {
   }
 
   try {
-    const optimisticConflict = detectConcurrencyConflict(existing, expectedUpdatedAt);
+    const optimisticConflict = detectConcurrencyConflict(existing, expectedUpdatedAt, 'preference');
     if (optimisticConflict) {
       return json({ error: optimisticConflict }, { status: 409 });
     }
@@ -154,81 +145,6 @@ export const PATCH: RequestHandler = async ({ locals, request }) => {
 
   return json({ error: 'Preference update failed' }, { status: 500 });
 };
-
-function detectConcurrencyConflict(
-  existing: UserInterfacePreference | undefined,
-  expectedUpdatedAt: string | null | undefined
-): string | null {
-  if (expectedUpdatedAt === undefined) {
-    return null;
-  }
-
-  // Do not treat null as conflict when a row exists: client may send null before hydration
-  // or after a transient read failure; allow the write and let the client catch up.
-  if (expectedUpdatedAt === null) {
-    return null;
-  }
-
-  if (!existing) {
-    return 'Concurrency conflict: preference does not exist';
-  }
-
-  if (existing.updatedAt !== expectedUpdatedAt) {
-    return 'Concurrency conflict: expected_updated_at does not match';
-  }
-
-  return null;
-}
-
-function parseSectionKey(raw: unknown): SectionKey {
-  if (typeof raw !== 'string' || raw.trim().length === 0) {
-    throw new Error('section_key is required');
-  }
-
-  const sectionKey = raw.trim();
-  if (sectionKey.length > SECTION_KEY_MAX_LENGTH) {
-    throw new Error('Invalid section_key format');
-  }
-  if (!SECTION_KEY_PATTERN.test(sectionKey)) {
-    throw new Error('Invalid section_key format');
-  }
-
-  return sectionKey as SectionKey;
-}
-
-function checkWriteRateLimit(userId: number, sectionKey: string): string | null {
-  const now = Date.now();
-  const stateKey = `${userId}:${sectionKey}`;
-  const existing = rateLimitState.get(stateKey);
-
-  if (!existing || now - existing.windowStart >= RATE_LIMIT_WINDOW_MS) {
-    rateLimitState.set(stateKey, {
-      windowStart: now,
-      count: 1,
-    });
-    return null;
-  }
-
-  if (existing.count >= RATE_LIMIT_MAX_REQUESTS) {
-    return 'Too many preference updates in a short period. Please retry later.';
-  }
-
-  existing.count += 1;
-  return null;
-}
-
-function parseStrictParam(raw: string | null): boolean {
-  if (raw === null) {
-    return false;
-  }
-  if (raw === STRICT_TRUE) {
-    return true;
-  }
-  if (raw === STRICT_FALSE) {
-    return false;
-  }
-  throw new Error(`strict must be "${STRICT_TRUE}" or "${STRICT_FALSE}"`);
-}
 
 function parseMode(raw: unknown): UiMode {
   if (raw !== 'basic' && raw !== 'advanced') {
