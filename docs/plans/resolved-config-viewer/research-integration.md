@@ -24,15 +24,18 @@ gap-in-one-place.
     `Number.parseInt(rawId, 10)`, rejecting non-integer/`<= 0` — matches the feature
     spec's `/^\d+$/` claim exactly.
   - Cache/database lookup pattern:
+
     ```ts
     const database = pcdManager.getById(databaseId);
     if (!database) return { error: 'Database not found', status: 404 };
     const cache = pcdManager.getCache(databaseId);
     if (!cache) return { error: 'Database cache not available', status: 500 };
     ```
+
     Note this route returns 404/500 for missing db/cache — the **parity** endpoint
     (see below) is the actual precedent the spec wants (400 for "not ready"), so
     resolved-config handlers should follow parity's convention, not this one's.
+
   - Other siblings: `packages/praxrr-app/src/routes/api/v1/pcd/[databaseId]/snapshots/**`,
     `.../[databaseId]/lidarr-metadata-profiles/[id]/+server.ts`.
 
@@ -53,6 +56,7 @@ gap-in-one-place.
 
 - Root file: `docs/api/v1/openapi.yaml` — `openapi: 3.1.0`.
 - `paths:` section maps URL templates to file refs, e.g.:
+
   ```yaml
   /compatibility/parity:
     $ref: './paths/compatibility.yaml#/parity'
@@ -63,12 +67,15 @@ gap-in-one-place.
   /pcd/{databaseId}/snapshots:
     $ref: './paths/pcd-snapshots.yaml#/snapshots'
   ```
+
   Some simple paths (e.g. `/ui-preferences`, `/complexity-tiers`, the Lidarr
   metadata-profile routes) are defined **inline** in `openapi.yaml` itself rather
   than via a `paths/*.yaml` file — both patterns coexist; the spec's plan to use a
   dedicated `paths/resolved-config.yaml` matches the more common (and cleaner)
   pattern used by `compatibility.yaml`, `sync.yaml`, `pcd-snapshots.yaml`.
+
 - `components.schemas:` section registers each schema individually:
+
   ```yaml
   ParityMapResponse:
     $ref: './schemas/compatibility.yaml#/ParityMapResponse'
@@ -77,9 +84,11 @@ gap-in-one-place.
   ProfileCompatibility:
     $ref: './schemas/compatibility.yaml#/ProfileCompatibility'
   ```
+
   Every schema referenced anywhere must have an individual top-level key/`$ref`
   line under `components.schemas` — nested/anonymous schemas inside path files are
   fine but named cross-referenced schemas need this registration line.
+
 - Existing schema/path files relevant as templates: `docs/api/v1/paths/sync.yaml`,
   `docs/api/v1/schemas/sync.yaml` (has `EntityChange`, `FieldChange`,
   `SyncPreviewSection`, etc. — exactly what the spec wants to reuse),
@@ -88,12 +97,15 @@ gap-in-one-place.
 ### Type generation and bundling
 
 - `deno task generate:api-types` (from `deno.json:69`):
+
   ```
   npx openapi-typescript docs/api/v1/openapi.yaml -o packages/praxrr-app/src/lib/api/v1.d.ts
   ```
+
   Single command, reads the root spec (which pulls in all `$ref`'d files via
   `openapi-typescript`'s own resolver), writes `packages/praxrr-app/src/lib/api/v1.d.ts`
   directly — no intermediate bundling needed for this step.
+
 - `deno task bundle:api` (`deno.json:94`) runs `deno run -A scripts/bundle-api.ts`:
   - Reads `docs/api/v1/openapi.yaml`, walks `components.schemas` refs, loads each
     referenced schema **file** once and imports **all** top-level keys from that
@@ -106,11 +118,13 @@ gap-in-one-place.
     injecting JSDoc banners on `paths`/`components`/`operations`/`webhooks`/`$defs`.
   - `deno task publish:api` = `bundle:api` then `cd packages/praxrr-api && deno publish`.
 - Handler consumption pattern (`compatibility/parity/+server.ts`):
+
   ```ts
   import type { components } from '$api/v1.d.ts';
   type ParityMapResponse = components['schemas']['ParityMapResponse'];
   type ErrorResponse = components['schemas']['ErrorResponse'];
   ```
+
   `$api/v1.d.ts` resolves to `packages/praxrr-app/src/lib/api/v1.d.ts` (per
   `svelte.config.js` alias table) — the generated file, never hand-edited.
 
@@ -313,24 +327,29 @@ In-memory Kysely schema (34 tables) exposed via `cache.kb`: `custom_formats`,
 ### Rate limit utilities
 
 - Generic limiter (`packages/praxrr-app/src/lib/server/utils/rateLimit.ts`):
+
   ```ts
   export function registerRateLimitAttempt(
     key: string,
     opts?: { windowMs?: number; maxRequests?: number }
   ): boolean;
   ```
+
   Defaults: `DEFAULT_RATE_LIMIT_WINDOW_MS = 30_000`, `DEFAULT_RATE_LIMIT_MAX_REQUESTS = 8`.
   In-memory `Map<string, {windowStart, count}>`, capped at `MAX_TRACKED_KEYS = 10_000`
   distinct keys with oldest-window eviction — single-process only (no
   cross-instance sharing), explicitly documented as such in the file header.
   `resetRateLimitForTests()` exported for test cleanup.
+
 - Preview-specific limiter (`packages/praxrr-app/src/lib/server/sync/preview/limits.ts`):
+
   ```ts
   export function registerPreviewCreateAttempt(
     instanceId: number,
     nowMs: number
   ): boolean;
   ```
+
   Separate sliding-window implementation (own `Map<number, {timestamps:number[]}>`,
   filter-based pruning, **not** built on top of `registerRateLimitAttempt`).
   Constants: `PREVIEW_CREATE_RATE_LIMIT_WINDOW_MS = 60_000`,

@@ -18,6 +18,7 @@ Verified shape, in order:
 2. Module-level cache for static/derived data that doesn't vary per request
    (`let cachedStaticPayload: StaticParityMapPayload | null = null;` + lazy getter).
 3. Auth gate is the **first statement** in the handler:
+
    ```ts
    if (!locals.user && !locals.authBypass) {
      return json({ error: 'Unauthorized' } satisfies ErrorResponse, {
@@ -25,7 +26,9 @@ Verified shape, in order:
      });
    }
    ```
+
 4. Param validation with strict digit regex, not `parseInt` alone:
+
    ```ts
    if (!/^\d+$/.test(databaseIdParam)) {
      return json({ error: 'Invalid databaseId' } satisfies ErrorResponse, {
@@ -33,9 +36,12 @@ Verified shape, in order:
      });
    }
    ```
+
    (Rejects `"1e5"`, `"1abc"`, `" 1"` — `Number.parseInt` alone would silently accept these.)
+
 5. Cache-guard, returning **400 not 404** for an unbuilt/unknown database ("caller input
    problem, no sibling-app fallback"):
+
    ```ts
    const cache = pcdManager.getCache(databaseId);
    if (!cache?.isBuilt()) {
@@ -44,9 +50,11 @@ Verified shape, in order:
      });
    }
    ```
+
 6. try/catch around the actual compute, logging via `$logger/logger.ts` with `source` +
    `meta.error` (never the raw `Error` object serialized directly), returning a generic
    500 message to the client:
+
    ```ts
    } catch (error) {
      await logger.error('Failed to compute compatibility parity map', {
@@ -56,6 +64,7 @@ Verified shape, in order:
      return json({ error: 'Failed to compute compatibility parity map' } satisfies ErrorResponse, { status: 500 });
    }
    ```
+
 7. Every response body is typed with `satisfies <SchemaType>` against the generated
    OpenAPI types — never a bare object literal.
 

@@ -21,7 +21,7 @@ unsanitized markdown diff pattern is copied, and fan-out load from multi-instanc
 
 #### Radarr API v3
 
-- **Documentation**: https://radarr.video/docs/api/ (JS-rendered; authoritative schema at a running
+- **Documentation**: <https://radarr.video/docs/api/> (JS-rendered; authoritative schema at a running
   instance's `/api/v3/openapi.json`)
 - **Authentication**: `X-Api-Key` header (already handled by `BaseArrClient`)
 - **Key Endpoints**: `GET /api/v3/qualityprofile`, `GET /api/v3/customformat`,
@@ -30,7 +30,7 @@ unsanitized markdown diff pattern is copied, and fan-out load from multi-instanc
 
 #### Sonarr API v3 (serves Sonarr v3 and v4 apps)
 
-- **Documentation**: https://sonarr.tv/docs/api/
+- **Documentation**: <https://sonarr.tv/docs/api/>
 - **Authentication**: `X-Api-Key` header
 - **Key Endpoints**: `GET /api/v3/qualityprofile` (no `language` field, unlike Radarr),
   `GET /api/v3/releaseprofile` (Sonarr-only), `GET /api/v3/customformat` (**v4-app-only**)

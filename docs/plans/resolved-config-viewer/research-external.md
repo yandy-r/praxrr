@@ -65,10 +65,10 @@ UI's data model, since these are unversioned, source-of-truth-is-the-code APIs.
 
 ### Radarr API v3
 
-- **Docs**: https://radarr.video/docs/api/ (JS-rendered Swagger UI; use a running instance's
+- **Docs**: <https://radarr.video/docs/api/> (JS-rendered Swagger UI; use a running instance's
   `/api/v3/openapi.json` or `/docs` for the authoritative live schema — the public docs page does
   not serve static, fetchable content).
-- **Source of truth used here**: https://github.com/Radarr/Radarr — resource classes under
+- **Source of truth used here**: <https://github.com/Radarr/Radarr> — resource classes under
   `src/Radarr.Api.V3/`.
 - **Auth**: `X-Api-Key` header (also accepted as `apikey` query param per generated OpenAPI
   clients). Radarr V5 tightened this — API keys/passwords are now obfuscated in responses and the
@@ -98,11 +98,11 @@ UI's data model, since these are unversioned, source-of-truth-is-the-code APIs.
 
 ### Sonarr API v3 (also serves Sonarr v4 apps)
 
-- **Docs**: https://sonarr.tv/docs/api/ (same JS-rendered limitation as Radarr's docs page).
+- **Docs**: <https://sonarr.tv/docs/api/> (same JS-rendered limitation as Radarr's docs page).
   Sonarr's dev docs note two API generations: **V3** (stable, used by both Sonarr v3 and v4 apps)
   and **V5** (Sonarr v5 app only, not yet relevant to Praxrr's stated Sonarr v3/v4 support). Docs
   are generated from source and exposed per-instance at `/docs/{version}/openapi.json`.
-- **Source of truth used here**: https://github.com/Sonarr/Sonarr —
+- **Source of truth used here**: <https://github.com/Sonarr/Sonarr> —
   `src/Sonarr.Api.V3/Profiles/Quality/QualityProfileResource.cs`.
 - **Auth**: `X-Api-Key` header, same convention as Radarr.
 - **Relevant endpoints**:
