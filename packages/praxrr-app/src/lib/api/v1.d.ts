@@ -2024,10 +2024,13 @@ export interface components {
             /**
              * @description Sanitized reason when this instance's desired/live lookup failed.
              *     Raw error detail never appears here; full detail is logged
-             *     server-side only.
+             *     server-side only. Superset of the single-instance live-diff reason
+             *     enum: `incompatible` (unrecognized arr_type), `rate-limited`
+             *     (per-instance live fetch throttled), and `error` (unexpected
+             *     failure, detail logged not surfaced) are comparison-specific.
              * @enum {string|null}
              */
-            error?: "unreachable" | "timeout" | "unauthorized" | "invalid_response" | "unsupported" | "not_found" | null;
+            error?: "unreachable" | "timeout" | "unauthorized" | "invalid_response" | "unsupported" | "not_found" | "incompatible" | "rate-limited" | "error" | null;
         };
         CrossInstanceComparisonResponse: {
             /** @description PCD database ID */

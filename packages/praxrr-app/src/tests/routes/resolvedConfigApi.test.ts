@@ -8,7 +8,8 @@ import { DenoSqlite3Dialect } from '@soapbox/kysely-deno-sqlite';
 import type { PCDDatabase } from '$shared/pcd/types.ts';
 // Value import (not `import type`) -- Task 3.1's layer=base/user fixtures patch
 // `PCDCache.prototype.buildReadOnly`, which needs the class itself, not just its type.
-import { PCDCache } from '$pcd/index.ts';
+import { PCDCache, COMPARE_MAX_INSTANCES } from '$pcd/index.ts';
+import type { CompareAcrossInstancesInput } from '$pcd/index.ts';
 import { setCache, deleteCache } from '$pcd/database/registry.ts';
 import { GET as GET_LIST } from '../../routes/api/v1/pcd/[databaseId]/resolved/[entityType]/+server.ts';
 import { GET as GET_NAMED } from '../../routes/api/v1/pcd/[databaseId]/resolved/[entityType]/[name]/+server.ts';
@@ -16,6 +17,10 @@ import {
   _liveDiffDependencies,
   GET as GET_DIFF,
 } from '../../routes/api/v1/pcd/[databaseId]/resolved/[entityType]/[name]/diff/+server.ts';
+import {
+  _compareDependencies,
+  GET as GET_COMPARE,
+} from '../../routes/api/v1/pcd/[databaseId]/resolved/[entityType]/[name]/compare/+server.ts';
 import type { components } from '$api/v1.d.ts';
 import { databaseInstancesQueries } from '$db/queries/databaseInstances.ts';
 import type { DatabaseInstance } from '$db/queries/databaseInstances.ts';
@@ -30,14 +35,17 @@ import {
   registerPreviewCreateAttempt,
   resetPreviewCreateRateLimitForTests,
 } from '$sync/preview/limits.ts';
+import { DEFAULT_RATE_LIMIT_MAX_REQUESTS, resetRateLimitForTests } from '$utils/rateLimit.ts';
 import { logger } from '$logger/logger.ts';
 
 type ListGetEvent = Parameters<typeof GET_LIST>[0];
 type NamedGetEvent = Parameters<typeof GET_NAMED>[0];
 type DiffGetEvent = Parameters<typeof GET_DIFF>[0];
+type CompareGetEvent = Parameters<typeof GET_COMPARE>[0];
 type ResolvedEntityListResponse = components['schemas']['ResolvedEntityListResponse'];
 type ResolvedEntityState = components['schemas']['ResolvedEntityState'];
 type ResolvedLiveDiffResponse = components['schemas']['ResolvedLiveDiffResponse'];
+type CrossInstanceComparisonResponse = components['schemas']['CrossInstanceComparisonResponse'];
 type ErrorResponse = components['schemas']['ErrorResponse'];
 
 function buildLocals(authenticated: boolean) {
@@ -111,6 +119,24 @@ function buildDiffGetEvent(
   return event as DiffGetEvent;
 }
 
+function buildCompareGetEvent(
+  databaseId: string,
+  entityType: string,
+  name: string,
+  query: string,
+  authenticated: boolean
+): CompareGetEvent {
+  const event: Partial<CompareGetEvent> = {
+    url: new URL(
+      `http://localhost/api/v1/pcd/${databaseId}/resolved/${entityType}/${encodeURIComponent(name)}/compare${query}`
+    ),
+    params: { databaseId, entityType, name },
+    locals: buildLocals(authenticated),
+  };
+
+  return event as CompareGetEvent;
+}
+
 // ============================================================================
 // LIVE DIFF FIXTURE (Task 3.2)
 // ============================================================================
@@ -138,6 +164,21 @@ function withArrInstanceFixture(instance: ArrInstance, restores: Restore[]): voi
     arrInstancesQueries,
     'getById',
     ((id: number) => (id === instance.id ? instance : undefined)) as typeof arrInstancesQueries.getById,
+    restores
+  );
+}
+
+/**
+ * Patches `arrInstancesQueries.getById` to resolve any of the given fixture instances
+ * (compare's `instanceIds` fans out to multiple instances, unlike diff's single
+ * `instanceId`). An empty list makes every lookup resolve to `undefined`.
+ */
+function withArrInstancesFixture(instances: ArrInstance[], restores: Restore[]): void {
+  const byId = new Map(instances.map((instance) => [instance.id, instance]));
+  patchTarget(
+    arrInstancesQueries,
+    'getById',
+    ((id: number) => byId.get(id)) as typeof arrInstancesQueries.getById,
     restores
   );
 }
@@ -980,6 +1021,316 @@ Deno.test('get resolved entity live diff: sanitized infra failure reason maps to
     } finally {
       restores.reverse().forEach((restore) => restore());
       resetPreviewCreateRateLimitForTests();
+    }
+  });
+});
+
+// ============================================================================
+// COMPARE ENDPOINT (Task 3.3)
+// ============================================================================
+
+Deno.test('compare resolved entity: unauthenticated request returns 401', async () => {
+  const response = await GET_COMPARE(
+    buildCompareGetEvent('909090', 'regularExpression', 'Sample RE', '?instanceIds=1', false)
+  );
+  assertEquals(response.status, 401);
+});
+
+Deno.test('compare resolved entity: invalid databaseId returns 400', async () => {
+  const response = await GET_COMPARE(
+    buildCompareGetEvent('abc', 'regularExpression', 'Sample RE', '?instanceIds=1', true)
+  );
+  assertEquals(response.status, 400);
+});
+
+Deno.test('compare resolved entity: unbuilt/unknown database returns 400', async () => {
+  const response = await GET_COMPARE(
+    buildCompareGetEvent('424242', 'regularExpression', 'Sample RE', '?instanceIds=1', true)
+  );
+  assertEquals(response.status, 400);
+
+  const body = (await response.json()) as ErrorResponse;
+  assertEquals(body.error, 'Database not found');
+});
+
+Deno.test('compare resolved entity: unknown entityType returns 400', async () => {
+  await withFixture(async (databaseId) => {
+    const response = await GET_COMPARE(
+      buildCompareGetEvent(String(databaseId), 'notAnEntityType', 'Sample RE', '?instanceIds=1', true)
+    );
+    assertEquals(response.status, 400);
+  });
+});
+
+Deno.test('compare resolved entity: missing instanceIds returns 400', async () => {
+  await withFixture(async (databaseId) => {
+    const response = await GET_COMPARE(
+      buildCompareGetEvent(String(databaseId), 'regularExpression', 'Sample RE', '', true)
+    );
+    assertEquals(response.status, 400);
+
+    const body = (await response.json()) as ErrorResponse;
+    assert(body.error.includes('instanceIds'));
+  });
+});
+
+Deno.test('compare resolved entity: invalid instanceIds element returns 400', async () => {
+  await withFixture(async (databaseId) => {
+    const response = await GET_COMPARE(
+      buildCompareGetEvent(String(databaseId), 'regularExpression', 'Sample RE', '?instanceIds=1,2x', true)
+    );
+    assertEquals(response.status, 400);
+
+    const body = (await response.json()) as ErrorResponse;
+    assert(body.error.includes('instanceIds'));
+  });
+});
+
+Deno.test('compare resolved entity: instanceIds count exceeding the cap returns 400', async () => {
+  await withFixture(async (databaseId) => {
+    // COMPARE_MAX_INSTANCES + 1 ids -- the cap check runs before any per-id existence
+    // lookup, so these ids need not resolve to real fixture instances.
+    const ids = Array.from({ length: COMPARE_MAX_INSTANCES + 1 }, (_, index) => index + 1).join(',');
+    const response = await GET_COMPARE(
+      buildCompareGetEvent(String(databaseId), 'regularExpression', 'Sample RE', `?instanceIds=${ids}`, true)
+    );
+    assertEquals(response.status, 400);
+
+    const body = (await response.json()) as ErrorResponse;
+    assert(body.error.includes(String(COMPARE_MAX_INSTANCES)));
+  });
+});
+
+Deno.test('compare resolved entity: unknown instanceId returns 400', async () => {
+  await withFixture(async (databaseId) => {
+    const restores: Restore[] = [];
+    withArrInstancesFixture([], restores);
+
+    try {
+      const response = await GET_COMPARE(
+        buildCompareGetEvent(String(databaseId), 'regularExpression', 'Sample RE', '?instanceIds=590101', true)
+      );
+      assertEquals(response.status, 400);
+
+      const body = (await response.json()) as ErrorResponse;
+      assert(body.error.includes('590101'));
+    } finally {
+      restores.reverse().forEach((restore) => restore());
+    }
+  });
+});
+
+Deno.test('compare resolved entity: entity missing from every compatible instance returns 404', async () => {
+  await withFixture(async (databaseId) => {
+    const instance = buildArrInstanceFixture({ id: 590107, type: 'radarr' });
+    const restores: Restore[] = [];
+    withArrInstancesFixture([instance], restores);
+
+    try {
+      const response = await GET_COMPARE(
+        buildCompareGetEvent(
+          String(databaseId),
+          'regularExpression',
+          'Does Not Exist',
+          `?instanceIds=${instance.id}`,
+          true
+        )
+      );
+      assertEquals(response.status, 404);
+
+      const body = (await response.json()) as ErrorResponse;
+      assert(typeof body.error === 'string' && body.error.length > 0);
+    } finally {
+      restores.reverse().forEach((restore) => restore());
+      resetRateLimitForTests();
+    }
+  });
+});
+
+Deno.test('compare resolved entity: 429 after the per-user rate limit window is exhausted', async () => {
+  await withFixture(async (databaseId) => {
+    const instance = buildArrInstanceFixture({ id: 590102, type: 'radarr' });
+    const restores: Restore[] = [];
+    withArrInstancesFixture([instance], restores);
+
+    try {
+      for (let attempt = 0; attempt < DEFAULT_RATE_LIMIT_MAX_REQUESTS; attempt++) {
+        await GET_COMPARE(
+          buildCompareGetEvent(
+            String(databaseId),
+            'regularExpression',
+            'Sample RE',
+            `?instanceIds=${instance.id}`,
+            true
+          )
+        );
+      }
+
+      const response = await GET_COMPARE(
+        buildCompareGetEvent(String(databaseId), 'regularExpression', 'Sample RE', `?instanceIds=${instance.id}`, true)
+      );
+      assertEquals(response.status, 429);
+
+      const body = (await response.json()) as ErrorResponse;
+      assert(typeof body.error === 'string' && body.error.length > 0);
+    } finally {
+      restores.reverse().forEach((restore) => restore());
+      resetRateLimitForTests();
+    }
+  });
+});
+
+Deno.test(
+  'compare resolved entity: 200 returns mixed compatible/incompatible instances via stubbed compareAcrossInstances',
+  async () => {
+    await withFixture(async (databaseId) => {
+      const compatibleInstance = buildArrInstanceFixture({ id: 590108, type: 'radarr', name: 'Radarr A' });
+      const incompatibleInstance = buildArrInstanceFixture({ id: 590109, type: 'lidarr', name: 'Lidarr A' });
+      const restores: Restore[] = [];
+      withArrInstancesFixture([compatibleInstance, incompatibleInstance], restores);
+
+      patchTarget(
+        _compareDependencies,
+        'compareAcrossInstances',
+        (async () => ({
+          databaseId,
+          entityType: 'regularExpression',
+          name: 'Sample RE',
+          instances: [
+            {
+              instanceId: compatibleInstance.id,
+              instanceName: compatibleInstance.name,
+              arrType: 'radarr',
+              compatible: true,
+              present: true,
+              desired: { name: 'Sample RE', pattern: '.*sample.*', description: null, regex101Id: null, tags: [] },
+              actual: null,
+              error: null,
+            },
+            {
+              instanceId: incompatibleInstance.id,
+              instanceName: incompatibleInstance.name,
+              arrType: 'lidarr',
+              compatible: false,
+              present: false,
+              desired: null,
+              actual: null,
+              error: 'unsupported',
+            },
+          ],
+          diffs: [
+            {
+              instanceId: compatibleInstance.id,
+              changes: [
+                { entityType: 'regularExpression', name: 'Sample RE', action: 'unchanged', remoteId: null, fields: [] },
+              ],
+            },
+          ],
+        })) as typeof _compareDependencies.compareAcrossInstances,
+        restores
+      );
+
+      try {
+        const response = await GET_COMPARE(
+          buildCompareGetEvent(
+            String(databaseId),
+            'regularExpression',
+            'Sample RE',
+            `?instanceIds=${compatibleInstance.id},${incompatibleInstance.id}`,
+            true
+          )
+        );
+        assertEquals(response.status, 200);
+
+        const body = (await response.json()) as CrossInstanceComparisonResponse;
+        assertEquals(body.databaseId, databaseId);
+        assertEquals(body.entityType, 'regularExpression');
+        assertEquals(body.name, 'Sample RE');
+        assertEquals(body.instances.length, 2);
+
+        const compatible = body.instances.find((instance) => instance.instanceId === compatibleInstance.id);
+        assert(compatible);
+        assertEquals(compatible.compatible, true);
+        assertEquals(compatible.present, true);
+        assertEquals(compatible.error, null);
+
+        const incompatible = body.instances.find((instance) => instance.instanceId === incompatibleInstance.id);
+        assert(incompatible);
+        assertEquals(incompatible.compatible, false);
+        assertEquals(incompatible.error, 'unsupported');
+
+        assertEquals(body.diffs.length, 1);
+        assertEquals(body.diffs[0].instanceId, compatibleInstance.id);
+      } finally {
+        restores.reverse().forEach((restore) => restore());
+        resetRateLimitForTests();
+      }
+    });
+  }
+);
+
+Deno.test('compare resolved entity: includeLive defaults to false and is passed through unchanged', async () => {
+  await withFixture(async (databaseId) => {
+    const instance = buildArrInstanceFixture({ id: 590110, type: 'radarr' });
+    const restores: Restore[] = [];
+    withArrInstancesFixture([instance], restores);
+
+    let capturedIncludeLive: boolean | undefined;
+
+    patchTarget(
+      _compareDependencies,
+      'compareAcrossInstances',
+      (async (input: CompareAcrossInstancesInput) => {
+        capturedIncludeLive = input.includeLive;
+        return {
+          databaseId,
+          entityType: 'regularExpression',
+          name: 'Sample RE',
+          instances: [],
+          diffs: [],
+        };
+      }) as typeof _compareDependencies.compareAcrossInstances,
+      restores
+    );
+
+    try {
+      const response = await GET_COMPARE(
+        buildCompareGetEvent(String(databaseId), 'regularExpression', 'Sample RE', `?instanceIds=${instance.id}`, true)
+      );
+      assertEquals(response.status, 200);
+      assertEquals(capturedIncludeLive, false);
+    } finally {
+      restores.reverse().forEach((restore) => restore());
+      resetRateLimitForTests();
+    }
+  });
+});
+
+Deno.test('compare resolved entity: response payload never exposes instance api_key or url', async () => {
+  await withFixture(async (databaseId) => {
+    const instance = buildArrInstanceFixture({
+      id: 590111,
+      type: 'radarr',
+      url: 'http://secret-radarr.local:7878',
+      api_key: 'super-secret-api-key',
+    });
+    const restores: Restore[] = [];
+    withArrInstancesFixture([instance], restores);
+
+    try {
+      const response = await GET_COMPARE(
+        buildCompareGetEvent(String(databaseId), 'regularExpression', 'Sample RE', `?instanceIds=${instance.id}`, true)
+      );
+      assertEquals(response.status, 200);
+
+      const body = (await response.json()) as CrossInstanceComparisonResponse;
+      const serialized = JSON.stringify(body);
+      assert(!serialized.includes('api_key'));
+      assert(!serialized.includes('super-secret-api-key'));
+      assert(!serialized.includes('secret-radarr.local'));
+    } finally {
+      restores.reverse().forEach((restore) => restore());
+      resetRateLimitForTests();
     }
   });
 });

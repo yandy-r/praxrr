@@ -5,6 +5,7 @@
   import { browser } from '$app/environment';
   import type { components } from '$api/v1.d.ts';
   import ResolvedStatePanel from './ResolvedStatePanel.svelte';
+  import LiveDiffPanel from './LiveDiffPanel.svelte';
   import type { PageData } from './$types';
 
   export let data: PageData;
@@ -53,7 +54,10 @@
 
   // Panels register here — one entry per feature panel. Task 4.2 (LiveDiffPanel) and
   // Task 4.3 (CrossInstanceGrid) each append one additional entry to this array.
-  const panels: ConfigPanel[] = [{ id: 'resolved-state', label: 'Resolved State', component: ResolvedStatePanel }];
+  const panels: ConfigPanel[] = [
+    { id: 'resolved-state', label: 'Resolved State', component: ResolvedStatePanel },
+    { id: 'live-diff', label: 'Live Diff', component: LiveDiffPanel },
+  ];
 
   let activePanelId = panels[0].id;
   $: activePanel = panels.find((panel) => panel.id === activePanelId) ?? panels[0];

@@ -6233,9 +6233,12 @@
               "unauthorized",
               "invalid_response",
               "unsupported",
-              "not_found"
+              "not_found",
+              "incompatible",
+              "rate-limited",
+              "error"
             ],
-            "description": "Sanitized reason when this instance's desired/live lookup failed.\nRaw error detail never appears here; full detail is logged\nserver-side only.\n"
+            "description": "Sanitized reason when this instance's desired/live lookup failed.\nRaw error detail never appears here; full detail is logged\nserver-side only. Superset of the single-instance live-diff reason\nenum: `incompatible` (unrecognized arr_type), `rate-limited`\n(per-instance live fetch throttled), and `error` (unexpected\nfailure, detail logged not surfaced) are comparison-specific.\n"
           }
         }
       },
