@@ -134,15 +134,18 @@ INSERT INTO quality_profile_custom_formats (quality_profile_name, custom_format_
   ('Score-Only-Profile', 'SomeCF', 'radarr', 10);
 `;
 
-Deno.test('authenticated parity map request with no databaseId returns the static matrix without profiles', async () => {
-  const response = await GET(buildGetEvent('', true));
-  assertEquals(response.status, 200);
+Deno.test(
+  'authenticated parity map request with no databaseId returns the static matrix without profiles',
+  async () => {
+    const response = await GET(buildGetEvent('', true));
+    assertEquals(response.status, 200);
 
-  const body = (await response.json()) as ParityMapResponse;
-  assertEquals(body.matrix.length, 5);
-  assert(body.semanticDifferences.length >= 8);
-  assertEquals(body.profiles, undefined);
-});
+    const body = (await response.json()) as ParityMapResponse;
+    assertEquals(body.matrix.length, 5);
+    assert(body.semanticDifferences.length >= 8);
+    assertEquals(body.profiles, undefined);
+  }
+);
 
 Deno.test('authenticated parity map request with a built cache returns per-profile compatibility', async () => {
   const databaseId = 424242;

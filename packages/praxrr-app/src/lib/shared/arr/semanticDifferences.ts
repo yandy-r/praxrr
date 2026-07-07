@@ -43,11 +43,11 @@ export const ARR_SEMANTIC_DIFFERENCES: ArrSemanticDifference[] = [
     apps: ['lidarr'],
     summary: 'Lidarr quality definitions are audio formats, not video resolutions.',
     detail:
-      "radarr_quality_definitions and sonarr_quality_definitions carry resolution-based video qualities " +
-      "(SDTV, HDTV-720p, Bluray-2160p, ...). lidarr_quality_definitions carry audio formats (MP3-192, FLAC, ...) " +
-      "with no resolution axis (resolution: 0). The two are schema-compatible - each app owns a dedicated " +
+      'radarr_quality_definitions and sonarr_quality_definitions carry resolution-based video qualities ' +
+      '(SDTV, HDTV-720p, Bluray-2160p, ...). lidarr_quality_definitions carry audio formats (MP3-192, FLAC, ...) ' +
+      'with no resolution axis (resolution: 0). The two are schema-compatible - each app owns a dedicated ' +
       "table, so the parity axis reports 'native' for all three - but the values are disjoint: a Lidarr " +
-      "quality definition can never represent a video quality tier, and vice versa.",
+      'quality definition can never represent a video quality tier, and vice versa.',
     suggestion: 'Maintain Lidarr quality definitions independently; do not port Radarr/Sonarr resolution-based tiers.',
     sourceRefs: ['$sync/mappings.ts (QUALITIES)', 'db/migrations/20260216_enforce_native_lidarr_quality_mappings.ts'],
   },
@@ -91,7 +91,8 @@ export const ARR_SEMANTIC_DIFFERENCES: ArrSemanticDifference[] = [
       'it resolves the active default at runtime as the untagged profile with the lowest order (falling back to ' +
       "id=1 only when none is found) and merges the existing remote profile's id/order/tags. Applying the same " +
       'PCD delay-profile config can target a different underlying profile on Lidarr than on Radarr/Sonarr.',
-    suggestion: 'Verify the resolved Lidarr default delay profile after sync; do not assume id=1 as with Radarr/Sonarr.',
+    suggestion:
+      'Verify the resolved Lidarr default delay profile after sync; do not assume id=1 as with Radarr/Sonarr.',
     sourceRefs: ['$sync/delayProfiles/syncer.ts (resolveTargetDelayProfile)'],
   },
   {
@@ -99,7 +100,7 @@ export const ARR_SEMANTIC_DIFFERENCES: ArrSemanticDifference[] = [
     apps: ['lidarr'],
     summary: 'Metadata profiles exist only on Lidarr.',
     detail:
-      "Radarr and Sonarr have no metadata-profile concept at all (capabilities.ts sync.metadata_profiles is " +
+      'Radarr and Sonarr have no metadata-profile concept at all (capabilities.ts sync.metadata_profiles is ' +
       'false for both); only Lidarr owns lidarr_metadata_profiles. A metadata-profile PCD entity has no possible ' +
       'target on Radarr/Sonarr - it is unsupported by schema, not merely by value.',
     sourceRefs: ['$shared/arr/capabilities.ts (LIDARR_CAPABILITIES.sync.metadata_profiles)', '$db/queries/arrSync.ts'],

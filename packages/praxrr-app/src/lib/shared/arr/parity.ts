@@ -11,11 +11,7 @@ import { ARR_APP_TYPES } from '$shared/pcd/types.ts';
  * ArrSyncSurface - see PARITY_ENTITY_TO_SYNC_SURFACE below.
  */
 export type ParityEntity =
-  | 'custom_formats'
-  | 'quality_profiles'
-  | 'quality_definitions'
-  | 'delay_profiles'
-  | 'metadata_profiles';
+  'custom_formats' | 'quality_profiles' | 'quality_definitions' | 'delay_profiles' | 'metadata_profiles';
 
 /** Ordered list of declared parity entities */
 export const PARITY_ENTITIES = [

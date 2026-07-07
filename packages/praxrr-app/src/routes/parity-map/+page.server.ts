@@ -1,9 +1,6 @@
 import type { ServerLoad } from '@sveltejs/kit';
 import { pcdManager } from '$pcd/index.ts';
-import {
-  computeProfileCompatibility,
-  type ProfileCompatibility,
-} from '$pcd/entities/qualityProfiles/compatibility.ts';
+import { computeProfileCompatibility, type ProfileCompatibility } from '$pcd/entities/qualityProfiles/compatibility.ts';
 
 /**
  * Cross-Arr Parity Map route load.

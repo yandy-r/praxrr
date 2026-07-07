@@ -13,7 +13,10 @@ import { DenoSqlite3Dialect } from '@soapbox/kysely-deno-sqlite';
 import type { PCDDatabase } from '$shared/pcd/types.ts';
 import type { PCDCache } from '$pcd/index.ts';
 import type { ArrAppType } from '$shared/arr/capabilities.ts';
-import { computeCompatibleProfileNames, computeProfileCompatibility } from '$pcd/entities/qualityProfiles/compatibility.ts';
+import {
+  computeCompatibleProfileNames,
+  computeProfileCompatibility,
+} from '$pcd/entities/qualityProfiles/compatibility.ts';
 import { list } from '$pcd/entities/qualityProfiles/list.ts';
 
 interface CacheFixture {
@@ -146,23 +149,20 @@ INSERT INTO quality_profile_custom_formats (quality_profile_name, custom_format_
 
 const ALL_ARR_TYPES: ArrAppType[] = ['radarr', 'sonarr', 'lidarr'];
 
-Deno.test(
-  'computeCompatibleProfileNames: video quality matches radarr/sonarr but not lidarr',
-  async () => {
-    const fixture = createCacheFixture(SCHEMA_AND_DATA_SQL);
-    try {
-      const radarrCompatible = await computeCompatibleProfileNames(fixture.cache, 'radarr');
-      const sonarrCompatible = await computeCompatibleProfileNames(fixture.cache, 'sonarr');
-      const lidarrCompatible = await computeCompatibleProfileNames(fixture.cache, 'lidarr');
+Deno.test('computeCompatibleProfileNames: video quality matches radarr/sonarr but not lidarr', async () => {
+  const fixture = createCacheFixture(SCHEMA_AND_DATA_SQL);
+  try {
+    const radarrCompatible = await computeCompatibleProfileNames(fixture.cache, 'radarr');
+    const sonarrCompatible = await computeCompatibleProfileNames(fixture.cache, 'sonarr');
+    const lidarrCompatible = await computeCompatibleProfileNames(fixture.cache, 'lidarr');
 
-      assert(radarrCompatible.has('Video-Profile'));
-      assert(sonarrCompatible.has('Video-Profile'));
-      assert(!lidarrCompatible.has('Video-Profile'));
-    } finally {
-      await fixture.destroy();
-    }
+    assert(radarrCompatible.has('Video-Profile'));
+    assert(sonarrCompatible.has('Video-Profile'));
+    assert(!lidarrCompatible.has('Video-Profile'));
+  } finally {
+    await fixture.destroy();
   }
-);
+});
 
 Deno.test('computeCompatibleProfileNames: audio quality (FLAC) matches lidarr only', async () => {
   const fixture = createCacheFixture(SCHEMA_AND_DATA_SQL);
@@ -248,10 +248,7 @@ Deno.test(
         const compatibleNames = await computeCompatibleProfileNames(fixture.cache, arrType);
         const listed = await list(fixture.cache, arrType);
 
-        assertEquals(
-          listed.map((row) => row.name).sort(),
-          [...compatibleNames].sort()
-        );
+        assertEquals(listed.map((row) => row.name).sort(), [...compatibleNames].sort());
       }
     } finally {
       await fixture.destroy();

@@ -1,9 +1,4 @@
-import {
-  PARITY_ENTITIES,
-  getEntitySupportStatus,
-  type ParityEntity,
-  type ParityStatus,
-} from '$shared/arr/parity.ts';
+import { PARITY_ENTITIES, getEntitySupportStatus, type ParityEntity, type ParityStatus } from '$shared/arr/parity.ts';
 import { ARR_APP_TYPES, type ArrAppType } from '$shared/pcd/types.ts';
 
 /** One row of the Cross-Arr Parity Map matrix: an entity plus its per-app support status. */

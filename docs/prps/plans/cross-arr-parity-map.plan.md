@@ -42,15 +42,15 @@ Tasks grouped by dependency for parallel execution. Tasks within the same batch 
 batches run in order. No two tasks in the same batch touch the same file (verified — all 22 tasks edit
 distinct files).
 
-| Batch | Tasks                     | Depends On | Parallel Width |
-| ----- | ------------------------- | ---------- | -------------- |
-| B1    | 1, 3, 16, 17, 22          | —          | 5              |
-| B2    | 2, 4, 10, 11, 15          | B1         | 5              |
-| B3    | 5, 6, 12, 13, 18, 19      | B1, B2     | 6              |
-| B4    | 7, 14                     | B3         | 2              |
-| B5    | 8, 21                     | B4         | 2              |
-| B6    | 9                         | B5         | 1              |
-| B7    | 20                        | B6         | 1              |
+| Batch | Tasks                | Depends On | Parallel Width |
+| ----- | -------------------- | ---------- | -------------- |
+| B1    | 1, 3, 16, 17, 22     | —          | 5              |
+| B2    | 2, 4, 10, 11, 15     | B1         | 5              |
+| B3    | 5, 6, 12, 13, 18, 19 | B1, B2     | 6              |
+| B4    | 7, 14                | B3         | 2              |
+| B5    | 8, 21                | B4         | 2              |
+| B6    | 9                    | B5         | 1              |
+| B7    | 20                   | B6         | 1              |
 
 - **Total tasks**: 22
 - **Total batches**: 7
@@ -77,14 +77,14 @@ distinct files).
 
 ### Interaction Changes
 
-| Touchpoint      | Before                                            | After                                                                                             | Notes                                    |
-| --------------- | ------------------------------------------------- | ------------------------------------------------------------------------------------------------- | ---------------------------------------- |
-| Nav discovery   | No parity item (`registry.ts:68-80`)              | New Overview entry `href:'/parity-map'`, `arrScope:'all'`, `requiredFeature` UNSET                 | Sidebar/mobile render generically        |
-| Nav icon        | `NAV_ICON_MAP` has no `LayoutGrid` (`iconMap.ts`) | Register `LayoutGrid`; unregistered `iconKey` → `resolveNavIcon` returns `undefined` (icon gone)  | Must-do wiring                           |
-| Support view    | Server-only booleans, never rendered              | `Table.svelte` matrix; cell via named `slot="cell"` switch on `column.key` → `<Badge variant>`    | `Badge.svelte:19-30` variant map         |
-| Semantic gaps   | Scattered `$sync/*`, invisible                    | Warning cards grouped by scope, `detail`+`suggestion`                                              | Static tier, no DB call                  |
-| Profile compat  | Only filters sync UI (`list.ts`)                  | Rendered "Usable by: Radarr · Sonarr" chips when `?databaseId=` present                            | Same extracted predicate                 |
-| DB selection    | Auto-redirect + localStorage (`score-simulator`)  | Explicit picker → `/parity-map?databaseId=<id>`; no auto-resolve (OQ3)                             | Page + API both read explicit id         |
+| Touchpoint     | Before                                            | After                                                                                            | Notes                             |
+| -------------- | ------------------------------------------------- | ------------------------------------------------------------------------------------------------ | --------------------------------- |
+| Nav discovery  | No parity item (`registry.ts:68-80`)              | New Overview entry `href:'/parity-map'`, `arrScope:'all'`, `requiredFeature` UNSET               | Sidebar/mobile render generically |
+| Nav icon       | `NAV_ICON_MAP` has no `LayoutGrid` (`iconMap.ts`) | Register `LayoutGrid`; unregistered `iconKey` → `resolveNavIcon` returns `undefined` (icon gone) | Must-do wiring                    |
+| Support view   | Server-only booleans, never rendered              | `Table.svelte` matrix; cell via named `slot="cell"` switch on `column.key` → `<Badge variant>`   | `Badge.svelte:19-30` variant map  |
+| Semantic gaps  | Scattered `$sync/*`, invisible                    | Warning cards grouped by scope, `detail`+`suggestion`                                            | Static tier, no DB call           |
+| Profile compat | Only filters sync UI (`list.ts`)                  | Rendered "Usable by: Radarr · Sonarr" chips when `?databaseId=` present                          | Same extracted predicate          |
+| DB selection   | Auto-redirect + localStorage (`score-simulator`)  | Explicit picker → `/parity-map?databaseId=<id>`; no auto-resolve (OQ3)                           | Page + API both read explicit id  |
 
 ---
 
@@ -92,34 +92,34 @@ distinct files).
 
 Files that MUST be read before implementing:
 
-| Priority       | File                                                                                  | Lines     | Why                                                                 |
-| -------------- | ------------------------------------------------------------------------------------- | --------- | ------------------------------------------------------------------- |
-| P0 (critical)  | `docs/prps/designs/cross-arr-parity-map.design.md`                                    | all       | Authoritative design: data model, architecture, semantic catalog    |
-| P0 (critical)  | `packages/praxrr-app/src/lib/shared/arr/capabilities.ts`                              | 35-60, 88-165, 168-237, 298-330 | Support registry, `as const satisfies` pins, predicates to derive from |
-| P0 (critical)  | `packages/praxrr-app/src/lib/server/pcd/entities/qualityProfiles/list.ts`             | 38-163    | Compatibility algorithm to EXTRACT (QUALITIES-∩ reader + fallback)  |
-| P0 (critical)  | `packages/praxrr-app/src/lib/server/pcd/entities/qualityProfiles/index.ts`            | all       | Exports/wiring for the entity module (where `list`/`compatibility` live) |
-| P1 (important) | `packages/praxrr-app/src/routes/api/v1/arr/library/+server.ts`                        | 1-22, 253-328, 487-497 | GET handler: contract types, `parseInt`+400, cache guard, 500 catch |
-| P1 (important) | `packages/praxrr-app/src/routes/api/v1/ui-preferences/+server.ts`                     | 1-60      | Simple GET: auth 401 + query parse 400 (mirror for endpoint)        |
-| P1 (important) | `packages/praxrr-app/src/routes/api/v1/openapi.json/+server.ts`                       | 1-23      | Module-level static-cache tier (mirror for static parity tier)      |
-| P1 (important) | `docs/api/v1/openapi.yaml`                                                             | 1-45, 610-664 | Root registration of paths/schemas/tags; `ErrorResponse` shape  |
-| P1 (important) | `docs/api/v1/paths/system.yaml` + `docs/api/v1/schemas/arr.yaml`                       | 1-30 each | Path/schema fragment authoring style                                |
-| P1 (important) | `scripts/bundle-api.ts`                                                                | 39-108    | Bundle drops any schema file not root-`$ref`'d (registration gotcha) |
-| P1 (important) | `packages/praxrr-app/src/lib/client/ui/table/Table.svelte` + `table/types.ts`         | 1-40, all | `Column<T>` + named `slot="cell" let:row let:column` render         |
-| P1 (important) | `packages/praxrr-app/src/lib/client/ui/badge/Badge.svelte`                            | 1-45      | Variants (success/info/warning + radarr/sonarr/lidarr); legacy events |
-| P1 (important) | `packages/praxrr-app/src/lib/client/navigation/iconMap.ts`                            | all       | `NAV_ICON_MAP` + `resolveNavIcon` (register `LayoutGrid`)           |
-| P1 (important) | `packages/praxrr-app/src/lib/server/navigation/registry.ts`                           | 60-90     | `NAV_REGISTRY` append pattern (`ensureGroupId`, `arrScope`, `iconKey`) |
-| P2 (reference) | `packages/praxrr-app/src/tests/arr/resolveArrTargets.test.ts`                         | all       | Pure-module Deno.test + `@std/assert` style                         |
-| P2 (reference) | `packages/praxrr-app/src/tests/arr/lidarrQualityMappingPrereqs.test.ts`               | 1-49, 87-123 | In-memory `@jsr/db__sqlite` Kysely PCD fixture                   |
-| P2 (reference) | `packages/praxrr-app/src/tests/routes/uiPreferencesApi.test.ts`                       | 1-19, 110-166 | Endpoint handler test (import GET, `Parameters<typeof GET>[0]`)  |
-| P2 (reference) | `packages/praxrr-app/src/routes/score-simulator/+page.svelte`                         | 14-46     | DB-scoped page + picker/empty-state pattern                         |
+| Priority       | File                                                                          | Lines                           | Why                                                                      |
+| -------------- | ----------------------------------------------------------------------------- | ------------------------------- | ------------------------------------------------------------------------ |
+| P0 (critical)  | `docs/prps/designs/cross-arr-parity-map.design.md`                            | all                             | Authoritative design: data model, architecture, semantic catalog         |
+| P0 (critical)  | `packages/praxrr-app/src/lib/shared/arr/capabilities.ts`                      | 35-60, 88-165, 168-237, 298-330 | Support registry, `as const satisfies` pins, predicates to derive from   |
+| P0 (critical)  | `packages/praxrr-app/src/lib/server/pcd/entities/qualityProfiles/list.ts`     | 38-163                          | Compatibility algorithm to EXTRACT (QUALITIES-∩ reader + fallback)       |
+| P0 (critical)  | `packages/praxrr-app/src/lib/server/pcd/entities/qualityProfiles/index.ts`    | all                             | Exports/wiring for the entity module (where `list`/`compatibility` live) |
+| P1 (important) | `packages/praxrr-app/src/routes/api/v1/arr/library/+server.ts`                | 1-22, 253-328, 487-497          | GET handler: contract types, `parseInt`+400, cache guard, 500 catch      |
+| P1 (important) | `packages/praxrr-app/src/routes/api/v1/ui-preferences/+server.ts`             | 1-60                            | Simple GET: auth 401 + query parse 400 (mirror for endpoint)             |
+| P1 (important) | `packages/praxrr-app/src/routes/api/v1/openapi.json/+server.ts`               | 1-23                            | Module-level static-cache tier (mirror for static parity tier)           |
+| P1 (important) | `docs/api/v1/openapi.yaml`                                                    | 1-45, 610-664                   | Root registration of paths/schemas/tags; `ErrorResponse` shape           |
+| P1 (important) | `docs/api/v1/paths/system.yaml` + `docs/api/v1/schemas/arr.yaml`              | 1-30 each                       | Path/schema fragment authoring style                                     |
+| P1 (important) | `scripts/bundle-api.ts`                                                       | 39-108                          | Bundle drops any schema file not root-`$ref`'d (registration gotcha)     |
+| P1 (important) | `packages/praxrr-app/src/lib/client/ui/table/Table.svelte` + `table/types.ts` | 1-40, all                       | `Column<T>` + named `slot="cell" let:row let:column` render              |
+| P1 (important) | `packages/praxrr-app/src/lib/client/ui/badge/Badge.svelte`                    | 1-45                            | Variants (success/info/warning + radarr/sonarr/lidarr); legacy events    |
+| P1 (important) | `packages/praxrr-app/src/lib/client/navigation/iconMap.ts`                    | all                             | `NAV_ICON_MAP` + `resolveNavIcon` (register `LayoutGrid`)                |
+| P1 (important) | `packages/praxrr-app/src/lib/server/navigation/registry.ts`                   | 60-90                           | `NAV_REGISTRY` append pattern (`ensureGroupId`, `arrScope`, `iconKey`)   |
+| P2 (reference) | `packages/praxrr-app/src/tests/arr/resolveArrTargets.test.ts`                 | all                             | Pure-module Deno.test + `@std/assert` style                              |
+| P2 (reference) | `packages/praxrr-app/src/tests/arr/lidarrQualityMappingPrereqs.test.ts`       | 1-49, 87-123                    | In-memory `@jsr/db__sqlite` Kysely PCD fixture                           |
+| P2 (reference) | `packages/praxrr-app/src/tests/routes/uiPreferencesApi.test.ts`               | 1-19, 110-166                   | Endpoint handler test (import GET, `Parameters<typeof GET>[0]`)          |
+| P2 (reference) | `packages/praxrr-app/src/routes/score-simulator/+page.svelte`                 | 14-46                           | DB-scoped page + picker/empty-state pattern                              |
 
 ## External Documentation
 
-| Topic                  | Source                                                                 | Key Takeaway                                                                                       |
-| ---------------------- | --------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
-| Type generation        | `deno.json:69` → `npx openapi-typescript docs/api/v1/openapi.yaml -o packages/praxrr-app/src/lib/api/v1.d.ts` | `deno task generate:api-types` regen adds ~3300 lines of tool-version noise (CI ungated) — scrub to a reviewable diff |
-| JSR mirror bundling    | `deno.json:94` → `scripts/bundle-api.ts`                              | `deno task bundle:api` flattens the multi-file spec → `packages/praxrr-api/{openapi.json,types.ts}`; run after contract changes |
-| SvelteKit endpoint     | `@sveltejs/kit` `RequestHandler` + `json()`                          | `export const GET: RequestHandler = async ({ locals, url }) => …`; responses via `json(payload, { status })` |
+| Topic               | Source                                                                                                        | Key Takeaway                                                                                                                    |
+| ------------------- | ------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| Type generation     | `deno.json:69` → `npx openapi-typescript docs/api/v1/openapi.yaml -o packages/praxrr-app/src/lib/api/v1.d.ts` | `deno task generate:api-types` regen adds ~3300 lines of tool-version noise (CI ungated) — scrub to a reviewable diff           |
+| JSR mirror bundling | `deno.json:94` → `scripts/bundle-api.ts`                                                                      | `deno task bundle:api` flattens the multi-file spec → `packages/praxrr-api/{openapi.json,types.ts}`; run after contract changes |
+| SvelteKit endpoint  | `@sveltejs/kit` `RequestHandler` + `json()`                                                                   | `export const GET: RequestHandler = async ({ locals, url }) => …`; responses via `json(payload, { status })`                    |
 
 _This is an INTERNAL feature — no third-party API/SDK. The "API" is the app's own contract-first `/api/v1` surface._
 
@@ -134,7 +134,11 @@ Code patterns discovered in the codebase. Follow these exactly.
 ```ts
 // SOURCE: capabilities.ts:35-50 — ordered literal arrays pinned with `as const satisfies readonly X[]`
 export const ARR_SYNC_SURFACES = [
-  'quality_profiles', 'custom_formats', 'delay_profiles', 'media_management', 'metadata_profiles',
+  'quality_profiles',
+  'custom_formats',
+  'delay_profiles',
+  'media_management',
+  'metadata_profiles',
 ] as const satisfies readonly ArrSyncSurface[];
 // → mirror as: export const PARITY_ENTITIES = [...] as const satisfies readonly ParityEntity[];
 // SCREAMING_SNAKE const registries (ARR_APPS, ARR_APP_TYPES) → PARITY_ENTITIES, NATIVE_ENTITY_APPS, ARR_SEMANTIC_DIFFERENCES
@@ -146,7 +150,8 @@ export const ARR_SYNC_SURFACES = [
 ```ts
 // SOURCE: capabilities.ts:168-205, 235-237
 const ARR_CAPABILITY_NON_REGRESSION_CHECK = {
-  radarr: ARR_APPS.radarr.capabilities, sonarr: ARR_APPS.sonarr.capabilities,
+  radarr: ARR_APPS.radarr.capabilities,
+  sonarr: ARR_APPS.sonarr.capabilities,
 } as const satisfies { radarr: { /* literal */ }; sonarr: { /* literal */ } };
 void ARR_CAPABILITY_NON_REGRESSION_CHECK;
 ```
@@ -155,7 +160,10 @@ void ARR_CAPABILITY_NON_REGRESSION_CHECK;
 
 ```ts
 // SOURCE: capabilities.ts:298-305 — parity.ts calls these; only native/shared is authored
-export function supportsArrSyncSurface(type: ArrAppType, surface: ArrSyncSurface): boolean {
+export function supportsArrSyncSurface(
+  type: ArrAppType,
+  surface: ArrSyncSurface
+): boolean {
   return ARR_APPS[type].capabilities.sync[surface];
 }
 // getEntitySupportStatus(app, entity): 'unsupported' when !supportsArrSyncSurface(app, BRIDGE[entity]); else native/shared from NATIVE_ENTITY_APPS.
@@ -166,10 +174,17 @@ export function supportsArrSyncSurface(type: ArrAppType, surface: ArrSyncSurface
 ```ts
 // SOURCE: list.ts:59-82 — QUALITIES-filtered mapping reader (transitional-row guard)
 const supportedApiNames = new Set(Object.keys(QUALITIES[arrType]));
-for (const row of mappingRows) { if (!supportedApiNames.has(row.api_name)) continue; supportedQualityNames.add(row.quality_name.toLowerCase()); }
-if (supportedQualityNames.size === 0) return [];   // never trust arr_type='all'
+for (const row of mappingRows) {
+  if (!supportedApiNames.has(row.api_name)) continue;
+  supportedQualityNames.add(row.quality_name.toLowerCase());
+}
+if (supportedQualityNames.size === 0) return []; // never trust arr_type='all'
 // SOURCE: list.ts:135-159 — zero-enabled → arr-specific-score fallback (where arr_type = arrType only)
-if (!enabledQualityNames || enabledQualityNames.size === 0) { if (hasArrSpecificScores.has(profile.name)) compatibleProfileNames.add(profile.name); continue; }
+if (!enabledQualityNames || enabledQualityNames.size === 0) {
+  if (hasArrSpecificScores.has(profile.name))
+    compatibleProfileNames.add(profile.name);
+  continue;
+}
 ```
 
 ### ERROR_HANDLING (endpoint fail-fast — mirror `arr/library` + `ui-preferences`)
@@ -177,11 +192,21 @@ if (!enabledQualityNames || enabledQualityNames.size === 0) { if (hasArrSpecific
 ```ts
 // SOURCE: arr/library/+server.ts:307-316 — auth 401, param parse 400 (deviate: unknown cache → 400 not 404)
 type ErrorResponse = components['schemas']['ErrorResponse'];
-if (!locals.user) return json({ error: 'Unauthorized' } satisfies ErrorResponse, { status: 401 });
+if (!locals.user)
+  return json({ error: 'Unauthorized' } satisfies ErrorResponse, {
+    status: 401,
+  });
 const id = parseInt(raw, 10);
-if (isNaN(id) || id < 0) return json({ error: 'Invalid databaseId' } satisfies ErrorResponse, { status: 400 });
+if (isNaN(id) || id < 0)
+  return json({ error: 'Invalid databaseId' } satisfies ErrorResponse, {
+    status: 400,
+  });
 // SOURCE: arr/library/+server.ts:253-254 — cache-built guard; unbuilt/absent → 400 (never 500)
-const cache = pcdManager.getCache(id); if (!cache?.isBuilt()) return json({ error: 'Database not found' } satisfies ErrorResponse, { status: 400 });
+const cache = pcdManager.getCache(id);
+if (!cache?.isBuilt())
+  return json({ error: 'Database not found' } satisfies ErrorResponse, {
+    status: 400,
+  });
 ```
 
 ### STATIC_CACHE_TIER (module-level cache — mirror `openapi.json/+server.ts`)
@@ -190,7 +215,8 @@ const cache = pcdManager.getCache(id); if (!cache?.isBuilt()) return json({ erro
 // SOURCE: openapi.json/+server.ts:6,16-23 — build once, reuse; DB touched only when ?databaseId= present
 let cachedStatic: ParityMapResponse | null = null;
 export const GET: RequestHandler = async ({ locals, url }) => {
-  if (!cachedStatic) cachedStatic = { entities, apps, matrix, semanticDifferences };
+  if (!cachedStatic)
+    cachedStatic = { entities, apps, matrix, semanticDifferences };
   // ... optional DB tier appends `profiles`
 };
 ```
@@ -222,10 +248,14 @@ type ParityMapResponse = components['schemas']['ParityMapResponse'];
 // SOURCE: resolveArrTargets.test.ts:1-8 — pure module
 import { assertEquals } from '@std/assert';
 import { getEntitySupportStatus } from '$shared/arr/parity.ts';
-Deno.test('parity: metadata_profiles → unsupported/unsupported/native', () => { /* ... */ });
+Deno.test('parity: metadata_profiles → unsupported/unsupported/native', () => {
+  /* ... */
+});
 // SOURCE: lidarrQualityMappingPrereqs.test.ts:32-49 — in-memory PCD fixture
 const db = new Database(':memory:', { int64: true });
-const kb = new Kysely<PCDDatabase>({ dialect: new DenoSqlite3Dialect({ database: db }) });
+const kb = new Kysely<PCDDatabase>({
+  dialect: new DenoSqlite3Dialect({ database: db }),
+});
 const cache = { kb } as unknown as PCDCache; // try { ... } finally { await kb.destroy(); db.close(); }
 // SOURCE: uiPreferencesApi.test.ts:1-19 — endpoint: import GET, Parameters<typeof GET>[0], build event as GetEvent
 ```
@@ -246,30 +276,30 @@ const cache = { kb } as unknown as PCDCache; // try { ... } finally { await kb.d
 
 ## Files to Change
 
-| File                                                                                          | Action  | Justification                                                                 |
-| --------------------------------------------------------------------------------------------- | ------- | ---------------------------------------------------------------------------- |
-| `packages/praxrr-app/src/lib/shared/arr/parity.ts`                                            | CREATE  | Entity axis + tri-state derivation from `supportsArrSyncSurface` via total bridge; `NATIVE_ENTITY_APPS`; `PARITY_NON_REGRESSION_CHECK` |
-| `packages/praxrr-app/src/lib/shared/arr/semanticDifferences.ts`                               | CREATE  | Authored per-`arr_type` catalog (≥8 entries) — the only net-new prose        |
-| `packages/praxrr-app/src/lib/server/pcd/entities/qualityProfiles/compatibility.ts`            | CREATE  | Single compat surface extracted from `list.ts:59-159`                        |
-| `packages/praxrr-app/src/lib/server/pcd/entities/qualityProfiles/list.ts`                     | UPDATE  | Delegate lines 59-159 to `computeCompatibleProfileNames` (behavior-preserving) |
-| `docs/api/v1/paths/compatibility.yaml`                                                         | CREATE  | `getCompatibilityParity` GET op, tag `compatibility`                          |
-| `docs/api/v1/schemas/compatibility.yaml`                                                       | CREATE  | `ParityMapResponse`, `ArrSemanticDifference`, `ProfileCompatibility` schemas |
-| `docs/api/v1/openapi.yaml`                                                                     | UPDATE  | Register path `$ref`, schema `$ref`s, `tags` entry (bundle-api drops unreferenced files) |
-| `packages/praxrr-app/src/lib/api/v1.d.ts`                                                      | REGEN   | `deno task generate:api-types`; scrub tool-version noise                     |
-| `packages/praxrr-app/src/routes/api/v1/compatibility/parity/+server.ts`                        | CREATE  | GET: static tier module-cached + DB tier via `computeProfileCompatibility` when `?databaseId=`; fail-fast 400 |
-| `packages/praxrr-app/src/routes/parity-map/parityRows.ts`                                      | CREATE  | Pure, Svelte-free matrix-row builder (unit-testable)                         |
-| `packages/praxrr-app/src/lib/client/ui/parity/CompatibilityBadges.svelte`                      | CREATE  | Reusable "Usable by: …" chip row (drop-in for the deferred inline editor)    |
-| `packages/praxrr-app/src/routes/parity-map/ParityMatrix.svelte`                                | CREATE  | Entity × app matrix via `Table.svelte` + status `Badge`s + per-app colored headers/logos |
-| `packages/praxrr-app/src/routes/parity-map/SemanticDifferences.svelte`                         | CREATE  | Warning cards grouped by scope; renders `detail` + `suggestion`             |
-| `packages/praxrr-app/src/routes/parity-map/+page.svelte`                                       | CREATE  | Page shell composing matrix + semantic cards + (when DB linked) profile-compat table |
-| `packages/praxrr-app/src/routes/parity-map/+page.server.ts`                                    | CREATE  | Load: static tier always; reads optional `?databaseId=`, calls `computeProfileCompatibility`; DB picker options |
-| `packages/praxrr-app/src/lib/client/navigation/iconMap.ts`                                     | UPDATE  | Import + register `LayoutGrid` in `NAV_ICON_MAP`                             |
-| `packages/praxrr-app/src/lib/server/navigation/registry.ts`                                    | UPDATE  | Append one `overview` nav entry (`/parity-map`, `arrScope: all`, no `requiredFeature`) |
-| `packages/praxrr-app/src/tests/arr/parityMap.test.ts`                                          | CREATE  | Tri-state truth table, bridge totality, axis↔subsection pin, catalog invariants |
-| `packages/praxrr-app/src/tests/pcd/qualityProfileCompatibility.test.ts`                        | CREATE  | Extracted-predicate + `list.ts` delegation-equivalence with in-memory fixture |
-| `packages/praxrr-app/src/tests/routes/parityMapApi.test.ts`                                    | CREATE  | Endpoint status + shape + contract types (static / `?databaseId=` / 400)     |
-| `packages/praxrr-api/openapi.json`, `packages/praxrr-api/types.ts`                             | REGEN   | `deno task bundle:api` (JSR mirror)                                          |
-| `scripts/test.ts`                                                                              | UPDATE  | Add `parity` alias to the aliases map (convenience)                          |
+| File                                                                               | Action | Justification                                                                                                                          |
+| ---------------------------------------------------------------------------------- | ------ | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `packages/praxrr-app/src/lib/shared/arr/parity.ts`                                 | CREATE | Entity axis + tri-state derivation from `supportsArrSyncSurface` via total bridge; `NATIVE_ENTITY_APPS`; `PARITY_NON_REGRESSION_CHECK` |
+| `packages/praxrr-app/src/lib/shared/arr/semanticDifferences.ts`                    | CREATE | Authored per-`arr_type` catalog (≥8 entries) — the only net-new prose                                                                  |
+| `packages/praxrr-app/src/lib/server/pcd/entities/qualityProfiles/compatibility.ts` | CREATE | Single compat surface extracted from `list.ts:59-159`                                                                                  |
+| `packages/praxrr-app/src/lib/server/pcd/entities/qualityProfiles/list.ts`          | UPDATE | Delegate lines 59-159 to `computeCompatibleProfileNames` (behavior-preserving)                                                         |
+| `docs/api/v1/paths/compatibility.yaml`                                             | CREATE | `getCompatibilityParity` GET op, tag `compatibility`                                                                                   |
+| `docs/api/v1/schemas/compatibility.yaml`                                           | CREATE | `ParityMapResponse`, `ArrSemanticDifference`, `ProfileCompatibility` schemas                                                           |
+| `docs/api/v1/openapi.yaml`                                                         | UPDATE | Register path `$ref`, schema `$ref`s, `tags` entry (bundle-api drops unreferenced files)                                               |
+| `packages/praxrr-app/src/lib/api/v1.d.ts`                                          | REGEN  | `deno task generate:api-types`; scrub tool-version noise                                                                               |
+| `packages/praxrr-app/src/routes/api/v1/compatibility/parity/+server.ts`            | CREATE | GET: static tier module-cached + DB tier via `computeProfileCompatibility` when `?databaseId=`; fail-fast 400                          |
+| `packages/praxrr-app/src/routes/parity-map/parityRows.ts`                          | CREATE | Pure, Svelte-free matrix-row builder (unit-testable)                                                                                   |
+| `packages/praxrr-app/src/lib/client/ui/parity/CompatibilityBadges.svelte`          | CREATE | Reusable "Usable by: …" chip row (drop-in for the deferred inline editor)                                                              |
+| `packages/praxrr-app/src/routes/parity-map/ParityMatrix.svelte`                    | CREATE | Entity × app matrix via `Table.svelte` + status `Badge`s + per-app colored headers/logos                                               |
+| `packages/praxrr-app/src/routes/parity-map/SemanticDifferences.svelte`             | CREATE | Warning cards grouped by scope; renders `detail` + `suggestion`                                                                        |
+| `packages/praxrr-app/src/routes/parity-map/+page.svelte`                           | CREATE | Page shell composing matrix + semantic cards + (when DB linked) profile-compat table                                                   |
+| `packages/praxrr-app/src/routes/parity-map/+page.server.ts`                        | CREATE | Load: static tier always; reads optional `?databaseId=`, calls `computeProfileCompatibility`; DB picker options                        |
+| `packages/praxrr-app/src/lib/client/navigation/iconMap.ts`                         | UPDATE | Import + register `LayoutGrid` in `NAV_ICON_MAP`                                                                                       |
+| `packages/praxrr-app/src/lib/server/navigation/registry.ts`                        | UPDATE | Append one `overview` nav entry (`/parity-map`, `arrScope: all`, no `requiredFeature`)                                                 |
+| `packages/praxrr-app/src/tests/arr/parityMap.test.ts`                              | CREATE | Tri-state truth table, bridge totality, axis↔subsection pin, catalog invariants                                                        |
+| `packages/praxrr-app/src/tests/pcd/qualityProfileCompatibility.test.ts`            | CREATE | Extracted-predicate + `list.ts` delegation-equivalence with in-memory fixture                                                          |
+| `packages/praxrr-app/src/tests/routes/parityMapApi.test.ts`                        | CREATE | Endpoint status + shape + contract types (static / `?databaseId=` / 400)                                                               |
+| `packages/praxrr-api/openapi.json`, `packages/praxrr-api/types.ts`                 | REGEN  | `deno task bundle:api` (JSR mirror)                                                                                                    |
+| `scripts/test.ts`                                                                  | UPDATE | Add `parity` alias to the aliases map (convenience)                                                                                    |
 
 ## NOT Building
 
@@ -506,22 +536,22 @@ const cache = { kb } as unknown as PCDCache; // try { ... } finally { await kb.d
 
 ### Unit Tests
 
-| Test                                        | Input                                                        | Expected Output                                              | Edge Case? |
-| ------------------------------------------- | ----------------------------------------------------------- | ----------------------------------------------------------- | ---------- |
-| `parityMap` truth table                     | `getEntitySupportStatus(app, entity)` for all 15 cells      | metadata→`u/u/native`; qualdefs→`native×3`; cf/qp/delay→`shared×3` | No |
-| `parityMap` bridge totality                 | `PARITY_ENTITY_TO_SYNC_SURFACE`                             | every `ParityEntity` mapped (typecheck + runtime)           | Yes        |
-| `parityMap` axis↔capabilities consistency   | each `unsupported` cell                                     | equals `!supportsArrSyncSurface(app, bridge[entity])`       | Yes        |
-| `parityMap` qualdefs↔subsection pin         | `getEntitySupportStatus(app, 'quality_definitions')`        | `!== 'unsupported'` iff `isMediaManagementSubsectionSupported(app, 'qualityDefinitions')` | Yes |
-| `parityMap` catalog invariants              | `ARR_SEMANTIC_DIFFERENCES`                                  | ≥8 entries; apps⊆`ARR_APP_TYPES`; valid scope; non-empty summary/detail/sourceRefs | Yes |
-| `qualityProfileCompatibility` video profile | PCD fixture w/ video qualities enabled                     | `compatibleArrTypes = [radarr, sonarr]`                      | No         |
-| `qualityProfileCompatibility` audio profile | PCD fixture w/ audio (FLAC) qualities                      | `compatibleArrTypes = [lidarr]`                              | No         |
-| `qualityProfileCompatibility` zero-enabled  | profile w/ no enabled qualities + arr-specific score row   | compatible via fallback                                     | Yes        |
-| `qualityProfileCompatibility` transitional  | pre-`20260216` Sonarr-cloned Lidarr `quality_api_mappings` row | excluded by QUALITIES filter                            | Yes        |
-| `qualityProfileCompatibility` delegation    | `list(cache, arrType)` pre/post refactor                   | identical filtered profile set (enabled + fallback paths)   | Yes        |
-| `parityMapApi` static                       | `GET` no `databaseId`, authed                              | 200; `matrix`+`semanticDifferences`; NO `profiles`          | No         |
-| `parityMapApi` DB tier                      | `GET ?databaseId=<valid>` (patched cache)                 | 200 with `profiles[]`                                       | No         |
-| `parityMapApi` fail-fast                    | `GET ?databaseId=abc` / `all` / unknown                   | 400 `{error}`                                              | Yes        |
-| `parityMapApi` auth                         | `GET` unauthenticated                                      | 401 `{error}`                                              | Yes        |
+| Test                                        | Input                                                          | Expected Output                                                                           | Edge Case? |
+| ------------------------------------------- | -------------------------------------------------------------- | ----------------------------------------------------------------------------------------- | ---------- |
+| `parityMap` truth table                     | `getEntitySupportStatus(app, entity)` for all 15 cells         | metadata→`u/u/native`; qualdefs→`native×3`; cf/qp/delay→`shared×3`                        | No         |
+| `parityMap` bridge totality                 | `PARITY_ENTITY_TO_SYNC_SURFACE`                                | every `ParityEntity` mapped (typecheck + runtime)                                         | Yes        |
+| `parityMap` axis↔capabilities consistency   | each `unsupported` cell                                        | equals `!supportsArrSyncSurface(app, bridge[entity])`                                     | Yes        |
+| `parityMap` qualdefs↔subsection pin         | `getEntitySupportStatus(app, 'quality_definitions')`           | `!== 'unsupported'` iff `isMediaManagementSubsectionSupported(app, 'qualityDefinitions')` | Yes        |
+| `parityMap` catalog invariants              | `ARR_SEMANTIC_DIFFERENCES`                                     | ≥8 entries; apps⊆`ARR_APP_TYPES`; valid scope; non-empty summary/detail/sourceRefs        | Yes        |
+| `qualityProfileCompatibility` video profile | PCD fixture w/ video qualities enabled                         | `compatibleArrTypes = [radarr, sonarr]`                                                   | No         |
+| `qualityProfileCompatibility` audio profile | PCD fixture w/ audio (FLAC) qualities                          | `compatibleArrTypes = [lidarr]`                                                           | No         |
+| `qualityProfileCompatibility` zero-enabled  | profile w/ no enabled qualities + arr-specific score row       | compatible via fallback                                                                   | Yes        |
+| `qualityProfileCompatibility` transitional  | pre-`20260216` Sonarr-cloned Lidarr `quality_api_mappings` row | excluded by QUALITIES filter                                                              | Yes        |
+| `qualityProfileCompatibility` delegation    | `list(cache, arrType)` pre/post refactor                       | identical filtered profile set (enabled + fallback paths)                                 | Yes        |
+| `parityMapApi` static                       | `GET` no `databaseId`, authed                                  | 200; `matrix`+`semanticDifferences`; NO `profiles`                                        | No         |
+| `parityMapApi` DB tier                      | `GET ?databaseId=<valid>` (patched cache)                      | 200 with `profiles[]`                                                                     | No         |
+| `parityMapApi` fail-fast                    | `GET ?databaseId=abc` / `all` / unknown                        | 400 `{error}`                                                                             | Yes        |
+| `parityMapApi` auth                         | `GET` unauthenticated                                          | 401 `{error}`                                                                             | Yes        |
 
 ### Edge Cases Checklist
 
@@ -632,17 +662,17 @@ EXPECT: Matrix + semantic cards render; nav `LayoutGrid` icon visible; `?databas
 
 ## Risks
 
-| Risk | Likelihood | Impact | Mitigation |
-| ---- | ---------- | ------ | ---------- |
-| `list.ts` refactor regresses profile-list filtering (load-bearing, feeds live sync-selection UI) | Medium | High | Delegation-only change + delegation-equivalence test (enabled + zero-enabled fallback) |
-| `v1.d.ts` regen emits ~3300 lines of tool-version noise (CI ungated) | High | Medium | Regenerate deliberately, scrub to a reviewable diff (memory `v1dts-generator-drift`) |
-| Multi-source drift — support facts copied instead of derived | Medium | High | Derive via `supportsArrSyncSurface`; only native/shared authored; `PARITY_NON_REGRESSION_CHECK` + axis↔capabilities test |
-| Unknown/`'all'` `databaseId` not fail-fast (registry `getCache`→`undefined`) | Medium | High | Explicit `parseInt`+reject → 400; no sibling fallback (deviate from `simulate/score`'s 404) |
-| Transitional pre-`20260216` Lidarr `quality_api_mappings` rows pollute compat | Medium | High | QUALITIES-∩ reader (`api_name ∈ QUALITIES[arrType]`); never trust `arr_type='all'` |
-| `bundle-api.ts` silently drops an unreferenced `compatibility.yaml` schema | Medium | Medium | Register every schema under root `components.schemas`; verify in regenerated bundle |
-| Nav icon silently vanishes if `iconKey` unregistered | Medium | Low | Register `LayoutGrid` in `NAV_ICON_MAP` in the same change as the registry entry |
-| Convention confusion from CLAUDE.md (runes/`onclick`/tabs) | Medium | Medium | Mirror `Badge`/`Button`/`Table` (legacy `on:click`/`export let`/`$:`); `deno task format` |
-| `quality_definitions` latent false-positive for a future app (derived from coarser `media_management`) | Low | Medium | Explicit bridge + subsection-pin test binding to `isMediaManagementSubsectionSupported` |
+| Risk                                                                                                   | Likelihood | Impact | Mitigation                                                                                                               |
+| ------------------------------------------------------------------------------------------------------ | ---------- | ------ | ------------------------------------------------------------------------------------------------------------------------ |
+| `list.ts` refactor regresses profile-list filtering (load-bearing, feeds live sync-selection UI)       | Medium     | High   | Delegation-only change + delegation-equivalence test (enabled + zero-enabled fallback)                                   |
+| `v1.d.ts` regen emits ~3300 lines of tool-version noise (CI ungated)                                   | High       | Medium | Regenerate deliberately, scrub to a reviewable diff (memory `v1dts-generator-drift`)                                     |
+| Multi-source drift — support facts copied instead of derived                                           | Medium     | High   | Derive via `supportsArrSyncSurface`; only native/shared authored; `PARITY_NON_REGRESSION_CHECK` + axis↔capabilities test |
+| Unknown/`'all'` `databaseId` not fail-fast (registry `getCache`→`undefined`)                           | Medium     | High   | Explicit `parseInt`+reject → 400; no sibling fallback (deviate from `simulate/score`'s 404)                              |
+| Transitional pre-`20260216` Lidarr `quality_api_mappings` rows pollute compat                          | Medium     | High   | QUALITIES-∩ reader (`api_name ∈ QUALITIES[arrType]`); never trust `arr_type='all'`                                       |
+| `bundle-api.ts` silently drops an unreferenced `compatibility.yaml` schema                             | Medium     | Medium | Register every schema under root `components.schemas`; verify in regenerated bundle                                      |
+| Nav icon silently vanishes if `iconKey` unregistered                                                   | Medium     | Low    | Register `LayoutGrid` in `NAV_ICON_MAP` in the same change as the registry entry                                         |
+| Convention confusion from CLAUDE.md (runes/`onclick`/tabs)                                             | Medium     | Medium | Mirror `Badge`/`Button`/`Table` (legacy `on:click`/`export let`/`$:`); `deno task format`                                |
+| `quality_definitions` latent false-positive for a future app (derived from coarser `media_management`) | Low        | Medium | Explicit bridge + subsection-pin test binding to `isMediaManagementSubsectionSupported`                                  |
 
 ## Notes
 
@@ -653,4 +683,3 @@ EXPECT: Matrix + semantic cards render; nav `LayoutGrid` icon visible; `?databas
 - **OQ1–OQ4 resolved (do not re-litigate):** OQ1 schema-shape taxonomy (Lidarr quality profiles stay `shared`; audio disjointness is a warning); OQ2 preserve `list.ts` enabled-qualities semantics with "based on enabled qualities" copy; OQ3 `profiles` iff `?databaseId=` supplied; OQ4 all verdicts inline.
 - **Cross-Arr Semantic Validation checklist** (CLAUDE.md policy + design §4) is structurally satisfied: per-`arr_type` resolution, no sibling fallback, total-`Record` fail-fast, explicit `ARR_APP_TYPES` iteration. The PR body must affirm all four boxes.
 - **Confidence Score: 9/10** — design + 7-researcher verification align on every path; the one residual is the mechanical `v1.d.ts` scrub.
-
