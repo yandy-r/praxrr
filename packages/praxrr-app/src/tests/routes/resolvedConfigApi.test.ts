@@ -1205,7 +1205,44 @@ Deno.test(
         assertEquals(response.status, 400);
 
         const body = (await response.json()) as ErrorResponse;
-        assert(body.error.includes('not configured to sync'));
+        assert(body.error.includes('syncs this section (delayProfiles) from a different database'));
+      } finally {
+        restores.reverse().forEach((restore) => restore());
+        resetPreviewCreateRateLimitForTests();
+      }
+    });
+  }
+);
+
+Deno.test(
+  'get resolved entity live diff: 400 with a distinct message when the section has no sync configuration at all',
+  async () => {
+    await withFixture(async (databaseId) => {
+      const instance = buildArrInstanceFixture({ id: 590011, type: 'radarr' });
+      const restores: Restore[] = [];
+      withArrInstanceFixture(instance, restores);
+
+      // databaseId: null = the instance has never configured delay-profile sync.
+      patchTarget(
+        arrSyncQueries,
+        'getDelayProfilesSync',
+        ((_instanceId: number) => ({
+          databaseId: null,
+          profileName: null,
+          trigger: 'manual' as const,
+          cron: null,
+        })) as typeof arrSyncQueries.getDelayProfilesSync,
+        restores
+      );
+
+      try {
+        const response = await GET_DIFF(
+          buildDiffGetEvent(String(databaseId), 'delayProfile', 'Some Profile', `?instanceId=${instance.id}`, true)
+        );
+        assertEquals(response.status, 400);
+
+        const body = (await response.json()) as ErrorResponse;
+        assert(body.error.includes('has no sync configuration for this section (delayProfiles)'));
       } finally {
         restores.reverse().forEach((restore) => restore());
         resetPreviewCreateRateLimitForTests();

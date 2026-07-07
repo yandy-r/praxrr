@@ -43,7 +43,7 @@ function toWireChange(change: EntityChange): ResolvedLiveDiffResponse['changes']
 }
 
 /**
- * Whether `instance`'s own per-section sync selection for `entityType` references
+ * How `instance`'s own per-section sync selection for `entityType` relates to
  * `databaseId`. The live diff's desired state comes from the INSTANCE's sync
  * selection, not from the `databaseId` path segment directly -- an instance can be
  * configured to sync this section from an entirely different PCD database, in which
@@ -51,35 +51,48 @@ function toWireChange(change: EntityChange): ResolvedLiveDiffResponse['changes']
  * against the wrong desired state. Checked before any live diff is attempted so the
  * mismatch surfaces as a caller-input 400, not a misleading result.
  *
+ * The two failure modes are deliberately distinct so the client can say exactly what
+ * to fix:
+ * - `not_configured`: the instance has no sync selection for this section at all.
+ * - `different_database`: a selection exists but references another PCD database.
+ *
  * `qualityProfiles` supports multiple selections (`customFormat` and `qualityProfile`
  * entities share the section) -- a match on ANY selection is sufficient. Every other
- * section carries at most one selection.
+ * section carries at most one selection (`databaseId: null` = unconfigured).
  */
-function instanceSyncTargetsDatabase(
+type SyncTargetCheck = 'ok' | 'not_configured' | 'different_database';
+
+function checkInstanceSyncTarget(
   instanceId: number,
   entityType: ResolvedEntityType,
   section: SectionType,
   databaseId: number
-): boolean {
+): SyncTargetCheck {
+  const compare = (selected: number | null): SyncTargetCheck => {
+    if (selected === null) return 'not_configured';
+    return selected === databaseId ? 'ok' : 'different_database';
+  };
+
   switch (section) {
     case 'qualityProfiles': {
       const { selections } = arrSyncQueries.getQualityProfilesSync(instanceId);
-      return selections.some((selection) => selection.databaseId === databaseId);
+      if (selections.length === 0) return 'not_configured';
+      return selections.some((selection) => selection.databaseId === databaseId) ? 'ok' : 'different_database';
     }
     case 'delayProfiles': {
-      const sync = arrSyncQueries.getDelayProfilesSync(instanceId);
-      return sync.databaseId === databaseId;
+      return compare(arrSyncQueries.getDelayProfilesSync(instanceId).databaseId);
     }
     case 'mediaManagement': {
       const sync = arrSyncQueries.getMediaManagementSync(instanceId);
-      if (entityType === 'naming') return sync.namingDatabaseId === databaseId;
-      if (entityType === 'mediaSettings') return sync.mediaSettingsDatabaseId === databaseId;
-      if (entityType === 'qualityDefinitions') return sync.qualityDefinitionsDatabaseId === databaseId;
-      return false;
+      if (entityType === 'naming') return compare(sync.namingDatabaseId);
+      if (entityType === 'mediaSettings') return compare(sync.mediaSettingsDatabaseId);
+      if (entityType === 'qualityDefinitions') return compare(sync.qualityDefinitionsDatabaseId);
+      // Unreachable: mapEntityTypeToSection only maps the three subsection entity
+      // types above to 'mediaManagement'. Defensive fail-fast for future mappings.
+      return 'not_configured';
     }
     case 'metadataProfiles': {
-      const sync = arrSyncQueries.getMetadataProfilesSync(instanceId);
-      return sync.databaseId === databaseId;
+      return compare(arrSyncQueries.getMetadataProfilesSync(instanceId).databaseId);
     }
   }
 }
@@ -153,11 +166,24 @@ export const GET: RequestHandler = async ({ locals, params, url }) => {
   // Entity types with no sync section at all (`regularExpression`) have no selection to
   // validate and fall through to `computeLiveDiff`'s existing `unsupported` handling.
   const section = mapEntityTypeToSection(entityType);
-  if (section && !instanceSyncTargetsDatabase(instanceId, entityType, section, databaseId)) {
-    return json(
-      { error: 'Instance is not configured to sync this section from this database' } satisfies ErrorResponse,
-      { status: 400 }
-    );
+  if (section) {
+    const syncTarget = checkInstanceSyncTarget(instanceId, entityType, section, databaseId);
+    if (syncTarget === 'not_configured') {
+      return json(
+        {
+          error: `Instance "${instance.name}" has no sync configuration for this section (${section}) — configure it on the instance's Sync page`,
+        } satisfies ErrorResponse,
+        { status: 400 }
+      );
+    }
+    if (syncTarget === 'different_database') {
+      return json(
+        {
+          error: `Instance "${instance.name}" syncs this section (${section}) from a different database — switch the viewer to that database or update the instance's sync selection`,
+        } satisfies ErrorResponse,
+        { status: 400 }
+      );
+    }
   }
 
   const nowMs = Date.now();
