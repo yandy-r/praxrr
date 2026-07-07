@@ -1,7 +1,7 @@
 {
   "name": "@yandy-r/praxrr-app",
   "exports": "./mod.ts",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Praxrr runtime application source (SvelteKit app)",
   "imports": {
     "$lib/": "./src/lib/",
