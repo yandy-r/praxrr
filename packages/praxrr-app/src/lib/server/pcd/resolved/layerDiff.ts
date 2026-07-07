@@ -213,8 +213,13 @@ function parseOpMetadata(raw: string | null): ParsedOpMetadata | null {
  * correlates to it (by `entity` + `name`, per `draftChanges.ts`'s precedent). Unmapped
  * `(entityType, arrType)` combinations or unparsable metadata defensively resolve to
  * `false` rather than throwing -- this is an annotation, not a validation gate.
+ *
+ * Exported (in addition to being used internally by `resolveLayerState`) so the list
+ * endpoint (`routes/.../resolved/[entityType]/+server.ts`) can compute this per-entity
+ * inside an already-open `withBaseOnlyCache` scope without re-running `withBaseOnlyCache`
+ * once per entity (which `resolveLayerState('base'|'user')` would otherwise force).
  */
-function computeHasPendingConflict(
+export function computeHasPendingConflict(
   databaseId: number,
   entityType: ResolvedEntityType,
   arrType: ArrAppType | undefined,

@@ -6,11 +6,12 @@ import {
   isResolvedConfigValidationError,
   pcdManager,
   PER_ARR_READERS,
-  readResolvedEntity,
+  resolveLayerState,
 } from '$pcd/index.ts';
 import type { ResolvedEntityPayload, ResolvedEntityType } from '$pcd/index.ts';
 import { isArrAppType } from '$shared/arr/capabilities.ts';
 import type { ArrAppType } from '$shared/pcd/types.ts';
+import type { FieldChange } from '$sync/preview/types.ts';
 import { logger } from '$logger/logger.ts';
 
 type ResolvedEntityState = components['schemas']['ResolvedEntityState'];
@@ -40,6 +41,17 @@ function toWirePayload(payload: ResolvedEntityPayload): ResolvedEntityState['ent
 }
 
 /**
+ * `FieldChange.current`/`.desired` (`$sync/preview/types.ts`) are internally typed
+ * `unknown` -- a diff can carry any JSON-shaped value -- while the generated
+ * `FieldChange` OpenAPI schema types them as a closed JSON-value union. Same
+ * wire-boundary narrowing as `toWirePayload` above; the two shapes are identical once
+ * serialized to JSON.
+ */
+function toWireOverrides(overrides: readonly FieldChange[]): ResolvedEntityState['overrides'] {
+  return overrides as unknown as ResolvedEntityState['overrides'];
+}
+
+/**
  * PCD cache tables are opened with `int64: true` (see `PCDCache`), so some integer
  * columns can come back as `bigint`. `json()` calls `JSON.stringify` internally, which
  * throws on `bigint` -- coerce any bigint (every resolved-config value is well within
@@ -53,7 +65,7 @@ function sanitizeBigInts<T>(value: T): T {
  * GET /api/v1/pcd/{databaseId}/resolved/{entityType}/{name}
  *
  * Returns resolved config state for a single named entity, for the selected
- * layer (`layer=resolved` only -- Task 3.1 wires `layer=base|user`).
+ * layer (`base`, `user`, or `resolved`), via `resolveLayerState`.
  *
  * Path params:
  * - databaseId: PCD database ID
@@ -101,10 +113,6 @@ export const GET: RequestHandler = async ({ locals, params, url }) => {
   if (layerParam !== 'base' && layerParam !== 'user' && layerParam !== 'resolved') {
     return json({ error: `Invalid layer "${layerParam}"` } satisfies ErrorResponse, { status: 400 });
   }
-  if (layerParam === 'base' || layerParam === 'user') {
-    // TODO(Task 3.1): wire layer=base|user via resolveLayerState (layers.ts + layerDiff.ts).
-    return json({ error: 'layer not yet supported' } satisfies ErrorResponse, { status: 400 });
-  }
 
   const arrTypeParam = url.searchParams.get('arrType');
   let arrType: ArrAppType | undefined;
@@ -116,19 +124,35 @@ export const GET: RequestHandler = async ({ locals, params, url }) => {
   }
 
   try {
-    const entity = await readResolvedEntity(cache, entityType, arrType, name);
+    // resolveLayerState composes the readers dispatch table (`layer=resolved`), the
+    // ephemeral base-only cache (`layer=base`), and the base-vs-resolved field diff
+    // (`layer=user`) behind one call -- a single entity read has no per-request
+    // repeated-build cost, so unlike the list endpoint's layer=base/user branches this
+    // always routes through resolveLayerState for hasPendingConflict uniformity.
+    const state = await resolveLayerState({ databaseId, entityType, arrType, name, layer: layerParam });
 
-    const response = {
-      databaseId,
-      entityType,
-      name,
-      layer: 'resolved',
-      present: true,
-      entity: toWirePayload(entity),
-      // TODO(Task 3.1): flag true when pcdOpHistoryQueries.listLatestConflictsByDatabase
-      // reports a pending value-guard conflict targeting this entity (Business Rule 6).
-      hasPendingConflict: false,
-    } satisfies ResolvedEntityState;
+    let response: ResolvedEntityState;
+    if (state.layer === 'user') {
+      response = {
+        databaseId,
+        entityType,
+        name,
+        layer: 'user',
+        present: state.present,
+        overrides: toWireOverrides(state.overrides),
+        hasPendingConflict: state.hasPendingConflict,
+      } satisfies ResolvedEntityState;
+    } else {
+      response = {
+        databaseId,
+        entityType,
+        name,
+        layer: state.layer,
+        present: state.present,
+        entity: state.entity !== null ? toWirePayload(state.entity) : null,
+        hasPendingConflict: state.hasPendingConflict,
+      } satisfies ResolvedEntityState;
+    }
 
     return json(sanitizeBigInts(response));
   } catch (error) {
@@ -136,8 +160,11 @@ export const GET: RequestHandler = async ({ locals, params, url }) => {
       return json({ error: error.message } satisfies ErrorResponse, { status: 400 });
     }
 
-    // serialize.ts's readers throw a plain `Error("... not found")` on a by-name miss --
-    // 404 is reserved for a hard miss in the resolved layer (see resolved-config.yaml).
+    // serialize.ts's readers throw a plain `Error("... not found")` on a by-name miss.
+    // `resolveLayerState` propagates this unwrapped for a hard miss in the resolved
+    // layer, and (for `layer=user`) when the entity is absent from BOTH resolved and
+    // base -- `layer=base`'s own absence is never an error (`present:false` instead,
+    // see resolved-config.yaml).
     if (error instanceof Error && error.message.includes('not found')) {
       return json({ error: error.message } satisfies ErrorResponse, { status: 404 });
     }

@@ -137,3 +137,12 @@ export type {
   ResolvedLayerUserState,
   ResolveLayerStateInput,
 } from './resolved/layerDiff.ts';
+export { compareAcrossInstances } from './resolved/compare.ts';
+export type {
+  CompareAcrossInstancesInput,
+  CompareAcrossInstancesResult,
+  CompareDeps,
+  CompareDiffRow,
+  CompareInstanceResult,
+  CompareReason,
+} from './resolved/compare.ts';
