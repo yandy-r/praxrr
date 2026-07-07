@@ -1,0 +1,72 @@
+# Setup Wizard — Security Discovery Table (plan-ready)
+
+Source findings: `docs/plans/setup-wizard/research-security.md` (C1–C4/W1–W6/A1–A4) +
+`feature-spec.md` §Security. All file:line verified against HEAD this session.
+
+## Risks
+
+| Risk | Likelihood | Impact | Mitigation |
+| ---- | ---------- | ------ | ---------- |
+| **C1 — Unauthenticated `/api/v1/setup/*`.** `hooks.server.ts:214-219` redirects (303) every path except literal `/auth/setup` while `needsSetup`; new setup APIs are either unreachable or, if added to `PUBLIC_PATHS` (`middleware.ts:27`) to work around it, become permanently unauthenticated (static prefix list, no "setup-in-progress" condition — `isPublicPath` `middleware.ts:32-34`). | High | Critical | Per-handler guard as **first statement**: require auth per active AUTH mode AND assert setup still in progress (throw 403 once complete). Mirror the `load`+`action` double-check in `routes/auth/setup/+page.server.ts:14,26`. Do NOT authorize via `PUBLIC_PATHS`. |
+| **C3 — SSRF via connection test.** `routes/arr/test/+server.ts:41` builds `createArrClient(type, url, apiKey)` from a fully user-supplied `url` → `BaseHttpClient.request()` → bare `fetch(url,…)` (`http/client.ts:57-62`). No host/scheme validation anywhere in `$arr`/`$http`. Once C1 makes this pre-auth-reachable, an anon caller probes `127.0.0.1`/`169.254.169.254` (IMDS)/RFC1918 and gets a differentiated signal (`success` + raw `error.message` at `arr/test/+server.ts:53`). | High | Critical | Shared `assertSafeArrUrl(url)` (new `$arr/urlSafety.ts`) called **before** `createArrClient` in BOTH the new endpoint and existing `/arr/test`. `http/https` only; resolve host; **narrow deny-list** (metadata `169.254.169.254`/`fd00:ec2::254`, `0.0.0.0`, link-local) — NOT an allow-list (self-hosted Arr legitimately on LAN). Add `redirect:'manual'` in `BaseHttpClient.request()` (`http/client.ts:57`) to block redirect-based bypass. |
+| **C2 — Race-to-setup / no anti-hijack binding.** `needsSetup` = "no local user" only (`middleware.ts:41,119`); no setup nonce; `csrf.trustedOrigins:['*']` disables Origin CSRF app-wide (`svelte.config.js:16-18`); default bind `HOST=0.0.0.0` (`config.ts:53`). Anyone reaching the fresh instance first can create the admin + point Praxrr at a malicious Arr/PCD before the real admin finishes. | Med | Critical | Per-boot single-use setup token on all setup POSTs; and/or restrict `/auth/setup`+`/api/v1/setup/*` to local IPs while `needsSetup` (reuse `isLocalAddress()` `network.ts:25`), env opt-out for remote-first-run; narrow `csrf.trustedOrigins` off `'*'` (W3). |
+| **C4 — Local-path traversal on PCD link.** `resolveLocalRepositoryPath()` (`git/write.ts:19-43`) accepts any `file://`/`/`/`./`/`../`/drive-letter path with zero root-confinement, then `clone()`→`copyPathRecursive()` (`git/write.ts:55-73,293`) recursively reads it into the data dir; contents become readable via app UI/export. Pre-auth arbitrary-directory read if the wizard exposes local-path linking. | Med | Critical | Wizard is **git-URL-only** (`https://`). Do not expose local-path linking in the guided flow. Keep local-path in authenticated Databases UI only, and even there confine result under `config.paths.data`/`PRAXRR_LOCAL_PCD_ROOT` before `Deno.stat`/copy. |
+| **W6 — Wizard never fires under `AUTH=off`.** `getAuthState()` returns `needsSetup:false` unconditionally for `AUTH=off` (`middleware.ts:44-51`) and `AUTH=oidc` (`middleware.ts:77`). Keying the wizard to `existsLocal()` means it never runs (or naively re-keyed, over-runs) for those modes. | Med | High | Gate wizard on a dedicated `setupStateQueries.wizard_completed` flag independent of auth mode; consistent across on/local/off/oidc. |
+| **W2 — No rate limit on test/link endpoints.** `checkWriteRateLimit` exists but is keyed by `userId` and local to one route (`section-preferences/_helpers.ts:58-83`); pre-auth setup has no userId. Unbounded → port-scan oracle (C3) / git-clone DoS. | Med | High | Extract to `$utils/rateLimit.ts`; key by client IP via `getClientIp()` (`network.ts:111`); cap test-connection AND PCD-link per IP/window. |
+| **W1 — Raw error leaked to client.** `arr/test/+server.ts:49-56` returns raw `error.message` (500); wizard must not repeat. | Med | Med | Sanitized reason enum (`unreachable\|unauthorized\|invalid_response\|timeout`) to client; log full error server-side (mirror `maskApiKey()`/`arrCredentialRedactionRoutes.test.ts`). |
+| **W4/W5 — Token disclosure via git URL.** `clone()` embeds PAT as `https://${token}@github.com` (`git/write.ts:316-319`) then throws raw `stderr` (`git/write.ts:338-339`) which git echoes URLs into; nothing rejects `repositoryUrl` with credentials-in-authority, and `manager.link()` logs `repositoryUrl` verbatim (`manager.ts:43-50`). | Med | High | Strip `https://<token>@` from `stderr` before throw; wizard PCD-link handler returns sanitized enum only; reject any `repositoryUrl` whose authority contains `@` at input time. Route the PAT only through `encryptDatabasePersonalAccessToken` (`manager.ts:67-70`). |
+| **W3 — App-wide CSRF disabled.** `csrf.trustedOrigins:['*']` (`svelte.config.js:16-18`); pre-auth setup flow has no session cookie to fall back on (auth flows partly cushioned by `sameSite:'lax'` `auth/setup/+page.server.ts:87-93`). | Med | Med | Narrow `trustedOrigins` to configured origin(s); if `'*'` kept for reverse-proxy, document + layer C2 setup token on top. |
+| **A2 — No login/setup lockout.** Only failed-login classification exists; the wizard's account-creation action is adjacent pre-auth surface in the same race window. | Low | Med | Apply IP-keyed rate limit to `/auth/login` + wizard account-creation (defense-in-depth, independent of C2). |
+
+## Patterns to Mirror → ERROR_HANDLING
+
+### Auth guard (model for the per-handler C1 guard — NOT `PUBLIC_PATHS`)
+
+- **Double-check `existsLocal()` in BOTH load and action** — `routes/auth/setup/+page.server.ts:11-19` (load) and `:21-28` (action):
+```ts
+export const load: ServerLoad = () => {
+  if (usersQueries.existsLocal()) { throw redirect(303, '/'); }   // L14-15
+  return {};
+};
+export const actions: Actions = {
+  default: async (event) => {
+    if (usersQueries.existsLocal()) { throw redirect(303, '/'); } // L26-27 race-condition protection
+```
+  → Wizard equivalent: an `assertSetupInProgress()` helper called as the **first statement** of every `/api/v1/setup/*` handler, throwing 403 (not redirect, for API) once the deployment-wide `wizard_completed` flag is set.
+
+- **AUTH-mode matrix** — `getAuthState()` `middleware.ts:40-124`. Guard logic must branch on this, not assume `AUTH=on`:
+  | Mode | `needsSetup` | `skipAuth` | Where |
+  | ---- | ------------ | ---------- | ----- |
+  | `off` | `false` (unconditional) | `true` | `middleware.ts:44-51` |
+  | `local` + local IP | `!hasLocalUsers` | `true` | `middleware.ts:54-68` (`isLocalAddress` bypass) |
+  | `local` + remote IP | falls through to `on` | `false` | `middleware.ts:54-68` |
+  | `oidc` | `false` (unconditional) | `false` | `middleware.ts:71-82` |
+  | `on` (default) | `!hasLocalUsers` | `false` | `middleware.ts:84-124` (`:119`) |
+
+- **`PUBLIC_PATHS` is routing convenience, not authz** — `middleware.ts:27` `['/auth/login','/auth/setup','/auth/oidc','/api/v1/health']`; matched by prefix in `isPublicPath` `middleware.ts:32-34`. Static, no "setup-in-progress" condition → **do not add setup APIs here**.
+
+- **Gate placement in `hooks.server.ts`** — `handle` `:207`; new wizard page-nav gate + reverse gate go AFTER the `needsSetup` gate (`:214-219`) and the login/API-401 gate (`:237-250`), and must be **page-nav only, never `/api/*`** (API paths already 401 at `:238`).
+
+### Input validation
+
+- **`arr_type` allow-list** — `arr/test/+server.ts:6` `VALID_TYPES=['radarr','sonarr','lidarr']`; field-type + non-empty checks `:28-38`. Reuse verbatim; reject `chaptarr`/`all`; reject unknown payload fields (do not pass untyped objects through).
+- **SSRF validator (new, C3)** — `assertSafeArrUrl()` in new `$arr/urlSafety.ts`, called before `createArrClient` at both `arr/test/+server.ts:41` and the new endpoint. Reuse `isLocalAddress()` semantics from `network.ts:25-38` **inverted into a narrow deny-list** (metadata `169.254.169.254`/`fd00:ec2::254` `network.ts:64-65,82-83`, `0.0.0.0`, link-local) — do NOT block all RFC1918/loopback.
+- **Rate limit (W2)** — token-bucket shape from `section-preferences/_helpers.ts:58-83` (`SECTION_PREFERENCE_RATE_LIMIT_WINDOW_MS=30_000`, `MAX_REQUESTS=8`, `:6-7`). Extract to `$utils/rateLimit.ts`; swap stateKey from `${userId}:${sectionKey}` (`:66`) to `getClientIp(event)` (`network.ts:111-136`).
+- **Reject credentials-in-URL (W5)** — reject any `repositoryUrl` whose authority contains `@` before host, at input time; direct user to the dedicated token field.
+- **Secret handling (A4)** — reuse `encryptArrInstanceApiKey()` (`arr-credentials.ts:89`, `async`) and `encryptDatabasePersonalAccessToken()` (`database-credentials.ts:11`, `async`) for every wizard-collected secret. Never echo a submitted key back (masked confirmation only, per `maskApiKey()`). No wizard-specific storage path.
+
+### Sanitized-error discipline
+
+- **Anti-pattern to avoid** — `arr/test/+server.ts:49-56` returns raw `error.message`; `git/write.ts:338-339` throws raw `stderr`. Wizard handlers map caught errors to a small enum, log full detail via `logger` server-side only. Logging already correct in `manager.ts` (logs `repositoryUrl`/`hasPersonalAccessToken` boolean, never the token) — hold that bar.
+
+## Acceptance Criteria additions (security)
+
+- [ ] **C1**: Every `/api/v1/setup/*` handler calls an `assertSetupInProgress()`-style guard as its first statement; unit test proves 403 for anonymous caller once `wizard_completed=1`, and that removal from `PUBLIC_PATHS` does not break in-progress access. Guard verified across all four AUTH modes (`middleware.ts:44-124`).
+- [ ] **C3**: `assertSafeArrUrl()` rejects `169.254.169.254`, `fd00:ec2::254`, `0.0.0.0`, link-local, and non-`http(s)` schemes; **accepts** RFC1918/loopback (self-hosted Arr). Called before client build in BOTH `/api/v1/setup/test-connection` AND legacy `/arr/test` (`arr/test/+server.ts:41`). `BaseHttpClient.request()` uses `redirect:'manual'` (`http/client.ts:57`). Unit test covers each rejection + LAN acceptance case.
+- [ ] **C4**: No wizard step accepts a local filesystem PCD path; only `https://` git URLs. Test asserts a `file://`/`/abs`/`../` source is rejected by the wizard link handler.
+- [ ] **C2/W3**: Setup-in-progress POSTs require the per-boot setup token and/or are local-IP-restricted; `csrf.trustedOrigins` narrowed off `'*'` (or documented + token-layered). Test: cross-origin blind POST cannot complete setup.
+- [ ] **W1/W4/W5**: Client responses from test-connection and PCD-link expose only a sanitized reason enum; no raw `error.message`/`stderr`/token reaches the client; `repositoryUrl` containing `@`-authority is rejected. Full error present in server logs only.
+- [ ] **W2**: test-connection and PCD-link are IP-keyed rate-limited (extracted `$utils/rateLimit.ts` reused). Test: N+1th call in window is throttled.
+- [ ] **W6**: Wizard gating uses `wizard_completed` flag; test asserts it triggers correctly and is enforced server-side under `AUTH=off/local/oidc/on`.
+- [ ] **A1**: Test asserts NO `Access-Control-Allow-Origin` header is emitted by any `/api/v1/setup/*` endpoint.
+- [ ] **A3/A4**: New setup queries use Kysely builder (no raw string SQL); every secret routes through existing `$server/utils/encryption/*` helpers; keys never echoed post-submit.
