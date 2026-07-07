@@ -26,6 +26,8 @@ tags:
     description: PCD entity export and portable format endpoints
   - name: PCD Snapshots
     description: PCD state snapshot management endpoints
+  - name: Resolved Config
+    description: Resolved PCD configuration state, layer breakdown, and live/cross-instance diff endpoints
   - name: User Preferences
     description: Durable UI preference storage for progressive disclosure
   - name: Complexity Tiers
@@ -604,6 +606,14 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/PcdErrorResponse'
+  /pcd/{databaseId}/resolved/{entityType}:
+    $ref: './paths/resolved-config.yaml#/list'
+  /pcd/{databaseId}/resolved/{entityType}/{name}:
+    $ref: './paths/resolved-config.yaml#/named'
+  /pcd/{databaseId}/resolved/{entityType}/{name}/compare:
+    $ref: './paths/resolved-config.yaml#/compare'
+  /pcd/{databaseId}/resolved/{entityType}/{name}/diff:
+    $ref: './paths/resolved-config.yaml#/diff'
   /setup/state:
     $ref: './paths/setup.yaml#/state'
   /setup/test-connection:
@@ -1331,3 +1341,16 @@ components:
       $ref: './schemas/compatibility.yaml#/ArrSemanticDifference'
     ProfileCompatibility:
       $ref: './schemas/compatibility.yaml#/ProfileCompatibility'
+    # Resolved Config
+    ResolvedLayer:
+      $ref: './schemas/resolved-config.yaml#/ResolvedLayer'
+    ResolvedEntityState:
+      $ref: './schemas/resolved-config.yaml#/ResolvedEntityState'
+    ResolvedEntityListResponse:
+      $ref: './schemas/resolved-config.yaml#/ResolvedEntityListResponse'
+    ResolvedInstanceState:
+      $ref: './schemas/resolved-config.yaml#/ResolvedInstanceState'
+    CrossInstanceComparisonResponse:
+      $ref: './schemas/resolved-config.yaml#/CrossInstanceComparisonResponse'
+    ResolvedLiveDiffResponse:
+      $ref: './schemas/resolved-config.yaml#/ResolvedLiveDiffResponse'

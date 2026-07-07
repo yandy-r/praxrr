@@ -1,0 +1,295 @@
+ResolvedLayer:
+  type: string
+  enum:
+    - base
+    - user
+    - resolved
+  description: |
+    PCD configuration layer represented by a resolved-state response:
+    - `base`: schema + base + tweaks ops only (user ops omitted)
+    - `user`: user-op overrides relative to the base layer, expressed as a
+      field-level diff
+    - `resolved`: the fully replayed state (schema -> base -> tweaks -> user),
+      matching what sync applies to Arr instances
+
+ResolvedEntityState:
+  type: object
+  required:
+    - databaseId
+    - entityType
+    - name
+    - layer
+    - present
+    - hasPendingConflict
+  properties:
+    databaseId:
+      type: integer
+      description: PCD database ID
+    entityType:
+      type: string
+      enum:
+        - delayProfile
+        - regularExpression
+        - customFormat
+        - qualityProfile
+        - naming
+        - mediaSettings
+        - qualityDefinitions
+        - lidarrMetadataProfile
+      description: Resolved config entity type
+    name:
+      type: string
+      description: Entity name
+    layer:
+      $ref: '#/ResolvedLayer'
+    present:
+      type: boolean
+      description: Whether the entity exists in the requested layer
+    entity:
+      description: |
+        Canonical Portable payload for the entity in the requested layer.
+        Present for `layer=base` and `layer=resolved` when `present` is true;
+        null when the entity is absent from that layer or when `layer=user`.
+        Shape varies by entityType (and arrType for per-arr-app entity
+        types):
+        - `delayProfile` -> PortableDelayProfile
+        - `regularExpression` -> PortableRegularExpression
+        - `customFormat` -> PortableCustomFormat
+        - `qualityProfile` -> PortableQualityProfile
+        - `naming` (radarr) -> PortableRadarrNaming
+        - `naming` (sonarr) -> PortableSonarrNaming
+        - `naming` (lidarr) -> PortableLidarrNaming
+        - `mediaSettings` (radarr, sonarr) -> PortableMediaSettings
+        - `mediaSettings` (lidarr) -> PortableLidarrMediaSettings
+        - `qualityDefinitions` (radarr, sonarr) -> PortableQualityDefinitions
+        - `qualityDefinitions` (lidarr) -> PortableLidarrQualityDefinitions
+        - `lidarrMetadataProfile` -> PortableLidarrMetadataProfile
+      nullable: true
+      oneOf:
+        - $ref: './pcd.yaml#/PortableDelayProfile'
+        - $ref: './pcd.yaml#/PortableRegularExpression'
+        - $ref: './pcd.yaml#/PortableCustomFormat'
+        - $ref: './pcd.yaml#/PortableQualityProfile'
+        - $ref: './pcd.yaml#/PortableRadarrNaming'
+        - $ref: './pcd.yaml#/PortableSonarrNaming'
+        - $ref: './pcd.yaml#/PortableLidarrNaming'
+        - $ref: './pcd.yaml#/PortableMediaSettings'
+        - $ref: './pcd.yaml#/PortableLidarrMediaSettings'
+        - $ref: './pcd.yaml#/PortableQualityDefinitions'
+        - $ref: './pcd.yaml#/PortableLidarrQualityDefinitions'
+        - $ref: './pcd.yaml#/PortableLidarrMetadataProfile'
+    overrides:
+      description: |
+        Field-level diff of user-op overrides relative to the base layer.
+        Present only for `layer=user`; an empty array means the resolved
+        value matches base exactly.
+      nullable: true
+      type: array
+      items:
+        $ref: './sync.yaml#/FieldChange'
+    hasPendingConflict:
+      type: boolean
+      description: |
+        True when a pending value-guard conflict targets this entity (see
+        `pcd_op_history`). The resolved value must not be treated as
+        unambiguous while this is true.
+
+ResolvedEntityListResponse:
+  type: object
+  required:
+    - databaseId
+    - entityType
+    - layer
+    - entities
+  properties:
+    databaseId:
+      type: integer
+      description: PCD database ID
+    entityType:
+      type: string
+      enum:
+        - delayProfile
+        - regularExpression
+        - customFormat
+        - qualityProfile
+        - naming
+        - mediaSettings
+        - qualityDefinitions
+        - lidarrMetadataProfile
+      description: Resolved config entity type
+    layer:
+      $ref: '#/ResolvedLayer'
+    entities:
+      type: array
+      items:
+        $ref: '#/ResolvedEntityState'
+      description: Per-entity resolved state for the requested layer
+
+ResolvedInstanceState:
+  type: object
+  required:
+    - instanceId
+    - instanceName
+    - arrType
+    - compatible
+    - present
+  properties:
+    instanceId:
+      type: integer
+      description: Arr instance ID
+    instanceName:
+      type: string
+      description: Arr instance name
+    arrType:
+      type: string
+      enum:
+        - radarr
+        - sonarr
+        - lidarr
+      description: Arr instance family
+    compatible:
+      type: boolean
+      description: Whether this entity type is supported for the instance's arr_type
+    present:
+      type: boolean
+      description: Whether the entity is present in this instance's desired payload
+    desired:
+      description: |
+        Per-instance transformed-desired Portable payload, present when
+        `compatible` and `present` are both true. Uses the same
+        entityType/arrType-to-Portable-shape mapping as
+        `ResolvedEntityState.entity`.
+      nullable: true
+      oneOf:
+        - $ref: './pcd.yaml#/PortableDelayProfile'
+        - $ref: './pcd.yaml#/PortableRegularExpression'
+        - $ref: './pcd.yaml#/PortableCustomFormat'
+        - $ref: './pcd.yaml#/PortableQualityProfile'
+        - $ref: './pcd.yaml#/PortableRadarrNaming'
+        - $ref: './pcd.yaml#/PortableSonarrNaming'
+        - $ref: './pcd.yaml#/PortableLidarrNaming'
+        - $ref: './pcd.yaml#/PortableMediaSettings'
+        - $ref: './pcd.yaml#/PortableLidarrMediaSettings'
+        - $ref: './pcd.yaml#/PortableQualityDefinitions'
+        - $ref: './pcd.yaml#/PortableLidarrQualityDefinitions'
+        - $ref: './pcd.yaml#/PortableLidarrMetadataProfile'
+    actual:
+      description: |
+        Raw live Arr state for this instance, only populated when
+        `includeLive=true` and the live fetch succeeded. Shape is the
+        upstream Arr API payload, not a Portable shape.
+      nullable: true
+      type: object
+      additionalProperties: true
+    error:
+      type: string
+      nullable: true
+      enum:
+        - unreachable
+        - timeout
+        - unauthorized
+        - invalid_response
+        - unsupported
+        - not_found
+      description: |
+        Sanitized reason when this instance's desired/live lookup failed.
+        Raw error detail never appears here; full detail is logged
+        server-side only.
+
+CrossInstanceComparisonResponse:
+  type: object
+  required:
+    - databaseId
+    - entityType
+    - name
+    - instances
+    - diffs
+  properties:
+    databaseId:
+      type: integer
+      description: PCD database ID
+    entityType:
+      type: string
+      enum:
+        - delayProfile
+        - regularExpression
+        - customFormat
+        - qualityProfile
+        - naming
+        - mediaSettings
+        - qualityDefinitions
+        - lidarrMetadataProfile
+      description: Resolved config entity type
+    name:
+      type: string
+      description: Entity name compared across instances
+    instances:
+      type: array
+      items:
+        $ref: '#/ResolvedInstanceState'
+      description: Per-instance desired (and optionally live) state
+    diffs:
+      type: array
+      items:
+        type: object
+        required:
+          - instanceId
+          - changes
+        properties:
+          instanceId:
+            type: integer
+            description: Arr instance ID this diff row belongs to
+          changes:
+            type: array
+            items:
+              $ref: './sync.yaml#/EntityChange'
+            description: |
+              Field-level changes relative to the first compatible
+              instance's desired payload.
+      description: |
+        Pairwise diffs of each compatible instance's desired payload against
+        the first compatible instance (the baseline).
+
+ResolvedLiveDiffResponse:
+  type: object
+  required:
+    - databaseId
+    - entityType
+    - name
+    - instanceId
+    - arrType
+    - changes
+  properties:
+    databaseId:
+      type: integer
+      description: PCD database ID
+    entityType:
+      type: string
+      enum:
+        - delayProfile
+        - regularExpression
+        - customFormat
+        - qualityProfile
+        - naming
+        - mediaSettings
+        - qualityDefinitions
+        - lidarrMetadataProfile
+      description: Resolved config entity type
+    name:
+      type: string
+      description: Entity name
+    instanceId:
+      type: integer
+      description: Arr instance ID the live diff was computed against
+    arrType:
+      type: string
+      enum:
+        - radarr
+        - sonarr
+        - lidarr
+      description: Arr instance family
+    changes:
+      type: array
+      items:
+        $ref: './sync.yaml#/EntityChange'
+      description: Desired-vs-actual field changes; an empty array means the entity is in sync

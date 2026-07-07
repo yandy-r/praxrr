@@ -104,3 +104,24 @@ export {
   DependencyError,
   ManifestValidationError,
 } from './core/errors.ts';
+
+// ============================================================================
+// RESOLVED CONFIG
+// ============================================================================
+
+export {
+  ARR_AGNOSTIC_READERS,
+  PER_ARR_READERS,
+  ResolvedConfigValidationError,
+  isResolvedConfigValidationError,
+  listResolvedEntityNames,
+  readResolvedEntity,
+} from './resolved/readers.ts';
+export type {
+  ArrAgnosticEntityType,
+  PerArrEntityType,
+  ResolvedEntityPayload,
+  ResolvedEntityType,
+  ResolvedLayer,
+  ResolvedReaderFn,
+} from './resolved/types.ts';

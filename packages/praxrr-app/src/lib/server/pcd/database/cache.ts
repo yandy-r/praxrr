@@ -64,22 +64,8 @@ export class PCDCache {
     }
 
     try {
-      // 1. Create in-memory database
-      // Enable int64 mode to properly handle large integers (e.g., file sizes in bytes)
-      this.db = new Database(':memory:', { int64: true });
-
-      // Enable foreign keys
-      this.db.exec('PRAGMA foreign_keys = ON');
-
-      // Initialize Kysely query builder
-      this.kysely = new Kysely<PCDDatabase>({
-        dialect: new DenoSqlite3Dialect({
-          database: this.db,
-        }),
-      });
-
-      // 2. Register helper functions used by SQL-based query compatibility paths
-      this.registerHelperFunctions();
+      // 1-2. Create in-memory database, initialize Kysely, and register SQL helper functions.
+      this.bootstrap();
 
       // 3. Load all operations
       const operations = await loadAllOperations(this.pcdPath, this.databaseInstanceId);
@@ -102,7 +88,7 @@ export class PCDCache {
         const isUserOp = !!userOp;
         const beforeChanges = trackHistory ? this.db!.totalChanges : 0;
         try {
-          this.db.exec(operation.sql);
+          this.db!.exec(operation.sql);
           if (trackHistory) {
             const trackedOpId = opId as number;
             const rowcount = this.db!.totalChanges - beforeChanges;
@@ -293,6 +279,67 @@ export class PCDCache {
       this.close();
       throw error;
     }
+  }
+
+  /**
+   * Build an ephemeral, read-only replay of a subset of PCD layers.
+   *
+   * This is a side-effect-free sibling to `build()`: it applies operation SQL for the
+   * requested `layers` only and never evaluates value guards, never records op history
+   * (`pcdOpHistoryQueries.create`), never mutates `pcd_ops.state` (`pcdOpsQueries.update`),
+   * and never calls `disableDatabaseInstance` on failure. A single op that fails to apply
+   * is logged via `logger.warn` and skipped so the remaining in-scope operations still run.
+   *
+   * The resulting instance is ephemeral: the caller owns its lifecycle and MUST call
+   * `close()` when done. It must NEVER be registered via `setCache()` — the cache
+   * registry is reserved exclusively for instances produced by `build()`.
+   */
+  async buildReadOnly(options: { layers: ReadonlySet<'schema' | 'base' | 'tweaks' | 'user'> }): Promise<void> {
+    // 1-2. Create in-memory database, initialize Kysely, and register SQL helper functions
+    //      (identical bootstrap to build() step 1-2).
+    this.bootstrap();
+
+    // 3. Load all operations, then keep only the requested layers.
+    //    loadAllOperations() already returns a fully sorted array, so filtering after
+    //    the fact preserves correct relative ordering within the kept layers.
+    const allOperations = await loadAllOperations(this.pcdPath, this.databaseInstanceId);
+    const operations = allOperations.filter((operation) => options.layers.has(operation.layer));
+    validateOperations(operations);
+
+    // 4. Execute operations in order - no value guards, no history writes, no state mutation.
+    for (const operation of operations) {
+      try {
+        this.db!.exec(operation.sql);
+      } catch (error) {
+        await logger.warn('buildReadOnly: skipping op that failed to apply', {
+          source: 'PCDCache',
+          meta: {
+            error: String(error),
+            layer: operation.layer,
+            filename: operation.filename,
+          },
+        });
+      }
+    }
+
+    this.built = true;
+  }
+
+  /**
+   * Create the in-memory SQLite database + Kysely query builder and register the SQL helper
+   * functions. Shared bootstrap for `build()` and `buildReadOnly()` — purely setup, no writes,
+   * no guard/history logic. Enables int64 mode to properly handle large integers (e.g., file
+   * sizes in bytes) and foreign key enforcement.
+   */
+  private bootstrap(): void {
+    this.db = new Database(':memory:', { int64: true });
+    this.db.exec('PRAGMA foreign_keys = ON');
+    this.kysely = new Kysely<PCDDatabase>({
+      dialect: new DenoSqlite3Dialect({
+        database: this.db,
+      }),
+    });
+    this.registerHelperFunctions();
   }
 
   /**

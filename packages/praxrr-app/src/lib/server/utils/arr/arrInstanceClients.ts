@@ -5,6 +5,7 @@ import type { ArrClientOptions } from './base.ts';
 import { createArrClient } from './factory.ts';
 import type { BaseArrClient } from './base.ts';
 import type { ArrType } from './types.ts';
+import { assertSafeArrUrl } from './urlSafety.ts';
 
 export interface ArrInstanceClientCacheEntry {
   keyVersion: string;
@@ -59,6 +60,8 @@ export async function getArrInstanceClient(
   options?: ArrClientOptions,
   cache?: ArrInstanceClientCache
 ): Promise<BaseArrClient> {
+  assertSafeArrUrl(url);
+
   let credentials;
   try {
     credentials = arrInstanceCredentialsQueries.getByInstanceId(instanceId);
