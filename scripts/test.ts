@@ -20,6 +20,8 @@ const aliases: Record<string, string> = {
   phase3:
     'packages/praxrr-app/src/tests/routes/scoreSimulatorPhase3Helpers.test.ts,packages/praxrr-app/src/tests/routes/scoreSimulatorUrlState.test.ts',
   selectors: 'packages/praxrr-app/src/tests/upgrades/selectors.test.ts',
+  'setup-wizard':
+    'packages/praxrr-app/src/tests/routes/setupWizard.test.ts,packages/praxrr-app/src/tests/base/setupProgress.test.ts',
   'url-state': 'packages/praxrr-app/src/tests/routes/scoreSimulatorUrlState.test.ts',
   'what-if': 'packages/praxrr-app/src/tests/routes/scoreSimulatorPhase3Helpers.test.ts',
 
