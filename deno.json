@@ -94,7 +94,10 @@
     "bundle:api": "deno run -A scripts/bundle-api.ts",
     "publish:api": "deno task bundle:api && cd packages/praxrr-api && deno publish",
     "version": "deno run -A scripts/version.ts",
-    "publish:app": "deno run -A scripts/version.ts --create-git-tags --publish"
+    "publish:app": "deno run -A scripts/version.ts --target=app --create-git-tags --publish",
+    "publish:db": "deno run -A scripts/version.ts --target=db --create-git-tags --publish",
+    "publish:schema": "deno run -A scripts/version.ts --target=schema --create-git-tags --publish",
+    "publish:all": "deno run -A scripts/version.ts --target=all --create-git-tags --publish"
   },
   "compilerOptions": {
     "lib": ["deno.window", "dom"],

@@ -25,12 +25,32 @@
       "description": "Release parsing and custom format evaluation"
     },
     {
+      "name": "Score Simulator",
+      "description": "Interactive release scoring playground"
+    },
+    {
       "name": "Arr",
       "description": "Arr instance library and release endpoints"
     },
     {
+      "name": "Trash Guide",
+      "description": "TRaSH Guide cached entity and source management"
+    },
+    {
       "name": "PCD",
       "description": "PCD entity export and portable format endpoints"
+    },
+    {
+      "name": "PCD Snapshots",
+      "description": "PCD state snapshot management endpoints"
+    },
+    {
+      "name": "User Preferences",
+      "description": "Durable UI preference storage for progressive disclosure"
+    },
+    {
+      "name": "Complexity Tiers",
+      "description": "Per-section complexity tier storage for progressive complexity"
     }
   ],
   "paths": {
@@ -39,7 +59,9 @@
         "operationId": "getHealth",
         "summary": "Health check",
         "description": "Returns the health status of the application and its components.\n\nStatus values:\n- `healthy`: All components functioning normally\n- `degraded`: Core functionality works but some components have issues\n- `unhealthy`: Core functionality is broken\n\nUse `?verbose=true` for detailed component information.\n",
-        "tags": ["System"],
+        "tags": [
+          "System"
+        ],
         "parameters": [
           {
             "name": "verbose",
@@ -70,7 +92,9 @@
         "operationId": "getOpenApiSpec",
         "summary": "OpenAPI specification",
         "description": "Returns the OpenAPI specification for this API",
-        "tags": ["System"],
+        "tags": [
+          "System"
+        ],
         "responses": {
           "200": {
             "description": "OpenAPI specification",
@@ -85,12 +109,413 @@
         }
       }
     },
+    "/parser/health": {
+      "get": {
+        "operationId": "getParserHealth",
+        "summary": "Parser health check",
+        "description": "Returns the availability status of the release title parser service.",
+        "tags": [
+          "System"
+        ],
+        "responses": {
+          "200": {
+            "description": "Parser health status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "parserAvailable"
+                  ],
+                  "properties": {
+                    "parserAvailable": {
+                      "type": "boolean",
+                      "description": "Whether the parser service is reachable and healthy"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/system/startup-pull/latest": {
+      "get": {
+        "operationId": "getLatestStartupPull",
+        "summary": "Latest startup pull run",
+        "description": "Returns the latest startup pull run with per-instance outcomes.\n\nThe startup pull feature reconstructs Arr sync selections from live Arr\nstate on application startup when `PULL_ON_START=true`. This endpoint\nprovides visibility into the most recent run for support and diagnostics.\n\nRun-level status values:\n- `success`: All instances completed without failures\n- `partial`: Some instances succeeded and some failed\n- `failed`: All instances failed\n- `skipped`: No instances were processed\n- `disabled`: Feature was disabled at run time\n\nPer-instance status values follow `JobRunStatus`:\n- `success`: Instance pull completed\n- `failure`: Instance pull failed\n- `skipped`: Instance was skipped\n- `cancelled`: Instance pull was cancelled\n",
+        "tags": [
+          "System"
+        ],
+        "responses": {
+          "200": {
+            "description": "Latest startup pull run with per-instance outcomes",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/components/schemas/StartupPullRunResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No startup pull runs exist",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Failed to fetch latest startup pull run",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ui-preferences": {
+      "get": {
+        "operationId": "getUiPreference",
+        "summary": "Read one UI preference",
+        "description": "Returns the preferred disclosure mode for a section key.\n\nMissing persisted values are returned as default `basic` unless `strict`\nis enabled.\n",
+        "tags": [
+          "User Preferences"
+        ],
+        "parameters": [
+          {
+            "name": "section_key",
+            "in": "query",
+            "required": true,
+            "description": "Canonical section key for progressive disclosure state",
+            "schema": {
+              "$ref": "#/components/schemas/UiSectionKey"
+            }
+          },
+          {
+            "name": "strict",
+            "in": "query",
+            "required": false,
+            "description": "When true, missing rows return 404 instead of default response",
+            "schema": {
+              "type": "boolean",
+              "default": false
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "UI preference record",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UiPreferenceRecord"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid query parameter",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PcdErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PcdErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Preference not found for strict read",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PcdErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Failed to read preference",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PcdErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "operationId": "upsertUiPreference",
+        "summary": "Upsert one UI preference",
+        "description": "Creates or updates the stored disclosure mode for a section key.\n\nPayloads include optional concurrency token `expected_updated_at`.\n",
+        "tags": [
+          "User Preferences"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UiPreferenceUpsertRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "UI preference persisted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UiPreferenceRecord"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PcdErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PcdErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Concurrency conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PcdErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Preference updates are being rate-limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PcdErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Failed to save preference",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PcdErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/complexity-tiers": {
+      "get": {
+        "operationId": "getComplexityTier",
+        "summary": "Read one complexity tier",
+        "description": "Returns the preferred complexity tier and progression counters for a\nsection key.\n\nMissing persisted values are returned as default `beginner` unless\n`strict` is enabled.\n",
+        "tags": [
+          "Complexity Tiers"
+        ],
+        "parameters": [
+          {
+            "name": "section_key",
+            "in": "query",
+            "required": true,
+            "description": "Canonical section key for progressive complexity state",
+            "schema": {
+              "$ref": "#/components/schemas/UiSectionKey"
+            }
+          },
+          {
+            "name": "strict",
+            "in": "query",
+            "required": false,
+            "description": "When true, missing rows return 404 instead of default response",
+            "schema": {
+              "type": "boolean",
+              "default": false
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Complexity tier record",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ComplexityTierRecord"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid query parameter",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PcdErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PcdErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Complexity tier not found for strict read",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PcdErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Failed to read complexity tier",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PcdErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "operationId": "upsertComplexityTier",
+        "summary": "Upsert one complexity tier",
+        "description": "Creates or updates the stored complexity tier for a section key.\n\nPayloads include optional concurrency token `expected_updated_at`.\nActivity deltas are bounded and may be used to drive non-intrusive\nprogression suggestions.\n",
+        "tags": [
+          "Complexity Tiers"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ComplexityTierUpsertRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Complexity tier persisted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ComplexityTierRecord"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PcdErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PcdErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Concurrency conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PcdErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Complexity tier updates are being rate-limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PcdErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Failed to save complexity tier",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PcdErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/entity-testing/evaluate": {
       "post": {
         "operationId": "evaluateReleases",
         "summary": "Evaluate releases against custom formats",
         "description": "Parses release titles and evaluates them against all custom formats in the specified database.\n\nThis endpoint:\n- Parses each release title to extract metadata (resolution, source, languages, etc.)\n- Matches regex patterns using .NET-compatible regex via the parser service\n- Evaluates each release against all custom formats in the database\n- Returns which custom formats match each release\n\nResults are cached for performance - repeated requests with the same titles will be faster.\n",
-        "tags": ["Entity Testing"],
+        "tags": [
+          "Entity Testing"
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -121,12 +546,107 @@
         }
       }
     },
+    "/simulate/score": {
+      "post": {
+        "operationId": "simulateScore",
+        "summary": "Simulate custom format scoring for releases",
+        "description": "Parses release titles, evaluates custom format matches, and calculates\nper-profile scores for interactive score simulation.\n",
+        "tags": [
+          "Score Simulator"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SimulateScoreRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Score simulation results",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SimulateScoreResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Database or profile not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "missing"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "missing": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/arr/library": {
       "get": {
         "operationId": "getLibrary",
         "summary": "Get Arr instance library",
-        "description": "Fetches the full library from an Arr instance with quality profile,\nscore, and progress information.\n\n- For Radarr: Returns movies with file quality, custom format scores, and cutoff progress\n- For Sonarr: Returns series with season summaries and episode statistics\n- For Lidarr: Returns artists/albums (capability-gated; detailed payload fields deferred to later phases)\n\nResults include Praxrr profile matching to indicate which items use managed profiles.\nResponses are cached server-side for 5 minutes.\n",
-        "tags": ["Arr"],
+        "description": "Fetches the full library from an Arr instance with quality profile,\nscore, and progress information.\n\n- For Radarr: Returns movies with file quality, custom format scores, and cutoff progress\n- For Sonarr: Returns series with season summaries and episode statistics\n- For Lidarr: Returns artists/albums (capability-gated; detailed payload fields deferred to later phases)\n\nResults include Praxrr profile matching to indicate which items use managed profiles.\nResponses are cached server-side for 5 minutes.\nSupports server-side filtering, sorting, and pagination.\n",
+        "tags": [
+          "Arr"
+        ],
         "parameters": [
           {
             "name": "instanceId",
@@ -136,6 +656,61 @@
               "type": "integer"
             },
             "description": "Arr instance ID"
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            },
+            "description": "Pagination page number (1-based)"
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 250,
+              "default": 100
+            },
+            "description": "Maximum number of items per page. Values above 250 are capped at 250.\n"
+          },
+          {
+            "name": "sortKey",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Optional sort field. Must be valid for the target Arr type\n(radarr, sonarr, or lidarr) or request will be rejected.\n"
+          },
+          {
+            "name": "sortDirection",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "default": "asc"
+            },
+            "description": "Sort order for the sortKey field."
+          },
+          {
+            "name": "query",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Optional case-insensitive text filter applied before sorting and pagination."
           }
         ],
         "responses": {
@@ -150,7 +725,7 @@
             }
           },
           "400": {
-            "description": "Invalid or missing instanceId",
+            "description": "Invalid instanceId, page, or sort/query parameters",
             "content": {
               "application/json": {
                 "schema": {
@@ -185,7 +760,9 @@
         "operationId": "invalidateLibraryCache",
         "summary": "Invalidate library cache",
         "description": "Clears the server-side cache for an Arr instance's library data.\nThe next GET request will fetch fresh data from the Arr instance.\n",
-        "tags": ["Arr"],
+        "tags": [
+          "Arr"
+        ],
         "parameters": [
           {
             "name": "instanceId",
@@ -226,7 +803,9 @@
         "operationId": "getLibraryEpisodes",
         "summary": "Get episode details for a Sonarr series",
         "description": "Lazy-loads episode-level data for a specific series in a Sonarr instance.\nReturns episodes with quality, custom format scores, and cutoff progress.\n\nThis endpoint is designed for on-demand loading when a series row is expanded\nin the library view. Sonarr instances only.\n\nResults are cached server-side for 5 minutes per series.\n",
-        "tags": ["Arr"],
+        "tags": [
+          "Arr"
+        ],
         "parameters": [
           {
             "name": "instanceId",
@@ -296,7 +875,9 @@
         "operationId": "getReleases",
         "summary": "Search for releases",
         "description": "Triggers an interactive search on an Arr instance and returns grouped/deduplicated results.\n\nFor Radarr: Searches for releases for the specified movie.\nFor Sonarr: Searches for season pack releases for the specified series and season.\nFor Lidarr: Searches for releases for the specified album.\n\nResults are grouped by title, combining information from multiple indexers.\n",
-        "tags": ["Arr"],
+        "tags": [
+          "Arr"
+        ],
         "parameters": [
           {
             "name": "instanceId",
@@ -376,7 +957,9 @@
         "operationId": "arrCleanup",
         "summary": "Scan or execute cleanup of stale configs",
         "description": "Detects and deletes stale namespace-suffixed custom formats and quality profiles\nfrom an Arr instance that are no longer in the current sync selections.\n\nTwo actions are supported via the `action` field in the request body:\n- `scan`: Scans for stale items and returns what would be deleted.\n- `execute`: Deletes the stale items from a previous scan result.\n\nQuality profiles assigned to media will be skipped with a warning (Arr returns HTTP 500 \"in use\").\n",
-        "tags": ["Arr"],
+        "tags": [
+          "Arr"
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -445,12 +1028,377 @@
         }
       }
     },
+    "/trash-guide/sources/{id}/entities/{trashId}": {
+      "get": {
+        "operationId": "getTrashGuideSourceEntity",
+        "summary": "Get one TRaSH cached entity",
+        "description": "Returns a single TRaSH entity from a synced source cache by trashId.\n",
+        "tags": [
+          "Trash Guide"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "TRaSH source ID",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "trashId",
+            "in": "path",
+            "required": true,
+            "description": "TRaSH entity ID (32 lowercase hex chars)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "required": true,
+            "description": "TRaSH entity type",
+            "schema": {
+              "$ref": "#/components/schemas/TrashGuideEntityType"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "TRaSH cached entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TrashGuideEntityDetailResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Missing or invalid source/id/type parameter",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PcdErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Source or TRaSH entity not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PcdErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid entity type",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PcdErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Failed to read TRaSH entity cache",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PcdErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sync/preview": {
+      "post": {
+        "operationId": "createSyncPreview",
+        "summary": "Generate a sync preview",
+        "description": "Computes a read-only preview of the sync changes for an Arr instance.\n\nThis endpoint performs no writes. It only reads from PCD and Arr GET\nendpoints to compare desired versus current state, then stores a preview\nsnapshot for later retrieval or application.\n\nIf no `sections` are provided, all configured sections for the instance are\nincluded.\n",
+        "tags": [
+          "Arr"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SyncPreviewCreateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Preview generated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SyncPreviewResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid instanceId, unsupported section, or request body",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Instance not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Preview for this instance is already generating",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Preview creation is rate-limited or preview-store capacity is exhausted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Failed to generate preview",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sync/preview/{previewId}": {
+      "get": {
+        "operationId": "getSyncPreview",
+        "summary": "Get a sync preview",
+        "description": "Retrieves a previously generated preview snapshot by ID.\n\nThis endpoint is read-only and is safe to call repeatedly while preview state\nchanges naturally over time.\n\nSnapshots are subject to staleness rules enforced by the preview TTL. A\npreview that has exceeded the TTL should be treated as expired.\n",
+        "tags": [
+          "Arr"
+        ],
+        "parameters": [
+          {
+            "name": "previewId",
+            "in": "path",
+            "required": true,
+            "description": "Preview snapshot ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Sync preview",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SyncPreviewResult"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Preview not found or expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Failed to fetch preview",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteSyncPreview",
+        "summary": "Discard a sync preview",
+        "description": "Removes a stored preview snapshot.\n\nThis endpoint does not trigger any Arr sync action; it only removes the cached\npreview and does not change runtime configuration.\n",
+        "tags": [
+          "Arr"
+        ],
+        "parameters": [
+          {
+            "name": "previewId",
+            "in": "path",
+            "required": true,
+            "description": "Preview snapshot ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Preview discarded"
+          },
+          "404": {
+            "description": "Preview not found or expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Failed to delete preview",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sync/preview/{previewId}/apply": {
+      "post": {
+        "operationId": "applySyncPreview",
+        "summary": "Apply a sync preview",
+        "description": "Applies a previously generated preview to the target Arr instance.\n\nPreview generation itself is read-only, but this operation runs the normal sync\nexecution path for the selected sections.\n\nApply rejects previews that are too stale based on policy:\n- warnings are returned when the preview is older than 5 minutes\n- apply is blocked when staleness exceeds the hard threshold\n",
+        "tags": [
+          "Arr"
+        ],
+        "parameters": [
+          {
+            "name": "previewId",
+            "in": "path",
+            "required": true,
+            "description": "Preview snapshot ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SyncPreviewApplyRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Preview applied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SyncPreviewResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request body",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Preview not found or expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Preview is not in a ready state, contains failed sections, or instance is syncing",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Preview is stale beyond apply threshold",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Failed to apply preview",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/pcd/export": {
       "get": {
         "operationId": "exportEntity",
         "summary": "Export a portable entity",
         "description": "Serializes a PCD entity into its portable JSON representation.\n\nThe portable format strips database IDs and timestamps, producing a\nself-contained snapshot suitable for clipboard copy, file export, or\ncross-database import.\n",
-        "tags": ["PCD"],
+        "tags": [
+          "PCD"
+        ],
         "parameters": [
           {
             "name": "databaseId",
@@ -528,8 +1476,10 @@
       "post": {
         "operationId": "importEntity",
         "summary": "Import a portable entity",
-        "description": "Deserializes a portable entity into PCD operations, creating the entity\nin the target database and layer.\n\nThe request body matches the export response format (`entityType` + `data`),\nplus `databaseId` and `layer` to specify the target.\n\nName uniqueness is validated — importing an entity with a name that already\nexists will return a 400 error.\n",
-        "tags": ["PCD"],
+        "description": "Deserializes a portable entity into PCD operations, creating the entity\nin the target database and layer.\n\nThe request body matches the export response format (`entityType` + `data`),\nplus `databaseId` and `layer` to specify the target.\nOptional `migration` metadata (`format`, `version`, `source`) can be provided\nfor hybrid JSON/YAML ingestion flows.\n\nName uniqueness is validated — importing an entity with a name that already\nexists will return a 400 error.\n",
+        "tags": [
+          "PCD"
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -583,23 +1533,706 @@
           }
         }
       }
+    },
+    "/pcd/{databaseId}/snapshots": {
+      "post": {
+        "operationId": "createPcdSnapshot",
+        "summary": "Create a manual PCD snapshot",
+        "description": "Creates a manual snapshot of the current PCD database state. The snapshot\ncaptures ops metadata and a state fingerprint for future restore operations.\n",
+        "tags": [
+          "PCD Snapshots"
+        ],
+        "parameters": [
+          {
+            "name": "databaseId",
+            "in": "path",
+            "required": true,
+            "description": "PCD database ID",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateManualSnapshotRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Snapshot created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PcdSnapshotDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid databaseId",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PcdErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Database not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PcdErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Snapshot creation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PcdErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "operationId": "listPcdSnapshots",
+        "summary": "List PCD snapshots for a database",
+        "description": "Returns a paginated list of snapshots for the specified database, ordered\nby creation time descending.\n",
+        "tags": [
+          "PCD Snapshots"
+        ],
+        "parameters": [
+          {
+            "name": "databaseId",
+            "in": "path",
+            "required": true,
+            "description": "PCD database ID",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "required": false,
+            "description": "Filter by snapshot type",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "auto",
+                "manual"
+              ]
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "description": "Maximum number of results to return",
+            "schema": {
+              "type": "integer",
+              "default": 50,
+              "minimum": 1,
+              "maximum": 200
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "description": "Pagination offset",
+            "schema": {
+              "type": "integer",
+              "default": 0,
+              "minimum": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Snapshot list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PcdSnapshotListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PcdErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Database not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PcdErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Failed to list snapshots",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PcdErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/pcd/{databaseId}/snapshots/{snapshotId}": {
+      "get": {
+        "operationId": "getPcdSnapshot",
+        "summary": "Get PCD snapshot detail",
+        "description": "Returns full snapshot detail including computed fields for restore context\n(opsWrittenSince, isRestorable). Restore support is not yet implemented,\nso `isRestorable` is always false.\n",
+        "tags": [
+          "PCD Snapshots"
+        ],
+        "parameters": [
+          {
+            "name": "databaseId",
+            "in": "path",
+            "required": true,
+            "description": "PCD database ID",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "snapshotId",
+            "in": "path",
+            "required": true,
+            "description": "PCD snapshot ID",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Snapshot full detail",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PcdSnapshotFullDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PcdErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Snapshot not found or doesn't belong to database",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PcdErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Failed to fetch snapshot",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PcdErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deletePcdSnapshot",
+        "summary": "Delete a PCD snapshot",
+        "description": "Deletes a snapshot. Ownership is enforced — the snapshot must belong to the\nspecified database.\n",
+        "tags": [
+          "PCD Snapshots"
+        ],
+        "parameters": [
+          {
+            "name": "databaseId",
+            "in": "path",
+            "required": true,
+            "description": "PCD database ID",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "snapshotId",
+            "in": "path",
+            "required": true,
+            "description": "PCD snapshot ID",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Snapshot deleted"
+          },
+          "400": {
+            "description": "Invalid parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PcdErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Snapshot not found or doesn't belong to database",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PcdErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Delete failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PcdErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/pcd/{databaseId}/lidarr-metadata-profiles": {
+      "get": {
+        "operationId": "listLidarrMetadataProfiles",
+        "summary": "List Lidarr metadata profiles",
+        "description": "Reads Lidarr metadata profiles from a PCD database.\n\nMetadata profiles are a Lidarr-only entity family and are not available\nfor Radarr or Sonarr entities.\n\nRead payloads are list DTOs that expose counts, not full type payloads.\n",
+        "tags": [
+          "PCD"
+        ],
+        "parameters": [
+          {
+            "name": "databaseId",
+            "in": "path",
+            "required": true,
+            "description": "PCD database ID",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Metadata profile list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/LidarrMetadataProfileListItem"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Missing or invalid databaseId",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PcdErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Database not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PcdErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Failed to read cache",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PcdErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "createLidarrMetadataProfile",
+        "summary": "Create a Lidarr metadata profile",
+        "description": "Creates a Lidarr metadata profile in the selected PCD database.\n\nRuntime validation enforces Lidarr-specific rules including:\n- case-insensitive unique profile name\n- reserved name `None` is rejected\n- all source categories include explicit `allowed` booleans\n- type/status rows in write payloads use `id`, `name`, and `allowed`.\n",
+        "tags": [
+          "PCD"
+        ],
+        "parameters": [
+          {
+            "name": "databaseId",
+            "in": "path",
+            "required": true,
+            "description": "PCD database ID",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LidarrMetadataProfileCreateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Metadata profile created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LidarrMetadataProfileMutationResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PcdErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Base layer write is not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PcdErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Write failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PcdErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/pcd/{databaseId}/lidarr-metadata-profiles/{id}": {
+      "get": {
+        "operationId": "getLidarrMetadataProfile",
+        "summary": "Get one Lidarr metadata profile",
+        "description": "Returns a single Lidarr metadata profile by local profile id.\n\nPayloads are the PCD contract used by runtime sync and portable\noperations, not the Lidarr API payload shape.\n",
+        "tags": [
+          "PCD"
+        ],
+        "parameters": [
+          {
+            "name": "databaseId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Local metadata profile id",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Metadata profile",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LidarrMetadataProfile"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Missing or invalid parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PcdErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Database or profile not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PcdErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Failed to read profile",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PcdErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "operationId": "updateLidarrMetadataProfile",
+        "summary": "Update a Lidarr metadata profile",
+        "description": "Updates selected fields of an existing Lidarr metadata profile.\n\nPartial updates are supported for edit flows.\nUpdates remain Lidarr-only and validate value-guard constraints.\n\nAt least one mutable field must be provided.\nUpdates use stable-name/value-guard semantics for concurrency safety.\n",
+        "tags": [
+          "PCD"
+        ],
+        "parameters": [
+          {
+            "name": "databaseId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Local metadata profile id",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LidarrMetadataProfileUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Metadata profile updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LidarrMetadataProfileMutationResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PcdErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Database or profile not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PcdErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Update failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PcdErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteLidarrMetadataProfile",
+        "summary": "Delete a Lidarr metadata profile",
+        "description": "Deletes a Lidarr metadata profile by id.\n\nDeletes are rejected if runtime guard checks detect in-use rows or stale\nvalue guards.\nThis endpoint must only be invoked for Lidarr-backed databases.\nDelete payloads must include the current row name for value-guard safety.\n",
+        "tags": [
+          "PCD"
+        ],
+        "parameters": [
+          {
+            "name": "databaseId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Local metadata profile id",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LidarrMetadataProfileDeleteRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Metadata profile deleted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LidarrMetadataProfileMutationResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PcdErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Database or profile not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PcdErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Delete failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PcdErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
     "schemas": {
       "ComponentStatus": {
         "type": "string",
-        "enum": ["healthy", "degraded", "unhealthy"],
+        "enum": [
+          "healthy",
+          "degraded",
+          "unhealthy"
+        ],
         "description": "Individual component health status"
       },
       "HealthStatus": {
         "type": "string",
-        "enum": ["healthy", "degraded", "unhealthy"],
+        "enum": [
+          "healthy",
+          "degraded",
+          "unhealthy"
+        ],
         "description": "Overall health status"
       },
       "SqliteHealth": {
         "type": "object",
-        "required": ["status", "responseTimeMs", "migration"],
+        "required": [
+          "status",
+          "responseTimeMs",
+          "migration"
+        ],
         "properties": {
           "status": {
             "$ref": "#/components/schemas/ComponentStatus"
@@ -620,7 +2253,9 @@
       },
       "ReposHealth": {
         "type": "object",
-        "required": ["status"],
+        "required": [
+          "status"
+        ],
         "properties": {
           "status": {
             "$ref": "#/components/schemas/ComponentStatus"
@@ -649,7 +2284,9 @@
       },
       "JobsHealth": {
         "type": "object",
-        "required": ["status"],
+        "required": [
+          "status"
+        ],
         "properties": {
           "status": {
             "$ref": "#/components/schemas/ComponentStatus"
@@ -671,7 +2308,10 @@
       },
       "BackupsHealth": {
         "type": "object",
-        "required": ["status", "enabled"],
+        "required": [
+          "status",
+          "enabled"
+        ],
         "properties": {
           "status": {
             "$ref": "#/components/schemas/ComponentStatus"
@@ -706,7 +2346,9 @@
       },
       "LogsHealth": {
         "type": "object",
-        "required": ["status"],
+        "required": [
+          "status"
+        ],
         "properties": {
           "status": {
             "$ref": "#/components/schemas/ComponentStatus"
@@ -739,7 +2381,13 @@
       },
       "HealthResponse": {
         "type": "object",
-        "required": ["status", "timestamp", "version", "uptime", "components"],
+        "required": [
+          "status",
+          "timestamp",
+          "version",
+          "uptime",
+          "components"
+        ],
         "properties": {
           "status": {
             "$ref": "#/components/schemas/HealthStatus"
@@ -759,7 +2407,13 @@
           },
           "components": {
             "type": "object",
-            "required": ["sqlite", "repos", "jobs", "backups", "logs"],
+            "required": [
+              "sqlite",
+              "repos",
+              "jobs",
+              "backups",
+              "logs"
+            ],
             "properties": {
               "sqlite": {
                 "$ref": "#/components/schemas/SqliteHealth"
@@ -782,12 +2436,21 @@
       },
       "MediaType": {
         "type": "string",
-        "enum": ["movie", "series"],
+        "enum": [
+          "movie",
+          "series"
+        ],
         "description": "Type of media"
       },
       "ParsedInfo": {
         "type": "object",
-        "required": ["source", "resolution", "modifier", "languages", "year"],
+        "required": [
+          "source",
+          "resolution",
+          "modifier",
+          "languages",
+          "year"
+        ],
         "properties": {
           "source": {
             "type": "string",
@@ -831,7 +2494,11 @@
       },
       "ReleaseInput": {
         "type": "object",
-        "required": ["id", "title", "type"],
+        "required": [
+          "id",
+          "title",
+          "type"
+        ],
         "properties": {
           "id": {
             "type": "integer",
@@ -848,7 +2515,11 @@
       },
       "ReleaseEvaluation": {
         "type": "object",
-        "required": ["releaseId", "title", "cfMatches"],
+        "required": [
+          "releaseId",
+          "title",
+          "cfMatches"
+        ],
         "properties": {
           "releaseId": {
             "type": "integer",
@@ -872,7 +2543,9 @@
       },
       "EvaluateRequest": {
         "type": "object",
-        "required": ["releases"],
+        "required": [
+          "releases"
+        ],
         "properties": {
           "databaseId": {
             "type": "integer",
@@ -889,7 +2562,10 @@
       },
       "EvaluateResponse": {
         "type": "object",
-        "required": ["parserAvailable", "evaluations"],
+        "required": [
+          "parserAvailable",
+          "evaluations"
+        ],
         "properties": {
           "parserAvailable": {
             "type": "boolean",
@@ -904,14 +2580,249 @@
           }
         }
       },
+      "SimulateConditionResult": {
+        "type": "object",
+        "required": [
+          "conditionName",
+          "conditionType",
+          "matched",
+          "required",
+          "negate",
+          "passes",
+          "expected",
+          "actual"
+        ],
+        "properties": {
+          "conditionName": {
+            "type": "string"
+          },
+          "conditionType": {
+            "type": "string"
+          },
+          "matched": {
+            "type": "boolean"
+          },
+          "required": {
+            "type": "boolean"
+          },
+          "negate": {
+            "type": "boolean"
+          },
+          "passes": {
+            "type": "boolean"
+          },
+          "expected": {
+            "type": "string"
+          },
+          "actual": {
+            "type": "string"
+          }
+        }
+      },
+      "SimulateCfMatch": {
+        "type": "object",
+        "required": [
+          "name",
+          "matches",
+          "conditions"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "matches": {
+            "type": "boolean"
+          },
+          "conditions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SimulateConditionResult"
+            }
+          }
+        }
+      },
+      "SimulateScoreContribution": {
+        "type": "object",
+        "required": [
+          "cfName",
+          "score"
+        ],
+        "properties": {
+          "cfName": {
+            "type": "string"
+          },
+          "score": {
+            "type": "integer"
+          }
+        }
+      },
+      "SimulateProfileScore": {
+        "type": "object",
+        "required": [
+          "profileName",
+          "totalScore",
+          "minimumScore",
+          "upgradeUntilScore",
+          "contributions"
+        ],
+        "properties": {
+          "profileName": {
+            "type": "string"
+          },
+          "totalScore": {
+            "type": "integer"
+          },
+          "minimumScore": {
+            "type": "integer"
+          },
+          "upgradeUntilScore": {
+            "type": "integer"
+          },
+          "contributions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SimulateScoreContribution"
+            }
+          }
+        }
+      },
+      "SimulateReleaseResult": {
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "parsed",
+          "cfMatches",
+          "profileScores"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "parsed": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ParsedInfo"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "cfMatches": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SimulateCfMatch"
+            }
+          },
+          "profileScores": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SimulateProfileScore"
+            }
+          }
+        }
+      },
+      "SimulateReleaseInput": {
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "type"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Client-generated correlation ID"
+          },
+          "title": {
+            "type": "string",
+            "description": "Release title to parse and evaluate"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "movie",
+              "series"
+            ]
+          }
+        }
+      },
+      "SimulateScoreRequest": {
+        "type": "object",
+        "required": [
+          "databaseId",
+          "releases",
+          "profileNames",
+          "arrType"
+        ],
+        "properties": {
+          "databaseId": {
+            "type": "integer",
+            "description": "PCD database instance ID"
+          },
+          "releases": {
+            "type": "array",
+            "maxItems": 50,
+            "description": "Release titles to simulate (max 50)",
+            "items": {
+              "$ref": "#/components/schemas/SimulateReleaseInput"
+            }
+          },
+          "profileNames": {
+            "type": "array",
+            "maxItems": 10,
+            "description": "Quality profile names to score against (max 10)",
+            "items": {
+              "type": "string"
+            }
+          },
+          "arrType": {
+            "type": "string",
+            "enum": [
+              "radarr",
+              "sonarr"
+            ],
+            "description": "Arr type for score column resolution"
+          }
+        }
+      },
+      "SimulateScoreResponse": {
+        "type": "object",
+        "required": [
+          "parserAvailable",
+          "results"
+        ],
+        "properties": {
+          "parserAvailable": {
+            "type": "boolean"
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SimulateReleaseResult"
+            }
+          }
+        }
+      },
       "ArrType": {
         "type": "string",
-        "enum": ["radarr", "sonarr", "lidarr"],
+        "enum": [
+          "radarr",
+          "sonarr",
+          "lidarr"
+        ],
         "description": "Type of Arr instance"
       },
       "CustomFormatRef": {
         "type": "object",
-        "required": ["id", "name"],
+        "required": [
+          "id",
+          "name"
+        ],
         "properties": {
           "id": {
             "type": "integer",
@@ -925,7 +2836,10 @@
       },
       "ScoreBreakdownItem": {
         "type": "object",
-        "required": ["name", "score"],
+        "required": [
+          "name",
+          "score"
+        ],
         "properties": {
           "name": {
             "type": "string",
@@ -939,7 +2853,11 @@
       },
       "ProfileByDatabase": {
         "type": "object",
-        "required": ["databaseId", "databaseName", "profiles"],
+        "required": [
+          "databaseId",
+          "databaseName",
+          "profiles"
+        ],
         "properties": {
           "databaseId": {
             "type": "integer",
@@ -1289,11 +3207,22 @@
       },
       "LibraryRadarrResponse": {
         "type": "object",
-        "required": ["type", "items", "profilesByDatabase"],
+        "required": [
+          "type",
+          "items",
+          "profilesByDatabase",
+          "page",
+          "pageSize",
+          "totalRecords",
+          "totalPages",
+          "hasNext"
+        ],
         "properties": {
           "type": {
             "type": "string",
-            "enum": ["radarr"]
+            "enum": [
+              "radarr"
+            ]
           },
           "items": {
             "type": "array",
@@ -1306,16 +3235,47 @@
             "items": {
               "$ref": "#/components/schemas/ProfileByDatabase"
             }
+          },
+          "page": {
+            "type": "integer",
+            "description": "Current page number"
+          },
+          "pageSize": {
+            "type": "integer",
+            "description": "Current items per page"
+          },
+          "totalRecords": {
+            "type": "integer",
+            "description": "Total number of records after search/filtering before pagination"
+          },
+          "totalPages": {
+            "type": "integer",
+            "description": "Total page count derived from totalRecords and pageSize"
+          },
+          "hasNext": {
+            "type": "boolean",
+            "description": "Indicates whether additional pages are available"
           }
         }
       },
       "LibrarySonarrResponse": {
         "type": "object",
-        "required": ["type", "items", "profilesByDatabase"],
+        "required": [
+          "type",
+          "items",
+          "profilesByDatabase",
+          "page",
+          "pageSize",
+          "totalRecords",
+          "totalPages",
+          "hasNext"
+        ],
         "properties": {
           "type": {
             "type": "string",
-            "enum": ["sonarr"]
+            "enum": [
+              "sonarr"
+            ]
           },
           "items": {
             "type": "array",
@@ -1328,16 +3288,47 @@
             "items": {
               "$ref": "#/components/schemas/ProfileByDatabase"
             }
+          },
+          "page": {
+            "type": "integer",
+            "description": "Current page number"
+          },
+          "pageSize": {
+            "type": "integer",
+            "description": "Current items per page"
+          },
+          "totalRecords": {
+            "type": "integer",
+            "description": "Total number of records after search/filtering before pagination"
+          },
+          "totalPages": {
+            "type": "integer",
+            "description": "Total page count derived from totalRecords and pageSize"
+          },
+          "hasNext": {
+            "type": "boolean",
+            "description": "Indicates whether additional pages are available"
           }
         }
       },
       "LibraryLidarrResponse": {
         "type": "object",
-        "required": ["type", "items", "profilesByDatabase"],
+        "required": [
+          "type",
+          "items",
+          "profilesByDatabase",
+          "page",
+          "pageSize",
+          "totalRecords",
+          "totalPages",
+          "hasNext"
+        ],
         "properties": {
           "type": {
             "type": "string",
-            "enum": ["lidarr"]
+            "enum": [
+              "lidarr"
+            ]
           },
           "items": {
             "type": "array",
@@ -1350,6 +3341,26 @@
             "items": {
               "$ref": "#/components/schemas/ProfileByDatabase"
             }
+          },
+          "page": {
+            "type": "integer",
+            "description": "Current page number"
+          },
+          "pageSize": {
+            "type": "integer",
+            "description": "Current items per page"
+          },
+          "totalRecords": {
+            "type": "integer",
+            "description": "Total number of records after search/filtering before pagination"
+          },
+          "totalPages": {
+            "type": "integer",
+            "description": "Total page count derived from totalRecords and pageSize"
+          },
+          "hasNext": {
+            "type": "boolean",
+            "description": "Indicates whether additional pages are available"
           }
         }
       },
@@ -1365,11 +3376,13 @@
             "$ref": "#/components/schemas/LibraryLidarrResponse"
           }
         ],
-        "description": "Library response varies by instance type.\nLidarr payload details remain capability-gated until dedicated library route support ships.\n"
+        "description": "Library response varies by instance type.\nPayload details for partially supported families remain capability-gated until\ntheir dedicated library routes are available.\n"
       },
       "EpisodesResponse": {
         "type": "object",
-        "required": ["episodes"],
+        "required": [
+          "episodes"
+        ],
         "properties": {
           "episodes": {
             "type": "array",
@@ -1382,7 +3395,9 @@
       },
       "CacheInvalidatedResponse": {
         "type": "object",
-        "required": ["success"],
+        "required": [
+          "success"
+        ],
         "properties": {
           "success": {
             "type": "boolean",
@@ -1392,7 +3407,13 @@
       },
       "GroupedRelease": {
         "type": "object",
-        "required": ["title", "size", "languages", "indexers", "flags"],
+        "required": [
+          "title",
+          "size",
+          "languages",
+          "indexers",
+          "flags"
+        ],
         "properties": {
           "title": {
             "type": "string",
@@ -1427,7 +3448,11 @@
       },
       "ReleasesResponse": {
         "type": "object",
-        "required": ["type", "rawCount", "releases"],
+        "required": [
+          "type",
+          "rawCount",
+          "releases"
+        ],
         "properties": {
           "type": {
             "$ref": "#/components/schemas/ArrType"
@@ -1447,7 +3472,9 @@
       },
       "ErrorResponse": {
         "type": "object",
-        "required": ["error"],
+        "required": [
+          "error"
+        ],
         "properties": {
           "error": {
             "type": "string",
@@ -1457,7 +3484,11 @@
       },
       "StaleItem": {
         "type": "object",
-        "required": ["id", "name", "strippedName"],
+        "required": [
+          "id",
+          "name",
+          "strippedName"
+        ],
         "properties": {
           "id": {
             "type": "integer",
@@ -1475,7 +3506,10 @@
       },
       "CleanupScanRequest": {
         "type": "object",
-        "required": ["instanceId", "action"],
+        "required": [
+          "instanceId",
+          "action"
+        ],
         "properties": {
           "instanceId": {
             "type": "integer",
@@ -1483,13 +3517,19 @@
           },
           "action": {
             "type": "string",
-            "enum": ["scan"]
+            "enum": [
+              "scan"
+            ]
           }
         }
       },
       "CleanupExecuteRequest": {
         "type": "object",
-        "required": ["instanceId", "action", "scanResult"],
+        "required": [
+          "instanceId",
+          "action",
+          "scanResult"
+        ],
         "properties": {
           "instanceId": {
             "type": "integer",
@@ -1497,7 +3537,9 @@
           },
           "action": {
             "type": "string",
-            "enum": ["execute"]
+            "enum": [
+              "execute"
+            ]
           },
           "scanResult": {
             "$ref": "#/components/schemas/CleanupScanResult"
@@ -1506,7 +3548,10 @@
       },
       "CleanupScanResult": {
         "type": "object",
-        "required": ["staleCustomFormats", "staleQualityProfiles"],
+        "required": [
+          "staleCustomFormats",
+          "staleQualityProfiles"
+        ],
         "properties": {
           "staleCustomFormats": {
             "type": "array",
@@ -1526,7 +3571,10 @@
       },
       "SkippedItem": {
         "type": "object",
-        "required": ["item", "reason"],
+        "required": [
+          "item",
+          "reason"
+        ],
         "properties": {
           "item": {
             "$ref": "#/components/schemas/StaleItem"
@@ -1539,7 +3587,11 @@
       },
       "CleanupDeleteResult": {
         "type": "object",
-        "required": ["deletedCustomFormats", "deletedQualityProfiles", "skippedQualityProfiles"],
+        "required": [
+          "deletedCustomFormats",
+          "deletedQualityProfiles",
+          "skippedQualityProfiles"
+        ],
         "properties": {
           "deletedCustomFormats": {
             "type": "array",
@@ -1564,9 +3616,489 @@
           }
         }
       },
+      "SyncPreviewCreateRequest": {
+        "type": "object",
+        "required": [
+          "instanceId"
+        ],
+        "properties": {
+          "instanceId": {
+            "type": "integer",
+            "description": "Arr instance ID to preview"
+          },
+          "sections": {
+            "type": "array",
+            "description": "Optional section filters for preview generation",
+            "items": {
+              "$ref": "#/components/schemas/SyncPreviewSection"
+            }
+          }
+        }
+      },
+      "SyncPreviewApplyRequest": {
+        "type": "object",
+        "properties": {
+          "sections": {
+            "type": "array",
+            "description": "Optional section filters for preview application",
+            "items": {
+              "$ref": "#/components/schemas/SyncPreviewSection"
+            }
+          }
+        }
+      },
+      "SyncPreviewStatus": {
+        "type": "string",
+        "enum": [
+          "generating",
+          "ready",
+          "applying",
+          "applied",
+          "failed",
+          "expired"
+        ],
+        "description": "Preview lifecycle state:\n- `generating`: build in progress\n- `ready`: preview fully materialized and runnable\n- `applying`: preview is being executed as sync\n- `applied`: execution succeeded\n- `failed`: generation or execution failed\n- `expired`: staleness TTL elapsed\n"
+      },
+      "SyncPreviewSection": {
+        "type": "string",
+        "enum": [
+          "qualityProfiles",
+          "delayProfiles",
+          "mediaManagement",
+          "metadataProfiles"
+        ],
+        "description": "Sync section handled by preview generation"
+      },
+      "SyncPreviewAction": {
+        "type": "string",
+        "enum": [
+          "create",
+          "update",
+          "delete",
+          "unchanged"
+        ]
+      },
+      "SyncPreviewFieldChangeType": {
+        "type": "string",
+        "enum": [
+          "added",
+          "changed",
+          "removed"
+        ]
+      },
+      "FieldChange": {
+        "type": "object",
+        "required": [
+          "field",
+          "type",
+          "current",
+          "desired"
+        ],
+        "properties": {
+          "field": {
+            "type": "string",
+            "description": "Dot-notated field path"
+          },
+          "type": {
+            "$ref": "#/components/schemas/SyncPreviewFieldChangeType"
+          },
+          "current": {
+            "description": "Previous value from Arr GET state",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "array"
+              },
+              {
+                "type": "object",
+                "additionalProperties": true
+              },
+              {
+                "type": null
+              }
+            ]
+          },
+          "desired": {
+            "description": "Desired value after sync transformation",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "array"
+              },
+              {
+                "type": "object",
+                "additionalProperties": true
+              },
+              {
+                "type": null
+              }
+            ]
+          }
+        }
+      },
+      "EntityChange": {
+        "type": "object",
+        "required": [
+          "entityType",
+          "name",
+          "action",
+          "remoteId",
+          "fields"
+        ],
+        "properties": {
+          "entityType": {
+            "type": "string",
+            "description": "Sync target entity kind (e.g., customFormat, qualityProfile)"
+          },
+          "name": {
+            "type": "string",
+            "description": "Entity display name (namespace-stripped where applicable)"
+          },
+          "action": {
+            "$ref": "#/components/schemas/SyncPreviewAction"
+          },
+          "remoteId": {
+            "type": "integer",
+            "nullable": true,
+            "description": "Arr entity ID when present"
+          },
+          "fields": {
+            "type": "array",
+            "description": "Field-level diff; empty for unchanged/create where no deltas are tracked",
+            "items": {
+              "$ref": "#/components/schemas/FieldChange"
+            }
+          }
+        }
+      },
+      "QualityProfilesPreview": {
+        "type": "object",
+        "required": [
+          "section",
+          "customFormats",
+          "qualityProfiles"
+        ],
+        "properties": {
+          "section": {
+            "type": "string",
+            "enum": [
+              "qualityProfiles"
+            ]
+          },
+          "customFormats": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EntityChange"
+            },
+            "description": "Custom-format change set"
+          },
+          "qualityProfiles": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EntityChange"
+            },
+            "description": "Quality-profile change set"
+          }
+        }
+      },
+      "DelayProfilesPreview": {
+        "type": "object",
+        "required": [
+          "section",
+          "profile"
+        ],
+        "properties": {
+          "section": {
+            "type": "string",
+            "enum": [
+              "delayProfiles"
+            ]
+          },
+          "profile": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/EntityChange"
+              },
+              {
+                "type": null
+              }
+            ],
+            "description": "Delay profile singleton section payload"
+          }
+        }
+      },
+      "MediaManagementPreview": {
+        "type": "object",
+        "required": [
+          "section",
+          "naming",
+          "qualityDefinitions",
+          "mediaSettings"
+        ],
+        "properties": {
+          "section": {
+            "type": "string",
+            "enum": [
+              "mediaManagement"
+            ]
+          },
+          "naming": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/EntityChange"
+              },
+              {
+                "type": null
+              }
+            ],
+            "description": "Naming config diff"
+          },
+          "qualityDefinitions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EntityChange"
+            },
+            "description": "Quality definition change set"
+          },
+          "mediaSettings": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/EntityChange"
+              },
+              {
+                "type": null
+              }
+            ],
+            "description": "Media settings config diff"
+          }
+        }
+      },
+      "MetadataProfilesPreview": {
+        "type": "object",
+        "required": [
+          "section",
+          "profile"
+        ],
+        "properties": {
+          "section": {
+            "type": "string",
+            "enum": [
+              "metadataProfiles"
+            ]
+          },
+          "profile": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/EntityChange"
+              },
+              {
+                "type": null
+              }
+            ],
+            "description": "Lidarr metadata profile singleton diff"
+          }
+        }
+      },
+      "SyncPreviewSummary": {
+        "type": "object",
+        "required": [
+          "totalCreates",
+          "totalUpdates",
+          "totalDeletes",
+          "totalUnchanged"
+        ],
+        "properties": {
+          "totalCreates": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Number of create actions"
+          },
+          "totalUpdates": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Number of update actions"
+          },
+          "totalDeletes": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Number of delete actions"
+          },
+          "totalUnchanged": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Number of unchanged entities"
+          }
+        }
+      },
+      "SyncPreviewSectionOutcome": {
+        "type": "object",
+        "required": [
+          "section",
+          "skipped",
+          "error"
+        ],
+        "properties": {
+          "section": {
+            "$ref": "#/components/schemas/SyncPreviewSection"
+          },
+          "skipped": {
+            "type": "boolean",
+            "description": "True when the section had no config to preview and was skipped."
+          },
+          "error": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": null
+              }
+            ],
+            "description": "Section-level preview generation error, when present."
+          }
+        }
+      },
+      "SyncPreviewResult": {
+        "type": "object",
+        "required": [
+          "id",
+          "instanceId",
+          "instanceName",
+          "arrType",
+          "createdAt",
+          "expiresAt",
+          "status",
+          "sections",
+          "sectionOutcomes",
+          "qualityProfiles",
+          "delayProfiles",
+          "mediaManagement",
+          "metadataProfiles",
+          "summary"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Preview identifier"
+          },
+          "instanceId": {
+            "type": "integer",
+            "description": "Target Arr instance ID"
+          },
+          "instanceName": {
+            "type": "string",
+            "description": "Target Arr instance name"
+          },
+          "arrType": {
+            "type": "string",
+            "enum": [
+              "radarr",
+              "sonarr",
+              "lidarr"
+            ],
+            "description": "Arr instance family"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "ISO 8601 timestamp when preview was generated"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "ISO 8601 timestamp when preview becomes expired"
+          },
+          "status": {
+            "$ref": "#/components/schemas/SyncPreviewStatus"
+          },
+          "error": {
+            "type": "string",
+            "description": "Optional error message from generation or apply"
+          },
+          "sections": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SyncPreviewSection"
+            },
+            "description": "Sections included in preview"
+          },
+          "sectionOutcomes": {
+            "type": "array",
+            "description": "Per-section preview generation status used to enforce safe apply behavior.",
+            "items": {
+              "$ref": "#/components/schemas/SyncPreviewSectionOutcome"
+            }
+          },
+          "qualityProfiles": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/QualityProfilesPreview"
+              },
+              {
+                "type": null
+              }
+            ]
+          },
+          "delayProfiles": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/DelayProfilesPreview"
+              },
+              {
+                "type": null
+              }
+            ]
+          },
+          "mediaManagement": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/MediaManagementPreview"
+              },
+              {
+                "type": null
+              }
+            ]
+          },
+          "metadataProfiles": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/MetadataProfilesPreview"
+              },
+              {
+                "type": null
+              }
+            ]
+          },
+          "summary": {
+            "$ref": "#/components/schemas/SyncPreviewSummary"
+          }
+        }
+      },
       "EntityType": {
         "type": "string",
-        "description": "Portable PCD entity identifiers used by import/export endpoints.\n\nv1 Lidarr media-management strategy: reuse existing entities.\nLidarr maps to `radarr_media_settings` / `sonarr_media_settings` and\n`radarr_quality_definitions` / `sonarr_quality_definitions` rather than\nintroducing dedicated `lidarr_*` entity types in this phase. Downstream\nsync resolves the Lidarr arr_type against these shared shapes and\ncapability-gates any Lidarr-only fields (e.g. naming formats, music-\nspecific media-info fields) so behavior is deterministic: unsupported\nfields are explicitly skipped with logged reasons, never silently\nwritten or partially applied.\n\nNo new enum values are added for Lidarr here. The `lidarr` arr_type\nis expressed in per-row `arr_type` columns (e.g. quality_profile_custom_formats,\ncustom_format_conditions, quality_api_mappings) and in the\nPortableCustomFormatScore.arrType enum, not as a distinct entity family.\n",
+        "description": "Portable PCD entity identifiers used by import/export endpoints.\n\nLidarr media-management entities are first-class portable contract members:\n- `lidarr_naming`\n- `lidarr_media_settings`\n- `lidarr_quality_definitions`\n\nRuntime validation is deterministic and fail-fast for Lidarr payloads:\npayloads are rejected when required fields are missing, when unsupported\nfields are present, or when cross-family fields are mixed into the payload\n(for example Radarr naming fields with `lidarr_naming`).\n\nClients must emit `lidarr_*` entity types for Lidarr entities.\n",
         "enum": [
           "delay_profile",
           "regular_expression",
@@ -1577,18 +4109,57 @@
           "radarr_media_settings",
           "sonarr_media_settings",
           "radarr_quality_definitions",
-          "sonarr_quality_definitions"
+          "sonarr_quality_definitions",
+          "lidarr_metadata_profile",
+          "lidarr_naming",
+          "lidarr_media_settings",
+          "lidarr_quality_definitions"
         ]
+      },
+      "PortableMigrationMetadata": {
+        "type": "object",
+        "required": [
+          "format",
+          "version",
+          "source"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "format": {
+            "type": "string",
+            "enum": [
+              "json",
+              "yaml"
+            ],
+            "description": "Migration payload format marker (`json` for JSON payloads, `yaml` for YAML\nin future hybrid ingestion flows).\n"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Migration schema contract version for hybrid payloads."
+          },
+          "source": {
+            "type": "string",
+            "description": "Migration source marker (example: `pcd-export`, `pcd-file`, `pcd-importer`).\n"
+          }
+        },
+        "description": "Optional metadata for hybrid JSON/YAML migration envelopes.\nExisting payloads are backward-compatible when omitted.\n"
       },
       "ExportResponse": {
         "type": "object",
-        "required": ["entityType", "data"],
+        "required": [
+          "entityType",
+          "data"
+        ],
         "properties": {
           "entityType": {
             "$ref": "#/components/schemas/EntityType"
           },
+          "migration": {
+            "$ref": "#/components/schemas/PortableMigrationMetadata"
+          },
           "data": {
-            "description": "The portable entity payload. Shape varies by entityType:\n- `delay_profile` → PortableDelayProfile\n- `regular_expression` → PortableRegularExpression\n- `custom_format` → PortableCustomFormat\n- `quality_profile` → PortableQualityProfile (contains PortableCustomFormatScore with lidarr-aware arrType)\n- `radarr_naming` → PortableRadarrNaming\n- `sonarr_naming` → PortableSonarrNaming\n- `radarr_media_settings` → PortableMediaSettings (reused for Lidarr in v1)\n- `sonarr_media_settings` → PortableMediaSettings (reused for Lidarr in v1)\n- `radarr_quality_definitions` → PortableQualityDefinitions (reused for Lidarr in v1)\n- `sonarr_quality_definitions` → PortableQualityDefinitions (reused for Lidarr in v1)\n\nv1 Lidarr reuse strategy:\nLidarr media-management sync maps to existing `radarr_*`/`sonarr_*` entity\nshapes. No `lidarr_*` entity types exist in this phase. Unsupported Lidarr-only\nfields (e.g. music-specific naming tokens, artist/album media-info fields) are\ncapability-gated: the sync layer explicitly skips them with deterministic,\nlogged outcomes rather than silently writing partial data.\n",
+            "description": "The portable entity payload. Shape varies by entityType:\n- `delay_profile` → PortableDelayProfile\n- `regular_expression` → PortableRegularExpression\n- `custom_format` → PortableCustomFormat\n- `quality_profile` → PortableQualityProfile (contains PortableCustomFormatScore with family-scoped arrType)\n- `radarr_naming` → PortableRadarrNaming\n- `sonarr_naming` → PortableSonarrNaming\n- `lidarr_naming` → PortableLidarrNaming\n- `radarr_media_settings` → PortableMediaSettings\n- `sonarr_media_settings` → PortableMediaSettings\n- `lidarr_media_settings` → PortableLidarrMediaSettings\n- `radarr_quality_definitions` → PortableQualityDefinitions\n- `sonarr_quality_definitions` → PortableQualityDefinitions\n- `lidarr_metadata_profile` → PortableLidarrMetadataProfile\n- `lidarr_quality_definitions` → PortableLidarrQualityDefinitions\n\n`lidarr_*` payloads are validated against strict allowlists so mixed\ncross-family payloads fail fast during import.\n",
             "oneOf": [
               {
                 "$ref": "#/components/schemas/PortableDelayProfile"
@@ -1609,10 +4180,22 @@
                 "$ref": "#/components/schemas/PortableSonarrNaming"
               },
               {
+                "$ref": "#/components/schemas/PortableLidarrNaming"
+              },
+              {
                 "$ref": "#/components/schemas/PortableMediaSettings"
               },
               {
+                "$ref": "#/components/schemas/PortableLidarrMediaSettings"
+              },
+              {
                 "$ref": "#/components/schemas/PortableQualityDefinitions"
+              },
+              {
+                "$ref": "#/components/schemas/PortableLidarrMetadataProfile"
+              },
+              {
+                "$ref": "#/components/schemas/PortableLidarrQualityDefinitions"
               }
             ]
           }
@@ -1620,7 +4203,12 @@
       },
       "ImportRequest": {
         "type": "object",
-        "required": ["databaseId", "layer", "entityType", "data"],
+        "required": [
+          "databaseId",
+          "layer",
+          "entityType",
+          "data"
+        ],
         "properties": {
           "databaseId": {
             "type": "integer",
@@ -1628,14 +4216,20 @@
           },
           "layer": {
             "type": "string",
-            "enum": ["user", "base"],
+            "enum": [
+              "user",
+              "base"
+            ],
             "description": "The operation layer to write to"
           },
           "entityType": {
             "$ref": "#/components/schemas/EntityType"
           },
+          "migration": {
+            "$ref": "#/components/schemas/PortableMigrationMetadata"
+          },
           "data": {
-            "description": "The portable entity payload (same shape as ExportResponse.data)",
+            "description": "The portable entity payload (same shape as ExportResponse.data).\nFor `lidarr_*` entity types, runtime validation rejects mixed\ncross-family payload fields and unknown fields.\n",
             "oneOf": [
               {
                 "$ref": "#/components/schemas/PortableDelayProfile"
@@ -1656,10 +4250,22 @@
                 "$ref": "#/components/schemas/PortableSonarrNaming"
               },
               {
+                "$ref": "#/components/schemas/PortableLidarrNaming"
+              },
+              {
                 "$ref": "#/components/schemas/PortableMediaSettings"
               },
               {
+                "$ref": "#/components/schemas/PortableLidarrMediaSettings"
+              },
+              {
                 "$ref": "#/components/schemas/PortableQualityDefinitions"
+              },
+              {
+                "$ref": "#/components/schemas/PortableLidarrMetadataProfile"
+              },
+              {
+                "$ref": "#/components/schemas/PortableLidarrQualityDefinitions"
               }
             ]
           }
@@ -1667,7 +4273,9 @@
       },
       "ImportResponse": {
         "type": "object",
-        "required": ["success"],
+        "required": [
+          "success"
+        ],
         "properties": {
           "success": {
             "type": "boolean"
@@ -1676,7 +4284,9 @@
       },
       "PcdErrorResponse": {
         "type": "object",
-        "required": ["error"],
+        "required": [
+          "error"
+        ],
         "properties": {
           "error": {
             "type": "string"
@@ -1700,7 +4310,12 @@
           },
           "preferredProtocol": {
             "type": "string",
-            "enum": ["prefer_usenet", "prefer_torrent", "only_usenet", "only_torrent"]
+            "enum": [
+              "prefer_usenet",
+              "prefer_torrent",
+              "only_usenet",
+              "only_torrent"
+            ]
           },
           "usenetDelay": {
             "type": "integer"
@@ -1721,7 +4336,13 @@
       },
       "PortableRegularExpression": {
         "type": "object",
-        "required": ["name", "pattern", "tags", "description", "regex101Id"],
+        "required": [
+          "name",
+          "pattern",
+          "tags",
+          "description",
+          "regex101Id"
+        ],
         "properties": {
           "name": {
             "type": "string"
@@ -1747,14 +4368,22 @@
       },
       "PortableCustomFormatTest": {
         "type": "object",
-        "required": ["title", "type", "shouldMatch", "description"],
+        "required": [
+          "title",
+          "type",
+          "shouldMatch",
+          "description"
+        ],
         "properties": {
           "title": {
             "type": "string"
           },
           "type": {
             "type": "string",
-            "enum": ["movie", "series"]
+            "enum": [
+              "movie",
+              "series"
+            ]
           },
           "shouldMatch": {
             "type": "boolean"
@@ -1767,7 +4396,14 @@
       },
       "PortableCustomFormat": {
         "type": "object",
-        "required": ["name", "description", "includeInRename", "tags", "conditions", "tests"],
+        "required": [
+          "name",
+          "description",
+          "includeInRename",
+          "tags",
+          "conditions",
+          "tests"
+        ],
         "properties": {
           "name": {
             "type": "string"
@@ -1802,15 +4438,24 @@
       },
       "PortableCustomFormatScore": {
         "type": "object",
-        "required": ["customFormatName", "arrType", "score"],
+        "required": [
+          "customFormatName",
+          "arrType",
+          "score"
+        ],
         "properties": {
           "customFormatName": {
             "type": "string"
           },
           "arrType": {
             "type": "string",
-            "enum": ["radarr", "sonarr", "lidarr", "all"],
-            "description": "Arr target for this score mapping. `lidarr` is a valid value for v1\nparity so quality profile custom-format scores can be scoped to Lidarr\ninstances. `all` applies the score to every arr type. Unsupported\nLidarr-only sync behavior (e.g. naming, music-specific media fields)\nremains capability-gated in the sync layer; this enum only governs\nscore applicability, not full feature support.\n"
+            "enum": [
+              "radarr",
+              "sonarr",
+              "lidarr",
+              "all"
+            ],
+            "description": "Arr target for this score mapping. `lidarr` is a first-class value\nso quality profile custom-format scores can be scoped to a specific Arr\napp family. `all` applies the score to every supported family.\n\nNon-regression contract: existing `radarr`, `sonarr`, and `all`\nenum semantics are unchanged; `lidarr` is an explicit additional arr\ntarget value and does not introduce fallback alias behavior.\n"
           },
           "score": {
             "type": "integer"
@@ -1872,6 +4517,62 @@
           }
         }
       },
+      "PortableMetadataProfileType": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "allowed"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "allowed": {
+            "type": "boolean"
+          }
+        }
+      },
+      "PortableLidarrMetadataProfile": {
+        "type": "object",
+        "required": [
+          "name",
+          "description",
+          "primaryTypes",
+          "secondaryTypes",
+          "releaseStatuses"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "primaryTypes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PortableMetadataProfileType"
+            }
+          },
+          "secondaryTypes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PortableMetadataProfileType"
+            }
+          },
+          "releaseStatuses": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PortableMetadataProfileType"
+            }
+          }
+        }
+      },
       "PortableRadarrNaming": {
         "type": "object",
         "required": [
@@ -1904,6 +4605,7 @@
         }
       },
       "PortableSonarrNaming": {
+        "description": "Portable naming payload for Sonarr entities.\n",
         "type": "object",
         "required": [
           "name",
@@ -1955,10 +4657,22 @@
           }
         }
       },
+      "PortableLidarrNaming": {
+        "description": "Portable naming payload for `lidarr_naming`.\nThe wire shape matches `PortableSonarrNaming` (shared column structure).\nField semantics are Lidarr-native (artist/album/track tokens).\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/PortableSonarrNaming"
+          }
+        ]
+      },
       "PortableMediaSettings": {
         "type": "object",
-        "description": "Shared media-management settings payload for Radarr, Sonarr, and (in v1)\nLidarr entity families. Lidarr reuses this shape rather than introducing\n`lidarr_media_settings` entities; the sync layer maps Lidarr instances to\nthe applicable `radarr_media_settings` or `sonarr_media_settings` entity\ntype and capability-gates any Lidarr-only fields not present here (e.g.\nmusic-specific media-info flags). Unsupported fields are explicitly\nskipped with logged reasons so sync outcomes are deterministic and\ntestable.\n",
-        "required": ["name", "propersRepacks", "enableMediaInfo"],
+        "description": "Shared media-management settings payload shape used across Arr families.\n",
+        "required": [
+          "name",
+          "propersRepacks",
+          "enableMediaInfo"
+        ],
         "properties": {
           "name": {
             "type": "string"
@@ -1971,10 +4685,21 @@
           }
         }
       },
+      "PortableLidarrMediaSettings": {
+        "description": "Portable payload for `lidarr_media_settings`.\nThe shape matches `PortableMediaSettings`.\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/PortableMediaSettings"
+          }
+        ]
+      },
       "PortableQualityDefinitions": {
         "type": "object",
-        "description": "Shared quality-definition payload for Radarr, Sonarr, and (in v1) Lidarr\nentity families. Lidarr reuses this shape rather than introducing\n`lidarr_quality_definitions` entities; the sync layer maps Lidarr\ninstances to the applicable `radarr_quality_definitions` or\n`sonarr_quality_definitions` entity type and capability-gates any\nLidarr-only fields not present here. Unsupported fields are explicitly\nskipped with logged reasons so sync outcomes are deterministic and\ntestable.\n",
-        "required": ["name", "entries"],
+        "description": "Shared quality-definition payload shape used across Arr families.\n",
+        "required": [
+          "name",
+          "entries"
+        ],
         "properties": {
           "name": {
             "type": "string"
@@ -1985,6 +4710,147 @@
               "type": "object",
               "description": "Quality definition entry with min/max/preferred sizes"
             }
+          }
+        }
+      },
+      "PortableLidarrQualityDefinitions": {
+        "description": "Portable payload for `lidarr_quality_definitions`.\nThe shape matches `PortableQualityDefinitions`.\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/PortableQualityDefinitions"
+          }
+        ]
+      },
+      "SnapshotType": {
+        "type": "string",
+        "enum": [
+          "auto",
+          "manual"
+        ],
+        "description": "Whether the snapshot was auto-created or user-initiated"
+      },
+      "SnapshotTrigger": {
+        "type": "string",
+        "enum": [
+          "pull",
+          "sync",
+          "manual"
+        ],
+        "description": "What event triggered the snapshot creation.\n- pull: before a PCD repository pull/refresh\n- sync: before an Arr instance sync\n- manual: user-initiated via API\n"
+      },
+      "PcdSnapshotDetail": {
+        "type": "object",
+        "required": [
+          "id",
+          "databaseId",
+          "type",
+          "trigger",
+          "description",
+          "opsSequenceMaxId",
+          "opsCountBase",
+          "opsCountUser",
+          "cacheStateHash",
+          "targetInstanceIds",
+          "createdAt"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "databaseId": {
+            "type": "integer"
+          },
+          "type": {
+            "$ref": "#/components/schemas/SnapshotType"
+          },
+          "trigger": {
+            "$ref": "#/components/schemas/SnapshotTrigger"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "opsSequenceMaxId": {
+            "type": "integer",
+            "description": "Maximum pcd_ops ID at snapshot time"
+          },
+          "opsCountBase": {
+            "type": "integer",
+            "description": "Count of published base-origin ops"
+          },
+          "opsCountUser": {
+            "type": "integer",
+            "description": "Count of published user-origin ops"
+          },
+          "cacheStateHash": {
+            "type": "string",
+            "nullable": true,
+            "description": "SHA-256 state fingerprint"
+          },
+          "targetInstanceIds": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            },
+            "nullable": true,
+            "description": "Arr instance IDs targeted by this operation"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "PcdSnapshotFullDetail": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/PcdSnapshotDetail"
+          },
+          {
+            "type": "object",
+            "required": [
+              "opsWrittenSince",
+              "isRestorable"
+            ],
+            "properties": {
+              "opsWrittenSince": {
+                "type": "integer",
+                "description": "Number of ops written after this snapshot (count of pcd_ops rows with id greater than opsSequenceMaxId)"
+              },
+              "isRestorable": {
+                "type": "boolean",
+                "description": "Always false in this release. Restore support is not yet implemented."
+              }
+            }
+          }
+        ]
+      },
+      "PcdSnapshotListResponse": {
+        "type": "object",
+        "required": [
+          "snapshots",
+          "total"
+        ],
+        "properties": {
+          "snapshots": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PcdSnapshotDetail"
+            }
+          },
+          "total": {
+            "type": "integer",
+            "description": "Total count matching the query filters"
+          }
+        }
+      },
+      "CreateManualSnapshotRequest": {
+        "type": "object",
+        "description": "Request body for creating a manual snapshot. All fields are optional.",
+        "properties": {
+          "description": {
+            "type": "string",
+            "description": "Optional description for the snapshot"
           }
         }
       }
