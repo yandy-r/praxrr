@@ -1,6 +1,6 @@
 # Praxrr Roadmap
 
-Reviewed: 2026-07-06 (updated after app technical documentation #77 shipped)
+Reviewed: 2026-07-06 (updated after progressive complexity architecture #29 / #203 shipped)
 
 Source: open GitHub issues in `yandy-r/praxrr` as of this review.
 
@@ -40,9 +40,9 @@ The best next order is:
    maintenance blockers.
 
 Phase 1 safety work from the research backlog is complete: Sync Preview/Dry-Run, API Key Masking,
-Encrypted API Key Storage, PCD State Snapshots, Progressive Disclosure rollout, Score Simulator
-(phases 1–3), TRaSH Guide Sync PR-122 hardening (#125, #126, #194), and docs infrastructure (#38).
-The open roadmap should not restart those completed issues.
+Encrypted API Key Storage, PCD State Snapshots, Progressive Disclosure rollout, Progressive Complexity
+Architecture (#29, #203), Score Simulator (phases 1–3), TRaSH Guide Sync PR-122 hardening (#125, #126,
+#194), and docs infrastructure (#38). The open roadmap should not restart those completed issues.
 
 ## Recently Shipped
 
@@ -50,6 +50,7 @@ Merged work since the Score Simulator and TRaSH Guide Sync foundations landed.
 
 | Date       | PR / commit                                        | Summary                                                                                                                                     | Closes / relates                                     |
 | ---------- | -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
+| 2026-07-06 | [#203](https://github.com/yandy-r/praxrr/pull/203) | Progressive complexity architecture: tier model, disclosure modes, section preferences API, `userComplexityTiers` store, and E2E coverage   | [#29](https://github.com/yandy-r/praxrr/issues/29)   |
 | 2026-07-06 | [#201](https://github.com/yandy-r/praxrr/pull/201) | App technical documentation: 8 contributor pages (architecture, startup, development, PCD, jobs, sync, notifications, testing) with Mermaid | [#77](https://github.com/yandy-r/praxrr/issues/77)   |
 | 2026-07-06 | [#200](https://github.com/yandy-r/praxrr/pull/200) | PCD schema per-table reference: 42 table pages with columns, relationships, constraints, and cross-links                                    | [#73](https://github.com/yandy-r/praxrr/issues/73)   |
 | 2026-07-06 | [#199](https://github.com/yandy-r/praxrr/pull/199) | PCD database content docs: 253 custom formats, quality profile presets, release/delay profiles, Lidarr guide, changelog, sidebar wiring     | [#76](https://github.com/yandy-r/praxrr/issues/76)   |
@@ -104,7 +105,7 @@ Goal: help users understand what Praxrr will do before they trust it with their 
 
 | Order | Issue                                                                                  | Priority | Decision                                                                                                                                                                                         | Done When                                                                                                             |
 | ----- | -------------------------------------------------------------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------- |
-| 1     | [#29](https://github.com/yandy-r/praxrr/issues/29) Progressive Complexity Architecture | Medium   | Use as the UX architecture for this phase, not as a one-off screen. Progressive Disclosure rollout (#164, #170) is shipped; close #29 once the architecture doc and reveal rules are formalized. | Beginner and advanced surfaces have clear reveal rules, and new feature designs follow the same complexity model.     |
+| 1     | [#29](https://github.com/yandy-r/praxrr/issues/29) Progressive Complexity Architecture | Medium   | **Done** — Tier model, disclosure modes, section preferences API, and reveal rules shipped ([#203](https://github.com/yandy-r/praxrr/pull/203)). Builds on Progressive Disclosure rollout (#164, #170). | Beginner and advanced surfaces have clear reveal rules, and new feature designs follow the same complexity model.     |
 | 2     | [#12](https://github.com/yandy-r/praxrr/issues/12) Setup Wizard                        | High     | First user-facing feature in this phase. It addresses first-run abandonment directly.                                                                                                            | A new user can connect the first Arr instance, link a PCD, and reach the first successful sync through a guided flow. |
 | 3     | [#14](https://github.com/yandy-r/praxrr/issues/14) Cross-Arr Parity Map                | Medium   | Build before deeper cross-Arr automation so semantic differences are visible.                                                                                                                    | Users can see app compatibility for config entities and understand Radarr/Sonarr/Lidarr differences before sync.      |
 | 4     | [#25](https://github.com/yandy-r/praxrr/issues/25) Resolved Config Viewer              | High     | Build as the desired-state visibility foundation.                                                                                                                                                | Users can inspect base ops + user ops + overrides as Praxrr's final desired state.                                    |
@@ -116,8 +117,8 @@ Notes:
 - #25, #26, and #30 should share model work where possible. Avoid three separate interpretations of
   "resolved config."
 - #14 is both UX and correctness work. It supports the cross-Arr semantic validation policy.
-- #29 should be treated as a design constraint for all new UI in this phase. Progressive Disclosure
-  UI rollout is shipped (#164, #170); remaining work is formalizing the architecture and closing #29.
+- #29 is shipped (#203). Treat the tier model and disclosure modes as the design constraint for all
+  new UI in this phase. Progressive Disclosure UI rollout (#164, #170) remains the foundation.
 - Score Simulator (phases 1–3, #176/#184/#190) is shipped and can inform #30, but #30 still covers
   broader profile/sync impact beyond release-title scoring.
 
@@ -207,6 +208,7 @@ Use this checklist when planning a sprint or milestone.
 
 ### Completed (2026-07-06)
 
+- [x] #29 - Progressive Complexity Architecture ([#203](https://github.com/yandy-r/praxrr/pull/203))
 - [x] #197 - PCD display type split ([#202](https://github.com/yandy-r/praxrr/pull/202))
 - [x] #77 - App technical docs ([#201](https://github.com/yandy-r/praxrr/pull/201))
 - [x] #73 - PCD schema table reference ([#200](https://github.com/yandy-r/praxrr/pull/200))
@@ -227,7 +229,6 @@ Use this checklist when planning a sprint or milestone.
 
 ### Onboarding and Transparency
 
-- [ ] #29 - Progressive Complexity Architecture
 - [ ] #12 - Setup Wizard
 - [ ] #14 - Cross-Arr Parity Map
 - [ ] #25 - Resolved Config Viewer
@@ -273,12 +274,14 @@ Use this checklist when planning a sprint or milestone.
 
 ## Next Sprint Recommendation
 
-Continue the documentation content sprint:
+Shift focus from documentation to onboarding:
 
-1. Update #6 so the parent research checklist points to this roadmap and no longer implies closed
+1. Start #12 Setup Wizard as the next P1 onboarding feature.
+2. Update #6 so the parent research checklist points to this roadmap and no longer implies closed
    Phase 1 items are still active.
-2. Schedule #75 UI component reference when contributor onboarding becomes the bottleneck.
+3. Schedule #75 UI component reference when contributor onboarding becomes the bottleneck.
 
 Docs infrastructure (#38), user guides (#74), PCD database content (#76), PCD schema table reference
-(#73), app technical docs (#77), deploy CI, and TRaSH Guide Sync stabilization (#125, #126, #194) are
-complete. The next documentation milestone is the UI component reference (#75) as needed.
+(#73), app technical docs (#77), deploy CI, TRaSH Guide Sync stabilization (#125, #126, #194), and
+progressive complexity architecture (#29, #203) are complete. The next documentation milestone is
+the UI component reference (#75) as needed.
