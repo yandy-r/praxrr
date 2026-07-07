@@ -79,6 +79,21 @@
       advancing = false;
     }
   }
+
+  // InstanceForm's own Save button submits its hidden #save-form directly, which
+  // would let a user advance the wizard without a green test from the box below.
+  // InstanceForm is shared/pre-existing (also used by arr/new) and isn't wizard-aware,
+  // so gate here by intercepting the submit event during the capture phase — this
+  // runs before InstanceForm's own use:enhance handler on that same form element,
+  // letting us block the save without editing InstanceForm.
+  function handleSaveFormSubmitCapture(event: Event) {
+    const target = event.target;
+    if (target instanceof HTMLFormElement && target.id === 'save-form' && testStatus !== 'success') {
+      event.preventDefault();
+      event.stopPropagation();
+      alertStore.add('error', 'Test the connection successfully before saving.');
+    }
+  }
 </script>
 
 <svelte:head>
@@ -110,7 +125,10 @@
     />
   </div>
 {:else}
-  <div class="space-y-6">
+  <div class="space-y-6" on:submit|capture={handleSaveFormSubmitCapture}>
+    <p class="text-xs text-neutral-500 dark:text-neutral-400">
+      Run the test below and confirm it succeeds before saving — Save is blocked until then.
+    </p>
     <InstanceForm mode="create" {form} />
 
     <div class="space-y-2 rounded-lg border border-neutral-200 p-4 dark:border-neutral-700">

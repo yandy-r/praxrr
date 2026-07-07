@@ -38,10 +38,35 @@ function isLinkLocalIPv4(ip: string): boolean {
 
 /**
  * Check whether an IPv6 address falls within the link-local range
- * (fe80::/10).
+ * (fe80::/10). Only meaningful for IPv6 literals, so hostnames without a
+ * `:` (plain IPv4 or DNS names) short-circuit to false.
  */
 function isLinkLocalIPv6(ip: string): boolean {
-  return ip.toLowerCase().startsWith('fe80:');
+  if (!ip.includes(':')) return false;
+
+  const firstHextet = parseInt(ip.split(':')[0] || '0', 16);
+  if (isNaN(firstHextet)) return false;
+
+  return (firstHextet & 0xffc0) === 0xfe80;
+}
+
+/**
+ * Extract the dotted-decimal form of an IPv4 address embedded in an IPv6
+ * literal. Covers IPv4-mapped addresses (`::ffff:a.b.c.d`, which Deno's URL
+ * parser normalizes to `::ffff:HHHH:HHHH`) and NAT64 addresses
+ * (`64:ff9b::HHHH:HHHH`), plus the textual `::ffff:a.b.c.d` form directly in
+ * case a parser ever yields it unnormalized. Returns null when the hostname
+ * doesn't embed an IPv4 address in one of these shapes.
+ */
+function extractEmbeddedIPv4(hostname: string): string | null {
+  const textual = hostname.match(/^::ffff:(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/);
+  if (textual) return textual[1];
+
+  const hex = hostname.match(/^(?:::ffff:|64:ff9b::)([0-9a-f]{1,4}):([0-9a-f]{1,4})$/);
+  if (!hex) return null;
+
+  const ip = (parseInt(hex[1], 16) << 16) | parseInt(hex[2], 16);
+  return `${(ip >>> 24) & 255}.${(ip >>> 16) & 255}.${(ip >>> 8) & 255}.${ip & 255}`;
 }
 
 /**
@@ -66,12 +91,20 @@ export function assertSafeArrUrl(url: string): void {
   }
 
   const hostname = stripBrackets(parsed.hostname.toLowerCase());
+  // IPv4-mapped/NAT64 IPv6 literals can smuggle a metadata/link-local IPv4
+  // address past hostname-only checks; also compare against its embedded
+  // dotted-decimal form when present.
+  const embeddedIPv4 = extractEmbeddedIPv4(hostname);
 
-  if (METADATA_HOSTNAMES.has(hostname)) {
+  if (METADATA_HOSTNAMES.has(hostname) || (embeddedIPv4 !== null && METADATA_HOSTNAMES.has(embeddedIPv4))) {
     throw new Error(`Refusing to connect to metadata address: ${hostname}`);
   }
 
-  if (isLinkLocalIPv4(hostname) || isLinkLocalIPv6(hostname)) {
+  if (
+    isLinkLocalIPv4(hostname) ||
+    isLinkLocalIPv6(hostname) ||
+    (embeddedIPv4 !== null && isLinkLocalIPv4(embeddedIPv4))
+  ) {
     throw new Error(`Refusing to connect to link-local address: ${hostname}`);
   }
 }

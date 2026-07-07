@@ -1,17 +1,8 @@
 import { redirect } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
-import { arrInstancesQueries } from '$db/queries/arrInstances.ts';
 import { arrSyncQueries } from '$db/queries/arrSync.ts';
 import { pcdManager } from '$pcd/index.ts';
-
-/**
- * The primary connected instance for the wizard: prefer an enabled instance
- * (the common case for a freshly-connected one), falling back to the first
- * instance if none is enabled yet. Mirrors select-profiles/+page.server.ts.
- */
-function resolvePrimaryInstance() {
-  return arrInstancesQueries.getEnabled()[0] ?? arrInstancesQueries.getAll()[0];
-}
+import { resolvePrimaryInstance } from '$server/setup/progress.ts';
 
 export const load: PageServerLoad = async () => {
   const instance = resolvePrimaryInstance();
@@ -24,10 +15,10 @@ export const load: PageServerLoad = async () => {
     throw redirect(303, '/setup/link-database');
   }
 
+  // Zero selections is a supported path (select-profiles allows advancing with
+  // none chosen) — render an explicit "nothing to sync" state instead of
+  // bouncing back, which would trap the user in a redirect loop.
   const { selections } = arrSyncQueries.getQualityProfilesSync(instance.id);
-  if (selections.length === 0) {
-    throw redirect(303, '/setup/select-profiles');
-  }
 
   return {
     instanceId: instance.id,

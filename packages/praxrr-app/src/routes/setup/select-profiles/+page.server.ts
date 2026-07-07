@@ -1,21 +1,12 @@
 import { error, fail, redirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
-import { arrInstancesQueries } from '$db/queries/arrInstances.ts';
 import { arrSyncQueries, type ProfileSelection } from '$db/queries/arrSync.ts';
 import { setupStateQueries } from '$db/queries/setupState.ts';
 import { pcdManager } from '$pcd/index.ts';
 import * as qualityProfileQueries from '$pcd/entities/qualityProfiles/index.ts';
 import { getArrAppMetadata, isArrAppType } from '$shared/arr/capabilities.ts';
 import { logger } from '$logger/logger.ts';
-
-/**
- * The primary connected instance for the wizard: prefer an enabled instance
- * (the common case for a freshly-connected one), falling back to the first
- * instance if none is enabled yet.
- */
-function resolvePrimaryInstance() {
-  return arrInstancesQueries.getEnabled()[0] ?? arrInstancesQueries.getAll()[0];
-}
+import { resolvePrimaryInstance } from '$server/setup/progress.ts';
 
 export const load: PageServerLoad = async () => {
   const instance = resolvePrimaryInstance();

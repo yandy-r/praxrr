@@ -1,6 +1,13 @@
 export const DEFAULT_RATE_LIMIT_WINDOW_MS = 30_000;
 export const DEFAULT_RATE_LIMIT_MAX_REQUESTS = 8;
 
+/**
+ * Upper bound on distinct keys tracked at once. Guards against unbounded
+ * memory growth from a flood of distinct IPs (e.g. a spoofed-header attack)
+ * outpacing the window-based pruning below.
+ */
+const MAX_TRACKED_KEYS = 10_000;
+
 type RateLimitState = {
   windowStart: number;
   count: number;
@@ -21,6 +28,16 @@ const rateLimitState = new Map<string, RateLimitState>();
 function pruneExpiredRateLimitEntries(now: number, windowMs: number): void {
   for (const [key, state] of rateLimitState) {
     if (now - state.windowStart >= windowMs) {
+      rateLimitState.delete(key);
+    }
+  }
+
+  // Still over the cap after pruning expired entries: drop the oldest
+  // windows first rather than let the map grow without bound.
+  if (rateLimitState.size > MAX_TRACKED_KEYS) {
+    const entries = [...rateLimitState.entries()].sort((a, b) => a[1].windowStart - b[1].windowStart);
+    const excess = rateLimitState.size - MAX_TRACKED_KEYS;
+    for (const [key] of entries.slice(0, excess)) {
       rateLimitState.delete(key);
     }
   }

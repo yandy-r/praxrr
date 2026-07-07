@@ -6,15 +6,9 @@ import { setupStateQueries } from '$db/queries/setupState.ts';
 import { logger } from '$logger/logger.ts';
 import { schedulePcdSyncForDatabase } from '$lib/server/jobs/init.ts';
 import { validateHttpsGitRepositoryUrl, type GitRepositoryUrlError } from '$utils/validation/url.ts';
+import { resolveDefaultDatabaseConfig } from '$server/setup/defaultDatabase.ts';
 
 type LinkMode = 'default' | 'custom';
-
-interface DefaultDatabaseHint {
-  configured: boolean;
-  url: string | null;
-  branch: string;
-  name: string;
-}
 
 const GIT_URL_ERROR_MESSAGES: Record<GitRepositoryUrlError, string> = {
   invalid_url: 'Only https git URLs are supported in setup',
@@ -22,21 +16,6 @@ const GIT_URL_ERROR_MESSAGES: Record<GitRepositoryUrlError, string> = {
   not_https: 'Only https git URLs are supported in setup',
   has_credentials: 'Credentials in the repository URL are not supported. Use the personal access token field instead.',
 };
-
-/**
- * Resolve the default database hint the same way `hooks.server.ts` and
- * `/api/v1/setup/state` do: unset falls back to the canonical `praxrr-db` repo,
- * explicitly empty disables it. Never substitute a fallback when the env var is
- * set to ''.
- */
-function resolveDefaultDatabaseHint(): DefaultDatabaseHint {
-  const fromEnv = Deno.env.get('PRAXRR_DEFAULT_DB_URL');
-  const url = fromEnv === undefined ? 'https://github.com/yandy-r/praxrr-db' : fromEnv.trim();
-  const branch = Deno.env.get('PRAXRR_DEFAULT_DB_BRANCH')?.trim() || 'main';
-  const name = Deno.env.get('PRAXRR_DEFAULT_DB_NAME')?.trim() || 'Praxrr-DB';
-
-  return { configured: url !== '', url: url !== '' ? url : null, branch, name };
-}
 
 function getFirstNonEmptyFormValue(formData: FormData, key: string): string | undefined {
   const value = formData.get(key)?.toString().trim();
@@ -49,7 +28,7 @@ export const load: PageServerLoad = () => {
   return {
     linkedDatabases,
     alreadyLinked: linkedDatabases.length > 0,
-    defaultDatabase: resolveDefaultDatabaseHint(),
+    defaultDatabase: resolveDefaultDatabaseConfig(),
   };
 };
 
@@ -64,7 +43,7 @@ export const actions = {
     let personalAccessToken: string | undefined;
 
     if (mode === 'default') {
-      const hint = resolveDefaultDatabaseHint();
+      const hint = resolveDefaultDatabaseConfig();
       if (!hint.configured || !hint.url) {
         return fail(400, {
           error: 'No default database is configured for this deployment. Use a custom repository instead.',

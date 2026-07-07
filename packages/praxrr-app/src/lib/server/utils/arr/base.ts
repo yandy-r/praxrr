@@ -1,4 +1,5 @@
 import { BaseHttpClient } from '../http/client.ts';
+import { HttpError } from '../http/types.ts';
 import type {
   ArrSystemStatus,
   ArrDelayProfile,
@@ -63,9 +64,12 @@ export class BaseArrClient extends BaseHttpClient {
    * Get system status from the arr instance
    * Calls /api/{version}/system/status endpoint
    * Note: This method has built-in retry logic (3 attempts by default)
-   * @returns { appName, version } if successful, null on failure
+   * @returns a discriminated result: `{ok: true, appName, version}` on success,
+   * or `{ok: false, status}` on failure, where `status` is the HTTP status
+   * code when the arr instance responded with an error, and `undefined` when
+   * the request never got a response (network error, DNS failure, timeout).
    */
-  async getSystemStatus(): Promise<{ appName: string; version: string } | null> {
+  async getSystemStatus(): Promise<{ ok: true; appName: string; version: string } | { ok: false; status?: number }> {
     try {
       const status = await this.get<ArrSystemStatus>(`/api/${this.apiVersion}/system/status`);
 
@@ -78,7 +82,7 @@ export class BaseArrClient extends BaseHttpClient {
         },
       });
 
-      return { appName: status.appName, version: status.version };
+      return { ok: true, appName: status.appName, version: status.version };
     } catch (error) {
       // Only log after all retries are exhausted
       await logger.error(`Connection failed to ${this.baseUrl} after retries`, {
@@ -86,7 +90,7 @@ export class BaseArrClient extends BaseHttpClient {
         meta: error,
       });
 
-      return null;
+      return { ok: false, status: error instanceof HttpError ? error.status : undefined };
     }
   }
 
@@ -95,7 +99,7 @@ export class BaseArrClient extends BaseHttpClient {
    * @returns true if connection successful, false otherwise
    */
   async testConnection(): Promise<boolean> {
-    return (await this.getSystemStatus()) !== null;
+    return (await this.getSystemStatus()).ok;
   }
 
   // =========================================================================

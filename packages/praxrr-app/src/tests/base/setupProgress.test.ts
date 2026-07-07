@@ -85,6 +85,11 @@ class SetupProgressTest extends BaseTest {
       assertThrows(() => assertSafeArrUrl('http://169.254.1.1'));
       assertThrows(() => assertSafeArrUrl('ftp://x'));
       assertThrows(() => assertSafeArrUrl('http://[fe80::1]'));
+      assertThrows(() => assertSafeArrUrl('http://[fe90::1]'));
+      assertThrows(() => assertSafeArrUrl('http://[febf:ffff::1]'));
+      // IPv4-mapped/NAT64 IPv6 literals embedding a metadata address.
+      assertThrows(() => assertSafeArrUrl('http://[::ffff:169.254.169.254]'));
+      assertThrows(() => assertSafeArrUrl('http://[64:ff9b::169.254.169.254]'));
     });
 
     this.test('assertSafeArrUrl accepts LAN, loopback, localhost, and public https hosts', () => {
@@ -92,6 +97,8 @@ class SetupProgressTest extends BaseTest {
       assertSafeArrUrl('http://127.0.0.1:7878');
       assertSafeArrUrl('http://localhost:7878');
       assertSafeArrUrl('https://radarr.example.com');
+      assertSafeArrUrl('http://[::1]');
+      assertSafeArrUrl('http://[2606:4700:4700::1111]');
     });
 
     // ---- setupStateQueries wizard methods (real DB) ----

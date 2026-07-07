@@ -2,25 +2,10 @@ import { json } from '@sveltejs/kit';
 import type { RequestHandler } from '@sveltejs/kit';
 import { createArrClient } from '$arr/factory.ts';
 import { assertSafeArrUrl } from '$arr/urlSafety.ts';
+import { toFailureReason } from '$arr/testConnectionReason.ts';
 import type { ArrType } from '$arr/types.ts';
 
 const VALID_TYPES = ['radarr', 'sonarr', 'lidarr'];
-
-/** Sanitized failure reasons returned to the client; never leak raw error details. */
-type TestFailureReason = 'unreachable' | 'unauthorized' | 'invalid_response' | 'timeout';
-
-/**
- * Map an internal error to a sanitized reason string so response bodies never
- * echo raw error messages (which may include internal hostnames/paths).
- */
-function toFailureReason(error: unknown): TestFailureReason {
-  const message = error instanceof Error ? error.message : '';
-
-  if (/timeout/i.test(message)) return 'timeout';
-  if (/HTTP 401|HTTP 403/i.test(message)) return 'unauthorized';
-  if (/HTTP \d/i.test(message)) return 'invalid_response';
-  return 'unreachable';
-}
 
 /**
  * POST /arr/test

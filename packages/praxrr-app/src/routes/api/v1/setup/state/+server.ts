@@ -3,6 +3,7 @@ import type { RequestHandler } from '@sveltejs/kit';
 import { setupStateQueries, type WizardStep } from '$db/queries/setupState.ts';
 import { databaseInstancesQueries } from '$db/queries/databaseInstances.ts';
 import { assertSetupInProgress, getSetupProgress } from '$server/setup/progress.ts';
+import { resolveDefaultDatabaseConfig } from '$server/setup/defaultDatabase.ts';
 
 type ErrorResponse = {
   error: string;
@@ -17,16 +18,6 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 /**
- * Resolve the default database URL the same way `hooks.server.ts` does for
- * auto-linking: unset falls back to the canonical `praxrr-db` repo, explicitly
- * empty disables it. Never substitute a fallback when the env var is set to ''.
- */
-function resolveDefaultDatabaseUrl(): string {
-  const fromEnv = Deno.env.get('PRAXRR_DEFAULT_DB_URL');
-  return fromEnv === undefined ? 'https://github.com/yandy-r/praxrr-db' : fromEnv.trim();
-}
-
-/**
  * GET /api/v1/setup/state
  *
  * Wizard state, prerequisite progress, and default database auto-link info,
@@ -35,14 +26,14 @@ function resolveDefaultDatabaseUrl(): string {
 export const GET: RequestHandler = async () => {
   assertSetupInProgress();
 
-  const defaultDatabaseUrl = resolveDefaultDatabaseUrl();
+  const defaultDatabaseConfig = resolveDefaultDatabaseConfig();
 
   return json({
     wizard: setupStateQueries.getWizardState(),
     prerequisites: getSetupProgress(),
     defaultDatabase: {
-      configured: defaultDatabaseUrl !== '',
-      url: defaultDatabaseUrl !== '' ? defaultDatabaseUrl : null,
+      configured: defaultDatabaseConfig.configured,
+      url: defaultDatabaseConfig.url,
       alreadyLinked: databaseInstancesQueries.getAll().length > 0,
     },
   });

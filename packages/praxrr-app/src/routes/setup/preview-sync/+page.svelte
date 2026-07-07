@@ -36,9 +36,10 @@
 
   // Generate the initial preview ourselves rather than reusing
   // SyncPreviewTrigger.svelte, which reads $page.params.id — this route has no
-  // [id] param, so instanceId is passed explicitly from `data`.
+  // [id] param, so instanceId is passed explicitly from `data`. Zero selections
+  // means there's nothing to preview — skip straight to the empty state below.
   onMount(() => {
-    void generatePreview();
+    if (data.selectionCount > 0) void generatePreview();
   });
 
   async function generatePreview() {
@@ -101,25 +102,32 @@
 </svelte:head>
 
 <div class="space-y-6">
-  <p class="text-neutral-600 dark:text-neutral-400">
-    Review the planned quality profile changes for <span class="font-medium">{data.instanceName}</span> before
-    applying. You can finish setup with or without syncing now — this preview stays available from the
-    instance's sync page afterward.
-  </p>
+  {#if data.selectionCount === 0}
+    <p class="text-neutral-600 dark:text-neutral-400">
+      No profiles selected for <span class="font-medium">{data.instanceName}</span> — there's nothing to sync yet.
+      You can finish setup now and add profiles later from the instance's sync page.
+    </p>
+  {:else}
+    <p class="text-neutral-600 dark:text-neutral-400">
+      Review the planned quality profile changes for <span class="font-medium">{data.instanceName}</span> before
+      applying. You can finish setup with or without syncing now — this preview stays available from the
+      instance's sync page afterward.
+    </p>
 
-  <div class="flex justify-end">
-    <Button
-      variant="secondary"
-      size="sm"
-      icon={previewState.status === 'generating' ? Loader2 : RefreshCw}
-      iconColor={previewState.status === 'generating' ? 'animate-spin' : ''}
-      text={previewState.status === 'generating' ? 'Generating…' : 'Refresh preview'}
-      disabled={previewState.status === 'generating'}
-      on:click={generatePreview}
-    />
-  </div>
+    <div class="flex justify-end">
+      <Button
+        variant="secondary"
+        size="sm"
+        icon={previewState.status === 'generating' ? Loader2 : RefreshCw}
+        iconColor={previewState.status === 'generating' ? 'animate-spin' : ''}
+        text={previewState.status === 'generating' ? 'Generating…' : 'Refresh preview'}
+        disabled={previewState.status === 'generating'}
+        on:click={generatePreview}
+      />
+    </div>
 
-  <SyncPreviewPanel {previewState} instanceName={data.instanceName} focusSection="qualityProfiles" />
+    <SyncPreviewPanel {previewState} instanceName={data.instanceName} focusSection="qualityProfiles" />
+  {/if}
 
   <div class="flex items-center justify-between">
     <Button variant="ghost" size="md" icon={ArrowLeft} text="Back" href="/setup/select-profiles" />

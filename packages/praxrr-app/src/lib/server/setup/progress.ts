@@ -18,6 +18,16 @@ export interface SetupProgress {
 }
 
 /**
+ * The primary connected instance for the wizard: prefer an enabled instance
+ * (the common case for a freshly-connected one), falling back to the first
+ * instance if none is enabled yet. Shared by every `/setup/*` step that needs
+ * "the instance this wizard run is about."
+ */
+export function resolvePrimaryInstance() {
+  return arrInstancesQueries.getEnabled()[0] ?? arrInstancesQueries.getAll()[0];
+}
+
+/**
  * Compute setup progress from existing queries. Synchronous — mirrors the
  * better-sqlite3-style synchronous query layer used elsewhere — so it is safe
  * to call directly from `hooks.server.ts` without adding async to the request

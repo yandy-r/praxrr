@@ -5,25 +5,10 @@ import { getClientIp } from '$auth/network.ts';
 import { registerRateLimitAttempt } from '$utils/rateLimit.ts';
 import { assertSafeArrUrl } from '$arr/urlSafety.ts';
 import { createArrClient } from '$arr/factory.ts';
+import { reasonFromStatus, toFailureReason } from '$arr/testConnectionReason.ts';
 import type { ArrType } from '$arr/types.ts';
 
 const VALID_TYPES = ['radarr', 'sonarr', 'lidarr'];
-
-/** Sanitized failure reasons returned to the client; never leak raw error details. */
-type TestConnectionReason = 'unreachable' | 'unauthorized' | 'invalid_response' | 'timeout';
-
-/**
- * Map an internal error to a sanitized reason string so response bodies never
- * echo raw error messages (which may include internal hostnames/paths).
- */
-function toFailureReason(error: unknown): TestConnectionReason {
-  const message = error instanceof Error ? error.message : '';
-
-  if (/timeout/i.test(message)) return 'timeout';
-  if (/HTTP 401|HTTP 403/i.test(message)) return 'unauthorized';
-  if (/HTTP \d/i.test(message)) return 'invalid_response';
-  return 'unreachable';
-}
 
 /**
  * POST /api/v1/setup/test-connection
@@ -41,6 +26,9 @@ function toFailureReason(error: unknown): TestConnectionReason {
 export const POST: RequestHandler = async (event) => {
   assertSetupInProgress();
 
+  // Note: getClientIp trusts proxy headers (X-Forwarded-For, etc) and is
+  // spoofable without a trusted-proxy allowlist; this is a defense-in-depth
+  // limitation, not a substitute for network-level rate limiting.
   const clientIp = getClientIp(event);
   if (!registerRateLimitAttempt(clientIp)) {
     return json({ success: false, reason: 'rate_limited' }, { status: 429 });
@@ -74,13 +62,13 @@ export const POST: RequestHandler = async (event) => {
 
     // 3 second timeout, no retries: this is a quick-feedback probe, not a sync.
     client = createArrClient(type as ArrType, url, apiKey, { timeout: 3000, retries: 0 });
-    const status = await client.getSystemStatus();
+    const result = await client.getSystemStatus();
 
-    if (!status) {
-      return json({ success: false, reason: 'unreachable' });
+    if (!result.ok) {
+      return json({ success: false, reason: reasonFromStatus(result.status) });
     }
 
-    return json({ success: true, appName: status.appName, version: status.version });
+    return json({ success: true, appName: result.appName, version: result.version });
   } catch (error) {
     return json(
       {

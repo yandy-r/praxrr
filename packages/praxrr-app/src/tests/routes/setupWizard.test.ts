@@ -302,7 +302,7 @@ Deno.test(
     patchTarget(
       BaseArrClient.prototype,
       'getSystemStatus',
-      async () => ({ appName: 'Radarr', version: '5.10.0' }),
+      async () => ({ ok: true, appName: 'Radarr', version: '5.10.0' }),
       restores
     );
 
@@ -321,3 +321,24 @@ Deno.test(
     }
   }
 );
+
+Deno.test('POST /api/v1/setup/test-connection maps a 401 status to an unauthorized reason', async () => {
+  const restores: Restore[] = [];
+  installFakeSetupState(restores);
+  resetRateLimitForTests();
+  patchTarget(BaseArrClient.prototype, 'getSystemStatus', async () => ({ ok: false, status: 401 }), restores);
+
+  try {
+    const response = await testConnectionPost(
+      buildTestConnectionRequest(
+        { type: 'radarr', url: 'http://10.0.0.5:7878', apiKey: 'invalid-key' },
+        '198.51.100.14'
+      )
+    );
+    assertEquals(response.status, 200);
+    assertEquals(await response.json(), { success: false, reason: 'unauthorized' });
+  } finally {
+    restoreAll(restores);
+    resetRateLimitForTests();
+  }
+});
