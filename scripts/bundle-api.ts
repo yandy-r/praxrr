@@ -87,8 +87,7 @@ const schemas: Record<string, any> = {};
 const schemaFilesLoaded = new Set<string>();
 
 const rootSchemas = (root.components as Record<string, unknown>)?.schemas as
-  | Record<string, { $ref?: string }>
-  | undefined;
+  Record<string, { $ref?: string }> | undefined;
 
 if (rootSchemas) {
   for (const [, schemaRef] of Object.entries(rootSchemas)) {

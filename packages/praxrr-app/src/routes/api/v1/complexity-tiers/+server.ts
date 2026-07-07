@@ -3,11 +3,7 @@ import { logger } from '$logger/logger.ts';
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from '@sveltejs/kit';
 import type { UserComplexityTier } from '$db/queries/user_complexity_tiers.ts';
-import {
-  COMPLEXITY_TIERS,
-  type ComplexityTier,
-  type SectionKey,
-} from '$shared/complexity/tiers.ts';
+import { COMPLEXITY_TIERS, type ComplexityTier, type SectionKey } from '$shared/complexity/tiers.ts';
 import {
   checkWriteRateLimit,
   detectConcurrencyConflict,
@@ -141,11 +137,7 @@ export const PATCH: RequestHandler = async ({ locals, request }) => {
   }
 
   try {
-    const optimisticConflict = detectConcurrencyConflict(
-      existing,
-      parsed.expectedUpdatedAt,
-      'complexity tier'
-    );
+    const optimisticConflict = detectConcurrencyConflict(existing, parsed.expectedUpdatedAt, 'complexity tier');
     if (optimisticConflict) {
       return json({ error: optimisticConflict }, { status: 409 });
     }
@@ -286,10 +278,7 @@ function parseOptionalCounterDelta(raw: unknown, field: string): number {
   }
 
   const delta = Math.trunc(raw);
-  return Math.max(
-    -MAX_COUNTER_DELTA_PER_REQUEST,
-    Math.min(MAX_COUNTER_DELTA_PER_REQUEST, delta)
-  );
+  return Math.max(-MAX_COUNTER_DELTA_PER_REQUEST, Math.min(MAX_COUNTER_DELTA_PER_REQUEST, delta));
 }
 
 function clampCount(value: number): number {

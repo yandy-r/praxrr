@@ -28,10 +28,7 @@ import {
 import { toPortableNaming } from './transformers/mediaManagement.ts';
 
 export type TrashGuideTransformErrorCode =
-  | 'arr_type_mismatch'
-  | 'identity_collision'
-  | 'unsupported_spec_implementation'
-  | 'ambiguous_mapping';
+  'arr_type_mismatch' | 'identity_collision' | 'unsupported_spec_implementation' | 'ambiguous_mapping';
 
 export class TrashGuideTransformError extends Error {
   readonly code: TrashGuideTransformErrorCode;

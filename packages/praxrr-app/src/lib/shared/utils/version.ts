@@ -2,13 +2,7 @@
 // Version comes from the database (fetched via API)
 
 type Platform =
-  | 'docker-amd64'
-  | 'docker-arm64'
-  | 'windows-amd64'
-  | 'linux-amd64'
-  | 'linux-arm64'
-  | 'macos-amd64'
-  | 'macos-arm64';
+  'docker-amd64' | 'docker-arm64' | 'windows-amd64' | 'linux-amd64' | 'linux-arm64' | 'macos-amd64' | 'macos-arm64';
 
 type Channel = 'stable' | 'beta' | 'develop' | 'dev';
 

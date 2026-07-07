@@ -96,12 +96,7 @@ export type QualityDefinitionEntriesRow = {
 };
 
 export type DraftEntitySectionRow =
-  | FieldRow
-  | ConditionsRow
-  | TestsRow
-  | CustomFormatScoresRow
-  | OrderedItemsRow
-  | QualityDefinitionEntriesRow;
+  FieldRow | ConditionsRow | TestsRow | CustomFormatScoresRow | OrderedItemsRow | QualityDefinitionEntriesRow;
 
 export type DraftEntitySection = {
   id: string;

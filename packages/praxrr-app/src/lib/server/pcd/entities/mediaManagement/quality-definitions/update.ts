@@ -17,9 +17,7 @@ const QUALITY_DEFINITION_UNMAPPED_ERROR_PREFIX = 'Unsupported quality names for 
 const QUALITY_DEFINITION_DUPLICATE_QUALITIES_ERROR = 'Quality definitions cannot contain duplicate quality names';
 
 type QualityDefinitionsBadRequestCode =
-  | 'quality_definitions_duplicate_qualities'
-  | 'quality_definitions_duplicate_name'
-  | 'quality_definitions_unmapped';
+  'quality_definitions_duplicate_qualities' | 'quality_definitions_duplicate_name' | 'quality_definitions_unmapped';
 
 interface QualityDefinitionsBadRequestError extends Error {
   status: 400;

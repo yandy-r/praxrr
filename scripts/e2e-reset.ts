@@ -155,8 +155,7 @@ function getDatabaseRow(dbPath: string, options: CliOptions): DatabaseRow {
     let row: DatabaseRow | undefined;
     if (options.databaseId !== null) {
       row = db.prepare('SELECT id, name, local_path FROM database_instances WHERE id = ?').get(options.databaseId) as
-        | DatabaseRow
-        | undefined;
+        DatabaseRow | undefined;
     } else {
       row = db
         .prepare('SELECT id, name, local_path FROM database_instances WHERE name = ?')

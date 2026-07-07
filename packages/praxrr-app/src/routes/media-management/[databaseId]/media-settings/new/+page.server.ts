@@ -61,9 +61,7 @@ export const actions: Actions = {
     const enableMediaInfo = formData.get('enableMediaInfo') === 'true';
 
     let createFn:
-      | typeof createRadarrMediaSettings
-      | typeof createSonarrMediaSettings
-      | typeof createLidarrMediaSettings;
+      typeof createRadarrMediaSettings | typeof createSonarrMediaSettings | typeof createLidarrMediaSettings;
     switch (arrType) {
       case 'radarr':
         createFn = createRadarrMediaSettings;

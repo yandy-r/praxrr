@@ -29,11 +29,7 @@ export type ArrWorkflowSurface = 'instances' | 'library' | 'releases' | 'rename'
 
 /** Feature surfaces driven by sync pipeline support */
 export type ArrSyncSurface =
-  | 'quality_profiles'
-  | 'custom_formats'
-  | 'delay_profiles'
-  | 'media_management'
-  | 'metadata_profiles';
+  'quality_profiles' | 'custom_formats' | 'delay_profiles' | 'media_management' | 'metadata_profiles';
 
 /** Ordered list of declared workflow surfaces */
 export const ARR_WORKFLOW_SURFACES = [

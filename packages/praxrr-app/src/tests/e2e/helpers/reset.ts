@@ -18,8 +18,7 @@ function getClonePath(databaseId: number): string {
   const db = new Database(DB_PATH, { readonly: true });
   try {
     const row = db.prepare('SELECT uuid, local_path FROM database_instances WHERE id = ?').get(databaseId) as
-      | DatabaseRow
-      | undefined;
+      DatabaseRow | undefined;
     if (!row) throw new Error(`Database ${databaseId} not found`);
     return row.local_path;
   } finally {

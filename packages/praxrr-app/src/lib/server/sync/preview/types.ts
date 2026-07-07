@@ -63,10 +63,7 @@ export interface MetadataProfilesPreview extends SyncPreviewSectionMetadata {
 }
 
 export type SyncPreviewSectionResult =
-  | QualityProfilesPreview
-  | DelayProfilesPreview
-  | MediaManagementPreview
-  | MetadataProfilesPreview;
+  QualityProfilesPreview | DelayProfilesPreview | MediaManagementPreview | MetadataProfilesPreview;
 
 export interface SyncPreviewSummary {
   readonly totalCreates: number;

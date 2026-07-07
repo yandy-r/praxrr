@@ -14,9 +14,7 @@ const QUALITY_DEFINITION_UNSUPPORTED_ERROR_PREFIX = 'Unsupported quality names f
 const SUPPORTED_QUALITY_DEFINITION_ARR_TYPES = ['radarr', 'sonarr', 'lidarr'] as const;
 
 type QualityDefinitionsBadRequestCode =
-  | 'quality_definitions_duplicate_qualities'
-  | 'quality_definitions_duplicate_name'
-  | 'quality_definitions_unmapped';
+  'quality_definitions_duplicate_qualities' | 'quality_definitions_duplicate_name' | 'quality_definitions_unmapped';
 
 interface QualityDefinitionsBadRequestError extends Error {
   status: 400;

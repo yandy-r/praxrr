@@ -10,9 +10,7 @@ import { arrSyncQueries } from '$db/queries/arrSync.ts';
 const QUALITY_DEFINITION_UNSUPPORTED_ERROR_PREFIX = 'Unsupported quality names for quality definitions';
 
 type QualityDefinitionsBadRequestCode =
-  | 'quality_definitions_duplicate_qualities'
-  | 'quality_definitions_duplicate_name'
-  | 'quality_definitions_unmapped';
+  'quality_definitions_duplicate_qualities' | 'quality_definitions_duplicate_name' | 'quality_definitions_unmapped';
 
 interface QualityDefinitionsBadRequestError extends Error {
   status: 400;

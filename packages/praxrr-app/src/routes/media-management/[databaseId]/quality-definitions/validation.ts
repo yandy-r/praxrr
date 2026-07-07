@@ -34,8 +34,7 @@ type QualityDefinitionsActionValidationFailure = {
 };
 
 export type QualityDefinitionsActionValidationResult =
-  | QualityDefinitionsActionValidationSuccess
-  | QualityDefinitionsActionValidationFailure;
+  QualityDefinitionsActionValidationSuccess | QualityDefinitionsActionValidationFailure;
 
 export function validateQualityDefinitionsActionInput(input: {
   name: string | null | undefined;

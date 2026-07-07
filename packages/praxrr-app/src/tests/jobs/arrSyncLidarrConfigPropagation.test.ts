@@ -28,9 +28,7 @@ type ArrSyncMetadataProfilesStatusRow = {
 };
 
 type MediaManagementConfigNameColumn =
-  | 'naming_config_name'
-  | 'quality_definitions_config_name'
-  | 'media_settings_config_name';
+  'naming_config_name' | 'quality_definitions_config_name' | 'media_settings_config_name';
 
 function bootstrapSchema(): void {
   db.exec(`

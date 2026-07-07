@@ -5,11 +5,7 @@ import { parseTrashGuideSourceArrType, type TrashGuideSourceArrType } from '$lib
 export type TrashGuideSyncTrigger = 'none' | 'manual' | 'on_pull' | 'on_change' | 'schedule';
 export type TrashGuideSyncStatus = 'idle' | 'pending' | 'in_progress' | 'failed';
 export type TrashGuideSyncSectionType =
-  | 'qualityProfiles'
-  | 'customFormats'
-  | 'qualityDefinitions'
-  | 'naming'
-  | 'mediaManagement';
+  'qualityProfiles' | 'customFormats' | 'qualityDefinitions' | 'naming' | 'mediaManagement';
 
 export class TrashGuideSyncValidationError extends Error {
   constructor(message: string) {

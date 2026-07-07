@@ -4,12 +4,7 @@ import type { JobRunStatus } from '$jobs/queueTypes.ts';
 export type StartupPullArrType = ArrAppType;
 
 export type StartupPullSection =
-  | 'qualityProfiles'
-  | 'delayProfiles'
-  | 'naming'
-  | 'mediaSettings'
-  | 'qualityDefinitions'
-  | 'metadataProfiles';
+  'qualityProfiles' | 'delayProfiles' | 'naming' | 'mediaSettings' | 'qualityDefinitions' | 'metadataProfiles';
 
 export type StartupPullMatchStatus = 'matched' | 'no_match' | 'conflicted';
 

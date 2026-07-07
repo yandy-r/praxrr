@@ -93,8 +93,7 @@ export function getLatestHistory(opId: number): PcdOpHistory | undefined {
   const db = openDb();
   try {
     return db.prepare('SELECT * FROM pcd_op_history WHERE op_id = ? ORDER BY id DESC LIMIT 1').get(opId) as
-      | PcdOpHistory
-      | undefined;
+      PcdOpHistory | undefined;
   } finally {
     db.close();
   }

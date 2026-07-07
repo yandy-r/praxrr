@@ -305,8 +305,7 @@ export class PCDCache {
     // qp(name) - Quality profile lookup by name
     this.db.function('qp', (name: string) => {
       const result = this.db!.prepare('SELECT id FROM quality_profiles WHERE name = ?').get(name) as
-        | { id: number }
-        | undefined;
+        { id: number } | undefined;
       if (!result) {
         throw new Error(`Quality profile not found: ${name}`);
       }
@@ -316,8 +315,7 @@ export class PCDCache {
     // cf(name) - Custom format lookup by name
     this.db.function('cf', (name: string) => {
       const result = this.db!.prepare('SELECT id FROM custom_formats WHERE name = ?').get(name) as
-        | { id: number }
-        | undefined;
+        { id: number } | undefined;
       if (!result) {
         throw new Error(`Custom format not found: ${name}`);
       }
@@ -327,8 +325,7 @@ export class PCDCache {
     // dp(name) - Delay profile lookup by name
     this.db.function('dp', (name: string) => {
       const result = this.db!.prepare('SELECT id FROM delay_profiles WHERE name = ?').get(name) as
-        | { id: number }
-        | undefined;
+        { id: number } | undefined;
       if (!result) {
         throw new Error(`Delay profile not found: ${name}`);
       }
@@ -338,8 +335,7 @@ export class PCDCache {
     // mp(name) - Lidarr metadata profile lookup by name
     this.db.function('mp', (name: string) => {
       const result = this.db!.prepare('SELECT id FROM lidarr_metadata_profiles WHERE name = ?').get(name) as
-        | { id: number }
-        | undefined;
+        { id: number } | undefined;
       if (!result) {
         throw new Error(`Lidarr metadata profile not found: ${name}`);
       }

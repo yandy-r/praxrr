@@ -2511,8 +2511,7 @@ export interface operations {
     requestBody: {
       content: {
         'application/json':
-          | components['schemas']['CleanupScanRequest']
-          | components['schemas']['CleanupExecuteRequest'];
+          components['schemas']['CleanupScanRequest'] | components['schemas']['CleanupExecuteRequest'];
       };
     };
     responses: {
