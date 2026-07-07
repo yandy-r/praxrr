@@ -1,0 +1,144 @@
+ArrSemanticDifference:
+  type: object
+  required:
+    - scope
+    - apps
+    - summary
+    - detail
+    - sourceRefs
+  properties:
+    scope:
+      type: string
+      description: Parity entity or workflow surface this semantic difference applies to
+    apps:
+      type: array
+      items:
+        type: string
+        enum:
+          - radarr
+          - sonarr
+          - lidarr
+      description: Arr apps this entry applies to
+    summary:
+      type: string
+      description: One-line summary of the semantic divergence
+    detail:
+      type: string
+      description: Full explanation of why the divergence exists
+    suggestion:
+      type: string
+      description: Suggested alternative or mitigation, when applicable
+    sourceRefs:
+      type: array
+      items:
+        type: string
+      description: Prose file/symbol anchors for drift audits, not imports
+
+ProfileCompatibility:
+  type: object
+  required:
+    - name
+    - compatibleArrTypes
+    - basis
+  properties:
+    name:
+      type: string
+      description: Quality profile name
+    compatibleArrTypes:
+      type: array
+      items:
+        type: string
+        enum:
+          - radarr
+          - sonarr
+          - lidarr
+      description: Arr app types this profile's enabled qualities are compatible with
+    basis:
+      type: string
+      enum:
+        - enabled-qualities
+      description: Algorithm basis used to compute this compatibility verdict
+
+ParityMapResponse:
+  type: object
+  required:
+    - entities
+    - apps
+    - matrix
+    - semanticDifferences
+  properties:
+    entities:
+      type: array
+      items:
+        type: string
+        enum:
+          - custom_formats
+          - quality_profiles
+          - quality_definitions
+          - delay_profiles
+          - metadata_profiles
+      description: PCD config entities tracked by the Cross-Arr Parity Map
+    apps:
+      type: array
+      items:
+        type: string
+        enum:
+          - radarr
+          - sonarr
+          - lidarr
+      description: Arr app types represented as matrix columns
+    matrix:
+      type: array
+      items:
+        type: object
+        required:
+          - entity
+          - label
+          - radarr
+          - sonarr
+          - lidarr
+        properties:
+          entity:
+            type: string
+            enum:
+              - custom_formats
+              - quality_profiles
+              - quality_definitions
+              - delay_profiles
+              - metadata_profiles
+            description: Parity entity this row describes
+          label:
+            type: string
+            description: Human-readable label for this entity row
+          radarr:
+            type: string
+            enum:
+              - native
+              - shared
+              - unsupported
+            description: Radarr support status for this entity
+          sonarr:
+            type: string
+            enum:
+              - native
+              - shared
+              - unsupported
+            description: Sonarr support status for this entity
+          lidarr:
+            type: string
+            enum:
+              - native
+              - shared
+              - unsupported
+            description: Lidarr support status for this entity
+      description: One row per parity entity, with a per-app support status column
+    semanticDifferences:
+      type: array
+      items:
+        $ref: '#/ArrSemanticDifference'
+      description: Curated catalog of same-API-shape/different-domain-semantics divergences
+    profiles:
+      type: array
+      items:
+        $ref: '#/ProfileCompatibility'
+      description: Per-profile Arr-type compatibility, when quality profile data is available

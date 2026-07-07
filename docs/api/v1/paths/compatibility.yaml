@@ -1,0 +1,45 @@
+parity:
+  get:
+    operationId: getCompatibilityParity
+    summary: Cross-Arr compatibility parity map
+    description: |
+      Returns the static cross-Arr entity/app support matrix and catalog of known
+      semantic differences between Arr apps.
+
+      When `databaseId` is provided, also computes per-profile compatibility for
+      that database's quality profiles against each Arr app's compatible quality
+      names, attached as `profiles`.
+    tags:
+      - compatibility
+    parameters:
+      - name: databaseId
+        in: query
+        required: false
+        description: PCD database ID to compute profile compatibility for
+        schema:
+          type: integer
+    responses:
+      '200':
+        description: Compatibility parity map
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/compatibility.yaml#/ParityMapResponse'
+      '400':
+        description: Invalid databaseId
+        content:
+          application/json:
+            schema:
+              $ref: '../openapi.yaml#/components/schemas/ErrorResponse'
+      '401':
+        description: Authentication required
+        content:
+          application/json:
+            schema:
+              $ref: '../openapi.yaml#/components/schemas/ErrorResponse'
+      '500':
+        description: Failed to compute compatibility parity map
+        content:
+          application/json:
+            schema:
+              $ref: '../openapi.yaml#/components/schemas/ErrorResponse'
