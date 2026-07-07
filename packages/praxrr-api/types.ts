@@ -622,6 +622,209 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/pcd/{databaseId}/resolved/{entityType}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * List resolved config entities by type
+     * @description Returns resolved config state for every entity of the given type in the
+     *     PCD database, for the selected layer.
+     *
+     *     `layer` defaults to `resolved` (the schema -> base -> tweaks -> user
+     *     replay, matching what sync applies to Arr instances). `arrType` is
+     *     required for per-arr-app entity types (`naming`, `mediaSettings`,
+     *     `qualityDefinitions`) and rejected for arr-agnostic entity types
+     *     (`delayProfile`, `regularExpression`, `customFormat`, `qualityProfile`)
+     *     and for `lidarrMetadataProfile`, which is Lidarr-only and implicit.
+     */
+    get: operations['listResolvedConfigEntities'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/pcd/{databaseId}/resolved/{entityType}/{name}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get one resolved config entity by name
+     * @description Returns resolved config state for a single named entity, for the
+     *     selected layer.
+     *
+     *     `layer` defaults to `resolved`. `404` is reserved for a hard miss in the
+     *     `resolved` layer; the `base`/`user` layers return `200` with
+     *     `present: false` when the entity does not exist in that layer.
+     */
+    get: operations['getResolvedConfigEntity'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/pcd/{databaseId}/resolved/{entityType}/{name}/compare': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Compare one resolved config entity across instances
+     * @description Computes per-instance transformed-desired payloads (and optionally live
+     *     Arr state) for a single named entity across up to 8 Arr instances, with
+     *     pairwise diffs against the first compatible instance.
+     *
+     *     Per-instance failures (unreachable, incompatible arr_type, unsupported
+     *     entity type) are reported as inline statuses on that instance and never
+     *     fail the whole request.
+     */
+    get: operations['compareResolvedConfigEntity'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/pcd/{databaseId}/resolved/{entityType}/{name}/diff': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Diff resolved config entity against live Arr state
+     * @description Computes the desired-vs-actual field diff for a single named entity on
+     *     one Arr instance, via the sync-preview section syncer filtered to the
+     *     entity (namespace-suffix aware). An empty `changes` array means the
+     *     entity is in sync; it is never conflatable with a failed check.
+     */
+    get: operations['getResolvedConfigLiveDiff'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/setup/state': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get setup wizard state
+     * @description Returns the current wizard step, completion/dismissal status,
+     *     prerequisite progress, and default database auto-link info used to
+     *     render and resume the setup wizard.
+     */
+    get: operations['getSetupState'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    /**
+     * Advance the wizard step
+     * @description Advances the wizard to the given step. Rejects steps outside the known
+     *     wizard sequence.
+     */
+    patch: operations['updateSetupState'];
+    trace?: never;
+  };
+  '/setup/test-connection': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Test an Arr connection during setup
+     * @description Validates Arr connection credentials without persisting an instance.
+     *
+     *     This endpoint performs no writes. It is rate-limited per client IP and
+     *     rejects metadata/link-local URLs before attempting a connection, so it
+     *     cannot be used as an SSRF or port-scan oracle.
+     */
+    post: operations['testSetupConnection'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/setup/complete': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Mark setup wizard completed
+     * @description Marks the setup wizard completed.
+     *
+     *     Terminal and idempotent by design: unlike `GET`/`PATCH /state`, this
+     *     endpoint does not require the wizard to still be in progress, so a
+     *     repeated call succeeds instead of rejecting once setup is already
+     *     completed.
+     */
+    post: operations['completeSetup'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/setup/skip': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Mark setup wizard dismissed
+     * @description Marks the setup wizard dismissed.
+     *
+     *     Terminal and idempotent by design: unlike `GET`/`PATCH /state`, this
+     *     endpoint does not require the wizard to still be in progress, so a
+     *     repeated call succeeds instead of rejecting once setup is already
+     *     dismissed.
+     */
+    post: operations['skipSetup'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/compatibility/parity': {
     parameters: {
       query?: never;
@@ -799,79 +1002,6 @@ export interface components {
      * @enum {string}
      */
     ArrType: 'radarr' | 'sonarr' | 'lidarr';
-    ParityMapResponse: {
-      /** @description PCD config entities tracked by the Cross-Arr Parity Map */
-      entities: ('custom_formats' | 'quality_profiles' | 'quality_definitions' | 'delay_profiles' | 'metadata_profiles')[];
-      /** @description Arr app types represented as matrix columns */
-      apps: ('radarr' | 'sonarr' | 'lidarr')[];
-      /** @description One row per parity entity, with a per-app support status column */
-      matrix: {
-        /**
-         * @description Parity entity this row describes
-         * @enum {string}
-         */
-        entity: 'custom_formats' | 'quality_profiles' | 'quality_definitions' | 'delay_profiles' | 'metadata_profiles';
-        /** @description Human-readable label for this entity row */
-        label: string;
-        /**
-         * @description Radarr support status for this entity
-         * @enum {string}
-         */
-        radarr: 'native' | 'shared' | 'unsupported';
-        /**
-         * @description Sonarr support status for this entity
-         * @enum {string}
-         */
-        sonarr: 'native' | 'shared' | 'unsupported';
-        /**
-         * @description Lidarr support status for this entity
-         * @enum {string}
-         */
-        lidarr: 'native' | 'shared' | 'unsupported';
-      }[];
-      /** @description Curated catalog of same-API-shape/different-domain-semantics divergences */
-      semanticDifferences: components['schemas']['ArrSemanticDifference'][];
-      /** @description Per-profile Arr-type compatibility, when quality profile data is available */
-      profiles?: components['schemas']['ProfileCompatibility'][];
-    };
-    ArrSemanticDifference: {
-      /**
-       * @description Parity entity or workflow surface this semantic difference applies to
-       * @enum {string}
-       */
-      scope:
-        | 'custom_formats'
-        | 'quality_profiles'
-        | 'quality_definitions'
-        | 'delay_profiles'
-        | 'metadata_profiles'
-        | 'instances'
-        | 'library'
-        | 'releases'
-        | 'rename'
-        | 'upgrades';
-      /** @description Arr apps this entry applies to */
-      apps: ('radarr' | 'sonarr' | 'lidarr')[];
-      /** @description One-line summary of the semantic divergence */
-      summary: string;
-      /** @description Full explanation of why the divergence exists */
-      detail: string;
-      /** @description Suggested alternative or mitigation, when applicable */
-      suggestion?: string;
-      /** @description Prose file/symbol anchors for drift audits, not imports */
-      sourceRefs: string[];
-    };
-    ProfileCompatibility: {
-      /** @description Quality profile name */
-      name: string;
-      /** @description Arr app types this profile's enabled qualities are compatible with */
-      compatibleArrTypes: ('radarr' | 'sonarr' | 'lidarr')[];
-      /**
-       * @description Algorithm basis used to compute this compatibility verdict
-       * @enum {string}
-       */
-      basis: 'enabled-qualities';
-    };
     CustomFormatRef: {
       /** @description Custom format ID */
       id: number;
@@ -1724,6 +1854,374 @@ export interface components {
       /** @description Per-instance outcomes for this run */
       instances: components['schemas']['StartupPullInstanceOutcome'][];
     };
+    /**
+     * @description Ordered setup wizard step
+     * @enum {string}
+     */
+    WizardStep: 'welcome' | 'connect-arr' | 'link-database' | 'select-profiles' | 'preview-sync' | 'done';
+    WizardState: {
+      /** @description Whether the wizard has been marked completed */
+      completed: boolean;
+      /**
+       * Format: date-time
+       * @description Timestamp the wizard was dismissed, or null if never dismissed
+       */
+      dismissedAt: string | null;
+      currentStep: components['schemas']['WizardStep'];
+    };
+    SetupStateResponse: {
+      wizard: components['schemas']['WizardState'];
+      /** @description Setup prerequisite progress derived from real entity state */
+      prerequisites: {
+        /** @description Whether at least one Arr instance has been connected */
+        hasArrInstance: boolean;
+        /** @description Whether at least one PCD database has been linked */
+        hasDatabase: boolean;
+        /** @description Whether at least one instance has quality profile selections synced */
+        hasProfileSelections: boolean;
+      };
+      /** @description Default database auto-link info used to render the link-database step */
+      defaultDatabase: {
+        /** @description Whether PRAXRR_DEFAULT_DB_URL resolves to a non-empty value */
+        configured: boolean;
+        /** @description Resolved default database URL, or null when not configured */
+        url: string | null;
+        /** @description Whether any PCD database is already linked */
+        alreadyLinked: boolean;
+      };
+    };
+    /** @description Advance the wizard to the given step */
+    SetupStatePatchRequest: {
+      currentStep: components['schemas']['WizardStep'];
+    };
+    TestConnectionRequest: {
+      /**
+       * @description Target Arr application type
+       * @enum {string}
+       */
+      type: 'radarr' | 'sonarr' | 'lidarr';
+      /** @description Arr base URL */
+      url: string;
+      /** @description Arr API key */
+      apiKey: string;
+    };
+    TestConnectionResponse: {
+      success: boolean;
+      /** @description Arr application name, present on success */
+      appName?: string;
+      /** @description Arr application version, present on success */
+      version?: string;
+      /**
+       * @description Sanitized failure reason, present on failure
+       * @enum {string}
+       */
+      reason?: 'unreachable' | 'unauthorized' | 'invalid_response' | 'timeout' | 'rate_limited';
+    };
+    ParityMapResponse: {
+      /** @description PCD config entities tracked by the Cross-Arr Parity Map */
+      entities: (
+        'custom_formats' | 'quality_profiles' | 'quality_definitions' | 'delay_profiles' | 'metadata_profiles'
+      )[];
+      /** @description Arr app types represented as matrix columns */
+      apps: ('radarr' | 'sonarr' | 'lidarr')[];
+      /** @description One row per parity entity, with a per-app support status column */
+      matrix: {
+        /**
+         * @description Parity entity this row describes
+         * @enum {string}
+         */
+        entity: 'custom_formats' | 'quality_profiles' | 'quality_definitions' | 'delay_profiles' | 'metadata_profiles';
+        /** @description Human-readable label for this entity row */
+        label: string;
+        /**
+         * @description Radarr support status for this entity
+         * @enum {string}
+         */
+        radarr: 'native' | 'shared' | 'unsupported';
+        /**
+         * @description Sonarr support status for this entity
+         * @enum {string}
+         */
+        sonarr: 'native' | 'shared' | 'unsupported';
+        /**
+         * @description Lidarr support status for this entity
+         * @enum {string}
+         */
+        lidarr: 'native' | 'shared' | 'unsupported';
+      }[];
+      /** @description Curated catalog of same-API-shape/different-domain-semantics divergences */
+      semanticDifferences: components['schemas']['ArrSemanticDifference'][];
+      /** @description Per-profile Arr-type compatibility, when quality profile data is available */
+      profiles?: components['schemas']['ProfileCompatibility'][];
+    };
+    ArrSemanticDifference: {
+      /**
+       * @description Parity entity or workflow surface this semantic difference applies to
+       * @enum {string}
+       */
+      scope:
+        | 'custom_formats'
+        | 'quality_profiles'
+        | 'quality_definitions'
+        | 'delay_profiles'
+        | 'metadata_profiles'
+        | 'instances'
+        | 'library'
+        | 'releases'
+        | 'rename'
+        | 'upgrades';
+      /** @description Arr apps this entry applies to */
+      apps: ('radarr' | 'sonarr' | 'lidarr')[];
+      /** @description One-line summary of the semantic divergence */
+      summary: string;
+      /** @description Full explanation of why the divergence exists */
+      detail: string;
+      /** @description Suggested alternative or mitigation, when applicable */
+      suggestion?: string;
+      /** @description Prose file/symbol anchors for drift audits, not imports */
+      sourceRefs: string[];
+    };
+    ProfileCompatibility: {
+      /** @description Quality profile name */
+      name: string;
+      /** @description Arr app types this profile's enabled qualities are compatible with */
+      compatibleArrTypes: ('radarr' | 'sonarr' | 'lidarr')[];
+      /**
+       * @description Algorithm basis used to compute this compatibility verdict
+       * @enum {string}
+       */
+      basis: 'enabled-qualities';
+    };
+    /**
+     * @description PCD configuration layer represented by a resolved-state response:
+     *     - `base`: schema + base + tweaks ops only (user ops omitted)
+     *     - `user`: user-op overrides relative to the base layer, expressed as a
+     *       field-level diff
+     *     - `resolved`: the fully replayed state (schema -> base -> tweaks -> user),
+     *       matching what sync applies to Arr instances
+     * @enum {string}
+     */
+    ResolvedLayer: 'base' | 'user' | 'resolved';
+    ResolvedEntityState: {
+      /** @description PCD database ID */
+      databaseId: number;
+      /**
+       * @description Resolved config entity type
+       * @enum {string}
+       */
+      entityType:
+        | 'delayProfile'
+        | 'regularExpression'
+        | 'customFormat'
+        | 'qualityProfile'
+        | 'naming'
+        | 'mediaSettings'
+        | 'qualityDefinitions'
+        | 'lidarrMetadataProfile';
+      /** @description Entity name */
+      name: string;
+      layer: components['schemas']['ResolvedLayer'];
+      /** @description Whether the entity exists in the requested layer */
+      present: boolean;
+      /**
+       * @description Canonical Portable payload for the entity in the requested layer.
+       *     Present for `layer=base` and `layer=resolved` when `present` is true;
+       *     null when the entity is absent from that layer or when `layer=user`.
+       *     Shape varies by entityType (and arrType for per-arr-app entity
+       *     types):
+       *     - `delayProfile` -> PortableDelayProfile
+       *     - `regularExpression` -> PortableRegularExpression
+       *     - `customFormat` -> PortableCustomFormat
+       *     - `qualityProfile` -> PortableQualityProfile
+       *     - `naming` (radarr) -> PortableRadarrNaming
+       *     - `naming` (sonarr) -> PortableSonarrNaming
+       *     - `naming` (lidarr) -> PortableLidarrNaming
+       *     - `mediaSettings` (radarr, sonarr) -> PortableMediaSettings
+       *     - `mediaSettings` (lidarr) -> PortableLidarrMediaSettings
+       *     - `qualityDefinitions` (radarr, sonarr) -> PortableQualityDefinitions
+       *     - `qualityDefinitions` (lidarr) -> PortableLidarrQualityDefinitions
+       *     - `lidarrMetadataProfile` -> PortableLidarrMetadataProfile
+       */
+      entity?:
+        | (
+            | components['schemas']['PortableDelayProfile']
+            | components['schemas']['PortableRegularExpression']
+            | components['schemas']['PortableCustomFormat']
+            | components['schemas']['PortableQualityProfile']
+            | components['schemas']['PortableRadarrNaming']
+            | components['schemas']['PortableSonarrNaming']
+            | components['schemas']['PortableLidarrNaming']
+            | components['schemas']['PortableMediaSettings']
+            | components['schemas']['PortableLidarrMediaSettings']
+            | components['schemas']['PortableQualityDefinitions']
+            | components['schemas']['PortableLidarrQualityDefinitions']
+            | components['schemas']['PortableLidarrMetadataProfile']
+          )
+        | null;
+      /**
+       * @description Field-level diff of user-op overrides relative to the base layer.
+       *     Present only for `layer=user`; an empty array means the resolved
+       *     value matches base exactly.
+       */
+      overrides?: components['schemas']['FieldChange'][] | null;
+      /**
+       * @description True when a pending value-guard conflict targets this entity (see
+       *     `pcd_op_history`). The resolved value must not be treated as
+       *     unambiguous while this is true.
+       */
+      hasPendingConflict: boolean;
+    };
+    ResolvedEntityListResponse: {
+      /** @description PCD database ID */
+      databaseId: number;
+      /**
+       * @description Resolved config entity type
+       * @enum {string}
+       */
+      entityType:
+        | 'delayProfile'
+        | 'regularExpression'
+        | 'customFormat'
+        | 'qualityProfile'
+        | 'naming'
+        | 'mediaSettings'
+        | 'qualityDefinitions'
+        | 'lidarrMetadataProfile';
+      layer: components['schemas']['ResolvedLayer'];
+      /** @description Per-entity resolved state for the requested layer */
+      entities: components['schemas']['ResolvedEntityState'][];
+    };
+    ResolvedInstanceState: {
+      /** @description Arr instance ID */
+      instanceId: number;
+      /** @description Arr instance name */
+      instanceName: string;
+      /**
+       * @description Arr instance family, or null when the instance's own `arr_type` value is
+       *     unrecognized (the `incompatible` error case).
+       * @enum {string|null}
+       */
+      arrType: 'radarr' | 'sonarr' | 'lidarr' | null;
+      /** @description Whether this entity type is supported for the instance's arr_type */
+      compatible: boolean;
+      /** @description Whether the entity is present in this instance's desired payload */
+      present: boolean;
+      /**
+       * @description Per-instance transformed-desired Portable payload, present when
+       *     `compatible` and `present` are both true. Uses the same
+       *     entityType/arrType-to-Portable-shape mapping as
+       *     `ResolvedEntityState.entity`.
+       */
+      desired?:
+        | (
+            | components['schemas']['PortableDelayProfile']
+            | components['schemas']['PortableRegularExpression']
+            | components['schemas']['PortableCustomFormat']
+            | components['schemas']['PortableQualityProfile']
+            | components['schemas']['PortableRadarrNaming']
+            | components['schemas']['PortableSonarrNaming']
+            | components['schemas']['PortableLidarrNaming']
+            | components['schemas']['PortableMediaSettings']
+            | components['schemas']['PortableLidarrMediaSettings']
+            | components['schemas']['PortableQualityDefinitions']
+            | components['schemas']['PortableLidarrQualityDefinitions']
+            | components['schemas']['PortableLidarrMetadataProfile']
+          )
+        | null;
+      /**
+       * @description Raw live Arr state for this instance, only populated when
+       *     `includeLive=true` and the live fetch succeeded. Shape is the
+       *     upstream Arr API payload, not a Portable shape.
+       */
+      actual?: {
+        [key: string]: unknown;
+      } | null;
+      /**
+       * @description Sanitized reason when this instance's desired/live lookup failed.
+       *     Raw error detail never appears here; full detail is logged
+       *     server-side only. Superset of the single-instance live-diff reason
+       *     enum: `incompatible` (unrecognized arr_type), `rate-limited`
+       *     (per-instance live fetch throttled), and `error` (unexpected
+       *     failure, detail logged not surfaced) are comparison-specific.
+       *     `not_configured` means the section has no sync configuration on the
+       *     instance at all.
+       * @enum {string|null}
+       */
+      error?:
+        | 'unreachable'
+        | 'timeout'
+        | 'unauthorized'
+        | 'invalid_response'
+        | 'unsupported'
+        | 'not_found'
+        | 'not_configured'
+        | 'incompatible'
+        | 'rate-limited'
+        | 'error'
+        | null;
+    };
+    CrossInstanceComparisonResponse: {
+      /** @description PCD database ID */
+      databaseId: number;
+      /**
+       * @description Resolved config entity type
+       * @enum {string}
+       */
+      entityType:
+        | 'delayProfile'
+        | 'regularExpression'
+        | 'customFormat'
+        | 'qualityProfile'
+        | 'naming'
+        | 'mediaSettings'
+        | 'qualityDefinitions'
+        | 'lidarrMetadataProfile';
+      /** @description Entity name compared across instances */
+      name: string;
+      /** @description Per-instance desired (and optionally live) state */
+      instances: components['schemas']['ResolvedInstanceState'][];
+      /**
+       * @description Pairwise diffs of each compatible instance's desired payload against
+       *     the first compatible instance (the baseline).
+       */
+      diffs: {
+        /** @description Arr instance ID this diff row belongs to */
+        instanceId: number;
+        /**
+         * @description Field-level changes relative to the first compatible
+         *     instance's desired payload.
+         */
+        changes: components['schemas']['EntityChange'][];
+      }[];
+    };
+    ResolvedLiveDiffResponse: {
+      /** @description PCD database ID */
+      databaseId: number;
+      /**
+       * @description Resolved config entity type
+       * @enum {string}
+       */
+      entityType:
+        | 'delayProfile'
+        | 'regularExpression'
+        | 'customFormat'
+        | 'qualityProfile'
+        | 'naming'
+        | 'mediaSettings'
+        | 'qualityDefinitions'
+        | 'lidarrMetadataProfile';
+      /** @description Entity name */
+      name: string;
+      /** @description Arr instance ID the live diff was computed against */
+      instanceId: number;
+      /**
+       * @description Arr instance family
+       * @enum {string}
+       */
+      arrType: 'radarr' | 'sonarr' | 'lidarr';
+      /** @description Desired-vs-actual field changes; an empty array means the entity is in sync */
+      changes: components['schemas']['EntityChange'][];
+    };
     SqliteHealth: {
       status: components['schemas']['ComponentStatus'];
       /** @description Database query response time in milliseconds */
@@ -1842,7 +2340,9 @@ export interface components {
       description: string | null;
       includeInRename: boolean;
       tags: string[];
-      conditions: Record<string, never>[];
+      conditions: {
+        [key: string]: unknown;
+      }[];
       tests: components['schemas']['PortableCustomFormatTest'][];
     };
     PortableCustomFormatScore: {
@@ -1943,56 +2443,6 @@ export interface components {
 export type $defs = Record<string, never>;
 /** API operation definitions with typed parameters, request bodies, and responses. */
 export interface operations {
-  getCompatibilityParity: {
-    parameters: {
-      query?: {
-        /** @description PCD database ID to compute profile compatibility for */
-        databaseId?: number;
-      };
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Compatibility parity map */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ParityMapResponse'];
-        };
-      };
-      /** @description Invalid databaseId */
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ErrorResponse'];
-        };
-      };
-      /** @description Authentication required */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ErrorResponse'];
-        };
-      };
-      /** @description Failed to compute compatibility parity map */
-      500: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ErrorResponse'];
-        };
-      };
-    };
-  };
   getHealth: {
     parameters: {
       query?: {
@@ -3570,6 +4020,556 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['PcdErrorResponse'];
+        };
+      };
+    };
+  };
+  listResolvedConfigEntities: {
+    parameters: {
+      query?: {
+        /** @description Resolved config layer to read */
+        layer?: 'base' | 'user' | 'resolved';
+        /**
+         * @description Arr app type. Required for per-arr-app entity types (naming,
+         *     mediaSettings, qualityDefinitions); rejected for arr-agnostic entity
+         *     types and for lidarrMetadataProfile.
+         */
+        arrType?: 'radarr' | 'sonarr' | 'lidarr';
+      };
+      header?: never;
+      path: {
+        /** @description PCD database ID */
+        databaseId: number;
+        /** @description Resolved config entity type */
+        entityType:
+          | 'delayProfile'
+          | 'regularExpression'
+          | 'customFormat'
+          | 'qualityProfile'
+          | 'naming'
+          | 'mediaSettings'
+          | 'qualityDefinitions'
+          | 'lidarrMetadataProfile';
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Resolved entity list */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ResolvedEntityListResponse'];
+        };
+      };
+      /** @description Invalid databaseId, unknown entityType, missing/invalid arrType, or database not ready */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Authentication required */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Database not found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Failed to read resolved config state */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+    };
+  };
+  getResolvedConfigEntity: {
+    parameters: {
+      query?: {
+        /** @description Resolved config layer to read */
+        layer?: 'base' | 'user' | 'resolved';
+        /**
+         * @description Arr app type. Required for per-arr-app entity types (naming,
+         *     mediaSettings, qualityDefinitions); rejected for arr-agnostic entity
+         *     types and for lidarrMetadataProfile.
+         */
+        arrType?: 'radarr' | 'sonarr' | 'lidarr';
+      };
+      header?: never;
+      path: {
+        /** @description PCD database ID */
+        databaseId: number;
+        /** @description Resolved config entity type */
+        entityType:
+          | 'delayProfile'
+          | 'regularExpression'
+          | 'customFormat'
+          | 'qualityProfile'
+          | 'naming'
+          | 'mediaSettings'
+          | 'qualityDefinitions'
+          | 'lidarrMetadataProfile';
+        /** @description Entity name */
+        name: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Resolved entity state */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ResolvedEntityState'];
+        };
+      };
+      /** @description Invalid databaseId, unknown entityType, missing/invalid arrType, or database not ready */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Authentication required */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Database not found, or entity not found in the resolved layer */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Failed to read resolved config state */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+    };
+  };
+  compareResolvedConfigEntity: {
+    parameters: {
+      query: {
+        /** @description Comma-separated Arr instance IDs to compare (maximum 8) */
+        instanceIds: string;
+        /**
+         * @description When true, also fetch live per-instance state. Live fetches are
+         *     rate-limited per instance.
+         */
+        includeLive?: boolean;
+      };
+      header?: never;
+      path: {
+        /** @description PCD database ID */
+        databaseId: number;
+        /** @description Resolved config entity type */
+        entityType:
+          | 'delayProfile'
+          | 'regularExpression'
+          | 'customFormat'
+          | 'qualityProfile'
+          | 'naming'
+          | 'mediaSettings'
+          | 'qualityDefinitions'
+          | 'lidarrMetadataProfile';
+        /** @description Entity name */
+        name: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Cross-instance comparison result */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['CrossInstanceComparisonResponse'];
+        };
+      };
+      /** @description Invalid databaseId/entityType, invalid or unknown instanceIds, instance cap exceeded, or database not ready */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Authentication required */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Database not found, or entity not found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Comparison requests are being rate-limited */
+      429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Failed to compute cross-instance comparison */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+    };
+  };
+  getResolvedConfigLiveDiff: {
+    parameters: {
+      query: {
+        /** @description Arr instance ID to diff resolved state against */
+        instanceId: number;
+      };
+      header?: never;
+      path: {
+        /** @description PCD database ID */
+        databaseId: number;
+        /** @description Resolved config entity type */
+        entityType:
+          | 'delayProfile'
+          | 'regularExpression'
+          | 'customFormat'
+          | 'qualityProfile'
+          | 'naming'
+          | 'mediaSettings'
+          | 'qualityDefinitions'
+          | 'lidarrMetadataProfile';
+        /** @description Entity name */
+        name: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Live diff result */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ResolvedLiveDiffResponse'];
+        };
+      };
+      /** @description Invalid databaseId/entityType, entity type unsupported for the instance's arr_type, or database not ready */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Authentication required */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Database not found, Arr instance not found, or entity not found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Live diff requests are being rate-limited */
+      429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Failed to compute live diff */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+    };
+  };
+  getSetupState: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Setup state */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['SetupStateResponse'];
+        };
+      };
+      /** @description Setup has already been completed or dismissed */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  updateSetupState: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['SetupStatePatchRequest'];
+      };
+    };
+    responses: {
+      /** @description Wizard state updated */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': {
+            wizard: components['schemas']['WizardState'];
+          };
+        };
+      };
+      /** @description Missing or invalid currentStep */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Setup has already been completed or dismissed */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  testSetupConnection: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['TestConnectionRequest'];
+      };
+    };
+    responses: {
+      /** @description Connection test result */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['TestConnectionResponse'];
+        };
+      };
+      /** @description Missing/invalid type, url, or apiKey, or an unsafe URL */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['TestConnectionResponse'];
+        };
+      };
+      /** @description Setup has already been completed or dismissed */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Connection test attempts are rate-limited */
+      429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['TestConnectionResponse'];
+        };
+      };
+      /** @description Connection attempt failed unexpectedly */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['TestConnectionResponse'];
+        };
+      };
+    };
+  };
+  completeSetup: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Wizard marked completed */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': {
+            wizard: components['schemas']['WizardState'];
+          };
+        };
+      };
+    };
+  };
+  skipSetup: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Wizard marked dismissed */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': {
+            wizard: components['schemas']['WizardState'];
+          };
+        };
+      };
+    };
+  };
+  getCompatibilityParity: {
+    parameters: {
+      query?: {
+        /** @description PCD database ID to compute profile compatibility for */
+        databaseId?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Compatibility parity map */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ParityMapResponse'];
+        };
+      };
+      /** @description Invalid databaseId */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Authentication required */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Failed to compute compatibility parity map */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
         };
       };
     };

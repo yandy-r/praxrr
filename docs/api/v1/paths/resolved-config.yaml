@@ -1,0 +1,368 @@
+list:
+  get:
+    operationId: listResolvedConfigEntities
+    summary: List resolved config entities by type
+    description: |
+      Returns resolved config state for every entity of the given type in the
+      PCD database, for the selected layer.
+
+      `layer` defaults to `resolved` (the schema -> base -> tweaks -> user
+      replay, matching what sync applies to Arr instances). `arrType` is
+      required for per-arr-app entity types (`naming`, `mediaSettings`,
+      `qualityDefinitions`) and rejected for arr-agnostic entity types
+      (`delayProfile`, `regularExpression`, `customFormat`, `qualityProfile`)
+      and for `lidarrMetadataProfile`, which is Lidarr-only and implicit.
+    tags:
+      - Resolved Config
+    parameters:
+      - name: databaseId
+        in: path
+        required: true
+        description: PCD database ID
+        schema:
+          type: integer
+      - name: entityType
+        in: path
+        required: true
+        description: Resolved config entity type
+        schema:
+          type: string
+          enum:
+            - delayProfile
+            - regularExpression
+            - customFormat
+            - qualityProfile
+            - naming
+            - mediaSettings
+            - qualityDefinitions
+            - lidarrMetadataProfile
+      - name: layer
+        in: query
+        required: false
+        description: Resolved config layer to read
+        schema:
+          type: string
+          enum:
+            - base
+            - user
+            - resolved
+          default: resolved
+      - name: arrType
+        in: query
+        required: false
+        description: |
+          Arr app type. Required for per-arr-app entity types (naming,
+          mediaSettings, qualityDefinitions); rejected for arr-agnostic entity
+          types and for lidarrMetadataProfile.
+        schema:
+          type: string
+          enum:
+            - radarr
+            - sonarr
+            - lidarr
+    responses:
+      '200':
+        description: Resolved entity list
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/resolved-config.yaml#/ResolvedEntityListResponse'
+      '400':
+        description: Invalid databaseId, unknown entityType, missing/invalid arrType, or database not ready
+        content:
+          application/json:
+            schema:
+              $ref: '../openapi.yaml#/components/schemas/ErrorResponse'
+      '401':
+        description: Authentication required
+        content:
+          application/json:
+            schema:
+              $ref: '../openapi.yaml#/components/schemas/ErrorResponse'
+      '404':
+        description: Database not found
+        content:
+          application/json:
+            schema:
+              $ref: '../openapi.yaml#/components/schemas/ErrorResponse'
+      '500':
+        description: Failed to read resolved config state
+        content:
+          application/json:
+            schema:
+              $ref: '../openapi.yaml#/components/schemas/ErrorResponse'
+
+named:
+  get:
+    operationId: getResolvedConfigEntity
+    summary: Get one resolved config entity by name
+    description: |
+      Returns resolved config state for a single named entity, for the
+      selected layer.
+
+      `layer` defaults to `resolved`. `404` is reserved for a hard miss in the
+      `resolved` layer; the `base`/`user` layers return `200` with
+      `present: false` when the entity does not exist in that layer.
+    tags:
+      - Resolved Config
+    parameters:
+      - name: databaseId
+        in: path
+        required: true
+        description: PCD database ID
+        schema:
+          type: integer
+      - name: entityType
+        in: path
+        required: true
+        description: Resolved config entity type
+        schema:
+          type: string
+          enum:
+            - delayProfile
+            - regularExpression
+            - customFormat
+            - qualityProfile
+            - naming
+            - mediaSettings
+            - qualityDefinitions
+            - lidarrMetadataProfile
+      - name: name
+        in: path
+        required: true
+        description: Entity name
+        schema:
+          type: string
+      - name: layer
+        in: query
+        required: false
+        description: Resolved config layer to read
+        schema:
+          type: string
+          enum:
+            - base
+            - user
+            - resolved
+          default: resolved
+      - name: arrType
+        in: query
+        required: false
+        description: |
+          Arr app type. Required for per-arr-app entity types (naming,
+          mediaSettings, qualityDefinitions); rejected for arr-agnostic entity
+          types and for lidarrMetadataProfile.
+        schema:
+          type: string
+          enum:
+            - radarr
+            - sonarr
+            - lidarr
+    responses:
+      '200':
+        description: Resolved entity state
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/resolved-config.yaml#/ResolvedEntityState'
+      '400':
+        description: Invalid databaseId, unknown entityType, missing/invalid arrType, or database not ready
+        content:
+          application/json:
+            schema:
+              $ref: '../openapi.yaml#/components/schemas/ErrorResponse'
+      '401':
+        description: Authentication required
+        content:
+          application/json:
+            schema:
+              $ref: '../openapi.yaml#/components/schemas/ErrorResponse'
+      '404':
+        description: Database not found, or entity not found in the resolved layer
+        content:
+          application/json:
+            schema:
+              $ref: '../openapi.yaml#/components/schemas/ErrorResponse'
+      '500':
+        description: Failed to read resolved config state
+        content:
+          application/json:
+            schema:
+              $ref: '../openapi.yaml#/components/schemas/ErrorResponse'
+
+compare:
+  get:
+    operationId: compareResolvedConfigEntity
+    summary: Compare one resolved config entity across instances
+    description: |
+      Computes per-instance transformed-desired payloads (and optionally live
+      Arr state) for a single named entity across up to 8 Arr instances, with
+      pairwise diffs against the first compatible instance.
+
+      Per-instance failures (unreachable, incompatible arr_type, unsupported
+      entity type) are reported as inline statuses on that instance and never
+      fail the whole request.
+    tags:
+      - Resolved Config
+    parameters:
+      - name: databaseId
+        in: path
+        required: true
+        description: PCD database ID
+        schema:
+          type: integer
+      - name: entityType
+        in: path
+        required: true
+        description: Resolved config entity type
+        schema:
+          type: string
+          enum:
+            - delayProfile
+            - regularExpression
+            - customFormat
+            - qualityProfile
+            - naming
+            - mediaSettings
+            - qualityDefinitions
+            - lidarrMetadataProfile
+      - name: name
+        in: path
+        required: true
+        description: Entity name
+        schema:
+          type: string
+      - name: instanceIds
+        in: query
+        required: true
+        description: Comma-separated Arr instance IDs to compare (maximum 8)
+        schema:
+          type: string
+      - name: includeLive
+        in: query
+        required: false
+        description: |
+          When true, also fetch live per-instance state. Live fetches are
+          rate-limited per instance.
+        schema:
+          type: boolean
+          default: false
+    responses:
+      '200':
+        description: Cross-instance comparison result
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/resolved-config.yaml#/CrossInstanceComparisonResponse'
+      '400':
+        description: Invalid databaseId/entityType, invalid or unknown instanceIds, instance cap exceeded, or database not ready
+        content:
+          application/json:
+            schema:
+              $ref: '../openapi.yaml#/components/schemas/ErrorResponse'
+      '401':
+        description: Authentication required
+        content:
+          application/json:
+            schema:
+              $ref: '../openapi.yaml#/components/schemas/ErrorResponse'
+      '404':
+        description: Database not found, or entity not found
+        content:
+          application/json:
+            schema:
+              $ref: '../openapi.yaml#/components/schemas/ErrorResponse'
+      '429':
+        description: Comparison requests are being rate-limited
+        content:
+          application/json:
+            schema:
+              $ref: '../openapi.yaml#/components/schemas/ErrorResponse'
+      '500':
+        description: Failed to compute cross-instance comparison
+        content:
+          application/json:
+            schema:
+              $ref: '../openapi.yaml#/components/schemas/ErrorResponse'
+
+diff:
+  get:
+    operationId: getResolvedConfigLiveDiff
+    summary: Diff resolved config entity against live Arr state
+    description: |
+      Computes the desired-vs-actual field diff for a single named entity on
+      one Arr instance, via the sync-preview section syncer filtered to the
+      entity (namespace-suffix aware). An empty `changes` array means the
+      entity is in sync; it is never conflatable with a failed check.
+    tags:
+      - Resolved Config
+    parameters:
+      - name: databaseId
+        in: path
+        required: true
+        description: PCD database ID
+        schema:
+          type: integer
+      - name: entityType
+        in: path
+        required: true
+        description: Resolved config entity type
+        schema:
+          type: string
+          enum:
+            - delayProfile
+            - regularExpression
+            - customFormat
+            - qualityProfile
+            - naming
+            - mediaSettings
+            - qualityDefinitions
+            - lidarrMetadataProfile
+      - name: name
+        in: path
+        required: true
+        description: Entity name
+        schema:
+          type: string
+      - name: instanceId
+        in: query
+        required: true
+        description: Arr instance ID to diff resolved state against
+        schema:
+          type: integer
+    responses:
+      '200':
+        description: Live diff result
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/resolved-config.yaml#/ResolvedLiveDiffResponse'
+      '400':
+        description: Invalid databaseId/entityType, entity type unsupported for the instance's arr_type, or database not ready
+        content:
+          application/json:
+            schema:
+              $ref: '../openapi.yaml#/components/schemas/ErrorResponse'
+      '401':
+        description: Authentication required
+        content:
+          application/json:
+            schema:
+              $ref: '../openapi.yaml#/components/schemas/ErrorResponse'
+      '404':
+        description: Database not found, Arr instance not found, or entity not found
+        content:
+          application/json:
+            schema:
+              $ref: '../openapi.yaml#/components/schemas/ErrorResponse'
+      '429':
+        description: Live diff requests are being rate-limited
+        content:
+          application/json:
+            schema:
+              $ref: '../openapi.yaml#/components/schemas/ErrorResponse'
+      '500':
+        description: Failed to compute live diff
+        content:
+          application/json:
+            schema:
+              $ref: '../openapi.yaml#/components/schemas/ErrorResponse'

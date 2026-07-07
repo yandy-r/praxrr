@@ -104,3 +104,40 @@ export {
   DependencyError,
   ManifestValidationError,
 } from './core/errors.ts';
+
+// ============================================================================
+// RESOLVED CONFIG
+// ============================================================================
+
+export {
+  ARR_AGNOSTIC_READERS,
+  PER_ARR_READERS,
+  isReaderNotFoundMessage,
+  isResolvedConfigValidationError,
+  isResolvedEntityNotFoundError,
+  listResolvedEntityNames,
+  readResolvedEntity,
+  ResolvedConfigValidationError,
+  ResolvedEntityNotFoundError,
+} from './resolved/readers.ts';
+export type { ResolvedEntityPayload, ResolvedEntityType, ResolvedLayer } from './resolved/types.ts';
+export { computeLiveDiff } from './resolved/liveDiff.ts';
+export type { LiveDiffDeps, LiveDiffReason, LiveDiffResult } from './resolved/liveDiff.ts';
+export { COMPARE_MAX_INSTANCES, isInstanceCountWithinCap, registerCompareAttempt } from './resolved/limits.ts';
+export { ResolvedConfigDatabaseNotFoundError, withBaseOnlyCache } from './resolved/layers.ts';
+export {
+  buildPendingConflictIndex,
+  computeUserOverrides,
+  PORTABLE_ARRAY_KEY_STRATEGIES,
+  readEntityOrNull,
+  resolveLayerState,
+} from './resolved/layerDiff.ts';
+export type { PendingConflictLookup } from './resolved/layerDiff.ts';
+export { compareAcrossInstances } from './resolved/compare.ts';
+export type {
+  CompareAcrossInstancesInput,
+  CompareAcrossInstancesResult,
+  CompareDeps,
+  CompareInstanceResult,
+  CompareReason,
+} from './resolved/compare.ts';

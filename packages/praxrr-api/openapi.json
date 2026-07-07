@@ -17,10 +17,6 @@
   ],
   "tags": [
     {
-      "name": "Compatibility",
-      "description": "Cross-Arr compatibility parity map and semantic difference catalog"
-    },
-    {
       "name": "System",
       "description": "System health and status endpoints"
     },
@@ -49,76 +45,27 @@
       "description": "PCD state snapshot management endpoints"
     },
     {
+      "name": "Resolved Config",
+      "description": "Resolved PCD configuration state, layer breakdown, and live/cross-instance diff endpoints"
+    },
+    {
       "name": "User Preferences",
       "description": "Durable UI preference storage for progressive disclosure"
     },
     {
       "name": "Complexity Tiers",
       "description": "Per-section complexity tier storage for progressive complexity"
+    },
+    {
+      "name": "Setup",
+      "description": "First-run setup wizard state and Arr connection testing"
+    },
+    {
+      "name": "Compatibility",
+      "description": "Cross-Arr compatibility parity map and semantic difference catalog"
     }
   ],
   "paths": {
-    "/compatibility/parity": {
-      "get": {
-        "operationId": "getCompatibilityParity",
-        "summary": "Cross-Arr compatibility parity map",
-        "description": "Returns the static cross-Arr entity/app support matrix and catalog of known\nsemantic differences between Arr apps.\n\nWhen `databaseId` is provided, also computes per-profile compatibility for\nthat database's quality profiles against each Arr app's compatible quality\nnames, attached as `profiles`.\n",
-        "tags": ["Compatibility"],
-        "parameters": [
-          {
-            "name": "databaseId",
-            "in": "query",
-            "required": false,
-            "description": "PCD database ID to compute profile compatibility for",
-            "schema": {
-              "type": "integer"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Compatibility parity map",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ParityMapResponse"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Invalid databaseId",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Authentication required",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Failed to compute compatibility parity map",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/health": {
       "get": {
         "operationId": "getHealth",
@@ -2192,164 +2139,733 @@
           }
         }
       }
+    },
+    "/pcd/{databaseId}/resolved/{entityType}": {
+      "get": {
+        "operationId": "listResolvedConfigEntities",
+        "summary": "List resolved config entities by type",
+        "description": "Returns resolved config state for every entity of the given type in the\nPCD database, for the selected layer.\n\n`layer` defaults to `resolved` (the schema -> base -> tweaks -> user\nreplay, matching what sync applies to Arr instances). `arrType` is\nrequired for per-arr-app entity types (`naming`, `mediaSettings`,\n`qualityDefinitions`) and rejected for arr-agnostic entity types\n(`delayProfile`, `regularExpression`, `customFormat`, `qualityProfile`)\nand for `lidarrMetadataProfile`, which is Lidarr-only and implicit.\n",
+        "tags": ["Resolved Config"],
+        "parameters": [
+          {
+            "name": "databaseId",
+            "in": "path",
+            "required": true,
+            "description": "PCD database ID",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "entityType",
+            "in": "path",
+            "required": true,
+            "description": "Resolved config entity type",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "delayProfile",
+                "regularExpression",
+                "customFormat",
+                "qualityProfile",
+                "naming",
+                "mediaSettings",
+                "qualityDefinitions",
+                "lidarrMetadataProfile"
+              ]
+            }
+          },
+          {
+            "name": "layer",
+            "in": "query",
+            "required": false,
+            "description": "Resolved config layer to read",
+            "schema": {
+              "type": "string",
+              "enum": ["base", "user", "resolved"],
+              "default": "resolved"
+            }
+          },
+          {
+            "name": "arrType",
+            "in": "query",
+            "required": false,
+            "description": "Arr app type. Required for per-arr-app entity types (naming,\nmediaSettings, qualityDefinitions); rejected for arr-agnostic entity\ntypes and for lidarrMetadataProfile.\n",
+            "schema": {
+              "type": "string",
+              "enum": ["radarr", "sonarr", "lidarr"]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Resolved entity list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResolvedEntityListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid databaseId, unknown entityType, missing/invalid arrType, or database not ready",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Database not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Failed to read resolved config state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/pcd/{databaseId}/resolved/{entityType}/{name}": {
+      "get": {
+        "operationId": "getResolvedConfigEntity",
+        "summary": "Get one resolved config entity by name",
+        "description": "Returns resolved config state for a single named entity, for the\nselected layer.\n\n`layer` defaults to `resolved`. `404` is reserved for a hard miss in the\n`resolved` layer; the `base`/`user` layers return `200` with\n`present: false` when the entity does not exist in that layer.\n",
+        "tags": ["Resolved Config"],
+        "parameters": [
+          {
+            "name": "databaseId",
+            "in": "path",
+            "required": true,
+            "description": "PCD database ID",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "entityType",
+            "in": "path",
+            "required": true,
+            "description": "Resolved config entity type",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "delayProfile",
+                "regularExpression",
+                "customFormat",
+                "qualityProfile",
+                "naming",
+                "mediaSettings",
+                "qualityDefinitions",
+                "lidarrMetadataProfile"
+              ]
+            }
+          },
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "description": "Entity name",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "layer",
+            "in": "query",
+            "required": false,
+            "description": "Resolved config layer to read",
+            "schema": {
+              "type": "string",
+              "enum": ["base", "user", "resolved"],
+              "default": "resolved"
+            }
+          },
+          {
+            "name": "arrType",
+            "in": "query",
+            "required": false,
+            "description": "Arr app type. Required for per-arr-app entity types (naming,\nmediaSettings, qualityDefinitions); rejected for arr-agnostic entity\ntypes and for lidarrMetadataProfile.\n",
+            "schema": {
+              "type": "string",
+              "enum": ["radarr", "sonarr", "lidarr"]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Resolved entity state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResolvedEntityState"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid databaseId, unknown entityType, missing/invalid arrType, or database not ready",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Database not found, or entity not found in the resolved layer",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Failed to read resolved config state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/pcd/{databaseId}/resolved/{entityType}/{name}/compare": {
+      "get": {
+        "operationId": "compareResolvedConfigEntity",
+        "summary": "Compare one resolved config entity across instances",
+        "description": "Computes per-instance transformed-desired payloads (and optionally live\nArr state) for a single named entity across up to 8 Arr instances, with\npairwise diffs against the first compatible instance.\n\nPer-instance failures (unreachable, incompatible arr_type, unsupported\nentity type) are reported as inline statuses on that instance and never\nfail the whole request.\n",
+        "tags": ["Resolved Config"],
+        "parameters": [
+          {
+            "name": "databaseId",
+            "in": "path",
+            "required": true,
+            "description": "PCD database ID",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "entityType",
+            "in": "path",
+            "required": true,
+            "description": "Resolved config entity type",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "delayProfile",
+                "regularExpression",
+                "customFormat",
+                "qualityProfile",
+                "naming",
+                "mediaSettings",
+                "qualityDefinitions",
+                "lidarrMetadataProfile"
+              ]
+            }
+          },
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "description": "Entity name",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "instanceIds",
+            "in": "query",
+            "required": true,
+            "description": "Comma-separated Arr instance IDs to compare (maximum 8)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "includeLive",
+            "in": "query",
+            "required": false,
+            "description": "When true, also fetch live per-instance state. Live fetches are\nrate-limited per instance.\n",
+            "schema": {
+              "type": "boolean",
+              "default": false
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Cross-instance comparison result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CrossInstanceComparisonResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid databaseId/entityType, invalid or unknown instanceIds, instance cap exceeded, or database not ready",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Database not found, or entity not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Comparison requests are being rate-limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Failed to compute cross-instance comparison",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/pcd/{databaseId}/resolved/{entityType}/{name}/diff": {
+      "get": {
+        "operationId": "getResolvedConfigLiveDiff",
+        "summary": "Diff resolved config entity against live Arr state",
+        "description": "Computes the desired-vs-actual field diff for a single named entity on\none Arr instance, via the sync-preview section syncer filtered to the\nentity (namespace-suffix aware). An empty `changes` array means the\nentity is in sync; it is never conflatable with a failed check.\n",
+        "tags": ["Resolved Config"],
+        "parameters": [
+          {
+            "name": "databaseId",
+            "in": "path",
+            "required": true,
+            "description": "PCD database ID",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "entityType",
+            "in": "path",
+            "required": true,
+            "description": "Resolved config entity type",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "delayProfile",
+                "regularExpression",
+                "customFormat",
+                "qualityProfile",
+                "naming",
+                "mediaSettings",
+                "qualityDefinitions",
+                "lidarrMetadataProfile"
+              ]
+            }
+          },
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "description": "Entity name",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "instanceId",
+            "in": "query",
+            "required": true,
+            "description": "Arr instance ID to diff resolved state against",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Live diff result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResolvedLiveDiffResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid databaseId/entityType, entity type unsupported for the instance's arr_type, or database not ready",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Database not found, Arr instance not found, or entity not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Live diff requests are being rate-limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Failed to compute live diff",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/setup/state": {
+      "get": {
+        "operationId": "getSetupState",
+        "summary": "Get setup wizard state",
+        "description": "Returns the current wizard step, completion/dismissal status,\nprerequisite progress, and default database auto-link info used to\nrender and resume the setup wizard.\n",
+        "tags": ["Setup"],
+        "responses": {
+          "200": {
+            "description": "Setup state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SetupStateResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Setup has already been completed or dismissed"
+          }
+        }
+      },
+      "patch": {
+        "operationId": "updateSetupState",
+        "summary": "Advance the wizard step",
+        "description": "Advances the wizard to the given step. Rejects steps outside the known\nwizard sequence.\n",
+        "tags": ["Setup"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetupStatePatchRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Wizard state updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["wizard"],
+                  "properties": {
+                    "wizard": {
+                      "$ref": "#/components/schemas/WizardState"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Missing or invalid currentStep",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Setup has already been completed or dismissed"
+          }
+        }
+      }
+    },
+    "/setup/test-connection": {
+      "post": {
+        "operationId": "testSetupConnection",
+        "summary": "Test an Arr connection during setup",
+        "description": "Validates Arr connection credentials without persisting an instance.\n\nThis endpoint performs no writes. It is rate-limited per client IP and\nrejects metadata/link-local URLs before attempting a connection, so it\ncannot be used as an SSRF or port-scan oracle.\n",
+        "tags": ["Setup"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TestConnectionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Connection test result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TestConnectionResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Missing/invalid type, url, or apiKey, or an unsafe URL",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TestConnectionResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Setup has already been completed or dismissed"
+          },
+          "429": {
+            "description": "Connection test attempts are rate-limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TestConnectionResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Connection attempt failed unexpectedly",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TestConnectionResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/setup/complete": {
+      "post": {
+        "operationId": "completeSetup",
+        "summary": "Mark setup wizard completed",
+        "description": "Marks the setup wizard completed.\n\nTerminal and idempotent by design: unlike `GET`/`PATCH /state`, this\nendpoint does not require the wizard to still be in progress, so a\nrepeated call succeeds instead of rejecting once setup is already\ncompleted.\n",
+        "tags": ["Setup"],
+        "responses": {
+          "200": {
+            "description": "Wizard marked completed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["wizard"],
+                  "properties": {
+                    "wizard": {
+                      "$ref": "#/components/schemas/WizardState"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/setup/skip": {
+      "post": {
+        "operationId": "skipSetup",
+        "summary": "Mark setup wizard dismissed",
+        "description": "Marks the setup wizard dismissed.\n\nTerminal and idempotent by design: unlike `GET`/`PATCH /state`, this\nendpoint does not require the wizard to still be in progress, so a\nrepeated call succeeds instead of rejecting once setup is already\ndismissed.\n",
+        "tags": ["Setup"],
+        "responses": {
+          "200": {
+            "description": "Wizard marked dismissed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["wizard"],
+                  "properties": {
+                    "wizard": {
+                      "$ref": "#/components/schemas/WizardState"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/compatibility/parity": {
+      "get": {
+        "operationId": "getCompatibilityParity",
+        "summary": "Cross-Arr compatibility parity map",
+        "description": "Returns the static cross-Arr entity/app support matrix and catalog of known\nsemantic differences between Arr apps.\n\nWhen `databaseId` is provided, also computes per-profile compatibility for\nthat database's quality profiles against each Arr app's compatible quality\nnames, attached as `profiles`.\n",
+        "tags": ["Compatibility"],
+        "parameters": [
+          {
+            "name": "databaseId",
+            "in": "query",
+            "required": false,
+            "description": "PCD database ID to compute profile compatibility for",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Compatibility parity map",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ParityMapResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid databaseId",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Failed to compute compatibility parity map",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
     "schemas": {
-      "ParityMapResponse": {
-        "type": "object",
-        "required": ["entities", "apps", "matrix", "semanticDifferences"],
-        "properties": {
-          "entities": {
-            "type": "array",
-            "items": {
-              "type": "string",
-              "enum": [
-                "custom_formats",
-                "quality_profiles",
-                "quality_definitions",
-                "delay_profiles",
-                "metadata_profiles"
-              ]
-            },
-            "description": "PCD config entities tracked by the Cross-Arr Parity Map"
-          },
-          "apps": {
-            "type": "array",
-            "items": {
-              "type": "string",
-              "enum": ["radarr", "sonarr", "lidarr"]
-            },
-            "description": "Arr app types represented as matrix columns"
-          },
-          "matrix": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "required": ["entity", "label", "radarr", "sonarr", "lidarr"],
-              "properties": {
-                "entity": {
-                  "type": "string",
-                  "enum": [
-                    "custom_formats",
-                    "quality_profiles",
-                    "quality_definitions",
-                    "delay_profiles",
-                    "metadata_profiles"
-                  ],
-                  "description": "Parity entity this row describes"
-                },
-                "label": {
-                  "type": "string",
-                  "description": "Human-readable label for this entity row"
-                },
-                "radarr": {
-                  "type": "string",
-                  "enum": ["native", "shared", "unsupported"],
-                  "description": "Radarr support status for this entity"
-                },
-                "sonarr": {
-                  "type": "string",
-                  "enum": ["native", "shared", "unsupported"],
-                  "description": "Sonarr support status for this entity"
-                },
-                "lidarr": {
-                  "type": "string",
-                  "enum": ["native", "shared", "unsupported"],
-                  "description": "Lidarr support status for this entity"
-                }
-              }
-            },
-            "description": "One row per parity entity, with a per-app support status column"
-          },
-          "semanticDifferences": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/ArrSemanticDifference"
-            },
-            "description": "Curated catalog of same-API-shape/different-domain-semantics divergences"
-          },
-          "profiles": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/ProfileCompatibility"
-            },
-            "description": "Per-profile Arr-type compatibility, when quality profile data is available"
-          }
-        }
-      },
-      "ArrSemanticDifference": {
-        "type": "object",
-        "required": ["scope", "apps", "summary", "detail", "sourceRefs"],
-        "properties": {
-          "scope": {
-            "type": "string",
-            "enum": [
-              "custom_formats",
-              "quality_profiles",
-              "quality_definitions",
-              "delay_profiles",
-              "metadata_profiles",
-              "instances",
-              "library",
-              "releases",
-              "rename",
-              "upgrades"
-            ],
-            "description": "Parity entity or workflow surface this semantic difference applies to"
-          },
-          "apps": {
-            "type": "array",
-            "items": {
-              "type": "string",
-              "enum": ["radarr", "sonarr", "lidarr"]
-            },
-            "description": "Arr apps this entry applies to"
-          },
-          "summary": {
-            "type": "string",
-            "description": "One-line summary of the semantic divergence"
-          },
-          "detail": {
-            "type": "string",
-            "description": "Full explanation of why the divergence exists"
-          },
-          "suggestion": {
-            "type": "string",
-            "description": "Suggested alternative or mitigation, when applicable"
-          },
-          "sourceRefs": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            },
-            "description": "Prose file/symbol anchors for drift audits, not imports"
-          }
-        }
-      },
-      "ProfileCompatibility": {
-        "type": "object",
-        "required": ["name", "compatibleArrTypes", "basis"],
-        "properties": {
-          "name": {
-            "type": "string",
-            "description": "Quality profile name"
-          },
-          "compatibleArrTypes": {
-            "type": "array",
-            "items": {
-              "type": "string",
-              "enum": ["radarr", "sonarr", "lidarr"]
-            },
-            "description": "Arr app types this profile's enabled qualities are compatible with"
-          },
-          "basis": {
-            "type": "string",
-            "enum": ["enabled-qualities"],
-            "description": "Algorithm basis used to compute this compatibility verdict"
-          }
-        }
-      },
       "ComponentStatus": {
         "type": "string",
         "enum": ["healthy", "degraded", "unhealthy"],
@@ -4287,6 +4803,7 @@
             "type": "array",
             "items": {
               "type": "object",
+              "additionalProperties": true,
               "description": "Condition data (shape varies by condition type)"
             }
           },
@@ -4674,6 +5191,604 @@
           "description": {
             "type": "string",
             "description": "Optional description for the snapshot"
+          }
+        }
+      },
+      "WizardStep": {
+        "type": "string",
+        "enum": ["welcome", "connect-arr", "link-database", "select-profiles", "preview-sync", "done"],
+        "description": "Ordered setup wizard step"
+      },
+      "WizardState": {
+        "type": "object",
+        "required": ["completed", "dismissedAt", "currentStep"],
+        "properties": {
+          "completed": {
+            "type": "boolean",
+            "description": "Whether the wizard has been marked completed"
+          },
+          "dismissedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "Timestamp the wizard was dismissed, or null if never dismissed"
+          },
+          "currentStep": {
+            "$ref": "#/components/schemas/WizardStep"
+          }
+        }
+      },
+      "SetupStateResponse": {
+        "type": "object",
+        "required": ["wizard", "prerequisites", "defaultDatabase"],
+        "properties": {
+          "wizard": {
+            "$ref": "#/components/schemas/WizardState"
+          },
+          "prerequisites": {
+            "type": "object",
+            "required": ["hasArrInstance", "hasDatabase", "hasProfileSelections"],
+            "properties": {
+              "hasArrInstance": {
+                "type": "boolean",
+                "description": "Whether at least one Arr instance has been connected"
+              },
+              "hasDatabase": {
+                "type": "boolean",
+                "description": "Whether at least one PCD database has been linked"
+              },
+              "hasProfileSelections": {
+                "type": "boolean",
+                "description": "Whether at least one instance has quality profile selections synced"
+              }
+            },
+            "description": "Setup prerequisite progress derived from real entity state"
+          },
+          "defaultDatabase": {
+            "type": "object",
+            "required": ["configured", "url", "alreadyLinked"],
+            "properties": {
+              "configured": {
+                "type": "boolean",
+                "description": "Whether PRAXRR_DEFAULT_DB_URL resolves to a non-empty value"
+              },
+              "url": {
+                "type": "string",
+                "nullable": true,
+                "description": "Resolved default database URL, or null when not configured"
+              },
+              "alreadyLinked": {
+                "type": "boolean",
+                "description": "Whether any PCD database is already linked"
+              }
+            },
+            "description": "Default database auto-link info used to render the link-database step"
+          }
+        }
+      },
+      "SetupStatePatchRequest": {
+        "type": "object",
+        "required": ["currentStep"],
+        "properties": {
+          "currentStep": {
+            "$ref": "#/components/schemas/WizardStep"
+          }
+        },
+        "description": "Advance the wizard to the given step"
+      },
+      "TestConnectionRequest": {
+        "type": "object",
+        "required": ["type", "url", "apiKey"],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["radarr", "sonarr", "lidarr"],
+            "description": "Target Arr application type"
+          },
+          "url": {
+            "type": "string",
+            "description": "Arr base URL"
+          },
+          "apiKey": {
+            "type": "string",
+            "description": "Arr API key"
+          }
+        }
+      },
+      "TestConnectionResponse": {
+        "type": "object",
+        "required": ["success"],
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "appName": {
+            "type": "string",
+            "description": "Arr application name, present on success"
+          },
+          "version": {
+            "type": "string",
+            "description": "Arr application version, present on success"
+          },
+          "reason": {
+            "type": "string",
+            "enum": ["unreachable", "unauthorized", "invalid_response", "timeout", "rate_limited"],
+            "description": "Sanitized failure reason, present on failure"
+          }
+        }
+      },
+      "ArrSemanticDifference": {
+        "type": "object",
+        "required": ["scope", "apps", "summary", "detail", "sourceRefs"],
+        "properties": {
+          "scope": {
+            "type": "string",
+            "enum": [
+              "custom_formats",
+              "quality_profiles",
+              "quality_definitions",
+              "delay_profiles",
+              "metadata_profiles",
+              "instances",
+              "library",
+              "releases",
+              "rename",
+              "upgrades"
+            ],
+            "description": "Parity entity or workflow surface this semantic difference applies to"
+          },
+          "apps": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": ["radarr", "sonarr", "lidarr"]
+            },
+            "description": "Arr apps this entry applies to"
+          },
+          "summary": {
+            "type": "string",
+            "description": "One-line summary of the semantic divergence"
+          },
+          "detail": {
+            "type": "string",
+            "description": "Full explanation of why the divergence exists"
+          },
+          "suggestion": {
+            "type": "string",
+            "description": "Suggested alternative or mitigation, when applicable"
+          },
+          "sourceRefs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Prose file/symbol anchors for drift audits, not imports"
+          }
+        }
+      },
+      "ProfileCompatibility": {
+        "type": "object",
+        "required": ["name", "compatibleArrTypes", "basis"],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Quality profile name"
+          },
+          "compatibleArrTypes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": ["radarr", "sonarr", "lidarr"]
+            },
+            "description": "Arr app types this profile's enabled qualities are compatible with"
+          },
+          "basis": {
+            "type": "string",
+            "enum": ["enabled-qualities"],
+            "description": "Algorithm basis used to compute this compatibility verdict"
+          }
+        }
+      },
+      "ParityMapResponse": {
+        "type": "object",
+        "required": ["entities", "apps", "matrix", "semanticDifferences"],
+        "properties": {
+          "entities": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "custom_formats",
+                "quality_profiles",
+                "quality_definitions",
+                "delay_profiles",
+                "metadata_profiles"
+              ]
+            },
+            "description": "PCD config entities tracked by the Cross-Arr Parity Map"
+          },
+          "apps": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": ["radarr", "sonarr", "lidarr"]
+            },
+            "description": "Arr app types represented as matrix columns"
+          },
+          "matrix": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["entity", "label", "radarr", "sonarr", "lidarr"],
+              "properties": {
+                "entity": {
+                  "type": "string",
+                  "enum": [
+                    "custom_formats",
+                    "quality_profiles",
+                    "quality_definitions",
+                    "delay_profiles",
+                    "metadata_profiles"
+                  ],
+                  "description": "Parity entity this row describes"
+                },
+                "label": {
+                  "type": "string",
+                  "description": "Human-readable label for this entity row"
+                },
+                "radarr": {
+                  "type": "string",
+                  "enum": ["native", "shared", "unsupported"],
+                  "description": "Radarr support status for this entity"
+                },
+                "sonarr": {
+                  "type": "string",
+                  "enum": ["native", "shared", "unsupported"],
+                  "description": "Sonarr support status for this entity"
+                },
+                "lidarr": {
+                  "type": "string",
+                  "enum": ["native", "shared", "unsupported"],
+                  "description": "Lidarr support status for this entity"
+                }
+              }
+            },
+            "description": "One row per parity entity, with a per-app support status column"
+          },
+          "semanticDifferences": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ArrSemanticDifference"
+            },
+            "description": "Curated catalog of same-API-shape/different-domain-semantics divergences"
+          },
+          "profiles": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProfileCompatibility"
+            },
+            "description": "Per-profile Arr-type compatibility, when quality profile data is available"
+          }
+        }
+      },
+      "ResolvedLayer": {
+        "type": "string",
+        "enum": ["base", "user", "resolved"],
+        "description": "PCD configuration layer represented by a resolved-state response:\n- `base`: schema + base + tweaks ops only (user ops omitted)\n- `user`: user-op overrides relative to the base layer, expressed as a\n  field-level diff\n- `resolved`: the fully replayed state (schema -> base -> tweaks -> user),\n  matching what sync applies to Arr instances\n"
+      },
+      "ResolvedEntityState": {
+        "type": "object",
+        "required": ["databaseId", "entityType", "name", "layer", "present", "hasPendingConflict"],
+        "properties": {
+          "databaseId": {
+            "type": "integer",
+            "description": "PCD database ID"
+          },
+          "entityType": {
+            "type": "string",
+            "enum": [
+              "delayProfile",
+              "regularExpression",
+              "customFormat",
+              "qualityProfile",
+              "naming",
+              "mediaSettings",
+              "qualityDefinitions",
+              "lidarrMetadataProfile"
+            ],
+            "description": "Resolved config entity type"
+          },
+          "name": {
+            "type": "string",
+            "description": "Entity name"
+          },
+          "layer": {
+            "$ref": "#/components/schemas/ResolvedLayer"
+          },
+          "present": {
+            "type": "boolean",
+            "description": "Whether the entity exists in the requested layer"
+          },
+          "entity": {
+            "description": "Canonical Portable payload for the entity in the requested layer.\nPresent for `layer=base` and `layer=resolved` when `present` is true;\nnull when the entity is absent from that layer or when `layer=user`.\nShape varies by entityType (and arrType for per-arr-app entity\ntypes):\n- `delayProfile` -> PortableDelayProfile\n- `regularExpression` -> PortableRegularExpression\n- `customFormat` -> PortableCustomFormat\n- `qualityProfile` -> PortableQualityProfile\n- `naming` (radarr) -> PortableRadarrNaming\n- `naming` (sonarr) -> PortableSonarrNaming\n- `naming` (lidarr) -> PortableLidarrNaming\n- `mediaSettings` (radarr, sonarr) -> PortableMediaSettings\n- `mediaSettings` (lidarr) -> PortableLidarrMediaSettings\n- `qualityDefinitions` (radarr, sonarr) -> PortableQualityDefinitions\n- `qualityDefinitions` (lidarr) -> PortableLidarrQualityDefinitions\n- `lidarrMetadataProfile` -> PortableLidarrMetadataProfile\n",
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/PortableDelayProfile"
+              },
+              {
+                "$ref": "#/components/schemas/PortableRegularExpression"
+              },
+              {
+                "$ref": "#/components/schemas/PortableCustomFormat"
+              },
+              {
+                "$ref": "#/components/schemas/PortableQualityProfile"
+              },
+              {
+                "$ref": "#/components/schemas/PortableRadarrNaming"
+              },
+              {
+                "$ref": "#/components/schemas/PortableSonarrNaming"
+              },
+              {
+                "$ref": "#/components/schemas/PortableLidarrNaming"
+              },
+              {
+                "$ref": "#/components/schemas/PortableMediaSettings"
+              },
+              {
+                "$ref": "#/components/schemas/PortableLidarrMediaSettings"
+              },
+              {
+                "$ref": "#/components/schemas/PortableQualityDefinitions"
+              },
+              {
+                "$ref": "#/components/schemas/PortableLidarrQualityDefinitions"
+              },
+              {
+                "$ref": "#/components/schemas/PortableLidarrMetadataProfile"
+              }
+            ]
+          },
+          "overrides": {
+            "description": "Field-level diff of user-op overrides relative to the base layer.\nPresent only for `layer=user`; an empty array means the resolved\nvalue matches base exactly.\n",
+            "nullable": true,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FieldChange"
+            }
+          },
+          "hasPendingConflict": {
+            "type": "boolean",
+            "description": "True when a pending value-guard conflict targets this entity (see\n`pcd_op_history`). The resolved value must not be treated as\nunambiguous while this is true.\n"
+          }
+        }
+      },
+      "ResolvedEntityListResponse": {
+        "type": "object",
+        "required": ["databaseId", "entityType", "layer", "entities"],
+        "properties": {
+          "databaseId": {
+            "type": "integer",
+            "description": "PCD database ID"
+          },
+          "entityType": {
+            "type": "string",
+            "enum": [
+              "delayProfile",
+              "regularExpression",
+              "customFormat",
+              "qualityProfile",
+              "naming",
+              "mediaSettings",
+              "qualityDefinitions",
+              "lidarrMetadataProfile"
+            ],
+            "description": "Resolved config entity type"
+          },
+          "layer": {
+            "$ref": "#/components/schemas/ResolvedLayer"
+          },
+          "entities": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ResolvedEntityState"
+            },
+            "description": "Per-entity resolved state for the requested layer"
+          }
+        }
+      },
+      "ResolvedInstanceState": {
+        "type": "object",
+        "required": ["instanceId", "instanceName", "arrType", "compatible", "present"],
+        "properties": {
+          "instanceId": {
+            "type": "integer",
+            "description": "Arr instance ID"
+          },
+          "instanceName": {
+            "type": "string",
+            "description": "Arr instance name"
+          },
+          "arrType": {
+            "type": "string",
+            "nullable": true,
+            "enum": ["radarr", "sonarr", "lidarr"],
+            "description": "Arr instance family, or null when the instance's own `arr_type` value is\nunrecognized (the `incompatible` error case).\n"
+          },
+          "compatible": {
+            "type": "boolean",
+            "description": "Whether this entity type is supported for the instance's arr_type"
+          },
+          "present": {
+            "type": "boolean",
+            "description": "Whether the entity is present in this instance's desired payload"
+          },
+          "desired": {
+            "description": "Per-instance transformed-desired Portable payload, present when\n`compatible` and `present` are both true. Uses the same\nentityType/arrType-to-Portable-shape mapping as\n`ResolvedEntityState.entity`.\n",
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/PortableDelayProfile"
+              },
+              {
+                "$ref": "#/components/schemas/PortableRegularExpression"
+              },
+              {
+                "$ref": "#/components/schemas/PortableCustomFormat"
+              },
+              {
+                "$ref": "#/components/schemas/PortableQualityProfile"
+              },
+              {
+                "$ref": "#/components/schemas/PortableRadarrNaming"
+              },
+              {
+                "$ref": "#/components/schemas/PortableSonarrNaming"
+              },
+              {
+                "$ref": "#/components/schemas/PortableLidarrNaming"
+              },
+              {
+                "$ref": "#/components/schemas/PortableMediaSettings"
+              },
+              {
+                "$ref": "#/components/schemas/PortableLidarrMediaSettings"
+              },
+              {
+                "$ref": "#/components/schemas/PortableQualityDefinitions"
+              },
+              {
+                "$ref": "#/components/schemas/PortableLidarrQualityDefinitions"
+              },
+              {
+                "$ref": "#/components/schemas/PortableLidarrMetadataProfile"
+              }
+            ]
+          },
+          "actual": {
+            "description": "Raw live Arr state for this instance, only populated when\n`includeLive=true` and the live fetch succeeded. Shape is the\nupstream Arr API payload, not a Portable shape.\n",
+            "nullable": true,
+            "type": "object",
+            "additionalProperties": true
+          },
+          "error": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "unreachable",
+              "timeout",
+              "unauthorized",
+              "invalid_response",
+              "unsupported",
+              "not_found",
+              "not_configured",
+              "incompatible",
+              "rate-limited",
+              "error"
+            ],
+            "description": "Sanitized reason when this instance's desired/live lookup failed.\nRaw error detail never appears here; full detail is logged\nserver-side only. Superset of the single-instance live-diff reason\nenum: `incompatible` (unrecognized arr_type), `rate-limited`\n(per-instance live fetch throttled), and `error` (unexpected\nfailure, detail logged not surfaced) are comparison-specific.\n`not_configured` means the section has no sync configuration on the\ninstance at all.\n"
+          }
+        }
+      },
+      "CrossInstanceComparisonResponse": {
+        "type": "object",
+        "required": ["databaseId", "entityType", "name", "instances", "diffs"],
+        "properties": {
+          "databaseId": {
+            "type": "integer",
+            "description": "PCD database ID"
+          },
+          "entityType": {
+            "type": "string",
+            "enum": [
+              "delayProfile",
+              "regularExpression",
+              "customFormat",
+              "qualityProfile",
+              "naming",
+              "mediaSettings",
+              "qualityDefinitions",
+              "lidarrMetadataProfile"
+            ],
+            "description": "Resolved config entity type"
+          },
+          "name": {
+            "type": "string",
+            "description": "Entity name compared across instances"
+          },
+          "instances": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ResolvedInstanceState"
+            },
+            "description": "Per-instance desired (and optionally live) state"
+          },
+          "diffs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["instanceId", "changes"],
+              "properties": {
+                "instanceId": {
+                  "type": "integer",
+                  "description": "Arr instance ID this diff row belongs to"
+                },
+                "changes": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/EntityChange"
+                  },
+                  "description": "Field-level changes relative to the first compatible\ninstance's desired payload.\n"
+                }
+              }
+            },
+            "description": "Pairwise diffs of each compatible instance's desired payload against\nthe first compatible instance (the baseline).\n"
+          }
+        }
+      },
+      "ResolvedLiveDiffResponse": {
+        "type": "object",
+        "required": ["databaseId", "entityType", "name", "instanceId", "arrType", "changes"],
+        "properties": {
+          "databaseId": {
+            "type": "integer",
+            "description": "PCD database ID"
+          },
+          "entityType": {
+            "type": "string",
+            "enum": [
+              "delayProfile",
+              "regularExpression",
+              "customFormat",
+              "qualityProfile",
+              "naming",
+              "mediaSettings",
+              "qualityDefinitions",
+              "lidarrMetadataProfile"
+            ],
+            "description": "Resolved config entity type"
+          },
+          "name": {
+            "type": "string",
+            "description": "Entity name"
+          },
+          "instanceId": {
+            "type": "integer",
+            "description": "Arr instance ID the live diff was computed against"
+          },
+          "arrType": {
+            "type": "string",
+            "enum": ["radarr", "sonarr", "lidarr"],
+            "description": "Arr instance family"
+          },
+          "changes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EntityChange"
+            },
+            "description": "Desired-vs-actual field changes; an empty array means the entity is in sync"
           }
         }
       }
