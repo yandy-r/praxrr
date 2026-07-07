@@ -79,6 +79,18 @@ export const NAV_REGISTRY: ArrCapabilityAwareNavItem[] = [
     hasChildren: false,
   },
   {
+    id: 'overview.parity_map',
+    label: 'Parity Map',
+    href: '/parity-map',
+    groupId: ensureGroupId('overview'),
+    order: 1,
+    arrScope: scopeAll,
+    mobilePriority: 'medium',
+    iconKey: 'LayoutGrid',
+    emoji: '🗺️',
+    hasChildren: false,
+  },
+  {
     id: 'apps.arrs',
     label: 'Arrs',
     href: '/arr',
