@@ -60,12 +60,12 @@ export class BaseArrClient extends BaseHttpClient {
   }
 
   /**
-   * Test connection to the arr instance
+   * Get system status from the arr instance
    * Calls /api/{version}/system/status endpoint
    * Note: This method has built-in retry logic (3 attempts by default)
-   * @returns true if connection successful, false otherwise
+   * @returns { appName, version } if successful, null on failure
    */
-  async testConnection(): Promise<boolean> {
+  async getSystemStatus(): Promise<{ appName: string; version: string } | null> {
     try {
       const status = await this.get<ArrSystemStatus>(`/api/${this.apiVersion}/system/status`);
 
@@ -78,7 +78,7 @@ export class BaseArrClient extends BaseHttpClient {
         },
       });
 
-      return true;
+      return { appName: status.appName, version: status.version };
     } catch (error) {
       // Only log after all retries are exhausted
       await logger.error(`Connection failed to ${this.baseUrl} after retries`, {
@@ -86,8 +86,16 @@ export class BaseArrClient extends BaseHttpClient {
         meta: error,
       });
 
-      return false;
+      return null;
     }
+  }
+
+  /**
+   * Test connection to the arr instance
+   * @returns true if connection successful, false otherwise
+   */
+  async testConnection(): Promise<boolean> {
+    return (await this.getSystemStatus()) !== null;
   }
 
   // =========================================================================

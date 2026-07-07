@@ -59,6 +59,10 @@ export class BaseHttpClient {
             headers,
             body: options?.body ? JSON.stringify(options.body) : undefined,
             signal: options?.signal ?? controller.signal,
+            // Never auto-follow redirects: a malicious/compromised target could
+            // redirect to an internal address, bypassing SSRF checks on the
+            // original URL.
+            redirect: 'manual',
           });
 
           clearTimeout(timeoutId);
