@@ -34,19 +34,19 @@ All three targets (Radarr, Sonarr, Lidarr) share the same .NET "Servarr" backend
 auth/status contract, but the **API version differs by app** — this is a real gotcha, not a
 theoretical one, and the codebase already encodes it correctly.
 
-| App    | API root  | Status endpoint         | Docs                           |
-| ------ | --------- | ----------------------- | ------------------------------ |
-| Radarr | `/api/v3` | `/api/v3/system/status` | https://radarr.video/docs/api/ |
-| Sonarr | `/api/v3` | `/api/v3/system/status` | https://sonarr.tv/docs/api/    |
-| Lidarr | `/api/v1` | `/api/v1/system/status` | https://lidarr.audio/docs/api/ |
+| App    | API root  | Status endpoint         | Docs                             |
+| ------ | --------- | ----------------------- | -------------------------------- |
+| Radarr | `/api/v3` | `/api/v3/system/status` | <https://radarr.video/docs/api/> |
+| Sonarr | `/api/v3` | `/api/v3/system/status` | <https://sonarr.tv/docs/api/>    |
+| Lidarr | `/api/v1` | `/api/v1/system/status` | <https://lidarr.audio/docs/api/> |
 
 Community/mirror docs (useful when official sites don't render full schemas in a fetch):
 
-- Sonarr wiki API page: https://github.com/Sonarr/Sonarr/wiki/API
-- Lidarr wiki API page: https://github.com/lidarr/Lidarr/wiki/API
-- Servarr Wiki (shared conventions, API key requirements): https://wiki.servarr.com/
-- Servarr Wiki — Radarr system/API key notes: https://wiki.servarr.com/radarr/system
-- Servarr Wiki — Lidarr system/API key notes: https://wiki.servarr.com/lidarr/system
+- Sonarr wiki API page: <https://github.com/Sonarr/Sonarr/wiki/API>
+- Lidarr wiki API page: <https://github.com/lidarr/Lidarr/wiki/API>
+- Servarr Wiki (shared conventions, API key requirements): <https://wiki.servarr.com/>
+- Servarr Wiki — Radarr system/API key notes: <https://wiki.servarr.com/radarr/system>
+- Servarr Wiki — Lidarr system/API key notes: <https://wiki.servarr.com/lidarr/system>
 
 **Auth mechanism (identical across all three apps):**
 
@@ -97,14 +97,14 @@ validation at nearly every step (Arr connectivity, PCD link, profile/format sele
 naturally onto SvelteKit's existing form-action model rather than a client-side component wizard.
 Client-only stepper libraries surveyed for reference (not recommended as dependencies):
 
-- https://github.com/uduma-sonia/svelte-wizard
-- https://madewithsvelte.com/svelte-steps
-- Svelte's own "multisteps forms" playground example: https://svelte.dev/playground/7b05d57dcdc04f49be72844e4b2825b3
+- <https://github.com/uduma-sonia/svelte-wizard>
+- <https://madewithsvelte.com/svelte-steps>
+- Svelte's own "multisteps forms" playground example: <https://svelte.dev/playground/7b05d57dcdc04f49be72844e4b2825b3>
 
 These are pure client-state wizards (no persistence across reload, no progressive enhancement) and
 don't fit a flow where each step has a real server-side side effect (saving an Arr instance,
 linking a database). The closer architectural reference is progressive-enhancement-based:
-https://github.com/stephane-vanraes/sveltekit-multistep-form (route-per-step + form actions;
+<https://github.com/stephane-vanraes/sveltekit-multistep-form> (route-per-step + form actions;
 returned 404 on direct fetch during this research pass — verify it still exists before treating it
 as a canonical source, but the pattern it demonstrates is the standard documented SvelteKit
 approach below regardless).
@@ -197,24 +197,24 @@ matches the linear, named-step nature of onboarding better than a percentage bar
 
 ## Onboarding Best-Practice References
 
-- **Home Assistant onboarding** — https://www.home-assistant.io/getting-started/onboarding/
+- **Home Assistant onboarding** — <https://www.home-assistant.io/getting-started/onboarding/>
   Linear 5-step flow (Preparing → Welcome/create-or-restore → account → integrations → Finish),
   entirely browser-based, ends by landing on the real working dashboard rather than a static
   "success" screen. Directly analogous to ending praxrr's wizard on a working dashboard/database
   view instead of a dead-end confirmation page.
   Related roadmap discussion arguing onboarding shouldn't be strictly one-and-done (users may need
   to revisit steps, e.g. add a second Arr instance later):
-  https://github.com/home-assistant/roadmap/issues/25
+  <https://github.com/home-assistant/roadmap/issues/25>
 - **Getting-started framing** (installation → onboarding → first real action) —
-  https://www.home-assistant.io/getting-started/
+  <https://www.home-assistant.io/getting-started/>
 - **Nielsen Norman Group — Smart-device onboarding guidelines** —
-  https://www.nngroup.com/articles/smart-device-onboarding/
+  <https://www.nngroup.com/articles/smart-device-onboarding/>
   Key takeaways applicable here: present the flow as a visual step wizard with clear, actionable
   steps; make failure messages specific and actionable (map directly onto the Servarr connectivity
   failure modes above — "wrong API key" vs "host unreachable" should be distinguishable messages,
   not a generic "connection failed").
 - **General onboarding-wizard pattern reference** —
-  https://userguiding.com/blog/what-is-an-onboarding-wizard-with-examples
+  <https://userguiding.com/blog/what-is-an-onboarding-wizard-with-examples>
 
 ## Accessibility (WAI-ARIA)
 
@@ -225,22 +225,22 @@ from adjacent patterns:
   change, such as move to next step in a wizard... it is often appropriate to move focus to the
   starting point for that action." On Next/Back, move focus to the new step's heading (use
   `tabindex="-1"` on an `<h2>` and `.focus()` it) rather than leaving focus on the button or losing
-  it to `<body>`. Source: https://www.w3.org/TR/2021/NOTE-wai-aria-practices-1.2-20211129/ and the
-  live APG: https://wai-aria-practices.netlify.app/aria-practices/
+  it to `<body>`. Source: <https://www.w3.org/TR/2021/NOTE-wai-aria-practices-1.2-20211129/> and the
+  live APG: <https://wai-aria-practices.netlify.app/aria-practices/>
 - **Progress indicator semantics** — do NOT use the `meter` role for step progress; APG explicitly
   states meter "should not be used to indicate progress, such as loading or percent completion of a
   task." Use `progressbar` only if rendering a percentage; for a named-step list, use a plain list
   with `aria-current="step"` on the active item instead. Meter pattern reference:
-  https://www.w3.org/WAI/ARIA/apg/patterns/meter/
+  <https://www.w3.org/WAI/ARIA/apg/patterns/meter/>
 - **If any step is rendered as a modal/dialog** (not recommended here — full-page steps are
   simpler and match the existing `auth/setup` precedent), the Dialog (Modal) Pattern's focus-trap
-  and initial-focus rules apply: https://www.w3.org/WAI/ARIA/apg/patterns/dialog-modal/
+  and initial-focus rules apply: <https://www.w3.org/WAI/ARIA/apg/patterns/dialog-modal/>
 - **General focus/keyboard-nav guidance** for the connect/select steps (form fields, checkboxes for
   profile/format selection): logical tab order, visible focus indicators meeting WCAG contrast,
-  no keyboard traps — https://developer.mozilla.org/en-US/docs/Learn_web_development/Core/Accessibility/WAI-ARIA_basics
+  no keyboard traps — <https://developer.mozilla.org/en-US/docs/Learn_web_development/Core/Accessibility/WAI-ARIA_basics>
 - Cross-screen-reader testing caveat: dialog/alertdialog ARIA roles behave inconsistently between
   NVDA and VoiceOver even when APG is followed exactly — another reason to prefer full-page steps
-  over modal steps for this flow: https://www.deque.com/blog/aria-modal-alert-dialogs-a11y-support-series-part-2/
+  over modal steps for this flow: <https://www.deque.com/blog/aria-modal-alert-dialogs-a11y-support-series-part-2/>
 
 ## Constraints / Gotchas Specific to This Codebase
 

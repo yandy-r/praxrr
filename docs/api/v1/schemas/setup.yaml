@@ -1,0 +1,126 @@
+WizardStep:
+  type: string
+  enum:
+    - welcome
+    - connect-arr
+    - link-database
+    - select-profiles
+    - preview-sync
+    - done
+  description: Ordered setup wizard step
+
+WizardState:
+  type: object
+  required:
+    - completed
+    - dismissedAt
+    - currentStep
+  properties:
+    completed:
+      type: boolean
+      description: Whether the wizard has been marked completed
+    dismissedAt:
+      type: string
+      format: date-time
+      nullable: true
+      description: Timestamp the wizard was dismissed, or null if never dismissed
+    currentStep:
+      $ref: '#/WizardStep'
+
+SetupStateResponse:
+  type: object
+  required:
+    - wizard
+    - prerequisites
+    - defaultDatabase
+  properties:
+    wizard:
+      $ref: '#/WizardState'
+    prerequisites:
+      type: object
+      required:
+        - hasArrInstance
+        - hasDatabase
+        - hasProfileSelections
+      properties:
+        hasArrInstance:
+          type: boolean
+          description: Whether at least one Arr instance has been connected
+        hasDatabase:
+          type: boolean
+          description: Whether at least one PCD database has been linked
+        hasProfileSelections:
+          type: boolean
+          description: Whether at least one instance has quality profile selections synced
+      description: Setup prerequisite progress derived from real entity state
+    defaultDatabase:
+      type: object
+      required:
+        - configured
+        - url
+        - alreadyLinked
+      properties:
+        configured:
+          type: boolean
+          description: Whether PRAXRR_DEFAULT_DB_URL resolves to a non-empty value
+        url:
+          type: string
+          nullable: true
+          description: Resolved default database URL, or null when not configured
+        alreadyLinked:
+          type: boolean
+          description: Whether any PCD database is already linked
+      description: Default database auto-link info used to render the link-database step
+
+SetupStatePatchRequest:
+  type: object
+  required:
+    - currentStep
+  properties:
+    currentStep:
+      $ref: '#/WizardStep'
+  description: Advance the wizard to the given step
+
+TestConnectionRequest:
+  type: object
+  required:
+    - type
+    - url
+    - apiKey
+  properties:
+    type:
+      type: string
+      enum:
+        - radarr
+        - sonarr
+        - lidarr
+      description: Target Arr application type
+    url:
+      type: string
+      description: Arr base URL
+    apiKey:
+      type: string
+      description: Arr API key
+
+TestConnectionResponse:
+  type: object
+  required:
+    - success
+  properties:
+    success:
+      type: boolean
+    appName:
+      type: string
+      description: Arr application name, present on success
+    version:
+      type: string
+      description: Arr application version, present on success
+    reason:
+      type: string
+      enum:
+        - unreachable
+        - unauthorized
+        - invalid_response
+        - timeout
+        - rate_limited
+      description: Sanitized failure reason, present on failure
