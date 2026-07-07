@@ -41,9 +41,9 @@ The best next order is:
 
 Phase 1 safety work from the research backlog is complete: Sync Preview/Dry-Run, API Key Masking,
 Encrypted API Key Storage, PCD State Snapshots, Progressive Disclosure rollout, Progressive Complexity
-Architecture (#29, #203), Score Simulator (phases 1–3), TRaSH Guide Sync PR-122 hardening (#125, #126,
-
-# 194), and docs infrastructure (#38). The open roadmap should not restart those completed issues.
+Architecture (#29, #203), Score Simulator (phases 1–3), TRaSH Guide Sync PR-122 hardening
+(#125, #126, #194), and docs infrastructure (#38). The open roadmap should not restart those
+completed issues.
 
 ## Recently Shipped
 
