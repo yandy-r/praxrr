@@ -32,6 +32,8 @@ tags:
     description: Per-section complexity tier storage for progressive complexity
   - name: Setup
     description: First-run setup wizard state and Arr connection testing
+  - name: compatibility
+    description: Cross-Arr compatibility parity map and semantic difference catalog
 
 paths:
   /health:
@@ -610,6 +612,8 @@ paths:
     $ref: './paths/setup.yaml#/complete'
   /setup/skip:
     $ref: './paths/setup.yaml#/skip'
+  /compatibility/parity:
+    $ref: './paths/compatibility.yaml#/parity'
 
 components:
   schemas:
@@ -1320,3 +1324,10 @@ components:
       $ref: './schemas/setup.yaml#/TestConnectionRequest'
     TestConnectionResponse:
       $ref: './schemas/setup.yaml#/TestConnectionResponse'
+    # Compatibility
+    ParityMapResponse:
+      $ref: './schemas/compatibility.yaml#/ParityMapResponse'
+    ArrSemanticDifference:
+      $ref: './schemas/compatibility.yaml#/ArrSemanticDifference'
+    ProfileCompatibility:
+      $ref: './schemas/compatibility.yaml#/ProfileCompatibility'
