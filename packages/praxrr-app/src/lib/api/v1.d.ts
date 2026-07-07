@@ -2094,10 +2094,11 @@ export interface components {
       /** @description Arr instance name */
       instanceName: string;
       /**
-       * @description Arr instance family
-       * @enum {string}
+       * @description Arr instance family, or null when the instance's own `arr_type` value is
+       *     unrecognized (the `incompatible` error case).
+       * @enum {string|null}
        */
-      arrType: 'radarr' | 'sonarr' | 'lidarr';
+      arrType: 'radarr' | 'sonarr' | 'lidarr' | null;
       /** @description Whether this entity type is supported for the instance's arr_type */
       compatible: boolean;
       /** @description Whether the entity is present in this instance's desired payload */
@@ -2139,6 +2140,8 @@ export interface components {
        *     enum: `incompatible` (unrecognized arr_type), `rate-limited`
        *     (per-instance live fetch throttled), and `error` (unexpected
        *     failure, detail logged not surfaced) are comparison-specific.
+       *     `not_configured` means the section has no sync configuration on the
+       *     instance at all.
        * @enum {string|null}
        */
       error?:
@@ -2148,6 +2151,7 @@ export interface components {
         | 'invalid_response'
         | 'unsupported'
         | 'not_found'
+        | 'not_configured'
         | 'incompatible'
         | 'rate-limited'
         | 'error'

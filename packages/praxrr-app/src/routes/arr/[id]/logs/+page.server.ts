@@ -22,9 +22,10 @@ export const load: ServerLoad = async ({ params, url }) => {
   const pageSize = parseInt(url.searchParams.get('pageSize') || '50', 10);
   const level = url.searchParams.get('level') || undefined;
 
-  const client = await getArrInstanceClient(instance.type as ArrType, instance.id, instance.url);
-
+  let client;
   try {
+    client = await getArrInstanceClient(instance.type as ArrType, instance.id, instance.url);
+
     const logs = await client.getLogs({
       page,
       pageSize,
@@ -45,6 +46,8 @@ export const load: ServerLoad = async ({ params, url }) => {
   } catch (err) {
     error(500, `Failed to fetch logs: ${err instanceof Error ? err.message : 'Unknown error'}`);
   } finally {
-    client.close();
+    // `client` may be unset if `getArrInstanceClient` itself threw (e.g. an SSRF-guard
+    // rejection from `assertSafeArrUrl`) before ever constructing a client to close.
+    client?.close();
   }
 };

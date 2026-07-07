@@ -1,43 +1,35 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
-  import { browser } from '$app/environment';
   import { CheckCircle2, RefreshCw, XCircle } from 'lucide-svelte';
   import type { components } from '$api/v1.d.ts';
   import Badge from '$ui/badge/Badge.svelte';
+  import { FIELD_META, formatFieldValue } from '$ui/resolved/fieldChangeDisplay.ts';
 
   type ResolvedEntityType = components['schemas']['ResolvedEntityState']['entityType'];
   type ArrAppType = components['schemas']['ResolvedInstanceState']['arrType'];
   type ResolvedLiveDiffResponse = components['schemas']['ResolvedLiveDiffResponse'];
   type SyncPreviewAction = components['schemas']['SyncPreviewAction'];
-  type FieldChangeType = components['schemas']['SyncPreviewFieldChangeType'];
   type ErrorResponse = components['schemas']['ErrorResponse'];
+
+  // Instance options are always a concrete Arr app -- `arrType` on this wire type also
+  // covers the compare response's `null` (unrecognized arr_type) case, which never
+  // applies to the instance list built server-side by `+page.server.ts`.
+  interface InstanceOption {
+    id: number;
+    name: string;
+    type: NonNullable<ArrAppType>;
+  }
 
   export let databaseId: number;
   export let entityType: ResolvedEntityType;
   export let arrType: ArrAppType | undefined = undefined;
   export let entityName: string | null;
-
-  interface InstanceOption {
-    id: number;
-    name: string;
-    type: ArrAppType;
-  }
-
-  interface InstancesListResponse {
-    instances: InstanceOption[];
-  }
+  export let instances: InstanceOption[] = [];
 
   interface CheckContext {
     instanceId: number;
     entityType: ResolvedEntityType;
     entityName: string;
   }
-
-  const FIELD_META: Record<FieldChangeType, { glyph: string; label: string; textClass: string }> = {
-    added: { glyph: '+', label: 'Added', textClass: 'text-emerald-700 dark:text-emerald-300' },
-    changed: { glyph: '~', label: 'Changed', textClass: 'text-amber-700 dark:text-amber-300' },
-    removed: { glyph: '-', label: 'Removed', textClass: 'text-red-700 dark:text-red-300' },
-  };
 
   type CreateOrDeleteAction = Extract<SyncPreviewAction, 'create' | 'delete'>;
 
@@ -61,10 +53,6 @@
     },
   };
 
-  let instances: InstanceOption[] = [];
-  let instancesLoading = false;
-  let instancesError: string | null = null;
-
   let selectedInstanceId: number | null = null;
 
   let checking = false;
@@ -72,6 +60,7 @@
   let rateLimited = false;
   let result: ResolvedLiveDiffResponse | null = null;
   let lastCheckContext: CheckContext | null = null;
+  let checkRequestId = 0;
 
   $: filteredInstances = arrType ? instances.filter((instance) => instance.type === arrType) : instances;
   $: if (selectedInstanceId !== null && !filteredInstances.some((instance) => instance.id === selectedInstanceId)) {
@@ -101,36 +90,17 @@
       : null;
   $: showFieldTable = changeRow !== null && !isInSync && createOrDeleteMeta === null;
 
-  async function loadInstances() {
-    instancesLoading = true;
-    instancesError = null;
-
-    try {
-      const response = await fetch(`/resolved-config/${databaseId}/instances`);
-
-      if (!response.ok) {
-        const body = (await response.json().catch(() => null)) as { error?: string } | null;
-        instancesError = body?.error ?? `Failed to load Arr instances (HTTP ${response.status})`;
-        instances = [];
-        return;
-      }
-
-      const body = (await response.json()) as InstancesListResponse;
-      instances = body.instances;
-    } catch (err) {
-      instancesError = err instanceof Error ? err.message : 'Failed to load Arr instances';
-      instances = [];
-    } finally {
-      instancesLoading = false;
-    }
-  }
-
   async function runCheck() {
     if (entityName === null || selectedInstanceId === null || checking) return;
 
     const instanceId = selectedInstanceId;
     const checkEntityType = entityType;
     const checkEntityName = entityName;
+    // Generation guard: if a newer runCheck starts before this one's awaits resolve, this
+    // call's `requestId` no longer matches `checkRequestId` and its result/context
+    // assignment below is skipped -- an older, slower response can never clobber a newer
+    // one's state.
+    const requestId = ++checkRequestId;
 
     checking = true;
     result = null;
@@ -141,20 +111,27 @@
       const response = await fetch(
         `/api/v1/pcd/${databaseId}/resolved/${checkEntityType}/${encodeURIComponent(checkEntityName)}/diff?instanceId=${instanceId}`
       );
+      if (requestId !== checkRequestId) return;
 
       if (response.status === 429) {
         rateLimited = true;
       } else if (!response.ok) {
         const body = (await response.json().catch(() => null)) as ErrorResponse | null;
+        if (requestId !== checkRequestId) return;
         checkError = body?.error ?? `Failed to check live diff (HTTP ${response.status})`;
       } else {
-        result = (await response.json()) as ResolvedLiveDiffResponse;
+        const nextResult = (await response.json()) as ResolvedLiveDiffResponse;
+        if (requestId !== checkRequestId) return;
+        result = nextResult;
       }
     } catch (err) {
+      if (requestId !== checkRequestId) return;
       checkError = err instanceof Error ? err.message : 'Failed to check live diff';
     } finally {
-      lastCheckContext = { instanceId, entityType: checkEntityType, entityName: checkEntityName };
-      checking = false;
+      if (requestId === checkRequestId) {
+        lastCheckContext = { instanceId, entityType: checkEntityType, entityName: checkEntityName };
+        checking = false;
+      }
     }
   }
 
@@ -162,19 +139,6 @@
     const value = (event.currentTarget as HTMLSelectElement).value;
     selectedInstanceId = value ? Number.parseInt(value, 10) : null;
   }
-
-  function formatFieldValue(value: unknown): string {
-    if (value === undefined) return 'undefined';
-    if (value === null) return 'null';
-    if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
-      return String(value);
-    }
-    return JSON.stringify(value, null, 2);
-  }
-
-  onMount(() => {
-    if (browser) void loadInstances();
-  });
 </script>
 
 <div class="space-y-4">
@@ -184,7 +148,7 @@
       <select
         class="min-w-56 rounded-lg border border-neutral-300 bg-white px-3 py-1.5 text-sm text-neutral-900 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
         value={selectedInstanceId ?? ''}
-        disabled={instancesLoading || filteredInstances.length === 0}
+        disabled={filteredInstances.length === 0}
         on:change={handleInstanceChange}
       >
         <option value="" disabled>Select an instance…</option>
@@ -214,17 +178,6 @@
       class="rounded-lg border border-dashed border-neutral-300 p-6 text-center text-sm text-neutral-500 dark:border-neutral-700 dark:text-neutral-400"
     >
       Select an entity to check it against a live Arr instance.
-    </div>
-  {:else if instancesLoading}
-    <div class="animate-pulse space-y-2">
-      <div class="h-4 w-1/3 rounded bg-neutral-200 dark:bg-neutral-700"></div>
-      <div class="h-4 w-1/2 rounded bg-neutral-200 dark:bg-neutral-700"></div>
-    </div>
-  {:else if instancesError}
-    <div
-      class="rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-900 dark:border-red-900/60 dark:bg-red-900/20 dark:text-red-200"
-    >
-      {instancesError}
     </div>
   {:else if filteredInstances.length === 0}
     <div

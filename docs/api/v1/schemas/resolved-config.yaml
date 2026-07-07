@@ -142,11 +142,14 @@ ResolvedInstanceState:
       description: Arr instance name
     arrType:
       type: string
+      nullable: true
       enum:
         - radarr
         - sonarr
         - lidarr
-      description: Arr instance family
+      description: |
+        Arr instance family, or null when the instance's own `arr_type` value is
+        unrecognized (the `incompatible` error case).
     compatible:
       type: boolean
       description: Whether this entity type is supported for the instance's arr_type
@@ -191,6 +194,7 @@ ResolvedInstanceState:
         - invalid_response
         - unsupported
         - not_found
+        - not_configured
         - incompatible
         - rate-limited
         - error
@@ -201,6 +205,8 @@ ResolvedInstanceState:
         enum: `incompatible` (unrecognized arr_type), `rate-limited`
         (per-instance live fetch throttled), and `error` (unexpected
         failure, detail logged not surfaced) are comparison-specific.
+        `not_configured` means the section has no sync configuration on the
+        instance at all.
 
 CrossInstanceComparisonResponse:
   type: object

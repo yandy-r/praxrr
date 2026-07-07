@@ -24,7 +24,7 @@ import type { FieldChange } from '$sync/preview/types.ts';
 import { pcdOpHistoryQueries } from '$db/queries/pcdOpHistory.ts';
 import { getCache } from '../database/registry.ts';
 import { withBaseOnlyCache } from './layers.ts';
-import { isResolvedConfigValidationError, readResolvedEntity } from './readers.ts';
+import { isResolvedEntityNotFoundError, ResolvedEntityNotFoundError, readResolvedEntity } from './readers.ts';
 import type { PCDCache } from '../database/cache.ts';
 import type { ResolvedEntityPayload, ResolvedEntityType, ResolvedLayer } from './types.ts';
 
@@ -206,18 +206,56 @@ function parseOpMetadata(raw: string | null): ParsedOpMetadata | null {
   }
 }
 
+/** `(entityType, arrType, name) -> hasPendingConflict` lookup returned by `buildPendingConflictIndex`. */
+export type PendingConflictLookup = (
+  entityType: ResolvedEntityType,
+  arrType: ArrAppType | undefined,
+  name: string
+) => boolean;
+
+/**
+ * Runs `pcdOpHistoryQueries.listLatestConflictsByDatabase(databaseId)` ONCE and returns a
+ * lookup closure over the parsed result, instead of re-running that query on every
+ * `computeHasPendingConflict` call (an O(n) query pattern when checking many entities for
+ * the same `databaseId`, e.g. the list endpoint's per-entity loop). Callers that need to
+ * check many `(entityType, arrType, name)` combinations for the same `databaseId` should
+ * call this once and reuse the returned closure.
+ *
+ * Preserves `computeHasPendingConflict`'s exact matching semantics (Business Rule 6): an
+ * unmapped `(entityType, arrType)` combination or unparsable op metadata resolves to
+ * `false`; a match requires `metadata.entity === resolveOpMetadataEntity(entityType,
+ * arrType)` AND `metadata.name === name` on at least one `conflicted`/`conflicted_pending`
+ * op, per `draftChanges.ts`'s correlation precedent.
+ */
+export function buildPendingConflictIndex(databaseId: number): PendingConflictLookup {
+  const conflicts = pcdOpHistoryQueries.listLatestConflictsByDatabase(databaseId);
+  const parsedMetadata: ParsedOpMetadata[] = [];
+  for (const conflict of conflicts) {
+    const metadata = parseOpMetadata(conflict.op.metadata);
+    if (metadata) {
+      parsedMetadata.push(metadata);
+    }
+  }
+
+  return (entityType, arrType, name) => {
+    const metadataEntity = resolveOpMetadataEntity(entityType, arrType);
+    if (!metadataEntity) return false;
+
+    return parsedMetadata.some((metadata) => metadata.entity === metadataEntity && metadata.name === name);
+  };
+}
+
 /**
  * Business Rule 6: an entity with a pending value-guard conflict must never present an
- * unambiguous resolved value. Queries `pcdOpHistoryQueries.listLatestConflictsByDatabase`
- * once and flags this entity when any `conflicted`/`conflicted_pending` op's metadata
- * correlates to it (by `entity` + `name`, per `draftChanges.ts`'s precedent). Unmapped
- * `(entityType, arrType)` combinations or unparsable metadata defensively resolve to
- * `false` rather than throwing -- this is an annotation, not a validation gate.
+ * unambiguous resolved value. Thin per-call wrapper around `buildPendingConflictIndex`
+ * (see its doc for matching semantics) -- callers checking a SINGLE entity (e.g.
+ * `resolveLayerState`) use this; callers checking MANY entities for the same
+ * `databaseId` (e.g. a list endpoint) should call `buildPendingConflictIndex` once
+ * instead, to avoid re-running the underlying query per entity.
  *
- * Exported (in addition to being used internally by `resolveLayerState`) so the list
- * endpoint (`routes/.../resolved/[entityType]/+server.ts`) can compute this per-entity
- * inside an already-open `withBaseOnlyCache` scope without re-running `withBaseOnlyCache`
- * once per entity (which `resolveLayerState('base'|'user')` would otherwise force).
+ * Exported (in addition to being used internally by `resolveLayerState`) so the named
+ * endpoint (`routes/.../resolved/[entityType]/[name]/+server.ts`) can compute this
+ * directly.
  */
 export function computeHasPendingConflict(
   databaseId: number,
@@ -225,19 +263,7 @@ export function computeHasPendingConflict(
   arrType: ArrAppType | undefined,
   name: string
 ): boolean {
-  const metadataEntity = resolveOpMetadataEntity(entityType, arrType);
-  if (!metadataEntity) return false;
-
-  const conflicts = pcdOpHistoryQueries.listLatestConflictsByDatabase(databaseId);
-  for (const conflict of conflicts) {
-    const metadata = parseOpMetadata(conflict.op.metadata);
-    if (!metadata) continue;
-    if (metadata.entity === metadataEntity && metadata.name === name) {
-      return true;
-    }
-  }
-
-  return false;
+  return buildPendingConflictIndex(databaseId)(entityType, arrType, name);
 }
 
 // ============================================================================
@@ -277,13 +303,15 @@ export interface ResolvedLayerUserState {
 export type ResolvedLayerState = ResolvedLayerResolvedState | ResolvedLayerBaseState | ResolvedLayerUserState;
 
 /**
- * Reads a resolved-config entity by name via `cache`, returning `null` on a plain
- * not-found miss (propagated unwrapped by `readResolvedEntity`/`serialize.ts`) while
- * still propagating `ResolvedConfigValidationError` (bad/missing arrType, unmapped
- * entityType) -- that is always a caller-input problem, regardless of which layer was
- * requested.
+ * Reads a resolved-config entity by name via `cache`, returning `null` ONLY on a typed
+ * `ResolvedEntityNotFoundError` miss (`readResolvedEntity`'s `invokeReader` rewraps a
+ * `serialize.ts` by-name miss into this type -- see `readers.ts`). Every OTHER error --
+ * `ResolvedConfigValidationError` (bad/missing arrType, unmapped entityType) as well as
+ * any other failure (e.g. a genuine PCD cache/schema failure) -- is rethrown unchanged.
+ * Swallowing anything broader than `ResolvedEntityNotFoundError` here would mask a real
+ * cache failure as "entity absent", which is the bug this narrow catch fixes.
  */
-async function readEntityOrNull(
+export async function readEntityOrNull(
   cache: PCDCache,
   entityType: ResolvedEntityType,
   arrType: ArrAppType | undefined,
@@ -292,10 +320,10 @@ async function readEntityOrNull(
   try {
     return await readResolvedEntity(cache, entityType, arrType, name);
   } catch (error) {
-    if (isResolvedConfigValidationError(error)) {
-      throw error;
+    if (isResolvedEntityNotFoundError(error)) {
+      return null;
     }
-    return null;
+    throw error;
   }
 }
 
@@ -347,7 +375,7 @@ export async function resolveLayerState(input: ResolveLayerStateInput): Promise<
     const baseEntity = await readEntityOrNull(baseCache, entityType, arrType, name);
 
     if (resolvedEntity === null && baseEntity === null) {
-      throw new Error(`${entityType} "${name}" not found`);
+      throw new ResolvedEntityNotFoundError(entityType, arrType, name);
     }
 
     return {

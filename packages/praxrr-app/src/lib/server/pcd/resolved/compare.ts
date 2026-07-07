@@ -23,9 +23,10 @@
  *    imported from `liveDiff.ts` (per the parallel-plan's task-independence mandate). It
  *    is a superset of the already-authored OpenAPI `ResolvedInstanceState.error` enum
  *    (`unreachable|timeout|unauthorized|invalid_response|unsupported|not_found`) plus
- *    three comparison-specific values this module also needs
- *    (`incompatible` -- unrecognized `arr_type`; `rate-limited` -- per-instance live
- *    fetch throttled; `error` -- unexpected failure, detail logged not surfaced). The
+ *    `not_configured` (mirrors `liveDiff.ts`'s `LiveDiffReason` -- a live section with no
+ *    sync configuration on the instance) and three comparison-specific values this module
+ *    also needs (`incompatible` -- unrecognized `arr_type`; `rate-limited` -- per-instance
+ *    live fetch throttled; `error` -- unexpected failure, detail logged not surfaced). The
  *    route layer (Task 3.3) owns reconciling this superset with the wire enum.
  * 3. `actual` on a compatible+present instance is the located `EntityChange` returned by
  *    `computeLiveDiff` (its `.fields` is already the live-vs-desired diff) -- NOT the raw
@@ -74,6 +75,7 @@ const SOURCE = 'ResolvedConfigCompare';
 export type CompareReason =
   | 'incompatible'
   | 'unsupported'
+  | 'not_configured'
   | 'rate-limited'
   | 'unreachable'
   | 'timeout'
@@ -82,11 +84,20 @@ export type CompareReason =
   | 'error'
   | 'not_found';
 
-/** Per-instance desired (and optionally live) state -- maps to `ResolvedInstanceState`. */
+/**
+ * Per-instance desired (and optionally live) state -- maps to `ResolvedInstanceState`.
+ *
+ * `arrType` is narrowed to `ArrAppType | null`: `null` only for the `incompatible` case
+ * (an unrecognized `arr_type` value on the instance row), with the original raw value
+ * preserved separately on `rawArrType` for logging/diagnostics -- the wire schema's
+ * `arrType` is a closed `radarr|sonarr|lidarr` enum, so an unrecognized value must never
+ * flow through as a plain `string`.
+ */
 export interface CompareInstanceResult {
   readonly instanceId: number;
   readonly instanceName: string;
-  readonly arrType: string;
+  readonly arrType: ArrAppType | null;
+  readonly rawArrType?: string;
   readonly compatible: boolean;
   readonly present: boolean;
   readonly desired: ResolvedEntityPayload | null;
@@ -191,6 +202,8 @@ function mapLiveDiffReasonToCompareReason(reason: LiveDiffReason): CompareReason
       return 'unsupported';
     case 'not_found':
       return 'not_found';
+    case 'not_configured':
+      return 'not_configured';
     case 'error':
       return 'error';
     default: {
@@ -198,6 +211,29 @@ function mapLiveDiffReasonToCompareReason(reason: LiveDiffReason): CompareReason
       return exhaustiveCheck;
     }
   }
+}
+
+// ============================================================================
+// RESULT BUILDERS
+// ============================================================================
+
+/**
+ * Shared `compatible: false, error: 'unsupported'` result shape -- both the
+ * reader/sync-section compatibility gate and the `'validation-error'` desired-read
+ * outcome push this exact shape (see the two call sites in `compareAcrossInstances`);
+ * factored out to avoid the duplicate literal.
+ */
+function buildUnsupportedInstanceResult(instance: ArrInstance, arrType: ArrAppType): CompareInstanceResult {
+  return {
+    instanceId: instance.id,
+    instanceName: instance.name,
+    arrType,
+    compatible: false,
+    present: false,
+    desired: null,
+    actual: null,
+    error: 'unsupported',
+  };
 }
 
 // ============================================================================
@@ -259,7 +295,8 @@ export async function compareAcrossInstances(
       instanceResults.push({
         instanceId: instance.id,
         instanceName: instance.name,
-        arrType: rawArrType,
+        arrType: null,
+        rawArrType,
         compatible: false,
         present: false,
         desired: null,
@@ -272,32 +309,14 @@ export async function compareAcrossInstances(
     const arrType = rawArrType;
 
     if (!isEntityCompatibleWithArrType(entityType, arrType, isArrAgnostic)) {
-      instanceResults.push({
-        instanceId: instance.id,
-        instanceName: instance.name,
-        arrType,
-        compatible: false,
-        present: false,
-        desired: null,
-        actual: null,
-        error: 'unsupported',
-      });
+      instanceResults.push(buildUnsupportedInstanceResult(instance, arrType));
       continue;
     }
 
     const desired = await getDesiredForArrType(arrType);
 
     if (desired === 'validation-error') {
-      instanceResults.push({
-        instanceId: instance.id,
-        instanceName: instance.name,
-        arrType,
-        compatible: false,
-        present: false,
-        desired: null,
-        actual: null,
-        error: 'unsupported',
-      });
+      instanceResults.push(buildUnsupportedInstanceResult(instance, arrType));
       continue;
     }
 

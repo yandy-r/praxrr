@@ -9,7 +9,7 @@
 // base/user layers via `pcdOpsQueries.listByDatabaseAndOrigin` (an object method, patchable).
 // `pcdOpsQueries.update` and `pcdOpHistoryQueries.create` are spied on to assert zero writes.
 
-import { assert, assertEquals } from '@std/assert';
+import { assert, assertEquals, assertRejects } from '@std/assert';
 import { PCDCache } from '$pcd/index.ts';
 import { pcdOpsQueries } from '$db/queries/pcdOps.ts';
 import type { ListPcdOpsOptions, PcdOp, PcdOpOrigin, UpdatePcdOpInput } from '$db/queries/pcdOps.ts';
@@ -121,6 +121,36 @@ async function createFixturePcdDir(): Promise<string> {
   );
 
   // Tweaks layer: file-based, applied after the base (DB) layer, before the user (DB) layer.
+  await Deno.writeTextFile(
+    `${pcdPath}/tweaks/3.tweak.sql`,
+    "INSERT INTO items (name, layer) VALUES ('tweaks-item', 'tweaks');"
+  );
+
+  return pcdPath;
+}
+
+/**
+ * Same layout as `createFixturePcdDir`, plus a SECOND schema op that is deliberately
+ * invalid SQL. Schema ops run first (before base/tweaks/user), so a failure here must
+ * abort `buildReadOnly` before any later-layer op ever executes -- warn-skipping it (the
+ * base/tweaks/user behavior) would let every later op silently run against an
+ * incomplete schema.
+ */
+async function createFixturePcdDirWithBadSchemaOp(): Promise<string> {
+  const pcdPath = await Deno.makeTempDir({ prefix: 'pcd-build-read-only-bad-schema-' });
+  await Deno.mkdir(`${pcdPath}/deps/schema/ops`, { recursive: true });
+  await Deno.mkdir(`${pcdPath}/tweaks`, { recursive: true });
+
+  await Deno.writeTextFile(
+    `${pcdPath}/deps/schema/ops/0.schema.sql`,
+    `CREATE TABLE items (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  layer TEXT NOT NULL
+);`
+  );
+  await Deno.writeTextFile(`${pcdPath}/deps/schema/ops/1.schema-bad.sql`, 'CREATE TABLE this is not valid sql (');
+
   await Deno.writeTextFile(
     `${pcdPath}/tweaks/3.tweak.sql`,
     "INSERT INTO items (name, layer) VALUES ('tweaks-item', 'tweaks');"
@@ -252,3 +282,43 @@ Deno.test('PCDCache.buildReadOnly result supports close(), resetting isBuilt() t
     await fixture.cleanup();
   }
 });
+
+// ============================================================================
+// SCHEMA-LAYER FAILURE -- FAIL-FAST, NO CASCADE (CONFIRMED fix)
+// ============================================================================
+
+Deno.test(
+  'PCDCache.buildReadOnly throws when a schema-layer op fails to apply, instead of warn-skipping and cascading',
+  async () => {
+    const restores: Restores = [];
+    const warnMessages: string[] = [];
+    patchLoggerForTest(restores, (message) => warnMessages.push(message));
+    patchTarget(
+      pcdOpsQueries,
+      'listByDatabaseAndOrigin',
+      stubListByDatabaseAndOrigin as typeof pcdOpsQueries.listByDatabaseAndOrigin,
+      restores
+    );
+
+    const pcdPath = await createFixturePcdDirWithBadSchemaOp();
+    const cache = new PCDCache(pcdPath, DATABASE_ID);
+
+    try {
+      await assertRejects(
+        () => cache.buildReadOnly({ layers: new Set(['schema', 'base', 'tweaks']) }),
+        Error,
+        'schema op failed to apply'
+      );
+
+      assertEquals(cache.isBuilt(), false, 'a thrown schema op must never leave the cache marked built');
+      assert(
+        warnMessages.every((message) => !message.includes('skipping op')),
+        'a failed schema op must throw, not be warn-skipped like base/tweaks/user ops'
+      );
+    } finally {
+      cache.close();
+      await Deno.remove(pcdPath, { recursive: true });
+      restores.reverse().forEach((restore) => restore());
+    }
+  }
+);

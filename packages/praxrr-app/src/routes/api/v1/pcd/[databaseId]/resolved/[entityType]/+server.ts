@@ -2,96 +2,27 @@ import { json } from '@sveltejs/kit';
 import type { RequestHandler } from '@sveltejs/kit';
 import type { components } from '$api/v1.d.ts';
 import {
-  ARR_AGNOSTIC_READERS,
+  buildPendingConflictIndex,
   computeUserOverrides,
-  isResolvedConfigValidationError,
   listResolvedEntityNames,
   pcdManager,
-  PER_ARR_READERS,
+  readEntityOrNull,
   readResolvedEntity,
   withBaseOnlyCache,
 } from '$pcd/index.ts';
-import type { PCDCache, ResolvedEntityPayload, ResolvedEntityType } from '$pcd/index.ts';
-// Not re-exported via `$pcd/index.ts` -- imported directly from its owning module (an
-// established pattern in this codebase, see e.g. `tests/pcd/resolved/layerDiff.test.ts`).
-// `resolveLayerState` itself is not used here: it would rebuild the ephemeral base-only
-// cache once per entity in this loop, which the list endpoint must not do (see the
-// layer=base/user branches below, which build it once via `withBaseOnlyCache`).
-import { computeHasPendingConflict } from '$pcd/resolved/layerDiff.ts';
 import { isArrAppType } from '$shared/arr/capabilities.ts';
 import type { ArrAppType } from '$shared/pcd/types.ts';
-import type { FieldChange } from '$sync/preview/types.ts';
-import { logger } from '$logger/logger.ts';
+import {
+  isKnownResolvedEntityType,
+  mapResolvedErrorToResponse,
+  sanitizeBigInts,
+  toWireOverrides,
+  toWirePayload,
+} from '../shared.ts';
 
 type ResolvedEntityListResponse = components['schemas']['ResolvedEntityListResponse'];
 type ResolvedEntityState = components['schemas']['ResolvedEntityState'];
 type ErrorResponse = components['schemas']['ErrorResponse'];
-
-// readers.ts is the single source of truth for which entity types exist -- derive the
-// known-entityType set from its dispatch tables instead of re-declaring the union here.
-const RESOLVED_ENTITY_TYPES: ReadonlySet<string> = new Set<string>([
-  ...Object.keys(ARR_AGNOSTIC_READERS),
-  ...Object.keys(PER_ARR_READERS),
-]);
-
-function isKnownResolvedEntityType(value: string): value is ResolvedEntityType {
-  return RESOLVED_ENTITY_TYPES.has(value);
-}
-
-/**
- * `PortableCustomFormat.conditions` is an intentionally loosely-typed "shape varies by
- * condition type" field in the contract (see docs/api/v1/schemas/pcd.yaml); the
- * generated `{ [key: string]: unknown }` item shape has no structural relationship to
- * the internal `ConditionData` interface (it declares no index signature), even though
- * the two are identical once serialized to JSON. Narrow, single-purpose cast at the
- * wire boundary -- every other field on `ResolvedEntityState` stays `satisfies`-checked.
- */
-function toWirePayload(payload: ResolvedEntityPayload): ResolvedEntityState['entity'] {
-  return payload as unknown as ResolvedEntityState['entity'];
-}
-
-/**
- * `FieldChange.current`/`.desired` (`$sync/preview/types.ts`) are internally typed
- * `unknown` -- a diff can carry any JSON-shaped value -- while the generated
- * `FieldChange` OpenAPI schema types them as a closed JSON-value union. Same
- * wire-boundary narrowing as `toWirePayload` above; the two shapes are identical once
- * serialized to JSON.
- */
-function toWireOverrides(overrides: readonly FieldChange[]): ResolvedEntityState['overrides'] {
-  return overrides as unknown as ResolvedEntityState['overrides'];
-}
-
-/**
- * PCD cache tables are opened with `int64: true` (see `PCDCache`), so some integer
- * columns can come back as `bigint`. `json()` calls `JSON.stringify` internally, which
- * throws on `bigint` -- coerce any bigint (every resolved-config value is well within
- * the safe-integer range) to `number` before handing the payload off.
- */
-function sanitizeBigInts<T>(value: T): T {
-  return JSON.parse(JSON.stringify(value, (_key, val) => (typeof val === 'bigint' ? Number(val) : val))) as T;
-}
-
-/**
- * Reads a single entity from `cache`, resolving a plain not-found miss to `null`
- * instead of throwing -- mirrors `layerDiff.ts`'s private `readEntityOrNull`, which is
- * not exported. Still propagates `ResolvedConfigValidationError` (bad/missing arrType,
- * unmapped entityType): that is always a caller-input problem, not an absence.
- */
-async function readEntityOrNull(
-  cache: PCDCache,
-  entityType: ResolvedEntityType,
-  arrType: ArrAppType | undefined,
-  name: string
-): Promise<ResolvedEntityPayload | null> {
-  try {
-    return await readResolvedEntity(cache, entityType, arrType, name);
-  } catch (error) {
-    if (isResolvedConfigValidationError(error)) {
-      throw error;
-    }
-    return null;
-  }
-}
 
 /**
  * GET /api/v1/pcd/{databaseId}/resolved/{entityType}
@@ -150,15 +81,16 @@ export const GET: RequestHandler = async ({ locals, params, url }) => {
   }
 
   try {
+    // Business Rule 6: hoisted ONCE per request and reused as an O(1) lookup across
+    // every branch below -- see `buildPendingConflictIndex`'s doc for why this replaces
+    // a per-entity `pcdOpHistoryQueries.listLatestConflictsByDatabase` query. Also
+    // replaces the previous layer=resolved branch's hardcoded `hasPendingConflict:
+    // false`, which was never accurate.
+    const pendingConflictLookup = buildPendingConflictIndex(databaseId);
+
     let entities: ResolvedEntityState[];
 
     if (layerParam === 'resolved') {
-      // Deliberately NOT routed through `resolveLayerState`: that would re-run
-      // `pcdOpHistoryQueries.listLatestConflictsByDatabase` once per entity in this
-      // loop for no benefit (the underlying entity read is unchanged), regressing list
-      // performance for large entity sets. hasPendingConflict stays `false` here; the
-      // named endpoint (single entity, no loop) computes it accurately via
-      // `resolveLayerState` instead.
       const names = await listResolvedEntityNames(cache, entityType, arrType);
       entities = await Promise.all(
         names.map(async (name) => {
@@ -170,7 +102,7 @@ export const GET: RequestHandler = async ({ locals, params, url }) => {
             layer: 'resolved',
             present: true,
             entity: toWirePayload(entity),
-            hasPendingConflict: false,
+            hasPendingConflict: pendingConflictLookup(entityType, arrType, name),
           } satisfies ResolvedEntityState;
         })
       );
@@ -189,33 +121,41 @@ export const GET: RequestHandler = async ({ locals, params, url }) => {
               layer: 'base',
               present: true,
               entity: toWirePayload(entity),
-              hasPendingConflict: computeHasPendingConflict(databaseId, entityType, arrType, name),
+              hasPendingConflict: pendingConflictLookup(entityType, arrType, name),
             } satisfies ResolvedEntityState;
           })
         );
       });
     } else {
-      // layer === 'user': names come from the resolved cache (a superset of base --
-      // includes user-created entities absent from base), the base-only cache is built
-      // ONCE and reused for every name's diff.
-      const names = await listResolvedEntityNames(cache, entityType, arrType);
-      entities = await withBaseOnlyCache(databaseId, (baseCache) =>
-        Promise.all(
+      // layer === 'user': names are the UNION of the resolved-cache and base-cache
+      // names, not just the resolved cache -- a name present only in base (absent from
+      // resolved) is a user-deleted entity and must still be reported (present:false,
+      // removal overrides via `computeUserOverrides(baseEntity, null)`), not silently
+      // omitted from the list. The base-only cache is built ONCE and reused for every
+      // name's diff.
+      entities = await withBaseOnlyCache(databaseId, async (baseCache) => {
+        const [resolvedNames, baseNames] = await Promise.all([
+          listResolvedEntityNames(cache, entityType, arrType),
+          listResolvedEntityNames(baseCache, entityType, arrType),
+        ]);
+        const names = Array.from(new Set([...resolvedNames, ...baseNames])).sort();
+
+        return Promise.all(
           names.map(async (name) => {
-            const resolvedEntity = await readResolvedEntity(cache, entityType, arrType, name);
+            const resolvedEntity = await readEntityOrNull(cache, entityType, arrType, name);
             const baseEntity = await readEntityOrNull(baseCache, entityType, arrType, name);
             return {
               databaseId,
               entityType,
               name,
               layer: 'user',
-              present: true,
+              present: resolvedEntity !== null,
               overrides: toWireOverrides(computeUserOverrides(baseEntity, resolvedEntity)),
-              hasPendingConflict: computeHasPendingConflict(databaseId, entityType, arrType, name),
+              hasPendingConflict: pendingConflictLookup(entityType, arrType, name),
             } satisfies ResolvedEntityState;
           })
-        )
-      );
+        );
+      });
     }
 
     const response = {
@@ -227,15 +167,11 @@ export const GET: RequestHandler = async ({ locals, params, url }) => {
 
     return json(sanitizeBigInts(response));
   } catch (error) {
-    if (isResolvedConfigValidationError(error)) {
-      return json({ error: error.message } satisfies ErrorResponse, { status: 400 });
-    }
-
-    await logger.error('Failed to list resolved config entities', {
+    return mapResolvedErrorToResponse(error, {
       source: 'pcd/resolved/[entityType]',
-      meta: { databaseId, entityType, error: error instanceof Error ? error.message : String(error) },
+      logMessage: 'Failed to list resolved config entities',
+      meta: { databaseId, entityType },
+      fallbackMessage: 'Failed to read resolved config state',
     });
-
-    return json({ error: 'Failed to read resolved config state' } satisfies ErrorResponse, { status: 500 });
   }
 };

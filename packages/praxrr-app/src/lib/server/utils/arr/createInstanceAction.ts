@@ -8,6 +8,7 @@ import {
 } from '$server/utils/encryption/arr-credentials.ts';
 import { getAllArrCredentialKeyVersions } from '$server/utils/encryption/keys.ts';
 import { parseOptionalAbsoluteHttpUrl } from '$utils/validation/url.ts';
+import { assertSafeArrUrl } from './urlSafety.ts';
 
 const VALID_TYPES = ['radarr', 'sonarr', 'lidarr'];
 
@@ -75,6 +76,26 @@ export async function createArrInstanceFromForm(
       ok: false,
       failure: fail(400, {
         error: 'External URL must be a valid absolute http(s) URL',
+        values: { name, type, url },
+      }),
+    };
+  }
+
+  // Reject metadata/link-local targets at save time, so the rejection surfaces as a
+  // normal validation failure here instead of only being discovered later (SSRF guard
+  // rejection) when something tries to connect to the saved instance.
+  try {
+    assertSafeArrUrl(url);
+  } catch (err) {
+    await logger.warn('Attempted to create instance with an unsafe URL', {
+      source,
+      meta: { name, type, url, error: err instanceof Error ? err.message : String(err) },
+    });
+
+    return {
+      ok: false,
+      failure: fail(400, {
+        error: err instanceof Error ? err.message : 'This URL is not allowed',
         values: { name, type, url },
       }),
     };

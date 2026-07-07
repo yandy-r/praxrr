@@ -35,13 +35,23 @@ const SOURCE = 'LiveDiff';
 
 /**
  * Closed, sanitized failure-reason union. Follows `testConnectionReason.ts`'s shape:
- * network/HTTP-derived reasons from a pure mapping helper, plus two live-diff-specific
+ * network/HTTP-derived reasons from a pure mapping helper, plus three live-diff-specific
  * values -- `unsupported` (entity type has no sync section, or the section/arr-type
- * combination is unsupported) and `not_found` (the preview ran successfully but the
- * requested entity is absent from the returned section payload).
+ * combination is unsupported), `not_found` (the preview ran successfully but the
+ * requested entity is absent from the returned section payload), and `not_configured`
+ * (the preview ran, but this section has no sync configuration on the instance at all --
+ * `SyncPreviewSectionOutcome.skipped === true`, distinct from a real fetch/parse failure,
+ * which must not be misreported as a generic `error`).
  */
 export type LiveDiffReason =
-  'unreachable' | 'timeout' | 'unauthorized' | 'invalid_response' | 'unsupported' | 'not_found' | 'error';
+  | 'unreachable'
+  | 'timeout'
+  | 'unauthorized'
+  | 'invalid_response'
+  | 'unsupported'
+  | 'not_found'
+  | 'not_configured'
+  | 'error';
 
 /** Discriminated result: either the located `EntityChange`, or a sanitized failure reason. */
 export type LiveDiffResult =
@@ -76,8 +86,13 @@ export interface ComputeLiveDiffInput {
  * `regularExpression` has no sync-preview section counterpart -- there is nothing to
  * check it against live, so it maps to `null` and callers must short-circuit to the
  * `unsupported` reason before any gating or preview call.
+ *
+ * Exported so the diff route can resolve the same entityType -> section mapping when
+ * validating that an Arr instance's own sync selection for that section actually
+ * targets the requested PCD database, before ever calling `computeLiveDiff` (see
+ * `routes/.../resolved/[entityType]/[name]/diff/+server.ts`).
  */
-function mapEntityTypeToSection(entityType: ResolvedEntityType): SectionType | null {
+export function mapEntityTypeToSection(entityType: ResolvedEntityType): SectionType | null {
   switch (entityType) {
     case 'qualityProfile':
     case 'customFormat':
@@ -158,13 +173,33 @@ function findByNamespace(entities: readonly EntityChange[], name: string): Entit
 }
 
 /**
+ * Namespace-aware match for singleton section fields (`delayProfiles.profile`,
+ * `mediaManagement.naming`/`.mediaSettings`, `metadataProfiles.profile`). Even though
+ * there is at most one candidate, the section payload always reflects whatever the
+ * instance is currently configured with -- NOT necessarily the requested entity -- so
+ * the singleton's own `.name` must still be validated against `name` using the same
+ * `findNamespaceMatch` semantics `findByNamespace` uses for arrays (exact match first,
+ * then namespace-stripped match). Returning the singleton unconditionally would report a
+ * live diff for the wrong profile whenever the instance's live singleton name differs
+ * from the one being requested.
+ */
+function matchesSingleton(change: EntityChange | null, name: string): EntityChange | null {
+  if (!change) {
+    return null;
+  }
+
+  return findNamespaceMatch(name, [change.name]) ? change : null;
+}
+
+/**
  * Locates the requested entity's `EntityChange` inside the section payload returned by
  * `generatePreview`. Arrays (`qualityProfiles.qualityProfiles`/`.customFormats`,
  * `mediaManagement.qualityDefinitions`) use namespace-aware `.find()`; singletons
  * (`delayProfiles.profile`, `mediaManagement.naming`/`.mediaSettings`,
- * `metadataProfiles.profile`) are direct field access -- there is exactly one such
- * entity per instance, so no name matching applies. The `EntityChange` is returned
- * as-is; its `.fields` is already the diff.
+ * `metadataProfiles.profile`) use the same namespace-aware matching against their single
+ * candidate's `.name` (see `matchesSingleton`) -- a singleton section is still per-name,
+ * not per-instance. The `EntityChange` is returned as-is; its `.fields` is already the
+ * diff.
  */
 function locateEntityChange(
   entityType: ResolvedEntityType,
@@ -177,14 +212,14 @@ function locateEntityChange(
       if (entityType === 'qualityProfile') return findByNamespace(sectionResult.qualityProfiles, name);
       return null;
     case 'delayProfiles':
-      return sectionResult.profile;
+      return matchesSingleton(sectionResult.profile, name);
     case 'mediaManagement':
-      if (entityType === 'naming') return sectionResult.naming;
-      if (entityType === 'mediaSettings') return sectionResult.mediaSettings;
+      if (entityType === 'naming') return matchesSingleton(sectionResult.naming, name);
+      if (entityType === 'mediaSettings') return matchesSingleton(sectionResult.mediaSettings, name);
       if (entityType === 'qualityDefinitions') return findByNamespace(sectionResult.qualityDefinitions, name);
       return null;
     case 'metadataProfiles':
-      return sectionResult.profile;
+      return matchesSingleton(sectionResult.profile, name);
   }
 }
 
@@ -252,6 +287,14 @@ export async function computeLiveDiff(input: ComputeLiveDiffInput): Promise<Live
         },
       });
       return { found: false, reason: reasonForFailedSection(outcome.error) };
+    }
+
+    // `skipped === true` (no `error`, no `result`) means the section has no sync
+    // configuration on this instance at all -- not a fetch/parse failure. Reporting
+    // this as a generic 'error' is misleading (routes turn 'error' into a 500); it is
+    // a normal, expected outcome for an instance that has never configured this section.
+    if (outcome?.skipped) {
+      return { found: false, reason: 'not_configured' };
     }
 
     return { found: false, reason: 'error' };

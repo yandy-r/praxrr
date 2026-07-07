@@ -39,12 +39,22 @@
     { value: 'lidarr', label: 'Lidarr' },
   ];
 
+  // Instance options are always a concrete Arr app -- `arrType` on this wire type also
+  // covers the compare response's `null` (unrecognized arr_type) case, which never
+  // applies to the instance list this route's +page.server.ts load builds.
+  interface InstanceOption {
+    id: number;
+    name: string;
+    type: NonNullable<ArrAppType>;
+  }
+
   /** Common prop contract every registered panel component must accept. */
   interface ResolvedConfigPanelProps {
     databaseId: number;
     entityType: ResolvedEntityType;
     arrType?: ArrAppType;
     entityName: string | null;
+    instances?: InstanceOption[];
   }
 
   interface ConfigPanel {
@@ -53,8 +63,8 @@
     component: ComponentType<SvelteComponent<ResolvedConfigPanelProps>>;
   }
 
-  // Panels register here — one entry per feature panel. Task 4.2 (LiveDiffPanel) and
-  // Task 4.3 (CrossInstanceGrid) each append one additional entry to this array.
+  // Registered panels: Resolved State (layered entity view), Live Diff (single-instance
+  // live check), and Compare Instances (cross-instance grid).
   const panels: ConfigPanel[] = [
     { id: 'resolved-state', label: 'Resolved State', component: ResolvedStatePanel },
     { id: 'live-diff', label: 'Live Diff', component: LiveDiffPanel },
@@ -71,11 +81,29 @@
   let namesLoading = false;
   let namesError: string | null = null;
 
+  // Tracks the database the entity-name state was last loaded for. Initialized to the
+  // load's own selectedDatabaseId so this doesn't fire redundantly alongside onMount's
+  // initial load below -- it only reacts to *subsequent* database switches (client-side
+  // navigation via handleDatabaseChange, which updates `data` without remounting this
+  // component / re-running onMount).
+  let previousDatabaseId: number | null = data.selectedDatabaseId;
+
   $: currentOption =
     ENTITY_TYPE_OPTIONS.find((option) => option.value === selectedEntityType) ?? ENTITY_TYPE_OPTIONS[0];
   $: requiresArrType = currentOption.perArr;
   $: isLidarrOnly = selectedEntityType === 'lidarrMetadataProfile';
   $: currentArrType = computeArrTypeFor(selectedEntityType, selectedArrType);
+
+  // Database switch: reset stale entity-name state from the previous database and reload
+  // for the new one.
+  $: if (data.selectedDatabaseId !== previousDatabaseId) {
+    previousDatabaseId = data.selectedDatabaseId;
+    entityNames = [];
+    selectedEntityName = null;
+    if (browser && data.selectedDatabaseId !== null && !data.error) {
+      void loadEntityNames(currentArrType);
+    }
+  }
 
   function computeArrTypeFor(entityType: ResolvedEntityType, arrType: ArrAppType): ArrAppType | undefined {
     const option = ENTITY_TYPE_OPTIONS.find((candidate) => candidate.value === entityType);
@@ -294,6 +322,7 @@
             entityType={selectedEntityType}
             arrType={currentArrType}
             entityName={selectedEntityName}
+            instances={data.instances}
           />
         </div>
       {/if}

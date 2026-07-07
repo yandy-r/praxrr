@@ -1,30 +1,24 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from '@sveltejs/kit';
 import type { components } from '$api/v1.d.ts';
-import { ARR_AGNOSTIC_READERS, computeLiveDiff, PER_ARR_READERS, pcdManager } from '$pcd/index.ts';
+import { computeLiveDiff, pcdManager } from '$pcd/index.ts';
 import type { ResolvedEntityType } from '$pcd/index.ts';
+// Not re-exported via `$pcd/index.ts` -- imported directly from its owning module, same
+// established pattern as the list endpoint's `computeHasPendingConflict` import.
+import { mapEntityTypeToSection } from '$pcd/resolved/liveDiff.ts';
 import { arrInstancesQueries } from '$db/queries/arrInstances.ts';
+import { arrSyncQueries } from '$db/queries/arrSync.ts';
 import { isArrAppType } from '$shared/arr/capabilities.ts';
 import type { EntityChange } from '$sync/preview/types.ts';
+import type { SectionType } from '$sync/types.ts';
 import { registerPreviewCreateAttempt } from '$sync/preview/limits.ts';
 import { logger } from '$logger/logger.ts';
+import { isKnownResolvedEntityType, mapResolvedErrorToResponse, sanitizeBigInts } from '../../../shared.ts';
 
 type ResolvedLiveDiffResponse = components['schemas']['ResolvedLiveDiffResponse'];
 type ErrorResponse = components['schemas']['ErrorResponse'];
 
 const SOURCE = 'pcd/resolved/[entityType]/[name]/diff';
-
-// readers.ts is the single source of truth for which entity types exist -- derive the
-// known-entityType set from its dispatch tables instead of re-declaring the union here
-// (mirrors the sibling list/named endpoints).
-const RESOLVED_ENTITY_TYPES: ReadonlySet<string> = new Set<string>([
-  ...Object.keys(ARR_AGNOSTIC_READERS),
-  ...Object.keys(PER_ARR_READERS),
-]);
-
-function isKnownResolvedEntityType(value: string): value is ResolvedEntityType {
-  return RESOLVED_ENTITY_TYPES.has(value);
-}
 
 /**
  * Testable dependency seam for `computeLiveDiff`, mirroring `_serializeDependencies` /
@@ -49,13 +43,45 @@ function toWireChange(change: EntityChange): ResolvedLiveDiffResponse['changes']
 }
 
 /**
- * PCD cache tables are opened with `int64: true`, so integer columns can come back as
- * `bigint` elsewhere in this feature; `json()` throws on `bigint` via `JSON.stringify`.
- * Kept for parity with the sibling endpoints even though this response is not sourced
- * from the PCD cache directly.
+ * Whether `instance`'s own per-section sync selection for `entityType` references
+ * `databaseId`. The live diff's desired state comes from the INSTANCE's sync
+ * selection, not from the `databaseId` path segment directly -- an instance can be
+ * configured to sync this section from an entirely different PCD database, in which
+ * case computing a diff against the path database's entity would silently compare
+ * against the wrong desired state. Checked before any live diff is attempted so the
+ * mismatch surfaces as a caller-input 400, not a misleading result.
+ *
+ * `qualityProfiles` supports multiple selections (`customFormat` and `qualityProfile`
+ * entities share the section) -- a match on ANY selection is sufficient. Every other
+ * section carries at most one selection.
  */
-function sanitizeBigInts<T>(value: T): T {
-  return JSON.parse(JSON.stringify(value, (_key, val) => (typeof val === 'bigint' ? Number(val) : val))) as T;
+function instanceSyncTargetsDatabase(
+  instanceId: number,
+  entityType: ResolvedEntityType,
+  section: SectionType,
+  databaseId: number
+): boolean {
+  switch (section) {
+    case 'qualityProfiles': {
+      const { selections } = arrSyncQueries.getQualityProfilesSync(instanceId);
+      return selections.some((selection) => selection.databaseId === databaseId);
+    }
+    case 'delayProfiles': {
+      const sync = arrSyncQueries.getDelayProfilesSync(instanceId);
+      return sync.databaseId === databaseId;
+    }
+    case 'mediaManagement': {
+      const sync = arrSyncQueries.getMediaManagementSync(instanceId);
+      if (entityType === 'naming') return sync.namingDatabaseId === databaseId;
+      if (entityType === 'mediaSettings') return sync.mediaSettingsDatabaseId === databaseId;
+      if (entityType === 'qualityDefinitions') return sync.qualityDefinitionsDatabaseId === databaseId;
+      return false;
+    }
+    case 'metadataProfiles': {
+      const sync = arrSyncQueries.getMetadataProfilesSync(instanceId);
+      return sync.databaseId === databaseId;
+    }
+  }
 }
 
 /**
@@ -121,6 +147,19 @@ export const GET: RequestHandler = async ({ locals, params, url }) => {
     return json({ error: 'Arr instance not found' } satisfies ErrorResponse, { status: 404 });
   }
 
+  // Desired state comes from the instance's OWN per-section sync selection, which may
+  // reference a different PCD database than the one in the path -- reject a mismatch
+  // before any live diff is attempted (see `instanceSyncTargetsDatabase`'s doc).
+  // Entity types with no sync section at all (`regularExpression`) have no selection to
+  // validate and fall through to `computeLiveDiff`'s existing `unsupported` handling.
+  const section = mapEntityTypeToSection(entityType);
+  if (section && !instanceSyncTargetsDatabase(instanceId, entityType, section, databaseId)) {
+    return json(
+      { error: 'Instance is not configured to sync this section from this database' } satisfies ErrorResponse,
+      { status: 400 }
+    );
+  }
+
   const nowMs = Date.now();
   if (!registerPreviewCreateAttempt(instanceId, nowMs)) {
     return json(
@@ -146,9 +185,23 @@ export const GET: RequestHandler = async ({ locals, params, url }) => {
         return json({ error: `Entity "${name}" not found` } satisfies ErrorResponse, { status: 404 });
       }
 
+      if (result.reason === 'not_configured') {
+        // The preview ran successfully -- this section simply has no sync
+        // configuration on the instance at all. A caller-input problem (400), not an
+        // infra failure (500).
+        return json(
+          {
+            error: `Entity type "${entityType}" is not configured for live diff against instance "${instance.name}"`,
+          } satisfies ErrorResponse,
+          { status: 400 }
+        );
+      }
+
       // 'unreachable' | 'timeout' | 'unauthorized' | 'invalid_response' | 'error':
       // computeLiveDiff already logged full detail server-side -- only the sanitized
-      // reason is safe to log/echo here.
+      // reason is safe to log/echo here. Not an exception -- a discriminated result
+      // branch -- so this stays a direct log+500, not `mapResolvedErrorToResponse`
+      // (reserved for `catch` blocks below).
       await logger.error('Live diff request failed', {
         source: SOURCE,
         meta: { databaseId, entityType, name, instanceId, reason: result.reason },
@@ -177,11 +230,11 @@ export const GET: RequestHandler = async ({ locals, params, url }) => {
 
     return json(sanitizeBigInts(response));
   } catch (error) {
-    await logger.error('Failed to compute resolved config live diff', {
+    return mapResolvedErrorToResponse(error, {
       source: SOURCE,
-      meta: { databaseId, entityType, name, instanceId, error: error instanceof Error ? error.message : String(error) },
+      logMessage: 'Failed to compute resolved config live diff',
+      meta: { databaseId, entityType, name, instanceId },
+      fallbackMessage: 'Failed to compute live diff',
     });
-
-    return json({ error: 'Failed to compute live diff' } satisfies ErrorResponse, { status: 500 });
   }
 };

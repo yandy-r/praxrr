@@ -37,7 +37,6 @@ import {
 } from '../../routes/api/v1/pcd/[databaseId]/resolved/[entityType]/[name]/diff/+server.ts';
 import { GET as resolvedConfigCompareGet } from '../../routes/api/v1/pcd/[databaseId]/resolved/[entityType]/[name]/compare/+server.ts';
 import { load as resolvedConfigPageLoad } from '../../routes/resolved-config/[databaseId]/+page.server.ts';
-import { GET as resolvedConfigInstancesGet } from '../../routes/resolved-config/[databaseId]/instances/+server.ts';
 import { resetPreviewCreateRateLimitForTests } from '../../lib/server/sync/preview/limits.ts';
 import { resetRateLimitForTests } from '../../lib/server/utils/rateLimit.ts';
 import { usersQueries } from '../../lib/server/db/queries/users.ts';
@@ -601,7 +600,7 @@ class ArrCredentialRedactionRoutesTest extends BaseTest {
 
   private runResolvedConfigPageLoadRedactionTest(): void {
     this.test('resolved-config page load payload omits plaintext api_key', async () => {
-      this.registerResolvedConfigCredentialFixture();
+      const { instance } = this.registerResolvedConfigCredentialFixture();
       const fixture = this.createResolvedConfigCacheFixture();
       setCache(RESOLVED_CONFIG_DATABASE_ID, fixture.cache);
       this.installPatch(
@@ -620,29 +619,24 @@ class ArrCredentialRedactionRoutesTest extends BaseTest {
 
         this.assertPayloadNoLeak(payload, SECRET_API_KEY, 'resolved-config page load payload');
         assertFalse('api_key' in (payload as unknown as Record<string, unknown>));
+
+        // The page load now returns the Live Diff / Compare Instances panels' instance
+        // options directly (the page-scoped `/instances` endpoint was removed) -- assert
+        // the array carries only id/name/type and never api_key/url.
+        const { instances } = payload as unknown as { instances: Array<Record<string, unknown>> };
+        assert(Array.isArray(instances));
+        assertEquals(instances.length, 1);
+        assertEquals(instances[0].id, instance.id);
+        assertEquals(instances[0].name, instance.name);
+        assertEquals(instances[0].type, instance.type);
+        for (const instanceRow of instances) {
+          assertEquals(Object.keys(instanceRow).sort(), ['id', 'name', 'type']);
+          assertFalse('api_key' in instanceRow, 'resolved-config page load instances should not include api_key');
+          assertFalse('url' in instanceRow, 'resolved-config page load instances should not include url');
+        }
       } finally {
         deleteCache(RESOLVED_CONFIG_DATABASE_ID);
         await fixture.destroy();
-      }
-    });
-  }
-
-  private runResolvedConfigInstancesRouteRedactionTest(): void {
-    this.test('resolved-config instances endpoint omits plaintext api_key', async () => {
-      this.registerResolvedConfigCredentialFixture();
-
-      const response = await resolvedConfigInstancesGet({
-        params: { databaseId: String(RESOLVED_CONFIG_DATABASE_ID) },
-      } as unknown as Parameters<typeof resolvedConfigInstancesGet>[0]);
-
-      assertEquals(response.status, 200);
-      const text = await response.text();
-      this.assertPayloadNoLeak(text, SECRET_API_KEY, 'resolved-config instances endpoint payload');
-
-      const payload = JSON.parse(text) as { instances: Array<Record<string, unknown>> };
-      assert(payload.instances.length > 0);
-      for (const instanceRow of payload.instances) {
-        assertFalse('api_key' in instanceRow);
       }
     });
   }
@@ -801,7 +795,6 @@ class ArrCredentialRedactionRoutesTest extends BaseTest {
     this.runResolvedConfigDiffRedactionTest();
     this.runResolvedConfigCompareRedactionTest();
     this.runResolvedConfigPageLoadRedactionTest();
-    this.runResolvedConfigInstancesRouteRedactionTest();
     return Promise.resolve();
   }
 }

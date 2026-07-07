@@ -5613,8 +5613,9 @@
           },
           "arrType": {
             "type": "string",
+            "nullable": true,
             "enum": ["radarr", "sonarr", "lidarr"],
-            "description": "Arr instance family"
+            "description": "Arr instance family, or null when the instance's own `arr_type` value is\nunrecognized (the `incompatible` error case).\n"
           },
           "compatible": {
             "type": "boolean",
@@ -5682,11 +5683,12 @@
               "invalid_response",
               "unsupported",
               "not_found",
+              "not_configured",
               "incompatible",
               "rate-limited",
               "error"
             ],
-            "description": "Sanitized reason when this instance's desired/live lookup failed.\nRaw error detail never appears here; full detail is logged\nserver-side only. Superset of the single-instance live-diff reason\nenum: `incompatible` (unrecognized arr_type), `rate-limited`\n(per-instance live fetch throttled), and `error` (unexpected\nfailure, detail logged not surfaced) are comparison-specific.\n"
+            "description": "Sanitized reason when this instance's desired/live lookup failed.\nRaw error detail never appears here; full detail is logged\nserver-side only. Superset of the single-instance live-diff reason\nenum: `incompatible` (unrecognized arr_type), `rate-limited`\n(per-instance live fetch throttled), and `error` (unexpected\nfailure, detail logged not surfaced) are comparison-specific.\n`not_configured` means the section has no sync configuration on the\ninstance at all.\n"
           }
         }
       },

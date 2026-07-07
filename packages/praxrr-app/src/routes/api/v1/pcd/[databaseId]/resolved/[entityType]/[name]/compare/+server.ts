@@ -2,37 +2,23 @@ import { json } from '@sveltejs/kit';
 import type { RequestHandler } from '@sveltejs/kit';
 import type { components } from '$api/v1.d.ts';
 import {
-  ARR_AGNOSTIC_READERS,
   compareAcrossInstances,
   COMPARE_MAX_INSTANCES,
   isInstanceCountWithinCap,
-  PER_ARR_READERS,
   pcdManager,
   registerCompareAttempt,
 } from '$pcd/index.ts';
-import type { CompareAcrossInstancesResult, CompareInstanceResult, ResolvedEntityType } from '$pcd/index.ts';
+import type { CompareAcrossInstancesResult, CompareInstanceResult } from '$pcd/index.ts';
 import { arrInstancesQueries } from '$db/queries/arrInstances.ts';
 import type { ArrInstance } from '$db/queries/arrInstances.ts';
 import type { EntityChange } from '$sync/preview/types.ts';
-import { logger } from '$logger/logger.ts';
+import { isKnownResolvedEntityType, mapResolvedErrorToResponse, sanitizeBigInts } from '../../../shared.ts';
 
 type CrossInstanceComparisonResponse = components['schemas']['CrossInstanceComparisonResponse'];
 type ResolvedInstanceStateWire = CrossInstanceComparisonResponse['instances'][number];
 type ErrorResponse = components['schemas']['ErrorResponse'];
 
 const SOURCE = 'pcd/resolved/[entityType]/[name]/compare';
-
-// readers.ts is the single source of truth for which entity types exist -- derive the
-// known-entityType set from its dispatch tables instead of re-declaring the union here
-// (mirrors the sibling list/named/diff endpoints).
-const RESOLVED_ENTITY_TYPES: ReadonlySet<string> = new Set<string>([
-  ...Object.keys(ARR_AGNOSTIC_READERS),
-  ...Object.keys(PER_ARR_READERS),
-]);
-
-function isKnownResolvedEntityType(value: string): value is ResolvedEntityType {
-  return RESOLVED_ENTITY_TYPES.has(value);
-}
 
 /**
  * Testable dependency seam for `compareAcrossInstances`, mirroring `_liveDiffDependencies`
@@ -57,9 +43,10 @@ function toWireChange(change: EntityChange): components['schemas']['EntityChange
 /**
  * Maps a `CompareInstanceResult` (compare.ts's internal shape) onto the generated
  * `ResolvedInstanceState` wire shape:
- * - `arrType` is `string` on `CompareInstanceResult` (it holds the raw, possibly
- *   unrecognized `arr_type` value for the `incompatible` case) -- narrowed here since the
- *   wire schema's `arrType` is a closed `radarr|sonarr|lidarr` enum.
+ * - `arrType` and `error` map directly, with no narrowing cast -- `arrType` is nullable
+ *   on the wire schema (as of the OpenAPI contract update pairing this fix) and matches
+ *   `CompareInstanceResult.arrType: ArrAppType | null` exactly, and `error`'s wire enum
+ *   now includes `not_configured`, making it an exact match for `CompareReason`.
  * - `desired` is a `Portable*` union whose nested array fields (e.g. `PortableCustomFormat`'s
  *   `conditions: ConditionData[]`) are internally typed, while the generated schema types
  *   nested arrays as a closed JSON-value index-signature shape -- same wire-boundary
@@ -68,30 +55,18 @@ function toWireChange(change: EntityChange): components['schemas']['EntityChange
  *   not the raw upstream Arr payload the OpenAPI schema's free-form `additionalProperties`
  *   shape implies -- the most information-preserving mapping available without redesigning
  *   `liveDiff.ts`.
- * - `error` is `CompareReason`, a superset of the wire `error` enum by design (see
- *   compare.ts module doc point 2); the contract was amended in this task to match the
- *   full superset, so no narrowing cast is needed here.
  */
 function toWireInstance(result: CompareInstanceResult): ResolvedInstanceStateWire {
   return {
     instanceId: result.instanceId,
     instanceName: result.instanceName,
-    arrType: result.arrType as ResolvedInstanceStateWire['arrType'],
+    arrType: result.arrType,
     compatible: result.compatible,
     present: result.present,
     desired: result.desired as unknown as ResolvedInstanceStateWire['desired'],
     actual: result.actual as unknown as ResolvedInstanceStateWire['actual'],
     error: result.error,
   };
-}
-
-/**
- * PCD cache tables are opened with `int64: true`, so integer columns can come back as
- * `bigint` elsewhere in this feature; `json()` throws on `bigint` via `JSON.stringify`.
- * Kept for parity with the sibling endpoints.
- */
-function sanitizeBigInts<T>(value: T): T {
-  return JSON.parse(JSON.stringify(value, (_key, val) => (typeof val === 'bigint' ? Number(val) : val))) as T;
 }
 
 /**
@@ -235,11 +210,11 @@ export const GET: RequestHandler = async ({ locals, params, url }) => {
 
     return json(sanitizeBigInts(response));
   } catch (error) {
-    await logger.error('Failed to compute resolved config comparison', {
+    return mapResolvedErrorToResponse(error, {
       source: SOURCE,
-      meta: { databaseId, entityType, name, error: error instanceof Error ? error.message : String(error) },
+      logMessage: 'Failed to compute resolved config comparison',
+      meta: { databaseId, entityType, name },
+      fallbackMessage: 'Failed to compute cross-instance comparison',
     });
-
-    return json({ error: 'Failed to compute cross-instance comparison' } satisfies ErrorResponse, { status: 500 });
   }
 };

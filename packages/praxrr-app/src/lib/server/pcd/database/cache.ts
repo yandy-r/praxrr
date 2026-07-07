@@ -287,8 +287,18 @@ export class PCDCache {
    * This is a side-effect-free sibling to `build()`: it applies operation SQL for the
    * requested `layers` only and never evaluates value guards, never records op history
    * (`pcdOpHistoryQueries.create`), never mutates `pcd_ops.state` (`pcdOpsQueries.update`),
-   * and never calls `disableDatabaseInstance` on failure. A single op that fails to apply
-   * is logged via `logger.warn` and skipped so the remaining in-scope operations still run.
+   * and never calls `disableDatabaseInstance` on failure. A base/tweaks/user op that
+   * fails to apply is logged via `logger.warn` and skipped so the remaining in-scope
+   * operations still run.
+   *
+   * A `schema`-layer op that fails to apply is different: every later op assumes the
+   * schema is fully in place, so warn-skipping it would silently cascade into an
+   * incomplete (but still `built: true`) cache -- e.g. a missing table/column makes
+   * every later op targeting it fail too, and the resulting cache would misreport
+   * entities as absent/user-created rather than surfacing the real schema failure.
+   * A failed schema op therefore throws immediately (fail-fast), including the
+   * filename/layer in the error. `disableDatabaseInstance()` is still never called --
+   * this cache is ephemeral, so there is no persistent database row to disable.
    *
    * The resulting instance is ephemeral: the caller owns its lifecycle and MUST call
    * `close()` when done. It must NEVER be registered via `setCache()` — the cache
@@ -311,6 +321,12 @@ export class PCDCache {
       try {
         this.db!.exec(operation.sql);
       } catch (error) {
+        if (operation.layer === 'schema') {
+          throw new Error(
+            `buildReadOnly: schema op failed to apply (filename=${operation.filename}, layer=${operation.layer}): ${error}`
+          );
+        }
+
         await logger.warn('buildReadOnly: skipping op that failed to apply', {
           source: 'PCDCache',
           meta: {

@@ -5,10 +5,13 @@ import { DenoSqlite3Dialect } from '@soapbox/kysely-deno-sqlite';
 import type { PCDDatabase } from '$shared/pcd/types.ts';
 import type { PCDCache } from '$pcd/index.ts';
 import {
+  isReaderNotFoundMessage,
   isResolvedConfigValidationError,
+  isResolvedEntityNotFoundError,
   listResolvedEntityNames,
   readResolvedEntity,
   ResolvedConfigValidationError,
+  ResolvedEntityNotFoundError,
 } from '$pcd/resolved/readers.ts';
 
 // Mirrors parityMapApi.test.ts's fixture recipe: an in-memory PCDCache built from
@@ -125,17 +128,56 @@ Deno.test('readResolvedEntity rejects an arrType supplied for an arr-agnostic en
   });
 });
 
-Deno.test('readResolvedEntity propagates the not-found Error from serialize.ts unwrapped', async () => {
+Deno.test('readResolvedEntity rewraps a by-name miss from serialize.ts as ResolvedEntityNotFoundError', async () => {
   await withFixture(async (cache) => {
     try {
       await readResolvedEntity(cache, 'regularExpression', undefined, 'Does Not Exist');
       assert(false, 'expected readResolvedEntity to throw');
     } catch (error) {
       assert(error instanceof Error);
+      assert(isResolvedEntityNotFoundError(error));
       assert(!isResolvedConfigValidationError(error));
       assert(String((error as Error).message).includes('not found'));
     }
   });
+});
+
+Deno.test(
+  'readResolvedEntity: the rewrapped not-found error is an instance of ResolvedEntityNotFoundError',
+  async () => {
+    await withFixture(async (cache) => {
+      await assertRejects(
+        () => readResolvedEntity(cache, 'regularExpression', undefined, 'Does Not Exist'),
+        ResolvedEntityNotFoundError
+      );
+    });
+  }
+);
+
+// ============================================================================
+// isReaderNotFoundMessage -- exact-shape gate distinguishing a by-name miss from a
+// genuine cache/data-integrity failure (CONFIRMED string-sniffing hazard fix).
+// ============================================================================
+
+Deno.test('isReaderNotFoundMessage matches the exact serialize.ts by-name-miss shape', () => {
+  assertEquals(isReaderNotFoundMessage('Regular expression "Sample RE" not found', 'Sample RE'), true);
+  assertEquals(isReaderNotFoundMessage('Lidarr metadata profile "Standard" not found', 'Standard'), true);
+});
+
+Deno.test('isReaderNotFoundMessage does not match PCDCache SQL-helper-shaped errors', () => {
+  // database/cache.ts::registerHelperFunctions throws "<Label> not found: <name>" (no
+  // quotes, "not found" mid-sentence) -- a genuine cache/data-integrity failure, not a
+  // by-name miss on this read, and must never be reclassified as one.
+  assertEquals(isReaderNotFoundMessage('Tag not found: Sample RE', 'Sample RE'), false);
+  assertEquals(isReaderNotFoundMessage('Quality profile not found: Sample RE', 'Sample RE'), false);
+});
+
+Deno.test('isReaderNotFoundMessage does not match ResolvedConfigDatabaseNotFoundError-shaped messages', () => {
+  assertEquals(isReaderNotFoundMessage('Database instance 42 not found', 'Sample RE'), false);
+});
+
+Deno.test('isReaderNotFoundMessage does not match when the message is for a different name', () => {
+  assertEquals(isReaderNotFoundMessage('Regular expression "Other Name" not found', 'Sample RE'), false);
 });
 
 Deno.test('listResolvedEntityNames lists names for an arr-agnostic entity type', async () => {

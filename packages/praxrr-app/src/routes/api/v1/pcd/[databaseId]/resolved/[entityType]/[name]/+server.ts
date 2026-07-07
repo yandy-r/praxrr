@@ -1,65 +1,19 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from '@sveltejs/kit';
 import type { components } from '$api/v1.d.ts';
-import {
-  ARR_AGNOSTIC_READERS,
-  isResolvedConfigValidationError,
-  pcdManager,
-  PER_ARR_READERS,
-  resolveLayerState,
-} from '$pcd/index.ts';
-import type { ResolvedEntityPayload, ResolvedEntityType } from '$pcd/index.ts';
+import { pcdManager, resolveLayerState } from '$pcd/index.ts';
 import { isArrAppType } from '$shared/arr/capabilities.ts';
 import type { ArrAppType } from '$shared/pcd/types.ts';
-import type { FieldChange } from '$sync/preview/types.ts';
-import { logger } from '$logger/logger.ts';
+import {
+  isKnownResolvedEntityType,
+  mapResolvedErrorToResponse,
+  sanitizeBigInts,
+  toWireOverrides,
+  toWirePayload,
+} from '../../shared.ts';
 
 type ResolvedEntityState = components['schemas']['ResolvedEntityState'];
 type ErrorResponse = components['schemas']['ErrorResponse'];
-
-// readers.ts is the single source of truth for which entity types exist -- derive the
-// known-entityType set from its dispatch tables instead of re-declaring the union here.
-const RESOLVED_ENTITY_TYPES: ReadonlySet<string> = new Set<string>([
-  ...Object.keys(ARR_AGNOSTIC_READERS),
-  ...Object.keys(PER_ARR_READERS),
-]);
-
-function isKnownResolvedEntityType(value: string): value is ResolvedEntityType {
-  return RESOLVED_ENTITY_TYPES.has(value);
-}
-
-/**
- * `PortableCustomFormat.conditions` is an intentionally loosely-typed "shape varies by
- * condition type" field in the contract (see docs/api/v1/schemas/pcd.yaml); the
- * generated `{ [key: string]: unknown }` item shape has no structural relationship to
- * the internal `ConditionData` interface (it declares no index signature), even though
- * the two are identical once serialized to JSON. Narrow, single-purpose cast at the
- * wire boundary -- every other field on `ResolvedEntityState` stays `satisfies`-checked.
- */
-function toWirePayload(payload: ResolvedEntityPayload): ResolvedEntityState['entity'] {
-  return payload as unknown as ResolvedEntityState['entity'];
-}
-
-/**
- * `FieldChange.current`/`.desired` (`$sync/preview/types.ts`) are internally typed
- * `unknown` -- a diff can carry any JSON-shaped value -- while the generated
- * `FieldChange` OpenAPI schema types them as a closed JSON-value union. Same
- * wire-boundary narrowing as `toWirePayload` above; the two shapes are identical once
- * serialized to JSON.
- */
-function toWireOverrides(overrides: readonly FieldChange[]): ResolvedEntityState['overrides'] {
-  return overrides as unknown as ResolvedEntityState['overrides'];
-}
-
-/**
- * PCD cache tables are opened with `int64: true` (see `PCDCache`), so some integer
- * columns can come back as `bigint`. `json()` calls `JSON.stringify` internally, which
- * throws on `bigint` -- coerce any bigint (every resolved-config value is well within
- * the safe-integer range) to `number` before handing the payload off.
- */
-function sanitizeBigInts<T>(value: T): T {
-  return JSON.parse(JSON.stringify(value, (_key, val) => (typeof val === 'bigint' ? Number(val) : val))) as T;
-}
 
 /**
  * GET /api/v1/pcd/{databaseId}/resolved/{entityType}/{name}
@@ -156,24 +110,19 @@ export const GET: RequestHandler = async ({ locals, params, url }) => {
 
     return json(sanitizeBigInts(response));
   } catch (error) {
-    if (isResolvedConfigValidationError(error)) {
-      return json({ error: error.message } satisfies ErrorResponse, { status: 400 });
-    }
-
-    // serialize.ts's readers throw a plain `Error("... not found")` on a by-name miss.
-    // `resolveLayerState` propagates this unwrapped for a hard miss in the resolved
-    // layer, and (for `layer=user`) when the entity is absent from BOTH resolved and
-    // base -- `layer=base`'s own absence is never an error (`present:false` instead,
-    // see resolved-config.yaml).
-    if (error instanceof Error && error.message.includes('not found')) {
-      return json({ error: error.message } satisfies ErrorResponse, { status: 404 });
-    }
-
-    await logger.error('Failed to read resolved config entity', {
+    // Typed error mapping (never string-sniffed): `ResolvedConfigValidationError` ->
+    // 400, `ResolvedConfigDatabaseNotFoundError` -> 400 'Database not found',
+    // `ResolvedEntityNotFoundError` (a genuine by-name miss -- serialize.ts's readers
+    // throw a plain `Error("... not found")` on their own top-level miss, rewrapped by
+    // readers.ts's `invokeReader`) -> 404, everything else -> generic 500. Previously
+    // this branch used `error.message.includes('not found')`, which also matched
+    // `ResolvedConfigDatabaseNotFoundError`'s "Database instance N not found" and
+    // PCDCache's SQL-helper "Tag not found: X" misses -- both misclassified as 404.
+    return mapResolvedErrorToResponse(error, {
       source: 'pcd/resolved/[entityType]/[name]',
-      meta: { databaseId, entityType, name, error: error instanceof Error ? error.message : String(error) },
+      logMessage: 'Failed to read resolved config entity',
+      meta: { databaseId, entityType, name },
+      fallbackMessage: 'Failed to read resolved config state',
     });
-
-    return json({ error: 'Failed to read resolved config state' } satisfies ErrorResponse, { status: 500 });
   }
 };

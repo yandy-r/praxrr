@@ -1,9 +1,18 @@
-// Pure tests -- no I/O, no PCDCache, no database. `computeUserOverrides` is a thin,
-// synchronous wrapper around `diffToFieldChanges` with Portable-field-named array-key
-// strategies, so these tests exercise it directly against synthetic Portable-shaped
-// objects, mirroring `tests/base/syncPreviewDiff.test.ts`'s style.
+// The first section is pure -- no I/O, no PCDCache, no database. `computeUserOverrides`
+// is a thin, synchronous wrapper around `diffToFieldChanges` with Portable-field-named
+// array-key strategies, so those tests exercise it directly against synthetic
+// Portable-shaped objects, mirroring `tests/base/syncPreviewDiff.test.ts`'s style.
+//
+// The later sections (`readEntityOrNull`, `buildPendingConflictIndex`) DO use a real
+// in-memory PCDCache fixture (mirrors `readers.test.ts`'s recipe) and a patched
+// `pcdOpHistoryQueries.listLatestConflictsByDatabase` (mirrors `equivalence.test.ts`'s
+// patch-and-restore idiom) -- they cover the CONFIRMED not-found-masking and O(n)-query
+// fixes, which cannot be exercised without a real cache/query surface.
 
-import { assertEquals } from '@std/assert';
+import { assertEquals, assertRejects } from '@std/assert';
+import { Database } from '@jsr/db__sqlite';
+import { Kysely } from 'kysely';
+import { DenoSqlite3Dialect } from '@soapbox/kysely-deno-sqlite';
 import type {
   PortableCustomFormat,
   PortableDelayProfile,
@@ -11,7 +20,18 @@ import type {
   PortableQualityDefinitions,
   PortableQualityProfile,
 } from '$shared/pcd/portable.ts';
-import { computeUserOverrides, PORTABLE_ARRAY_KEY_STRATEGIES } from '$pcd/resolved/layerDiff.ts';
+import type { PCDDatabase } from '$shared/pcd/types.ts';
+import type { PCDCache } from '$pcd/index.ts';
+import { pcdOpHistoryQueries } from '$db/queries/pcdOpHistory.ts';
+import type { PcdOpHistoryWithOp } from '$db/queries/pcdOpHistory.ts';
+import { ResolvedConfigValidationError } from '$pcd/resolved/readers.ts';
+import {
+  buildPendingConflictIndex,
+  computeHasPendingConflict,
+  computeUserOverrides,
+  PORTABLE_ARRAY_KEY_STRATEGIES,
+  readEntityOrNull,
+} from '$pcd/resolved/layerDiff.ts';
 
 function buildQualityProfile(overrides: Partial<PortableQualityProfile> = {}): PortableQualityProfile {
   return {
@@ -245,4 +265,226 @@ Deno.test('computeUserOverrides: identical base and resolved entities produce no
   const resolved = buildQualityProfile();
 
   assertEquals(computeUserOverrides(base, resolved), []);
+});
+
+// ============================================================================
+// readEntityOrNull -- typed not-found error handling (CONFIRMED masking-bug fix)
+// ============================================================================
+
+interface CacheFixture {
+  cache: PCDCache;
+  destroy: () => Promise<void>;
+}
+
+function createCacheFixture(schemaAndDataSql: string): CacheFixture {
+  const db = new Database(':memory:', { int64: true });
+  const kb = new Kysely<PCDDatabase>({
+    dialect: new DenoSqlite3Dialect({
+      database: db,
+    }),
+  });
+
+  db.exec(schemaAndDataSql);
+
+  return {
+    cache: { kb } as unknown as PCDCache,
+    destroy: async () => {
+      await kb.destroy();
+      db.close();
+    },
+  };
+}
+
+// Complete schema (mirrors readers.test.ts's fixture) -- a present row round-trips
+// through both of serializeRegularExpression's queries without error.
+const COMPLETE_SCHEMA_SQL = `
+CREATE TABLE regular_expressions (
+  name TEXT PRIMARY KEY,
+  pattern TEXT NOT NULL,
+  description TEXT,
+  regex101_id TEXT
+);
+
+CREATE TABLE tags (
+  name TEXT PRIMARY KEY
+);
+
+CREATE TABLE regular_expression_tags (
+  regular_expression_name TEXT NOT NULL,
+  tag_name TEXT NOT NULL,
+  PRIMARY KEY (regular_expression_name, tag_name)
+);
+
+INSERT INTO regular_expressions (name, pattern, description, regex101_id) VALUES
+  ('Sample RE', '.*sample.*', 'A sample regular expression', NULL);
+`;
+
+// Deliberately omits `tags`/`regular_expression_tags` -- serializeRegularExpression's
+// tag lookup will throw a genuine "no such table" SQL error for a PRESENT row. This is
+// NOT a by-name miss (does not match `isReaderNotFoundMessage`'s shape) and must
+// propagate, not be swallowed as null.
+const SCHEMA_MISSING_TAGS_TABLE_SQL = `
+CREATE TABLE regular_expressions (
+  name TEXT PRIMARY KEY,
+  pattern TEXT NOT NULL,
+  description TEXT,
+  regex101_id TEXT
+);
+
+INSERT INTO regular_expressions (name, pattern, description, regex101_id) VALUES
+  ('Sample RE', '.*sample.*', 'A sample regular expression', NULL);
+`;
+
+Deno.test('readEntityOrNull returns null for a genuine by-name miss', async () => {
+  const fixture = createCacheFixture(COMPLETE_SCHEMA_SQL);
+  try {
+    const result = await readEntityOrNull(fixture.cache, 'regularExpression', undefined, 'Does Not Exist');
+    assertEquals(result, null);
+  } finally {
+    await fixture.destroy();
+  }
+});
+
+Deno.test(
+  'readEntityOrNull rethrows a genuine cache failure instead of masking it as absence (CONFIRMED fix)',
+  async () => {
+    const fixture = createCacheFixture(SCHEMA_MISSING_TAGS_TABLE_SQL);
+    try {
+      await assertRejects(() => readEntityOrNull(fixture.cache, 'regularExpression', undefined, 'Sample RE'), Error);
+    } finally {
+      await fixture.destroy();
+    }
+  }
+);
+
+Deno.test(
+  'readEntityOrNull rethrows ResolvedConfigValidationError (caller-input problems are not absence)',
+  async () => {
+    const fixture = createCacheFixture(COMPLETE_SCHEMA_SQL);
+    try {
+      await assertRejects(
+        () => readEntityOrNull(fixture.cache, 'naming', undefined, 'Default'),
+        ResolvedConfigValidationError
+      );
+    } finally {
+      await fixture.destroy();
+    }
+  }
+);
+
+// ============================================================================
+// buildPendingConflictIndex / computeHasPendingConflict parity (perf fix, CONFIRMED)
+// ============================================================================
+
+type Restore = () => void;
+
+function patchTarget<T extends object, K extends keyof T>(
+  target: T,
+  key: K,
+  replacement: T[K],
+  restores: Restore[]
+): void {
+  const original = target[key];
+  target[key] = replacement;
+  restores.push(() => {
+    target[key] = original;
+  });
+}
+
+function buildConflictRow(entity: string, name: string): PcdOpHistoryWithOp {
+  return {
+    history: {
+      id: 1,
+      op_id: 1,
+      database_id: 1,
+      batch_id: 'batch-1',
+      status: 'conflicted',
+      rowcount: null,
+      conflict_reason: 'diverged',
+      error: null,
+      details: null,
+      applied_at: '2026-01-01 00:00:00',
+    },
+    op: {
+      id: 1,
+      database_id: 1,
+      origin: 'user',
+      state: 'published',
+      source: 'local',
+      filename: null,
+      op_number: null,
+      sequence: null,
+      sql: '',
+      metadata: JSON.stringify({ entity, name }),
+      desired_state: null,
+      content_hash: null,
+      last_seen_in_repo_at: null,
+      superseded_by_op_id: null,
+      pushed_at: null,
+      pushed_commit: null,
+      created_at: '2026-01-01 00:00:00',
+      updated_at: '2026-01-01 00:00:00',
+    },
+  };
+}
+
+Deno.test('buildPendingConflictIndex lookup matches computeHasPendingConflict for the same inputs', () => {
+  const restores: Restore[] = [];
+  let queryCalls = 0;
+
+  patchTarget(
+    pcdOpHistoryQueries,
+    'listLatestConflictsByDatabase',
+    ((_databaseId: number) => {
+      queryCalls += 1;
+      return [buildConflictRow('custom_format', 'HDR10')];
+    }) as typeof pcdOpHistoryQueries.listLatestConflictsByDatabase,
+    restores
+  );
+
+  try {
+    const lookup = buildPendingConflictIndex(1);
+    assertEquals(queryCalls, 1, 'buildPendingConflictIndex must query exactly once');
+
+    // Matching (entityType, arrType, name) -> true on both the index lookup and the
+    // per-call wrapper.
+    assertEquals(lookup('customFormat', undefined, 'HDR10'), true);
+    assertEquals(computeHasPendingConflict(1, 'customFormat', undefined, 'HDR10'), true);
+
+    // Non-matching name -> false on both.
+    assertEquals(lookup('customFormat', undefined, 'Other'), false);
+    assertEquals(computeHasPendingConflict(1, 'customFormat', undefined, 'Other'), false);
+
+    // Unmapped (entityType, arrType) combination -> false on both (defensive, not a throw).
+    assertEquals(lookup('lidarrMetadataProfile', 'radarr', 'HDR10'), false);
+    assertEquals(computeHasPendingConflict(1, 'lidarrMetadataProfile', 'radarr', 'HDR10'), false);
+
+    // The index itself must not re-query on repeated lookups -- only the three
+    // computeHasPendingConflict calls above (each a fresh per-call index build) added
+    // to queryCalls beyond the first.
+    assertEquals(queryCalls, 4);
+  } finally {
+    restores.reverse().forEach((restore) => restore());
+  }
+});
+
+Deno.test('buildPendingConflictIndex: unparsable op metadata is uncorrelated, not a throw', () => {
+  const restores: Restore[] = [];
+
+  patchTarget(
+    pcdOpHistoryQueries,
+    'listLatestConflictsByDatabase',
+    ((_databaseId: number) => {
+      const row = buildConflictRow('custom_format', 'HDR10');
+      return [{ ...row, op: { ...row.op, metadata: 'not-json' } }];
+    }) as typeof pcdOpHistoryQueries.listLatestConflictsByDatabase,
+    restores
+  );
+
+  try {
+    const lookup = buildPendingConflictIndex(1);
+    assertEquals(lookup('customFormat', undefined, 'HDR10'), false);
+  } finally {
+    restores.reverse().forEach((restore) => restore());
+  }
 });

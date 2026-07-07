@@ -277,7 +277,8 @@ Deno.test('compareAcrossInstances: an unrecognized arr_type is marked incompatib
       {
         instanceId: unknown.id,
         instanceName: unknown.name,
-        arrType: 'plex',
+        arrType: null,
+        rawArrType: 'plex',
         compatible: false,
         present: false,
         desired: null,

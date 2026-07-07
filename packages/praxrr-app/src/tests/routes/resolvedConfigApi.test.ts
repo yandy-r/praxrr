@@ -26,6 +26,7 @@ import { databaseInstancesQueries } from '$db/queries/databaseInstances.ts';
 import type { DatabaseInstance } from '$db/queries/databaseInstances.ts';
 import { arrInstancesQueries } from '$db/queries/arrInstances.ts';
 import type { ArrInstance } from '$db/queries/arrInstances.ts';
+import { arrSyncQueries } from '$db/queries/arrSync.ts';
 import { pcdOpsQueries } from '$db/queries/pcdOps.ts';
 import type { PcdOp, UpdatePcdOpInput } from '$db/queries/pcdOps.ts';
 import { pcdOpHistoryQueries } from '$db/queries/pcdOpHistory.ts';
@@ -315,6 +316,10 @@ async function withFixture(
 // - 'Matches Base RE': identical in both layers -> empty overrides
 // - 'User Only RE': absent from base entirely -> present:false at layer=base, and an
 //   'added' FieldChange for every field at layer=user (entity created via user ops only)
+// 'Base Only RE' (added to `BASE_ONLY_SQL` below, deliberately absent here) covers the
+// inverse: present in base but absent from resolved -- a user-deleted entity, which
+// layer=user's name list must still surface (present:false, 'removed' overrides)
+// instead of silently omitting it.
 const RESOLVED_LAYER_DIVERGENT_SQL = `
 CREATE TABLE regular_expressions (
   name TEXT PRIMARY KEY,
@@ -339,7 +344,9 @@ INSERT INTO regular_expressions (name, pattern, description, regex101_id) VALUES
   ('User Only RE', '.*user-only-pattern.*', 'Created entirely via user ops', NULL);
 `;
 
-// "Base" side: schema+base+tweaks-only -- 'User Only RE' is deliberately absent.
+// "Base" side: schema+base+tweaks-only -- 'User Only RE' is deliberately absent, and
+// 'Base Only RE' is deliberately present-only-here (absent from the resolved side) to
+// exercise the layer=user union's user-deleted-entity case.
 const BASE_ONLY_SQL = `
 CREATE TABLE regular_expressions (
   name TEXT PRIMARY KEY,
@@ -360,7 +367,8 @@ CREATE TABLE regular_expression_tags (
 
 INSERT INTO regular_expressions (name, pattern, description, regex101_id) VALUES
   ('Sample RE', '.*base-pattern.*', 'Shared description', NULL),
-  ('Matches Base RE', '.*same-pattern.*', 'Shared description', NULL);
+  ('Matches Base RE', '.*same-pattern.*', 'Shared description', NULL),
+  ('Base Only RE', '.*base-only-pattern.*', 'Present in base only (user-deleted)', NULL);
 `;
 
 function buildLayerDivergenceDatabaseInstance(databaseId: number): DatabaseInstance {
@@ -504,9 +512,10 @@ Deno.test(
       assertEquals(body.layer, 'base');
 
       // 'User Only RE' exists only in the resolved cache -- absent from the base-layer
-      // list entirely (not a present:false row).
+      // list entirely (not a present:false row). 'Base Only RE' exists only in base and
+      // IS listed here (layer=base lists straight from the base cache).
       const names = body.entities.map((entity) => entity.name).sort();
-      assertEquals(names, ['Matches Base RE', 'Sample RE']);
+      assertEquals(names, ['Base Only RE', 'Matches Base RE', 'Sample RE']);
 
       for (const entity of body.entities) {
         assertEquals(entity.present, true);
@@ -516,6 +525,37 @@ Deno.test(
       const sampleRe = body.entities.find((entity) => entity.name === 'Sample RE');
       assert(sampleRe?.entity);
       assertEquals((sampleRe.entity as { pattern: string }).pattern, '.*base-pattern.*');
+    });
+  }
+);
+
+Deno.test(
+  'list resolved entities: layer=user union includes a base-only (user-deleted) entity as present:false',
+  async () => {
+    await withLayerDivergenceFixture(async (databaseId) => {
+      const response = await GET_LIST(buildListGetEvent(String(databaseId), 'regularExpression', '?layer=user', true));
+      assertEquals(response.status, 200);
+
+      const body = (await response.json()) as ResolvedEntityListResponse;
+      assertEquals(body.layer, 'user');
+
+      // Union of resolved names ('Sample RE', 'Matches Base RE', 'User Only RE') and
+      // base names ('Sample RE', 'Matches Base RE', 'Base Only RE') -- 'Base Only RE'
+      // must NOT be silently omitted just because it is absent from resolved.
+      const names = body.entities.map((entity) => entity.name).sort();
+      assertEquals(names, ['Base Only RE', 'Matches Base RE', 'Sample RE', 'User Only RE']);
+
+      const baseOnly = body.entities.find((entity) => entity.name === 'Base Only RE');
+      assert(baseOnly);
+      assertEquals(baseOnly.present, false);
+      assert(baseOnly.overrides && baseOnly.overrides.length > 0);
+      assert(baseOnly.overrides.every((change) => change.type === 'removed'));
+
+      const userOnly = body.entities.find((entity) => entity.name === 'User Only RE');
+      assert(userOnly);
+      assertEquals(userOnly.present, true);
+      assert(userOnly.overrides && userOnly.overrides.length > 0);
+      assert(userOnly.overrides.every((change) => change.type === 'added'));
     });
   }
 );
@@ -553,6 +593,57 @@ Deno.test('list resolved entities: 200 returns the per-arr entity list', async (
     assert(body.entities.map((entity) => entity.name).includes('Default'));
   });
 });
+
+Deno.test(
+  'list resolved entities: layer=resolved reports a real hasPendingConflict instead of the previous hardcoded false',
+  async () => {
+    const conflictOp: PcdOp = {
+      id: 2,
+      database_id: 909090,
+      origin: 'user',
+      state: 'published',
+      source: 'local',
+      filename: null,
+      op_number: null,
+      sequence: null,
+      sql: 'SELECT 1',
+      metadata: JSON.stringify({ entity: 'regular_expression', name: 'Sample RE' }),
+      desired_state: null,
+      content_hash: null,
+      last_seen_in_repo_at: null,
+      superseded_by_op_id: null,
+      pushed_at: null,
+      pushed_commit: null,
+      created_at: '2026-01-01 00:00:00',
+      updated_at: '2026-01-01 00:00:00',
+    };
+    const conflictHistory: PcdOpHistory = {
+      id: 2,
+      op_id: 2,
+      database_id: 909090,
+      batch_id: 'batch-2',
+      status: 'conflicted_pending',
+      rowcount: null,
+      conflict_reason: 'value_mismatch',
+      error: null,
+      details: null,
+      applied_at: '2026-01-01 00:00:00',
+    };
+
+    await withFixture(
+      async (databaseId) => {
+        const response = await GET_LIST(buildListGetEvent(String(databaseId), 'regularExpression', '', true));
+        assertEquals(response.status, 200);
+
+        const body = (await response.json()) as ResolvedEntityListResponse;
+        const sampleRe = body.entities.find((entity) => entity.name === 'Sample RE');
+        assert(sampleRe);
+        assertEquals(sampleRe.hasPendingConflict, true);
+      },
+      { conflicts: [{ history: conflictHistory, op: conflictOp }] }
+    );
+  }
+);
 
 // ============================================================================
 // NAMED ENDPOINT
@@ -680,6 +771,38 @@ Deno.test('get resolved entity: layer=base returns present:false (not 404) for a
     assertEquals(body.hasPendingConflict, false);
   });
 });
+
+// Regression test for the CONFIRMED hazard: the named endpoint used to detect a 404 via
+// `error.message.includes('not found')`, which ALSO matched
+// `ResolvedConfigDatabaseNotFoundError`'s "Database instance N not found" message --
+// misclassifying a database-lookup failure as a by-name entity miss. The typed
+// `mapResolvedErrorToResponse` mapping must return 400 'Database not found' here, not 404.
+Deno.test(
+  'get resolved entity: layer=base with no matching database_instances row returns 400 (typed, not message-sniffed)',
+  async () => {
+    await withFixture(async (databaseId) => {
+      const restores: Restore[] = [];
+      patchTarget(
+        databaseInstancesQueries,
+        'getById',
+        (() => undefined) as typeof databaseInstancesQueries.getById,
+        restores
+      );
+
+      try {
+        const response = await GET_NAMED(
+          buildNamedGetEvent(String(databaseId), 'regularExpression', 'Sample RE', '?layer=base', true)
+        );
+        assertEquals(response.status, 400);
+
+        const body = (await response.json()) as ErrorResponse;
+        assertEquals(body.error, 'Database not found');
+      } finally {
+        restores.reverse().forEach((restore) => restore());
+      }
+    });
+  }
+);
 
 Deno.test('get resolved entity: layer=user returns an empty overrides array when resolved matches base', async () => {
   await withLayerDivergenceFixture(async (databaseId) => {
@@ -1024,6 +1147,117 @@ Deno.test('get resolved entity live diff: sanitized infra failure reason maps to
     }
   });
 });
+
+Deno.test('get resolved entity live diff: not_configured live-diff reason maps to 400, not 500', async () => {
+  await withFixture(async (databaseId) => {
+    const instance = buildArrInstanceFixture({ id: 590007, type: 'radarr' });
+    const restores: Restore[] = [];
+    withArrInstanceFixture(instance, restores);
+
+    patchTarget(
+      _liveDiffDependencies,
+      'computeLiveDiff',
+      (async () => ({ found: false, reason: 'not_configured' })) as typeof _liveDiffDependencies.computeLiveDiff,
+      restores
+    );
+
+    try {
+      // regularExpression maps to no sync section, so the new instance/database gate is
+      // skipped entirely and this exercises computeLiveDiff's `not_configured` mapping
+      // directly.
+      const response = await GET_DIFF(
+        buildDiffGetEvent(String(databaseId), 'regularExpression', 'Sample RE', `?instanceId=${instance.id}`, true)
+      );
+      assertEquals(response.status, 400);
+    } finally {
+      restores.reverse().forEach((restore) => restore());
+      resetPreviewCreateRateLimitForTests();
+    }
+  });
+});
+
+Deno.test(
+  'get resolved entity live diff: 400 when the instance sync selection does not reference the path database',
+  async () => {
+    await withFixture(async (databaseId) => {
+      const instance = buildArrInstanceFixture({ id: 590008, type: 'radarr' });
+      const restores: Restore[] = [];
+      withArrInstanceFixture(instance, restores);
+
+      // delayProfile maps to the 'delayProfiles' section -- point the instance's own
+      // selection at a DIFFERENT database than the one in the path.
+      patchTarget(
+        arrSyncQueries,
+        'getDelayProfilesSync',
+        ((_instanceId: number) => ({
+          databaseId: databaseId + 1,
+          profileName: 'Some Profile',
+          trigger: 'manual' as const,
+          cron: null,
+        })) as typeof arrSyncQueries.getDelayProfilesSync,
+        restores
+      );
+
+      try {
+        const response = await GET_DIFF(
+          buildDiffGetEvent(String(databaseId), 'delayProfile', 'Some Profile', `?instanceId=${instance.id}`, true)
+        );
+        assertEquals(response.status, 400);
+
+        const body = (await response.json()) as ErrorResponse;
+        assert(body.error.includes('not configured to sync'));
+      } finally {
+        restores.reverse().forEach((restore) => restore());
+        resetPreviewCreateRateLimitForTests();
+      }
+    });
+  }
+);
+
+Deno.test(
+  'get resolved entity live diff: 200 when the instance sync selection references the path database',
+  async () => {
+    await withFixture(async (databaseId) => {
+      const instance = buildArrInstanceFixture({ id: 590009, type: 'radarr' });
+      const restores: Restore[] = [];
+      withArrInstanceFixture(instance, restores);
+
+      patchTarget(
+        arrSyncQueries,
+        'getDelayProfilesSync',
+        ((_instanceId: number) => ({
+          databaseId,
+          profileName: 'Some Profile',
+          trigger: 'manual' as const,
+          cron: null,
+        })) as typeof arrSyncQueries.getDelayProfilesSync,
+        restores
+      );
+      patchTarget(
+        _liveDiffDependencies,
+        'computeLiveDiff',
+        (async () => ({
+          found: true,
+          change: { entityType: 'delayProfile', name: 'Some Profile', action: 'unchanged', remoteId: null, fields: [] },
+        })) as typeof _liveDiffDependencies.computeLiveDiff,
+        restores
+      );
+
+      try {
+        const response = await GET_DIFF(
+          buildDiffGetEvent(String(databaseId), 'delayProfile', 'Some Profile', `?instanceId=${instance.id}`, true)
+        );
+        assertEquals(response.status, 200);
+
+        const body = (await response.json()) as ResolvedLiveDiffResponse;
+        assertEquals(body.changes[0].action, 'unchanged');
+      } finally {
+        restores.reverse().forEach((restore) => restore());
+        resetPreviewCreateRateLimitForTests();
+      }
+    });
+  }
+);
 
 // ============================================================================
 // COMPARE ENDPOINT (Task 3.3)

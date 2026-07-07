@@ -168,6 +168,57 @@ Deno.test('computeLiveDiff locates a singleton entity via direct field access', 
   assertEquals(result.change, change);
 });
 
+Deno.test(
+  'computeLiveDiff returns not_found when the singleton profile name does not match the requested name',
+  async () => {
+    // The live instance is configured with a DIFFERENT delay profile than the one being
+    // requested -- returning the singleton unconditionally (the pre-fix behavior) would
+    // report a live diff for the wrong profile instead of not_found.
+    const change = buildEntityChange({ entityType: 'delayProfile', name: 'Some Other Profile', fields: [] });
+
+    const stub: LiveDiffDeps['generatePreview'] = () =>
+      Promise.resolve(
+        buildPreviewResult({
+          sections: ['delayProfiles'],
+          sectionOutcomes: [{ section: 'delayProfiles', error: null, skipped: false }],
+          delayProfiles: { section: 'delayProfiles', profile: change },
+        })
+      );
+
+    const result = await computeLiveDiff({
+      instance: buildInstance({ type: 'radarr' }),
+      entityType: 'delayProfile',
+      name: 'Default',
+      deps: { generatePreview: stub },
+    });
+
+    assertEquals(result, { found: false, reason: 'not_found' });
+  }
+);
+
+Deno.test('computeLiveDiff locates a namespace-suffixed singleton profile name', async () => {
+  const change = buildEntityChange({ entityType: 'delayProfile', name: 'Default​', fields: [] });
+
+  const stub: LiveDiffDeps['generatePreview'] = () =>
+    Promise.resolve(
+      buildPreviewResult({
+        sections: ['delayProfiles'],
+        sectionOutcomes: [{ section: 'delayProfiles', error: null, skipped: false }],
+        delayProfiles: { section: 'delayProfiles', profile: change },
+      })
+    );
+
+  const result = await computeLiveDiff({
+    instance: buildInstance({ type: 'radarr' }),
+    entityType: 'delayProfile',
+    name: 'Default',
+    deps: { generatePreview: stub },
+  });
+
+  assert(result.found, 'expected the namespace-suffixed singleton candidate to match');
+  assertEquals(result.change, change);
+});
+
 Deno.test('computeLiveDiff returns not_found when the entity is absent from the section payload', async () => {
   const stub: LiveDiffDeps['generatePreview'] = () =>
     Promise.resolve(
@@ -187,6 +238,32 @@ Deno.test('computeLiveDiff returns not_found when the entity is absent from the 
 
   assertEquals(result, { found: false, reason: 'not_found' });
 });
+
+Deno.test(
+  'computeLiveDiff returns not_configured (not error) when the section has no sync configuration on the instance',
+  async () => {
+    // `skipped: true` with `error: null` and no `result` (see orchestrator.ts's
+    // `!handler.hasConfig(...)` branch) means this instance has never configured the
+    // section at all -- a normal outcome, not a fetch/parse failure. Before the fix this
+    // fell through to the generic 'error' reason, which routes turn into a 500.
+    const stub: LiveDiffDeps['generatePreview'] = () =>
+      Promise.resolve(
+        buildPreviewResult({
+          sections: ['qualityProfiles'],
+          sectionOutcomes: [{ section: 'qualityProfiles', error: null, skipped: true }],
+        })
+      );
+
+    const result = await computeLiveDiff({
+      instance: buildInstance({ type: 'radarr' }),
+      entityType: 'qualityProfile',
+      name: 'Profile A',
+      deps: { generatePreview: stub },
+    });
+
+    assertEquals(result, { found: false, reason: 'not_configured' });
+  }
+);
 
 Deno.test('computeLiveDiff maps a section outcome error to a sanitized reason', async () => {
   const restores: Restore[] = [];

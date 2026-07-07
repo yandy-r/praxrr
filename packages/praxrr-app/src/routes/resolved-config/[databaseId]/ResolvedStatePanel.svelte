@@ -4,12 +4,12 @@
   import type { components } from '$api/v1.d.ts';
   import JsonView from '$ui/meta/JsonView.svelte';
   import Badge from '$ui/badge/Badge.svelte';
+  import { FIELD_META, formatFieldValue } from '$ui/resolved/fieldChangeDisplay.ts';
 
   type ResolvedEntityType = components['schemas']['ResolvedEntityState']['entityType'];
   type ArrAppType = components['schemas']['ResolvedInstanceState']['arrType'];
   type ResolvedEntityState = components['schemas']['ResolvedEntityState'];
   type FieldChange = components['schemas']['FieldChange'];
-  type FieldChangeType = components['schemas']['SyncPreviewFieldChangeType'];
   type ErrorResponse = components['schemas']['ErrorResponse'];
   type Layer = 'resolved' | 'base' | 'user';
 
@@ -23,12 +23,6 @@
     { id: 'base', label: 'Base' },
     { id: 'user', label: 'User Overrides' },
   ];
-
-  const FIELD_META: Record<FieldChangeType, { glyph: string; label: string; textClass: string }> = {
-    added: { glyph: '+', label: 'Added', textClass: 'text-emerald-700 dark:text-emerald-300' },
-    changed: { glyph: '~', label: 'Changed', textClass: 'text-amber-700 dark:text-amber-300' },
-    removed: { glyph: '-', label: 'Removed', textClass: 'text-red-700 dark:text-red-300' },
-  };
 
   let activeLayer: Layer = 'resolved';
 
@@ -61,6 +55,12 @@
   async function loadEntity() {
     if (entityName === null) return;
 
+    // Capture the key this call is fetching for -- if a newer selection supersedes it
+    // (entity/layer/arrType change) before this call's awaits resolve, `fetchKey` will
+    // have moved on and every guard below bails instead of letting an older, slower
+    // response overwrite a newer one's state.
+    const requestKey = fetchKey;
+
     loading = true;
     error = null;
     showRaw = false;
@@ -71,20 +71,27 @@
       const response = await fetch(
         `/api/v1/pcd/${databaseId}/resolved/${entityType}/${encodeURIComponent(entityName)}?${query.toString()}`
       );
+      if (requestKey !== fetchKey) return;
 
       if (!response.ok) {
         const body = (await response.json().catch(() => null)) as ErrorResponse | null;
+        if (requestKey !== fetchKey) return;
         error = body?.error ?? `Failed to load resolved state (HTTP ${response.status})`;
         state = null;
         return;
       }
 
-      state = (await response.json()) as ResolvedEntityState;
+      const nextState = (await response.json()) as ResolvedEntityState;
+      if (requestKey !== fetchKey) return;
+      state = nextState;
     } catch (err) {
+      if (requestKey !== fetchKey) return;
       error = err instanceof Error ? err.message : 'Failed to load resolved state';
       state = null;
     } finally {
-      loading = false;
+      if (requestKey === fetchKey) {
+        loading = false;
+      }
     }
   }
 
@@ -106,15 +113,6 @@
 
   function isComplex(value: unknown): boolean {
     return typeof value === 'object' && value !== null;
-  }
-
-  function formatFieldValue(value: unknown): string {
-    if (value === undefined) return 'undefined';
-    if (value === null) return 'null';
-    if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
-      return String(value);
-    }
-    return JSON.stringify(value, null, 2);
   }
 </script>
 

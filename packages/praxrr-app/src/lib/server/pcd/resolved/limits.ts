@@ -10,9 +10,17 @@
  */
 
 import { registerRateLimitAttempt } from '$utils/rateLimit.ts';
+import { COMPARE_MAX_INSTANCES } from '$shared/resolvedConfig.ts';
 
-/** Maximum number of Arr instances a single cross-instance comparison request may target. */
-export const COMPARE_MAX_INSTANCES = 8;
+/**
+ * Maximum number of Arr instances a single cross-instance comparison request may target.
+ * Re-exported from `$shared/resolvedConfig.ts` (client-safe -- no server-only imports)
+ * so client-side code (e.g. the viewer page) can import the same cap without pulling in
+ * this server-only module; kept as a re-export here (not a redeclaration) so server and
+ * client can never drift out of sync, and existing server-side imports of
+ * `COMPARE_MAX_INSTANCES` from this module keep working unchanged.
+ */
+export { COMPARE_MAX_INSTANCES };
 
 /** Namespaces compare-attempt keys so they never collide with other `registerRateLimitAttempt` callers. */
 const COMPARE_RATE_LIMIT_KEY_PREFIX = 'resolved-compare:';
