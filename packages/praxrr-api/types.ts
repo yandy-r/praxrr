@@ -2196,7 +2196,9 @@ export interface components {
             description: string | null;
             includeInRename: boolean;
             tags: string[];
-            conditions: Record<string, never>[];
+            conditions: {
+                [key: string]: unknown;
+            }[];
             tests: components["schemas"]["PortableCustomFormatTest"][];
         };
         PortableCustomFormatScore: {

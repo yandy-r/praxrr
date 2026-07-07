@@ -5202,6 +5202,7 @@
             "type": "array",
             "items": {
               "type": "object",
+              "additionalProperties": true,
               "description": "Condition data (shape varies by condition type)"
             }
           },

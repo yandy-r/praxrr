@@ -125,3 +125,5 @@ export type {
   ResolvedLayer,
   ResolvedReaderFn,
 } from './resolved/types.ts';
+export { computeLiveDiff } from './resolved/liveDiff.ts';
+export type { ComputeLiveDiffInput, LiveDiffDeps, LiveDiffReason, LiveDiffResult } from './resolved/liveDiff.ts';
