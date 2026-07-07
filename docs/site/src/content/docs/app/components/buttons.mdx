@@ -1,0 +1,325 @@
+---
+title: Buttons & Actions
+description: 'Reusable button and action-bar components for the Praxrr UI: variants, sizes, icons, and toolbar composition.'
+---
+
+import ButtonDemo from '../../../../components/demos/ButtonDemo.svelte';
+
+This category covers the reusable button and action-bar controls used across the Praxrr UI. All components live under `$ui/` (source: `packages/praxrr-app/src/lib/client/ui/`) and use Svelte 4 `export let` prop declarations with forwarded `on:click` handlers. They compose into connected control strips for list pages, toolbars, and dropdown triggers.
+
+## Button
+
+Multi-variant button (primary/secondary/danger/ghost) with optional icon, responsive sizing, tooltip, and anchor mode. Renders a `<button>` normally, or an `<a>` when `href` is set. The element is wrapped in a `Tooltip`.
+
+```svelte
+import Button from '$ui/button/Button.svelte';
+```
+
+| Prop               | Type                                              | Default       | Required | Description                                                                                        |
+| ------------------ | ------------------------------------------------- | ------------- | -------- | -------------------------------------------------------------------------------------------------- |
+| `text`             | `string`                                          | `''`          | No       | Button label text; when empty and `icon` is set, the button renders icon-only (square padding).    |
+| `variant`          | `'primary' \| 'secondary' \| 'danger' \| 'ghost'` | `'secondary'` | No       | Visual style. primary=accent fill, secondary=bordered neutral, danger=red fill, ghost=transparent. |
+| `size`             | `'xs' \| 'sm' \| 'md'`                            | `'sm'`        | No       | Size preset controlling padding, rounding, text size, and icon size (xs=12, sm=14, md=16).         |
+| `disabled`         | `boolean`                                         | `false`       | No       | Disables the button (ignored in anchor mode); applies not-allowed cursor and 50% opacity.          |
+| `icon`             | `ComponentType \| null`                           | `null`        | No       | Lucide/Svelte icon component to render alongside (or instead of) the text.                         |
+| `iconColor`        | `string`                                          | `''`          | No       | Tailwind class(es) applied to the icon; falls back to a neutral color for the ghost variant.       |
+| `textColor`        | `string`                                          | `''`          | No       | Tailwind class(es) applied to the text span; falls back to a neutral color for the ghost variant.  |
+| `iconPosition`     | `'left' \| 'right'`                               | `'left'`      | No       | Whether the icon renders before or after the text/slot.                                            |
+| `type`             | `'button' \| 'submit'`                            | `'button'`    | No       | Native button type (button mode only).                                                             |
+| `responsive`       | `boolean`                                         | `false`       | No       | When true, auto-switches to the `xs` size on screens below 768px via a `matchMedia` listener.      |
+| `hideTextOnMobile` | `boolean`                                         | `false`       | No       | Hides the text span on mobile (`hidden md:inline`), showing icon only on small screens.            |
+| `fullWidth`        | `boolean`                                         | `false`       | No       | Applies `w-full` to stretch the button to its container width.                                     |
+| `href`             | `string \| undefined`                             | `undefined`   | No       | When provided, renders an `<a>` anchor instead of a `<button>`.                                    |
+| `target`           | `string \| undefined`                             | `undefined`   | No       | Anchor target attribute (anchor mode only).                                                        |
+| `rel`              | `string \| undefined`                             | `undefined`   | No       | Anchor rel attribute (anchor mode only).                                                           |
+| `justify`          | `'center' \| 'between'`                           | `'center'`    | No       | Content alignment; `'between'` is used for dropdown-style triggers (`justify-between`).            |
+| `title`            | `string`                                          | `''`          | No       | Native title attribute, applied only when no tooltip is set.                                       |
+| `ariaLabel`        | `string`                                          | `''`          | No       | `aria-label`; falls back to the tooltip text when empty.                                           |
+| `tooltip`          | `string`                                          | `''`          | No       | Tooltip text rendered via the wrapping `Tooltip` component.                                        |
+| `tooltipPosition`  | `'top' \| 'bottom'`                               | `'bottom'`    | No       | Position passed to the `Tooltip`.                                                                  |
+
+### Usage
+
+```svelte
+<script>
+  import Button from '$ui/button/Button.svelte';
+  import { Plus, Filter } from 'lucide-svelte';
+
+  function handleAdd() {
+    // ...
+  }
+</script>
+
+<Button text="Add" variant="primary" icon={Plus} on:click={handleAdd} />
+<Button text="Next" variant="secondary" icon={Filter} iconPosition="right" />
+<Button text="Docs" variant="ghost" href="/docs" target="_blank" rel="noopener" />
+```
+
+The interactive island below reproduces the `variant` and `size` API against standard Tailwind colors.
+
+<ButtonDemo client:load />
+
+### Events & Slots
+
+- `on:click` — forwarded from the underlying `<button>` or `<a>`.
+- Default slot — rendered between the text and the right-position icon, for custom content such as dropdown chevrons.
+
+### Variants & Notes
+
+- Variants: `primary`, `secondary`, `danger`, `ghost`. Sizes: `xs`, `sm`, `md`.
+- Icon-only mode auto-triggers when `icon` is set and `text` is empty (uses square `iconOnlySizeClasses`).
+- Svelte 4-style `export let` props with a forwarded `on:click`; wrapped in `$ui/tooltip/Tooltip.svelte`.
+- Responsive mode registers a `(max-width: 767px)` `matchMedia` listener on mount and cleans it up on destroy.
+- `iconSize` is derived from the effective size.
+
+## ActionButton
+
+Bordered icon button sized for action bars, with an optional hover-activated dropdown region. Fixed 40px height; square by default.
+
+```svelte
+import ActionButton from '$ui/actions/ActionButton.svelte';
+```
+
+| Prop               | Type                            | Default     | Required | Description                                                                                |
+| ------------------ | ------------------------------- | ----------- | -------- | ------------------------------------------------------------------------------------------ |
+| `icon`             | `ComponentType \| undefined`    | `undefined` | No       | Icon component rendered at size 20 inside the button.                                      |
+| `iconClass`        | `string`                        | `''`        | No       | Extra Tailwind class(es) appended to the icon.                                             |
+| `square`           | `boolean`                       | `true`      | No       | Fixed square size (`h-10 w-10`); when false, uses `h-10` with horizontal padding (`px-4`). |
+| `hasDropdown`      | `boolean`                       | `false`     | No       | Enables the hover-driven dropdown slot region.                                             |
+| `dropdownPosition` | `'left' \| 'right' \| 'middle'` | `'left'`    | No       | Passed through to the dropdown slot as a slot prop for positioning.                        |
+| `disabled`         | `boolean`                       | `false`     | No       | Disables the button; applies not-allowed cursor and 50% opacity, removes hover styles.     |
+| `title`            | `string`                        | `''`        | No       | Native title/tooltip attribute on the button.                                              |
+| `type`             | `'button' \| 'submit'`          | `'button'`  | No       | Native button type.                                                                        |
+| `variant`          | `'neutral' \| 'danger'`         | `'neutral'` | No       | Hover style; danger adds a red icon tint on group hover.                                   |
+
+### Usage
+
+```svelte
+<script>
+  import ActionButton from '$ui/actions/ActionButton.svelte';
+  import Dropdown from '$ui/dropdown/Dropdown.svelte';
+  import DropdownItem from '$ui/dropdown/DropdownItem.svelte';
+  import { Plus, Filter, FileText } from 'lucide-svelte';
+
+  function add() {
+    // ...
+  }
+</script>
+
+<ActionButton icon={Plus} title="Add" on:click={add} />
+
+<ActionButton icon={Filter} hasDropdown={true} dropdownPosition="right">
+  <svelte:fragment slot="dropdown">
+    <Dropdown position="right">
+      <DropdownItem icon={FileText} label="Option A" />
+    </Dropdown>
+  </svelte:fragment>
+</ActionButton>
+```
+
+### Events & Slots
+
+- `on:click` — forwarded from the inner `<button>`.
+- Default slot — rendered inside the button, after the icon.
+- `dropdown` slot — exposes slot props `dropdownPosition` and `open` (boolean); shown only while hovered and `hasDropdown` is true.
+
+### Variants & Notes
+
+- `variant`: `neutral` or `danger`; `square` vs. padded (`square={false}`).
+- Hover state uses a 100ms leave delay so the pointer can travel into the dropdown.
+- The dropdown appears with a 150ms fade transition.
+- The outer wrapper is a `role="group"` div handling `mouseenter`/`mouseleave`.
+
+## ActionsBar
+
+Layout wrapper that groups action items (`SearchAction`, `ActionButton`, `ViewToggle`, etc.) into a single connected control strip with collapsed borders and auto-rounded outer edges.
+
+```svelte
+import ActionsBar from '$ui/actions/ActionsBar.svelte';
+```
+
+| Prop        | Type     | Default | Required | Description                                                                                  |
+| ----------- | -------- | ------- | -------- | -------------------------------------------------------------------------------------------- |
+| `className` | `string` | `''`    | No       | Extra Tailwind class(es) appended to the bar's root (e.g. `md:justify-start` to left-align). |
+
+### Usage
+
+```svelte
+<script>
+  import ActionsBar from '$ui/actions/ActionsBar.svelte';
+  import SearchAction from '$ui/actions/SearchAction.svelte';
+  import ActionButton from '$ui/actions/ActionButton.svelte';
+  import ViewToggle from '$ui/actions/ViewToggle.svelte';
+  import { Plus } from 'lucide-svelte';
+
+  let view = 'table';
+</script>
+
+<ActionsBar className="md:justify-start">
+  <SearchAction searchStore={search} responsive />
+  <ActionButton icon={Plus} title="Add" />
+  <ViewToggle bind:value={view} />
+</ActionsBar>
+```
+
+### Slots
+
+- Default slot — holds the child action items. Scoped `:global` styles collapse inner borders (`margin-left: -1px`), strip inner rounding, and re-apply rounding to the first/last (or only) child's bordered elements.
+
+### Variants & Notes
+
+- On mobile the bar is centered and full-width (`flex w-full justify-center`), switching to auto-width left-aligned on md+ (`md:w-auto md:mx-0`).
+- The border/rounding orchestration relies on the DOM shape of children, so items must be direct children.
+
+## ViewToggle
+
+Action-bar control that toggles a data page between `'cards'` and `'table'` view via an `ActionButton` with a hover dropdown of the two options.
+
+```svelte
+import ViewToggle from '$ui/actions/ViewToggle.svelte';
+```
+
+| Prop       | Type                              | Default   | Required | Description                                                                                            |
+| ---------- | --------------------------------- | --------- | -------- | ------------------------------------------------------------------------------------------------------ |
+| `value`    | `ViewMode` (`'table' \| 'cards'`) | `'table'` | No       | Currently selected view mode; intended to be bound (`bind:value`) — dropdown items assign it on click. |
+| `position` | `'left' \| 'right' \| 'middle'`   | `'right'` | No       | Dropdown positioning, forwarded to the inner `Dropdown` and the `ActionButton`'s `dropdownPosition`.   |
+
+### Usage
+
+```svelte
+<script>
+  import ViewToggle from '$ui/actions/ViewToggle.svelte';
+  import type { ViewMode } from '$lib/client/stores/dataPage';
+
+  let view: ViewMode = 'table';
+</script>
+
+<ViewToggle bind:value={view} position="right" />
+```
+
+### Events & Slots
+
+- No custom dispatched events; state changes are surfaced by mutating the bindable `value` prop.
+- No slots exposed to consumers (internally composes `ActionButton` + `Dropdown` + `DropdownItem` for Cards/Table).
+
+### Variants & Notes
+
+- Two options: Cards (`LayoutGrid` icon) and Table (`Table` icon); the `Eye` icon is the trigger.
+- Built on `ActionButton` (`icon={Eye}`, `hasDropdown`) with a `Dropdown` of two `DropdownItem`s.
+- Selection is reflected by the `selected` state on each item. Use with `bind:value` to observe changes.
+
+## SearchAction
+
+Search input designed for action bars, backed by a `SearchStore`. Desktop shows an inline bordered input; in responsive mode on mobile it collapses to a trigger button that opens a full-screen search modal. Supports an active-query badge.
+
+```svelte
+import SearchAction from '$ui/actions/SearchAction.svelte';
+```
+
+| Prop          | Type          | Default       | Required | Description                                                                                       |
+| ------------- | ------------- | ------------- | -------- | ------------------------------------------------------------------------------------------------- |
+| `searchStore` | `SearchStore` | —             | Yes      | Required search store; the component reads `$searchStore.query` and calls `setQuery()`/`clear()`. |
+| `placeholder` | `string`      | `'Search...'` | No       | Input placeholder text (suppressed on desktop while an `activeQuery` badge is shown).             |
+| `activeQuery` | `string`      | `''`          | No       | An already-applied query shown as an accent `Badge` inside the field; enables Backspace-to-clear. |
+| `responsive`  | `boolean`     | `false`       | No       | When true, switches to the mobile button+modal presentation on screens below 768px.               |
+| `hideIcon`    | `boolean`     | `false`       | No       | Hides the leading Search icon and adjusts input padding accordingly.                              |
+
+### Usage
+
+```svelte
+<script>
+  import SearchAction from '$ui/actions/SearchAction.svelte';
+  import { createSearchStore } from '$lib/client/stores/search';
+
+  const search = createSearchStore();
+
+  function runSearch(query) {
+    // ...
+  }
+
+  function resetFilter() {
+    // ...
+  }
+</script>
+
+<SearchAction
+  searchStore={search}
+  placeholder="Search components..."
+  responsive
+  on:submit={(e) => runSearch(e.detail)}
+  on:clearQuery={resetFilter}
+/>
+```
+
+### Events & Slots
+
+- `on:submit` — dispatches the trimmed query string when Enter is pressed with a non-empty query.
+- `on:clearQuery` — dispatched (void) when Backspace is pressed on an empty input while an `activeQuery` exists, or when the `activeQuery` clear button is clicked.
+- No slots.
+
+### Variants & Notes
+
+- Desktop inline mode vs. mobile modal mode (driven by `responsive` + viewport).
+- Clear (X) button state varies: clears current query, clears `activeQuery`, or closes the modal.
+- `createEventDispatcher` is typed as `{ submit: string; clearQuery: void }`.
+- Registers a `(max-width: 767px)` `matchMedia` listener when responsive; closes the modal automatically when leaving mobile width.
+- Keydown handling: Enter submits, Backspace on empty clears `activeQuery`, Escape closes the modal.
+- Uses `Badge` (`$ui/badge/Badge.svelte`) for the active query chip.
+
+## SourceFilterAction
+
+Action-bar filter for selecting one or more PCD sources. Renders as inline segmented pill buttons for small source counts, or a labeled dropdown (with active count badge) when there are many sources, on mobile, or when forced. Supports single- and multi-select modes.
+
+```svelte
+import SourceFilterAction from '$ui/actions/SourceFilterAction.svelte';
+```
+
+| Prop             | Type                            | Default              | Required | Description                                                                                                            |
+| ---------------- | ------------------------------- | -------------------- | -------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `sources`        | `SourceRef[]`                   | `[]`                 | No       | Available sources; each maps to an option keyed `${source.type}:${source.id}` with a Database or Trash2 icon.          |
+| `selectedKeys`   | `SourceFilterKey[]`             | `[]`                 | No       | Currently selected source keys; normalized against available options. Bindable — updated before each change dispatch.  |
+| `selectionMode`  | `'single' \| 'multi'`           | `'multi'`            | No       | single=exactly one source active (radio-like); multi=any subset, with an 'All sources' option and a last-source guard. |
+| `position`       | `'left' \| 'right' \| 'middle'` | `'right'`            | No       | Dropdown menu position (dropdown mode).                                                                                |
+| `responsive`     | `boolean`                       | `true`               | No       | When true, forces dropdown mode on screens below 768px via `matchMedia`.                                               |
+| `hideWhenSingle` | `boolean`                       | `true`               | No       | When true, the component renders nothing if there is 0 or 1 source option.                                             |
+| `pillsThreshold` | `number`                        | `5`                  | No       | Source count at/above which the inline pills collapse into a dropdown.                                                 |
+| `dropdownOnly`   | `boolean`                       | `false`              | No       | Forces dropdown presentation regardless of source count or viewport.                                                   |
+| `label`          | `string`                        | `'Sources'`          | No       | Text label on the dropdown trigger button.                                                                             |
+| `ariaLabel`      | `string`                        | `'Filter by source'` | No       | Accessible label applied to the group and trigger button/title.                                                        |
+| `disabled`       | `boolean`                       | `false`              | No       | Disables all interaction (toggle, select-all, dropdown open).                                                          |
+| `active`         | `boolean \| undefined`          | `undefined`          | No       | Optional override of the computed 'active' (filtered) visual state; when undefined it is derived.                      |
+
+### Usage
+
+```svelte
+<script>
+  import SourceFilterAction from '$ui/actions/SourceFilterAction.svelte';
+
+  let selectedKeys = [];
+
+  function applyFilter(selectedSources) {
+    // ...
+  }
+</script>
+
+<SourceFilterAction
+  sources={sources}
+  bind:selectedKeys
+  selectionMode="multi"
+  on:change={(e) => applyFilter(e.detail.selectedSources)}
+/>
+```
+
+### Events & Slots
+
+- `on:change` — dispatches `SourceFilterChangeDetail { selectedKeys, selectedSources, selectionMode, active }` whenever the normalized selection changes.
+- No slots (internally composes `Dropdown` + `DropdownItem` in dropdown mode; native pill buttons in inline mode).
+
+### Variants & Notes
+
+- Inline segmented pills (`aria-pressed` toggles) vs. dropdown trigger with Filter icon, active count badge (`n/total`), and ChevronDown.
+- Multi mode adds an 'All sources' item; single mode closes the dropdown on select.
+- Uses local types `SourceOption` and `SourceFilterChangeDetail`; keys are the template-literal type `${SourceRef['type']}:${number}`.
+- `normalizeSelection()` filters invalid keys and defaults empty multi-selection to all options / empty single-selection to the first option.
+- `computeActiveState()` marks the filter active when a strict subset is selected.
+- Dropdown uses `use:clickOutside` to close and also closes when the viewport crosses into mobile width; registers a `(max-width: 767px)` `matchMedia` listener when responsive.

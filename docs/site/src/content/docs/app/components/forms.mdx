@@ -1,0 +1,692 @@
+---
+title: Form Inputs
+description: 'Form input components: text, number, date/time, tags, toggles, cron, ranges, key-value lists, and disclosure sections.'
+---
+
+import ToggleDemo from '../../../../components/demos/ToggleDemo.svelte';
+
+This category covers the reusable form input controls used across the Praxrr UI. All components live under `$ui/` (source: `packages/praxrr-app/src/lib/client/ui/`) and use Svelte 4 `export let` prop declarations. Some forward classic `on:*` events via `createEventDispatcher`, while others expose `onchange` callback props — the tables below note which pattern each component uses.
+
+## FormInput
+
+Labeled text field wrapper supporting text/number/email/password/url/time/date inputs, a multi-line `<textarea>`, an auto-resizing wrap mode, a password visibility toggle, and a suffix slot.
+
+```svelte
+import FormInput from '$ui/form/FormInput.svelte';
+```
+
+| Prop                | Type                                                                       | Default  | Required | Description                                                                                      |
+| ------------------- | -------------------------------------------------------------------------- | -------- | -------- | ------------------------------------------------------------------------------------------------ |
+| `label`             | `string`                                                                   | —        | Yes      | Field label text (rendered in a `<label>`).                                                      |
+| `description`       | `string`                                                                   | `''`     | No       | Helper text shown under the label.                                                               |
+| `placeholder`       | `string`                                                                   | `''`     | No       | Input placeholder.                                                                               |
+| `value`             | `string`                                                                   | `''`     | No       | Bindable input value.                                                                            |
+| `textarea`          | `boolean`                                                                  | `false`  | No       | Render a multi-line `<textarea>` instead of `<input>`.                                           |
+| `rows`              | `number`                                                                   | `6`      | No       | Textarea row count (only for textarea mode).                                                     |
+| `type`              | `'text' \| 'number' \| 'email' \| 'password' \| 'url' \| 'time' \| 'date'` | `'text'` | No       | Native input type (ignored when textarea/wrap; overridden by `private_`).                        |
+| `required`          | `boolean`                                                                  | `false`  | No       | Marks field required and renders a red asterisk.                                                 |
+| `hideLabel`         | `boolean`                                                                  | `false`  | No       | Visually hide the label (sr-only); also collapses container spacing when no description.         |
+| `name`              | `string`                                                                   | `''`     | No       | Input name and id (label for-attribute).                                                         |
+| `autocomplete`      | `string`                                                                   | `''`     | No       | Autocomplete attribute (only applied on non-textarea/non-wrap inputs).                           |
+| `private_`          | `boolean`                                                                  | `false`  | No       | Password mode: masks input and adds an Eye/EyeOff visibility toggle button.                      |
+| `readonly`          | `boolean`                                                                  | `false`  | No       | Read-only field with muted styling.                                                              |
+| `mono`              | `boolean`                                                                  | `false`  | No       | Use monospace font.                                                                              |
+| `disabled`          | `boolean`                                                                  | `false`  | No       | Disable the input with muted styling.                                                            |
+| `showPrivateToggle` | `boolean`                                                                  | `true`   | No       | In `private_` mode, show/hide the reveal button.                                                 |
+| `wrap`              | `boolean`                                                                  | `false`  | No       | Render a single-visual-line textarea that auto-resizes to content (via the `autoResize` action). |
+| `size`              | `'sm' \| 'md' \| 'lg'`                                                     | `'md'`   | No       | Sizing/padding/rounding preset.                                                                  |
+| `inputClass`        | `string`                                                                   | `''`     | No       | Extra CSS classes appended to the input element.                                                 |
+| `inputElement`      | `HTMLInputElement \| HTMLTextAreaElement \| null`                          | `null`   | No       | Bindable reference to the underlying input/textarea element.                                     |
+
+### Usage
+
+```svelte
+<script>
+  import FormInput from '$ui/form/FormInput.svelte';
+  import Badge from '$ui/badge/Badge.svelte';
+
+  let demoFormPassword = '';
+  let val = '';
+</script>
+
+<FormInput label="Password" name="apiKey" private_ bind:value={demoFormPassword} on:input={(e) => (val = e.detail)}>
+  <svelte:fragment slot="suffix"><Badge>copy</Badge></svelte:fragment>
+</FormInput>
+```
+
+### Events & Slots
+
+- `on:input` — dispatched with the current value string (`detail`).
+- `on:focus` / `on:blur` — dispatched (void).
+- `suffix` slot — rendered as an absolutely-positioned adornment inside the input (triggers a relative wrapper and right-padding).
+
+### Variants & Notes
+
+- Sizes: `sm`, `md`, `lg`. Modes: `textarea`, `private_` (password), `wrap` (auto-resize).
+- `mono` font; `readonly`/`disabled` muted states; time/date types get a dark color-scheme.
+- Svelte 4 syntax (`export let`, `createEventDispatcher`, `on:*`, `$$slots.suffix`). Render-branch precedence: textarea, then `private_`, then wrap, then plain input.
+- In `private_` mode the input type toggles between `'text'`/`'password'` regardless of `type`; `hasSuffix` derives from `$$slots.suffix`.
+
+## NumberInput
+
+Numeric input with custom stepper up/down buttons, min/max/step clamping, partial-input tolerance, compact and responsive auto-compact sizing, and mono/sans font options. Unlabeled bare control.
+
+```svelte
+import NumberInput from '$ui/form/NumberInput.svelte';
+```
+
+| Prop           | Type                                     | Default     | Required | Description                                                                       |
+| -------------- | ---------------------------------------- | ----------- | -------- | --------------------------------------------------------------------------------- |
+| `name`         | `string`                                 | —           | Yes      | Input name attribute.                                                             |
+| `id`           | `string`                                 | `name`      | No       | Input id (defaults to the `name` prop).                                           |
+| `value`        | `number \| undefined`                    | `undefined` | No       | Bindable numeric value; `undefined` means empty.                                  |
+| `min`          | `number \| undefined`                    | `undefined` | No       | Minimum allowed value (clamps input and blocks decrement).                        |
+| `max`          | `number \| undefined`                    | `undefined` | No       | Maximum allowed value (clamps input and blocks increment).                        |
+| `step`         | `number`                                 | `1`         | No       | Increment/decrement step.                                                         |
+| `required`     | `boolean`                                | `false`     | No       | Native required attribute.                                                        |
+| `disabled`     | `boolean`                                | `false`     | No       | Disable input and stepper buttons.                                                |
+| `placeholder`  | `string`                                 | `''`        | No       | Placeholder text.                                                                 |
+| `font`         | `'mono' \| 'sans' \| undefined`          | `undefined` | No       | Font family override.                                                             |
+| `compact`      | `boolean`                                | `false`     | No       | Smaller sizing with narrower stepper buttons.                                     |
+| `responsive`   | `boolean`                                | `false`     | No       | Auto-switch to compact and hide steppers below 1280px (via `matchMedia`).         |
+| `onchange`     | `((value: number) => void) \| undefined` | `undefined` | No       | Callback prop fired on committed value changes (not fired for undefined/cleared). |
+| `onMinBlocked` | `(() => void) \| undefined`              | `undefined` | No       | Callback when decrement is blocked at min.                                        |
+| `onMaxBlocked` | `(() => void) \| undefined`              | `undefined` | No       | Callback when increment is blocked at max.                                        |
+
+### Usage
+
+```svelte
+<script>
+  import NumberInput from '$ui/form/NumberInput.svelte';
+
+  let demoNumber = 50;
+  let score = 50;
+</script>
+
+<NumberInput name="score" bind:value={demoNumber} min={0} max={100} step={1} on:change={(e) => e.detail !== undefined && (score = e.detail)} />
+```
+
+### Events & Slots
+
+- `on:change` — dispatched on every commit, including `undefined` when the field is cleared on blur.
+- `onchange` callback prop — receives numbers only (never `undefined`).
+
+### Variants & Notes
+
+- Default / `compact` / `responsive` (auto-compact plus hidden steppers on small screens). `font`: `mono` or `sans`.
+- Internally uses Svelte 4 `on:input`/`on:focus`/`on:blur` with `bind:value={inputValue}` (string state).
+- Allows partial inputs (`-`, `.`, `-.`) while typing; commits and clamps on blur. Emits both `dispatch('change')` and the `onchange` callback.
+
+## DateInput
+
+Composite `YYYY-MM-DD` date picker built from three `SearchDropdown` selects (month/day/year) with per-month day-count clamping and a configurable year range.
+
+```svelte
+import DateInput from '$ui/form/DateInput.svelte';
+```
+
+| Prop          | Type                   | Default     | Required | Description                                                    |
+| ------------- | ---------------------- | ----------- | -------- | -------------------------------------------------------------- |
+| `label`       | `string`               | —           | Yes      | Field label.                                                   |
+| `description` | `string`               | `''`        | No       | Helper text under the label.                                   |
+| `value`       | `string`               | `''`        | No       | Bindable value in `YYYY-MM-DD` format.                         |
+| `required`    | `boolean`              | `false`     | No       | Renders a red asterisk on the label.                           |
+| `hideLabel`   | `boolean`              | `false`     | No       | Hide the label entirely (label not rendered).                  |
+| `name`        | `string`               | `''`        | No       | Base name; child selects get `-month`/`-day`/`-year` suffixes. |
+| `readonly`    | `boolean`              | `false`     | No       | Treated the same as disabled (`effectiveDisabled`).            |
+| `disabled`    | `boolean`              | `false`     | No       | Disable all three selects.                                     |
+| `size`        | `'sm' \| 'md' \| 'lg'` | `'md'`      | No       | Size passed to each `SearchDropdown`.                          |
+| `minYear`     | `number \| undefined`  | `undefined` | No       | Minimum selectable year (default `currentYear - 10`).          |
+| `maxYear`     | `number \| undefined`  | `undefined` | No       | Maximum selectable year (default `currentYear + 10`).          |
+
+### Usage
+
+```svelte
+<script>
+  import DateInput from '$ui/form/DateInput.svelte';
+
+  let dateValue = '';
+</script>
+
+<DateInput label="Release date" name="release" bind:value={dateValue} minYear={2000} maxYear={2030} on:change={(e) => (dateValue = e.detail)} />
+```
+
+### Events & Slots
+
+- `on:input` and `on:change` — both fire with the new `YYYY-MM-DD` string when any field changes.
+
+### Variants & Notes
+
+- Sizes: `sm`, `md`, `lg`. Year range configurable via `minYear`/`maxYear` (auto-normalized so `min <= max`).
+- An empty value auto-initializes to today's date on mount. Day options recompute from days-in-month; the day clamps down if the month/year shrinks.
+- Uses `SearchDropdown` with `fullWidth={false}`.
+
+## TimeInput
+
+Composite `HH:MM` (24-hour) time picker built from two `SearchDropdown` selects (hour 00-23, minute 00-59) with fixed-width fields.
+
+```svelte
+import TimeInput from '$ui/form/TimeInput.svelte';
+```
+
+| Prop            | Type                   | Default | Required | Description                                              |
+| --------------- | ---------------------- | ------- | -------- | -------------------------------------------------------- |
+| `label`         | `string`               | —       | Yes      | Field label.                                             |
+| `description`   | `string`               | `''`    | No       | Helper text under the label.                             |
+| `value`         | `string`               | `''`    | No       | Bindable value in `HH:MM` format.                        |
+| `required`      | `boolean`              | `false` | No       | Renders a red asterisk on the label.                     |
+| `hideLabel`     | `boolean`              | `false` | No       | Hide the label entirely.                                 |
+| `name`          | `string`               | `''`    | No       | Base name; child selects get `-hour`/`-minute` suffixes. |
+| `readonly`      | `boolean`              | `false` | No       | Disables the selects (combined with `disabled`).         |
+| `disabled`      | `boolean`              | `false` | No       | Disable both selects.                                    |
+| `size`          | `'sm' \| 'md' \| 'lg'` | `'md'`  | No       | Size passed to each `SearchDropdown`.                    |
+| `fieldWidthRem` | `number`               | `5`     | No       | Width in rem of each hour/minute field wrapper.          |
+
+### Usage
+
+```svelte
+<script>
+  import TimeInput from '$ui/form/TimeInput.svelte';
+
+  let dailyTime = '00:00';
+</script>
+
+<TimeInput label="Time" hideLabel name="cron-daily-time" fieldWidthRem={5} bind:value={dailyTime} on:input={(e) => (dailyTime = e.detail)} />
+```
+
+### Events & Slots
+
+- `on:input` — fires with the new `HH:MM` string. There is no separate change event.
+
+### Variants & Notes
+
+- Sizes: `sm`, `md`, `lg`; configurable field width via `fieldWidthRem`.
+- Defaults hour/minute to `00` when the value is unparseable. Parses/clamps hour 0-23 and minute 0-59.
+- The container is `inline-flex flex-col`. Used heavily by `CronInput`.
+
+## SearchDropdown
+
+Single-select searchable combobox built on `FormInput`. Filters options by typed text, is keyboard navigable (Arrow/Enter/Escape), offers a clear button, and supports a custom item slot.
+
+```svelte
+import SearchDropdown from '$ui/form/SearchDropdown.svelte';
+```
+
+| Prop                  | Type                                                              | Default       | Required | Description                                                      |
+| --------------------- | ----------------------------------------------------------------- | ------------- | -------- | ---------------------------------------------------------------- |
+| `options`             | `Array<{ value: string; label: string; [key: string]: unknown }>` | `[]`          | No       | Selectable options (value + label, plus arbitrary extra fields). |
+| `value`               | `string \| null`                                                  | `null`        | No       | Bindable selected option value.                                  |
+| `placeholder`         | `string`                                                          | `'Search...'` | No       | Input placeholder.                                               |
+| `disabled`            | `boolean`                                                         | `false`       | No       | Disable the control.                                             |
+| `fullWidth`           | `boolean`                                                         | `true`        | No       | Apply `w-full` to the wrapper.                                   |
+| `label`               | `string`                                                          | `'Search'`    | No       | Field label (passed to `FormInput`).                             |
+| `description`         | `string`                                                          | `''`          | No       | Helper text (passed to `FormInput`).                             |
+| `name`                | `string`                                                          | `''`          | No       | Input name.                                                      |
+| `hideLabel`           | `boolean`                                                         | `true`        | No       | Hide the label (hidden by default).                              |
+| `size`                | `'sm' \| 'md' \| 'lg'`                                            | `'md'`        | No       | Size passed to `FormInput`.                                      |
+| `constrainMenuHeight` | `boolean`                                                         | `true`        | No       | Cap dropdown menu height at `max-h-60` with scroll.              |
+
+### Usage
+
+```svelte
+<script>
+  import SearchDropdown from '$ui/form/SearchDropdown.svelte';
+
+  let selected = null;
+  let demoAutoOptions = [
+    { value: 'radarr', label: 'Radarr' },
+    { value: 'sonarr', label: 'Sonarr' }
+  ];
+</script>
+
+<SearchDropdown options={demoAutoOptions} bind:value={selected} placeholder="Search arrs..." on:change={(e) => (selected = e.detail)}>
+  <svelte:fragment slot="item" let:option>{option.label}</svelte:fragment>
+</SearchDropdown>
+```
+
+### Events & Slots
+
+- `on:change` — fires with the selected option value (empty string `''` when cleared). `value` is bindable, but only the dispatch communicates selection.
+- `item` slot (`let:option`) — custom rendering of each option row (defaults to `option.label`).
+
+### Variants & Notes
+
+- Sizes: `sm`, `md`, `lg`; `fullWidth`; `constrainMenuHeight` on/off.
+- Closes on outside click (`use:clickOutside`) and on blur after 100ms. The highlight index syncs to the selected or first filtered option.
+- `selectOption` dispatches change but does not itself set `value` (the parent must bind or handle change). Renders a clear button in `FormInput`'s suffix slot when a value is set.
+
+## MarkdownInput
+
+Markdown-aware `<textarea>` or single-line input with a formatting toolbar (bold/italic/code/link/bullet/ordered list), Ctrl+B/Ctrl+I shortcuts, and a live rendered preview toggle (via `marked`).
+
+```svelte
+import MarkdownInput from '$ui/form/MarkdownInput.svelte';
+```
+
+| Prop          | Type                                     | Default     | Required | Description                                                            |
+| ------------- | ---------------------------------------- | ----------- | -------- | ---------------------------------------------------------------------- |
+| `value`       | `string`                                 | `''`        | No       | Bindable text content.                                                 |
+| `placeholder` | `string`                                 | `''`        | No       | Placeholder text.                                                      |
+| `label`       | `string`                                 | `''`        | No       | Field label (rendered only if set).                                    |
+| `description` | `string`                                 | `''`        | No       | Helper text under the label.                                           |
+| `rows`        | `number`                                 | `6`         | No       | Textarea rows (multiline mode).                                        |
+| `multiline`   | `boolean`                                | `true`      | No       | Render a textarea (`true`) vs. a single-line input (`false`).          |
+| `markdown`    | `boolean`                                | `true`      | No       | Enable the toolbar, shortcuts, and preview toggle.                     |
+| `required`    | `boolean`                                | `false`     | No       | Renders a red asterisk on the label.                                   |
+| `disabled`    | `boolean`                                | `false`     | No       | Disable input and toolbar buttons.                                     |
+| `name`        | `string`                                 | `''`        | No       | Field name; when set in preview mode a hidden input mirrors the value. |
+| `id`          | `string`                                 | `name`      | No       | Element id (defaults to the `name` prop).                              |
+| `onchange`    | `((value: string) => void) \| undefined` | `undefined` | No       | Callback fired on input and on toolbar insertions.                     |
+
+### Usage
+
+```svelte
+<script>
+  import MarkdownInput from '$ui/form/MarkdownInput.svelte';
+
+  let demoMarkdown = '';
+</script>
+
+<MarkdownInput label="Description" description="Supports **markdown**" bind:value={demoMarkdown} rows={4} onchange={(v) => (demoMarkdown = v)} />
+```
+
+### Events & Slots
+
+- `onchange` callback prop (no `createEventDispatcher`). Fires with the new value string.
+
+### Variants & Notes
+
+- Multiline textarea vs. single-line input; `markdown` on/off (plain input when off); preview vs. edit mode toggle.
+- Preview renders `marked.parse(value)` via `{@html}` (no sanitization). The toolbar is disabled when `disabled` or `showPreview`.
+- Ctrl/Cmd+B and +I insert bold/italic. Link insertion wraps the selection or inserts a placeholder. When `markdown={true}` the input gets `rounded-t-none`/`border-t-0` to join the toolbar.
+
+## TagInput
+
+Chip-style tag entry field. Type and press Enter to add a tag (rendered as an accent `Badge`); click the X or press Backspace on an empty input to remove. Duplicate detection is case-insensitive with a throttled alert toast.
+
+```svelte
+import TagInput from '$ui/form/TagInput.svelte';
+```
+
+| Prop          | Type                                      | Default                              | Required | Description                                           |
+| ------------- | ----------------------------------------- | ------------------------------------ | -------- | ----------------------------------------------------- |
+| `tags`        | `string[]`                                | `[]`                                 | No       | Bindable array of tag strings.                        |
+| `placeholder` | `string`                                  | `'Type and press Enter to add tags'` | No       | Input placeholder.                                    |
+| `onchange`    | `((tags: string[]) => void) \| undefined` | `undefined`                          | No       | Callback fired with the new tags array on add/remove. |
+
+### Usage
+
+```svelte
+<script>
+  import TagInput from '$ui/form/TagInput.svelte';
+
+  let demoTags = [];
+</script>
+
+<TagInput bind:tags={demoTags} placeholder="Add a tag..." onchange={(t) => (demoTags = t)} />
+```
+
+### Events & Slots
+
+- `onchange` callback prop (no `createEventDispatcher`). Fires with the updated `string[]`.
+
+### Variants & Notes
+
+- Duplicates are compared lowercased; a rejected duplicate shows `alertStore.add('error', 'Tag already added.')`, throttled to once per 1500ms per tag.
+- The stored tag preserves original case (trimmed). Backspace on an empty input removes the last tag. Uses a fixed internal input id `tags-input`.
+
+## IconCheckbox
+
+Icon-rendering checkbox button (`role=checkbox`) with named/hex/CSS-var colors, filled or outline variants, and three shapes. The icon shows only when checked.
+
+```svelte
+import IconCheckbox from '$ui/form/IconCheckbox.svelte';
+```
+
+| Prop              | Type                                                                                    | Default     | Required | Description                                                                                                           |
+| ----------------- | --------------------------------------------------------------------------------------- | ----------- | -------- | --------------------------------------------------------------------------------------------------------------------- |
+| `checked`         | `boolean`                                                                               | `false`     | No       | Bindable checked state.                                                                                               |
+| `icon`            | `ComponentType`                                                                         | —           | Yes      | Lucide/Svelte icon component rendered (size 14) when checked.                                                         |
+| `color`           | `'accent' \| 'blue' \| 'green' \| 'red' \| 'neutral' \| #${string} \| var(--${string})` | `'accent'`  | No       | Named color, hex (e.g. `#FFC230`), or CSS var (e.g. `var(--arr-radarr-color)`). Custom colors apply via inline style. |
+| `shape`           | `'square' \| 'circle' \| 'rounded'`                                                     | `'rounded'` | No       | Corner shape (square=`rounded-none`, circle=`rounded-full`, rounded=`rounded-lg`).                                    |
+| `disabled`        | `boolean`                                                                               | `false`     | No       | Disable the button (opacity plus not-allowed cursor).                                                                 |
+| `variant`         | `'filled' \| 'outline'`                                                                 | `'filled'`  | No       | Filled background vs. outlined with a colored icon.                                                                   |
+| `iconColor`       | `string`                                                                                | `''`        | No       | Override icon color class (else white for filled / color for outline).                                                |
+| `stopPropagation` | `boolean`                                                                               | `false`     | No       | Call `event.stopPropagation()` on click before dispatching.                                                           |
+| `title`           | `string \| undefined`                                                                   | `undefined` | No       | Native title tooltip.                                                                                                 |
+
+### Usage
+
+```svelte
+<script>
+  import IconCheckbox from '$ui/form/IconCheckbox.svelte';
+  import { Check } from 'lucide-svelte';
+
+  let enabled = false;
+</script>
+
+<IconCheckbox icon={Check} color="green" variant="outline" bind:checked={enabled} on:click={() => (enabled = !enabled)} />
+```
+
+### Events & Slots
+
+- `on:click` — fires with the `MouseEvent`. It does NOT auto-toggle `checked`; the caller manages state.
+
+### Variants & Notes
+
+- `variant`: `filled` or `outline`; `shape`: `square`, `circle`, or `rounded`; colors `accent`/`blue`/`green`/`red`/`neutral` plus hex and CSS var.
+- Named colors resolve to Tailwind class maps; hex/var colors resolve via an inline `buttonStyle`. Only the five named colors are supported — other names fall back to `accent`.
+- The component does not mutate `checked` itself, so a standalone `on:click` handler must toggle it.
+
+## Toggle
+
+Card-style switch (`role=switch`): a bordered clickable row with optional label text and an `IconCheckbox` on the right. Keyboard-activatable (Enter/Space) and self-toggling.
+
+```svelte
+import Toggle from '$ui/toggle/Toggle.svelte';
+```
+
+| Prop            | Type                                                                                          | Default    | Required | Description                                                                            |
+| --------------- | --------------------------------------------------------------------------------------------- | ---------- | -------- | -------------------------------------------------------------------------------------- |
+| `checked`       | `boolean`                                                                                     | `false`    | No       | Bindable on/off state.                                                                 |
+| `disabled`      | `boolean`                                                                                     | `false`    | No       | Disable interaction (muted, non-focusable).                                            |
+| `label`         | `string`                                                                                      | `''`       | No       | Visible label text (also used as the aria-label fallback).                             |
+| `ariaLabel`     | `string`                                                                                      | `'Toggle'` | No       | Accessible label when there is no visible label.                                       |
+| `color`         | `'accent' \| 'amber' \| 'green' \| 'red' \| 'neutral'`                                        | `'accent'` | No       | Legacy color prop mapped to the `IconCheckbox` color (amber maps to hex `#F59E0B`).    |
+| `icon`          | `ComponentType`                                                                               | `Check`    | No       | Icon shown when checked (passed to `IconCheckbox`); defaults to the lucide Check icon. |
+| `checkboxColor` | `'accent' \| 'blue' \| 'green' \| 'red' \| 'neutral' \| #${string} \| var(--${string}) \| ''` | `''`       | No       | Direct `IconCheckbox` color override; when set it takes precedence over `color`.       |
+| `shape`         | `'square' \| 'circle' \| 'rounded'`                                                           | `'circle'` | No       | `IconCheckbox` shape.                                                                  |
+| `variant`       | `'filled' \| 'outline'`                                                                       | `'filled'` | No       | `IconCheckbox` variant.                                                                |
+| `iconColor`     | `string`                                                                                      | `''`       | No       | `IconCheckbox` icon color override.                                                    |
+
+The interactive island below reproduces the switch card interaction (self-toggling row plus icon indicator).
+
+<ToggleDemo client:load />
+
+### Usage
+
+```svelte
+<script>
+  import Toggle from '$ui/toggle/Toggle.svelte';
+
+  let enabled = false;
+</script>
+
+<Toggle color="green" bind:checked={enabled} label="Enable feature" on:change={(e) => (enabled = e.detail)} />
+```
+
+### Events & Slots
+
+- `on:change` and `on:checked` — both fire with the new checked value on toggle.
+
+### Variants & Notes
+
+- `color` accent/amber/green/red/neutral (legacy) or `checkboxColor` override; `shape`/`variant` pass through to `IconCheckbox`.
+- Unlike the bare `IconCheckbox`, `Toggle` self-mutates `checked` in `handleToggle`. `color` `'amber'` has no `IconCheckbox` equivalent, so it is remapped to hex `#F59E0B`.
+- `resolvedLabel = label || ariaLabel`. The whole card is the switch; the inner `IconCheckbox` stops propagation and re-triggers the same toggle.
+
+## RangeScale
+
+Draggable multi-marker range track. Renders color-coded draggable dots with badge labels, enforces step snapping and a minimum separation between markers, and supports optional unit/unlimited/transform display formatting. Horizontal or vertical.
+
+```svelte
+import RangeScale from '$ui/form/RangeScale.svelte';
+```
+
+| Prop               | Type                                  | Default        | Required | Description                                                                          |
+| ------------------ | ------------------------------------- | -------------- | -------- | ------------------------------------------------------------------------------------ |
+| `orientation`      | `'horizontal' \| 'vertical'`          | `'horizontal'` | No       | Track orientation.                                                                   |
+| `direction`        | `'start' \| 'end'`                    | `'start'`      | No       | `start` puts min at left/top; `end` reverses the axis.                               |
+| `min`              | `number`                              | `0`            | No       | Scale minimum.                                                                       |
+| `max`              | `number`                              | `100`          | No       | Scale maximum.                                                                       |
+| `step`             | `number`                              | `1`            | No       | Value snapping step.                                                                 |
+| `minSeparation`    | `number`                              | `20`           | No       | Minimum pixels enforced between adjacent markers during drag.                        |
+| `markers`          | `Marker[]`                            | `[]`           | No       | Bindable array of markers (`{ id, label, color, value }`). Mutated in place on drag. |
+| `unit`             | `string`                              | `''`           | No       | Optional unit suffix appended to badge values.                                       |
+| `unlimitedValue`   | `number \| null`                      | `null`         | No       | Value at/above which the badge displays `Unlimited`.                                 |
+| `displayTransform` | `((value: number) => number) \| null` | `null`         | No       | Optional transform applied to the displayed value (shown with `toFixed(1)`).         |
+
+### Usage
+
+```svelte
+<script>
+  import RangeScale, { type Marker } from '$ui/form/RangeScale.svelte';
+
+  let markers: Marker[] = [{ id: 'min', label: 'Min', color: 'blue', value: 20 }];
+</script>
+
+<RangeScale min={0} max={100} step={5} bind:markers unit="%" on:change={(e) => (markers = e.detail.markers)} />
+```
+
+### Events & Slots
+
+- `on:change` (untyped dispatcher) — `dispatch('change', { index, value, markers })` fires during drag when a marker value changes.
+
+### Variants & Notes
+
+- `orientation`: horizontal or vertical; `direction`: start or end; seven marker colors (accent/blue/green/orange/red/purple/neutral).
+- Exports the `MarkerColor` type and `Marker` interface from `context="module"` — import `type { Marker }` alongside the default import.
+- Neighbor min-separation is enforced only during drag, not on external updates (external values are only clamped to min/max). Supports mouse and touch dragging via window listeners.
+
+## KeyValueList
+
+Dynamic key-value pair editor with add/remove rows. The value column can be plain text or a semantic-version (major.minor.patch) editor using `NumberInput` steppers. Responsive stacked-card (mobile) / grid (desktop) layout, with an optional locked first entry.
+
+```svelte
+import KeyValueList from '$ui/form/KeyValueList.svelte';
+```
+
+| Prop                        | Type                                                              | Default         | Required | Description                                                                              |
+| --------------------------- | ----------------------------------------------------------------- | --------------- | -------- | ---------------------------------------------------------------------------------------- |
+| `value`                     | `Record<string, string>`                                          | `{}`            | No       | Bindable object of key/value pairs.                                                      |
+| `label`                     | `string`                                                          | `''`            | No       | Section label.                                                                           |
+| `description`               | `string`                                                          | `''`            | No       | Helper text under the label.                                                             |
+| `keyLabel`                  | `string`                                                          | `'Key'`         | No       | Header/label for the key column.                                                         |
+| `valueLabel`                | `string`                                                          | `'Value'`       | No       | Header/label for the value column.                                                       |
+| `keyPlaceholder`            | `string`                                                          | `'Enter key'`   | No       | Placeholder for key inputs.                                                              |
+| `valuePlaceholder`          | `string`                                                          | `'Enter value'` | No       | Placeholder for value inputs (text mode).                                                |
+| `onchange`                  | `((value: Record<string, string>) => void) \| undefined`          | `undefined`     | No       | Callback fired when entries change (`syncToValue`).                                      |
+| `lockedFirst`               | `{ key: string; value?: string; minMajor?: number } \| undefined` | `undefined`     | No       | Pins a non-removable/non-renamable first entry; `minMajor` sets its version major floor. |
+| `onLockedDeleteAttempt`     | `(() => void) \| undefined`                                       | `undefined`     | No       | Callback when the user tries to delete the locked entry.                                 |
+| `onLockedEditAttempt`       | `(() => void) \| undefined`                                       | `undefined`     | No       | Callback when the user focuses the locked entry key field.                               |
+| `onLockedVersionMinBlocked` | `(() => void) \| undefined`                                       | `undefined`     | No       | Callback when the locked entry's version major hits its min.                             |
+| `valueType`                 | `'text' \| 'version'`                                             | `'text'`        | No       | Value editor type: free text or major.minor.patch version steppers.                      |
+| `versionMinMajor`           | `number`                                                          | `0`             | No       | Minimum major version for non-locked version entries.                                    |
+| `addDisabled`               | `boolean`                                                         | `false`         | No       | Disable the Add entry action (fires `onAddBlocked`).                                     |
+| `onAddBlocked`              | `(() => void) \| undefined`                                       | `undefined`     | No       | Callback when Add is attempted while `addDisabled`.                                      |
+
+### Usage
+
+```svelte
+<script>
+  import KeyValueList from '$ui/form/KeyValueList.svelte';
+
+  let demoKV = {};
+</script>
+
+<KeyValueList bind:value={demoKV} label="Environment Variables" keyPlaceholder="Variable name" valuePlaceholder="Value" onchange={(v) => (demoKV = v)} />
+```
+
+### Events & Slots
+
+- `onchange` callback prop (no `createEventDispatcher`). Also fires the locked/add blocked callbacks.
+
+### Variants & Notes
+
+- `valueType` text or version; optional `lockedFirst` entry; responsive mobile-card vs. desktop-grid layout.
+- Composes `FormInput` (key + text value) and `NumberInput` (version parts). New version entries default to `1.0.0`.
+- Empty keys are dropped from the emitted object but preserved as in-progress editing rows. External value changes re-sync entries while keeping empty-key rows and re-pinning `lockedFirst` to index 0.
+
+## MaskedApiKey
+
+Read-only API key display with reveal/hide and copy-to-clipboard controls, an auto-hide timeout, transient status messaging (`aria-live`), and reveal/copy event callbacks.
+
+```svelte
+import MaskedApiKey from '$ui/form/MaskedApiKey.svelte';
+```
+
+| Prop                    | Type      | Default            | Required | Description                                               |
+| ----------------------- | --------- | ------------------ | -------- | --------------------------------------------------------- |
+| `id`                    | `string`  | `'masked-api-key'` | No       | Base id; the status region uses `${id}-status`.           |
+| `label`                 | `string`  | `'API key'`        | No       | Label above the value and in button aria-labels.          |
+| `maskedValue`           | `string`  | `''`               | No       | Masked representation shown when not revealed.            |
+| `value`                 | `string`  | `''`               | No       | Actual secret value (shown when revealed, used for copy). |
+| `hasValue`              | `boolean` | `false`            | No       | Whether a key exists (drives interactivity/labels).       |
+| `revealTimeoutMs`       | `number`  | `30000`            | No       | Auto-hide delay after reveal; `0` disables auto-hide.     |
+| `copyFeedbackVisibleMs` | `number`  | `2000`             | No       | Duration the status feedback stays visible.               |
+| `disabled`              | `boolean` | `false`            | No       | Disable reveal/copy interaction.                          |
+| `revealLabel`           | `string`  | `'Reveal'`         | No       | Reveal button aria fragment.                              |
+| `hideLabel`             | `string`  | `'Hide'`           | No       | Hide button aria fragment.                                |
+| `copyLabel`             | `string`  | `'Copy'`           | No       | Copy button aria fragment.                                |
+
+### Usage
+
+```svelte
+<script>
+  import MaskedApiKey from '$ui/form/MaskedApiKey.svelte';
+
+  const apiKey = 'secret-value';
+
+  function log(detail) {
+    // ...
+  }
+</script>
+
+<MaskedApiKey label="API key" value={apiKey} maskedValue="abc***xyz" hasValue on:revealChange={(e) => log(e.detail)} on:copyFeedback={(e) => log(e.detail)} />
+```
+
+### Events & Slots
+
+- `on:revealChange` — `{ revealed: boolean; reason: 'manual' | 'timeout' }`.
+- `on:copyFeedback` — `{ success: boolean; message: string; error?: Error }`.
+
+### Variants & Notes
+
+- With/without value (a `noValueLabel` state); reveal auto-hide vs. manual (`revealTimeoutMs=0`).
+- Copy uses `navigator.clipboard.writeText`; it fails gracefully with an error status if unavailable or the value is empty. Timers are cleared on destroy, and it auto-hides if it becomes non-interactive while revealed.
+- Button label text is hardcoded (`Reveal`/`Hide`/`Copy`) in the markup; `revealLabel`/`hideLabel`/`copyLabel` drive the `aria-label`/`title` only.
+
+## CronInput
+
+Human-friendly cron expression builder. Presents a schedule-type selector (Every/Hourly/Daily/Weekly/Monthly/Custom) with contextual controls, two-way syncing a standard 5-field cron string. Validates custom expressions with `croner`.
+
+```svelte
+import CronInput from '$ui/cron/CronInput.svelte';
+```
+
+| Prop       | Type      | Default       | Required | Description                                                                                            |
+| ---------- | --------- | ------------- | -------- | ------------------------------------------------------------------------------------------------------ |
+| `value`    | `string`  | `'0 * * * *'` | No       | Bindable cron expression (5-field; 6-field input is tolerated by dropping the seconds field on parse). |
+| `disabled` | `boolean` | `false`       | No       | Disable all sub-controls.                                                                              |
+
+### Usage
+
+```svelte
+<script>
+  import CronInput from '$ui/cron/CronInput.svelte';
+
+  let cronExpression = '0 * * * *';
+</script>
+
+<CronInput bind:value={cronExpression} />
+```
+
+### Events & Slots
+
+- No dispatcher; communicates solely via the bindable `value` (`setValue` mutates `value`).
+
+### Variants & Notes
+
+- Schedule types: every (interval minutes 1-60), hourly (minute 0-59), daily (time), weekly (weekday + time), monthly (day 1-31 + time), custom (raw cron with validation).
+- Composes `DropdownSelect`, `NumberInput`, `TimeInput`, and `FormInput`. Parses an existing value back into the simplest matching schedule type (`parseSimple`) or falls back to `custom`.
+- Custom mode validates via `new Cron(customCron)` from `croner` and applies a red border on error (`cronError`). `buildCronFromSimple` clamps ranges, and reactive blocks keep `value` and the UI in sync in both directions.
+
+## AdvancedSection
+
+Presentational disclosure wrapper: an always-visible default slot plus a collapsible advanced slot toggled by a Show/Hide Advanced button. Bindable basic/advanced mode with a slide transition and ARIA wiring.
+
+```svelte
+import AdvancedSection from '$ui/form/AdvancedSection.svelte';
+```
+
+| Prop                | Type                                         | Default                                                   | Required | Description                                                             |
+| ------------------- | -------------------------------------------- | --------------------------------------------------------- | -------- | ----------------------------------------------------------------------- |
+| `sectionId`         | `string`                                     | `''`                                                      | No       | Base id for panel/heading ARIA ids; falls back to an auto-generated id. |
+| `sectionTitle`      | `string`                                     | `'Advanced settings'`                                     | No       | Section heading text.                                                   |
+| `sectionHint`       | `string`                                     | `'These options are hidden by default and are optional.'` | No       | Sub-heading hint text (rendered if set).                                |
+| `showAdvancedLabel` | `string`                                     | `'Show Advanced'`                                         | No       | Toggle button label when collapsed.                                     |
+| `hideAdvancedLabel` | `string`                                     | `'Hide Advanced'`                                         | No       | Toggle button label when expanded.                                      |
+| `mode`              | `UiPreferenceMode` (`'basic' \| 'advanced'`) | `'basic'`                                                 | No       | Bindable disclosure mode; `advanced` reveals the advanced slot.         |
+
+### Usage
+
+```svelte
+<script>
+  import AdvancedSection from '$ui/form/AdvancedSection.svelte';
+  import BasicFields from './BasicFields.svelte';
+  import AdvancedFields from './AdvancedFields.svelte';
+
+  let mode = 'basic';
+</script>
+
+<AdvancedSection sectionTitle="Advanced settings" bind:mode={mode}>
+  <BasicFields />
+  <svelte:fragment slot="advanced"><AdvancedFields /></svelte:fragment>
+</AdvancedSection>
+```
+
+### Events & Slots
+
+- No dispatcher; two-way state via `bind:mode`. The internal button toggles `mode`.
+- Default slot — always-visible content; `advanced` slot — collapsible content (falls back to `No advanced options available` text).
+
+### Variants & Notes
+
+- `mode` basic or advanced. Respects `prefers-reduced-motion` (disables the slide).
+- `UiPreferenceMode` is imported from `$shared/disclosure/sectionKeys.ts`. Uses `ActionsBar` for the toggle; a module-scope counter generates fallback ids.
+- This is the presentational primitive that `DisclosureSection` wraps with persistence.
+
+## DisclosureSection
+
+Stateful wrapper around `AdvancedSection` that persists basic/advanced mode per section key via the user-interface-preferences store and integrates with the complexity-tier context (tier-driven default mode plus activity recording).
+
+```svelte
+import DisclosureSection from '$ui/form/DisclosureSection.svelte';
+```
+
+| Prop                | Type                            | Default                                                   | Required | Description                                                                                        |
+| ------------------- | ------------------------------- | --------------------------------------------------------- | -------- | -------------------------------------------------------------------------------------------------- |
+| `sectionKey`        | `SectionKey`                    | —                                                         | Yes      | Persistence/store key identifying this section (from `$shared/disclosure/sectionKeys.ts`).         |
+| `sectionTitle`      | `string`                        | `'Advanced settings'`                                     | No       | Section heading (passed to `AdvancedSection`).                                                     |
+| `sectionHint`       | `string`                        | `'These options are hidden by default and are optional.'` | No       | Sub-heading hint (passed through).                                                                 |
+| `initialMode`       | `UiPreferenceMode \| undefined` | `undefined`                                               | No       | Explicit initial mode; when set it overrides tier-driven defaults and blocks tier/store overrides. |
+| `showAdvancedLabel` | `string`                        | `'Show Advanced'`                                         | No       | Toggle button label when collapsed.                                                                |
+| `hideAdvancedLabel` | `string`                        | `'Hide Advanced'`                                         | No       | Toggle button label when expanded.                                                                 |
+
+### Usage
+
+```svelte
+<script>
+  import DisclosureSection from '$ui/form/DisclosureSection.svelte';
+  import BasicFields from './BasicFields.svelte';
+  import AdvancedFields from './AdvancedFields.svelte';
+
+  const mySectionKey = 'quality-profile.advanced';
+</script>
+
+<DisclosureSection sectionKey={mySectionKey} sectionTitle="Advanced options">
+  <BasicFields />
+  <svelte:fragment slot="advanced"><AdvancedFields /></svelte:fragment>
+</DisclosureSection>
+```
+
+### Events & Slots
+
+- No dispatcher; persists mode changes to the section store and records complexity-tier activity on manual toggles.
+- Default slot — always-visible content; `advanced` slot — collapsible content (both forwarded to `AdvancedSection`).
+
+### Variants & Notes
+
+- Tier-driven default mode; explicit `initialMode` override; persisted vs. unpersisted state.
+- Depends on `getComplexityTierContext()`, `getUserInterfacePreferenceSectionStore()`, and pure helpers in `disclosureSectionLogic.ts` (`resolveDisclosureInitialMode`, `resolveTierDrivenMode`, `shouldBlockTierUpdates`).
+- Surfaces a warning alert if activity persistence fails (except `AuthRequiredError`). Cleans up subscriptions and the store on destroy. `SectionKey`/`UiPreferenceMode` come from `$shared/disclosure/sectionKeys.ts`.
