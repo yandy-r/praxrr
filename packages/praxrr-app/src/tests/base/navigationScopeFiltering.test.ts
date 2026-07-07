@@ -185,6 +185,8 @@ Deno.test('bottom nav ordering is deterministic by priority and sidebar traversa
 
   assertEquals(sidebarOrder, [
     '/databases',
+    '/parity-map',
+    '/resolved-config',
     '/arr',
     '/quality-profiles',
     '/custom-formats',
@@ -202,6 +204,8 @@ Deno.test('bottom nav ordering is deterministic by priority and sidebar traversa
     '/quality-profiles',
     '/custom-formats',
     '/settings',
+    '/parity-map',
+    '/resolved-config',
     '/regular-expressions',
     '/score-simulator',
     '/media-management',

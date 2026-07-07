@@ -20,6 +20,8 @@ Deno.test('app layout shell is stable and deep-link hrefs remain unchanged', () 
   const topLevelHrefs = first.groups.flatMap((group) => group.items.map((item) => item.href));
   assertEquals(topLevelHrefs, [
     '/databases',
+    '/parity-map',
+    '/resolved-config',
     '/arr',
     '/quality-profiles',
     '/custom-formats',
@@ -39,6 +41,8 @@ Deno.test('app layout shell is stable and deep-link hrefs remain unchanged', () 
   }
   assertEquals(deepLinks, [
     '/databases',
+    '/parity-map',
+    '/resolved-config',
     '/arr',
     '/quality-profiles',
     '/quality-profiles/entity-testing',
