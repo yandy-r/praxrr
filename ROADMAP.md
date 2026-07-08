@@ -1,6 +1,6 @@
 # Praxrr Roadmap
 
-Reviewed: 2026-07-06 (updated after progressive complexity architecture #29 / #203 shipped)
+Reviewed: 2026-07-08 (updated after the Onboarding & Transparency wave shipped: Setup Wizard #12/#205, Cross-Arr Parity Map #14/#206, Resolved Config Viewer #25/#207, Dependency Graph #26/#208, and UI component reference #75/#204)
 
 Source: open GitHub issues in `yandy-r/praxrr` as of this review.
 
@@ -32,11 +32,11 @@ are still respected, but they are not the only sorting rule.
 
 The best next order is:
 
-1. Finish remaining documentation content (#75 as needed).
-2. Build onboarding and transparency features.
-3. Build configuration lifecycle safety.
-4. Add advanced automation, trust, and integration features.
-5. Handle parser migration and deferred ecosystem expansion only when they become release or
+1. Finish the last onboarding/transparency feature (#30 Configuration Impact Simulator). P0
+   documentation and the rest of the transparency wave (#12, #14, #25, #26, #75) are complete.
+2. Build configuration lifecycle safety (P2), starting with the Resilient Arr API Adapter Layer (#24).
+3. Add advanced automation, trust, and integration features (P3).
+4. Handle parser migration and deferred ecosystem expansion only when they become release or
    maintenance blockers.
 
 Phase 1 safety work from the research backlog is complete: Sync Preview/Dry-Run, API Key Masking,
@@ -49,32 +49,38 @@ completed issues.
 
 Merged work since the Score Simulator and TRaSH Guide Sync foundations landed.
 
-| Date       | PR / commit                                        | Summary                                                                                                                                     | Closes / relates                                     |
-| ---------- | -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
-| 2026-07-06 | [#203](https://github.com/yandy-r/praxrr/pull/203) | Progressive complexity architecture: tier model, disclosure modes, section preferences API, `userComplexityTiers` store, and E2E coverage   | [#29](https://github.com/yandy-r/praxrr/issues/29)   |
-| 2026-07-06 | [#201](https://github.com/yandy-r/praxrr/pull/201) | App technical documentation: 8 contributor pages (architecture, startup, development, PCD, jobs, sync, notifications, testing) with Mermaid | [#77](https://github.com/yandy-r/praxrr/issues/77)   |
-| 2026-07-06 | [#200](https://github.com/yandy-r/praxrr/pull/200) | PCD schema per-table reference: 42 table pages with columns, relationships, constraints, and cross-links                                    | [#73](https://github.com/yandy-r/praxrr/issues/73)   |
-| 2026-07-06 | [#199](https://github.com/yandy-r/praxrr/pull/199) | PCD database content docs: 253 custom formats, quality profile presets, release/delay profiles, Lidarr guide, changelog, sidebar wiring     | [#76](https://github.com/yandy-r/praxrr/issues/76)   |
-| 2026-07-06 | [#198](https://github.com/yandy-r/praxrr/pull/198) | User-facing Getting Started and Guides (10 pages): install, configure, sync, upgrade, troubleshooting                                       | [#74](https://github.com/yandy-r/praxrr/issues/74)   |
-| 2026-07-05 | `bf50467e`, `0f324ddd`, `56b359a9`                 | Docs deploy CI: Workers Assets deployment, wrangler config loading, and deploy trigger                                                      | [#38](https://github.com/yandy-r/praxrr/issues/38)   |
-| 2026-07-05 | [#195](https://github.com/yandy-r/praxrr/pull/195) | Reject NUL bytes in TRaSH metadata paths with typed `TrashGuideFetcherError`                                                                | [#194](https://github.com/yandy-r/praxrr/issues/194) |
-| 2026-07-05 | [#196](https://github.com/yandy-r/praxrr/pull/196) | Astro Starlight documentation site with OpenAPI generation, mirror-doc imports, docs CI, Cloudflare Pages wiring, and dispatches            | [#38](https://github.com/yandy-r/praxrr/issues/38)   |
-| 2026-07-05 | [#193](https://github.com/yandy-r/praxrr/pull/193) | Test coverage for 8 TRaSH modules (~137 tests): fetcher, sync job, manager, sources route, transformers, parser, trash-id mappings          | [#125](https://github.com/yandy-r/praxrr/issues/125) |
-| 2026-07-05 | [#191](https://github.com/yandy-r/praxrr/pull/191) | Type design hardening: narrow `arr_type`, consolidate parse helpers, boolean `enabled`/`auto_pull` at query boundary                        | [#126](https://github.com/yandy-r/praxrr/issues/126) |
-| 2026-07-05 | [#192](https://github.com/yandy-r/praxrr/pull/192) | Fix pre-existing CI failures: lint-docs, lint-shell, autofix workflow                                                                       | Relates to #126                                      |
-| 2026-07-05 | `177451b3`                                         | Shared lint/format tooling (`scripts/style.sh`) with CI workflows                                                                           | —                                                    |
-| 2026-07-05 | `6c9f75c0`                                         | Remove Claude review workflows                                                                                                              | —                                                    |
-| 2026-07-05 | `e5b4e260`                                         | Add project roadmap                                                                                                                         | —                                                    |
-| 2026-07-05 | `2bb21043`                                         | Version management script and UI version display fix                                                                                        | —                                                    |
-| 2026-03-08 | [#190](https://github.com/yandy-r/praxrr/pull/190) | Score Simulator phase 3                                                                                                                     | Score Simulator                                      |
-| 2026-03-06 | [#184](https://github.com/yandy-r/praxrr/pull/184) | Score Simulator phase 2: batch input, profile comparison, ranking table                                                                     | Score Simulator                                      |
-| 2026-03-05 | [#176](https://github.com/yandy-r/praxrr/pull/176) | Score Simulator phase 1                                                                                                                     | #171–#175                                            |
-| 2026-03-04 | [#170](https://github.com/yandy-r/praxrr/pull/170) | Progressive Disclosure rollout across form and settings pages                                                                               | Progressive Disclosure                               |
-| 2026-03-02 | [#164](https://github.com/yandy-r/praxrr/pull/164) | Persist advanced section visibility preferences                                                                                             | Progressive Disclosure                               |
+| Date       | PR / commit                                        | Summary                                                                                                                                                                                                                                                      | Closes / relates                                     |
+| ---------- | -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------- |
+| 2026-07-08 | [#208](https://github.com/yandy-r/praxrr/pull/208) | Dependency Graph (Transparency Layer): read-only resolved dependency graph over PCD entities — adjacency/impact table, editor "Used by" + cascade-delete panels, contract-first `/api/v1/pcd/{id}/graph` endpoints, DRY-extracted reverse-dependency readers | [#26](https://github.com/yandy-r/praxrr/issues/26)   |
+| 2026-07-07 | [#207](https://github.com/yandy-r/praxrr/pull/207) | Resolved Config Viewer: resolved state per entity, base/user/resolved layer breakdown, live desired-vs-actual diff, and cross-instance compare via a new `$pcd/resolved/*` service                                                                           | [#25](https://github.com/yandy-r/praxrr/issues/25)   |
+| 2026-07-07 | [#206](https://github.com/yandy-r/praxrr/pull/206) | Cross-Arr Parity Map: app compatibility matrix, semantic warnings, and quality-profile compatibility                                                                                                                                                         | [#14](https://github.com/yandy-r/praxrr/issues/14)   |
+| 2026-07-07 | [#205](https://github.com/yandy-r/praxrr/pull/205) | Setup Wizard: first-run guided flow to connect an Arr instance, link a PCD, and reach the first successful sync                                                                                                                                              | [#12](https://github.com/yandy-r/praxrr/issues/12)   |
+| 2026-07-07 | [#204](https://github.com/yandy-r/praxrr/pull/204) | UI component library reference: reusable `$ui` components, alert patterns, dirty tracking, and Tailwind conventions                                                                                                                                          | [#75](https://github.com/yandy-r/praxrr/issues/75)   |
+| 2026-07-06 | [#203](https://github.com/yandy-r/praxrr/pull/203) | Progressive complexity architecture: tier model, disclosure modes, section preferences API, `userComplexityTiers` store, and E2E coverage                                                                                                                    | [#29](https://github.com/yandy-r/praxrr/issues/29)   |
+| 2026-07-06 | [#201](https://github.com/yandy-r/praxrr/pull/201) | App technical documentation: 8 contributor pages (architecture, startup, development, PCD, jobs, sync, notifications, testing) with Mermaid                                                                                                                  | [#77](https://github.com/yandy-r/praxrr/issues/77)   |
+| 2026-07-06 | [#200](https://github.com/yandy-r/praxrr/pull/200) | PCD schema per-table reference: 42 table pages with columns, relationships, constraints, and cross-links                                                                                                                                                     | [#73](https://github.com/yandy-r/praxrr/issues/73)   |
+| 2026-07-06 | [#199](https://github.com/yandy-r/praxrr/pull/199) | PCD database content docs: 253 custom formats, quality profile presets, release/delay profiles, Lidarr guide, changelog, sidebar wiring                                                                                                                      | [#76](https://github.com/yandy-r/praxrr/issues/76)   |
+| 2026-07-06 | [#198](https://github.com/yandy-r/praxrr/pull/198) | User-facing Getting Started and Guides (10 pages): install, configure, sync, upgrade, troubleshooting                                                                                                                                                        | [#74](https://github.com/yandy-r/praxrr/issues/74)   |
+| 2026-07-05 | `bf50467e`, `0f324ddd`, `56b359a9`                 | Docs deploy CI: Workers Assets deployment, wrangler config loading, and deploy trigger                                                                                                                                                                       | [#38](https://github.com/yandy-r/praxrr/issues/38)   |
+| 2026-07-05 | [#195](https://github.com/yandy-r/praxrr/pull/195) | Reject NUL bytes in TRaSH metadata paths with typed `TrashGuideFetcherError`                                                                                                                                                                                 | [#194](https://github.com/yandy-r/praxrr/issues/194) |
+| 2026-07-05 | [#196](https://github.com/yandy-r/praxrr/pull/196) | Astro Starlight documentation site with OpenAPI generation, mirror-doc imports, docs CI, Cloudflare Pages wiring, and dispatches                                                                                                                             | [#38](https://github.com/yandy-r/praxrr/issues/38)   |
+| 2026-07-05 | [#193](https://github.com/yandy-r/praxrr/pull/193) | Test coverage for 8 TRaSH modules (~137 tests): fetcher, sync job, manager, sources route, transformers, parser, trash-id mappings                                                                                                                           | [#125](https://github.com/yandy-r/praxrr/issues/125) |
+| 2026-07-05 | [#191](https://github.com/yandy-r/praxrr/pull/191) | Type design hardening: narrow `arr_type`, consolidate parse helpers, boolean `enabled`/`auto_pull` at query boundary                                                                                                                                         | [#126](https://github.com/yandy-r/praxrr/issues/126) |
+| 2026-07-05 | [#192](https://github.com/yandy-r/praxrr/pull/192) | Fix pre-existing CI failures: lint-docs, lint-shell, autofix workflow                                                                                                                                                                                        | Relates to #126                                      |
+| 2026-07-05 | `177451b3`                                         | Shared lint/format tooling (`scripts/style.sh`) with CI workflows                                                                                                                                                                                            | —                                                    |
+| 2026-07-05 | `6c9f75c0`                                         | Remove Claude review workflows                                                                                                                                                                                                                               | —                                                    |
+| 2026-07-05 | `e5b4e260`                                         | Add project roadmap                                                                                                                                                                                                                                          | —                                                    |
+| 2026-07-05 | `2bb21043`                                         | Version management script and UI version display fix                                                                                                                                                                                                         | —                                                    |
+| 2026-03-08 | [#190](https://github.com/yandy-r/praxrr/pull/190) | Score Simulator phase 3                                                                                                                                                                                                                                      | Score Simulator                                      |
+| 2026-03-06 | [#184](https://github.com/yandy-r/praxrr/pull/184) | Score Simulator phase 2: batch input, profile comparison, ranking table                                                                                                                                                                                      | Score Simulator                                      |
+| 2026-03-05 | [#176](https://github.com/yandy-r/praxrr/pull/176) | Score Simulator phase 1                                                                                                                                                                                                                                      | #171–#175                                            |
+| 2026-03-04 | [#170](https://github.com/yandy-r/praxrr/pull/170) | Progressive Disclosure rollout across form and settings pages                                                                                                                                                                                                | Progressive Disclosure                               |
+| 2026-03-02 | [#164](https://github.com/yandy-r/praxrr/pull/164) | Persist advanced section visibility preferences                                                                                                                                                                                                              | Progressive Disclosure                               |
 
-## P0 - Current Focus: Documentation Foundation
+## P0 - Documentation Foundation (Complete)
 
 Goal: make Praxrr understandable enough for users and contributors to run, debug, and extend it.
+**Status: complete** — all five items below shipped on docs.praxrr.dev (#73, #74, #75, #76, #77).
 
 | Order | Issue                                                                               | Priority | Decision                                                                                                                                              | Done When                                                                                                                    |
 | ----- | ----------------------------------------------------------------------------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
@@ -98,20 +104,20 @@ Goal: make the TRaSH Guide Sync pipeline safe to keep building on. **Closed 2026
 
 Goal: help users understand what Praxrr will do before they trust it with their Arr instances.
 
-| Order | Issue                                                                                  | Priority | Decision                                                                                                                                                                                                | Done When                                                                                                             |
-| ----- | -------------------------------------------------------------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| 1     | [#29](https://github.com/yandy-r/praxrr/issues/29) Progressive Complexity Architecture | Medium   | **Done** — Tier model, disclosure modes, section preferences API, and reveal rules shipped ([#203](https://github.com/yandy-r/praxrr/pull/203)). Builds on Progressive Disclosure rollout (#164, #170). | Beginner and advanced surfaces have clear reveal rules, and new feature designs follow the same complexity model.     |
-| 2     | [#12](https://github.com/yandy-r/praxrr/issues/12) Setup Wizard                        | High     | **Done** - First user-facing feature in this phase. It addresses first-run abandonment directly.                                                                                                        | A new user can connect the first Arr instance, link a PCD, and reach the first successful sync through a guided flow. |
-| 3     | [#14](https://github.com/yandy-r/praxrr/issues/14) Cross-Arr Parity Map                | Medium   | **Done** - Build before deeper cross-Arr automation so semantic differences are visible.                                                                                                                | Users can see app compatibility for config entities and understand Radarr/Sonarr/Lidarr differences before sync.      |
-| 4     | [#25](https://github.com/yandy-r/praxrr/issues/25) Resolved Config Viewer              | High     | **Done** - Build as the desired-state visibility foundation.                                                                                                                                            | Users can inspect base ops + user ops + overrides as Praxrr's final desired state.                                    |
-| 5     | [#26](https://github.com/yandy-r/praxrr/issues/26) Dependency Graph                    | High     | Build after or with #25 because dependency edges are easier to explain from resolved state.                                                                                                             | Users can see which entities depend on which profiles, formats, qualities, and mappings.                              |
-| 6     | [#30](https://github.com/yandy-r/praxrr/issues/30) Configuration Impact Simulator      | Medium   | Build the basic simulator after #25/#26 so simulations can explain inputs and impact.                                                                                                                   | Users can test score/profile changes and understand likely release-selection or sync impact before applying changes.  |
+| Order | Issue                                                                                  | Priority | Decision                                                                                                                                                                                                                                                             | Done When                                                                                                             |
+| ----- | -------------------------------------------------------------------------------------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| 1     | [#29](https://github.com/yandy-r/praxrr/issues/29) Progressive Complexity Architecture | Medium   | **Done** — Tier model, disclosure modes, section preferences API, and reveal rules shipped ([#203](https://github.com/yandy-r/praxrr/pull/203)). Builds on Progressive Disclosure rollout (#164, #170).                                                              | Beginner and advanced surfaces have clear reveal rules, and new feature designs follow the same complexity model.     |
+| 2     | [#12](https://github.com/yandy-r/praxrr/issues/12) Setup Wizard                        | High     | **Done** - First user-facing feature in this phase. It addresses first-run abandonment directly.                                                                                                                                                                     | A new user can connect the first Arr instance, link a PCD, and reach the first successful sync through a guided flow. |
+| 3     | [#14](https://github.com/yandy-r/praxrr/issues/14) Cross-Arr Parity Map                | Medium   | **Done** - Build before deeper cross-Arr automation so semantic differences are visible.                                                                                                                                                                             | Users can see app compatibility for config entities and understand Radarr/Sonarr/Lidarr differences before sync.      |
+| 4     | [#25](https://github.com/yandy-r/praxrr/issues/25) Resolved Config Viewer              | High     | **Done** - Build as the desired-state visibility foundation.                                                                                                                                                                                                         | Users can inspect base ops + user ops + overrides as Praxrr's final desired state.                                    |
+| 5     | [#26](https://github.com/yandy-r/praxrr/issues/26) Dependency Graph                    | High     | **Done** ([#208](https://github.com/yandy-r/praxrr/pull/208)) — read-only dependency graph over PCD entities with impact preview and cascade warnings, built on the resolved-state model. Graphical canvas and e2e deferred per the issue's "start simple" guidance. | Users can see which entities depend on which profiles, formats, qualities, and mappings.                              |
+| 6     | [#30](https://github.com/yandy-r/praxrr/issues/30) Configuration Impact Simulator      | Medium   | **Next in this phase** — build the basic simulator on the #25/#26 resolved-state/edge model so simulations can explain inputs and impact.                                                                                                                            | Users can test score/profile changes and understand likely release-selection or sync impact before applying changes.  |
 
 Notes:
 
-- #25, #26, and #30 should share model work where possible. Avoid three separate interpretations of
-  "resolved config."
-- #14 is both UX and correctness work. It supports the cross-Arr semantic validation policy.
+- #25 and #26 shipped and share the resolved-state/edge model; #30 must build on it rather than
+  create a third interpretation of "resolved config."
+- #14 (shipped) was both UX and correctness work and reinforces the cross-Arr semantic validation policy.
 - #29 is shipped (#203). Treat the tier model and disclosure modes as the design constraint for all
   new UI in this phase. Progressive Disclosure UI rollout (#164, #170) remains the foundation.
 - Score Simulator (phases 1–3, #176/#184/#190) is shipped and can inform #30, but #30 still covers
@@ -201,6 +207,17 @@ Do not start these until the promotion criteria are met.
 
 Use this checklist when planning a sprint or milestone.
 
+### Completed (2026-07-08)
+
+- [x] #26 - Dependency Graph ([#208](https://github.com/yandy-r/praxrr/pull/208))
+
+### Completed (2026-07-07)
+
+- [x] #25 - Resolved Config Viewer ([#207](https://github.com/yandy-r/praxrr/pull/207))
+- [x] #14 - Cross-Arr Parity Map ([#206](https://github.com/yandy-r/praxrr/pull/206))
+- [x] #12 - Setup Wizard ([#205](https://github.com/yandy-r/praxrr/pull/205))
+- [x] #75 - UI component library reference ([#204](https://github.com/yandy-r/praxrr/pull/204))
+
 ### Completed (2026-07-06)
 
 - [x] #29 - Progressive Complexity Architecture ([#203](https://github.com/yandy-r/praxrr/pull/203))
@@ -220,14 +237,16 @@ Use this checklist when planning a sprint or milestone.
 
 ### Current Focus
 
-- [ ] #75 - UI component reference
+P0 Documentation Foundation is complete (#73, #74, #75, #76, #77, #38).
+
+- [x] #75 - UI component reference ([#204](https://github.com/yandy-r/praxrr/pull/204))
 
 ### Onboarding and Transparency
 
-- [ ] #12 - Setup Wizard
-- [ ] #14 - Cross-Arr Parity Map
-- [ ] #25 - Resolved Config Viewer
-- [ ] #26 - Dependency Graph
+- [x] #12 - Setup Wizard ([#205](https://github.com/yandy-r/praxrr/pull/205))
+- [x] #14 - Cross-Arr Parity Map ([#206](https://github.com/yandy-r/praxrr/pull/206))
+- [x] #25 - Resolved Config Viewer ([#207](https://github.com/yandy-r/praxrr/pull/207))
+- [x] #26 - Dependency Graph ([#208](https://github.com/yandy-r/praxrr/pull/208))
 - [ ] #30 - Configuration Impact Simulator
 
 ### Lifecycle Safety
@@ -269,14 +288,17 @@ Use this checklist when planning a sprint or milestone.
 
 ## Next Sprint Recommendation
 
-Shift focus from documentation to onboarding:
+The Onboarding & Transparency wave is nearly complete — only #30 remains:
 
-1. Start #12 Setup Wizard as the next P1 onboarding feature.
-2. Update #6 so the parent research checklist points to this roadmap and no longer implies closed
+1. Build #30 Configuration Impact Simulator, reusing the resolved-state/edge model from Resolved
+   Config (#25/#207) and Dependency Graph (#26/#208) rather than reinterpreting resolved config.
+2. Then open P2 Lifecycle Safety with #24 Resilient Arr API Adapter Layer, scheduled early because
+   the lifecycle features (#15, #16, #17, #19, #27) depend on reliable Arr reads/writes.
+3. Update #6 so the parent research checklist points to this roadmap and no longer implies closed
    Phase 1 items are still active.
-3. Schedule #75 UI component reference when contributor onboarding becomes the bottleneck.
 
-Docs infrastructure (#38), user guides (#74), PCD database content (#76), PCD schema table reference
-(#73), app technical docs (#77), deploy CI, TRaSH Guide Sync stabilization (#125, #126, #194), and
-progressive complexity architecture (#29, #203) are complete. The next documentation milestone is
-the UI component reference (#75) as needed.
+P0 Documentation Foundation is complete: docs infrastructure (#38), user guides (#74), PCD database
+content (#76), PCD schema table reference (#73), app technical docs (#77), and the UI component
+reference (#75/#204). The P1 Onboarding & Transparency wave is complete except #30: Progressive
+Complexity Architecture (#29/#203), Setup Wizard (#12/#205), Cross-Arr Parity Map (#14/#206),
+Resolved Config Viewer (#25/#207), and Dependency Graph (#26/#208).
