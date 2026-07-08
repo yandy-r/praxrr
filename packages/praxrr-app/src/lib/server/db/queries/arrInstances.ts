@@ -15,8 +15,10 @@ export interface ArrInstance {
   tags: string | null;
   enabled: number;
   source?: ArrInstanceSource;
-  detected_version: string | null;
-  detected_at: string | null;
+  // Always present on DB reads (see arrInstanceSelect), NULL until first detected.
+  // Optional so hand-built test mocks need not restate them.
+  detected_version?: string | null;
+  detected_at?: string | null;
   created_at: string;
   updated_at: string;
 }
