@@ -4,10 +4,7 @@ import { arrInstancesQueries } from '$db/queries/arrInstances.ts';
 import { driftStatusQueries } from '$db/queries/driftStatus.ts';
 import { isSyncPreviewArrType } from '$sync/preview/types.ts';
 import { checkAndPersistInstance } from '$sync/drift/persist.ts';
-import {
-  DRIFT_REFRESH_RATE_LIMIT_WINDOW_MS,
-  registerDriftRefreshAttempt,
-} from '$sync/drift/limits.ts';
+import { DRIFT_REFRESH_RATE_LIMIT_WINDOW_MS, registerDriftRefreshAttempt } from '$sync/drift/limits.ts';
 import { toDriftDetail } from '$sync/drift/responses.ts';
 import { logger } from '$logger/logger.ts';
 

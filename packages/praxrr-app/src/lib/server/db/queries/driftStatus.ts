@@ -124,12 +124,16 @@ export const driftStatusQueries = {
   /**
    * Replace the single latest-state row for an instance (INSERT or UPDATE on conflict).
    * Preserves `notified_signature` and `created_at`; advances `updated_at`.
+   *
+   * Deliberately a bare `db.execute` (no `db.transaction` wrapper): a single
+   * `INSERT ... ON CONFLICT DO UPDATE` is statement-atomic, and `db.transaction` issues a
+   * bare `BEGIN` on the shared connection that is NOT re-entrancy-safe — under the drift
+   * sweep's concurrent `processBatches` a nested `BEGIN` would throw and silently drop rows.
    */
-  async upsert(input: UpsertDriftStatusInput): Promise<void> {
+  upsert(input: UpsertDriftStatusInput): void {
     const changesJson = JSON.stringify(input.changes);
-    await db.transaction(() =>
-      db.execute(
-        `INSERT INTO drift_instance_status (
+    db.execute(
+      `INSERT INTO drift_instance_status (
 					arr_instance_id, arr_type, status, reason,
 					drifted_count, missing_count, unmanaged_count,
 					drift_signature, detected_version, changes,
@@ -149,20 +153,19 @@ export const driftStatusQueries = {
 					content_checked_at = excluded.content_checked_at,
 					duration_ms = excluded.duration_ms,
 					updated_at = CURRENT_TIMESTAMP`,
-        input.arrInstanceId,
-        input.arrType,
-        input.status,
-        input.reason,
-        input.driftedCount,
-        input.missingCount,
-        input.unmanagedCount,
-        input.driftSignature,
-        input.detectedVersion,
-        changesJson,
-        input.checkedAt,
-        input.contentCheckedAt,
-        input.durationMs
-      )
+      input.arrInstanceId,
+      input.arrType,
+      input.status,
+      input.reason,
+      input.driftedCount,
+      input.missingCount,
+      input.unmanagedCount,
+      input.driftSignature,
+      input.detectedVersion,
+      changesJson,
+      input.checkedAt,
+      input.contentCheckedAt,
+      input.durationMs
     );
   },
 

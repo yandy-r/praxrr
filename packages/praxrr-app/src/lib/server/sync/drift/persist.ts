@@ -94,7 +94,7 @@ export async function checkAndPersistInstance(
 
     // On a failed/degraded check (no fresh diff) preserve the last-known content so the UI
     // shows "last good check at X; currently <status>" rather than blanking known drift.
-    await driftStatusQueries.upsert({
+    driftStatusQueries.upsert({
       arrInstanceId: next.instanceId,
       arrType: next.arrType,
       status: next.status,
