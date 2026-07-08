@@ -1,496 +1,494 @@
 <script lang="ts">
-	import { Check, Trash2 } from 'lucide-svelte';
-	import { createEventDispatcher } from 'svelte';
-	import radarrLogo from '$lib/client/assets/Radarr.svg';
-	import sonarrLogo from '$lib/client/assets/Sonarr.svg';
-	import Button from '$ui/button/Button.svelte';
-	import FormInput from '$ui/form/FormInput.svelte';
-	import NumberInput from '$ui/form/NumberInput.svelte';
-	import Toggle from '$ui/toggle/Toggle.svelte';
-	import SearchDropdown from '$ui/form/SearchDropdown.svelte';
-	import {
-		ARR_APP_TYPES,
-		ARR_CONDITION_TARGET_OPTIONS,
-		getArrAppMetadata,
-		type ArrAppType,
-		type ArrConditionTargetType
-	} from '$shared/arr/capabilities.ts';
-	import {
-		CONDITION_TYPES,
-		PATTERN_TYPES,
-		SOURCE_VALUES,
-		RESOLUTION_VALUES,
-		QUALITY_MODIFIER_VALUES,
-		RELEASE_TYPE_VALUES,
-		INDEXER_FLAG_VALUES
-	} from '$shared/pcd/conditions';
-	import type { ConditionData } from '$shared/pcd/display.ts';
+  import { Check, Trash2 } from 'lucide-svelte';
+  import { createEventDispatcher } from 'svelte';
+  import radarrLogo from '$lib/client/assets/Radarr.svg';
+  import sonarrLogo from '$lib/client/assets/Sonarr.svg';
+  import Button from '$ui/button/Button.svelte';
+  import FormInput from '$ui/form/FormInput.svelte';
+  import NumberInput from '$ui/form/NumberInput.svelte';
+  import Toggle from '$ui/toggle/Toggle.svelte';
+  import SearchDropdown from '$ui/form/SearchDropdown.svelte';
+  import {
+    ARR_APP_TYPES,
+    ARR_CONDITION_TARGET_OPTIONS,
+    getArrAppMetadata,
+    type ArrAppType,
+    type ArrConditionTargetType,
+  } from '$shared/arr/capabilities.ts';
+  import {
+    CONDITION_TYPES,
+    PATTERN_TYPES,
+    SOURCE_VALUES,
+    RESOLUTION_VALUES,
+    QUALITY_MODIFIER_VALUES,
+    RELEASE_TYPE_VALUES,
+    INDEXER_FLAG_VALUES,
+  } from '$shared/pcd/conditions';
+  import type { ConditionData } from '$shared/pcd/display.ts';
 
-	const dispatch = createEventDispatcher<{
-		remove: void;
-		confirm: ConditionData;
-		discard: void;
-		change: ConditionData;
-	}>();
+  const dispatch = createEventDispatcher<{
+    remove: void;
+    confirm: ConditionData;
+    discard: void;
+    change: ConditionData;
+  }>();
 
-	// Mode: 'normal' for existing conditions, 'draft' for new unsaved conditions
-	export let mode: 'normal' | 'draft' = 'normal';
-	export let condition: ConditionData;
-	export let nameConflict = false;
+  // Mode: 'normal' for existing conditions, 'draft' for new unsaved conditions
+  export let mode: 'normal' | 'draft' = 'normal';
+  export let condition: ConditionData;
+  export let nameConflict = false;
 
-	// Available patterns and languages from database (passed in)
-	export let availablePatterns: { id: number; name: string; pattern: string }[] = [];
-	export let availableLanguages: { name: string; radarr: boolean; sonarr: boolean; lidarr: boolean }[] = [];
+  // Available patterns and languages from database (passed in)
+  export let availablePatterns: { id: number; name: string; pattern: string }[] = [];
+  export let availableLanguages: { name: string; radarr: boolean; sonarr: boolean; lidarr: boolean }[] = [];
 
-	// Computed states based on mode
-	$: isDraft = mode === 'draft';
-	$: rightPaddingClass = 'pr-3';
-	$: conditionNameId = `condition-name-${(condition.name || 'untitled')
-		.toLowerCase()
-		.replace(/[^a-z0-9]+/g, '-')}`;
-	$: nameError = '';
+  // Computed states based on mode
+  $: isDraft = mode === 'draft';
+  $: rightPaddingClass = 'pr-3';
+  $: conditionNameId = `condition-name-${(condition.name || 'untitled').toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
+  $: nameError = '';
 
-	// Helper to emit changes - creates new object to maintain immutability
-	function emitChange(updates: Partial<ConditionData>) {
-		dispatch('change', { ...condition, ...updates });
-	}
+  // Helper to emit changes - creates new object to maintain immutability
+  function emitChange(updates: Partial<ConditionData>) {
+    dispatch('change', { ...condition, ...updates });
+  }
 
-	function handleArrTypeToggle(target: ArrConditionTargetType, enabled: boolean) {
-		if (enabled) {
-			emitChange({ arrType: target });
-			return;
-		}
+  function handleArrTypeToggle(target: ArrConditionTargetType, enabled: boolean) {
+    if (enabled) {
+      emitChange({ arrType: target });
+      return;
+    }
 
-		if (condition.arrType === target) {
-			emitChange({ arrType: '' });
-		}
-	}
+    if (condition.arrType === target) {
+      emitChange({ arrType: '' });
+    }
+  }
 
-	// All condition types
-	$: filteredConditionTypes = [...CONDITION_TYPES];
+  // All condition types
+  $: filteredConditionTypes = [...CONDITION_TYPES];
 
-	// Get value options based on current type
-	$: valueOptions = getValueOptions(condition.type);
+  // Get value options based on current type
+  $: valueOptions = getValueOptions(condition.type);
 
-	function getValueOptions(type: string) {
-		switch (type) {
-			case 'source':
-				return [...SOURCE_VALUES];
-			case 'resolution':
-				return [...RESOLUTION_VALUES];
-			case 'quality_modifier':
-				return [...QUALITY_MODIFIER_VALUES];
-			case 'release_type':
-				return [...RELEASE_TYPE_VALUES];
-			case 'indexer_flag':
-				return [...INDEXER_FLAG_VALUES];
-			default:
-				return [];
-		}
-	}
+  function getValueOptions(type: string) {
+    switch (type) {
+      case 'source':
+        return [...SOURCE_VALUES];
+      case 'resolution':
+        return [...RESOLUTION_VALUES];
+      case 'quality_modifier':
+        return [...QUALITY_MODIFIER_VALUES];
+      case 'release_type':
+        return [...RELEASE_TYPE_VALUES];
+      case 'indexer_flag':
+        return [...INDEXER_FLAG_VALUES];
+      default:
+        return [];
+    }
+  }
 
-	// Check if type is pattern-based
-	$: isPatternType = PATTERN_TYPES.includes(condition.type as (typeof PATTERN_TYPES)[number]);
+  // Check if type is pattern-based
+  $: isPatternType = PATTERN_TYPES.includes(condition.type as (typeof PATTERN_TYPES)[number]);
 
-	// SearchDropdown options for patterns
-	$: patternOptions = availablePatterns.map((p) => ({ value: p.name, label: p.name }));
+  // SearchDropdown options for patterns
+  $: patternOptions = availablePatterns.map((p) => ({ value: p.name, label: p.name }));
 
-	function handlePatternChange(value: string) {
-		if (!value) {
-			emitChange({ patterns: [] });
-			return;
-		}
-		const pattern = availablePatterns.find((p) => p.name === value);
-		emitChange({ patterns: pattern ? [{ name: pattern.name, pattern: pattern.pattern }] : [] });
-	}
+  function handlePatternChange(value: string) {
+    if (!value) {
+      emitChange({ patterns: [] });
+      return;
+    }
+    const pattern = availablePatterns.find((p) => p.name === value);
+    emitChange({ patterns: pattern ? [{ name: pattern.name, pattern: pattern.pattern }] : [] });
+  }
 
-	// Reactive selected value based on condition type
-	$: selectedValue = (() => {
-		if (isPatternType) {
-			return condition.patterns?.[0]?.name ?? '';
-		}
-		switch (condition.type) {
-			case 'source':
-				return condition.sources?.[0] ?? '';
-			case 'resolution':
-				return condition.resolutions?.[0] ?? '';
-			case 'quality_modifier':
-				return condition.qualityModifiers?.[0] ?? '';
-			case 'release_type':
-				return condition.releaseTypes?.[0] ?? '';
-			case 'indexer_flag':
-				return condition.indexerFlags?.[0] ?? '';
-			case 'language':
-				return condition.languages?.[0]?.name ?? '';
-			default:
-				return '';
-		}
-	})();
+  // Reactive selected value based on condition type
+  $: selectedValue = (() => {
+    if (isPatternType) {
+      return condition.patterns?.[0]?.name ?? '';
+    }
+    switch (condition.type) {
+      case 'source':
+        return condition.sources?.[0] ?? '';
+      case 'resolution':
+        return condition.resolutions?.[0] ?? '';
+      case 'quality_modifier':
+        return condition.qualityModifiers?.[0] ?? '';
+      case 'release_type':
+        return condition.releaseTypes?.[0] ?? '';
+      case 'indexer_flag':
+        return condition.indexerFlags?.[0] ?? '';
+      case 'language':
+        return condition.languages?.[0]?.name ?? '';
+      default:
+        return '';
+    }
+  })();
 
-	// Update value when Select changes
-	function handleSelectChange(value: string) {
-		switch (condition.type) {
-			case 'source':
-				emitChange({ sources: value ? [value] : [] });
-				break;
-			case 'resolution':
-				emitChange({ resolutions: value ? [value] : [] });
-				break;
-			case 'quality_modifier':
-				emitChange({ qualityModifiers: value ? [value] : [] });
-				break;
-			case 'release_type':
-				emitChange({ releaseTypes: value ? [value] : [] });
-				break;
-			case 'indexer_flag':
-				emitChange({ indexerFlags: value ? [value] : [] });
-				break;
-		}
-	}
+  // Update value when Select changes
+  function handleSelectChange(value: string) {
+    switch (condition.type) {
+      case 'source':
+        emitChange({ sources: value ? [value] : [] });
+        break;
+      case 'resolution':
+        emitChange({ resolutions: value ? [value] : [] });
+        break;
+      case 'quality_modifier':
+        emitChange({ qualityModifiers: value ? [value] : [] });
+        break;
+      case 'release_type':
+        emitChange({ releaseTypes: value ? [value] : [] });
+        break;
+      case 'indexer_flag':
+        emitChange({ indexerFlags: value ? [value] : [] });
+        break;
+    }
+  }
 
-	// Available logo assets keyed by ArrAppType.
-	// Apps without a logo asset (e.g. Lidarr) fall back to an initial-letter
-	// badge in the language dropdown template.
-	const logoAssets: Partial<Record<ArrAppType, string>> = {
-		radarr: radarrLogo,
-		sonarr: sonarrLogo
-	};
+  // Available logo assets keyed by ArrAppType.
+  // Apps without a logo asset (e.g. Lidarr) fall back to an initial-letter
+  // badge in the language dropdown template.
+  const logoAssets: Partial<Record<ArrAppType, string>> = {
+    radarr: radarrLogo,
+    sonarr: sonarrLogo,
+  };
 
-	// Build a map of language name -> supported app types for use in the
-	// dropdown item slot, where the SearchDropdown Option type erases extra
-	// properties to `unknown`.
-	$: languageSupportMap = new Map(
-		availableLanguages.map((l) => [
-			l.name,
-			ARR_APP_TYPES.filter((type) => l[type as keyof typeof l] === true)
-		])
-	);
+  // Build a map of language name -> supported app types for use in the
+  // dropdown item slot, where the SearchDropdown Option type erases extra
+  // properties to `unknown`.
+  $: languageSupportMap = new Map(
+    availableLanguages.map((l) => [l.name, ARR_APP_TYPES.filter((type) => l[type as keyof typeof l] === true)])
+  );
 
-	// Language options for SearchDropdown
-	$: languageOptions = availableLanguages.map((l) => ({
-		value: l.name,
-		label: l.name
-	}));
+  // Language options for SearchDropdown
+  $: languageOptions = availableLanguages.map((l) => ({
+    value: l.name,
+    label: l.name,
+  }));
 
-	// Language except state
-	$: hasLanguage = (condition.languages?.length ?? 0) > 0;
-	$: languageExcept = condition.languages?.[0]?.except ?? false;
+  // Language except state
+  $: hasLanguage = (condition.languages?.length ?? 0) > 0;
+  $: languageExcept = condition.languages?.[0]?.except ?? false;
 
-	function handleLanguageChange(value: string) {
-		if (!value) {
-			emitChange({ languages: [] });
-			return;
-		}
-		emitChange({ languages: [{ name: value, except: languageExcept }] });
-	}
+  function handleLanguageChange(value: string) {
+    if (!value) {
+      emitChange({ languages: [] });
+      return;
+    }
+    emitChange({ languages: [{ name: value, except: languageExcept }] });
+  }
 
-	function handleLanguageExceptChange(enabled: boolean) {
-		if (hasLanguage) {
-			emitChange({
-				languages: [{ ...condition.languages![0], except: enabled }]
-			});
-		}
-	}
+  function handleLanguageExceptChange(enabled: boolean) {
+    if (hasLanguage) {
+      emitChange({
+        languages: [{ ...condition.languages![0], except: enabled }],
+      });
+    }
+  }
 
-	// Handle type change - reset values
-	function handleTypeChange(newType: string) {
-		emitChange({
-			type: newType,
-			patterns: undefined,
-			languages: undefined,
-			sources: undefined,
-			resolutions: undefined,
-			qualityModifiers: undefined,
-			releaseTypes: undefined,
-			indexerFlags: undefined,
-			size: undefined,
-			years: undefined
-		});
-	}
+  // Handle type change - reset values
+  function handleTypeChange(newType: string) {
+    emitChange({
+      type: newType,
+      patterns: undefined,
+      languages: undefined,
+      sources: undefined,
+      resolutions: undefined,
+      qualityModifiers: undefined,
+      releaseTypes: undefined,
+      indexerFlags: undefined,
+      size: undefined,
+      years: undefined,
+    });
+  }
 
-	// Type options for Select
-	$: typeOptions = filteredConditionTypes.map((t) => ({ value: t.value, label: t.label }));
+  // Type options for Select
+  $: typeOptions = filteredConditionTypes.map((t) => ({ value: t.value, label: t.label }));
 
-	// Size helpers (convert between bytes and GB for display)
-	$: minSizeGB = condition.size?.minBytes
-		? condition.size.minBytes / 1024 / 1024 / 1024
-		: undefined;
-	$: maxSizeGB = condition.size?.maxBytes
-		? condition.size.maxBytes / 1024 / 1024 / 1024
-		: undefined;
+  // Size helpers (convert between bytes and GB for display)
+  $: minSizeGB = condition.size?.minBytes ? condition.size.minBytes / 1024 / 1024 / 1024 : undefined;
+  $: maxSizeGB = condition.size?.maxBytes ? condition.size.maxBytes / 1024 / 1024 / 1024 : undefined;
 
-	function handleMinSizeChange(value: number | undefined) {
-		const currentSize = condition.size ?? { minBytes: null, maxBytes: null };
-		emitChange({
-			size: {
-				...currentSize,
-				minBytes: value == null ? null : Math.round(value * 1024 * 1024 * 1024)
-			}
-		});
-	}
+  function handleMinSizeChange(value: number | undefined) {
+    const currentSize = condition.size ?? { minBytes: null, maxBytes: null };
+    emitChange({
+      size: {
+        ...currentSize,
+        minBytes: value == null ? null : Math.round(value * 1024 * 1024 * 1024),
+      },
+    });
+  }
 
-	function handleMaxSizeChange(value: number | undefined) {
-		const currentSize = condition.size ?? { minBytes: null, maxBytes: null };
-		emitChange({
-			size: {
-				...currentSize,
-				maxBytes: value == null ? null : Math.round(value * 1024 * 1024 * 1024)
-			}
-		});
-	}
+  function handleMaxSizeChange(value: number | undefined) {
+    const currentSize = condition.size ?? { minBytes: null, maxBytes: null };
+    emitChange({
+      size: {
+        ...currentSize,
+        maxBytes: value == null ? null : Math.round(value * 1024 * 1024 * 1024),
+      },
+    });
+  }
 
-	// Year helpers
-	$: minYear = condition.years?.minYear ?? undefined;
-	$: maxYear = condition.years?.maxYear ?? undefined;
+  // Year helpers
+  $: minYear = condition.years?.minYear ?? undefined;
+  $: maxYear = condition.years?.maxYear ?? undefined;
 
-	function handleMinYearChange(value: number | undefined) {
-		const currentYears = condition.years ?? { minYear: null, maxYear: null };
-		emitChange({
-			years: {
-				...currentYears,
-				minYear: value ?? null
-			}
-		});
-	}
+  function handleMinYearChange(value: number | undefined) {
+    const currentYears = condition.years ?? { minYear: null, maxYear: null };
+    emitChange({
+      years: {
+        ...currentYears,
+        minYear: value ?? null,
+      },
+    });
+  }
 
-	function handleMaxYearChange(value: number | undefined) {
-		const currentYears = condition.years ?? { minYear: null, maxYear: null };
-		emitChange({
-			years: {
-				...currentYears,
-				maxYear: value ?? null
-			}
-		});
-	}
-
+  function handleMaxYearChange(value: number | undefined) {
+    const currentYears = condition.years ?? { minYear: null, maxYear: null };
+    emitChange({
+      years: {
+        ...currentYears,
+        maxYear: value ?? null,
+      },
+    });
+  }
 </script>
 
 <div class="relative flex flex-col gap-3 px-3 py-3 {rightPaddingClass} md:flex-row md:items-center">
-	<!-- Identity -->
-	<div class="rounded-xl border border-neutral-200 bg-neutral-50/40 p-2 dark:border-neutral-800 dark:bg-neutral-900/40 md:contents md:border-0 md:bg-transparent md:p-0">
-		<div class="mb-2 text-[11px] font-medium tracking-wide text-neutral-500 uppercase dark:text-neutral-400 md:hidden">
-			Identity
-		</div>
-		<div class="grid gap-2 md:contents">
-			<div class="w-full min-w-0 shrink-0 md:w-48" title={nameConflict ? 'Duplicate condition name' : ''}>
-				<FormInput
-					label="Name"
-					hideLabel
-					name={conditionNameId}
-					value={condition.name}
-					placeholder="Condition name"
-					description={nameError}
-					on:input={(e) => emitChange({ name: e.detail })}
-				/>
-			</div>
-			<div class="w-full min-w-0 shrink-0 md:w-52">
-				<SearchDropdown
-					options={typeOptions}
-					value={condition.type}
-					placeholder="Select type..."
-					constrainMenuHeight={false}
-					on:change={(e) => handleTypeChange(e.detail)}
-				/>
-			</div>
-		</div>
-	</div>
+  <!-- Identity -->
+  <div
+    class="rounded-xl border border-neutral-200 bg-neutral-50/40 p-2 md:contents md:border-0 md:bg-transparent md:p-0 dark:border-neutral-800 dark:bg-neutral-900/40"
+  >
+    <div class="mb-2 text-[11px] font-medium tracking-wide text-neutral-500 uppercase md:hidden dark:text-neutral-400">
+      Identity
+    </div>
+    <div class="grid gap-2 md:contents">
+      <div class="w-full min-w-0 shrink-0 md:w-48" title={nameConflict ? 'Duplicate condition name' : ''}>
+        <FormInput
+          label="Name"
+          hideLabel
+          name={conditionNameId}
+          value={condition.name}
+          placeholder="Condition name"
+          description={nameError}
+          on:input={(e) => emitChange({ name: e.detail })}
+        />
+      </div>
+      <div class="w-full min-w-0 shrink-0 md:w-52">
+        <SearchDropdown
+          options={typeOptions}
+          value={condition.type}
+          placeholder="Select type..."
+          constrainMenuHeight={false}
+          on:change={(e) => handleTypeChange(e.detail)}
+        />
+      </div>
+    </div>
+  </div>
 
-	<!-- Value -->
-	<div class="rounded-xl border border-neutral-200 bg-neutral-50/40 p-2 dark:border-neutral-800 dark:bg-neutral-900/40 md:contents md:border-0 md:bg-transparent md:p-0">
-		<div class="mb-2 text-[11px] font-medium tracking-wide text-neutral-500 uppercase dark:text-neutral-400 md:hidden">
-			Value
-		</div>
-		<div class="min-w-0 md:flex-1">
-			{#if isPatternType}
-				<SearchDropdown
-					options={patternOptions}
-					value={selectedValue}
-					placeholder="Select pattern..."
-					on:change={(e) => handlePatternChange(e.detail)}
-				/>
-			{:else if condition.type === 'language'}
-				<div class="flex flex-col gap-2 md:flex-row md:items-center">
-					<div class="min-w-0 flex-1">
-						<SearchDropdown
-							options={languageOptions}
-							value={selectedValue}
-							placeholder="Select language..."
-							on:change={(e) => handleLanguageChange(e.detail)}
-						>
-							<svelte:fragment slot="item" let:option>
-								<span class="flex w-full items-center justify-between">
-									<span>{option.label}</span>
-									<span class="flex gap-1">
-										{#each languageSupportMap.get(option.value) ?? [] as appType (appType)}
-											{@const logo = logoAssets[appType]}
-											{@const meta = getArrAppMetadata(appType)}
-											{#if logo}
-												<img src={logo} alt={meta.label} class="h-3.5 w-3.5" title={meta.label} />
-											{:else}
-												<span
-													class="inline-flex h-3.5 w-3.5 items-center justify-center rounded-sm text-[8px] font-bold text-white"
-													style="background-color: {meta.conditionTargetCheckboxColor}"
-													title={meta.label}
-													aria-label={meta.label}
-												>
-													{meta.label.charAt(0)}
-												</span>
-											{/if}
-										{/each}
-									</span>
-								</span>
-							</svelte:fragment>
-						</SearchDropdown>
-					</div>
-					<Toggle
-						checked={languageExcept}
-						ariaLabel="Except language"
-						label="Except"
-						color="red"
-						disabled={!hasLanguage}
-						on:change={(e) => handleLanguageExceptChange(e.detail)}
-					/>
-				</div>
-			{:else if condition.type === 'size'}
-				<div class="flex flex-col gap-2 md:flex-row md:items-center">
-					<div class="w-full flex-1">
-						<NumberInput
-							name="minSize"
-							value={minSizeGB}
-							min={0}
-							step={1}
-							font="mono"
-							responsive
-							placeholder="Min GB"
-							on:change={(e) => handleMinSizeChange(e.detail)}
-						/>
-					</div>
-					<span class="hidden text-sm text-neutral-500 md:inline">-</span>
-					<div class="w-full flex-1">
-						<NumberInput
-							name="maxSize"
-							value={maxSizeGB}
-							min={0}
-							step={1}
-							font="mono"
-							responsive
-							placeholder="Max GB"
-							on:change={(e) => handleMaxSizeChange(e.detail)}
-						/>
-					</div>
-				</div>
-			{:else if condition.type === 'year'}
-				<div class="flex flex-col gap-2 md:flex-row md:items-center">
-					<div class="w-full flex-1">
-						<NumberInput
-							name="minYear"
-							value={minYear}
-							min={1900}
-							max={2100}
-							step={1}
-							font="mono"
-							responsive
-							placeholder="Min Year"
-							on:change={(e) => handleMinYearChange(e.detail)}
-						/>
-					</div>
-					<span class="hidden text-sm text-neutral-500 md:inline">-</span>
-					<div class="w-full flex-1">
-						<NumberInput
-							name="maxYear"
-							value={maxYear}
-							min={1900}
-							max={2100}
-							step={1}
-							font="mono"
-							responsive
-							placeholder="Max Year"
-							on:change={(e) => handleMaxYearChange(e.detail)}
-						/>
-					</div>
-				</div>
-			{:else}
-				<SearchDropdown
-					options={valueOptions}
-					value={selectedValue}
-					placeholder="Select value..."
-					constrainMenuHeight={false}
-					on:change={(e) => handleSelectChange(e.detail)}
-				/>
-			{/if}
-		</div>
-	</div>
+  <!-- Value -->
+  <div
+    class="rounded-xl border border-neutral-200 bg-neutral-50/40 p-2 md:contents md:border-0 md:bg-transparent md:p-0 dark:border-neutral-800 dark:bg-neutral-900/40"
+  >
+    <div class="mb-2 text-[11px] font-medium tracking-wide text-neutral-500 uppercase md:hidden dark:text-neutral-400">
+      Value
+    </div>
+    <div class="min-w-0 md:flex-1">
+      {#if isPatternType}
+        <SearchDropdown
+          options={patternOptions}
+          value={selectedValue}
+          placeholder="Select pattern..."
+          on:change={(e) => handlePatternChange(e.detail)}
+        />
+      {:else if condition.type === 'language'}
+        <div class="flex flex-col gap-2 md:flex-row md:items-center">
+          <div class="min-w-0 flex-1">
+            <SearchDropdown
+              options={languageOptions}
+              value={selectedValue}
+              placeholder="Select language..."
+              on:change={(e) => handleLanguageChange(e.detail)}
+            >
+              <svelte:fragment slot="item" let:option>
+                <span class="flex w-full items-center justify-between">
+                  <span>{option.label}</span>
+                  <span class="flex gap-1">
+                    {#each languageSupportMap.get(option.value) ?? [] as appType (appType)}
+                      {@const logo = logoAssets[appType]}
+                      {@const meta = getArrAppMetadata(appType)}
+                      {#if logo}
+                        <img src={logo} alt={meta.label} class="h-3.5 w-3.5" title={meta.label} />
+                      {:else}
+                        <span
+                          class="inline-flex h-3.5 w-3.5 items-center justify-center rounded-sm text-[8px] font-bold text-white"
+                          style="background-color: {meta.conditionTargetCheckboxColor}"
+                          title={meta.label}
+                          aria-label={meta.label}
+                        >
+                          {meta.label.charAt(0)}
+                        </span>
+                      {/if}
+                    {/each}
+                  </span>
+                </span>
+              </svelte:fragment>
+            </SearchDropdown>
+          </div>
+          <Toggle
+            checked={languageExcept}
+            ariaLabel="Except language"
+            label="Except"
+            color="red"
+            disabled={!hasLanguage}
+            on:change={(e) => handleLanguageExceptChange(e.detail)}
+          />
+        </div>
+      {:else if condition.type === 'size'}
+        <div class="flex flex-col gap-2 md:flex-row md:items-center">
+          <div class="w-full flex-1">
+            <NumberInput
+              name="minSize"
+              value={minSizeGB}
+              min={0}
+              step={1}
+              font="mono"
+              responsive
+              placeholder="Min GB"
+              on:change={(e) => handleMinSizeChange(e.detail)}
+            />
+          </div>
+          <span class="hidden text-sm text-neutral-500 md:inline">-</span>
+          <div class="w-full flex-1">
+            <NumberInput
+              name="maxSize"
+              value={maxSizeGB}
+              min={0}
+              step={1}
+              font="mono"
+              responsive
+              placeholder="Max GB"
+              on:change={(e) => handleMaxSizeChange(e.detail)}
+            />
+          </div>
+        </div>
+      {:else if condition.type === 'year'}
+        <div class="flex flex-col gap-2 md:flex-row md:items-center">
+          <div class="w-full flex-1">
+            <NumberInput
+              name="minYear"
+              value={minYear}
+              min={1900}
+              max={2100}
+              step={1}
+              font="mono"
+              responsive
+              placeholder="Min Year"
+              on:change={(e) => handleMinYearChange(e.detail)}
+            />
+          </div>
+          <span class="hidden text-sm text-neutral-500 md:inline">-</span>
+          <div class="w-full flex-1">
+            <NumberInput
+              name="maxYear"
+              value={maxYear}
+              min={1900}
+              max={2100}
+              step={1}
+              font="mono"
+              responsive
+              placeholder="Max Year"
+              on:change={(e) => handleMaxYearChange(e.detail)}
+            />
+          </div>
+        </div>
+      {:else}
+        <SearchDropdown
+          options={valueOptions}
+          value={selectedValue}
+          placeholder="Select value..."
+          constrainMenuHeight={false}
+          on:change={(e) => handleSelectChange(e.detail)}
+        />
+      {/if}
+    </div>
+  </div>
 
-	<!-- Flags -->
-	<div class="rounded-xl border border-neutral-200 bg-neutral-50/40 p-2 dark:border-neutral-800 dark:bg-neutral-900/40 md:contents md:border-0 md:bg-transparent md:p-0">
-		<div class="mb-2 text-[11px] font-medium tracking-wide text-neutral-500 uppercase dark:text-neutral-400 md:hidden">
-			Flags
-		</div>
-		<div class="grid grid-cols-2 gap-2 md:ml-auto md:flex md:flex-wrap md:items-center md:gap-2 md:shrink-0">
-			<Toggle
-				checked={condition.negate}
-				ariaLabel="Negate"
-				label="Negate"
-				color="red"
-				on:change={(e) => emitChange({ negate: e.detail })}
-			/>
-			<Toggle
-				checked={condition.required}
-				ariaLabel="Required"
-				label="Required"
-				color="green"
-				on:change={(e) => emitChange({ required: e.detail })}
-			/>
-			{#each ARR_CONDITION_TARGET_OPTIONS as option (option.value)}
-				<Toggle
-					checked={condition.arrType === option.value}
-					ariaLabel={`${option.label} target`}
-					label={option.label}
-					checkboxColor={option.checkboxColor}
-					on:change={(e) => handleArrTypeToggle(option.value, e.detail)}
-				/>
-			{/each}
-		</div>
-	</div>
+  <!-- Flags -->
+  <div
+    class="rounded-xl border border-neutral-200 bg-neutral-50/40 p-2 md:contents md:border-0 md:bg-transparent md:p-0 dark:border-neutral-800 dark:bg-neutral-900/40"
+  >
+    <div class="mb-2 text-[11px] font-medium tracking-wide text-neutral-500 uppercase md:hidden dark:text-neutral-400">
+      Flags
+    </div>
+    <div class="grid grid-cols-2 gap-2 md:ml-auto md:flex md:shrink-0 md:flex-wrap md:items-center md:gap-2">
+      <Toggle
+        checked={condition.negate}
+        ariaLabel="Negate"
+        label="Negate"
+        color="red"
+        on:change={(e) => emitChange({ negate: e.detail })}
+      />
+      <Toggle
+        checked={condition.required}
+        ariaLabel="Required"
+        label="Required"
+        color="green"
+        on:change={(e) => emitChange({ required: e.detail })}
+      />
+      {#each ARR_CONDITION_TARGET_OPTIONS as option (option.value)}
+        <Toggle
+          checked={condition.arrType === option.value}
+          ariaLabel={`${option.label} target`}
+          label={option.label}
+          checkboxColor={option.checkboxColor}
+          on:change={(e) => handleArrTypeToggle(option.value, e.detail)}
+        />
+      {/each}
+    </div>
+  </div>
 
-	<!-- Actions -->
-	<div class="rounded-xl border border-neutral-200 bg-neutral-50/40 p-2 dark:border-neutral-800 dark:bg-neutral-900/40 md:contents md:border-0 md:bg-transparent md:p-0">
-		<div class="mb-2 text-[11px] font-medium tracking-wide text-neutral-500 uppercase dark:text-neutral-400 md:hidden">
-			Actions
-		</div>
-		{#if isDraft}
-			<div class="grid grid-cols-2 gap-2 md:flex md:flex-wrap md:items-center md:gap-2">
-				<Button
-					text="Discard"
-					icon={Trash2}
-					iconColor="text-red-600 dark:text-red-400"
-					variant="secondary"
-					title="Discard condition"
-					ariaLabel="Discard condition"
-					on:click={() => dispatch('discard')}
-				/>
-				<Button
-					text="Accept"
-					icon={Check}
-					iconColor="text-green-600 dark:text-green-400"
-					variant="secondary"
-					title="Confirm condition"
-					ariaLabel="Confirm condition"
-					on:click={() => dispatch('confirm', condition)}
-				/>
-			</div>
-		{:else}
-			<div class="grid grid-cols-1 gap-2 md:flex md:flex-wrap md:items-center md:gap-2">
-				<Button
-					text="Remove"
-					icon={Trash2}
-					iconColor="text-red-600 dark:text-red-400"
-					variant="secondary"
-					title="Remove condition"
-					ariaLabel="Remove condition"
-					on:click={() => dispatch('remove')}
-				/>
-			</div>
-		{/if}
-	</div>
+  <!-- Actions -->
+  <div
+    class="rounded-xl border border-neutral-200 bg-neutral-50/40 p-2 md:contents md:border-0 md:bg-transparent md:p-0 dark:border-neutral-800 dark:bg-neutral-900/40"
+  >
+    <div class="mb-2 text-[11px] font-medium tracking-wide text-neutral-500 uppercase md:hidden dark:text-neutral-400">
+      Actions
+    </div>
+    {#if isDraft}
+      <div class="grid grid-cols-2 gap-2 md:flex md:flex-wrap md:items-center md:gap-2">
+        <Button
+          text="Discard"
+          icon={Trash2}
+          iconColor="text-red-600 dark:text-red-400"
+          variant="secondary"
+          title="Discard condition"
+          ariaLabel="Discard condition"
+          on:click={() => dispatch('discard')}
+        />
+        <Button
+          text="Accept"
+          icon={Check}
+          iconColor="text-green-600 dark:text-green-400"
+          variant="secondary"
+          title="Confirm condition"
+          ariaLabel="Confirm condition"
+          on:click={() => dispatch('confirm', condition)}
+        />
+      </div>
+    {:else}
+      <div class="grid grid-cols-1 gap-2 md:flex md:flex-wrap md:items-center md:gap-2">
+        <Button
+          text="Remove"
+          icon={Trash2}
+          iconColor="text-red-600 dark:text-red-400"
+          variant="secondary"
+          title="Remove condition"
+          ariaLabel="Remove condition"
+          on:click={() => dispatch('remove')}
+        />
+      </div>
+    {/if}
+  </div>
 </div>

@@ -1,93 +1,93 @@
 <script lang="ts">
-	import DetailHeader from '../../components/DetailHeader.svelte';
-	import DetailCard from '../../components/DetailCard.svelte';
-	import DetailField from '../../components/DetailField.svelte';
-	import Table from '$ui/table/Table.svelte';
-	import type { Column } from '$ui/table/types.ts';
-	import type { TrashGuideQualitySizeEntry } from '$lib/server/trashguide/types.ts';
-	import { page } from '$app/stores';
+  import DetailHeader from '../../components/DetailHeader.svelte';
+  import DetailCard from '../../components/DetailCard.svelte';
+  import DetailField from '../../components/DetailField.svelte';
+  import Table from '$ui/table/Table.svelte';
+  import type { Column } from '$ui/table/types.ts';
+  import type { TrashGuideQualitySizeEntry } from '$lib/server/trashguide/types.ts';
+  import { page } from '$app/stores';
 
-	$: source = $page.data.source;
-	$: entity = $page.data.entity;
-	$: fetchedAt = $page.data.fetchedAt;
+  $: source = $page.data.source;
+  $: entity = $page.data.entity;
+  $: fetchedAt = $page.data.fetchedAt;
 
-	$: qualities = entity?.qualities ?? [];
-	$: qualityRows = qualities as TrashGuideQualitySizeEntry[];
+  $: qualities = entity?.qualities ?? [];
+  $: qualityRows = qualities as TrashGuideQualitySizeEntry[];
 
-	function formatSize(mb: number): string {
-		if (mb >= 1000) {
-			return `${(mb / 1000).toFixed(1)} GB`;
-		}
-		return `${mb.toFixed(1)} MB`;
-	}
+  function formatSize(mb: number): string {
+    if (mb >= 1000) {
+      return `${(mb / 1000).toFixed(1)} GB`;
+    }
+    return `${mb.toFixed(1)} MB`;
+  }
 
-	$: columns = [
-		{
-			key: 'quality',
-			header: 'Quality',
-			sortable: true
-		},
-		{
-			key: 'min',
-			header: 'Min',
-			align: 'right' as const,
-			sortable: true,
-			cell: (row: TrashGuideQualitySizeEntry) => formatSize(row.min)
-		},
-		{
-			key: 'preferred',
-			header: 'Preferred',
-			align: 'right' as const,
-			sortable: true,
-			cell: (row: TrashGuideQualitySizeEntry) => formatSize(row.preferred)
-		},
-		{
-			key: 'max',
-			header: 'Max',
-			align: 'right' as const,
-			sortable: true,
-			cell: (row: TrashGuideQualitySizeEntry) => formatSize(row.max)
-		}
-	] satisfies Column<TrashGuideQualitySizeEntry>[];
+  $: columns = [
+    {
+      key: 'quality',
+      header: 'Quality',
+      sortable: true,
+    },
+    {
+      key: 'min',
+      header: 'Min',
+      align: 'right' as const,
+      sortable: true,
+      cell: (row: TrashGuideQualitySizeEntry) => formatSize(row.min),
+    },
+    {
+      key: 'preferred',
+      header: 'Preferred',
+      align: 'right' as const,
+      sortable: true,
+      cell: (row: TrashGuideQualitySizeEntry) => formatSize(row.preferred),
+    },
+    {
+      key: 'max',
+      header: 'Max',
+      align: 'right' as const,
+      sortable: true,
+      cell: (row: TrashGuideQualitySizeEntry) => formatSize(row.max),
+    },
+  ] satisfies Column<TrashGuideQualitySizeEntry>[];
 
-	function formatDate(date: string): string {
-		return new Date(date).toLocaleString(undefined, {
-			year: 'numeric',
-			month: 'short',
-			day: 'numeric',
-			hour: 'numeric',
-			minute: '2-digit'
-		});
-	}
+  function formatDate(date: string): string {
+    return new Date(date).toLocaleString(undefined, {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+    });
+  }
 </script>
 
 <svelte:head>
-	<title>{entity?.name ?? 'Quality Size'} - Praxrr</title>
+  <title>{entity?.name ?? 'Quality Size'} - Praxrr</title>
 </svelte:head>
 
 {#if entity}
-	<div class="mt-6 space-y-6">
-		<DetailHeader name={entity.name} arrType={source?.arrType ?? 'radarr'} />
+  <div class="mt-6 space-y-6">
+    <DetailHeader name={entity.name} arrType={source?.arrType ?? 'radarr'} />
 
-		<DetailCard title="Details">
-			<DetailField label="Name" value={entity.name} />
-			<DetailField label="Profile Type" value={entity.profile_type} />
-			<DetailField label="File Path" value={entity.file_path} mono />
-			<DetailField label="Fetched At" value={formatDate(fetchedAt)} />
-		</DetailCard>
+    <DetailCard title="Details">
+      <DetailField label="Name" value={entity.name} />
+      <DetailField label="Profile Type" value={entity.profile_type} />
+      <DetailField label="File Path" value={entity.file_path} mono />
+      <DetailField label="Fetched At" value={formatDate(fetchedAt)} />
+    </DetailCard>
 
-		<div>
-			<h3 class="mb-3 text-sm font-semibold text-neutral-900 dark:text-neutral-50">
-				Quality Entries ({qualities.length})
-			</h3>
-			<Table
-				columns={columns}
-				data={qualityRows}
-				compact
-				hoverable={false}
-				emptyMessage="No quality entries defined."
-				responsive
-			/>
-		</div>
-	</div>
+    <div>
+      <h3 class="mb-3 text-sm font-semibold text-neutral-900 dark:text-neutral-50">
+        Quality Entries ({qualities.length})
+      </h3>
+      <Table
+        {columns}
+        data={qualityRows}
+        compact
+        hoverable={false}
+        emptyMessage="No quality entries defined."
+        responsive
+      />
+    </div>
+  </div>
 {/if}

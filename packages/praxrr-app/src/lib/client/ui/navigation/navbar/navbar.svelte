@@ -11,7 +11,7 @@
 </script>
 
 <nav
-  class="fixed top-0 left-0 z-50 w-full border-b border-r-0 border-neutral-200 bg-neutral-50 md:z-[80] md:w-80 md:border-r dark:border-neutral-800 dark:bg-neutral-900"
+  class="fixed top-0 left-0 z-50 w-full border-r-0 border-b border-neutral-200 bg-neutral-50 md:z-[80] md:w-80 md:border-r dark:border-neutral-800 dark:bg-neutral-900"
 >
   <div class="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 px-4 py-4">
     <!-- Left: Hamburger (mobile) + Brand name with logo (desktop) -->

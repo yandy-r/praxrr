@@ -1,48 +1,48 @@
 <script lang="ts">
-	import { themeStore } from '$stores/theme.ts';
-	import { navIconStore } from '$stores/navIcons';
-	import { MoonStar, Sun } from 'lucide-svelte';
+  import { themeStore } from '$stores/theme.ts';
+  import { navIconStore } from '$stores/navIcons';
+  import { MoonStar, Sun } from 'lucide-svelte';
 
-	$: isDark = $themeStore === 'dark';
-	$: useEmoji = $navIconStore === 'emoji';
+  $: isDark = $themeStore === 'dark';
+  $: useEmoji = $navIconStore === 'emoji';
 </script>
 
 <button
-	on:click={() => themeStore.toggle()}
-	class="relative flex h-9 w-9 items-center justify-center rounded-md transition-colors hover:bg-neutral-200 dark:hover:bg-neutral-800"
-	aria-label="Toggle theme"
+  on:click={() => themeStore.toggle()}
+  class="relative flex h-9 w-9 items-center justify-center rounded-md transition-colors hover:bg-neutral-200 dark:hover:bg-neutral-800"
+  aria-label="Toggle theme"
 >
-	{#if useEmoji}
-		<!-- Emoji mode -->
-		<div
-			class="absolute transition-all duration-300 {isDark
-				? 'scale-100 rotate-0 opacity-100'
-				: 'scale-75 rotate-180 opacity-0'}"
-		>
-			<span class="text-lg">✨</span>
-		</div>
-		<div
-			class="absolute transition-all duration-300 {isDark
-				? 'scale-75 -rotate-180 opacity-0'
-				: 'scale-100 rotate-0 opacity-100'}"
-		>
-			<span class="text-lg">💡</span>
-		</div>
-	{:else}
-		<!-- Lucide icon mode -->
-		<div
-			class="absolute transition-all duration-300 {isDark
-				? 'scale-100 rotate-0 opacity-100'
-				: 'scale-75 rotate-180 opacity-0'}"
-		>
-			<MoonStar class="h-[18px] w-[18px] text-neutral-700 dark:text-neutral-300" />
-		</div>
-		<div
-			class="absolute transition-all duration-300 {isDark
-				? 'scale-75 -rotate-180 opacity-0'
-				: 'scale-100 rotate-0 opacity-100'}"
-		>
-			<Sun class="h-[18px] w-[18px] text-neutral-700 dark:text-neutral-300" />
-		</div>
-	{/if}
+  {#if useEmoji}
+    <!-- Emoji mode -->
+    <div
+      class="absolute transition-all duration-300 {isDark
+        ? 'scale-100 rotate-0 opacity-100'
+        : 'scale-75 rotate-180 opacity-0'}"
+    >
+      <span class="text-lg">✨</span>
+    </div>
+    <div
+      class="absolute transition-all duration-300 {isDark
+        ? 'scale-75 -rotate-180 opacity-0'
+        : 'scale-100 rotate-0 opacity-100'}"
+    >
+      <span class="text-lg">💡</span>
+    </div>
+  {:else}
+    <!-- Lucide icon mode -->
+    <div
+      class="absolute transition-all duration-300 {isDark
+        ? 'scale-100 rotate-0 opacity-100'
+        : 'scale-75 rotate-180 opacity-0'}"
+    >
+      <MoonStar class="h-[18px] w-[18px] text-neutral-700 dark:text-neutral-300" />
+    </div>
+    <div
+      class="absolute transition-all duration-300 {isDark
+        ? 'scale-75 -rotate-180 opacity-0'
+        : 'scale-100 rotate-0 opacity-100'}"
+    >
+      <Sun class="h-[18px] w-[18px] text-neutral-700 dark:text-neutral-300" />
+    </div>
+  {/if}
 </button>

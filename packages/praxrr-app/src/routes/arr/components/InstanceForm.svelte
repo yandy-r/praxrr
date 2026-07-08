@@ -371,12 +371,11 @@
       alertStore.add('error', form.error);
     }
   }
-  $: storedApiKeyDisplayValue =
-    hasStoredApiKey
-      ? isStoredApiKeyRevealed && activeRevealedApiKey
-        ? activeRevealedApiKey
-        : apiKeyMasked || '••••••••'
-      : '';
+  $: storedApiKeyDisplayValue = hasStoredApiKey
+    ? isStoredApiKeyRevealed && activeRevealedApiKey
+      ? activeRevealedApiKey
+      : apiKeyMasked || '••••••••'
+    : '';
 
   // Display text based on mode
   $: selectedAppType = isArrAppType(type) ? type : null;
@@ -588,11 +587,7 @@
             label={mode === 'edit' ? 'New API Key' : 'API Key'}
             name="api_key"
             value={apiKey}
-            placeholder={
-              mode === 'create'
-                ? 'Enter API key'
-                : '••••••••'
-            }
+            placeholder={mode === 'create' ? 'Enter API key' : '••••••••'}
             description={mode === 'edit'
               ? canEditCoreConnectionFields
                 ? 'Re-enter API key to save changes'
@@ -682,11 +677,7 @@
   <input type="hidden" name="type" value={type} />
   <input type="hidden" name="url" value={url} />
   <input type="hidden" name="external_url" value={externalUrl.trim()} />
-  <input
-    type="hidden"
-    name="api_key"
-    value={lockCoreFields ? '' : apiKey}
-  />
+  <input type="hidden" name="api_key" value={lockCoreFields ? '' : apiKey} />
   <input type="hidden" name="enabled" value={enabled === 'true' ? '1' : '0'} />
   <input type="hidden" name="tags" value={JSON.stringify(tags)} />
 </form>

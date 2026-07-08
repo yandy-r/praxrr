@@ -201,7 +201,7 @@
         <span>{label}</span>
         {#if resolvedActive}
           <span
-            class="rounded-full bg-accent-100 px-1.5 py-0.5 text-xs font-semibold text-accent-700 dark:bg-accent-900/40 dark:text-accent-300"
+            class="bg-accent-100 text-accent-700 dark:bg-accent-900/40 dark:text-accent-300 rounded-full px-1.5 py-0.5 text-xs font-semibold"
           >
             {countLabel}
           </span>

@@ -183,7 +183,7 @@
                 href={row.href}
                 target="_blank"
                 rel="noopener noreferrer"
-                class="text-sm text-accent-600 hover:underline dark:text-accent-400"
+                class="text-accent-600 dark:text-accent-400 text-sm hover:underline"
               >
                 {row.value}
               </a>
@@ -221,7 +221,7 @@
                   href={row.href}
                   target="_blank"
                   rel="noopener noreferrer"
-                  class="text-sm text-accent-600 hover:underline dark:text-accent-400"
+                  class="text-accent-600 dark:text-accent-400 text-sm hover:underline"
                 >
                   {row.value}
                 </a>
@@ -341,7 +341,7 @@
                     target="_blank"
                     rel="noopener noreferrer"
                     data-sveltekit-reload
-                    class="font-mono text-sm font-medium text-accent-600 hover:underline dark:text-accent-400"
+                    class="text-accent-600 dark:text-accent-400 font-mono text-sm font-medium hover:underline"
                   >
                     {row.tag_name}
                   </a>
@@ -372,7 +372,7 @@
                           target="_blank"
                           rel="noopener noreferrer"
                           data-sveltekit-reload
-                          class="font-mono text-sm font-medium text-accent-600 hover:underline dark:text-accent-400"
+                          class="text-accent-600 dark:text-accent-400 font-mono text-sm font-medium hover:underline"
                         >
                           {row.tag_name}
                         </a>
@@ -418,7 +418,7 @@
             {#if row.remark}
               <span class="text-sm text-neutral-600 dark:text-neutral-400">{row.remark}</span>
             {:else}
-              <span class="text-sm italic text-neutral-400 dark:text-neutral-500">
+              <span class="text-sm text-neutral-400 italic dark:text-neutral-500">
                 Remark pending - someone should probably ask them
               </span>
             {/if}

@@ -690,7 +690,7 @@
 
     return items.filter((item) => {
       return [...filtersByField.entries()].every(([field, filters]) => {
-				const itemValue = (item as Record<string, unknown>)[field];
+        const itemValue = (item as Record<string, unknown>)[field];
         return filters.some((filter) => {
           if (filter.operator === 'eq') return itemValue === filter.value;
           if (filter.operator === 'neq') return itemValue !== filter.value;
@@ -1182,7 +1182,7 @@
                 {#if isEpisodeLoading}
                   <div class="flex items-center gap-2 p-4 text-sm text-neutral-500 dark:text-neutral-400">
                     <div
-                      class="h-4 w-4 animate-spin rounded-full border-2 border-neutral-300 border-t-accent-500"
+                      class="border-t-accent-500 h-4 w-4 animate-spin rounded-full border-2 border-neutral-300"
                     ></div>
                     Loading episodes...
                   </div>

@@ -73,14 +73,12 @@
     active: db.id === data.currentDatabase.id,
   }));
 
-  $: qualityProfileOptions = data.qualityProfiles.map(
-    (profile): SimulatorProfileOption => ({
-      id: profile.id,
-      name: profile.name,
-      value: profile.value ?? `pcd:${encodeURIComponent(profile.name)}`,
-      displayName: profile.displayName ?? profile.name,
-    })
-  );
+  $: qualityProfileOptions = data.qualityProfiles.map((profile): SimulatorProfileOption => ({
+    id: profile.id,
+    name: profile.name,
+    value: profile.value ?? `pcd:${encodeURIComponent(profile.name)}`,
+    displayName: profile.displayName ?? profile.name,
+  }));
   $: selectedProfileLabel =
     selectedProfileName === null
       ? null
@@ -208,8 +206,7 @@
     const initialize = async () => {
       await refreshParserAvailability();
       const shouldSimulateFromCurrentState =
-        shouldSimulateFromUrl ||
-        (!hasAnyUrlState && releaseTitle.trim().length > 0 && selectedProfileName !== null);
+        shouldSimulateFromUrl || (!hasAnyUrlState && releaseTitle.trim().length > 0 && selectedProfileName !== null);
       if (shouldSimulateFromCurrentState) {
         await simulateSingle();
       }
@@ -577,11 +574,9 @@
         ...buildShareState(),
       };
 
-      const { success, truncated } = await copyShareLink(
-        shareState,
-        `${window.location.origin}${$page.url.pathname}`,
-        { mode }
-      );
+      const { success, truncated } = await copyShareLink(shareState, `${window.location.origin}${$page.url.pathname}`, {
+        mode,
+      });
       if (!success) {
         alertStore.add('info', 'Could not copy to clipboard. Copy URL from the address bar.');
         return;
@@ -624,17 +619,11 @@
   <title>Score Simulator - {data.currentDatabase.name} - Praxrr</title>
 </svelte:head>
 
-  <div class="space-y-6 px-4 pt-4 pb-8 md:px-8">
+<div class="space-y-6 px-4 pt-4 pb-8 md:px-8">
   <div class="flex flex-wrap items-center justify-between gap-2">
     <Tabs {tabs} responsive />
     <div class="flex items-center gap-2">
-      <Button
-        text="Copy Full Link"
-        variant="secondary"
-        size="xs"
-        icon={Link}
-        on:click={() => handleCopyLink('full')}
-      />
+      <Button text="Copy Full Link" variant="secondary" size="xs" icon={Link} on:click={() => handleCopyLink('full')} />
       <Button
         text="Copy Safe Link"
         variant="secondary"
@@ -676,13 +665,7 @@
           >
             <span>{overrideCount} What-if change{overrideCount > 1 ? 's' : ''} active.</span>
             <span class="text-neutral-500">Overrides are temporary and will not be saved.</span>
-            <Button
-              text="Reset All"
-              variant="ghost"
-              size="xs"
-              icon={RotateCcw}
-              on:click={handleOverrideResetAll}
-            />
+            <Button text="Reset All" variant="ghost" size="xs" icon={RotateCcw} on:click={handleOverrideResetAll} />
           </div>
         {/if}
 
@@ -801,10 +784,7 @@
               </div>
             </div>
 
-            <PresetSelector
-              sampleCategory={batchSampleCategory}
-              on:presetSelected={handlePresetSelected}
-            />
+            <PresetSelector sampleCategory={batchSampleCategory} on:presetSelected={handlePresetSelected} />
             <ProfileComparison
               qualityProfiles={qualityProfileOptions}
               primaryProfileName={batchSelectedProfileName}

@@ -1,51 +1,47 @@
 <script lang="ts">
-	import { marked } from 'marked';
+  import { marked } from 'marked';
 
-	export let content: string | null = null;
-	export let inline: boolean = true;
-	export let maxLines: number | undefined = undefined;
+  export let content: string | null = null;
+  export let inline: boolean = true;
+  export let maxLines: number | undefined = undefined;
 
-	$: html = content
-		? inline
-			? (marked.parseInline(content) as string)
-			: (marked.parse(content) as string)
-		: '';
+  $: html = content ? (inline ? (marked.parseInline(content) as string) : (marked.parse(content) as string)) : '';
 </script>
 
 {#if html}
-	<span
-		class="markdown text-xs text-neutral-600 dark:text-neutral-400"
-		style={maxLines
-			? `display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: ${maxLines}; overflow: hidden;`
-			: ''}
-	>
-		{@html html}
-	</span>
+  <span
+    class="markdown text-xs text-neutral-600 dark:text-neutral-400"
+    style={maxLines
+      ? `display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: ${maxLines}; overflow: hidden;`
+      : ''}
+  >
+    {@html html}
+  </span>
 {/if}
 
 <style>
-	.markdown :global(code) {
-		background-color: rgb(229 231 235);
-		padding: 0.125rem 0.25rem;
-		border-radius: 0.25rem;
-		font-size: 0.75rem;
-		font-family: ui-monospace, monospace;
-	}
+  .markdown :global(code) {
+    background-color: rgb(229 231 235);
+    padding: 0.125rem 0.25rem;
+    border-radius: 0.25rem;
+    font-size: 0.75rem;
+    font-family: ui-monospace, monospace;
+  }
 
-	:global(.dark) .markdown :global(code) {
-		background-color: rgb(38 38 38);
-	}
+  :global(.dark) .markdown :global(code) {
+    background-color: rgb(38 38 38);
+  }
 
-	.markdown :global(strong) {
-		font-weight: 600;
-	}
+  .markdown :global(strong) {
+    font-weight: 600;
+  }
 
-	.markdown :global(a) {
-		color: rgb(var(--color-accent-600));
-		text-decoration: underline;
-	}
+  .markdown :global(a) {
+    color: rgb(var(--color-accent-600));
+    text-decoration: underline;
+  }
 
-	:global(.dark) .markdown :global(a) {
-		color: rgb(var(--color-accent-400));
-	}
+  :global(.dark) .markdown :global(a) {
+    color: rgb(var(--color-accent-400));
+  }
 </style>

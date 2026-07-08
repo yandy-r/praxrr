@@ -422,7 +422,7 @@
       <div class="space-y-3">
         <p class="text-xs font-medium text-neutral-500 uppercase dark:text-neutral-400">StickyCard (scroll to see)</p>
         <div
-          class="relative h-48 overflow-y-auto overflow-x-hidden rounded-lg border border-neutral-200 dark:border-neutral-700"
+          class="relative h-48 overflow-x-hidden overflow-y-auto rounded-lg border border-neutral-200 dark:border-neutral-700"
         >
           <StickyCard position="top" variant="default">
             <svelte:fragment slot="left">
@@ -1070,7 +1070,7 @@
         >
           <svelte:fragment let:item let:index>
             <div class="flex items-center gap-3">
-              <span class="text-xs font-mono text-neutral-400">{index + 1}</span>
+              <span class="font-mono text-xs text-neutral-400">{index + 1}</span>
               <span class="text-sm text-neutral-700 dark:text-neutral-300">{item.label}</span>
             </div>
           </svelte:fragment>

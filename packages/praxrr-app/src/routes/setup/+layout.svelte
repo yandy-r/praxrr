@@ -70,14 +70,7 @@
           Step {activeIndex + 1} of {STEPS.length}
         </span>
       </div>
-      <Button
-        variant="ghost"
-        size="sm"
-        icon={X}
-        text="Skip wizard"
-        disabled={skipping}
-        on:click={handleSkip}
-      />
+      <Button variant="ghost" size="sm" icon={X} text="Skip wizard" disabled={skipping} on:click={handleSkip} />
     </div>
 
     <ol class="mx-auto mt-4 flex max-w-3xl items-center gap-2" aria-label="Setup steps">

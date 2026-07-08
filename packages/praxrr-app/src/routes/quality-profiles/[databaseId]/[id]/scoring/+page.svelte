@@ -79,12 +79,12 @@
     const enabled: Record<string, Record<string, boolean>> = {};
 
     scoring.customFormats.forEach((cf: CustomFormatScoring) => {
-			scores[cf.name] = { ...cf.scores };
-			enabled[cf.name] = {};
-			scoring.arrTypes.forEach((arrType: string) => {
-				enabled[cf.name][arrType] = scores[cf.name][arrType] !== null;
-			});
-		});
+      scores[cf.name] = { ...cf.scores };
+      enabled[cf.name] = {};
+      scoring.arrTypes.forEach((arrType: string) => {
+        enabled[cf.name][arrType] = scores[cf.name][arrType] !== null;
+      });
+    });
 
     return {
       minimumScore: scoring.minimum_custom_format_score,
@@ -588,13 +588,13 @@
       <div class="flex items-center gap-2">
         <Button text="Scoring" icon={Info} on:click={() => (showInfoModal = true)} />
         <Button text="Options" icon={Info} on:click={() => (showOptionsInfoModal = true)} />
-				{#if data.profileName}
-					<SimulateButton
-						databaseId={Number($page.params.databaseId)}
-						profileName={data.profileName ?? ''}
-						arrTypes={data.scoring?.arrTypes ?? []}
-					/>
-				{/if}
+        {#if data.profileName}
+          <SimulateButton
+            databaseId={Number($page.params.databaseId)}
+            profileName={data.profileName ?? ''}
+            arrTypes={data.scoring?.arrTypes ?? []}
+          />
+        {/if}
         <Button
           disabled={isSaving || !$isDirty}
           icon={isSaving ? Loader2 : Save}

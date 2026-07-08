@@ -209,7 +209,7 @@
       {#if showSourceClearAction}
         <button
           type="button"
-          class="mt-3 text-sm font-medium text-accent-700 transition-colors hover:text-accent-600 dark:text-accent-300 dark:hover:text-accent-200"
+          class="text-accent-700 hover:text-accent-600 dark:text-accent-300 dark:hover:text-accent-200 mt-3 text-sm font-medium transition-colors"
           on:click={clearSourceFilters}
         >
           Clear source filters

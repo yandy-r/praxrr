@@ -10,8 +10,7 @@
   export let data;
 
   // Hide navigation on auth pages and the first-run setup wizard.
-  $: isAuthPage =
-    $page.url.pathname.startsWith('/auth/') || $page.url.pathname.startsWith('/setup');
+  $: isAuthPage = $page.url.pathname.startsWith('/auth/') || $page.url.pathname.startsWith('/setup');
 </script>
 
 <svelte:head>
@@ -26,6 +25,6 @@
 {/if}
 <AlertContainer />
 
-<main class={isAuthPage ? '' : 'pt-16 pb-16 md:pb-0 md:pt-0 md:pl-80'}>
+<main class={isAuthPage ? '' : 'pt-16 pb-16 md:pt-0 md:pb-0 md:pl-80'}>
   <slot />
 </main>

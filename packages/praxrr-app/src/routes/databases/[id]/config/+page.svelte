@@ -410,7 +410,12 @@
                 <span class="block text-sm font-medium text-neutral-700 dark:text-neutral-300">README</span>
                 <p class="text-xs text-neutral-500 dark:text-neutral-400">Documentation for your database</p>
                 <div class="mt-1">
-                  <MarkdownInput value={readme} onchange={updateReadme} placeholder="Write your README here..." rows={12} />
+                  <MarkdownInput
+                    value={readme}
+                    onchange={updateReadme}
+                    placeholder="Write your README here..."
+                    rows={12}
+                  />
                 </div>
               </div>
             </div>

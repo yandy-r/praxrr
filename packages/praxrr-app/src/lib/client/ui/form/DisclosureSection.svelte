@@ -10,7 +10,7 @@
   import {
     resolveDisclosureInitialMode,
     resolveTierDrivenMode,
-    shouldBlockTierUpdates
+    shouldBlockTierUpdates,
   } from './disclosureSectionLogic.ts';
 
   export let sectionKey: SectionKey;
@@ -40,7 +40,7 @@
     if (error instanceof Error) {
       console.error('Failed to record complexity tier activity', {
         sectionKey,
-        error: error.message
+        error: error.message,
       });
       alertStore.add(
         'warning',
@@ -54,10 +54,7 @@
       return;
     }
 
-    const activity =
-      nextMode === 'advanced'
-        ? { interaction: 1, advancedToggle: 1 }
-        : { interaction: 1 };
+    const activity = nextMode === 'advanced' ? { interaction: 1, advancedToggle: 1 } : { interaction: 1 };
 
     void complexityContext.recordActivity(activity).catch(persistActivityFailure);
   };

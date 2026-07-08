@@ -52,10 +52,12 @@
    * Get cell value by key path (supports nested properties like 'user.name')
    */
   function getCellValue(row: T, key: string): unknown {
-    return key.split('.').reduce<unknown>(
-      (obj, k) => (obj !== null && typeof obj === 'object' ? (obj as Record<string, unknown>)[k] : undefined),
-      row
-    );
+    return key
+      .split('.')
+      .reduce<unknown>(
+        (obj, k) => (obj !== null && typeof obj === 'object' ? (obj as Record<string, unknown>)[k] : undefined),
+        row
+      );
   }
 
   /**

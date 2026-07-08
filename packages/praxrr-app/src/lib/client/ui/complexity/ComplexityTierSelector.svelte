@@ -11,7 +11,7 @@
   const labels: Record<ComplexityTier, string> = {
     beginner: 'Beginner',
     intermediate: 'Intermediate',
-    advanced: 'Advanced'
+    advanced: 'Advanced',
   };
 
   if (context) {
@@ -40,7 +40,9 @@
 
 {#if context}
   <div class="flex flex-wrap items-center gap-2">
-    <div class="inline-flex overflow-hidden rounded-lg border border-neutral-300 bg-white dark:border-neutral-700 dark:bg-neutral-900">
+    <div
+      class="inline-flex overflow-hidden rounded-lg border border-neutral-300 bg-white dark:border-neutral-700 dark:bg-neutral-900"
+    >
       {#each COMPLEXITY_TIERS as tier}
         <button
           type="button"

@@ -46,9 +46,7 @@
     <slot />
   </div>
 
-  <div
-    class="rounded-xl border border-neutral-300 bg-neutral-50 dark:border-neutral-700/60 dark:bg-neutral-900/50"
-  >
+  <div class="rounded-xl border border-neutral-300 bg-neutral-50 dark:border-neutral-700/60 dark:bg-neutral-900/50">
     <div
       class="flex flex-wrap items-center justify-between gap-3 rounded-t-xl border-b border-neutral-200 bg-white px-4 py-2.5 dark:border-neutral-700/60 dark:bg-neutral-950/40"
     >
@@ -83,7 +81,7 @@
         id={advancedPanelId}
         role="region"
         aria-labelledby={advancedHeadingId}
-        class="px-4 pb-4 pt-3"
+        class="px-4 pt-3 pb-4"
         transition:slide={{ duration: slideDuration, easing: quintOut }}
       >
         <slot name="advanced">

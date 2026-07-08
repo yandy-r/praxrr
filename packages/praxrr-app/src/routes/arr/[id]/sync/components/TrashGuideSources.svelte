@@ -475,11 +475,11 @@
 
   <div class="space-y-4 p-6">
     <div class="relative">
-      <Search size={14} class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
+      <Search size={14} class="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-neutral-400" />
       <input
         type="text"
         bind:value={sourceFilter}
-        class="w-full rounded-lg border border-neutral-200 bg-white py-2 pl-9 pr-3 text-sm text-neutral-800 outline-none transition-colors focus:border-accent-400 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+        class="focus:border-accent-400 w-full rounded-lg border border-neutral-200 bg-white py-2 pr-3 pl-9 text-sm text-neutral-800 transition-colors outline-none dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
         placeholder="Filter sources by name, Arr type, or item"
         disabled={isLoading || orderedSources.length === 0}
         aria-label="Filter TRaSH sources"
@@ -551,7 +551,7 @@
                   </label>
                   <select
                     id={`trigger-${source.sourceId}`}
-                    class="w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-700 outline-none transition-colors focus:border-accent-400 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+                    class="focus:border-accent-400 w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-700 transition-colors outline-none dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
                     value={state.trigger}
                     on:change={(event) =>
                       setSourceTrigger(
@@ -581,7 +581,7 @@
                       value={state.cronExpression}
                       on:input={(event) =>
                         setSourceCron(source.sourceId, (event.currentTarget as HTMLInputElement).value)}
-                      class="w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm font-mono text-neutral-700 outline-none transition-colors focus:border-accent-400 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+                      class="focus:border-accent-400 w-full rounded-md border border-neutral-300 bg-white px-3 py-2 font-mono text-sm text-neutral-700 transition-colors outline-none dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
                       placeholder={DEFAULT_CRON}
                     />
                   </div>

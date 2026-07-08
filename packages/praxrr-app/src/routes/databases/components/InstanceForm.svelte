@@ -251,12 +251,11 @@
       alertStore.add('error', form.error);
     }
   }
-  $: storedPersonalAccessTokenDisplayValue =
-    hasStoredPersonalAccessToken
-      ? isStoredPersonalAccessTokenRevealed && activeRevealedPersonalAccessToken
-        ? activeRevealedPersonalAccessToken
-        : personalAccessTokenMasked || '••••••••'
-      : '';
+  $: storedPersonalAccessTokenDisplayValue = hasStoredPersonalAccessToken
+    ? isStoredPersonalAccessTokenRevealed && activeRevealedPersonalAccessToken
+      ? activeRevealedPersonalAccessToken
+      : personalAccessTokenMasked || '••••••••'
+    : '';
 
   // Display text based on mode
   $: title = mode === 'create' ? 'Link Database' : 'Settings';

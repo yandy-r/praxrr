@@ -30,10 +30,9 @@
 
 <div class="space-y-6">
   <p class="text-neutral-600 dark:text-neutral-400">
-    Praxrr keeps your Radarr and Sonarr quality profiles, custom formats, and release
-    profiles in sync with a curated configuration database. This quick setup connects an
-    Arr instance, links a configuration database, and picks the quality profiles to sync
-    — it takes about five minutes.
+    Praxrr keeps your Radarr and Sonarr quality profiles, custom formats, and release profiles in sync with a curated
+    configuration database. This quick setup connects an Arr instance, links a configuration database, and picks the
+    quality profiles to sync — it takes about five minutes.
   </p>
 
   <Button

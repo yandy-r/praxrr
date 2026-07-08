@@ -1,251 +1,245 @@
 <script context="module" lang="ts">
-	export type MarkerColor = 'accent' | 'blue' | 'green' | 'orange' | 'red' | 'purple' | 'neutral';
+  export type MarkerColor = 'accent' | 'blue' | 'green' | 'orange' | 'red' | 'purple' | 'neutral';
 
-	export interface Marker {
-		id: string;
-		label: string;
-		color: MarkerColor;
-		value: number;
-	}
+  export interface Marker {
+    id: string;
+    label: string;
+    color: MarkerColor;
+    value: number;
+  }
 </script>
 
 <script lang="ts">
-	import { createEventDispatcher } from 'svelte';
+  import { createEventDispatcher } from 'svelte';
 
-	// Props
-	export let orientation: 'horizontal' | 'vertical' = 'horizontal';
-	export let direction: 'start' | 'end' = 'start'; // start = min at left/top
-	export let min: number = 0;
-	export let max: number = 100;
-	export let step: number = 1;
-	export let minSeparation: number = 20; // minimum px between markers
-	export let markers: Marker[] = [];
-	export let unit: string = ''; // optional unit suffix for badge display
-	export let unlimitedValue: number | null = null; // value that should display as "Unlimited"
-	export let displayTransform: ((value: number) => number) | null = null; // optional transform for display values
+  // Props
+  export let orientation: 'horizontal' | 'vertical' = 'horizontal';
+  export let direction: 'start' | 'end' = 'start'; // start = min at left/top
+  export let min: number = 0;
+  export let max: number = 100;
+  export let step: number = 1;
+  export let minSeparation: number = 20; // minimum px between markers
+  export let markers: Marker[] = [];
+  export let unit: string = ''; // optional unit suffix for badge display
+  export let unlimitedValue: number | null = null; // value that should display as "Unlimited"
+  export let displayTransform: ((value: number) => number) | null = null; // optional transform for display values
 
-	const dispatch = createEventDispatcher();
+  const dispatch = createEventDispatcher();
 
-	// Track container and dragging state
-	let container: HTMLDivElement;
-	let draggingIndex: number | null = null;
+  // Track container and dragging state
+  let container: HTMLDivElement;
+  let draggingIndex: number | null = null;
 
-	// Color classes for markers
-	const colorClasses: Record<MarkerColor, { dot: string; badge: string }> = {
-		accent: {
-			dot: 'bg-accent-500',
-			badge: 'bg-accent-100 text-accent-700 dark:bg-accent-900/40 dark:text-accent-300'
-		},
-		blue: {
-			dot: 'bg-blue-500',
-			badge: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300'
-		},
-		green: {
-			dot: 'bg-green-500',
-			badge: 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300'
-		},
-		orange: {
-			dot: 'bg-orange-500',
-			badge: 'bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300'
-		},
-		red: {
-			dot: 'bg-red-500',
-			badge: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300'
-		},
-		purple: {
-			dot: 'bg-purple-500',
-			badge: 'bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300'
-		},
-		neutral: {
-			dot: 'bg-neutral-500',
-			badge: 'bg-neutral-100 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300'
-		}
-	};
+  // Color classes for markers
+  const colorClasses: Record<MarkerColor, { dot: string; badge: string }> = {
+    accent: {
+      dot: 'bg-accent-500',
+      badge: 'bg-accent-100 text-accent-700 dark:bg-accent-900/40 dark:text-accent-300',
+    },
+    blue: {
+      dot: 'bg-blue-500',
+      badge: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300',
+    },
+    green: {
+      dot: 'bg-green-500',
+      badge: 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300',
+    },
+    orange: {
+      dot: 'bg-orange-500',
+      badge: 'bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300',
+    },
+    red: {
+      dot: 'bg-red-500',
+      badge: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300',
+    },
+    purple: {
+      dot: 'bg-purple-500',
+      badge: 'bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300',
+    },
+    neutral: {
+      dot: 'bg-neutral-500',
+      badge: 'bg-neutral-100 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300',
+    },
+  };
 
-	// Convert value to position percentage
-	function valueToPercent(value: number): number {
-		const percent = ((value - min) / (max - min)) * 100;
-		return direction === 'start' ? percent : 100 - percent;
-	}
+  // Convert value to position percentage
+  function valueToPercent(value: number): number {
+    const percent = ((value - min) / (max - min)) * 100;
+    return direction === 'start' ? percent : 100 - percent;
+  }
 
-	// Convert position to value
-	function positionToValue(position: number, containerSize: number): number {
-		let percent = (position / containerSize) * 100;
-		if (direction === 'end') {
-			percent = 100 - percent;
-		}
-		const rawValue = min + (percent / 100) * (max - min);
-		// Round to step
-		const stepped = Math.round(rawValue / step) * step;
-		// Clamp to min/max
-		return Math.max(min, Math.min(max, stepped));
-	}
+  // Convert position to value
+  function positionToValue(position: number, containerSize: number): number {
+    let percent = (position / containerSize) * 100;
+    if (direction === 'end') {
+      percent = 100 - percent;
+    }
+    const rawValue = min + (percent / 100) * (max - min);
+    // Round to step
+    const stepped = Math.round(rawValue / step) * step;
+    // Clamp to min/max
+    return Math.max(min, Math.min(max, stepped));
+  }
 
-	// Get container size based on orientation
-	function getContainerSize(): number {
-		if (!container) return 0;
-		return orientation === 'horizontal' ? container.offsetWidth : container.offsetHeight;
-	}
+  // Get container size based on orientation
+  function getContainerSize(): number {
+    if (!container) return 0;
+    return orientation === 'horizontal' ? container.offsetWidth : container.offsetHeight;
+  }
 
-	// Calculate min/max allowed value for a marker based on neighbors and minSeparation
-	function getMarkerBounds(index: number): { minVal: number; maxVal: number } {
-		const containerSize = getContainerSize();
-		const range = max - min;
-		// Convert minSeparation pixels to value units
-		const separationValue = containerSize > 0 ? (minSeparation / containerSize) * range : 0;
+  // Calculate min/max allowed value for a marker based on neighbors and minSeparation
+  function getMarkerBounds(index: number): { minVal: number; maxVal: number } {
+    const containerSize = getContainerSize();
+    const range = max - min;
+    // Convert minSeparation pixels to value units
+    const separationValue = containerSize > 0 ? (minSeparation / containerSize) * range : 0;
 
-		let minVal = min;
-		let maxVal = max;
+    let minVal = min;
+    let maxVal = max;
 
-		// Constrain by previous marker
-		if (index > 0) {
-			minVal = markers[index - 1].value + separationValue;
-		}
+    // Constrain by previous marker
+    if (index > 0) {
+      minVal = markers[index - 1].value + separationValue;
+    }
 
-		// Constrain by next marker
-		if (index < markers.length - 1) {
-			maxVal = markers[index + 1].value - separationValue;
-		}
+    // Constrain by next marker
+    if (index < markers.length - 1) {
+      maxVal = markers[index + 1].value - separationValue;
+    }
 
-		return { minVal, maxVal };
-	}
+    return { minVal, maxVal };
+  }
 
-	// Handle drag start
-	function handleDragStart(index: number, event: MouseEvent | TouchEvent) {
-		event.preventDefault();
-		draggingIndex = index;
+  // Handle drag start
+  function handleDragStart(index: number, event: MouseEvent | TouchEvent) {
+    event.preventDefault();
+    draggingIndex = index;
 
-		const moveHandler = (e: MouseEvent | TouchEvent) => handleDragMove(e);
-		const upHandler = () => {
-			draggingIndex = null;
-			window.removeEventListener('mousemove', moveHandler);
-			window.removeEventListener('mouseup', upHandler);
-			window.removeEventListener('touchmove', moveHandler);
-			window.removeEventListener('touchend', upHandler);
-		};
+    const moveHandler = (e: MouseEvent | TouchEvent) => handleDragMove(e);
+    const upHandler = () => {
+      draggingIndex = null;
+      window.removeEventListener('mousemove', moveHandler);
+      window.removeEventListener('mouseup', upHandler);
+      window.removeEventListener('touchmove', moveHandler);
+      window.removeEventListener('touchend', upHandler);
+    };
 
-		window.addEventListener('mousemove', moveHandler);
-		window.addEventListener('mouseup', upHandler);
-		window.addEventListener('touchmove', moveHandler);
-		window.addEventListener('touchend', upHandler);
-	}
+    window.addEventListener('mousemove', moveHandler);
+    window.addEventListener('mouseup', upHandler);
+    window.addEventListener('touchmove', moveHandler);
+    window.addEventListener('touchend', upHandler);
+  }
 
-	// Handle drag move
-	function handleDragMove(event: MouseEvent | TouchEvent) {
-		if (draggingIndex === null || !container) return;
+  // Handle drag move
+  function handleDragMove(event: MouseEvent | TouchEvent) {
+    if (draggingIndex === null || !container) return;
 
-		const rect = container.getBoundingClientRect();
-		const clientPos = 'touches' in event ? event.touches[0] : event;
+    const rect = container.getBoundingClientRect();
+    const clientPos = 'touches' in event ? event.touches[0] : event;
 
-		let position: number;
-		if (orientation === 'horizontal') {
-			position = clientPos.clientX - rect.left;
-		} else {
-			position = clientPos.clientY - rect.top;
-		}
+    let position: number;
+    if (orientation === 'horizontal') {
+      position = clientPos.clientX - rect.left;
+    } else {
+      position = clientPos.clientY - rect.top;
+    }
 
-		const containerSize = getContainerSize();
-		position = Math.max(0, Math.min(containerSize, position));
+    const containerSize = getContainerSize();
+    position = Math.max(0, Math.min(containerSize, position));
 
-		let newValue = positionToValue(position, containerSize);
+    let newValue = positionToValue(position, containerSize);
 
-		// Apply ordering constraints
-		const bounds = getMarkerBounds(draggingIndex);
-		newValue = Math.max(bounds.minVal, Math.min(bounds.maxVal, newValue));
+    // Apply ordering constraints
+    const bounds = getMarkerBounds(draggingIndex);
+    newValue = Math.max(bounds.minVal, Math.min(bounds.maxVal, newValue));
 
-		// Round to step again after constraints
-		newValue = Math.round(newValue / step) * step;
+    // Round to step again after constraints
+    newValue = Math.round(newValue / step) * step;
 
-		// Update the marker value
-		if (markers[draggingIndex].value !== newValue) {
-			markers[draggingIndex].value = newValue;
-			markers = markers; // trigger reactivity
-			dispatch('change', { index: draggingIndex, value: newValue, markers });
-		}
-	}
+    // Update the marker value
+    if (markers[draggingIndex].value !== newValue) {
+      markers[draggingIndex].value = newValue;
+      markers = markers; // trigger reactivity
+      dispatch('change', { index: draggingIndex, value: newValue, markers });
+    }
+  }
 
-	// Reactive: ensure markers stay within bounds when values change externally
-	$: {
-		let needsUpdate = false;
-		const updatedMarkers = markers.map((marker, index) => {
-			const bounds = getMarkerBounds(index);
-			let value = marker.value;
+  // Reactive: ensure markers stay within bounds when values change externally
+  $: {
+    let needsUpdate = false;
+    const updatedMarkers = markers.map((marker, index) => {
+      const bounds = getMarkerBounds(index);
+      let value = marker.value;
 
-			// Clamp to scale bounds
-			value = Math.max(min, Math.min(max, value));
+      // Clamp to scale bounds
+      value = Math.max(min, Math.min(max, value));
 
-			// Note: We don't enforce neighbor constraints here to allow external updates
-			// The constraints are only enforced during drag
+      // Note: We don't enforce neighbor constraints here to allow external updates
+      // The constraints are only enforced during drag
 
-			if (value !== marker.value) {
-				needsUpdate = true;
-				return { ...marker, value };
-			}
-			return marker;
-		});
+      if (value !== marker.value) {
+        needsUpdate = true;
+        return { ...marker, value };
+      }
+      return marker;
+    });
 
-		if (needsUpdate) {
-			markers = updatedMarkers;
-		}
-	}
+    if (needsUpdate) {
+      markers = updatedMarkers;
+    }
+  }
 </script>
 
-<div
-	class="relative select-none"
-	class:w-full={orientation === 'horizontal'}
-	class:h-full={orientation === 'vertical'}
->
-	<!-- Track container -->
-	<div
-		bind:this={container}
-		class="relative"
-		class:h-2={orientation === 'horizontal'}
-		class:w-2={orientation === 'vertical'}
-		class:w-full={orientation === 'horizontal'}
-		class:h-full={orientation === 'vertical'}
-	>
-		<!-- Track line -->
-		<div
-			class="absolute rounded-full bg-neutral-200 dark:bg-neutral-700 {orientation === 'horizontal'
-				? 'top-1/2 h-1 w-full -translate-y-1/2'
-				: 'left-1/2 h-full w-1 -translate-x-1/2'}"
-		></div>
+<div class="relative select-none" class:w-full={orientation === 'horizontal'} class:h-full={orientation === 'vertical'}>
+  <!-- Track container -->
+  <div
+    bind:this={container}
+    class="relative"
+    class:h-2={orientation === 'horizontal'}
+    class:w-2={orientation === 'vertical'}
+    class:w-full={orientation === 'horizontal'}
+    class:h-full={orientation === 'vertical'}
+  >
+    <!-- Track line -->
+    <div
+      class="absolute rounded-full bg-neutral-200 dark:bg-neutral-700 {orientation === 'horizontal'
+        ? 'top-1/2 h-1 w-full -translate-y-1/2'
+        : 'left-1/2 h-full w-1 -translate-x-1/2'}"
+    ></div>
 
-		<!-- Markers -->
-		{#each markers as marker, index}
-			{@const percent = valueToPercent(marker.value)}
-			{@const colors = colorClasses[marker.color]}
-			<div
-				class="absolute {orientation === 'horizontal'
-					? 'top-1/2 -translate-y-1/2'
-					: 'left-1/2 -translate-x-1/2'}"
-				style="{orientation === 'horizontal' ? 'left' : 'top'}: {percent}%;"
-			>
-				<!-- Dot -->
-				<button
-					type="button"
-					on:mousedown={(e) => handleDragStart(index, e)}
-					on:touchstart={(e) => handleDragStart(index, e)}
-					class="relative h-4 w-4 -translate-x-1/2 cursor-grab rounded-full shadow-sm transition-transform hover:scale-125 {colors.dot} {orientation ===
-					'vertical'
-						? '-translate-y-1/2'
-						: ''} {draggingIndex === index ? 'scale-150 cursor-grabbing' : ''}"
-					aria-label="Drag to adjust {marker.label}"
-				></button>
+    <!-- Markers -->
+    {#each markers as marker, index}
+      {@const percent = valueToPercent(marker.value)}
+      {@const colors = colorClasses[marker.color]}
+      <div
+        class="absolute {orientation === 'horizontal' ? 'top-1/2 -translate-y-1/2' : 'left-1/2 -translate-x-1/2'}"
+        style="{orientation === 'horizontal' ? 'left' : 'top'}: {percent}%;"
+      >
+        <!-- Dot -->
+        <button
+          type="button"
+          on:mousedown={(e) => handleDragStart(index, e)}
+          on:touchstart={(e) => handleDragStart(index, e)}
+          class="relative h-4 w-4 -translate-x-1/2 cursor-grab rounded-full shadow-sm transition-transform hover:scale-125 {colors.dot} {orientation ===
+          'vertical'
+            ? '-translate-y-1/2'
+            : ''} {draggingIndex === index ? 'scale-150 cursor-grabbing' : ''}"
+          aria-label="Drag to adjust {marker.label}"
+        ></button>
 
-				<!-- Badge label (alternate above/below) -->
-				<div
-					class="absolute whitespace-nowrap {orientation === 'horizontal'
-						? `left-0 -translate-x-1/2 ${index % 2 === 0 ? 'top-6' : 'bottom-6'}`
-						: 'left-6 translate-x-0'}"
-				>
-					<span class="inline-block rounded px-1.5 py-0.5 text-xs font-medium {colors.badge}">
-						{marker.label}: {unlimitedValue !== null && marker.value >= unlimitedValue
-							? 'Unlimited'
-							: `${displayTransform ? displayTransform(marker.value).toFixed(1) : Math.round(marker.value)}${unit ? ` ${unit}` : ''}`}
-					</span>
-				</div>
-			</div>
-		{/each}
-	</div>
+        <!-- Badge label (alternate above/below) -->
+        <div
+          class="absolute whitespace-nowrap {orientation === 'horizontal'
+            ? `left-0 -translate-x-1/2 ${index % 2 === 0 ? 'top-6' : 'bottom-6'}`
+            : 'left-6 translate-x-0'}"
+        >
+          <span class="inline-block rounded px-1.5 py-0.5 text-xs font-medium {colors.badge}">
+            {marker.label}: {unlimitedValue !== null && marker.value >= unlimitedValue
+              ? 'Unlimited'
+              : `${displayTransform ? displayTransform(marker.value).toFixed(1) : Math.round(marker.value)}${unit ? ` ${unit}` : ''}`}
+          </span>
+        </div>
+      </div>
+    {/each}
+  </div>
 </div>

@@ -1,211 +1,208 @@
 <script lang="ts">
-	import { createEventDispatcher } from 'svelte';
-	import type { QualityProfileTableRow } from '$shared/pcd/display.ts';
-	import type { SourceRef } from '$shared/sources/types.ts';
-	import { page } from '$app/stores';
-	import { BookOpenText, Gauge, Earth, Copy, Download } from 'lucide-svelte';
-	import CardGrid from '$ui/card/CardGrid.svelte';
-	import Card from '$ui/card/Card.svelte';
-	import Label from '$ui/label/Label.svelte';
-	import SourceBadge from '$ui/badge/SourceBadge.svelte';
-	import Button from '$ui/button/Button.svelte';
-	import { createProgressiveList } from '$lib/client/utils/progressiveList';
+  import { createEventDispatcher } from 'svelte';
+  import type { QualityProfileTableRow } from '$shared/pcd/display.ts';
+  import type { SourceRef } from '$shared/sources/types.ts';
+  import { page } from '$app/stores';
+  import { BookOpenText, Gauge, Earth, Copy, Download } from 'lucide-svelte';
+  import CardGrid from '$ui/card/CardGrid.svelte';
+  import Card from '$ui/card/Card.svelte';
+  import Label from '$ui/label/Label.svelte';
+  import SourceBadge from '$ui/badge/SourceBadge.svelte';
+  import Button from '$ui/button/Button.svelte';
+  import { createProgressiveList } from '$lib/client/utils/progressiveList';
 
-	export let profiles: QualityProfileTableRow[];
-	export let availableSources: SourceRef[] = [];
-	export let showSourceBadges = false;
-	export let currentDatabaseId: number;
+  export let profiles: QualityProfileTableRow[];
+  export let availableSources: SourceRef[] = [];
+  export let showSourceBadges = false;
+  export let currentDatabaseId: number;
 
-	const dispatch = createEventDispatcher<{ clone: { name: string }; export: { name: string } }>();
+  const dispatch = createEventDispatcher<{ clone: { name: string }; export: { name: string } }>();
 
-	$: databaseId = $page.params.databaseId;
-	$: sourceMap = new Map(availableSources.map((source) => [`${source.type}:${source.id}`, source]));
+  $: databaseId = $page.params.databaseId;
+  $: sourceMap = new Map(availableSources.map((source) => [`${source.type}:${source.id}`, source]));
 
-	const { visibleCount, sentinel, reset, setTotalCount } = createProgressiveList({ pageSize: 30 });
-	$: setTotalCount(profiles.length);
-	$: {
-		void profiles;
-		reset();
-	}
-	$: visibleProfiles = profiles.slice(0, $visibleCount);
+  const { visibleCount, sentinel, reset, setTotalCount } = createProgressiveList({ pageSize: 30 });
+  $: setTotalCount(profiles.length);
+  $: {
+    void profiles;
+    reset();
+  }
+  $: visibleProfiles = profiles.slice(0, $visibleCount);
 
-	function resolveSource(profile: QualityProfileTableRow): SourceRef | null {
-		const fallbackDatabaseId = Number(databaseId);
-		const sourceType = profile.sourceType ?? 'pcd';
-		const sourceDatabaseId =
-			profile.sourceDatabaseId != null
-				? profile.sourceDatabaseId
-				: Number.isFinite(fallbackDatabaseId)
-					? fallbackDatabaseId
-					: null;
+  function resolveSource(profile: QualityProfileTableRow): SourceRef | null {
+    const fallbackDatabaseId = Number(databaseId);
+    const sourceType = profile.sourceType ?? 'pcd';
+    const sourceDatabaseId =
+      profile.sourceDatabaseId != null
+        ? profile.sourceDatabaseId
+        : Number.isFinite(fallbackDatabaseId)
+          ? fallbackDatabaseId
+          : null;
 
-		if (sourceDatabaseId == null) return null;
+    if (sourceDatabaseId == null) return null;
 
-		const sourceKey = `${sourceType}:${sourceDatabaseId}`;
-		const matchedSource = sourceMap.get(sourceKey);
-		if (matchedSource) return matchedSource;
+    const sourceKey = `${sourceType}:${sourceDatabaseId}`;
+    const matchedSource = sourceMap.get(sourceKey);
+    if (matchedSource) return matchedSource;
 
-		if (sourceType === 'pcd' && profile.sourceDatabaseName) {
-			return {
-				type: 'pcd',
-				id: sourceDatabaseId,
-				name: profile.sourceDatabaseName
-			};
-		}
+    if (sourceType === 'pcd' && profile.sourceDatabaseName) {
+      return {
+        type: 'pcd',
+        id: sourceDatabaseId,
+        name: profile.sourceDatabaseName,
+      };
+    }
 
-		return null;
-	}
+    return null;
+  }
 
-	function resolveSourceDatabaseId(profile: QualityProfileTableRow): number {
-		if (profile.sourceType === 'pcd' && typeof profile.sourceDatabaseId === 'number') {
-			return profile.sourceDatabaseId;
-		}
+  function resolveSourceDatabaseId(profile: QualityProfileTableRow): number {
+    if (profile.sourceType === 'pcd' && typeof profile.sourceDatabaseId === 'number') {
+      return profile.sourceDatabaseId;
+    }
 
-		const fallbackDatabaseId = Number(databaseId);
-		if (Number.isInteger(fallbackDatabaseId)) {
-			return fallbackDatabaseId;
-		}
+    const fallbackDatabaseId = Number(databaseId);
+    if (Number.isInteger(fallbackDatabaseId)) {
+      return fallbackDatabaseId;
+    }
 
-		return currentDatabaseId;
-	}
+    return currentDatabaseId;
+  }
 
-	function isTrashRow(profile: QualityProfileTableRow): boolean {
-		return profile.sourceType === 'trash';
-	}
+  function isTrashRow(profile: QualityProfileTableRow): boolean {
+    return profile.sourceType === 'trash';
+  }
 
-	function isEditableRow(profile: QualityProfileTableRow): boolean {
-		return !isTrashRow(profile) && resolveSourceDatabaseId(profile) === currentDatabaseId;
-	}
+  function isEditableRow(profile: QualityProfileTableRow): boolean {
+    return !isTrashRow(profile) && resolveSourceDatabaseId(profile) === currentDatabaseId;
+  }
 
-	function getCardHref(profile: QualityProfileTableRow): string | undefined {
-		if (isTrashRow(profile)) {
-			return profile.trashId
-				? `/databases/trash/${profile.sourceDatabaseId}/quality-profiles/${profile.trashId}/`
-				: undefined;
-		}
+  function getCardHref(profile: QualityProfileTableRow): string | undefined {
+    if (isTrashRow(profile)) {
+      return profile.trashId
+        ? `/databases/trash/${profile.sourceDatabaseId}/quality-profiles/${profile.trashId}/`
+        : undefined;
+    }
 
-		return `/quality-profiles/${resolveSourceDatabaseId(profile)}/${profile.id}/general`;
-	}
+    return `/quality-profiles/${resolveSourceDatabaseId(profile)}/${profile.id}/general`;
+  }
 </script>
 
 <CardGrid flush>
-	{#each visibleProfiles as profile}
-		<Card href={getCardHref(profile)} hoverable>
-			<svelte:fragment slot="header">
-				<!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
-				<div class="flex items-start justify-between gap-2">
-					<h3 class="text-sm font-semibold text-neutral-900 dark:text-neutral-100">{profile.name}</h3>
-					{#if isEditableRow(profile)}
-						<div class="flex shrink-0 items-center gap-0.5" on:click|stopPropagation|preventDefault>
-							<Button
-								icon={Download}
-								size="xs"
-								variant="ghost"
-								tooltip="Export"
-								on:click={() => dispatch('export', { name: profile.name })}
-							/>
-							<Button
-								icon={Copy}
-								size="xs"
-								variant="ghost"
-								tooltip="Clone"
-								on:click={() => dispatch('clone', { name: profile.name })}
-							/>
-						</div>
-					{/if}
-				</div>
-			</svelte:fragment>
+  {#each visibleProfiles as profile}
+    <Card href={getCardHref(profile)} hoverable>
+      <svelte:fragment slot="header">
+        <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
+        <div class="flex items-start justify-between gap-2">
+          <h3 class="text-sm font-semibold text-neutral-900 dark:text-neutral-100">{profile.name}</h3>
+          {#if isEditableRow(profile)}
+            <div class="flex shrink-0 items-center gap-0.5" on:click|stopPropagation|preventDefault>
+              <Button
+                icon={Download}
+                size="xs"
+                variant="ghost"
+                tooltip="Export"
+                on:click={() => dispatch('export', { name: profile.name })}
+              />
+              <Button
+                icon={Copy}
+                size="xs"
+                variant="ghost"
+                tooltip="Clone"
+                on:click={() => dispatch('clone', { name: profile.name })}
+              />
+            </div>
+          {/if}
+        </div>
+      </svelte:fragment>
 
-			<div class="space-y-3">
-				{#if profile.tags.length > 0}
-					<div class="flex flex-wrap gap-1">
-						{#each profile.tags as tag}
-							<Label variant="info" size="sm" rounded="md">{tag.name}</Label>
-						{/each}
-					</div>
-				{/if}
+      <div class="space-y-3">
+        {#if profile.tags.length > 0}
+          <div class="flex flex-wrap gap-1">
+            {#each profile.tags as tag}
+              <Label variant="info" size="sm" rounded="md">{tag.name}</Label>
+            {/each}
+          </div>
+        {/if}
 
-				{#if showSourceBadges}
-					{@const source = resolveSource(profile)}
-					{#if source}
-						<SourceBadge
-							sourceType={source.type}
-							sourceName={source.name}
-							arrType={source.type === 'trash' ? source.arrType : null}
-						/>
-					{/if}
-				{/if}
+        {#if showSourceBadges}
+          {@const source = resolveSource(profile)}
+          {#if source}
+            <SourceBadge
+              sourceType={source.type}
+              sourceName={source.name}
+              arrType={source.type === 'trash' ? source.arrType : null}
+            />
+          {/if}
+        {/if}
 
-				{#if profile.description}
-					<div class="description text-xs text-neutral-600 dark:text-neutral-400">
-						{@html profile.description}
-					</div>
-				{/if}
+        {#if profile.description}
+          <div class="description text-xs text-neutral-600 dark:text-neutral-400">
+            {@html profile.description}
+          </div>
+        {/if}
 
-				<!-- Qualities -->
-				<div class="flex flex-wrap items-center gap-1">
-					{#each profile.qualities.slice(0, 3) as quality, idx}
-						{#if idx > 0}
-							<span class="text-xs text-neutral-400">›</span>
-						{/if}
-						<Label
-							variant={quality.is_upgrade_until ? 'success' : 'secondary'}
-							size="sm"
-							rounded="md"
-							mono
-						>{quality.name}</Label>
-					{/each}
-					{#if profile.qualities.length > 3}
-						<span class="text-[10px] text-neutral-500 dark:text-neutral-400">
-							+{profile.qualities.length - 3} more
-						</span>
-					{/if}
-				</div>
-			</div>
+        <!-- Qualities -->
+        <div class="flex flex-wrap items-center gap-1">
+          {#each profile.qualities.slice(0, 3) as quality, idx}
+            {#if idx > 0}
+              <span class="text-xs text-neutral-400">›</span>
+            {/if}
+            <Label variant={quality.is_upgrade_until ? 'success' : 'secondary'} size="sm" rounded="md" mono
+              >{quality.name}</Label
+            >
+          {/each}
+          {#if profile.qualities.length > 3}
+            <span class="text-[10px] text-neutral-500 dark:text-neutral-400">
+              +{profile.qualities.length - 3} more
+            </span>
+          {/if}
+        </div>
+      </div>
 
-			<svelte:fragment slot="footer">
-				<div class="flex items-center gap-3 text-xs">
-					<div class="flex items-center gap-1">
-						<BookOpenText size={12} class="text-neutral-400" />
-						<Label variant="secondary" size="sm" rounded="md" mono>{profile.custom_formats.total}</Label>
-					</div>
-					<div class="flex items-center gap-1">
-						<Gauge size={12} class="text-neutral-400" />
-						<Label variant="secondary" size="sm" rounded="md" mono>{profile.minimum_custom_format_score}</Label>
-					</div>
-					<div class="flex items-center gap-1">
-						<Earth size={12} class="text-neutral-400" />
-						<Label variant="secondary" size="sm" rounded="md">{profile.language ? profile.language.name : 'Any'}</Label>
-					</div>
-				</div>
-			</svelte:fragment>
-		</Card>
-	{/each}
+      <svelte:fragment slot="footer">
+        <div class="flex items-center gap-3 text-xs">
+          <div class="flex items-center gap-1">
+            <BookOpenText size={12} class="text-neutral-400" />
+            <Label variant="secondary" size="sm" rounded="md" mono>{profile.custom_formats.total}</Label>
+          </div>
+          <div class="flex items-center gap-1">
+            <Gauge size={12} class="text-neutral-400" />
+            <Label variant="secondary" size="sm" rounded="md" mono>{profile.minimum_custom_format_score}</Label>
+          </div>
+          <div class="flex items-center gap-1">
+            <Earth size={12} class="text-neutral-400" />
+            <Label variant="secondary" size="sm" rounded="md">{profile.language ? profile.language.name : 'Any'}</Label>
+          </div>
+        </div>
+      </svelte:fragment>
+    </Card>
+  {/each}
 </CardGrid>
 <div use:sentinel></div>
 
 <style>
-	.description :global(ul) {
-		list-style-type: disc;
-		padding-left: 1.5rem;
-		margin: 0.5rem 0;
-	}
+  .description :global(ul) {
+    list-style-type: disc;
+    padding-left: 1.5rem;
+    margin: 0.5rem 0;
+  }
 
-	.description :global(ol) {
-		list-style-type: decimal;
-		padding-left: 1.5rem;
-		margin: 0.5rem 0;
-	}
+  .description :global(ol) {
+    list-style-type: decimal;
+    padding-left: 1.5rem;
+    margin: 0.5rem 0;
+  }
 
-	.description :global(li) {
-		margin: 0.25rem 0;
-	}
+  .description :global(li) {
+    margin: 0.25rem 0;
+  }
 
-	.description :global(p) {
-		margin: 0.5rem 0;
-	}
+  .description :global(p) {
+    margin: 0.5rem 0;
+  }
 
-	.description :global(strong) {
-		font-weight: 600;
-	}
+  .description :global(strong) {
+    font-weight: 600;
+  }
 </style>

@@ -32,16 +32,16 @@
 <div class="space-y-6">
   <p class="text-neutral-600 dark:text-neutral-400">
     Choose which <span class="font-medium">{data.arrTypeLabel}</span>-compatible quality profiles from
-    <span class="font-medium">{data.databaseName}</span> should sync to this instance. Custom formats are
-    already scored on each profile — you can fine-tune them later.
+    <span class="font-medium">{data.databaseName}</span> should sync to this instance. Custom formats are already scored on
+    each profile — you can fine-tune them later.
   </p>
 
   {#if data.profiles.length === 0}
     <div
       class="rounded-lg border border-neutral-200/60 bg-white/50 p-6 text-center text-sm text-neutral-500 dark:border-neutral-700/60 dark:bg-neutral-800/50 dark:text-neutral-400"
     >
-      This database has no {data.arrTypeLabel}-compatible profiles yet. You can continue and select profiles
-      later from the instance's sync page.
+      This database has no {data.arrTypeLabel}-compatible profiles yet. You can continue and select profiles later from
+      the instance's sync page.
     </div>
   {:else}
     <ul class="space-y-2">

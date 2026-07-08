@@ -160,7 +160,7 @@
     <div
       class="flex flex-col items-center justify-center gap-4 rounded-lg border border-neutral-200 bg-white p-12 dark:border-neutral-800 dark:bg-neutral-900"
     >
-      <div class="animate-spin text-accent-500">
+      <div class="text-accent-500 animate-spin">
         <Loader2 size={32} />
       </div>
       <div class="text-center">

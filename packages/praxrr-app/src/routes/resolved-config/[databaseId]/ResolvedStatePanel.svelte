@@ -261,7 +261,7 @@
 
       <button
         type="button"
-        class="text-xs font-medium text-accent-600 hover:underline dark:text-accent-500"
+        class="text-accent-600 dark:text-accent-500 text-xs font-medium hover:underline"
         on:click={() => (showRaw = !showRaw)}
       >
         {showRaw ? 'Hide' : 'Show'} raw JSON

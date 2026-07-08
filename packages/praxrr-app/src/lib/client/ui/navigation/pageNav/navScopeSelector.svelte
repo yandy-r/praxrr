@@ -19,12 +19,14 @@
 </script>
 
 <div class="mb-4 space-y-1.5">
-  <label for="nav-scope-select" class="block text-xs font-medium tracking-wide text-neutral-500 dark:text-neutral-400">Apps Scope</label>
+  <label for="nav-scope-select" class="block text-xs font-medium tracking-wide text-neutral-500 dark:text-neutral-400"
+    >Apps Scope</label
+  >
   <select
     id="nav-scope-select"
     value={$navScope}
     on:change={onScopeChange}
-    class="w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-700 outline-none transition-colors dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-200 dark:focus:border-neutral-400 dark:focus:ring-1 dark:focus:ring-neutral-400"
+    class="w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-700 transition-colors outline-none dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-200 dark:focus:border-neutral-400 dark:focus:ring-1 dark:focus:ring-neutral-400"
   >
     {#each scopeOptions as option (option.value)}
       <option value={option.value}>{option.label}</option>

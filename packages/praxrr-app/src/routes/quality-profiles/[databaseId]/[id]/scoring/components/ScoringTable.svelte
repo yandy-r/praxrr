@@ -1,71 +1,64 @@
 <script lang="ts">
-	import { onMount, onDestroy } from 'svelte';
-	import type { CustomFormatScoring } from '$shared/pcd/display.ts';
+  import { onMount, onDestroy } from 'svelte';
+  import type { CustomFormatScoring } from '$shared/pcd/display.ts';
 
-	export let formats: CustomFormatScoring[];
-	export let arrTypes: string[];
-	export let customFormatScores: Record<string, Record<string, number | null>>;
-	export let customFormatEnabled: Record<string, Record<string, boolean>>;
-	type IconCheckboxColor =
-		| 'accent'
-		| 'blue'
-		| 'green'
-		| 'red'
-		| 'neutral'
-		| `#${string}`
-		| `var(--${string})`;
-	export let getArrTypeColor: (arrType: string) => IconCheckboxColor;
-	export let title: string | null = null;
+  export let formats: CustomFormatScoring[];
+  export let arrTypes: string[];
+  export let customFormatScores: Record<string, Record<string, number | null>>;
+  export let customFormatEnabled: Record<string, Record<string, boolean>>;
+  type IconCheckboxColor = 'accent' | 'blue' | 'green' | 'red' | 'neutral' | `#${string}` | `var(--${string})`;
+  export let getArrTypeColor: (arrType: string) => IconCheckboxColor;
+  export let title: string | null = null;
 
-	import ScoringTableDesktop from './ScoringTableDesktop.svelte';
-	import ScoringTableMobile from './ScoringTableMobile.svelte';
+  import ScoringTableDesktop from './ScoringTableDesktop.svelte';
+  import ScoringTableMobile from './ScoringTableMobile.svelte';
 
-	let isDesktop = true;
-	let mediaQuery: MediaQueryList | null = null;
+  let isDesktop = true;
+  let mediaQuery: MediaQueryList | null = null;
 
-	function handleMediaChange(e: MediaQueryListEvent) {
-		isDesktop = e.matches;
-	}
+  function handleMediaChange(e: MediaQueryListEvent) {
+    isDesktop = e.matches;
+  }
 
-	onMount(() => {
-		if (typeof window !== 'undefined') {
-			mediaQuery = window.matchMedia('(min-width: 768px)');
-			isDesktop = mediaQuery.matches;
-			mediaQuery.addEventListener('change', handleMediaChange);
-		}
-	});
+  onMount(() => {
+    if (typeof window !== 'undefined') {
+      mediaQuery = window.matchMedia('(min-width: 768px)');
+      isDesktop = mediaQuery.matches;
+      mediaQuery.addEventListener('change', handleMediaChange);
+    }
+  });
 
-	onDestroy(() => {
-		if (mediaQuery) {
-			mediaQuery.removeEventListener('change', handleMediaChange);
-		}
-	});
+  onDestroy(() => {
+    if (mediaQuery) {
+      mediaQuery.removeEventListener('change', handleMediaChange);
+    }
+  });
 </script>
 
 {#if title}
-	<div class="mb-3">
-		<h3 class="text-lg font-semibold text-neutral-900 dark:text-neutral-100">{title}</h3>
-	</div>
+  <div class="mb-3">
+    <h3 class="text-lg font-semibold text-neutral-900 dark:text-neutral-100">{title}</h3>
+  </div>
 {/if}
 
 {#if isDesktop}
-	<ScoringTableDesktop
-		{formats}
-		{arrTypes}
-		{customFormatScores}
-		{customFormatEnabled}
-		{getArrTypeColor}
-		on:scoreChange
-		on:enabledChange
-	/>
+  <ScoringTableDesktop
+    {formats}
+    {arrTypes}
+    {customFormatScores}
+    {customFormatEnabled}
+    {getArrTypeColor}
+    on:scoreChange
+    on:enabledChange
+  />
 {:else}
-	<ScoringTableMobile
-		{formats}
-		{arrTypes}
-		{customFormatScores}
-		{customFormatEnabled}
-		{getArrTypeColor}
-		on:scoreChange
-		on:enabledChange
-	/>
+  <ScoringTableMobile
+    {formats}
+    {arrTypes}
+    {customFormatScores}
+    {customFormatEnabled}
+    {getArrTypeColor}
+    on:scoreChange
+    on:enabledChange
+  />
 {/if}

@@ -59,7 +59,7 @@
         aria-live="polite"
       >
         <div>
-          <div class="text-xs uppercase tracking-wide text-neutral-500 dark:text-neutral-400">Score Difference</div>
+          <div class="text-xs tracking-wide text-neutral-500 uppercase dark:text-neutral-400">Score Difference</div>
           <div class="mt-1">
             <span class="font-mono text-lg font-semibold {deltaColorClass(comparisonResult.totalDelta)}">
               {formatDelta(comparisonResult.totalDelta)}
@@ -107,7 +107,7 @@
       {#if !isMobile}
         <!-- Desktop Side-by-Side Headers -->
         <div
-          class="grid grid-cols-[1fr_auto_auto_auto] items-center gap-x-3 text-xs font-medium uppercase tracking-wide text-neutral-500 dark:text-neutral-400"
+          class="grid grid-cols-[1fr_auto_auto_auto] items-center gap-x-3 text-xs font-medium tracking-wide text-neutral-500 uppercase dark:text-neutral-400"
         >
           <span>Custom Format</span>
           <span class="w-20 text-right">{profileALabel}</span>
@@ -122,7 +122,7 @@
             {#each sortedContributions as row (row.cfName)}
               <li
                 class="grid grid-cols-[1fr_auto_auto_auto] items-center gap-x-3 rounded-md px-2.5 py-2 {row.delta !== 0
-                  ? 'border-l-2 border-accent-500'
+                  ? 'border-accent-500 border-l-2'
                   : 'border-l-2 border-transparent'}"
               >
                 <CustomFormatBadge name={row.cfName} score={row.scoreA} />
@@ -166,17 +166,17 @@
             {#each sortedContributions as row (row.cfName)}
               <li
                 class="flex items-center justify-between gap-3 rounded-md border px-2.5 py-2 {row.delta !== 0
-                  ? 'border-l-2 border-l-accent-500 border-neutral-200 dark:border-neutral-800'
+                  ? 'border-l-accent-500 border-l-2 border-neutral-200 dark:border-neutral-800'
                   : 'border-neutral-200 dark:border-neutral-800'}"
               >
-                <div class="flex-1 min-w-0">
+                <div class="min-w-0 flex-1">
                   <CustomFormatBadge name={row.cfName} score={activeTab === 'a' ? row.scoreA : row.scoreB} />
                 </div>
                 <div class="flex items-center gap-3">
                   <span
-                    class="{activeTab === 'a' && hasAnyOverrides && isOverriddenInProfileA(row.originalScoreA)
+                    class={activeTab === 'a' && hasAnyOverrides && isOverriddenInProfileA(row.originalScoreA)
                       ? 'rounded bg-amber-50 px-1 py-0.5 dark:bg-amber-900/20'
-                      : ''}"
+                      : ''}
                   >
                     <Score score={activeTab === 'a' ? row.scoreA : row.scoreB} size="sm" />
                   </span>

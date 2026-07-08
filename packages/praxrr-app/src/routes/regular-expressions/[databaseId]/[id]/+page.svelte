@@ -1,39 +1,39 @@
 <script lang="ts">
-	import { goto } from '$app/navigation';
-	import RegularExpressionForm from '../components/RegularExpressionForm.svelte';
-	import DirtyModal from '$ui/modal/DirtyModal.svelte';
-	import type { PageData } from './$types';
+  import { goto } from '$app/navigation';
+  import RegularExpressionForm from '../components/RegularExpressionForm.svelte';
+  import DirtyModal from '$ui/modal/DirtyModal.svelte';
+  import type { PageData } from './$types';
 
-	export let data: PageData;
+  export let data: PageData;
 
-	// Build initial data from server
-	$: initialData = {
-		name: data.regularExpression.name,
-		tags: data.regularExpression.tags.map((t) => t.name),
-		pattern: data.regularExpression.pattern,
-		description: data.regularExpression.description ?? '',
-		regex101Id: data.regularExpression.regex101_id ?? ''
-	};
+  // Build initial data from server
+  $: initialData = {
+    name: data.regularExpression.name,
+    tags: data.regularExpression.tags.map((t) => t.name),
+    pattern: data.regularExpression.pattern,
+    description: data.regularExpression.description ?? '',
+    regex101Id: data.regularExpression.regex101_id ?? '',
+  };
 
-	function handleCancel() {
-		goto(`/regular-expressions/${data.currentDatabase.id}`);
-	}
+  function handleCancel() {
+    goto(`/regular-expressions/${data.currentDatabase.id}`);
+  }
 </script>
 
 <svelte:head>
-	<title>{data.regularExpression.name} - Regular Expressions - Praxrr</title>
+  <title>{data.regularExpression.name} - Regular Expressions - Praxrr</title>
 </svelte:head>
 
 <div class="p-4 md:p-8">
-	<RegularExpressionForm
-		mode="edit"
-		databaseName={data.currentDatabase.name}
-		canWriteToBase={data.canWriteToBase}
-		actionUrl="?/update"
-		{initialData}
-		impact={data.impact}
-		onCancel={handleCancel}
-	/>
+  <RegularExpressionForm
+    mode="edit"
+    databaseName={data.currentDatabase.name}
+    canWriteToBase={data.canWriteToBase}
+    actionUrl="?/update"
+    {initialData}
+    impact={data.impact}
+    onCancel={handleCancel}
+  />
 </div>
 
 <DirtyModal />

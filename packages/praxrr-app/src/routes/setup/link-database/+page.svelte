@@ -81,8 +81,7 @@
 {:else}
   <div class="space-y-6">
     <p class="text-neutral-600 dark:text-neutral-400">
-      Link a Praxrr Compliant Database to source quality profiles, custom formats, and release
-      profiles for sync.
+      Link a Praxrr Compliant Database to source quality profiles, custom formats, and release profiles for sync.
     </p>
 
     <AdvancedSection

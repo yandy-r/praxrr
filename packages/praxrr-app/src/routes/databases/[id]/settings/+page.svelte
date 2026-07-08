@@ -1,19 +1,19 @@
 <script lang="ts">
-	import InstanceForm from '../../components/InstanceForm.svelte';
-	import type { ActionData, PageData } from './$types';
+  import InstanceForm from '../../components/InstanceForm.svelte';
+  import type { ActionData, PageData } from './$types';
 
-	export let form: ActionData;
-	export let data: PageData;
+  export let form: ActionData;
+  export let data: PageData;
 </script>
 
 <svelte:head>
-	<title>{data.database.name} - Settings - Praxrr</title>
+  <title>{data.database.name} - Settings - Praxrr</title>
 </svelte:head>
 
 <InstanceForm
-	mode="edit"
-	{form}
-	instance={data.database}
-	hasStoredPersonalAccessToken={data.hasPersonalAccessToken}
-	personalAccessTokenMasked={data.personalAccessTokenMasked}
+  mode="edit"
+  {form}
+  instance={data.database}
+  hasStoredPersonalAccessToken={data.hasPersonalAccessToken}
+  personalAccessTokenMasked={data.personalAccessTokenMasked}
 />

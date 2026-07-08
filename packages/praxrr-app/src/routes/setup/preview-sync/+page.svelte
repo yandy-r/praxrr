@@ -60,9 +60,7 @@
       }
 
       const payload = (await response.json().catch(() => null)) as
-        | { id: string; summary?: SyncPreviewSummary }
-        | { error: string }
-        | null;
+        { id: string; summary?: SyncPreviewSummary } | { error: string } | null;
 
       if (!response.ok || !payload || !('id' in payload)) {
         const message = payload && 'error' in payload && payload.error ? payload.error : 'Failed to generate preview.';
@@ -104,14 +102,13 @@
 <div class="space-y-6">
   {#if data.selectionCount === 0}
     <p class="text-neutral-600 dark:text-neutral-400">
-      No profiles selected for <span class="font-medium">{data.instanceName}</span> — there's nothing to sync yet.
-      You can finish setup now and add profiles later from the instance's sync page.
+      No profiles selected for <span class="font-medium">{data.instanceName}</span> — there's nothing to sync yet. You can
+      finish setup now and add profiles later from the instance's sync page.
     </p>
   {:else}
     <p class="text-neutral-600 dark:text-neutral-400">
-      Review the planned quality profile changes for <span class="font-medium">{data.instanceName}</span> before
-      applying. You can finish setup with or without syncing now — this preview stays available from the
-      instance's sync page afterward.
+      Review the planned quality profile changes for <span class="font-medium">{data.instanceName}</span> before applying.
+      You can finish setup with or without syncing now — this preview stays available from the instance's sync page afterward.
     </p>
 
     <div class="flex justify-end">

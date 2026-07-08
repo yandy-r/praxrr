@@ -1,296 +1,284 @@
 <script lang="ts">
-	import { createEventDispatcher } from 'svelte';
-	import Table from '$ui/table/Table.svelte';
-	import Button from '$ui/button/Button.svelte';
-	import SourceBadge from '$ui/badge/SourceBadge.svelte';
-	import type { Column } from '$ui/table/types';
-	import type { CustomFormatTableRow } from '$shared/pcd/display.ts';
-	import type { SourceRef } from '$shared/sources/types.ts';
-	import { getArrAppMetadata, type ArrAppType, type ArrConditionTargetType } from '$shared/arr/capabilities.ts';
-	import { Tag, FileText, Layers, FlaskConical, Copy, Download, Database } from 'lucide-svelte';
-	import { marked } from 'marked';
-	import { sortConditions } from '$shared/pcd/conditions';
+  import { createEventDispatcher } from 'svelte';
+  import Table from '$ui/table/Table.svelte';
+  import Button from '$ui/button/Button.svelte';
+  import SourceBadge from '$ui/badge/SourceBadge.svelte';
+  import type { Column } from '$ui/table/types';
+  import type { CustomFormatTableRow } from '$shared/pcd/display.ts';
+  import type { SourceRef } from '$shared/sources/types.ts';
+  import { getArrAppMetadata, type ArrAppType, type ArrConditionTargetType } from '$shared/arr/capabilities.ts';
+  import { Tag, FileText, Layers, FlaskConical, Copy, Download, Database } from 'lucide-svelte';
+  import { marked } from 'marked';
+  import { sortConditions } from '$shared/pcd/conditions';
 
-	export let formats: CustomFormatTableRow[];
-	export let sources: SourceRef[] = [];
-	export let currentDatabaseId: number;
-	export let currentDatabaseName: string;
-	export let showSourceBadges: boolean = false;
+  export let formats: CustomFormatTableRow[];
+  export let sources: SourceRef[] = [];
+  export let currentDatabaseId: number;
+  export let currentDatabaseName: string;
+  export let showSourceBadges: boolean = false;
 
-	const dispatch = createEventDispatcher<{ clone: { name: string }; export: { name: string } }>();
+  const dispatch = createEventDispatcher<{ clone: { name: string }; export: { name: string } }>();
 
-	$: sourceLookup = new Map(sources.map((source) => [`${source.type}:${source.id}`, source] as const));
-	$: fallbackSource = {
-		type: 'pcd' as const,
-		id: currentDatabaseId,
-		name: currentDatabaseName
-	};
+  $: sourceLookup = new Map(sources.map((source) => [`${source.type}:${source.id}`, source] as const));
+  $: fallbackSource = {
+    type: 'pcd' as const,
+    id: currentDatabaseId,
+    name: currentDatabaseName,
+  };
 
-	interface ResolvedSource {
-		type: SourceRef['type'];
-		id: number;
-		name: string;
-		arrType: ArrAppType | null;
-	}
+  interface ResolvedSource {
+    type: SourceRef['type'];
+    id: number;
+    name: string;
+    arrType: ArrAppType | null;
+  }
 
-	function resolveSourceDatabaseId(row: CustomFormatTableRow): number {
-		return typeof row.sourceDatabaseId === 'number' ? row.sourceDatabaseId : currentDatabaseId;
-	}
+  function resolveSourceDatabaseId(row: CustomFormatTableRow): number {
+    return typeof row.sourceDatabaseId === 'number' ? row.sourceDatabaseId : currentDatabaseId;
+  }
 
-	function isTrashRow(row: CustomFormatTableRow): boolean {
-		return row.sourceType === 'trash';
-	}
+  function isTrashRow(row: CustomFormatTableRow): boolean {
+    return row.sourceType === 'trash';
+  }
 
-	function isEditableRow(row: CustomFormatTableRow): boolean {
-		return !isTrashRow(row) && resolveSourceDatabaseId(row) === currentDatabaseId;
-	}
+  function isEditableRow(row: CustomFormatTableRow): boolean {
+    return !isTrashRow(row) && resolveSourceDatabaseId(row) === currentDatabaseId;
+  }
 
-	function getRowHref(row: CustomFormatTableRow): string | null {
-		if (isTrashRow(row)) {
-			return row.trashId
-				? `/databases/trash/${row.sourceDatabaseId}/custom-formats/${row.trashId}/`
-				: null;
-		}
+  function getRowHref(row: CustomFormatTableRow): string | null {
+    if (isTrashRow(row)) {
+      return row.trashId ? `/databases/trash/${row.sourceDatabaseId}/custom-formats/${row.trashId}/` : null;
+    }
 
-		return `/custom-formats/${resolveSourceDatabaseId(row)}/${row.id}`;
-	}
+    return `/custom-formats/${resolveSourceDatabaseId(row)}/${row.id}`;
+  }
 
-	function resolveSource(row: CustomFormatTableRow): ResolvedSource {
-		if (row.sourceType && typeof row.sourceDatabaseId === 'number') {
-			const matched = sourceLookup.get(`${row.sourceType}:${row.sourceDatabaseId}`);
-			if (matched) {
-				return {
-					type: matched.type,
-					id: matched.id,
-					name: matched.name,
-					arrType: matched.type === 'trash' ? matched.arrType : null
-				};
-			}
+  function resolveSource(row: CustomFormatTableRow): ResolvedSource {
+    if (row.sourceType && typeof row.sourceDatabaseId === 'number') {
+      const matched = sourceLookup.get(`${row.sourceType}:${row.sourceDatabaseId}`);
+      if (matched) {
+        return {
+          type: matched.type,
+          id: matched.id,
+          name: matched.name,
+          arrType: matched.type === 'trash' ? matched.arrType : null,
+        };
+      }
 
-			return {
-				type: row.sourceType,
-				id: row.sourceDatabaseId,
-				name: row.sourceDatabaseName ?? `Source ${row.sourceDatabaseId}`,
-				arrType: null
-			};
-		}
+      return {
+        type: row.sourceType,
+        id: row.sourceDatabaseId,
+        name: row.sourceDatabaseName ?? `Source ${row.sourceDatabaseId}`,
+        arrType: null,
+      };
+    }
 
-		return {
-			type: fallbackSource.type,
-			id: fallbackSource.id,
-			name: fallbackSource.name,
-			arrType: null
-		};
-	}
+    return {
+      type: fallbackSource.type,
+      id: fallbackSource.id,
+      name: fallbackSource.name,
+      arrType: null,
+    };
+  }
 
-	function escapeHtml(text: string): string {
-		return text
-			.replace(/&/g, '&amp;')
-			.replace(/</g, '&lt;')
-			.replace(/>/g, '&gt;')
-			.replace(/"/g, '&quot;')
-			.replace(/'/g, '&#039;');
-	}
+  function escapeHtml(text: string): string {
+    return text
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  }
 
-	function parseMarkdown(text: string | null): string {
-		if (!text) return '';
-		return marked.parseInline(text) as string;
-	}
+  function parseMarkdown(text: string | null): string {
+    if (!text) return '';
+    return marked.parseInline(text) as string;
+  }
 
-	function getArrTargetBadgeHtml(target: ArrConditionTargetType): string {
-		if (target === 'all') {
-			return '<span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-neutral-100 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300">All Apps</span>';
-		}
+  function getArrTargetBadgeHtml(target: ArrConditionTargetType): string {
+    if (target === 'all') {
+      return '<span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-neutral-100 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300">All Apps</span>';
+    }
 
-		const label = escapeHtml(getArrAppMetadata(target).label);
-		return `<span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium" style="background-color: var(--arr-${target}-color); color: #111827;">${label}</span>`;
-	}
+    const label = escapeHtml(getArrAppMetadata(target).label);
+    return `<span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium" style="background-color: var(--arr-${target}-color); color: #111827;">${label}</span>`;
+  }
 
-	function getArrTargetsHtml(targets: ArrConditionTargetType[]): string {
-		if (targets.length === 0) return '';
-		return `<div class="mt-1 flex flex-wrap gap-1">${targets.map((target) => getArrTargetBadgeHtml(target)).join('')}</div>`;
-	}
+  function getArrTargetsHtml(targets: ArrConditionTargetType[]): string {
+    if (targets.length === 0) return '';
+    return `<div class="mt-1 flex flex-wrap gap-1">${targets.map((target) => getArrTargetBadgeHtml(target)).join('')}</div>`;
+  }
 
-	const baseColumns: Column<CustomFormatTableRow>[] = [
-		{
-			key: 'name',
-			header: 'Name',
-			headerIcon: Tag,
-			align: 'left',
-			sortable: true,
-			width: 'w-48',
-			cell: (row: CustomFormatTableRow) => ({
-				html: `
+  const baseColumns: Column<CustomFormatTableRow>[] = [
+    {
+      key: 'name',
+      header: 'Name',
+      headerIcon: Tag,
+      align: 'left',
+      sortable: true,
+      width: 'w-48',
+      cell: (row: CustomFormatTableRow) => ({
+        html: `
 					<div>
 						<div class="font-medium">${escapeHtml(row.name)}</div>
 						${
-							row.tags.length > 0
-								? `
+              row.tags.length > 0
+                ? `
 							<div class="mt-1 flex flex-wrap gap-1">
 								${row.tags
-									.map(
-										(tag) => `
+                  .map(
+                    (tag) => `
 									<span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-accent-100 text-accent-800 dark:bg-accent-900 dark:text-accent-200">
 										${escapeHtml(tag.name)}
 									</span>
 								`
-									)
-									.join('')}
+                  )
+                  .join('')}
 							</div>
 						`
-								: ''
-						}
+                : ''
+            }
 						${getArrTargetsHtml(row.arrTargets)}
 					</div>
-				`
-			})
-		},
-		{
-			key: 'description',
-			header: 'Description',
-			headerIcon: FileText,
-			align: 'left',
-			cell: (row: CustomFormatTableRow) => ({
-				html: row.description
-					? `<span class="text-sm text-neutral-600 dark:text-neutral-400 prose-inline">${parseMarkdown(row.description)}</span>`
-					: `<span class="text-neutral-400">-</span>`
-			})
-		},
-		{
-			key: 'conditions',
-			header: 'Conditions',
-			headerIcon: Layers,
-			align: 'left',
-			cell: (row: CustomFormatTableRow) => ({
-				html:
-					row.conditions.length > 0
-						? `<div class="flex flex-wrap gap-1">${sortConditions(row.conditions)
-								.map((c) => {
-									// Color based on required/negate:
-									// required + negate = red (must NOT match)
-									// required + !negate = green (must match)
-									// !required + negate = amber (optional negative)
-									// !required + !negate = neutral (optional)
-									let colorClass: string;
-									if (c.required && c.negate) {
-										colorClass = 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200';
-									} else if (c.required) {
-										colorClass =
-											'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200';
-									} else if (c.negate) {
-										colorClass =
-											'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200';
-									} else {
-										colorClass =
-											'bg-neutral-100 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300';
-									}
-									return `<span class="inline-flex items-center px-1.5 py-0.5 rounded font-mono text-[10px] font-medium ${colorClass}">${escapeHtml(c.name)}</span>`;
-								})
-								.join('')}</div>`
-						: `<span class="text-neutral-400 text-xs">None</span>`
-			})
-		},
-		{
-			key: 'testCount',
-			header: 'Tests',
-			headerIcon: FlaskConical,
-			align: 'center',
-			width: 'w-20',
-			sortable: true,
-			cell: (row: CustomFormatTableRow) => ({
-				html:
-					row.testCount > 0
-						? `<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-neutral-100 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300">${row.testCount}</span>`
-						: `<span class="text-neutral-400 text-xs">-</span>`
-			})
-		}
-	];
+				`,
+      }),
+    },
+    {
+      key: 'description',
+      header: 'Description',
+      headerIcon: FileText,
+      align: 'left',
+      cell: (row: CustomFormatTableRow) => ({
+        html: row.description
+          ? `<span class="text-sm text-neutral-600 dark:text-neutral-400 prose-inline">${parseMarkdown(row.description)}</span>`
+          : `<span class="text-neutral-400">-</span>`,
+      }),
+    },
+    {
+      key: 'conditions',
+      header: 'Conditions',
+      headerIcon: Layers,
+      align: 'left',
+      cell: (row: CustomFormatTableRow) => ({
+        html:
+          row.conditions.length > 0
+            ? `<div class="flex flex-wrap gap-1">${sortConditions(row.conditions)
+                .map((c) => {
+                  // Color based on required/negate:
+                  // required + negate = red (must NOT match)
+                  // required + !negate = green (must match)
+                  // !required + negate = amber (optional negative)
+                  // !required + !negate = neutral (optional)
+                  let colorClass: string;
+                  if (c.required && c.negate) {
+                    colorClass = 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200';
+                  } else if (c.required) {
+                    colorClass = 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200';
+                  } else if (c.negate) {
+                    colorClass = 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200';
+                  } else {
+                    colorClass = 'bg-neutral-100 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300';
+                  }
+                  return `<span class="inline-flex items-center px-1.5 py-0.5 rounded font-mono text-[10px] font-medium ${colorClass}">${escapeHtml(c.name)}</span>`;
+                })
+                .join('')}</div>`
+            : `<span class="text-neutral-400 text-xs">None</span>`,
+      }),
+    },
+    {
+      key: 'testCount',
+      header: 'Tests',
+      headerIcon: FlaskConical,
+      align: 'center',
+      width: 'w-20',
+      sortable: true,
+      cell: (row: CustomFormatTableRow) => ({
+        html:
+          row.testCount > 0
+            ? `<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-neutral-100 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300">${row.testCount}</span>`
+            : `<span class="text-neutral-400 text-xs">-</span>`,
+      }),
+    },
+  ];
 
-	const sourceColumn: Column<CustomFormatTableRow> = {
-		key: 'source',
-		header: 'Source',
-		headerIcon: Database,
-		align: 'left',
-		width: 'w-40',
-		sortable: true,
-		sortAccessor: (row) => resolveSource(row).name.toLowerCase()
-	};
+  const sourceColumn: Column<CustomFormatTableRow> = {
+    key: 'source',
+    header: 'Source',
+    headerIcon: Database,
+    align: 'left',
+    width: 'w-40',
+    sortable: true,
+    sortAccessor: (row) => resolveSource(row).name.toLowerCase(),
+  };
 
-	$: columns = showSourceBadges
-		? [baseColumns[0], sourceColumn, ...baseColumns.slice(1)]
-		: baseColumns;
+  $: columns = showSourceBadges ? [baseColumns[0], sourceColumn, ...baseColumns.slice(1)] : baseColumns;
 </script>
 
 <Table
-	data={formats}
-	{columns}
-	emptyMessage="No custom formats found"
-	hoverable={true}
-	compact={false}
-	rowHref={getRowHref}
-	pageSize={50}
+  data={formats}
+  {columns}
+  emptyMessage="No custom formats found"
+  hoverable={true}
+  compact={false}
+  rowHref={getRowHref}
+  pageSize={50}
 >
-	<svelte:fragment slot="cell" let:row let:column>
-		{#if column.key === 'source'}
-			{@const source = resolveSource(row)}
-			<SourceBadge
-				sourceType={source.type}
-				sourceName={source.name}
-				size="sm"
-				arrType={source.arrType}
-			/>
-		{:else}
-			{String(row[column.key as keyof CustomFormatTableRow] ?? '')}
-		{/if}
-	</svelte:fragment>
+  <svelte:fragment slot="cell" let:row let:column>
+    {#if column.key === 'source'}
+      {@const source = resolveSource(row)}
+      <SourceBadge sourceType={source.type} sourceName={source.name} size="sm" arrType={source.arrType} />
+    {:else}
+      {String(row[column.key as keyof CustomFormatTableRow] ?? '')}
+    {/if}
+  </svelte:fragment>
 
-	<!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
-	<svelte:fragment slot="actions" let:row>
-		{#if isEditableRow(row)}
-			<div class="flex items-center justify-end gap-0.5" on:click|stopPropagation>
-				<Button
-					icon={Download}
-					size="xs"
-					variant="ghost"
-					tooltip="Export"
-					on:click={() => dispatch('export', { name: row.name })}
-				/>
-				<Button
-					icon={Copy}
-					size="xs"
-					variant="ghost"
-					tooltip="Clone"
-					on:click={() => dispatch('clone', { name: row.name })}
-				/>
-			</div>
-		{/if}
-	</svelte:fragment>
+  <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
+  <svelte:fragment slot="actions" let:row>
+    {#if isEditableRow(row)}
+      <div class="flex items-center justify-end gap-0.5" on:click|stopPropagation>
+        <Button
+          icon={Download}
+          size="xs"
+          variant="ghost"
+          tooltip="Export"
+          on:click={() => dispatch('export', { name: row.name })}
+        />
+        <Button
+          icon={Copy}
+          size="xs"
+          variant="ghost"
+          tooltip="Clone"
+          on:click={() => dispatch('clone', { name: row.name })}
+        />
+      </div>
+    {/if}
+  </svelte:fragment>
 </Table>
 
 <style>
-	/* Inline prose styles for markdown content */
-	:global(.prose-inline code) {
-		background-color: rgb(229 231 235);
-		padding: 0.125rem 0.25rem;
-		border-radius: 0.25rem;
-		font-size: 0.75rem;
-		font-family: ui-monospace, monospace;
-	}
+  /* Inline prose styles for markdown content */
+  :global(.prose-inline code) {
+    background-color: rgb(229 231 235);
+    padding: 0.125rem 0.25rem;
+    border-radius: 0.25rem;
+    font-size: 0.75rem;
+    font-family: ui-monospace, monospace;
+  }
 
-	:global(.dark .prose-inline code) {
-		background-color: rgb(38 38 38);
-	}
+  :global(.dark .prose-inline code) {
+    background-color: rgb(38 38 38);
+  }
 
-	:global(.prose-inline strong) {
-		font-weight: 600;
-	}
+  :global(.prose-inline strong) {
+    font-weight: 600;
+  }
 
-	:global(.prose-inline a) {
-		color: rgb(var(--color-accent-600));
-		text-decoration: underline;
-	}
+  :global(.prose-inline a) {
+    color: rgb(var(--color-accent-600));
+    text-decoration: underline;
+  }
 
-	:global(.dark .prose-inline a) {
-		color: rgb(var(--color-accent-400));
-	}
+  :global(.dark .prose-inline a) {
+    color: rgb(var(--color-accent-400));
+  }
 </style>

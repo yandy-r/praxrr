@@ -1,18 +1,18 @@
 <script lang="ts">
-	import MediaSettingsForm from '../../components/MediaSettingsForm.svelte';
-	import DirtyModal from '$ui/modal/DirtyModal.svelte';
-	import type { PageData } from './$types';
+  import MediaSettingsForm from '../../components/MediaSettingsForm.svelte';
+  import DirtyModal from '$ui/modal/DirtyModal.svelte';
+  import type { PageData } from './$types';
 
-	export let data: PageData;
+  export let data: PageData;
 </script>
 
 <MediaSettingsForm
-	mode="edit"
-	arrType="radarr"
-	databaseName={data.currentDatabase.name}
-	canWriteToBase={data.canWriteToBase}
-	actionUrl="?/update"
-	initialData={data.mediaSettingsConfig}
+  mode="edit"
+  arrType="radarr"
+  databaseName={data.currentDatabase.name}
+  canWriteToBase={data.canWriteToBase}
+  actionUrl="?/update"
+  initialData={data.mediaSettingsConfig}
 />
 
 <DirtyModal />

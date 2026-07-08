@@ -198,7 +198,7 @@
           >
             <!-- Primary row: first column as title + actions + chevron -->
             <div class="flex items-start justify-between gap-3 px-4 py-3">
-              <div class="min-w-0 flex-1 break-all font-medium text-neutral-900 dark:text-neutral-100">
+              <div class="min-w-0 flex-1 font-medium break-all text-neutral-900 dark:text-neutral-100">
                 <slot name="cell" {row} column={mobilePrimaryColumn} {index} expanded={expandedRows.has(rowId)}>
                   {mobilePrimaryColumn ? getCellValue(row, mobilePrimaryColumn.key) : ''}
                 </slot>
