@@ -19,6 +19,10 @@ export interface SyncResult {
   itemsSynced: number;
   error?: string;
   failedProfiles?: string[];
+  /** True when the section was skipped by a version-compatibility gate (neither success nor failure). */
+  skipped?: boolean;
+  /** Reason a skipped section was withheld (e.g. the resolved feature-availability reason). */
+  skipReason?: string;
 }
 
 /**

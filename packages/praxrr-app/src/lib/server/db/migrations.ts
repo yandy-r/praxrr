@@ -69,6 +69,7 @@ import { migration as migration20260227NormalizeTrashGuideTrashIds } from './mig
 import { migration as migration20260228CreatePcdSnapshots } from './migrations/20260228_create_pcd_snapshots.ts';
 import { migration as migration20260706CreateUserComplexityTiers } from './migrations/20260706_create_user_complexity_tiers.ts';
 import { migration as migration20260707AddSetupWizardState } from './migrations/20260707_add_setup_wizard_state.ts';
+import { migration as migration20260708AddArrInstanceDetectedVersion } from './migrations/20260708_add_arr_instance_detected_version.ts';
 
 export interface Migration {
   version: number;
@@ -367,6 +368,7 @@ export function loadMigrations(): Migration[] {
     migration20260228CreatePcdSnapshots,
     migration20260706CreateUserComplexityTiers,
     migration20260707AddSetupWizardState,
+    migration20260708AddArrInstanceDetectedVersion,
   ];
 
   // Sort by version number

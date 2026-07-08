@@ -32,6 +32,8 @@ import './metadataProfiles/handler.ts';
 
 import { getAllSections, getSection } from './registry.ts';
 import { generatePreview, type GeneratePreviewResult } from './preview/orchestrator.ts';
+import { detectAndRecordArrVersion } from '$arr/instanceCompatibility.ts';
+import { resolveSyncSectionAvailability, type SyncArrType } from './mappings.ts';
 
 // Concurrency limit for parallel instance processing
 const CONCURRENCY_LIMIT = 3;
@@ -201,9 +203,29 @@ async function processInstanceSections(
     clientCache
   );
 
+  // Best-effort version detection reusing this run's client (no extra round-trip
+  // beyond the one status probe). Non-fatal: on failure it keeps the last-known
+  // version, and we fall back to the instance's persisted version for gating.
+  const detected = await detectAndRecordArrVersion(instance.id, instance.type, client);
+  const detectedVersion = detected?.detectedVersion ?? instance.detected_version;
+
   // Process sections sequentially (quality profiles depend on custom formats being synced first)
   for (const sectionType of sectionTypes) {
     const handler = getSection(sectionType);
+
+    // Version-compatibility gate: withhold a section only when it is genuinely
+    // unavailable for the detected version (dormant today — no breaking major is
+    // authored). Never a failure: clear the pending status and record a skip.
+    const availability = resolveSyncSectionAvailability(instance.type as SyncArrType, sectionType, detectedVersion);
+    if (availability.status === 'unavailable') {
+      await logger.warn(`Skipping ${sectionType} sync for "${instance.name}" (${availability.reason})`, {
+        source: 'SyncProcessor',
+        meta: { instanceId: instance.id, section: sectionType, reason: availability.reason },
+      });
+      handler.completeSync(instance.id);
+      instanceResult[sectionType] = { success: true, itemsSynced: 0, skipped: true, skipReason: availability.reason };
+      continue;
+    }
 
     // Atomically claim the sync (prevents double-processing)
     if (!handler.claimSync(instance.id)) {

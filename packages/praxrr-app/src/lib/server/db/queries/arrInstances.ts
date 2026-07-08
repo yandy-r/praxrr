@@ -15,6 +15,8 @@ export interface ArrInstance {
   tags: string | null;
   enabled: number;
   source?: ArrInstanceSource;
+  detected_version: string | null;
+  detected_at: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -57,6 +59,8 @@ const arrInstanceSelect = `
     tags,
     enabled,
     source,
+    detected_version,
+    detected_at,
     created_at,
     updated_at
   FROM arr_instances`;
@@ -349,6 +353,23 @@ export const arrInstancesQueries = {
    */
   delete(id: number): boolean {
     const affected = db.execute('DELETE FROM arr_instances WHERE id = ?', id);
+    return affected > 0;
+  },
+
+  /**
+   * Record the detected application version for an instance.
+   *
+   * Detection is a system side-channel (populated from getSystemStatus), not a
+   * user edit — it deliberately lives off the `update()` patch path and touches
+   * only the detection columns.
+   */
+  setDetectedVersion(id: number, args: { version: string; detectedAt: string }): boolean {
+    const affected = db.execute(
+      'UPDATE arr_instances SET detected_version = ?, detected_at = ? WHERE id = ?',
+      args.version,
+      args.detectedAt,
+      id
+    );
     return affected > 0;
   },
 

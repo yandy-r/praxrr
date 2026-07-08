@@ -909,6 +909,29 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/compatibility/versions': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Feature-by-version compatibility matrix
+     * @description Returns the static feature-by-version-tier compatibility matrix for every
+     *     supported Arr application, derived from the authored support ranges. Answers
+     *     "which Praxrr features work with which application versions" without needing
+     *     a connected instance.
+     */
+    get: operations['getCompatibilityVersions'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
 }
 /** Webhook event definitions. Currently unused. */
 export type webhooks = Record<string, never>;
@@ -2147,6 +2170,51 @@ export interface components {
        * @enum {string}
        */
       basis: 'enabled-qualities';
+    };
+    /**
+     * @description Coarse support tier for a detected (arr_type, application version) pair
+     * @enum {string}
+     */
+    ArrSupportTier: 'supported' | 'degraded' | 'unsupported' | 'unknown';
+    ArrSupportRange: {
+      /** @description Versions below this are unsupported */
+      minimumSupported: string;
+      /** @description Versions below this are degraded (below recommended) */
+      minimumRecommended?: string;
+      /** @description Latest tested version; newer versions stay supported with an informational warning */
+      latestTested: string;
+      /** @description Versions at or below this are degraded with an end-of-support advisory */
+      eolBelow?: string;
+      /** @description Versions at or above this are unsupported (known or expected breaking major) */
+      breakingAtOrAbove?: string;
+      /** @description Feature surfaces gated to degraded when the tier is degraded */
+      degradedFeatures?: string[];
+      /** @description Extra advisory copy surfaced with an end-of-support warning */
+      eolNote?: string;
+      /** @description Documentation link surfaced with warnings */
+      docsHref?: string;
+    };
+    VersionSupportedFeature: {
+      /** @description Feature surface (workflow or sync) this row describes */
+      feature: string;
+      /** @description Per-tier resolved availability status for this feature */
+      tiers: {
+        [key: string]: 'available' | 'degraded' | 'unavailable';
+      };
+    };
+    ArrVersionCompatibility: {
+      /**
+       * @description Arr application type
+       * @enum {string}
+       */
+      arrType: 'radarr' | 'sonarr' | 'lidarr';
+      range: components['schemas']['ArrSupportRange'];
+      /** @description Per-feature availability across every support tier */
+      features: components['schemas']['VersionSupportedFeature'][];
+    };
+    VersionCompatibilityMatrix: {
+      /** @description Per-app feature-by-version-tier availability */
+      apps: components['schemas']['ArrVersionCompatibility'][];
     };
     /**
      * @description PCD configuration layer represented by a resolved-state response:
@@ -4944,6 +5012,44 @@ export interface operations {
         };
       };
       /** @description Failed to compute compatibility parity map */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+    };
+  };
+  getCompatibilityVersions: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Version compatibility matrix */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['VersionCompatibilityMatrix'];
+        };
+      };
+      /** @description Authentication required */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Failed to build version compatibility matrix */
       500: {
         headers: {
           [name: string]: unknown;
