@@ -3,11 +3,17 @@ import type { JobHandler, JobRunStatus, JobType } from '../queueTypes.ts';
 import { arrInstancesQueries } from '$db/queries/arrInstances.ts';
 import { arrSyncQueries } from '$db/queries/arrSync.ts';
 import { getArrInstanceClient } from '$arr/arrInstanceClients.ts';
+import { detectAndRecordArrVersion } from '$arr/instanceCompatibility.ts';
 import type { ArrType } from '$arr/types.ts';
 import { calculateNextRun } from '$lib/server/sync/utils.ts';
 import type { SectionType } from '$lib/server/sync/types.ts';
 import { getSection } from '$lib/server/sync/registry.ts';
-import { SYNC_SECTION_ORDER, getUnsupportedSyncSectionReason, type SyncArrType } from '$lib/server/sync/mappings.ts';
+import {
+  SYNC_SECTION_ORDER,
+  getUnsupportedSyncSectionReason,
+  resolveSyncSectionAvailability,
+  type SyncArrType,
+} from '$lib/server/sync/mappings.ts';
 import { logger } from '$logger/logger.ts';
 import { snapshotService } from '$pcd/snapshots/service.ts';
 
@@ -345,6 +351,12 @@ const arrSyncHandler: JobHandler = async (job) => {
     return { status: 'failure', error: message };
   }
 
+  // Refresh the detected application version on every run, reusing this run's
+  // client (best-effort, non-fatal). This keeps compatibility badges/warnings
+  // current after an Arr upgrade and feeds the per-section version gate below.
+  const detected = await detectAndRecordArrVersion(instanceId, instance.type, client);
+  const detectedVersion = detected?.detectedVersion ?? instance.detected_version;
+
   // Pre-sync snapshots: capture PCD state before Arr sync writes
   const snapshotDatabaseIds = collectSnapshotDatabaseIds(instanceId, sectionsToRun);
   for (const databaseId of snapshotDatabaseIds) {
@@ -376,6 +388,28 @@ const arrSyncHandler: JobHandler = async (job) => {
           instanceType: syncArrType,
           section,
           reason: unsupportedReason,
+        },
+      });
+      continue;
+    }
+
+    // Version-compatibility gate: withhold a section that the detected application
+    // version cannot support (never a failure — skip and keep going). Layered on
+    // the static section-support check above; dormant unless a version resolves to
+    // the unsupported tier (e.g. a below-minimum or future breaking major).
+    const versionAvailability = resolveSyncSectionAvailability(syncArrType, section, detectedVersion);
+    if (versionAvailability.status === 'unavailable') {
+      results.push(`${section}: skipped (version ${versionAvailability.reason})`);
+      await logger.warn('Skipping sync section incompatible with detected Arr version', {
+        source: 'ArrSyncJob',
+        meta: {
+          jobId: job.id,
+          instanceId,
+          instanceName: instance.name,
+          instanceType: syncArrType,
+          section,
+          detectedVersion,
+          reason: versionAvailability.reason,
         },
       });
       continue;

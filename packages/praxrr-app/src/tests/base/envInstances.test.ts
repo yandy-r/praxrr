@@ -1,4 +1,4 @@
-import { assertEquals, assertThrows } from '@std/assert';
+import { assertEquals, assertExists, assertThrows } from '@std/assert';
 import {
   parseArrInstanceEnvVars,
   parseTagsFromEnv,
@@ -8,6 +8,7 @@ import {
 import * as arrCredentialEncryption from '../../lib/server/utils/encryption/arr-credentials.ts';
 import { db } from '../../lib/server/db/db.ts';
 import { arrInstancesQueries } from '../../lib/server/db/queries/arrInstances.ts';
+import { BaseArrClient } from '../../lib/server/utils/arr/base.ts';
 import { config } from '../../lib/server/utils/config/config.ts';
 
 const APP_INSTANCE_ENV_KEY_RE = /^([A-Z]+)_INSTANCE_(URL|API_KEY|NAME|EXTERNAL_URL|TAGS|ENABLED)_(\d+)$/;
@@ -412,4 +413,150 @@ Deno.test('parseEnabledFromEnv: normalizes common bool-like values', () => {
   assertEquals(parseEnabledFromEnv('true'), true);
   assertEquals(parseEnabledFromEnv('1'), true);
   assertEquals(parseEnabledFromEnv(undefined), true);
+});
+
+const HEALTHY_STATUS = { ok: true as const, appName: 'Radarr', version: '5.14.0.9383' };
+
+function enableValidateInstances(restores: Restore[]): void {
+  const mutable = config as unknown as { validateInstances: boolean };
+  const original = mutable.validateInstances;
+  mutable.validateInstances = true;
+  restores.push(() => {
+    mutable.validateInstances = original;
+  });
+}
+
+Deno.test(
+  'reconcileEnvInstances stamps detected_version on the CREATE branch when validation reports a version',
+  async () => {
+    await withArrCredentialConfig(async () => {
+      const restores: Restore[] = [];
+      let createdId: number | undefined;
+      let setVersionArgs: { id: number; version: string } | undefined;
+
+      patchTarget(db, 'execute', () => 0, restores);
+      patchTarget(arrInstancesQueries, 'getBySourceAndName', () => undefined, restores);
+      patchTarget(arrInstancesQueries, 'getByApiKey', () => undefined, restores);
+      patchTarget(
+        arrInstancesQueries,
+        'create',
+        () => {
+          createdId = 77;
+          return 77;
+        },
+        restores
+      );
+      patchTarget(
+        arrInstancesQueries,
+        'setDetectedVersion',
+        (id: number, args: { version: string; detectedAt: string }) => {
+          setVersionArgs = { id, version: args.version };
+          return true;
+        },
+        restores
+      );
+      patchTarget(arrInstancesQueries, 'disableEnvInstancesMissingApiKeys', () => 0, restores);
+
+      // Validation seam: report a healthy version without any network I/O.
+      patchTarget(BaseArrClient.prototype, 'getSystemStatus', () => Promise.resolve(HEALTHY_STATUS), restores);
+      enableValidateInstances(restores);
+
+      try {
+        await withEnvVarsAsync(
+          {
+            RADARR_INSTANCE_URL_1: 'http://radarr.local:7878',
+            RADARR_INSTANCE_API_KEY_1: 'env-create-version-key',
+            RADARR_INSTANCE_NAME_1: 'Fresh Env Radarr',
+          },
+          async () => {
+            const result = await reconcileEnvInstances();
+
+            assertEquals(result.created, 1);
+            assertEquals(result.validationSuccesses, 1);
+            assertExists(setVersionArgs);
+            assertEquals(setVersionArgs?.id, createdId);
+            assertEquals(setVersionArgs?.version, '5.14.0.9383');
+          }
+        );
+      } finally {
+        for (const restore of restores.reverse()) {
+          restore();
+        }
+      }
+    });
+  }
+);
+
+Deno.test('reconcileEnvInstances does not stamp detected_version on the UPDATE branch at reconcile time', async () => {
+  await withArrCredentialConfig(async () => {
+    const restores: Restore[] = [];
+    let updateCalled = false;
+    let setVersionCalled = false;
+
+    patchTarget(db, 'execute', () => 0, restores);
+    patchTarget(arrInstancesQueries, 'getBySourceAndName', () => undefined, restores);
+    patchTarget(
+      arrInstancesQueries,
+      'getByApiKey',
+      (fingerprint: string) => ({
+        id: 44,
+        name: 'Existing Env Radarr',
+        type: 'radarr',
+        url: 'http://existing-radarr.local',
+        external_url: null,
+        api_key_fingerprint: fingerprint,
+        tags: null,
+        enabled: 1,
+        source: 'env' as const,
+        created_at: '2026-01-01',
+        updated_at: '2026-01-01',
+        api_key: '',
+      }),
+      restores
+    );
+    patchTarget(
+      arrInstancesQueries,
+      'updateEnvInstanceByApiKey',
+      () => {
+        updateCalled = true;
+        return true;
+      },
+      restores
+    );
+    patchTarget(
+      arrInstancesQueries,
+      'setDetectedVersion',
+      () => {
+        setVersionCalled = true;
+        return true;
+      },
+      restores
+    );
+    patchTarget(arrInstancesQueries, 'disableEnvInstancesMissingApiKeys', () => 1, restores);
+
+    patchTarget(BaseArrClient.prototype, 'getSystemStatus', () => Promise.resolve(HEALTHY_STATUS), restores);
+    enableValidateInstances(restores);
+
+    try {
+      await withEnvVarsAsync(
+        {
+          RADARR_INSTANCE_URL_1: 'http://radarr.local:7878',
+          RADARR_INSTANCE_API_KEY_1: 'env-update-version-key',
+          RADARR_INSTANCE_NAME_1: 'Existing Env Radarr',
+        },
+        async () => {
+          const result = await reconcileEnvInstances();
+
+          assertEquals(result.updated, 1);
+          assertEquals(updateCalled, true);
+          // Version stamping is deferred to the first sync for existing env instances.
+          assertEquals(setVersionCalled, false);
+        }
+      );
+    } finally {
+      for (const restore of restores.reverse()) {
+        restore();
+      }
+    }
+  });
 });

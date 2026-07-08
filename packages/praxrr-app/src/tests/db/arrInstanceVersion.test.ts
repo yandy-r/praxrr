@@ -3,7 +3,8 @@ import { config } from '$config';
 import { db } from '$db/db.ts';
 import { runMigrations } from '$db/migrations.ts';
 import { arrInstancesQueries } from '$db/queries/arrInstances.ts';
-import { detectAndRecordArrVersion } from '$arr/instanceCompatibility.ts';
+import { detectAndRecordArrVersion, detectArrVersionBestEffort } from '$arr/instanceCompatibility.ts';
+import { BaseArrClient } from '$arr/base.ts';
 import { makeSystemStatusMock, makeUnreachableMock } from '../arr/arrVersionFixtures.ts';
 
 /**
@@ -124,3 +125,61 @@ migratedTest(
     assertEquals(persisted.detected_at, '2026-07-01T00:00:00.000Z');
   }
 );
+
+migratedTest(
+  'detectArrVersionBestEffort resolves (never rejects) when getArrInstanceClient throws for missing credentials',
+  async () => {
+    // Created without a persisted credential row: getArrInstanceClient falls back
+    // to the instance api_key which is always stored empty, so it throws
+    // "No Arr credentials found". detectArrVersionBestEffort's outer try/catch must
+    // swallow that so the fire-and-forget caller never sees a rejection.
+    const id = arrInstancesQueries.create({
+      name: 'Radarr No Creds',
+      type: 'radarr',
+      url: 'http://localhost:7878',
+      apiKey: 'test-api-key',
+    });
+
+    const result = await detectArrVersionBestEffort(id, 'radarr', 'http://localhost:7878');
+    // Fire-and-forget: resolves to void, and nothing was persisted.
+    assertEquals(result, undefined);
+
+    const persisted = arrInstancesQueries.getById(id);
+    assertExists(persisted);
+    assertEquals(persisted.detected_version, null);
+    assertEquals(persisted.detected_at, null);
+  }
+);
+
+migratedTest('detectArrVersionBestEffort persists the detected version on a healthy probe', async () => {
+  const id = arrInstancesQueries.create({
+    name: 'Radarr Best Effort',
+    type: 'radarr',
+    url: 'http://localhost:7878',
+    apiKey: 'test-api-key',
+  });
+
+  const originalGetById = arrInstancesQueries.getById;
+  const originalGetSystemStatus = BaseArrClient.prototype.getSystemStatus;
+
+  // Inject a non-empty api_key so getArrInstanceClient's no-credentials fallback
+  // builds a real (never-networked) client; the probe itself is stubbed.
+  arrInstancesQueries.getById = (queryId: number) => {
+    const row = originalGetById(queryId);
+    return row ? { ...row, api_key: 'radarr-key' } : row;
+  };
+  BaseArrClient.prototype.getSystemStatus = () =>
+    Promise.resolve({ ok: true as const, appName: 'Radarr', version: '5.14.0.9383' });
+
+  try {
+    await detectArrVersionBestEffort(id, 'radarr', 'http://localhost:7878');
+
+    const persisted = originalGetById(id);
+    assertExists(persisted);
+    assertEquals(persisted.detected_version, '5.14.0.9383');
+    assertExists(persisted.detected_at);
+  } finally {
+    arrInstancesQueries.getById = originalGetById;
+    BaseArrClient.prototype.getSystemStatus = originalGetSystemStatus;
+  }
+});
