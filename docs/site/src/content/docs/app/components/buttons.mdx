@@ -303,7 +303,7 @@ import SourceFilterAction from '$ui/actions/SourceFilterAction.svelte';
 </script>
 
 <SourceFilterAction
-  sources={sources}
+  {sources}
   bind:selectedKeys
   selectionMode="multi"
   on:change={(e) => applyFilter(e.detail.selectedSources)}

@@ -97,7 +97,9 @@ Usage:
 <InfoModal bind:open={demoInfoModalOpen} header="About Profiles">
   <div class="space-y-2 text-sm text-neutral-600 dark:text-neutral-400">
     <p>Profiles define quality preferences for your media library.</p>
-    <p>Each profile can have custom formats, quality cutoffs, and upgrade rules.</p>
+    <p>
+      Each profile can have custom formats, quality cutoffs, and upgrade rules.
+    </p>
   </div>
 </InfoModal>
 ```

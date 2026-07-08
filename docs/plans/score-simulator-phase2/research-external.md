@@ -633,7 +633,9 @@ Minimal working example showing how to extend the existing page component for co
       : [];
 
   async function simulate() {
-    const titles = batchMode ? parseBatchInput(releaseTitle) : [releaseTitle.trim()];
+    const titles = batchMode
+      ? parseBatchInput(releaseTitle)
+      : [releaseTitle.trim()];
     if (titles.length === 0 || activeProfileNames.length === 0) {
       simulationResult = null;
       return;

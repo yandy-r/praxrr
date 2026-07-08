@@ -12,7 +12,8 @@ Wraps a section of UI and establishes the complexity-tier Svelte context for its
 Import:
 
 ```svelte
-import ComplexityTierProvider from '$ui/complexity/ComplexityTierProvider.svelte';
+import ComplexityTierProvider from
+'$ui/complexity/ComplexityTierProvider.svelte';
 ```
 
 Props:
@@ -25,11 +26,14 @@ Props:
 Usage:
 
 ```svelte
-<ComplexityTierProvider sectionKey={CF_CONDITIONS} initialTier={sectionTiers[CF_CONDITIONS] ?? 'beginner'}>
- {#if enableComplexityTiers}
-  <ComplexityTierSelector />
- {/if}
- <!-- section content that reads the tier context -->
+<ComplexityTierProvider
+  sectionKey={CF_CONDITIONS}
+  initialTier={sectionTiers[CF_CONDITIONS] ?? 'beginner'}
+>
+  {#if enableComplexityTiers}
+    <ComplexityTierSelector />
+  {/if}
+  <!-- section content that reads the tier context -->
 </ComplexityTierProvider>
 ```
 
@@ -48,7 +52,8 @@ Segmented button control that lets the user switch the active complexity tier (B
 Import:
 
 ```svelte
-import ComplexityTierSelector from '$ui/complexity/ComplexityTierSelector.svelte';
+import ComplexityTierSelector from
+'$ui/complexity/ComplexityTierSelector.svelte';
 ```
 
 Props:
@@ -61,7 +66,7 @@ Usage:
 
 ```svelte
 <ComplexityTierProvider sectionKey={CF_SCORING} initialTier={'beginner'}>
- <ComplexityTierSelector />
+  <ComplexityTierSelector />
 </ComplexityTierProvider>
 ```
 

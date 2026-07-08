@@ -171,7 +171,7 @@ return { ..., customFormatSectionModes: sectionModes };
 **File:** `$ui/navigation/pageNav/group.svelte` (53 lines)
 
 ```svelte
-import { slide } from 'svelte/transition';
+import {slide} from 'svelte/transition';
 {#if isOpen && hasItems}
   <div transition:slide={{ duration: 200 }}>...</div>
 {/if}

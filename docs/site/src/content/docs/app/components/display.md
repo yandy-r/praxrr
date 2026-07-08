@@ -93,7 +93,11 @@ import CodeBlock from '$ui/meta/CodeBlock.svelte';
   import CodeBlock from '$ui/meta/CodeBlock.svelte';
 </script>
 
-<CodeBlock code="SELECT * FROM profiles WHERE name = 'HD-1080p';" language="sql" label="Query">
+<CodeBlock
+  code="SELECT * FROM profiles WHERE name = 'HD-1080p';"
+  language="sql"
+  label="Query"
+>
   <SomeIcon slot="icon" />
 </CodeBlock>
 
@@ -136,8 +140,8 @@ import JsonView from '$ui/meta/JsonView.svelte';
     upgradesAllowed: true,
     queries: [
       "INSERT INTO profiles (name) VALUES ('HD-1080p');",
-      "UPDATE profiles SET cutoff = 7 WHERE name = 'HD-1080p';"
-    ]
+      "UPDATE profiles SET cutoff = 7 WHERE name = 'HD-1080p';",
+    ],
   }}
 />
 ```

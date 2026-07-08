@@ -395,7 +395,10 @@ infinite loops and unnecessary navigations.
       // Encode score overrides as compact format: cfName:score,cfName:score
       const overrideEntries = Object.entries(scoreOverrides);
       if (overrideEntries.length > 0) {
-        params.set('overrides', overrideEntries.map(([k, v]) => `${k}:${v}`).join(','));
+        params.set(
+          'overrides',
+          overrideEntries.map(([k, v]) => `${k}:${v}`).join(',')
+        );
       }
 
       const query = params.toString();
@@ -822,9 +825,7 @@ The project convention specifies "Svelte 5, no runes." This means:
   }
 </script>
 
-<button class="btn btn-secondary" onclick={openInSimulator}>
-  Simulate
-</button>
+<button class="btn btn-secondary" onclick={openInSimulator}> Simulate </button>
 ```
 
 ### What-If Score Override Pattern (Client-Side)

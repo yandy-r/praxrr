@@ -10,7 +10,17 @@ This page documents the client-side store patterns and conventions used across t
 Singleton form dirty-tracking store using snapshot comparison. It stores an original snapshot and current data; changing a field and then changing it back registers as not dirty, and create mode is always dirty. It also drives an unsaved-changes navigation guard modal.
 
 ```svelte
-import { isDirty, current, showModal, initEdit, initCreate, update, resetFromServer, clear, confirmNavigation, confirmDiscard, cancelDiscard } from '$stores/dirty';
+import {(isDirty,
+current,
+showModal,
+initEdit,
+initCreate,
+update,
+resetFromServer,
+clear,
+confirmNavigation,
+confirmDiscard,
+cancelDiscard)} from '$stores/dirty';
 ```
 
 | Prop                | Type                                                                     | Default | Required | Description                                                                                                                                      |
@@ -52,7 +62,7 @@ Notes:
 Global toast/alert queue. `add()` pushes a typed message that auto-dismisses after a resolved duration (an explicit argument, else the user's alert-settings duration). This is the canonical user-feedback mechanism referenced across the app.
 
 ```svelte
-import { alertStore } from '$lib/client/alerts/store';
+import {alertStore} from '$lib/client/alerts/store';
 ```
 
 | Prop        | Type                                                                            | Default | Required | Description                                                                                                                                                                                                     |
@@ -65,12 +75,9 @@ import { alertStore } from '$lib/client/alerts/store';
 | `Alert`     | `interface { id: string; type: AlertType; message: string; duration?: number }` | `—`     | No       | Exported shape of a queued alert.                                                                                                                                                                               |
 
 ```svelte
-import { alertStore } from '$lib/client/alerts/store';
-
-alertStore.add('success', 'Profile saved');
-alertStore.add('error', 'Save failed', 8000); // explicit duration ms
-const id = alertStore.add('info', 'Working...', 0); // 0 = no auto-dismiss
-alertStore.remove(id);
+import {alertStore} from '$lib/client/alerts/store'; alertStore.add('success', 'Profile
+saved'); alertStore.add('error', 'Save failed', 8000); // explicit duration ms const
+id = alertStore.add('info', 'Working...', 0); // 0 = no auto-dismiss alertStore.remove(id);
 ```
 
 Variants and notes:
@@ -84,7 +91,11 @@ Variants and notes:
 Persisted user preferences for alert position and default auto-dismiss duration. Hydrates from localStorage (`alertSettings`) with validation and writes back on every change.
 
 ```svelte
-import { alertSettingsStore, ALERT_POSITIONS, AlertPosition, AlertSettings, DEFAULT_ALERT_SETTINGS } from '$lib/client/alerts/settings';
+import {(alertSettingsStore,
+ALERT_POSITIONS,
+AlertPosition,
+AlertSettings,
+DEFAULT_ALERT_SETTINGS)} from '$lib/client/alerts/settings';
 ```
 
 | Prop                     | Type                                                                                          | Default | Required | Description                                                                                                                      |
@@ -97,10 +108,16 @@ import { alertSettingsStore, ALERT_POSITIONS, AlertPosition, AlertSettings, DEFA
 | `DEFAULT_ALERT_SETTINGS` | `AlertSettings`                                                                               | `—`     | No       | Exported defaults: { position: 'top-center', durationMs: 5000 }.                                                                 |
 
 ```svelte
-import { alertSettingsStore, ALERT_POSITIONS, DEFAULT_ALERT_SETTINGS } from '$lib/client/alerts/settings';
+import {(alertSettingsStore, ALERT_POSITIONS, DEFAULT_ALERT_SETTINGS)} from '$lib/client/alerts/settings';
 
-<select value={$alertSettingsStore.position}
-  on:change={(e) => alertSettingsStore.setSettings({ ...$alertSettingsStore, position: e.currentTarget.value })}>
+<select
+  value={$alertSettingsStore.position}
+  on:change={(e) =>
+    alertSettingsStore.setSettings({
+      ...$alertSettingsStore,
+      position: e.currentTarget.value,
+    })}
+>
   {#each ALERT_POSITIONS as pos}<option value={pos}>{pos}</option>{/each}
 </select>
 ```
@@ -116,7 +133,7 @@ Variants and notes:
 Singleton light/dark theme store. Initializes from localStorage (`theme`) or the prefers-color-scheme media query, applies the theme class to `<html>` (using the View Transitions API when available), and persists on toggle.
 
 ```svelte
-import { themeStore } from '$stores/theme';
+import {themeStore} from '$stores/theme';
 ```
 
 | Prop        | Type                                       | Default | Required | Description                                                                                                                                                                               |
@@ -125,7 +142,7 @@ import { themeStore } from '$stores/theme';
 | `toggle`    | `() => void`                               | `—`     | Yes      | Flip between light and dark; applies the class to document.documentElement (via document.startViewTransition when supported) and writes to localStorage (guarded against storage errors). |
 
 ```svelte
-import { themeStore } from '$stores/theme';
+import {themeStore} from '$stores/theme';
 
 <button on:click={themeStore.toggle}>
   {$themeStore === 'dark' ? 'Light mode' : 'Dark mode'}
@@ -142,7 +159,7 @@ Variants and notes:
 Singleton accent-color store. Persists a chosen accent to localStorage (`accent`) and writes the matching Tailwind-shade palette (50–950) to CSS custom properties (`--accent-50` … `--accent-950`) on `<html>`.
 
 ```svelte
-import { accentStore, accentColors, AccentColor } from '$stores/accent';
+import {(accentStore, accentColors, AccentColor)} from '$stores/accent';
 ```
 
 | Prop           | Type                                                                               | Default | Required | Description                                                                                                                                                   |
@@ -172,7 +189,7 @@ Variants and notes:
 Factory for a per-instance search + filter store with debounced query, arbitrary key/value filters, an `isActive` flag, and a generic array filter helper. `getPersistentSearchStore` returns a keyed singleton whose query is mirrored to localStorage.
 
 ```svelte
-import { createSearchStore, getPersistentSearchStore } from '$stores/search';
+import {(createSearchStore, getPersistentSearchStore)} from '$stores/search';
 ```
 
 | Prop                         | Type                                                                                                                                          | Default | Required | Description                                                                                                                                                                                                    |
@@ -215,7 +232,7 @@ Notes:
 Server-synced store for per-section UI complexity tiers (beginner/intermediate/etc.). It wraps a shared debounced section-sync engine that hydrates from and PATCHes to `/api/v1/complexity-tiers`, tracking interaction counts and tier-suggestion dismissals with optimistic-update auth handling.
 
 ```svelte
-import { userComplexityTiersStore, getUserComplexityTierSectionStore } from '$stores/userComplexityTiers';
+import {(userComplexityTiersStore, getUserComplexityTierSectionStore)} from '$stores/userComplexityTiers';
 ```
 
 | Prop                                                | Type                                                                                                                                                                                                                                      | Default | Required | Description                                                                                                                                                                          |
@@ -230,13 +247,9 @@ import { userComplexityTiersStore, getUserComplexityTierSectionStore } from '$st
 | `UserComplexityTierSectionStore.cleanup`            | `() => void`                                                                                                                                                                                                                              | `—`     | Yes      | Decrement the section's ref count and tear down shared state when it reaches zero. Call on component destroy.                                                                        |
 
 ```svelte
-import { getUserComplexityTierSectionStore } from '$stores/userComplexityTiers';
-import { onDestroy } from 'svelte';
-
-const section = getUserComplexityTierSectionStore('quality-profiles', 'beginner');
-const tier = section.tier;
-const isSyncing = section.isSyncing;
-onDestroy(section.cleanup);
+import {getUserComplexityTierSectionStore} from '$stores/userComplexityTiers'; import
+{onDestroy} from 'svelte'; const section = getUserComplexityTierSectionStore('quality-profiles',
+'beginner'); const tier = section.tier; const isSyncing = section.isSyncing; onDestroy(section.cleanup);
 
 <select bind:value={$tier}>...</select>
 {#if $isSyncing}<Spinner />{/if}

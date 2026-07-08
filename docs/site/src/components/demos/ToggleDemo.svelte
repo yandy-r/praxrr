@@ -1,16 +1,16 @@
 <script>
   // Self-contained demo island mirroring $ui/toggle/Toggle.svelte:
   // a labelled switch with an icon-checkbox indicator.
-  let checked = false
+  let checked = false;
 
   function handleToggle() {
-    checked = !checked
+    checked = !checked;
   }
 
   function handleKeydown(event) {
     if (event.key === 'Enter' || event.key === ' ') {
-      event.preventDefault()
-      handleToggle()
+      event.preventDefault();
+      handleToggle();
     }
   }
 </script>

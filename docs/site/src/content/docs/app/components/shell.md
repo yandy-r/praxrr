@@ -300,7 +300,11 @@ Props:
 Usage:
 
 ```svelte
-<GroupItem label="Custom Formats" href="/custom-formats" activePattern="/custom-formats" />
+<GroupItem
+  label="Custom Formats"
+  href="/custom-formats"
+  activePattern="/custom-formats"
+/>
 ```
 
 Notes:

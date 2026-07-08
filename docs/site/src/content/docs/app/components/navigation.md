@@ -31,7 +31,11 @@ import Dropdown from '$ui/dropdown/Dropdown.svelte';
 Usage:
 
 ```svelte
-<div class="relative" bind:this={triggerEl} use:clickOutside={() => (open = false)}>
+<div
+  class="relative"
+  bind:this={triggerEl}
+  use:clickOutside={() => (open = false)}
+>
   <button onclick={() => (open = !open)}>Menu</button>
   {#if open}
     <Dropdown position="right" minWidth="12rem" {triggerEl}>
@@ -139,7 +143,10 @@ Usage:
 <DropdownSelect
   label="Arr type"
   bind:value={selectedArr}
-  options={[{ value: 'radarr', label: 'Radarr' }, { value: 'sonarr', label: 'Sonarr' }]}
+  options={[
+    { value: 'radarr', label: 'Radarr' },
+    { value: 'sonarr', label: 'Sonarr' },
+  ]}
   position="left"
   on:change={(e) => (selectedArr = e.detail)}
 />
@@ -229,7 +236,7 @@ Usage:
   responsive
   tabs={[
     { label: 'Overview', href: '/x/overview', active: true, icon: Info },
-    { label: 'Settings', href: '/x/settings', icon: Settings }
+    { label: 'Settings', href: '/x/settings', icon: Settings },
   ]}
   breadcrumb={{ parent: { label: 'Dev', href: '/dev' }, current: 'Components' }}
 >

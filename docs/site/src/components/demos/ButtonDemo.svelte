@@ -2,30 +2,29 @@
   // Self-contained demo island mirroring $ui/button/Button.svelte.
   // Uses standard Tailwind colors (the app's accent-* theme vars are not
   // available in the docs site), but reproduces the variant/size API.
-  let variant = 'primary'
-  let size = 'sm'
-  let clicks = 0
+  let variant = 'primary';
+  let size = 'sm';
+  let clicks = 0;
 
-  const variants = ['primary', 'secondary', 'danger', 'ghost']
-  const sizes = ['xs', 'sm', 'md']
+  const variants = ['primary', 'secondary', 'danger', 'ghost'];
+  const sizes = ['xs', 'sm', 'md'];
 
   const sizeClasses = {
     xs: 'gap-1 rounded-lg px-2 py-1 text-xs',
     sm: 'gap-1.5 rounded-xl px-3 py-1.5 text-sm',
     md: 'gap-2 rounded-xl px-4 py-2.5 text-base',
-  }
+  };
 
   const variantClasses = {
     primary: 'bg-emerald-600 text-white hover:bg-emerald-700',
     secondary:
       'border border-slate-300 bg-white text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700',
     danger: 'bg-red-600 text-white hover:bg-red-700',
-    ghost:
-      'text-slate-600 hover:bg-slate-100 hover:text-slate-800 dark:text-slate-300 dark:hover:bg-slate-800',
-  }
+    ghost: 'text-slate-600 hover:bg-slate-100 hover:text-slate-800 dark:text-slate-300 dark:hover:bg-slate-800',
+  };
 
   function handleClick() {
-    clicks += 1
+    clicks += 1;
   }
 </script>
 

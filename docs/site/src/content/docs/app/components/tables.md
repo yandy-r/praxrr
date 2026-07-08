@@ -10,7 +10,7 @@ This category covers the reusable data-display components for tabular and list c
 Shared TypeScript type module that defines the column contract and sort state consumed by `Table` and `ExpandableTable`. Import these types to build strongly-typed column definitions.
 
 ```svelte
-import type { Column, SortState, SortDirection } from '$ui/table/types';
+import type {(Column, SortState, SortDirection)} from '$ui/table/types';
 ```
 
 | Prop                          | Type                                                                   | Default              | Required | Description                                                                                     |
@@ -133,7 +133,12 @@ import ExpandableTable from '$ui/table/ExpandableTable.svelte';
   import ExpandableTable from '$ui/table/ExpandableTable.svelte';
 </script>
 
-<ExpandableTable columns={demoTableColumns} data={demoTableData} getRowId={(row) => row.id} compact>
+<ExpandableTable
+  columns={demoTableColumns}
+  data={demoTableData}
+  getRowId={(row) => row.id}
+  compact
+>
   <svelte:fragment slot="expanded" let:row>
     <p>Details for {row.name} — score: {row.score}, status: {row.status}</p>
   </svelte:fragment>
@@ -180,7 +185,7 @@ import ReorderableList from '$ui/table/ReorderableList.svelte';
 
   let demoReorderItems = [
     { id: 1, label: 'First' },
-    { id: 2, label: 'Second' }
+    { id: 2, label: 'Second' },
   ];
 </script>
 
@@ -241,7 +246,12 @@ import TableActionButton from '$ui/table/TableActionButton.svelte';
   }
 </script>
 
-<TableActionButton icon={Trash2} title="Delete" variant="danger" on:click={handleDelete} />
+<TableActionButton
+  icon={Trash2}
+  title="Delete"
+  variant="danger"
+  on:click={handleDelete}
+/>
 ```
 
 ### Variants & Notes

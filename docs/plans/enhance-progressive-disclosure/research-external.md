@@ -214,7 +214,7 @@ Replace `hidden={!isAdvanced}` with `{#if isAdvanced}` and apply `transition:sli
     id={advancedPanelId}
     role="region"
     aria-labelledby={advancedHeadingId}
-    class="px-4 pb-4 pt-3"
+    class="px-4 pt-3 pb-4"
     transition:slide={{ duration: 200, easing: quintOut }}
   >
     <slot name="advanced" />
@@ -251,7 +251,7 @@ Keep content in DOM but animate visibility using CSS Grid:
       id={advancedPanelId}
       role="region"
       aria-labelledby={advancedHeadingId}
-      class="px-4 pb-4 pt-3"
+      class="px-4 pt-3 pb-4"
     >
       <slot name="advanced" />
     </div>
@@ -405,9 +405,10 @@ Use **Option A** (`transition:slide`) as the primary pattern for the `AdvancedSe
   <script>
     import { slide } from 'svelte/transition';
 
-    const reducedMotion = typeof window !== 'undefined'
-      ? window.matchMedia('(prefers-reduced-motion: reduce)').matches
-      : false;
+    const reducedMotion =
+      typeof window !== 'undefined'
+        ? window.matchMedia('(prefers-reduced-motion: reduce)').matches
+        : false;
 
     function accessibleSlide(node, params) {
       if (reducedMotion) return { duration: 0 };
@@ -478,7 +479,8 @@ Use **Option A** (`transition:slide`) as the primary pattern for the `AdvancedSe
 
   export let sectionId: string = '';
   export let sectionTitle = 'Advanced settings';
-  export let sectionHint = 'These options are hidden by default and are optional.';
+  export let sectionHint =
+    'These options are hidden by default and are optional.';
   export let showAdvancedLabel = 'Show Advanced';
   export let hideAdvancedLabel = 'Hide Advanced';
   export let mode: 'basic' | 'advanced' = 'basic';
@@ -561,7 +563,7 @@ Use **Option A** (`transition:slide`) as the primary pattern for the `AdvancedSe
         id={advancedPanelId}
         role="region"
         aria-labelledby={advancedHeadingId}
-        class="px-4 pb-4 pt-3"
+        class="px-4 pt-3 pb-4"
         transition:slide={{ duration: slideDuration, easing: quintOut }}
       >
         <slot name="advanced">
@@ -582,15 +584,12 @@ Use **Option A** (`transition:slide`) as the primary pattern for the `AdvancedSe
   class="grid transition-[grid-template-rows] duration-200 ease-out
     {isAdvanced ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}"
 >
-  <div
-    class="overflow-hidden"
-    aria-hidden={!isAdvanced}
-  >
+  <div class="overflow-hidden" aria-hidden={!isAdvanced}>
     <div
       id={advancedPanelId}
       role="region"
       aria-labelledby={advancedHeadingId}
-      class="px-4 pb-4 pt-3"
+      class="px-4 pt-3 pb-4"
       tabindex={isAdvanced ? undefined : -1}
       inert={!isAdvanced ? true : undefined}
     >
@@ -621,17 +620,27 @@ Use **Option A** (`transition:slide`) as the primary pattern for the `AdvancedSe
       if (mode !== m) mode = m;
     });
     return {
-      get mode() { return mode; },
+      get mode() {
+        return mode;
+      },
       set mode(m: UiPreferenceMode) {
-        if (m !== synced) { synced = m; section.mode.set(m); }
+        if (m !== synced) {
+          synced = m;
+          section.mode.set(m);
+        }
         mode = m;
       },
-      cleanup() { unsub(); section.cleanup(); },
+      cleanup() {
+        unsub();
+        section.cleanup();
+      },
     };
   }
 
   const naming = useSectionMode('media-management:media-settings:naming');
-  const folders = useSectionMode('media-management:media-settings:folder-management');
+  const folders = useSectionMode(
+    'media-management:media-settings:folder-management'
+  );
   const importing = useSectionMode('media-management:media-settings:importing');
 
   onDestroy(() => {

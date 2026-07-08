@@ -1,20 +1,17 @@
 <script>
-  let detailsOpen = false
+  let detailsOpen = false;
 
   function toggleDetails() {
-    detailsOpen = !detailsOpen
+    detailsOpen = !detailsOpen;
   }
 </script>
 
 <section class="praxrr-docs-panel my-6 bg-white shadow-sm dark:bg-slate-950">
   <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
     <div>
-      <p class="m-0 text-sm font-semibold uppercase text-emerald-700 dark:text-emerald-300">
-        Docs site status
-      </p>
+      <p class="m-0 text-sm font-semibold text-emerald-700 uppercase dark:text-emerald-300">Docs site status</p>
       <p class="m-0 mt-2 text-base text-slate-700 dark:text-slate-200">
-        Astro, Starlight, Svelte islands, Tailwind CSS, and OpenAPI generation are wired into one
-        static build.
+        Astro, Starlight, Svelte islands, Tailwind CSS, and OpenAPI generation are wired into one static build.
       </p>
     </div>
 

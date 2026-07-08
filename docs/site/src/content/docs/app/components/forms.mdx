@@ -103,7 +103,14 @@ import NumberInput from '$ui/form/NumberInput.svelte';
   let score = 50;
 </script>
 
-<NumberInput name="score" bind:value={demoNumber} min={0} max={100} step={1} on:change={(e) => e.detail !== undefined && (score = e.detail)} />
+<NumberInput
+  name="score"
+  bind:value={demoNumber}
+  min={0}
+  max={100}
+  step={1}
+  on:change={(e) => e.detail !== undefined && (score = e.detail)}
+/>
 ```
 
 ### Events & Slots
@@ -148,7 +155,14 @@ import DateInput from '$ui/form/DateInput.svelte';
   let dateValue = '';
 </script>
 
-<DateInput label="Release date" name="release" bind:value={dateValue} minYear={2000} maxYear={2030} on:change={(e) => (dateValue = e.detail)} />
+<DateInput
+  label="Release date"
+  name="release"
+  bind:value={dateValue}
+  minYear={2000}
+  maxYear={2030}
+  on:change={(e) => (dateValue = e.detail)}
+/>
 ```
 
 ### Events & Slots
@@ -191,7 +205,14 @@ import TimeInput from '$ui/form/TimeInput.svelte';
   let dailyTime = '00:00';
 </script>
 
-<TimeInput label="Time" hideLabel name="cron-daily-time" fieldWidthRem={5} bind:value={dailyTime} on:input={(e) => (dailyTime = e.detail)} />
+<TimeInput
+  label="Time"
+  hideLabel
+  name="cron-daily-time"
+  fieldWidthRem={5}
+  bind:value={dailyTime}
+  on:input={(e) => (dailyTime = e.detail)}
+/>
 ```
 
 ### Events & Slots
@@ -235,11 +256,16 @@ import SearchDropdown from '$ui/form/SearchDropdown.svelte';
   let selected = null;
   let demoAutoOptions = [
     { value: 'radarr', label: 'Radarr' },
-    { value: 'sonarr', label: 'Sonarr' }
+    { value: 'sonarr', label: 'Sonarr' },
   ];
 </script>
 
-<SearchDropdown options={demoAutoOptions} bind:value={selected} placeholder="Search arrs..." on:change={(e) => (selected = e.detail)}>
+<SearchDropdown
+  options={demoAutoOptions}
+  bind:value={selected}
+  placeholder="Search arrs..."
+  on:change={(e) => (selected = e.detail)}
+>
   <svelte:fragment slot="item" let:option>{option.label}</svelte:fragment>
 </SearchDropdown>
 ```
@@ -287,7 +313,13 @@ import MarkdownInput from '$ui/form/MarkdownInput.svelte';
   let demoMarkdown = '';
 </script>
 
-<MarkdownInput label="Description" description="Supports **markdown**" bind:value={demoMarkdown} rows={4} onchange={(v) => (demoMarkdown = v)} />
+<MarkdownInput
+  label="Description"
+  description="Supports **markdown**"
+  bind:value={demoMarkdown}
+  rows={4}
+  onchange={(v) => (demoMarkdown = v)}
+/>
 ```
 
 ### Events & Slots
@@ -365,7 +397,13 @@ import IconCheckbox from '$ui/form/IconCheckbox.svelte';
   let enabled = false;
 </script>
 
-<IconCheckbox icon={Check} color="green" variant="outline" bind:checked={enabled} on:click={() => (enabled = !enabled)} />
+<IconCheckbox
+  icon={Check}
+  color="green"
+  variant="outline"
+  bind:checked={enabled}
+  on:click={() => (enabled = !enabled)}
+/>
 ```
 
 ### Events & Slots
@@ -504,7 +542,13 @@ import KeyValueList from '$ui/form/KeyValueList.svelte';
   let demoKV = {};
 </script>
 
-<KeyValueList bind:value={demoKV} label="Environment Variables" keyPlaceholder="Variable name" valuePlaceholder="Value" onchange={(v) => (demoKV = v)} />
+<KeyValueList
+  bind:value={demoKV}
+  label="Environment Variables"
+  keyPlaceholder="Variable name"
+  valuePlaceholder="Value"
+  onchange={(v) => (demoKV = v)}
+/>
 ```
 
 ### Events & Slots
@@ -552,7 +596,14 @@ import MaskedApiKey from '$ui/form/MaskedApiKey.svelte';
   }
 </script>
 
-<MaskedApiKey label="API key" value={apiKey} maskedValue="abc***xyz" hasValue on:revealChange={(e) => log(e.detail)} on:copyFeedback={(e) => log(e.detail)} />
+<MaskedApiKey
+  label="API key"
+  value={apiKey}
+  maskedValue="abc***xyz"
+  hasValue
+  on:revealChange={(e) => log(e.detail)}
+  on:copyFeedback={(e) => log(e.detail)}
+/>
 ```
 
 ### Events & Slots
@@ -629,7 +680,7 @@ import AdvancedSection from '$ui/form/AdvancedSection.svelte';
   let mode = 'basic';
 </script>
 
-<AdvancedSection sectionTitle="Advanced settings" bind:mode={mode}>
+<AdvancedSection sectionTitle="Advanced settings" bind:mode>
   <BasicFields />
   <svelte:fragment slot="advanced"><AdvancedFields /></svelte:fragment>
 </AdvancedSection>

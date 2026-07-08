@@ -266,9 +266,11 @@ const cache = { kb } as unknown as PCDCache; // try { ... } finally { await kb.d
 <!-- SOURCE: Badge.svelte / Button.svelte / Table.svelte — repo is LEGACY-event mode -->
 <script lang="ts">
   export let variant: BadgeVariant = 'default'; // props via export let
-  $: classes = computeClasses(variant);          // reactivity via $:
+  $: classes = computeClasses(variant); // reactivity via $:
 </script>
-<button on:click={handler}>...</button>            <!-- events via on:click, NOT onclick -->
+
+<button on:click={handler}>...</button>
+<!-- events via on:click, NOT onclick -->
 <!-- ⚠ CLAUDE.md says "onclick handlers, no $state/$derived" — the actual repo uses on:click + export let + $:. Mirror the codebase; run `deno task format` (.prettierrc.json: 2-space/single-quote/semi/~120w). -->
 ```
 
