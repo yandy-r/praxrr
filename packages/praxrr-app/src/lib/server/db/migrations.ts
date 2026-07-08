@@ -70,6 +70,7 @@ import { migration as migration20260228CreatePcdSnapshots } from './migrations/2
 import { migration as migration20260706CreateUserComplexityTiers } from './migrations/20260706_create_user_complexity_tiers.ts';
 import { migration as migration20260707AddSetupWizardState } from './migrations/20260707_add_setup_wizard_state.ts';
 import { migration as migration20260708AddArrInstanceDetectedVersion } from './migrations/20260708_add_arr_instance_detected_version.ts';
+import { migration as migration20260709CreateDriftTables } from './migrations/20260709_create_drift_tables.ts';
 
 export interface Migration {
   version: number;
@@ -369,6 +370,7 @@ export function loadMigrations(): Migration[] {
     migration20260706CreateUserComplexityTiers,
     migration20260707AddSetupWizardState,
     migration20260708AddArrInstanceDetectedVersion,
+    migration20260709CreateDriftTables,
   ];
 
   // Sort by version number

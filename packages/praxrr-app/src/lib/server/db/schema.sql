@@ -960,3 +960,48 @@ CREATE TABLE setup_state (
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
+
+-- ==============================================================================
+-- TABLE: drift_check_settings
+-- Purpose: Singleton (id=1) driving the global recurring drift.check job
+-- Migration: 20260709_create_drift_tables.ts
+-- ==============================================================================
+
+CREATE TABLE drift_check_settings (
+    id               INTEGER PRIMARY KEY CHECK (id = 1),
+    enabled          INTEGER NOT NULL DEFAULT 1 CHECK (enabled IN (0, 1)),
+    interval_minutes INTEGER NOT NULL DEFAULT 360 CHECK (interval_minutes >= 5),
+    last_run_at      TEXT,
+    error_count      INTEGER NOT NULL DEFAULT 0 CHECK (error_count >= 0),
+    backoff_until    TEXT,
+    created_at       DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at       DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ==============================================================================
+-- TABLE: drift_instance_status
+-- Purpose: Latest-state, one upserted row per Arr instance; entity detail in `changes` JSON
+-- Migration: 20260709_create_drift_tables.ts
+-- ==============================================================================
+
+CREATE TABLE drift_instance_status (
+    arr_instance_id    INTEGER PRIMARY KEY REFERENCES arr_instances(id) ON DELETE CASCADE,
+    arr_type           TEXT NOT NULL CHECK (arr_type IN ('radarr', 'sonarr', 'lidarr')),
+    status             TEXT NOT NULL CHECK (status IN ('in-sync', 'drifted', 'unreachable', 'unauthorized', 'error')),
+    reason             TEXT CHECK (
+        reason IN ('unreachable', 'timeout', 'unauthorized', 'invalid_response', 'not_configured', 'cache_not_ready', 'rate_limited', 'error')
+        OR reason IS NULL
+    ),
+    drifted_count      INTEGER NOT NULL DEFAULT 0,
+    missing_count      INTEGER NOT NULL DEFAULT 0,
+    unmanaged_count    INTEGER NOT NULL DEFAULT 0,
+    drift_signature    TEXT,
+    notified_signature TEXT,
+    detected_version   TEXT,
+    changes            TEXT NOT NULL DEFAULT '[]',
+    checked_at         TEXT NOT NULL,
+    content_checked_at TEXT,
+    duration_ms        INTEGER,
+    created_at         DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at         DATETIME DEFAULT CURRENT_TIMESTAMP
+);
