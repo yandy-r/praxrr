@@ -215,7 +215,8 @@ export interface DriftCheckDeps {
   readonly generatePreview: typeof generatePreview; // orchestrator.ts:193
   readonly getSystemStatus: (instance: ArrInstance) => Promise<HeartbeatResult>; // wraps getArrInstanceClient + base.ts:72, {timeout:5000, retries:0}
   readonly isPcdCacheReady: (instanceId: number) => boolean; // getCache().isBuilt() over the instance's synced DBs
-  readonly resolveAvailableSections: ( // detectAndRecordArrVersion + resolveSyncSectionAvailability
+  readonly resolveAvailableSections: (
+    // detectAndRecordArrVersion + resolveSyncSectionAvailability
     instance: ArrInstance,
     version: string
   ) => Promise<Set<SyncPreviewSection>>; //   → version-supported section set
