@@ -164,7 +164,7 @@ impact:
             schema:
               $ref: '../openapi.yaml#/components/schemas/ErrorResponse'
       '404':
-        description: Database not found, or no node with that kind and name
+        description: No node with that kind and name (an unknown or not-yet-built databaseId is 400, not 404)
         content:
           application/json:
             schema:

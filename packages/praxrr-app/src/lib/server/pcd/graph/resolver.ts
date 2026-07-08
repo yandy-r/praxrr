@@ -221,8 +221,26 @@ export async function buildDependencyGraph(
 ): Promise<DependencyGraph> {
   const { arrType, nodeKind } = options;
 
-  const allEdges = await getAllEdges(cache);
-  let edges = allEdges.filter((edge) => keepForArr(edge.arrType, arrType));
+  const [allEdges, qpCompat] = await Promise.all([getAllEdges(cache), getQualityProfileCompatibility(cache)]);
+
+  // When a concrete Arr app is requested, quality profiles incompatible with it are not
+  // part of that arr's graph (their nodes and incident edges are dropped, so degrees stay
+  // consistent). Compatibility comes only from computeProfileCompatibility -- never from an
+  // arr_type='all' score inference (Arr-Cutover guardrail).
+  const concreteArr: ArrAppType | undefined = arrType && arrType !== 'all' ? arrType : undefined;
+  const excludedProfiles = new Set<string>();
+  if (concreteArr) {
+    for (const [name, arrs] of qpCompat) {
+      if (!arrs.includes(concreteArr)) excludedProfiles.add(name);
+    }
+  }
+  const touchesExcludedProfile = (ref: NodeRef): boolean =>
+    ref.kind === 'quality_profile' && excludedProfiles.has(ref.name);
+
+  let edges = allEdges.filter(
+    (edge) =>
+      keepForArr(edge.arrType, arrType) && !touchesExcludedProfile(edge.from) && !touchesExcludedProfile(edge.to)
+  );
 
   const inDegree = new Map<string, number>();
   const outDegree = new Map<string, number>();
@@ -231,7 +249,7 @@ export async function buildDependencyGraph(
     inDegree.set(nodeKey(edge.to), (inDegree.get(nodeKey(edge.to)) ?? 0) + 1);
   }
 
-  const nodes = await buildNodes(cache, edges, inDegree, outDegree);
+  const nodes = await buildNodes(cache, edges, inDegree, outDegree, qpCompat, excludedProfiles);
 
   let truncated = false;
   if (edges.length > GRAPH_EDGE_CAP) {
@@ -255,13 +273,14 @@ async function buildNodes(
   cache: PCDCache,
   edges: GraphEdge[],
   inDegree: Map<string, number>,
-  outDegree: Map<string, number>
+  outDegree: Map<string, number>,
+  qpCompat: Map<string, ArrAppType[]>,
+  excludedProfiles: Set<string>
 ): Promise<GraphNode[]> {
-  const [customFormats, qualityProfiles, regularExpressions, qpCompat, qualityCompat] = await Promise.all([
+  const [customFormats, qualityProfiles, regularExpressions, qualityCompat] = await Promise.all([
     cache.kb.selectFrom('custom_formats').select(['id', 'name']).execute(),
     cache.kb.selectFrom('quality_profiles').select(['id', 'name']).execute(),
     cache.kb.selectFrom('regular_expressions').select(['id', 'name']).execute(),
-    getQualityProfileCompatibility(cache),
     getQualityCompatibility(cache),
   ]);
 
@@ -282,7 +301,10 @@ async function buildNodes(
 
   // Main entity kinds: include every row so orphans (referenced by nothing) still appear.
   for (const row of customFormats) put('custom_format', row.name, Number(row.id));
-  for (const row of qualityProfiles) put('quality_profile', row.name, Number(row.id), qpCompat.get(row.name) ?? []);
+  for (const row of qualityProfiles) {
+    if (excludedProfiles.has(row.name)) continue; // arr-incompatible under a concrete-arr filter
+    put('quality_profile', row.name, Number(row.id), qpCompat.get(row.name) ?? []);
+  }
   for (const row of regularExpressions) put('regular_expression', row.name, Number(row.id));
 
   // Leaf kinds (quality, quality_definition): only those that participate in an edge.

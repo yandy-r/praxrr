@@ -36,6 +36,18 @@
 
 	$: focusKey = $page.url.searchParams.get('focus');
 
+	// Switching database via the in-page dropdown is a client-side navigation between two
+	// instances of the same [databaseId] route: SvelteKit reruns load() (updating
+	// data.selectedDatabaseId) but reuses this component, so onMount does not re-run. Reset
+	// and refetch on databaseId change (requestId guards overlapping fetches). Mirrors the
+	// resolved-config page's guard.
+	let previousDatabaseId = data.selectedDatabaseId;
+	$: if (data.selectedDatabaseId !== previousDatabaseId) {
+		previousDatabaseId = data.selectedDatabaseId;
+		graph = null;
+		loadGraph();
+	}
+
 	function onDatabaseChange(event: Event) {
 		const id = (event.target as HTMLSelectElement).value;
 		if (id) {

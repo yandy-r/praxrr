@@ -322,3 +322,40 @@ Deno.test('buildDependencyGraph(nodeKind=custom_format) returns custom formats p
     assertEquals(findNode(graph, 'quality_definition', 'QD SDTV'), undefined);
   });
 });
+
+// Cross-Arr compatibility filtering: under a concrete arr filter, a quality profile whose
+// compatibility (via computeProfileCompatibility) excludes that arr must be dropped from the
+// graph; without a concrete arr (or arrType='all') it is kept. 'REGIONAL' is a radarr-only
+// quality name, so 'RadarrOnly' resolves to compatibleArrTypes=['radarr'].
+const ARR_COMPAT_SQL = `
+CREATE TABLE custom_formats (id INTEGER PRIMARY KEY, name TEXT NOT NULL);
+CREATE TABLE quality_profiles (id INTEGER PRIMARY KEY, name TEXT NOT NULL);
+CREATE TABLE regular_expressions (id INTEGER PRIMARY KEY, name TEXT NOT NULL);
+CREATE TABLE quality_profile_custom_formats (quality_profile_name TEXT, custom_format_name TEXT, arr_type TEXT, score INTEGER);
+CREATE TABLE condition_patterns (custom_format_name TEXT, condition_name TEXT, regular_expression_name TEXT);
+CREATE TABLE custom_format_conditions (id INTEGER PRIMARY KEY AUTOINCREMENT, custom_format_name TEXT, name TEXT, type TEXT, arr_type TEXT, negate INTEGER, required INTEGER);
+CREATE TABLE quality_profile_qualities (id INTEGER PRIMARY KEY AUTOINCREMENT, quality_profile_name TEXT, quality_name TEXT, quality_group_name TEXT, position INTEGER, enabled INTEGER, upgrade_until INTEGER);
+CREATE TABLE quality_group_members (quality_profile_name TEXT, quality_group_name TEXT, quality_name TEXT);
+CREATE TABLE quality_api_mappings (quality_name TEXT, arr_type TEXT, api_name TEXT);
+CREATE TABLE radarr_quality_definitions (name TEXT, quality_name TEXT, min_size REAL, max_size REAL, preferred_size REAL);
+CREATE TABLE sonarr_quality_definitions (name TEXT, quality_name TEXT, min_size REAL, max_size REAL, preferred_size REAL);
+CREATE TABLE lidarr_quality_definitions (name TEXT, quality_name TEXT, min_size REAL, max_size REAL, preferred_size REAL);
+
+INSERT INTO quality_profiles (id, name) VALUES (1, 'RadarrOnly');
+INSERT INTO quality_profile_qualities (quality_profile_name, quality_name, quality_group_name, position, enabled, upgrade_until) VALUES
+  ('RadarrOnly', 'REGIONAL', NULL, 0, 1, 0);
+INSERT INTO quality_api_mappings (quality_name, arr_type, api_name) VALUES ('REGIONAL', 'radarr', 'REGIONAL');
+`;
+
+Deno.test('buildDependencyGraph drops arr-incompatible quality profiles under a concrete arr filter', async () => {
+  const fixture = createCacheFixture(ARR_COMPAT_SQL);
+  const hasRadarrOnly = (graph: DependencyGraph) =>
+    graph.nodes.some((node) => node.kind === 'quality_profile' && node.name === 'RadarrOnly');
+  try {
+    assert(hasRadarrOnly(await buildDependencyGraph(fixture.cache, 1, { arrType: 'radarr' })), 'kept under radarr');
+    assert(!hasRadarrOnly(await buildDependencyGraph(fixture.cache, 1, { arrType: 'sonarr' })), 'dropped under sonarr');
+    assert(hasRadarrOnly(await buildDependencyGraph(fixture.cache, 1, {})), 'kept when unfiltered');
+  } finally {
+    await fixture.destroy();
+  }
+});

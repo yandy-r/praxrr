@@ -4611,7 +4611,7 @@ export interface operations {
           'application/json': components['schemas']['ErrorResponse'];
         };
       };
-      /** @description Database not found, or no node with that kind and name */
+      /** @description No node with that kind and name (an unknown or not-yet-built databaseId is 400, not 404) */
       404: {
         headers: {
           [name: string]: unknown;
