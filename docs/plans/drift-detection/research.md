@@ -1,0 +1,165 @@
+# Implementation Brief — Drift Detection Dashboard (Issue #15)
+
+Drift Detection is a **scheduled/on-demand caller of the existing preview diff engine that persists `EntityChange[]` as drift records**. There is essentially **no new diff, HTTP, scheduler, notification, or migration machinery to build** — every subsystem already exposes the exact seam we need. The work is wiring, persistence, and presentation. This brief is the reuse map + extension recipe the design phase builds on.
+
+---
+
+## 1. Reuse Inventory
+
+### 1a. Diff engine — the core of the feature (reuse as-is, do NOT reimplement)
+
+| Reuse | file:line | Maps to drift as |
+| --- | --- | --- |
+| **`generatePreview({ instance, sections:[section] })`** | `packages/praxrr-app/src/lib/server/sync/preview/orchestrator.ts:193` | **PRIMARY DRIFT SCANNER.** One Arr fetch = whole-section desired-vs-live drift. Iterate returned `EntityChange` arrays/singletons: `action='update'`→field drift, `'create'`→missing on Arr, `'delete'`→extra on Arr, `'unchanged'`→in-sync. Far cheaper than per-name loops. |
+| **`computeLiveDiff({ instance, entityType, name })`** | `packages/praxrr-app/src/lib/server/pcd/resolved/liveDiff.ts:241` | **Canonical single-entity drift call.** Fetches live state itself; returns `{found:true, change:EntityChange}` or `{found:false, reason:LiveDiffReason}`. `change.fields` = per-field drift (`current`=live, `desired`=PCD). Takes the **ArrInstance row** (id+name+type+url), never a bare instanceId or pre-fetched payload. |
+| `compareAcrossInstances(input)` | `packages/praxrr-app/src/lib/server/pcd/resolved/compare.ts:250` | **Reference orchestration blueprint** for a multi-instance drift scan: already loops instances, validates `arr_type`, memoizes desired reads, rate-limits via `registerPreviewCreateAttempt`, never throws on one bad instance. Per-instance live drift is on `result.actual` (an `EntityChange`), NOT the top-level `diffs[]` (which are desired-vs-desired cross-instance). |
+| `diffToFieldChanges(current, desired, options)` | `packages/praxrr-app/src/lib/server/sync/preview/diff.ts:288` | The pure primitive — only reach for it if we materialize desired+live ourselves. Auto-ignores volatile fields (id/links/timestamps); null==missing. Requires a matching array-key strategy or reorders become N-adds+N-removes. |
+| `mapEntityTypeToSection(entityType)` + `isSyncSectionSupported(arrType, section)` | `liveDiff.ts:95` | Gate/route before any network call: reject unsupported `entityType`/`arr_type` combos. `regularExpression`→null (no live section, always `unsupported`). |
+| `EntityChange` / `FieldChange` interfaces | `packages/praxrr-app/src/lib/server/sync/preview/types.ts:34` / `:27` | The drift record shapes. `FieldChange.current`=LIVE (old), `.desired`=PCD (new). `EntityChange.remoteId`=live Arr id or null. **This is the exact old/new the feature needs — persist these directly.** |
+| `LiveDiffReason` union | `liveDiff.ts:46` | `'unreachable'|'timeout'|'unauthorized'|'invalid_response'|'unsupported'|'not_found'|'not_configured'|'error'`. `not_configured`/`not_found`/`unsupported` are **normal outcomes, not errors** — do not map to 500. |
+| `readResolvedEntity(cache, entityType, arrType, name)` | `packages/praxrr-app/src/lib/server/pcd/resolved/readers.ts:201` | Desired (PCD) side, per-`arr_type` dispatch, no sibling fallback. Only needed for bespoke diffs outside the preview engine. |
+| `PORTABLE_ARRAY_KEY_STRATEGIES` | `packages/praxrr-app/src/lib/server/pcd/resolved/layerDiff.ts:50` | Array-key set for Portable* payloads. **Distinct** from `sectionDiffs.ts` strategies (live-Arr-API field names). Mixing them silently defeats keying. |
+
+**Bottom line:** a drift check = call `generatePreview(instance, [section])` per enabled instance/section (or `computeLiveDiff` per watched entity), then persist the resulting `EntityChange[]`. No new field-diff logic.
+
+### 1b. Arr live-fetch / reachability layer
+
+| Reuse | file:line | Maps to drift as |
+| --- | --- | --- |
+| `getArrInstanceClient(type, instanceId, url, options?, cache?)` | `packages/praxrr-app/src/lib/server/utils/arr/arrInstanceClients.ts:56` | **The only way to build a poll client.** SSRF-checks url, decrypts creds from `arr_instance_credentials`, dispatches by `arr_type`. **Never read `instance.api_key`** (always `''` on reads). |
+| `getSystemStatus()` | `packages/praxrr-app/src/lib/server/utils/arr/base.ts:72` | **Cheap heartbeat.** Only getter that does NOT throw — discriminated `{ok,status?,version}`. Feeds reachability status + version. |
+| `detectAndRecordArrVersion(id, arrType, client)` | `packages/praxrr-app/src/lib/server/utils/arr/instanceCompatibility.ts:28` | Heartbeat + persist `detected_version` in one call (wraps `getSystemStatus`). Best-effort, non-fatal. |
+| Section getters: `getCustomFormats/getQualityProfiles/getDelayProfiles/getMediaManagementConfig/getNamingConfig/getQualityDefinitions/getTags` (+ Lidarr `getMetadataProfiles`) | `base.ts:226,265,112,169,188,207,151`; `clients/lidarr.ts:138` | The full-drift fetch surface. Each is one GET that **THROWS `HttpError`** — wrap per-section, don't abort the poll on one failure. |
+| `toFailureReason(error)` / `reasonFromStatus(status)` | `packages/praxrr-app/src/lib/server/utils/arr/testConnectionReason.ts:8,22` | Sanitize failures → `'unreachable'|'unauthorized'|'invalid_response'|'timeout'` without leaking hostnames. |
+| `resolveInstanceCompatibility(instance)` / `resolveSyncSectionAvailability(type, section, detectedVersion)` | `instanceCompatibility.ts:81` / `sync/mappings.ts:82` | Version-gate: **skip (not fail)** sections whose tier is `unavailable`, exactly as `arrSync.ts` does. `unknown` tier = optimistic, proceed. |
+| `arrInstancesQueries.getEnabled()` | `packages/praxrr-app/src/lib/server/db/queries/arrInstances.ts:342` | The drift-poll candidate set (`WHERE enabled=1`). |
+| `processBatches(...)` w/ `CONCURRENCY_LIMIT=3` | `packages/praxrr-app/src/lib/server/sync/processor.ts` | The only cross-instance throttle in the codebase — reuse for poll pacing. Share one `ArrInstanceClientCache` per cycle to skip re-decryption. |
+
+Reference orchestration to mirror end-to-end: `packages/praxrr-app/src/lib/server/jobs/handlers/arrSync.ts` (get instance → enabled check → `getArrInstanceClient` → `detectAndRecordArrVersion` → per-section availability gate → skip-never-fail).
+
+### 1c. Jobs / scheduler
+
+| Reuse | file:line | Maps to drift as |
+| --- | --- | --- |
+| `JobHandler` / `JobHandlerResult{ status, rescheduleAt? }` | `packages/praxrr-app/src/lib/server/jobs/queueTypes.ts:137` / `:130` | Recurrence + backoff are **entirely handler-driven** via `rescheduleAt` — there is NO framework retry/backoff. |
+| `jobQueueRegistry.register(jobType, handler)` | `packages/praxrr-app/src/lib/server/jobs/queueRegistry.ts:6` | Self-register at module bottom; module must be imported by `handlers/index.ts`. |
+| `jobQueueQueries.upsertScheduled(input)` | `packages/praxrr-app/src/lib/server/db/queries/jobQueue.ts:79` | Idempotent recurring seed keyed by mandatory `dedupeKey`; won't disturb a `running` row. |
+| `calculateNextRunFromMinutes(lastRunAt, minutes)` | `packages/praxrr-app/src/lib/server/jobs/scheduleUtils.ts:4` | Interval next-run math for a configurable drift interval. |
+| `scheduleAllJobs()` | `packages/praxrr-app/src/lib/server/jobs/schedule.ts:181` | Single startup fan-out — add `scheduleDriftCheck()` here. |
+| Template handler | `packages/praxrr-app/src/lib/server/jobs/handlers/pcdSync.ts` | Best template: reads interval, checks "due?", returns `rescheduleAt`, guards recurrence on `job.source==='schedule'`. |
+
+### 1d. App DB + migrations
+
+| Reuse | file:line | Maps to drift as |
+| --- | --- | --- |
+| Singleton `db` (query/queryFirst/execute/transaction) | `packages/praxrr-app/src/lib/server/db/db.ts:133,144,155,213` | Raw parameterized SQL — **no Kysely for app DB** (Kysely is PCD-cache-only). WAL + FK ON at connect. |
+| `Migration` interface + `loadMigrations()` | `packages/praxrr-app/src/lib/server/db/migrations.ts:74` / `:302` | The ONLY migration registry — static import + array-append or it never runs. |
+| CREATE-TABLE + FK-CASCADE + index template | `packages/praxrr-app/src/lib/server/db/migrations/20260228_create_pcd_snapshots.ts` | Exact pattern for a drift-results table (CHECK constraints, `ON DELETE CASCADE`, `created_at DEFAULT CURRENT_TIMESTAMP`). |
+| ADD-COLUMN template | `packages/praxrr-app/src/lib/server/db/migrations/20260708_add_arr_instance_detected_version.ts` | If per-instance drift state is a column on `arr_instances`. |
+| Query-module shape (`xxxQueries` object, co-located `types.ts` Row+domain, `toDetail()`, JSON helpers) | `packages/praxrr-app/src/lib/server/db/queries/pcdSnapshots.ts:71` | Structural template for `driftXxxQueries`. |
+| Singleton-settings-table pattern | `packages/praxrr-app/src/lib/server/db/queries/backupSettings.ts` | Template for `drift_check_settings` (enabled + interval + last_run + error_count). |
+
+### 1e. Notifications
+
+| Reuse | file:line | Maps to drift as |
+| --- | --- | --- |
+| `notificationTypes[]` shared registry | `packages/praxrr-app/src/lib/shared/notifications/types.ts:16` | **Add `drift.detected` here** — the ONLY thing that surfaces an opt-in checkbox and makes `getAllNotificationTypeIds()` capture it. |
+| `notify(type).generic(...).discord(...).send()` | `packages/praxrr-app/src/lib/server/notifications/builder.ts:126,87` | **Simplest trigger** — routes via `NotificationManager` (opt-in filter + `notification_history` logging, never throws). |
+| `NotificationManager.notify` | `packages/praxrr-app/src/lib/server/notifications/NotificationManager.ts:17` | Filters by `enabled_types.includes(type)`, parallel dispatch, records history. |
+| `definitions/rename.ts` (rich embed template) | `packages/praxrr-app/src/lib/server/notifications/definitions/rename.ts` | Template for `definitions/drift.ts`. |
+
+### 1f. API + OpenAPI + UI
+
+| Reuse | file:line | Maps to drift as |
+| --- | --- | --- |
+| Aggregate endpoint template (per-component status, roll-up, `?verbose`, HTTP from aggregate) | `packages/praxrr-app/src/routes/api/v1/health/+server.ts` | Model `GET /api/v1/drift/summary` (DriftStatus in-sync/drifted/unreachable roll-up, per-instance degraded pattern). |
+| POST endpoint conventions (json()+RequestHandler, `{ error }` shape, body/parse guards, 400/404/429/500) | `packages/praxrr-app/src/routes/api/v1/sync/preview/+server.ts` | Model `POST /api/v1/drift/[instanceId]` refresh. |
+| Param-route template (GET/DELETE, `params.<name>`, 204) | `.../sync/preview/[previewId]/+server.ts` | Model `GET /api/v1/drift/[instanceId]`. |
+| OpenAPI split-file templates | `docs/api/v1/paths/system.yaml`, `docs/api/v1/paths/sync.yaml`, `docs/api/v1/schemas/health.yaml` | Templates for `paths/drift.yaml` + `schemas/drift.yaml`. |
+| Bare-landing → redirect load/page | `packages/praxrr-app/src/routes/resolved-config/+page.server.ts` / `+page.svelte` | `/drift` landing → redirect to `/drift/[databaseId]` (or instance-scoped). |
+| Detail-route load (validate param, inline `{error}`, picker lists id/name/type only) | `.../resolved-config/[databaseId]/+page.server.ts:45` | Drift detail route load. |
+| **`LiveDiffPanel.svelte`** (status banners, Field/Change/Current(live)/Desired(PCD) table, 429+error retry, requestId race-guard) | `.../resolved-config/[databaseId]/LiveDiffPanel.svelte` | **Reuse wholesale** for drift entity detail view. |
+| `FIELD_META` + `formatFieldValue()` | `packages/praxrr-app/src/lib/client/ui/resolved/fieldChangeDisplay.ts` | Consistent field-diff rendering. |
+| `Badge` / `Card`+`CardGrid` | `.../ui/badge/Badge.svelte:4` / `.../ui/card/Card.svelte:4` | Status chips (success=in-sync, warning=drifted, danger=unreachable) + KPI summary tiles. |
+| `alertStore.add(type, message, duration?)` | `packages/praxrr-app/src/lib/client/alerts/store.ts:19` | User feedback. |
+| `NAV_REGISTRY` | `packages/praxrr-app/src/lib/server/navigation/registry.ts` | Register `/drift` once (overview group, `scopeAll`, lucide `Activity`/`GitCompare`). |
+
+---
+
+## 2. Extension Recipe
+
+### (a) DB tables / migration
+1. **`drift_check_settings`** (singleton, modeled on `backupSettings.ts` + migration `005`): `enabled`, `interval_minutes`, `last_run_at`, `error_count`, `backoff_until`. Backs the configurable interval + handler-owned backoff state (framework has none).
+2. **`drift_results`** (modeled on `20260228_create_pcd_snapshots.ts`): columns for `arr_instance_id INTEGER REFERENCES arr_instances(id) ON DELETE CASCADE`, `arr_type TEXT`, `entity_type TEXT`, `entity_name TEXT`, `action TEXT CHECK(action IN ('create','update','delete','unchanged'))`, `remote_id INTEGER NULL`, `fields TEXT` (JSON `FieldChange[]`), `status TEXT` (in-sync/drifted/unreachable), `reason TEXT NULL` (sanitized `LiveDiffReason`), `checked_at DATETIME DEFAULT CURRENT_TIMESTAMP`, plus indexes on `(arr_instance_id, checked_at)`. **Store `arr_type`/`instance_id` on every row and dispatch per type** (cross-Arr policy). Design must decide snapshot-history vs latest-state (see §4).
+3. Author as `packages/praxrr-app/src/lib/server/db/migrations/20260709_create_drift_results.ts` etc. (date-based version; bump trailing digits if same-day). Provide a `down` that DROPs indexes then table. **Register:** static import + append to `loadMigrations()` in `migrations.ts` (miss either = never runs). Update `db/schema.sql` (reference doc only). Write `queries/driftResults.ts` + co-located `types.ts` (Row byte-aligned to columns).
+4. **Do NOT touch `seedBuiltInBaseOps.ts`** — that path is PCD-base-ops (`pcd_ops`) only; drift tables are ordinary app-DB tables (it is a no-op stub anyway).
+
+### (b) Recurring job + handler (5 touchpoints, nothing bypasses `upsertScheduled`)
+1. **Type:** add `'drift.check'` to the `JobType` union + a `DriftCheckJobPayload` interface + `JobPayloadByType` entry (`queueTypes.ts:1-14, 58-72`).
+2. **Handler:** `packages/praxrr-app/src/lib/server/jobs/handlers/driftCheck.ts` modeled on `pcdSync.ts`. Reads `drift_check_settings`; guards recurrence on `job.source==='schedule'`; runs the poll (§1b: `getEnabled()` → `processBatches(_, _, 3)` → `getArrInstanceClient` → `generatePreview(instance,[section])` per supported section → persist `EntityChange[]` into `drift_results`); emits `drift.detected` when drift found; returns `rescheduleAt`. **Backoff:** on failure return `{status:'failure', rescheduleAt: now + min(base*2^errorCount, cap)}` and persist incrementing `error_count`; reset on success. End file with `jobQueueRegistry.register('drift.check', driftCheckHandler)`.
+3. **Register import:** add `import './driftCheck.ts';` to `handlers/index.ts` (else handler never registers → dispatcher logs "Handler not found").
+4. **Seed:** add `scheduleDriftCheck()` to `schedule.ts` (reads interval+enabled, `upsertScheduled({ jobType:'drift.check', runAt: calculateNextRunFromMinutes(lastRunAt, minutes), payload:{}, source:'schedule', dedupeKey:'drift.check' })` then `notify(runAt)`; if disabled, `cancelByDedupeKey('drift.check')`). Call it inside `scheduleAllJobs()` and export from `init.ts`.
+5. **Label (optional):** `case 'drift.check': return 'Drift Check';` in `display.ts`.
+   Store `run_at` as ISO-8601 UTC (`toISOString()`) — due-detection depends on it (`jobQueue.ts:183-192`).
+
+### (c) Notification event
+1. **Required:** add `{ id:'drift.detected', label:'Drift Detected', category:'Drift', description:'...' }` to `notificationTypes[]` in the shared registry (`shared/notifications/types.ts`) — surfaces the opt-in checkbox and enables form capture (new `Drift` category auto-groups; new+edit service actions unchanged).
+2. **Idiomatic:** add `DRIFT_DETECTED: 'drift.detected'` to `NotificationTypes` in `server/notifications/types.ts`.
+3. **Rich embed:** create `definitions/drift.ts` (mirror `rename.ts` imports) carrying `instanceName` + `arr_type` in the embed; register in `definitions/index.ts`.
+4. **Trigger (preferred):** `await notify('drift.detected').generic(title, message).discord(d=>d.embed(embed)).send();` — respects opt-in + records history. No migration (`notification_type` is free-form TEXT). Emit **fire-and-forget, non-blocking** — a notification failure must never affect drift results. Avoid the rename/upgrade manual-loop unless per-service embed username/avatar is essential (it skips history + re-implements opt-in).
+
+### (d) API endpoints + OpenAPI (contract-first, in this order)
+1. Author `docs/api/v1/schemas/drift.yaml` — all drift schemas as top-level keys: `DriftStatus` enum (`in-sync|drifted|unreachable`), `DriftInstanceSummary`, `DriftSummaryResponse`, `DriftEntityDrift`, `DriftDetailResponse` (reuse `FieldChange`/`SyncPreviewAction` shapes).
+2. Author `docs/api/v1/paths/drift.yaml` — operation keys `drift-summary`, `drift-detail`, `drift-refresh`; each `get/post` with `tags:[Drift Detection]`, error responses `$ref '../schemas/arr.yaml#/ErrorResponse'`.
+3. Edit `docs/api/v1/openapi.yaml`: add `- name: Drift Detection` tag; add path `$ref`s (`/drift/summary: { $ref: './paths/drift.yaml#/drift-summary' }` …); add schema `$ref`s under `components.schemas` (**list at least one drift schema per file** — bundler only loads a file if ≥1 of its schemas is referenced, but then imports all top-level keys).
+4. Run `deno task bundle:api` → `deno task generate:api-types` → `deno task format` (**`packages/praxrr-api/openapi.json` is prettier-gated in CI**; never hand-edit it or `v1.d.ts`; commit only meaningful `v1.d.ts` drift additions if the diff is noisy).
+5. Implement routes: `routes/api/v1/drift/+server.ts` (GET summary, model on `health/+server.ts` aggregate — per-instance degraded, don't fail whole aggregate) and `routes/api/v1/drift/[instanceId]/+server.ts` (GET detail; optional POST refresh, rate-limit expensive live checks via a `$sync/preview/limits.ts`-style 429 guard). Use `json()`+`RequestHandler`, local `type ErrorResponse={error:string}`, `$logger`, `$db/queries/arrInstances`, `$pcd`. **No per-route auth** — hooks protect `/api/*` by default; **do NOT add drift to `PUBLIC_PATHS`**.
+
+### (e) Dashboard route + UI
+- `routes/drift/+page.server.ts` (ServerLoad → `{ databases, instances }` via `arrInstancesQueries.getEnabled()`, id/name/type only) + `+page.svelte` bare-landing → redirect to `/drift/[databaseId]` (or `[instanceId]`) with localStorage memory + `EmptyState` fallback; `[databaseId]/+page.server.ts` + `+page.svelte` detail. **Svelte 5 no runes:** `export let data: PageData`, `$:` derivations, `on:click`, `$store`, `<svelte:head><title>Drift - Praxrr</title>`. Client-fetch `/api/v1/drift/*` with the `LiveDiffPanel` requestId race-guard; surface failures via `alertStore.add('error', ...)`.
+- **UI reuse:** summary KPI row = `CardGrid columns={4}` of `Card` tiles (total/in-sync/drifted/unreachable); status chips = `Badge` (success/warning/danger); per-entity field diffs = copy `LiveDiffPanel` banners + field table with `FIELD_META`/`formatFieldValue`; empty = `EmptyState`; listings = `Table`/`ExpandableTable`.
+- Register one `NAV_REGISTRY` entry (`/drift`, overview group, `scopeAll`, lucide `Activity`/`GitCompare`, `hasChildren:false`, order after `dependency_graph`).
+
+---
+
+## 3. Key Constraints & Conventions
+
+- **Svelte 5, NO runes:** `export let`, `$:`, `on:click`/`on:change`, `$store`. Do NOT use `$state`/`$derived`/`$effect`.
+- **Contract-first API is mandatory:** edit `docs/api/v1/*.yaml` FIRST, then `bundle:api` then `generate:api-types`. Never hand-edit `openapi.json` or `v1.d.ts`. `openapi.json` is prettier-gated in CI (`v1.d.ts` is not — commit only real drift additions).
+- **Per-`arr_type`, no sibling fallback:** dispatch strictly on `instance.type` via `factory.ts`/`readers.ts` (both fail-fast on unknown). `regularExpression` has no live section (always `unsupported`). Lidarr differs materially: `/api/v1` (all others v3) + metadata-profiles surface + CF language specs skipped. Preview/live accept only `radarr|sonarr|lidarr` (`isSyncPreviewArrType`); `'all'`/`'chaptarr'`→unsupported. Carry `arr_type` on every drift row, embed, and API payload.
+- **Rate limits / backoff (must add — mostly absent):** `BaseHttpClient` retries only `[500,502,503,504]` (exp backoff, 3 retries); **NO 429/Retry-After, NO token bucket, NO circuit breaker**; 408 timeouts + status-0 network errors are NOT retried. The only existing throttle is `CONCURRENCY_LIMIT=3`. Poll with bounded `{timeout:~5000, retries:1}`, pace via `processBatches`, and layer any per-instance throttle/backoff on the shared client (never a fork). Job-level backoff is handler-driven (`rescheduleAt` + persisted `error_count`).
+- **WAL + FK enforced** at connect (`db.ts` PRAGMA). Migrations run with FKs ON and sorted by `version` ascending — FK-referenced tables (`arr_instances`, `database_instances`) already exist; a lower version can't reference a higher one's table. Provide a `down`; prefer plain-SQL data migrations in `up` over `afterUp` (afterUp runs outside the schema txn → not rolled back together).
+- **`seedBuiltInBaseOps` does NOT apply** — drift tables are app-DB tables, not `pcd_ops` base ops. The function is a no-op stub.
+- **Prettier reality:** actual `.prettierrc` = **2-space / es5 / semi / 120w** (CLAUDE.md's "tabs/100w" is stale — match the config). Run `deno task format` after any OpenAPI/shared-registry change.
+- **Credentials never leak:** build clients only via `getArrInstanceClient` (never `instance.api_key`, always `''` on reads); loads expose only `id/name/type`.
+- **Failure reasons are sanitized closed unions** (`LiveDiffReason`/`CompareReason`); raw errors logged server-side only. `not_configured`/`not_found`/`unsupported` are normal, not 500.
+- **Notifications are fire-and-forget** (never throw / never await for success).
+- **FieldChange direction is load-bearing:** `current`=LIVE (old), `desired`=PCD (new). Do not invert — the whole engine and UI (`LiveDiffPanel`) assume it.
+
+---
+
+## 4. Open Design Questions (resolve in design phase)
+
+1. **Drift granularity:** instance-level status only, per-entity, or per-field? The engine emits per-field (`EntityChange.fields`); the dashboard needs a roll-up. Decide the summary aggregation rule (any drifted entity ⇒ instance "drifted"?) and whether `create`/`delete` (missing/extra on Arr) count as drift or a separate "unmanaged" category.
+2. **Storage model:** append-only **snapshot history** (`drift_results` rows per check, enabling trends/history) vs **latest-state** (one row per instance/entity, upserted). History costs storage + needs pruning (see `pcdSnapshots.pruneAutoSnapshots`); latest-state loses trend data. Hybrid (latest + capped history) is likely.
+3. **Heartbeat vs full-check separation:** run a cheap `getSystemStatus` reachability sweep on a fast cadence and full `generatePreview` drift on a slower one, or one combined job? Combined is simpler; split keeps "unreachable" fresh without hammering full-state GETs.
+4. **Acknowledge model:** can users acknowledge/mute/snooze a specific drift so it stops alerting until it changes again? Needs an ack table/columns + a "changed since ack" comparison. Affects whether `drift.detected` re-fires every cycle or only on new/changed drift (design the notification dedup key).
+5. **"Expected" local drift:** user-ops layer and intentional local overrides mean some divergence is desired, not drift. How do we distinguish PCD-vs-live drift the user *wants* (e.g. instance-specific tweaks) from unwanted drift? Consider per-entity allowlists or comparing against resolved (base+user) rather than base desired state.
+6. **Polling scheduling model:** single global interval vs per-instance schedules vs per-entity "watched" subscriptions. Global (`drift.check` dedupeKey) is simplest; per-instance uses `drift.check:<id>` dedupe keys but multiplies job rows. Also decide on-demand refresh scope (single instance vs full sweep) and its rate-limit interaction.
+7. **Namespace-suffix correlation:** synced CF/profile names carry an invisible per-database namespace char (`sync/customFormats/syncer.ts`) — live Arr names ≠ raw PCD names. Confirm the drift model correlates via the same transformer the syncers use (does `generatePreview` already normalize this end-to-end, or must the poller run `sync/customFormats/transformer.ts` first?).
+8. **Auth-failure policy:** `arrSync.ts` auto-disables instances on credential failure. Should the drift poller replicate that, or treat auth failures as transient `unreachable`/`unauthorized` drift-check errors? Don't silently inherit auto-disable.
+
+---
+
+## 5. Risks & Unknowns (verify during implementation)
+
+- **Blocking scheduler:** single-process, single `setTimeout`, one `running` flag serializes ALL jobs — a long full-instance drift sweep **blocks the entire queue** (incl. sync). Bound poll timeouts/concurrency; consider chunking the sweep across multiple shorter job runs. Not multi-instance/HA safe.
+- **No 429 handling anywhere:** a drift sweep that iterates every enabled instance × every section could hammer Arr instances with no Retry-After respect. Confirm real-world Arr rate limits; the 429/backoff throttle is net-new work.
+- **Array-diff false positives:** wrong/absent array-key strategy ⇒ reorders read as N-adds+N-removes; nested arrays inside keyed items (e.g. `OrderedItem.members`) can't be keyed and may show index churn. Verify the right strategy set (`PORTABLE_*` vs `sectionDiffs.ts *`) is applied for whatever payload shape the poller diffs — mixing them silently defeats keying.
+- **Namespace-suffix mismatch (see Q7):** unverified whether the poller must pre-transform live names; getting this wrong makes every managed entity look like create+delete drift.
+- **`generatePreview` is a bare ESM export (not monkey-patchable):** follow the injectable-`deps` pattern (as `liveDiff`/`compare` do) for any new drift module to keep it testable.
+- **PCD cache readiness:** desired reads require `cache.isBuilt()` (`resolveLayerState`/`getCache`); a drift check before the cache builds must degrade gracefully, not 500.
+- **Chaptarr has no concrete getters yet** — full drift is `radarr|sonarr|lidarr` only; ensure the poller skips unsupported types cleanly.
+- **`v1.d.ts` regen noise:** `generate:api-types` emits large tool-version diff churn CI doesn't gate; commit only the meaningful drift schema additions.
+- **Migration same-day version collisions:** if multiple drift migrations land 2026-07-09, bump trailing digits to keep versions unique + strictly increasing (never edit a shipped migration).
+- **Detail-view reuse fit:** `LiveDiffPanel` is built for a single entity's live diff — confirm it slots into a multi-entity/multi-instance drift dashboard without forking (it may need a thin wrapper rather than direct reuse for list contexts).
