@@ -26,6 +26,8 @@ export const migration: Migration = {
 			last_run_at      TEXT,
 			error_count      INTEGER NOT NULL DEFAULT 0 CHECK (error_count >= 0),
 			backoff_until    TEXT,
+			sweep_cursor     INTEGER NOT NULL DEFAULT 0,
+			sweep_started_at TEXT,
 			created_at       DATETIME DEFAULT CURRENT_TIMESTAMP,
 			updated_at       DATETIME DEFAULT CURRENT_TIMESTAMP
 		);

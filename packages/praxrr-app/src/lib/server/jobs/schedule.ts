@@ -6,6 +6,7 @@ import { arrRenameSettingsQueries } from '$db/queries/arrRenameSettings.ts';
 import { databaseInstancesQueries } from '$db/queries/databaseInstances.ts';
 import { backupSettingsQueries } from '$db/queries/backupSettings.ts';
 import { logSettingsQueries } from '$db/queries/logSettings.ts';
+import { driftSettingsQueries } from '$db/queries/driftSettings.ts';
 import { calculateNextRun } from '$lib/server/sync/utils.ts';
 import { calculateNextRunFromMinutes, calculateNextRunFromSchedule } from './scheduleUtils.ts';
 import { jobDispatcher } from './dispatcher.ts';
@@ -178,6 +179,29 @@ export function scheduleTrashGuideSyncJobs(): void {
   }
 }
 
+export function scheduleDriftCheck(): void {
+  const settings = driftSettingsQueries.get();
+  if (settings.enabled !== 1) {
+    jobQueueQueries.cancelByDedupeKey('drift.check');
+    return;
+  }
+
+  // First-ever schedule runs promptly; subsequent runs land one interval after the last sweep.
+  const runAt = settings.last_run_at
+    ? calculateNextRunFromMinutes(settings.last_run_at, settings.interval_minutes)
+    : new Date().toISOString();
+
+  const job = jobQueueQueries.upsertScheduled({
+    jobType: 'drift.check',
+    runAt,
+    payload: {},
+    source: 'schedule',
+    dedupeKey: 'drift.check',
+  });
+
+  notify(job.runAt);
+}
+
 export function scheduleAllJobs(): void {
   const arrInstances = arrInstancesQueries.getAll();
   for (const instance of arrInstances) {
@@ -194,4 +218,5 @@ export function scheduleAllJobs(): void {
   scheduleTrashGuideSyncJobs();
   scheduleBackupJobs();
   scheduleLogCleanup();
+  scheduleDriftCheck();
 }

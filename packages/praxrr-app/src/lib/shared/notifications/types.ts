@@ -125,6 +125,14 @@ export const notificationTypes: NotificationType[] = [
     category: 'Renames',
     description: 'Notification when all file renames fail',
   },
+
+  // Drift
+  {
+    id: 'drift.detected',
+    label: 'Drift Detected',
+    category: 'Drift',
+    description: 'Notification when an Arr instance diverges from its desired configuration',
+  },
 ];
 
 /**

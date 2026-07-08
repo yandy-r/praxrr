@@ -28,6 +28,9 @@ export const NotificationTypes = {
   RENAME_SUCCESS: 'rename.success',
   RENAME_PARTIAL: 'rename.partial',
   RENAME_FAILED: 'rename.failed',
+
+  // Drift
+  DRIFT_DETECTED: 'drift.detected',
 } as const;
 
 /**

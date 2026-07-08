@@ -10,6 +10,8 @@ export interface DriftCheckSettings {
   last_run_at: string | null;
   error_count: number;
   backoff_until: string | null;
+  sweep_cursor: number;
+  sweep_started_at: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -66,12 +68,27 @@ export const driftSettingsQueries = {
   },
 
   /**
-   * Record a completed sweep: advance last_run_at and clear backoff state.
+   * Persist chunked-sweep progress between job runs (cursor = last processed instance id).
+   */
+  setSweepProgress(cursor: number, sweepStartedAt: string): boolean {
+    const affected = db.execute(
+      `UPDATE drift_check_settings
+			 SET sweep_cursor = ?, sweep_started_at = ?, updated_at = CURRENT_TIMESTAMP
+			 WHERE id = 1`,
+      cursor,
+      sweepStartedAt
+    );
+    return affected > 0;
+  },
+
+  /**
+   * Record a completed sweep: advance last_run_at, clear backoff, and reset sweep progress.
    */
   markRun(lastRunAt: string): boolean {
     const affected = db.execute(
       `UPDATE drift_check_settings
-			 SET last_run_at = ?, error_count = 0, backoff_until = NULL, updated_at = CURRENT_TIMESTAMP
+			 SET last_run_at = ?, error_count = 0, backoff_until = NULL,
+			     sweep_cursor = 0, sweep_started_at = NULL, updated_at = CURRENT_TIMESTAMP
 			 WHERE id = 1`,
       lastRunAt
     );
@@ -79,12 +96,14 @@ export const driftSettingsQueries = {
   },
 
   /**
-   * Record a failed sweep: persist the incremented backoff exponent and next-eligible gate.
+   * Record a failed sweep: persist the incremented backoff exponent and next-eligible gate,
+   * and reset sweep progress so the next attempt restarts a fresh sweep.
    */
   markFailure(errorCount: number, backoffUntil: string): boolean {
     const affected = db.execute(
       `UPDATE drift_check_settings
-			 SET error_count = ?, backoff_until = ?, updated_at = CURRENT_TIMESTAMP
+			 SET error_count = ?, backoff_until = ?,
+			     sweep_cursor = 0, sweep_started_at = NULL, updated_at = CURRENT_TIMESTAMP
 			 WHERE id = 1`,
       errorCount,
       backoffUntil
