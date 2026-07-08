@@ -1,5 +1,7 @@
 <script lang="ts">
   import Tabs from '$ui/navigation/tabs/Tabs.svelte';
+  import VersionSupportBadge from '$ui/arr/VersionSupportBadge.svelte';
+  import CompatibilityBanner from '$ui/arr/CompatibilityBanner.svelte';
   import { page } from '$app/stores';
   import { Library, RefreshCw, ArrowUpCircle, FileEdit, ScrollText, Settings } from 'lucide-svelte';
   import type { LayoutData } from './$types';
@@ -60,5 +62,14 @@
 
 <div class="p-4 md:p-8">
   <Tabs {tabs} {breadcrumb} responsive />
+  {#if data?.versionCompatibility}
+    <div class="mt-3 flex flex-wrap items-center gap-2">
+      <span class="text-xs font-medium text-neutral-500 dark:text-neutral-400">Version</span>
+      <VersionSupportBadge version={data.versionCompatibility.detectedVersion} tier={data.versionCompatibility.tier} />
+    </div>
+    <div class="mt-3">
+      <CompatibilityBanner compatibility={data.versionCompatibility} />
+    </div>
+  {/if}
   <slot />
 </div>

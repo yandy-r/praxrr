@@ -1,6 +1,7 @@
 import { error, type ServerLoad } from '@sveltejs/kit';
 import { arrInstancesQueries } from '$db/queries/arrInstances.ts';
 import type { ArrInstance } from '$db/queries/arrInstances.ts';
+import { resolveInstanceCompatibility } from '$arr/instanceCompatibility.ts';
 
 export const load: ServerLoad = ({ params }) => {
   const id = parseInt(params.id || '', 10);
@@ -23,5 +24,6 @@ export const load: ServerLoad = ({ params }) => {
 
   return {
     instance: typedInstance,
+    versionCompatibility: resolveInstanceCompatibility(instance),
   };
 };

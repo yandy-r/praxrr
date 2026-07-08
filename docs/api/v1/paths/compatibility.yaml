@@ -43,3 +43,34 @@ parity:
           application/json:
             schema:
               $ref: '../openapi.yaml#/components/schemas/ErrorResponse'
+
+versions:
+  get:
+    operationId: getCompatibilityVersions
+    summary: Feature-by-version compatibility matrix
+    description: |
+      Returns the static feature-by-version-tier compatibility matrix for every
+      supported Arr application, derived from the authored support ranges. Answers
+      "which Praxrr features work with which application versions" without needing
+      a connected instance.
+    tags:
+      - Compatibility
+    responses:
+      '200':
+        description: Version compatibility matrix
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/compatibility.yaml#/VersionCompatibilityMatrix'
+      '401':
+        description: Authentication required
+        content:
+          application/json:
+            schema:
+              $ref: '../openapi.yaml#/components/schemas/ErrorResponse'
+      '500':
+        description: Failed to build version compatibility matrix
+        content:
+          application/json:
+            schema:
+              $ref: '../openapi.yaml#/components/schemas/ErrorResponse'

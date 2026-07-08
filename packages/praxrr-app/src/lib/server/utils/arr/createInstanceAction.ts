@@ -9,6 +9,7 @@ import {
 import { getAllArrCredentialKeyVersions } from '$server/utils/encryption/keys.ts';
 import { parseOptionalAbsoluteHttpUrl } from '$utils/validation/url.ts';
 import { assertSafeArrUrl } from './urlSafety.ts';
+import { detectArrVersionBestEffort } from './instanceCompatibility.ts';
 
 const VALID_TYPES = ['radarr', 'sonarr', 'lidarr'];
 
@@ -214,6 +215,10 @@ export async function createArrInstanceFromForm(
       source,
       meta: { id: insertedId, name, type, url },
     });
+
+    // Best-effort, non-blocking version detection so a freshly added instance can
+    // display its version before the first sync. Never blocks or fails create.
+    void detectArrVersionBestEffort(insertedId, type, url);
 
     return { ok: true, id: insertedId };
   } catch (error) {

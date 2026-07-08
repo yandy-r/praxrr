@@ -10,6 +10,8 @@
 
 const aliases: Record<string, string> = {
   // Individual test files
+  'arr-adapters':
+    'packages/praxrr-app/src/tests/arr/arrVersion.test.ts,packages/praxrr-app/src/tests/arr/arrCompatibilityResolver.test.ts,packages/praxrr-app/src/tests/db/arrInstanceVersion.test.ts,packages/praxrr-app/src/tests/routes/arrCompatibilityApi.test.ts,packages/praxrr-app/src/tests/jobs/arrSyncVersionGate.test.ts',
   backup: 'packages/praxrr-app/src/tests/jobs/createBackup.test.ts',
   cleanup: 'packages/praxrr-app/src/tests/logger/cleanupLogs.test.ts',
   complexity:

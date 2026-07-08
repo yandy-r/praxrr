@@ -5,6 +5,8 @@
  */
 
 import type { ArrType } from '$shared/pcd/types.ts';
+import type { ArrSyncSurface } from '$shared/arr/capabilities.ts';
+import { type ArrFeatureAvailability, resolveArrCapability } from '$shared/arr/compatibility.ts';
 import type { SectionType } from './types.ts';
 
 // Sync runtime supports all concrete Arr instance types.
@@ -57,6 +59,32 @@ export function getUnsupportedSyncSectionReason(arrType: SyncArrType, section: S
   }
 
   return UNSUPPORTED_SYNC_SECTION_REASONS[arrType]?.[section] ?? `Section ${section} is not supported for ${arrType}`;
+}
+
+/**
+ * Bridge from a sync section to the capability sync surface that gates it. A
+ * total Record forces a compile-time error if a new SectionType is added
+ * without wiring it to a surface (mirrors PARITY_ENTITY_TO_SYNC_SURFACE).
+ */
+const SECTION_TO_SYNC_SURFACE: Record<SectionType, ArrSyncSurface> = {
+  qualityProfiles: 'quality_profiles',
+  delayProfiles: 'delay_profiles',
+  mediaManagement: 'media_management',
+  metadataProfiles: 'metadata_profiles',
+};
+
+/**
+ * Resolve a sync section's availability for a detected application version,
+ * layering the version dimension on top of the static section-support check.
+ * The base capability is a hard floor — an app that never supports the section
+ * resolves to `unavailable` regardless of version.
+ */
+export function resolveSyncSectionAvailability(
+  arrType: SyncArrType,
+  section: SectionType,
+  detectedVersion: string | null | undefined
+): ArrFeatureAvailability {
+  return resolveArrCapability(arrType, SECTION_TO_SYNC_SURFACE[section], detectedVersion);
 }
 
 export function getUnsupportedMediaManagementSubsectionReason(

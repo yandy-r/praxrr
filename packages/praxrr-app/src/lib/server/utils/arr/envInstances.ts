@@ -114,14 +114,17 @@ export function parseExternalUrlFromEnv(value?: string | null): string | null {
   return parsed.value;
 }
 
-async function validateInstanceConnection(descriptor: ParsedEnvInstanceDescriptor): Promise<boolean> {
+async function validateInstanceConnection(
+  descriptor: ParsedEnvInstanceDescriptor
+): Promise<{ connected: boolean; version: string | null }> {
   const client = createArrClient(descriptor.type, descriptor.url, descriptor.apiKey, {
     timeout: ARR_TEST_TIMEOUT_MS,
     retries: ARR_TEST_RETRIES,
   });
 
   try {
-    return await client.testConnection();
+    const status = await client.getSystemStatus();
+    return { connected: status.ok, version: status.ok ? status.version : null };
   } finally {
     client.close();
   }
@@ -360,14 +363,16 @@ export async function reconcileEnvInstances(): Promise<ReconcileEnvInstancesResu
 
     activeApiKeyFingerprints.add(apiKeyFingerprint);
 
+    let detectedVersion: string | null = null;
     try {
       if (config.validateInstances) {
         try {
-          const isConnected = await validateInstanceConnection(descriptor);
-          if (!isConnected) {
+          const { connected, version } = await validateInstanceConnection(descriptor);
+          if (!connected) {
             metrics.validationFailures += 1;
             throw new Error(`Validation failed for ${descriptor.type} instance ${descriptor.name}`);
           }
+          detectedVersion = version;
         } catch (error) {
           if (!(error instanceof Error && error.message.startsWith('Validation failed for '))) {
             metrics.validationFailures += 1;
@@ -440,6 +445,19 @@ export async function reconcileEnvInstances(): Promise<ReconcileEnvInstancesResu
       );
       if (id === 0) {
         throw new Error('Failed to create env instance');
+      }
+
+      // Persist the version observed during validation (reuses that probe — no
+      // extra I/O). Best-effort: a failure here never fails reconciliation.
+      if (detectedVersion) {
+        try {
+          arrInstancesQueries.setDetectedVersion(id, {
+            version: detectedVersion,
+            detectedAt: new Date().toISOString(),
+          });
+        } catch {
+          // Non-fatal: version refreshes on the first sync.
+        }
       }
 
       metrics.created += 1;

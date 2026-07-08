@@ -153,3 +153,97 @@ ParityMapResponse:
       items:
         $ref: '#/ProfileCompatibility'
       description: Per-profile Arr-type compatibility, when quality profile data is available
+
+ArrSupportTier:
+  type: string
+  enum:
+    - supported
+    - degraded
+    - unsupported
+    - unknown
+  description: Coarse support tier for a detected (arr_type, application version) pair
+
+ArrSupportRange:
+  type: object
+  required:
+    - minimumSupported
+    - latestTested
+  properties:
+    minimumSupported:
+      type: string
+      description: Versions below this are unsupported
+    minimumRecommended:
+      type: string
+      description: Versions below this are degraded (below recommended)
+    latestTested:
+      type: string
+      description: Latest tested version; newer versions stay supported with an informational warning
+    eolBelow:
+      type: string
+      description: Versions at or below this are degraded with an end-of-support advisory
+    breakingAtOrAbove:
+      type: string
+      description: Versions at or above this are unsupported (known or expected breaking major)
+    degradedFeatures:
+      type: array
+      items:
+        type: string
+      description: Feature surfaces gated to degraded when the tier is degraded
+    eolNote:
+      type: string
+      description: Extra advisory copy surfaced with an end-of-support warning
+    docsHref:
+      type: string
+      description: Documentation link surfaced with warnings
+
+VersionSupportedFeature:
+  type: object
+  required:
+    - feature
+    - tiers
+  properties:
+    feature:
+      type: string
+      description: Feature surface (workflow or sync) this row describes
+    tiers:
+      type: object
+      description: Per-tier resolved availability status for this feature
+      additionalProperties:
+        type: string
+        enum:
+          - available
+          - degraded
+          - unavailable
+
+ArrVersionCompatibility:
+  type: object
+  required:
+    - arrType
+    - range
+    - features
+  properties:
+    arrType:
+      type: string
+      enum:
+        - radarr
+        - sonarr
+        - lidarr
+      description: Arr application type
+    range:
+      $ref: '#/ArrSupportRange'
+    features:
+      type: array
+      items:
+        $ref: '#/VersionSupportedFeature'
+      description: Per-feature availability across every support tier
+
+VersionCompatibilityMatrix:
+  type: object
+  required:
+    - apps
+  properties:
+    apps:
+      type: array
+      items:
+        $ref: '#/ArrVersionCompatibility'
+      description: Per-app feature-by-version-tier availability

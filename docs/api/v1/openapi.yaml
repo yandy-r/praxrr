@@ -634,6 +634,8 @@ paths:
     $ref: './paths/setup.yaml#/skip'
   /compatibility/parity:
     $ref: './paths/compatibility.yaml#/parity'
+  /compatibility/versions:
+    $ref: './paths/compatibility.yaml#/versions'
 
 components:
   schemas:
@@ -1376,6 +1378,16 @@ components:
       $ref: './schemas/compatibility.yaml#/ArrSemanticDifference'
     ProfileCompatibility:
       $ref: './schemas/compatibility.yaml#/ProfileCompatibility'
+    ArrSupportTier:
+      $ref: './schemas/compatibility.yaml#/ArrSupportTier'
+    ArrSupportRange:
+      $ref: './schemas/compatibility.yaml#/ArrSupportRange'
+    VersionSupportedFeature:
+      $ref: './schemas/compatibility.yaml#/VersionSupportedFeature'
+    ArrVersionCompatibility:
+      $ref: './schemas/compatibility.yaml#/ArrVersionCompatibility'
+    VersionCompatibilityMatrix:
+      $ref: './schemas/compatibility.yaml#/VersionCompatibilityMatrix'
     # Resolved Config
     ResolvedLayer:
       $ref: './schemas/resolved-config.yaml#/ResolvedLayer'
