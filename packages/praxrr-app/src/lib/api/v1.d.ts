@@ -1053,6 +1053,103 @@ export interface components {
       parserAvailable: boolean;
       results: components['schemas']['SimulateReleaseResult'][];
     };
+    SetCfScoreChange: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      kind: 'set_cf_score';
+      /** @description Raw PCD quality-profile name (pcd:-stripped) */
+      profileName: string;
+      customFormatName: string;
+      /** @description Finite integer custom-format score */
+      score: number;
+    };
+    SetProfileSettingChange: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      kind: 'set_profile_setting';
+      profileName: string;
+      /** @enum {string} */
+      field: 'minimum_custom_format_score' | 'upgrade_until_score' | 'upgrade_score_increment';
+      value: number;
+    };
+    ProposedChange: components['schemas']['SetCfScoreChange'] | components['schemas']['SetProfileSettingChange'];
+    SimulateImpactRequest: {
+      /** @description PCD database instance ID */
+      databaseId: number;
+      /** @enum {string} */
+      arrType: 'radarr' | 'sonarr';
+      releases: components['schemas']['SimulateReleaseInput'][];
+      /** @description PCD or TRaSH selectors ('name' | 'pcd:name' | 'trash:name') */
+      profileNames: string[];
+      proposedChanges: components['schemas']['ProposedChange'][];
+    };
+    SkippedChange: {
+      change: components['schemas']['ProposedChange'];
+      reason: string;
+    };
+    /** @enum {string} */
+    ThresholdState: 'below' | 'accepted' | 'upgrade-reached';
+    CfContributionDelta: {
+      cfName: string;
+      matches: boolean;
+      currentScore: number;
+      proposedScore: number;
+      delta: number;
+    };
+    ProfileImpact: {
+      profileName: string;
+      editable: boolean;
+      currentTotal: number;
+      proposedTotal: number;
+      delta: number;
+      minimumScore: number;
+      upgradeUntilScore: number;
+      currentState: components['schemas']['ThresholdState'];
+      proposedState: components['schemas']['ThresholdState'];
+      changedCfs: components['schemas']['CfContributionDelta'][];
+    };
+    ReleaseImpact: {
+      id?: string;
+      title: string;
+      parsed: components['schemas']['ParsedInfo'] | null;
+      profiles: components['schemas']['ProfileImpact'][];
+    };
+    EntityConfigDiff: {
+      /** @enum {string} */
+      entityType: 'quality_profile';
+      name: string;
+      /** @enum {string} */
+      arrType: 'radarr' | 'sonarr';
+      changes: components['schemas']['FieldChange'][];
+    };
+    CascadeWarning: {
+      /** @enum {string} */
+      nodeKind: 'custom_format';
+      name: string;
+      arrType: string;
+      /** @description Distinct related-entity counts keyed by node kind, plus total */
+      counts: {
+        [key: string]: number;
+      };
+      byArrType: {
+        [key: string]: number;
+      };
+      truncated: boolean;
+    };
+    SimulateImpactResponse: {
+      parserAvailable: boolean;
+      /** @enum {string} */
+      cascadeBasis: 'current';
+      appliedChanges: components['schemas']['ProposedChange'][];
+      skippedChanges: components['schemas']['SkippedChange'][];
+      releaseImpacts: components['schemas']['ReleaseImpact'][];
+      configDiff: components['schemas']['EntityConfigDiff'][];
+      cascade: components['schemas']['CascadeWarning'][];
+    };
     /**
      * @description Type of Arr instance
      * @enum {string}

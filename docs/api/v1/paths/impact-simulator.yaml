@@ -1,0 +1,42 @@
+impact:
+  post:
+    operationId: simulateImpact
+    summary: Simulate configuration change impact for releases
+    description: |
+      Applies proposed custom-format score and quality-profile threshold
+      changes to an isolated ephemeral sandbox cache and returns release-level
+      impact, config A/B diff, and cascade warnings. Proposed changes never
+      touch pcd_ops or the registered cache.
+    tags:
+      - Impact Simulator
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../schemas/impact-simulator.yaml#/SimulateImpactRequest'
+    responses:
+      '200':
+        description: Impact simulation results
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/impact-simulator.yaml#/SimulateImpactResponse'
+      '400':
+        description: Invalid request (bad JSON, cap violation, bad arrType, unknown change kind)
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/pcd.yaml#/PcdErrorResponse'
+      '404':
+        description: Database instance or built cache not found
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/pcd.yaml#/PcdErrorResponse'
+      '500':
+        description: Internal server error
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/pcd.yaml#/PcdErrorResponse'

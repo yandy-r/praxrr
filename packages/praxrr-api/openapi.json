@@ -29,6 +29,10 @@
       "description": "Interactive release scoring playground"
     },
     {
+      "name": "Impact Simulator",
+      "description": "Configuration change impact simulation (scores, thresholds, cascade)"
+    },
+    {
       "name": "Arr",
       "description": "Arr instance library and release endpoints"
     },
@@ -47,6 +51,10 @@
     {
       "name": "Resolved Config",
       "description": "Resolved PCD configuration state, layer breakdown, and live/cross-instance diff endpoints"
+    },
+    {
+      "name": "Dependency Graph",
+      "description": "Resolved dependency relationships between PCD config entities, with per-entity impact"
     },
     {
       "name": "User Preferences",
@@ -615,6 +623,66 @@
                       "type": "string"
                     }
                   }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/simulate/impact": {
+      "post": {
+        "operationId": "simulateImpact",
+        "summary": "Simulate configuration change impact for releases",
+        "description": "Applies proposed custom-format score and quality-profile threshold\nchanges to an isolated ephemeral sandbox cache and returns release-level\nimpact, config A/B diff, and cascade warnings. Proposed changes never\ntouch pcd_ops or the registered cache.\n",
+        "tags": ["Impact Simulator"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SimulateImpactRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Impact simulation results",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SimulateImpactResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request (bad JSON, cap violation, bad arrType, unknown change kind)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PcdErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Database instance or built cache not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PcdErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PcdErrorResponse"
                 }
               }
             }
@@ -2617,6 +2685,210 @@
         }
       }
     },
+    "/pcd/{databaseId}/graph": {
+      "get": {
+        "operationId": "getDependencyGraph",
+        "summary": "Get the resolved dependency graph for a PCD database",
+        "description": "Returns the dependency graph of config entities for a PCD database,\ncomputed on demand from the in-memory PCD cache (read-only). Nodes are\ncustom formats, regular expressions, quality profiles, qualities, and\nquality definitions; edges are referrer -> dependency relationships:\nquality profile -> custom format (scored), custom format -> regular\nexpression, quality profile -> quality, and quality definition ->\nquality.\n\n`arrType` filters to edges scoped to that Arr app (plus `all` edges) and\nto quality profiles compatible with it; `nodeKind` filters nodes/edges to\na single entity family. All arr-scoped edges resolve by explicit\n`arr_type` with no sibling fallback.\n",
+        "tags": ["Dependency Graph"],
+        "parameters": [
+          {
+            "name": "databaseId",
+            "in": "path",
+            "required": true,
+            "description": "PCD database ID",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "arrType",
+            "in": "query",
+            "required": false,
+            "description": "Restrict to edges scoped to this Arr app (and `all`) and compatible quality profiles",
+            "schema": {
+              "type": "string",
+              "enum": ["radarr", "sonarr", "lidarr", "all"]
+            }
+          },
+          {
+            "name": "nodeKind",
+            "in": "query",
+            "required": false,
+            "description": "Restrict the graph to a single entity family",
+            "schema": {
+              "type": "string",
+              "enum": ["custom_format", "regular_expression", "quality_profile", "quality", "quality_definition"]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Dependency graph",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DependencyGraphResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid databaseId, unknown arrType/nodeKind, or database not ready",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Failed to build the dependency graph",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/pcd/{databaseId}/graph/{nodeKind}/{name}": {
+      "get": {
+        "operationId": "getDependencyImpact",
+        "summary": "Get the dependency impact of a single entity",
+        "description": "Returns the entities that reference (`direction=dependents`, default) or\nare referenced by (`direction=dependencies`) a single named node, via a\nbounded traversal over the dependency graph. Powers editor \"Used by\"\npanels, cascade-delete warnings, and node-focus navigation.\n\n`name` may contain reserved characters (it is a free-form entity name);\nclients MUST percent-encode it. `depth` is clamped to `[1, 3]`. A\nwell-formed request for a name that does not exist returns `404`; an\nunknown or not-yet-built `databaseId` returns `400`.\n",
+        "tags": ["Dependency Graph"],
+        "parameters": [
+          {
+            "name": "databaseId",
+            "in": "path",
+            "required": true,
+            "description": "PCD database ID",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "nodeKind",
+            "in": "path",
+            "required": true,
+            "description": "Entity family of the focus node",
+            "schema": {
+              "type": "string",
+              "enum": ["custom_format", "regular_expression", "quality_profile", "quality", "quality_definition"]
+            }
+          },
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "description": "Name of the focus entity (percent-encoded; may contain reserved characters)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "direction",
+            "in": "query",
+            "required": false,
+            "description": "Traverse to dependents (reverse, default) or dependencies (forward)",
+            "schema": {
+              "type": "string",
+              "enum": ["dependents", "dependencies"],
+              "default": "dependents"
+            }
+          },
+          {
+            "name": "depth",
+            "in": "query",
+            "required": false,
+            "description": "Traversal depth, clamped to [1, 3]",
+            "schema": {
+              "type": "integer",
+              "default": 2,
+              "minimum": 1,
+              "maximum": 3
+            }
+          },
+          {
+            "name": "arrType",
+            "in": "query",
+            "required": false,
+            "description": "Restrict to edges scoped to this Arr app (and `all`)",
+            "schema": {
+              "type": "string",
+              "enum": ["radarr", "sonarr", "lidarr", "all"]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Dependency impact result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GraphImpactResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid databaseId, unknown nodeKind/arrType, or database not ready",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No node with that kind and name (an unknown or not-yet-built databaseId is 400, not 404)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Failed to compute dependency impact",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/setup/state": {
       "get": {
         "operationId": "getSetupState",
@@ -3361,6 +3633,323 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/SimulateReleaseResult"
+            }
+          }
+        }
+      },
+      "SetCfScoreChange": {
+        "type": "object",
+        "required": ["kind", "profileName", "customFormatName", "score"],
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": ["set_cf_score"]
+          },
+          "profileName": {
+            "type": "string",
+            "description": "Raw PCD quality-profile name (pcd:-stripped)"
+          },
+          "customFormatName": {
+            "type": "string"
+          },
+          "score": {
+            "type": "integer",
+            "description": "Finite integer custom-format score"
+          }
+        }
+      },
+      "SetProfileSettingChange": {
+        "type": "object",
+        "required": ["kind", "profileName", "field", "value"],
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": ["set_profile_setting"]
+          },
+          "profileName": {
+            "type": "string"
+          },
+          "field": {
+            "type": "string",
+            "enum": ["minimum_custom_format_score", "upgrade_until_score", "upgrade_score_increment"]
+          },
+          "value": {
+            "type": "integer"
+          }
+        }
+      },
+      "ProposedChange": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/SetCfScoreChange"
+          },
+          {
+            "$ref": "#/components/schemas/SetProfileSettingChange"
+          }
+        ],
+        "discriminator": {
+          "propertyName": "kind",
+          "mapping": {
+            "set_cf_score": "#/SetCfScoreChange",
+            "set_profile_setting": "#/SetProfileSettingChange"
+          }
+        }
+      },
+      "SimulateImpactRequest": {
+        "type": "object",
+        "required": ["databaseId", "arrType", "releases", "profileNames", "proposedChanges"],
+        "properties": {
+          "databaseId": {
+            "type": "integer",
+            "description": "PCD database instance ID"
+          },
+          "arrType": {
+            "type": "string",
+            "enum": ["radarr", "sonarr"]
+          },
+          "releases": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 50,
+            "items": {
+              "$ref": "#/components/schemas/SimulateReleaseInput"
+            }
+          },
+          "profileNames": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 10,
+            "description": "PCD or TRaSH selectors ('name' | 'pcd:name' | 'trash:name')",
+            "items": {
+              "type": "string"
+            }
+          },
+          "proposedChanges": {
+            "type": "array",
+            "maxItems": 100,
+            "items": {
+              "$ref": "#/components/schemas/ProposedChange"
+            }
+          }
+        }
+      },
+      "SkippedChange": {
+        "type": "object",
+        "required": ["change", "reason"],
+        "properties": {
+          "change": {
+            "$ref": "#/components/schemas/ProposedChange"
+          },
+          "reason": {
+            "type": "string"
+          }
+        }
+      },
+      "ThresholdState": {
+        "type": "string",
+        "enum": ["below", "accepted", "upgrade-reached"]
+      },
+      "CfContributionDelta": {
+        "type": "object",
+        "required": ["cfName", "matches", "currentScore", "proposedScore", "delta"],
+        "properties": {
+          "cfName": {
+            "type": "string"
+          },
+          "matches": {
+            "type": "boolean"
+          },
+          "currentScore": {
+            "type": "integer"
+          },
+          "proposedScore": {
+            "type": "integer"
+          },
+          "delta": {
+            "type": "integer"
+          }
+        }
+      },
+      "ProfileImpact": {
+        "type": "object",
+        "required": [
+          "profileName",
+          "editable",
+          "currentTotal",
+          "proposedTotal",
+          "delta",
+          "minimumScore",
+          "upgradeUntilScore",
+          "currentState",
+          "proposedState",
+          "changedCfs"
+        ],
+        "properties": {
+          "profileName": {
+            "type": "string"
+          },
+          "editable": {
+            "type": "boolean"
+          },
+          "currentTotal": {
+            "type": "integer"
+          },
+          "proposedTotal": {
+            "type": "integer"
+          },
+          "delta": {
+            "type": "integer"
+          },
+          "minimumScore": {
+            "type": "integer"
+          },
+          "upgradeUntilScore": {
+            "type": "integer"
+          },
+          "currentState": {
+            "$ref": "#/components/schemas/ThresholdState"
+          },
+          "proposedState": {
+            "$ref": "#/components/schemas/ThresholdState"
+          },
+          "changedCfs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CfContributionDelta"
+            }
+          }
+        }
+      },
+      "ReleaseImpact": {
+        "type": "object",
+        "required": ["title", "parsed", "profiles"],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "parsed": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ParsedInfo"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "profiles": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProfileImpact"
+            }
+          }
+        }
+      },
+      "EntityConfigDiff": {
+        "type": "object",
+        "required": ["entityType", "name", "arrType", "changes"],
+        "properties": {
+          "entityType": {
+            "type": "string",
+            "enum": ["quality_profile"]
+          },
+          "name": {
+            "type": "string"
+          },
+          "arrType": {
+            "type": "string",
+            "enum": ["radarr", "sonarr"]
+          },
+          "changes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FieldChange"
+            }
+          }
+        }
+      },
+      "CascadeWarning": {
+        "type": "object",
+        "required": ["nodeKind", "name", "arrType", "counts", "byArrType", "truncated"],
+        "properties": {
+          "nodeKind": {
+            "type": "string",
+            "enum": ["custom_format"]
+          },
+          "name": {
+            "type": "string"
+          },
+          "arrType": {
+            "type": "string"
+          },
+          "counts": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "description": "Distinct related-entity counts keyed by node kind, plus total"
+          },
+          "byArrType": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "integer"
+            }
+          },
+          "truncated": {
+            "type": "boolean"
+          }
+        }
+      },
+      "SimulateImpactResponse": {
+        "type": "object",
+        "required": [
+          "parserAvailable",
+          "cascadeBasis",
+          "appliedChanges",
+          "skippedChanges",
+          "releaseImpacts",
+          "configDiff",
+          "cascade"
+        ],
+        "properties": {
+          "parserAvailable": {
+            "type": "boolean"
+          },
+          "cascadeBasis": {
+            "type": "string",
+            "enum": ["current"]
+          },
+          "appliedChanges": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProposedChange"
+            }
+          },
+          "skippedChanges": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SkippedChange"
+            }
+          },
+          "releaseImpacts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReleaseImpact"
+            }
+          },
+          "configDiff": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EntityConfigDiff"
+            }
+          },
+          "cascade": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CascadeWarning"
             }
           }
         }
@@ -5789,6 +6378,201 @@
               "$ref": "#/components/schemas/EntityChange"
             },
             "description": "Desired-vs-actual field changes; an empty array means the entity is in sync"
+          }
+        }
+      },
+      "GraphNodeKind": {
+        "type": "string",
+        "enum": ["custom_format", "regular_expression", "quality_profile", "quality", "quality_definition"],
+        "description": "PCD entity family a dependency-graph node represents. `quality` and\n`quality_definition` are leaf kinds with no per-id editor route (see\n`GraphNode.routeId`).\n"
+      },
+      "GraphArrType": {
+        "type": "string",
+        "enum": ["radarr", "sonarr", "lidarr", "all"],
+        "description": "Arr scope of a dependency edge. `all` is a first-class, distinct value (an\nedge that applies to every Arr app); it is never expanded into per-arr\nedges and never establishes per-arr quality-profile compatibility.\n"
+      },
+      "GraphEdgeKind": {
+        "type": "string",
+        "enum": [
+          "quality_profile_custom_format",
+          "custom_format_regular_expression",
+          "quality_profile_quality",
+          "quality_definition_quality"
+        ],
+        "description": "Relationship family. Direction is always referrer (`from`) -> dependency\n(`to`).\n"
+      },
+      "GraphNodeRef": {
+        "type": "object",
+        "required": ["kind", "name"],
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/GraphNodeKind"
+          },
+          "name": {
+            "type": "string",
+            "description": "Name-keyed identifier of the referenced entity"
+          }
+        }
+      },
+      "GraphNode": {
+        "type": "object",
+        "required": ["kind", "name", "routeId", "inDegree", "outDegree"],
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/GraphNodeKind"
+          },
+          "name": {
+            "type": "string",
+            "description": "Name-keyed identifier (never a route id)"
+          },
+          "routeId": {
+            "type": "integer",
+            "nullable": true,
+            "description": "Integer editor id for linkable kinds (`custom_format`,\n`regular_expression`, `quality_profile`); null for leaf kinds\n(`quality`, `quality_definition`) that have no per-id editor route.\n"
+          },
+          "inDegree": {
+            "type": "integer",
+            "description": "Number of edges pointing at this node (how many entities reference it)"
+          },
+          "outDegree": {
+            "type": "integer",
+            "description": "Number of edges leaving this node (how many entities it depends on)"
+          },
+          "compatibleArrTypes": {
+            "type": "array",
+            "nullable": true,
+            "items": {
+              "type": "string",
+              "enum": ["radarr", "sonarr", "lidarr"]
+            },
+            "description": "Arr apps this node is valid for, present only for `quality_profile` and\n`quality` nodes. For quality profiles it is derived from\n`computeProfileCompatibility` (never from `arr_type='all'` scores).\n"
+          }
+        }
+      },
+      "GraphEdge": {
+        "type": "object",
+        "required": ["from", "to", "edgeKind", "arrType"],
+        "properties": {
+          "from": {
+            "$ref": "#/components/schemas/GraphNodeRef"
+          },
+          "to": {
+            "$ref": "#/components/schemas/GraphNodeRef"
+          },
+          "edgeKind": {
+            "$ref": "#/components/schemas/GraphEdgeKind"
+          },
+          "arrType": {
+            "$ref": "#/components/schemas/GraphArrType"
+          },
+          "score": {
+            "type": "integer",
+            "nullable": true,
+            "description": "Custom-format score, present only on `quality_profile_custom_format` edges"
+          },
+          "groupName": {
+            "type": "string",
+            "nullable": true,
+            "description": "Quality group name, present only on grouped `quality_profile_quality` edges"
+          }
+        }
+      },
+      "DependencyGraphResponse": {
+        "type": "object",
+        "required": ["databaseId", "nodes", "edges", "arrTypesPresent", "truncated"],
+        "properties": {
+          "databaseId": {
+            "type": "integer",
+            "description": "PCD database ID"
+          },
+          "nodes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GraphNode"
+            },
+            "description": "Every in-scope entity node, with in/out degree and (where applicable) compatibility"
+          },
+          "edges": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GraphEdge"
+            },
+            "description": "Referrer -> dependency edges, filtered by the requested arrType/nodeKind"
+          },
+          "arrTypesPresent": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GraphArrType"
+            },
+            "description": "Distinct arr scopes present across the returned edges"
+          },
+          "truncated": {
+            "type": "boolean",
+            "description": "True when the graph exceeded the server-side edge cap and was truncated"
+          }
+        }
+      },
+      "GraphImpactResponse": {
+        "type": "object",
+        "required": [
+          "databaseId",
+          "node",
+          "direction",
+          "depth",
+          "edges",
+          "byArrType",
+          "counts",
+          "hasDownstream",
+          "truncated"
+        ],
+        "properties": {
+          "databaseId": {
+            "type": "integer",
+            "description": "PCD database ID"
+          },
+          "node": {
+            "$ref": "#/components/schemas/GraphNode"
+          },
+          "direction": {
+            "type": "string",
+            "enum": ["dependents", "dependencies"],
+            "description": "`dependents` (default) = entities that reference this node (reverse\ntraversal); `dependencies` = entities this node references (forward).\n"
+          },
+          "depth": {
+            "type": "integer",
+            "description": "Traversal depth actually applied (clamped to [1, 3])"
+          },
+          "edges": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GraphEdge"
+            },
+            "description": "All edges discovered by the bounded traversal"
+          },
+          "byArrType": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "array",
+              "items": {
+                "$ref": "#/components/schemas/GraphEdge"
+              }
+            },
+            "description": "The same edges grouped by arrType (arr scopes never collapsed)"
+          },
+          "counts": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "description": "Count of distinct related entities keyed by node kind, plus `total`"
+          },
+          "hasDownstream": {
+            "type": "boolean",
+            "description": "True when at least one edge was found (there is downstream impact)"
+          },
+          "truncated": {
+            "type": "boolean",
+            "description": "True when the traversal hit its depth or visited cap and stopped early"
           }
         }
       }
