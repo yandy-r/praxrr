@@ -18,6 +18,8 @@ tags:
     description: Release parsing and custom format evaluation
   - name: Score Simulator
     description: Interactive release scoring playground
+  - name: Impact Simulator
+    description: Configuration change impact simulation (scores, thresholds, cascade)
   - name: Arr
     description: Arr instance library and release endpoints
   - name: Trash Guide
@@ -271,6 +273,8 @@ paths:
     $ref: './paths/entity-testing.yaml#/evaluate'
   /simulate/score:
     $ref: './paths/score-simulator.yaml#/score'
+  /simulate/impact:
+    $ref: './paths/impact-simulator.yaml#/impact'
   /arr/library:
     $ref: './paths/arr.yaml#/library'
   /arr/library/episodes:
@@ -671,6 +675,31 @@ components:
       $ref: './schemas/score-simulator.yaml#/SimulateScoreRequest'
     SimulateScoreResponse:
       $ref: './schemas/score-simulator.yaml#/SimulateScoreResponse'
+    # Impact Simulator
+    SetCfScoreChange:
+      $ref: './schemas/impact-simulator.yaml#/SetCfScoreChange'
+    SetProfileSettingChange:
+      $ref: './schemas/impact-simulator.yaml#/SetProfileSettingChange'
+    ProposedChange:
+      $ref: './schemas/impact-simulator.yaml#/ProposedChange'
+    SimulateImpactRequest:
+      $ref: './schemas/impact-simulator.yaml#/SimulateImpactRequest'
+    SkippedChange:
+      $ref: './schemas/impact-simulator.yaml#/SkippedChange'
+    ThresholdState:
+      $ref: './schemas/impact-simulator.yaml#/ThresholdState'
+    CfContributionDelta:
+      $ref: './schemas/impact-simulator.yaml#/CfContributionDelta'
+    ProfileImpact:
+      $ref: './schemas/impact-simulator.yaml#/ProfileImpact'
+    ReleaseImpact:
+      $ref: './schemas/impact-simulator.yaml#/ReleaseImpact'
+    EntityConfigDiff:
+      $ref: './schemas/impact-simulator.yaml#/EntityConfigDiff'
+    CascadeWarning:
+      $ref: './schemas/impact-simulator.yaml#/CascadeWarning'
+    SimulateImpactResponse:
+      $ref: './schemas/impact-simulator.yaml#/SimulateImpactResponse'
     # Arr - Shared
     ArrType:
       $ref: './schemas/arr.yaml#/ArrType'

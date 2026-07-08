@@ -12,20 +12,20 @@ import type { CompiledQuery } from 'kysely';
 // Input types
 // ============================================================================
 
-interface CustomFormatScore {
+export interface CustomFormatScore {
   customFormatName: string;
   arrType: string;
   score: number | null;
 }
 
-interface UpdateScoringInput {
+export interface UpdateScoringInput {
   minimumScore: number;
   upgradeUntilScore: number;
   upgradeScoreIncrement: number;
   customFormatScores: CustomFormatScore[];
 }
 
-interface UpdateScoringOptions {
+export interface UpdateScoringOptions {
   databaseId: number;
   cache: PCDCache;
   layer: OperationLayer;
@@ -33,7 +33,7 @@ interface UpdateScoringOptions {
   input: UpdateScoringInput;
 }
 
-interface ScoringOp {
+export interface ScoringOp {
   description: string;
   queries: CompiledQuery[];
   desiredState: Record<string, unknown>;
@@ -48,10 +48,19 @@ interface ScoringOp {
 // ============================================================================
 
 /**
- * Update quality profile scoring settings
+ * Build the ordered scoring write-ops for a quality profile without persisting
+ * them. Reads current state from the provided cache and produces value-guarded
+ * INSERT/UPDATE/DELETE queries (including 'all'-row expansion) plus threshold
+ * updates. Callers persist via {@link updateScoring} or apply to an isolated
+ * sandbox cache (see withSandboxCache) — the impact simulator uses the latter.
+ *
+ * Returns `{ error }` when the profile is missing; throws when the requested
+ * upgrade score increment is invalid (preserved from the original write path).
  */
-export async function updateScoring(options: UpdateScoringOptions) {
-  const { databaseId, cache, layer, profileName, input } = options;
+export async function buildScoringOps(
+  options: UpdateScoringOptions
+): Promise<{ ops: ScoringOp[] } | { error: string }> {
+  const { cache, profileName, input } = options;
   const db = cache.kb;
 
   if (input.upgradeScoreIncrement < 1) {
@@ -65,7 +74,7 @@ export async function updateScoring(options: UpdateScoringOptions) {
     .executeTakeFirst();
 
   if (!currentProfile) {
-    return { success: false, error: `Quality profile "${profileName}" not found` };
+    return { error: `Quality profile "${profileName}" not found` };
   }
 
   const currentScores = await db
@@ -365,6 +374,21 @@ WHERE quality_profile_name = '${esc(profileName)}'
       });
     }
   }
+
+  return { ops };
+}
+
+/**
+ * Update quality profile scoring settings
+ */
+export async function updateScoring(options: UpdateScoringOptions) {
+  const { databaseId, layer, profileName } = options;
+
+  const built = await buildScoringOps(options);
+  if ('error' in built) {
+    return { success: false, error: built.error };
+  }
+  const ops = built.ops;
 
   if (ops.length === 0) {
     return { success: true };

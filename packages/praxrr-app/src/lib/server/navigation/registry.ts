@@ -240,6 +240,18 @@ export const NAV_REGISTRY: ArrCapabilityAwareNavItem[] = [
     hasChildren: false,
   },
   {
+    id: 'policies.impact_simulator',
+    label: 'Impact Simulator',
+    href: '/impact-simulator',
+    groupId: ensureGroupId('policies'),
+    order: 7,
+    arrScope: scopeAll,
+    mobilePriority: 'medium',
+    iconKey: 'GitCompare',
+    emoji: '🔀',
+    hasChildren: false,
+  },
+  {
     id: 'settings.settings',
     label: 'Settings',
     href: '/settings',

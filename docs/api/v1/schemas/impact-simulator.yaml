@@ -1,0 +1,276 @@
+SetCfScoreChange:
+  type: object
+  required:
+    - kind
+    - profileName
+    - customFormatName
+    - score
+  properties:
+    kind:
+      type: string
+      enum:
+        - set_cf_score
+    profileName:
+      type: string
+      description: Raw PCD quality-profile name (pcd:-stripped)
+    customFormatName:
+      type: string
+    score:
+      type: integer
+      description: Finite integer custom-format score
+
+SetProfileSettingChange:
+  type: object
+  required:
+    - kind
+    - profileName
+    - field
+    - value
+  properties:
+    kind:
+      type: string
+      enum:
+        - set_profile_setting
+    profileName:
+      type: string
+    field:
+      type: string
+      enum:
+        - minimum_custom_format_score
+        - upgrade_until_score
+        - upgrade_score_increment
+    value:
+      type: integer
+
+ProposedChange:
+  oneOf:
+    - $ref: '#/SetCfScoreChange'
+    - $ref: '#/SetProfileSettingChange'
+  discriminator:
+    propertyName: kind
+    mapping:
+      set_cf_score: SetCfScoreChange
+      set_profile_setting: SetProfileSettingChange
+
+SimulateImpactRequest:
+  type: object
+  required:
+    - databaseId
+    - arrType
+    - releases
+    - profileNames
+    - proposedChanges
+  properties:
+    databaseId:
+      type: integer
+      description: PCD database instance ID
+    arrType:
+      type: string
+      enum:
+        - radarr
+        - sonarr
+    releases:
+      type: array
+      minItems: 1
+      maxItems: 50
+      items:
+        $ref: '../schemas/score-simulator.yaml#/SimulateReleaseInput'
+    profileNames:
+      type: array
+      minItems: 1
+      maxItems: 10
+      description: PCD or TRaSH selectors ('name' | 'pcd:name' | 'trash:name')
+      items:
+        type: string
+    proposedChanges:
+      type: array
+      maxItems: 100
+      items:
+        $ref: '#/ProposedChange'
+
+SkippedChange:
+  type: object
+  required:
+    - change
+    - reason
+  properties:
+    change:
+      $ref: '#/ProposedChange'
+    reason:
+      type: string
+
+ThresholdState:
+  type: string
+  enum:
+    - below
+    - accepted
+    - upgrade-reached
+
+CfContributionDelta:
+  type: object
+  required:
+    - cfName
+    - matches
+    - currentScore
+    - proposedScore
+    - delta
+  properties:
+    cfName:
+      type: string
+    matches:
+      type: boolean
+    currentScore:
+      type: integer
+    proposedScore:
+      type: integer
+    delta:
+      type: integer
+
+ProfileImpact:
+  type: object
+  required:
+    - profileName
+    - editable
+    - currentTotal
+    - proposedTotal
+    - delta
+    - minimumScore
+    - upgradeUntilScore
+    - currentState
+    - proposedState
+    - changedCfs
+  properties:
+    profileName:
+      type: string
+    editable:
+      type: boolean
+    currentTotal:
+      type: integer
+    proposedTotal:
+      type: integer
+    delta:
+      type: integer
+    minimumScore:
+      type: integer
+    upgradeUntilScore:
+      type: integer
+    currentState:
+      $ref: '#/ThresholdState'
+    proposedState:
+      $ref: '#/ThresholdState'
+    changedCfs:
+      type: array
+      items:
+        $ref: '#/CfContributionDelta'
+
+ReleaseImpact:
+  type: object
+  required:
+    - title
+    - parsed
+    - profiles
+  properties:
+    id:
+      type: string
+    title:
+      type: string
+    parsed:
+      oneOf:
+        - $ref: '../schemas/entity-testing.yaml#/ParsedInfo'
+        - type: 'null'
+    profiles:
+      type: array
+      items:
+        $ref: '#/ProfileImpact'
+
+EntityConfigDiff:
+  type: object
+  required:
+    - entityType
+    - name
+    - arrType
+    - changes
+  properties:
+    entityType:
+      type: string
+      enum:
+        - quality_profile
+    name:
+      type: string
+    arrType:
+      type: string
+      enum:
+        - radarr
+        - sonarr
+    changes:
+      type: array
+      items:
+        $ref: '../schemas/sync.yaml#/FieldChange'
+
+CascadeWarning:
+  type: object
+  required:
+    - nodeKind
+    - name
+    - arrType
+    - counts
+    - byArrType
+    - truncated
+  properties:
+    nodeKind:
+      type: string
+      enum:
+        - custom_format
+    name:
+      type: string
+    arrType:
+      type: string
+    counts:
+      type: object
+      additionalProperties:
+        type: integer
+      description: Distinct related-entity counts keyed by node kind, plus total
+    byArrType:
+      type: object
+      additionalProperties:
+        type: integer
+    truncated:
+      type: boolean
+
+SimulateImpactResponse:
+  type: object
+  required:
+    - parserAvailable
+    - cascadeBasis
+    - appliedChanges
+    - skippedChanges
+    - releaseImpacts
+    - configDiff
+    - cascade
+  properties:
+    parserAvailable:
+      type: boolean
+    cascadeBasis:
+      type: string
+      enum:
+        - current
+    appliedChanges:
+      type: array
+      items:
+        $ref: '#/ProposedChange'
+    skippedChanges:
+      type: array
+      items:
+        $ref: '#/SkippedChange'
+    releaseImpacts:
+      type: array
+      items:
+        $ref: '#/ReleaseImpact'
+    configDiff:
+      type: array
+      items:
+        $ref: '#/EntityConfigDiff'
+    cascade:
+      type: array
+      items:
+        $ref: '#/CascadeWarning'
