@@ -29,6 +29,9 @@ Thumbs.db
 # Test arr instances (config data)
 .arr/
 
+# TSDProxy runtime data (Tailscale auth state, config)
+.tsdproxy/
+
 # Env
 .env
 .env.*

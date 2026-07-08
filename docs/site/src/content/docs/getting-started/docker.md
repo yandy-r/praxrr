@@ -45,8 +45,53 @@ Start local Arr containers for integration testing:
 docker compose -f compose.dev.yml --profile arr up -d lidarr radarr sonarr
 ```
 
-Dev Arr services expose host ports `17878`, `18989`, and `18686` mapped to the
-standard Arr API ports inside the network.
+Or run the full dev stack (Praxrr, parser, Arr, and TSDProxy):
+
+```bash
+docker compose -f compose.dev.yml --profile dev --profile arr up --build --watch
+```
+
+### Tailscale access (dev compose)
+
+The dev compose file does **not** publish host ports. Instead,
+[TSDProxy](https://almeidapaulopt.github.io/tsdproxy/) exposes services over
+HTTPS on your Tailscale tailnet. All hostnames are prefixed with `praxrr` to
+avoid collisions.
+
+#### First-time setup
+
+```bash
+mkdir -p .tsdproxy/config .tsdproxy/data
+cp docker/tsdproxy.yaml.example .tsdproxy/config/tsdproxy.yaml
+```
+
+Optionally set `tailscale.providers.default.authKey` in `.tsdproxy/config/tsdproxy.yaml`
+for unattended (headless) Tailscale authentication. Otherwise, authenticate
+interactively through the TSDProxy dashboard.
+
+#### Tailscale hostnames
+
+Replace `<tailnet>` with your tailnet name (for example `my-tailnet`):
+
+| Service            | Tailscale name    | URL                                        |
+| ------------------ | ----------------- | ------------------------------------------ |
+| Praxrr UI          | `praxrr-dev`      | `https://praxrr-dev.<tailnet>.ts.net`      |
+| TSDProxy dashboard | `praxrr-tsdproxy` | `https://praxrr-tsdproxy.<tailnet>.ts.net` |
+| Radarr             | `praxrr-radarr`   | `https://praxrr-radarr.<tailnet>.ts.net`   |
+| Sonarr             | `praxrr-sonarr`   | `https://praxrr-sonarr.<tailnet>.ts.net`   |
+| Lidarr             | `praxrr-lidarr`   | `https://praxrr-lidarr.<tailnet>.ts.net`   |
+
+#### Authenticating proxies
+
+After starting the stack:
+
+1. Open `https://praxrr-tsdproxy.<tailnet>.ts.net` from a device on your
+   tailnet.
+2. Sign in to Tailscale if prompted.
+3. Approve each proxy card for the services you want to expose.
+
+The parser service (`parser-dev`) remains internal-only. Praxrr reaches it over
+the Docker network at `parser-dev:5000`; it is not proxied to Tailscale.
 
 ## Volumes
 
@@ -69,7 +114,9 @@ to the mounted directory.
   `http://praxrr-radarr:7878`) so Praxrr reaches Arr over the compose network.
 - **External URL:** Set `RADARR_INSTANCE_EXTERNAL_URL_1` (or the Sonarr/Lidarr
   equivalents) when browser links should use a public hostname or reverse-proxy
-  path. API traffic still uses the canonical URL field.
+  path. In dev compose, uncomment the Tailscale URL hints in `compose.dev.yml`
+  (for example `https://praxrr-radarr.<your-tailnet>.ts.net`). API traffic
+  still uses the canonical URL field.
 - **Parser:** When enabled, set `PARSER_HOST` to the parser service name
   (`parser` in production, `parser-dev` in dev compose) and `PARSER_PORT=5000`.
 

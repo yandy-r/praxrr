@@ -1,9 +1,31 @@
 # Development compose - builds from source
 # Usage:
-#   docker compose -f compose.dev.yml --profile dev up --build --watch
-#   docker compose -f compose.dev.yml --profile arr up -d lidarr radarr sonarr
+#   Dev + Tailscale (no host ports):
+#     docker compose -f compose.dev.yml --profile dev up --build --watch
+#   Arr + Tailscale:
+#     docker compose -f compose.dev.yml --profile arr up -d
+#   Full stack:
+#     docker compose -f compose.dev.yml --profile dev --profile arr up --build --watch
 
 services:
+  tsdproxy:
+    profiles: ['dev', 'arr']
+    container_name: praxrr-tsdproxy
+    hostname: praxrr-tsdproxy
+    image: almeidapaulopt/tsdproxy:2
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./.tsdproxy/data:/data
+      - ./.tsdproxy/config:/config
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
+    labels:
+      tsdproxy.enable: 'true'
+      tsdproxy.name: 'praxrr-tsdproxy'
+      tsdproxy.dash.visible: 'false'
+      tsdproxy.port.1: '443/https:8080/http'
+
   praxrr:
     profiles: ['dev']
     container_name: praxrr-dev
@@ -12,8 +34,13 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    ports:
-      - '6969:6868'
+    expose:
+      - '6868'
+    labels:
+      tsdproxy.enable: 'true'
+      tsdproxy.name: 'praxrr-dev'
+      tsdproxy.port.1: '443/https:6868/http'
+      tsdproxy.dash.label: 'Praxrr Dev'
     volumes:
       - ./config:/config
       - ./packages/praxrr-db:/praxrr-db # Optional: bind mount for local db development
@@ -44,17 +71,17 @@ services:
       # Optional Arr instances via environment at startup
       - LIDARR_INSTANCE_NAME_1=Lidarr # Optional (Generated if not provided)
       - LIDARR_INSTANCE_URL_1=http://praxrr-lidarr:8686
-      # - LIDARR_INSTANCE_EXTERNAL_URL_1=${PRAXRR_LIDARR_EXTERNAL_URL} # Optional
+      - LIDARR_INSTANCE_EXTERNAL_URL_1=${LIDARR_INSTANCE_EXTERNAL_URL_1}
       - LIDARR_INSTANCE_API_KEY_1=${PRAXRR_LIDARR_API_KEY}
       - LIDARR_INSTANCE_TAGS_1=music,flac,lossless
       - RADARR_INSTANCE_NAME_1=Radarr # Optional (Generated if not provided)
       - RADARR_INSTANCE_URL_1=http://praxrr-radarr:7878
-      # - RADARR_INSTANCE_EXTERNAL_URL_1=${PRAXRR_RADARR_EXTERNAL_URL} # Optional
+      - RADARR_INSTANCE_EXTERNAL_URL_1=${RADARR_INSTANCE_EXTERNAL_URL_1}
       - RADARR_INSTANCE_API_KEY_1=${PRAXRR_RADARR_API_KEY}
       - RADARR_INSTANCE_TAGS_1=movies,4k
       - SONARR_INSTANCE_NAME_1=Sonarr # Optional (Generated if not provided)
       - SONARR_INSTANCE_URL_1=http://praxrr-sonarr:8989
-      # - SONARR_INSTANCE_EXTERNAL_URL_1=${PRAXRR_SONARR_EXTERNAL_URL} # Optional
+      - SONARR_INSTANCE_EXTERNAL_URL_1=${SONARR_INSTANCE_EXTERNAL_URL_1}
       - SONARR_INSTANCE_API_KEY_1=${PRAXRR_SONARR_API_KEY}
       - SONARR_INSTANCE_TAGS_1=tv,4k
       - PRAXRR_VALIDATE_INSTANCES=false
@@ -154,8 +181,13 @@ services:
     hostname: praxrr-radarr
     image: lscr.io/linuxserver/radarr:latest
     restart: unless-stopped
-    ports:
-      - 17878:7878
+    expose:
+      - '7878'
+    labels:
+      tsdproxy.enable: 'true'
+      tsdproxy.name: 'praxrr-radarr'
+      tsdproxy.port.1: '443/https:7878/http'
+      tsdproxy.dash.label: 'Radarr'
     environment:
       - PUID=${PUID:-1000}
       - PGID=${PGID:-1000}
@@ -170,8 +202,13 @@ services:
     hostname: praxrr-sonarr
     image: lscr.io/linuxserver/sonarr:latest
     restart: unless-stopped
-    ports:
-      - 18989:8989
+    expose:
+      - '8989'
+    labels:
+      tsdproxy.enable: 'true'
+      tsdproxy.name: 'praxrr-sonarr'
+      tsdproxy.port.1: '443/https:8989/http'
+      tsdproxy.dash.label: 'Sonarr'
     environment:
       - PUID=${PUID:-1000}
       - PGID=${PGID:-1000}
@@ -186,8 +223,13 @@ services:
     hostname: praxrr-lidarr
     image: lscr.io/linuxserver/lidarr:latest
     restart: unless-stopped
-    ports:
-      - 18686:8686
+    expose:
+      - '8686'
+    labels:
+      tsdproxy.enable: 'true'
+      tsdproxy.name: 'praxrr-lidarr'
+      tsdproxy.port.1: '443/https:8686/http'
+      tsdproxy.dash.label: 'Lidarr'
     environment:
       - PUID=${PUID:-1000}
       - PGID=${PGID:-1000}

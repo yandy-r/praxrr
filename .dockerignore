@@ -59,6 +59,9 @@ coverage/
 .nyc_output/
 .arr/
 
+# TSDProxy runtime data (Tailscale auth state, config)
+.tsdproxy/
+
 # -----------------------------------------------------------------------------
 # Docker files themselves (prevent recursion)
 # -----------------------------------------------------------------------------
