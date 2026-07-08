@@ -3,7 +3,7 @@
  */
 
 import type { PCDCache } from '$pcd/index.ts';
-import { writeOperation, type OperationLayer, type WriteResult } from '$pcd/index.ts';
+import { getCustomFormatDependentScores, writeOperation, type OperationLayer, type WriteResult } from '$pcd/index.ts';
 import type { CustomFormatGeneral } from '$shared/pcd/display.ts';
 import { uuid } from '$shared/utils/uuid.ts';
 import { logger } from '$logger/logger.ts';
@@ -145,13 +145,10 @@ export async function updateGeneral(options: UpdateGeneralOptions) {
     tagQueries.push(linkTag);
   }
 
-  const dependentScores = isRename
-    ? await db
-        .selectFrom('quality_profile_custom_formats')
-        .select(['quality_profile_name', 'custom_format_name', 'arr_type', 'score'])
-        .where('custom_format_name', '=', current.name)
-        .execute()
-    : [];
+  // Reverse-dependency enumeration extracted to graph/references.ts (single source shared
+  // with the dependency-graph E1 edge + customFormats/delete.ts). Intentionally UNORDERED:
+  // the rename op write order follows Map insertion order below, not SQL order.
+  const dependentScores = isRename ? await getCustomFormatDependentScores(cache, current.name) : [];
 
   const dependentOps: Array<{
     profileName: string;

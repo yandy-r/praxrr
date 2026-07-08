@@ -3,7 +3,7 @@
  */
 
 import type { PCDCache } from '$pcd/index.ts';
-import { writeOperation, type OperationLayer } from '$pcd/index.ts';
+import { getCustomFormatDependentScores, writeOperation, type OperationLayer } from '$pcd/index.ts';
 import { uuid } from '$shared/utils/uuid.ts';
 
 interface DeleteCustomFormatOptions {
@@ -27,13 +27,12 @@ export async function remove(options: DeleteCustomFormatOptions) {
   const queries = [];
   const groupId = uuid();
 
-  const dependentScores = await db
-    .selectFrom('quality_profile_custom_formats')
-    .select(['quality_profile_name', 'custom_format_name', 'arr_type', 'score'])
-    .where('custom_format_name', '=', formatName)
-    .orderBy('quality_profile_name')
-    .orderBy('arr_type')
-    .execute();
+  // Reverse-dependency enumeration extracted to graph/references.ts (single source shared
+  // with the dependency-graph E1 edge + customFormats/general/update.ts). Ordered exactly
+  // as before so the generated scoring-removal ops stay byte-identical.
+  const dependentScores = await getCustomFormatDependentScores(cache, formatName, {
+    orderBy: ['quality_profile_name', 'arr_type'],
+  });
 
   const scoresByProfile = new Map<string, Array<{ custom_format_name: string; arr_type: string; score: number }>>();
 

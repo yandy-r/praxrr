@@ -141,3 +141,39 @@ export type {
   CompareInstanceResult,
   CompareReason,
 } from './resolved/compare.ts';
+
+// ============================================================================
+// DEPENDENCY GRAPH
+// ============================================================================
+
+export { buildDependencyGraph, getImpact } from './graph/resolver.ts';
+export { getCustomFormatDependentScores, getRegularExpressionDependentConditions } from './graph/references.ts';
+export type {
+  CustomFormatDependentScoreOptions,
+  CustomFormatDependentScoreOrderColumn,
+  CustomFormatDependentScoreRow,
+  RegularExpressionDependentConditionRow,
+} from './graph/references.ts';
+export {
+  GRAPH_EDGE_CAP,
+  GraphDatabaseNotFoundError,
+  GraphNodeNotFoundError,
+  GraphValidationError,
+  IMPACT_DEFAULT_DEPTH,
+  IMPACT_MAX_DEPTH,
+  isGraphDatabaseNotFoundError,
+  isGraphNodeNotFoundError,
+  isGraphValidationError,
+  isNodeKind,
+  NODE_KINDS,
+} from './graph/types.ts';
+export type {
+  DependencyGraph,
+  GraphArrType,
+  GraphEdge,
+  GraphImpact,
+  GraphNode,
+  ImpactDirection,
+  NodeKind,
+  NodeRef,
+} from './graph/types.ts';

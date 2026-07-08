@@ -78,15 +78,11 @@ export function toWireOverrides(overrides: readonly FieldChange[]): ResolvedEnti
 // BIGINT SANITIZATION
 // ============================================================================
 
-/**
- * PCD cache tables are opened with `int64: true` (see `PCDCache`), so some integer
- * columns can come back as `bigint`. `json()` calls `JSON.stringify` internally, which
- * throws on `bigint` -- coerce any bigint (every resolved-config value is well within
- * the safe-integer range) to `number` before handing the payload off.
- */
-export function sanitizeBigInts<T>(value: T): T {
-  return JSON.parse(JSON.stringify(value, (_key, val) => (typeof val === 'bigint' ? Number(val) : val))) as T;
-}
+// Re-exported from the shared `$http` boundary util so the four resolved route handlers
+// keep their existing `import { sanitizeBigInts } from '../shared.ts'` path while the
+// implementation lives in exactly one place (also consumed by the dependency-graph
+// routes). See `$http/sanitizeBigInts.ts`.
+export { sanitizeBigInts } from '$http/sanitizeBigInts.ts';
 
 // ============================================================================
 // ERROR -> RESPONSE MAPPING

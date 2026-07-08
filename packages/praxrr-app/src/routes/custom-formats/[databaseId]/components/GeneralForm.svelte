@@ -21,8 +21,11 @@
 		type SectionModeMap
 	} from '$shared/disclosure/sectionKeys.ts';
 	import type { SectionTierMap } from '$shared/complexity/tiers.ts';
+	import type { components } from '$api/v1.d.ts';
 	import { alertStore } from '$alerts/store';
 	import { current, isDirty, initEdit, initCreate, update } from '$lib/client/stores/dirty';
+	import DependencyImpact from '$ui/graph/DependencyImpact.svelte';
+	import { formatCascadeSummary } from '$ui/graph/cascadeSummary.ts';
 
 	// Form data shape
 	interface GeneralFormData {
@@ -88,6 +91,15 @@
 
 	// Validation
 	$: isValid = name.trim() !== '';
+
+	// Reverse-dependency impact (eager-loaded server-side) for the "Used by" panel and the
+	// cascade-aware delete-confirm copy.
+	$: impact = ($page.data.impact ?? null) as components['schemas']['GraphImpactResponse'] | null;
+	$: deleteMessage =
+		`Are you sure you want to delete "${name}"? This action cannot be undone.` +
+		(impact && impact.hasDownstream
+			? ` ${formatCascadeSummary(impact, { verb: 'Deleting', entityLabel: 'this custom format', effect: 'removes those scores' })}`
+			: '');
 
 	async function handleSaveClick() {
 		selectedLayer = canWriteToBase ? 'base' : 'user';
@@ -223,6 +235,10 @@
 				/>
 			</div>
 
+			{#if mode === 'edit'}
+				<DependencyImpact {impact} heading="Used by quality profiles" />
+			{/if}
+
 			<DisclosureSection
 				sectionKey={CF_CONDITIONS}
 				sectionTitle="Conditions"
@@ -329,7 +345,7 @@
 	<Modal
 		open={showDeleteConfirmModal}
 		header="Delete Custom Format"
-		bodyMessage={`Are you sure you want to delete "${name}"? This action cannot be undone.`}
+		bodyMessage={deleteMessage}
 		confirmText="Delete"
 		cancelText="Cancel"
 		confirmDanger={true}
