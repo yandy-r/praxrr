@@ -112,6 +112,14 @@ function readScores(raw: Database): Array<{ name: string; arrType: string; score
   return rows.map((r) => ({ name: r.name, arrType: r.arrType, score: Number(r.score) }));
 }
 
+/** Read the 'Primary' profile's minimum custom-format score, normalizing int64. */
+function readMinimumScore(raw: Database): number {
+  const row = raw
+    .prepare("SELECT minimum_custom_format_score AS min FROM quality_profiles WHERE name = 'Primary'")
+    .get() as { min: number | bigint };
+  return Number(row.min);
+}
+
 /** Installs the fixture patches (instance lookup + buildReadOnly seeding), runs `fn`, restores. */
 async function withFixture(fn: () => Promise<void>): Promise<void> {
   const restores: Restore[] = [];
@@ -280,6 +288,58 @@ Deno.test('withSandboxCache: closes the sandbox across repeated runs and when fn
     assertEquals(holder.cache.isBuilt(), false, 'sandbox closed even though fn threw');
   });
 });
+
+Deno.test(
+  'withSandboxCache: a mid-profile op failure rolls back the profile earlier ops (atomic per profile)',
+  async () => {
+    await withFixture(async () => {
+      // A valid threshold UPDATE (minimum 0 -> 20) is emitted BEFORE the per-CF ops, so it
+      // applies first; the CF INSERT for a non-existent custom format then fails the FK on
+      // custom_formats(name). The whole profile must be reported skipped AND the earlier
+      // threshold mutation must be rolled back — not left committed in the sandbox.
+      const thresholdChange: ProposedChange = {
+        kind: 'set_profile_setting',
+        profileName: 'Primary',
+        field: 'minimum_custom_format_score',
+        value: 20,
+      };
+      const badCfChange: ProposedChange = {
+        kind: 'set_cf_score',
+        profileName: 'Primary',
+        customFormatName: 'DoesNotExist',
+        score: 30,
+      };
+      const edits = new Map<string, ProfileEdit>([
+        [
+          'Primary',
+          {
+            input: {
+              minimumScore: 20,
+              upgradeUntilScore: 0,
+              upgradeScoreIncrement: 1,
+              customFormatScores: [{ customFormatName: 'DoesNotExist', arrType: 'radarr', score: 30 }],
+            },
+            changes: [thresholdChange, badCfChange],
+          },
+        ],
+      ]);
+
+      await withSandboxCache(DATABASE_ID, edits, async (sandboxCache, report) => {
+        const raw = sandboxCache.getRawDb();
+        assert(raw, 'sandbox raw db should be available');
+
+        // Whole profile is reported not-applied.
+        assertEquals(report.appliedChanges.length, 0);
+        assertEquals(report.skippedChanges.length, 2);
+
+        // The earlier valid threshold UPDATE was rolled back with the failed profile.
+        assertEquals(readMinimumScore(raw), 0, 'partial threshold op rolled back for a skipped profile');
+        // The seeded CF score is untouched, and no phantom DoesNotExist row was left behind.
+        assertEquals(readScores(raw), [{ name: 'CF-Existing', arrType: 'radarr', score: 50 }]);
+      });
+    });
+  }
+);
 
 Deno.test(
   'withSandboxCache: fail-soft — a failing profile skips ALL its changes, a valid profile applies',

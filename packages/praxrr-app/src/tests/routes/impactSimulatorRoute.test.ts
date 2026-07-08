@@ -691,6 +691,11 @@ Deno.test('impact: request validation and missing-cache errors', async (t) => {
     assertEquals(getErrorStatus(error), 400);
   });
 
+  await t.step('literal null body -> 400 (not 500)', async () => {
+    const error = await assertRejects(async () => impactRouteModule.POST(buildRawEvent('null')));
+    assertEquals(getErrorStatus(error), 400);
+  });
+
   await t.step('invalid arrType -> 400', async () => {
     const error = await assertRejects(async () =>
       impactRouteModule.POST(

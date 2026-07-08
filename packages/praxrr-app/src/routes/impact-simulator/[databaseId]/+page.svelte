@@ -72,8 +72,14 @@
     }
 
     // Only keep changes that target a currently-selected editable profile.
+    // Derive synchronously from `selectedProfileValues` (just assigned above) and
+    // `profileOptions` — NOT the reactive `selectedProfiles`, which has not yet
+    // recomputed at this point in onMount and would leave the set empty.
+    const selectedValues = new Set(selectedProfileValues);
     const editableNames = new Set(
-      selectedProfiles.filter((profile) => profile.editable).map((profile) => profile.name)
+      profileOptions
+        .filter((profile) => selectedValues.has(profile.value) && profile.editable)
+        .map((profile) => profile.name)
     );
     const hydratedChanges = (urlState.proposedChanges ?? []).filter((change) => editableNames.has(change.profileName));
     initEdit({ proposedChanges: hydratedChanges });

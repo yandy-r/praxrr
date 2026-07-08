@@ -77,6 +77,7 @@ export async function withSandboxCache<T>(
 
     const appliedChanges: ProposedChange[] = [];
     const skippedChanges: SkippedChange[] = [];
+    let savepointCounter = 0;
 
     for (const [profileName, edit] of editsByProfile) {
       const skipProfile = (reason: string) => {
@@ -95,6 +96,13 @@ export async function withSandboxCache<T>(
         continue;
       }
 
+      // Apply this profile's ops atomically on the ephemeral cache. A mid-profile
+      // failure must leave the sandbox exactly as it was before the profile's first
+      // op, so a skipped profile never partially mutates the config the report
+      // claims was not applied (e.g. a valid threshold UPDATE followed by an FK-
+      // failing CF INSERT). Commit (RELEASE) only when every op in the profile lands.
+      const savepoint = `sandbox_sp_${savepointCounter++}`;
+      raw.exec(`SAVEPOINT ${savepoint}`);
       let failReason: string | null = null;
       for (const op of built.ops) {
         for (const query of op.queries) {
@@ -117,8 +125,11 @@ export async function withSandboxCache<T>(
       }
 
       if (failReason !== null) {
+        raw.exec(`ROLLBACK TO ${savepoint}`);
+        raw.exec(`RELEASE ${savepoint}`);
         skipProfile(failReason);
       } else {
+        raw.exec(`RELEASE ${savepoint}`);
         for (const change of edit.changes) appliedChanges.push(change);
       }
     }

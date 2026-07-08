@@ -106,12 +106,16 @@ async function buildConfigDiff(
 }
 
 export const POST: RequestHandler = async ({ request }) => {
-  let body: SimulateImpactRequest;
+  let parsed: unknown;
   try {
-    body = await request.json();
+    parsed = await request.json();
   } catch {
     throw error(400, 'Invalid request body: expected valid JSON');
   }
+  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+    throw error(400, 'Invalid request body: expected a JSON object');
+  }
+  const body = parsed as SimulateImpactRequest;
 
   const { databaseId, arrType, releases, profileNames, proposedChanges } = body;
 

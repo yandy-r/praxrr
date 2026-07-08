@@ -3690,8 +3690,8 @@
         "discriminator": {
           "propertyName": "kind",
           "mapping": {
-            "set_cf_score": "#/SetCfScoreChange",
-            "set_profile_setting": "#/SetProfileSettingChange"
+            "set_cf_score": "SetCfScoreChange",
+            "set_profile_setting": "SetProfileSettingChange"
           }
         }
       },
