@@ -196,6 +196,7 @@ Deno.test('bottom nav ordering is deterministic by priority and sidebar traversa
     '/delay-profiles',
     '/metadata-profiles',
     '/score-simulator',
+    '/impact-simulator',
     '/settings',
   ]);
 
@@ -210,6 +211,7 @@ Deno.test('bottom nav ordering is deterministic by priority and sidebar traversa
     '/dependency-graph',
     '/regular-expressions',
     '/score-simulator',
+    '/impact-simulator',
     '/media-management',
     '/delay-profiles',
     '/metadata-profiles',

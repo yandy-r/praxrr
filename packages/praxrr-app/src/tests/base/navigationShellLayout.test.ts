@@ -31,6 +31,7 @@ Deno.test('app layout shell is stable and deep-link hrefs remain unchanged', () 
     '/delay-profiles',
     '/metadata-profiles',
     '/score-simulator',
+    '/impact-simulator',
     '/settings',
   ]);
 
@@ -57,6 +58,7 @@ Deno.test('app layout shell is stable and deep-link hrefs remain unchanged', () 
     '/delay-profiles',
     '/metadata-profiles',
     '/score-simulator',
+    '/impact-simulator',
     '/settings',
     '/settings/general',
     '/settings/jobs',
