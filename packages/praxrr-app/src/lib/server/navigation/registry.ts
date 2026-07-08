@@ -103,6 +103,18 @@ export const NAV_REGISTRY: ArrCapabilityAwareNavItem[] = [
     hasChildren: false,
   },
   {
+    id: 'overview.dependency_graph',
+    label: 'Dependency Graph',
+    href: '/dependency-graph',
+    groupId: ensureGroupId('overview'),
+    order: 3,
+    arrScope: scopeAll,
+    mobilePriority: 'medium',
+    iconKey: 'Network',
+    emoji: '🔗',
+    hasChildren: false,
+  },
+  {
     id: 'apps.arrs',
     label: 'Arrs',
     href: '/arr',

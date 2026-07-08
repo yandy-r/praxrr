@@ -1,7 +1,8 @@
 import { error, redirect, fail } from '@sveltejs/kit';
 import type { ServerLoad, Actions } from '@sveltejs/kit';
 import { pcdManager } from '$pcd/index.ts';
-import { canWriteToBase } from '$pcd/index.ts';
+import { canWriteToBase, getImpact } from '$pcd/index.ts';
+import { sanitizeBigInts } from '$http/sanitizeBigInts.ts';
 import * as regularExpressionQueries from '$pcd/entities/regularExpressions/index.ts';
 import { parseOperationLayer } from '$pcd/index.ts';
 import { logger } from '$logger/logger.ts';
@@ -35,9 +36,30 @@ export const load: ServerLoad = async ({ params }) => {
     throw error(404, 'Regular expression not found');
   }
 
+  // Eager reverse-dependency impact (custom formats whose conditions use this regex) so the
+  // delete-confirm modal has cascade data without a lazy round-trip. Defensive: a graph
+  // failure must never break the editor.
+  let impact = null;
+  try {
+    impact = sanitizeBigInts(
+      await getImpact(
+        cache,
+        currentDatabaseId,
+        { kind: 'regular_expression', name: regularExpression.name },
+        {
+          direction: 'dependents',
+          depth: 1,
+        }
+      )
+    );
+  } catch {
+    impact = null;
+  }
+
   return {
     currentDatabase,
     regularExpression,
+    impact,
     canWriteToBase: canWriteToBase(currentDatabaseId),
   };
 };

@@ -3,7 +3,7 @@
  */
 
 import type { PCDCache } from '$pcd/index.ts';
-import { writeOperation, type OperationLayer } from '$pcd/index.ts';
+import { getRegularExpressionDependentConditions, writeOperation, type OperationLayer } from '$pcd/index.ts';
 import type { RegularExpressionWithTags } from '$shared/pcd/display.ts';
 import { uuid } from '$shared/utils/uuid.ts';
 
@@ -33,17 +33,11 @@ export async function remove(options: DeleteRegularExpressionOptions) {
   const queries = [];
   const groupId = uuid();
 
-  // 1. Capture any custom format conditions that reference this regex
-  const dependentConditions = await db
-    .selectFrom('condition_patterns as cp')
-    .innerJoin('custom_format_conditions as cfc', (join) =>
-      join.onRef('cfc.custom_format_name', '=', 'cp.custom_format_name').onRef('cfc.name', '=', 'cp.condition_name')
-    )
-    .select(['cp.custom_format_name', 'cp.condition_name', 'cfc.type', 'cfc.arr_type', 'cfc.negate', 'cfc.required'])
-    .where('cp.regular_expression_name', '=', current.name)
-    .orderBy('cp.custom_format_name')
-    .orderBy('cp.condition_name')
-    .execute();
+  // 1. Capture any custom format conditions that reference this regex.
+  // Reverse-dependency enumeration extracted to graph/references.ts (single source shared
+  // with the dependency-graph E2 edge). Same 6-column superset + (custom_format_name,
+  // condition_name) order as before, so the generated condition-removal ops are unchanged.
+  const dependentConditions = await getRegularExpressionDependentConditions(cache, current.name);
 
   // 2. Create custom format condition removal ops (so they appear as updates)
   const conditionsByFormat = new Map<

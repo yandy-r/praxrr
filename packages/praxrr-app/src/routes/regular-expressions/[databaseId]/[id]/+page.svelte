@@ -31,6 +31,7 @@
 		canWriteToBase={data.canWriteToBase}
 		actionUrl="?/update"
 		{initialData}
+		impact={data.impact}
 		onCancel={handleCancel}
 	/>
 </div>

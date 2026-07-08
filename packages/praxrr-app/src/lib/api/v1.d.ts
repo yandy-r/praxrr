@@ -723,6 +723,65 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/pcd/{databaseId}/graph': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get the resolved dependency graph for a PCD database
+     * @description Returns the dependency graph of config entities for a PCD database,
+     *     computed on demand from the in-memory PCD cache (read-only). Nodes are
+     *     custom formats, regular expressions, quality profiles, qualities, and
+     *     quality definitions; edges are referrer -> dependency relationships:
+     *     quality profile -> custom format (scored), custom format -> regular
+     *     expression, quality profile -> quality, and quality definition ->
+     *     quality.
+     *
+     *     `arrType` filters to edges scoped to that Arr app (plus `all` edges) and
+     *     to quality profiles compatible with it; `nodeKind` filters nodes/edges to
+     *     a single entity family. All arr-scoped edges resolve by explicit
+     *     `arr_type` with no sibling fallback.
+     */
+    get: operations['getDependencyGraph'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/pcd/{databaseId}/graph/{nodeKind}/{name}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get the dependency impact of a single entity
+     * @description Returns the entities that reference (`direction=dependents`, default) or
+     *     are referenced by (`direction=dependencies`) a single named node, via a
+     *     bounded traversal over the dependency graph. Powers editor "Used by"
+     *     panels, cascade-delete warnings, and node-focus navigation.
+     *
+     *     `name` may contain reserved characters (it is a free-form entity name);
+     *     clients MUST percent-encode it. `depth` is clamped to `[1, 3]`. A
+     *     well-formed request for a name that does not exist returns `404`; an
+     *     unknown or not-yet-built `databaseId` returns `400`.
+     */
+    get: operations['getDependencyImpact'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/setup/state': {
     parameters: {
       query?: never;
@@ -2218,6 +2277,105 @@ export interface components {
       arrType: 'radarr' | 'sonarr' | 'lidarr';
       /** @description Desired-vs-actual field changes; an empty array means the entity is in sync */
       changes: components['schemas']['EntityChange'][];
+    };
+    /**
+     * @description PCD entity family a dependency-graph node represents. `quality` and
+     *     `quality_definition` are leaf kinds with no per-id editor route (see
+     *     `GraphNode.routeId`).
+     * @enum {string}
+     */
+    GraphNodeKind: 'custom_format' | 'regular_expression' | 'quality_profile' | 'quality' | 'quality_definition';
+    /**
+     * @description Arr scope of a dependency edge. `all` is a first-class, distinct value (an
+     *     edge that applies to every Arr app); it is never expanded into per-arr
+     *     edges and never establishes per-arr quality-profile compatibility.
+     * @enum {string}
+     */
+    GraphArrType: 'radarr' | 'sonarr' | 'lidarr' | 'all';
+    /**
+     * @description Relationship family. Direction is always referrer (`from`) -> dependency
+     *     (`to`).
+     * @enum {string}
+     */
+    GraphEdgeKind:
+      | 'quality_profile_custom_format'
+      | 'custom_format_regular_expression'
+      | 'quality_profile_quality'
+      | 'quality_definition_quality';
+    GraphNodeRef: {
+      kind: components['schemas']['GraphNodeKind'];
+      /** @description Name-keyed identifier of the referenced entity */
+      name: string;
+    };
+    GraphNode: {
+      kind: components['schemas']['GraphNodeKind'];
+      /** @description Name-keyed identifier (never a route id) */
+      name: string;
+      /**
+       * @description Integer editor id for linkable kinds (`custom_format`,
+       *     `regular_expression`, `quality_profile`); null for leaf kinds
+       *     (`quality`, `quality_definition`) that have no per-id editor route.
+       */
+      routeId: number | null;
+      /** @description Number of edges pointing at this node (how many entities reference it) */
+      inDegree: number;
+      /** @description Number of edges leaving this node (how many entities it depends on) */
+      outDegree: number;
+      /**
+       * @description Arr apps this node is valid for, present only for `quality_profile` and
+       *     `quality` nodes. For quality profiles it is derived from
+       *     `computeProfileCompatibility` (never from `arr_type='all'` scores).
+       */
+      compatibleArrTypes?: ('radarr' | 'sonarr' | 'lidarr')[] | null;
+    };
+    GraphEdge: {
+      from: components['schemas']['GraphNodeRef'];
+      to: components['schemas']['GraphNodeRef'];
+      edgeKind: components['schemas']['GraphEdgeKind'];
+      arrType: components['schemas']['GraphArrType'];
+      /** @description Custom-format score, present only on `quality_profile_custom_format` edges */
+      score?: number | null;
+      /** @description Quality group name, present only on grouped `quality_profile_quality` edges */
+      groupName?: string | null;
+    };
+    DependencyGraphResponse: {
+      /** @description PCD database ID */
+      databaseId: number;
+      /** @description Every in-scope entity node, with in/out degree and (where applicable) compatibility */
+      nodes: components['schemas']['GraphNode'][];
+      /** @description Referrer -> dependency edges, filtered by the requested arrType/nodeKind */
+      edges: components['schemas']['GraphEdge'][];
+      /** @description Distinct arr scopes present across the returned edges */
+      arrTypesPresent: components['schemas']['GraphArrType'][];
+      /** @description True when the graph exceeded the server-side edge cap and was truncated */
+      truncated: boolean;
+    };
+    GraphImpactResponse: {
+      /** @description PCD database ID */
+      databaseId: number;
+      node: components['schemas']['GraphNode'];
+      /**
+       * @description `dependents` (default) = entities that reference this node (reverse
+       *     traversal); `dependencies` = entities this node references (forward).
+       * @enum {string}
+       */
+      direction: 'dependents' | 'dependencies';
+      /** @description Traversal depth actually applied (clamped to [1, 3]) */
+      depth: number;
+      /** @description All edges discovered by the bounded traversal */
+      edges: components['schemas']['GraphEdge'][];
+      /** @description The same edges grouped by arrType (arr scopes never collapsed) */
+      byArrType: {
+        [key: string]: components['schemas']['GraphEdge'][];
+      };
+      /** @description Count of distinct related entities keyed by node kind, plus `total` */
+      counts: {
+        [key: string]: number;
+      };
+      /** @description True when at least one edge was found (there is downstream impact) */
+      hasDownstream: boolean;
+      /** @description True when the traversal hit its depth or visited cap and stopped early */
+      truncated: boolean;
     };
     SqliteHealth: {
       status: components['schemas']['ComponentStatus'];
@@ -4338,6 +4496,131 @@ export interface operations {
         };
       };
       /** @description Failed to compute live diff */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+    };
+  };
+  getDependencyGraph: {
+    parameters: {
+      query?: {
+        /** @description Restrict to edges scoped to this Arr app (and `all`) and compatible quality profiles */
+        arrType?: 'radarr' | 'sonarr' | 'lidarr' | 'all';
+        /** @description Restrict the graph to a single entity family */
+        nodeKind?: 'custom_format' | 'regular_expression' | 'quality_profile' | 'quality' | 'quality_definition';
+      };
+      header?: never;
+      path: {
+        /** @description PCD database ID */
+        databaseId: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Dependency graph */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DependencyGraphResponse'];
+        };
+      };
+      /** @description Invalid databaseId, unknown arrType/nodeKind, or database not ready */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Authentication required */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Failed to build the dependency graph */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+    };
+  };
+  getDependencyImpact: {
+    parameters: {
+      query?: {
+        /** @description Traverse to dependents (reverse, default) or dependencies (forward) */
+        direction?: 'dependents' | 'dependencies';
+        /** @description Traversal depth, clamped to [1, 3] */
+        depth?: number;
+        /** @description Restrict to edges scoped to this Arr app (and `all`) */
+        arrType?: 'radarr' | 'sonarr' | 'lidarr' | 'all';
+      };
+      header?: never;
+      path: {
+        /** @description PCD database ID */
+        databaseId: number;
+        /** @description Entity family of the focus node */
+        nodeKind: 'custom_format' | 'regular_expression' | 'quality_profile' | 'quality' | 'quality_definition';
+        /** @description Name of the focus entity (percent-encoded; may contain reserved characters) */
+        name: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Dependency impact result */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['GraphImpactResponse'];
+        };
+      };
+      /** @description Invalid databaseId, unknown nodeKind/arrType, or database not ready */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Authentication required */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description No node with that kind and name (an unknown or not-yet-built databaseId is 400, not 404) */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Failed to compute dependency impact */
       500: {
         headers: {
           [name: string]: unknown;

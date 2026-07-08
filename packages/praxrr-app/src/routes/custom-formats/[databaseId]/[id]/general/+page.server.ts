@@ -1,7 +1,8 @@
 import { error, redirect, fail } from '@sveltejs/kit';
 import type { ServerLoad, Actions } from '@sveltejs/kit';
 import { pcdManager } from '$pcd/index.ts';
-import { canWriteToBase } from '$pcd/index.ts';
+import { canWriteToBase, getImpact } from '$pcd/index.ts';
+import { sanitizeBigInts } from '$http/sanitizeBigInts.ts';
 import * as customFormatQueries from '$pcd/entities/customFormats/index.ts';
 import { loadSectionTiers } from '$lib/server/complexity/loadSectionTiers.ts';
 import { loadSectionModes } from '$lib/server/disclosure/loadSectionModes.ts';
@@ -49,9 +50,29 @@ export const load: ServerLoad = async ({ params, locals }) => {
   const customFormatSectionModes = loadSectionModes(locals.user?.id, CUSTOM_FORMAT_KEYS);
   const customFormatSectionTiers = loadSectionTiers(locals.user?.id, CUSTOM_FORMAT_KEYS);
 
+  // Eager reverse-dependency impact so the delete-confirm modal has cascade data without a
+  // lazy round-trip. Defensive: a graph failure must never break the editor.
+  let impact = null;
+  try {
+    impact = sanitizeBigInts(
+      await getImpact(
+        cache,
+        currentDatabaseId,
+        { kind: 'custom_format', name: format.name },
+        {
+          direction: 'dependents',
+          depth: 1,
+        }
+      )
+    );
+  } catch {
+    impact = null;
+  }
+
   return {
     currentDatabase,
     format,
+    impact,
     canWriteToBase: canWriteToBase(currentDatabaseId),
     customFormatSectionModes,
     customFormatSectionTiers,

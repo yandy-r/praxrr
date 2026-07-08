@@ -13,6 +13,9 @@
   import { alertStore } from '$alerts/store';
   import { Save, Trash2, Loader2 } from 'lucide-svelte';
   import { current, isDirty, initEdit, initCreate, update } from '$lib/client/stores/dirty';
+  import DependencyImpact from '$ui/graph/DependencyImpact.svelte';
+  import { formatCascadeSummary } from '$ui/graph/cascadeSummary.ts';
+  import type { components } from '$api/v1.d.ts';
 
   // Form data shape
   interface RegularExpressionFormData {
@@ -30,6 +33,9 @@
   export let canWriteToBase: boolean = false;
   export let actionUrl: string = '';
   export let initialData: RegularExpressionFormData;
+  // Eager reverse-dependency impact (custom formats using this regex); passed explicitly
+  // because this form does not import the page store.
+  export let impact: components['schemas']['GraphImpactResponse'] | null = null;
 
   // Event handlers
   export let onCancel: () => void;
@@ -73,6 +79,12 @@
   $: submitButtonText = mode === 'create' ? 'Create' : 'Save Changes';
 
   $: isValid = formData.name.trim() !== '' && formData.pattern.trim() !== '';
+
+  $: deleteMessage =
+    `Are you sure you want to delete "${formData.name}"? This action cannot be undone.` +
+    (impact && impact.hasDownstream
+      ? ` ${formatCascadeSummary(impact, { verb: 'Deleting', entityLabel: 'this regular expression', effect: 'removes it from those conditions' })}`
+      : '');
 
   async function handleSaveClick() {
     selectedLayer = canWriteToBase ? 'base' : 'user';
@@ -206,6 +218,12 @@
     </div>
   </form>
 
+  {#if mode === 'edit'}
+    <div class="md:px-4">
+      <DependencyImpact {impact} heading="Used by custom formats" />
+    </div>
+  {/if}
+
   <!-- Hidden delete form -->
   {#if mode === 'edit'}
     <form
@@ -236,7 +254,7 @@
   <Modal
     open={showDeleteConfirmModal}
     header="Delete Regular Expression"
-    bodyMessage={`Are you sure you want to delete "${formData.name}"? This action cannot be undone.`}
+    bodyMessage={deleteMessage}
     confirmText="Delete"
     cancelText="Cancel"
     confirmDanger={true}

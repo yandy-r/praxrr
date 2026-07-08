@@ -28,6 +28,8 @@ tags:
     description: PCD state snapshot management endpoints
   - name: Resolved Config
     description: Resolved PCD configuration state, layer breakdown, and live/cross-instance diff endpoints
+  - name: Dependency Graph
+    description: Resolved dependency relationships between PCD config entities, with per-entity impact
   - name: User Preferences
     description: Durable UI preference storage for progressive disclosure
   - name: Complexity Tiers
@@ -614,6 +616,10 @@ paths:
     $ref: './paths/resolved-config.yaml#/compare'
   /pcd/{databaseId}/resolved/{entityType}/{name}/diff:
     $ref: './paths/resolved-config.yaml#/diff'
+  /pcd/{databaseId}/graph:
+    $ref: './paths/graph.yaml#/graph'
+  /pcd/{databaseId}/graph/{nodeKind}/{name}:
+    $ref: './paths/graph.yaml#/impact'
   /setup/state:
     $ref: './paths/setup.yaml#/state'
   /setup/test-connection:
@@ -1354,3 +1360,20 @@ components:
       $ref: './schemas/resolved-config.yaml#/CrossInstanceComparisonResponse'
     ResolvedLiveDiffResponse:
       $ref: './schemas/resolved-config.yaml#/ResolvedLiveDiffResponse'
+    # Dependency Graph
+    GraphNodeKind:
+      $ref: './schemas/graph.yaml#/GraphNodeKind'
+    GraphArrType:
+      $ref: './schemas/graph.yaml#/GraphArrType'
+    GraphEdgeKind:
+      $ref: './schemas/graph.yaml#/GraphEdgeKind'
+    GraphNodeRef:
+      $ref: './schemas/graph.yaml#/GraphNodeRef'
+    GraphNode:
+      $ref: './schemas/graph.yaml#/GraphNode'
+    GraphEdge:
+      $ref: './schemas/graph.yaml#/GraphEdge'
+    DependencyGraphResponse:
+      $ref: './schemas/graph.yaml#/DependencyGraphResponse'
+    GraphImpactResponse:
+      $ref: './schemas/graph.yaml#/GraphImpactResponse'
