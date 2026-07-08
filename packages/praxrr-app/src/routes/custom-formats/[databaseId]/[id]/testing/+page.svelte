@@ -73,6 +73,14 @@
     return `${test.title}:${test.type}`;
   }
 
+  function groupConditionsByType(conditions: Condition[]) {
+    return conditions.reduce<Record<string, Condition[]>>((acc, condition) => {
+      if (!acc[condition.conditionType]) acc[condition.conditionType] = [];
+      acc[condition.conditionType].push(condition);
+      return acc;
+    }, {});
+  }
+
   // Delete modal state
   let showDeleteModal = false;
   let testToDelete: Test | null = null;
@@ -217,11 +225,7 @@
 					'indexer_flag': 'Indexer Flag',
 					'size': 'Size'
 				}}
-          {@const groupedConditions = row.conditions.reduce((acc, c) => {
-            if (!acc[c.conditionType]) acc[c.conditionType] = [];
-            acc[c.conditionType].push(c);
-            return acc;
-          }, {})}
+          {@const groupedConditions = groupConditionsByType(row.conditions)}
           {@const conditionTypes = Object.keys(groupedConditions)}
           {@const allRequiredPass = row.conditions
             .filter((c: Condition) => c.required)
