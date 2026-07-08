@@ -7,28 +7,29 @@ Scope anchor: `docs/plans/drift-detection/research.md` (the reuse map).
 
 ## 1. Overview & Goals
 
-Drift Detection is a **scheduled/on-demand caller of the existing preview diff engine (`generatePreview`) that persists the resulting `EntityChange[]` as a latest-state, one-row-per-instance drift record**, surfaced through a `/drift` dashboard. It answers issue #15's acceptance — *"compare desired to Arr state, show drift by instance / profile / entity"* — by iterating every enabled, supported Arr instance, running the already-namespace-correlated desired-vs-live diff the sync engine produces, and rolling each instance up to a single `DriftStatus` with per-entity, per-field detail. There is **no new diff, HTTP, scheduler, or notification machinery to build**; the work is persistence, wiring, and presentation.
+Drift Detection is a **scheduled/on-demand caller of the existing preview diff engine (`generatePreview`) that persists the resulting `EntityChange[]` as a latest-state, one-row-per-instance drift record**, surfaced through a `/drift` dashboard. It answers issue #15's acceptance — _"compare desired to Arr state, show drift by instance / profile / entity"_ — by iterating every enabled, supported Arr instance, running the already-namespace-correlated desired-vs-live diff the sync engine produces, and rolling each instance up to a single `DriftStatus` with per-entity, per-field detail. There is **no new diff, HTTP, scheduler, or notification machinery to build**; the work is persistence, wiring, and presentation.
 
 V1 is:
-- **Arr-read-only** — it never writes remote Arr state. It inherits exactly **one idempotent app-DB write** from the engine (`arrNamespaceQueries.getOrCreate`); this is namespace-registration bookkeeping, not an Arr mutation. The headline "read-only" claim is scoped precisely to *the Arr* (see §9, "Read-only scope") (addresses critique: the preview is not purely read-only because `getOrCreate` writes app-DB rows).
+
+- **Arr-read-only** — it never writes remote Arr state. It inherits exactly **one idempotent app-DB write** from the engine (`arrNamespaceQueries.getOrCreate`); this is namespace-registration bookkeeping, not an Arr mutation. The headline "read-only" claim is scoped precisely to _the Arr_ (see §9, "Read-only scope") (addresses critique: the preview is not purely read-only because `getOrCreate` writes app-DB rows).
 - **Latest-state only** (no history — bounded storage, see §3).
 - **Info-only** (it reports; it does not remediate).
 
 **Key axis resolutions** (one line each — these close research.md §4/§5):
 
-| Open axis | Decision | Rationale |
-| --- | --- | --- |
-| Granularity (Q1) | Per-instance status + per-entity/per-field detail | Engine emits per-field; dashboard needs the roll-up. |
-| Storage model (Q2) | **2 tables**: singleton settings + one **latest-state upsert row per instance**, entity detail as a JSON `changes[]` blob on that row; **`unchanged` never persisted** | V1 reads are always whole-instance; a child table buys nothing until #22/#27. Upsert + no-`unchanged` = bounded storage, no append-only growth (addresses critique: append-only `drift_results` with `unchanged` rows grows unbounded with no retention). |
-| Routing scope (Q5/2e) | **Instance-scoped everywhere** (`/drift/[instanceId]`, one `generatePreview({instance})` call) | `generatePreview` has no `databaseId` input and groups all DBs internally; instance-scoping is the only shape one call can satisfy — this doc contains **zero** `[databaseId]` routing (addresses critique: engine is instance-scoped but brief waffled toward `/drift/[databaseId]`). |
-| `create`/`delete` classification (Q…) | `update`→drift (alert), `create`→missing (alert), `delete`→**unmanaged (non-alerting)** | `delete` = every live Arr entity not in the configured desired set (foreign-DB, manual, Recyclarr/Configarr CFs). Alerting on it makes every real instance permanently "drifted" (addresses critique: `delete`→drift is permanent false drift). |
-| Heartbeat vs full check (Q3) | **Combined** job, heartbeat-first | Status column models `unreachable`/`unauthorized`; a future split needs no schema change. |
-| Acknowledge model (Q4) | Out of V1; `drift_signature` is the exact primitive an ack later attaches to | Dedup key doubles as the future ack anchor. |
-| "Expected" local drift | `desired` = **resolved (base+user) ops** the cache already layers; intentional overrides are user-ops → `unchanged`, never drift | Expected drift is structurally not a diff — no allowlist needed. |
-| Scheduling model (Q6) | **Single global interval** (`dedupeKey 'drift.check'`), **chunked** across job runs; on-demand = single-instance | Per-instance schedules multiply job rows for no V1 gain; chunking bounds dispatcher occupancy (see §5). |
-| Namespace correlation (Q7) | **Do NOT run `transformer.ts`**; `generatePreview` correlates end-to-end via syncer suffixing + `findNamespaceMatch` | Running the transformer ourselves double-suffixes → every entity looks like `create`+`delete`. |
-| Auth-failure policy (Q8) | `unauthorized` status, **no auto-disable** | Silently disabling an instance is worse than a stale row; creds may be transiently wrong. |
-| Retention (Q2) | Latest-state upsert, no `unchanged` rows, `ON DELETE CASCADE` reap → **no prune routine needed** | Row count is bounded by `#instances`; storage cannot grow with time (addresses critique: no retention/prune specified). |
+| Open axis                             | Decision                                                                                                                                                               | Rationale                                                                                                                                                                                                                                                                              |
+| ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Granularity (Q1)                      | Per-instance status + per-entity/per-field detail                                                                                                                      | Engine emits per-field; dashboard needs the roll-up.                                                                                                                                                                                                                                   |
+| Storage model (Q2)                    | **2 tables**: singleton settings + one **latest-state upsert row per instance**, entity detail as a JSON `changes[]` blob on that row; **`unchanged` never persisted** | V1 reads are always whole-instance; a child table buys nothing until #22/#27. Upsert + no-`unchanged` = bounded storage, no append-only growth (addresses critique: append-only `drift_results` with `unchanged` rows grows unbounded with no retention).                              |
+| Routing scope (Q5/2e)                 | **Instance-scoped everywhere** (`/drift/[instanceId]`, one `generatePreview({instance})` call)                                                                         | `generatePreview` has no `databaseId` input and groups all DBs internally; instance-scoping is the only shape one call can satisfy — this doc contains **zero** `[databaseId]` routing (addresses critique: engine is instance-scoped but brief waffled toward `/drift/[databaseId]`). |
+| `create`/`delete` classification (Q…) | `update`→drift (alert), `create`→missing (alert), `delete`→**unmanaged (non-alerting)**                                                                                | `delete` = every live Arr entity not in the configured desired set (foreign-DB, manual, Recyclarr/Configarr CFs). Alerting on it makes every real instance permanently "drifted" (addresses critique: `delete`→drift is permanent false drift).                                        |
+| Heartbeat vs full check (Q3)          | **Combined** job, heartbeat-first                                                                                                                                      | Status column models `unreachable`/`unauthorized`; a future split needs no schema change.                                                                                                                                                                                              |
+| Acknowledge model (Q4)                | Out of V1; `drift_signature` is the exact primitive an ack later attaches to                                                                                           | Dedup key doubles as the future ack anchor.                                                                                                                                                                                                                                            |
+| "Expected" local drift                | `desired` = **resolved (base+user) ops** the cache already layers; intentional overrides are user-ops → `unchanged`, never drift                                       | Expected drift is structurally not a diff — no allowlist needed.                                                                                                                                                                                                                       |
+| Scheduling model (Q6)                 | **Single global interval** (`dedupeKey 'drift.check'`), **chunked** across job runs; on-demand = single-instance                                                       | Per-instance schedules multiply job rows for no V1 gain; chunking bounds dispatcher occupancy (see §5).                                                                                                                                                                                |
+| Namespace correlation (Q7)            | **Do NOT run `transformer.ts`**; `generatePreview` correlates end-to-end via syncer suffixing + `findNamespaceMatch`                                                   | Running the transformer ourselves double-suffixes → every entity looks like `create`+`delete`.                                                                                                                                                                                         |
+| Auth-failure policy (Q8)              | `unauthorized` status, **no auto-disable**                                                                                                                             | Silently disabling an instance is worse than a stale row; creds may be transiently wrong.                                                                                                                                                                                              |
+| Retention (Q2)                        | Latest-state upsert, no `unchanged` rows, `ON DELETE CASCADE` reap → **no prune routine needed**                                                                       | Row count is bounded by `#instances`; storage cannot grow with time (addresses critique: no retention/prune specified).                                                                                                                                                                |
 
 **DriftStatus enum (stored)** = `in-sync | drifted | unreachable | unauthorized | error` (5 values — **extends** research.md:112's 3-value enum; `unauthorized` is its own status to honor no-auto-disable, and `error` ≠ `unreachable`). The summary read model adds a synthesized `never-checked` for instances with no row yet.
 
@@ -149,7 +150,7 @@ CREATE TABLE drift_instance_status (
 
 **arr_type has a CHECK** constraint restricting to `radarr|sonarr|lidarr` (addresses critique: `arr_type TEXT` had no CHECK).
 
-**Why 2 tables, not 3.** Instance status is **stored, not derived** — an `unreachable`/`unauthorized` instance has zero entity rows, so status cannot be derived from a detail scan. Entity *detail* is a JSON blob because V1 reads are **always whole-instance** and there is **zero cross-entity SQL query in scope** (that is #22/#27, OUT). The three category counts are the **only** denormalization — cheap ints so the summary roll-up never parses JSON. On a **failed** check (unreachable/unauthorized/error) the handler updates `status`/`reason`/`checked_at` only and **leaves `changes` + `content_checked_at` untouched**, so the UI shows "last good check at X; currently unreachable" rather than blanking known drift.
+**Why 2 tables, not 3.** Instance status is **stored, not derived** — an `unreachable`/`unauthorized` instance has zero entity rows, so status cannot be derived from a detail scan. Entity _detail_ is a JSON blob because V1 reads are **always whole-instance** and there is **zero cross-entity SQL query in scope** (that is #22/#27, OUT). The three category counts are the **only** denormalization — cheap ints so the summary roll-up never parses JSON. On a **failed** check (unreachable/unauthorized/error) the handler updates `status`/`reason`/`checked_at` only and **leaves `changes` + `content_checked_at` untouched**, so the UI shows "last good check at X; currently unreachable" rather than blanking known drift.
 
 **No entity-name keying — collision-proof by construction.** The critique's collision scenario ("two databases syncing same-named entities collide under an upsert keyed on `(instance_id, entity_type, entity_name)`") **does not apply to this design**: nothing is keyed on `entity_name`. The upsert key is `arr_instance_id` (PK); same-named entities from different DBs are simply two distinct elements of the `changes[]` JSON array, each carrying its own `remoteId` — no data loss. The one place display-name ambiguity could still bite is dedup, which we harden by qualifying the signature with `remoteId` (see §6) (addresses critique: namespace-stripped display names collide under name keying — resolved structurally by not keying on name, and by remoteId-qualifying the signature).
 
@@ -157,13 +158,13 @@ CREATE TABLE drift_instance_status (
 
 ```ts
 interface DriftEntityChange {
-  section: SyncPreviewSection;                 // 'qualityProfiles'|'delayProfiles'|'mediaManagement'|'metadataProfiles'
-  entityType: string;                          // EntityChange.entityType (customFormat|qualityProfile|naming|…)
-  name: string;                                // EntityChange.name (namespace-STRIPPED display name)
-  action: 'create' | 'update' | 'delete';      // SyncPreviewAction minus 'unchanged'
+  section: SyncPreviewSection; // 'qualityProfiles'|'delayProfiles'|'mediaManagement'|'metadataProfiles'
+  entityType: string; // EntityChange.entityType (customFormat|qualityProfile|naming|…)
+  name: string; // EntityChange.name (namespace-STRIPPED display name)
+  action: 'create' | 'update' | 'delete'; // SyncPreviewAction minus 'unchanged'
   category: 'drift' | 'missing' | 'unmanaged'; // derived from action; makes the non-alerting split explicit
-  remoteId: number | null;                     // EntityChange.remoteId (live Arr id or null for create)
-  fields: FieldChange[];                        // EntityChange.fields VERBATIM — current=LIVE (old), desired=PCD (new)
+  remoteId: number | null; // EntityChange.remoteId (live Arr id or null for create)
+  fields: FieldChange[]; // EntityChange.fields VERBATIM — current=LIVE (old), desired=PCD (new)
 }
 ```
 
@@ -181,43 +182,71 @@ Home: `packages/praxrr-app/src/lib/server/sync/drift/` (a preview-engine consume
 
 ```ts
 // $sync/drift/types.ts
-export type DriftStatus = 'in-sync' | 'drifted' | 'unreachable' | 'unauthorized' | 'error';
+export type DriftStatus =
+  'in-sync' | 'drifted' | 'unreachable' | 'unauthorized' | 'error';
 export type DriftReason =
-  | 'unreachable' | 'timeout' | 'unauthorized' | 'invalid_response'
-  | 'not_configured' | 'cache_not_ready' | 'rate_limited' | 'error';
+  | 'unreachable'
+  | 'timeout'
+  | 'unauthorized'
+  | 'invalid_response'
+  | 'not_configured'
+  | 'cache_not_ready'
+  | 'rate_limited'
+  | 'error';
 export interface InstanceDriftResult {
-  instanceId: number; instanceName: string; arrType: SyncPreviewArrType;
-  status: DriftStatus; reason: DriftReason | null; detectedVersion: string | null;
+  instanceId: number;
+  instanceName: string;
+  arrType: SyncPreviewArrType;
+  status: DriftStatus;
+  reason: DriftReason | null;
+  detectedVersion: string | null;
   counts: { drifted: number; missing: number; unmanaged: number };
-  changes: DriftEntityChange[];            // update+create+delete
-  driftSignature: string | null;           // over update+create only, remoteId-qualified
-  checkedAt: string; contentCheckedAt: string | null; durationMs: number;
+  changes: DriftEntityChange[]; // update+create+delete
+  driftSignature: string | null; // over update+create only, remoteId-qualified
+  checkedAt: string;
+  contentCheckedAt: string | null;
+  durationMs: number;
 }
-type HeartbeatResult = { ok: true; version: string } | { ok: false; status?: number };
+type HeartbeatResult =
+  { ok: true; version: string } | { ok: false; status?: number };
 
 // $sync/drift/check.ts
 export interface DriftCheckDeps {
-  readonly generatePreview: typeof generatePreview;                                // orchestrator.ts:193
-  readonly getSystemStatus: (instance: ArrInstance) => Promise<HeartbeatResult>;   // wraps getArrInstanceClient + base.ts:72, {timeout:5000, retries:0}
-  readonly isPcdCacheReady: (instanceId: number) => boolean;                        // getCache().isBuilt() over the instance's synced DBs
-  readonly resolveAvailableSections:                                               // detectAndRecordArrVersion + resolveSyncSectionAvailability
-    (instance: ArrInstance, version: string) => Promise<Set<SyncPreviewSection>>;  //   → version-supported section set
-  readonly registerPreviewAttempt: typeof registerPreviewCreateAttempt;            // limits.ts:17 — SHARED preview window
+  readonly generatePreview: typeof generatePreview; // orchestrator.ts:193
+  readonly getSystemStatus: (instance: ArrInstance) => Promise<HeartbeatResult>; // wraps getArrInstanceClient + base.ts:72, {timeout:5000, retries:0}
+  readonly isPcdCacheReady: (instanceId: number) => boolean; // getCache().isBuilt() over the instance's synced DBs
+  readonly resolveAvailableSections: ( // detectAndRecordArrVersion + resolveSyncSectionAvailability
+    instance: ArrInstance,
+    version: string
+  ) => Promise<Set<SyncPreviewSection>>; //   → version-supported section set
+  readonly registerPreviewAttempt: typeof registerPreviewCreateAttempt; // limits.ts:17 — SHARED preview window
   readonly now: () => number;
-  readonly budgetMs: number;                                                       // default 20000
+  readonly budgetMs: number; // default 20000
 }
 export const defaultDriftCheckDeps: DriftCheckDeps;
 
 // Pure aggregation core — no I/O, never throws:
-export function aggregateDrift(preview: GeneratePreviewResult, availableSections: Set<SyncPreviewSection>):
-  { changes: DriftEntityChange[]; counts: { drifted: number; missing: number; unmanaged: number }; allSectionsErrored: boolean };
+export function aggregateDrift(
+  preview: GeneratePreviewResult,
+  availableSections: Set<SyncPreviewSection>
+): {
+  changes: DriftEntityChange[];
+  counts: { drifted: number; missing: number; unmanaged: number };
+  allSectionsErrored: boolean;
+};
 export function driftSignature(changes: DriftEntityChange[]): string | null;
 
 // IO shell — never throws; returns a status even on failure:
-export async function checkInstanceDrift(instance: ArrInstance, deps?: Partial<DriftCheckDeps>): Promise<InstanceDriftResult>;
+export async function checkInstanceDrift(
+  instance: ArrInstance,
+  deps?: Partial<DriftCheckDeps>
+): Promise<InstanceDriftResult>;
 
 // $sync/drift/persist.ts — the single path both the sweep and the POST use:
-export async function checkAndPersistInstance(instance: ArrInstance, deps?: Partial<DriftCheckDeps>): Promise<InstanceDriftResult>;
+export async function checkAndPersistInstance(
+  instance: ArrInstance,
+  deps?: Partial<DriftCheckDeps>
+): Promise<InstanceDriftResult>;
 ```
 
 `aggregateDrift` and `driftSignature` are pure; `checkInstanceDrift` layers heartbeat/version-gate/gates/timeout/network; `checkAndPersistInstance` layers prior-read → check → transactional upsert → dedup notify. Both the scheduled sweep and `POST /drift/[id]` call **`checkAndPersistInstance` verbatim** so they can never diverge.
@@ -233,7 +262,7 @@ export async function checkAndPersistInstance(instance: ArrInstance, deps?: Part
    - `ok:true` → record `detectedVersion`; continue.
 3. **Gates** (heartbeat OK only):
    - `registerPreviewAttempt(id, now) === false` → `error`, reason `rate_limited` (sweep yields the slot; POST returns 429). Shared window = drift + sync-preview can't collectively hammer an Arr.
-   - `isPcdCacheReady(id) === false` → `error`, reason `cache_not_ready`. **This is the anti-false-`in-sync` guard**: `getCache()` throws without a built PCD cache (syncer.ts:501); an unbuilt cache would make the syncers read empty `desired` → zero create/update → a *false* `in-sync`. We check `isBuilt()` first and degrade, never trusting a clean result on a cold cache and never 500-ing (addresses critique: `getCache` throws without a built cache).
+   - `isPcdCacheReady(id) === false` → `error`, reason `cache_not_ready`. **This is the anti-false-`in-sync` guard**: `getCache()` throws without a built PCD cache (syncer.ts:501); an unbuilt cache would make the syncers read empty `desired` → zero create/update → a _false_ `in-sync`. We check `isBuilt()` first and degrade, never trusting a clean result on a cold cache and never 500-ing (addresses critique: `getCache` throws without a built cache).
    - **Version/section availability** — `available = await resolveAvailableSections(instance, version)` (`detectAndRecordArrVersion` + `resolveSyncSectionAvailability`). This is computed **before** the preview so version-unsupported sections are excluded from the compared universe, not surfaced as section errors (addresses critique: `generatePreview` does not version-gate — only `handler.hasConfig` — so a version-unsupported section throws an `HttpError` that would map to a false `error`/`invalid_response`). If `available` is empty → `in-sync`, reason `not_configured`, counts 0.
 4. **Full check** — `outcome = await Promise.race([generatePreview({ instance }), budgetTimeout(budgetMs)])`. Passing **no `sections`** makes `resolveSections` auto-limit to sections the instance actually syncs (`orchestrator.ts:87-96`, `handler.hasConfig`); we then intersect the result with `available` so version-gated sections are dropped, not diffed. `generatePreview` throws only on unsupported arr_type (pre-gated) or client-build failure; per-section `HttpError`s are captured in `sectionOutcomes[].error`, **not** thrown.
    - threw → `error`, reason `error`; budget exceeded → `error`, reason `timeout`.
@@ -241,14 +270,14 @@ export async function checkAndPersistInstance(instance: ArrInstance, deps?: Part
    - success → `aggregateDrift(preview, available)`.
 5. **Aggregate** over `preview.qualityProfiles/.customFormats`, `.delayProfiles`, `.mediaManagement/.naming/.qualityDefinitions/.mediaSettings`, `.metadataProfiles`, restricted to `available` sections, collecting every `EntityChange` with `action !== 'unchanged'`:
 
-| `EntityChange.action` | meaning | count | category | status effect |
-| --- | --- | --- | --- | --- |
-| `update` | field diverged (manual Arr edit / competing tool) | `drifted_count` | `drift` | → `drifted` |
-| `create` | managed entity absent on Arr (deleted in UI / never pushed) | `missing_count` | `missing` | → `drifted` |
-| `delete` | extra live entity not in resolved desired | `unmanaged_count` | `unmanaged` | **none** (non-alerting) |
-| `unchanged` | in-sync | — (count only, **never persisted**) | — | — |
+| `EntityChange.action` | meaning                                                     | count                               | category    | status effect           |
+| --------------------- | ----------------------------------------------------------- | ----------------------------------- | ----------- | ----------------------- |
+| `update`              | field diverged (manual Arr edit / competing tool)           | `drifted_count`                     | `drift`     | → `drifted`             |
+| `create`              | managed entity absent on Arr (deleted in UI / never pushed) | `missing_count`                     | `missing`   | → `drifted`             |
+| `delete`              | extra live entity not in resolved desired                   | `unmanaged_count`                   | `unmanaged` | **none** (non-alerting) |
+| `unchanged`           | in-sync                                                     | — (count only, **never persisted**) | —           | —                       |
 
-**Roll-up:** `status = (drifted_count > 0 || missing_count > 0) ? 'drifted' : 'in-sync'`; `unmanaged_count` **never** flips to drifted. **Skip-never-fail semantics are implemented by us, not inherited from `generatePreview`** — a section that still errors *despite* being version-available (genuine transient `HttpError`) is dropped and we aggregate over the OK sections; only `allSectionsErrored` (every available section errored) while heartbeat OK → `error`/`invalid_response`. On any successful diff, `content_checked_at = now` (rebuttal-with-fix: the draft's "mirror arrSync skip-never-fail" phrasing was imprecise — `generatePreview` captures per-section errors but does not version-gate; we add version-gating + OK-section aggregation to get true skip-never-fail).
+**Roll-up:** `status = (drifted_count > 0 || missing_count > 0) ? 'drifted' : 'in-sync'`; `unmanaged_count` **never** flips to drifted. **Skip-never-fail semantics are implemented by us, not inherited from `generatePreview`** — a section that still errors _despite_ being version-available (genuine transient `HttpError`) is dropped and we aggregate over the OK sections; only `allSectionsErrored` (every available section errored) while heartbeat OK → `error`/`invalid_response`. On any successful diff, `content_checked_at = now` (rebuttal-with-fix: the draft's "mirror arrSync skip-never-fail" phrasing was imprecise — `generatePreview` captures per-section errors but does not version-gate; we add version-gating + OK-section aggregation to get true skip-never-fail).
 
 **Why `create` alerts but `delete` doesn't.** `diffEntityCollection` matches sync-selected `desired` against the instance's **full** live set (syncer.ts:400 passes ALL live CFs; sectionDiffs.ts:211-225 emits `delete` for every unconsumed one); an unmatched live entity (`delete`) is dominated by legitimate user/other-tool config (Recyclarr/Configarr/personal CFs) — alerting on it would make nearly every real instance permanently "drifted" and bury real drift. A managed entity a user deleted in the Arr UI still surfaces as `create` (missing), which we **do** alert — so treating `delete` as non-alerting hides nothing actionable. It is still stored + counted + shown in a quiet "unmanaged" bucket.
 
@@ -281,22 +310,28 @@ Handler-driven (framework has none). On sweep failure: persist `error_count + 1`
 ## 6. Notifications
 
 **Event registration** (brief §c):
+
 - Add `{ id:'drift.detected', label:'Drift Detected', category:'Drift', description:'…' }` to `notificationTypes[]` in `shared/notifications/types.ts:16` (surfaces the opt-in checkbox; new `Drift` category auto-groups).
 - Add `DRIFT_DETECTED: 'drift.detected'` to `NotificationTypes` in `server/notifications/types.ts`.
 - Create `definitions/drift.ts` (mirror `definitions/rename.ts`); register in `definitions/index.ts`. No migration (`notification_type` is free-form TEXT).
 
-**Dedup key** — `drift_signature`, computed in the pure layer, a stable hash over the **sorted** list of **alerting** changes only (action ∈ {`update`,`create`}), each rendered **`${section}|${entityType}|${name}|${remoteId ?? 'new'}|${action}`**; empty set → `null`. The `remoteId` qualifier means two same-named managed entities from different DBs on one instance produce distinct tokens instead of collapsing (addresses critique: namespace-stripped display names collide — the signature is now remoteId-qualified). `delete`/`unchanged` are excluded so unmanaged churn never perturbs it. Field **names** (not values) participate → re-alert fires when the *set* of drifted entities/fields changes, not on every value wiggle (a field-value hash is a one-line seam if precise re-alerting is later wanted). *(Edge case: two same-named `create` rows both have `remoteId=null`→`new` and still collapse in dedup — accepted, since both are "missing" and the detail blob still stores both; a namespace-qualified source-DB id is the seam if this ever matters.)*
+**Dedup key** — `drift_signature`, computed in the pure layer, a stable hash over the **sorted** list of **alerting** changes only (action ∈ {`update`,`create`}), each rendered **`${section}|${entityType}|${name}|${remoteId ?? 'new'}|${action}`**; empty set → `null`. The `remoteId` qualifier means two same-named managed entities from different DBs on one instance produce distinct tokens instead of collapsing (addresses critique: namespace-stripped display names collide — the signature is now remoteId-qualified). `delete`/`unchanged` are excluded so unmanaged churn never perturbs it. Field **names** (not values) participate → re-alert fires when the _set_ of drifted entities/fields changes, not on every value wiggle (a field-value hash is a one-line seam if precise re-alerting is later wanted). _(Edge case: two same-named `create` rows both have `remoteId=null`→`new` and still collapse in dedup — accepted, since both are "missing" and the detail blob still stores both; a namespace-qualified source-DB id is the seam if this ever matters.)_
 
 **Fire predicate** (`shouldNotify(prior, next)`, pure): fire iff
 `next.status === 'drifted' && (prior == null || prior.status !== 'drifted' || prior.notified_signature !== next.drift_signature)`.
 Fires on: first-ever drift, `in-sync → drifted`, and `drifted → drifted` where the drift set changed. Does **not** fire on: identical repeated drift (deduped every cycle — this is the specified answer to "fires every cycle while drift persists"), `drifted → in-sync` (recovery — out of V1), or any `unreachable`/`unauthorized`/`error` transition (addresses critique: notification dedup was unspecified so `drift.detected` would spam every cycle). Because the predicate keys on `prior.status !== 'drifted'`, a recovery-then-redrift correctly re-alerts without an explicit "clear on return-to-in-sync" step.
 
 **Fire point** — in `checkAndPersistInstance`: read `prior` **before** the upsert; **after** the transaction commits, if `shouldNotify`, emit fire-and-forget and advance `notified_signature` only on a successful emit attempt:
+
 ```ts
-void notify('drift.detected').generic(title, message).discord(d => d.embed(embed)).send()
+void notify('drift.detected')
+  .generic(title, message)
+  .discord((d) => d.embed(embed))
+  .send()
   .then(() => driftStatusQueries.markNotified(id, next.driftSignature))
   .catch(() => {});
 ```
+
 Never awaited into job status; a notification failure can never affect drift results. Payload carries `arr_type` + `instanceName` (cross-Arr policy): title `Drift detected on ${instanceName} (${arrType})`; message `${drifted_count} changed, ${missing_count} missing on Arr`; embed fields = instanceName, arrType, status, the three counts, `checkedAt`, ≤10 `${entityType} "${name}" — ${action}` lines, and a `/drift/${instanceId}` deep link.
 
 ---
@@ -308,52 +343,124 @@ Never awaited into job status; a notification failure can never affect drift res
 **Route files:** `routes/api/v1/drift/summary/+server.ts` (GET), `routes/api/v1/drift/[instanceId]/+server.ts` (GET + POST), `routes/api/v1/drift/settings/+server.ts` (PUT). **All routing is instance-scoped — there is no `[databaseId]` route** (addresses critique: engine has no `databaseId` input; one call cannot serve database-scoped routing).
 
 ### GET /api/v1/drift/summary → 200 (degraded aggregate; 500 only on internal DB error)
+
 ```json
 {
   "generatedAt": "2026-07-08T12:00:00.000Z",
-  "settings": { "enabled": true, "intervalMinutes": 360, "lastRunAt": "2026-07-08T06:00:00.000Z",
-                "nextRunAt": "2026-07-08T12:00:00.000Z", "backoffUntil": null, "errorCount": 0 },
-  "totals": { "instances": 4, "inSync": 1, "drifted": 1, "unreachable": 1, "unauthorized": 0, "error": 0, "neverChecked": 1 },
+  "settings": {
+    "enabled": true,
+    "intervalMinutes": 360,
+    "lastRunAt": "2026-07-08T06:00:00.000Z",
+    "nextRunAt": "2026-07-08T12:00:00.000Z",
+    "backoffUntil": null,
+    "errorCount": 0
+  },
+  "totals": {
+    "instances": 4,
+    "inSync": 1,
+    "drifted": 1,
+    "unreachable": 1,
+    "unauthorized": 0,
+    "error": 0,
+    "neverChecked": 1
+  },
   "instances": [
-    { "instanceId": 12, "instanceName": "Radarr 4K", "arrType": "radarr", "status": "drifted", "reason": null,
-      "detectedVersion": "5.14.0", "counts": { "drifted": 2, "missing": 1, "unmanaged": 4 },
-      "checkedAt": "2026-07-08T06:00:03.412Z", "contentCheckedAt": "2026-07-08T06:00:03.412Z" },
-    { "instanceId": 8, "instanceName": "Sonarr", "arrType": "sonarr", "status": "unreachable", "reason": "timeout",
-      "detectedVersion": null, "counts": { "drifted": 0, "missing": 0, "unmanaged": 0 },
-      "checkedAt": "2026-07-08T06:00:08.940Z", "contentCheckedAt": "2026-07-08T05:00:04.001Z" },
-    { "instanceId": 9, "instanceName": "Radarr HD", "arrType": "radarr", "status": "never-checked", "reason": null,
-      "detectedVersion": null, "counts": { "drifted": 0, "missing": 0, "unmanaged": 0 },
-      "checkedAt": null, "contentCheckedAt": null }
+    {
+      "instanceId": 12,
+      "instanceName": "Radarr 4K",
+      "arrType": "radarr",
+      "status": "drifted",
+      "reason": null,
+      "detectedVersion": "5.14.0",
+      "counts": { "drifted": 2, "missing": 1, "unmanaged": 4 },
+      "checkedAt": "2026-07-08T06:00:03.412Z",
+      "contentCheckedAt": "2026-07-08T06:00:03.412Z"
+    },
+    {
+      "instanceId": 8,
+      "instanceName": "Sonarr",
+      "arrType": "sonarr",
+      "status": "unreachable",
+      "reason": "timeout",
+      "detectedVersion": null,
+      "counts": { "drifted": 0, "missing": 0, "unmanaged": 0 },
+      "checkedAt": "2026-07-08T06:00:08.940Z",
+      "contentCheckedAt": "2026-07-08T05:00:04.001Z"
+    },
+    {
+      "instanceId": 9,
+      "instanceName": "Radarr HD",
+      "arrType": "radarr",
+      "status": "never-checked",
+      "reason": null,
+      "detectedVersion": null,
+      "counts": { "drifted": 0, "missing": 0, "unmanaged": 0 },
+      "checkedAt": null,
+      "contentCheckedAt": null
+    }
   ]
 }
 ```
 
 ### GET /api/v1/drift/[instanceId] → 200 (detail; 404 if no instance; degrade, never 500)
+
 ```json
 {
-  "instanceId": 12, "instanceName": "Radarr 4K", "arrType": "radarr", "status": "drifted", "reason": null,
-  "detectedVersion": "5.14.0", "checkedAt": "2026-07-08T06:00:03.412Z", "contentCheckedAt": "2026-07-08T06:00:03.412Z",
+  "instanceId": 12,
+  "instanceName": "Radarr 4K",
+  "arrType": "radarr",
+  "status": "drifted",
+  "reason": null,
+  "detectedVersion": "5.14.0",
+  "checkedAt": "2026-07-08T06:00:03.412Z",
+  "contentCheckedAt": "2026-07-08T06:00:03.412Z",
   "counts": { "drifted": 2, "missing": 1, "unmanaged": 4 },
   "drift": [
-    { "section": "qualityProfiles", "entityType": "customFormat", "name": "HDR10", "action": "update",
-      "category": "drift", "remoteId": 42, "fields": [ { "field": "score", "type": "changed", "current": 100, "desired": 50 } ] }
+    {
+      "section": "qualityProfiles",
+      "entityType": "customFormat",
+      "name": "HDR10",
+      "action": "update",
+      "category": "drift",
+      "remoteId": 42,
+      "fields": [
+        { "field": "score", "type": "changed", "current": 100, "desired": 50 }
+      ]
+    }
   ],
   "missing": [
-    { "section": "qualityProfiles", "entityType": "qualityProfile", "name": "HD Bluray + WEB", "action": "create",
-      "category": "missing", "remoteId": null, "fields": [] }
+    {
+      "section": "qualityProfiles",
+      "entityType": "qualityProfile",
+      "name": "HD Bluray + WEB",
+      "action": "create",
+      "category": "missing",
+      "remoteId": null,
+      "fields": []
+    }
   ],
   "unmanaged": [
-    { "section": "qualityProfiles", "entityType": "customFormat", "name": "SomeOtherToolCF", "action": "delete",
-      "category": "unmanaged", "remoteId": 99, "fields": [] }
+    {
+      "section": "qualityProfiles",
+      "entityType": "customFormat",
+      "name": "SomeOtherToolCF",
+      "action": "delete",
+      "category": "unmanaged",
+      "remoteId": 99,
+      "fields": []
+    }
   ]
 }
 ```
+
 The route reads the `changes` blob and groups by `category` into `drift`/`missing`/`unmanaged` so a client cannot render unmanaged as drift. `create`/`delete` entries carry `fields:[]` and render as identity-only lines; `create` additionally has `remoteId:null`. A degraded instance returns e.g. `{ "status":"unauthorized", "reason":"unauthorized", "drift":[], "missing":[], "unmanaged":[], "counts":{…0} }` at 200. `fields[].current` = LIVE, `.desired` = PCD (verbatim, never swapped).
 
 ### POST /api/v1/drift/[instanceId] → 200 (refresh, same DriftDetailResponse) · 404 unknown · 400 unsupported/disabled type · 409 in-flight · 429 rate-limited (+`Retry-After`)
+
 Runs `checkAndPersistInstance` on the request thread (**not** the job queue), identical classification + dedup as the sweep.
 
 ### PUT /api/v1/drift/settings → 200 (updated settings) · 400 invalid
+
 Body `{ "enabled": true, "intervalMinutes": 360 }`; validates `intervalMinutes >= 5`; persists; re-runs `scheduleDriftCheck()` to reseed or `cancelByDedupeKey('drift.check')`.
 
 `drift.yaml` schemas: `DriftStatus` (5-value stored enum), `DriftSummaryStatus` (adds `never-checked`), `DriftCounts`, `DriftSettings`, `DriftInstanceSummary`, `DriftSummaryResponse`, `DriftEntityChange` (`action` → `$ref` SyncPreviewAction, `fields` → `[$ref FieldChange]`), `DriftDetailResponse`, `DriftSettingsUpdateRequest`.
@@ -387,11 +494,13 @@ Body `{ "enabled": true, "intervalMinutes": 360 }`; validates `intervalMinutes >
 ## 10. Testing Strategy
 
 **Pure unit (no DB, no network):**
+
 - `aggregateDrift` — feed canned `GeneratePreviewResult` fixtures mixing `update`/`create`/`delete`/`unchanged` across all sections; assert action→count→category mapping, that `unmanaged` never contributes to drift, that `unchanged` is never emitted into `changes`, `allSectionsErrored` detection, and that sections **outside `availableSections`** are excluded.
 - `driftSignature` — stability (reorder entities/fields → identical signature), sensitivity (add a drifted field → different signature), `remoteId` disambiguation (two same-named `update` entities with different `remoteId` → distinct tokens), and `delete`/`unchanged` exclusion.
 - `shouldNotify` — every transition: first drift, `in-sync→drifted`, `drifted→drifted` (same vs changed signature), `drifted→in-sync`, recovery-then-redrift re-alerts, `unreachable`/`unauthorized`/`error` (must not fire).
 
 **`checkInstanceDrift` with injected deps (no network/DB):**
+
 - `getSystemStatus → {ok:false,status:401}` ⇒ `unauthorized`, no disable, no notify; `{ok:false}` ⇒ `unreachable`; `isPcdCacheReady=false` ⇒ `error`/`cache_not_ready`; `registerPreviewAttempt=false` ⇒ `error`/`rate_limited`; `resolveAvailableSections=∅` ⇒ `in-sync`/`not_configured`; `generatePreview` stub with drift fixtures ⇒ `drifted`; clean ⇒ `in-sync`; unmanaged-only ⇒ `in-sync`; throwing stub ⇒ `error`; slow stub + fake clock ⇒ `error`/`timeout` (budget branch); **version-unavailable section stub** ⇒ that section skipped, no false `error`. `now` makes `checkedAt` deterministic.
 
 **Persist + notify shell** (in-memory app DB, real migration applied like `tests/pcd/snapshots/service.test.ts`): assert the transactional upsert **replaces** the single row (no growth), that a failed check leaves `changes`/`content_checked_at` untouched, `shouldNotify` fires exactly once on new drift, does **not** re-fire on identical repeat, does **not** fire on unmanaged-only change, and `notified_signature` advances only after a successful emit. Reset the shared window with `resetPreviewCreateRateLimitForTests()` in `beforeEach`.
@@ -405,6 +514,7 @@ Body `{ "enabled": true, "intervalMinutes": 360 }`; validates `intervalMinutes >
 **Backoff** — handler returns `rescheduleAt` with exponential growth and incremented `error_count` on failure; resets both on success.
 
 **Correctness tests the risks demand (brief §5):**
+
 1. **Namespace correlation** — drive a real section diff (`diffEntityCollection` / a syncer's `generatePreview` with a stubbed client returning a live payload whose CF/QP names carry the per-DB namespace suffix) and assert the managed entity resolves to `update`/`unchanged`, **never** `create`+`delete`. Highest-severity regression guard.
 2. **Cross-DB same-name** — two databases syncing a same-named entity to one instance: assert both survive in `changes[]` (blob not name-keyed) and produce distinct signature tokens via `remoteId`.
 3. **Array-key false positives** — feed a live payload with a **reordered** keyed array (e.g. CF `specifications`, QP `items`) through the real section diff and assert **no** false `update` drift (verifies the inherited `sectionDiffs.ts` key strategy — never the `PORTABLE_*` set — is applied). Include a nested-array case (e.g. `OrderedItem.members`) to document the known index-churn boundary.
@@ -413,17 +523,17 @@ Body `{ "enabled": true, "intervalMinutes": 360 }`; validates `intervalMinutes >
 
 ## 11. Extension Seams (named, not built)
 
-| Future (issue) | Attach point | Rework required |
-| --- | --- | --- |
-| **Ack / snooze / mute** (Q4) | `ADD COLUMN acknowledged_signature TEXT, snoozed_until TEXT`; `shouldNotify` gains `&& next.drift_signature !== acknowledged_signature`; UI mute button | None to V1 tables — `drift_signature` is already the exact ack primitive. |
-| **History / trends** (#27) | New append-only `drift_status_history(arr_instance_id, checked_at, drift_signature, status, counts…)` snapshotted alongside the upsert | None — status/detail contract untouched. |
-| **Config health scoring** (#22) | Read the already-separated `drifted_count`/`missing_count`/`unmanaged_count` and weight them; when cross-entity SQL is needed, add a normalized `drift_entity_changes(...)` child table **alongside** the JSON blob | None to V1 tables — counts already category-split. |
-| **Per-instance schedules** (Q6) | New `drift_instance_schedule(...)` + `dedupeKey 'drift.check:<id>'`; global settings stays the default | None — schedule fan-out only. |
-| **Split fast-heartbeat cadence** (Q3) | `ADD COLUMN heartbeat_interval_minutes`; a heartbeat-only sweep updates `status`/`checked_at`, full sweep updates content | None — `content_checked_at` + reachability statuses already exist. |
-| **Read-only namespace resolver** | Replace `getOrCreate` in the drift path with a read-only namespace lookup (or pre-warm namespaces) | Engine-level; contract untouched — removes the one inherited app-DB write. |
-| **Chunk/concurrency tuning** | `DRIFT_SWEEP_CHUNK_SIZE` / `CONCURRENCY_LIMIT` as settings columns | None — already parameterized. |
-| **Alert-on-extra / strict mode** | `ADD COLUMN alert_on_extra INTEGER`; promote `unmanaged` → alerting | None — `unmanaged_count` + delete rows already persisted. |
-| **Value-level re-alerting** | Include a `FieldChange` value hash in `driftSignature` | One-line change. |
+| Future (issue)                        | Attach point                                                                                                                                                                                                        | Rework required                                                            |
+| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| **Ack / snooze / mute** (Q4)          | `ADD COLUMN acknowledged_signature TEXT, snoozed_until TEXT`; `shouldNotify` gains `&& next.drift_signature !== acknowledged_signature`; UI mute button                                                             | None to V1 tables — `drift_signature` is already the exact ack primitive.  |
+| **History / trends** (#27)            | New append-only `drift_status_history(arr_instance_id, checked_at, drift_signature, status, counts…)` snapshotted alongside the upsert                                                                              | None — status/detail contract untouched.                                   |
+| **Config health scoring** (#22)       | Read the already-separated `drifted_count`/`missing_count`/`unmanaged_count` and weight them; when cross-entity SQL is needed, add a normalized `drift_entity_changes(...)` child table **alongside** the JSON blob | None to V1 tables — counts already category-split.                         |
+| **Per-instance schedules** (Q6)       | New `drift_instance_schedule(...)` + `dedupeKey 'drift.check:<id>'`; global settings stays the default                                                                                                              | None — schedule fan-out only.                                              |
+| **Split fast-heartbeat cadence** (Q3) | `ADD COLUMN heartbeat_interval_minutes`; a heartbeat-only sweep updates `status`/`checked_at`, full sweep updates content                                                                                           | None — `content_checked_at` + reachability statuses already exist.         |
+| **Read-only namespace resolver**      | Replace `getOrCreate` in the drift path with a read-only namespace lookup (or pre-warm namespaces)                                                                                                                  | Engine-level; contract untouched — removes the one inherited app-DB write. |
+| **Chunk/concurrency tuning**          | `DRIFT_SWEEP_CHUNK_SIZE` / `CONCURRENCY_LIMIT` as settings columns                                                                                                                                                  | None — already parameterized.                                              |
+| **Alert-on-extra / strict mode**      | `ADD COLUMN alert_on_extra INTEGER`; promote `unmanaged` → alerting                                                                                                                                                 | None — `unmanaged_count` + delete rows already persisted.                  |
+| **Value-level re-alerting**           | Include a `FieldChange` value hash in `driftSignature`                                                                                                                                                              | One-line change.                                                           |
 
 ---
 

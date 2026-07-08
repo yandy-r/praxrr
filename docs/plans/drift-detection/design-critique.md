@@ -1,6 +1,5 @@
 # Design Adversarial Critique (resolved in design.md)
 
-
 **Verdict:** NOT implementation-ready. No design doc exists: docs/plans/drift-detection/ holds only research.md (the brief). Verified against code: the brief is correct that FieldChange is current=LIVE/desired=PCD, api_key is never read, generatePreview normalizes namespace names end-to-end (Q7 resolved), and cross-Arr dispatch fails fast. But its core recipe (call generatePreview, persist EntityChange[]) has code-verified defects: delete=every unmanaged/foreign live entity so delete->drift is permanent false drift; the preview is not read-only (getOrCreate writes rows, getCache needs a built cache); a full sweep blocks the single-flag serialized dispatcher. All 8 open design questions are unresolved. Author a design doc that resolves them first.
 
 ## Findings

@@ -39,7 +39,11 @@ export function shouldNotify(prior: DriftInstanceStatusDetail | undefined, next:
   return prior.notifiedSignature !== next.driftSignature;
 }
 
-function buildDriftNotification(next: InstanceDriftResult): { title: string; message: string; embed: ReturnType<typeof createEmbed> } {
+function buildDriftNotification(next: InstanceDriftResult): {
+  title: string;
+  message: string;
+  embed: ReturnType<typeof createEmbed>;
+} {
   const title = `Drift detected on ${next.instanceName} (${next.arrType})`;
   const message = `${next.counts.drifted} changed, ${next.counts.missing} missing on Arr`;
 

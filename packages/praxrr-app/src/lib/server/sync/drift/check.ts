@@ -260,7 +260,9 @@ function stableHash(input: string): string {
 export function driftSignature(changes: readonly DriftEntityChange[]): string | null {
   const tokens = changes
     .filter((change) => change.action === 'update' || change.action === 'create')
-    .map((change) => `${change.section}|${change.entityType}|${change.name}|${change.remoteId ?? 'new'}|${change.action}`)
+    .map(
+      (change) => `${change.section}|${change.entityType}|${change.name}|${change.remoteId ?? 'new'}|${change.action}`
+    )
     .sort();
   if (tokens.length === 0) {
     return null;

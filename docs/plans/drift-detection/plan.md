@@ -15,14 +15,14 @@ Every `designCorrection` from the 5 verification lanes, and how this plan accoun
 **Lane 1 — Preview engine / rate-limit / concurrency**
 
 - **DC-1 `processBatches` arg order (BLOCKING).** Design §5 L271/L49 call `processBatches(chunk, CONCURRENCY_LIMIT=3, checkAndPersist)`. Real signature is `processBatches(items, processor, concurrency)` (`processor.ts:247`). → **S2-T1** calls `processBatches(chunk, checkAndPersistInstance, 3)`. Also: `processBatches` uses `Promise.all` per batch (`processor.ts:250-256`) with no per-item isolation, so **S1-T3** must guarantee `checkAndPersistInstance` never throws (load-bearing precondition, tested in **S1-T9**).
-- **DC-2 no top-level `preview.customFormats`.** CF/QP EntityChange arrays live *inside* `preview.qualityProfiles` (`.customFormats`, `.qualityProfiles` — `types.ts:44-45`); delay `.profile` (`:50`); media `.naming`/`.qualityDefinitions`/`.mediaSettings` (`:55-57`); metadata `.profile` (`:62`). → **S1-T1** `aggregateDrift` reads one level deeper with null-guards (`preview.qualityProfiles?.customFormats`, …). Guarded in **S1-T4**.
+- **DC-2 no top-level `preview.customFormats`.** CF/QP EntityChange arrays live _inside_ `preview.qualityProfiles` (`.customFormats`, `.qualityProfiles` — `types.ts:44-45`); delay `.profile` (`:50`); media `.naming`/`.qualityDefinitions`/`.mediaSettings` (`:55-57`); metadata `.profile` (`:62`). → **S1-T1** `aggregateDrift` reads one level deeper with null-guards (`preview.qualityProfiles?.customFormats`, …). Guarded in **S1-T4**.
 - **DC-3 `allSectionsErrored` source.** Top-level section fields are `null` for errored, skipped, AND not-configured alike (`orchestrator.ts:167-188,295-299`); the returned `sectionOutcomes` strips `result`. → **S1-T1** derives `allSectionsErrored` from `preview.sectionOutcomes[]` (`error !== null` vs `skipped`) intersected with `availableSections`, never from a null section field. Tested in **S1-T4**.
 
 **Lane 2 — Arr fetch / version gating / instance listing**
 
 - **DC-4 `getSystemStatus` is not a bare export.** It is an instance method on `BaseArrClient` (`base.ts:72`), not an importable binding. → **S1-T1** authors the `DriftCheckDeps.getSystemStatus` wrapper itself: build client → call → close.
 - **DC-5 timeout/retries are client-build options, not call options.** `getSystemStatus()` takes zero args; set `{timeout:5000, retries:0}` at `getArrInstanceClient(...)` build time (`base.ts:27-30`, `http/client.ts:18-19,42,45,49`). → **S1-T1** heartbeat builds a dedicated 5s/0-retry client per beat, then `client.close()`.
-- **DC-6 `resolveAvailableSections` double-fetch/mis-arg.** `detectAndRecordArrVersion(instanceId, arrType, client)` takes a **client** and re-calls `getSystemStatus` internally (`instanceCompatibility.ts:28-52`); `resolveSyncSectionAvailability` is pure and needs only the version string. → **S1-T1** takes `version` from the single heartbeat, persists it via `arrInstancesQueries.setDetectedVersion` (or reuses the *same* open heartbeat client for `detectAndRecordArrVersion` before close — no second round-trip), then builds the section Set purely.
+- **DC-6 `resolveAvailableSections` double-fetch/mis-arg.** `detectAndRecordArrVersion(instanceId, arrType, client)` takes a **client** and re-calls `getSystemStatus` internally (`instanceCompatibility.ts:28-52`); `resolveSyncSectionAvailability` is pure and needs only the version string. → **S1-T1** takes `version` from the single heartbeat, persists it via `arrInstancesQueries.setDetectedVersion` (or reuses the _same_ open heartbeat client for `detectAndRecordArrVersion` before close — no second round-trip), then builds the section Set purely.
 - **DC-7 availability is not boolean.** `resolveSyncSectionAvailability` returns `ArrFeatureAvailability{status: 'available'|'degraded'|'unavailable'}` (`compatibility.ts:52-59`). → **S1-T1** includes a section iff `status !== 'unavailable'` (degraded counts as present). Tested in **S1-T5**.
 - **DC-8 `isSyncPreviewArrType` is route-private.** Defined un-exported in `routes/api/v1/sync/preview/+server.ts:41`. → **S0-T9** promotes it to `$sync/preview/types.ts` as an exported predicate and updates the route to import it; drift service + drift routes import the shared version.
 - **DC-9 `getEnabled()` orders by name, not id.** `arrInstances.ts:342-344` → cursor-by-id chunking is inconsistent. → **S2-T1** re-sorts the `getEnabled()` result by `id` in memory before applying `id > cursor` + slice.
@@ -36,14 +36,14 @@ Every `designCorrection` from the 5 verification lanes, and how this plan accoun
 
 **Lane 4 — OpenAPI contract-first / UI components**
 
-- **DC-14 `LiveDiffPanel` cannot be reused wholesale.** It is a self-contained fetcher hitting the *resolved-config* diff endpoint, single-entity (`LiveDiffPanel.svelte:22-26,84`). → **S4-T1** extracts the presentational field-table + create/delete banners (`:232-282`) + `fieldChangeDisplay.ts` into a shared dumb component fed a precomputed `DriftEntityChange[]`; **S4-T3** consumes it. No mounting of `LiveDiffPanel` as-is.
+- **DC-14 `LiveDiffPanel` cannot be reused wholesale.** It is a self-contained fetcher hitting the _resolved-config_ diff endpoint, single-entity (`LiveDiffPanel.svelte:22-26,84`). → **S4-T1** extracts the presentational field-table + create/delete banners (`:232-282`) + `fieldChangeDisplay.ts` into a shared dumb component fed a precomputed `DriftEntityChange[]`; **S4-T3** consumes it. No mounting of `LiveDiffPanel` as-is.
 - **DC-15 settings panels use form-actions, not client-fetch-PUT + dirty store.** Every existing settings panel uses `<form method="POST" action="?/x" use:enhance>`. → **S4-T4** implements a `?/updateDriftSettings` form action in `+page.server.ts` (validate → `driftSettingsQueries.update` → `scheduleDriftCheck()` server-side) for convention consistency; the `PUT /api/v1/drift/settings` route (**S3-T7**) is kept for API/contract completeness. Dirty store is **not** wired into this two-field panel (avoids a novel pattern).
 - **DC-16 nav entry required fields.** Must include `id:'overview.drift'`, `emoji`, `mobilePriority`, `arrScope:scopeAll`, `groupId:ensureGroupId('overview')`, `order:4`, `hasChildren:false`. → captured in **S4-T5**.
 - **DC-17 `EmptyState` requires a CTA.** All of `icon/title/description/buttonText/buttonHref` mandatory; always renders a link. → **S4-T2** supplies `buttonText:'Add Arr instance'`, `buttonHref:'/arr'`.
 
 **Lane 5 — PCD cache readiness / notifications**
 
-- **DC-18 `getCache()` does NOT throw — a missing cache is a silent skip.** `registry.getCache` is a `Map.get` returning `undefined` (`registry.ts:23`); syncers `warn + continue` (`qualityProfiles/syncer.ts:501-517`, siblings), yielding a **false `in-sync` with no section error**. The design's "getCache throws" framing is wrong; the readiness gate is *more* necessary. → **S1-T1** `isPcdCacheReady` is a proactive pre-check (not a try/catch), and the §4.2/§9 wording is treated as "silent skip → false in-sync → proactive gate required."
+- **DC-18 `getCache()` does NOT throw — a missing cache is a silent skip.** `registry.getCache` is a `Map.get` returning `undefined` (`registry.ts:23`); syncers `warn + continue` (`qualityProfiles/syncer.ts:501-517`, siblings), yielding a **false `in-sync` with no section error**. The design's "getCache throws" framing is wrong; the readiness gate is _more_ necessary. → **S1-T1** `isPcdCacheReady` is a proactive pre-check (not a try/catch), and the §4.2/§9 wording is treated as "silent skip → false in-sync → proactive gate required."
 - **DC-19 `isPcdCacheReady` must enumerate all referenced DBs with the `?.` guard.** `getCache(id)?.isBuilt() === true` (undefined guard); there is no single instance→databaseIds helper — enumerate every `databaseId` from the instance's per-section sync selections (`arrSyncQueries.getQualityProfilesSync(instanceId).selections[].databaseId` + delay/media/metadata `syncConfig.databaseId` + TRaSH hydrations; `qualityProfiles/syncer.ts:457-468`, `handler.ts:52-61`) and require **all** built; dominant failure is `undefined`, not `isBuilt()===false`. → **S1-T1** implements the full enumeration.
 - **DC-20 `NotificationTypes` const (server) is inert.** The load-bearing wiring is (a) the `notificationTypes[]` entry in `shared/notifications/types.ts:16` and (b) the `notify('drift.detected').send()` call. → **S2-T6** is the load-bearing edit; **S2-T7** (server const) is optional convention.
 - **DC-21 do not copy `rename`'s direct-notifier emit.** `rename/processor.ts:84-85` bypasses `NotificationManager` (no `enabled_types` filter, no manager history). The `.send()` path (`builder.ts:87 → NotificationManager.notify`) is correct and required for opt-in filtering. → **S1-T3** uses inline `notify('drift.detected')…send()`; `definitions/drift.ts` (**S2-T8**) is optional convenience only.
@@ -55,6 +55,7 @@ Every `designCorrection` from the 5 verification lanes, and how this plan accoun
 > Everything downstream depends on these. Run in listed order; the SHARED edits (S0-T2, S0-T7, S0-T8, S0-T9) touch files nothing else in this stage touches, so the NEW files (S0-T1, S0-T4, S0-T5, S0-T6) may be authored in parallel, but the whole stage completes before Stage 1.
 
 ### S0-T1 — Create drift tables migration `[NEW]`
+
 - **files:** `packages/praxrr-app/src/lib/server/db/migrations/20260709_create_drift_tables.ts`
 - **template to mirror:** `migrations/20260228_create_pcd_snapshots.ts:10-38` (multi-statement `up` string: CREATE TABLE + seed in one `;`-separated block); interface at `migrations.ts:74-80`; version pattern `20260708_add_arr_instance_detected_version.ts:15`.
 - **dependsOn:** —
@@ -62,6 +63,7 @@ Every `designCorrection` from the 5 verification lanes, and how this plan accoun
 - **acceptance:** File type-checks; SQL matches design §3 verbatim (CHECK constraints present).
 
 ### S0-T2 — Register migration `[SHARED]`
+
 - **files:** `packages/praxrr-app/src/lib/server/db/migrations.ts`
 - **template to mirror:** `migrations.ts:72` (last import), `:371` (last array entry `migration20260708…`), `loadMigrations()` `:302-376`.
 - **dependsOn:** S0-T1
@@ -69,6 +71,7 @@ Every `designCorrection` from the 5 verification lanes, and how this plan accoun
 - **acceptance:** `deno task check:server` passes; migration runs on a fresh DB (both tables + seed row exist; `SELECT * FROM drift_check_settings WHERE id=1` returns 1 row).
 
 ### S0-T3 — Update reference `schema.sql` `[SHARED, best-effort]`
+
 - **files:** `packages/praxrr-app/src/lib/server/db/schema.sql`
 - **template to mirror:** `schema.sql:1-4` (header says reference-only; already stale — not a CI gate).
 - **dependsOn:** S0-T1
@@ -76,6 +79,7 @@ Every `designCorrection` from the 5 verification lanes, and how this plan accoun
 - **acceptance:** File contains both tables; no build impact.
 
 ### S0-T4 — Core drift types `[NEW]`
+
 - **files:** `packages/praxrr-app/src/lib/server/sync/drift/types.ts`
 - **template to mirror:** `$sync/preview/types.ts:14,27-40` (SyncPreviewSection, FieldChange, EntityChange, SyncPreviewAction); design §4.1.
 - **dependsOn:** —
@@ -83,6 +87,7 @@ Every `designCorrection` from the 5 verification lanes, and how this plan accoun
 - **acceptance:** Type-checks; no circular import.
 
 ### S0-T5 — `driftSettingsQueries` module `[NEW]`
+
 - **files:** `packages/praxrr-app/src/lib/server/db/queries/driftSettings.ts`
 - **template to mirror:** `queries/backupSettings.ts:6-23` (co-located Row + Update input types), `:33-35` (`get()` → `db.queryFirst`), `:40-76` (`update()` dynamic SET + `updated_at`); `db.ts:144` (queryFirst), `:155` (execute).
 - **dependsOn:** —
@@ -90,13 +95,15 @@ Every `designCorrection` from the 5 verification lanes, and how this plan accoun
 - **acceptance:** `get()` returns seeded row; `update`/`markRun` mutate; unit-covered in **S1-T-QUERIES**.
 
 ### S0-T6 — `driftStatusQueries` module `[NEW]`
+
 - **files:** `packages/praxrr-app/src/lib/server/db/queries/driftStatus.ts`
 - **template to mirror:** `queries/pcdSnapshots.ts:35-66` (JSON-column parse + `toDetail` camelCase mapping), `:113-116` (getById); `db.ts:213` (async `transaction`), `:155` (execute w/ params); `backupSettings.ts` for the get shape.
 - **dependsOn:** —
-- **what:** Co-located snake_case Row + `toDetail(row)` parsing the `changes` JSON blob into `DriftEntityChange[]`. `getById(instanceId)`, `getAllForSummary()` (single full-table pass, no `WHERE status`). **Upsert (DC-13):** `await db.transaction(() => db.execute(<INSERT … ON CONFLICT(arr_instance_id) DO UPDATE …>, ...params))` — one parameterized `execute`, never `exec`. `markNotified(instanceId, signature)`. On a *failed* check the upsert updates only `status`/`reason`/`checked_at` and leaves `changes`/`content_checked_at` (design §3).
+- **what:** Co-located snake_case Row + `toDetail(row)` parsing the `changes` JSON blob into `DriftEntityChange[]`. `getById(instanceId)`, `getAllForSummary()` (single full-table pass, no `WHERE status`). **Upsert (DC-13):** `await db.transaction(() => db.execute(<INSERT … ON CONFLICT(arr_instance_id) DO UPDATE …>, ...params))` — one parameterized `execute`, never `exec`. `markNotified(instanceId, signature)`. On a _failed_ check the upsert updates only `status`/`reason`/`checked_at` and leaves `changes`/`content_checked_at` (design §3).
 - **acceptance:** Upsert replaces the single row (no growth); failed-check path preserves prior `changes`; JSON round-trips. Covered in **S1-T9** + **S1-T-QUERIES**.
 
 ### S0-T7 — `JobType` union + payload `[SHARED]`
+
 - **files:** `packages/praxrr-app/src/lib/server/jobs/queueTypes.ts`
 - **template to mirror:** `queueTypes.ts:130-137` (JobHandler/JobHandlerResult), existing `JobPayloadByType` entries; DC-11.
 - **dependsOn:** —
@@ -104,6 +111,7 @@ Every `designCorrection` from the 5 verification lanes, and how this plan accoun
 - **acceptance:** `deno task check:server` passes; `upsertScheduled({jobType:'drift.check', payload:{}})` type-checks.
 
 ### S0-T8 — Export `processBatches` `[SHARED]`
+
 - **files:** `packages/praxrr-app/src/lib/server/sync/processor.ts`
 - **template to mirror:** `processor.ts:247-257` (declaration), `:37` (`CONCURRENCY_LIMIT=3`).
 - **dependsOn:** —
@@ -111,6 +119,7 @@ Every `designCorrection` from the 5 verification lanes, and how this plan accoun
 - **acceptance:** `processBatches` importable from `$sync/processor.ts`; existing internal callers (`:100`, `:317`) unchanged.
 
 ### S0-T9 — Promote `isSyncPreviewArrType` `[SHARED]`
+
 - **files:** `packages/praxrr-app/src/lib/server/sync/preview/types.ts` (add exported predicate), `packages/praxrr-app/src/routes/api/v1/sync/preview/+server.ts` (import it)
 - **template to mirror:** `preview/+server.ts:41-43` (current private def), `preview/types.ts:21` (`SyncPreviewArrType`).
 - **dependsOn:** —
@@ -124,6 +133,7 @@ Every `designCorrection` from the 5 verification lanes, and how this plan accoun
 > All NEW files → parallelizable except where noted. The three **load-bearing correctness tests** (S1-T6/T7/T8) are their own tasks.
 
 ### S1-T1 — `check.ts`: aggregateDrift + driftSignature + checkInstanceDrift `[NEW]`
+
 - **files:** `packages/praxrr-app/src/lib/server/sync/drift/check.ts`
 - **template to mirror:** deps pattern `$sync/preview/liveDiff.ts:67`; `orchestrator.ts:193` (`generatePreview`), `:40-45` (input), `:47-62` (result), `:87-96` (resolveSections auto-limit), `:255-273/:295-299` (sectionOutcomes); `base.ts:72` + `arrInstanceClients.ts:56-130` (heartbeat client build/close); `instanceCompatibility.ts:28-52` (detectAndRecordArrVersion) + `mappings.ts:82-88` (resolveSyncSectionAvailability); `registry.ts:23` + `cache.ts:421-423` (isPcdCacheReady); `arrSyncQueries.getQualityProfilesSync` + `qualityProfiles/syncer.ts:457-468` (dbId enumeration).
 - **dependsOn:** S0-T4, S0-T8, S0-T9
@@ -135,6 +145,7 @@ Every `designCorrection` from the 5 verification lanes, and how this plan accoun
 - **acceptance/tests:** covered by S1-T4, S1-T5; must satisfy DC-2/DC-3/DC-6/DC-7/DC-18/DC-19.
 
 ### S1-T2 — `limits.ts`: drift refresh window `[NEW]`
+
 - **files:** `packages/praxrr-app/src/lib/server/sync/drift/limits.ts`
 - **template to mirror:** `$sync/preview/limits.ts:1-33` (module-level `Map<number,{timestamps:number[]}>`, private `pruneWindow`, exported `register*`, exported `reset*ForTests`).
 - **dependsOn:** —
@@ -142,6 +153,7 @@ Every `designCorrection` from the 5 verification lanes, and how this plan accoun
 - **acceptance:** 4th call within 60s returns false; reset clears state.
 
 ### S1-T3 — `persist.ts`: checkAndPersistInstance + shouldNotify `[NEW]`
+
 - **files:** `packages/praxrr-app/src/lib/server/sync/drift/persist.ts`
 - **template to mirror:** `notify` chain `builder.ts:126,:61,:76,:87` (`.send()` = manager path — **DC-21**); `NotificationManager.ts:27-34` (enabled_types filter); `driftStatusQueries` upsert/markNotified (S0-T6).
 - **dependsOn:** S1-T1, S0-T6; soft-dep S2-T6 (opt-in checkbox surface)
@@ -149,6 +161,7 @@ Every `designCorrection` from the 5 verification lanes, and how this plan accoun
 - **acceptance/tests:** S1-T9 (persist+notify shell) proves single-row replace, failed-check preservation, fire-once dedup, `notified_signature` advance, and no-throw.
 
 ### S1-T4 — Pure unit tests: aggregateDrift / driftSignature / shouldNotify `[NEW]`
+
 - **files:** `packages/praxrr-app/tests/sync/drift/aggregate.test.ts` (+ signature/notify or split)
 - **template to mirror:** design §10 "Pure unit"; existing sync test fixtures.
 - **dependsOn:** S1-T1, S1-T3
@@ -156,6 +169,7 @@ Every `designCorrection` from the 5 verification lanes, and how this plan accoun
 - **acceptance:** all assertions pass under `deno task test`.
 
 ### S1-T5 — checkInstanceDrift injected-deps tests `[NEW]`
+
 - **files:** `packages/praxrr-app/tests/sync/drift/checkInstance.test.ts`
 - **template to mirror:** design §10 "checkInstanceDrift with injected deps".
 - **dependsOn:** S1-T1
@@ -163,6 +177,7 @@ Every `designCorrection` from the 5 verification lanes, and how this plan accoun
 - **acceptance:** every branch asserted.
 
 ### S1-T6 — LOAD-BEARING: namespace correlation regression `[NEW]`
+
 - **files:** `packages/praxrr-app/tests/sync/drift/namespaceCorrelation.test.ts`
 - **template to mirror:** design §10 correctness #1; `diffEntityCollection`/`findNamespaceMatch`; syncer suffixing (`qualityProfiles/syncer.ts:400`, `sectionDiffs.ts:211-225`).
 - **dependsOn:** S1-T1
@@ -170,6 +185,7 @@ Every `designCorrection` from the 5 verification lanes, and how this plan accoun
 - **acceptance:** zero spurious create/delete for a suffix-matched managed entity.
 
 ### S1-T7 — LOAD-BEARING: cross-DB same-name `[NEW]`
+
 - **files:** `packages/praxrr-app/tests/sync/drift/crossDbSameName.test.ts`
 - **template to mirror:** design §3 "collision-proof by construction", §10 correctness #2.
 - **dependsOn:** S1-T1, S0-T6
@@ -177,6 +193,7 @@ Every `designCorrection` from the 5 verification lanes, and how this plan accoun
 - **acceptance:** no row overwrite; two distinct signature tokens.
 
 ### S1-T8 — LOAD-BEARING: array-key false positives `[NEW]`
+
 - **files:** `packages/praxrr-app/tests/sync/drift/arrayKeyDrift.test.ts`
 - **template to mirror:** design §10 correctness #3; inherited `sectionDiffs.ts` key strategy (not `PORTABLE_*`).
 - **dependsOn:** S1-T1
@@ -184,6 +201,7 @@ Every `designCorrection` from the 5 verification lanes, and how this plan accoun
 - **acceptance:** reordered-but-equal arrays produce `unchanged`, not `update`.
 
 ### S1-T9 — persist + notify shell test `[NEW]`
+
 - **files:** `packages/praxrr-app/tests/sync/drift/persist.test.ts`
 - **template to mirror:** in-memory app DB w/ real migration like `tests/pcd/snapshots/service.test.ts`; `resetPreviewCreateRateLimitForTests()` in `beforeEach`.
 - **dependsOn:** S1-T3, S0-T2, S0-T6
@@ -191,6 +209,7 @@ Every `designCorrection` from the 5 verification lanes, and how this plan accoun
 - **acceptance:** all pass under `deno task test`.
 
 ### S1-T-QUERIES — driftSettings/driftStatus query tests `[NEW]`
+
 - **files:** `packages/praxrr-app/tests/db/driftQueries.test.ts`
 - **template to mirror:** design §10 "Query modules"; temp-DB pattern.
 - **dependsOn:** S0-T5, S0-T6, S0-T2
@@ -202,6 +221,7 @@ Every `designCorrection` from the 5 verification lanes, and how this plan accoun
 ## Stage 2 — Wiring (depends on Stage 1; SHARED edits — SERIALIZE)
 
 ### S2-T1 — driftCheck job handler (chunked sweep) `[NEW]`
+
 - **files:** `packages/praxrr-app/src/lib/server/jobs/handlers/driftCheck.ts`
 - **template to mirror:** `handlers/pcdSync.ts:51-100` (handler shape), `:9` (payload coercion); `queueRegistry.ts:6-8` (register); `jobQueue.ts:79-118` (upsertScheduled), `scheduleUtils.ts:4-15` (calculateNextRunFromMinutes); `processor.ts:247` (`processBatches` — **DC-1**); `arrInstances.ts:342-344` (getEnabled — **DC-9**).
 - **dependsOn:** S1-T3, S0-T7, S0-T8, S0-T5
@@ -209,6 +229,7 @@ Every `designCorrection` from the 5 verification lanes, and how this plan accoun
 - **acceptance/tests:** S2-T-HANDLER.
 
 ### S2-T-HANDLER — job handler / chunking test `[NEW]`
+
 - **files:** `packages/praxrr-app/tests/jobs/driftCheck.test.ts`
 - **template to mirror:** design §10 "Job handler / chunking" + "Backoff".
 - **dependsOn:** S2-T1
@@ -216,6 +237,7 @@ Every `designCorrection` from the 5 verification lanes, and how this plan accoun
 - **acceptance:** chunk boundaries + backoff asserted.
 
 ### S2-T2 — handler side-effect import `[SHARED]`
+
 - **files:** `packages/praxrr-app/src/lib/server/jobs/handlers/index.ts`
 - **template to mirror:** `handlers/index.ts:1-9`.
 - **dependsOn:** S2-T1
@@ -223,6 +245,7 @@ Every `designCorrection` from the 5 verification lanes, and how this plan accoun
 - **acceptance:** handler registered at startup.
 
 ### S2-T3 — `scheduleDriftCheck()` + wire into `scheduleAllJobs()` `[SHARED]`
+
 - **files:** `packages/praxrr-app/src/lib/server/jobs/schedule.ts`
 - **template to mirror:** `schedule.ts:61-101` (last_run + calculateNextRunFromMinutes), `:124-172` (cancelByDedupeKey), `:181-197` (scheduleAllJobs); `jobQueue.ts:244-249` (cancelByDedupeKey).
 - **dependsOn:** S0-T5
@@ -230,6 +253,7 @@ Every `designCorrection` from the 5 verification lanes, and how this plan accoun
 - **acceptance:** startup seeds/cancels the drift job per settings.
 
 ### S2-T4 — export `scheduleDriftCheck` from init `[SHARED]`
+
 - **files:** `packages/praxrr-app/src/lib/server/jobs/init.ts`
 - **template to mirror:** `init.ts:22-30` (re-export block).
 - **dependsOn:** S2-T3
@@ -237,6 +261,7 @@ Every `designCorrection` from the 5 verification lanes, and how this plan accoun
 - **acceptance:** importable from `$jobs/init.ts`.
 
 ### S2-T5 — job label `[SHARED, optional]`
+
 - **files:** `packages/praxrr-app/src/lib/server/jobs/display.ts`
 - **template to mirror:** existing `case` entries in `display.ts`.
 - **dependsOn:** S0-T7
@@ -244,6 +269,7 @@ Every `designCorrection` from the 5 verification lanes, and how this plan accoun
 - **acceptance:** label renders in job UI.
 
 ### S2-T6 — notification opt-in registration (LOAD-BEARING) `[SHARED]`
+
 - **files:** `packages/praxrr-app/src/lib/shared/notifications/types.ts`
 - **template to mirror:** `shared/notifications/types.ts:16` (array), `:6-11` (item shape), `:133` (auto-group by category).
 - **dependsOn:** —
@@ -251,6 +277,7 @@ Every `designCorrection` from the 5 verification lanes, and how this plan accoun
 - **acceptance:** checkbox appears under a `Drift` group; `notify('drift.detected').send()` delivers to opted-in services.
 
 ### S2-T7 — server NotificationTypes const `[SHARED, optional/inert]`
+
 - **files:** `packages/praxrr-app/src/lib/server/notifications/types.ts`
 - **template to mirror:** existing `NotificationTypes` const.
 - **dependsOn:** —
@@ -258,6 +285,7 @@ Every `designCorrection` from the 5 verification lanes, and how this plan accoun
 - **acceptance:** compiles; no behavior change.
 
 ### S2-T8 — `definitions/drift.ts` `[NEW, optional]`
+
 - **files:** `packages/praxrr-app/src/lib/server/notifications/definitions/drift.ts`, `packages/praxrr-app/src/lib/server/notifications/definitions/index.ts`
 - **template to mirror:** `definitions/rename.ts:273-276,345-367`; register in `definitions/index.ts:19-23`.
 - **dependsOn:** —
@@ -269,6 +297,7 @@ Every `designCorrection` from the 5 verification lanes, and how this plan accoun
 ## Stage 3 — API (contract-first; depends on Stage 1 types)
 
 ### S3-T1 — `schemas/drift.yaml` `[NEW]`
+
 - **files:** `docs/api/v1/schemas/drift.yaml`
 - **template to mirror:** `schemas/sync.yaml:13,78,118,127` (intra-file `#/Name` refs, cross-file `../schemas/…`); `FieldChange` `sync.yaml:66`, `SyncPreviewAction` `:51`.
 - **dependsOn:** S0-T4
@@ -276,6 +305,7 @@ Every `designCorrection` from the 5 verification lanes, and how this plan accoun
 - **acceptance:** shapes match design §7 JSON examples byte-for-byte (field names, nullable rules).
 
 ### S3-T2 — `paths/drift.yaml` `[NEW]`
+
 - **files:** `docs/api/v1/paths/drift.yaml`
 - **template to mirror:** `paths/sync.yaml:1,60,133` (top-level keys per operation), refs to schemas `:21,28,34`; errors `$ref '../schemas/arr.yaml#/ErrorResponse'`.
 - **dependsOn:** S3-T1
@@ -283,6 +313,7 @@ Every `designCorrection` from the 5 verification lanes, and how this plan accoun
 - **acceptance:** all operations reference drift/sync/arr schemas correctly.
 
 ### S3-T3 — wire into root `openapi.yaml` `[SHARED]`
+
 - **files:** `docs/api/v1/openapi.yaml`
 - **template to mirror:** `openapi.yaml:14-42` (tags), `:44-638` (paths, e.g. `:344-349`), `:640-1420` + `:766-773` (components.schemas).
 - **dependsOn:** S3-T1, S3-T2
@@ -290,6 +321,7 @@ Every `designCorrection` from the 5 verification lanes, and how this plan accoun
 - **acceptance:** bundle step (S3-T4) resolves all refs without error.
 
 ### S3-T4 — bundle + generate + format `[SHARED, generated artifacts]`
+
 - **files (generated):** `packages/praxrr-api/openapi.json`, `packages/praxrr-api/types.ts`, `packages/praxrr-app/src/lib/api/v1.d.ts`
 - **template to mirror:** `scripts/bundle-api.ts:14,144-145,150-168`; deno tasks `bundle:api`, `generate:api-types`, `format`.
 - **dependsOn:** S3-T3
@@ -297,6 +329,7 @@ Every `designCorrection` from the 5 verification lanes, and how this plan accoun
 - **acceptance:** `deno task format:check` clean; drift types appear in `v1.d.ts`.
 
 ### S3-T5 — `GET /drift/summary` route `[NEW]`
+
 - **files:** `packages/praxrr-app/src/routes/api/v1/drift/summary/+server.ts`
 - **template to mirror:** existing `routes/api/v1/**` GET handlers; `driftStatusQueries.getAllForSummary` (S0-T6, single pass, no `WHERE status`), `driftSettingsQueries.get`, `arrInstancesQueries.getEnabled` filtered by `isSyncPreviewArrType`.
 - **dependsOn:** S3-T4, S0-T5, S0-T6, S0-T9
@@ -304,6 +337,7 @@ Every `designCorrection` from the 5 verification lanes, and how this plan accoun
 - **acceptance:** covered in S3-T8.
 
 ### S3-T6 — `GET/POST /drift/[instanceId]` route `[NEW]`
+
 - **files:** `packages/praxrr-app/src/routes/api/v1/drift/[instanceId]/+server.ts`
 - **template to mirror:** `routes/api/v1/sync/preview/+server.ts` (validation, `isSyncPreviewArrType`, 400/404/429); `driftStatusQueries.getById` + `toDetail`; `checkAndPersistInstance` (S1-T3); `registerDriftRefreshAttempt` (S1-T2).
 - **dependsOn:** S3-T4, S1-T3, S1-T2, S0-T6
@@ -311,6 +345,7 @@ Every `designCorrection` from the 5 verification lanes, and how this plan accoun
 - **acceptance:** covered in S3-T8.
 
 ### S3-T7 — `PUT /drift/settings` route `[NEW]`
+
 - **files:** `packages/praxrr-app/src/routes/api/v1/drift/settings/+server.ts`
 - **template to mirror:** existing PUT/validation routes; `driftSettingsQueries.update`; `scheduleDriftCheck` from `$jobs/init.ts` (S2-T4).
 - **dependsOn:** S3-T4, S0-T5, S2-T4
@@ -318,6 +353,7 @@ Every `designCorrection` from the 5 verification lanes, and how this plan accoun
 - **acceptance:** covered in S3-T8.
 
 ### S3-T8 — route tests `[NEW]`
+
 - **files:** `packages/praxrr-app/tests/routes/drift/*.test.ts`
 - **template to mirror:** design §10 "Route tests"; existing v1 route tests (type-checked via `deno test <dir>`).
 - **dependsOn:** S3-T5, S3-T6, S3-T7
@@ -329,6 +365,7 @@ Every `designCorrection` from the 5 verification lanes, and how this plan accoun
 ## Stage 4 — UI (depends on Stage 3 contract)
 
 ### S4-T1 — extract shared field-diff component `[NEW]`
+
 - **files:** `packages/praxrr-app/src/lib/client/ui/drift/DriftFieldDiff.svelte` (+ index if needed)
 - **template to mirror (DC-14):** `LiveDiffPanel.svelte:232-282` (field table + create/delete banner markup); `$ui/resolved/fieldChangeDisplay.ts:13,20` (`FIELD_META`, `formatFieldValue`).
 - **dependsOn:** S3-T4
@@ -336,6 +373,7 @@ Every `designCorrection` from the 5 verification lanes, and how this plan accoun
 - **acceptance:** renders update field tables and identity-only create/delete rows from static props.
 
 ### S4-T2 — `/drift` dashboard `[NEW]`
+
 - **files:** `packages/praxrr-app/src/routes/drift/+page.server.ts`, `packages/praxrr-app/src/routes/drift/+page.svelte`
 - **template to mirror:** `routes/resolved-config/[databaseId]/+page.server.ts:22-87` + `+page.svelte:8,70,321-325` (load exposes id/name/type, client-fetch, `$:`, `on:click`); `Card.svelte:4-9`, `CardGrid.svelte:4-7`, `Badge.svelte:4-9`, `EmptyState.svelte:5-10`; `alerts/store.ts:19,45`; `LiveDiffPanel.svelte:63,75-82,93-136` (requestId race-guard).
 - **dependsOn:** S3-T4, S3-T5
@@ -343,6 +381,7 @@ Every `designCorrection` from the 5 verification lanes, and how this plan accoun
 - **acceptance:** dashboard renders totals + cards; empty state links to `/arr`.
 
 ### S4-T3 — `/drift/[instanceId]` detail `[NEW]`
+
 - **files:** `packages/praxrr-app/src/routes/drift/[instanceId]/+page.server.ts`, `.../+page.svelte`
 - **template to mirror:** `resolved-config/[databaseId]/+page.server.ts:22-87` (param validation, never-throws, inline `error`); S4-T1 component; `LiveDiffPanel.svelte:93-136` (429/error retry handling).
 - **dependsOn:** S4-T1, S3-T6
@@ -350,6 +389,7 @@ Every `designCorrection` from the 5 verification lanes, and how this plan accoun
 - **acceptance:** detail groups by category; refresh handles 409/429.
 
 ### S4-T4 — Drift settings panel `[NEW]`
+
 - **files:** `packages/praxrr-app/src/routes/settings/<drift>/+page.server.ts` + `+page.svelte` (place under the existing settings surface)
 - **template to mirror (DC-15):** `routes/settings/backups/+page.svelte:201-216` + its `+page.server.ts` form-action + `use:enhance`; `driftSettingsQueries.update`; `scheduleDriftCheck` (S2-T4).
 - **dependsOn:** S3-T7, S2-T4
@@ -357,6 +397,7 @@ Every `designCorrection` from the 5 verification lanes, and how this plan accoun
 - **acceptance:** toggling/saving persists and reschedules/cancels the job; no dirty-store dependency.
 
 ### S4-T5 — nav registry entry `[SHARED]`
+
 - **files:** `packages/praxrr-app/src/lib/server/navigation/registry.ts`
 - **template to mirror (DC-12/DC-16):** `registry.ts:106-116` (dependency_graph entry, `order:3`), `:56` (`scopeAll`), `:60-116`; `shared/navigation/types.ts:21-37`.
 - **dependsOn:** —
@@ -368,6 +409,7 @@ Every `designCorrection` from the 5 verification lanes, and how this plan accoun
 ## Stage 5 — Integration / verify (orchestrator-driven)
 
 ### S5-T1 — full verification sweep
+
 - **dependsOn:** all Stage 0-4 tasks
 - **commands (real `deno.json` task names):**
   - `deno task check` (→ `check:server` + `check:client`)
@@ -379,6 +421,7 @@ Every `designCorrection` from the 5 verification lanes, and how this plan accoun
 - **acceptance:** check + lint + test all green; e2e smoke passes; generated API artifacts formatted.
 
 ### S5-T2 — ROADMAP update `[SHARED]`
+
 - **files:** `ROADMAP.md`
 - **template to mirror:** existing shipped-feature rows (`ROADMAP.md:56-57`), checklist item `:259` (`- [ ] #15 - Drift Detection Dashboard`), narrative `:36-37,298-299`.
 - **dependsOn:** S5-T1
