@@ -103,6 +103,20 @@ migratedTest('GET /security-posture/summary grades a plaintext instance and carr
   assert((transport?.recommendations.length ?? 0) >= 1);
 });
 
+migratedTest('GET /security-posture/summary grades transport from url, never external_url', async () => {
+  // url is https+loopback (grades 100/encrypted); external_url is public http (would grade 30/public if
+  // gather wrongly used it). The guardrail: the Arr API key never travels over external_url.
+  db.execute(
+    `INSERT INTO arr_instances (name, type, url, external_url, api_key, api_key_fingerprint, tags, enabled, source)
+     VALUES ('Radarr', 'radarr', 'https://127.0.0.1:7878', 'http://8.8.8.8:7878', '', NULL, NULL, 1, 'ui')`
+  );
+  const { body } = await getSummary();
+  const row = body.transport[0];
+  assertEquals(row.scheme, 'https'); // from url, not external_url's http
+  assertEquals(row.host, '127.0.0.1'); // from url, not the public external_url host
+  assertEquals(row.tier, 'encrypted');
+});
+
 migratedTest('GET /security-posture/summary never returns a secret value', async () => {
   insertInstance('Radarr', 'radarr', 'http://radarr:7878');
   const { body } = await getSummary();

@@ -28,6 +28,18 @@ const DRIFT_CATEGORY_TONE: Readonly<Record<DriftCategory, NarrationTone>> = {
   unmanaged: 'neutral',
 };
 
+/**
+ * Severity ranking for a narration tone (higher = more severe), the single source of truth for
+ * ordering lines most-severe-first. Shared so every consumer — config-health suggestions,
+ * security-posture top actions — ranks tones identically.
+ */
+export const TONE_SEVERITY: Readonly<Record<NarrationTone, number>> = {
+  neutral: 0,
+  info: 1,
+  warning: 2,
+  danger: 3,
+};
+
 const STATUS_TONE: Readonly<Record<DriftSummaryStatus, NarrationTone>> = {
   'in-sync': 'neutral',
   'never-checked': 'neutral',

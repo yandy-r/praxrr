@@ -4,7 +4,6 @@
   import Card from '$ui/card/Card.svelte';
   import CardGrid from '$ui/card/CardGrid.svelte';
   import Badge from '$ui/badge/Badge.svelte';
-  import EmptyState from '$ui/state/EmptyState.svelte';
   import ShieldRecommendationBlock from '$ui/security/ShieldRecommendationBlock.svelte';
   import ShieldFixControl from '$ui/security/ShieldFixControl.svelte';
   import {
@@ -272,6 +271,15 @@
               </div>
             {/if}
 
+            {#if check.id === 'arr_transport' && summary.transport.length === 0}
+              <p class="mt-3 text-xs text-neutral-500 dark:text-neutral-400">
+                No enabled Radarr, Sonarr, or Lidarr instances to grade for transport.
+                <a href="/arr" class="text-accent-600 dark:text-accent-500 font-medium hover:underline"
+                  >Add an Arr instance →</a
+                >
+              </p>
+            {/if}
+
             {#if check.recommendations.length > 0}
               <div class="mt-3 space-y-2">
                 {#each check.recommendations as recommendation (recommendation.headline)}
@@ -328,16 +336,6 @@
           {/each}
         </div>
       </section>
-    {/if}
-
-    {#if summary.transport.length === 0}
-      <EmptyState
-        icon={ShieldCheck}
-        title="No Arr instances to audit for transport"
-        description="Connection transport is graded per enabled Radarr, Sonarr, or Lidarr instance. The control-plane checks above still apply."
-        buttonText="Add Arr instance"
-        buttonHref="/arr"
-      />
     {/if}
   {/if}
 </div>

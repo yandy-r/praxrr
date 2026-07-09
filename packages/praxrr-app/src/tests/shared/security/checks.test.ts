@@ -51,6 +51,7 @@ Deno.test('classifyHost: loopback / private / docker-alias / unknown / public', 
   assertEquals(classifyHost('::1'), 'loopback');
   assertEquals(classifyHost('[::1]'), 'loopback');
   assertEquals(classifyHost('0.0.0.0'), 'loopback');
+  assertEquals(classifyHost('::'), 'unknown'); // the IPv6 wildcard is NOT loopback
   assertEquals(classifyHost('10.0.0.5'), 'private');
   assertEquals(classifyHost('192.168.1.10'), 'private');
   assertEquals(classifyHost('172.16.4.4'), 'private');
@@ -121,6 +122,13 @@ Deno.test('control_plane_auth: scores every mode and never returns null', () => 
   assertEquals(offLoop.status, 'attention');
   assertEquals(offLoop.bandCapWhenAction, null);
   assertEquals(runCheck('control_plane_auth', makeInputs({ authMode: 'off', bindHost: 'localhost' })).score, 55);
+  assertEquals(runCheck('control_plane_auth', makeInputs({ authMode: 'off', bindHost: '::1' })).score, 55);
+
+  // The IPv6 wildcard '::' binds ALL interfaces (the analog of 0.0.0.0) — NOT loopback-mitigated.
+  const offWildcardV6 = runCheck('control_plane_auth', makeInputs({ authMode: 'off', bindHost: '::' }));
+  assertEquals(offWildcardV6.score, 35);
+  assertEquals(offWildcardV6.status, 'action');
+  assertEquals(offWildcardV6.bandCapWhenAction, 'exposed');
 
   for (const authMode of ['on', 'local', 'off', 'oidc'] as const) {
     assert(runCheck('control_plane_auth', makeInputs({ authMode })).score !== null, `${authMode} must score`);
@@ -228,6 +236,20 @@ Deno.test('credential_rotation: null without rotation; penalizes stale rows; nul
     })
   );
   assertEquals(unreadable.score, 100); // null keyVersion is not counted as stale
+
+  // A row under a key REMOVED from the ring (not in configuredVersions) is undecryptable — not
+  // stale (drift's concern), so it must not be penalized here with unactionable "re-save" advice.
+  const removedKey = runCheck(
+    'credential_rotation',
+    makeInputs({
+      rotation: {
+        activeVersion: '2',
+        configuredVersions: ['2', '3'],
+        instanceKeyVersions: [{ instanceId: 1, keyVersion: '1' }],
+      },
+    })
+  );
+  assertEquals(removedKey.score, 100);
 });
 
 // --- log_redaction ----------------------------------------------------------------------------

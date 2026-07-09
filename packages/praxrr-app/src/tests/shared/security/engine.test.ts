@@ -85,12 +85,36 @@ Deno.test('computeShieldReport: band thresholds at 85 (hardened) and 60 (guarded
   const hardened = computeShieldReport(
     makeInputs({ instances: [{ id: 1, name: 'R', arrType: 'radarr', url: 'https://r' }] })
   );
-  assert(hardened.score >= 85 && hardened.band === 'hardened');
+  assert(hardened.score >= 85);
+  assertEquals(hardened.band, 'hardened');
 
-  const local = computeShieldReport(
+  // local(60) + private-http(65) + app_key(70), no action check → 64 → guarded (pins the >=60 boundary).
+  const guarded = computeShieldReport(
     makeInputs({ authMode: 'local', instances: [{ id: 1, name: 'R', arrType: 'radarr', url: 'http://10.0.0.5' }] })
   );
-  assert(local.band === 'guarded' || local.band === 'exposed'); // clearly not hardened
+  assert(guarded.score >= 60 && guarded.score < 85, `expected a guarded-range score, got ${guarded.score}`);
+  assertEquals(guarded.band, 'guarded');
+  assertEquals(guarded.bandCappedBy, null); // numeric band, not a cap
+
+  // off+loopback(55) + private-http(65), app_key null → 59 → exposed (just below 60, no action cap).
+  const exposed = computeShieldReport(
+    makeInputs({
+      authMode: 'off',
+      bindHost: '127.0.0.1',
+      instances: [{ id: 1, name: 'R', arrType: 'radarr', url: 'http://10.0.0.5' }],
+    })
+  );
+  assert(exposed.score < 60, `expected a sub-60 score, got ${exposed.score}`);
+  assertEquals(exposed.band, 'exposed');
+});
+
+Deno.test('computeShieldReport: recoverablePoints = round((100 - score) * weight / Σ scored weights)', () => {
+  // Only control_plane_auth scores: local=60 (weight 40); no app key (null), no instances (transport null),
+  // single-key rotation (null), redaction assured (null). Σ scored weight = 40 → round((100-60)*40/40) = 40.
+  const report = computeShieldReport(makeInputs({ authMode: 'local', appApiKeyPresent: false, instances: [] }));
+  const auth = report.checks.find((c) => c.id === 'control_plane_auth');
+  assertEquals(auth?.score, 60);
+  assertEquals(auth?.recoverablePoints, 40);
 });
 
 Deno.test('computeShieldReport: AUTH=off on a public bind is capped to exposed despite a high average', () => {

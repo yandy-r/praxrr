@@ -8,7 +8,7 @@
  * no `Date`, no `Math.random`; instance-order-invariant — identical input yields deep-equal output.
  */
 
-import type { NarrationTone } from '$shared/narration/index.ts';
+import { TONE_SEVERITY } from '$shared/narration/index.ts';
 import { ALL_CHECKS, buildTransportRows } from './checks.ts';
 import { capBand, rollUp, shieldBandFor } from './policy.ts';
 import {
@@ -20,9 +20,6 @@ import {
   type ShieldReport,
   type TopAction,
 } from './types.ts';
-
-/** Severity ranking used to break recoverable-points ties when ordering the top actions. */
-const TONE_SEVERITY: Record<NarrationTone, number> = { neutral: 0, info: 1, warning: 2, danger: 3 };
 
 /** Always-on protections surfaced as verified affirmations; they contribute zero to the score. */
 function buildAssurances(inputs: PostureInputs): Assurance[] {

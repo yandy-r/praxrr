@@ -119,7 +119,8 @@ export function classifyHost(rawHost: string): HostClass {
   const host = stripBrackets(rawHost.trim().toLowerCase());
   if (host.length === 0) return 'unknown';
   if (host === 'localhost' || host === '0.0.0.0') return 'loopback';
-  if (host === '::1' || host === '::') return 'loopback';
+  // Only `::1` is IPv6 loopback; `::` is the unspecified/wildcard address (analog of 0.0.0.0), not loopback.
+  if (host === '::1') return 'loopback';
   if (isIpv4(host)) return classifyIpv4(host);
   if (host.includes(':')) {
     // IPv6 literal: unique-local (fc00::/7) and link-local (fe80::/10) are private; the rest unknown.
@@ -132,10 +133,13 @@ export function classifyHost(rawHost: string): HostClass {
   return 'unknown';
 }
 
-/** Loopback BIND detection for the auth check. Unlike {@link classifyHost}, `0.0.0.0` is NOT loopback (it binds all interfaces). */
+/**
+ * Loopback BIND detection for the auth check. The wildcard binds `0.0.0.0` and `::` bind ALL
+ * interfaces and are therefore NOT loopback — only `localhost`, `::1`, and `127.0.0.0/8` are.
+ */
 function isLoopbackBindHost(rawHost: string): boolean {
   const host = stripBrackets(rawHost.trim().toLowerCase());
-  if (host === 'localhost' || host === '::1' || host === '::') return true;
+  if (host === 'localhost' || host === '::1') return true;
   return isIpv4(host) && Number(host.split('.')[0]) === 127;
 }
 
@@ -247,12 +251,20 @@ const controlPlaneAuth: SecurityCheck = {
           'attention',
           false,
           null,
-          ['OIDC is selected but its configuration is incomplete.'],
+          [
+            inputs.oidcPartiallyConfigured
+              ? 'OIDC is selected but only partially configured.'
+              : 'OIDC is selected but not configured yet.',
+          ],
           [
             rec(
-              'OIDC is enabled but not fully configured',
+              inputs.oidcPartiallyConfigured
+                ? 'OIDC is only partially configured'
+                : 'OIDC is enabled but not configured',
               [
-                'Set OIDC_DISCOVERY_URL, OIDC_CLIENT_ID and OIDC_CLIENT_SECRET so sign-in actually works; until then users cannot authenticate.',
+                inputs.oidcPartiallyConfigured
+                  ? 'Some OIDC settings are set but others are missing, so sign-in is broken. Set OIDC_DISCOVERY_URL, OIDC_CLIENT_ID and OIDC_CLIENT_SECRET.'
+                  : 'Set OIDC_DISCOVERY_URL, OIDC_CLIENT_ID and OIDC_CLIENT_SECRET so sign-in works; until then users cannot authenticate.',
               ],
               'warning',
               { kind: 'env-var', name: 'OIDC_DISCOVERY_URL', label: 'Complete the OIDC configuration' }
@@ -504,8 +516,13 @@ const credentialRotation: SecurityCheck = {
       return result(ID_ROTATION, LABEL_ROTATION, null, W, 'na', false, null, ['No enabled instances to evaluate.'], []);
     }
 
-    // Only rows we can actually read AND that sit under a retired version count as stale.
-    const stale = instanceKeyVersions.filter((i) => i.keyVersion !== null && i.keyVersion !== activeVersion);
+    // Only rows we can actually DECRYPT (their key version is still configured) AND that sit under a
+    // retired-but-present version count as stale. A row under a key that was dropped from
+    // ARR_CREDENTIAL_PREVIOUS_KEYS is undecryptable — a broken/functional state (drift's concern),
+    // not a re-saveable rotation lag, so it must not be scored here with "re-save" advice.
+    const stale = instanceKeyVersions.filter(
+      (i) => i.keyVersion !== null && i.keyVersion !== activeVersion && configuredVersions.includes(i.keyVersion)
+    );
     if (stale.length === 0) {
       return result(
         ID_ROTATION,
