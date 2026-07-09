@@ -152,7 +152,7 @@ export const ARR_SYNC_SURFACES = [
 const ARR_CAPABILITY_NON_REGRESSION_CHECK = {
   radarr: ARR_APPS.radarr.capabilities,
   sonarr: ARR_APPS.sonarr.capabilities,
-} as const satisfies { radarr: { /* literal */ }; sonarr: { /* literal */ } };
+} as const satisfies { radarr: {/* literal */}; sonarr: {/* literal */} };
 void ARR_CAPABILITY_NON_REGRESSION_CHECK;
 ```
 
