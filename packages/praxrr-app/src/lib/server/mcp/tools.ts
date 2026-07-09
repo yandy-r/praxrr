@@ -143,12 +143,12 @@ export const TOOLS: readonly McpTool[] = [
     handler: (args) => {
       const type = optArrType(args, 'type');
       const enabledOnly = optBoolean(args, 'enabledOnly');
-      const rows = type
-        ? arrInstancesQueries.getByType(type)
-        : enabledOnly
-          ? arrInstancesQueries.getEnabled()
-          : arrInstancesQueries.getAll();
-      return Promise.resolve(rows.filter((instance) => isSyncPreviewArrType(instance.type)).map(toMcpInstance));
+      // `type` and `enabledOnly` compose (AND); getByType has no enabled filter, so apply it here.
+      const base = type ? arrInstancesQueries.getByType(type) : arrInstancesQueries.getAll();
+      const rows = base
+        .filter((instance) => isSyncPreviewArrType(instance.type))
+        .filter((instance) => !enabledOnly || instance.enabled === 1);
+      return Promise.resolve(rows.map(toMcpInstance));
     },
   },
   {

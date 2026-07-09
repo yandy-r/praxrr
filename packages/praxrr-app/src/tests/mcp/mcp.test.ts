@@ -10,6 +10,10 @@ import { arrInstancesQueries } from '$db/queries/arrInstances.ts';
 import { databaseInstancesQueries } from '$db/queries/databaseInstances.ts';
 import { configHealthSettingsQueries } from '$db/queries/configHealthSettings.ts';
 import { redactSecrets } from '$lib/server/mcp/redact.ts';
+import { toMcpDatabase, toMcpInstance } from '$lib/server/mcp/mappers.ts';
+import { toToolResult } from '$lib/server/mcp/serialize.ts';
+import type { ArrInstance } from '$db/queries/arrInstances.ts';
+import type { DatabaseInstance } from '$db/queries/databaseInstances.ts';
 import { DELETE, GET, POST } from '../../routes/api/v1/mcp/+server.ts';
 
 type PostEvent = Parameters<typeof POST>[0];
@@ -203,6 +207,28 @@ migratedTest('tools/call list_instances: happy path returns text content, isErro
   assertEquals(body.result.content[0].type, 'text');
   const parsed = JSON.parse(body.result.content[0].text);
   assertEquals(parsed.length, 1);
+});
+
+migratedTest('list_instances: type and enabledOnly compose (AND)', async () => {
+  const enabledId = seedInstance('radarr');
+  arrInstancesQueries.create({
+    name: `radarr-disabled ${crypto.randomUUID()}`,
+    type: 'radarr',
+    url: 'http://127.0.0.1:9',
+    apiKey: 'k',
+    apiKeyFingerprint: 'fp',
+    enabled: false,
+  });
+  const byType = await rpcBody('tools/call', { name: 'list_instances', arguments: { type: 'radarr' } });
+  assertEquals(JSON.parse(byType.result.content[0].text).length, 2);
+
+  const enabledOnly = await rpcBody('tools/call', {
+    name: 'list_instances',
+    arguments: { type: 'radarr', enabledOnly: true },
+  });
+  const rows = JSON.parse(enabledOnly.result.content[0].text) as Array<{ id: number }>;
+  assertEquals(rows.length, 1);
+  assertEquals(rows[0].id, enabledId);
 });
 
 migratedTest('tools/call get_drift_status: unknown instance → isError result (not a protocol error)', async () => {
@@ -506,4 +532,58 @@ Deno.test('redactSecrets scrubs string secrets (incl. password_hash) but keeps f
   assertEquals(scrubbed.nested[0].token, '[REDACTED]');
   assertEquals(scrubbed.nested[0].label, 'keep-me');
   assertEquals(scrubbed.count, 5);
+});
+
+// ============================================================================
+// Mapper-level redaction (feeds a REAL raw secret through the whitelist + serializer)
+// ============================================================================
+
+Deno.test('toMcpInstance + toToolResult drop a raw api_key and keep the fingerprint', () => {
+  const instance = {
+    id: 1,
+    name: 'radarr',
+    type: 'radarr',
+    url: 'http://x',
+    external_url: null,
+    api_key_fingerprint: 'fp-xyz',
+    api_key: 'RAW-API-KEY-VALUE',
+    tags: null,
+    enabled: 1,
+    source: 'ui',
+    detected_version: null,
+    detected_at: null,
+    created_at: 't',
+    updated_at: 't',
+  } as ArrInstance;
+  const wire = toMcpInstance(instance);
+  assert(!Object.keys(wire).includes('api_key'));
+  assertEquals(wire.api_key_fingerprint, 'fp-xyz');
+  assert(!JSON.stringify(toToolResult(wire)).includes('RAW-API-KEY-VALUE'));
+});
+
+Deno.test('toMcpDatabase + toToolResult drop a raw personal_access_token', () => {
+  const db = {
+    id: 1,
+    uuid: 'u',
+    name: 'db',
+    repository_url: 'http://x',
+    local_path: '/x',
+    sync_strategy: 0,
+    auto_pull: 0,
+    enabled: 1,
+    personal_access_token: 'RAW-GIT-PAT',
+    has_personal_access_token: 1,
+    is_private: 0,
+    local_ops_enabled: 0,
+    git_user_name: null,
+    git_user_email: null,
+    conflict_strategy: 'override',
+    last_synced_at: null,
+    created_at: 't',
+    updated_at: 't',
+  } as DatabaseInstance;
+  const wire = toMcpDatabase(db);
+  assert(!Object.keys(wire).includes('personal_access_token'));
+  assertEquals(wire.has_personal_access_token, true);
+  assert(!JSON.stringify(toToolResult(wire)).includes('RAW-GIT-PAT'));
 });

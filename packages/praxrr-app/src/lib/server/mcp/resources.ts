@@ -3,8 +3,9 @@
  *
  * Static resources appear in `resources/list`; templated (`{param}`) resources appear only in
  * `resources/templates/list`. Every read wraps a verified service function and passes through the
- * redaction gate (via {@link toResourceContents}). A bad/unmatched URI is an invalid-params
- * protocol error (`-32602`) — resources have no `isError` result channel.
+ * redaction gate (via {@link toResourceContents}). An unmatched or unresolvable URI is a
+ * resource-not-found error (`-32002`); malformed URI params (invalid arrType/entityType or bad
+ * percent-encoding) are invalid-params (`-32602`). Resources have no `isError` result channel.
  */
 
 import { arrInstancesQueries } from '$db/queries/arrInstances.ts';

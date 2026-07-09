@@ -3,8 +3,8 @@
  *
  * Carries only audit identity in PR #1 (read-only tier) — the hook already authorized the request,
  * so this is never used for re-authorization. Only `{ id, username }` is projected off the user;
- * the raw `User` is never copied (it carries `password_hash`, which the secret scrubber does not
- * strip because the key ends in `_hash`).
+ * the raw `User` (which carries `password_hash` and other fields) is never copied, as a
+ * least-privilege measure — the MCP boundary needs only audit identity.
  */
 
 export interface McpContext {
