@@ -139,6 +139,18 @@ export const NAV_REGISTRY: ArrCapabilityAwareNavItem[] = [
     hasChildren: false,
   },
   {
+    id: 'overview.security_posture',
+    label: 'Security Posture',
+    href: '/security-posture',
+    groupId: ensureGroupId('overview'),
+    order: 6,
+    arrScope: scopeAll,
+    mobilePriority: 'medium',
+    iconKey: 'ShieldCheck',
+    emoji: '🛡️',
+    hasChildren: false,
+  },
+  {
     id: 'apps.arrs',
     label: 'Arrs',
     href: '/arr',

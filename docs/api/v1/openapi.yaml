@@ -50,6 +50,8 @@ tags:
     description: Staged rollout orchestration — canary sync, verification gate, and batched fan-out
   - name: Config Health
     description: Score configuration quality/health per instance and profile, with suggestions and trends
+  - name: Security Posture
+    description: Non-blocking security posture "Shield Check" — auth, transport, and credential exposure audit
 
 paths:
   /health:
@@ -690,6 +692,8 @@ paths:
     $ref: './paths/config-health.yaml#/trends'
   /config-health/settings:
     $ref: './paths/config-health.yaml#/settings'
+  /security-posture/summary:
+    $ref: './paths/security-posture.yaml#/summary'
 
 components:
   schemas:
@@ -1642,3 +1646,34 @@ components:
       $ref: './schemas/config-health.yaml#/ConfigHealthSettingsResponse'
     ConfigHealthSettingsUpdateRequest:
       $ref: './schemas/config-health.yaml#/ConfigHealthSettingsUpdateRequest'
+    # Security Posture
+    SecurityShieldBand:
+      $ref: './schemas/security-posture.yaml#/SecurityShieldBand'
+    SecurityCheckId:
+      $ref: './schemas/security-posture.yaml#/SecurityCheckId'
+    SecurityArrType:
+      $ref: './schemas/security-posture.yaml#/SecurityArrType'
+    SecurityTone:
+      $ref: './schemas/security-posture.yaml#/SecurityTone'
+    SecurityCheckStatus:
+      $ref: './schemas/security-posture.yaml#/SecurityCheckStatus'
+    SecurityTransportTier:
+      $ref: './schemas/security-posture.yaml#/SecurityTransportTier'
+    SecurityFix:
+      $ref: './schemas/security-posture.yaml#/SecurityFix'
+    SecurityRecommendation:
+      $ref: './schemas/security-posture.yaml#/SecurityRecommendation'
+    SecurityCheck:
+      $ref: './schemas/security-posture.yaml#/SecurityCheck'
+    SecurityTransportRow:
+      $ref: './schemas/security-posture.yaml#/SecurityTransportRow'
+    SecurityAssurance:
+      $ref: './schemas/security-posture.yaml#/SecurityAssurance'
+    SecurityAdvisory:
+      $ref: './schemas/security-posture.yaml#/SecurityAdvisory'
+    SecurityTopAction:
+      $ref: './schemas/security-posture.yaml#/SecurityTopAction'
+    SecurityBandCap:
+      $ref: './schemas/security-posture.yaml#/SecurityBandCap'
+    SecurityPostureSummaryResponse:
+      $ref: './schemas/security-posture.yaml#/SecurityPostureSummaryResponse'

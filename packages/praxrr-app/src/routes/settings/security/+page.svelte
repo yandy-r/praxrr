@@ -2,7 +2,7 @@
   import type { PageData, ActionData } from './$types';
   import { enhance } from '$app/forms';
   import { invalidateAll } from '$app/navigation';
-  import { RefreshCw, LogOut, Check, Globe, Monitor, Smartphone, Network, Clock } from 'lucide-svelte';
+  import { RefreshCw, LogOut, Check, Globe, Monitor, Smartphone, Network, Clock, ShieldCheck } from 'lucide-svelte';
   import { parseUTC } from '$shared/utils/dates';
   import Button from '$ui/button/Button.svelte';
   import CollapsibleCard from '$ui/card/CollapsibleCard.svelte';
@@ -240,6 +240,13 @@
     <p class="mt-2 text-base text-neutral-600 md:mt-3 md:text-lg dark:text-neutral-400">
       Manage your password, API key, and active sessions
     </p>
+    <a
+      href="/security-posture"
+      class="text-accent-600 dark:text-accent-500 mt-3 inline-flex items-center gap-1.5 text-sm font-medium hover:underline"
+    >
+      <ShieldCheck size={16} />
+      View security posture — audit auth, transport, and credential exposure →
+    </a>
   </div>
 
   <div class="space-y-8">
