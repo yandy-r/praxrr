@@ -23,10 +23,35 @@ import type { ArrInstance } from '$db/queries/arrInstances.ts';
 import type { SectionType } from '$sync/types.ts';
 import type { GeneratePreviewResult } from '$sync/preview/orchestrator.ts';
 import type { EntityChange } from '$sync/preview/types.ts';
-import type { SyncEntityChange, SyncHistoryInput } from './types.ts';
+import type { SyncEntityChange, SyncHistoryInput, SyncOperationStatus, SyncSectionResult } from './types.ts';
 
 const SOURCE = 'SyncHistoryRecord';
 const MAX_EMBED_CHANGE_LINES = 10;
+
+/**
+ * Derive the audit status from a run's outcome. Discriminates `partial` vs `failed`
+ * on whether ANY section actually succeeded — NOT on total item count, because a
+ * successful no-op section reports 0 items and a failing section can report >0. So a
+ * mixed run (some sections succeed, some fail) is correctly `partial`, and a run
+ * where every ran section failed is `failed`.
+ */
+export function deriveSyncHistoryStatus(
+  ranSections: number,
+  failures: number,
+  sectionResults: readonly SyncSectionResult[]
+): SyncOperationStatus {
+  if (ranSections === 0) {
+    return 'skipped';
+  }
+  const successCount = sectionResults.filter((section) => section.status === 'success').length;
+  if (failures > 0 && successCount === 0) {
+    return 'failed';
+  }
+  if (failures > 0) {
+    return 'partial';
+  }
+  return 'success';
+}
 
 /** Whether recording (and pre-sync preview capture) is enabled. */
 export function isSyncHistoryEnabled(): boolean {

@@ -18,8 +18,16 @@ type UpdateBody = {
  *
  * Returns the current sync history retention + enable settings.
  */
-export const GET: RequestHandler = () => {
-  return json(toSyncHistorySettingsResponse(syncHistorySettingsQueries.get()));
+export const GET: RequestHandler = async () => {
+  try {
+    return json(toSyncHistorySettingsResponse(syncHistorySettingsQueries.get()));
+  } catch (error) {
+    await logger.error('Failed to read sync history settings', {
+      source: 'SyncHistorySettingsRoute',
+      meta: { error: error instanceof Error ? error.message : String(error) },
+    });
+    return json({ error: 'Failed to read sync history settings' } satisfies ErrorResponse, { status: 500 });
+  }
 };
 
 /**

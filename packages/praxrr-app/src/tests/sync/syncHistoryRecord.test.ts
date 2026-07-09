@@ -5,7 +5,7 @@ import { runMigrations } from '$db/migrations.ts';
 import { arrInstancesQueries } from '$db/queries/arrInstances.ts';
 import { syncHistoryQueries } from '$db/queries/syncHistory.ts';
 import { syncHistorySettingsQueries } from '$db/queries/syncHistorySettings.ts';
-import { isSyncHistoryEnabled, recordSyncHistory } from '$sync/syncHistory/record.ts';
+import { deriveSyncHistoryStatus, isSyncHistoryEnabled, recordSyncHistory } from '$sync/syncHistory/record.ts';
 import type {
   SyncEntityChange,
   SyncHistoryInput,
@@ -264,4 +264,26 @@ migratedTest('recordSyncHistory records nothing when disabled and isSyncHistoryE
 
   recordSyncHistory(makeInput(instanceId, 'radarr'));
   assertEquals(syncHistoryQueries.count({}), 1);
+});
+
+function section(status: SyncSectionResult['status'], itemsSynced: number): SyncSectionResult {
+  return { section: 'qualityProfiles', status, itemsSynced, error: status === 'failed' ? 'boom' : null };
+}
+
+Deno.test('deriveSyncHistoryStatus discriminates partial vs failed on section success, not item count', () => {
+  // No sections ran → skipped (regardless of captured changes).
+  assertEquals(deriveSyncHistoryStatus(0, 0, []), 'skipped');
+
+  // All sections succeeded → success.
+  assertEquals(deriveSyncHistoryStatus(2, 0, [section('success', 3), section('success', 0)]), 'success');
+
+  // Every ran section failed → failed.
+  assertEquals(deriveSyncHistoryStatus(1, 1, [section('failed', 0)]), 'failed');
+
+  // Mixed: a zero-item success alongside a failure is PARTIAL (regression guard —
+  // total itemsSynced is 0 here, which the old count-based check mislabeled 'failed').
+  assertEquals(deriveSyncHistoryStatus(2, 1, [section('success', 0), section('failed', 0)]), 'partial');
+
+  // Mirror: a single failed section reporting items>0 is FAILED, not partial.
+  assertEquals(deriveSyncHistoryStatus(1, 1, [section('failed', 5)]), 'failed');
 });

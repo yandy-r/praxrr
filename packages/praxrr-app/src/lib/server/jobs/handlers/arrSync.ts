@@ -16,7 +16,7 @@ import {
 } from '$lib/server/sync/mappings.ts';
 import { logger } from '$logger/logger.ts';
 import { snapshotService } from '$pcd/snapshots/service.ts';
-import { capturePreSyncChanges, recordSyncHistory } from '$sync/syncHistory/record.ts';
+import { capturePreSyncChanges, deriveSyncHistoryStatus, recordSyncHistory } from '$sync/syncHistory/record.ts';
 import type {
   SyncEntityChange,
   SyncOperationStatus,
@@ -546,8 +546,7 @@ const arrSyncHandler: JobHandler = async (job) => {
     }
   }
 
-  const historyStatus: SyncOperationStatus =
-    ranSections === 0 ? 'skipped' : failures > 0 && itemsSynced === 0 ? 'failed' : failures > 0 ? 'partial' : 'success';
+  const historyStatus = deriveSyncHistoryStatus(ranSections, failures, sectionResults);
   recordHistory(historyStatus, {
     error: failures > 0 ? results.join(', ') : null,
     sectionsAttempted: sectionsToRun,

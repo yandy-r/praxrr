@@ -356,3 +356,47 @@ migratedTest('PATCH /sync-history/settings: retentionDays=0 returns 400', async 
   const body = (await response.json()) as ErrorResponse;
   assert(body.error.includes('retentionDays'));
 });
+
+// ============================================================================
+// REVIEW FIXES -- CSV formula injection + strict/inclusive date bounds
+// ============================================================================
+
+migratedTest('GET /sync-history/export?format=csv: neutralizes spreadsheet formula injection', async () => {
+  const radarrId = createInstance('radarr');
+  // instanceName starts with '=' (also has quotes/commas → RFC-4180 quoted too);
+  // error starts with '-' (no other special chars → apostrophe-prefixed, unquoted).
+  seedRow({
+    arrInstanceId: radarrId,
+    status: 'failed',
+    failureCount: 1,
+    instanceName: '=HYPERLINK("http://evil","x")',
+    error: '-1+cmd',
+  });
+
+  const response = await GET_EXPORT(exportEvent(`instanceId=${radarrId}&format=csv`));
+  assertEquals(response.status, 200);
+  const csv = await response.text();
+
+  // Leading '=' neutralized with an apostrophe, then RFC-4180 quoted (contains quotes/commas).
+  assert(csv.includes('"\'=HYPERLINK('), 'formula-prefixed instanceName must be apostrophe-guarded');
+  // Leading '-' neutralized; no quoting needed.
+  assert(
+    csv.includes(",'-1+cmd,") || csv.includes(",'-1+cmd\r\n"),
+    'formula-prefixed error must be apostrophe-guarded'
+  );
+});
+
+migratedTest('GET /sync-history: date-only "to" includes runs recorded later that day', async () => {
+  const radarrId = createInstance('radarr');
+  seedRow({ arrInstanceId: radarrId, startedAt: '2026-07-09T18:30:00.000Z' });
+
+  const response = await GET_LIST(listEvent(`instanceId=${radarrId}&from=2026-07-09&to=2026-07-09`));
+  assertEquals(response.status, 200);
+  const body = (await response.json()) as SyncHistoryListResponse;
+  assertEquals(body.totalRecords, 1, 'an afternoon run must fall within an inclusive same-day range');
+});
+
+migratedTest('GET /sync-history: 400 on a loose date bound SQLite cannot parse', async () => {
+  const response = await GET_LIST(listEvent('from=2026-07'));
+  assertEquals(response.status, 400);
+});

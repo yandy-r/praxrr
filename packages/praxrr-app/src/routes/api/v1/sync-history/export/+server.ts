@@ -1,12 +1,16 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from '@sveltejs/kit';
 import { syncHistoryQueries, type SyncHistoryDetail, type SyncHistoryFilters } from '$db/queries/syncHistory.ts';
+import { parseDateBound } from '$sync/syncHistory/filters.ts';
 import { isSyncPreviewArrType } from '$sync/preview/types.ts';
 import { logger } from '$logger/logger.ts';
 
 type ErrorResponse = { error: string };
 
 type ExportFormat = 'json' | 'csv';
+
+/** Upper bound on exported rows; a hit is logged so a silent truncation is visible. */
+const EXPORT_ROW_CAP = 50000;
 
 const STATUSES = new Set(['success', 'partial', 'failed', 'skipped']);
 const TRIGGERS = new Set(['manual', 'schedule', 'system']);
@@ -39,14 +43,23 @@ const CSV_COLUMNS: (keyof SyncHistoryDetail)[] = [
 ];
 
 /**
- * RFC-4180 field escape: wrap in double-quotes and double any embedded quotes
- * when the value contains a quote, comma, or newline.
+ * CSV field escape:
+ * 1. Neutralize spreadsheet formula injection (CWE-1236) — a value whose first
+ *    character is `= + - @` (or tab/CR) is evaluated as a formula by Excel/Sheets
+ *    even inside quotes, so prefix it with an apostrophe. `error`/`instanceName`
+ *    carry externally-influenced text, so this is a real vector.
+ * 2. RFC-4180 quoting — wrap in double-quotes and double embedded quotes when the
+ *    value contains a quote, comma, or newline.
  */
 function escapeCsv(value: string): string {
-  if (/[",\r\n]/.test(value)) {
-    return `"${value.replace(/"/g, '""')}"`;
+  let escaped = value;
+  if (/^[=+\-@\t\r]/.test(escaped)) {
+    escaped = `'${escaped}`;
   }
-  return value;
+  if (/[",\r\n]/.test(escaped)) {
+    return `"${escaped.replace(/"/g, '""')}"`;
+  }
+  return escaped;
 }
 
 function cellValue(record: SyncHistoryDetail, column: keyof SyncHistoryDetail): string {
@@ -137,29 +150,34 @@ export const GET: RequestHandler = async ({ url }) => {
     filters.section = section;
   }
 
-  const from = params.get('from');
-  if (from !== null) {
-    if (Number.isNaN(Date.parse(from))) {
-      return json({ error: 'from must be an ISO-8601 date-time' } satisfies ErrorResponse, { status: 400 });
+  try {
+    const from = parseDateBound(params.get('from'), 'from', 'lower');
+    if (from !== undefined) {
+      filters.from = from;
     }
-    filters.from = from;
+    const to = parseDateBound(params.get('to'), 'to', 'upper');
+    if (to !== undefined) {
+      filters.to = to;
+    }
+  } catch (err) {
+    return json({ error: err instanceof Error ? err.message : 'Invalid date bound' } satisfies ErrorResponse, {
+      status: 400,
+    });
   }
 
-  const to = params.get('to');
-  if (to !== null) {
-    if (Number.isNaN(Date.parse(to))) {
-      return json({ error: 'to must be an ISO-8601 date-time' } satisfies ErrorResponse, { status: 400 });
-    }
-    filters.to = to;
-  }
-
-  const q = params.get('q');
-  if (q !== null && q !== '') {
+  const q = params.get('q')?.trim();
+  if (q) {
     filters.q = q;
   }
 
   try {
-    const rows = syncHistoryQueries.searchAll(filters);
+    const rows = syncHistoryQueries.searchAll(filters, EXPORT_ROW_CAP);
+    if (rows.length === EXPORT_ROW_CAP) {
+      await logger.warn('Sync history export hit the row cap; results are truncated', {
+        source: 'SyncHistoryExportRoute',
+        meta: { cap: EXPORT_ROW_CAP },
+      });
+    }
     const timestamp = new Date().toISOString();
 
     if (format === 'csv') {

@@ -2,6 +2,7 @@ import { json } from '@sveltejs/kit';
 import type { RequestHandler } from '@sveltejs/kit';
 import { syncHistoryQueries, type SyncHistoryFilters } from '$db/queries/syncHistory.ts';
 import { buildSyncHistoryListResponse } from '$sync/syncHistory/responses.ts';
+import { parseDateBound } from '$sync/syncHistory/filters.ts';
 import type { SyncOperationStatus, SyncTrigger } from '$sync/syncHistory/types.ts';
 import { isSyncPreviewArrType, type SyncPreviewArrType, type SyncPreviewSection } from '$sync/preview/types.ts';
 import { logger } from '$logger/logger.ts';
@@ -119,21 +120,6 @@ function parseSection(raw: string | null): SyncPreviewSection | undefined {
   return raw as SyncPreviewSection;
 }
 
-/**
- * Validate an ISO-8601 date-time bound via `Date.parse`, passing the original
- * string through to the query (which compares with SQLite `datetime(...)`).
- */
-function parseDateBound(raw: string | null, name: string): string | undefined {
-  if (raw === null) {
-    return undefined;
-  }
-  const trimmed = raw.trim();
-  if (!trimmed || Number.isNaN(Date.parse(trimmed))) {
-    throw new Error(`Invalid ${name}`);
-  }
-  return trimmed;
-}
-
 function parseListQuery(url: URL): ListQuery {
   const params = url.searchParams;
 
@@ -164,12 +150,12 @@ function parseListQuery(url: URL): ListQuery {
     filters.section = section;
   }
 
-  const from = parseDateBound(params.get('from'), 'from');
+  const from = parseDateBound(params.get('from'), 'from', 'lower');
   if (from !== undefined) {
     filters.from = from;
   }
 
-  const to = parseDateBound(params.get('to'), 'to');
+  const to = parseDateBound(params.get('to'), 'to', 'upper');
   if (to !== undefined) {
     filters.to = to;
   }
