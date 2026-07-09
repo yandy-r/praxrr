@@ -1,0 +1,25 @@
+summary:
+  get:
+    operationId: getSecurityPostureSummary
+    summary: Security posture shield report
+    description: |
+      The live "Shield Check" for this deployment: an overall 0–100 shield score and band (with any
+      critical band-cap), a per-check breakdown, the per-instance connection-transport table, always-on
+      assurances, unscored advisories, and the ranked "to reach Hardened" actions. Read-only, computed
+      on demand, zero network probing. The payload NEVER contains a secret value — only presence
+      booleans, host strings, and key-version identifiers. Non-blocking: it informs, it never blocks.
+    tags:
+      - Security Posture
+    responses:
+      '200':
+        description: The security posture shield report.
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/security-posture.yaml#/SecurityPostureSummaryResponse'
+      '500':
+        description: Internal error.
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'

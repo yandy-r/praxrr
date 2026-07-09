@@ -31,6 +31,8 @@ const aliases: Record<string, string> = {
     'packages/praxrr-app/src/tests/routes/scoreSimulatorPhase3Helpers.test.ts,packages/praxrr-app/src/tests/routes/scoreSimulatorUrlState.test.ts',
   resolvedConfig:
     'packages/praxrr-app/src/tests/pcd/resolved,packages/praxrr-app/src/tests/routes/resolvedConfigApi.test.ts',
+  'security-posture':
+    'packages/praxrr-app/src/tests/shared/security,packages/praxrr-app/src/tests/shared/scoring/rollup.test.ts,packages/praxrr-app/src/tests/routes/securityPosture.test.ts,packages/praxrr-app/src/tests/logger/sanitizerRegression.test.ts',
   selectors: 'packages/praxrr-app/src/tests/upgrades/selectors.test.ts',
   'setup-wizard':
     'packages/praxrr-app/src/tests/routes/setupWizard.test.ts,packages/praxrr-app/src/tests/base/setupProgress.test.ts',
