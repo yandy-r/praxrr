@@ -1,8 +1,8 @@
 # Automation Transparency Audit
 
-**Audit date:** 2026-07-09  
-**Scope:** every production `JobType` plus material direct automation and evidence workflows required by issue #21  
-**Registry source:** `packages/praxrr-app/src/lib/server/jobs/queueTypes.ts` and `packages/praxrr-app/src/lib/server/jobs/transparencyAudit.ts`
+- **Audit date:** 2026-07-09
+- **Scope:** every production `JobType` plus material direct automation and evidence workflows required by issue #21
+- **Registry source:** `packages/praxrr-app/src/lib/server/jobs/queueTypes.ts` and `packages/praxrr-app/src/lib/server/jobs/transparencyAudit.ts`
 
 ## Reading the audit
 
