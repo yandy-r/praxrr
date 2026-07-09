@@ -276,6 +276,18 @@ export const NAV_REGISTRY: ArrCapabilityAwareNavItem[] = [
     hasChildren: false,
   },
   {
+    id: 'policies.quality_goals',
+    label: 'Quality Goals',
+    href: '/goals',
+    groupId: ensureGroupId('policies'),
+    order: 8,
+    arrScope: scopeAll,
+    mobilePriority: 'medium',
+    iconKey: 'Sliders',
+    emoji: '🎯',
+    hasChildren: false,
+  },
+  {
     id: 'settings.settings',
     label: 'Settings',
     href: '/settings',
