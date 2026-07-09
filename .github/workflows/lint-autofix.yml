@@ -32,6 +32,11 @@ jobs:
         with:
           node-version: lts/*
 
+      - uses: denoland/setup-deno@v2
+
+      - name: Install project dependencies
+        run: deno install --frozen
+
       - name: Apply formatters
         run: ./scripts/style.sh format --docs
 
