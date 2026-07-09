@@ -178,7 +178,9 @@
             {verbose ? 'Hide details' : 'Show details'}
           </button>
         </div>
-        <NarrationBlock line={narrateDriftCounts(detail.counts, detail.status, level)} {verbose} />
+        {#if detail.counts.drifted > 0 || detail.counts.missing > 0 || detail.counts.unmanaged > 0}
+          <NarrationBlock line={narrateDriftCounts(detail.counts, detail.status, level)} {verbose} />
+        {/if}
       </div>
 
       {#if detail.drift.length === 0 && detail.missing.length === 0 && detail.unmanaged.length === 0}

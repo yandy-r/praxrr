@@ -205,11 +205,21 @@ Deno.test('narrateDriftReason: distinct sentences across never-checked / in-sync
   assertEquals(sentences.size, 3);
 });
 
-Deno.test('narrateDriftReason: verbose adds a retry note only for recoverable failures', () => {
-  assertEquals(narrateDriftReason('unreachable', 'timeout', 'verbose').detail, [
-    'Praxrr will retry on the next scheduled drift check.',
-  ]);
+Deno.test('narrateDriftReason: verbose adds a retry note for every recoverable failure status', () => {
+  const retry = ['Praxrr will retry on the next scheduled drift check.'];
+  assertEquals(narrateDriftReason('unreachable', 'timeout', 'verbose').detail, retry);
+  assertEquals(narrateDriftReason('unauthorized', null, 'verbose').detail, retry);
+  assertEquals(narrateDriftReason('error', 'error', 'verbose').detail, retry);
   assertEquals(narrateDriftReason('in-sync', null, 'verbose').detail, []);
+});
+
+Deno.test('narrateDriftReason: tone reflects severity across statuses', () => {
+  assertEquals(narrateDriftReason('in-sync', null, 'summary').tone, 'neutral');
+  assertEquals(narrateDriftReason('never-checked', null, 'summary').tone, 'neutral');
+  assertEquals(narrateDriftReason('drifted', null, 'summary').tone, 'warning');
+  assertEquals(narrateDriftReason('unreachable', 'timeout', 'summary').tone, 'warning');
+  assertEquals(narrateDriftReason('unauthorized', null, 'summary').tone, 'danger');
+  assertEquals(narrateDriftReason('error', null, 'summary').tone, 'danger');
 });
 
 // --- narrateDriftCounts (rollup headline; reads counts, never re-tallies) ----------------
@@ -228,6 +238,18 @@ Deno.test('narrateDriftCounts: verbose explains each non-zero category', () => {
     '1 managed entity not present on the instance.',
     '3 unmanaged entities present on the instance (info only).',
   ]);
+});
+
+Deno.test('narrateDriftCounts: two non-zero categories join without an Oxford comma', () => {
+  const line = narrateDriftCounts({ drifted: 2, missing: 1, unmanaged: 0 }, 'drifted', 'summary');
+  assertEquals(line.headline, 'Praxrr found 2 drifted and 1 missing.');
+  assertEquals(line.tone, 'warning');
+});
+
+Deno.test('narrateDriftCounts: unmanaged-only stays neutral (non-alerting)', () => {
+  const line = narrateDriftCounts({ drifted: 0, missing: 0, unmanaged: 2 }, 'in-sync', 'summary');
+  assertEquals(line.headline, 'Praxrr found 2 unmanaged.');
+  assertEquals(line.tone, 'neutral');
 });
 
 Deno.test('narrateDriftCounts: zero counts report a clean in-sync headline', () => {

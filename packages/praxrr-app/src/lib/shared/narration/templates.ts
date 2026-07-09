@@ -7,23 +7,9 @@
  * label (see the repo's cross-Arr semantic policy).
  */
 
-import type { EntityChange, FieldChange, SyncPreviewArrType, SyncPreviewSection } from '$sync/preview/types.ts';
+import type { FieldChange, SyncPreviewArrType, SyncPreviewSection } from '$sync/preview/types.ts';
 import type { DriftCategory, DriftReason } from '$sync/drift/types.ts';
 import type { DriftSummaryStatus } from '$sync/drift/responses.ts';
-
-/** Decision verb for a sync-preview entity action. */
-export function resolveActionPhrase(action: EntityChange['action']): string {
-  switch (action) {
-    case 'create':
-      return 'Add';
-    case 'update':
-      return 'Update';
-    case 'delete':
-      return 'Remove';
-    case 'unchanged':
-      return 'Keep';
-  }
-}
 
 /** Verb describing how a single field diverged. */
 export function resolveFieldVerb(type: FieldChange['type']): string {
