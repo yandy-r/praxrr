@@ -1,0 +1,97 @@
+WebAuthnRegistrationOptionsResponse:
+  type: object
+  description: >
+    WebAuthn credential creation options (PublicKeyCredentialCreationOptionsJSON), passed verbatim to
+    the browser's navigator.credentials.create(). The inner shape is owned by @simplewebauthn and
+    treated as opaque here.
+  required:
+    - options
+  properties:
+    options:
+      type: object
+      additionalProperties: true
+      description: PublicKeyCredentialCreationOptionsJSON (challenge, rp, user, pubKeyCredParams, ...).
+
+WebAuthnRegistrationVerifyRequest:
+  type: object
+  required:
+    - response
+  properties:
+    response:
+      type: object
+      additionalProperties: true
+      description: RegistrationResponseJSON returned by the browser startRegistration().
+    name:
+      type: string
+      maxLength: 100
+      description: Optional friendly credential name. Defaults to a user-agent-derived name when omitted.
+
+WebAuthnCredentialSummary:
+  type: object
+  description: Client-safe view of a registered passkey (no key material).
+  required:
+    - id
+    - name
+    - createdAt
+    - deviceType
+    - backedUp
+  properties:
+    id:
+      type: string
+      description: Base64URLString credential id.
+    name:
+      type: string
+    createdAt:
+      type: string
+    lastUsedAt:
+      type: string
+      nullable: true
+    deviceType:
+      type: string
+      enum:
+        - singleDevice
+        - multiDevice
+    backedUp:
+      type: boolean
+
+WebAuthnRegistrationVerifyResponse:
+  type: object
+  required:
+    - verified
+    - credential
+  properties:
+    verified:
+      type: boolean
+    credential:
+      $ref: '#/WebAuthnCredentialSummary'
+
+WebAuthnAuthenticationOptionsResponse:
+  type: object
+  description: >
+    WebAuthn assertion options (PublicKeyCredentialRequestOptionsJSON) for discoverable/passwordless
+    login, passed verbatim to navigator.credentials.get().
+  required:
+    - options
+  properties:
+    options:
+      type: object
+      additionalProperties: true
+      description: PublicKeyCredentialRequestOptionsJSON (challenge, rpId, ...).
+
+WebAuthnAuthenticationVerifyRequest:
+  type: object
+  required:
+    - response
+  properties:
+    response:
+      type: object
+      additionalProperties: true
+      description: AuthenticationResponseJSON returned by the browser startAuthentication().
+
+WebAuthnAuthenticationVerifyResponse:
+  type: object
+  required:
+    - verified
+  properties:
+    verified:
+      type: boolean

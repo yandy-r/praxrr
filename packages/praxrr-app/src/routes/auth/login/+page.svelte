@@ -1,10 +1,13 @@
 <script lang="ts">
   import type { ActionData, PageData } from './$types';
   import { enhance } from '$app/forms';
-  import { LogIn, KeyRound } from 'lucide-svelte';
+  import { goto } from '$app/navigation';
+  import { onMount } from 'svelte';
+  import { LogIn, KeyRound, Fingerprint } from 'lucide-svelte';
   import Button from '$ui/button/Button.svelte';
   import FormInput from '$ui/form/FormInput.svelte';
   import { alertStore } from '$alerts/store';
+  import { supportsWebAuthn, authenticatePasskey, WebAuthnError } from '$lib/client/utils/webauthn.ts';
   import logo from '$assets/logo.svg';
 
   export let data: PageData;
@@ -13,10 +16,28 @@
   let submitting = false;
   let username = form?.username ?? '';
   let password = '';
+  let canUseWebAuthn = false;
+
+  onMount(() => {
+    canUseWebAuthn = supportsWebAuthn();
+  });
 
   // Show errors via alert system
   $: if (form?.error) {
     alertStore.add('error', form.error);
+  }
+
+  async function signInWithPasskey() {
+    try {
+      const r = await authenticatePasskey();
+      if (r.verified) {
+        await goto('/');
+      } else {
+        alertStore.add('error', 'Passkey login failed');
+      }
+    } catch (e) {
+      alertStore.add('error', e instanceof WebAuthnError ? e.message : e instanceof Error ? e.message : 'Passkey login failed');
+    }
   }
 </script>
 
@@ -79,6 +100,24 @@
           disabled={submitting}
         />
       </form>
+
+      {#if data.authMode === 'on' && data.hasPasskeys && canUseWebAuthn}
+        <div class="my-6 flex items-center gap-3">
+          <div class="h-px flex-1 bg-neutral-200 dark:bg-neutral-700/60"></div>
+          <span class="text-xs text-neutral-500 dark:text-neutral-400">or</span>
+          <div class="h-px flex-1 bg-neutral-200 dark:bg-neutral-700/60"></div>
+        </div>
+
+        <Button
+          type="button"
+          variant="secondary"
+          size="md"
+          fullWidth
+          icon={Fingerprint}
+          text="Sign in with passkey"
+          on:click={signInWithPasskey}
+        />
+      {/if}
     {/if}
   </div>
 </div>

@@ -23,6 +23,12 @@ class Config {
   public readonly arrCredentialMasterKey: string | null;
   public readonly arrCredentialMasterKeyVersion: string | null;
   public readonly arrCredentialPreviousKeys: string | null;
+  // WebAuthn / passkey config (only used when AUTH=on). rpId/origin are optional overrides;
+  // when unset they are derived per-request from the Host / X-Forwarded-* headers.
+  public readonly webauthnRpId: string | null;
+  public readonly webauthnOrigin: string | null;
+  public readonly webauthnRpName: string;
+  public readonly webauthnChallengeTtlSeconds: number;
 
   constructor() {
     // Default base path logic:
@@ -73,6 +79,14 @@ class Config {
     this.arrCredentialMasterKeyVersion = Deno.env.get('ARR_CREDENTIAL_MASTER_KEY_VERSION') || null;
     this.arrCredentialPreviousKeys =
       Deno.env.get('ARR_CREDENTIAL_PREVIOUS_KEYS') || Deno.env.get('ARR_CREDENTIAL_MASTER_KEYS') || null;
+
+    // WebAuthn / passkey config. Empty/unset overrides resolve to null so the RP id and origin
+    // are derived per-request (reverse-proxy friendly). See lib/server/webauthn/rp.ts.
+    this.webauthnRpId = Deno.env.get('WEBAUTHN_RP_ID')?.trim() || null;
+    this.webauthnOrigin = Deno.env.get('WEBAUTHN_ORIGIN')?.trim() || null;
+    this.webauthnRpName = Deno.env.get('WEBAUTHN_RP_NAME')?.trim() || 'Praxrr';
+    const challengeTtl = parseInt(Deno.env.get('WEBAUTHN_CHALLENGE_TTL_SECONDS') || '300', 10);
+    this.webauthnChallengeTtlSeconds = Number.isFinite(challengeTtl) && challengeTtl > 0 ? challengeTtl : 300;
   }
 
   /**
