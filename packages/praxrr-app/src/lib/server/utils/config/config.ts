@@ -13,6 +13,7 @@ class Config {
   public readonly authMode: AuthMode;
   public readonly validateInstances: boolean;
   public readonly pullOnStart: boolean;
+  public readonly mcpEnabled: boolean;
   public readonly pullOnStartMaxConcurrency: number | null;
   public readonly pullOnStartTimeoutMs: number | null;
   public readonly oidc: {
@@ -65,6 +66,8 @@ class Config {
     const rawValidateInstances = Deno.env.get('PRAXRR_VALIDATE_INSTANCES')?.trim().toLowerCase();
     this.validateInstances = ['1', 'true', 'yes', 'on'].includes(rawValidateInstances || '');
     this.pullOnStart = Config.parseBooleanEnv(Deno.env.get('PULL_ON_START'));
+    // MCP server endpoint (/api/v1/mcp). Enabled by default; set MCP_ENABLED=0|false|no|off to disable.
+    this.mcpEnabled = Config.parseBooleanEnvWithDefault(Deno.env.get('MCP_ENABLED'), true);
     this.pullOnStartMaxConcurrency = Config.parsePositiveIntEnv('PULL_ON_START_MAX_CONCURRENCY');
     this.pullOnStartTimeoutMs = Config.parsePositiveIntEnv('PULL_ON_START_TIMEOUT_MS');
 
@@ -100,6 +103,15 @@ class Config {
   private static parseBooleanEnv(value: string | null | undefined): boolean {
     const normalized = value?.trim().toLowerCase();
     return ['1', 'true', 'yes', 'on'].includes(normalized || '');
+  }
+
+  /** Like {@link parseBooleanEnv} but treats an unset/empty value as `defaultValue` (for default-on flags). */
+  private static parseBooleanEnvWithDefault(value: string | null | undefined, defaultValue: boolean): boolean {
+    const normalized = value?.trim().toLowerCase();
+    if (normalized === undefined || normalized === '') {
+      return defaultValue;
+    }
+    return ['1', 'true', 'yes', 'on'].includes(normalized);
   }
 
   private static parsePositiveIntEnv(name: string): number | null {
