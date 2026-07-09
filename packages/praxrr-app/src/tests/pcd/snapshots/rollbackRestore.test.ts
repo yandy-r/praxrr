@@ -2,7 +2,8 @@ import { assert, assertEquals, assertRejects } from '@std/assert';
 import { db } from '$db/db.ts';
 import { pcdSnapshotQueries } from '$db/queries/pcdSnapshots.ts';
 import { rollbackQueries } from '$db/queries/pcdRollbacks.ts';
-import { computeStateHash } from '$pcd/snapshots/fingerprint.ts';
+import { computePublishedOpIds, computeStateHash } from '$pcd/snapshots/fingerprint.ts';
+import { verifySnapshot } from '$pcd/snapshots/reconstruct.ts';
 import { computeRewindSets, restore, type RestoreDeps } from '$pcd/snapshots/rollback/restore.ts';
 import { RollbackStaleError, RollbackUnverifiableError } from '$pcd/snapshots/rollback/types.ts';
 import { createTestDatabase, insertOp, migratedTest, opRowCount, publishedOpIds } from './rollbackTestHelpers.ts';
@@ -24,6 +25,8 @@ function createSnapshot(dbId: number, opsSequenceMaxId: number, cacheStateHash: 
     opsCountBase: 1,
     opsCountUser: 1,
     cacheStateHash,
+    // Capture the immutable published-op manifest at snapshot time.
+    publishedOpIds: computePublishedOpIds(dbId),
   });
 }
 
@@ -65,8 +68,8 @@ migratedTest('restore: undoes ops after the snapshot, post-verifies, and is appe
   assertEquals(pre?.type, 'manual');
   assertEquals(pre?.trigger, 'rollback');
 
-  // Append-only: original ops still present; only the boundary marker was added, nothing deleted.
-  assertEquals(opRowCount(dbId), rowsBefore + 1);
+  // Append-only: no op rows are deleted (the rewind only transitions state), so the count is unchanged.
+  assertEquals(opRowCount(dbId), rowsBefore);
   for (const id of [1, 2, 3]) {
     const exists = db.queryFirst<{ id: number }>('SELECT id FROM pcd_ops WHERE database_id = ? AND id = ?', dbId, id);
     assert(exists, `op ${id} must still exist`);
@@ -92,6 +95,38 @@ migratedTest('restore: reactivates a pre-snapshot op superseded after the snapsh
   assertEquals(result.opsUndone, 1); // op 3
   assertEquals(result.opsReactivated, 1); // op 1
   assertEquals(sortedIds(publishedOpIds(dbId)), [1, 2]);
+});
+
+migratedTest('restore: a REACTIVATING rollback keeps intermediate snapshots restorable and is reversible', async () => {
+  // The manifest makes reconstruction immune to the reactivate/supersede state churn that a
+  // derive-from-current-columns approach corrupts (PR #216 review blocker).
+  const dbId = createTestDatabase();
+  insertOp({ id: 1, databaseId: dbId, origin: 'user', state: 'published', contentHash: 'c1' });
+  insertOp({ id: 2, databaseId: dbId, origin: 'user', state: 'published', contentHash: 'c2' });
+  const hashS = await computeStateHash(dbId);
+  const snapshotS = createSnapshot(dbId, 2, hashS); // manifest {1,2}
+
+  // op 3 supersedes op 1 (an edit). Capture intermediate snapshot S2 (published = {2,3}).
+  insertOp({ id: 3, databaseId: dbId, origin: 'user', state: 'published', contentHash: 'c3' });
+  db.execute("UPDATE pcd_ops SET state = 'superseded', superseded_by_op_id = 3 WHERE database_id = ? AND id = 1", dbId);
+  const hashS2 = await computeStateHash(dbId);
+  const snapshotS2 = createSnapshot(dbId, 3, hashS2); // manifest {2,3}
+  const beforeRollbackHash = await computeStateHash(dbId);
+
+  // Roll back to S — this REACTIVATES op1 and undoes op3.
+  const result = await restore(snapshotS.id, beforeRollbackHash ?? '', { deps });
+  assertEquals(result.opsReactivated, 1);
+  assertEquals(sortedIds(publishedOpIds(dbId)), [1, 2]);
+
+  // The intermediate snapshot S2 is STILL restorable (manifest is immutable, not derived).
+  assertEquals((await verifySnapshot(pcdSnapshotQueries.getById(snapshotS2.id)!)).reconstructable, true);
+
+  // Reverse via the pre-rollback snapshot -> back to {2,3}.
+  const afterRollbackHash = await computeStateHash(dbId);
+  const reversal = await restore(result.preRollbackSnapshotId ?? -1, afterRollbackHash ?? '', { deps });
+  assertEquals(reversal.status, 'success');
+  assertEquals(reversal.postVerified, true);
+  assertEquals(sortedIds(publishedOpIds(dbId)), [2, 3]);
 });
 
 migratedTest('restore: is reversible via the pre-rollback snapshot (undo-only case)', async () => {

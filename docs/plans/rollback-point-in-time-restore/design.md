@@ -37,9 +37,21 @@ the existing fingerprint. This is the KISS path the spike recommended.
 
 ## 3. Mechanism — Verified Op-Log Rewind
 
-Restore = make the live set of `state='published'` ops equal the snapshot's published-op
-set, generically across **base + user** ops (so it uniformly handles a bad repo pull and
-bad user edits). Correctness is **proven by fingerprint equality**, not by faith.
+> **Post-review revision (as implemented).** §3.1/§3.2 originally derived the snapshot's
+> published-op set from the current mutable op-state columns. The PR review (with an
+> empirical repro) confirmed this is corrupted by a later reactivation (`superseded → published`
+> nulls the datable pointer), breaking reconstruction of the pre-rollback and intermediate
+> snapshots. **The implementation captures an immutable published-op-id manifest
+> (`pcd_snapshots.published_op_ids`) at snapshot time and replays THAT** — reconstruction
+> never reads mutable state, so no supersede/reactivate cycle can corrupt any snapshot. This
+> also removes the need for the boundary-marker op (undone ops just transition to
+> `superseded`, reactivated to `published`). `verifySnapshot` still fingerprint-verifies the
+> manifest (fail-closed); legacy snapshots without a manifest are not restorable.
+
+Restore = make the live set of `state='published'` ops equal the snapshot's captured
+published-op manifest, generically across **base + user** ops (so it uniformly handles a bad
+repo pull and bad user edits). Correctness is **proven by fingerprint equality**, not by
+faith.
 
 ### 3.1 Reconstruct the snapshot's published-op set (as-of `N = ops_sequence_max_id`)
 

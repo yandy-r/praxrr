@@ -118,8 +118,10 @@ snapshotById:
     summary: Get PCD snapshot detail
     description: |
       Returns full snapshot detail including computed fields for restore context
-      (opsWrittenSince, isRestorable). Restore support is not yet implemented,
-      so `isRestorable` is always false.
+      (opsWrittenSince, isRestorable). `isRestorable` reflects a real fail-closed check:
+      it is true only when the snapshot's published-op manifest reconstructs and its
+      recomputed fingerprint matches the stored cacheStateHash. See the
+      `.../rollback/preview` and `.../rollback` endpoints to preview and execute a restore.
     tags:
       - PCD Snapshots
     parameters:

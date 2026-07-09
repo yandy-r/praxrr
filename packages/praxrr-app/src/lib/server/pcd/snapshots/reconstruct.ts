@@ -1,26 +1,21 @@
 /**
  * PCD Snapshot Reconstruction + Verification (issue #16).
  *
- * A snapshot stores a marker (`ops_sequence_max_id = N`) plus a fingerprint
- * (`cache_state_hash`), NOT a copy of state. `pcd_ops` rows are append-only, but the
- * `state` column is mutated destructively (published → superseded/dropped/orphaned), so a
- * naive `id <= N AND state='published'` replay is unsound. This module reconstructs the set
- * of ops that were published AT capture time (`T`) and then verifies it against the stored
- * fingerprint — restore proceeds only on a match (fail-closed).
+ * A snapshot captures an immutable manifest of the exact `pcd_ops.id`s that were
+ * `state='published'` at capture time (`published_op_ids`). Rollback replays THIS manifest —
+ * it never derives historical membership from the mutable op-state columns (`state`,
+ * `superseded_by_op_id`), because a later supersede/reactivate cycle rewrites those columns
+ * and would corrupt the reconstruction of any snapshot taken across it. Because op rows are
+ * never hard-deleted at runtime, a manifest id always resolves to its original immutable SQL.
  *
- * Membership of `T` (see the corrected predicate below):
- *   id <= N AND state != 'draft'
- *     AND ( superseded_by_op_id > N                          -- superseded AFTER N (datable)
- *        OR (superseded_by_op_id IS NULL AND state != 'superseded') )  -- still active
- * This includes ops superseded after N, currently-published ops, and undatable
- * dropped/orphaned ops (optimistic — the fingerprint rejects an over/under-inclusion). It
- * excludes drafts, ops superseded on/before N, and "superseded with a NULL back-pointer"
- * rows (never included merely because the pointer is NULL — e.g. a legacy naive-rollback
- * artifact). Supersession is the one datable transition: the superseding op always has a
- * higher id, so `superseded_by_op_id > N` means it was still published at N.
+ * `verifySnapshot` is the fail-closed gate: it replays the manifest, recomputes the canonical
+ * fingerprint, and only reports `reconstructable` when it matches the stored
+ * `cache_state_hash`. Legacy snapshots without a manifest (captured before this column
+ * existed) are never restorable.
  */
 
 import { db } from '$db/db.ts';
+import { pcdSnapshotQueries } from '$db/queries/pcdSnapshots.ts';
 import type { PcdSnapshotDetail } from './types.ts';
 import { computeStateFingerprint, type FingerprintOpRow } from './fingerprint.ts';
 
@@ -30,60 +25,63 @@ export interface VerifyResult {
   recomputedHash: string | null;
 }
 
-/**
- * Reconstruct the ordered set of op rows that were published at snapshot time (`N`).
- * Rows are ordered by `id` ascending to match `computeStateHash`'s canonical ordering.
- */
-export function reconstructSnapshotOpRows(databaseId: number, opsSequenceMaxId: number): FingerprintOpRow[] {
+/** Load the manifest's op rows (id order) for hashing/replay. */
+function loadManifestRows(databaseId: number, opIds: readonly number[]): FingerprintOpRow[] {
+  if (opIds.length === 0) {
+    return [];
+  }
+  const placeholders = opIds.map(() => '?').join(', ');
   return db.query<FingerprintOpRow>(
     `SELECT id, origin, sequence, state, source, content_hash, sql, metadata
 		FROM pcd_ops
-		WHERE database_id = ?
-			AND id <= ?
-			AND state != 'draft'
-			AND (superseded_by_op_id > ? OR (superseded_by_op_id IS NULL AND state != 'superseded'))
+		WHERE database_id = ? AND id IN (${placeholders})
 		ORDER BY id`,
     databaseId,
-    opsSequenceMaxId,
-    opsSequenceMaxId
+    ...opIds
   );
 }
 
 /**
- * The reconstructed published-op id set for a snapshot — the exact ops a snapshot replay /
- * restore must apply.
+ * The snapshot's captured published-op-id set, or null when the snapshot has no manifest
+ * (legacy) — in which case it is not restorable.
  */
-export function reconstructSnapshotOpIds(databaseId: number, opsSequenceMaxId: number): Set<number> {
-  const rows = reconstructSnapshotOpRows(databaseId, opsSequenceMaxId);
-  return new Set(rows.map((row) => row.id));
+export function snapshotPublishedOpIds(snapshotId: number): Set<number> | null {
+  const ids = pcdSnapshotQueries.getPublishedOpIds(snapshotId);
+  return ids ? new Set(ids) : null;
 }
 
 /**
- * Verify a snapshot is safely restorable: reconstruct `T`, recompute its fingerprint (with
- * every member's `state` forced to `'published'`, matching what capture saw), and compare to
- * the stored `cacheStateHash`. A null stored hash (legacy snapshot) or any mismatch is
- * reported as non-reconstructable — restore then refuses (fail-closed).
+ * Verify a snapshot is safely restorable: the manifest must exist, all its op rows must still
+ * exist, and the fingerprint recomputed over them (each forced to `state='published'`, as at
+ * capture) must equal the stored `cacheStateHash`. Any gap fails closed.
  */
 export async function verifySnapshot(snapshot: PcdSnapshotDetail): Promise<VerifyResult> {
-  if (snapshot.cacheStateHash === null) {
+  const ids = pcdSnapshotQueries.getPublishedOpIds(snapshot.id);
+  if (ids === null) {
     return {
       reconstructable: false,
-      reason: 'Snapshot has no state fingerprint (legacy snapshot) and cannot be safely restored',
+      reason: 'Snapshot has no published-op manifest (legacy snapshot) and cannot be safely restored',
       recomputedHash: null,
     };
   }
 
-  const rows = reconstructSnapshotOpRows(snapshot.databaseId, snapshot.opsSequenceMaxId);
-  const recomputedHash = await computeStateFingerprint(rows, { forceStatePublished: true });
+  const rows = loadManifestRows(snapshot.databaseId, ids);
+  if (rows.length !== ids.length) {
+    return {
+      reconstructable: false,
+      reason: 'Some ops recorded in this snapshot no longer exist; it cannot be reconstructed',
+      recomputedHash: null,
+    };
+  }
 
+  const recomputedHash = await computeStateFingerprint(rows, { forceStatePublished: true });
   if (recomputedHash === snapshot.cacheStateHash) {
     return { reconstructable: true, reason: null, recomputedHash };
   }
 
   return {
     reconstructable: false,
-    reason:
-      'Reconstructed state fingerprint does not match the snapshot; the op history has diverged since capture (fail-closed)',
+    reason: 'Reconstructed state fingerprint does not match the snapshot; op content changed since capture (fail-closed)',
     recomputedHash,
   };
 }

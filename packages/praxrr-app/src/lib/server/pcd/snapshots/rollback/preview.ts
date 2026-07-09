@@ -13,7 +13,7 @@ import type { PCDCache } from '../../database/cache.ts';
 import { withCurrentCache, withSnapshotCache } from '../../resolved/layers.ts';
 import { pcdSnapshotQueries } from '$db/queries/pcdSnapshots.ts';
 import { computeOpsWrittenSince, computeStateHash } from '../fingerprint.ts';
-import { reconstructSnapshotOpIds, verifySnapshot } from '../reconstruct.ts';
+import { snapshotPublishedOpIds, verifySnapshot } from '../reconstruct.ts';
 import { diffEntityFamily, rollbackEntityTargets, summarizeSections } from './entities.ts';
 import type { RollbackPreview, RollbackSection } from './types.ts';
 
@@ -56,7 +56,21 @@ export async function previewRestore(snapshotId: number): Promise<RollbackPrevie
     };
   }
 
-  const snapshotOpIds = reconstructSnapshotOpIds(databaseId, opsSequenceMaxId);
+  // verifySnapshot guarantees the manifest exists; guard defensively for the type narrowing.
+  const snapshotOpIds = snapshotPublishedOpIds(snapshotId);
+  if (snapshotOpIds === null) {
+    return {
+      databaseId,
+      snapshotId,
+      reconstructable: false,
+      reason: 'Snapshot has no published-op manifest and cannot be restored',
+      currentStateHash: await computeStateHash(databaseId),
+      snapshotStateHash: snapshot.cacheStateHash,
+      opsWrittenSince,
+      sections: [],
+      summary: { ...EMPTY_SUMMARY },
+    };
+  }
 
   const sections = await withSnapshotCache(databaseId, snapshotOpIds, async (snapshotCache) => {
     const registered = getCache(databaseId);

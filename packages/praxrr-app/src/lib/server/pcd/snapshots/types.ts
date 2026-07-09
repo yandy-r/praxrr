@@ -65,6 +65,12 @@ export interface PcdSnapshotRow {
   ops_count_base: number;
   ops_count_user: number;
   cache_state_hash: string | null;
+  /**
+   * JSON array of the exact `pcd_ops.id`s that were `state='published'` at capture time —
+   * the immutable manifest rollback reconstruction replays (issue #16). NULL for legacy
+   * snapshots (captured before this column existed), which are therefore not restorable.
+   */
+  published_op_ids: string | null;
   target_instance_ids: string | null;
   created_at: string;
 }

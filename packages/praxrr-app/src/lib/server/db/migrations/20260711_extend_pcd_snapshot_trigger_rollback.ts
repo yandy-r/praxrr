@@ -11,6 +11,12 @@ import type { Migration } from '../migrations.ts';
  * SQLite cannot ALTER a CHECK constraint, so the table is rebuilt via
  * create-new/copy/drop/rename (the 035_add_job_skipped_status precedent), preserving every
  * column, the `database_instances` FK (ON DELETE CASCADE), and both indexes.
+ *
+ * This rebuild also adds `published_op_ids` (JSON array of the exact `pcd_ops.id`s that were
+ * `state='published'` at capture time). Rollback reconstruction (issue #16) replays this
+ * immutable manifest rather than deriving membership from mutable op-state columns — the
+ * latter is corrupted by later supersede/reactivate cycles. Legacy rows copied here get a
+ * NULL manifest and are therefore not restorable (fail-closed).
  */
 export const migration: Migration = {
   version: 20260711,
@@ -27,6 +33,7 @@ export const migration: Migration = {
 			ops_count_base INTEGER NOT NULL DEFAULT 0,
 			ops_count_user INTEGER NOT NULL DEFAULT 0,
 			cache_state_hash TEXT,
+			published_op_ids TEXT,
 			target_instance_ids TEXT,
 			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 			FOREIGN KEY (database_id) REFERENCES database_instances(id) ON DELETE CASCADE

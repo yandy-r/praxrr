@@ -112,6 +112,20 @@ export function computeStateHash(databaseId: number): Promise<string | null> {
 }
 
 /**
+ * The exact set of currently-published `pcd_ops.id`s for a database, ordered by id — the
+ * manifest a snapshot captures so rollback can replay it verbatim (issue #16). Uses the same
+ * `state='published' ORDER BY id` selection as `computeStateHash`, so the manifest and the
+ * fingerprint captured together are always consistent.
+ */
+export function computePublishedOpIds(databaseId: number): number[] {
+  const rows = db.query<{ id: number }>(
+    "SELECT id FROM pcd_ops WHERE database_id = ? AND state = 'published' ORDER BY id",
+    databaseId
+  );
+  return rows.map((row) => row.id);
+}
+
+/**
  * Compute ops metadata for a database snapshot: the maximum `pcd_ops` row id across all
  * states, and published-op counts by origin.
  */

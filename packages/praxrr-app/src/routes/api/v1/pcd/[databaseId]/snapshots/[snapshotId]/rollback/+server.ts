@@ -61,6 +61,13 @@ export const POST: RequestHandler = async ({ params, request }) => {
     return json({ error: databaseCheck.error }, { status: databaseCheck.status });
   }
 
+  // Reject oversized bodies via Content-Length before buffering; the post-read check below
+  // still guards the case where the header is absent or understates the actual size.
+  const declaredLength = Number(request.headers.get('content-length') ?? '0');
+  if (Number.isFinite(declaredLength) && declaredLength > MAX_BODY_BYTES) {
+    return json({ error: 'Request body too large' }, { status: 400 });
+  }
+
   const rawBody = await request.text();
   if (new TextEncoder().encode(rawBody).length > MAX_BODY_BYTES) {
     return json({ error: 'Request body too large' }, { status: 400 });

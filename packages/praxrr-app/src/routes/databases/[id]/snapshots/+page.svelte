@@ -109,6 +109,10 @@
   $: autoCount = data.snapshots.filter((row) => row.type === 'auto').length;
   $: rollbackCount = data.snapshots.filter((row) => row.trigger === 'rollback').length;
   $: showEmptyState = data.loadError === null && data.total === 0;
+  // The list is capped server-side; the Manual/Auto/Pre-rollback breakdown counts only the
+  // loaded page, so surface that when Total exceeds what was loaded (avoids implying they
+  // reconcile with Total).
+  $: breakdownCapped = data.total > data.snapshots.length;
 
   // --- Create manual snapshot -------------------------------------------------
 
@@ -246,6 +250,12 @@
         <p class="mt-1 text-2xl font-bold text-blue-600 dark:text-blue-400">{rollbackCount}</p>
       </Card>
     </CardGrid>
+
+    {#if breakdownCapped}
+      <p class="text-xs text-neutral-500 dark:text-neutral-400">
+        Manual / Auto / Pre-rollback count the {data.snapshots.length} most recent snapshots shown below.
+      </p>
+    {/if}
 
     <!-- Results -->
     <Table

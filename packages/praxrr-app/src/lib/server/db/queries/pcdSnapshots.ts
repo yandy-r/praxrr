@@ -30,6 +30,12 @@ interface CreateSnapshotInputBase {
   opsCountBase: number;
   opsCountUser: number;
   cacheStateHash?: string | null;
+  /**
+   * The exact published-op-id manifest captured at snapshot time (issue #16). Stored as a
+   * JSON array so rollback reconstruction replays it verbatim instead of deriving membership
+   * from mutable op-state columns. Omit/null for callers that never restore.
+   */
+  publishedOpIds?: number[] | null;
 }
 
 type CreateSnapshotInput = (CreateAutoSnapshotInput | CreateManualSnapshotInsertInput) & CreateSnapshotInputBase;
@@ -77,13 +83,14 @@ export const pcdSnapshotQueries = {
   create(input: CreateSnapshotInput): PcdSnapshotDetail {
     const targetInstanceIds =
       input.type === 'auto' && input.targetInstanceIds ? JSON.stringify(input.targetInstanceIds) : null;
+    const publishedOpIds = input.publishedOpIds ? JSON.stringify(input.publishedOpIds) : null;
 
     db.execute(
       `INSERT INTO pcd_snapshots (
 				database_id, type, "trigger", description,
 				ops_sequence_max_id, ops_count_base, ops_count_user,
-				cache_state_hash, target_instance_ids
-			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+				cache_state_hash, published_op_ids, target_instance_ids
+			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       input.databaseId,
       input.type,
       input.trigger,
@@ -92,6 +99,7 @@ export const pcdSnapshotQueries = {
       input.opsCountBase,
       input.opsCountUser,
       input.cacheStateHash ?? null,
+      publishedOpIds,
       targetInstanceIds
     );
 
@@ -115,6 +123,29 @@ export const pcdSnapshotQueries = {
   getById(id: number): PcdSnapshotDetail | undefined {
     const row = db.queryFirst<PcdSnapshotRow>('SELECT * FROM pcd_snapshots WHERE id = ?', id);
     return row ? toDetail(row) : undefined;
+  },
+
+  /**
+   * Return the captured published-op-id manifest for a snapshot, or null when the snapshot
+   * predates the manifest column (legacy, not restorable) or the JSON is unparseable.
+   */
+  getPublishedOpIds(id: number): number[] | null {
+    const row = db.queryFirst<{ published_op_ids: string | null }>(
+      'SELECT published_op_ids FROM pcd_snapshots WHERE id = ?',
+      id
+    );
+    if (!row || row.published_op_ids === null) {
+      return null;
+    }
+    try {
+      const parsed = JSON.parse(row.published_op_ids);
+      if (!Array.isArray(parsed)) {
+        return null;
+      }
+      return parsed.filter((value): value is number => typeof value === 'number');
+    } catch {
+      return null;
+    }
   },
 
   /**

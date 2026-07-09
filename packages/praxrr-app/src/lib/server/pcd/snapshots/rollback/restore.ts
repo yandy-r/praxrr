@@ -20,8 +20,8 @@ import { databaseInstancesQueries } from '$db/queries/databaseInstances.ts';
 import { logger } from '$logger/logger.ts';
 import { uuid } from '$shared/utils/uuid.ts';
 import { compile } from '../../database/compiler.ts';
-import { computeOpsMetadata, computeStateHash } from '../fingerprint.ts';
-import { reconstructSnapshotOpIds, verifySnapshot } from '../reconstruct.ts';
+import { computeOpsMetadata, computePublishedOpIds, computeStateHash } from '../fingerprint.ts';
+import { snapshotPublishedOpIds, verifySnapshot } from '../reconstruct.ts';
 import {
   RollbackPostVerifyError,
   RollbackStaleError,
@@ -75,31 +75,13 @@ export function computeRewindSets(
 function applyRewind(
   databaseId: number,
   snapshotId: number,
-  opsSequenceMaxId: number,
+  targetOpIds: ReadonlySet<number>,
   targetStateHash: string | null,
   preRollbackSnapshotId: number | null
 ): { rollbackId: number } & RewindCounts {
-  const targetOpIds = reconstructSnapshotOpIds(databaseId, opsSequenceMaxId);
-
   const batchId = uuid();
   db.beginTransaction();
   try {
-    // Append an inert rollback-boundary marker op. Its id is strictly greater than every
-    // pre-existing op, so undone ops get a DATABLE `superseded_by_op_id > id` — keeping the
-    // pre-rollback snapshot (and earlier ones) reconstructable across this rollback. The
-    // marker is state='superseded' with a NULL back-pointer, which excludes it from
-    // compilation, the fingerprint, AND reconstruction (the "toxic" exclusion branch), so it
-    // never affects any snapshot's published set. This also keeps rollback append-only: it
-    // adds rows, never deletes them.
-    const boundaryId = pcdOpsQueries.create({
-      databaseId,
-      origin: 'user',
-      state: 'superseded',
-      source: 'local',
-      sql: `-- rollback boundary marker (restore of snapshot #${snapshotId})`,
-      metadata: JSON.stringify({ rollbackBoundary: true, snapshotId }),
-    });
-
     const currentPublished = db.query<{ id: number }>(
       "SELECT id FROM pcd_ops WHERE database_id = ? AND state = 'published'",
       databaseId
@@ -108,8 +90,12 @@ function applyRewind(
 
     const { undoIds, reactivateIds } = computeRewindSets(currentPublishedIds, targetOpIds);
 
+    // Reconstruction replays the snapshot's immutable published-op manifest, never the
+    // mutable state columns, so these transitions cannot corrupt any snapshot's
+    // reconstruction. Undone ops move to a non-published state (excluded from compile +
+    // fingerprint); reactivated ops return to published. No op rows are deleted.
     for (const id of undoIds) {
-      pcdOpsQueries.update(id, { state: 'superseded', supersededByOpId: boundaryId });
+      pcdOpsQueries.update(id, { state: 'superseded', supersededByOpId: null });
     }
 
     for (const id of reactivateIds) {
@@ -165,12 +151,17 @@ export async function restore(
   if (!snapshot) {
     throw new Error(`Snapshot ${snapshotId} not found`);
   }
-  const { databaseId, opsSequenceMaxId } = snapshot;
+  const { databaseId } = snapshot;
 
   // 1. Re-verify — never restore an unverified snapshot.
   const verification = await verifySnapshot(snapshot);
   if (!verification.reconstructable) {
     throw new RollbackUnverifiableError(verification.reason ?? 'Snapshot cannot be safely restored');
+  }
+
+  const targetOpIds = snapshotPublishedOpIds(snapshotId);
+  if (targetOpIds === null) {
+    throw new RollbackUnverifiableError('Snapshot has no published-op manifest and cannot be restored');
   }
 
   // 2. From-state value-guard (skipped during internal recovery).
@@ -201,6 +192,7 @@ export async function restore(
       opsCountBase: meta.opsCountBase,
       opsCountUser: meta.opsCountUser,
       cacheStateHash: await computeStateHash(databaseId),
+      publishedOpIds: computePublishedOpIds(databaseId),
     });
     preRollbackSnapshotId = preSnapshot.id;
   }
@@ -209,7 +201,7 @@ export async function restore(
   const { rollbackId, opsUndone, opsReactivated } = applyRewind(
     databaseId,
     snapshotId,
-    opsSequenceMaxId,
+    targetOpIds,
     snapshot.cacheStateHash,
     preRollbackSnapshotId
   );

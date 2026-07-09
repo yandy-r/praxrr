@@ -6,7 +6,7 @@
 import { db } from '$db/db.ts';
 import { pcdSnapshotQueries } from '$db/queries/pcdSnapshots.ts';
 import { logger } from '$logger/logger.ts';
-import { computeOpsMetadata, computeOpsWrittenSince, computeStateHash } from './fingerprint.ts';
+import { computeOpsMetadata, computeOpsWrittenSince, computePublishedOpIds, computeStateHash } from './fingerprint.ts';
 import { verifySnapshot } from './reconstruct.ts';
 import { previewRestore } from './rollback/preview.ts';
 import { restore } from './rollback/restore.ts';
@@ -144,6 +144,7 @@ async function createAutoSnapshot(input: CreateAutoSnapshotInput): Promise<PcdSn
       opsCountBase,
       opsCountUser,
       cacheStateHash,
+      publishedOpIds: computePublishedOpIds(databaseId),
       targetInstanceIds: targetInstanceIds ?? null,
     });
 
@@ -215,6 +216,7 @@ async function createManualSnapshot(input: CreateManualSnapshotInput): Promise<P
     opsCountBase,
     opsCountUser,
     cacheStateHash,
+    publishedOpIds: computePublishedOpIds(databaseId),
   });
 
   await logger.info('Manual snapshot created', {
