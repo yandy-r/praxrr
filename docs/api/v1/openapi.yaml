@@ -46,6 +46,8 @@ tags:
     description: Append-only audit trail of Arr sync runs — search, detail, export, and retention
   - name: Quality Goals
     description: Intent-to-implementation bridge — translate presets/sliders into custom-format scores
+  - name: Config Health
+    description: Score configuration quality/health per instance and profile, with suggestions and trends
 
 paths:
   /health:
@@ -668,6 +670,14 @@ paths:
     $ref: './paths/goals.yaml#/apply'
   /goals/binding:
     $ref: './paths/goals.yaml#/binding'
+  /config-health/summary:
+    $ref: './paths/config-health.yaml#/summary'
+  /config-health/{instanceId}:
+    $ref: './paths/config-health.yaml#/detail'
+  /config-health/{instanceId}/trends:
+    $ref: './paths/config-health.yaml#/trends'
+  /config-health/settings:
+    $ref: './paths/config-health.yaml#/settings'
 
 components:
   schemas:
@@ -1542,3 +1552,40 @@ components:
       $ref: './schemas/graph.yaml#/DependencyGraphResponse'
     GraphImpactResponse:
       $ref: './schemas/graph.yaml#/GraphImpactResponse'
+    # Config Health
+    ConfigHealthBand:
+      $ref: './schemas/config-health.yaml#/ConfigHealthBand'
+    ConfigHealthArrType:
+      $ref: './schemas/config-health.yaml#/ConfigHealthArrType'
+    ConfigHealthTone:
+      $ref: './schemas/config-health.yaml#/ConfigHealthTone'
+    ConfigHealthSuggestion:
+      $ref: './schemas/config-health.yaml#/ConfigHealthSuggestion'
+    ConfigHealthCriterion:
+      $ref: './schemas/config-health.yaml#/ConfigHealthCriterion'
+    ConfigHealthScoredUnit:
+      $ref: './schemas/config-health.yaml#/ConfigHealthScoredUnit'
+    ConfigHealthProfileHealth:
+      $ref: './schemas/config-health.yaml#/ConfigHealthProfileHealth'
+    ConfigHealthInstanceSummary:
+      $ref: './schemas/config-health.yaml#/ConfigHealthInstanceSummary'
+    ConfigHealthTotals:
+      $ref: './schemas/config-health.yaml#/ConfigHealthTotals'
+    ConfigHealthSettingsSnapshot:
+      $ref: './schemas/config-health.yaml#/ConfigHealthSettingsSnapshot'
+    ConfigHealthSummaryResponse:
+      $ref: './schemas/config-health.yaml#/ConfigHealthSummaryResponse'
+    ConfigHealthDetailResponse:
+      $ref: './schemas/config-health.yaml#/ConfigHealthDetailResponse'
+    ConfigHealthTrendPoint:
+      $ref: './schemas/config-health.yaml#/ConfigHealthTrendPoint'
+    ConfigHealthTrendsResponse:
+      $ref: './schemas/config-health.yaml#/ConfigHealthTrendsResponse'
+    ConfigHealthCriterionConfig:
+      $ref: './schemas/config-health.yaml#/ConfigHealthCriterionConfig'
+    ConfigHealthCriterionMeta:
+      $ref: './schemas/config-health.yaml#/ConfigHealthCriterionMeta'
+    ConfigHealthSettingsResponse:
+      $ref: './schemas/config-health.yaml#/ConfigHealthSettingsResponse'
+    ConfigHealthSettingsUpdateRequest:
+      $ref: './schemas/config-health.yaml#/ConfigHealthSettingsUpdateRequest'

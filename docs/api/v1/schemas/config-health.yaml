@@ -1,0 +1,353 @@
+ConfigHealthBand:
+  type: string
+  description: Health band derived from the 0–100 rollup. `unknown` means every enabled criterion was skipped.
+  enum:
+    - healthy
+    - attention
+    - needs-review
+    - unknown
+
+ConfigHealthArrType:
+  type: string
+  enum:
+    - radarr
+    - sonarr
+    - lidarr
+
+ConfigHealthTone:
+  type: string
+  description: Presentation hint for a suggestion; health tone never exceeds `warning`.
+  enum:
+    - neutral
+    - info
+    - warning
+    - danger
+
+ConfigHealthSuggestion:
+  type: object
+  description: A non-judgmental remediation line rendered through the shared narration surface.
+  required:
+    - headline
+    - detail
+    - tone
+    - templateVersion
+  properties:
+    headline:
+      type: string
+    detail:
+      type: array
+      items:
+        type: string
+    tone:
+      $ref: '#/ConfigHealthTone'
+    templateVersion:
+      type: string
+
+ConfigHealthCriterion:
+  type: object
+  description: One criterion's contribution to a scored unit.
+  required:
+    - id
+    - label
+    - score
+    - weight
+    - contribution
+    - detail
+    - suggestions
+  properties:
+    id:
+      type: string
+      description: Criterion id — one of completeness, drift, coherence, compatibility, trash_alignment.
+    label:
+      type: string
+    score:
+      description: 0–100 sub-score, or null when the criterion could not be evaluated (excluded from the rollup).
+      oneOf:
+        - type: integer
+          minimum: 0
+          maximum: 100
+        - type: 'null'
+    weight:
+      type: integer
+      minimum: 0
+    contribution:
+      type: integer
+    detail:
+      type: array
+      items:
+        type: string
+    suggestions:
+      type: array
+      items:
+        $ref: '#/ConfigHealthSuggestion'
+
+ConfigHealthScoredUnit:
+  type: object
+  description: A scored unit (whole instance or one profile) — the rollup number, its band, and the breakdown.
+  required:
+    - score
+    - band
+    - criteria
+    - suggestions
+  properties:
+    score:
+      type: integer
+      minimum: 0
+      maximum: 100
+    band:
+      $ref: '#/ConfigHealthBand'
+    criteria:
+      type: array
+      items:
+        $ref: '#/ConfigHealthCriterion'
+    suggestions:
+      type: array
+      items:
+        $ref: '#/ConfigHealthSuggestion'
+
+ConfigHealthProfileHealth:
+  allOf:
+    - $ref: '#/ConfigHealthScoredUnit'
+    - type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+
+ConfigHealthInstanceSummary:
+  type: object
+  required:
+    - instanceId
+    - instanceName
+    - arrType
+    - score
+    - band
+    - generatedAt
+  properties:
+    instanceId:
+      type: integer
+    instanceName:
+      type: string
+    arrType:
+      $ref: '#/ConfigHealthArrType'
+    score:
+      type: integer
+      minimum: 0
+      maximum: 100
+    band:
+      $ref: '#/ConfigHealthBand'
+    generatedAt:
+      type: string
+      format: date-time
+
+ConfigHealthTotals:
+  type: object
+  required:
+    - instances
+    - healthy
+    - attention
+    - needsReview
+    - unknown
+    - averageScore
+  properties:
+    instances:
+      type: integer
+    healthy:
+      type: integer
+    attention:
+      type: integer
+    needsReview:
+      type: integer
+    unknown:
+      type: integer
+    averageScore:
+      description: Mean overall score across scored instances, or null when none could be scored.
+      oneOf:
+        - type: integer
+          minimum: 0
+          maximum: 100
+        - type: 'null'
+
+ConfigHealthSettingsSnapshot:
+  type: object
+  required:
+    - enabled
+    - intervalMinutes
+  properties:
+    enabled:
+      type: boolean
+    intervalMinutes:
+      type: integer
+      minimum: 5
+
+ConfigHealthSummaryResponse:
+  type: object
+  required:
+    - engineVersion
+    - generatedAt
+    - totals
+    - settings
+    - instances
+  properties:
+    engineVersion:
+      type: string
+    generatedAt:
+      type: string
+      format: date-time
+    totals:
+      $ref: '#/ConfigHealthTotals'
+    settings:
+      $ref: '#/ConfigHealthSettingsSnapshot'
+    instances:
+      type: array
+      items:
+        $ref: '#/ConfigHealthInstanceSummary'
+
+ConfigHealthDetailResponse:
+  type: object
+  required:
+    - instanceId
+    - instanceName
+    - arrType
+    - engineVersion
+    - generatedAt
+    - overall
+    - profiles
+  properties:
+    instanceId:
+      type: integer
+    instanceName:
+      type: string
+    arrType:
+      $ref: '#/ConfigHealthArrType'
+    engineVersion:
+      type: string
+    generatedAt:
+      type: string
+      format: date-time
+    overall:
+      $ref: '#/ConfigHealthScoredUnit'
+    profiles:
+      type: array
+      items:
+        $ref: '#/ConfigHealthProfileHealth'
+
+ConfigHealthTrendPoint:
+  type: object
+  required:
+    - generatedAt
+    - overallScore
+    - band
+  properties:
+    generatedAt:
+      type: string
+      format: date-time
+    overallScore:
+      type: integer
+      minimum: 0
+      maximum: 100
+    band:
+      $ref: '#/ConfigHealthBand'
+
+ConfigHealthTrendsResponse:
+  type: object
+  required:
+    - instanceId
+    - engineVersion
+    - points
+  properties:
+    instanceId:
+      type: integer
+    engineVersion:
+      type: string
+    points:
+      type: array
+      items:
+        $ref: '#/ConfigHealthTrendPoint'
+
+ConfigHealthCriterionConfig:
+  type: object
+  required:
+    - id
+    - enabled
+    - weight
+  properties:
+    id:
+      type: string
+    enabled:
+      type: boolean
+    weight:
+      type: integer
+      minimum: 0
+
+ConfigHealthCriterionMeta:
+  type: object
+  required:
+    - id
+    - label
+    - description
+  properties:
+    id:
+      type: string
+    label:
+      type: string
+    description:
+      type: string
+
+ConfigHealthSettingsResponse:
+  type: object
+  required:
+    - engineVersion
+    - enabled
+    - intervalMinutes
+    - retentionDays
+    - retentionMaxEntries
+    - criteria
+    - catalog
+  properties:
+    engineVersion:
+      type: string
+    enabled:
+      type: boolean
+    intervalMinutes:
+      type: integer
+      minimum: 5
+    retentionDays:
+      type: integer
+      minimum: 1
+    retentionMaxEntries:
+      type: integer
+      minimum: 1
+    criteria:
+      type: array
+      items:
+        $ref: '#/ConfigHealthCriterionConfig'
+    catalog:
+      type: array
+      items:
+        $ref: '#/ConfigHealthCriterionMeta'
+
+ConfigHealthSettingsUpdateRequest:
+  type: object
+  description: Partial settings update. `expectedEngineVersion` guards against a stale client (409 on mismatch).
+  required:
+    - expectedEngineVersion
+  properties:
+    expectedEngineVersion:
+      type: string
+    enabled:
+      type: boolean
+    intervalMinutes:
+      type: integer
+      minimum: 5
+    retentionDays:
+      type: integer
+      minimum: 1
+    retentionMaxEntries:
+      type: integer
+      minimum: 1
+    criteria:
+      type: array
+      items:
+        $ref: '#/ConfigHealthCriterionConfig'

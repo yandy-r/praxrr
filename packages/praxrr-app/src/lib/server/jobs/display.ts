@@ -39,6 +39,10 @@ export function formatJobTypeLabel(jobType: JobType): string {
       return 'Drift Check';
     case 'sync.history.cleanup':
       return 'Sync History Cleanup';
+    case 'config-health.snapshot':
+      return 'Config Health Snapshot';
+    case 'config-health.cleanup':
+      return 'Config Health Cleanup';
     default:
       return rawJobType
         .replace(/\./g, ' ')
