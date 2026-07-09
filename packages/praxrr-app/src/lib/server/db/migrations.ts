@@ -72,6 +72,7 @@ import { migration as migration20260707AddSetupWizardState } from './migrations/
 import { migration as migration20260708AddArrInstanceDetectedVersion } from './migrations/20260708_add_arr_instance_detected_version.ts';
 import { migration as migration20260709CreateDriftTables } from './migrations/20260709_create_drift_tables.ts';
 import { migration as migration20260710CreateSyncHistoryTables } from './migrations/20260710_create_sync_history_tables.ts';
+import { migration as migration20260711CreateQualityGoalBindings } from './migrations/20260711_create_quality_goal_bindings.ts';
 
 export interface Migration {
   version: number;
@@ -373,6 +374,7 @@ export function loadMigrations(): Migration[] {
     migration20260708AddArrInstanceDetectedVersion,
     migration20260709CreateDriftTables,
     migration20260710CreateSyncHistoryTables,
+    migration20260711CreateQualityGoalBindings,
   ];
 
   // Sort by version number

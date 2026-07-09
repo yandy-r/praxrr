@@ -5,14 +5,12 @@ import { getAllConditionsForEvaluation, extractAllPatterns } from '$pcd/entities
 import { scoring, QualityProfileScoringNotFoundError } from '$pcd/entities/qualityProfiles/index.ts';
 import type { UpdateScoringInput } from '$pcd/entities/qualityProfiles/scoring/update.ts';
 import { getImpact } from '$pcd/graph/resolver.ts';
-import { readEntityOrNull, computeUserOverrides } from '$pcd/resolved/layerDiff.ts';
 import { withSandboxCache, type ProfileEdit, type SandboxReport } from '$pcd/sandbox/withSandboxCache.ts';
+import { buildQualityProfileConfigDiff } from '$pcd/sandbox/configDiff.ts';
 import { simulateReleaseScores, type SimulateScoreContext } from '$pcd/simulate/simulateReleaseScores.ts';
 import { isArrType, isReleaseType, parseProfileSelector } from '$pcd/simulate/selectors.ts';
 import { resolveThresholdState } from '$shared/pcd/threshold.ts';
 import { logger } from '$logger/logger.ts';
-import type { PCDCache } from '$pcd/index.ts';
-import type { FieldChange } from '$sync/preview/types.ts';
 import type { components } from '$api/v1.d.ts';
 
 type SimulateImpactRequest = components['schemas']['SimulateImpactRequest'];
@@ -71,38 +69,6 @@ function validateProposedChange(change: unknown, index: number): ProposedChange 
   }
 
   throw error(400, `proposedChanges[${index}].kind: unsupported proposed-change kind`);
-}
-
-/**
- * `FieldChange.current`/`.desired` (`$sync/preview/types.ts`) are internally typed
- * `unknown`, while the generated `FieldChange` OpenAPI schema types them as a closed
- * JSON-value union. Same wire-boundary narrowing as resolved-config's `toWireOverrides`
- * / the diff route's `toWireChange` -- the two shapes are identical once serialized.
- */
-function toWireChanges(changes: FieldChange[]): EntityConfigDiff['changes'] {
-  return changes as unknown as EntityConfigDiff['changes'];
-}
-
-/**
- * Build a per-profile config A/B diff (current-resolved vs sandbox-resolved) for
- * each edited quality profile. Must be materialized inside the sandbox closure,
- * before the sandbox cache is closed. Quality profiles are arr-agnostic, so the
- * resolved reads pass `arrType: undefined`.
- */
-async function buildConfigDiff(
-  currentCache: PCDCache,
-  sandboxCache: PCDCache,
-  arrType: 'radarr' | 'sonarr',
-  profileNames: string[]
-): Promise<EntityConfigDiff[]> {
-  const result: EntityConfigDiff[] = [];
-  for (const name of profileNames) {
-    const current = await readEntityOrNull(currentCache, 'qualityProfile', undefined, name);
-    const proposed = await readEntityOrNull(sandboxCache, 'qualityProfile', undefined, name);
-    const changes = computeUserOverrides(current, proposed);
-    result.push({ entityType: 'quality_profile', name, arrType, changes: toWireChanges(changes) });
-  }
-  return result;
 }
 
 export const POST: RequestHandler = async ({ request }) => {
@@ -262,7 +228,7 @@ export const POST: RequestHandler = async ({ request }) => {
     report: SandboxReport;
   } = await withSandboxCache(databaseId, editsByProfile, async (sandboxCache, sandboxReport) => ({
     proposedScores: parserAvailable ? await simulateReleaseScores(sandboxCache, databaseId, ctx) : null,
-    configDiff: await buildConfigDiff(currentCache, sandboxCache, arrType, editedProfileNames),
+    configDiff: await buildQualityProfileConfigDiff(currentCache, sandboxCache, arrType, editedProfileNames),
     report: sandboxReport,
   }));
 
