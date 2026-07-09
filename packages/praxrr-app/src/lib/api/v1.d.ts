@@ -935,6 +935,109 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
   schemas: {
+    /** @enum {string} */
+    ConfigHealthBand: 'healthy' | 'attention' | 'needs-review' | 'unknown';
+    /** @enum {string} */
+    ConfigHealthArrType: 'radarr' | 'sonarr' | 'lidarr';
+    /** @enum {string} */
+    ConfigHealthTone: 'neutral' | 'info' | 'warning' | 'danger';
+    ConfigHealthSuggestion: {
+      headline: string;
+      detail: string[];
+      tone: components['schemas']['ConfigHealthTone'];
+      templateVersion: string;
+    };
+    ConfigHealthCriterion: {
+      id: string;
+      label: string;
+      score: number | null;
+      weight: number;
+      contribution: number;
+      detail: string[];
+      suggestions: components['schemas']['ConfigHealthSuggestion'][];
+    };
+    ConfigHealthScoredUnit: {
+      score: number;
+      band: components['schemas']['ConfigHealthBand'];
+      criteria: components['schemas']['ConfigHealthCriterion'][];
+      suggestions: components['schemas']['ConfigHealthSuggestion'][];
+    };
+    ConfigHealthProfileHealth: components['schemas']['ConfigHealthScoredUnit'] & {
+      name: string;
+    };
+    ConfigHealthInstanceSummary: {
+      instanceId: number;
+      instanceName: string;
+      arrType: components['schemas']['ConfigHealthArrType'];
+      score: number;
+      band: components['schemas']['ConfigHealthBand'];
+      generatedAt: string;
+    };
+    ConfigHealthTotals: {
+      instances: number;
+      healthy: number;
+      attention: number;
+      needsReview: number;
+      unknown: number;
+      averageScore: number | null;
+    };
+    ConfigHealthSettingsSnapshot: {
+      enabled: boolean;
+      intervalMinutes: number;
+    };
+    ConfigHealthSummaryResponse: {
+      engineVersion: string;
+      generatedAt: string;
+      totals: components['schemas']['ConfigHealthTotals'];
+      settings: components['schemas']['ConfigHealthSettingsSnapshot'];
+      instances: components['schemas']['ConfigHealthInstanceSummary'][];
+    };
+    ConfigHealthDetailResponse: {
+      instanceId: number;
+      instanceName: string;
+      arrType: components['schemas']['ConfigHealthArrType'];
+      engineVersion: string;
+      generatedAt: string;
+      overall: components['schemas']['ConfigHealthScoredUnit'];
+      profiles: components['schemas']['ConfigHealthProfileHealth'][];
+    };
+    ConfigHealthTrendPoint: {
+      generatedAt: string;
+      overallScore: number;
+      band: components['schemas']['ConfigHealthBand'];
+    };
+    ConfigHealthTrendsResponse: {
+      instanceId: number;
+      engineVersion: string;
+      points: components['schemas']['ConfigHealthTrendPoint'][];
+    };
+    ConfigHealthCriterionConfig: {
+      id: string;
+      enabled: boolean;
+      weight: number;
+    };
+    ConfigHealthCriterionMeta: {
+      id: string;
+      label: string;
+      description: string;
+    };
+    ConfigHealthSettingsResponse: {
+      engineVersion: string;
+      enabled: boolean;
+      intervalMinutes: number;
+      retentionDays: number;
+      retentionMaxEntries: number;
+      criteria: components['schemas']['ConfigHealthCriterionConfig'][];
+      catalog: components['schemas']['ConfigHealthCriterionMeta'][];
+    };
+    ConfigHealthSettingsUpdateRequest: {
+      expectedEngineVersion: string;
+      enabled?: boolean;
+      intervalMinutes?: number;
+      retentionDays?: number;
+      retentionMaxEntries?: number;
+      criteria?: components['schemas']['ConfigHealthCriterionConfig'][];
+    };
     /**
      * @description Individual component health status
      * @enum {string}

@@ -1,7 +1,7 @@
 import type { Migration } from '../migrations.ts';
 
 /**
- * Migration 20260714: Create canary sync / blast-radius tables (issue #19).
+ * Migration 20260715: Create canary sync / blast-radius tables (issue #19).
  *
  * - `canary_rollouts`: one row per canary rollout. Drives the resumable batched
  *   rollout state machine (`canary_running` -> `awaiting_confirmation` ->
@@ -22,7 +22,7 @@ import type { Migration } from '../migrations.ts';
  * `updated_at` are bookkeeping `CURRENT_TIMESTAMP`.
  */
 export const migration: Migration = {
-  version: 20260714,
+  version: 20260715,
   name: 'Create canary tables',
 
   up: `

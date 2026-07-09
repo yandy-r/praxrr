@@ -8,6 +8,7 @@ import { backupSettingsQueries } from '$db/queries/backupSettings.ts';
 import { logSettingsQueries } from '$db/queries/logSettings.ts';
 import { driftSettingsQueries } from '$db/queries/driftSettings.ts';
 import { syncHistorySettingsQueries } from '$db/queries/syncHistorySettings.ts';
+import { configHealthSettingsQueries } from '$db/queries/configHealthSettings.ts';
 import { calculateNextRun } from '$lib/server/sync/utils.ts';
 import { calculateNextRunFromMinutes, calculateNextRunFromSchedule } from './scheduleUtils.ts';
 import { jobDispatcher } from './dispatcher.ts';
@@ -224,6 +225,53 @@ export function scheduleSyncHistoryCleanup(): void {
   notify(job.runAt);
 }
 
+/**
+ * Schedule (or cancel) the recurring config-health snapshot sweep. On disable it cancels the job and
+ * clears any dangling sweep cursor so a later re-enable starts a clean sweep (mirrors drift).
+ */
+export function scheduleConfigHealthSnapshot(): void {
+  const settings = configHealthSettingsQueries.get();
+  if (settings.enabled !== 1) {
+    jobQueueQueries.cancelByDedupeKey('config-health.snapshot');
+    configHealthSettingsQueries.resetSweepProgress();
+    return;
+  }
+
+  const runAt = settings.last_run_at
+    ? calculateNextRunFromMinutes(settings.last_run_at, settings.interval_minutes)
+    : new Date().toISOString();
+
+  const job = jobQueueQueries.upsertScheduled({
+    jobType: 'config-health.snapshot',
+    runAt,
+    payload: {},
+    source: 'schedule',
+    dedupeKey: 'config-health.snapshot',
+  });
+
+  notify(job.runAt);
+}
+
+/** Schedule (or cancel) the daily config-health snapshot retention cleanup. */
+export function scheduleConfigHealthCleanup(): void {
+  const settings = configHealthSettingsQueries.get();
+  if (settings.enabled !== 1) {
+    jobQueueQueries.cancelByDedupeKey('config-health.cleanup');
+    return;
+  }
+
+  const runAt = calculateNextRunFromSchedule('daily');
+  const job = jobQueueQueries.upsertScheduled({
+    jobType: 'config-health.cleanup',
+    runAt,
+    payload: {},
+    source: 'schedule',
+    dedupeKey: 'config-health.cleanup',
+  });
+
+  notify(job.runAt);
+}
+
 export function scheduleAllJobs(): void {
   const arrInstances = arrInstancesQueries.getAll();
   for (const instance of arrInstances) {
@@ -242,4 +290,6 @@ export function scheduleAllJobs(): void {
   scheduleLogCleanup();
   scheduleDriftCheck();
   scheduleSyncHistoryCleanup();
+  scheduleConfigHealthSnapshot();
+  scheduleConfigHealthCleanup();
 }

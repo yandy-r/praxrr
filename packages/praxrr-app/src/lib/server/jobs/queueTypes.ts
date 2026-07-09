@@ -14,7 +14,9 @@ export type JobType =
   | 'logs.cleanup'
   | 'drift.check'
   | 'sync.history.cleanup'
-  | 'sync.canary.rollout';
+  | 'sync.canary.rollout'
+  | 'config-health.snapshot'
+  | 'config-health.cleanup';
 
 export type JobStatus = 'queued' | 'running' | 'success' | 'failed' | 'cancelled';
 
@@ -89,6 +91,8 @@ export interface JobPayloadByType {
   'drift.check': DriftCheckJobPayload;
   'sync.history.cleanup': ArrSyncCleanupOnlyPayload;
   'sync.canary.rollout': CanaryRolloutJobPayload;
+  'config-health.snapshot': ArrSyncCleanupOnlyPayload;
+  'config-health.cleanup': ArrSyncCleanupOnlyPayload;
 }
 
 export type JobPayload<T extends JobType = JobType> = T extends JobType ? JobPayloadByType[T] : never;

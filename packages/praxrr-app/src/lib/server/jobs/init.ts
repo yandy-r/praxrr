@@ -29,4 +29,6 @@ export {
   scheduleLogCleanup,
   scheduleDriftCheck,
   scheduleSyncHistoryCleanup,
+  scheduleConfigHealthSnapshot,
+  scheduleConfigHealthCleanup,
 } from './schedule.ts';

@@ -2,11 +2,11 @@ import { assert, assertEquals, assertExists } from '@std/assert';
 import { config } from '$config';
 import { db } from '$db/db.ts';
 import { runMigrations } from '$db/migrations.ts';
-import { migration } from '$db/migrations/20260714_create_canary_tables.ts';
+import { migration } from '$db/migrations/20260715_create_canary_tables.ts';
 
 /**
  * Point the db singleton at a scratch SQLite file under a fresh temp base path,
- * run the full migration chain (so migration 20260714 creates the canary tables
+ * run the full migration chain (so migration 20260715 creates the canary tables
  * and seeds the settings singleton in its real context), invoke the test body,
  * then tear the connection down. Mirrors syncHistoryQueries.test.ts.
  */

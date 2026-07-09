@@ -41,6 +41,10 @@ export function formatJobTypeLabel(jobType: JobType): string {
       return 'Sync History Cleanup';
     case 'sync.canary.rollout':
       return 'Canary Rollout';
+    case 'config-health.snapshot':
+      return 'Config Health Snapshot';
+    case 'config-health.cleanup':
+      return 'Config Health Cleanup';
     default:
       return rawJobType
         .replace(/\./g, ' ')
