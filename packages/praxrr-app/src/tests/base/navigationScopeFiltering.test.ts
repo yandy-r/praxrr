@@ -198,6 +198,7 @@ Deno.test('bottom nav ordering is deterministic by priority and sidebar traversa
     '/metadata-profiles',
     '/score-simulator',
     '/impact-simulator',
+    '/sync-history',
     '/settings',
   ]);
 
@@ -214,6 +215,7 @@ Deno.test('bottom nav ordering is deterministic by priority and sidebar traversa
     '/regular-expressions',
     '/score-simulator',
     '/impact-simulator',
+    '/sync-history',
     '/media-management',
     '/delay-profiles',
     '/metadata-profiles',
@@ -254,8 +256,10 @@ Deno.test('arr navigation remains scope-compatible while feature-gated routes st
   );
 
   const visibleTopLevelHrefs = shellWithoutDev.flatMap((group) => group.items.map((item) => item.href));
+  // Guards against sync sub-routes (e.g. /sync/preview) leaking into top-level nav; the
+  // /sync-history audit trail is an intentional top-level operations route.
   assertEquals(
-    visibleTopLevelHrefs.some((href) => href.includes('/sync')),
+    visibleTopLevelHrefs.some((href) => href.includes('/sync/')),
     false
   );
 });

@@ -30,6 +30,8 @@ const aliases: Record<string, string> = {
   selectors: 'packages/praxrr-app/src/tests/upgrades/selectors.test.ts',
   'setup-wizard':
     'packages/praxrr-app/src/tests/routes/setupWizard.test.ts,packages/praxrr-app/src/tests/base/setupProgress.test.ts',
+  'sync-history':
+    'packages/praxrr-app/src/tests/db/syncHistoryQueries.test.ts,packages/praxrr-app/src/tests/db/syncHistoryRetention.test.ts,packages/praxrr-app/src/tests/sync/syncHistoryRecord.test.ts,packages/praxrr-app/src/tests/routes/syncHistory.test.ts,packages/praxrr-app/src/tests/jobs/syncHistoryCleanup.test.ts',
   'url-state': 'packages/praxrr-app/src/tests/routes/scoreSimulatorUrlState.test.ts',
   'what-if': 'packages/praxrr-app/src/tests/routes/scoreSimulatorPhase3Helpers.test.ts',
 

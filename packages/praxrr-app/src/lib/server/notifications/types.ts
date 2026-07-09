@@ -31,6 +31,10 @@ export const NotificationTypes = {
 
   // Drift
   DRIFT_DETECTED: 'drift.detected',
+
+  // Sync (Arr push sync — audit trail)
+  SYNC_FAILED: 'sync.failed',
+  SYNC_PARTIAL: 'sync.partial',
 } as const;
 
 /**

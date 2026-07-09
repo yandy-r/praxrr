@@ -7,6 +7,7 @@ import { databaseInstancesQueries } from '$db/queries/databaseInstances.ts';
 import { backupSettingsQueries } from '$db/queries/backupSettings.ts';
 import { logSettingsQueries } from '$db/queries/logSettings.ts';
 import { driftSettingsQueries } from '$db/queries/driftSettings.ts';
+import { syncHistorySettingsQueries } from '$db/queries/syncHistorySettings.ts';
 import { calculateNextRun } from '$lib/server/sync/utils.ts';
 import { calculateNextRunFromMinutes, calculateNextRunFromSchedule } from './scheduleUtils.ts';
 import { jobDispatcher } from './dispatcher.ts';
@@ -204,6 +205,25 @@ export function scheduleDriftCheck(): void {
   notify(job.runAt);
 }
 
+export function scheduleSyncHistoryCleanup(): void {
+  const settings = syncHistorySettingsQueries.get();
+  if (settings.enabled !== 1) {
+    jobQueueQueries.cancelByDedupeKey('sync.history.cleanup');
+    return;
+  }
+
+  const runAt = calculateNextRunFromSchedule('daily');
+  const job = jobQueueQueries.upsertScheduled({
+    jobType: 'sync.history.cleanup',
+    runAt,
+    payload: {},
+    source: 'schedule',
+    dedupeKey: 'sync.history.cleanup',
+  });
+
+  notify(job.runAt);
+}
+
 export function scheduleAllJobs(): void {
   const arrInstances = arrInstancesQueries.getAll();
   for (const instance of arrInstances) {
@@ -221,4 +241,5 @@ export function scheduleAllJobs(): void {
   scheduleBackupJobs();
   scheduleLogCleanup();
   scheduleDriftCheck();
+  scheduleSyncHistoryCleanup();
 }

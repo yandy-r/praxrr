@@ -133,6 +133,20 @@ export const notificationTypes: NotificationType[] = [
     category: 'Drift',
     description: 'Notification when an Arr instance diverges from its desired configuration',
   },
+
+  // Sync (Arr push sync — audit trail)
+  {
+    id: 'sync.failed',
+    label: 'Sync Failed',
+    category: 'Sync',
+    description: 'Notification when an Arr sync run fails entirely',
+  },
+  {
+    id: 'sync.partial',
+    label: 'Sync Completed (Partial)',
+    category: 'Sync',
+    description: 'Notification when an Arr sync run partially fails (some sections synced, some failed)',
+  },
 ];
 
 /**

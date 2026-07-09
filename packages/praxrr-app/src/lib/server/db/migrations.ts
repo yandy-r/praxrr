@@ -71,6 +71,7 @@ import { migration as migration20260706CreateUserComplexityTiers } from './migra
 import { migration as migration20260707AddSetupWizardState } from './migrations/20260707_add_setup_wizard_state.ts';
 import { migration as migration20260708AddArrInstanceDetectedVersion } from './migrations/20260708_add_arr_instance_detected_version.ts';
 import { migration as migration20260709CreateDriftTables } from './migrations/20260709_create_drift_tables.ts';
+import { migration as migration20260710CreateSyncHistoryTables } from './migrations/20260710_create_sync_history_tables.ts';
 
 export interface Migration {
   version: number;
@@ -371,6 +372,7 @@ export function loadMigrations(): Migration[] {
     migration20260707AddSetupWizardState,
     migration20260708AddArrInstanceDetectedVersion,
     migration20260709CreateDriftTables,
+    migration20260710CreateSyncHistoryTables,
   ];
 
   // Sort by version number
