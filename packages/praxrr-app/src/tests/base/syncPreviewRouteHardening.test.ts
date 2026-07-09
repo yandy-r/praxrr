@@ -1,7 +1,7 @@
 import { assertEquals, assertMatch } from '@std/assert';
 import { POST as createPreviewPost } from '../../routes/api/v1/sync/preview/+server.ts';
 import {
-  handleSyncPreviewApplyRequest,
+  _handleSyncPreviewApplyRequest,
   POST as applyPreviewPost,
   type SyncPreviewApplyDependencies,
 } from '../../routes/api/v1/sync/preview/[previewId]/apply/+server.ts';
@@ -106,7 +106,7 @@ Deno.test('sync preview apply success body matches the generated response contra
     | undefined;
 
   try {
-    const response = await handleSyncPreviewApplyRequest(
+    const response = await _handleSyncPreviewApplyRequest(
       previewId,
       createApplyRequest(previewId, JSON.stringify({ sections: ['qualityProfiles'] })),
       {
@@ -144,7 +144,7 @@ Deno.test('sync preview apply skipped body matches the generated success contrac
   previewStore.create(createSnapshotInput(previewId), Date.now());
 
   try {
-    const response = await handleSyncPreviewApplyRequest(
+    const response = await _handleSyncPreviewApplyRequest(
       previewId,
       createApplyRequest(previewId, JSON.stringify({ sections: ['qualityProfiles'] })),
       dependenciesReturning({ status: 'skipped', output: 'No changes required' })
@@ -170,7 +170,7 @@ Deno.test('sync preview apply failed body matches the generated coarse result co
   previewStore.create(createSnapshotInput(previewId), Date.now());
 
   try {
-    const response = await handleSyncPreviewApplyRequest(
+    const response = await _handleSyncPreviewApplyRequest(
       previewId,
       createApplyRequest(previewId, JSON.stringify({ sections: ['qualityProfiles'] })),
       dependenciesReturning({ status: 'failure', error: 'Arr rejected the update' })
@@ -198,7 +198,7 @@ Deno.test('sync preview apply includes the stale warning in the generated respon
   previewStore.create(createSnapshotInput(previewId), createdAtMs);
 
   try {
-    const response = await handleSyncPreviewApplyRequest(
+    const response = await _handleSyncPreviewApplyRequest(
       previewId,
       createApplyRequest(previewId, JSON.stringify({ sections: ['qualityProfiles'] })),
       dependenciesReturning({ status: 'success', output: 'Synced' }, createdAtMs + 6 * 60 * 1000 + 30 * 1000)
@@ -220,7 +220,7 @@ Deno.test('sync preview apply stale-blocked body matches the generated error con
   let executionCount = 0;
 
   try {
-    const response = await handleSyncPreviewApplyRequest(previewId, createApplyRequest(previewId), {
+    const response = await _handleSyncPreviewApplyRequest(previewId, createApplyRequest(previewId), {
       getSectionsInProgress: () => [],
       executeSyncJob: () => {
         executionCount++;

@@ -29,7 +29,7 @@ const DEFAULT_DEPENDENCIES: GoalApplyDependencies = {
  * standard PCD user-op path, then record the goal binding. Returns 409 when the client computed
  * against a different engine version.
  */
-export async function handleGoalApplyRequest(
+export async function _handleGoalApplyRequest(
   request: Request,
   dependencies: GoalApplyDependencies = DEFAULT_DEPENDENCIES
 ): Promise<Response> {
@@ -85,4 +85,4 @@ export async function handleGoalApplyRequest(
   } satisfies GoalApplyResponse);
 }
 
-export const POST: RequestHandler = ({ request }) => handleGoalApplyRequest(request);
+export const POST: RequestHandler = ({ request }) => _handleGoalApplyRequest(request);
