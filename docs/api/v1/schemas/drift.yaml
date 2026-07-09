@@ -1,0 +1,294 @@
+DriftStatus:
+  type: string
+  enum:
+    - in-sync
+    - drifted
+    - unreachable
+    - unauthorized
+    - error
+  description: Stored per-instance drift status.
+
+DriftSummaryStatus:
+  type: string
+  enum:
+    - in-sync
+    - drifted
+    - unreachable
+    - unauthorized
+    - error
+    - never-checked
+  description: |
+    Drift status as surfaced in the summary. Extends `DriftStatus` with the synthesized
+    `never-checked` value for enabled instances that have no stored row yet.
+
+DriftReason:
+  type: string
+  enum:
+    - unreachable
+    - timeout
+    - unauthorized
+    - invalid_response
+    - not_configured
+    - cache_not_ready
+    - rate_limited
+    - error
+  description: Sanitized closed reason for a non-in-sync outcome.
+
+DriftCounts:
+  type: object
+  required:
+    - drifted
+    - missing
+    - unmanaged
+  properties:
+    drifted:
+      type: integer
+      minimum: 0
+      description: Managed entities whose fields diverged on the Arr (alerting).
+    missing:
+      type: integer
+      minimum: 0
+      description: Managed entities absent on the Arr (alerting).
+    unmanaged:
+      type: integer
+      minimum: 0
+      description: Live Arr entities not in the resolved desired set (non-alerting).
+
+DriftSettings:
+  type: object
+  required:
+    - enabled
+    - intervalMinutes
+    - lastRunAt
+    - nextRunAt
+    - backoffUntil
+    - errorCount
+  properties:
+    enabled:
+      type: boolean
+    intervalMinutes:
+      type: integer
+      minimum: 5
+    lastRunAt:
+      oneOf:
+        - type: string
+          format: date-time
+        - type: 'null'
+    nextRunAt:
+      oneOf:
+        - type: string
+          format: date-time
+        - type: 'null'
+    backoffUntil:
+      oneOf:
+        - type: string
+          format: date-time
+        - type: 'null'
+    errorCount:
+      type: integer
+      minimum: 0
+
+DriftEntityChange:
+  type: object
+  required:
+    - section
+    - entityType
+    - name
+    - action
+    - category
+    - remoteId
+    - fields
+  properties:
+    section:
+      $ref: '../schemas/sync.yaml#/SyncPreviewSection'
+    entityType:
+      type: string
+    name:
+      type: string
+      description: Entity display name (namespace-stripped).
+    action:
+      $ref: '../schemas/sync.yaml#/SyncPreviewAction'
+    category:
+      type: string
+      enum:
+        - drift
+        - missing
+        - unmanaged
+    remoteId:
+      type: integer
+      nullable: true
+      description: Live Arr entity id, or null for a create/missing entity.
+    fields:
+      type: array
+      description: Field-level diff (`current` = live, `desired` = PCD); empty for create/delete.
+      items:
+        $ref: '../schemas/sync.yaml#/FieldChange'
+
+DriftInstanceSummary:
+  type: object
+  required:
+    - instanceId
+    - instanceName
+    - arrType
+    - status
+    - reason
+    - detectedVersion
+    - counts
+    - checkedAt
+    - contentCheckedAt
+  properties:
+    instanceId:
+      type: integer
+    instanceName:
+      type: string
+    arrType:
+      type: string
+      enum:
+        - radarr
+        - sonarr
+        - lidarr
+    status:
+      $ref: '#/DriftSummaryStatus'
+    reason:
+      oneOf:
+        - $ref: '#/DriftReason'
+        - type: 'null'
+    detectedVersion:
+      oneOf:
+        - type: string
+        - type: 'null'
+    counts:
+      $ref: '#/DriftCounts'
+    checkedAt:
+      oneOf:
+        - type: string
+          format: date-time
+        - type: 'null'
+    contentCheckedAt:
+      oneOf:
+        - type: string
+          format: date-time
+        - type: 'null'
+
+DriftSummaryResponse:
+  type: object
+  required:
+    - generatedAt
+    - settings
+    - totals
+    - instances
+  properties:
+    generatedAt:
+      type: string
+      format: date-time
+    settings:
+      $ref: '#/DriftSettings'
+    totals:
+      type: object
+      required:
+        - instances
+        - inSync
+        - drifted
+        - unreachable
+        - unauthorized
+        - error
+        - neverChecked
+      properties:
+        instances:
+          type: integer
+          minimum: 0
+        inSync:
+          type: integer
+          minimum: 0
+        drifted:
+          type: integer
+          minimum: 0
+        unreachable:
+          type: integer
+          minimum: 0
+        unauthorized:
+          type: integer
+          minimum: 0
+        error:
+          type: integer
+          minimum: 0
+        neverChecked:
+          type: integer
+          minimum: 0
+    instances:
+      type: array
+      items:
+        $ref: '#/DriftInstanceSummary'
+
+DriftDetailResponse:
+  type: object
+  required:
+    - instanceId
+    - instanceName
+    - arrType
+    - status
+    - reason
+    - detectedVersion
+    - checkedAt
+    - contentCheckedAt
+    - counts
+    - drift
+    - missing
+    - unmanaged
+  properties:
+    instanceId:
+      type: integer
+    instanceName:
+      type: string
+    arrType:
+      type: string
+      enum:
+        - radarr
+        - sonarr
+        - lidarr
+    status:
+      $ref: '#/DriftSummaryStatus'
+    reason:
+      oneOf:
+        - $ref: '#/DriftReason'
+        - type: 'null'
+    detectedVersion:
+      oneOf:
+        - type: string
+        - type: 'null'
+    checkedAt:
+      oneOf:
+        - type: string
+          format: date-time
+        - type: 'null'
+    contentCheckedAt:
+      oneOf:
+        - type: string
+          format: date-time
+        - type: 'null'
+    counts:
+      $ref: '#/DriftCounts'
+    drift:
+      type: array
+      description: Entities whose fields diverged (action = update).
+      items:
+        $ref: '#/DriftEntityChange'
+    missing:
+      type: array
+      description: Managed entities absent on the Arr (action = create).
+      items:
+        $ref: '#/DriftEntityChange'
+    unmanaged:
+      type: array
+      description: Live Arr entities not in the desired set (action = delete, non-alerting).
+      items:
+        $ref: '#/DriftEntityChange'
+
+DriftSettingsUpdateRequest:
+  type: object
+  properties:
+    enabled:
+      type: boolean
+    intervalMinutes:
+      type: integer
+      minimum: 5

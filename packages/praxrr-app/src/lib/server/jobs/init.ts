@@ -27,4 +27,5 @@ export {
   schedulePcdSyncForDatabase,
   scheduleBackupJobs,
   scheduleLogCleanup,
+  scheduleDriftCheck,
 } from './schedule.ts';

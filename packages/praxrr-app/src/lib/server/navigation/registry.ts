@@ -115,6 +115,18 @@ export const NAV_REGISTRY: ArrCapabilityAwareNavItem[] = [
     hasChildren: false,
   },
   {
+    id: 'overview.drift',
+    label: 'Drift',
+    href: '/drift',
+    groupId: ensureGroupId('overview'),
+    order: 4,
+    arrScope: scopeAll,
+    mobilePriority: 'medium',
+    iconKey: 'GitCompare',
+    emoji: '🌊',
+    hasChildren: false,
+  },
+  {
     id: 'apps.arrs',
     label: 'Arrs',
     href: '/arr',

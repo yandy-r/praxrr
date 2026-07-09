@@ -11,7 +11,8 @@ export type JobType =
   | 'trashguide.sync'
   | 'backup.create'
   | 'backup.cleanup'
-  | 'logs.cleanup';
+  | 'logs.cleanup'
+  | 'drift.check';
 
 export type JobStatus = 'queued' | 'running' | 'success' | 'failed' | 'cancelled';
 
@@ -55,6 +56,16 @@ export interface ArrPullStartupJobPayload {
 
 export type ArrSyncCleanupOnlyPayload = Record<string, never>;
 
+/**
+ * Payload for the global drift.check sweep. Empty `{}` starts a fresh sweep; the
+ * continuation carries a cursor so a chunked sweep can resume without monopolizing the
+ * single-flag serialized dispatcher.
+ */
+export interface DriftCheckJobPayload {
+  sweepStartedAt?: string;
+  cursor?: number;
+}
+
 export interface JobPayloadByType {
   'arr.sync': ArrSyncJobPayload;
   'arr.sync.qualityProfiles': ArrSyncSectionJobPayload;
@@ -69,6 +80,7 @@ export interface JobPayloadByType {
   'backup.create': ArrSyncCleanupOnlyPayload;
   'backup.cleanup': ArrSyncCleanupOnlyPayload;
   'logs.cleanup': ArrSyncCleanupOnlyPayload;
+  'drift.check': DriftCheckJobPayload;
 }
 
 export type JobPayload<T extends JobType = JobType> = T extends JobType ? JobPayloadByType[T] : never;

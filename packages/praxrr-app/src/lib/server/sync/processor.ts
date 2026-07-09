@@ -242,9 +242,17 @@ async function processInstanceSections(
 }
 
 /**
- * Process items in batches with concurrency limit
+ * Process items in batches with concurrency limit.
+ *
+ * Note: each batch runs under `Promise.all`, so a rejecting `processor` aborts the whole
+ * batch — callers that must not lose sibling results (e.g. the drift sweep) are required to
+ * pass a processor that never throws.
  */
-async function processBatches<T, R>(items: T[], processor: (item: T) => Promise<R>, concurrency: number): Promise<R[]> {
+export async function processBatches<T, R>(
+  items: T[],
+  processor: (item: T) => Promise<R>,
+  concurrency: number
+): Promise<R[]> {
   const results: R[] = [];
 
   for (let i = 0; i < items.length; i += concurrency) {

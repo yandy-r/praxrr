@@ -71,6 +71,10 @@
     {
       "name": "Compatibility",
       "description": "Cross-Arr compatibility parity map and semantic difference catalog"
+    },
+    {
+      "name": "Drift Detection",
+      "description": "Desired-vs-actual drift status per Arr instance, on-demand refresh, and settings"
     }
   ],
   "paths": {
@@ -2889,6 +2893,226 @@
         }
       }
     },
+    "/drift/summary": {
+      "get": {
+        "operationId": "getDriftSummary",
+        "summary": "Drift detection summary",
+        "description": "Returns the latest drift status for every enabled, sync-capable Arr instance, plus\naggregate totals and the drift check settings. Instances that have never been checked\nare synthesized as `never-checked`. Degraded per-instance statuses (unreachable,\nunauthorized, error) are carried in the 200 body — this endpoint returns 500 only on an\ninternal error.\n",
+        "tags": ["Drift Detection"],
+        "responses": {
+          "200": {
+            "description": "Drift summary",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DriftSummaryResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Failed to build drift summary",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/drift/{instanceId}": {
+      "get": {
+        "operationId": "getDriftDetail",
+        "summary": "Per-instance drift detail",
+        "description": "Returns the stored drift detail for a single instance, grouped into `drift` (field\nchanges), `missing` (managed entities absent on the Arr), and `unmanaged` (extra live\nentities, non-alerting). A degraded status is returned in the 200 body; this endpoint\nreturns 404 only when the instance does not exist.\n",
+        "tags": ["Drift Detection"],
+        "parameters": [
+          {
+            "name": "instanceId",
+            "in": "path",
+            "required": true,
+            "description": "Arr instance ID",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Drift detail",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DriftDetailResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid instance id or unsupported instance type",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Instance not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Failed to read drift detail",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "refreshDriftDetail",
+        "summary": "Refresh drift for one instance on demand",
+        "description": "Runs a fresh drift check for the instance on the request thread (not the scheduled\nqueue) and returns the updated detail. Rate-limited per instance.\n",
+        "tags": ["Drift Detection"],
+        "parameters": [
+          {
+            "name": "instanceId",
+            "in": "path",
+            "required": true,
+            "description": "Arr instance ID",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Drift re-checked",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DriftDetailResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Instance type is unsupported or the instance is disabled",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Instance not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "A drift check for this instance is already in progress",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "On-demand drift refresh is rate-limited for this instance",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Failed to refresh drift",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/drift/settings": {
+      "put": {
+        "operationId": "updateDriftSettings",
+        "summary": "Update drift detection settings",
+        "description": "Enables/disables drift detection and sets the polling interval, then reschedules or\ncancels the recurring drift check job accordingly.\n",
+        "tags": ["Drift Detection"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DriftSettingsUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated drift settings",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DriftSettings"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid settings payload",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Failed to update drift settings",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/setup/state": {
       "get": {
         "operationId": "getSetupState",
@@ -5148,6 +5372,373 @@
           },
           "summary": {
             "$ref": "#/components/schemas/SyncPreviewSummary"
+          }
+        }
+      },
+      "DriftStatus": {
+        "type": "string",
+        "enum": ["in-sync", "drifted", "unreachable", "unauthorized", "error"],
+        "description": "Stored per-instance drift status."
+      },
+      "DriftSummaryStatus": {
+        "type": "string",
+        "enum": ["in-sync", "drifted", "unreachable", "unauthorized", "error", "never-checked"],
+        "description": "Drift status as surfaced in the summary. Extends `DriftStatus` with the synthesized\n`never-checked` value for enabled instances that have no stored row yet.\n"
+      },
+      "DriftReason": {
+        "type": "string",
+        "enum": [
+          "unreachable",
+          "timeout",
+          "unauthorized",
+          "invalid_response",
+          "not_configured",
+          "cache_not_ready",
+          "rate_limited",
+          "error"
+        ],
+        "description": "Sanitized closed reason for a non-in-sync outcome."
+      },
+      "DriftCounts": {
+        "type": "object",
+        "required": ["drifted", "missing", "unmanaged"],
+        "properties": {
+          "drifted": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Managed entities whose fields diverged on the Arr (alerting)."
+          },
+          "missing": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Managed entities absent on the Arr (alerting)."
+          },
+          "unmanaged": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Live Arr entities not in the resolved desired set (non-alerting)."
+          }
+        }
+      },
+      "DriftSettings": {
+        "type": "object",
+        "required": ["enabled", "intervalMinutes", "lastRunAt", "nextRunAt", "backoffUntil", "errorCount"],
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "intervalMinutes": {
+            "type": "integer",
+            "minimum": 5
+          },
+          "lastRunAt": {
+            "oneOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "nextRunAt": {
+            "oneOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "backoffUntil": {
+            "oneOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "errorCount": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      },
+      "DriftEntityChange": {
+        "type": "object",
+        "required": ["section", "entityType", "name", "action", "category", "remoteId", "fields"],
+        "properties": {
+          "section": {
+            "$ref": "#/components/schemas/SyncPreviewSection"
+          },
+          "entityType": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string",
+            "description": "Entity display name (namespace-stripped)."
+          },
+          "action": {
+            "$ref": "#/components/schemas/SyncPreviewAction"
+          },
+          "category": {
+            "type": "string",
+            "enum": ["drift", "missing", "unmanaged"]
+          },
+          "remoteId": {
+            "type": "integer",
+            "nullable": true,
+            "description": "Live Arr entity id, or null for a create/missing entity."
+          },
+          "fields": {
+            "type": "array",
+            "description": "Field-level diff (`current` = live, `desired` = PCD); empty for create/delete.",
+            "items": {
+              "$ref": "#/components/schemas/FieldChange"
+            }
+          }
+        }
+      },
+      "DriftInstanceSummary": {
+        "type": "object",
+        "required": [
+          "instanceId",
+          "instanceName",
+          "arrType",
+          "status",
+          "reason",
+          "detectedVersion",
+          "counts",
+          "checkedAt",
+          "contentCheckedAt"
+        ],
+        "properties": {
+          "instanceId": {
+            "type": "integer"
+          },
+          "instanceName": {
+            "type": "string"
+          },
+          "arrType": {
+            "type": "string",
+            "enum": ["radarr", "sonarr", "lidarr"]
+          },
+          "status": {
+            "$ref": "#/components/schemas/DriftSummaryStatus"
+          },
+          "reason": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/DriftReason"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "detectedVersion": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "counts": {
+            "$ref": "#/components/schemas/DriftCounts"
+          },
+          "checkedAt": {
+            "oneOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "contentCheckedAt": {
+            "oneOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "DriftSummaryResponse": {
+        "type": "object",
+        "required": ["generatedAt", "settings", "totals", "instances"],
+        "properties": {
+          "generatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "settings": {
+            "$ref": "#/components/schemas/DriftSettings"
+          },
+          "totals": {
+            "type": "object",
+            "required": ["instances", "inSync", "drifted", "unreachable", "unauthorized", "error", "neverChecked"],
+            "properties": {
+              "instances": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "inSync": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "drifted": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "unreachable": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "unauthorized": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "error": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "neverChecked": {
+                "type": "integer",
+                "minimum": 0
+              }
+            }
+          },
+          "instances": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DriftInstanceSummary"
+            }
+          }
+        }
+      },
+      "DriftDetailResponse": {
+        "type": "object",
+        "required": [
+          "instanceId",
+          "instanceName",
+          "arrType",
+          "status",
+          "reason",
+          "detectedVersion",
+          "checkedAt",
+          "contentCheckedAt",
+          "counts",
+          "drift",
+          "missing",
+          "unmanaged"
+        ],
+        "properties": {
+          "instanceId": {
+            "type": "integer"
+          },
+          "instanceName": {
+            "type": "string"
+          },
+          "arrType": {
+            "type": "string",
+            "enum": ["radarr", "sonarr", "lidarr"]
+          },
+          "status": {
+            "$ref": "#/components/schemas/DriftSummaryStatus"
+          },
+          "reason": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/DriftReason"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "detectedVersion": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "checkedAt": {
+            "oneOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "contentCheckedAt": {
+            "oneOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "counts": {
+            "$ref": "#/components/schemas/DriftCounts"
+          },
+          "drift": {
+            "type": "array",
+            "description": "Entities whose fields diverged (action = update).",
+            "items": {
+              "$ref": "#/components/schemas/DriftEntityChange"
+            }
+          },
+          "missing": {
+            "type": "array",
+            "description": "Managed entities absent on the Arr (action = create).",
+            "items": {
+              "$ref": "#/components/schemas/DriftEntityChange"
+            }
+          },
+          "unmanaged": {
+            "type": "array",
+            "description": "Live Arr entities not in the desired set (action = delete, non-alerting).",
+            "items": {
+              "$ref": "#/components/schemas/DriftEntityChange"
+            }
+          }
+        }
+      },
+      "DriftSettingsUpdateRequest": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "intervalMinutes": {
+            "type": "integer",
+            "minimum": 5
           }
         }
       },

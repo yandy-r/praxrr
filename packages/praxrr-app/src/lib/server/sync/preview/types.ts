@@ -20,6 +20,15 @@ export type SyncPreviewSection = 'qualityProfiles' | 'delayProfiles' | 'mediaMan
  */
 export type SyncPreviewArrType = Exclude<ArrType, 'all' | 'chaptarr'>;
 
+/**
+ * Narrows a loosely-typed instance `type` column to a sync-preview-capable arr type.
+ * Shared so the sync-preview route, the drift service, and drift routes all gate identically
+ * (excludes placeholder/unsupported `all`/`chaptarr`).
+ */
+export function isSyncPreviewArrType(value: string): value is SyncPreviewArrType {
+  return value === 'radarr' || value === 'sonarr' || value === 'lidarr';
+}
+
 export interface SyncPreviewSectionMetadata {
   readonly section: SyncPreviewSection;
 }

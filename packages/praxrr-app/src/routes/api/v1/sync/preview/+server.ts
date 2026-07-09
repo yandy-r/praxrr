@@ -15,6 +15,7 @@ import {
 } from '$sync/preview/limits.ts';
 import type { SectionType } from '$sync/types.ts';
 import type { SyncPreviewArrType, SyncPreviewResult, SyncPreviewSummary } from '$sync/preview/types.ts';
+import { isSyncPreviewArrType } from '$sync/preview/types.ts';
 import { uuid } from '$shared/utils/uuid.ts';
 
 type ErrorResponse = {
@@ -37,10 +38,6 @@ type CreatePreviewResult = {
   sections: SectionType[] | undefined;
   sectionConfigs?: Partial<Record<SectionType, unknown>>;
 };
-
-function isSyncPreviewArrType(value: string): value is SyncPreviewArrType {
-  return value === 'radarr' || value === 'sonarr' || value === 'lidarr';
-}
 
 function parseSectionOrderValue(rawSections: unknown): SectionType[] | undefined {
   if (rawSections === undefined) {

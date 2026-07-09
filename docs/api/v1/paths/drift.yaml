@@ -1,0 +1,156 @@
+summary:
+  get:
+    operationId: getDriftSummary
+    summary: Drift detection summary
+    description: |
+      Returns the latest drift status for every enabled, sync-capable Arr instance, plus
+      aggregate totals and the drift check settings. Instances that have never been checked
+      are synthesized as `never-checked`. Degraded per-instance statuses (unreachable,
+      unauthorized, error) are carried in the 200 body — this endpoint returns 500 only on an
+      internal error.
+    tags:
+      - Drift Detection
+    responses:
+      '200':
+        description: Drift summary
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/drift.yaml#/DriftSummaryResponse'
+      '500':
+        description: Failed to build drift summary
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+
+instance:
+  get:
+    operationId: getDriftDetail
+    summary: Per-instance drift detail
+    description: |
+      Returns the stored drift detail for a single instance, grouped into `drift` (field
+      changes), `missing` (managed entities absent on the Arr), and `unmanaged` (extra live
+      entities, non-alerting). A degraded status is returned in the 200 body; this endpoint
+      returns 404 only when the instance does not exist.
+    tags:
+      - Drift Detection
+    parameters:
+      - name: instanceId
+        in: path
+        required: true
+        description: Arr instance ID
+        schema:
+          type: integer
+    responses:
+      '200':
+        description: Drift detail
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/drift.yaml#/DriftDetailResponse'
+      '400':
+        description: Invalid instance id or unsupported instance type
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+      '404':
+        description: Instance not found
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+      '500':
+        description: Failed to read drift detail
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+  post:
+    operationId: refreshDriftDetail
+    summary: Refresh drift for one instance on demand
+    description: |
+      Runs a fresh drift check for the instance on the request thread (not the scheduled
+      queue) and returns the updated detail. Rate-limited per instance.
+    tags:
+      - Drift Detection
+    parameters:
+      - name: instanceId
+        in: path
+        required: true
+        description: Arr instance ID
+        schema:
+          type: integer
+    responses:
+      '200':
+        description: Drift re-checked
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/drift.yaml#/DriftDetailResponse'
+      '400':
+        description: Instance type is unsupported or the instance is disabled
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+      '404':
+        description: Instance not found
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+      '409':
+        description: A drift check for this instance is already in progress
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+      '429':
+        description: On-demand drift refresh is rate-limited for this instance
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+      '500':
+        description: Failed to refresh drift
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+
+settings:
+  put:
+    operationId: updateDriftSettings
+    summary: Update drift detection settings
+    description: |
+      Enables/disables drift detection and sets the polling interval, then reschedules or
+      cancels the recurring drift check job accordingly.
+    tags:
+      - Drift Detection
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../schemas/drift.yaml#/DriftSettingsUpdateRequest'
+    responses:
+      '200':
+        description: Updated drift settings
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/drift.yaml#/DriftSettings'
+      '400':
+        description: Invalid settings payload
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+      '500':
+        description: Failed to update drift settings
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'

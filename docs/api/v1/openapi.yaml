@@ -40,6 +40,8 @@ tags:
     description: First-run setup wizard state and Arr connection testing
   - name: Compatibility
     description: Cross-Arr compatibility parity map and semantic difference catalog
+  - name: Drift Detection
+    description: Desired-vs-actual drift status per Arr instance, on-demand refresh, and settings
 
 paths:
   /health:
@@ -624,6 +626,12 @@ paths:
     $ref: './paths/graph.yaml#/graph'
   /pcd/{databaseId}/graph/{nodeKind}/{name}:
     $ref: './paths/graph.yaml#/impact'
+  /drift/summary:
+    $ref: './paths/drift.yaml#/summary'
+  /drift/{instanceId}:
+    $ref: './paths/drift.yaml#/instance'
+  /drift/settings:
+    $ref: './paths/drift.yaml#/settings'
   /setup/state:
     $ref: './paths/setup.yaml#/state'
   /setup/test-connection:
@@ -783,6 +791,28 @@ components:
       $ref: './schemas/sync.yaml#/SyncPreviewSummary'
     SyncPreviewResult:
       $ref: './schemas/sync.yaml#/SyncPreviewResult'
+
+    # Drift Detection
+    DriftStatus:
+      $ref: './schemas/drift.yaml#/DriftStatus'
+    DriftSummaryStatus:
+      $ref: './schemas/drift.yaml#/DriftSummaryStatus'
+    DriftReason:
+      $ref: './schemas/drift.yaml#/DriftReason'
+    DriftCounts:
+      $ref: './schemas/drift.yaml#/DriftCounts'
+    DriftSettings:
+      $ref: './schemas/drift.yaml#/DriftSettings'
+    DriftEntityChange:
+      $ref: './schemas/drift.yaml#/DriftEntityChange'
+    DriftInstanceSummary:
+      $ref: './schemas/drift.yaml#/DriftInstanceSummary'
+    DriftSummaryResponse:
+      $ref: './schemas/drift.yaml#/DriftSummaryResponse'
+    DriftDetailResponse:
+      $ref: './schemas/drift.yaml#/DriftDetailResponse'
+    DriftSettingsUpdateRequest:
+      $ref: './schemas/drift.yaml#/DriftSettingsUpdateRequest'
     TrashGuideEntityType:
       type: string
       enum:
