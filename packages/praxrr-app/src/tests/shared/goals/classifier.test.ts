@@ -45,7 +45,7 @@ const GOLDEN: { cf: CfFacts; expected: string | null }[] = [
   { cf: cf('1080p Bluray', ['Source']), expected: 'resolution' },
   // uncategorized — no rule matches (Codec family has no category)
   { cf: cf('x265 (Bluray)', ['Codec']), expected: null },
-  { cf: cf('Season Pack', ['Flag']), expected: null }
+  { cf: cf('Season Pack', ['Flag']), expected: null },
 ];
 
 Deno.test('classifier: golden fixtures classify to expected categories (radarr)', () => {
@@ -87,6 +87,37 @@ Deno.test('classifier: lidarr drops video-only categories to uncategorized', () 
   assertEquals(classifyCustomFormat(cf('1080p Bluray', ['Source']), 'lidarr').category, null);
   // Audio survives for lidarr.
   assertEquals(classifyCustomFormat(cf('TrueHD', ['Audio']), 'lidarr').category, 'audio_lossless');
+});
+
+Deno.test('classifier: real descriptions do NOT leak into classification (name/tags only)', () => {
+  // Real default-DB descriptions mention OTHER formats via negations/comparisons — substring-matching
+  // them would invert intent. Each entry uses a REAL praxrr-db CF's name + tags + description.
+  const cases: { name: string; tags: string[]; description: string; expected: string | null }[] = [
+    {
+      name: 'SDR',
+      tags: [],
+      description: 'Ban 2160p WEB-DL Releases without Dolby Vision or HDR Formats',
+      expected: null,
+    },
+    {
+      name: '1080p Bluray',
+      tags: ['Source'],
+      description: 'Matches 1080p Blurays that are NOT remuxes',
+      expected: 'resolution',
+    },
+    {
+      name: 'x265 (Bluray)',
+      tags: ['Codec'],
+      description: 'Matches x265 Bluray Releases when not 2160p',
+      expected: null,
+    },
+    { name: 'UHD Bluray', tags: ['2160p', 'Storage'], description: 'not Dolby Vision', expected: 'resolution' },
+    { name: 'Atmos (Missing)', tags: ['Audio'], description: 'Atmos (TrueHD 7.1) missing', expected: 'audio_advanced' },
+  ];
+  for (const { name, tags, description, expected } of cases) {
+    const { category } = classifyCustomFormat(cf(name, tags, description), 'radarr');
+    assertEquals(category, expected, `"${name}" (desc "${description}") -> expected ${expected}, got ${category}`);
+  }
 });
 
 Deno.test('detectResolutionLevel: reads name and tags, including UHD/4K synonyms', () => {

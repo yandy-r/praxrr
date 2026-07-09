@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
+  import { browser } from '$app/environment';
   import { Sliders, Check } from 'lucide-svelte';
   import Card from '$ui/card/Card.svelte';
   import EmptyState from '$ui/state/EmptyState.svelte';
@@ -49,7 +50,9 @@
   $: bindingStale = binding !== null && binding.engineVersion !== engineVersion;
 
   function onDatabaseChange(event: Event): void {
-    goto(`/goals/${(event.currentTarget as HTMLSelectElement).value}`);
+    const targetId = (event.currentTarget as HTMLSelectElement).value;
+    if (browser) localStorage.setItem('qualityGoalsDatabase', targetId);
+    goto(`/goals/${targetId}`);
   }
 
   function selectPreset(preset: GoalPreset): void {
@@ -108,6 +111,12 @@
     const body = (await response.json()) as components['schemas']['GoalBindingResponse'];
     if (requestId !== bindingRequestId) return;
     binding = body.binding;
+    // Restore the governed profile's goal so the sliders/preset reflect what's applied. Skip when the
+    // binding was produced by a different engine version (weights may not map cleanly — prompt re-apply).
+    if (binding && binding.engineVersion === engineVersion) {
+      presetId = binding.presetId;
+      weights = { ...binding.weights };
+    }
   }
 
   async function runPreview(): Promise<void> {
@@ -167,6 +176,8 @@
       }
       alertStore.add('success', `Applied "${presetLabel(presetId)}" to ${profileName}.`);
       await loadBinding();
+      // Re-preview so the diff / "Changes on apply" reflect the now-applied state (drops to 0).
+      await runPreview();
     } catch (err) {
       alertStore.add('error', err instanceof Error ? err.message : 'Apply failed');
     } finally {
@@ -266,17 +277,21 @@
       <h2 class="mb-2 text-sm font-semibold text-neutral-900 dark:text-neutral-100">Start from a goal</h2>
       <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {#each presets as preset (preset.id)}
-          <Card
-            hoverable
-            onclick={() => selectPreset(preset)}
-            className={presetId === preset.id ? 'ring-2 ring-accent-500' : ''}
+          <button
+            type="button"
+            aria-pressed={presetId === preset.id}
+            class="rounded-xl border bg-white p-4 text-left transition-colors dark:bg-neutral-900 {presetId ===
+            preset.id
+              ? 'border-accent-500 ring-accent-500 ring-2'
+              : 'border-neutral-200 hover:bg-neutral-50 dark:border-neutral-800 dark:hover:bg-neutral-800/50'}"
+            on:click={() => selectPreset(preset)}
           >
             <div class="flex items-center justify-between">
               <span class="font-semibold text-neutral-900 dark:text-neutral-100">{preset.label}</span>
               {#if presetId === preset.id}<Check size={16} class="text-accent-600 dark:text-accent-400" />{/if}
             </div>
             <p class="mt-1 text-xs text-neutral-500 dark:text-neutral-400">{preset.description}</p>
-          </Card>
+          </button>
         {/each}
       </div>
     </div>
@@ -340,7 +355,7 @@
         <button
           type="button"
           class="bg-accent-600 hover:bg-accent-700 dark:bg-accent-500 dark:hover:bg-accent-600 flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white transition-colors disabled:cursor-not-allowed disabled:opacity-60"
-          disabled={applying || !preview || !!previewError}
+          disabled={applying || loadingPreview || !preview || !!previewError}
           on:click={applyGoal}
         >
           <Check size={16} />

@@ -2,8 +2,9 @@
  * Quality Goals classifier (issue #20).
  *
  * A pure, ordered, first-match rule set that places each custom format into one closed
- * {@link GoalCategory} using only the semantic signal available on the format: its tags, name, and
- * description. Ordering IS the transparency contract — a CF is assigned the category of the FIRST
+ * {@link GoalCategory} using the reliable semantic signal on the format: its tags and its name.
+ * Descriptions are intentionally NOT matched (they mention other formats via negations). Ordering IS
+ * the transparency contract — a CF is assigned the category of the FIRST
  * rule it matches, so `unwanted` (Banned) runs ahead of every reward category and dual-tagged CFs
  * (e.g. "Remux Tier 1", tagged both Release Group Tier and Remux) resolve deterministically.
  *
@@ -21,7 +22,7 @@ const LIDARR_EXCLUDED_CATEGORIES: ReadonlySet<GoalCategory> = new Set([
   'hdr_hdr10plus',
   'hdr_baseline',
   'remux',
-  'resolution'
+  'resolution',
 ]);
 
 interface ClassifierRule {
@@ -30,7 +31,7 @@ interface ClassifierRule {
   category: GoalCategory | null;
   /** Lowercased tag tokens; the rule fires if any is present. */
   matchTags: string[];
-  /** Lowercased name/description substrings; the rule fires if any is present. */
+  /** Lowercased name substrings; the rule fires if any is present. */
   matchName: string[];
   /** When set, the rule only fires if this lowercased tag is present (AND gate). */
   gateTag?: string;
@@ -52,14 +53,14 @@ export const CATEGORY_RULES: readonly ClassifierRule[] = [
     ruleId: 'rule.unwanted',
     category: 'unwanted',
     matchTags: ['banned'],
-    matchName: ['without fallback', 'full disc', 'br-disk', 'brdisk']
+    matchName: ['without fallback', 'full disc', 'br-disk', 'brdisk'],
   },
   { ruleId: 'rule.hdr.dv', category: 'hdr_dv', matchTags: [], matchName: ['dolby vision', 'dovi', 'dv hdr'] },
   {
     ruleId: 'rule.hdr.hdr10plus',
     category: 'hdr_hdr10plus',
     matchTags: [],
-    matchName: ['hdr10+', 'hdr10 plus', 'hdr10plus']
+    matchName: ['hdr10+', 'hdr10 plus', 'hdr10plus'],
   },
   { ruleId: 'rule.hdr.baseline', category: 'hdr_baseline', matchTags: ['hdr'], matchName: ['hdr', 'pq', 'hlg'] },
   {
@@ -67,7 +68,7 @@ export const CATEGORY_RULES: readonly ClassifierRule[] = [
     category: null,
     dynamic: 'release_group_tier',
     matchTags: ['release group tier'],
-    matchName: ['tier']
+    matchName: ['tier'],
   },
   { ruleId: 'rule.remux', category: 'remux', matchTags: [], matchName: ['remux'] },
   {
@@ -75,14 +76,14 @@ export const CATEGORY_RULES: readonly ClassifierRule[] = [
     category: 'audio_lossless',
     gateTag: 'audio',
     matchTags: [],
-    matchName: ['truehd', 'flac', 'pcm', 'dts-hd ma', 'dts hd ma', 'lossless']
+    matchName: ['truehd', 'flac', 'pcm', 'dts-hd ma', 'dts hd ma', 'lossless'],
   },
   {
     ruleId: 'rule.audio.advanced',
     category: 'audio_advanced',
     gateTag: 'audio',
     matchTags: [],
-    matchName: ['atmos', 'dts-x', 'dts:x', 'ddp', 'eac3', 'e-ac-3', 'dolby digital +', 'dd+']
+    matchName: ['atmos', 'dts-x', 'dts:x', 'ddp', 'eac3', 'e-ac-3', 'dolby digital +', 'dd+'],
   },
   { ruleId: 'rule.audio.baseline', category: 'audio_baseline', gateTag: 'audio', matchTags: [], matchName: [] },
   { ruleId: 'rule.streaming_service', category: 'streaming_service', matchTags: ['streaming service'], matchName: [] },
@@ -90,15 +91,15 @@ export const CATEGORY_RULES: readonly ClassifierRule[] = [
     ruleId: 'rule.movie_version',
     category: 'movie_version',
     matchTags: ['edition'],
-    matchName: ['imax', 'hybrid', 'remaster', 'special edition', 'uncut', 'director', 'theatrical']
+    matchName: ['imax', 'hybrid', 'remaster', 'special edition', 'uncut', 'director', 'theatrical'],
   },
   { ruleId: 'rule.repack_proper', category: 'repack_proper', matchTags: ['repack'], matchName: ['repack', 'proper'] },
   {
     ruleId: 'rule.resolution',
     category: 'resolution',
     matchTags: ['2160p', '1080p', '720p', '480p', '576p'],
-    matchName: ['2160p', '1080p', '720p', '480p', '576p', '4k', 'uhd']
-  }
+    matchName: ['2160p', '1080p', '720p', '480p', '576p', '4k', 'uhd'],
+  },
 ] as const;
 
 export const FALLBACK_RULE_ID = 'rule.fallback.no-match';
@@ -152,7 +153,10 @@ export function detectResolutionLevel(facts: CfFacts): ResolutionLevel | undefin
  */
 export function classifyCustomFormat(facts: CfFacts, arrType: GoalArrType | 'lidarr'): CfClassification {
   const tags = new Set(facts.tags.map(lower));
-  const haystack = `${lower(facts.name)} ${lower(facts.description ?? '')}`;
+  // Match name tokens against the NAME only — descriptions routinely mention OTHER formats via
+  // negations/comparisons (e.g. "...that are NOT remuxes", "...without Dolby Vision"), so substring
+  // matching on the description would invert intent and mis-score real custom formats.
+  const haystack = lower(facts.name);
 
   for (const rule of CATEGORY_RULES) {
     if (!ruleMatches(rule, tags, haystack)) continue;

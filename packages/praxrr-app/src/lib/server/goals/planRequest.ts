@@ -37,7 +37,7 @@ export function parseWeights(raw: unknown): GoalWeights {
     compatibility: axis('compatibility'),
     hdrPreference: axis('hdrPreference'),
     unwantedStrictness: axis('unwantedStrictness'),
-    resolutionCeiling: ceiling as GoalResolutionCeiling
+    resolutionCeiling: ceiling as GoalResolutionCeiling,
   };
 }
 
@@ -65,8 +65,8 @@ export async function readJsonObjectBody(request: Request): Promise<Record<strin
 
 /** Parse + validate a preview/apply request body (shared fields), throwing 400 on any problem. */
 export function parseGoalRequest(candidate: Record<string, unknown>): GoalRequest {
-  if (typeof candidate.databaseId !== 'number' || !Number.isFinite(candidate.databaseId)) {
-    throw error(400, 'databaseId must be a finite number');
+  if (typeof candidate.databaseId !== 'number' || !Number.isInteger(candidate.databaseId)) {
+    throw error(400, 'databaseId must be an integer');
   }
   if (!isGoalArrType(candidate.arrType)) {
     throw error(400, 'arrType must be one of: radarr, sonarr');
@@ -83,7 +83,7 @@ export function parseGoalRequest(candidate: Record<string, unknown>): GoalReques
     arrType: candidate.arrType,
     profileName: candidate.profileName,
     presetId: candidate.preset,
-    weights: parseWeights(candidate.weights)
+    weights: parseWeights(candidate.weights),
   };
 }
 
@@ -109,7 +109,7 @@ export async function buildGoalPlan(request: GoalRequest): Promise<{ cache: PCDC
     arrType: request.arrType,
     weights: request.weights,
     presetBaseUpgrade: preset.baseUpgrade,
-    customFormats
+    customFormats,
   });
 
   return { cache, plan };
