@@ -328,8 +328,9 @@ migratedTest('a deleted or disabled remaining target is skipped at its exact ins
     assertEquals(byId.get(disabled)?.status, 'skipped');
     assertEquals(byId.get(disabled)?.instanceId, disabled);
 
-    // A skipped instance is not a successful sync -> the rollout finishes failed.
-    assertEquals(canaryRolloutQueries.getById(id)?.status, 'failed');
+    // A skipped instance (deleted/disabled between the gate and rollout) is benign, not a
+    // failure -> a run with only successes and skips finishes `completed`, not `failed`.
+    assertEquals(canaryRolloutQueries.getById(id)?.status, 'completed');
   } finally {
     restore();
   }

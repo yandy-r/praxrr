@@ -31,17 +31,21 @@ async function syncRemainingInstance(
   target: CanaryTarget,
   sections: readonly SectionType[]
 ): Promise<CanaryInstanceResult> {
-  const instance = arrInstancesQueries.getById(target.instanceId);
-  if (!instance || instance.enabled !== 1) {
-    return {
-      instanceId: target.instanceId,
-      instanceName: target.instanceName,
-      status: 'skipped',
-      output: 'Instance no longer enabled; skipped.',
-    };
-  }
-
+  // Fully non-throwing: the `getById` liveness read is inside the try as well, so a
+  // transient DB fault records a `failure` result at the EXACT `instanceId` instead of
+  // rejecting the whole `Promise.all` batch (which would lose sibling results and strand
+  // the rollout in `rolling_out`).
   try {
+    const instance = arrInstancesQueries.getById(target.instanceId);
+    if (!instance || instance.enabled !== 1) {
+      return {
+        instanceId: target.instanceId,
+        instanceName: target.instanceName,
+        status: 'skipped',
+        output: 'Instance no longer enabled; skipped.',
+      };
+    }
+
     const result = await executeSyncJob(target.instanceId, sections, 'manual');
     return {
       instanceId: target.instanceId,
@@ -91,25 +95,30 @@ const canaryRolloutHandler: JobHandler = async (job) => {
     };
   }
 
-  const allOk = accumulatedResults.every((result) => result.status === 'success');
+  // A rollout has failed only if a remaining instance actually failed. A `skipped`
+  // result (a target legitimately disabled/deleted between the gate and rollout) is
+  // benign and must not flip a clean run to `failed` or fire a false CANARY_FAILED alert.
+  const rolloutFailed = accumulatedResults.some(
+    (result) => result.status === 'failure' || result.status === 'cancelled'
+  );
   const finishedAt = new Date().toISOString();
-  canaryRolloutQueries.finishRollout(rolloutId, allOk ? 'completed' : 'failed', finishedAt);
+  canaryRolloutQueries.finishRollout(rolloutId, rolloutFailed ? 'failed' : 'completed', finishedAt);
 
   const finished = canaryRolloutQueries.getById(rolloutId) ?? rollout;
-  if (allOk) {
-    notifyCanaryPromoted(finished);
-  } else {
+  if (rolloutFailed) {
     notifyCanaryFailed(finished);
+  } else {
+    notifyCanaryPromoted(finished);
   }
 
   await logger.info('Canary rollout finished', {
     source: 'CanaryRolloutJob',
-    meta: { rolloutId, status: allOk ? 'completed' : 'failed', synced: accumulatedResults.length },
+    meta: { rolloutId, status: rolloutFailed ? 'failed' : 'completed', synced: accumulatedResults.length },
   });
 
-  return allOk
-    ? { status: 'success', output: `Canary rollout completed: ${accumulatedResults.length} instance(s) synced` }
-    : { status: 'failure', error: `Canary rollout failed: not all ${remainingTargets.length} remaining instance(s) synced` };
+  return rolloutFailed
+    ? { status: 'failure', error: `Canary rollout failed: ${remainingTargets.length} remaining instance(s), one or more failed` }
+    : { status: 'success', output: `Canary rollout completed: ${accumulatedResults.length} instance(s) synced` };
 };
 
 jobQueueRegistry.register('sync.canary.rollout', canaryRolloutHandler);

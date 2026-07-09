@@ -15,6 +15,8 @@ import type { CanaryArrType, CanaryResolution, CanarySettings, CanaryStartInput,
 /** Fail-closed outcome of `resolveCanary` when no canary is resolvable. */
 export interface CanaryResolutionError {
   error: string;
+  /** True when an explicit `canaryInstanceId` referenced a non-existent instance (→ 404). */
+  notFound?: boolean;
 }
 
 /** Either a fully-applied resolution or a fail-closed error. */
@@ -83,7 +85,7 @@ function selectLeastCritical(cohort: readonly ArrInstance[]): ArrInstance | unde
 function resolveExplicitCanary(arrType: CanaryArrType, canaryInstanceId: number): ArrInstance | CanaryResolutionError {
   const instance = arrInstancesQueries.getById(canaryInstanceId);
   if (!instance) {
-    return { error: `Canary instance ${canaryInstanceId} not found` };
+    return { error: `Canary instance ${canaryInstanceId} not found`, notFound: true };
   }
   if (instance.enabled !== 1) {
     return { error: `Canary instance ${canaryInstanceId} is disabled` };

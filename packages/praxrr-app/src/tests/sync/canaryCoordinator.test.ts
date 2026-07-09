@@ -246,10 +246,13 @@ migratedTest('gate matrix: a failed canary aborts and never dispatches the remai
     assertEquals(calls.get(canaryId), 1, 'only the canary sync ran');
     assertEquals(calls.get(remainingId), undefined, 'remaining instance must not be dispatched on abort');
 
-    // Classification read was scoped to the canary and bounded by a `from` timestamp.
+    // Classification read was scoped to the canary, bounded by a `from` timestamp, and
+    // restricted to `trigger: 'manual'` so a concurrently-dispatched schedule/system sync
+    // of the same instance cannot win the newest-row ordering and mis-classify the canary.
     assertEquals(search.length, 1);
     assertEquals(search[0].filters.instanceId, canaryId);
     assert(typeof search[0].filters.from === 'string', 'classification must use the from:now bound');
+    assertEquals(search[0].filters.trigger, 'manual', 'classification must scope to trigger=manual');
   } finally {
     undo(restores);
   }

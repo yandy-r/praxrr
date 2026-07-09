@@ -69,9 +69,15 @@ function mapJobRunStatus(status: JobRunStatus): CanaryOutcomeStatus {
  * the canary before trusting it. When no bounded row exists (history disabled, or a
  * mid-run disable yields `cancelled` with no audit row), fall through to the conservative
  * `JobRunStatus` mapping — never read an older row that could upgrade a fail to success.
+ *
+ * The canary sync runs inline with `trigger: 'manual'`, so the read is scoped to
+ * `trigger: 'manual'` to exclude a concurrently-dispatched `schedule`/`system` sync of the
+ * same instance (which could otherwise win the newest-row ordering and mis-classify a
+ * failed canary as its success). The residual (a second *manual* sync of the same instance
+ * within the sub-second canary window) is implausible and operator-initiated.
  */
 function classifyCanaryOutcome(canaryId: number, from: string, result: SyncRunResult): CanaryClassification {
-  const rows = syncHistoryQueries.search({ instanceId: canaryId, from }, { limit: 1, offset: 0 });
+  const rows = syncHistoryQueries.search({ instanceId: canaryId, from, trigger: 'manual' }, { limit: 1, offset: 0 });
   const row = rows[0];
   if (row && row.arrInstanceId === canaryId) {
     return { canaryStatus: row.status, canarySyncHistoryId: row.id };
@@ -149,6 +155,11 @@ export async function startRollout(input: CanaryStartInput): Promise<CanaryStart
   const settings = canarySettingsQueries.get();
   const resolution = resolveCanary(input, settings);
   if (isCanaryResolutionError(resolution)) {
+    // An explicit canaryInstanceId that references a non-existent instance is a 404
+    // (matching the documented contract); every other resolution failure is a 422.
+    if (resolution.notFound) {
+      throw new CanaryNotFoundError(resolution.error);
+    }
     throw new CanaryUnresolvedError(resolution.error);
   }
 

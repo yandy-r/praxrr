@@ -69,6 +69,12 @@
       if (!response.ok) {
         const body = (await response.json().catch(() => null)) as { error?: string } | null;
         alertStore.add('error', body?.error ?? `Failed to ${action} rollout (HTTP ${response.status})`);
+        // The gate moved on (stale token 422 / wrong-state 409) or the request failed:
+        // close the confirm modals and reload authoritative rollout state so the now-stale
+        // token/status is never re-submitted on a retry.
+        proceedOpen = false;
+        abortOpen = false;
+        await invalidateAll();
         return;
       }
 

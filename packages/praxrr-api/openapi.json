@@ -7544,7 +7544,11 @@
       },
       "CanaryStartRequest": {
         "type": "object",
+        "required": ["arrType"],
         "properties": {
+          "arrType": {
+            "$ref": "#/components/schemas/CanaryArrType"
+          },
           "canaryInstanceId": {
             "type": "integer",
             "description": "Explicit canary instance. Highest selection precedence."

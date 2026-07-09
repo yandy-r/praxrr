@@ -113,7 +113,12 @@ CanarySyncRunResult:
 
 CanaryStartRequest:
   type: object
+  required:
+    - arrType
   properties:
+    arrType:
+      $ref: '#/CanaryArrType'
+      description: The Arr app the rollout is scoped to. Required — a rollout targets exactly one arr_type.
     canaryInstanceId:
       type: integer
       description: Explicit canary instance. Highest selection precedence.

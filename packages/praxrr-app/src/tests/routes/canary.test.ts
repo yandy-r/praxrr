@@ -251,6 +251,15 @@ migratedTest('POST /canary/rollouts: no eligible canary returns 422 with { error
   assert(typeof body.error === 'string' && body.error.length > 0);
 });
 
+migratedTest('POST /canary/rollouts: explicit canaryInstanceId that does not exist returns 404', async () => {
+  // An explicit canary referencing a non-existent instance is a missing resource (404),
+  // distinct from an unresolvable-by-heuristic canary (422) — matching the documented contract.
+  const response = await POST_START(startEvent({ arrType: 'radarr', canaryInstanceId: 999999 }));
+  assertEquals(response.status, 404);
+  const body = (await response.json()) as ErrorResponse;
+  assert(typeof body.error === 'string' && body.error.length > 0);
+});
+
 // ============================================================================
 // LIST ENDPOINT -- GET /canary/rollouts
 // ============================================================================
