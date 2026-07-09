@@ -24,7 +24,15 @@ export interface AuthState {
 /**
  * Paths that don't require authentication
  */
-const PUBLIC_PATHS = ['/auth/login', '/auth/setup', '/auth/oidc', '/api/v1/health'];
+const PUBLIC_PATHS = [
+  '/auth/login',
+  '/auth/setup',
+  '/auth/oidc',
+  '/api/v1/health',
+  // Passkey authentication ceremony (pre-login, discoverable credentials). Only the
+  // /authentication/* endpoints are public; /registration/* stays session-gated.
+  '/api/v1/auth/webauthn/authentication',
+];
 
 /**
  * Check if a path is public (doesn't require auth)

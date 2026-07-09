@@ -6,10 +6,21 @@ import { authSettingsQueries } from '$db/queries/authSettings.ts';
 import { hashPassword, verifyPassword } from '$auth/password.ts';
 import { logger } from '$logger/logger.ts';
 import { maskApiKey } from '$shared/utils/masking.ts';
+import { config } from '$config';
+import { webauthnCredentialsQueries } from '$db/queries/webauthnCredentials.ts';
+import { toCredentialSummary } from '$lib/server/webauthn/ceremonies.ts';
 
-export const load: ServerLoad = async ({ cookies }) => {
+export const load: ServerLoad = async ({ cookies, locals }) => {
   const currentSessionId = cookies.get('session');
   const user = usersQueries.getByUsername('admin') ?? usersQueries.getById(1);
+
+  const authedUser = locals.user;
+  const passkeysEnabled =
+    config.authMode === 'on' && !!authedUser && authedUser.id > 0 && !authedUser.username.startsWith('oidc:');
+  const passkeys =
+    passkeysEnabled && authedUser
+      ? webauthnCredentialsQueries.listByUserId(authedUser.id).map(toCredentialSummary)
+      : [];
 
   if (!user) {
     return {
@@ -17,6 +28,8 @@ export const load: ServerLoad = async ({ cookies }) => {
       apiKeyMasked: '',
       hasApiKey: false,
       currentSessionId: null,
+      passkeys,
+      passkeysEnabled,
     };
   }
 
@@ -39,6 +52,8 @@ export const load: ServerLoad = async ({ cookies }) => {
     apiKeyMasked,
     hasApiKey: Boolean(apiKey),
     currentSessionId,
+    passkeys,
+    passkeysEnabled,
   };
 };
 
@@ -167,5 +182,67 @@ export const actions: Actions = {
     }
 
     return { sessionsRevoked: count };
+  },
+
+  deletePasskey: async ({ request, locals }) => {
+    const user = locals.user;
+    if (!user || user.id <= 0 || user.username.startsWith('oidc:')) {
+      return fail(401, { passkeyError: 'Not authenticated' });
+    }
+
+    const formData = await request.formData();
+    const credentialId = formData.get('credentialId') as string;
+
+    if (!credentialId) {
+      return fail(400, { passkeyError: 'Credential id required' });
+    }
+
+    webauthnCredentialsQueries.deleteById(credentialId, user.id);
+
+    await logger.info('Passkey removed', {
+      source: 'Auth:Passkey',
+      meta: { userId: user.id, credentialId: credentialId.slice(0, 8) + '...' },
+    });
+
+    return { passkeyDeleted: true };
+  },
+
+  renamePasskey: async ({ request, locals }) => {
+    const user = locals.user;
+    if (!user || user.id <= 0 || user.username.startsWith('oidc:')) {
+      return fail(401, { passkeyError: 'Not authenticated' });
+    }
+
+    const formData = await request.formData();
+    const credentialId = formData.get('credentialId') as string;
+    const name = ((formData.get('name') as string) ?? '').trim();
+
+    if (!credentialId) {
+      return fail(400, { passkeyError: 'Credential id required' });
+    }
+
+    if (!name) {
+      return fail(400, { passkeyError: 'Passkey name is required' });
+    }
+
+    if (name.length > 100) {
+      return fail(400, { passkeyError: 'Passkey name must be 100 characters or fewer' });
+    }
+
+    try {
+      const updated = webauthnCredentialsQueries.rename(credentialId, user.id, name);
+      if (updated === 0) {
+        return fail(404, { passkeyError: 'Passkey not found' });
+      }
+    } catch {
+      return fail(409, { passkeyError: 'A passkey with that name already exists' });
+    }
+
+    await logger.info('Passkey renamed', {
+      source: 'Auth:Passkey',
+      meta: { userId: user.id, credentialId: credentialId.slice(0, 8) + '...' },
+    });
+
+    return { passkeyRenamed: true };
   },
 };

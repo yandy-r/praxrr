@@ -78,6 +78,7 @@ import { migration as migration20260713CreatePcdRollbacks } from './migrations/2
 import { migration as migration20260714ConfigHealth } from './migrations/20260714_create_config_health_tables.ts';
 import { migration as migration20260715CreateCanaryTables } from './migrations/20260715_create_canary_tables.ts';
 import { migration as migration20260716CreateTimelineAnnotations } from './migrations/20260716_create_timeline_annotations.ts';
+import { migration as migration20260717CreateWebauthnTables } from './migrations/20260717_create_webauthn_tables.ts';
 
 export interface Migration {
   version: number;
@@ -385,6 +386,7 @@ export function loadMigrations(): Migration[] {
     migration20260714ConfigHealth,
     migration20260715CreateCanaryTables,
     migration20260716CreateTimelineAnnotations,
+    migration20260717CreateWebauthnTables,
   ];
 
   // Sort by version number

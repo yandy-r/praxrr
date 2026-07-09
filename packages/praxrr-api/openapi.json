@@ -93,8 +93,16 @@
       "description": "Score configuration quality/health per instance and profile, with suggestions and trends"
     },
     {
+      "name": "Security Posture",
+      "description": "Non-blocking security posture \"Shield Check\" — auth, transport, and credential exposure audit"
+    },
+    {
       "name": "Timeline",
       "description": "Sync-archaeology timeline — merged read-only feed of syncs, snapshots, rollbacks, and canary rollouts, with annotations"
+    },
+    {
+      "name": "WebAuthn",
+      "description": "Passkey / WebAuthn authentication — register credentials while logged in and sign in passwordlessly (supplements password auth under AUTH=on)"
     }
   ],
   "paths": {
@@ -4810,6 +4818,36 @@
         }
       }
     },
+    "/security-posture/summary": {
+      "get": {
+        "operationId": "getSecurityPostureSummary",
+        "summary": "Security posture shield report",
+        "description": "The live \"Shield Check\" for this deployment: an overall 0–100 shield score and band (with any\ncritical band-cap), a per-check breakdown, the per-instance connection-transport table, always-on\nassurances, unscored advisories, and the ranked \"to reach Hardened\" actions. Read-only, computed\non demand, zero network probing. The payload NEVER contains a secret value — only presence\nbooleans, host strings, and key-version identifiers. Non-blocking: it informs, it never blocks.\n",
+        "tags": ["Security Posture"],
+        "responses": {
+          "200": {
+            "description": "The security posture shield report.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SecurityPostureSummaryResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/timeline": {
       "get": {
         "operationId": "listTimeline",
@@ -5366,6 +5404,226 @@
           },
           "500": {
             "description": "Failed to delete annotation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/webauthn/registration/options": {
+      "post": {
+        "operationId": "webauthnRegistrationOptions",
+        "summary": "Begin passkey registration",
+        "description": "Start registering a passkey for the authenticated local user. Requires `AUTH=on` and a real\nlocal user (rejects the API-key pseudo-user and OIDC users). Stores a single-use challenge and\nreturns WebAuthn creation options for `navigator.credentials.create()`.\n",
+        "tags": ["WebAuthn"],
+        "responses": {
+          "200": {
+            "description": "Credential creation options",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WebAuthnRegistrationOptionsResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not an authenticated local user",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Passkeys require AUTH=on",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "WebAuthn RP resolution failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/webauthn/registration/verify": {
+      "post": {
+        "operationId": "webauthnRegistrationVerify",
+        "summary": "Complete passkey registration",
+        "description": "Consume the single-use challenge, verify the attestation, and persist the credential for the\nauthenticated local user. Requires `AUTH=on` and a real local user.\n",
+        "tags": ["WebAuthn"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WebAuthnRegistrationVerifyRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Credential registered",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WebAuthnRegistrationVerifyResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Missing/expired challenge or verification failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not an authenticated local user",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Duplicate name / passkey already registered / AUTH not on",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "WebAuthn RP resolution failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/webauthn/authentication/options": {
+      "post": {
+        "operationId": "webauthnAuthenticationOptions",
+        "summary": "Begin passkey login",
+        "description": "Start a passwordless, discoverable passkey login. Public (pre-login) but only available under\n`AUTH=on`. Stores a single-use challenge and returns WebAuthn assertion options for\n`navigator.credentials.get()`.\n",
+        "tags": ["WebAuthn"],
+        "responses": {
+          "200": {
+            "description": "Assertion options",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WebAuthnAuthenticationOptionsResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Passkeys require AUTH=on",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "WebAuthn RP resolution failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/webauthn/authentication/verify": {
+      "post": {
+        "operationId": "webauthnAuthenticationVerify",
+        "summary": "Complete passkey login",
+        "description": "Consume the challenge, verify the assertion, guard against counter regression, then mint a\nsession cookie (same contract as password login). Public but only under `AUTH=on`. On success\nthe `session` cookie is set via Set-Cookie and the client navigates.\n",
+        "tags": ["WebAuthn"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WebAuthnAuthenticationVerifyRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Authenticated; session cookie set",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WebAuthnAuthenticationVerifyResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Missing/expired challenge, unknown credential, or verification failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Passkeys require AUTH=on",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "WebAuthn RP resolution failed",
             "content": {
               "application/json": {
                 "schema": {
@@ -11098,6 +11356,348 @@
           }
         }
       },
+      "SecurityShieldBand": {
+        "type": "string",
+        "description": "Shield band derived from the 0–100 rollup. `unknown` only when every check was skipped.",
+        "enum": ["hardened", "guarded", "exposed", "unknown"]
+      },
+      "SecurityCheckId": {
+        "type": "string",
+        "enum": ["control_plane_auth", "arr_transport", "app_key_at_rest", "credential_rotation", "log_redaction"]
+      },
+      "SecurityArrType": {
+        "type": "string",
+        "enum": ["radarr", "sonarr", "lidarr"]
+      },
+      "SecurityTone": {
+        "type": "string",
+        "enum": ["neutral", "info", "warning", "danger"]
+      },
+      "SecurityCheckStatus": {
+        "type": "string",
+        "description": "Presentation status derived from the check's score and severity.",
+        "enum": ["pass", "advisory", "attention", "action", "assured", "na"]
+      },
+      "SecurityTransportTier": {
+        "type": "string",
+        "description": "How an Arr connection's target host is classified from Praxrr's own knowledge (no probing).",
+        "enum": ["encrypted", "loopback", "docker-alias", "private", "unknown", "public"]
+      },
+      "SecurityFix": {
+        "type": "object",
+        "description": "A concrete remediation target. `kind` discriminates which optional fields are present.",
+        "required": ["kind"],
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": ["settings-link", "instance-link", "env-var", "docs", "none"]
+          },
+          "href": {
+            "type": "string",
+            "description": "Present for settings-link, instance-link, and docs."
+          },
+          "label": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string",
+            "description": "The environment variable name (env-var kind)."
+          },
+          "docHref": {
+            "type": "string",
+            "description": "Optional documentation link (env-var kind)."
+          },
+          "instanceId": {
+            "type": "integer",
+            "description": "Present for instance-link."
+          }
+        }
+      },
+      "SecurityRecommendation": {
+        "type": "object",
+        "description": "A non-shaming remediation line paired with its concrete fix.",
+        "required": ["headline", "detail", "tone", "templateVersion", "fix"],
+        "properties": {
+          "headline": {
+            "type": "string"
+          },
+          "detail": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "tone": {
+            "$ref": "#/components/schemas/SecurityTone"
+          },
+          "templateVersion": {
+            "type": "string"
+          },
+          "fix": {
+            "$ref": "#/components/schemas/SecurityFix"
+          }
+        }
+      },
+      "SecurityCheck": {
+        "type": "object",
+        "description": "One scored check's contribution to the shield report.",
+        "required": [
+          "id",
+          "label",
+          "score",
+          "weight",
+          "contribution",
+          "recoverablePoints",
+          "status",
+          "critical",
+          "detail",
+          "recommendations"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/SecurityCheckId"
+          },
+          "label": {
+            "type": "string"
+          },
+          "score": {
+            "description": "0–100 sub-score, or null when the check could not be evaluated (excluded from the rollup).",
+            "oneOf": [
+              {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 100
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "weight": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "contribution": {
+            "type": "integer"
+          },
+          "recoverablePoints": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "status": {
+            "$ref": "#/components/schemas/SecurityCheckStatus"
+          },
+          "critical": {
+            "type": "boolean"
+          },
+          "detail": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "recommendations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SecurityRecommendation"
+            }
+          }
+        }
+      },
+      "SecurityTransportRow": {
+        "type": "object",
+        "description": "One enabled Arr connection's transport posture (host only — never the API key).",
+        "required": ["instanceId", "instanceName", "arrType", "scheme", "host", "tier", "score", "status", "fix"],
+        "properties": {
+          "instanceId": {
+            "type": "integer"
+          },
+          "instanceName": {
+            "type": "string"
+          },
+          "arrType": {
+            "$ref": "#/components/schemas/SecurityArrType"
+          },
+          "scheme": {
+            "type": "string",
+            "enum": ["http", "https"]
+          },
+          "host": {
+            "type": "string"
+          },
+          "tier": {
+            "$ref": "#/components/schemas/SecurityTransportTier"
+          },
+          "score": {
+            "oneOf": [
+              {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 100
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "status": {
+            "$ref": "#/components/schemas/SecurityCheckStatus"
+          },
+          "fix": {
+            "$ref": "#/components/schemas/SecurityFix"
+          }
+        }
+      },
+      "SecurityAssurance": {
+        "type": "object",
+        "description": "An always-on protection surfaced as a verified affirmation (contributes zero to the score).",
+        "required": ["id", "label", "verified", "note"],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "verified": {
+            "type": "boolean"
+          },
+          "note": {
+            "type": "string"
+          }
+        }
+      },
+      "SecurityAdvisory": {
+        "type": "object",
+        "description": "A real posture note whose exploitability Praxrr cannot observe, so it informs without a score.",
+        "required": ["id", "label", "detail", "fix"],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "detail": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "fix": {
+            "$ref": "#/components/schemas/SecurityFix"
+          }
+        }
+      },
+      "SecurityTopAction": {
+        "type": "object",
+        "description": "A ranked \"to reach Hardened\" step derived from a scored check below 100.",
+        "required": ["checkId", "headline", "tone", "recoverablePoints", "fix"],
+        "properties": {
+          "checkId": {
+            "$ref": "#/components/schemas/SecurityCheckId"
+          },
+          "headline": {
+            "type": "string"
+          },
+          "tone": {
+            "$ref": "#/components/schemas/SecurityTone"
+          },
+          "recoverablePoints": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "fix": {
+            "$ref": "#/components/schemas/SecurityFix"
+          }
+        }
+      },
+      "SecurityBandCap": {
+        "type": "object",
+        "required": ["checkId", "label"],
+        "properties": {
+          "checkId": {
+            "$ref": "#/components/schemas/SecurityCheckId"
+          },
+          "label": {
+            "type": "string"
+          }
+        }
+      },
+      "SecurityPostureSummaryResponse": {
+        "type": "object",
+        "description": "The live shield report for one deployment — computed on demand, never persisted.",
+        "required": [
+          "engineVersion",
+          "generatedAt",
+          "score",
+          "band",
+          "bandCappedBy",
+          "checks",
+          "transport",
+          "assurances",
+          "advisories",
+          "topActions"
+        ],
+        "properties": {
+          "engineVersion": {
+            "type": "string"
+          },
+          "generatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "score": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100
+          },
+          "band": {
+            "$ref": "#/components/schemas/SecurityShieldBand"
+          },
+          "bandCappedBy": {
+            "description": "The critical finding that lowered the band below the numeric average, or null.",
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/SecurityBandCap"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "checks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SecurityCheck"
+            }
+          },
+          "transport": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SecurityTransportRow"
+            }
+          },
+          "assurances": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SecurityAssurance"
+            }
+          },
+          "advisories": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SecurityAdvisory"
+            }
+          },
+          "topActions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SecurityTopAction"
+            }
+          }
+        }
+      },
       "TimelineSource": {
         "type": "string",
         "description": "The event source a timeline event originates from.",
@@ -11334,6 +11934,106 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 4000
+          }
+        }
+      },
+      "WebAuthnRegistrationOptionsResponse": {
+        "type": "object",
+        "description": "WebAuthn credential creation options (PublicKeyCredentialCreationOptionsJSON), passed verbatim to the browser's navigator.credentials.create(). The inner shape is owned by @simplewebauthn and treated as opaque here.\n",
+        "required": ["options"],
+        "properties": {
+          "options": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "PublicKeyCredentialCreationOptionsJSON (challenge, rp, user, pubKeyCredParams, ...)."
+          }
+        }
+      },
+      "WebAuthnRegistrationVerifyRequest": {
+        "type": "object",
+        "required": ["response"],
+        "properties": {
+          "response": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "RegistrationResponseJSON returned by the browser startRegistration()."
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 100,
+            "description": "Optional friendly credential name. Defaults to a user-agent-derived name when omitted."
+          }
+        }
+      },
+      "WebAuthnCredentialSummary": {
+        "type": "object",
+        "description": "Client-safe view of a registered passkey (no key material).",
+        "required": ["id", "name", "createdAt", "deviceType", "backedUp"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Base64URLString credential id."
+          },
+          "name": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "lastUsedAt": {
+            "type": "string",
+            "nullable": true
+          },
+          "deviceType": {
+            "type": "string",
+            "enum": ["singleDevice", "multiDevice"]
+          },
+          "backedUp": {
+            "type": "boolean"
+          }
+        }
+      },
+      "WebAuthnRegistrationVerifyResponse": {
+        "type": "object",
+        "required": ["verified", "credential"],
+        "properties": {
+          "verified": {
+            "type": "boolean"
+          },
+          "credential": {
+            "$ref": "#/components/schemas/WebAuthnCredentialSummary"
+          }
+        }
+      },
+      "WebAuthnAuthenticationOptionsResponse": {
+        "type": "object",
+        "description": "WebAuthn assertion options (PublicKeyCredentialRequestOptionsJSON) for discoverable/passwordless login, passed verbatim to navigator.credentials.get().\n",
+        "required": ["options"],
+        "properties": {
+          "options": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "PublicKeyCredentialRequestOptionsJSON (challenge, rpId, ...)."
+          }
+        }
+      },
+      "WebAuthnAuthenticationVerifyRequest": {
+        "type": "object",
+        "required": ["response"],
+        "properties": {
+          "response": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "AuthenticationResponseJSON returned by the browser startAuthentication()."
+          }
+        }
+      },
+      "WebAuthnAuthenticationVerifyResponse": {
+        "type": "object",
+        "required": ["verified"],
+        "properties": {
+          "verified": {
+            "type": "boolean"
           }
         }
       }

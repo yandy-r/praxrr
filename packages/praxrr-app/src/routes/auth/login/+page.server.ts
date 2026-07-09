@@ -4,6 +4,7 @@ import { config } from '$config';
 import { usersQueries } from '$db/queries/users.ts';
 import { sessionsQueries } from '$db/queries/sessions.ts';
 import { authSettingsQueries } from '$db/queries/authSettings.ts';
+import { webauthnCredentialsQueries } from '$db/queries/webauthnCredentials.ts';
 import { verifyPassword } from '$auth/password.ts';
 import { getClientIp } from '$auth/network.ts';
 import { parseUserAgent } from '$auth/userAgent.ts';
@@ -13,7 +14,7 @@ import { logger } from '$logger/logger.ts';
 export const load: ServerLoad = () => {
   // OIDC mode - just show the OIDC button, no setup needed
   if (config.authMode === 'oidc') {
-    return { authMode: 'oidc' };
+    return { authMode: 'oidc', hasPasskeys: false };
   }
 
   // If no local users exist, redirect to setup
@@ -22,7 +23,8 @@ export const load: ServerLoad = () => {
     throw redirect(303, '/auth/setup');
   }
 
-  return { authMode: config.authMode };
+  const hasPasskeys = config.authMode === 'on' && webauthnCredentialsQueries.count() > 0;
+  return { authMode: config.authMode, hasPasskeys };
 };
 
 export const actions: Actions = {
