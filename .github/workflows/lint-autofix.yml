@@ -32,6 +32,9 @@ jobs:
         with:
           node-version: lts/*
 
+      - name: Install project dependencies
+        run: npm ci
+
       - name: Apply formatters
         run: ./scripts/style.sh format --docs
 

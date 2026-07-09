@@ -1,7 +1,18 @@
 <script lang="ts">
-  import type { EntityChange, SyncPreviewFieldChangeType } from '$sync/preview/types.ts';
+  import NarrationBlock from '$ui/narration/NarrationBlock.svelte';
+  import { narrateEntityChange } from '$shared/narration/index.ts';
+  import type { NarrationLevel } from '$shared/narration/index.ts';
+  import type {
+    EntityChange,
+    SyncPreviewArrType,
+    SyncPreviewFieldChangeType,
+    SyncPreviewSection,
+  } from '$sync/preview/types.ts';
 
   export let entity: EntityChange;
+  export let arrType: SyncPreviewArrType;
+  export let section: SyncPreviewSection;
+  export let level: NarrationLevel;
   export let defaultExpanded = false;
 
   let expanded = defaultExpanded;
@@ -16,25 +27,25 @@
   const ACTION_META: Record<ActionType, ActionMeta> = {
     create: {
       icon: '+',
-      label: 'Create',
+      label: 'Planned create',
       bgClass: 'bg-emerald-100 dark:bg-emerald-900/30',
       textClass: 'text-emerald-700 dark:text-emerald-300',
     },
     update: {
       icon: '~',
-      label: 'Update',
+      label: 'Planned update',
       bgClass: 'bg-amber-100 dark:bg-amber-900/30',
       textClass: 'text-amber-700 dark:text-amber-300',
     },
     delete: {
       icon: '-',
-      label: 'Delete',
+      label: 'Planned delete',
       bgClass: 'bg-red-100 dark:bg-red-900/30',
       textClass: 'text-red-700 dark:text-red-300',
     },
     unchanged: {
       icon: '=',
-      label: 'Unchanged',
+      label: 'Already matching',
       bgClass: 'bg-neutral-100 dark:bg-neutral-800',
       textClass: 'text-neutral-600 dark:text-neutral-300',
     },
@@ -59,8 +70,8 @@
     },
   };
 
-  const actionMeta = ACTION_META[entity.action];
-
+  $: actionMeta = ACTION_META[entity.action];
+  $: narration = narrateEntityChange(entity, arrType, section, level);
   $: entityLabel = `${entity.name}`;
   $: entityMeta = `${entity.entityType}${entity.remoteId ? ` (id: ${entity.remoteId})` : ''}`;
   $: summaryText = entity.fields.length === 1 ? '1 field change' : `${entity.fields.length} field changes`;
@@ -84,7 +95,12 @@
 </script>
 
 <div class="rounded-lg border border-neutral-200 bg-white dark:border-neutral-700 dark:bg-neutral-900">
-  <button type="button" class="flex w-full items-start justify-between gap-3 px-4 py-3 text-left" on:click={toggle}>
+  <button
+    type="button"
+    class="flex w-full items-start justify-between gap-3 px-4 py-3 text-left"
+    aria-expanded={expanded}
+    on:click={toggle}
+  >
     <div class="flex flex-col gap-1">
       <div class="flex items-center gap-2">
         <span class="text-sm font-medium text-neutral-900 dark:text-neutral-50">{entityLabel}</span>
@@ -108,7 +124,8 @@
   </button>
 
   {#if expanded}
-    <div class="border-t border-neutral-200 px-4 py-3 dark:border-neutral-700">
+    <div class="space-y-3 border-t border-neutral-200 px-4 py-3 dark:border-neutral-700">
+      <NarrationBlock line={narration} verbose={level === 'verbose'} />
       {#if entity.fields.length === 0}
         <p class="text-sm text-neutral-600 dark:text-neutral-400">
           No field-level differences were detected for this entity.

@@ -1,6 +1,11 @@
 import { assertEquals, assertMatch } from '@std/assert';
 import { POST as createPreviewPost } from '../../routes/api/v1/sync/preview/+server.ts';
-import { POST as applyPreviewPost } from '../../routes/api/v1/sync/preview/[previewId]/apply/+server.ts';
+import {
+  handleSyncPreviewApplyRequest,
+  POST as applyPreviewPost,
+  type SyncPreviewApplyDependencies,
+} from '../../routes/api/v1/sync/preview/[previewId]/apply/+server.ts';
+import type { components } from '$api/v1.d.ts';
 import { arrInstancesQueries, type ArrInstance } from '../../lib/server/db/queries/arrInstances.ts';
 import {
   previewStore,
@@ -17,6 +22,11 @@ import {
 
 const INSTANCE_ID = 7001;
 const now = '2026-02-21T00:00:00.000Z';
+
+type ErrorResponse = components['schemas']['ErrorResponse'];
+type SyncPreviewApplyResponse = components['schemas']['SyncPreviewApplyResponse'];
+type SyncPreviewApplyErrorResponse = components['schemas']['SyncPreviewApplyErrorResponse'];
+type SyncJobResult = Awaited<ReturnType<SyncPreviewApplyDependencies['executeSyncJob']>>;
 
 function createArrInstanceFixture(): ArrInstance {
   return {
@@ -68,6 +78,169 @@ function createSnapshotInput(id: string): SyncPreviewCreateInput {
   };
 }
 
+function createApplyRequest(previewId: string, body: string = '{}'): Request {
+  return new Request(`http://localhost/api/v1/sync/preview/${previewId}/apply`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body,
+  });
+}
+
+function dependenciesReturning(result: SyncJobResult, nowMs: number = Date.now()): SyncPreviewApplyDependencies {
+  return {
+    getSectionsInProgress: () => [],
+    executeSyncJob: () => Promise.resolve(result),
+    now: () => nowMs,
+  };
+}
+
+Deno.test('sync preview apply success body matches the generated response contract', async () => {
+  const previewId = `preview-apply-success-${crypto.randomUUID()}`;
+  previewStore.create(createSnapshotInput(previewId), Date.now());
+  let execution:
+    | {
+        instanceId: number;
+        sections: readonly string[];
+        source: string | undefined;
+      }
+    | undefined;
+
+  try {
+    const response = await handleSyncPreviewApplyRequest(
+      previewId,
+      createApplyRequest(previewId, JSON.stringify({ sections: ['qualityProfiles'] })),
+      {
+        getSectionsInProgress: () => [],
+        executeSyncJob: (instanceId, sections, source) => {
+          execution = { instanceId, sections, source };
+          return Promise.resolve({ status: 'success', output: 'Synced 2 entities' });
+        },
+        now: Date.now,
+      }
+    );
+
+    assertEquals(response.status, 200);
+    const payload = (await response.json()) as SyncPreviewApplyResponse;
+    assertEquals(payload, {
+      success: true,
+      results: {
+        status: 'success',
+        output: 'Synced 2 entities',
+      },
+      staleWarning: null,
+    });
+    assertEquals(execution, {
+      instanceId: INSTANCE_ID,
+      sections: ['qualityProfiles'],
+      source: 'manual',
+    });
+  } finally {
+    previewStore.delete(previewId);
+  }
+});
+
+Deno.test('sync preview apply skipped body matches the generated success contract', async () => {
+  const previewId = `preview-apply-skipped-${crypto.randomUUID()}`;
+  previewStore.create(createSnapshotInput(previewId), Date.now());
+
+  try {
+    const response = await handleSyncPreviewApplyRequest(
+      previewId,
+      createApplyRequest(previewId, JSON.stringify({ sections: ['qualityProfiles'] })),
+      dependenciesReturning({ status: 'skipped', output: 'No changes required' })
+    );
+
+    assertEquals(response.status, 200);
+    const payload = (await response.json()) as SyncPreviewApplyResponse;
+    assertEquals(payload, {
+      success: true,
+      results: {
+        status: 'skipped',
+        output: 'No changes required',
+      },
+      staleWarning: null,
+    });
+  } finally {
+    previewStore.delete(previewId);
+  }
+});
+
+Deno.test('sync preview apply failed body matches the generated coarse result contract', async () => {
+  const previewId = `preview-apply-job-failed-${crypto.randomUUID()}`;
+  previewStore.create(createSnapshotInput(previewId), Date.now());
+
+  try {
+    const response = await handleSyncPreviewApplyRequest(
+      previewId,
+      createApplyRequest(previewId, JSON.stringify({ sections: ['qualityProfiles'] })),
+      dependenciesReturning({ status: 'failure', error: 'Arr rejected the update' })
+    );
+
+    assertEquals(response.status, 500);
+    const payload = (await response.json()) as SyncPreviewApplyResponse;
+    assertEquals(payload, {
+      success: false,
+      results: {
+        status: 'failure',
+        output: '',
+        error: 'Arr rejected the update',
+      },
+      staleWarning: null,
+    });
+  } finally {
+    previewStore.delete(previewId);
+  }
+});
+
+Deno.test('sync preview apply includes the stale warning in the generated response shape', async () => {
+  const previewId = `preview-apply-stale-warning-${crypto.randomUUID()}`;
+  const createdAtMs = Date.now();
+  previewStore.create(createSnapshotInput(previewId), createdAtMs);
+
+  try {
+    const response = await handleSyncPreviewApplyRequest(
+      previewId,
+      createApplyRequest(previewId, JSON.stringify({ sections: ['qualityProfiles'] })),
+      dependenciesReturning({ status: 'success', output: 'Synced' }, createdAtMs + 6 * 60 * 1000 + 30 * 1000)
+    );
+
+    assertEquals(response.status, 200);
+    const payload = (await response.json()) as SyncPreviewApplyResponse;
+    assertEquals(payload.staleWarning, 'Preview is 6 minute(s) old.');
+    assertEquals(payload.results.status, 'success');
+  } finally {
+    previewStore.delete(previewId);
+  }
+});
+
+Deno.test('sync preview apply stale-blocked body matches the generated error contract', async () => {
+  const previewId = `preview-apply-stale-blocked-${crypto.randomUUID()}`;
+  const createdAtMs = Date.now();
+  previewStore.create(createSnapshotInput(previewId), createdAtMs);
+  let executionCount = 0;
+
+  try {
+    const response = await handleSyncPreviewApplyRequest(previewId, createApplyRequest(previewId), {
+      getSectionsInProgress: () => [],
+      executeSyncJob: () => {
+        executionCount++;
+        return Promise.resolve({ status: 'success' });
+      },
+      now: () => createdAtMs + 31 * 60 * 1000,
+    });
+
+    assertEquals(response.status, 422);
+    const payload = (await response.json()) as SyncPreviewApplyErrorResponse;
+    assertEquals(payload, {
+      error: 'Preview is older than 30 minutes. Regenerate before applying.',
+      staleWarning: 'Preview is 31 minute(s) old.',
+    });
+    assertEquals(executionCount, 0);
+  } finally {
+    previewStore.delete(previewId);
+  }
+});
+
 Deno.test('sync preview apply blocks when preview had section-generation errors', async () => {
   const previewId = `preview-apply-section-errors-${crypto.randomUUID()}`;
   previewStore.create(
@@ -89,14 +262,14 @@ Deno.test('sync preview apply blocks when preview had section-generation errors'
     } as unknown as Parameters<typeof applyPreviewPost>[0]);
 
     assertEquals(response.status, 409);
-    const payload = (await response.json()) as { error: string };
+    const payload = (await response.json()) as ErrorResponse;
     assertMatch(payload.error, /section-generation errors.*Regenerate/i);
   } finally {
     previewStore.delete(previewId);
   }
 });
 
-Deno.test('sync preview apply rejects explicitly requested failed sections', async () => {
+Deno.test('sync preview apply rejects explicitly requested ineligible sections', async () => {
   const previewId = `preview-apply-failed-${crypto.randomUUID()}`;
   previewStore.create(createSnapshotInput(previewId), Date.now());
 
@@ -113,7 +286,7 @@ Deno.test('sync preview apply rejects explicitly requested failed sections', asy
     } as unknown as Parameters<typeof applyPreviewPost>[0]);
 
     assertEquals(response.status, 409);
-    const payload = (await response.json()) as { error: string };
+    const payload = (await response.json()) as ErrorResponse;
     assertMatch(payload.error, /failed preview generation/i);
   } finally {
     previewStore.delete(previewId);
@@ -152,7 +325,7 @@ Deno.test('sync preview apply blocks when no sections were successfully previewe
     } as unknown as Parameters<typeof applyPreviewPost>[0]);
 
     assertEquals(response.status, 400);
-    const payload = (await response.json()) as { error: string };
+    const payload = (await response.json()) as ErrorResponse;
     assertMatch(payload.error, /No successfully previewed sections/i);
   } finally {
     previewStore.delete(previewId);
@@ -175,7 +348,7 @@ Deno.test('sync preview apply rejects oversized request payloads', async () => {
     } as unknown as Parameters<typeof applyPreviewPost>[0]);
 
     assertEquals(response.status, 400);
-    const payload = (await response.json()) as { error: string };
+    const payload = (await response.json()) as ErrorResponse;
     assertMatch(payload.error, /exceeds .* bytes/i);
   } finally {
     previewStore.delete(previewId);
@@ -197,7 +370,7 @@ Deno.test('sync preview apply rejects malformed JSON body', async () => {
     } as unknown as Parameters<typeof applyPreviewPost>[0]);
 
     assertEquals(response.status, 400);
-    const payload = (await response.json()) as { error: string };
+    const payload = (await response.json()) as ErrorResponse;
     assertEquals(payload.error, 'Invalid JSON body');
   } finally {
     previewStore.delete(previewId);

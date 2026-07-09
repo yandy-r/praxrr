@@ -12,7 +12,7 @@
  * narration produced by different template generations apart. Declared here ONCE; every other
  * narration module imports it rather than re-declaring it.
  */
-export const NARRATION_TEMPLATE_VERSION = '1';
+export const NARRATION_TEMPLATE_VERSION = '3';
 
 /** Summary shows only the headline; verbose adds the per-field/per-category detail lines. */
 export type NarrationLevel = 'summary' | 'verbose';
@@ -30,10 +30,3 @@ export interface NarrationLine {
   readonly tone: NarrationTone;
   readonly templateVersion: string;
 }
-
-/**
- * Forward seam for the resolved-config work (#25). Defined now and intentionally unwired in
- * this PR so a later change can attach base/user/override provenance to a field's narration
- * without changing any engine signature.
- */
-export type NarrationProvenance = 'base' | 'user-override' | 'database-default';

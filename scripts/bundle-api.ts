@@ -31,9 +31,16 @@ function resolveFileRef(ref: string, baseDir: string): { value: unknown; fileDir
   return { value, fileDir: dirname(fullPath) };
 }
 
+function convertSchemaReference(ref: string): string {
+  if (ref.startsWith('#/components/')) return ref;
+  if (ref.startsWith('#/')) return `#/components/schemas/${ref.substring(2)}`;
+  if (ref.includes('#/')) return `#/components/schemas/${ref.split('#/')[1]}`;
+  return ref;
+}
+
 /**
- * Walk an object tree and convert all file/local $refs to internal
- * #/components/schemas/X format.
+ * Walk an object tree and convert file/local schema references to internal
+ * #/components/schemas/X format, including URI-valued discriminator mappings.
  */
 // deno-lint-ignore no-explicit-any
 function convertRefs(obj: any): any {
@@ -45,30 +52,31 @@ function convertRefs(obj: any): any {
 
   if (obj.$ref && typeof obj.$ref === 'string') {
     const ref: string = obj.$ref;
-
-    // Already internal component ref — leave as-is
-    if (ref.startsWith('#/components/')) {
-      return obj;
-    }
-
-    // Local ref like '#/CustomFormatRef' → '#/components/schemas/CustomFormatRef'
-    if (ref.startsWith('#/')) {
-      return { $ref: `#/components/schemas/${ref.substring(2)}` };
-    }
-
-    // File ref like '../schemas/arr.yaml#/ErrorResponse' → extract fragment name
-    if (ref.includes('#/')) {
-      const fragment = ref.split('#/')[1];
-      return { $ref: `#/components/schemas/${fragment}` };
-    }
-
-    return obj;
+    const converted = convertSchemaReference(ref);
+    return converted === ref ? obj : { $ref: converted };
   }
 
   // deno-lint-ignore no-explicit-any
   const result: Record<string, any> = {};
   for (const [key, value] of Object.entries(obj)) {
-    result[key] = convertRefs(value);
+    const converted = convertRefs(value);
+    if (
+      key === 'discriminator' &&
+      typeof converted === 'object' &&
+      converted !== null &&
+      !Array.isArray(converted) &&
+      typeof converted.mapping === 'object' &&
+      converted.mapping !== null &&
+      !Array.isArray(converted.mapping)
+    ) {
+      converted.mapping = Object.fromEntries(
+        Object.entries(converted.mapping).map(([name, target]) => [
+          name,
+          typeof target === 'string' ? convertSchemaReference(target) : target,
+        ])
+      );
+    }
+    result[key] = converted;
   }
   return result;
 }

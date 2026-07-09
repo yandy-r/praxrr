@@ -101,6 +101,10 @@
       "description": "Sync-archaeology timeline — merged read-only feed of syncs, snapshots, rollbacks, and canary rollouts, with annotations"
     },
     {
+      "name": "MCP",
+      "description": "Model Context Protocol server — read-only tools, resources, and prompts over Praxrr's configuration and observability surface"
+    },
+    {
       "name": "WebAuthn",
       "description": "Passkey / WebAuthn authentication — register credentials while logged in and sign in passwordlessly (supplements password auth under AUTH=on)"
     }
@@ -220,6 +224,107 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "/mcp": {
+      "post": {
+        "operationId": "postMcp",
+        "summary": "MCP Streamable HTTP endpoint",
+        "description": "Model Context Protocol (MCP) endpoint over Streamable HTTP, stateless. The request body is a\nsingle JSON-RPC 2.0 request or notification: a request returns a single JSON-RPC response, a\nnotification returns 202 with no body. The tool/resource/prompt surface is discovered at\nruntime via `tools/list`, `resources/list`, and `prompts/list` rather than modeled here.\n\nRead-only: exposes Praxrr's configuration and observability surface (instances, drift, config\nhealth, security posture, PCD databases and resolved entities, sync history) plus a\nwrite-free `preview_sync`. Authenticate with the `X-Api-Key` header (required under AUTH=on);\nthere is no OAuth/Bearer support. Disabled (404) when `MCP_ENABLED` is off.\n",
+        "tags": ["MCP"],
+        "parameters": [
+          {
+            "name": "X-Api-Key",
+            "in": "header",
+            "required": false,
+            "description": "Praxrr API key. Required for non-browser clients under AUTH=on.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "MCP-Protocol-Version",
+            "in": "header",
+            "required": false,
+            "description": "Negotiated MCP protocol version. An unsupported value returns 400.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true,
+                "description": "A single JSON-RPC 2.0 request or notification object."
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "A single JSON-RPC 2.0 response object.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "A single JSON-RPC 2.0 response object (result or error)."
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "A JSON-RPC notification was accepted; no response body."
+          },
+          "400": {
+            "description": "Unsupported MCP-Protocol-Version header.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated (missing or invalid API key)."
+          },
+          "403": {
+            "description": "Rejected cross-origin request (DNS-rebinding defense)."
+          },
+          "404": {
+            "description": "The MCP endpoint is disabled (MCP_ENABLED is off)."
+          },
+          "413": {
+            "description": "Request body too large."
+          }
+        }
+      },
+      "get": {
+        "operationId": "getMcp",
+        "summary": "Method not allowed",
+        "description": "The MCP endpoint offers no server-initiated SSE stream; GET returns 405 (use POST).",
+        "tags": ["MCP"],
+        "responses": {
+          "405": {
+            "description": "Method Not Allowed. Use POST."
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteMcp",
+        "summary": "Method not allowed",
+        "description": "The MCP endpoint is stateless with no session lifecycle; DELETE returns 405 (use POST).",
+        "tags": ["MCP"],
+        "responses": {
+          "405": {
+            "description": "Method Not Allowed. Use POST."
           }
         }
       }
@@ -1364,7 +1469,7 @@
       "post": {
         "operationId": "applySyncPreview",
         "summary": "Apply a sync preview",
-        "description": "Applies a previously generated preview to the target Arr instance.\n\nPreview generation itself is read-only, but this operation runs the normal sync\nexecution path for the selected sections.\n\nApply rejects previews that are too stale based on policy:\n- warnings are returned when the preview is older than 5 minutes\n- apply is blocked when staleness exceeds the hard threshold\n",
+        "description": "Applies the selected sections from a previously generated preview to the\ntarget Arr instance.\n\nPreview generation itself is read-only. Apply runs the normal sync job path\nafresh for the selected sections using the current saved sync configuration;\nit does not replay stored per-entity mutations from the preview snapshot.\n\nThe response reports only the aggregate job/run result. Preview entity changes\nremain planned evidence and are not per-entity confirmation of what succeeded.\n\nApply rejects previews that are too stale based on policy:\n- warnings are returned when the preview is older than 5 minutes\n- apply is blocked when staleness exceeds the hard threshold\n",
         "tags": ["Arr"],
         "parameters": [
           {
@@ -1389,11 +1494,11 @@
         },
         "responses": {
           "200": {
-            "description": "Preview applied",
+            "description": "Selected sections completed successfully or required no work",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/SyncPreviewResult"
+                  "$ref": "#/components/schemas/SyncPreviewApplyResponse"
                 }
               }
             }
@@ -1433,17 +1538,24 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
+                  "$ref": "#/components/schemas/SyncPreviewApplyErrorResponse"
                 }
               }
             }
           },
           "500": {
-            "description": "Failed to apply preview",
+            "description": "Sync job reported failure or preview apply raised an unexpected error",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/SyncPreviewApplyResponse"
+                    },
+                    {
+                      "$ref": "#/components/schemas/SyncPreviewApplyErrorResponse"
+                    }
+                  ]
                 }
               }
             }
@@ -6190,8 +6302,8 @@
         "discriminator": {
           "propertyName": "kind",
           "mapping": {
-            "set_cf_score": "SetCfScoreChange",
-            "set_profile_setting": "SetProfileSettingChange"
+            "set_cf_score": "#/components/schemas/SetCfScoreChange",
+            "set_profile_setting": "#/components/schemas/SetProfileSettingChange"
           }
         }
       },
@@ -7227,6 +7339,74 @@
             "items": {
               "$ref": "#/components/schemas/SyncPreviewSection"
             }
+          }
+        }
+      },
+      "SyncPreviewApplyJobStatus": {
+        "type": "string",
+        "enum": ["success", "failure", "skipped", "cancelled"],
+        "description": "Terminal status returned by the sync job execution."
+      },
+      "SyncPreviewApplyJobResult": {
+        "type": "object",
+        "required": ["status", "output"],
+        "properties": {
+          "status": {
+            "$ref": "#/components/schemas/SyncPreviewApplyJobStatus"
+          },
+          "output": {
+            "type": "string",
+            "description": "Aggregate human-readable output from the sync job."
+          },
+          "error": {
+            "type": "string",
+            "description": "User-facing sync-job failure reason, when one is available."
+          }
+        }
+      },
+      "SyncPreviewApplyResponse": {
+        "type": "object",
+        "description": "Coarse result of executing the preview's selected sections through the normal\nsync job path. `results` describes only the aggregate job/run outcome. It does\nnot confirm which individual preview entity changes succeeded.\n",
+        "required": ["success", "results", "staleWarning"],
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "True when the sync job succeeded or reported that no work was needed."
+          },
+          "results": {
+            "$ref": "#/components/schemas/SyncPreviewApplyJobResult"
+          },
+          "staleWarning": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Preview-age warning returned when the reviewed snapshot is stale, or null."
+          }
+        }
+      },
+      "SyncPreviewApplyErrorResponse": {
+        "type": "object",
+        "required": ["error", "staleWarning"],
+        "properties": {
+          "error": {
+            "type": "string",
+            "description": "User-facing reason the preview could not be applied."
+          },
+          "staleWarning": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Preview-age warning when relevant to the failure, or null."
           }
         }
       },

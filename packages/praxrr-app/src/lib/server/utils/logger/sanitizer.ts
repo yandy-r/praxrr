@@ -17,12 +17,26 @@ const SENSITIVE_VALUE_PATTERNS = [
   /^sk-[A-Za-z0-9]{20,}$/,
 ];
 
+const EMBEDDED_SECRET_PATTERNS = [
+  /\b[a-f0-9]{32}\b/gi,
+  /\beyJ[A-Za-z0-9-_]{5,}\.[A-Za-z0-9-_]{5,}\.[A-Za-z0-9-_]{5,}\b/g,
+  /\bsk-[A-Za-z0-9]{20,}\b/g,
+  /\bBearer\s+[^\s,;]+/gi,
+];
+
+const CREDENTIAL_QUERY_PATTERN = /([?&](?:api[-_]?key|token|access[-_]?token|password|secret)=)[^&#\s]+/gi;
+
 function sanitizeStringValue(value: string): string {
   if (SENSITIVE_VALUE_PATTERNS.some((pattern) => pattern.test(value))) {
     return REDACTED_VALUE;
   }
 
-  return value;
+  let sanitized = value;
+  for (const pattern of EMBEDDED_SECRET_PATTERNS) {
+    sanitized = sanitized.replace(pattern, REDACTED_VALUE);
+  }
+
+  return sanitized.replace(CREDENTIAL_QUERY_PATTERN, `$1${REDACTED_VALUE}`);
 }
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {

@@ -7,9 +7,82 @@
  * label (see the repo's cross-Arr semantic policy).
  */
 
-import type { FieldChange, SyncPreviewArrType, SyncPreviewSection } from '$sync/preview/types.ts';
+import type {
+  FieldChange,
+  SyncPreviewAction,
+  SyncPreviewArrType,
+  SyncPreviewSection,
+  SyncPreviewSectionOutcome,
+} from '$sync/preview/types.ts';
 import type { DriftCategory, DriftReason } from '$sync/drift/types.ts';
 import type { DriftSummaryStatus } from '$sync/drift/responses.ts';
+
+const SYNC_SECTION_LABELS: Readonly<Record<SyncPreviewSection, string>> = {
+  qualityProfiles: 'Quality Profiles',
+  delayProfiles: 'Delay Profiles',
+  mediaManagement: 'Media Management',
+  metadataProfiles: 'Metadata Profiles',
+};
+
+/** Friendly label for one closed sync-preview section. */
+export function resolveSyncSectionLabel(section: SyncPreviewSection): string {
+  return SYNC_SECTION_LABELS[section];
+}
+
+/**
+ * Planned-count clause for an authoritative sync-preview summary. Wording stays in future tense so
+ * a preview can never be mistaken for a confirmed apply result.
+ */
+export function resolvePlannedActionCountPhrase(action: SyncPreviewAction, count: number): string {
+  const entities = count === 1 ? 'entity' : 'entities';
+
+  switch (action) {
+    case 'create':
+      return `${count} ${entities} to add`;
+    case 'update':
+      return `${count} ${entities} to update`;
+    case 'delete':
+      return `${count} ${entities} to remove`;
+    case 'unchanged':
+      return `${count} ${entities} already matching`;
+  }
+}
+
+/** Stable no-op preview summary; does not imply that preview generation covered every section. */
+export function resolveNoPlannedChangesPhrase(): string {
+  return 'No changes are planned from the supplied preview data.';
+}
+
+/**
+ * Describe preview-generation coverage for one section. This intentionally says nothing about
+ * apply execution: {@link SyncPreviewSectionOutcome} records only whether preview generation
+ * included, skipped, or failed that section.
+ */
+export function resolvePreviewSectionOutcomePhrase(outcome: SyncPreviewSectionOutcome): string {
+  const label = resolveSyncSectionLabel(outcome.section);
+
+  if (outcome.error !== null) {
+    return `${label} preview generation failed.`;
+  }
+  if (outcome.skipped) {
+    return `${label} was skipped during preview generation.`;
+  }
+  return `${label} was included in preview generation.`;
+}
+
+/** Generic failure headline for free-form preview errors. */
+export function resolvePreviewErrorHeadline(): string {
+  return 'A trustworthy preview could not be generated.';
+}
+
+/**
+ * Closed user-facing explanation for an upstream preview error. This narration boundary does not
+ * render the free-form error retained by the upstream preview contract; issue #235 still owns that
+ * broader transport and persistence contract.
+ */
+export function resolvePreviewErrorDetail(): string {
+  return 'Preview generation reported an error. Review the instance connection and configuration, then regenerate the preview.';
+}
 
 /** Verb describing how a single field diverged. */
 export function resolveFieldVerb(type: FieldChange['type']): string {
