@@ -56,6 +56,8 @@ tags:
     description: Sync-archaeology timeline — merged read-only feed of syncs, snapshots, rollbacks, and canary rollouts, with annotations
   - name: MCP
     description: Model Context Protocol server — read-only tools, resources, and prompts over Praxrr's configuration and observability surface
+  - name: WebAuthn
+    description: Passkey / WebAuthn authentication — register credentials while logged in and sign in passwordlessly (supplements password auth under AUTH=on)
 
 paths:
   /health:
@@ -708,6 +710,14 @@ paths:
     $ref: './paths/timeline.yaml#/annotations'
   /timeline/annotations/{id}:
     $ref: './paths/timeline.yaml#/annotation'
+  /auth/webauthn/registration/options:
+    $ref: './paths/webauthn.yaml#/registrationOptions'
+  /auth/webauthn/registration/verify:
+    $ref: './paths/webauthn.yaml#/registrationVerify'
+  /auth/webauthn/authentication/options:
+    $ref: './paths/webauthn.yaml#/authenticationOptions'
+  /auth/webauthn/authentication/verify:
+    $ref: './paths/webauthn.yaml#/authenticationVerify'
 
 components:
   schemas:
@@ -1716,3 +1726,18 @@ components:
       $ref: './schemas/timeline.yaml#/CreateAnnotationRequest'
     UpdateAnnotationRequest:
       $ref: './schemas/timeline.yaml#/UpdateAnnotationRequest'
+    # WebAuthn / passkey
+    WebAuthnRegistrationOptionsResponse:
+      $ref: './schemas/webauthn.yaml#/WebAuthnRegistrationOptionsResponse'
+    WebAuthnRegistrationVerifyRequest:
+      $ref: './schemas/webauthn.yaml#/WebAuthnRegistrationVerifyRequest'
+    WebAuthnCredentialSummary:
+      $ref: './schemas/webauthn.yaml#/WebAuthnCredentialSummary'
+    WebAuthnRegistrationVerifyResponse:
+      $ref: './schemas/webauthn.yaml#/WebAuthnRegistrationVerifyResponse'
+    WebAuthnAuthenticationOptionsResponse:
+      $ref: './schemas/webauthn.yaml#/WebAuthnAuthenticationOptionsResponse'
+    WebAuthnAuthenticationVerifyRequest:
+      $ref: './schemas/webauthn.yaml#/WebAuthnAuthenticationVerifyRequest'
+    WebAuthnAuthenticationVerifyResponse:
+      $ref: './schemas/webauthn.yaml#/WebAuthnAuthenticationVerifyResponse'

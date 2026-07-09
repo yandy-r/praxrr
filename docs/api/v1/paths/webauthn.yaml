@@ -1,0 +1,154 @@
+registrationOptions:
+  post:
+    operationId: webauthnRegistrationOptions
+    summary: Begin passkey registration
+    description: |
+      Start registering a passkey for the authenticated local user. Requires `AUTH=on` and a real
+      local user (rejects the API-key pseudo-user and OIDC users). Stores a single-use challenge and
+      returns WebAuthn creation options for `navigator.credentials.create()`.
+    tags:
+      - WebAuthn
+    responses:
+      '200':
+        description: Credential creation options
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/webauthn.yaml#/WebAuthnRegistrationOptionsResponse'
+      '401':
+        description: Not an authenticated local user
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+      '409':
+        description: Passkeys require AUTH=on
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+      '500':
+        description: WebAuthn RP resolution failed
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+
+registrationVerify:
+  post:
+    operationId: webauthnRegistrationVerify
+    summary: Complete passkey registration
+    description: |
+      Consume the single-use challenge, verify the attestation, and persist the credential for the
+      authenticated local user. Requires `AUTH=on` and a real local user.
+    tags:
+      - WebAuthn
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../schemas/webauthn.yaml#/WebAuthnRegistrationVerifyRequest'
+    responses:
+      '200':
+        description: Credential registered
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/webauthn.yaml#/WebAuthnRegistrationVerifyResponse'
+      '400':
+        description: Missing/expired challenge or verification failed
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+      '401':
+        description: Not an authenticated local user
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+      '409':
+        description: Duplicate name / passkey already registered / AUTH not on
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+      '500':
+        description: WebAuthn RP resolution failed
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+
+authenticationOptions:
+  post:
+    operationId: webauthnAuthenticationOptions
+    summary: Begin passkey login
+    description: |
+      Start a passwordless, discoverable passkey login. Public (pre-login) but only available under
+      `AUTH=on`. Stores a single-use challenge and returns WebAuthn assertion options for
+      `navigator.credentials.get()`.
+    tags:
+      - WebAuthn
+    responses:
+      '200':
+        description: Assertion options
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/webauthn.yaml#/WebAuthnAuthenticationOptionsResponse'
+      '409':
+        description: Passkeys require AUTH=on
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+      '500':
+        description: WebAuthn RP resolution failed
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+
+authenticationVerify:
+  post:
+    operationId: webauthnAuthenticationVerify
+    summary: Complete passkey login
+    description: |
+      Consume the challenge, verify the assertion, guard against counter regression, then mint a
+      session cookie (same contract as password login). Public but only under `AUTH=on`. On success
+      the `session` cookie is set via Set-Cookie and the client navigates.
+    tags:
+      - WebAuthn
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../schemas/webauthn.yaml#/WebAuthnAuthenticationVerifyRequest'
+    responses:
+      '200':
+        description: Authenticated; session cookie set
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/webauthn.yaml#/WebAuthnAuthenticationVerifyResponse'
+      '400':
+        description: Missing/expired challenge, unknown credential, or verification failed
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+      '409':
+        description: Passkeys require AUTH=on
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+      '500':
+        description: WebAuthn RP resolution failed
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'

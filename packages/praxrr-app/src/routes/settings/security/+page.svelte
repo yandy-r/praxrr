@@ -1,8 +1,9 @@
 <script lang="ts">
   import type { PageData, ActionData } from './$types';
-  import { enhance } from '$app/forms';
+  import { onMount } from 'svelte';
+  import { enhance, applyAction, deserialize } from '$app/forms';
   import { invalidateAll } from '$app/navigation';
-  import { RefreshCw, LogOut, Check, Globe, Monitor, Smartphone, Network, Clock, ShieldCheck } from 'lucide-svelte';
+  import { RefreshCw, LogOut, Check, Globe, Monitor, Smartphone, Network, Clock, ShieldCheck, Fingerprint, Trash2, Pencil } from 'lucide-svelte';
   import { parseUTC } from '$shared/utils/dates';
   import Button from '$ui/button/Button.svelte';
   import CollapsibleCard from '$ui/card/CollapsibleCard.svelte';
@@ -13,6 +14,7 @@
   import { alertStore } from '$alerts/store';
   import { SETTINGS_SECURITY_SESSIONS } from '$shared/disclosure/sectionKeys';
   import type { Column } from '$ui/table/types';
+  import { supportsWebAuthn, registerPasskey as doRegisterPasskey, WebAuthnError, type WebAuthnCredentialSummary } from '$lib/client/utils/webauthn.ts';
 
   export let data: PageData;
   export let form: ActionData;
@@ -21,6 +23,11 @@
   let currentPassword = '';
   let newPassword = '';
   let confirmPassword = '';
+
+  let passkeyName = '';
+  let registering = false;
+  // null until resolved in onMount — avoids rendering a false "unsupported" message during SSR.
+  let canUseWebAuthn: boolean | null = null;
 
   let regeneratingKey = false;
   let revealInProgress = false;
@@ -60,6 +67,15 @@
   }
   $: if (form?.sessionError) {
     alertStore.add('error', form.sessionError);
+  }
+  $: if (form?.passkeyDeleted) {
+    alertStore.add('success', 'Passkey removed');
+  }
+  $: if (form?.passkeyRenamed) {
+    alertStore.add('success', 'Passkey renamed');
+  }
+  $: if (form?.passkeyError) {
+    alertStore.add('error', form.passkeyError);
   }
 
   function clearAuthApiKeyAutoHide() {
@@ -230,6 +246,105 @@
       cell: (row) => ({
         html: `<span class="text-xs text-neutral-500 dark:text-neutral-400">${formatRelativeTime(row.last_active_at)}</span>`,
       }),
+    },
+  ];
+
+  onMount(() => {
+    canUseWebAuthn = supportsWebAuthn();
+  });
+
+  async function registerPasskey() {
+    if (registering) {
+      return;
+    }
+
+    registering = true;
+    try {
+      const result = await doRegisterPasskey(passkeyName.trim() || undefined);
+      if (result.verified) {
+        alertStore.add('success', 'Passkey registered');
+        passkeyName = '';
+        await invalidateAll();
+      }
+    } catch (e) {
+      alertStore.add(
+        'error',
+        e instanceof WebAuthnError ? e.message : e instanceof Error ? e.message : 'Passkey registration failed'
+      );
+    } finally {
+      registering = false;
+    }
+  }
+
+  async function renamePasskey(row: WebAuthnCredentialSummary) {
+    const next = window.prompt('Rename passkey', row.name);
+    if (next === null) {
+      return;
+    }
+
+    const name = next.trim();
+    if (!name) {
+      alertStore.add('error', 'Passkey name is required');
+      return;
+    }
+
+    const body = new FormData();
+    body.set('credentialId', row.id);
+    body.set('name', name);
+
+    const response = await fetch('?/renamePasskey', {
+      method: 'POST',
+      headers: { 'x-sveltekit-action': 'true' },
+      body,
+    });
+    const result = deserialize(await response.text());
+    await applyAction(result);
+    if (result.type === 'success') {
+      await invalidateAll();
+    }
+  }
+
+  const passkeyColumns: Column<WebAuthnCredentialSummary>[] = [
+    {
+      key: 'name',
+      header: 'Name',
+      headerIcon: Fingerprint,
+      cell: (row) => row.name,
+    },
+    {
+      key: 'createdAt',
+      header: 'Created',
+      headerIcon: Clock,
+      cell: (row) => ({
+        html: `<span class="text-xs text-neutral-500 dark:text-neutral-400">${formatDate(row.createdAt)}</span>`,
+      }),
+    },
+    {
+      key: 'lastUsedAt',
+      header: 'Last Used',
+      headerIcon: Clock,
+      cell: (row) => ({
+        html: `<span class="text-xs text-neutral-500 dark:text-neutral-400">${row.lastUsedAt ? formatDate(row.lastUsedAt) : '—'}</span>`,
+      }),
+    },
+    {
+      key: 'deviceType',
+      header: 'Device',
+      headerIcon: Smartphone,
+      cell: (row) => (row.deviceType === 'multiDevice' ? 'Multi-device' : 'Single-device'),
+    },
+    {
+      key: 'backedUp',
+      header: 'Backed Up',
+      headerIcon: ShieldCheck,
+      cell: (row) =>
+        row.backedUp
+          ? {
+              html: '<span class="inline-flex items-center rounded bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200">Backed up</span>',
+            }
+          : {
+              html: '<span class="inline-flex items-center rounded bg-neutral-100 px-2 py-0.5 text-xs font-medium text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300">Local only</span>',
+            },
     },
   ];
 </script>
@@ -418,6 +533,73 @@
         {/if}
       </div>
     </div>
+
+    {#if data.passkeysEnabled}
+      <!-- Passkeys -->
+      <div class="rounded-lg border border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900">
+        <div class="border-b border-neutral-200 px-6 py-4 dark:border-neutral-800">
+          <h2 class="text-lg font-semibold text-neutral-900 md:text-xl dark:text-neutral-50">Passkeys</h2>
+          <p class="mt-1 text-sm text-neutral-600 dark:text-neutral-400">
+            Sign in without a password using a passkey on this device or a hardware security key
+          </p>
+        </div>
+        <div class="p-6">
+          <div class="space-y-4">
+            <div class="flex flex-col gap-3 sm:flex-row sm:items-end">
+              <div class="flex-1">
+                <FormInput
+                  name="passkeyName"
+                  label="Name (optional)"
+                  placeholder="e.g. MacBook Touch ID"
+                  bind:value={passkeyName}
+                />
+              </div>
+              <Button
+                type="button"
+                variant="primary"
+                icon={Fingerprint}
+                text={registering ? 'Registering...' : 'Register a passkey'}
+                disabled={!canUseWebAuthn || registering}
+                on:click={registerPasskey}
+              />
+            </div>
+            {#if canUseWebAuthn === false}
+              <p class="text-sm text-neutral-500 dark:text-neutral-400">This browser doesn't support passkeys.</p>
+            {/if}
+            {#if data.passkeys.length > 0}
+              <Table columns={passkeyColumns} data={data.passkeys} compact responsive>
+                <svelte:fragment slot="actions" let:row>
+                  <div class="flex items-center justify-end gap-2">
+                    <TableActionButton
+                      icon={Pencil}
+                      title="Rename passkey"
+                      variant="neutral"
+                      size="sm"
+                      on:click={() => renamePasskey(row)}
+                    />
+                    <form
+                      method="POST"
+                      action="?/deletePasskey"
+                      use:enhance={() => {
+                        return async ({ update }) => {
+                          await update();
+                          await invalidateAll();
+                        };
+                      }}
+                    >
+                      <input type="hidden" name="credentialId" value={row.id} />
+                      <TableActionButton icon={Trash2} title="Delete passkey" variant="danger" size="sm" type="submit" />
+                    </form>
+                  </div>
+                </svelte:fragment>
+              </Table>
+            {:else}
+              <p class="text-sm text-neutral-500 dark:text-neutral-400">No passkeys registered yet</p>
+            {/if}
+          </div>
+        </div>
+      </div>
+    {/if}
 
     <!-- Active Sessions -->
     <CollapsibleCard

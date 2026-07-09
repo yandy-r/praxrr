@@ -751,6 +751,7 @@ class ArrCredentialRedactionRoutesTest extends BaseTest {
         cookies: {
           get: () => null,
         },
+        locals: { user: null },
       } as unknown as Parameters<typeof settingsSecurityLoad>[0])) as {
         apiKeyMasked: string;
         hasApiKey: boolean;
@@ -772,6 +773,7 @@ class ArrCredentialRedactionRoutesTest extends BaseTest {
         cookies: {
           get: () => null,
         },
+        locals: { user: null },
       } as unknown as Parameters<typeof settingsSecurityLoad>[0])) as {
         apiKeyMasked: string;
         hasApiKey: boolean;

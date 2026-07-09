@@ -8,6 +8,8 @@
   "dependencies": {
     "@deno/vite-plugin": "^1.0.5",
     "@jsr/db__sqlite": "^0.12.0",
+    "@simplewebauthn/browser": "13.3.0",
+    "@simplewebauthn/server": "13.3.2",
     "croner": "^9.1.0",
     "highlight.js": "^11.11.1",
     "kysely": "0.27.6",
