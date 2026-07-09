@@ -1,6 +1,6 @@
 # MCP Server — Implementation Plan (PR #1, read-only tier)
 
-> Companion to `docs/plans/mcp-server/design.md` (issue #23). This plan is discovery-complete: every service call below is pinned to a **verified** signature. Where the design's assumed signature differed from reality, the correction is applied inline and catalogued in §8. Save as `docs/plans/mcp-server/implementation-plan.md`.
+> Companion to `docs/internal/mcp-server/design.md` (issue #23). This plan is discovery-complete: every service call below is pinned to a **verified** signature. Where the design's assumed signature differed from reality, the correction is applied inline and catalogued in §8. Save as `docs/internal/mcp-server/implementation-plan.md`.
 
 ---
 
