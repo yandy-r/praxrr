@@ -333,6 +333,44 @@ Deno.test('all available sections skipped (none errored, none compared) → in-s
   assertEquals(result.contentCheckedAt, FIXED_ISO);
 });
 
+Deno.test(
+  'PARTIAL failure: one section CLEAN + one section ERRORED → error / invalid_response (not in-sync)',
+  async () => {
+    // A single errored section must not be masked by a sibling that compared clean. The diff is
+    // incomplete, so drift in the failed section could be silently erased — surface `error` and
+    // leave contentCheckedAt null so persist preserves last-known content instead of overwriting
+    // it with a false "clean" snapshot.
+    const preview = makePreview({
+      sections: ['qualityProfiles', 'delayProfiles'],
+      sectionOutcomes: [
+        { section: 'qualityProfiles', error: null, skipped: false }, // compared clean
+        { section: 'delayProfiles', error: 'HTTP 500', skipped: false }, // errored
+      ],
+      // Clean, compared-but-no-changes section.
+      qualityProfiles: {
+        section: 'qualityProfiles',
+        customFormats: [entity({ name: 'HDR', action: 'unchanged', remoteId: 10 })],
+        qualityProfiles: [],
+      },
+      // Errored section carries a null payload (nothing was fetched/diffed).
+      delayProfiles: null,
+    });
+
+    const result = await checkInstanceDrift(
+      makeInstance(),
+      baseDeps({
+        resolveAvailableSections: () => new Set<SyncPreviewSection>(['qualityProfiles', 'delayProfiles']),
+        generatePreview: () => Promise.resolve(preview),
+      })
+    );
+
+    assertEquals(result.status, 'error');
+    assertEquals(result.reason, 'invalid_response');
+    assertEquals(result.contentCheckedAt, null); // incomplete diff must not stamp a content checkpoint
+    assertEquals(result.detectedVersion, VERSION);
+  }
+);
+
 // ============================================================================
 // DC-7 — a 'degraded' (not 'unavailable') section stays in the compared universe.
 // resolveAvailableSections returns it; assert it reaches generatePreview and its

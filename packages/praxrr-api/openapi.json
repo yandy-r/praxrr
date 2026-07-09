@@ -2951,6 +2951,16 @@
               }
             }
           },
+          "400": {
+            "description": "Invalid instance id or unsupported instance type",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "404": {
             "description": "Instance not found",
             "content": {

@@ -119,19 +119,18 @@ function persistedStatusIds(): number[] {
 }
 
 /**
- * These tests exercise the HANDLER's chunk/cursor/backoff contract. They deliberately assert
- * `drift_instance_status` rows only as a *subset* of the chunk the handler handed to
- * `processBatches` (every persisted id is inside the chunk; nothing beyond the boundary is
- * touched) rather than the exact set.
+ * These tests exercise the HANDLER's chunk/cursor/backoff contract by asserting the EXACT set of
+ * `drift_instance_status` rows persisted per pass. Each id-ordered chunk the handler hands to
+ * `processBatches` (CONCURRENCY=3) must persist a row for EVERY instance in that chunk and
+ * nothing beyond the chunk boundary.
  *
- * Reason: there is a latent concurrency defect DOWNSTREAM of the handler. The sweep runs
- * `checkAndPersistInstance` under `processBatches` (CONCURRENCY=3), but
- * `driftStatusQueries.upsert` opens a `db.transaction` (bare `BEGIN`) on the single shared
- * SQLite connection. Concurrent upserts in a batch collide with "cannot start a transaction
- * within a transaction"; that throw is swallowed by `checkAndPersistInstance` (returns null),
- * so only the first instance per batch actually persists. That bug is orthogonal to the chunk
- * math these tests cover and is reported separately — the subset assertions still fully prove
- * the handler processed the correct id-ordered chunk and nothing outside it.
+ * Whole-chunk persistence holds because `driftStatusQueries.upsert` is a statement-atomic bare
+ * `db.execute` (`INSERT ... ON CONFLICT DO UPDATE`), not a `db.transaction`. A `db.transaction`
+ * would issue a nested `BEGIN` on the single shared SQLite connection under the sweep's
+ * concurrent `processBatches`, throw "cannot start a transaction within a transaction", and get
+ * swallowed by `checkAndPersistInstance` — silently dropping every instance after the first per
+ * batch. That defect is fixed; the exact-set assertions below lock in whole-chunk persistence so
+ * it can never regress.
  */
 
 // ============================================================================
@@ -174,14 +173,10 @@ migratedTest('drift.check chunks a >5 instance sweep and completes on a later in
     `continuation rescheduleAt ${result1.rescheduleAt} should be ~now`
   );
 
-  // Only the leading id-ordered chunk of 5 was processed: every persisted row is inside the
-  // first five, and nothing beyond the chunk boundary was touched. (Subset, not exact set —
-  // see the file-level note on the downstream upsert-concurrency defect.)
+  // The leading id-ordered chunk of 5 was processed IN FULL: the persisted set is exactly the
+  // first five, and nothing beyond the chunk boundary was touched.
   const afterRun1Ids = persistedStatusIds();
-  assert(afterRun1Ids.length >= 1, 'the leading chunk should persist at least its head instance');
-  for (const id of afterRun1Ids) {
-    assert(firstFive.includes(id), `persisted id ${id} must be within the leading id-ordered chunk`);
-  }
+  assertEquals(afterRun1Ids, firstFive, 'the leading chunk persists a row for every one of its 5 instances');
   for (const id of lastThree) {
     assert(!afterRun1Ids.includes(id), `id ${id} is beyond the chunk boundary and must not be processed yet`);
   }
@@ -201,11 +196,10 @@ migratedTest('drift.check chunks a >5 instance sweep and completes on a later in
   assertExists(result2.output);
   assertStringIncludes(result2.output!, 'complete');
 
-  // The remaining chunk (ids beyond the run-1 cursor) was processed this pass: at least one of
-  // the trailing instances now has a persisted status row.
+  // The terminal chunk (ids beyond the run-1 cursor) was processed this pass: the persisted set
+  // is now exactly all eight instances (leading five from run 1 + trailing three from run 2).
   const afterRun2Ids = persistedStatusIds();
-  const remainderTouched = lastThree.filter((id) => afterRun2Ids.includes(id));
-  assert(remainderTouched.length >= 1, 'terminal chunk should process the trailing instances');
+  assertEquals(afterRun2Ids, ids, 'the completed sweep persists a row for every one of the 8 instances');
 
   // Terminal transition: last_run_at advanced to the sweep start, cursor + progress reset.
   const finalSettings = driftSettingsQueries.get();
@@ -240,14 +234,10 @@ migratedTest('drift.check resumes from a persisted cursor and processes only the
   // Only the remainder is processed this pass; that is the terminal chunk -> complete.
   assertStringIncludes(result.output!, 'complete');
 
-  // The resume pass only touches ids beyond the cursor: every persisted row is in the
-  // remainder, and none of the already-processed leading ids were re-checked. (Subset check —
-  // see the file-level note on the downstream upsert-concurrency defect.)
+  // The resume pass processes exactly the remainder (ids beyond the cursor) in full, and none of
+  // the already-processed leading ids are re-checked.
   const persisted = persistedStatusIds();
-  assert(persisted.length >= 1, 'resume pass should process at least the remainder head');
-  for (const id of persisted) {
-    assert(remainder.includes(id), `resume pass must only touch ids beyond the cursor (got ${id})`);
-  }
+  assertEquals(persisted, remainder, 'the resume pass persists a row for every remainder instance and nothing else');
   for (const id of firstFive) {
     assert(!persisted.includes(id), `cursor should skip already-processed id ${id}`);
   }

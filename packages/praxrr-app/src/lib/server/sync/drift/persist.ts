@@ -25,15 +25,18 @@ const MAX_EMBED_CHANGE_LINES = 10;
 const inFlight = new Set<number>();
 
 /**
- * Pure notification predicate: fire only when an instance newly enters drift or its alerting
- * drift set changes vs the last-notified signature. Never fires on recovery
- * (`drifted → in-sync`) or on any reachability/error status.
+ * Pure notification predicate: fire only when an instance is drifted AND its alerting drift
+ * set differs from the last-notified signature. Dedup is keyed purely on `notifiedSignature`
+ * (not on the prior status), so a drift that persists across a transient degraded cycle
+ * (`drifted → error → drifted`, same signature) never re-fires. `notifiedSignature` is cleared
+ * on genuine recovery (see `checkAndPersistInstance`), so an identical drift that returns after
+ * a real recovery does re-fire. Never fires on any non-drifted status.
  */
 export function shouldNotify(prior: DriftInstanceStatusDetail | undefined, next: InstanceDriftResult): boolean {
   if (next.status !== 'drifted') {
     return false;
   }
-  if (!prior || prior.status !== 'drifted') {
+  if (!prior) {
     return true;
   }
   return prior.notifiedSignature !== next.driftSignature;
@@ -74,16 +77,27 @@ function isContentRefresh(result: InstanceDriftResult): boolean {
 }
 
 /**
- * Checks an instance and persists the merged latest-state row. Returns the fresh
- * `InstanceDriftResult`, or `null` when the instance is already being checked (caller maps
- * to a 409 / skip) or an unexpected error occurred (logged, never thrown).
+ * Discriminated result so callers can tell the two "no fresh result" causes apart: an
+ * instance already being checked (→ 409 / skip) vs an unexpected persistence error (→ 500).
+ * The scheduled sweep treats both non-`ok` kinds identically (ignore).
+ */
+export type CheckAndPersistOutcome =
+  | { readonly kind: 'ok'; readonly result: InstanceDriftResult }
+  | { readonly kind: 'in_flight' }
+  | { readonly kind: 'error' };
+
+/**
+ * Checks an instance and persists the merged latest-state row. Never throws — the scheduled
+ * sweep runs it under `processBatches` (`Promise.all` per batch, no per-item isolation), so a
+ * throw would abort sibling instances. On any unexpected error it logs and returns
+ * `{ kind: 'error' }`; an already-in-flight instance returns `{ kind: 'in_flight' }`.
  */
 export async function checkAndPersistInstance(
   instance: ArrInstance,
   deps: Partial<DriftCheckDeps> = {}
-): Promise<InstanceDriftResult | null> {
+): Promise<CheckAndPersistOutcome> {
   if (inFlight.has(instance.id)) {
-    return null;
+    return { kind: 'in_flight' };
   }
   inFlight.add(instance.id);
 
@@ -110,6 +124,12 @@ export async function checkAndPersistInstance(
       durationMs: next.durationMs,
     });
 
+    // Genuine recovery: a fresh clean check (no alerting drift) clears the last-notified
+    // signature so an identical drift that returns later re-fires. No-op if nothing was notified.
+    if (contentRefresh && next.driftSignature === null && prior?.notifiedSignature) {
+      driftStatusQueries.markNotified(next.instanceId, null);
+    }
+
     if (shouldNotify(prior, next)) {
       const { title, message, embed } = buildDriftNotification(next);
       // Fire-and-forget: never awaited into the result; a notification failure must never
@@ -126,7 +146,7 @@ export async function checkAndPersistInstance(
         });
     }
 
-    return next;
+    return { kind: 'ok', result: next };
   } catch (error) {
     await logger.error('Drift check-and-persist failed', {
       source: SOURCE,
@@ -136,7 +156,7 @@ export async function checkAndPersistInstance(
         error: error instanceof Error ? error.message : String(error),
       },
     });
-    return null;
+    return { kind: 'error' };
   } finally {
     inFlight.delete(instance.id);
   }

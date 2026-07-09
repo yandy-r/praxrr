@@ -82,6 +82,19 @@ export const driftSettingsQueries = {
   },
 
   /**
+   * Clear any in-progress sweep state (used when drift is disabled) so a re-enable starts a
+   * fresh sweep instead of resuming a stale cursor.
+   */
+  resetSweepProgress(): boolean {
+    const affected = db.execute(
+      `UPDATE drift_check_settings
+			 SET sweep_cursor = 0, sweep_started_at = NULL, updated_at = CURRENT_TIMESTAMP
+			 WHERE id = 1`
+    );
+    return affected > 0;
+  },
+
+  /**
    * Record a completed sweep: advance last_run_at, clear backoff, and reset sweep progress.
    */
   markRun(lastRunAt: string): boolean {

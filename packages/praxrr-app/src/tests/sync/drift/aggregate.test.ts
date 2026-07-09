@@ -152,6 +152,8 @@ Deno.test('aggregateDrift maps update→drift, create→missing, delete→unmana
   assertEquals(result.counts, { drifted: 1, missing: 1, unmanaged: 1 });
   assertEquals(result.comparedAny, true);
   assertEquals(result.allSectionsErrored, false);
+  // All available outcomes succeeded → no section errored.
+  assertEquals(result.anySectionErrored, false);
 });
 
 Deno.test("aggregateDrift never emits 'unchanged' entities into changes or counts", () => {
@@ -285,6 +287,10 @@ Deno.test('aggregateDrift: mixed errored + succeeded available sections → not 
   assertEquals(result.allSectionsErrored, false);
   assertEquals(result.comparedAny, true);
   assertEquals(result.counts.drifted, 1);
+  // Partial failure: delayProfiles errored even though qualityProfiles compared clean. This is
+  // the signal `checkInstanceDrift` promotes to status='error' so a failed section can't silently
+  // erase drift by hiding behind an OK sibling.
+  assertEquals(result.anySectionErrored, true);
 });
 
 Deno.test('aggregateDrift: only a skipped outcome → neither errored nor compared', () => {
@@ -423,6 +429,27 @@ Deno.test('shouldNotify does NOT fire on drifted → drifted with unchanged sign
 
 Deno.test('shouldNotify fires on drifted → drifted when the signature changed', () => {
   const prior = makePrior({ status: 'drifted', notifiedSignature: 'sig-a' });
+  const next = makeNext({ status: 'drifted', driftSignature: 'sig-b' });
+  assertEquals(shouldNotify(prior, next), true);
+});
+
+Deno.test(
+  'shouldNotify does NOT re-fire on drifted → transient error → drifted with the SAME signature (churn fix)',
+  () => {
+    // A transient degraded cycle leaves the prior row at status='error' while the last-notified
+    // signature stays preserved (persist only clears it on a genuine clean recovery). Dedup is
+    // keyed PURELY on notifiedSignature — NOT on prior.status — so the identical drift returning
+    // after the blip must not re-alert.
+    const prior = makePrior({ status: 'error', reason: 'error', notifiedSignature: 'sig-a' });
+    const next = makeNext({ status: 'drifted', driftSignature: 'sig-a' });
+    assertEquals(shouldNotify(prior, next), false);
+  }
+);
+
+Deno.test('shouldNotify fires when prior.status=error but the returning drift signature differs', () => {
+  // Same error-status prior, but a DIFFERENT drift returns than what was last notified. Because
+  // the predicate ignores prior.status entirely, the mismatched signature alone drives the fire.
+  const prior = makePrior({ status: 'error', reason: 'error', notifiedSignature: 'sig-a' });
   const next = makeNext({ status: 'drifted', driftSignature: 'sig-b' });
   assertEquals(shouldNotify(prior, next), true);
 });

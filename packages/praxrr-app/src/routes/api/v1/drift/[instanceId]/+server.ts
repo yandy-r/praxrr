@@ -81,11 +81,14 @@ export const POST: RequestHandler = async ({ params }) => {
     });
   }
 
-  const result = await checkAndPersistInstance(instance);
-  if (!result) {
+  const outcome = await checkAndPersistInstance(instance);
+  if (outcome.kind === 'in_flight') {
     return json({ error: 'A drift check for this instance is already in progress' } satisfies ErrorResponse, {
       status: 409,
     });
+  }
+  if (outcome.kind === 'error') {
+    return json({ error: 'Failed to run drift check' } satisfies ErrorResponse, { status: 500 });
   }
 
   const row = driftStatusQueries.getById(instanceId);

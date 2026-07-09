@@ -49,7 +49,10 @@
       if (requestId !== detailRequestId) return;
       loadError = err instanceof Error ? err.message : 'Failed to load drift detail';
     } finally {
-      if (requestId === detailRequestId) loading = false;
+      // loadDetail is the sole owner of `loading` (calls never overlap; refreshNow doesn't set
+      // it), so clear it unconditionally — otherwise a refresh that bumps the guard mid-load
+      // would strand the spinner forever.
+      loading = false;
     }
   }
 
@@ -124,7 +127,7 @@
       <button
         type="button"
         class="bg-accent-600 hover:bg-accent-700 dark:bg-accent-500 dark:hover:bg-accent-600 flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white transition-colors disabled:cursor-not-allowed disabled:opacity-60"
-        disabled={refreshing}
+        disabled={refreshing || (loading && !detail)}
         on:click={refreshNow}
       >
         <RefreshCw size={14} class={refreshing ? 'animate-spin' : ''} />

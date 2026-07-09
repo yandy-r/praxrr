@@ -183,6 +183,8 @@ export function scheduleDriftCheck(): void {
   const settings = driftSettingsQueries.get();
   if (settings.enabled !== 1) {
     jobQueueQueries.cancelByDedupeKey('drift.check');
+    // Clear any dangling sweep cursor so a later re-enable starts a clean sweep.
+    driftSettingsQueries.resetSweepProgress();
     return;
   }
 

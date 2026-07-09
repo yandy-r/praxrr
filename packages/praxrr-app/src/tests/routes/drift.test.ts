@@ -1,12 +1,13 @@
 // eslint-disable-next-line @typescript-eslint/triple-slash-reference -- SvelteKit app ambient types for route tests
 /// <reference path="../../app.d.ts" />
 
-import { assert, assertEquals } from '@std/assert';
+import { assert, assertEquals, assertExists } from '@std/assert';
 import { config } from '$config';
 import { db } from '$db/db.ts';
 import { runMigrations } from '$db/migrations.ts';
 import { arrInstancesQueries } from '$db/queries/arrInstances.ts';
 import { driftStatusQueries } from '$db/queries/driftStatus.ts';
+import { checkAndPersistInstance } from '$sync/drift/persist.ts';
 import type { DriftEntityChange } from '$sync/drift/types.ts';
 import type { DriftDetailResponse, DriftInstanceSummary, DriftSettingsResponse } from '$sync/drift/responses.ts';
 import {
@@ -318,6 +319,43 @@ migratedTest('POST /drift/{instanceId}: 200 running a live check against an unre
   assertEquals(detail.status, 200);
   const detailBody = (await detail.json()) as DriftDetailResponse;
   assertEquals(detailBody.status, 'unreachable');
+});
+
+migratedTest('POST /drift/{instanceId}: 409 when a check for that instance is already in progress', async () => {
+  const id = createInstance({ name: 'Radarr Concurrent Refresh' });
+  const instance = arrInstancesQueries.getById(id);
+  assertExists(instance);
+
+  // Occupy the module-level in-flight slot for this id by starting a concurrent
+  // checkAndPersistInstance whose heartbeat blocks on a gate (mirrors the gated-dep
+  // pattern in persist.test.ts). The slot is added synchronously before the first
+  // await, so the POST route below observes the id as busy and short-circuits to 409
+  // without touching the network.
+  let release: () => void = () => {};
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+
+  const inFlightCall = checkAndPersistInstance(instance, {
+    heartbeat: async () => {
+      await gate;
+      return { ok: false };
+    },
+  });
+
+  try {
+    const response = await POST_DETAIL(detailPostEvent(String(id)));
+    assertEquals(response.status, 409);
+
+    const body = (await response.json()) as ErrorResponse;
+    assert(body.error.toLowerCase().includes('already in progress'));
+  } finally {
+    // Release the gate so the background check finishes, clears the in-flight slot,
+    // and completes its write before the DB is torn down.
+    release();
+    const outcome = await inFlightCall;
+    assertEquals(outcome.kind, 'ok');
+  }
 });
 
 // ============================================================================

@@ -49,6 +49,12 @@ instance:
           application/json:
             schema:
               $ref: '../schemas/drift.yaml#/DriftDetailResponse'
+      '400':
+        description: Invalid instance id or unsupported instance type
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
       '404':
         description: Instance not found
         content:

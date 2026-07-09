@@ -188,6 +188,8 @@ export interface AggregateResult {
   counts: { drifted: number; missing: number; unmanaged: number };
   /** Every available section that ran errored (none produced a result). */
   allSectionsErrored: boolean;
+  /** At least one available section errored (partial OR total failure). */
+  anySectionErrored: boolean;
   /** At least one available section produced a successful diff result. */
   comparedAny: boolean;
 }
@@ -238,6 +240,7 @@ export function aggregateDrift(
     changes,
     counts,
     allSectionsErrored: succeeded.length === 0 && errored.length > 0,
+    anySectionErrored: errored.length > 0,
     comparedAny: succeeded.length > 0,
   };
 }
@@ -390,7 +393,11 @@ export async function checkInstanceDrift(
 
   // 4. Aggregate.
   const aggregate = aggregateDrift(outcome, available);
-  if (aggregate.allSectionsErrored) {
+  if (aggregate.anySectionErrored) {
+    // A partial (or total) section failure is an incomplete diff. Surface degraded and leave
+    // contentCheckedAt null so persist preserves last-known content rather than overwriting
+    // prior drift with an incomplete "clean" snapshot (which would erase drift in the failed
+    // section and surface a false in-sync).
     return build('error', 'invalid_response', { detectedVersion: version });
   }
   if (!aggregate.comparedAny) {

@@ -4,7 +4,7 @@ import { db } from '$db/db.ts';
 import { runMigrations } from '$db/migrations.ts';
 import { arrInstancesQueries, type ArrInstance } from '$db/queries/arrInstances.ts';
 import { driftStatusQueries, type DriftInstanceStatusDetail } from '$db/queries/driftStatus.ts';
-import { checkAndPersistInstance, shouldNotify } from '$sync/drift/persist.ts';
+import { checkAndPersistInstance, shouldNotify, type CheckAndPersistOutcome } from '$sync/drift/persist.ts';
 import type { DriftCheckDeps } from '$sync/drift/check.ts';
 import type { GeneratePreviewResult } from '$sync/preview/orchestrator.ts';
 import type { EntityChange, SyncPreviewSection } from '$sync/preview/types.ts';
@@ -17,7 +17,7 @@ import { resetPreviewCreateRateLimitForTests } from '$sync/preview/limits.ts';
  * the full migration chain (so `drift_instance_status` and the FK to `arr_instances` exist),
  * resets the shared preview rate-limit window, then runs the test body. The drift check's IO
  * boundary is fully stubbed via `DriftCheckDeps` so the assertions exercise persist.ts wiring
- * (upsert/replace, failed-check preservation, dedup notify, in-flight guard, never-throws) and
+ * (outcome union, failed-check preservation, dedup notify, in-flight guard, never-throws) and
  * the real query layer — never the network.
  */
 function migratedTest(name: string, fn: () => Promise<void> | void): void {
@@ -61,6 +61,19 @@ function createInstance(name: string): ArrInstance {
   const row = arrInstancesQueries.getById(id);
   assertExists(row);
   return row;
+}
+
+/**
+ * Unwrap a successful outcome to its `InstanceDriftResult`, failing the test loudly on the
+ * `in_flight`/`error` discriminants. `checkAndPersistInstance` now returns a discriminated
+ * union, so every "success" call site narrows through here.
+ */
+function expectOk(outcome: CheckAndPersistOutcome): InstanceDriftResult {
+  assertEquals(outcome.kind, 'ok');
+  if (outcome.kind !== 'ok') {
+    throw new Error(`expected an ok outcome, got kind=${outcome.kind}`);
+  }
+  return outcome.result;
 }
 
 const UPDATE_ENTITY: EntityChange = {
@@ -107,6 +120,34 @@ function previewWith(instance: ArrInstance, qualityProfiles: EntityChange[]): Ge
 }
 
 /**
+ * A two-section preview where `qualityProfiles` compared clean (no changes) while
+ * `delayProfiles` errored. `aggregateDrift` reports `anySectionErrored`, so the whole check is
+ * an incomplete diff: `checkInstanceDrift` surfaces `error`/`invalid_response` with a null
+ * `contentCheckedAt`, and persist must NOT overwrite prior drift with this partial "clean" pass.
+ */
+function partialFailurePreview(instance: ArrInstance): GeneratePreviewResult {
+  return {
+    instanceId: instance.id,
+    instanceName: instance.name,
+    arrType: 'radarr',
+    status: 'ready',
+    createdAtMs: 0,
+    sections: ['qualityProfiles', 'delayProfiles'],
+    sectionOutcomes: [
+      { section: 'qualityProfiles', error: null, skipped: false },
+      { section: 'delayProfiles', error: 'delay profile fetch failed', skipped: false },
+    ],
+    // qualityProfiles compared clean (present, no changes); delayProfiles errored (null payload).
+    qualityProfiles: { section: 'qualityProfiles', customFormats: [], qualityProfiles: [] },
+    delayProfiles: null,
+    mediaManagement: null,
+    metadataProfiles: null,
+    summary: { totalCreates: 0, totalUpdates: 0, totalDeletes: 0, totalUnchanged: 0 },
+    errors: [],
+  };
+}
+
+/**
  * Fully stubbed drift deps: reachable heartbeat, ready cache, one available section, an
  * always-allowed rate gate, and a fixed clock. Callers override `generatePreview`/`now`.
  */
@@ -127,6 +168,18 @@ function driftedDeps(instance: ArrInstance, entities: EntityChange[], nowIso: st
   return deps({
     now: () => Date.parse(nowIso),
     generatePreview: () => Promise.resolve(previewWith(instance, entities)),
+  });
+}
+
+/**
+ * Deps whose available set spans two sections but whose preview errors one of them while the
+ * other compares clean — the PARTIAL section failure path.
+ */
+function partialFailureDeps(instance: ArrInstance, nowIso: string): Partial<DriftCheckDeps> {
+  return deps({
+    now: () => Date.parse(nowIso),
+    resolveAvailableSections: () => new Set<SyncPreviewSection>(['qualityProfiles', 'delayProfiles']),
+    generatePreview: () => Promise.resolve(partialFailurePreview(instance)),
   });
 }
 
@@ -152,7 +205,7 @@ async function awaitNotified(instanceId: number, expected: string | null, tries 
 }
 
 // ---------------------------------------------------------------------------
-// Pure predicate: shouldNotify
+// Pure predicate: shouldNotify (dedups PURELY on notified_signature)
 // ---------------------------------------------------------------------------
 
 function driftResult(overrides: Partial<InstanceDriftResult> = {}): InstanceDriftResult {
@@ -193,12 +246,14 @@ function priorDetail(overrides: Partial<DriftInstanceStatusDetail> = {}): DriftI
   };
 }
 
-Deno.test('shouldNotify fires on newly detected drift (no prior row or prior not drifted)', () => {
+Deno.test('shouldNotify fires on newly detected drift (no prior notified signature)', () => {
+  // No prior row at all → fire.
   assert(shouldNotify(undefined, driftResult({ driftSignature: 'sig-a' })));
-  assert(shouldNotify(priorDetail({ status: 'in-sync', notifiedSignature: null }), driftResult()));
+  // Prior row exists but nothing was ever notified (null signature) → fire.
+  assert(shouldNotify(priorDetail({ notifiedSignature: null }), driftResult({ driftSignature: 'sig-a' })));
 });
 
-Deno.test('shouldNotify does NOT re-fire on an identical repeat', () => {
+Deno.test('shouldNotify does NOT re-fire when the notified signature already matches', () => {
   const prior = priorDetail({ status: 'drifted', notifiedSignature: 'sig-a' });
   assertEquals(shouldNotify(prior, driftResult({ driftSignature: 'sig-a' })), false);
 });
@@ -208,7 +263,17 @@ Deno.test('shouldNotify re-fires when the alerting drift set changes', () => {
   assert(shouldNotify(prior, driftResult({ driftSignature: 'sig-b' })));
 });
 
-Deno.test('shouldNotify does NOT fire on unmanaged-only, recovery, or unreachable', () => {
+Deno.test('shouldNotify dedups purely on notified signature, ignoring prior status', () => {
+  // drifted → transient error → drifted with the SAME signature: the prior row now reads
+  // status=error, but its notified_signature is still sig-a, so the returning identical drift
+  // must NOT re-fire. Dedup keys on notified_signature ONLY, never on prior.status.
+  const priorError = priorDetail({ status: 'error', reason: 'invalid_response', notifiedSignature: 'sig-a' });
+  assertEquals(shouldNotify(priorError, driftResult({ driftSignature: 'sig-a' })), false);
+  // A DIFFERENT signature returning after that same error DOES fire.
+  assert(shouldNotify(priorError, driftResult({ driftSignature: 'sig-c' })));
+});
+
+Deno.test('shouldNotify never fires on a non-drifted status', () => {
   // Unmanaged-only resolves to in-sync with a null signature: non-alerting.
   assertEquals(
     shouldNotify(
@@ -222,8 +287,15 @@ Deno.test('shouldNotify does NOT fire on unmanaged-only, recovery, or unreachabl
     shouldNotify(priorDetail({ status: 'drifted' }), driftResult({ status: 'in-sync', driftSignature: null })),
     false
   );
-  // Reachability/error statuses never notify.
+  // Reachability/error statuses never notify, even with no prior row.
   assertEquals(shouldNotify(undefined, driftResult({ status: 'unreachable', reason: 'timeout' })), false);
+  assertEquals(
+    shouldNotify(
+      priorDetail({ notifiedSignature: null }),
+      driftResult({ status: 'error', reason: 'invalid_response', driftSignature: null })
+    ),
+    false
+  );
 });
 
 // ---------------------------------------------------------------------------
@@ -233,12 +305,10 @@ Deno.test('shouldNotify does NOT fire on unmanaged-only, recovery, or unreachabl
 migratedTest('a successful drift check upserts exactly one row with the fresh diff', async () => {
   const instance = createInstance('Radarr Upsert');
 
-  const result = await checkAndPersistInstance(
-    instance,
-    driftedDeps(instance, [UPDATE_ENTITY], '2026-07-08T10:00:00.000Z')
+  const result = expectOk(
+    await checkAndPersistInstance(instance, driftedDeps(instance, [UPDATE_ENTITY], '2026-07-08T10:00:00.000Z'))
   );
 
-  assertExists(result);
   assertEquals(result.status, 'drifted');
   assertEquals(driftRowCount(), 1);
 
@@ -257,15 +327,17 @@ migratedTest('a successful drift check upserts exactly one row with the fresh di
 migratedTest('a second check REPLACES the row — count stays 1, no growth', async () => {
   const instance = createInstance('Radarr Replace');
 
-  await checkAndPersistInstance(instance, driftedDeps(instance, [UPDATE_ENTITY], '2026-07-08T10:00:00.000Z'));
+  expectOk(await checkAndPersistInstance(instance, driftedDeps(instance, [UPDATE_ENTITY], '2026-07-08T10:00:00.000Z')));
   assertEquals(driftRowCount(), 1);
 
   // Second, different diff for the same instance.
-  const second = await checkAndPersistInstance(
-    instance,
-    driftedDeps(instance, [UPDATE_ENTITY, OTHER_UPDATE_ENTITY], '2026-07-08T11:00:00.000Z')
+  const second = expectOk(
+    await checkAndPersistInstance(
+      instance,
+      driftedDeps(instance, [UPDATE_ENTITY, OTHER_UPDATE_ENTITY], '2026-07-08T11:00:00.000Z')
+    )
   );
-  assertExists(second);
+  assertEquals(second.counts.drifted, 2);
 
   assertEquals(driftRowCount(), 1);
   const row = driftStatusQueries.getById(instance.id);
@@ -278,17 +350,19 @@ migratedTest('a failed check preserves prior changes and content_checked_at', as
   const instance = createInstance('Radarr Failed');
 
   // Establish a last-known-good drifted state.
-  await checkAndPersistInstance(instance, driftedDeps(instance, [UPDATE_ENTITY], '2026-07-08T10:00:00.000Z'));
+  expectOk(await checkAndPersistInstance(instance, driftedDeps(instance, [UPDATE_ENTITY], '2026-07-08T10:00:00.000Z')));
   const before = driftStatusQueries.getById(instance.id);
   assertExists(before);
   assertEquals(before.status, 'drifted');
 
-  // Now the instance goes unreachable (heartbeat fails, no status → timeout).
-  const failed = await checkAndPersistInstance(
-    instance,
-    deps({ now: () => Date.parse('2026-07-08T12:00:00.000Z'), heartbeat: () => Promise.resolve({ ok: false }) })
+  // Now the instance goes unreachable (heartbeat fails, no status → timeout). This is a normal
+  // (non-throwing) degraded result, so it is still an `ok` outcome carrying the failed status.
+  const failed = expectOk(
+    await checkAndPersistInstance(
+      instance,
+      deps({ now: () => Date.parse('2026-07-08T12:00:00.000Z'), heartbeat: () => Promise.resolve({ ok: false }) })
+    )
   );
-  assertExists(failed);
   assertEquals(failed.status, 'unreachable');
   assertEquals(failed.contentCheckedAt, null);
 
@@ -308,16 +382,54 @@ migratedTest('a failed check preserves prior changes and content_checked_at', as
   assertEquals(driftRowCount(), 1);
 });
 
+migratedTest('a PARTIAL section failure preserves prior drift and does not blank it to in-sync', async () => {
+  const instance = createInstance('Radarr Partial');
+
+  // Establish a last-known-good drifted state on the qualityProfiles section.
+  expectOk(await checkAndPersistInstance(instance, driftedDeps(instance, [UPDATE_ENTITY], '2026-07-08T10:00:00.000Z')));
+  const before = driftStatusQueries.getById(instance.id);
+  assertExists(before);
+  assertEquals(before.status, 'drifted');
+  assertEquals(before.counts.drifted, 1);
+  assertExists(before.driftSignature);
+
+  // Next check: two available sections, one errors (delayProfiles) while the other compares
+  // clean (qualityProfiles, now with no changes). Because at least one available section
+  // errored, the check is an INCOMPLETE diff — it must surface error/invalid_response with a
+  // null content stamp, NOT a false in-sync that erases the drift in the failed section.
+  const partial = expectOk(
+    await checkAndPersistInstance(instance, partialFailureDeps(instance, '2026-07-08T12:00:00.000Z'))
+  );
+  assertEquals(partial.status, 'error');
+  assertEquals(partial.reason, 'invalid_response');
+  assertEquals(partial.contentCheckedAt, null);
+  assertEquals(partial.counts.drifted, 0);
+  assertEquals(partial.driftSignature, null);
+
+  const after = driftStatusQueries.getById(instance.id);
+  assertExists(after);
+  // The failed status/reason and advancing checkedAt are recorded...
+  assertEquals(after.status, 'error');
+  assertEquals(after.reason, 'invalid_response');
+  assertEquals(after.checkedAt, '2026-07-08T12:00:00.000Z');
+  // ...but the prior content (drift in the section that could NOT be re-verified) is preserved
+  // verbatim rather than overwritten with the clean partial snapshot.
+  assertEquals(after.counts.drifted, before.counts.drifted);
+  assertEquals(after.changes.length, 1);
+  assertEquals(after.changes[0].name, 'HD-1080p');
+  assertEquals(after.driftSignature, before.driftSignature);
+  assertEquals(after.contentCheckedAt, before.contentCheckedAt);
+  assertEquals(driftRowCount(), 1);
+});
+
 migratedTest('drift emit advances notified_signature; unmanaged-only never notifies', async () => {
   const drifted = createInstance('Radarr Notify');
   const unmanaged = createInstance('Radarr Unmanaged');
 
   // Drifted (alerting) instance: notify fires, notified_signature advances after emit.
-  const result = await checkAndPersistInstance(
-    drifted,
-    driftedDeps(drifted, [UPDATE_ENTITY], '2026-07-08T10:00:00.000Z')
+  const result = expectOk(
+    await checkAndPersistInstance(drifted, driftedDeps(drifted, [UPDATE_ENTITY], '2026-07-08T10:00:00.000Z'))
   );
-  assertExists(result);
   assertExists(result.driftSignature);
 
   // Immediately after the call returns, the upsert has NOT touched notified_signature —
@@ -330,11 +442,9 @@ migratedTest('drift emit advances notified_signature; unmanaged-only never notif
   assertEquals(notified, result.driftSignature);
 
   // Unmanaged-only resolves to in-sync: no emit, notified_signature stays null.
-  const unmanagedResult = await checkAndPersistInstance(
-    unmanaged,
-    driftedDeps(unmanaged, [DELETE_ENTITY], '2026-07-08T10:00:00.000Z')
+  const unmanagedResult = expectOk(
+    await checkAndPersistInstance(unmanaged, driftedDeps(unmanaged, [DELETE_ENTITY], '2026-07-08T10:00:00.000Z'))
   );
-  assertExists(unmanagedResult);
   assertEquals(unmanagedResult.status, 'in-sync');
   assertEquals(unmanagedResult.counts.unmanaged, 1);
 
@@ -348,42 +458,113 @@ migratedTest('drift emit advances notified_signature; unmanaged-only never notif
 migratedTest('a changed drift set re-advances notified_signature after a new emit', async () => {
   const instance = createInstance('Radarr Resignature');
 
-  const first = await checkAndPersistInstance(
-    instance,
-    driftedDeps(instance, [UPDATE_ENTITY], '2026-07-08T10:00:00.000Z')
+  const first = expectOk(
+    await checkAndPersistInstance(instance, driftedDeps(instance, [UPDATE_ENTITY], '2026-07-08T10:00:00.000Z'))
   );
-  assertExists(first);
   const sigA = await awaitNotified(instance.id, first.driftSignature);
   assertEquals(sigA, first.driftSignature);
 
   // Identical repeat: prior.notifiedSignature === next.driftSignature, so shouldNotify is
   // false and the signature must not move.
-  const repeat = await checkAndPersistInstance(
-    instance,
-    driftedDeps(instance, [UPDATE_ENTITY], '2026-07-08T10:30:00.000Z')
+  const repeat = expectOk(
+    await checkAndPersistInstance(instance, driftedDeps(instance, [UPDATE_ENTITY], '2026-07-08T10:30:00.000Z'))
   );
-  assertExists(repeat);
   assertEquals(repeat.driftSignature, first.driftSignature);
   await flush();
   assertEquals(driftStatusQueries.getById(instance.id)?.notifiedSignature, sigA);
 
   // Changed alerting set → new signature → re-emit advances notified_signature.
-  const changed = await checkAndPersistInstance(
-    instance,
-    driftedDeps(instance, [OTHER_UPDATE_ENTITY], '2026-07-08T11:00:00.000Z')
+  const changed = expectOk(
+    await checkAndPersistInstance(instance, driftedDeps(instance, [OTHER_UPDATE_ENTITY], '2026-07-08T11:00:00.000Z'))
   );
-  assertExists(changed);
   assert(changed.driftSignature !== first.driftSignature);
   const sigB = await awaitNotified(instance.id, changed.driftSignature);
   assertEquals(sigB, changed.driftSignature);
 });
 
-migratedTest('checkAndPersistInstance returns null (never throws) on an unexpected dep error', async () => {
+migratedTest('a genuine recovery clears notified_signature so an identical drift re-fires', async () => {
+  const instance = createInstance('Radarr Recovery');
+
+  // Notified drift establishes notified_signature = sigA.
+  const first = expectOk(
+    await checkAndPersistInstance(instance, driftedDeps(instance, [UPDATE_ENTITY], '2026-07-08T10:00:00.000Z'))
+  );
+  const sigA = await awaitNotified(instance.id, first.driftSignature);
+  assertEquals(sigA, first.driftSignature);
+
+  // A fully-clean CONTENT refresh (real successful diff, no alerting drift) is a genuine
+  // recovery: persist clears notified_signature back to null even though nothing re-notified.
+  const recovered = expectOk(
+    await checkAndPersistInstance(instance, driftedDeps(instance, [], '2026-07-08T11:00:00.000Z'))
+  );
+  assertEquals(recovered.status, 'in-sync');
+  assertEquals(recovered.driftSignature, null);
+  assertExists(recovered.contentCheckedAt);
+  // markNotified(null) runs synchronously inside the recovery branch, before the call resolves.
+  assertEquals(driftStatusQueries.getById(instance.id)?.notifiedSignature, null);
+
+  // The SAME drift set returns after the genuine recovery → it MUST re-fire, advancing
+  // notified_signature back to the (identical) signature.
+  const again = expectOk(
+    await checkAndPersistInstance(instance, driftedDeps(instance, [UPDATE_ENTITY], '2026-07-08T12:00:00.000Z'))
+  );
+  assertEquals(again.driftSignature, first.driftSignature);
+  const reNotified = await awaitNotified(instance.id, again.driftSignature);
+  assertEquals(reNotified, again.driftSignature);
+});
+
+migratedTest('drifted → transient error → drifted with the SAME set does NOT re-fire', async () => {
+  const instance = createInstance('Radarr Transient');
+
+  // 1. Notified drift → notified_signature = sigA.
+  const first = expectOk(
+    await checkAndPersistInstance(instance, driftedDeps(instance, [UPDATE_ENTITY], '2026-07-08T10:00:00.000Z'))
+  );
+  const sigA = await awaitNotified(instance.id, first.driftSignature);
+  assertEquals(sigA, first.driftSignature);
+
+  // 2. Transient partial-section error. This is NOT a content refresh (contentCheckedAt=null),
+  // so the recovery-clear branch is skipped: notified_signature must stay sigA and the prior
+  // drift signature must be preserved (so the returning drift keeps the SAME signature).
+  const errored = expectOk(
+    await checkAndPersistInstance(instance, partialFailureDeps(instance, '2026-07-08T11:00:00.000Z'))
+  );
+  assertEquals(errored.status, 'error');
+  const errorRow = driftStatusQueries.getById(instance.id);
+  assertExists(errorRow);
+  assertEquals(errorRow.status, 'error');
+  assertEquals(errorRow.notifiedSignature, sigA); // NOT cleared by the error step.
+  assertEquals(errorRow.driftSignature, first.driftSignature); // Prior drift signature preserved.
+
+  // The persist path's decision on the error row is definitively non-firing: the returning
+  // identical drift's signature already equals the row's notified_signature.
+  assertEquals(
+    shouldNotify(errorRow, driftResult({ instanceId: instance.id, driftSignature: errorRow.driftSignature })),
+    false
+  );
+
+  // 3. The SAME drift set returns. Because notified_signature already matches its signature,
+  // drift.detected must NOT re-fire and notified_signature must remain sigA (unchanged).
+  const returned = expectOk(
+    await checkAndPersistInstance(instance, driftedDeps(instance, [UPDATE_ENTITY], '2026-07-08T12:00:00.000Z'))
+  );
+  assertEquals(returned.status, 'drifted');
+  assertEquals(returned.driftSignature, first.driftSignature);
+
+  await flush();
+  const finalRow = driftStatusQueries.getById(instance.id);
+  assertExists(finalRow);
+  assertEquals(finalRow.status, 'drifted');
+  assertEquals(finalRow.notifiedSignature, sigA); // Unchanged — no re-fire across the transient error.
+  assertEquals(driftRowCount(), 1);
+});
+
+migratedTest('checkAndPersistInstance returns { kind: error } (never throws) on an unexpected dep error', async () => {
   const instance = createInstance('Radarr Throws');
 
   // A throwing clock escapes checkInstanceDrift's inner guards and must be caught by the
-  // persist shell, which logs and returns null rather than propagating.
-  const result = await checkAndPersistInstance(
+  // persist shell, which logs and returns { kind: 'error' } rather than propagating.
+  const outcome = await checkAndPersistInstance(
     instance,
     deps({
       now: () => {
@@ -392,21 +573,19 @@ migratedTest('checkAndPersistInstance returns null (never throws) on an unexpect
     })
   );
 
-  assertEquals(result, null);
+  assertEquals(outcome.kind, 'error');
   // The failure happened before any upsert — no partial row was written.
   assertEquals(driftRowCount(), 0);
 
   // The in-flight guard was released in `finally`, so a subsequent healthy check still runs.
-  const recovered = await checkAndPersistInstance(
-    instance,
-    driftedDeps(instance, [UPDATE_ENTITY], '2026-07-08T10:00:00.000Z')
+  const recovered = expectOk(
+    await checkAndPersistInstance(instance, driftedDeps(instance, [UPDATE_ENTITY], '2026-07-08T10:00:00.000Z'))
   );
-  assertExists(recovered);
   assertEquals(recovered.status, 'drifted');
   assertEquals(driftRowCount(), 1);
 });
 
-migratedTest('an already-in-flight instance returns null without a second write', async () => {
+migratedTest('an already-in-flight instance returns { kind: in_flight } without a second write', async () => {
   const instance = createInstance('Radarr InFlight');
 
   let release: () => void = () => {};
@@ -431,12 +610,11 @@ migratedTest('an already-in-flight instance returns null without a second write'
     instance,
     driftedDeps(instance, [UPDATE_ENTITY], '2026-07-08T10:00:00.000Z')
   );
-  assertEquals(concurrent, null);
+  assertEquals(concurrent.kind, 'in_flight');
 
   // Unblock and let the first call finish.
   release();
-  const first = await blocked;
-  assertExists(first);
+  const first = expectOk(await blocked);
   assertEquals(first.status, 'drifted');
   assertEquals(driftRowCount(), 1);
 });
