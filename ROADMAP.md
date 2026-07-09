@@ -240,7 +240,8 @@ Use this checklist when planning a sprint or milestone.
 - [x] #16 - Rollback / Point-in-Time Restore ([#216](https://github.com/yandy-r/praxrr/pull/216))
 - [x] #20 - Quality Goals foundation ([#215](https://github.com/yandy-r/praxrr/pull/215))
 - [x] #17 - Sync History / Audit Trail ([#214](https://github.com/yandy-r/praxrr/pull/214))
-- [x] #21 - Transparent Automation Engine foundation + drift surface ([#213](https://github.com/yandy-r/praxrr/pull/213))
+- [x] PR [#213](https://github.com/yandy-r/praxrr/pull/213) - Transparent Automation Engine
+      foundation + drift surface; advances open issue [#21](https://github.com/yandy-r/praxrr/issues/21)
 - [x] #15 - Drift Detection Dashboard ([#212](https://github.com/yandy-r/praxrr/pull/212))
 - [x] #24 - Resilient Arr API Adapter Layer ([#211](https://github.com/yandy-r/praxrr/pull/211))
 
