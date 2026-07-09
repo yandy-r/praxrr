@@ -231,6 +231,13 @@ migratedTest('GET /timeline: pagination hasNext + totalPages', async () => {
   assertEquals(p2.hasNext, false);
 });
 
+migratedTest('GET /timeline: pageSize above the cap is clamped to 250', async () => {
+  const inst = seedInstance();
+  seedSync(inst, '2026-07-09T09:00:00.000Z');
+  const body = await listBody('pageSize=100000');
+  assertEquals(body.pageSize, 250);
+});
+
 migratedTest('GET /timeline?instanceId gates to sync+canary', async () => {
   const inst = seedInstance();
   const dbId = seedDatabase();
@@ -309,6 +316,17 @@ migratedTest('GET /timeline/export?format=csv: CSV attachment, RFC-4180 escaped'
   assert(text.includes('"Weird, ""name"""') || text.includes('Weird, ""name""'));
 });
 
+migratedTest('GET /timeline/export?format=csv: neutralizes spreadsheet formula injection', async () => {
+  const inst = seedInstance();
+  // instance_name -> scopeLabel cell; a leading '=' would be evaluated as a formula by Excel/Sheets.
+  seedSync(inst, '2026-07-09T09:00:00.000Z', '=HYPERLINK("http://evil","x")');
+  const res = await GET_EXPORT(exportEvent('format=csv'));
+  const text = await res.text();
+  // apostrophe-guarded (CWE-1236) and no unguarded field beginning with '='
+  assert(text.includes("'=HYPERLINK"), 'formula cell must be apostrophe-guarded');
+  assert(!text.includes(',=HYPERLINK'), 'no CSV field may start with a bare =');
+});
+
 migratedTest('POST /timeline/annotations: 401 unauthenticated, 201 with author, bypass -> null author', async () => {
   const inst = seedInstance();
   const sid = seedSync(inst, '2026-07-09T09:00:00.000Z');
@@ -323,6 +341,8 @@ migratedTest('POST /timeline/annotations: 401 unauthenticated, 201 with author, 
   assertEquals(created.authorUserId, uid);
   assertEquals(created.authorName, `user-${uid}`);
   assertEquals(created.body, 'why');
+  // timestamps are returned as ISO-8601 UTC (not raw space-form), so clients parse them as UTC
+  assert(created.createdAt.includes('T') && created.createdAt.endsWith('Z'), 'createdAt must be ISO-8601 UTC');
 
   const bypass = await POST_NOTE(notePostEvent({ source: 'sync', eventId: sid, body: 'ok' }, null, true));
   assertEquals(bypass.status, 201);
@@ -408,6 +428,26 @@ migratedTest('DELETE /timeline/annotations: 403 non-author, 200 author, 404 unkn
   assertEquals((await DELETE_NOTE(noteDeleteEvent(String(note.id), author))).status, 200);
   assertEquals(timelineAnnotationQueries.getById(note.id), undefined);
   assertEquals((await DELETE_NOTE(noteDeleteEvent('999999', author))).status, 404);
+});
+
+migratedTest('null-author (AUTH=off) notes are editable/deletable only under authBypass', async () => {
+  const inst = seedInstance();
+  const sid = seedSync(inst, '2026-07-09T09:00:00.000Z');
+  const note = timelineAnnotationQueries.create({
+    eventSource: 'sync',
+    eventId: sid,
+    body: 'orig',
+    authorUserId: null,
+    authorName: null,
+  });
+
+  // a regular authenticated user is NOT the author (author is null) -> 403
+  assertEquals((await PATCH_NOTE(notePatchEvent(String(note.id), { body: 'x' }, 6))).status, 403);
+  assertEquals((await DELETE_NOTE(noteDeleteEvent(String(note.id), 6))).status, 403);
+  // bypass mode may edit + delete
+  assertEquals((await PATCH_NOTE(notePatchEvent(String(note.id), { body: 'admin edit' }, null, true))).status, 200);
+  assertEquals((await DELETE_NOTE(noteDeleteEvent(String(note.id), null, true))).status, 200);
+  assertEquals(timelineAnnotationQueries.getById(note.id), undefined);
 });
 
 migratedTest('Annotation on a pruned event is invisible in-feed but survives via annotations GET', async () => {

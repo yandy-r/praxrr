@@ -354,6 +354,17 @@ migratedTest('from/to bounds are inclusive across dialects', () => {
   assertEquals(windowed[0].source, 'sync');
 });
 
+migratedTest('q free-text narrows results by scope label across arms', () => {
+  const inst = seedInstance();
+  seedSync({ arrInstanceId: inst, instanceName: 'Radarr Main', startedAt: '2026-07-09T09:00:00.000Z' });
+  seedSync({ arrInstanceId: inst, instanceName: 'Sonarr Backup', startedAt: '2026-07-09T09:01:00.000Z' });
+  seedCanary({ canaryInstanceId: inst, canaryInstanceName: 'Radarr Canary', startedAt: '2026-07-09T09:02:00.000Z' });
+  const radarr = ALL({ q: 'Radarr' });
+  assertEquals(new Set(radarr.map((r) => r.scope_label)), new Set(['Radarr Main', 'Radarr Canary']));
+  assertEquals(ALL({ q: 'Backup' }).length, 1);
+  assertEquals(ALL({ q: 'Nonexistent' }).length, 0);
+});
+
 migratedTest('sync_history recording disabled still lists pre-existing rows', () => {
   db.execute('UPDATE sync_history_settings SET enabled = 0 WHERE id = 1');
   const inst = seedInstance();

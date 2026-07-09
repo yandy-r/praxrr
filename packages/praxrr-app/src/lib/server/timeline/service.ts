@@ -18,8 +18,11 @@ export function listTimeline(
   filters: TimelineFilters,
   pagination: { page: number; pageSize: number }
 ): TimelineListResponse {
-  const total = timelineFeedQueries.count(filters);
+  // sourceCounts is computed over the same included branches + WHERE/params as the feed, so its
+  // sum IS the total — deriving it here avoids a second, redundant full-union COUNT scan.
+  // (timelineFeedQueries.count remains and is covered directly by the query-module tests.)
   const sourceCounts = timelineFeedQueries.sourceCounts(filters);
+  const total = Object.values(sourceCounts).reduce((sum, count) => sum + count, 0);
   const rows = timelineFeedQueries.search(filters, {
     limit: pagination.pageSize,
     offset: (pagination.page - 1) * pagination.pageSize,

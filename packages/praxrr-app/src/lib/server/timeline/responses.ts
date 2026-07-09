@@ -8,6 +8,7 @@
 import { annotationKey } from '$db/queries/timelineAnnotations.ts';
 import type { TimelineFeedRow } from '$db/queries/timelineFeed.ts';
 import { statusBadge } from './status.ts';
+import { sqliteUtcToIso } from './time.ts';
 import type {
   TimelineAnnotation,
   TimelineArrType,
@@ -17,15 +18,6 @@ import type {
   TimelineSourceCounts,
   TimelineStatus,
 } from './types.ts';
-
-/**
- * Convert the normalized `occurred_at` sort key (`YYYY-MM-DD HH:MM:SS.SSS`, UTC) into a uniform
- * ISO-8601 UTC timestamp, so the API surface is dialect-agnostic regardless of which source (ISO
- * or space-form) produced the row.
- */
-function toIso(occurredAt: string): string {
-  return `${occurredAt.replace(' ', 'T')}Z`;
-}
 
 function drop<T extends Record<string, string | number | null>>(bag: T): Record<string, string | number | null> {
   const out: Record<string, string | number | null> = {};
@@ -103,7 +95,7 @@ export function toTimelineEvent(row: TimelineFeedRow, annotations: TimelineAnnot
     id: annotationKey(row.source, row.source_id),
     source: row.source,
     sourceId: row.source_id,
-    timestamp: toIso(row.occurred_at),
+    timestamp: sqliteUtcToIso(row.occurred_at),
     type: row.trigger,
     status,
     badge: statusBadge(status),

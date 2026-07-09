@@ -304,6 +304,12 @@ annotation:
           application/json:
             schema:
               $ref: '../schemas/arr.yaml#/ErrorResponse'
+      '401':
+        description: Authentication required
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
       '403':
         description: Not the author
         content:
@@ -348,6 +354,12 @@ annotation:
                   type: boolean
       '400':
         description: Invalid id
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+      '401':
+        description: Authentication required
         content:
           application/json:
             schema:

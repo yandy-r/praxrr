@@ -1,4 +1,5 @@
 import { db } from '../db.ts';
+import { sqliteUtcToIso } from '$lib/server/timeline/time.ts';
 import type { TimelineAnnotation, TimelineSource } from '$lib/server/timeline/types.ts';
 
 /**
@@ -41,8 +42,8 @@ function toAnnotation(row: TimelineAnnotationRow): TimelineAnnotation {
     body: row.body,
     authorUserId: row.author_user_id,
     authorName: row.author_name,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
+    createdAt: sqliteUtcToIso(row.created_at),
+    updatedAt: sqliteUtcToIso(row.updated_at),
   };
 }
 
