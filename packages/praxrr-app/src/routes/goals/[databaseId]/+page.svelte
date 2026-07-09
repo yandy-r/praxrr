@@ -40,6 +40,9 @@
   let applying = false;
   let ready = false;
   let previewTimer: ReturnType<typeof setTimeout> | undefined;
+  // Sequence guards: only the latest in-flight request may write shared state (out-of-order responses).
+  let previewRequestId = 0;
+  let bindingRequestId = 0;
 
   $: databaseId = data.currentDatabase.id;
   $: changeCount = preview?.configDiff[0]?.changes.length ?? 0;
@@ -90,20 +93,25 @@
   }
 
   async function loadBinding(): Promise<void> {
+    const requestId = ++bindingRequestId;
     if (!profileName) {
       binding = null;
       return;
     }
     const params = new URLSearchParams({ databaseId: String(databaseId), profileName, arrType });
     const response = await fetch(`/api/v1/goals/binding?${params}`);
+    if (requestId !== bindingRequestId) return;
     if (!response.ok) {
       binding = null;
       return;
     }
-    binding = ((await response.json()) as components['schemas']['GoalBindingResponse']).binding;
+    const body = (await response.json()) as components['schemas']['GoalBindingResponse'];
+    if (requestId !== bindingRequestId) return;
+    binding = body.binding;
   }
 
   async function runPreview(): Promise<void> {
+    const requestId = ++previewRequestId;
     if (!profileName) {
       preview = null;
       return;
@@ -116,18 +124,23 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ databaseId, arrType, profileName, preset: presetId, weights }),
       });
+      if (requestId !== previewRequestId) return;
       if (!response.ok) {
         const body = (await response.json().catch(() => null)) as { message?: string; error?: string } | null;
+        if (requestId !== previewRequestId) return;
         previewError = body?.message ?? body?.error ?? `Preview failed (HTTP ${response.status})`;
         preview = null;
         return;
       }
-      preview = (await response.json()) as GoalPreviewResponse;
+      const body = (await response.json()) as GoalPreviewResponse;
+      if (requestId !== previewRequestId) return;
+      preview = body;
     } catch (err) {
+      if (requestId !== previewRequestId) return;
       previewError = err instanceof Error ? err.message : 'Preview failed';
       preview = null;
     } finally {
-      loadingPreview = false;
+      if (requestId === previewRequestId) loadingPreview = false;
     }
   }
 
@@ -194,6 +207,7 @@
     </div>
     <select
       class="rounded-lg border border-neutral-300 bg-white px-3 py-1.5 text-sm dark:border-neutral-700 dark:bg-neutral-800"
+      aria-label="Database"
       value={String(databaseId)}
       on:change={onDatabaseChange}
     >
@@ -286,6 +300,8 @@
                 {#each axis.options ?? [] as option (option)}
                   <button
                     type="button"
+                    aria-label={`${axis.label}: ${option}`}
+                    aria-pressed={weights.resolutionCeiling === option}
                     class="flex-1 rounded-lg border px-2 py-1 text-xs font-medium transition-colors {weights.resolutionCeiling ===
                     option
                       ? 'border-accent-500 bg-accent-50 text-accent-700 dark:bg-accent-900/30 dark:text-accent-300'
@@ -299,6 +315,7 @@
             {:else}
               <input
                 type="range"
+                aria-label={axis.label}
                 min={axis.min ?? 0}
                 max={axis.max ?? 100}
                 step={axis.step ?? 1}

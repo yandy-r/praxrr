@@ -65,12 +65,17 @@ const BEST_QUALITY_WEIGHTS = {
   compatibility: 30,
   hdrPreference: 70,
   unwantedStrictness: 85,
-  resolutionCeiling: '2160p'
+  resolutionCeiling: '2160p',
 };
 
 type Restore = () => void;
 
-function patchTarget<T extends object, K extends keyof T>(target: T, key: K, replacement: T[K], restores: Restore[]): void {
+function patchTarget<T extends object, K extends keyof T>(
+  target: T,
+  key: K,
+  replacement: T[K],
+  restores: Restore[]
+): void {
   const original = target[key];
   target[key] = replacement;
   restores.push(() => {
@@ -96,7 +101,7 @@ function buildInstance(): DatabaseInstance {
     conflict_strategy: 'override',
     last_synced_at: null,
     created_at: '2026-01-01 00:00:00',
-    updated_at: '2026-01-01 00:00:00'
+    updated_at: '2026-01-01 00:00:00',
   };
 }
 
@@ -115,7 +120,7 @@ function createCurrentCache(): CurrentFixture {
     destroy: async () => {
       await kb.destroy();
       sqlite.close();
-    }
+    },
   };
 }
 
@@ -159,8 +164,8 @@ function postEvent(payload: unknown): any {
     request: new Request('http://localhost/api/v1/goals', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(payload)
-    })
+      body: JSON.stringify(payload),
+    }),
   };
 }
 
@@ -194,7 +199,7 @@ function migratedTest(name: string, fn: () => Promise<void> | void): void {
         config.setBasePath(originalBasePath);
         await Deno.remove(tempBasePath, { recursive: true }).catch(() => {});
       }
-    }
+    },
   });
 }
 
@@ -207,10 +212,12 @@ Deno.test('goals presets: returns the catalog, axes, and engine version', async 
   const response: Response = await presetsRoute.GET({} as any);
   assertEquals(response.status, 200);
   const body = (await response.json()) as GoalPresetsResponse;
-  assertEquals(
-    body.presets.map((preset) => preset.id).sort(),
-    ['4k-hdr-priority', 'balanced', 'best-quality', 'smallest-size']
-  );
+  assertEquals(body.presets.map((preset) => preset.id).sort(), [
+    '4k-hdr-priority',
+    'balanced',
+    'best-quality',
+    'smallest-size',
+  ]);
   assertEquals(body.axes.length, 5);
   assert(body.axes.some((axis) => axis.key === 'resolutionCeiling' && axis.kind === 'ceiling'));
   assertEquals(body.engineVersion, '1');
@@ -223,13 +230,22 @@ Deno.test('goals presets: returns the catalog, axes, and engine version', async 
 Deno.test('goals preview: returns the plan + config diff without persisting', async () => {
   await withGoalsFixture(async (databaseId, current) => {
     const response: Response = await previewRoute.POST(
-      postEvent({ databaseId, arrType: 'radarr', profileName: 'Movies', preset: 'best-quality', weights: BEST_QUALITY_WEIGHTS })
+      postEvent({
+        databaseId,
+        arrType: 'radarr',
+        profileName: 'Movies',
+        preset: 'best-quality',
+        weights: BEST_QUALITY_WEIGHTS,
+      })
     );
     assertEquals(response.status, 200);
     const body = (await response.json()) as GoalPreviewResponse;
 
     assertEquals(body.plan.coverage, { total: 6, scored: 5, uncategorized: 1 });
-    assertEquals(body.plan.uncategorized.map((cf) => cf.name), ['x265 (Bluray)']);
+    assertEquals(
+      body.plan.uncategorized.map((cf) => cf.name),
+      ['x265 (Bluray)']
+    );
     const dv = body.plan.decisions.find((d) => d.customFormatName === 'Dolby Vision');
     assertEquals(dv?.category, 'hdr_dv');
     assertEquals(dv?.score, 680);
@@ -252,16 +268,44 @@ Deno.test('goals preview: returns the plan + config diff without persisting', as
 });
 
 Deno.test('goals preview: validation and missing-cache errors', async () => {
-  await assertRejects(async () => previewRoute.POST(postEvent({ databaseId: 1, arrType: 'lidarr', profileName: 'M', preset: 'balanced', weights: BEST_QUALITY_WEIGHTS })));
-  await assertRejects(async () => previewRoute.POST(postEvent({ databaseId: 1, arrType: 'radarr', profileName: 'M', preset: 'nope', weights: BEST_QUALITY_WEIGHTS })));
   await assertRejects(async () =>
     previewRoute.POST(
-      postEvent({ databaseId: 1, arrType: 'radarr', profileName: 'M', preset: 'balanced', weights: { ...BEST_QUALITY_WEIGHTS, qualityVsSize: 150 } })
+      postEvent({
+        databaseId: 1,
+        arrType: 'lidarr',
+        profileName: 'M',
+        preset: 'balanced',
+        weights: BEST_QUALITY_WEIGHTS,
+      })
+    )
+  );
+  await assertRejects(async () =>
+    previewRoute.POST(
+      postEvent({ databaseId: 1, arrType: 'radarr', profileName: 'M', preset: 'nope', weights: BEST_QUALITY_WEIGHTS })
+    )
+  );
+  await assertRejects(async () =>
+    previewRoute.POST(
+      postEvent({
+        databaseId: 1,
+        arrType: 'radarr',
+        profileName: 'M',
+        preset: 'balanced',
+        weights: { ...BEST_QUALITY_WEIGHTS, qualityVsSize: 150 },
+      })
     )
   );
   // Unregistered databaseId -> 404 (valid body, no cache).
   const notFound = await assertRejects(async () =>
-    previewRoute.POST(postEvent({ databaseId: 999999, arrType: 'radarr', profileName: 'Movies', preset: 'balanced', weights: BEST_QUALITY_WEIGHTS }))
+    previewRoute.POST(
+      postEvent({
+        databaseId: 999999,
+        arrType: 'radarr',
+        profileName: 'Movies',
+        preset: 'balanced',
+        weights: BEST_QUALITY_WEIGHTS,
+      })
+    )
   );
   assertEquals(getErrorStatus(notFound), 404);
 });
@@ -273,13 +317,28 @@ Deno.test('goals preview: validation and missing-cache errors', async () => {
 Deno.test('goals apply: engine-version mismatch -> 409, missing version -> 400', async () => {
   const mismatch = await assertRejects(async () =>
     applyRoute.POST(
-      postEvent({ databaseId: 1, arrType: 'radarr', profileName: 'Movies', preset: 'balanced', weights: BEST_QUALITY_WEIGHTS, expectedEngineVersion: '0' })
+      postEvent({
+        databaseId: 1,
+        arrType: 'radarr',
+        profileName: 'Movies',
+        preset: 'balanced',
+        weights: BEST_QUALITY_WEIGHTS,
+        expectedEngineVersion: '0',
+      })
     )
   );
   assertEquals(getErrorStatus(mismatch), 409);
 
   const missing = await assertRejects(async () =>
-    applyRoute.POST(postEvent({ databaseId: 1, arrType: 'radarr', profileName: 'Movies', preset: 'balanced', weights: BEST_QUALITY_WEIGHTS }))
+    applyRoute.POST(
+      postEvent({
+        databaseId: 1,
+        arrType: 'radarr',
+        profileName: 'Movies',
+        preset: 'balanced',
+        weights: BEST_QUALITY_WEIGHTS,
+      })
+    )
   );
   assertEquals(getErrorStatus(missing), 400);
 });
@@ -293,10 +352,12 @@ migratedTest('goals binding: null when unbound, then reflects an upserted bindin
     uuid: crypto.randomUUID(),
     name: 'Binding Route DB',
     repositoryUrl: 'https://example.invalid/repo.git',
-    localPath: '/tmp/binding-route-db-does-not-exist'
+    localPath: '/tmp/binding-route-db-does-not-exist',
   });
 
-  const empty: Response = await bindingRoute.GET(getEvent(`databaseId=${databaseId}&profileName=Movies&arrType=radarr`));
+  const empty: Response = await bindingRoute.GET(
+    getEvent(`databaseId=${databaseId}&profileName=Movies&arrType=radarr`)
+  );
   assertEquals(empty.status, 200);
   assertEquals(((await empty.json()) as GoalBindingResponse).binding, null);
 
@@ -307,14 +368,27 @@ migratedTest('goals binding: null when unbound, then reflects an upserted bindin
     presetId: 'best-quality',
     weightsJson: JSON.stringify(BEST_QUALITY_WEIGHTS),
     engineVersion: '1',
-    appliedAt: '2026-07-09T00:00:00.000Z'
+    appliedAt: '2026-07-09T00:00:00.000Z',
   });
 
-  const bound: Response = await bindingRoute.GET(getEvent(`databaseId=${databaseId}&profileName=Movies&arrType=radarr`));
+  const bound: Response = await bindingRoute.GET(
+    getEvent(`databaseId=${databaseId}&profileName=Movies&arrType=radarr`)
+  );
   const body = (await bound.json()) as GoalBindingResponse;
   assertEquals(body.binding?.presetId, 'best-quality');
   assertEquals(body.binding?.weights.resolutionCeiling, '2160p');
 
-  const badArr = await assertRejects(async () => bindingRoute.GET(getEvent(`databaseId=${databaseId}&profileName=Movies&arrType=lidarr`)));
+  const badArr = await assertRejects(async () =>
+    bindingRoute.GET(getEvent(`databaseId=${databaseId}&profileName=Movies&arrType=lidarr`))
+  );
   assertEquals(getErrorStatus(badArr), 400);
+});
+
+Deno.test('goals binding: empty or missing databaseId query param -> 400 (not a 200 null)', async () => {
+  const empty = await assertRejects(async () =>
+    bindingRoute.GET(getEvent('databaseId=&profileName=Movies&arrType=radarr'))
+  );
+  assertEquals(getErrorStatus(empty), 400);
+  const missing = await assertRejects(async () => bindingRoute.GET(getEvent('profileName=Movies&arrType=radarr')));
+  assertEquals(getErrorStatus(missing), 400);
 });

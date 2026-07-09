@@ -15,7 +15,7 @@ export const GET: RequestHandler = ({ url }) => {
   const arrType = url.searchParams.get('arrType');
 
   const databaseId = Number(rawDatabaseId);
-  if (rawDatabaseId === null || !Number.isInteger(databaseId)) {
+  if (rawDatabaseId === null || rawDatabaseId.trim() === '' || !Number.isInteger(databaseId)) {
     throw error(400, 'databaseId query parameter must be an integer');
   }
   if (profileName === null || profileName.trim() === '') {
