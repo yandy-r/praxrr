@@ -86,6 +86,9 @@ export const POST: RequestHandler = async (event) => {
 
   const { credential, credentialDeviceType, credentialBackedUp, aaguid } = verification.registrationInfo;
 
+  if (body.name !== undefined && typeof body.name !== 'string') {
+    return json({ error: 'Invalid name' } satisfies ErrorResponse, { status: 400 });
+  }
   const requestedName = (body.name ?? '').trim();
   const name = requestedName || defaultCredentialName(event.request.headers.get('user-agent') ?? '');
   if (name.length > MAX_NAME_LENGTH) {

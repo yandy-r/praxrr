@@ -26,7 +26,8 @@
 
   let passkeyName = '';
   let registering = false;
-  let canUseWebAuthn = false;
+  // null until resolved in onMount — avoids rendering a false "unsupported" message during SSR.
+  let canUseWebAuthn: boolean | null = null;
 
   let regeneratingKey = false;
   let revealInProgress = false;
@@ -562,7 +563,7 @@
                 on:click={registerPasskey}
               />
             </div>
-            {#if !canUseWebAuthn}
+            {#if canUseWebAuthn === false}
               <p class="text-sm text-neutral-500 dark:text-neutral-400">This browser doesn't support passkeys.</p>
             {/if}
             {#if data.passkeys.length > 0}
