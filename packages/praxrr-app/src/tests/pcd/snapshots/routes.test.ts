@@ -168,11 +168,11 @@ Deno.test('snapshot detail route returns computed opsWrittenSince and never-rest
     snapshotService,
     'getFullDetail',
     (() =>
-      ({
+      Promise.resolve({
         ...snapshot,
         opsWrittenSince: 15,
         isRestorable: false,
-      }) as PcdSnapshotFullDetail) as typeof snapshotService.getFullDetail,
+      } as PcdSnapshotFullDetail)) as typeof snapshotService.getFullDetail,
     restores
   );
 
@@ -275,11 +275,11 @@ Deno.test('snapshot detail and delete routes enforce database ownership', async 
     snapshotService,
     'getFullDetail',
     (() =>
-      ({
+      Promise.resolve({
         ...snapshot,
         opsWrittenSince: 0,
         isRestorable: false,
-      }) as PcdSnapshotFullDetail) as typeof snapshotService.getFullDetail,
+      } as PcdSnapshotFullDetail)) as typeof snapshotService.getFullDetail,
     restores
   );
 

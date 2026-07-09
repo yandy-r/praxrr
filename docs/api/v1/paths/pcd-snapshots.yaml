@@ -202,3 +202,120 @@ snapshotById:
           application/json:
             schema:
               $ref: '../schemas/pcd.yaml#/PcdErrorResponse'
+
+snapshotRollbackPreview:
+  get:
+    operationId: previewSnapshotRollback
+    summary: Preview restoring a PCD snapshot
+    description: |
+      Read-only, PCD-to-PCD preview of exactly what restoring this snapshot would change in
+      the PCD desired state (issue #16). Does not contact any Arr instance. The returned
+      currentStateHash is the from-state value-guard required by the execute endpoint.
+    tags:
+      - PCD Snapshots
+    parameters:
+      - name: databaseId
+        in: path
+        required: true
+        description: PCD database ID
+        schema:
+          type: integer
+      - name: snapshotId
+        in: path
+        required: true
+        description: PCD snapshot ID
+        schema:
+          type: integer
+    responses:
+      '200':
+        description: Rollback preview
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/pcd-snapshots.yaml#/RollbackPreview'
+      '400':
+        description: Invalid parameters
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/pcd.yaml#/PcdErrorResponse'
+      '404':
+        description: Snapshot not found or doesn't belong to database
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/pcd.yaml#/PcdErrorResponse'
+      '500':
+        description: Failed to generate rollback preview
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/pcd.yaml#/PcdErrorResponse'
+
+snapshotRollback:
+  post:
+    operationId: executeSnapshotRollback
+    summary: Execute a PCD point-in-time restore
+    description: |
+      Restores PCD state to this snapshot by rewinding the append-only op log (issue #16).
+      No op rows are deleted; a durable pre-rollback snapshot is captured first. The body's
+      expectedCurrentStateHash (from the preview) guards against an apply-after-change race —
+      a mismatch returns 422 and the caller must regenerate the preview.
+    tags:
+      - PCD Snapshots
+    parameters:
+      - name: databaseId
+        in: path
+        required: true
+        description: PCD database ID
+        schema:
+          type: integer
+      - name: snapshotId
+        in: path
+        required: true
+        description: PCD snapshot ID
+        schema:
+          type: integer
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../schemas/pcd-snapshots.yaml#/ExecuteRollbackRequest'
+    responses:
+      '200':
+        description: Rollback executed
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/pcd-snapshots.yaml#/RollbackResult'
+      '400':
+        description: Invalid parameters or missing expectedCurrentStateHash
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/pcd.yaml#/PcdErrorResponse'
+      '404':
+        description: Snapshot not found or doesn't belong to database
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/pcd.yaml#/PcdErrorResponse'
+      '409':
+        description: Snapshot cannot be reconstructed/verified (unrestorable)
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/pcd.yaml#/PcdErrorResponse'
+      '422':
+        description: Database state changed since preview; regenerate the preview and retry
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/pcd.yaml#/PcdErrorResponse'
+      '500':
+        description: Rollback execution failed
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/pcd.yaml#/PcdErrorResponse'

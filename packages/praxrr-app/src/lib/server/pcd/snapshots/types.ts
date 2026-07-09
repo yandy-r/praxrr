@@ -17,8 +17,10 @@ export type SnapshotType = 'auto' | 'manual';
  * - pull: before a PCD repository pull/refresh
  * - sync: before an Arr instance sync
  * - manual: user-initiated via API
+ * - rollback: system pre-rollback auto-capture taken before a Point-in-Time Restore
+ *   rewinds the op log, so the restore is itself reversible (issue #16)
  */
-export type SnapshotTrigger = 'pull' | 'sync' | 'manual';
+export type SnapshotTrigger = 'pull' | 'sync' | 'manual' | 'rollback';
 
 // ============================================================================
 // INPUT TYPES
@@ -96,9 +98,9 @@ export interface PcdSnapshotFullDetail extends PcdSnapshotDetail {
   /** Number of ops written after this snapshot was taken */
   opsWrittenSince: number;
   /**
-   * Whether this snapshot can theoretically be restored.
-   * Restore support is intentionally disabled in this milestone; this remains
-   * false for all snapshots.
+   * Whether this snapshot can be safely restored (issue #16).
+   * True only when the snapshot's published-op set can be reconstructed and its
+   * recomputed fingerprint matches the stored `cacheStateHash` (fail-closed).
    */
   isRestorable: boolean;
 }

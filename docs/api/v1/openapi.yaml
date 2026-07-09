@@ -359,6 +359,10 @@ paths:
     $ref: './paths/pcd-snapshots.yaml#/snapshots'
   /pcd/{databaseId}/snapshots/{snapshotId}:
     $ref: './paths/pcd-snapshots.yaml#/snapshotById'
+  /pcd/{databaseId}/snapshots/{snapshotId}/rollback/preview:
+    $ref: './paths/pcd-snapshots.yaml#/snapshotRollbackPreview'
+  /pcd/{databaseId}/snapshots/{snapshotId}/rollback:
+    $ref: './paths/pcd-snapshots.yaml#/snapshotRollback'
   /pcd/{databaseId}/lidarr-metadata-profiles:
     get:
       operationId: listLidarrMetadataProfiles
@@ -1044,6 +1048,16 @@ components:
       $ref: './schemas/pcd-snapshots.yaml#/PcdSnapshotListResponse'
     CreateManualSnapshotRequest:
       $ref: './schemas/pcd-snapshots.yaml#/CreateManualSnapshotRequest'
+    RollbackSection:
+      $ref: './schemas/pcd-snapshots.yaml#/RollbackSection'
+    RollbackPreview:
+      $ref: './schemas/pcd-snapshots.yaml#/RollbackPreview'
+    RollbackSummary:
+      $ref: './schemas/pcd-snapshots.yaml#/RollbackSummary'
+    ExecuteRollbackRequest:
+      $ref: './schemas/pcd-snapshots.yaml#/ExecuteRollbackRequest'
+    RollbackResult:
+      $ref: './schemas/pcd-snapshots.yaml#/RollbackResult'
     LidarrMetadataProfileTypeToggle:
       type: object
       required:

@@ -40,6 +40,22 @@ function loadDbOps(databaseId: number, origin: 'base' | 'user', states: PcdOpSta
 }
 
 /**
+ * Load exactly the ops whose raw `pcd_ops.id` is in `ids`, regardless of their CURRENT
+ * state. Used by point-in-time snapshot replay (rollback, issue #16): membership is the
+ * reconstructed published-op set for a snapshot, so every member is mapped as a published
+ * Operation (no draft-sequence offset). Filtering is on raw `op.id`, never `Operation.order`,
+ * so base-draft high-sequence rows cannot leak in.
+ */
+function loadDbOpsByIds(databaseId: number, origin: 'base' | 'user', ids: ReadonlySet<number>): Operation[] {
+  if (ids.size === 0) {
+    return [];
+  }
+  const rows = pcdOpsQueries.listByDatabaseAndOrigin(databaseId, origin);
+  const operations = rows.filter((op) => ids.has(op.id)).map((op) => toOperation(op, origin));
+  return operations.sort(compareOperations);
+}
+
+/**
  * Resolve the schema dependency ops path.
  * Supports both "deps/schema" (upstream) and "deps/praxrr-schema" (fork) layouts.
  */
@@ -62,26 +78,50 @@ async function resolveSchemaOpsPath(pcdPath: string): Promise<string> {
   return `${pcdPath}/deps/schema/ops`;
 }
 
+export interface LoadOperationsOptions {
+  /**
+   * Point-in-time snapshot replay (rollback, issue #16): when present, the base and user
+   * layers are loaded as EXACTLY the ops whose id is in this set (the reconstructed
+   * published-op set for a snapshot), ignoring current op state and base drafts. Schema and
+   * tweaks file layers are still loaded normally — the snapshot fingerprint only covers
+   * `pcd_ops` base+user, so file layers use their current on-disk content.
+   */
+  snapshotOpIds?: ReadonlySet<number>;
+}
+
 /**
  * Load all operations for a PCD in layer order:
  * 1. Schema layer (from dependency)
  * 2. Base layer (published, then drafts)
  * 3. Tweaks layer (from PCD, optional)
  * 4. User ops layer (local user modifications)
+ *
+ * When `options.snapshotOpIds` is provided the base/user layers instead replay exactly that
+ * id set (all as published, no base drafts) for point-in-time snapshot reconstruction.
  */
-export async function loadAllOperations(pcdPath: string, databaseInstanceId: number): Promise<Operation[]> {
+export async function loadAllOperations(
+  pcdPath: string,
+  databaseInstanceId: number,
+  options?: LoadOperationsOptions
+): Promise<Operation[]> {
   const allOperations: Operation[] = [];
+  const snapshotOpIds = options?.snapshotOpIds;
 
   // 1. Load schema layer from dependency (files)
   const schemaPath = await resolveSchemaOpsPath(pcdPath);
   const schemaOps = await loadOperationsFromDir(schemaPath, 'schema');
   allOperations.push(...schemaOps);
 
-  // 2. Load base layer from DB: published, then drafts
-  const basePublished = loadDbOps(databaseInstanceId, 'base', ['published']);
-  allOperations.push(...basePublished);
-  const baseDrafts = loadDbOps(databaseInstanceId, 'base', ['draft'], DRAFT_SEQUENCE_BASE);
-  allOperations.push(...baseDrafts);
+  // 2. Load base layer from DB
+  if (snapshotOpIds) {
+    allOperations.push(...loadDbOpsByIds(databaseInstanceId, 'base', snapshotOpIds));
+  } else {
+    // published, then drafts
+    const basePublished = loadDbOps(databaseInstanceId, 'base', ['published']);
+    allOperations.push(...basePublished);
+    const baseDrafts = loadDbOps(databaseInstanceId, 'base', ['draft'], DRAFT_SEQUENCE_BASE);
+    allOperations.push(...baseDrafts);
+  }
 
   // 3. Load tweaks layer (files, optional)
   const tweaksPath = `${pcdPath}/tweaks`;
@@ -89,8 +129,12 @@ export async function loadAllOperations(pcdPath: string, databaseInstanceId: num
   allOperations.push(...tweakOps);
 
   // 4. User ops layer (DB)
-  const userOps = loadDbOps(databaseInstanceId, 'user', ['published']);
-  allOperations.push(...userOps);
+  if (snapshotOpIds) {
+    allOperations.push(...loadDbOpsByIds(databaseInstanceId, 'user', snapshotOpIds));
+  } else {
+    const userOps = loadDbOps(databaseInstanceId, 'user', ['published']);
+    allOperations.push(...userOps);
+  }
 
   return allOperations;
 }

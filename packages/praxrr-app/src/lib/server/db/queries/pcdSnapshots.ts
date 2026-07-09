@@ -11,7 +11,9 @@ import type {
 type CreateManualSnapshotInsertInput = {
   databaseId: number;
   type: 'manual';
-  trigger: 'manual';
+  // 'rollback' = a durable (never auto-pruned) pre-rollback capture taken before a restore
+  // rewinds the op log, so the restore is itself reversible (issue #16).
+  trigger: 'manual' | 'rollback';
   description?: string | null;
 };
 
