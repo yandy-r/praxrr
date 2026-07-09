@@ -16,6 +16,13 @@ import {
 } from '$lib/server/sync/mappings.ts';
 import { logger } from '$logger/logger.ts';
 import { snapshotService } from '$pcd/snapshots/service.ts';
+import { capturePreSyncChanges, deriveSyncHistoryStatus, recordSyncHistory } from '$sync/syncHistory/record.ts';
+import type {
+  SyncEntityChange,
+  SyncOperationStatus,
+  SyncPreviewSection,
+  SyncSectionResult,
+} from '$sync/syncHistory/types.ts';
 
 // Register sync handlers
 import '$lib/server/sync/qualityProfiles/handler.ts';
@@ -290,26 +297,67 @@ export const __testOnly = {
 };
 
 const arrSyncHandler: JobHandler = async (job) => {
+  const startedAt = new Date().toISOString();
   const instanceId = Number(job.payload.instanceId);
   if (!Number.isFinite(instanceId)) {
+    // No instance context — nothing attempted, no audit row.
     return { status: 'failure', error: 'Invalid instance ID' };
   }
 
   const instance = arrInstancesQueries.getById(instanceId);
   if (!instance || !instance.enabled) {
+    // Disabled/missing instance — nothing attempted (semantically cancelled), no audit row.
     return { status: 'cancelled', output: 'Arr instance disabled' };
   }
+
+  const syncArrType = toSyncArrType(instance.type);
+  if (!syncArrType) {
+    // arr_type cannot satisfy the sync_history CHECK (radarr/sonarr/lidarr only), so this
+    // misconfiguration is not audited beyond the failure return.
+    return { status: 'failure', error: `Unsupported sync instance type: ${instance.type}` };
+  }
+
+  // Audit-trail recorder (never throws; self-gates on sync_history_settings.enabled).
+  const recordHistory = (
+    status: SyncOperationStatus,
+    opts: {
+      error?: string | null;
+      sectionsAttempted?: readonly SyncPreviewSection[];
+      sectionsRun?: number;
+      itemsSynced?: number;
+      failureCount?: number;
+      sectionResults?: SyncSectionResult[];
+      changes?: SyncEntityChange[];
+    } = {}
+  ): void => {
+    const finishedAt = new Date().toISOString();
+    recordSyncHistory({
+      arrInstanceId: instanceId,
+      instanceName: instance.name,
+      arrType: syncArrType,
+      jobId: job.id === 0 ? null : job.id,
+      trigger: job.source,
+      triggerEvent: null,
+      sectionsAttempted: [...(opts.sectionsAttempted ?? [])],
+      status,
+      sectionsRun: opts.sectionsRun ?? 0,
+      itemsSynced: opts.itemsSynced ?? 0,
+      failureCount: opts.failureCount ?? 0,
+      sectionResults: opts.sectionResults ?? [],
+      changes: opts.changes ?? [],
+      error: opts.error ?? null,
+      startedAt,
+      finishedAt,
+      durationMs: Date.parse(finishedAt) - Date.parse(startedAt),
+    });
+  };
 
   const configStatus = arrSyncQueries.getSyncConfigStatus(instanceId);
   const sectionsToRun = resolveSections(job.jobType, job.payload);
 
   if (sectionsToRun.length === 0) {
+    recordHistory('skipped', { error: 'No sync sections specified' });
     return { status: 'skipped', output: 'No sync sections specified' };
-  }
-
-  const syncArrType = toSyncArrType(instance.type);
-  if (!syncArrType) {
-    return { status: 'failure', error: `Unsupported sync instance type: ${instance.type}` };
   }
 
   let client: Awaited<ReturnType<typeof getArrInstanceClient>>;
@@ -342,12 +390,16 @@ const arrSyncHandler: JobHandler = async (job) => {
         });
       }
 
-      return {
-        status: 'failure',
-        error: `Arr credentials are not readable. ${getArrClientFailureMessage(message)} The instance has been disabled.`,
-      };
+      const credentialError = `Arr credentials are not readable. ${getArrClientFailureMessage(message)} The instance has been disabled.`;
+      recordHistory('failed', {
+        error: credentialError,
+        sectionsAttempted: sectionsToRun,
+        failureCount: sectionsToRun.length,
+      });
+      return { status: 'failure', error: credentialError };
     }
 
+    recordHistory('failed', { error: message, sectionsAttempted: sectionsToRun, failureCount: sectionsToRun.length });
     return { status: 'failure', error: message };
   }
 
@@ -367,6 +419,12 @@ const arrSyncHandler: JobHandler = async (job) => {
     });
   }
 
+  // Capture the intended before/after diff BEFORE any writes (post-write it would be empty).
+  // Best-effort + gated on sync_history_settings.enabled; never affects the sync.
+  const changes = await capturePreSyncChanges(instance, sectionsToRun);
+  const sectionResults: SyncSectionResult[] = [];
+  let itemsSynced = 0;
+
   const results: string[] = [];
   let failures = 0;
   let ranSections = 0;
@@ -379,6 +437,7 @@ const arrSyncHandler: JobHandler = async (job) => {
 
     if (unsupportedReason) {
       results.push(`${section}: skipped (${unsupportedReason})`);
+      sectionResults.push({ section, status: 'skipped', itemsSynced: 0, error: unsupportedReason });
       await logger.debug('Skipping unsupported sync section', {
         source: 'ArrSyncJob',
         meta: {
@@ -400,6 +459,12 @@ const arrSyncHandler: JobHandler = async (job) => {
     const versionAvailability = resolveSyncSectionAvailability(syncArrType, section, detectedVersion);
     if (versionAvailability.status === 'unavailable') {
       results.push(`${section}: skipped (version ${versionAvailability.reason})`);
+      sectionResults.push({
+        section,
+        status: 'skipped',
+        itemsSynced: 0,
+        error: `version ${versionAvailability.reason}`,
+      });
       await logger.warn('Skipping sync section incompatible with detected Arr version', {
         source: 'ArrSyncJob',
         meta: {
@@ -417,11 +482,13 @@ const arrSyncHandler: JobHandler = async (job) => {
 
     if (job.source === 'schedule' && config.trigger !== 'schedule') {
       results.push(`${section}: skipped`);
+      sectionResults.push({ section, status: 'skipped', itemsSynced: 0, error: null });
       continue;
     }
 
     if (!handler.hasConfig(instanceId)) {
       results.push(`${section}: skipped`);
+      sectionResults.push({ section, status: 'skipped', itemsSynced: 0, error: null });
       continue;
     }
 
@@ -435,19 +502,35 @@ const arrSyncHandler: JobHandler = async (job) => {
       const syncer = handler.createSyncer(client, instance);
       const result = await syncer.sync();
 
+      itemsSynced += result.itemsSynced;
       if (result.success) {
         handler.completeSync(instanceId);
         results.push(`${section}: ${result.itemsSynced} item(s)`);
+        sectionResults.push({
+          section,
+          status: 'success',
+          itemsSynced: result.itemsSynced,
+          error: null,
+          failedProfiles: result.failedProfiles,
+        });
       } else {
         handler.failSync(instanceId, result.error ?? 'Unknown error');
         results.push(`${section}: failed`);
         failures++;
+        sectionResults.push({
+          section,
+          status: 'failed',
+          itemsSynced: result.itemsSynced,
+          error: result.error ?? 'Unknown error',
+          failedProfiles: result.failedProfiles,
+        });
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';
       handler.failSync(instanceId, message);
       results.push(`${section}: failed`);
       failures++;
+      sectionResults.push({ section, status: 'failed', itemsSynced: 0, error: message });
       await logger.error('Arr sync failed', {
         source: 'ArrSyncJob',
         meta: { jobId: job.id, instanceId, instanceName: instance.name, section, error: message },
@@ -462,6 +545,17 @@ const arrSyncHandler: JobHandler = async (job) => {
       }
     }
   }
+
+  const historyStatus = deriveSyncHistoryStatus(ranSections, failures, sectionResults);
+  recordHistory(historyStatus, {
+    error: failures > 0 ? results.join(', ') : null,
+    sectionsAttempted: sectionsToRun,
+    sectionsRun: ranSections,
+    itemsSynced,
+    failureCount: failures,
+    sectionResults,
+    changes,
+  });
 
   if (job.source === 'schedule' && job.jobType === 'arr.sync') {
     const nextRunAt = arrSyncQueries.getNextScheduledRunAt(instanceId);

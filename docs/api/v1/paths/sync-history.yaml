@@ -1,0 +1,257 @@
+list:
+  get:
+    operationId: listSyncHistory
+    summary: List / search sync history
+    description: |
+      Returns a filtered, paginated list of sync run audit entries (newest first). All
+      filters are optional and combine with AND. This endpoint returns 500 only on an
+      internal error; invalid query params return 400.
+    tags:
+      - Sync History
+    parameters:
+      - name: instanceId
+        in: query
+        schema:
+          type: integer
+      - name: arrType
+        in: query
+        schema:
+          type: string
+          enum:
+            - radarr
+            - sonarr
+            - lidarr
+      - name: status
+        in: query
+        schema:
+          $ref: '../schemas/sync-history.yaml#/SyncOperationStatus'
+      - name: trigger
+        in: query
+        schema:
+          $ref: '../schemas/sync-history.yaml#/SyncTrigger'
+      - name: section
+        in: query
+        schema:
+          $ref: '../schemas/sync.yaml#/SyncPreviewSection'
+      - name: from
+        in: query
+        description: ISO-8601 lower bound on startedAt.
+        schema:
+          type: string
+          format: date-time
+      - name: to
+        in: query
+        description: ISO-8601 upper bound on startedAt.
+        schema:
+          type: string
+          format: date-time
+      - name: q
+        in: query
+        description: Free-text match on instance name or error.
+        schema:
+          type: string
+      - name: page
+        in: query
+        schema:
+          type: integer
+          minimum: 1
+          default: 1
+      - name: pageSize
+        in: query
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 250
+          default: 100
+    responses:
+      '200':
+        description: Sync history page
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/sync-history.yaml#/SyncHistoryListResponse'
+      '400':
+        description: Invalid query parameter
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+      '500':
+        description: Failed to list sync history
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+
+detail:
+  get:
+    operationId: getSyncHistoryEntry
+    summary: Sync history entry detail
+    description: Returns one sync run audit entry with the full section results and diff.
+    tags:
+      - Sync History
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+    responses:
+      '200':
+        description: Sync history detail
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/sync-history.yaml#/SyncHistoryDetail'
+      '400':
+        description: Invalid id
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+      '404':
+        description: Entry not found
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+      '500':
+        description: Failed to read sync history entry
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+
+export:
+  get:
+    operationId: exportSyncHistory
+    summary: Export sync history
+    description: |
+      Streams the filtered sync history (same filters as the list endpoint, no pagination)
+      as a JSON array or CSV file download.
+    tags:
+      - Sync History
+    parameters:
+      - name: format
+        in: query
+        schema:
+          type: string
+          enum:
+            - json
+            - csv
+          default: json
+      - name: instanceId
+        in: query
+        schema:
+          type: integer
+      - name: arrType
+        in: query
+        schema:
+          type: string
+          enum:
+            - radarr
+            - sonarr
+            - lidarr
+      - name: status
+        in: query
+        schema:
+          $ref: '../schemas/sync-history.yaml#/SyncOperationStatus'
+      - name: trigger
+        in: query
+        schema:
+          $ref: '../schemas/sync-history.yaml#/SyncTrigger'
+      - name: section
+        in: query
+        schema:
+          $ref: '../schemas/sync.yaml#/SyncPreviewSection'
+      - name: from
+        in: query
+        schema:
+          type: string
+          format: date-time
+      - name: to
+        in: query
+        schema:
+          type: string
+          format: date-time
+      - name: q
+        in: query
+        schema:
+          type: string
+    responses:
+      '200':
+        description: Sync history export
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: '../schemas/sync-history.yaml#/SyncHistoryDetail'
+          text/csv:
+            schema:
+              type: string
+      '400':
+        description: Invalid query parameter
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+      '500':
+        description: Failed to export sync history
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+
+settings:
+  get:
+    operationId: getSyncHistorySettings
+    summary: Get sync history settings
+    tags:
+      - Sync History
+    responses:
+      '200':
+        description: Sync history settings
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/sync-history.yaml#/SyncHistorySettings'
+      '500':
+        description: Failed to read sync history settings
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+  patch:
+    operationId: updateSyncHistorySettings
+    summary: Update sync history settings
+    description: |
+      Updates retention (days + max entries) and the enable flag, then reschedules or cancels
+      the recurring cleanup job accordingly.
+    tags:
+      - Sync History
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../schemas/sync-history.yaml#/SyncHistorySettingsUpdateRequest'
+    responses:
+      '200':
+        description: Updated sync history settings
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/sync-history.yaml#/SyncHistorySettings'
+      '400':
+        description: Invalid settings payload
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+      '500':
+        description: Failed to update sync history settings
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'

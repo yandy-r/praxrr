@@ -139,6 +139,18 @@ export const NAV_REGISTRY: ArrCapabilityAwareNavItem[] = [
     hasChildren: false,
   },
   {
+    id: 'operations.sync_history',
+    label: 'Sync History',
+    href: '/sync-history',
+    groupId: ensureGroupId('operations'),
+    order: 0,
+    arrScope: scopeAll,
+    mobilePriority: 'medium',
+    iconKey: 'History',
+    emoji: '📜',
+    hasChildren: false,
+  },
+  {
     id: 'policies.quality_profiles',
     label: 'Quality Profiles',
     href: '/quality-profiles',

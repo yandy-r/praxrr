@@ -42,6 +42,8 @@ tags:
     description: Cross-Arr compatibility parity map and semantic difference catalog
   - name: Drift Detection
     description: Desired-vs-actual drift status per Arr instance, on-demand refresh, and settings
+  - name: Sync History
+    description: Append-only audit trail of Arr sync runs — search, detail, export, and retention
 
 paths:
   /health:
@@ -632,6 +634,14 @@ paths:
     $ref: './paths/drift.yaml#/instance'
   /drift/settings:
     $ref: './paths/drift.yaml#/settings'
+  /sync-history:
+    $ref: './paths/sync-history.yaml#/list'
+  /sync-history/{id}:
+    $ref: './paths/sync-history.yaml#/detail'
+  /sync-history/export:
+    $ref: './paths/sync-history.yaml#/export'
+  /sync-history/settings:
+    $ref: './paths/sync-history.yaml#/settings'
   /setup/state:
     $ref: './paths/setup.yaml#/state'
   /setup/test-connection:
@@ -813,6 +823,26 @@ components:
       $ref: './schemas/drift.yaml#/DriftDetailResponse'
     DriftSettingsUpdateRequest:
       $ref: './schemas/drift.yaml#/DriftSettingsUpdateRequest'
+
+    # Sync History
+    SyncTrigger:
+      $ref: './schemas/sync-history.yaml#/SyncTrigger'
+    SyncOperationStatus:
+      $ref: './schemas/sync-history.yaml#/SyncOperationStatus'
+    SyncSectionResult:
+      $ref: './schemas/sync-history.yaml#/SyncSectionResult'
+    SyncEntityChange:
+      $ref: './schemas/sync-history.yaml#/SyncEntityChange'
+    SyncHistoryEntry:
+      $ref: './schemas/sync-history.yaml#/SyncHistoryEntry'
+    SyncHistoryDetail:
+      $ref: './schemas/sync-history.yaml#/SyncHistoryDetail'
+    SyncHistoryListResponse:
+      $ref: './schemas/sync-history.yaml#/SyncHistoryListResponse'
+    SyncHistorySettings:
+      $ref: './schemas/sync-history.yaml#/SyncHistorySettings'
+    SyncHistorySettingsUpdateRequest:
+      $ref: './schemas/sync-history.yaml#/SyncHistorySettingsUpdateRequest'
     TrashGuideEntityType:
       type: string
       enum:

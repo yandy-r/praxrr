@@ -28,4 +28,5 @@ export {
   scheduleBackupJobs,
   scheduleLogCleanup,
   scheduleDriftCheck,
+  scheduleSyncHistoryCleanup,
 } from './schedule.ts';
