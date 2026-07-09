@@ -72,8 +72,9 @@ import { migration as migration20260707AddSetupWizardState } from './migrations/
 import { migration as migration20260708AddArrInstanceDetectedVersion } from './migrations/20260708_add_arr_instance_detected_version.ts';
 import { migration as migration20260709CreateDriftTables } from './migrations/20260709_create_drift_tables.ts';
 import { migration as migration20260710CreateSyncHistoryTables } from './migrations/20260710_create_sync_history_tables.ts';
-import { migration as migration20260711ExtendPcdSnapshotTriggerRollback } from './migrations/20260711_extend_pcd_snapshot_trigger_rollback.ts';
-import { migration as migration20260712CreatePcdRollbacks } from './migrations/20260712_create_pcd_rollbacks.ts';
+import { migration as migration20260711CreateQualityGoalBindings } from './migrations/20260711_create_quality_goal_bindings.ts';
+import { migration as migration20260712ExtendPcdSnapshotTriggerRollback } from './migrations/20260712_extend_pcd_snapshot_trigger_rollback.ts';
+import { migration as migration20260713CreatePcdRollbacks } from './migrations/20260713_create_pcd_rollbacks.ts';
 
 export interface Migration {
   version: number;
@@ -375,8 +376,9 @@ export function loadMigrations(): Migration[] {
     migration20260708AddArrInstanceDetectedVersion,
     migration20260709CreateDriftTables,
     migration20260710CreateSyncHistoryTables,
-    migration20260711ExtendPcdSnapshotTriggerRollback,
-    migration20260712CreatePcdRollbacks,
+    migration20260711CreateQualityGoalBindings,
+    migration20260712ExtendPcdSnapshotTriggerRollback,
+    migration20260713CreatePcdRollbacks,
   ];
 
   // Sort by version number

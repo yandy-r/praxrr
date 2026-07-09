@@ -14,7 +14,7 @@ import type { Migration } from '../migrations.ts';
  * cascades away a rollback record.
  */
 export const migration: Migration = {
-  version: 20260712,
+  version: 20260713,
   name: 'Create pcd_rollbacks audit table',
 
   up: `

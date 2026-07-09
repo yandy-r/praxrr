@@ -44,6 +44,8 @@ tags:
     description: Desired-vs-actual drift status per Arr instance, on-demand refresh, and settings
   - name: Sync History
     description: Append-only audit trail of Arr sync runs — search, detail, export, and retention
+  - name: Quality Goals
+    description: Intent-to-implementation bridge — translate presets/sliders into custom-format scores
 
 paths:
   /health:
@@ -658,6 +660,14 @@ paths:
     $ref: './paths/compatibility.yaml#/parity'
   /compatibility/versions:
     $ref: './paths/compatibility.yaml#/versions'
+  /goals/presets:
+    $ref: './paths/goals.yaml#/presets'
+  /goals/preview:
+    $ref: './paths/goals.yaml#/preview'
+  /goals/apply:
+    $ref: './paths/goals.yaml#/apply'
+  /goals/binding:
+    $ref: './paths/goals.yaml#/binding'
 
 components:
   schemas:
@@ -847,6 +857,46 @@ components:
       $ref: './schemas/sync-history.yaml#/SyncHistorySettings'
     SyncHistorySettingsUpdateRequest:
       $ref: './schemas/sync-history.yaml#/SyncHistorySettingsUpdateRequest'
+    GoalCategory:
+      $ref: './schemas/goals.yaml#/GoalCategory'
+    GoalCeilingRelation:
+      $ref: './schemas/goals.yaml#/GoalCeilingRelation'
+    GoalResolutionCeiling:
+      $ref: './schemas/goals.yaml#/GoalResolutionCeiling'
+    GoalWeights:
+      $ref: './schemas/goals.yaml#/GoalWeights'
+    GoalAxisMeta:
+      $ref: './schemas/goals.yaml#/GoalAxisMeta'
+    GoalPreset:
+      $ref: './schemas/goals.yaml#/GoalPreset'
+    GoalAxisContribution:
+      $ref: './schemas/goals.yaml#/GoalAxisContribution'
+    GoalReason:
+      $ref: './schemas/goals.yaml#/GoalReason'
+    GoalCfDecision:
+      $ref: './schemas/goals.yaml#/GoalCfDecision'
+    GoalUncategorizedCf:
+      $ref: './schemas/goals.yaml#/GoalUncategorizedCf'
+    GoalCoverage:
+      $ref: './schemas/goals.yaml#/GoalCoverage'
+    GoalThresholds:
+      $ref: './schemas/goals.yaml#/GoalThresholds'
+    GoalPlan:
+      $ref: './schemas/goals.yaml#/GoalPlan'
+    GoalBinding:
+      $ref: './schemas/goals.yaml#/GoalBinding'
+    GoalPresetsResponse:
+      $ref: './schemas/goals.yaml#/GoalPresetsResponse'
+    GoalPreviewRequest:
+      $ref: './schemas/goals.yaml#/GoalPreviewRequest'
+    GoalPreviewResponse:
+      $ref: './schemas/goals.yaml#/GoalPreviewResponse'
+    GoalApplyRequest:
+      $ref: './schemas/goals.yaml#/GoalApplyRequest'
+    GoalApplyResponse:
+      $ref: './schemas/goals.yaml#/GoalApplyResponse'
+    GoalBindingResponse:
+      $ref: './schemas/goals.yaml#/GoalBindingResponse'
     TrashGuideEntityType:
       type: string
       enum:

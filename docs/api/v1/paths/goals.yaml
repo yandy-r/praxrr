@@ -1,0 +1,138 @@
+presets:
+  get:
+    operationId: getGoalPresets
+    summary: List Quality Goal presets and slider axes
+    description: |
+      Returns the built-in goal presets, the slider-axis metadata, and the engine version. The editor
+      renders sliders and can run the pure engine client-side from this payload with nothing hardcoded.
+    tags:
+      - Quality Goals
+    responses:
+      '200':
+        description: Presets and axes
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/goals.yaml#/GoalPresetsResponse'
+
+preview:
+  post:
+    operationId: previewGoal
+    summary: Preview the config a goal would generate (non-persisting)
+    description: |
+      Translates a goal (preset + slider weights) into a concrete scoring plan for one quality
+      profile and returns the plan plus the authoritative sandbox config diff. Mutates nothing —
+      scores are compiled only inside an ephemeral sandbox cache; `pcd_ops` is untouched.
+    tags:
+      - Quality Goals
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../schemas/goals.yaml#/GoalPreviewRequest'
+    responses:
+      '200':
+        description: The generated plan and sandbox diff
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/goals.yaml#/GoalPreviewResponse'
+      '400':
+        description: Invalid request
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+      '404':
+        description: Database cache not found
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+
+apply:
+  post:
+    operationId: applyGoal
+    summary: Apply a goal to a quality profile
+    description: |
+      Persists the generated scores + thresholds to the quality profile via the standard PCD user-op
+      path (`updateScoring`) and records the goal binding. Applied scores are ordinary user ops,
+      editable anywhere manual scores are. Returns 409 when `expectedEngineVersion` does not match the
+      server engine version (optimistic concurrency).
+    tags:
+      - Quality Goals
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../schemas/goals.yaml#/GoalApplyRequest'
+    responses:
+      '200':
+        description: The applied plan and persisted binding
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/goals.yaml#/GoalApplyResponse'
+      '400':
+        description: Invalid request
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+      '404':
+        description: Database cache or profile not found
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+      '409':
+        description: Engine version mismatch
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+
+binding:
+  get:
+    operationId: getGoalBinding
+    summary: Get the goal binding for a quality profile
+    description: |
+      Returns the persisted goal binding (preset + weights + engine version + applied time) for a
+      profile, or `null` when the profile is not goal-governed. A stale `engineVersion` drives a
+      re-apply prompt in the editor.
+    tags:
+      - Quality Goals
+    parameters:
+      - name: databaseId
+        in: query
+        required: true
+        schema:
+          type: integer
+      - name: profileName
+        in: query
+        required: true
+        schema:
+          type: string
+      - name: arrType
+        in: query
+        required: true
+        schema:
+          type: string
+          enum:
+            - radarr
+            - sonarr
+    responses:
+      '200':
+        description: The binding, or null
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/goals.yaml#/GoalBindingResponse'
+      '400':
+        description: Invalid query parameters
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'

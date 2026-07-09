@@ -2755,6 +2755,143 @@ export interface components {
      *     The shape matches `PortableQualityDefinitions`.
      */
     PortableLidarrQualityDefinitions: components['schemas']['PortableQualityDefinitions'];
+    /** @description Closed set of semantic categories a custom format is classified into. */
+    GoalCategory:
+      | 'unwanted'
+      | 'hdr_dv'
+      | 'hdr_hdr10plus'
+      | 'hdr_baseline'
+      | 'remux'
+      | 'release_group_tier_1'
+      | 'release_group_tier_2'
+      | 'release_group_tier_3'
+      | 'audio_lossless'
+      | 'audio_advanced'
+      | 'audio_baseline'
+      | 'streaming_service'
+      | 'movie_version'
+      | 'repack_proper'
+      | 'resolution';
+    /** @enum {string} */
+    GoalCeilingRelation: 'above' | 'match' | 'below';
+    /** @enum {string} */
+    GoalResolutionCeiling: '720p' | '1080p' | '2160p';
+    GoalWeights: {
+      qualityVsSize: number;
+      compatibility: number;
+      hdrPreference: number;
+      unwantedStrictness: number;
+      resolutionCeiling: components['schemas']['GoalResolutionCeiling'];
+    };
+    GoalAxisMeta: {
+      key: string;
+      label: string;
+      /** @enum {string} */
+      kind: 'weight' | 'strictness' | 'ceiling';
+      min?: number;
+      max?: number;
+      step?: number;
+      options?: components['schemas']['GoalResolutionCeiling'][];
+      description: string;
+    };
+    GoalPreset: {
+      /** @enum {string} */
+      id: 'best-quality' | 'smallest-size' | 'balanced' | '4k-hdr-priority';
+      label: string;
+      description: string;
+      weights: components['schemas']['GoalWeights'];
+    };
+    GoalAxisContribution: {
+      axis: string;
+      delta: number;
+    };
+    GoalReason: {
+      code: string;
+      category: components['schemas']['GoalCategory'] | null;
+      ruleId: string;
+      base: number;
+      axisContributions: components['schemas']['GoalAxisContribution'][];
+      ceiling: components['schemas']['GoalCeilingRelation'] | null;
+    };
+    GoalCfDecision: {
+      customFormatName: string;
+      /** @enum {string} */
+      arrType: 'radarr' | 'sonarr';
+      category: components['schemas']['GoalCategory'];
+      score: number;
+      reason: components['schemas']['GoalReason'];
+    };
+    GoalUncategorizedCf: {
+      name: string;
+      suggestedCategory: components['schemas']['GoalCategory'] | null;
+      reason: string;
+    };
+    GoalCoverage: {
+      total: number;
+      scored: number;
+      uncategorized: number;
+    };
+    GoalThresholds: {
+      minimumScore: number;
+      upgradeUntilScore: number;
+      upgradeScoreIncrement: number;
+    };
+    /** @description Deterministic translation of a goal into concrete scores + thresholds. */
+    GoalPlan: {
+      engineVersion: string;
+      /** @enum {string} */
+      arrType: 'radarr' | 'sonarr';
+      decisions: components['schemas']['GoalCfDecision'][];
+      uncategorized: components['schemas']['GoalUncategorizedCf'][];
+      thresholds: components['schemas']['GoalThresholds'];
+      coverage: components['schemas']['GoalCoverage'];
+    };
+    /** @description Persisted intent metadata for a goal-governed quality profile. */
+    GoalBinding: {
+      presetId: string;
+      weights: components['schemas']['GoalWeights'];
+      engineVersion: string;
+      /** @description ISO-8601 UTC timestamp of the last apply */
+      appliedAt: string;
+    };
+    GoalPresetsResponse: {
+      presets: components['schemas']['GoalPreset'][];
+      axes: components['schemas']['GoalAxisMeta'][];
+      engineVersion: string;
+    };
+    GoalPreviewRequest: {
+      databaseId: number;
+      /** @enum {string} */
+      arrType: 'radarr' | 'sonarr';
+      /** @description Raw PCD quality-profile name (pcd:-stripped) */
+      profileName: string;
+      preset: string;
+      weights: components['schemas']['GoalWeights'];
+    };
+    /** @description Non-persisting preview — the plan plus the authoritative sandbox config diff. */
+    GoalPreviewResponse: {
+      plan: components['schemas']['GoalPlan'];
+      configDiff: components['schemas']['EntityConfigDiff'][];
+      appliedChanges: components['schemas']['ProposedChange'][];
+      skippedChanges: components['schemas']['SkippedChange'][];
+    };
+    GoalApplyRequest: {
+      databaseId: number;
+      /** @enum {string} */
+      arrType: 'radarr' | 'sonarr';
+      profileName: string;
+      preset: string;
+      weights: components['schemas']['GoalWeights'];
+      /** @description The engine version the client computed against; a mismatch yields 409. */
+      expectedEngineVersion: string;
+    };
+    GoalApplyResponse: {
+      plan: components['schemas']['GoalPlan'];
+      binding: components['schemas']['GoalBinding'];
+    };
+    GoalBindingResponse: {
+      binding: components['schemas']['GoalBinding'] | null;
+    };
   };
   responses: never;
   parameters: never;

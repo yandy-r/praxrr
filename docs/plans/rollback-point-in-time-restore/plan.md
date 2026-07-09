@@ -47,8 +47,9 @@ replay the _reconstructed_ op set, not a naive `id<=N` clamp) which is folded in
     {radarr,sonarr,lidarr} + lidarrMetadataProfile×{lidarr}. No family silently omitted.
 13. **PCD-only scope explicit** in response + UI; live-Arr drift via existing drift/sync
     surfaces (honors ROADMAP:152). "Arr changed since snapshot" overlay deferred.
-14. **Migrations** (versions > 20260710): `20260711_extend_pcd_snapshot_trigger_rollback`
-    (table rebuild per `035` precedent) + `20260712_create_pcd_rollbacks`. Register both.
+14. **Migrations** (versions > latest on main): `20260712_extend_pcd_snapshot_trigger_rollback`
+    (table rebuild per `035` precedent) + `20260713_create_pcd_rollbacks`. Register both.
+    (Renumbered from 20260711/20260712 after #20 landed a 20260711 migration on main.)
 15. **`getFullDetail` becomes async** (isRestorable needs reconstruct+verify → crypto);
     the existing GET route must `await`.
 

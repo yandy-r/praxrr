@@ -19,7 +19,7 @@ import type { Migration } from '../migrations.ts';
  * NULL manifest and are therefore not restorable (fail-closed).
  */
 export const migration: Migration = {
-  version: 20260711,
+  version: 20260712,
   name: 'Extend pcd_snapshots trigger with rollback',
 
   up: `
