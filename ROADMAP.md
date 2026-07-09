@@ -1,6 +1,6 @@
 # Praxrr Roadmap
 
-Reviewed: 2026-07-08 (updated after the Onboarding & Transparency wave shipped: Setup Wizard #12/#205, Cross-Arr Parity Map #14/#206, Resolved Config Viewer #25/#207, Dependency Graph #26/#208, Configuration Impact Simulator #30/#209, and UI component reference #75/#204)
+Reviewed: 2026-07-09 (updated after Rollback / Point-in-Time Restore #16/#216 and Quality Goals foundation #20/#215 shipped; Safety Triad complete — Sync Preview + Drift #15/#212 + Rollback. Prior wave: Sync History #17/#214, Transparent Automation foundation #21/#213, Resilient Arr Adapter #24/#211, Onboarding & Transparency #12/#14/#25/#26/#30/#75)
 
 Source: open GitHub issues in `yandy-r/praxrr` as of this review.
 
@@ -32,14 +32,14 @@ are still respected, but they are not the only sorting rule.
 
 The best next order is:
 
-1. Build configuration lifecycle safety (P2). The Resilient Arr API Adapter Layer (#24) shipped in
-   [#211](https://github.com/yandy-r/praxrr/pull/211), the Drift Detection Dashboard (#15) shipped in
-   [#212](https://github.com/yandy-r/praxrr/pull/212), Sync History / Audit Trail (#17) shipped in
-   [#214](https://github.com/yandy-r/praxrr/pull/214), and Rollback / Point-in-Time Restore (#16) shipped
-   — completing the Safety Triad (preview + drift + rollback). The next lifecycle feature is Canary Sync /
-   Blast Radius Safety (#19), which builds on the drift, audit, and rollback foundations. The Onboarding &
-   Transparency wave is complete (#12, #14, #25, #26, #30, #75), as is P0 documentation.
-2. Add advanced automation, trust, and integration features (P3).
+1. Finish configuration lifecycle safety (P2). The Resilient Arr API Adapter Layer (#24/#211), Drift
+   Detection Dashboard (#15/#212), Sync History / Audit Trail (#17/#214), and Rollback / Point-in-Time
+   Restore (#16/#216) shipped — completing the Safety Triad (preview + drift + rollback). The next
+   lifecycle feature is Canary Sync / Blast Radius Safety (#19), then Sync Archaeology Timeline (#27).
+   The Onboarding & Transparency wave is complete (#12, #14, #25, #26, #30, #75), as is P0 documentation.
+2. Extend advanced automation, trust, and integration features (P3). Quality Goals foundation (#20/#215)
+   and Transparent Automation foundation (#21/#213) are in; remaining work is surface coverage and
+   follow-ups, not greenfield engines.
 3. Handle parser migration and deferred ecosystem expansion only when they become release or
    maintenance blockers.
 
@@ -55,6 +55,7 @@ Merged work since the Score Simulator and TRaSH Guide Sync foundations landed.
 
 | Date       | PR / commit                                        | Summary                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                | Closes / relates                                            |
 | ---------- | -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------- |
+| 2026-07-09 | [#216](https://github.com/yandy-r/praxrr/pull/216) | Rollback / Point-in-Time Restore: verified op-log rewind to a snapshot's reconstructed published-op set (fingerprint-verified, fail-closed); mandatory PCD-to-PCD preview reusing the sync-preview differ; append-only restore (boundary marker + `pcd_rollbacks` audit + durable pre-rollback snapshot); contract-first `GET/POST .../snapshots/{id}/rollback[/preview]`; per-database Snapshots UI with restore-preview diff and danger-confirm; PCD-only scope (next sync stays separately preview-gated)                                                                                                                                         | [#16](https://github.com/yandy-r/praxrr/issues/16)          |
 | 2026-07-09 | [#215](https://github.com/yandy-r/praxrr/pull/215) | Quality Goals (intent-to-implementation bridge, foundation): pure, versioned `$shared/goals` engine that classifies each custom format (real praxrr-db tag vocabulary) and translates presets + sliders into concrete custom-format scores + quality-profile thresholds; reuses `buildScoringOps`/`updateScoring`/`withSandboxCache` with **no new writer**; contract-first `/api/v1/goals` presets/preview(non-persisting)/apply(+engine-version guard)/binding; `quality_goal_bindings` intent metadata (scores stay in `pcd_ops`); `/goals` editor with always-shown generated-config transparency, coverage split, and flagged-uncategorized panel | [#20](https://github.com/yandy-r/praxrr/issues/20)          |
 | 2026-07-09 | [#214](https://github.com/yandy-r/praxrr/pull/214) | Sync History / Audit Trail: append-only per-run audit table (nullable FK + denormalized instance snapshot so history survives deletion); never-throwing recorder in the arr-sync handler capturing success/partial/failed/skipped + credential-failure with full before/after diffs via best-effort pre-sync preview (zero sync-write-path change); daily `sync.history.cleanup` age+max-entries retention; contract-first `/api/v1/sync-history` list/detail/export(JSON+CSV)/settings; `/sync-history` dashboard + detail UI; opt-in `sync.failed`/`sync.partial` notifications                                                                      | [#17](https://github.com/yandy-r/praxrr/issues/17)          |
 | 2026-07-09 | [#213](https://github.com/yandy-r/praxrr/pull/213) | Transparent Automation Engine (foundation): pure, versioned `$shared/narration` engine that renders the sync-preview/drift decision records (`EntityChange`/`FieldChange`, drift counts + reasons) into leveled summary/verbose "show its work" narration; first surface is the `/drift/[instanceId]` detail page (per-entity rationale, user-facing failure-reason sentences, counts rollup, verbose toggle) via a reusable `NarrationBlock`; no endpoint/OpenAPI/migration, all `$sync` imports type-only                                                                                                                                            | Advances [#21](https://github.com/yandy-r/praxrr/issues/21) |
@@ -153,7 +154,8 @@ Notes:
 - #16 shipped as PCD-only rollback: it restores desired state and shows a preview of exactly what
   changes; the next sync stays an explicit, separately preview-gated step (never auto-synced). Selective
   per-entity rollback and an "Arr changed since snapshot" overlay are documented follow-ups.
-- #27 should be delayed until audit and rollback events exist as structured data.
+- #27 can now consume structured audit (#17) and rollback (#16) events; keep it as a visual layer, not a
+  second source of truth.
 
 ## P3 - Advanced Capabilities: Automation, Trust, and Integrations
 
@@ -161,8 +163,8 @@ Goal: add higher-level intelligence after the core lifecycle is explainable and 
 
 | Order | Issue                                                                                        | Priority | Decision                                                                                                                                                                                                                                                 | Done When                                                                                                     |
 | ----- | -------------------------------------------------------------------------------------------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
-| 1     | [#21](https://github.com/yandy-r/praxrr/issues/21) Transparent Automation Engine             | High     | **Foundation shipped in [#213](https://github.com/yandy-r/praxrr/pull/213)** — pure `$shared/narration` engine + drift-detail surface. Remaining surfaces (sync-preview narration, decision logging #20, resolved-config provenance #25) are follow-ups. | Automated actions show inputs, decisions, outputs, and failure reasons in user-facing language.               |
-| 2     | [#20](https://github.com/yandy-r/praxrr/issues/20) Quality Goals                             | High     | **Foundation shipped in [#215](https://github.com/yandy-r/praxrr/pull/215)** — `$shared/goals` engine + `/api/v1/goals` + `/goals` editor. Follow-ups: quality-ladder gating, Lidarr apply path, natural-language input.                                 | Users can choose plain-language goals and inspect the exact technical configuration produced.                 |
+| 1     | [#21](https://github.com/yandy-r/praxrr/issues/21) Transparent Automation Engine             | High     | **Foundation shipped in [#213](https://github.com/yandy-r/praxrr/pull/213)** — pure `$shared/narration` engine + drift-detail surface. Remaining surfaces (sync-preview narration, Quality Goals reason objects from #20/#215, resolved-config provenance #25) are follow-ups. | Automated actions show inputs, decisions, outputs, and failure reasons in user-facing language.               |
+| —     | [#20](https://github.com/yandy-r/praxrr/issues/20) Quality Goals                             | High     | **Foundation shipped in [#215](https://github.com/yandy-r/praxrr/pull/215)** — `$shared/goals` engine + `/api/v1/goals` + `/goals` editor. Follow-ups: quality-ladder gating, Lidarr apply path, natural-language input.                                                      | **Done (foundation)** — users can choose presets/sliders and inspect the exact technical configuration produced before apply. |
 | 3     | [#22](https://github.com/yandy-r/praxrr/issues/22) Config Health Scoring                     | Medium   | Build after drift and audit data exist.                                                                                                                                                                                                                  | Health scores are explainable, actionable, and based on observable config state rather than vague heuristics. |
 | 4     | [#28](https://github.com/yandy-r/praxrr/issues/28) Ecosystem Security Posture / Shield Check | Medium   | Build when there is enough instance/config metadata to make checks actionable.                                                                                                                                                                           | Praxrr can identify common security risks without presenting theater or unactionable warnings.                |
 | 5     | [#18](https://github.com/yandy-r/praxrr/issues/18) Passkey / WebAuthn Auth                   | Medium   | Schedule as release hardening if password auth becomes a blocker, otherwise after lifecycle safety.                                                                                                                                                      | Passkeys supplement or replace password auth without breaking existing auth modes.                            |
@@ -170,7 +172,10 @@ Goal: add higher-level intelligence after the core lifecycle is explainable and 
 
 Notes:
 
-- #20 should not become opaque AI magic. It must show the generated scoring/profile details.
+- #20 foundation shipped with always-shown generated-config transparency; keep follow-ups
+  (quality-ladder gating, Lidarr apply, NL input) non-opaque — never hide the produced scores.
+- #22 can now use drift (#15) and audit (#17) as observable inputs; prefer explainable scores over
+  vague heuristics.
 - #23 should wait for stable API contracts and clear authorization boundaries.
 - #28 should be threat-model driven. Avoid generic security scorecards that users cannot act on.
 
@@ -218,6 +223,15 @@ Do not start these until the promotion criteria are met.
 
 Use this checklist when planning a sprint or milestone.
 
+### Completed (2026-07-09)
+
+- [x] #16 - Rollback / Point-in-Time Restore ([#216](https://github.com/yandy-r/praxrr/pull/216))
+- [x] #20 - Quality Goals foundation ([#215](https://github.com/yandy-r/praxrr/pull/215))
+- [x] #17 - Sync History / Audit Trail ([#214](https://github.com/yandy-r/praxrr/pull/214))
+- [x] #21 - Transparent Automation Engine foundation + drift surface ([#213](https://github.com/yandy-r/praxrr/pull/213))
+- [x] #15 - Drift Detection Dashboard ([#212](https://github.com/yandy-r/praxrr/pull/212))
+- [x] #24 - Resilient Arr API Adapter Layer ([#211](https://github.com/yandy-r/praxrr/pull/211))
+
 ### Completed (2026-07-08)
 
 - [x] #30 - Configuration Impact Simulator ([#209](https://github.com/yandy-r/praxrr/pull/209))
@@ -249,9 +263,11 @@ Use this checklist when planning a sprint or milestone.
 
 ### Current Focus
 
-P0 Documentation Foundation is complete (#73, #74, #75, #76, #77, #38).
+Safety Triad complete (Sync Preview + Drift #15/#212 + Rollback #16/#216). Next lifecycle item is
+Canary Sync (#19); #27 Sync Archaeology can follow once timeline UX is the gap.
 
-- [x] #75 - UI component reference ([#204](https://github.com/yandy-r/praxrr/pull/204))
+- [ ] #19 - Canary Sync / Blast Radius Safety
+- [ ] #27 - Sync Archaeology Timeline
 
 ### Onboarding and Transparency
 
@@ -273,7 +289,7 @@ P0 Documentation Foundation is complete (#73, #74, #75, #76, #77, #38).
 ### Advanced Capabilities
 
 - [ ] #21 - Transparent Automation Engine — foundation + drift surface shipped in [#213](https://github.com/yandy-r/praxrr/pull/213); remaining surfaces are follow-ups
-- [x] #20 - Quality Goals (foundation shipped in #215)
+- [x] #20 - Quality Goals foundation ([#215](https://github.com/yandy-r/praxrr/pull/215)); follow-ups: quality-ladder gating, Lidarr apply, NL input
 - [ ] #22 - Config Health Scoring
 - [ ] #28 - Ecosystem Security Posture / Shield Check
 - [ ] #18 - Passkey / WebAuthn Auth
@@ -300,21 +316,16 @@ P0 Documentation Foundation is complete (#73, #74, #75, #76, #77, #38).
 
 ## Next Sprint Recommendation
 
-The Onboarding & Transparency wave is complete (#30 shipped in [#209](https://github.com/yandy-r/praxrr/pull/209)):
+The Safety Triad is complete (#16 shipped in [#216](https://github.com/yandy-r/praxrr/pull/216)):
 
-1. P2 Lifecycle Safety opened with #24 Resilient Arr API Adapter Layer (shipped in
-   [#211](https://github.com/yandy-r/praxrr/pull/211)), #15 Drift Detection Dashboard (shipped in
-   [#212](https://github.com/yandy-r/praxrr/pull/212)), #17 Sync History / Audit Trail (shipped in
-   [#214](https://github.com/yandy-r/praxrr/pull/214)), and #16 Rollback / Point-in-Time Restore (shipped
-   in [#216](https://github.com/yandy-r/praxrr/pull/216)) — completing the Safety Triad. Continue with
-   #19 Canary Sync / Blast Radius Safety, since the remaining lifecycle features (#19, #27) build on the
-   drift, audit, and rollback foundations now in place.
-2. Update #6 so the parent research checklist points to this roadmap and no longer implies closed
+1. Continue P2 Lifecycle Safety with #19 Canary Sync / Blast Radius Safety, then #27 Sync Archaeology
+   Timeline as the visual layer over audit (#17) and rollback (#16) events.
+2. On the P3 track, extend Transparent Automation (#21) to sync-preview and Quality Goals reason
+   surfaces, and keep Quality Goals follow-ups (ladder gating, Lidarr apply, NL) behind the same
+   always-shown generated-config rule shipped in [#215](https://github.com/yandy-r/praxrr/pull/215).
+3. Update #6 so the parent research checklist points to this roadmap and no longer implies closed
    Phase 1 items are still active.
 
-P0 Documentation Foundation is complete: docs infrastructure (#38), user guides (#74), PCD database
-content (#76), PCD schema table reference (#73), app technical docs (#77), and the UI component
-reference (#75/#204). The P1 Onboarding & Transparency wave is complete: Progressive
-Complexity Architecture (#29/#203), Setup Wizard (#12/#205), Cross-Arr Parity Map (#14/#206),
-Resolved Config Viewer (#25/#207), Dependency Graph (#26/#208), and Configuration Impact
-Simulator (#30/#209).
+Shipped foundations to build on: P0 docs (#38, #73–#77), P1 Onboarding & Transparency (#12, #14,
+#25, #26, #29, #30, #75), P2 Safety Triad + adapter/audit (#15, #16, #17, #24), and P3 foundations
+for narration (#21/#213) and Quality Goals (#20/#215).
