@@ -46,6 +46,8 @@ tags:
     description: Append-only audit trail of Arr sync runs — search, detail, export, and retention
   - name: Quality Goals
     description: Intent-to-implementation bridge — translate presets/sliders into custom-format scores
+  - name: Canary
+    description: Staged rollout orchestration — canary sync, verification gate, and batched fan-out
 
 paths:
   /health:
@@ -668,6 +670,16 @@ paths:
     $ref: './paths/goals.yaml#/apply'
   /goals/binding:
     $ref: './paths/goals.yaml#/binding'
+  /canary/rollouts:
+    $ref: './paths/canary.yaml#/rollouts'
+  /canary/rollouts/{id}:
+    $ref: './paths/canary.yaml#/rolloutById'
+  /canary/rollouts/{id}/proceed:
+    $ref: './paths/canary.yaml#/rolloutProceed'
+  /canary/rollouts/{id}/abort:
+    $ref: './paths/canary.yaml#/rolloutAbort'
+  /canary/settings:
+    $ref: './paths/canary.yaml#/settings'
 
 components:
   schemas:
@@ -857,6 +869,47 @@ components:
       $ref: './schemas/sync-history.yaml#/SyncHistorySettings'
     SyncHistorySettingsUpdateRequest:
       $ref: './schemas/sync-history.yaml#/SyncHistorySettingsUpdateRequest'
+    # Canary
+    CanaryArrType:
+      $ref: './schemas/canary.yaml#/CanaryArrType'
+    CanaryRolloutStatus:
+      $ref: './schemas/canary.yaml#/CanaryRolloutStatus'
+    CanaryOutcomeStatus:
+      $ref: './schemas/canary.yaml#/CanaryOutcomeStatus'
+    CanaryPartialPolicy:
+      $ref: './schemas/canary.yaml#/CanaryPartialPolicy'
+    CanaryTrigger:
+      $ref: './schemas/canary.yaml#/CanaryTrigger'
+    CanaryJobRunStatus:
+      $ref: './schemas/canary.yaml#/CanaryJobRunStatus'
+    CanaryTarget:
+      $ref: './schemas/canary.yaml#/CanaryTarget'
+    CanaryInstanceResult:
+      $ref: './schemas/canary.yaml#/CanaryInstanceResult'
+    CanarySyncRunResult:
+      $ref: './schemas/canary.yaml#/CanarySyncRunResult'
+    CanaryStartRequest:
+      $ref: './schemas/canary.yaml#/CanaryStartRequest'
+    CanaryRolloutDetail:
+      $ref: './schemas/canary.yaml#/CanaryRolloutDetail'
+    CanaryRolloutSummary:
+      $ref: './schemas/canary.yaml#/CanaryRolloutSummary'
+    CanaryStartSkipped:
+      $ref: './schemas/canary.yaml#/CanaryStartSkipped'
+    CanaryStartGated:
+      $ref: './schemas/canary.yaml#/CanaryStartGated'
+    CanaryStartResult:
+      $ref: './schemas/canary.yaml#/CanaryStartResult'
+    CanaryRolloutListResponse:
+      $ref: './schemas/canary.yaml#/CanaryRolloutListResponse'
+    CanarySettings:
+      $ref: './schemas/canary.yaml#/CanarySettings'
+    CanarySettingsUpdate:
+      $ref: './schemas/canary.yaml#/CanarySettingsUpdate'
+    CanaryProceedRequest:
+      $ref: './schemas/canary.yaml#/CanaryProceedRequest'
+    CanaryAbortRequest:
+      $ref: './schemas/canary.yaml#/CanaryAbortRequest'
     GoalCategory:
       $ref: './schemas/goals.yaml#/GoalCategory'
     GoalCeilingRelation:

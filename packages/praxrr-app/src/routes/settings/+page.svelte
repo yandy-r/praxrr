@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Sliders, ShieldCheck, Bell, Clock, FileText, Archive, Info } from 'lucide-svelte';
+  import { Sliders, ShieldCheck, Bell, Clock, FileText, Archive, Info, Bird } from 'lucide-svelte';
 
   const settingsItems = [
     {
@@ -29,6 +29,13 @@
       description: 'Scheduled tasks and automation workflows',
       icon: Clock,
       iconClass: 'text-emerald-600 dark:text-emerald-400',
+    },
+    {
+      label: 'Canary Sync',
+      href: '/settings/canary',
+      description: 'Staged rollouts and blast-radius safety',
+      icon: Bird,
+      iconClass: 'text-teal-600 dark:text-teal-400',
     },
     {
       label: 'Logs',

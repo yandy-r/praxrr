@@ -151,6 +151,18 @@ export const NAV_REGISTRY: ArrCapabilityAwareNavItem[] = [
     hasChildren: false,
   },
   {
+    id: 'operations.canary',
+    label: 'Canary',
+    href: '/canary',
+    groupId: ensureGroupId('operations'),
+    order: 1,
+    arrScope: scopeAll,
+    mobilePriority: 'medium',
+    iconKey: 'Microscope',
+    emoji: '🐤',
+    hasChildren: false,
+  },
+  {
     id: 'policies.quality_profiles',
     label: 'Quality Profiles',
     href: '/quality-profiles',

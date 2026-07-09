@@ -1,0 +1,299 @@
+rollouts:
+  post:
+    operationId: startCanaryRollout
+    summary: Start a canary rollout
+    description: |
+      Runs the canary sync inline, persists the rollout, and returns the canary result plus a
+      live preview of the remaining same-`arr_type` instances. When only one eligible target
+      exists the staged flow is auto-skipped and a plain sync result is returned instead. The
+      response is discriminated on `skipped`.
+    tags:
+      - Canary
+    requestBody:
+      required: false
+      content:
+        application/json:
+          schema:
+            $ref: '../schemas/canary.yaml#/CanaryStartRequest'
+    responses:
+      '200':
+        description: Canary started (staged) or auto-skipped (plain sync)
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/canary.yaml#/CanaryStartResult'
+      '400':
+        description: Invalid request body
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+      '404':
+        description: Explicit canary instance not found
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+      '422':
+        description: No canary resolvable, or the canary is not a radarr/sonarr/lidarr instance
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+      '500':
+        description: Failed to start canary rollout
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+  get:
+    operationId: listCanaryRollouts
+    summary: List recent canary rollouts
+    description: Returns a paginated list of recent rollouts (newest first) for the history table.
+    tags:
+      - Canary
+    parameters:
+      - name: page
+        in: query
+        schema:
+          type: integer
+          minimum: 1
+          default: 1
+      - name: pageSize
+        in: query
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 250
+          default: 100
+    responses:
+      '200':
+        description: Canary rollout page
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/canary.yaml#/CanaryRolloutListResponse'
+      '400':
+        description: Invalid query parameter
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+      '500':
+        description: Failed to list canary rollouts
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+
+rolloutById:
+  get:
+    operationId: getCanaryRollout
+    summary: Canary rollout detail
+    description: |
+      Returns one rollout with its full state: canary diagnostics, remaining targets, per-instance
+      rollout results, and the current `stateToken` used to guard proceed/abort.
+    tags:
+      - Canary
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+    responses:
+      '200':
+        description: Canary rollout detail
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/canary.yaml#/CanaryRolloutDetail'
+      '400':
+        description: Invalid id
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+      '404':
+        description: Rollout not found
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+      '500':
+        description: Failed to read canary rollout
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+
+rolloutProceed:
+  post:
+    operationId: proceedCanaryRollout
+    summary: Proceed past the verification gate
+    description: |
+      Confirms an `awaiting_confirmation` rollout, transitions it to `rolling_out`, and enqueues the
+      resumable batched rollout job. Value-guarded on `stateToken`; returns the updated rollout.
+    tags:
+      - Canary
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../schemas/canary.yaml#/CanaryProceedRequest'
+    responses:
+      '200':
+        description: Rollout is now rolling out
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/canary.yaml#/CanaryRolloutDetail'
+      '400':
+        description: Invalid request body or id
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+      '404':
+        description: Rollout not found
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+      '409':
+        description: Rollout is not awaiting confirmation
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+      '422':
+        description: Stale state token
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+      '500':
+        description: Failed to proceed canary rollout
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+
+rolloutAbort:
+  post:
+    operationId: abortCanaryRollout
+    summary: Abort the rollout at the verification gate
+    description: |
+      Aborts an `awaiting_confirmation` rollout; remaining instances are never dispatched.
+      Value-guarded on `stateToken`; returns the updated rollout.
+    tags:
+      - Canary
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../schemas/canary.yaml#/CanaryAbortRequest'
+    responses:
+      '200':
+        description: Rollout aborted
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/canary.yaml#/CanaryRolloutDetail'
+      '400':
+        description: Invalid request body or id
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+      '404':
+        description: Rollout not found
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+      '409':
+        description: Rollout is not awaiting confirmation
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+      '422':
+        description: Stale state token
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+      '500':
+        description: Failed to abort canary rollout
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+
+settings:
+  get:
+    operationId: getCanarySettings
+    summary: Get canary settings
+    tags:
+      - Canary
+    responses:
+      '200':
+        description: Canary settings
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/canary.yaml#/CanarySettings'
+      '500':
+        description: Failed to read canary settings
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+  patch:
+    operationId: updateCanarySettings
+    summary: Update canary settings
+    description: |
+      Updates the opt-in enable flag, default batch size, auto-select, default canary instance,
+      and default partial policy. `defaultMaxBatchSize` must be an integer `>= 1`.
+    tags:
+      - Canary
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../schemas/canary.yaml#/CanarySettingsUpdate'
+    responses:
+      '200':
+        description: Updated canary settings
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/canary.yaml#/CanarySettings'
+      '400':
+        description: Invalid settings payload
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+      '500':
+        description: Failed to update canary settings
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'

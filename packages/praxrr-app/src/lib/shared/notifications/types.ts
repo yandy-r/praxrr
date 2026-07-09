@@ -147,6 +147,20 @@ export const notificationTypes: NotificationType[] = [
     category: 'Sync',
     description: 'Notification when an Arr sync run partially fails (some sections synced, some failed)',
   },
+
+  // Canary (blast-radius safety)
+  {
+    id: 'canary.failed',
+    label: 'Canary Failed',
+    category: 'Canary',
+    description: 'Notification when a canary sync fails and its rollout is aborted before touching remaining instances',
+  },
+  {
+    id: 'canary.promoted',
+    label: 'Canary Promoted',
+    category: 'Canary',
+    description: 'Notification when a canary is promoted and the rollout proceeds to the remaining instances',
+  },
 ];
 
 /**
