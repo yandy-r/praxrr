@@ -135,10 +135,15 @@ previewApply:
     operationId: applySyncPreview
     summary: Apply a sync preview
     description: |
-      Applies a previously generated preview to the target Arr instance.
+      Applies the selected sections from a previously generated preview to the
+      target Arr instance.
 
-      Preview generation itself is read-only, but this operation runs the normal sync
-      execution path for the selected sections.
+      Preview generation itself is read-only. Apply runs the normal sync job path
+      afresh for the selected sections using the current saved sync configuration;
+      it does not replay stored per-entity mutations from the preview snapshot.
+
+      The response reports only the aggregate job/run result. Preview entity changes
+      remain planned evidence and are not per-entity confirmation of what succeeded.
 
       Apply rejects previews that are too stale based on policy:
       - warnings are returned when the preview is older than 5 minutes
@@ -160,11 +165,11 @@ previewApply:
             $ref: '../schemas/sync.yaml#/SyncPreviewApplyRequest'
     responses:
       '200':
-        description: Preview applied
+        description: Selected sections completed successfully or required no work
         content:
           application/json:
             schema:
-              $ref: '../schemas/sync.yaml#/SyncPreviewResult'
+              $ref: '../schemas/sync.yaml#/SyncPreviewApplyResponse'
       '400':
         description: Invalid request body
         content:
@@ -188,10 +193,12 @@ previewApply:
         content:
           application/json:
             schema:
-              $ref: '../schemas/arr.yaml#/ErrorResponse'
+              $ref: '../schemas/sync.yaml#/SyncPreviewApplyErrorResponse'
       '500':
-        description: Failed to apply preview
+        description: Sync job reported failure or preview apply raised an unexpected error
         content:
           application/json:
             schema:
-              $ref: '../schemas/arr.yaml#/ErrorResponse'
+              oneOf:
+                - $ref: '../schemas/sync.yaml#/SyncPreviewApplyResponse'
+                - $ref: '../schemas/sync.yaml#/SyncPreviewApplyErrorResponse'

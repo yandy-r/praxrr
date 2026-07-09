@@ -451,7 +451,7 @@ Deno.test(
     sanitizeResources: false,
   },
   async () => {
-    let slowTimer: number | undefined;
+    let slowTimer: ReturnType<typeof setTimeout> | undefined;
     const slowPreview: DriftCheckDeps['generatePreview'] = () =>
       new Promise<GeneratePreviewResult>((resolve) => {
         slowTimer = setTimeout(() => resolve(makePreview()), 200);

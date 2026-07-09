@@ -1,4 +1,4 @@
-import { assert, assertEquals, assertExists } from '@std/assert';
+import { assertEquals, assertExists } from '@std/assert';
 import { config } from '$config';
 import { db } from '$db/db.ts';
 import { runMigrations } from '$db/migrations.ts';

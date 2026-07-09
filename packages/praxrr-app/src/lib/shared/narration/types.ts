@@ -12,7 +12,7 @@
  * narration produced by different template generations apart. Declared here ONCE; every other
  * narration module imports it rather than re-declaring it.
  */
-export const NARRATION_TEMPLATE_VERSION = '1';
+export const NARRATION_TEMPLATE_VERSION = '2';
 
 /** Summary shows only the headline; verbose adds the per-field/per-category detail lines. */
 export type NarrationLevel = 'summary' | 'verbose';

@@ -218,6 +218,29 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/simulate/impact': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Simulate configuration change impact for releases
+     * @description Applies proposed custom-format score and quality-profile threshold
+     *     changes to an isolated ephemeral sandbox cache and returns release-level
+     *     impact, config A/B diff, and cascade warnings. Proposed changes never
+     *     touch pcd_ops or the registered cache.
+     */
+    post: operations['simulateImpact'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/arr/library': {
     parameters: {
       query?: never;
@@ -422,10 +445,15 @@ export interface paths {
     put?: never;
     /**
      * Apply a sync preview
-     * @description Applies a previously generated preview to the target Arr instance.
+     * @description Applies the selected sections from a previously generated preview to the
+     *     target Arr instance.
      *
-     *     Preview generation itself is read-only, but this operation runs the normal sync
-     *     execution path for the selected sections.
+     *     Preview generation itself is read-only. Apply runs the normal sync job path
+     *     afresh for the selected sections using the current saved sync configuration;
+     *     it does not replay stored per-entity mutations from the preview snapshot.
+     *
+     *     The response reports only the aggregate job/run result. Preview entity changes
+     *     remain planned evidence and are not per-entity confirmation of what succeeded.
      *
      *     Apply rejects previews that are too stale based on policy:
      *     - warnings are returned when the preview is older than 5 minutes
@@ -527,8 +555,10 @@ export interface paths {
     /**
      * Get PCD snapshot detail
      * @description Returns full snapshot detail including computed fields for restore context
-     *     (opsWrittenSince, isRestorable). Restore support is not yet implemented,
-     *     so `isRestorable` is always false.
+     *     (opsWrittenSince, isRestorable). `isRestorable` reflects a real fail-closed check:
+     *     it is true only when the snapshot's published-op manifest reconstructs and its
+     *     recomputed fingerprint matches the stored cacheStateHash. See the
+     *     `.../rollback/preview` and `.../rollback` endpoints to preview and execute a restore.
      */
     get: operations['getPcdSnapshot'];
     put?: never;
@@ -539,6 +569,51 @@ export interface paths {
      *     specified database.
      */
     delete: operations['deletePcdSnapshot'];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/pcd/{databaseId}/snapshots/{snapshotId}/rollback/preview': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Preview restoring a PCD snapshot
+     * @description Read-only, PCD-to-PCD preview of exactly what restoring this snapshot would change in
+     *     the PCD desired state (issue #16). Does not contact any Arr instance. The returned
+     *     currentStateHash is the from-state value-guard required by the execute endpoint.
+     */
+    get: operations['previewSnapshotRollback'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/pcd/{databaseId}/snapshots/{snapshotId}/rollback': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Execute a PCD point-in-time restore
+     * @description Restores PCD state to this snapshot by rewinding the append-only op log (issue #16).
+     *     No op rows are deleted; a durable pre-rollback snapshot is captured first. The body's
+     *     expectedCurrentStateHash (from the preview) guards against an apply-after-change race —
+     *     a mismatch returns 422 and the caller must regenerate the preview.
+     */
+    post: operations['executeSnapshotRollback'];
+    delete?: never;
     options?: never;
     head?: never;
     patch?: never;
@@ -782,6 +857,164 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/drift/summary': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Drift detection summary
+     * @description Returns the latest drift status for every enabled, sync-capable Arr instance, plus
+     *     aggregate totals and the drift check settings. Instances that have never been checked
+     *     are synthesized as `never-checked`. Degraded per-instance statuses (unreachable,
+     *     unauthorized, error) are carried in the 200 body — this endpoint returns 500 only on an
+     *     internal error.
+     */
+    get: operations['getDriftSummary'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/drift/{instanceId}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Per-instance drift detail
+     * @description Returns the stored drift detail for a single instance, grouped into `drift` (field
+     *     changes), `missing` (managed entities absent on the Arr), and `unmanaged` (extra live
+     *     entities, non-alerting). A degraded status is returned in the 200 body; this endpoint
+     *     returns 404 only when the instance does not exist.
+     */
+    get: operations['getDriftDetail'];
+    put?: never;
+    /**
+     * Refresh drift for one instance on demand
+     * @description Runs a fresh drift check for the instance on the request thread (not the scheduled
+     *     queue) and returns the updated detail. Rate-limited per instance.
+     */
+    post: operations['refreshDriftDetail'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/drift/settings': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /**
+     * Update drift detection settings
+     * @description Enables/disables drift detection and sets the polling interval, then reschedules or
+     *     cancels the recurring drift check job accordingly.
+     */
+    put: operations['updateDriftSettings'];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/sync-history': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * List / search sync history
+     * @description Returns a filtered, paginated list of sync run audit entries (newest first). All
+     *     filters are optional and combine with AND. This endpoint returns 500 only on an
+     *     internal error; invalid query params return 400.
+     */
+    get: operations['listSyncHistory'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/sync-history/{id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Sync history entry detail
+     * @description Returns one sync run audit entry with the full section results and diff.
+     */
+    get: operations['getSyncHistoryEntry'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/sync-history/export': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Export sync history
+     * @description Streams the filtered sync history (same filters as the list endpoint, no pagination)
+     *     as a JSON array or CSV file download.
+     */
+    get: operations['exportSyncHistory'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/sync-history/settings': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get sync history settings */
+    get: operations['getSyncHistorySettings'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    /**
+     * Update sync history settings
+     * @description Updates retention (days + max entries) and the enable flag, then reschedules or cancels
+     *     the recurring cleanup job accordingly.
+     */
+    patch: operations['updateSyncHistorySettings'];
+    trace?: never;
+  };
   '/setup/state': {
     parameters: {
       query?: never;
@@ -931,113 +1164,429 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/goals/presets': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * List Quality Goal presets and slider axes
+     * @description Returns the built-in goal presets, the slider-axis metadata, and the engine version. The editor
+     *     renders sliders and can run the pure engine client-side from this payload with nothing hardcoded.
+     */
+    get: operations['getGoalPresets'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/goals/preview': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Preview the config a goal would generate (non-persisting)
+     * @description Translates a goal (preset + slider weights) into a concrete scoring plan for one quality
+     *     profile and returns the plan plus the authoritative sandbox config diff. Mutates nothing —
+     *     scores are compiled only inside an ephemeral sandbox cache; `pcd_ops` is untouched.
+     */
+    post: operations['previewGoal'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/goals/apply': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Apply a goal to a quality profile
+     * @description Persists the generated scores + thresholds to the quality profile via the standard PCD user-op
+     *     path (`updateScoring`) and records the goal binding. Applied scores are ordinary user ops,
+     *     editable anywhere manual scores are. Returns 409 when `expectedEngineVersion` does not match the
+     *     server engine version (optimistic concurrency).
+     */
+    post: operations['applyGoal'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/goals/binding': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get the goal binding for a quality profile
+     * @description Returns the persisted goal binding (preset + weights + engine version + applied time) for a
+     *     profile, or `null` when the profile is not goal-governed. A stale `engineVersion` drives a
+     *     re-apply prompt in the editor.
+     */
+    get: operations['getGoalBinding'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/canary/rollouts': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * List recent canary rollouts
+     * @description Returns a paginated list of recent rollouts (newest first) for the history table.
+     */
+    get: operations['listCanaryRollouts'];
+    put?: never;
+    /**
+     * Start a canary rollout
+     * @description Runs the canary sync inline, persists the rollout, and returns the canary result plus a
+     *     live preview of the remaining same-`arr_type` instances. When only one eligible target
+     *     exists the staged flow is auto-skipped and a plain sync result is returned instead. The
+     *     response is discriminated on `skipped`.
+     */
+    post: operations['startCanaryRollout'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/canary/rollouts/{id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Canary rollout detail
+     * @description Returns one rollout with its full state: canary diagnostics, remaining targets, per-instance
+     *     rollout results, and the current `stateToken` used to guard proceed/abort.
+     */
+    get: operations['getCanaryRollout'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/canary/rollouts/{id}/proceed': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Proceed past the verification gate
+     * @description Confirms an `awaiting_confirmation` rollout, transitions it to `rolling_out`, and enqueues the
+     *     resumable batched rollout job. Value-guarded on `stateToken`; returns the updated rollout.
+     */
+    post: operations['proceedCanaryRollout'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/canary/rollouts/{id}/abort': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Abort the rollout at the verification gate
+     * @description Aborts an `awaiting_confirmation` rollout; remaining instances are never dispatched.
+     *     Value-guarded on `stateToken`; returns the updated rollout.
+     */
+    post: operations['abortCanaryRollout'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/canary/settings': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get canary settings */
+    get: operations['getCanarySettings'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    /**
+     * Update canary settings
+     * @description Updates the opt-in enable flag, default batch size, auto-select, default canary instance,
+     *     and default partial policy. `defaultMaxBatchSize` must be an integer `>= 1`.
+     */
+    patch: operations['updateCanarySettings'];
+    trace?: never;
+  };
+  '/config-health/summary': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Fleet config-health summary
+     * @description Live per-instance overall health score and band for every enabled, sync-capable Arr instance,
+     *     plus aggregate totals and a settings snapshot. Degraded/never-checked states are carried in the
+     *     200 body (per-instance band), not as an HTTP error.
+     */
+    get: operations['getConfigHealthSummary'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/config-health/{instanceId}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Config-health detail for one instance
+     * @description Live overall health plus a per-quality-profile breakdown with per-criterion contributions and
+     *     non-judgmental suggestions for a single instance.
+     */
+    get: operations['getConfigHealthDetail'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/config-health/{instanceId}/trends': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Config-health score trend for one instance
+     * @description Time-series of the persisted overall score and band for one instance, oldest → newest, for the
+     *     trend sparkline. Bounded to the last `days` when provided.
+     */
+    get: operations['getConfigHealthTrends'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/config-health/settings': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Read config-health settings
+     * @description The configurable per-criterion enable/weight set, cadence, retention, the engine version, and
+     *     the static criterion catalog (id/label/description) so the client hardcodes nothing.
+     */
+    get: operations['getConfigHealthSettings'];
+    /**
+     * Update config-health settings
+     * @description Update the criteria enable/weights, cadence, and retention. Reschedules the snapshot + cleanup
+     *     jobs immediately. Returns 409 when `expectedEngineVersion` does not match the server engine.
+     */
+    put: operations['updateConfigHealthSettings'];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/security-posture/summary': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Security posture shield report
+     * @description The live "Shield Check" for this deployment: an overall 0–100 shield score and band (with any
+     *     critical band-cap), a per-check breakdown, the per-instance connection-transport table, always-on
+     *     assurances, unscored advisories, and the ranked "to reach Hardened" actions. Read-only, computed
+     *     on demand, zero network probing. The payload NEVER contains a secret value — only presence
+     *     booleans, host strings, and key-version identifiers. Non-blocking: it informs, it never blocks.
+     */
+    get: operations['getSecurityPostureSummary'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/timeline': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * List / search the sync-archaeology timeline
+     * @description Returns a merged, paginated feed of archaeology events aggregated across four read-only
+     *     sources (sync runs, PCD snapshots, rollbacks, canary rollouts), newest first, with
+     *     annotations hydrated inline. This is a pure read/visual layer — no materialized event table;
+     *     the only persisted timeline state is user annotations.
+     *
+     *     Filters combine with AND and gate which sources are included (fail-closed):
+     *     - no scope filter → all four sources
+     *     - `instanceId` or `arrType` → `sync` + `canary` only (snapshot/rollback carry no arr scope)
+     *     - `databaseId` → `snapshot` + `rollback` only
+     *     - `source` intersects the included set
+     *     - `status`, `from`, `to`, `q` apply inside every included branch
+     *
+     *     Ordering is `occurredAt DESC, source ASC, id DESC` so same-second cross-source events never
+     *     duplicate or skip across page boundaries. Contradictory scope combinations return 400.
+     */
+    get: operations['listTimeline'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/timeline/export': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Export the timeline
+     * @description Streams the filtered timeline (same filters and source-gating as the list endpoint, no
+     *     pagination) as a JSON array or CSV file download. Capped server-side to guard memory.
+     */
+    get: operations['exportTimeline'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/timeline/annotations': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * List annotations for one event
+     * @description Returns every annotation attached to a single timeline event (a thread), oldest first.
+     *     Orphaned annotations (whose source event no longer exists) remain reachable here by explicit
+     *     `source`+`eventId` but never surface in the merged feed.
+     */
+    get: operations['listTimelineAnnotations'];
+    put?: never;
+    /**
+     * Attach a note to a timeline event
+     * @description Requires an authenticated user (or AUTH-bypass). The referenced event must exist (404
+     *     otherwise, so a note is never born dangling).
+     */
+    post: operations['createTimelineAnnotation'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/timeline/annotations/{id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    /**
+     * Delete an annotation
+     * @description Author-gated (403 for non-authors unless in AUTH-bypass mode).
+     */
+    delete: operations['deleteTimelineAnnotation'];
+    options?: never;
+    head?: never;
+    /**
+     * Edit an annotation
+     * @description Author-gated (403 for non-authors unless in AUTH-bypass mode).
+     */
+    patch: operations['updateTimelineAnnotation'];
+    trace?: never;
+  };
 }
 export type webhooks = Record<string, never>;
 export interface components {
   schemas: {
-    /** @enum {string} */
-    ConfigHealthBand: 'healthy' | 'attention' | 'needs-review' | 'unknown';
-    /** @enum {string} */
-    ConfigHealthArrType: 'radarr' | 'sonarr' | 'lidarr';
-    /** @enum {string} */
-    ConfigHealthTone: 'neutral' | 'info' | 'warning' | 'danger';
-    ConfigHealthSuggestion: {
-      headline: string;
-      detail: string[];
-      tone: components['schemas']['ConfigHealthTone'];
-      templateVersion: string;
-    };
-    ConfigHealthCriterion: {
-      id: string;
-      label: string;
-      score: number | null;
-      weight: number;
-      contribution: number;
-      detail: string[];
-      suggestions: components['schemas']['ConfigHealthSuggestion'][];
-    };
-    ConfigHealthScoredUnit: {
-      score: number;
-      band: components['schemas']['ConfigHealthBand'];
-      criteria: components['schemas']['ConfigHealthCriterion'][];
-      suggestions: components['schemas']['ConfigHealthSuggestion'][];
-    };
-    ConfigHealthProfileHealth: components['schemas']['ConfigHealthScoredUnit'] & {
-      name: string;
-    };
-    ConfigHealthInstanceSummary: {
-      instanceId: number;
-      instanceName: string;
-      arrType: components['schemas']['ConfigHealthArrType'];
-      score: number;
-      band: components['schemas']['ConfigHealthBand'];
-      generatedAt: string;
-    };
-    ConfigHealthTotals: {
-      instances: number;
-      healthy: number;
-      attention: number;
-      needsReview: number;
-      unknown: number;
-      averageScore: number | null;
-    };
-    ConfigHealthSettingsSnapshot: {
-      enabled: boolean;
-      intervalMinutes: number;
-    };
-    ConfigHealthSummaryResponse: {
-      engineVersion: string;
-      generatedAt: string;
-      totals: components['schemas']['ConfigHealthTotals'];
-      settings: components['schemas']['ConfigHealthSettingsSnapshot'];
-      instances: components['schemas']['ConfigHealthInstanceSummary'][];
-    };
-    ConfigHealthDetailResponse: {
-      instanceId: number;
-      instanceName: string;
-      arrType: components['schemas']['ConfigHealthArrType'];
-      engineVersion: string;
-      generatedAt: string;
-      overall: components['schemas']['ConfigHealthScoredUnit'];
-      profiles: components['schemas']['ConfigHealthProfileHealth'][];
-    };
-    ConfigHealthTrendPoint: {
-      generatedAt: string;
-      overallScore: number;
-      band: components['schemas']['ConfigHealthBand'];
-    };
-    ConfigHealthTrendsResponse: {
-      instanceId: number;
-      engineVersion: string;
-      points: components['schemas']['ConfigHealthTrendPoint'][];
-    };
-    ConfigHealthCriterionConfig: {
-      id: string;
-      enabled: boolean;
-      weight: number;
-    };
-    ConfigHealthCriterionMeta: {
-      id: string;
-      label: string;
-      description: string;
-    };
-    ConfigHealthSettingsResponse: {
-      engineVersion: string;
-      enabled: boolean;
-      intervalMinutes: number;
-      retentionDays: number;
-      retentionMaxEntries: number;
-      criteria: components['schemas']['ConfigHealthCriterionConfig'][];
-      catalog: components['schemas']['ConfigHealthCriterionMeta'][];
-    };
-    ConfigHealthSettingsUpdateRequest: {
-      expectedEngineVersion: string;
-      enabled?: boolean;
-      intervalMinutes?: number;
-      retentionDays?: number;
-      retentionMaxEntries?: number;
-      criteria?: components['schemas']['ConfigHealthCriterionConfig'][];
-    };
     /**
      * @description Individual component health status
      * @enum {string}
@@ -1709,6 +2258,504 @@ export interface components {
       metadataProfiles: components['schemas']['MetadataProfilesPreview'] | Record<string, never>;
       summary: components['schemas']['SyncPreviewSummary'];
     };
+    /**
+     * @description Stored per-instance drift status.
+     * @enum {string}
+     */
+    DriftStatus: 'in-sync' | 'drifted' | 'unreachable' | 'unauthorized' | 'error';
+    /**
+     * @description Drift status as surfaced in the summary. Extends `DriftStatus` with the synthesized
+     *     `never-checked` value for enabled instances that have no stored row yet.
+     * @enum {string}
+     */
+    DriftSummaryStatus: 'in-sync' | 'drifted' | 'unreachable' | 'unauthorized' | 'error' | 'never-checked';
+    /**
+     * @description Sanitized closed reason for a non-in-sync outcome.
+     * @enum {string}
+     */
+    DriftReason:
+      | 'unreachable'
+      | 'timeout'
+      | 'unauthorized'
+      | 'invalid_response'
+      | 'not_configured'
+      | 'cache_not_ready'
+      | 'rate_limited'
+      | 'error';
+    DriftCounts: {
+      /** @description Managed entities whose fields diverged on the Arr (alerting). */
+      drifted: number;
+      /** @description Managed entities absent on the Arr (alerting). */
+      missing: number;
+      /** @description Live Arr entities not in the resolved desired set (non-alerting). */
+      unmanaged: number;
+    };
+    DriftSettings: {
+      enabled: boolean;
+      intervalMinutes: number;
+      lastRunAt: string | null;
+      nextRunAt: string | null;
+      backoffUntil: string | null;
+      errorCount: number;
+    };
+    DriftEntityChange: {
+      section: components['schemas']['SyncPreviewSection'];
+      entityType: string;
+      /** @description Entity display name (namespace-stripped). */
+      name: string;
+      action: components['schemas']['SyncPreviewAction'];
+      /** @enum {string} */
+      category: 'drift' | 'missing' | 'unmanaged';
+      /** @description Live Arr entity id, or null for a create/missing entity. */
+      remoteId: number | null;
+      /** @description Field-level diff (`current` = live, `desired` = PCD); empty for create/delete. */
+      fields: components['schemas']['FieldChange'][];
+    };
+    DriftInstanceSummary: {
+      instanceId: number;
+      instanceName: string;
+      /** @enum {string} */
+      arrType: 'radarr' | 'sonarr' | 'lidarr';
+      status: components['schemas']['DriftSummaryStatus'];
+      reason: components['schemas']['DriftReason'] | null;
+      detectedVersion: string | null;
+      counts: components['schemas']['DriftCounts'];
+      checkedAt: string | null;
+      contentCheckedAt: string | null;
+    };
+    DriftSummaryResponse: {
+      /** Format: date-time */
+      generatedAt: string;
+      settings: components['schemas']['DriftSettings'];
+      totals: {
+        instances: number;
+        inSync: number;
+        drifted: number;
+        unreachable: number;
+        unauthorized: number;
+        error: number;
+        neverChecked: number;
+      };
+      instances: components['schemas']['DriftInstanceSummary'][];
+    };
+    DriftDetailResponse: {
+      instanceId: number;
+      instanceName: string;
+      /** @enum {string} */
+      arrType: 'radarr' | 'sonarr' | 'lidarr';
+      status: components['schemas']['DriftSummaryStatus'];
+      reason: components['schemas']['DriftReason'] | null;
+      detectedVersion: string | null;
+      checkedAt: string | null;
+      contentCheckedAt: string | null;
+      counts: components['schemas']['DriftCounts'];
+      /** @description Entities whose fields diverged (action = update). */
+      drift: components['schemas']['DriftEntityChange'][];
+      /** @description Managed entities absent on the Arr (action = create). */
+      missing: components['schemas']['DriftEntityChange'][];
+      /** @description Live Arr entities not in the desired set (action = delete, non-alerting). */
+      unmanaged: components['schemas']['DriftEntityChange'][];
+    };
+    DriftSettingsUpdateRequest: {
+      enabled?: boolean;
+      intervalMinutes?: number;
+    };
+    /**
+     * @description How a sync run was initiated.
+     * @enum {string}
+     */
+    SyncTrigger: 'manual' | 'schedule' | 'system';
+    /**
+     * @description Terminal status of an audited sync run.
+     * @enum {string}
+     */
+    SyncOperationStatus: 'success' | 'partial' | 'failed' | 'skipped';
+    SyncSectionResult: {
+      section: components['schemas']['SyncPreviewSection'];
+      /** @enum {string} */
+      status: 'success' | 'failed' | 'skipped';
+      itemsSynced: number;
+      error: string | null;
+      failedProfiles?: string[];
+    };
+    SyncEntityChange: {
+      section: components['schemas']['SyncPreviewSection'];
+      /** @description Sibling collection within the section (e.g. customFormats, naming). */
+      category: string;
+      entityType: string;
+      /** @description Entity display name (namespace-stripped). */
+      name: string;
+      action: components['schemas']['SyncPreviewAction'];
+      remoteId: number | null;
+      /** @description Field-level diff (`current` = live/old, `desired` = PCD/new). */
+      fields: components['schemas']['FieldChange'][];
+    };
+    SyncHistoryEntry: {
+      id: number;
+      /** @description Null when the source instance was deleted after this run. */
+      arrInstanceId: number | null;
+      instanceName: string;
+      /** @enum {string} */
+      arrType: 'radarr' | 'sonarr' | 'lidarr';
+      jobId: number | null;
+      trigger: components['schemas']['SyncTrigger'];
+      triggerEvent: string | null;
+      sectionsAttempted: components['schemas']['SyncPreviewSection'][];
+      status: components['schemas']['SyncOperationStatus'];
+      sectionsRun: number;
+      itemsSynced: number;
+      failureCount: number;
+      entityChangeCount: number;
+      error: string | null;
+      /** Format: date-time */
+      startedAt: string;
+      finishedAt: string | null;
+      durationMs: number | null;
+      createdAt: string;
+    };
+    SyncHistoryDetail: components['schemas']['SyncHistoryEntry'] & {
+      sectionResults: components['schemas']['SyncSectionResult'][];
+      changes: components['schemas']['SyncEntityChange'][];
+    };
+    SyncHistoryListResponse: {
+      items: components['schemas']['SyncHistoryEntry'][];
+      page: number;
+      pageSize: number;
+      totalRecords: number;
+      totalPages: number;
+      hasNext: boolean;
+    };
+    SyncHistorySettings: {
+      enabled: boolean;
+      retentionDays: number;
+      /** @description Keep at most this many rows; 0 disables the entry cap (age-only retention). */
+      retentionMaxEntries: number;
+    };
+    SyncHistorySettingsUpdateRequest: {
+      enabled?: boolean;
+      retentionDays?: number;
+      retentionMaxEntries?: number;
+    };
+    /**
+     * @description Arr family a rollout is scoped to. A rollout never spans types.
+     * @enum {string}
+     */
+    CanaryArrType: 'radarr' | 'sonarr' | 'lidarr';
+    /**
+     * @description Live state machine of a staged rollout:
+     *     - `canary_running`: canary sync is executing inline
+     *     - `awaiting_confirmation`: canary passed, waiting at the verification gate
+     *     - `rolling_out`: batched rollout job is syncing remaining instances
+     *     - `completed`: all remaining instances synced cleanly
+     *     - `aborted`: gate declined, or canary failed/partial-abort/skipped (remaining untouched)
+     *     - `failed`: rollout ran but one or more remaining instances failed
+     * @enum {string}
+     */
+    CanaryRolloutStatus:
+      'canary_running' | 'awaiting_confirmation' | 'rolling_out' | 'completed' | 'aborted' | 'failed';
+    /**
+     * @description Classified terminal status of the canary sync run.
+     * @enum {string}
+     */
+    CanaryOutcomeStatus: 'success' | 'partial' | 'failed' | 'skipped';
+    /**
+     * @description How a `partial` canary outcome is treated:
+     *     - `gate`: pass-with-warning; continue to the verification gate
+     *     - `abort`: treat as failure; remaining instances are never touched
+     * @enum {string}
+     */
+    CanaryPartialPolicy: 'gate' | 'abort';
+    /**
+     * @description How the rollout was initiated.
+     * @enum {string}
+     */
+    CanaryTrigger: 'manual' | 'system' | 'schedule';
+    /**
+     * @description Per-instance outcome status following JobRunStatus semantics.
+     * @enum {string}
+     */
+    CanaryJobRunStatus: 'success' | 'failure' | 'skipped' | 'cancelled';
+    CanaryTarget: {
+      /** @description Arr instance ID selected as a rollout target. */
+      instanceId: number;
+      /** @description Denormalized instance name captured at rollout start. */
+      instanceName: string;
+    };
+    CanaryInstanceResult: {
+      instanceId: number;
+      instanceName: string;
+      status: components['schemas']['CanaryJobRunStatus'];
+      /** @description Human-readable sync summary from executeSyncJob. */
+      output?: string;
+      /** @description Per-instance diagnostics on failure. */
+      error?: string;
+    };
+    /** @description Verbatim executeSyncJob return, surfaced when a start auto-skips to a plain sync. */
+    CanarySyncRunResult: {
+      status: components['schemas']['CanaryJobRunStatus'];
+      output?: string;
+      error?: string;
+      rescheduleAt?: string | null;
+    };
+    CanaryStartRequest: {
+      /** @description The Arr app the rollout is scoped to. Required — a rollout targets exactly one arr_type. */
+      arrType: components['schemas']['CanaryArrType'];
+      /** @description Explicit canary instance. Highest selection precedence. */
+      canaryInstanceId?: number;
+      /** @description Optional section filters. Omit for all configured sections. */
+      sections?: components['schemas']['SyncPreviewSection'][];
+      /** @description Max remaining instances synced per batch. Falls back to the settings default. */
+      maxBatchSize?: number;
+      partialPolicy?: components['schemas']['CanaryPartialPolicy'];
+    };
+    CanaryRolloutDetail: {
+      id: number;
+      arrType: components['schemas']['CanaryArrType'];
+      status: components['schemas']['CanaryRolloutStatus'];
+      /** @description Null when the canary instance was deleted after this run. */
+      canaryInstanceId: number | null;
+      canaryInstanceName: string;
+      /** @description Null while the canary is still running. */
+      canaryStatus: components['schemas']['CanaryOutcomeStatus'] | null;
+      /** @description FK to the canary's sync_history row (diagnostics source). */
+      canarySyncHistoryId: number | null;
+      /** @description Requested sections, or null for all configured sections. */
+      sections: components['schemas']['SyncPreviewSection'][] | null;
+      maxBatchSize: number;
+      partialPolicy: components['schemas']['CanaryPartialPolicy'];
+      canaryOutput: string | null;
+      canaryError: string | null;
+      remainingTargets: components['schemas']['CanaryTarget'][];
+      /** @description Index into remainingTargets the rollout job has reached (resumable). */
+      batchCursor: number;
+      rolloutResults: components['schemas']['CanaryInstanceResult'][];
+      trigger: components['schemas']['CanaryTrigger'];
+      /** Format: date-time */
+      startedAt: string;
+      finishedAt: string | null;
+      /** @description Value-guard token for /proceed and /abort; re-issued on every transition. */
+      stateToken: string;
+      createdAt: string;
+      updatedAt: string;
+    };
+    CanaryRolloutSummary: {
+      id: number;
+      arrType: components['schemas']['CanaryArrType'];
+      status: components['schemas']['CanaryRolloutStatus'];
+      canaryInstanceId: number | null;
+      canaryInstanceName: string;
+      canaryStatus: components['schemas']['CanaryOutcomeStatus'] | null;
+      maxBatchSize: number;
+      partialPolicy: components['schemas']['CanaryPartialPolicy'];
+      trigger: components['schemas']['CanaryTrigger'];
+      /** @description Number of remaining targets, derived from remainingTargets length. */
+      remainingCount: number;
+      /** @description Number of instances rolled out, derived from rolloutResults length. */
+      completedCount: number;
+      /** Format: date-time */
+      startedAt: string;
+      finishedAt: string | null;
+      createdAt: string;
+      updatedAt: string;
+    };
+    /** @description Returned when a single eligible same-arr_type target auto-skips the staged flow. */
+    CanaryStartSkipped: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      skipped: 'CanaryStartSkipped';
+      result: components['schemas']['CanarySyncRunResult'];
+    };
+    /** @description Returned when the canary passed and the rollout is awaiting confirmation. */
+    CanaryStartGated: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      skipped: 'CanaryStartGated';
+      rollout: components['schemas']['CanaryRolloutDetail'];
+      /** @description Live per-instance preview of remaining targets shown at the gate. */
+      remainingPreview: components['schemas']['SyncPreviewResult'][];
+    };
+    /**
+     * @description Two-headed start response discriminated on `skipped`:
+     *     - `skipped: true`: single-target auto-skip ran a plain sync
+     *     - `skipped: false`: staged rollout persisted and awaiting confirmation
+     */
+    CanaryStartResult: components['schemas']['CanaryStartSkipped'] | components['schemas']['CanaryStartGated'];
+    CanaryRolloutListResponse: {
+      items: components['schemas']['CanaryRolloutSummary'][];
+      page: number;
+      pageSize: number;
+      totalRecords: number;
+      totalPages: number;
+      hasNext: boolean;
+    };
+    CanarySettings: {
+      /** @description Opt-in. When false the staged flow is hidden and start falls through to a plain sync. */
+      enabled: boolean;
+      defaultMaxBatchSize: number;
+      /** @description Allow least-critical auto-pick when no explicit or default canary is set. */
+      autoSelect: boolean;
+      defaultCanaryInstanceId: number | null;
+      defaultPartialPolicy: components['schemas']['CanaryPartialPolicy'];
+    };
+    CanarySettingsUpdate: {
+      enabled?: boolean;
+      defaultMaxBatchSize?: number;
+      autoSelect?: boolean;
+      defaultCanaryInstanceId?: number | null;
+      defaultPartialPolicy?: components['schemas']['CanaryPartialPolicy'];
+    };
+    CanaryProceedRequest: {
+      /** @description The state_token the client was shown; value-guards concurrent/double-proceed. */
+      stateToken: string;
+    };
+    CanaryAbortRequest: {
+      /** @description The state_token the client was shown; value-guards concurrent proceed/abort. */
+      stateToken: string;
+    };
+    /**
+     * @description Closed set of semantic categories a custom format is classified into.
+     * @enum {string}
+     */
+    GoalCategory:
+      | 'unwanted'
+      | 'hdr_dv'
+      | 'hdr_hdr10plus'
+      | 'hdr_baseline'
+      | 'remux'
+      | 'release_group_tier_1'
+      | 'release_group_tier_2'
+      | 'release_group_tier_3'
+      | 'audio_lossless'
+      | 'audio_advanced'
+      | 'audio_baseline'
+      | 'streaming_service'
+      | 'movie_version'
+      | 'repack_proper'
+      | 'resolution';
+    /** @enum {string} */
+    GoalCeilingRelation: 'above' | 'match' | 'below';
+    /** @enum {string} */
+    GoalResolutionCeiling: '720p' | '1080p' | '2160p';
+    GoalWeights: {
+      qualityVsSize: number;
+      compatibility: number;
+      hdrPreference: number;
+      unwantedStrictness: number;
+      resolutionCeiling: components['schemas']['GoalResolutionCeiling'];
+    };
+    GoalAxisMeta: {
+      key: string;
+      label: string;
+      /** @enum {string} */
+      kind: 'weight' | 'strictness' | 'ceiling';
+      min?: number;
+      max?: number;
+      step?: number;
+      options?: components['schemas']['GoalResolutionCeiling'][];
+      description: string;
+    };
+    GoalPreset: {
+      /** @enum {string} */
+      id: 'best-quality' | 'smallest-size' | 'balanced' | '4k-hdr-priority';
+      label: string;
+      description: string;
+      weights: components['schemas']['GoalWeights'];
+    };
+    GoalAxisContribution: {
+      axis: string;
+      delta: number;
+    };
+    GoalReason: {
+      code: string;
+      category: components['schemas']['GoalCategory'] | null;
+      ruleId: string;
+      base: number;
+      axisContributions: components['schemas']['GoalAxisContribution'][];
+      ceiling: components['schemas']['GoalCeilingRelation'] | null;
+    };
+    GoalCfDecision: {
+      customFormatName: string;
+      /** @enum {string} */
+      arrType: 'radarr' | 'sonarr';
+      category: components['schemas']['GoalCategory'];
+      score: number;
+      reason: components['schemas']['GoalReason'];
+    };
+    GoalUncategorizedCf: {
+      name: string;
+      suggestedCategory: components['schemas']['GoalCategory'] | null;
+      reason: string;
+    };
+    GoalCoverage: {
+      total: number;
+      scored: number;
+      uncategorized: number;
+    };
+    GoalThresholds: {
+      minimumScore: number;
+      upgradeUntilScore: number;
+      upgradeScoreIncrement: number;
+    };
+    /** @description Deterministic translation of a goal into concrete scores + thresholds. */
+    GoalPlan: {
+      engineVersion: string;
+      /** @enum {string} */
+      arrType: 'radarr' | 'sonarr';
+      decisions: components['schemas']['GoalCfDecision'][];
+      uncategorized: components['schemas']['GoalUncategorizedCf'][];
+      thresholds: components['schemas']['GoalThresholds'];
+      coverage: components['schemas']['GoalCoverage'];
+    };
+    /** @description Persisted intent metadata for a goal-governed quality profile. */
+    GoalBinding: {
+      presetId: string;
+      weights: components['schemas']['GoalWeights'];
+      engineVersion: string;
+      /** @description ISO-8601 UTC timestamp of the last apply */
+      appliedAt: string;
+    };
+    GoalPresetsResponse: {
+      presets: components['schemas']['GoalPreset'][];
+      axes: components['schemas']['GoalAxisMeta'][];
+      engineVersion: string;
+    };
+    GoalPreviewRequest: {
+      databaseId: number;
+      /** @enum {string} */
+      arrType: 'radarr' | 'sonarr';
+      /** @description Raw PCD quality-profile name (pcd:-stripped) */
+      profileName: string;
+      preset: string;
+      weights: components['schemas']['GoalWeights'];
+    };
+    /** @description Non-persisting preview — the plan plus the authoritative sandbox config diff. */
+    GoalPreviewResponse: {
+      plan: components['schemas']['GoalPlan'];
+      configDiff: components['schemas']['EntityConfigDiff'][];
+      appliedChanges: components['schemas']['ProposedChange'][];
+      skippedChanges: components['schemas']['SkippedChange'][];
+    };
+    GoalApplyRequest: {
+      databaseId: number;
+      /** @enum {string} */
+      arrType: 'radarr' | 'sonarr';
+      profileName: string;
+      preset: string;
+      weights: components['schemas']['GoalWeights'];
+      /** @description The engine version the client computed against; a mismatch yields 409. */
+      expectedEngineVersion: string;
+    };
+    GoalApplyResponse: {
+      plan: components['schemas']['GoalPlan'];
+      binding: components['schemas']['GoalBinding'];
+    };
+    GoalBindingResponse: {
+      binding: components['schemas']['GoalBinding'] | null;
+    };
     /** @enum {string} */
     TrashGuideEntityType: 'custom_format' | 'custom_format_group' | 'quality_profile' | 'quality_size' | 'naming';
     TrashGuideEntityDetailResponse: {
@@ -1908,9 +2955,10 @@ export interface components {
      *     - pull: before a PCD repository pull/refresh
      *     - sync: before an Arr instance sync
      *     - manual: user-initiated via API
+     *     - rollback: system pre-rollback auto-capture taken before a restore rewinds the op log
      * @enum {string}
      */
-    SnapshotTrigger: 'pull' | 'sync' | 'manual';
+    SnapshotTrigger: 'pull' | 'sync' | 'manual' | 'rollback';
     PcdSnapshotDetail: {
       id: number;
       databaseId: number;
@@ -1933,7 +2981,11 @@ export interface components {
     PcdSnapshotFullDetail: components['schemas']['PcdSnapshotDetail'] & {
       /** @description Number of ops written after this snapshot (count of pcd_ops rows with id greater than opsSequenceMaxId) */
       opsWrittenSince: number;
-      /** @description Always false in this release. Restore support is not yet implemented. */
+      /**
+       * @description Whether this snapshot can be safely restored. True only when the snapshot's
+       *     published-op set reconstructs and its recomputed fingerprint matches the stored
+       *     cacheStateHash (fail-closed). Legacy snapshots without a fingerprint are false.
+       */
       isRestorable: boolean;
     };
     PcdSnapshotListResponse: {
@@ -1945,6 +2997,74 @@ export interface components {
     CreateManualSnapshotRequest: {
       /** @description Optional description for the snapshot */
       description?: string;
+    };
+    /**
+     * @description A group of entity changes for one resolved-config family. Reuses the sync-preview
+     *     EntityChange/FieldChange shapes. Diff direction is PCD-to-PCD: each FieldChange.current
+     *     is the CURRENT PCD desired-state and FieldChange.desired is the SNAPSHOT restore-target
+     *     state (NOT live Arr state).
+     */
+    RollbackSection: {
+      /** @description Human-readable family label (e.g. "Custom Formats", "Naming (radarr)") */
+      title: string;
+      /** @description Namespaced entity type; per-arr families are "${entityType}:${arrType}" */
+      entityType: string;
+      /** @enum {string|null} */
+      arrType: 'radarr' | 'sonarr' | 'lidarr' | null;
+      changes: components['schemas']['EntityChange'][];
+    };
+    /**
+     * @description Mandatory PCD-to-PCD preview of what restoring a snapshot would change in the PCD desired
+     *     state. Never contacts an Arr instance. When reconstructable is false the snapshot cannot
+     *     be safely restored and sections is empty.
+     */
+    RollbackPreview: {
+      databaseId: number;
+      snapshotId: number;
+      /** @description Whether the snapshot verifies against its fingerprint and can be restored */
+      reconstructable: boolean;
+      /** @description When not reconstructable, why (legacy/no-fingerprint or diverged history) */
+      reason: string | null;
+      /** @description Live published-op fingerprint at preview time; echo as expectedCurrentStateHash on execute */
+      currentStateHash: string | null;
+      /** @description The snapshot's stored restore-target fingerprint */
+      snapshotStateHash: string | null;
+      opsWrittenSince: number;
+      sections: components['schemas']['RollbackSection'][];
+      summary: components['schemas']['RollbackSummary'];
+    };
+    RollbackSummary: {
+      totalCreates: number;
+      totalUpdates: number;
+      totalDeletes: number;
+      totalUnchanged: number;
+    };
+    /**
+     * @description Request body to execute a rollback. expectedCurrentStateHash is a from-state value-guard
+     *     echoed from the preview's currentStateHash; if the live state changed since the preview
+     *     the request is rejected with 422.
+     */
+    ExecuteRollbackRequest: {
+      /** @description The preview's currentStateHash (may be empty string when no published ops exist) */
+      expectedCurrentStateHash: string;
+    };
+    RollbackResult: {
+      rollbackId: number;
+      snapshotId: number;
+      databaseId: number;
+      /** @enum {string} */
+      status: 'success' | 'failed';
+      /** @description Ops written after the snapshot that were superseded */
+      opsUndone: number;
+      /** @description Pre-snapshot ops deactivated since that were re-published */
+      opsReactivated: number;
+      /** @description The durable pre-rollback capture that makes this rollback reversible */
+      preRollbackSnapshotId: number | null;
+      targetStateHash: string | null;
+      postVerified: boolean;
+      error: string | null;
+      /** Format: date-time */
+      createdAt: string;
     };
     LidarrMetadataProfileTypeToggle: {
       /**
@@ -2645,6 +3765,329 @@ export interface components {
       /** @description True when the traversal hit its depth or visited cap and stopped early */
       truncated: boolean;
     };
+    /**
+     * @description Health band derived from the 0–100 rollup. `unknown` means every enabled criterion was skipped.
+     * @enum {string}
+     */
+    ConfigHealthBand: 'healthy' | 'attention' | 'needs-review' | 'unknown';
+    /** @enum {string} */
+    ConfigHealthArrType: 'radarr' | 'sonarr' | 'lidarr';
+    /**
+     * @description Presentation hint for a suggestion; health tone never exceeds `warning`.
+     * @enum {string}
+     */
+    ConfigHealthTone: 'neutral' | 'info' | 'warning' | 'danger';
+    /** @description A non-judgmental remediation line rendered through the shared narration surface. */
+    ConfigHealthSuggestion: {
+      headline: string;
+      detail: string[];
+      tone: components['schemas']['ConfigHealthTone'];
+      templateVersion: string;
+    };
+    /** @description One criterion's contribution to a scored unit. */
+    ConfigHealthCriterion: {
+      /** @description Criterion id — one of completeness, drift, coherence, compatibility, trash_alignment. */
+      id: string;
+      label: string;
+      /** @description 0–100 sub-score, or null when the criterion could not be evaluated (excluded from the rollup). */
+      score: number | null;
+      weight: number;
+      contribution: number;
+      detail: string[];
+      suggestions: components['schemas']['ConfigHealthSuggestion'][];
+    };
+    /** @description A scored unit (whole instance or one profile) — the rollup number, its band, and the breakdown. */
+    ConfigHealthScoredUnit: {
+      score: number;
+      band: components['schemas']['ConfigHealthBand'];
+      criteria: components['schemas']['ConfigHealthCriterion'][];
+      suggestions: components['schemas']['ConfigHealthSuggestion'][];
+    };
+    ConfigHealthProfileHealth: components['schemas']['ConfigHealthScoredUnit'] & {
+      name: string;
+    };
+    ConfigHealthInstanceSummary: {
+      instanceId: number;
+      instanceName: string;
+      arrType: components['schemas']['ConfigHealthArrType'];
+      score: number;
+      band: components['schemas']['ConfigHealthBand'];
+      /** Format: date-time */
+      generatedAt: string;
+    };
+    ConfigHealthTotals: {
+      instances: number;
+      healthy: number;
+      attention: number;
+      needsReview: number;
+      unknown: number;
+      /** @description Mean overall score across scored instances, or null when none could be scored. */
+      averageScore: number | null;
+    };
+    ConfigHealthSettingsSnapshot: {
+      enabled: boolean;
+      intervalMinutes: number;
+    };
+    ConfigHealthSummaryResponse: {
+      engineVersion: string;
+      /** Format: date-time */
+      generatedAt: string;
+      totals: components['schemas']['ConfigHealthTotals'];
+      settings: components['schemas']['ConfigHealthSettingsSnapshot'];
+      instances: components['schemas']['ConfigHealthInstanceSummary'][];
+    };
+    ConfigHealthDetailResponse: {
+      instanceId: number;
+      instanceName: string;
+      arrType: components['schemas']['ConfigHealthArrType'];
+      engineVersion: string;
+      /** Format: date-time */
+      generatedAt: string;
+      overall: components['schemas']['ConfigHealthScoredUnit'];
+      profiles: components['schemas']['ConfigHealthProfileHealth'][];
+    };
+    ConfigHealthTrendPoint: {
+      /** Format: date-time */
+      generatedAt: string;
+      overallScore: number;
+      band: components['schemas']['ConfigHealthBand'];
+    };
+    ConfigHealthTrendsResponse: {
+      instanceId: number;
+      engineVersion: string;
+      points: components['schemas']['ConfigHealthTrendPoint'][];
+    };
+    ConfigHealthCriterionConfig: {
+      id: string;
+      enabled: boolean;
+      weight: number;
+    };
+    ConfigHealthCriterionMeta: {
+      id: string;
+      label: string;
+      description: string;
+    };
+    ConfigHealthSettingsResponse: {
+      engineVersion: string;
+      enabled: boolean;
+      intervalMinutes: number;
+      retentionDays: number;
+      retentionMaxEntries: number;
+      criteria: components['schemas']['ConfigHealthCriterionConfig'][];
+      catalog: components['schemas']['ConfigHealthCriterionMeta'][];
+    };
+    /** @description Partial settings update. `expectedEngineVersion` guards against a stale client (409 on mismatch). */
+    ConfigHealthSettingsUpdateRequest: {
+      expectedEngineVersion: string;
+      enabled?: boolean;
+      intervalMinutes?: number;
+      retentionDays?: number;
+      retentionMaxEntries?: number;
+      criteria?: components['schemas']['ConfigHealthCriterionConfig'][];
+    };
+    /**
+     * @description Shield band derived from the 0–100 rollup. `unknown` only when every check was skipped.
+     * @enum {string}
+     */
+    SecurityShieldBand: 'hardened' | 'guarded' | 'exposed' | 'unknown';
+    /** @enum {string} */
+    SecurityCheckId:
+      'control_plane_auth' | 'arr_transport' | 'app_key_at_rest' | 'credential_rotation' | 'log_redaction';
+    /** @enum {string} */
+    SecurityArrType: 'radarr' | 'sonarr' | 'lidarr';
+    /** @enum {string} */
+    SecurityTone: 'neutral' | 'info' | 'warning' | 'danger';
+    /**
+     * @description Presentation status derived from the check's score and severity.
+     * @enum {string}
+     */
+    SecurityCheckStatus: 'pass' | 'advisory' | 'attention' | 'action' | 'assured' | 'na';
+    /**
+     * @description How an Arr connection's target host is classified from Praxrr's own knowledge (no probing).
+     * @enum {string}
+     */
+    SecurityTransportTier: 'encrypted' | 'loopback' | 'docker-alias' | 'private' | 'unknown' | 'public';
+    /** @description A concrete remediation target. `kind` discriminates which optional fields are present. */
+    SecurityFix: {
+      /** @enum {string} */
+      kind: 'settings-link' | 'instance-link' | 'env-var' | 'docs' | 'none';
+      /** @description Present for settings-link, instance-link, and docs. */
+      href?: string;
+      label?: string;
+      /** @description The environment variable name (env-var kind). */
+      name?: string;
+      /** @description Optional documentation link (env-var kind). */
+      docHref?: string;
+      /** @description Present for instance-link. */
+      instanceId?: number;
+    };
+    /** @description A non-shaming remediation line paired with its concrete fix. */
+    SecurityRecommendation: {
+      headline: string;
+      detail: string[];
+      tone: components['schemas']['SecurityTone'];
+      templateVersion: string;
+      fix: components['schemas']['SecurityFix'];
+    };
+    /** @description One scored check's contribution to the shield report. */
+    SecurityCheck: {
+      id: components['schemas']['SecurityCheckId'];
+      label: string;
+      /** @description 0–100 sub-score, or null when the check could not be evaluated (excluded from the rollup). */
+      score: number | null;
+      weight: number;
+      contribution: number;
+      recoverablePoints: number;
+      status: components['schemas']['SecurityCheckStatus'];
+      critical: boolean;
+      detail: string[];
+      recommendations: components['schemas']['SecurityRecommendation'][];
+    };
+    /** @description One enabled Arr connection's transport posture (host only — never the API key). */
+    SecurityTransportRow: {
+      instanceId: number;
+      instanceName: string;
+      arrType: components['schemas']['SecurityArrType'];
+      /** @enum {string} */
+      scheme: 'http' | 'https';
+      host: string;
+      tier: components['schemas']['SecurityTransportTier'];
+      score: number | null;
+      status: components['schemas']['SecurityCheckStatus'];
+      fix: components['schemas']['SecurityFix'];
+    };
+    /** @description An always-on protection surfaced as a verified affirmation (contributes zero to the score). */
+    SecurityAssurance: {
+      id: string;
+      label: string;
+      verified: boolean;
+      note: string;
+    };
+    /** @description A real posture note whose exploitability Praxrr cannot observe, so it informs without a score. */
+    SecurityAdvisory: {
+      id: string;
+      label: string;
+      detail: string[];
+      fix: components['schemas']['SecurityFix'];
+    };
+    /** @description A ranked "to reach Hardened" step derived from a scored check below 100. */
+    SecurityTopAction: {
+      checkId: components['schemas']['SecurityCheckId'];
+      headline: string;
+      tone: components['schemas']['SecurityTone'];
+      recoverablePoints: number;
+      fix: components['schemas']['SecurityFix'];
+    };
+    SecurityBandCap: {
+      checkId: components['schemas']['SecurityCheckId'];
+      label: string;
+    };
+    /** @description The live shield report for one deployment — computed on demand, never persisted. */
+    SecurityPostureSummaryResponse: {
+      engineVersion: string;
+      /** Format: date-time */
+      generatedAt: string;
+      score: number;
+      band: components['schemas']['SecurityShieldBand'];
+      /** @description The critical finding that lowered the band below the numeric average, or null. */
+      bandCappedBy: components['schemas']['SecurityBandCap'] | null;
+      checks: components['schemas']['SecurityCheck'][];
+      transport: components['schemas']['SecurityTransportRow'][];
+      assurances: components['schemas']['SecurityAssurance'][];
+      advisories: components['schemas']['SecurityAdvisory'][];
+      topActions: components['schemas']['SecurityTopAction'][];
+    };
+    /**
+     * @description The event source a timeline event originates from.
+     * @enum {string}
+     */
+    TimelineSource: 'sync' | 'canary' | 'snapshot' | 'rollback';
+    /**
+     * @description Which instance axis an event is scoped to.
+     * @enum {string}
+     */
+    TimelineScopeKind: 'arr-instance' | 'pcd-database';
+    /**
+     * @description Normalized, cross-source status used for filtering and badge colour.
+     * @enum {string}
+     */
+    TimelineStatus: 'success' | 'partial' | 'failed' | 'skipped' | 'pending' | 'info';
+    /**
+     * @description Badge variant used to colour the event row.
+     * @enum {string}
+     */
+    TimelineBadge: 'success' | 'warning' | 'danger' | 'neutral' | 'info';
+    /** @enum {string} */
+    TimelineArrType: 'radarr' | 'sonarr' | 'lidarr';
+    /** @description Where an event happened. `id` is null when the Arr instance was deleted; `label` is retained. */
+    TimelineScope: {
+      kind: components['schemas']['TimelineScopeKind'];
+      id: number | null;
+      label: string | null;
+      arrType: components['schemas']['TimelineArrType'] | null;
+    };
+    /** @description A user note attached to a single timeline event. */
+    TimelineAnnotation: {
+      id: number;
+      source: components['schemas']['TimelineSource'];
+      eventId: number;
+      body: string;
+      authorUserId: number | null;
+      authorName: string | null;
+      /** Format: date-time */
+      createdAt: string;
+      /** Format: date-time */
+      updatedAt: string;
+    };
+    /** @description A single normalized timeline event with inline annotations. */
+    TimelineEvent: {
+      /** @description Stable composite key `${source}:${sourceId}`. */
+      id: string;
+      source: components['schemas']['TimelineSource'];
+      sourceId: number;
+      /**
+       * Format: date-time
+       * @description ISO-8601 UTC event time (normalized across source dialects).
+       */
+      timestamp: string;
+      /** @description Source-specific subtype (e.g. the trigger). */
+      type: string | null;
+      status: components['schemas']['TimelineStatus'];
+      badge: components['schemas']['TimelineBadge'];
+      scope: components['schemas']['TimelineScope'];
+      title: string;
+      /** @description Small source-specific bag of counts sufficient to render the row. */
+      metrics: {
+        [key: string]: (string | number) | null;
+      };
+      /** @description Deep-link into the owning feature's existing detail surface. */
+      detailHref: string;
+      annotations: components['schemas']['TimelineAnnotation'][];
+    };
+    /** @description Per-source event counts over the same filtered/gated set. */
+    TimelineSourceCounts: {
+      sync: number;
+      canary: number;
+      snapshot: number;
+      rollback: number;
+    };
+    TimelineListResponse: {
+      items: components['schemas']['TimelineEvent'][];
+      page: number;
+      pageSize: number;
+      totalRecords: number;
+      totalPages: number;
+      hasNext: boolean;
+      sourceCounts: components['schemas']['TimelineSourceCounts'];
+    };
+    CreateAnnotationRequest: {
+      source: components['schemas']['TimelineSource'];
+      eventId: number;
+      body: string;
+    };
+    UpdateAnnotationRequest: {
+      body: string;
+    };
     SqliteHealth: {
       status: components['schemas']['ComponentStatus'];
       /** @description Database query response time in milliseconds */
@@ -2717,6 +4160,36 @@ export interface components {
       item: components['schemas']['StaleItem'];
       /** @description Why the item was skipped (e.g. "Profile is assigned to media") */
       reason: string;
+    };
+    /**
+     * @description Terminal status returned by the sync job execution.
+     * @enum {string}
+     */
+    SyncPreviewApplyJobStatus: 'success' | 'failure' | 'skipped' | 'cancelled';
+    SyncPreviewApplyJobResult: {
+      status: components['schemas']['SyncPreviewApplyJobStatus'];
+      /** @description Aggregate human-readable output from the sync job. */
+      output: string;
+      /** @description User-facing sync-job failure reason, when one is available. */
+      error?: string;
+    };
+    /**
+     * @description Coarse result of executing the preview's selected sections through the normal
+     *     sync job path. `results` describes only the aggregate job/run outcome. It does
+     *     not confirm which individual preview entity changes succeeded.
+     */
+    SyncPreviewApplyResponse: {
+      /** @description True when the sync job succeeded or reported that no work was needed. */
+      success: boolean;
+      results: components['schemas']['SyncPreviewApplyJobResult'];
+      /** @description Preview-age warning returned when the reviewed snapshot is stale, or null. */
+      staleWarning: string | null;
+    };
+    SyncPreviewApplyErrorResponse: {
+      /** @description User-facing reason the preview could not be applied. */
+      error: string;
+      /** @description Preview-age warning when relevant to the failure, or null. */
+      staleWarning: string | null;
     };
     /**
      * @description Optional metadata for hybrid JSON/YAML migration envelopes.
@@ -2855,143 +4328,6 @@ export interface components {
      *     The shape matches `PortableQualityDefinitions`.
      */
     PortableLidarrQualityDefinitions: components['schemas']['PortableQualityDefinitions'];
-    /** @description Closed set of semantic categories a custom format is classified into. */
-    GoalCategory:
-      | 'unwanted'
-      | 'hdr_dv'
-      | 'hdr_hdr10plus'
-      | 'hdr_baseline'
-      | 'remux'
-      | 'release_group_tier_1'
-      | 'release_group_tier_2'
-      | 'release_group_tier_3'
-      | 'audio_lossless'
-      | 'audio_advanced'
-      | 'audio_baseline'
-      | 'streaming_service'
-      | 'movie_version'
-      | 'repack_proper'
-      | 'resolution';
-    /** @enum {string} */
-    GoalCeilingRelation: 'above' | 'match' | 'below';
-    /** @enum {string} */
-    GoalResolutionCeiling: '720p' | '1080p' | '2160p';
-    GoalWeights: {
-      qualityVsSize: number;
-      compatibility: number;
-      hdrPreference: number;
-      unwantedStrictness: number;
-      resolutionCeiling: components['schemas']['GoalResolutionCeiling'];
-    };
-    GoalAxisMeta: {
-      key: string;
-      label: string;
-      /** @enum {string} */
-      kind: 'weight' | 'strictness' | 'ceiling';
-      min?: number;
-      max?: number;
-      step?: number;
-      options?: components['schemas']['GoalResolutionCeiling'][];
-      description: string;
-    };
-    GoalPreset: {
-      /** @enum {string} */
-      id: 'best-quality' | 'smallest-size' | 'balanced' | '4k-hdr-priority';
-      label: string;
-      description: string;
-      weights: components['schemas']['GoalWeights'];
-    };
-    GoalAxisContribution: {
-      axis: string;
-      delta: number;
-    };
-    GoalReason: {
-      code: string;
-      category: components['schemas']['GoalCategory'] | null;
-      ruleId: string;
-      base: number;
-      axisContributions: components['schemas']['GoalAxisContribution'][];
-      ceiling: components['schemas']['GoalCeilingRelation'] | null;
-    };
-    GoalCfDecision: {
-      customFormatName: string;
-      /** @enum {string} */
-      arrType: 'radarr' | 'sonarr';
-      category: components['schemas']['GoalCategory'];
-      score: number;
-      reason: components['schemas']['GoalReason'];
-    };
-    GoalUncategorizedCf: {
-      name: string;
-      suggestedCategory: components['schemas']['GoalCategory'] | null;
-      reason: string;
-    };
-    GoalCoverage: {
-      total: number;
-      scored: number;
-      uncategorized: number;
-    };
-    GoalThresholds: {
-      minimumScore: number;
-      upgradeUntilScore: number;
-      upgradeScoreIncrement: number;
-    };
-    /** @description Deterministic translation of a goal into concrete scores + thresholds. */
-    GoalPlan: {
-      engineVersion: string;
-      /** @enum {string} */
-      arrType: 'radarr' | 'sonarr';
-      decisions: components['schemas']['GoalCfDecision'][];
-      uncategorized: components['schemas']['GoalUncategorizedCf'][];
-      thresholds: components['schemas']['GoalThresholds'];
-      coverage: components['schemas']['GoalCoverage'];
-    };
-    /** @description Persisted intent metadata for a goal-governed quality profile. */
-    GoalBinding: {
-      presetId: string;
-      weights: components['schemas']['GoalWeights'];
-      engineVersion: string;
-      /** @description ISO-8601 UTC timestamp of the last apply */
-      appliedAt: string;
-    };
-    GoalPresetsResponse: {
-      presets: components['schemas']['GoalPreset'][];
-      axes: components['schemas']['GoalAxisMeta'][];
-      engineVersion: string;
-    };
-    GoalPreviewRequest: {
-      databaseId: number;
-      /** @enum {string} */
-      arrType: 'radarr' | 'sonarr';
-      /** @description Raw PCD quality-profile name (pcd:-stripped) */
-      profileName: string;
-      preset: string;
-      weights: components['schemas']['GoalWeights'];
-    };
-    /** @description Non-persisting preview — the plan plus the authoritative sandbox config diff. */
-    GoalPreviewResponse: {
-      plan: components['schemas']['GoalPlan'];
-      configDiff: components['schemas']['EntityConfigDiff'][];
-      appliedChanges: components['schemas']['ProposedChange'][];
-      skippedChanges: components['schemas']['SkippedChange'][];
-    };
-    GoalApplyRequest: {
-      databaseId: number;
-      /** @enum {string} */
-      arrType: 'radarr' | 'sonarr';
-      profileName: string;
-      preset: string;
-      weights: components['schemas']['GoalWeights'];
-      /** @description The engine version the client computed against; a mismatch yields 409. */
-      expectedEngineVersion: string;
-    };
-    GoalApplyResponse: {
-      plan: components['schemas']['GoalPlan'];
-      binding: components['schemas']['GoalBinding'];
-    };
-    GoalBindingResponse: {
-      binding: components['schemas']['GoalBinding'] | null;
-    };
   };
   responses: never;
   parameters: never;
@@ -3457,6 +4793,57 @@ export interface operations {
           'application/json': {
             error: string;
           };
+        };
+      };
+    };
+  };
+  simulateImpact: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['SimulateImpactRequest'];
+      };
+    };
+    responses: {
+      /** @description Impact simulation results */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['SimulateImpactResponse'];
+        };
+      };
+      /** @description Invalid request (bad JSON, cap violation, bad arrType, unknown change kind) */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PcdErrorResponse'];
+        };
+      };
+      /** @description Database instance or built cache not found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PcdErrorResponse'];
+        };
+      };
+      /** @description Internal server error */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PcdErrorResponse'];
         };
       };
     };
@@ -3943,13 +5330,13 @@ export interface operations {
       };
     };
     responses: {
-      /** @description Preview applied */
+      /** @description Selected sections completed successfully or required no work */
       200: {
         headers: {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['SyncPreviewResult'];
+          'application/json': components['schemas']['SyncPreviewApplyResponse'];
         };
       };
       /** @description Invalid request body */
@@ -3985,16 +5372,17 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['ErrorResponse'];
+          'application/json': components['schemas']['SyncPreviewApplyErrorResponse'];
         };
       };
-      /** @description Failed to apply preview */
+      /** @description Sync job reported failure or preview apply raised an unexpected error */
       500: {
         headers: {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['ErrorResponse'];
+          'application/json':
+            components['schemas']['SyncPreviewApplyResponse'] | components['schemas']['SyncPreviewApplyErrorResponse'];
         };
       };
     };
@@ -4307,6 +5695,132 @@ export interface operations {
         };
       };
       /** @description Delete failed */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PcdErrorResponse'];
+        };
+      };
+    };
+  };
+  previewSnapshotRollback: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        /** @description PCD database ID */
+        databaseId: number;
+        /** @description PCD snapshot ID */
+        snapshotId: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Rollback preview */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['RollbackPreview'];
+        };
+      };
+      /** @description Invalid parameters */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PcdErrorResponse'];
+        };
+      };
+      /** @description Snapshot not found or doesn't belong to database */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PcdErrorResponse'];
+        };
+      };
+      /** @description Failed to generate rollback preview */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PcdErrorResponse'];
+        };
+      };
+    };
+  };
+  executeSnapshotRollback: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        /** @description PCD database ID */
+        databaseId: number;
+        /** @description PCD snapshot ID */
+        snapshotId: number;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ExecuteRollbackRequest'];
+      };
+    };
+    responses: {
+      /** @description Rollback executed */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['RollbackResult'];
+        };
+      };
+      /** @description Invalid parameters or missing expectedCurrentStateHash */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PcdErrorResponse'];
+        };
+      };
+      /** @description Snapshot not found or doesn't belong to database */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PcdErrorResponse'];
+        };
+      };
+      /** @description Snapshot cannot be reconstructed/verified (unrestorable) */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PcdErrorResponse'];
+        };
+      };
+      /** @description Database state changed since preview; regenerate the preview and retry */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PcdErrorResponse'];
+        };
+      };
+      /** @description Rollback execution failed */
       500: {
         headers: {
           [name: string]: unknown;
@@ -5036,6 +6550,416 @@ export interface operations {
       };
     };
   };
+  getDriftSummary: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Drift summary */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DriftSummaryResponse'];
+        };
+      };
+      /** @description Failed to build drift summary */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+    };
+  };
+  getDriftDetail: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        /** @description Arr instance ID */
+        instanceId: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Drift detail */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DriftDetailResponse'];
+        };
+      };
+      /** @description Invalid instance id or unsupported instance type */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Instance not found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Failed to read drift detail */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+    };
+  };
+  refreshDriftDetail: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        /** @description Arr instance ID */
+        instanceId: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Drift re-checked */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DriftDetailResponse'];
+        };
+      };
+      /** @description Instance type is unsupported or the instance is disabled */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Instance not found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description A drift check for this instance is already in progress */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description On-demand drift refresh is rate-limited for this instance */
+      429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Failed to refresh drift */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+    };
+  };
+  updateDriftSettings: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['DriftSettingsUpdateRequest'];
+      };
+    };
+    responses: {
+      /** @description Updated drift settings */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DriftSettings'];
+        };
+      };
+      /** @description Invalid settings payload */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Failed to update drift settings */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+    };
+  };
+  listSyncHistory: {
+    parameters: {
+      query?: {
+        instanceId?: number;
+        arrType?: 'radarr' | 'sonarr' | 'lidarr';
+        status?: components['schemas']['SyncOperationStatus'];
+        trigger?: components['schemas']['SyncTrigger'];
+        section?: components['schemas']['SyncPreviewSection'];
+        /** @description ISO-8601 lower bound on startedAt. */
+        from?: string;
+        /** @description ISO-8601 upper bound on startedAt. */
+        to?: string;
+        /** @description Free-text match on instance name or error. */
+        q?: string;
+        page?: number;
+        pageSize?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Sync history page */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['SyncHistoryListResponse'];
+        };
+      };
+      /** @description Invalid query parameter */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Failed to list sync history */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+    };
+  };
+  getSyncHistoryEntry: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Sync history detail */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['SyncHistoryDetail'];
+        };
+      };
+      /** @description Invalid id */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Entry not found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Failed to read sync history entry */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+    };
+  };
+  exportSyncHistory: {
+    parameters: {
+      query?: {
+        format?: 'json' | 'csv';
+        instanceId?: number;
+        arrType?: 'radarr' | 'sonarr' | 'lidarr';
+        status?: components['schemas']['SyncOperationStatus'];
+        trigger?: components['schemas']['SyncTrigger'];
+        section?: components['schemas']['SyncPreviewSection'];
+        from?: string;
+        to?: string;
+        q?: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Sync history export */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['SyncHistoryDetail'][];
+          'text/csv': string;
+        };
+      };
+      /** @description Invalid query parameter */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Failed to export sync history */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+    };
+  };
+  getSyncHistorySettings: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Sync history settings */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['SyncHistorySettings'];
+        };
+      };
+      /** @description Failed to read sync history settings */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+    };
+  };
+  updateSyncHistorySettings: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['SyncHistorySettingsUpdateRequest'];
+      };
+    };
+    responses: {
+      /** @description Updated sync history settings */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['SyncHistorySettings'];
+        };
+      };
+      /** @description Invalid settings payload */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Failed to update sync history settings */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+    };
+  };
   getSetupState: {
     parameters: {
       query?: never;
@@ -5285,6 +7209,1069 @@ export interface operations {
         };
       };
       /** @description Failed to build version compatibility matrix */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+    };
+  };
+  getGoalPresets: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Presets and axes */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['GoalPresetsResponse'];
+        };
+      };
+    };
+  };
+  previewGoal: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['GoalPreviewRequest'];
+      };
+    };
+    responses: {
+      /** @description The generated plan and sandbox diff */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['GoalPreviewResponse'];
+        };
+      };
+      /** @description Invalid request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Database cache not found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+    };
+  };
+  applyGoal: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['GoalApplyRequest'];
+      };
+    };
+    responses: {
+      /** @description The applied plan and persisted binding */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['GoalApplyResponse'];
+        };
+      };
+      /** @description Invalid request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Database cache or profile not found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Engine version mismatch */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+    };
+  };
+  getGoalBinding: {
+    parameters: {
+      query: {
+        databaseId: number;
+        profileName: string;
+        arrType: 'radarr' | 'sonarr';
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description The binding, or null */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['GoalBindingResponse'];
+        };
+      };
+      /** @description Invalid query parameters */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+    };
+  };
+  listCanaryRollouts: {
+    parameters: {
+      query?: {
+        page?: number;
+        pageSize?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Canary rollout page */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['CanaryRolloutListResponse'];
+        };
+      };
+      /** @description Invalid query parameter */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Failed to list canary rollouts */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+    };
+  };
+  startCanaryRollout: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: {
+      content: {
+        'application/json': components['schemas']['CanaryStartRequest'];
+      };
+    };
+    responses: {
+      /** @description Canary started (staged) or auto-skipped (plain sync) */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['CanaryStartResult'];
+        };
+      };
+      /** @description Invalid request body */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Explicit canary instance not found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description No canary resolvable, or the canary is not a radarr/sonarr/lidarr instance */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Failed to start canary rollout */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+    };
+  };
+  getCanaryRollout: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Canary rollout detail */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['CanaryRolloutDetail'];
+        };
+      };
+      /** @description Invalid id */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Rollout not found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Failed to read canary rollout */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+    };
+  };
+  proceedCanaryRollout: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: number;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CanaryProceedRequest'];
+      };
+    };
+    responses: {
+      /** @description Rollout is now rolling out */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['CanaryRolloutDetail'];
+        };
+      };
+      /** @description Invalid request body or id */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Rollout not found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Rollout is not awaiting confirmation */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Stale state token */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Failed to proceed canary rollout */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+    };
+  };
+  abortCanaryRollout: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: number;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CanaryAbortRequest'];
+      };
+    };
+    responses: {
+      /** @description Rollout aborted */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['CanaryRolloutDetail'];
+        };
+      };
+      /** @description Invalid request body or id */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Rollout not found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Rollout is not awaiting confirmation */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Stale state token */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Failed to abort canary rollout */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+    };
+  };
+  getCanarySettings: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Canary settings */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['CanarySettings'];
+        };
+      };
+      /** @description Failed to read canary settings */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+    };
+  };
+  updateCanarySettings: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CanarySettingsUpdate'];
+      };
+    };
+    responses: {
+      /** @description Updated canary settings */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['CanarySettings'];
+        };
+      };
+      /** @description Invalid settings payload */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Failed to update canary settings */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+    };
+  };
+  getConfigHealthSummary: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Fleet health summary */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ConfigHealthSummaryResponse'];
+        };
+      };
+      /** @description Internal error */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+    };
+  };
+  getConfigHealthDetail: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        /** @description Arr instance id */
+        instanceId: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Instance health detail */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ConfigHealthDetailResponse'];
+        };
+      };
+      /** @description Invalid instance id */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Instance not found or not sync-capable */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+    };
+  };
+  getConfigHealthTrends: {
+    parameters: {
+      query?: {
+        /** @description Restrict the series to the last N days. */
+        days?: number;
+      };
+      header?: never;
+      path: {
+        /** @description Arr instance id */
+        instanceId: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Health trend series */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ConfigHealthTrendsResponse'];
+        };
+      };
+      /** @description Invalid instance id or days */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Instance not found or not sync-capable */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+    };
+  };
+  getConfigHealthSettings: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Config-health settings */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ConfigHealthSettingsResponse'];
+        };
+      };
+    };
+  };
+  updateConfigHealthSettings: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ConfigHealthSettingsUpdateRequest'];
+      };
+    };
+    responses: {
+      /** @description Updated config-health settings */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ConfigHealthSettingsResponse'];
+        };
+      };
+      /** @description Invalid request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Engine version mismatch */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+    };
+  };
+  getSecurityPostureSummary: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description The security posture shield report. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['SecurityPostureSummaryResponse'];
+        };
+      };
+      /** @description Internal error. */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+    };
+  };
+  listTimeline: {
+    parameters: {
+      query?: {
+        /** @description Restrict to a subset of sources. Comma-separated (form, non-exploded). */
+        source?: components['schemas']['TimelineSource'][];
+        /** @description Restrict to one scope axis. Rejected with 400 when it contradicts a supplied id. */
+        scopeKind?: components['schemas']['TimelineScopeKind'];
+        /** @description Arr instance scope — includes `sync` + `canary` only. */
+        instanceId?: number;
+        /** @description PCD database scope — includes `snapshot` + `rollback` only. */
+        databaseId?: number;
+        /** @description Arr family scope — includes `sync` + `canary` only (never inferred for pcd sources). */
+        arrType?: components['schemas']['TimelineArrType'];
+        status?: components['schemas']['TimelineStatus'];
+        /** @description ISO-8601 (or date-only) lower bound on the event time. */
+        from?: string;
+        /** @description ISO-8601 (or date-only) upper bound on the event time. */
+        to?: string;
+        /** @description Free-text match on scope label or error text. */
+        q?: string;
+        page?: number;
+        pageSize?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Timeline page */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['TimelineListResponse'];
+        };
+      };
+      /** @description Invalid query parameter or contradictory scope combination */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Failed to list timeline */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+    };
+  };
+  exportTimeline: {
+    parameters: {
+      query?: {
+        format?: 'json' | 'csv';
+        source?: components['schemas']['TimelineSource'][];
+        scopeKind?: components['schemas']['TimelineScopeKind'];
+        instanceId?: number;
+        databaseId?: number;
+        arrType?: components['schemas']['TimelineArrType'];
+        status?: components['schemas']['TimelineStatus'];
+        from?: string;
+        to?: string;
+        q?: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Timeline export */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['TimelineEvent'][];
+          'text/csv': string;
+        };
+      };
+      /** @description Invalid query parameter or contradictory scope combination */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Failed to export timeline */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+    };
+  };
+  listTimelineAnnotations: {
+    parameters: {
+      query: {
+        source: components['schemas']['TimelineSource'];
+        eventId: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Annotation thread for the event */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['TimelineAnnotation'][];
+        };
+      };
+      /** @description Missing or invalid source/eventId */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Failed to list annotations */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+    };
+  };
+  createTimelineAnnotation: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CreateAnnotationRequest'];
+      };
+    };
+    responses: {
+      /** @description Annotation created */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['TimelineAnnotation'];
+        };
+      };
+      /** @description Invalid body or source */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Authentication required */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Referenced event not found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Failed to create annotation */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+    };
+  };
+  deleteTimelineAnnotation: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Deleted */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': {
+            deleted: boolean;
+          };
+        };
+      };
+      /** @description Invalid id */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Authentication required */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Not the author */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Annotation not found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Failed to delete annotation */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+    };
+  };
+  updateTimelineAnnotation: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: number;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['UpdateAnnotationRequest'];
+      };
+    };
+    responses: {
+      /** @description Updated annotation */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['TimelineAnnotation'];
+        };
+      };
+      /** @description Invalid id or body */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Authentication required */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Not the author */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Annotation not found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Failed to update annotation */
       500: {
         headers: {
           [name: string]: unknown;

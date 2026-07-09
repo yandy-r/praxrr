@@ -5,6 +5,7 @@
   import JsonView from '$ui/meta/JsonView.svelte';
   import Badge from '$ui/badge/Badge.svelte';
   import { FIELD_META, formatFieldValue } from '$ui/resolved/fieldChangeDisplay.ts';
+  import { explainResolvedProvenance, type ResolvedProvenanceKind } from '$shared/pcd/resolvedProvenance.ts';
 
   type ResolvedEntityType = components['schemas']['ResolvedEntityState']['entityType'];
   type ArrAppType = components['schemas']['ResolvedInstanceState']['arrType'];
@@ -102,6 +103,23 @@
 
   $: fields = state?.entity ? Object.entries(state.entity) : [];
   $: overrides = (state?.overrides ?? []) as FieldChange[];
+  $: provenance = state
+    ? explainResolvedProvenance({
+        // Entity names are selected from the resolved-layer list, so a loaded base response has
+        // independent evidence that the selected entity is present in resolved config.
+        basePresent: state.layer === 'base' ? state.present : null,
+        resolvedPresent: state.layer === 'base' ? true : state.present,
+        overrides: state.layer === 'user' ? overrides : null,
+        hasPendingConflict: state.hasPendingConflict,
+      })
+    : null;
+
+  function provenanceVariant(kind: ResolvedProvenanceKind): 'neutral' | 'info' | 'warning' | 'accent' {
+    if (kind === 'pending-conflict') return 'warning';
+    if (kind === 'user-override') return 'info';
+    if (kind === 'user-created') return 'accent';
+    return 'neutral';
+  }
 
   function formatValue(value: unknown): string {
     if (value === null || value === undefined) return '—';
@@ -174,6 +192,15 @@
       </div>
     {/if}
 
+    {#if provenance}
+      <div
+        class="flex flex-wrap items-center gap-2 rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2 text-sm text-neutral-700 dark:border-neutral-800 dark:bg-neutral-900 dark:text-neutral-300"
+      >
+        <Badge variant={provenanceVariant(provenance.kind)}>{provenance.label}</Badge>
+        <span>{provenance.detail}</span>
+      </div>
+    {/if}
+
     {#if activeLayer === 'user'}
       {#if overrides.length === 0}
         <div
@@ -230,7 +257,7 @@
         class="rounded-lg border border-dashed border-neutral-300 p-6 text-center text-sm text-neutral-500 dark:border-neutral-700 dark:text-neutral-400"
       >
         {activeLayer === 'base'
-          ? 'Does not exist in base — created by user ops.'
+          ? 'Does not exist in the base-side layer.'
           : 'This entity does not exist in the resolved state.'}
       </div>
     {:else}
