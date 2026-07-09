@@ -1,0 +1,385 @@
+GoalCategory:
+  type: string
+  description: Closed set of semantic categories a custom format is classified into.
+  enum:
+    - unwanted
+    - hdr_dv
+    - hdr_hdr10plus
+    - hdr_baseline
+    - remux
+    - release_group_tier_1
+    - release_group_tier_2
+    - release_group_tier_3
+    - audio_lossless
+    - audio_advanced
+    - audio_baseline
+    - streaming_service
+    - movie_version
+    - repack_proper
+    - resolution
+
+GoalCeilingRelation:
+  type: string
+  enum:
+    - above
+    - match
+    - below
+
+GoalResolutionCeiling:
+  type: string
+  enum:
+    - 720p
+    - 1080p
+    - 2160p
+
+GoalWeights:
+  type: object
+  required:
+    - qualityVsSize
+    - compatibility
+    - hdrPreference
+    - unwantedStrictness
+    - resolutionCeiling
+  properties:
+    qualityVsSize:
+      type: integer
+      minimum: 0
+      maximum: 100
+    compatibility:
+      type: integer
+      minimum: 0
+      maximum: 100
+    hdrPreference:
+      type: integer
+      minimum: 0
+      maximum: 100
+    unwantedStrictness:
+      type: integer
+      minimum: 0
+      maximum: 100
+    resolutionCeiling:
+      $ref: '#/GoalResolutionCeiling'
+
+GoalAxisMeta:
+  type: object
+  required:
+    - key
+    - label
+    - kind
+    - description
+  properties:
+    key:
+      type: string
+    label:
+      type: string
+    kind:
+      type: string
+      enum:
+        - weight
+        - strictness
+        - ceiling
+    min:
+      type: integer
+    max:
+      type: integer
+    step:
+      type: integer
+    options:
+      type: array
+      items:
+        $ref: '#/GoalResolutionCeiling'
+    description:
+      type: string
+
+GoalPreset:
+  type: object
+  required:
+    - id
+    - label
+    - description
+    - weights
+  properties:
+    id:
+      type: string
+      enum:
+        - best-quality
+        - smallest-size
+        - balanced
+        - 4k-hdr-priority
+    label:
+      type: string
+    description:
+      type: string
+    weights:
+      $ref: '#/GoalWeights'
+
+GoalAxisContribution:
+  type: object
+  required:
+    - axis
+    - delta
+  properties:
+    axis:
+      type: string
+    delta:
+      type: integer
+
+GoalReason:
+  type: object
+  required:
+    - code
+    - category
+    - ruleId
+    - base
+    - axisContributions
+    - ceiling
+  properties:
+    code:
+      type: string
+    category:
+      oneOf:
+        - $ref: '#/GoalCategory'
+        - type: 'null'
+    ruleId:
+      type: string
+    base:
+      type: integer
+    axisContributions:
+      type: array
+      items:
+        $ref: '#/GoalAxisContribution'
+    ceiling:
+      oneOf:
+        - $ref: '#/GoalCeilingRelation'
+        - type: 'null'
+
+GoalCfDecision:
+  type: object
+  required:
+    - customFormatName
+    - arrType
+    - category
+    - score
+    - reason
+  properties:
+    customFormatName:
+      type: string
+    arrType:
+      type: string
+      enum:
+        - radarr
+        - sonarr
+    category:
+      $ref: '#/GoalCategory'
+    score:
+      type: integer
+    reason:
+      $ref: '#/GoalReason'
+
+GoalUncategorizedCf:
+  type: object
+  required:
+    - name
+    - suggestedCategory
+    - reason
+  properties:
+    name:
+      type: string
+    suggestedCategory:
+      oneOf:
+        - $ref: '#/GoalCategory'
+        - type: 'null'
+    reason:
+      type: string
+
+GoalCoverage:
+  type: object
+  required:
+    - total
+    - scored
+    - uncategorized
+  properties:
+    total:
+      type: integer
+    scored:
+      type: integer
+    uncategorized:
+      type: integer
+
+GoalThresholds:
+  type: object
+  required:
+    - minimumScore
+    - upgradeUntilScore
+    - upgradeScoreIncrement
+  properties:
+    minimumScore:
+      type: integer
+    upgradeUntilScore:
+      type: integer
+    upgradeScoreIncrement:
+      type: integer
+
+GoalPlan:
+  type: object
+  description: Deterministic translation of a goal into concrete scores + thresholds.
+  required:
+    - engineVersion
+    - arrType
+    - decisions
+    - uncategorized
+    - thresholds
+    - coverage
+  properties:
+    engineVersion:
+      type: string
+    arrType:
+      type: string
+      enum:
+        - radarr
+        - sonarr
+    decisions:
+      type: array
+      items:
+        $ref: '#/GoalCfDecision'
+    uncategorized:
+      type: array
+      items:
+        $ref: '#/GoalUncategorizedCf'
+    thresholds:
+      $ref: '#/GoalThresholds'
+    coverage:
+      $ref: '#/GoalCoverage'
+
+GoalBinding:
+  type: object
+  description: Persisted intent metadata for a goal-governed quality profile.
+  required:
+    - presetId
+    - weights
+    - engineVersion
+    - appliedAt
+  properties:
+    presetId:
+      type: string
+    weights:
+      $ref: '#/GoalWeights'
+    engineVersion:
+      type: string
+    appliedAt:
+      type: string
+      description: ISO-8601 UTC timestamp of the last apply
+
+GoalPresetsResponse:
+  type: object
+  required:
+    - presets
+    - axes
+    - engineVersion
+  properties:
+    presets:
+      type: array
+      items:
+        $ref: '#/GoalPreset'
+    axes:
+      type: array
+      items:
+        $ref: '#/GoalAxisMeta'
+    engineVersion:
+      type: string
+
+GoalPreviewRequest:
+  type: object
+  required:
+    - databaseId
+    - arrType
+    - profileName
+    - preset
+    - weights
+  properties:
+    databaseId:
+      type: integer
+    arrType:
+      type: string
+      enum:
+        - radarr
+        - sonarr
+    profileName:
+      type: string
+      description: Raw PCD quality-profile name (pcd:-stripped)
+    preset:
+      type: string
+    weights:
+      $ref: '#/GoalWeights'
+
+GoalPreviewResponse:
+  type: object
+  description: Non-persisting preview — the plan plus the authoritative sandbox config diff.
+  required:
+    - plan
+    - configDiff
+    - appliedChanges
+    - skippedChanges
+  properties:
+    plan:
+      $ref: '#/GoalPlan'
+    configDiff:
+      type: array
+      items:
+        $ref: '../schemas/impact-simulator.yaml#/EntityConfigDiff'
+    appliedChanges:
+      type: array
+      items:
+        $ref: '../schemas/impact-simulator.yaml#/ProposedChange'
+    skippedChanges:
+      type: array
+      items:
+        $ref: '../schemas/impact-simulator.yaml#/SkippedChange'
+
+GoalApplyRequest:
+  type: object
+  required:
+    - databaseId
+    - arrType
+    - profileName
+    - preset
+    - weights
+    - expectedEngineVersion
+  properties:
+    databaseId:
+      type: integer
+    arrType:
+      type: string
+      enum:
+        - radarr
+        - sonarr
+    profileName:
+      type: string
+    preset:
+      type: string
+    weights:
+      $ref: '#/GoalWeights'
+    expectedEngineVersion:
+      type: string
+      description: The engine version the client computed against; a mismatch yields 409.
+
+GoalApplyResponse:
+  type: object
+  required:
+    - plan
+    - binding
+  properties:
+    plan:
+      $ref: '#/GoalPlan'
+    binding:
+      $ref: '#/GoalBinding'
+
+GoalBindingResponse:
+  type: object
+  required:
+    - binding
+  properties:
+    binding:
+      oneOf:
+        - $ref: '#/GoalBinding'
+        - type: 'null'
