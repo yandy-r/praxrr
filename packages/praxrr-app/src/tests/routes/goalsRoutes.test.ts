@@ -391,7 +391,7 @@ Deno.test('goals preview: validation and missing-cache errors', async () => {
 
 Deno.test('goals apply: logs one server-derived decision event after persistence succeeds', async () => {
   const logs: ApplyLogCall[] = [];
-  const response = await applyRoute.handleGoalApplyRequest(
+  const response = await applyRoute._handleGoalApplyRequest(
     postEvent({
       databaseId: DATABASE_ID,
       arrType: 'radarr',
@@ -433,7 +433,7 @@ Deno.test('goals apply: validation and engine-version failures do not log', asyn
   const dependencies = buildApplyDependencies(logs);
 
   const invalid = await assertRejects(() =>
-    applyRoute.handleGoalApplyRequest(
+    applyRoute._handleGoalApplyRequest(
       postEvent({
         databaseId: 1,
         arrType: 'lidarr',
@@ -448,7 +448,7 @@ Deno.test('goals apply: validation and engine-version failures do not log', asyn
   assertEquals(getErrorStatus(invalid), 400);
 
   const mismatch = await assertRejects(() =>
-    applyRoute.handleGoalApplyRequest(
+    applyRoute._handleGoalApplyRequest(
       postEvent({
         databaseId: 1,
         arrType: 'radarr',
@@ -463,7 +463,7 @@ Deno.test('goals apply: validation and engine-version failures do not log', asyn
   assertEquals(getErrorStatus(mismatch), 409);
 
   const missing = await assertRejects(() =>
-    applyRoute.handleGoalApplyRequest(
+    applyRoute._handleGoalApplyRequest(
       postEvent({
         databaseId: 1,
         arrType: 'radarr',
@@ -491,7 +491,7 @@ Deno.test('goals apply: scoring and binding failures do not log', async () => {
   const scoringLogs: ApplyLogCall[] = [];
   let scoringFailureBindingCalls = 0;
   const scoringFailure = await assertRejects(() =>
-    applyRoute.handleGoalApplyRequest(
+    applyRoute._handleGoalApplyRequest(
       postEvent(requestPayload).request,
       buildApplyDependencies(scoringLogs, {
         updateScoring: () => Promise.resolve({ success: false, error: 'Scoring write failed' }),
@@ -509,7 +509,7 @@ Deno.test('goals apply: scoring and binding failures do not log', async () => {
   const bindingLogs: ApplyLogCall[] = [];
   await assertRejects(
     () =>
-      applyRoute.handleGoalApplyRequest(
+      applyRoute._handleGoalApplyRequest(
         postEvent(requestPayload).request,
         buildApplyDependencies(bindingLogs, {
           upsertBinding: () => {

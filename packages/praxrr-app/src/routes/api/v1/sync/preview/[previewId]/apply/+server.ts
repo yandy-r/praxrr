@@ -98,7 +98,7 @@ function resolveEligibleSections(snapshot: SyncPreviewResult): SectionType[] {
  * Body:
  * - sections: optional explicit list of sections to apply. Defaults to eligible preview sections.
  */
-export async function handleSyncPreviewApplyRequest(
+export async function _handleSyncPreviewApplyRequest(
   previewId: string | undefined,
   request: Request,
   dependencies: SyncPreviewApplyDependencies = DEFAULT_DEPENDENCIES
@@ -265,4 +265,4 @@ export async function handleSyncPreviewApplyRequest(
   }
 }
 
-export const POST: RequestHandler = ({ params, request }) => handleSyncPreviewApplyRequest(params.previewId, request);
+export const POST: RequestHandler = ({ params, request }) => _handleSyncPreviewApplyRequest(params.previewId, request);

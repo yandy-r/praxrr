@@ -118,3 +118,8 @@ jobs:
           npx svelte-kit sync
           cd ../..
           deno task check
+
+      - name: Build app for production
+        run: |
+          cd packages/praxrr-app
+          APP_BASE_PATH="$GITHUB_WORKSPACE/dist/build" VITE_CHANNEL=develop deno run -A npm:vite build
