@@ -13,7 +13,7 @@ import {
   type DriftFacts,
   type HealthInputs,
   type HealthScope,
-  type ProfileFacts
+  type ProfileFacts,
 } from '$shared/health/index.ts';
 
 const CONFIG: CriterionConfig = { id: 'completeness', enabled: true, weight: 100 };
@@ -36,7 +36,7 @@ function makeProfile(overrides: Partial<ProfileFacts> = {}): ProfileFacts {
     recommendedCfCount: 47,
     thresholds: { minimumScore: 0, upgradeUntilScore: 10000, upgradeScoreIncrement: 1 },
     cfScores: [{ name: 'a', score: 100 }],
-    ...overrides
+    ...overrides,
   };
 }
 
@@ -47,11 +47,19 @@ function makeInputs(overrides: Partial<HealthInputs> = {}): HealthInputs {
     arrType: 'radarr',
     detectedVersion: '5.0.0.0',
     versionSupported: true,
-    drift: { status: 'in-sync', reason: null, drifted: 0, missing: 0, unmanaged: 0, checkedAt: 't', contentCheckedAt: 't' },
+    drift: {
+      status: 'in-sync',
+      reason: null,
+      drifted: 0,
+      missing: 0,
+      unmanaged: 0,
+      checkedAt: 't',
+      contentCheckedAt: 't',
+    },
     profiles: [makeProfile()],
     criteria: [CONFIG],
     nowIso: 't',
-    ...overrides
+    ...overrides,
   };
 }
 
@@ -69,12 +77,18 @@ Deno.test('completeness: full assignment with cutoff + qualities scores 100', ()
 });
 
 Deno.test('completeness: no recommended CFs is null (nothing to measure)', () => {
-  const inputs = makeInputs({ profiles: [makeProfile({ recommendedCfCount: 0, totalCfCount: 0, assignedCfCount: 0 })] });
+  const inputs = makeInputs({
+    profiles: [makeProfile({ recommendedCfCount: 0, totalCfCount: 0, assignedCfCount: 0 })],
+  });
   assertEquals(score('completeness', inputs, PROFILE_SCOPE).score, null);
 });
 
 Deno.test('completeness: missing cutoff and disabled qualities apply penalties', () => {
-  const penalized = score('completeness', makeInputs({ profiles: [makeProfile({ hasCutoff: false, enabledQualityCount: 0 })] }), PROFILE_SCOPE).score;
+  const penalized = score(
+    'completeness',
+    makeInputs({ profiles: [makeProfile({ hasCutoff: false, enabledQualityCount: 0 })] }),
+    PROFILE_SCOPE
+  ).score;
   assert(penalized !== null && penalized < 100, `expected penalty below 100, got ${penalized}`);
 });
 
@@ -85,19 +99,43 @@ Deno.test('drift: in-sync scores 100', () => {
 });
 
 Deno.test('drift: drifted with a fresh content check is penalized per entity, unmanaged excluded', () => {
-  const drift: DriftFacts = { status: 'drifted', reason: null, drifted: 2, missing: 0, unmanaged: 10, checkedAt: 't', contentCheckedAt: 't' };
+  const drift: DriftFacts = {
+    status: 'drifted',
+    reason: null,
+    drifted: 2,
+    missing: 0,
+    unmanaged: 10,
+    checkedAt: 't',
+    contentCheckedAt: 't',
+  };
   // 100 - 8*(2+0) = 84; the 10 unmanaged entities must NOT lower the score.
   assertEquals(score('drift', makeInputs({ drift }), INSTANCE_SCOPE).score, 84);
 });
 
 Deno.test('drift: drifted but stale (no fresh content check) is null, not real drift', () => {
-  const drift: DriftFacts = { status: 'drifted', reason: null, drifted: 5, missing: 5, unmanaged: 0, checkedAt: 't', contentCheckedAt: null };
+  const drift: DriftFacts = {
+    status: 'drifted',
+    reason: null,
+    drifted: 5,
+    missing: 5,
+    unmanaged: 0,
+    checkedAt: 't',
+    contentCheckedAt: null,
+  };
   assertEquals(score('drift', makeInputs({ drift }), INSTANCE_SCOPE).score, null);
 });
 
 Deno.test('drift: environment states (unreachable/never-checked) are null, not a config defect', () => {
   for (const status of ['unreachable', 'unauthorized', 'error', 'never-checked'] as const) {
-    const drift: DriftFacts = { status, reason: 'unreachable', drifted: 0, missing: 0, unmanaged: 0, checkedAt: null, contentCheckedAt: null };
+    const drift: DriftFacts = {
+      status,
+      reason: 'unreachable',
+      drifted: 0,
+      missing: 0,
+      unmanaged: 0,
+      checkedAt: null,
+      contentCheckedAt: null,
+    };
     assertEquals(score('drift', makeInputs({ drift }), INSTANCE_SCOPE).score, null, `status ${status} should be null`);
   }
 });
@@ -110,14 +148,23 @@ Deno.test('coherence: unreadable thresholds are null (skipped, not 0)', () => {
 });
 
 Deno.test('coherence: minimum score above the upgrade target is penalized', () => {
-  const inputs = makeInputs({ profiles: [makeProfile({ thresholds: { minimumScore: 500, upgradeUntilScore: 100, upgradeScoreIncrement: 1 } })] });
+  const inputs = makeInputs({
+    profiles: [makeProfile({ thresholds: { minimumScore: 500, upgradeUntilScore: 100, upgradeScoreIncrement: 1 } })],
+  });
   const result = score('coherence', inputs, PROFILE_SCOPE).score;
   assert(result !== null && result < 100, `expected coherence penalty, got ${result}`);
 });
 
 Deno.test('coherence: all-zero custom-format scores are penalized', () => {
   const inputs = makeInputs({
-    profiles: [makeProfile({ cfScores: [{ name: 'a', score: 0 }, { name: 'b', score: null }] })]
+    profiles: [
+      makeProfile({
+        cfScores: [
+          { name: 'a', score: 0 },
+          { name: 'b', score: null },
+        ],
+      }),
+    ],
   });
   const result = score('coherence', inputs, PROFILE_SCOPE).score;
   assert(result !== null && result < 100, `expected no-signal penalty, got ${result}`);
@@ -142,6 +189,12 @@ Deno.test('compatibility: an unsupported version penalizes the score', () => {
 Deno.test('compatibility: no profiles and unknown version is null', () => {
   const inputs = makeInputs({ profiles: [], versionSupported: null });
   assertEquals(score('compatibility', inputs, INSTANCE_SCOPE).score, null);
+});
+
+Deno.test('compatibility: unknown compatibility (null) is skipped, not scored as incompatible', () => {
+  // A degraded/unreadable profile carries compatible=null and must NOT inject a real 40 sub-score.
+  const inputs = makeInputs({ profiles: [makeProfile({ compatible: null })] });
+  assertEquals(score('compatibility', inputs, PROFILE_SCOPE).score, null);
 });
 
 // --- trash_alignment ---

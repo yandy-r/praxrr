@@ -13,7 +13,15 @@
 
 import { NARRATION_TEMPLATE_VERSION, type NarrationLine, type NarrationTone } from '$shared/narration/index.ts';
 import { clamp0100 } from './policy.ts';
-import type { Criterion, CriterionConfig, CriterionResult, HealthInputs, HealthScope, ProfileFacts, SubScore } from './types.ts';
+import type {
+  Criterion,
+  CriterionConfig,
+  CriterionResult,
+  HealthInputs,
+  HealthScope,
+  ProfileFacts,
+  SubScore,
+} from './types.ts';
 
 // --- tunable penalties (integer points) -------------------------------------------------------
 
@@ -86,21 +94,39 @@ const completeness: Criterion = {
     const detail: string[] = [];
     const suggestions: NarrationLine[] = [];
     if (evaluable.length > 0) {
-      detail.push(`${totalAssigned} of ${totalRecommended} custom formats assigned across ${evaluable.length} profile(s)`);
+      detail.push(
+        `${totalAssigned} of ${totalRecommended} custom formats assigned across ${evaluable.length} profile(s)`
+      );
     }
     if (unassigned > 0) {
       suggestions.push(
-        line(`${unassigned} custom format assignment(s) could be added`, ['Assigning scores to more custom formats sharpens release selection.'], 'info')
+        line(
+          `${unassigned} custom format assignment(s) could be added`,
+          ['Assigning scores to more custom formats sharpens release selection.'],
+          'info'
+        )
       );
     }
     if (noCutoff > 0) {
-      suggestions.push(line(`${noCutoff} profile(s) have no upgrade cutoff`, ['Setting an upgrade-until target lets Praxrr stop upgrading once quality is good enough.'], 'info'));
+      suggestions.push(
+        line(
+          `${noCutoff} profile(s) have no upgrade cutoff`,
+          ['Setting an upgrade-until target lets Praxrr stop upgrading once quality is good enough.'],
+          'info'
+        )
+      );
     }
     if (noQualities > 0) {
-      suggestions.push(line(`${noQualities} profile(s) enable no qualities`, ['A profile with no enabled qualities cannot select any release.'], 'warning'));
+      suggestions.push(
+        line(
+          `${noQualities} profile(s) enable no qualities`,
+          ['A profile with no enabled qualities cannot select any release.'],
+          'warning'
+        )
+      );
     }
     return result('completeness', 'Completeness', score, config, detail, suggestions);
-  }
+  },
 };
 
 // --- drift ------------------------------------------------------------------------------------
@@ -122,23 +148,53 @@ const drift: Criterion = {
     if (d.status === 'drifted') {
       // Preserved-but-stale counts (no fresh content diff) must not be scored as real drift.
       if (d.contentCheckedAt === null) {
-        return result('drift', 'Drift', null, config, ['Drift status is stale — last check did not refresh the diff'], [
-          line('Drift measurement is stale', ['The most recent drift check could not refresh the live diff.'], 'info')
-        ]);
+        return result(
+          'drift',
+          'Drift',
+          null,
+          config,
+          ['Drift status is stale — last check did not refresh the diff'],
+          [line('Drift measurement is stale', ['The most recent drift check could not refresh the live diff.'], 'info')]
+        );
       }
       const magnitude = d.drifted + d.missing;
       const score = clamp0100(100 - DRIFT_PER_ENTITY_PENALTY * magnitude);
-      return result('drift', 'Drift', score, config, [`${d.drifted} changed, ${d.missing} missing on Arr (${d.unmanaged} unmanaged)`], [
-        line(`${magnitude} managed entit${magnitude === 1 ? 'y has' : 'ies have'} drifted from the desired configuration`, ['Run a sync to bring the instance back in line, or review the drift dashboard for details.'], 'warning')
-      ]);
+      return result(
+        'drift',
+        'Drift',
+        score,
+        config,
+        [`${d.drifted} changed, ${d.missing} missing on Arr (${d.unmanaged} unmanaged)`],
+        [
+          line(
+            `${magnitude} managed entit${magnitude === 1 ? 'y has' : 'ies have'} drifted from the desired configuration`,
+            ['Run a sync to bring the instance back in line, or review the drift dashboard for details.'],
+            'warning'
+          ),
+        ]
+      );
     }
 
     // never-checked / unreachable / unauthorized / error: an environment state, not a config defect.
-    const reasonNote = d.status === 'never-checked' ? 'Drift has not been measured yet' : `Instance is ${d.status}${d.reason ? ` (${d.reason})` : ''}`;
-    return result('drift', 'Drift', null, config, [reasonNote], [
-      line(d.status === 'never-checked' ? 'Drift not yet measured' : 'Drift could not be measured', [reasonNote, 'Health is scored from the remaining criteria until drift can be checked.'], 'info')
-    ]);
-  }
+    const reasonNote =
+      d.status === 'never-checked'
+        ? 'Drift has not been measured yet'
+        : `Instance is ${d.status}${d.reason ? ` (${d.reason})` : ''}`;
+    return result(
+      'drift',
+      'Drift',
+      null,
+      config,
+      [reasonNote],
+      [
+        line(
+          d.status === 'never-checked' ? 'Drift not yet measured' : 'Drift could not be measured',
+          [reasonNote, 'Health is scored from the remaining criteria until drift can be checked.'],
+          'info'
+        ),
+      ]
+    );
+  },
 };
 
 // --- coherence --------------------------------------------------------------------------------
@@ -155,7 +211,8 @@ function evalCoherenceProfile(p: ProfileFacts): CoherenceEval {
   const t = p.thresholds;
   let score = 100;
   const incoherentMin = t.upgradeUntilScore !== null && t.minimumScore > t.upgradeUntilScore;
-  const badIncrement = t.upgradeUntilScore !== null && (t.upgradeScoreIncrement === null || t.upgradeScoreIncrement <= 0);
+  const badIncrement =
+    t.upgradeUntilScore !== null && (t.upgradeScoreIncrement === null || t.upgradeScoreIncrement <= 0);
   const noSignal = p.cfScores.length > 0 && p.cfScores.every((cf) => cf.score === null || cf.score === 0);
   if (incoherentMin) score -= INCOHERENT_MIN_PENALTY;
   if (badIncrement) score -= BAD_INCREMENT_PENALTY;
@@ -179,21 +236,41 @@ const coherence: Criterion = {
     const suggestions: NarrationLine[] = [];
     if (incoherentMin > 0) {
       detail.push(`${incoherentMin} profile(s) have a minimum score above their upgrade target`);
-      suggestions.push(line(`${incoherentMin} profile(s) reject everything they would upgrade to`, ['The minimum score sits above the upgrade-until score, so no release can satisfy both.'], 'warning'));
+      suggestions.push(
+        line(
+          `${incoherentMin} profile(s) reject everything they would upgrade to`,
+          ['The minimum score sits above the upgrade-until score, so no release can satisfy both.'],
+          'warning'
+        )
+      );
     }
     if (badIncrement > 0) {
-      suggestions.push(line(`${badIncrement} profile(s) have upgrades enabled without a positive increment`, ['Set a positive upgrade score increment so upgrades can make progress.'], 'info'));
+      suggestions.push(
+        line(
+          `${badIncrement} profile(s) have upgrades enabled without a positive increment`,
+          ['Set a positive upgrade score increment so upgrades can make progress.'],
+          'info'
+        )
+      );
     }
     if (noSignal > 0) {
-      suggestions.push(line(`${noSignal} profile(s) have no effective custom-format scores`, ['Without any non-zero custom-format score, releases are ranked by quality alone.'], 'info'));
+      suggestions.push(
+        line(
+          `${noSignal} profile(s) have no effective custom-format scores`,
+          ['Without any non-zero custom-format score, releases are ranked by quality alone.'],
+          'info'
+        )
+      );
     }
     return result('coherence', 'Coherence', score, config, detail, suggestions);
-  }
+  },
 };
 
 // --- compatibility ----------------------------------------------------------------------------
 
 function scoreCompatibilityProfile(p: ProfileFacts, versionSupported: boolean | null): SubScore {
+  // Compatibility unknown (unbuilt cache / read error): skip rather than fabricate an "incompatible".
+  if (p.compatible === null) return null;
   let score = p.compatible ? 100 : INCOMPATIBLE_PROFILE_SCORE;
   if (versionSupported === false) score -= UNSUPPORTED_VERSION_PENALTY;
   return clamp0100(score);
@@ -219,18 +296,34 @@ const compatibility: Criterion = {
       score = meanScored(profiles.map((p) => scoreCompatibilityProfile(p, inputs.versionSupported)));
     }
 
-    const incompatible = profiles.filter((p) => !p.compatible);
+    const incompatible = profiles.filter((p) => p.compatible === false);
     if (incompatible.length > 0) {
       detail.push(`${incompatible.length} profile(s) reference qualities not mapped for ${inputs.arrType}`);
       suggestions.push(
-        line(`${incompatible.length} profile(s) may not be compatible with ${inputs.arrType}`, incompatible.slice(0, 5).map((p) => `Profile "${p.name}" enables qualities without a ${inputs.arrType} mapping.`), 'warning')
+        line(
+          `${incompatible.length} profile(s) may not be compatible with ${inputs.arrType}`,
+          incompatible
+            .slice(0, 5)
+            .map((p) => `Profile "${p.name}" enables qualities without a ${inputs.arrType} mapping.`),
+          'warning'
+        )
       );
     }
     if (inputs.versionSupported === false) {
-      suggestions.push(line(`Detected ${inputs.arrType} version is outside the supported range`, [inputs.detectedVersion ? `Running version ${inputs.detectedVersion}.` : 'Upgrade the instance to a supported version for full compatibility.'], 'warning'));
+      suggestions.push(
+        line(
+          `Detected ${inputs.arrType} version is outside the supported range`,
+          [
+            inputs.detectedVersion
+              ? `Running version ${inputs.detectedVersion}.`
+              : 'Upgrade the instance to a supported version for full compatibility.',
+          ],
+          'warning'
+        )
+      );
     }
     return result('compatibility', 'Compatibility', score, config, detail, suggestions);
-  }
+  },
 };
 
 // --- trash_alignment (Phase-1 stub) -----------------------------------------------------------
@@ -244,7 +337,7 @@ const trashAlignment: Criterion = {
   label: 'TRaSH Alignment',
   score(_inputs, _scope, config) {
     return result('trash_alignment', 'TRaSH Alignment', null, config, [], []);
-  }
+  },
 };
 
 /** The criteria registry, in stable order. Adding a criterion is one entry here. */

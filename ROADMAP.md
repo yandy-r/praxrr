@@ -328,6 +328,6 @@ The Safety Triad is complete (#16 shipped in [#216](https://github.com/yandy-r/p
 3. Update #6 so the parent research checklist points to this roadmap and no longer implies closed
    Phase 1 items are still active.
 
-Shipped foundations to build on: P0 docs (#38, #73–#77), P1 Onboarding & Transparency (#12, #14,
-#25, #26, #29, #30, #75), P2 Safety Triad + adapter/audit (#15, #16, #17, #24), and P3 foundations
-for narration (#21/#213) and Quality Goals (#20/#215).
+Shipped foundations to build on: P0 docs (#38/#73–#77); P1 Onboarding & Transparency
+(#12/#14/#25/#26/#29/#30/#75); P2 Safety Triad plus adapter/audit (#15/#16/#17/#24); and P3
+foundations for narration (#21/#213) and Quality Goals (#20/#215).

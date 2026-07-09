@@ -38,6 +38,9 @@ export interface UpdateConfigHealthSettingsInput {
 
 const VALID_IDS = new Set<CriterionId>(CRITERION_IDS);
 
+/** Upper bound on a criterion weight — keeps the engine's weighted rollup finite (no Infinity/NaN). */
+const MAX_CRITERION_WEIGHT = 1000;
+
 /**
  * Decode + normalize the stored criteria JSON. Merges valid stored entries over
  * {@link DEFAULT_CRITERIA} so the set is always complete and ordered by {@link CRITERION_IDS} — a
@@ -58,10 +61,16 @@ export function normalizeCriteria(raw: string): CriterionConfig[] {
       const candidate = entry as Record<string, unknown>;
       const id = candidate.id;
       if (typeof id !== 'string' || !VALID_IDS.has(id as CriterionId)) continue;
+      const rawWeight = candidate.weight;
+      // Clamp to a finite [0, MAX] range so a hostile/huge weight can never yield Infinity/NaN scores.
+      const weight =
+        typeof rawWeight === 'number' && Number.isFinite(rawWeight) && rawWeight >= 0
+          ? Math.min(rawWeight, MAX_CRITERION_WEIGHT)
+          : 0;
       byId.set(id as CriterionId, {
         id: id as CriterionId,
         enabled: candidate.enabled === true,
-        weight: typeof candidate.weight === 'number' && candidate.weight >= 0 ? candidate.weight : 0
+        weight,
       });
     }
   }

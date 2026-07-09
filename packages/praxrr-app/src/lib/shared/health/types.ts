@@ -36,7 +36,7 @@ export const CRITERION_IDS: readonly CriterionId[] = [
   'drift',
   'coherence',
   'compatibility',
-  'trash_alignment'
+  'trash_alignment',
 ] as const;
 
 /** A criterion sub-score in `[0, 100]`, or `null` when it cannot be evaluated (skipped, NOT scored 0). */
@@ -94,8 +94,12 @@ export interface HealthThresholds {
 export interface ProfileFacts {
   readonly name: string;
   readonly arrType: HealthArrType;
-  /** From `computeCompatibleProfileNames` (enabled-quality mapping) — NEVER an `arr_type='all'` fold. */
-  readonly compatible: boolean;
+  /**
+   * From `computeCompatibleProfileNames` (enabled-quality mapping) — NEVER an `arr_type='all'` fold.
+   * `null` when compatibility could not be determined (unbuilt cache / read error); the compatibility
+   * criterion then SKIPS this profile (null) rather than scoring a real "incompatible" value.
+   */
+  readonly compatible: boolean | null;
   readonly enabledQualityCount: number;
   readonly hasCutoff: boolean;
   /** Count of custom formats with a non-null effective score for this arr_type. */

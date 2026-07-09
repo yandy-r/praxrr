@@ -21,8 +21,15 @@ export const GET: RequestHandler = () => {
   return json(toSettingsResponse(settings) satisfies SettingsResponse);
 };
 
-function isInt(value: unknown, min: number): value is number {
-  return typeof value === 'number' && Number.isInteger(value) && value >= min;
+// Upper bounds guard against absurd values that would overflow the Date arithmetic in the
+// scheduler (a huge interval makes `calculateNextRunFromMinutes` produce an invalid Date and throw,
+// which would 500 the request AND crash job init on the next startup). Mirrored by the table CHECKs.
+const MAX_INTERVAL_MINUTES = 525_600; // 1 year
+const MAX_RETENTION_DAYS = 3_650; // 10 years
+const MAX_RETENTION_MAX_ENTRIES = 1_000_000;
+
+function isInt(value: unknown, min: number, max: number): value is number {
+  return typeof value === 'number' && Number.isInteger(value) && value >= min && value <= max;
 }
 
 /**
@@ -64,20 +71,31 @@ export const PUT: RequestHandler = async ({ request }) => {
     update.enabled = body.enabled;
   }
   if (body.intervalMinutes !== undefined) {
-    if (!isInt(body.intervalMinutes, 5)) {
-      return json({ error: 'intervalMinutes must be an integer >= 5' } satisfies ErrorResponse, { status: 400 });
+    if (!isInt(body.intervalMinutes, 5, MAX_INTERVAL_MINUTES)) {
+      return json(
+        { error: `intervalMinutes must be an integer between 5 and ${MAX_INTERVAL_MINUTES}` } satisfies ErrorResponse,
+        { status: 400 }
+      );
     }
     update.intervalMinutes = body.intervalMinutes;
   }
   if (body.retentionDays !== undefined) {
-    if (!isInt(body.retentionDays, 1)) {
-      return json({ error: 'retentionDays must be an integer >= 1' } satisfies ErrorResponse, { status: 400 });
+    if (!isInt(body.retentionDays, 1, MAX_RETENTION_DAYS)) {
+      return json(
+        { error: `retentionDays must be an integer between 1 and ${MAX_RETENTION_DAYS}` } satisfies ErrorResponse,
+        { status: 400 }
+      );
     }
     update.retentionDays = body.retentionDays;
   }
   if (body.retentionMaxEntries !== undefined) {
-    if (!isInt(body.retentionMaxEntries, 1)) {
-      return json({ error: 'retentionMaxEntries must be an integer >= 1' } satisfies ErrorResponse, { status: 400 });
+    if (!isInt(body.retentionMaxEntries, 1, MAX_RETENTION_MAX_ENTRIES)) {
+      return json(
+        {
+          error: `retentionMaxEntries must be an integer between 1 and ${MAX_RETENTION_MAX_ENTRIES}`,
+        } satisfies ErrorResponse,
+        { status: 400 }
+      );
     }
     update.retentionMaxEntries = body.retentionMaxEntries;
   }

@@ -41,11 +41,9 @@ export const GET: RequestHandler = async ({ params, url }) => {
   }
 
   const instance = arrInstancesQueries.getById(instanceId);
-  if (!instance) {
-    return json({ error: 'Instance not found' } satisfies ErrorResponse, { status: 404 });
-  }
-  if (!isSyncPreviewArrType(instance.type)) {
-    return json({ error: `Unsupported instance type: ${instance.type}` } satisfies ErrorResponse, { status: 400 });
+  // 404 covers both "unknown" and "not sync-capable" (per the OpenAPI contract).
+  if (!instance || !isSyncPreviewArrType(instance.type)) {
+    return json({ error: 'Instance not found or not sync-capable' } satisfies ErrorResponse, { status: 404 });
   }
 
   try {

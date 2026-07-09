@@ -13,7 +13,7 @@ import {
   type DriftFacts,
   type HealthInputs,
   type ProfileFacts,
-  type ScoredUnit
+  type ScoredUnit,
 } from '$shared/health/index.ts';
 
 function makeProfile(overrides: Partial<ProfileFacts> = {}): ProfileFacts {
@@ -29,9 +29,9 @@ function makeProfile(overrides: Partial<ProfileFacts> = {}): ProfileFacts {
     thresholds: { minimumScore: 0, upgradeUntilScore: 10000, upgradeScoreIncrement: 1 },
     cfScores: [
       { name: 'a', score: 100 },
-      { name: 'b', score: 0 }
+      { name: 'b', score: 0 },
     ],
-    ...overrides
+    ...overrides,
   };
 }
 
@@ -42,7 +42,7 @@ const inSyncDrift: DriftFacts = {
   missing: 0,
   unmanaged: 0,
   checkedAt: '2026-07-14T00:00:00Z',
-  contentCheckedAt: '2026-07-14T00:00:00Z'
+  contentCheckedAt: '2026-07-14T00:00:00Z',
 };
 
 function makeInputs(overrides: Partial<HealthInputs> = {}): HealthInputs {
@@ -56,7 +56,7 @@ function makeInputs(overrides: Partial<HealthInputs> = {}): HealthInputs {
     profiles: [makeProfile()],
     criteria: DEFAULT_CRITERIA.map((c) => ({ ...c })),
     nowIso: '2026-07-14T02:00:00Z',
-    ...overrides
+    ...overrides,
   };
 }
 
@@ -81,9 +81,9 @@ Deno.test('computeHealthReport: contributions sum exactly to the score for every
       profiles: [
         makeProfile({ name: 'Alpha', assignedCfCount: 30 }),
         makeProfile({ name: 'Beta', assignedCfCount: 47, compatible: false }),
-        makeProfile({ name: 'Gamma', hasCutoff: false, enabledQualityCount: 0 })
+        makeProfile({ name: 'Gamma', hasCutoff: false, enabledQualityCount: 0 }),
       ],
-      drift: { ...inSyncDrift, status: 'drifted', drifted: 3, missing: 1, contentCheckedAt: '2026-07-14T00:00:00Z' }
+      drift: { ...inSyncDrift, status: 'drifted', drifted: 3, missing: 1, contentCheckedAt: '2026-07-14T00:00:00Z' },
     })
   );
   assertContributionsSumToScore(report.overall);
@@ -94,7 +94,7 @@ Deno.test('computeHealthReport: contributions sum exactly to the score for every
 
 Deno.test('computeHealthReport: profile order does not change the output (order-invariant)', () => {
   const base = {
-    profiles: [makeProfile({ name: 'Zulu' }), makeProfile({ name: 'Alpha' }), makeProfile({ name: 'Mike' })]
+    profiles: [makeProfile({ name: 'Zulu' }), makeProfile({ name: 'Alpha' }), makeProfile({ name: 'Mike' })],
   };
   const forward = computeHealthReport(makeInputs(base));
   const reversed = computeHealthReport(makeInputs({ profiles: [...base.profiles].reverse() }));
@@ -119,7 +119,15 @@ Deno.test('computeHealthReport: all-null criteria yield band "unknown" and score
       profiles: [],
       versionSupported: null,
       detectedVersion: null,
-      drift: { status: 'never-checked', reason: null, drifted: 0, missing: 0, unmanaged: 0, checkedAt: null, contentCheckedAt: null }
+      drift: {
+        status: 'never-checked',
+        reason: null,
+        drifted: 0,
+        missing: 0,
+        unmanaged: 0,
+        checkedAt: null,
+        contentCheckedAt: null,
+      },
     })
   );
   assertEquals(report.overall.band, 'unknown');
@@ -137,16 +145,29 @@ Deno.test('computeHealthReport: a null sub-score is excluded, not treated as 0',
   const withDrift = computeHealthReport(makeInputs());
   const neverChecked = computeHealthReport(
     makeInputs({
-      drift: { status: 'never-checked', reason: null, drifted: 0, missing: 0, unmanaged: 0, checkedAt: null, contentCheckedAt: null }
+      drift: {
+        status: 'never-checked',
+        reason: null,
+        drifted: 0,
+        missing: 0,
+        unmanaged: 0,
+        checkedAt: null,
+        contentCheckedAt: null,
+      },
     })
   );
   const driftResult = neverChecked.overall.criteria.find((c) => c.id === 'drift');
   assertEquals(driftResult?.score, null);
   assertEquals(driftResult?.contribution, 0);
-  // Excluding a null drift (which was 100 in the in-sync case) should not RAISE or fabricate; the
-  // non-drift criteria keep their weighted mean. Score stays a valid 0..100 and >0.
-  assert(neverChecked.overall.score > 0 && neverChecked.overall.score <= 100);
   assert(withDrift.overall.band === 'healthy');
+
+  // Pin the exclusion: a null drift must roll up IDENTICALLY to drift being disabled entirely.
+  // (If a null were counted as 0, the drifted-in denominator would drag the score below this.)
+  const driftDisabled = computeHealthReport(
+    makeInputs({ criteria: DEFAULT_CRITERIA.filter((c) => c.id !== 'drift').map((c) => ({ ...c })) })
+  );
+  assertEquals(neverChecked.overall.score, driftDisabled.overall.score);
+  assert(neverChecked.overall.score > driftDisabled.overall.score - 1); // sanity: not fabricated
 });
 
 Deno.test('computeHealthReport: disabled criteria never appear in the breakdown', () => {
@@ -157,7 +178,11 @@ Deno.test('computeHealthReport: disabled criteria never appear in the breakdown'
 });
 
 Deno.test('computeHealthReport: drift is instance-scope only (null at profile scope)', () => {
-  const report = computeHealthReport(makeInputs({ drift: { ...inSyncDrift, status: 'drifted', drifted: 5, missing: 0, contentCheckedAt: '2026-07-14T00:00:00Z' } }));
+  const report = computeHealthReport(
+    makeInputs({
+      drift: { ...inSyncDrift, status: 'drifted', drifted: 5, missing: 0, contentCheckedAt: '2026-07-14T00:00:00Z' },
+    })
+  );
   const overallDrift = report.overall.criteria.find((c) => c.id === 'drift');
   assert(overallDrift && overallDrift.score !== null, 'drift scored at instance scope');
   for (const profile of report.profiles) {
@@ -171,7 +196,7 @@ Deno.test('computeHealthReport: fewer drifted entities never lowers the overall 
     computeHealthReport(
       makeInputs({
         criteria: [{ id: 'drift', enabled: true, weight: 100 } satisfies CriterionConfig],
-        drift: { ...inSyncDrift, status: 'drifted', drifted, missing: 0, contentCheckedAt: '2026-07-14T00:00:00Z' }
+        drift: { ...inSyncDrift, status: 'drifted', drifted, missing: 0, contentCheckedAt: '2026-07-14T00:00:00Z' },
       })
     ).overall.score;
   assert(single(1) >= single(5), 'less drift should score at least as high');
@@ -183,7 +208,7 @@ Deno.test('computeHealthReport: more assigned custom formats never lowers comple
     computeHealthReport(
       makeInputs({
         criteria: [{ id: 'completeness', enabled: true, weight: 100 } satisfies CriterionConfig],
-        profiles: [makeProfile({ assignedCfCount: assigned })]
+        profiles: [makeProfile({ assignedCfCount: assigned })],
       })
     ).overall.score;
   assert(single(47) >= single(30), 'more assigned CFs should score at least as high');

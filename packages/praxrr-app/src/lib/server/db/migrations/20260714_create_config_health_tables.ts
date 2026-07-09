@@ -41,9 +41,9 @@ export const migration: Migration = {
 		CREATE TABLE config_health_settings (
 			id                    INTEGER PRIMARY KEY CHECK (id = 1),
 			enabled               INTEGER NOT NULL DEFAULT 1 CHECK (enabled IN (0, 1)),
-			interval_minutes      INTEGER NOT NULL DEFAULT 360 CHECK (interval_minutes >= 5),
-			retention_days        INTEGER NOT NULL DEFAULT 90 CHECK (retention_days > 0),
-			retention_max_entries INTEGER NOT NULL DEFAULT 5000 CHECK (retention_max_entries > 0),
+			interval_minutes      INTEGER NOT NULL DEFAULT 360 CHECK (interval_minutes >= 5 AND interval_minutes <= 525600),
+			retention_days        INTEGER NOT NULL DEFAULT 90 CHECK (retention_days > 0 AND retention_days <= 3650),
+			retention_max_entries INTEGER NOT NULL DEFAULT 5000 CHECK (retention_max_entries > 0 AND retention_max_entries <= 1000000),
 			criteria              TEXT NOT NULL DEFAULT '[]',
 			last_run_at           TEXT,
 			error_count           INTEGER NOT NULL DEFAULT 0 CHECK (error_count >= 0),

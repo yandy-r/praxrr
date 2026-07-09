@@ -22,7 +22,14 @@ import { scoring, QualityProfileScoringNotFoundError } from '$pcd/entities/quali
 import { qualities } from '$pcd/entities/qualityProfiles/qualities/read.ts';
 import { resolveArrCompatibility } from '$shared/arr/compatibility.ts';
 import { isSyncPreviewArrType } from '$sync/preview/types.ts';
-import type { DriftFacts, HealthArrType, HealthCfScore, HealthInputs, HealthThresholds, ProfileFacts } from '$shared/health/index.ts';
+import type {
+  DriftFacts,
+  HealthArrType,
+  HealthCfScore,
+  HealthInputs,
+  HealthThresholds,
+  ProfileFacts,
+} from '$shared/health/index.ts';
 
 const SOURCE = 'ConfigHealthGather';
 
@@ -30,7 +37,15 @@ const SOURCE = 'ConfigHealthGather';
 function gatherDrift(instanceId: number): DriftFacts {
   const detail = driftStatusQueries.getById(instanceId);
   if (!detail) {
-    return { status: 'never-checked', reason: null, drifted: 0, missing: 0, unmanaged: 0, checkedAt: null, contentCheckedAt: null };
+    return {
+      status: 'never-checked',
+      reason: null,
+      drifted: 0,
+      missing: 0,
+      unmanaged: 0,
+      checkedAt: null,
+      contentCheckedAt: null,
+    };
   }
   return {
     status: detail.status,
@@ -39,7 +54,7 @@ function gatherDrift(instanceId: number): DriftFacts {
     missing: detail.counts.missing,
     unmanaged: detail.counts.unmanaged,
     checkedAt: detail.checkedAt,
-    contentCheckedAt: detail.contentCheckedAt
+    contentCheckedAt: detail.contentCheckedAt,
   };
 }
 
@@ -51,7 +66,7 @@ function gatherVersionSupported(arrType: HealthArrType, detectedVersion: string 
 }
 
 /** A profile we could not read (unbuilt cache / missing row): scored as `unknown`, never crashes. */
-function degradedProfile(name: string, arrType: HealthArrType, compatible: boolean): ProfileFacts {
+function degradedProfile(name: string, arrType: HealthArrType, compatible: boolean | null): ProfileFacts {
   return {
     name,
     arrType,
@@ -62,7 +77,7 @@ function degradedProfile(name: string, arrType: HealthArrType, compatible: boole
     totalCfCount: 0,
     recommendedCfCount: 0,
     thresholds: null,
-    cfScores: []
+    cfScores: [],
   };
 }
 
@@ -72,7 +87,7 @@ async function buildProfileFacts(
   databaseId: number,
   name: string,
   arrType: HealthArrType,
-  compatible: boolean
+  compatible: boolean | null
 ): Promise<ProfileFacts> {
   let thresholds: HealthThresholds | null = null;
   let cfScores: HealthCfScore[] = [];
@@ -88,13 +103,13 @@ async function buildProfileFacts(
       minimumScore: score.minimum_custom_format_score,
       // `scoring()` returns 0 (never null) when upgrades are off; 0 => "no upgrade target".
       upgradeUntilScore: score.upgrade_until_score === 0 ? null : score.upgrade_until_score,
-      upgradeScoreIncrement: score.upgrade_score_increment === 0 ? null : score.upgrade_score_increment
+      upgradeScoreIncrement: score.upgrade_score_increment === 0 ? null : score.upgrade_score_increment,
     };
   } catch (error) {
     if (!(error instanceof QualityProfileScoringNotFoundError)) {
       await logger.warn('Config health: scoring read failed; degrading profile', {
         source: SOURCE,
-        meta: { databaseId, profile: name, error: error instanceof Error ? error.message : String(error) }
+        meta: { databaseId, profile: name, error: error instanceof Error ? error.message : String(error) },
       });
     }
   }
@@ -108,7 +123,7 @@ async function buildProfileFacts(
   } catch (error) {
     await logger.warn('Config health: qualities read failed; degrading profile qualities', {
       source: SOURCE,
-      meta: { databaseId, profile: name, error: error instanceof Error ? error.message : String(error) }
+      meta: { databaseId, profile: name, error: error instanceof Error ? error.message : String(error) },
     });
   }
 
@@ -122,7 +137,7 @@ async function buildProfileFacts(
     totalCfCount,
     recommendedCfCount: totalCfCount, // Phase 1: assigned-vs-available (no curated TRaSH set yet)
     thresholds,
-    cfScores
+    cfScores,
   };
 }
 
@@ -142,18 +157,21 @@ async function gatherProfiles(instance: ArrInstance, arrType: HealthArrType): Pr
     const cache = getCache(databaseId);
     if (!cache || !cache.isBuilt()) {
       // Cache not ready: degrade every profile in this database to unknown rather than throw.
-      for (const name of profileNames) profiles.push(degradedProfile(name, arrType, false));
+      // `compatible: null` so the compatibility criterion SKIPS it (not a false "incompatible").
+      for (const name of profileNames) profiles.push(degradedProfile(name, arrType, null));
       continue;
     }
     // Compute the compatibility set once per (cache, arrType) — the guardrail-correct signal.
-    let compatibleNames: Set<string>;
+    // On a read error, compatibility is UNKNOWN (null) for every profile here, not a fabricated false.
+    let compatibleNames: Set<string> | null;
     try {
       compatibleNames = await computeCompatibleProfileNames(cache, arrType, profileNames);
     } catch {
-      compatibleNames = new Set();
+      compatibleNames = null;
     }
     for (const name of profileNames) {
-      profiles.push(await buildProfileFacts(cache, databaseId, name, arrType, compatibleNames.has(name)));
+      const compatible = compatibleNames === null ? null : compatibleNames.has(name);
+      profiles.push(await buildProfileFacts(cache, databaseId, name, arrType, compatible));
     }
   }
   return profiles;
@@ -178,7 +196,7 @@ export async function buildHealthInputs(instance: ArrInstance): Promise<HealthIn
     // Catastrophic gather failure still yields a scoreable instance (drift + version only).
     await logger.error('Config health: profile gather failed; scoring instance without profiles', {
       source: SOURCE,
-      meta: { instanceId: instance.id, error: error instanceof Error ? error.message : String(error) }
+      meta: { instanceId: instance.id, error: error instanceof Error ? error.message : String(error) },
     });
   }
 
@@ -191,7 +209,7 @@ export async function buildHealthInputs(instance: ArrInstance): Promise<HealthIn
     drift,
     profiles,
     criteria,
-    nowIso
+    nowIso,
   };
 }
 
