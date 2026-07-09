@@ -91,6 +91,10 @@
     {
       "name": "Config Health",
       "description": "Score configuration quality/health per instance and profile, with suggestions and trends"
+    },
+    {
+      "name": "Timeline",
+      "description": "Sync-archaeology timeline — merged read-only feed of syncs, snapshots, rollbacks, and canary rollouts, with annotations"
     }
   ],
   "paths": {
@@ -4795,6 +4799,573 @@
           },
           "409": {
             "description": "Engine version mismatch",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/timeline": {
+      "get": {
+        "operationId": "listTimeline",
+        "summary": "List / search the sync-archaeology timeline",
+        "description": "Returns a merged, paginated feed of archaeology events aggregated across four read-only\nsources (sync runs, PCD snapshots, rollbacks, canary rollouts), newest first, with\nannotations hydrated inline. This is a pure read/visual layer — no materialized event table;\nthe only persisted timeline state is user annotations.\n\nFilters combine with AND and gate which sources are included (fail-closed):\n- no scope filter → all four sources\n- `instanceId` or `arrType` → `sync` + `canary` only (snapshot/rollback carry no arr scope)\n- `databaseId` → `snapshot` + `rollback` only\n- `source` intersects the included set\n- `status`, `from`, `to`, `q` apply inside every included branch\n\nOrdering is `occurredAt DESC, source ASC, id DESC` so same-second cross-source events never\nduplicate or skip across page boundaries. Contradictory scope combinations return 400.\n",
+        "tags": ["Timeline"],
+        "parameters": [
+          {
+            "name": "source",
+            "in": "query",
+            "description": "Restrict to a subset of sources. Comma-separated (form, non-exploded).",
+            "style": "form",
+            "explode": false,
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/components/schemas/TimelineSource"
+              }
+            }
+          },
+          {
+            "name": "scopeKind",
+            "in": "query",
+            "description": "Restrict to one scope axis. Rejected with 400 when it contradicts a supplied id.",
+            "schema": {
+              "$ref": "#/components/schemas/TimelineScopeKind"
+            }
+          },
+          {
+            "name": "instanceId",
+            "in": "query",
+            "description": "Arr instance scope — includes `sync` + `canary` only.",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "databaseId",
+            "in": "query",
+            "description": "PCD database scope — includes `snapshot` + `rollback` only.",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "arrType",
+            "in": "query",
+            "description": "Arr family scope — includes `sync` + `canary` only (never inferred for pcd sources).",
+            "schema": {
+              "$ref": "#/components/schemas/TimelineArrType"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/TimelineStatus"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "description": "ISO-8601 (or date-only) lower bound on the event time.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "description": "ISO-8601 (or date-only) upper bound on the event time.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "description": "Free-text match on scope label or error text.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 250,
+              "default": 100
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Timeline page",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TimelineListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid query parameter or contradictory scope combination",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Failed to list timeline",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/timeline/export": {
+      "get": {
+        "operationId": "exportTimeline",
+        "summary": "Export the timeline",
+        "description": "Streams the filtered timeline (same filters and source-gating as the list endpoint, no\npagination) as a JSON array or CSV file download. Capped server-side to guard memory.\n",
+        "tags": ["Timeline"],
+        "parameters": [
+          {
+            "name": "format",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": ["json", "csv"],
+              "default": "json"
+            }
+          },
+          {
+            "name": "source",
+            "in": "query",
+            "style": "form",
+            "explode": false,
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/components/schemas/TimelineSource"
+              }
+            }
+          },
+          {
+            "name": "scopeKind",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/TimelineScopeKind"
+            }
+          },
+          {
+            "name": "instanceId",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "databaseId",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "arrType",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/TimelineArrType"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/TimelineStatus"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Timeline export",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TimelineEvent"
+                  }
+                }
+              },
+              "text/csv": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid query parameter or contradictory scope combination",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Failed to export timeline",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/timeline/annotations": {
+      "get": {
+        "operationId": "listTimelineAnnotations",
+        "summary": "List annotations for one event",
+        "description": "Returns every annotation attached to a single timeline event (a thread), oldest first.\nOrphaned annotations (whose source event no longer exists) remain reachable here by explicit\n`source`+`eventId` but never surface in the merged feed.\n",
+        "tags": ["Timeline"],
+        "parameters": [
+          {
+            "name": "source",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/TimelineSource"
+            }
+          },
+          {
+            "name": "eventId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Annotation thread for the event",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TimelineAnnotation"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Missing or invalid source/eventId",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Failed to list annotations",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "createTimelineAnnotation",
+        "summary": "Attach a note to a timeline event",
+        "description": "Requires an authenticated user (or AUTH-bypass). The referenced event must exist (404\notherwise, so a note is never born dangling).\n",
+        "tags": ["Timeline"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateAnnotationRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Annotation created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TimelineAnnotation"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid body or source",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Referenced event not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Failed to create annotation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/timeline/annotations/{id}": {
+      "patch": {
+        "operationId": "updateTimelineAnnotation",
+        "summary": "Edit an annotation",
+        "description": "Author-gated (403 for non-authors unless in AUTH-bypass mode).",
+        "tags": ["Timeline"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateAnnotationRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated annotation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TimelineAnnotation"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid id or body",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not the author",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Annotation not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Failed to update annotation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteTimelineAnnotation",
+        "summary": "Delete an annotation",
+        "description": "Author-gated (403 for non-authors unless in AUTH-bypass mode).",
+        "tags": ["Timeline"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Deleted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["deleted"],
+                  "properties": {
+                    "deleted": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid id",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not the author",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Annotation not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Failed to delete annotation",
             "content": {
               "application/json": {
                 "schema": {
@@ -10524,6 +11095,245 @@
             "items": {
               "$ref": "#/components/schemas/ConfigHealthCriterionConfig"
             }
+          }
+        }
+      },
+      "TimelineSource": {
+        "type": "string",
+        "description": "The event source a timeline event originates from.",
+        "enum": ["sync", "canary", "snapshot", "rollback"]
+      },
+      "TimelineScopeKind": {
+        "type": "string",
+        "description": "Which instance axis an event is scoped to.",
+        "enum": ["arr-instance", "pcd-database"]
+      },
+      "TimelineStatus": {
+        "type": "string",
+        "description": "Normalized, cross-source status used for filtering and badge colour.",
+        "enum": ["success", "partial", "failed", "skipped", "pending", "info"]
+      },
+      "TimelineBadge": {
+        "type": "string",
+        "description": "Badge variant used to colour the event row.",
+        "enum": ["success", "warning", "danger", "neutral", "info"]
+      },
+      "TimelineArrType": {
+        "type": "string",
+        "enum": ["radarr", "sonarr", "lidarr"]
+      },
+      "TimelineScope": {
+        "type": "object",
+        "description": "Where an event happened. `id` is null when the Arr instance was deleted; `label` is retained.",
+        "required": ["kind", "id", "label", "arrType"],
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/TimelineScopeKind"
+          },
+          "id": {
+            "type": "integer",
+            "nullable": true
+          },
+          "label": {
+            "type": "string",
+            "nullable": true
+          },
+          "arrType": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TimelineArrType"
+              }
+            ],
+            "nullable": true
+          }
+        }
+      },
+      "TimelineAnnotation": {
+        "type": "object",
+        "description": "A user note attached to a single timeline event.",
+        "required": ["id", "source", "eventId", "body", "authorUserId", "authorName", "createdAt", "updatedAt"],
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "source": {
+            "$ref": "#/components/schemas/TimelineSource"
+          },
+          "eventId": {
+            "type": "integer"
+          },
+          "body": {
+            "type": "string"
+          },
+          "authorUserId": {
+            "type": "integer",
+            "nullable": true
+          },
+          "authorName": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "TimelineEvent": {
+        "type": "object",
+        "description": "A single normalized timeline event with inline annotations.",
+        "required": [
+          "id",
+          "source",
+          "sourceId",
+          "timestamp",
+          "type",
+          "status",
+          "badge",
+          "scope",
+          "title",
+          "metrics",
+          "detailHref",
+          "annotations"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Stable composite key `${source}:${sourceId}`."
+          },
+          "source": {
+            "$ref": "#/components/schemas/TimelineSource"
+          },
+          "sourceId": {
+            "type": "integer"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "description": "ISO-8601 UTC event time (normalized across source dialects)."
+          },
+          "type": {
+            "type": "string",
+            "nullable": true,
+            "description": "Source-specific subtype (e.g. the trigger)."
+          },
+          "status": {
+            "$ref": "#/components/schemas/TimelineStatus"
+          },
+          "badge": {
+            "$ref": "#/components/schemas/TimelineBadge"
+          },
+          "scope": {
+            "$ref": "#/components/schemas/TimelineScope"
+          },
+          "title": {
+            "type": "string"
+          },
+          "metrics": {
+            "type": "object",
+            "description": "Small source-specific bag of counts sufficient to render the row.",
+            "additionalProperties": {
+              "nullable": true,
+              "oneOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "number"
+                }
+              ]
+            }
+          },
+          "detailHref": {
+            "type": "string",
+            "description": "Deep-link into the owning feature's existing detail surface."
+          },
+          "annotations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TimelineAnnotation"
+            }
+          }
+        }
+      },
+      "TimelineSourceCounts": {
+        "type": "object",
+        "description": "Per-source event counts over the same filtered/gated set.",
+        "required": ["sync", "canary", "snapshot", "rollback"],
+        "properties": {
+          "sync": {
+            "type": "integer"
+          },
+          "canary": {
+            "type": "integer"
+          },
+          "snapshot": {
+            "type": "integer"
+          },
+          "rollback": {
+            "type": "integer"
+          }
+        }
+      },
+      "TimelineListResponse": {
+        "type": "object",
+        "required": ["items", "page", "pageSize", "totalRecords", "totalPages", "hasNext", "sourceCounts"],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TimelineEvent"
+            }
+          },
+          "page": {
+            "type": "integer"
+          },
+          "pageSize": {
+            "type": "integer"
+          },
+          "totalRecords": {
+            "type": "integer"
+          },
+          "totalPages": {
+            "type": "integer"
+          },
+          "hasNext": {
+            "type": "boolean"
+          },
+          "sourceCounts": {
+            "$ref": "#/components/schemas/TimelineSourceCounts"
+          }
+        }
+      },
+      "CreateAnnotationRequest": {
+        "type": "object",
+        "required": ["source", "eventId", "body"],
+        "properties": {
+          "source": {
+            "$ref": "#/components/schemas/TimelineSource"
+          },
+          "eventId": {
+            "type": "integer"
+          },
+          "body": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4000
+          }
+        }
+      },
+      "UpdateAnnotationRequest": {
+        "type": "object",
+        "required": ["body"],
+        "properties": {
+          "body": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4000
           }
         }
       }

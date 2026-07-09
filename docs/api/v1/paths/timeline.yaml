@@ -1,0 +1,384 @@
+list:
+  get:
+    operationId: listTimeline
+    summary: List / search the sync-archaeology timeline
+    description: |
+      Returns a merged, paginated feed of archaeology events aggregated across four read-only
+      sources (sync runs, PCD snapshots, rollbacks, canary rollouts), newest first, with
+      annotations hydrated inline. This is a pure read/visual layer — no materialized event table;
+      the only persisted timeline state is user annotations.
+
+      Filters combine with AND and gate which sources are included (fail-closed):
+      - no scope filter → all four sources
+      - `instanceId` or `arrType` → `sync` + `canary` only (snapshot/rollback carry no arr scope)
+      - `databaseId` → `snapshot` + `rollback` only
+      - `source` intersects the included set
+      - `status`, `from`, `to`, `q` apply inside every included branch
+
+      Ordering is `occurredAt DESC, source ASC, id DESC` so same-second cross-source events never
+      duplicate or skip across page boundaries. Contradictory scope combinations return 400.
+    tags:
+      - Timeline
+    parameters:
+      - name: source
+        in: query
+        description: Restrict to a subset of sources. Comma-separated (form, non-exploded).
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            $ref: '../schemas/timeline.yaml#/TimelineSource'
+      - name: scopeKind
+        in: query
+        description: Restrict to one scope axis. Rejected with 400 when it contradicts a supplied id.
+        schema:
+          $ref: '../schemas/timeline.yaml#/TimelineScopeKind'
+      - name: instanceId
+        in: query
+        description: Arr instance scope — includes `sync` + `canary` only.
+        schema:
+          type: integer
+      - name: databaseId
+        in: query
+        description: PCD database scope — includes `snapshot` + `rollback` only.
+        schema:
+          type: integer
+      - name: arrType
+        in: query
+        description: Arr family scope — includes `sync` + `canary` only (never inferred for pcd sources).
+        schema:
+          $ref: '../schemas/timeline.yaml#/TimelineArrType'
+      - name: status
+        in: query
+        schema:
+          $ref: '../schemas/timeline.yaml#/TimelineStatus'
+      - name: from
+        in: query
+        description: ISO-8601 (or date-only) lower bound on the event time.
+        schema:
+          type: string
+      - name: to
+        in: query
+        description: ISO-8601 (or date-only) upper bound on the event time.
+        schema:
+          type: string
+      - name: q
+        in: query
+        description: Free-text match on scope label or error text.
+        schema:
+          type: string
+      - name: page
+        in: query
+        schema:
+          type: integer
+          minimum: 1
+          default: 1
+      - name: pageSize
+        in: query
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 250
+          default: 100
+    responses:
+      '200':
+        description: Timeline page
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/timeline.yaml#/TimelineListResponse'
+      '400':
+        description: Invalid query parameter or contradictory scope combination
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+      '500':
+        description: Failed to list timeline
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+
+export:
+  get:
+    operationId: exportTimeline
+    summary: Export the timeline
+    description: |
+      Streams the filtered timeline (same filters and source-gating as the list endpoint, no
+      pagination) as a JSON array or CSV file download. Capped server-side to guard memory.
+    tags:
+      - Timeline
+    parameters:
+      - name: format
+        in: query
+        schema:
+          type: string
+          enum:
+            - json
+            - csv
+          default: json
+      - name: source
+        in: query
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            $ref: '../schemas/timeline.yaml#/TimelineSource'
+      - name: scopeKind
+        in: query
+        schema:
+          $ref: '../schemas/timeline.yaml#/TimelineScopeKind'
+      - name: instanceId
+        in: query
+        schema:
+          type: integer
+      - name: databaseId
+        in: query
+        schema:
+          type: integer
+      - name: arrType
+        in: query
+        schema:
+          $ref: '../schemas/timeline.yaml#/TimelineArrType'
+      - name: status
+        in: query
+        schema:
+          $ref: '../schemas/timeline.yaml#/TimelineStatus'
+      - name: from
+        in: query
+        schema:
+          type: string
+      - name: to
+        in: query
+        schema:
+          type: string
+      - name: q
+        in: query
+        schema:
+          type: string
+    responses:
+      '200':
+        description: Timeline export
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: '../schemas/timeline.yaml#/TimelineEvent'
+          text/csv:
+            schema:
+              type: string
+      '400':
+        description: Invalid query parameter or contradictory scope combination
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+      '500':
+        description: Failed to export timeline
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+
+annotations:
+  get:
+    operationId: listTimelineAnnotations
+    summary: List annotations for one event
+    description: |
+      Returns every annotation attached to a single timeline event (a thread), oldest first.
+      Orphaned annotations (whose source event no longer exists) remain reachable here by explicit
+      `source`+`eventId` but never surface in the merged feed.
+    tags:
+      - Timeline
+    parameters:
+      - name: source
+        in: query
+        required: true
+        schema:
+          $ref: '../schemas/timeline.yaml#/TimelineSource'
+      - name: eventId
+        in: query
+        required: true
+        schema:
+          type: integer
+    responses:
+      '200':
+        description: Annotation thread for the event
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: '../schemas/timeline.yaml#/TimelineAnnotation'
+      '400':
+        description: Missing or invalid source/eventId
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+      '500':
+        description: Failed to list annotations
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+  post:
+    operationId: createTimelineAnnotation
+    summary: Attach a note to a timeline event
+    description: |
+      Requires an authenticated user (or AUTH-bypass). The referenced event must exist (404
+      otherwise, so a note is never born dangling).
+    tags:
+      - Timeline
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../schemas/timeline.yaml#/CreateAnnotationRequest'
+    responses:
+      '201':
+        description: Annotation created
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/timeline.yaml#/TimelineAnnotation'
+      '400':
+        description: Invalid body or source
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+      '401':
+        description: Authentication required
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+      '404':
+        description: Referenced event not found
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+      '500':
+        description: Failed to create annotation
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+
+annotation:
+  patch:
+    operationId: updateTimelineAnnotation
+    summary: Edit an annotation
+    description: Author-gated (403 for non-authors unless in AUTH-bypass mode).
+    tags:
+      - Timeline
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../schemas/timeline.yaml#/UpdateAnnotationRequest'
+    responses:
+      '200':
+        description: Updated annotation
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/timeline.yaml#/TimelineAnnotation'
+      '400':
+        description: Invalid id or body
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+      '401':
+        description: Authentication required
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+      '403':
+        description: Not the author
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+      '404':
+        description: Annotation not found
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+      '500':
+        description: Failed to update annotation
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+  delete:
+    operationId: deleteTimelineAnnotation
+    summary: Delete an annotation
+    description: Author-gated (403 for non-authors unless in AUTH-bypass mode).
+    tags:
+      - Timeline
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+    responses:
+      '200':
+        description: Deleted
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - deleted
+              properties:
+                deleted:
+                  type: boolean
+      '400':
+        description: Invalid id
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+      '401':
+        description: Authentication required
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+      '403':
+        description: Not the author
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+      '404':
+        description: Annotation not found
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+      '500':
+        description: Failed to delete annotation
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'

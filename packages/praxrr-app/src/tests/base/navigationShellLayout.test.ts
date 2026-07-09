@@ -37,6 +37,7 @@ Deno.test('app layout shell is stable and deep-link hrefs remain unchanged', () 
     '/goals',
     '/sync-history',
     '/canary',
+    '/timeline',
     '/settings',
   ]);
 
@@ -69,6 +70,7 @@ Deno.test('app layout shell is stable and deep-link hrefs remain unchanged', () 
     '/goals',
     '/sync-history',
     '/canary',
+    '/timeline',
     '/settings',
     '/settings/general',
     '/settings/jobs',

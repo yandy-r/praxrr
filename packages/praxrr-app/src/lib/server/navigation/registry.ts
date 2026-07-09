@@ -175,6 +175,18 @@ export const NAV_REGISTRY: ArrCapabilityAwareNavItem[] = [
     hasChildren: false,
   },
   {
+    id: 'operations.timeline',
+    label: 'Timeline',
+    href: '/timeline',
+    groupId: ensureGroupId('operations'),
+    order: 2,
+    arrScope: scopeAll,
+    mobilePriority: 'medium',
+    iconKey: 'Clock',
+    emoji: '🕰️',
+    hasChildren: false,
+  },
+  {
     id: 'policies.quality_profiles',
     label: 'Quality Profiles',
     href: '/quality-profiles',

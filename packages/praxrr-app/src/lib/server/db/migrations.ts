@@ -77,6 +77,7 @@ import { migration as migration20260712ExtendPcdSnapshotTriggerRollback } from '
 import { migration as migration20260713CreatePcdRollbacks } from './migrations/20260713_create_pcd_rollbacks.ts';
 import { migration as migration20260714ConfigHealth } from './migrations/20260714_create_config_health_tables.ts';
 import { migration as migration20260715CreateCanaryTables } from './migrations/20260715_create_canary_tables.ts';
+import { migration as migration20260716CreateTimelineAnnotations } from './migrations/20260716_create_timeline_annotations.ts';
 
 export interface Migration {
   version: number;
@@ -383,6 +384,7 @@ export function loadMigrations(): Migration[] {
     migration20260713CreatePcdRollbacks,
     migration20260714ConfigHealth,
     migration20260715CreateCanaryTables,
+    migration20260716CreateTimelineAnnotations,
   ];
 
   // Sort by version number
