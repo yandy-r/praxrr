@@ -1583,6 +1583,93 @@ export interface paths {
     patch: operations['updateTimelineAnnotation'];
     trace?: never;
   };
+  '/auth/webauthn/registration/options': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Begin passkey registration
+     * @description Start registering a passkey for the authenticated local user. Requires `AUTH=on` and a real
+     *     local user (rejects the API-key pseudo-user and OIDC users). Stores a single-use challenge and
+     *     returns WebAuthn creation options for `navigator.credentials.create()`.
+     */
+    post: operations['webauthnRegistrationOptions'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/auth/webauthn/registration/verify': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Complete passkey registration
+     * @description Consume the single-use challenge, verify the attestation, and persist the credential for the
+     *     authenticated local user. Requires `AUTH=on` and a real local user.
+     */
+    post: operations['webauthnRegistrationVerify'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/auth/webauthn/authentication/options': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Begin passkey login
+     * @description Start a passwordless, discoverable passkey login. Public (pre-login) but only available under
+     *     `AUTH=on`. Stores a single-use challenge and returns WebAuthn assertion options for
+     *     `navigator.credentials.get()`.
+     */
+    post: operations['webauthnAuthenticationOptions'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/auth/webauthn/authentication/verify': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Complete passkey login
+     * @description Consume the challenge, verify the assertion, guard against counter regression, then mint a
+     *     session cookie (same contract as password login). Public but only under `AUTH=on`. On success
+     *     the `session` cookie is set via Set-Cookie and the client navigates.
+     */
+    post: operations['webauthnAuthenticationVerify'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -4087,6 +4174,52 @@ export interface components {
     };
     UpdateAnnotationRequest: {
       body: string;
+    };
+    /** @description WebAuthn credential creation options (PublicKeyCredentialCreationOptionsJSON), passed verbatim to the browser's navigator.credentials.create(). The inner shape is owned by @simplewebauthn and treated as opaque here. */
+    WebAuthnRegistrationOptionsResponse: {
+      /** @description PublicKeyCredentialCreationOptionsJSON (challenge, rp, user, pubKeyCredParams, ...). */
+      options: {
+        [key: string]: unknown;
+      };
+    };
+    WebAuthnRegistrationVerifyRequest: {
+      /** @description RegistrationResponseJSON returned by the browser startRegistration(). */
+      response: {
+        [key: string]: unknown;
+      };
+      /** @description Optional friendly credential name. Defaults to a user-agent-derived name when omitted. */
+      name?: string;
+    };
+    /** @description Client-safe view of a registered passkey (no key material). */
+    WebAuthnCredentialSummary: {
+      /** @description Base64URLString credential id. */
+      id: string;
+      name: string;
+      createdAt: string;
+      lastUsedAt?: string | null;
+      /** @enum {string} */
+      deviceType: 'singleDevice' | 'multiDevice';
+      backedUp: boolean;
+    };
+    WebAuthnRegistrationVerifyResponse: {
+      verified: boolean;
+      credential: components['schemas']['WebAuthnCredentialSummary'];
+    };
+    /** @description WebAuthn assertion options (PublicKeyCredentialRequestOptionsJSON) for discoverable/passwordless login, passed verbatim to navigator.credentials.get(). */
+    WebAuthnAuthenticationOptionsResponse: {
+      /** @description PublicKeyCredentialRequestOptionsJSON (challenge, rpId, ...). */
+      options: {
+        [key: string]: unknown;
+      };
+    };
+    WebAuthnAuthenticationVerifyRequest: {
+      /** @description AuthenticationResponseJSON returned by the browser startAuthentication(). */
+      response: {
+        [key: string]: unknown;
+      };
+    };
+    WebAuthnAuthenticationVerifyResponse: {
+      verified: boolean;
     };
     SqliteHealth: {
       status: components['schemas']['ComponentStatus'];
@@ -8272,6 +8405,202 @@ export interface operations {
         };
       };
       /** @description Failed to update annotation */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+    };
+  };
+  webauthnRegistrationOptions: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Credential creation options */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['WebAuthnRegistrationOptionsResponse'];
+        };
+      };
+      /** @description Not an authenticated local user */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Passkeys require AUTH=on */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description WebAuthn RP resolution failed */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+    };
+  };
+  webauthnRegistrationVerify: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['WebAuthnRegistrationVerifyRequest'];
+      };
+    };
+    responses: {
+      /** @description Credential registered */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['WebAuthnRegistrationVerifyResponse'];
+        };
+      };
+      /** @description Missing/expired challenge or verification failed */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Not an authenticated local user */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Duplicate name / passkey already registered / AUTH not on */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description WebAuthn RP resolution failed */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+    };
+  };
+  webauthnAuthenticationOptions: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Assertion options */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['WebAuthnAuthenticationOptionsResponse'];
+        };
+      };
+      /** @description Passkeys require AUTH=on */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description WebAuthn RP resolution failed */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+    };
+  };
+  webauthnAuthenticationVerify: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['WebAuthnAuthenticationVerifyRequest'];
+      };
+    };
+    responses: {
+      /** @description Authenticated; session cookie set */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['WebAuthnAuthenticationVerifyResponse'];
+        };
+      };
+      /** @description Missing/expired challenge, unknown credential, or verification failed */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Passkeys require AUTH=on */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description WebAuthn RP resolution failed */
       500: {
         headers: {
           [name: string]: unknown;
