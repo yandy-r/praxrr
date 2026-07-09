@@ -76,6 +76,7 @@ import { migration as migration20260711CreateQualityGoalBindings } from './migra
 import { migration as migration20260712ExtendPcdSnapshotTriggerRollback } from './migrations/20260712_extend_pcd_snapshot_trigger_rollback.ts';
 import { migration as migration20260713CreatePcdRollbacks } from './migrations/20260713_create_pcd_rollbacks.ts';
 import { migration as migration20260714ConfigHealth } from './migrations/20260714_create_config_health_tables.ts';
+import { migration as migration20260715CreateCanaryTables } from './migrations/20260715_create_canary_tables.ts';
 
 export interface Migration {
   version: number;
@@ -381,6 +382,7 @@ export function loadMigrations(): Migration[] {
     migration20260712ExtendPcdSnapshotTriggerRollback,
     migration20260713CreatePcdRollbacks,
     migration20260714ConfigHealth,
+    migration20260715CreateCanaryTables,
   ];
 
   // Sort by version number

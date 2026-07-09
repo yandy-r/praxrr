@@ -39,6 +39,8 @@ export function formatJobTypeLabel(jobType: JobType): string {
       return 'Drift Check';
     case 'sync.history.cleanup':
       return 'Sync History Cleanup';
+    case 'sync.canary.rollout':
+      return 'Canary Rollout';
     case 'config-health.snapshot':
       return 'Config Health Snapshot';
     case 'config-health.cleanup':

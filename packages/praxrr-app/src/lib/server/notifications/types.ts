@@ -35,6 +35,10 @@ export const NotificationTypes = {
   // Sync (Arr push sync — audit trail)
   SYNC_FAILED: 'sync.failed',
   SYNC_PARTIAL: 'sync.partial',
+
+  // Canary (blast-radius safety)
+  CANARY_FAILED: 'canary.failed',
+  CANARY_PROMOTED: 'canary.promoted',
 } as const;
 
 /**

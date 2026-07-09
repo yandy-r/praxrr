@@ -9,5 +9,6 @@ import './backupCreate.ts';
 import './backupCleanup.ts';
 import './logsCleanup.ts';
 import './syncHistoryCleanup.ts';
+import './canaryRollout.ts';
 import './configHealthSnapshot.ts';
 import './configHealthCleanup.ts';

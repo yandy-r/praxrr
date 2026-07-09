@@ -1,0 +1,428 @@
+CanaryArrType:
+  type: string
+  enum:
+    - radarr
+    - sonarr
+    - lidarr
+  description: Arr family a rollout is scoped to. A rollout never spans types.
+
+CanaryRolloutStatus:
+  type: string
+  enum:
+    - canary_running
+    - awaiting_confirmation
+    - rolling_out
+    - completed
+    - aborted
+    - failed
+  description: |
+    Live state machine of a staged rollout:
+    - `canary_running`: canary sync is executing inline
+    - `awaiting_confirmation`: canary passed, waiting at the verification gate
+    - `rolling_out`: batched rollout job is syncing remaining instances
+    - `completed`: all remaining instances synced cleanly
+    - `aborted`: gate declined, or canary failed/partial-abort/skipped (remaining untouched)
+    - `failed`: rollout ran but one or more remaining instances failed
+
+CanaryOutcomeStatus:
+  type: string
+  enum:
+    - success
+    - partial
+    - failed
+    - skipped
+  description: Classified terminal status of the canary sync run.
+
+CanaryPartialPolicy:
+  type: string
+  enum:
+    - gate
+    - abort
+  description: |
+    How a `partial` canary outcome is treated:
+    - `gate`: pass-with-warning; continue to the verification gate
+    - `abort`: treat as failure; remaining instances are never touched
+
+CanaryTrigger:
+  type: string
+  enum:
+    - manual
+    - system
+    - schedule
+  description: How the rollout was initiated.
+
+CanaryJobRunStatus:
+  type: string
+  enum:
+    - success
+    - failure
+    - skipped
+    - cancelled
+  description: Per-instance outcome status following JobRunStatus semantics.
+
+CanaryTarget:
+  type: object
+  required:
+    - instanceId
+    - instanceName
+  properties:
+    instanceId:
+      type: integer
+      description: Arr instance ID selected as a rollout target.
+    instanceName:
+      type: string
+      description: Denormalized instance name captured at rollout start.
+
+CanaryInstanceResult:
+  type: object
+  required:
+    - instanceId
+    - instanceName
+    - status
+  properties:
+    instanceId:
+      type: integer
+    instanceName:
+      type: string
+    status:
+      $ref: '#/CanaryJobRunStatus'
+    output:
+      type: string
+      description: Human-readable sync summary from executeSyncJob.
+    error:
+      type: string
+      description: Per-instance diagnostics on failure.
+
+CanarySyncRunResult:
+  type: object
+  required:
+    - status
+  properties:
+    status:
+      $ref: '#/CanaryJobRunStatus'
+    output:
+      type: string
+    error:
+      type: string
+    rescheduleAt:
+      oneOf:
+        - type: string
+          format: date-time
+        - type: 'null'
+  description: Verbatim executeSyncJob return, surfaced when a start auto-skips to a plain sync.
+
+CanaryStartRequest:
+  type: object
+  required:
+    - arrType
+  properties:
+    arrType:
+      $ref: '#/CanaryArrType'
+      description: The Arr app the rollout is scoped to. Required — a rollout targets exactly one arr_type.
+    canaryInstanceId:
+      type: integer
+      description: Explicit canary instance. Highest selection precedence.
+    sections:
+      type: array
+      description: Optional section filters. Omit for all configured sections.
+      items:
+        $ref: '../schemas/sync.yaml#/SyncPreviewSection'
+    maxBatchSize:
+      type: integer
+      minimum: 1
+      description: Max remaining instances synced per batch. Falls back to the settings default.
+    partialPolicy:
+      $ref: '#/CanaryPartialPolicy'
+
+CanaryRolloutDetail:
+  type: object
+  required:
+    - id
+    - arrType
+    - status
+    - canaryInstanceId
+    - canaryInstanceName
+    - canaryStatus
+    - canarySyncHistoryId
+    - sections
+    - maxBatchSize
+    - partialPolicy
+    - canaryOutput
+    - canaryError
+    - remainingTargets
+    - batchCursor
+    - rolloutResults
+    - trigger
+    - startedAt
+    - finishedAt
+    - stateToken
+    - createdAt
+    - updatedAt
+  properties:
+    id:
+      type: integer
+    arrType:
+      $ref: '#/CanaryArrType'
+    status:
+      $ref: '#/CanaryRolloutStatus'
+    canaryInstanceId:
+      oneOf:
+        - type: integer
+        - type: 'null'
+      description: Null when the canary instance was deleted after this run.
+    canaryInstanceName:
+      type: string
+    canaryStatus:
+      oneOf:
+        - $ref: '#/CanaryOutcomeStatus'
+        - type: 'null'
+      description: Null while the canary is still running.
+    canarySyncHistoryId:
+      oneOf:
+        - type: integer
+        - type: 'null'
+      description: FK to the canary's sync_history row (diagnostics source).
+    sections:
+      oneOf:
+        - type: array
+          items:
+            $ref: '../schemas/sync.yaml#/SyncPreviewSection'
+        - type: 'null'
+      description: Requested sections, or null for all configured sections.
+    maxBatchSize:
+      type: integer
+      minimum: 1
+    partialPolicy:
+      $ref: '#/CanaryPartialPolicy'
+    canaryOutput:
+      oneOf:
+        - type: string
+        - type: 'null'
+    canaryError:
+      oneOf:
+        - type: string
+        - type: 'null'
+    remainingTargets:
+      type: array
+      items:
+        $ref: '#/CanaryTarget'
+    batchCursor:
+      type: integer
+      minimum: 0
+      description: Index into remainingTargets the rollout job has reached (resumable).
+    rolloutResults:
+      type: array
+      items:
+        $ref: '#/CanaryInstanceResult'
+    trigger:
+      $ref: '#/CanaryTrigger'
+    startedAt:
+      type: string
+      format: date-time
+    finishedAt:
+      oneOf:
+        - type: string
+          format: date-time
+        - type: 'null'
+    stateToken:
+      type: string
+      description: Value-guard token for /proceed and /abort; re-issued on every transition.
+    createdAt:
+      type: string
+    updatedAt:
+      type: string
+
+CanaryRolloutSummary:
+  type: object
+  required:
+    - id
+    - arrType
+    - status
+    - canaryInstanceId
+    - canaryInstanceName
+    - canaryStatus
+    - maxBatchSize
+    - partialPolicy
+    - trigger
+    - remainingCount
+    - completedCount
+    - startedAt
+    - finishedAt
+    - createdAt
+    - updatedAt
+  properties:
+    id:
+      type: integer
+    arrType:
+      $ref: '#/CanaryArrType'
+    status:
+      $ref: '#/CanaryRolloutStatus'
+    canaryInstanceId:
+      oneOf:
+        - type: integer
+        - type: 'null'
+    canaryInstanceName:
+      type: string
+    canaryStatus:
+      oneOf:
+        - $ref: '#/CanaryOutcomeStatus'
+        - type: 'null'
+    maxBatchSize:
+      type: integer
+      minimum: 1
+    partialPolicy:
+      $ref: '#/CanaryPartialPolicy'
+    trigger:
+      $ref: '#/CanaryTrigger'
+    remainingCount:
+      type: integer
+      minimum: 0
+      description: Number of remaining targets, derived from remainingTargets length.
+    completedCount:
+      type: integer
+      minimum: 0
+      description: Number of instances rolled out, derived from rolloutResults length.
+    startedAt:
+      type: string
+      format: date-time
+    finishedAt:
+      oneOf:
+        - type: string
+          format: date-time
+        - type: 'null'
+    createdAt:
+      type: string
+    updatedAt:
+      type: string
+
+CanaryStartSkipped:
+  type: object
+  required:
+    - skipped
+    - result
+  properties:
+    skipped:
+      type: boolean
+      const: true
+    result:
+      $ref: '#/CanarySyncRunResult'
+  description: Returned when a single eligible same-arr_type target auto-skips the staged flow.
+
+CanaryStartGated:
+  type: object
+  required:
+    - skipped
+    - rollout
+    - remainingPreview
+  properties:
+    skipped:
+      type: boolean
+      const: false
+    rollout:
+      $ref: '#/CanaryRolloutDetail'
+    remainingPreview:
+      type: array
+      description: Live per-instance preview of remaining targets shown at the gate.
+      items:
+        $ref: '../schemas/sync.yaml#/SyncPreviewResult'
+  description: Returned when the canary passed and the rollout is awaiting confirmation.
+
+CanaryStartResult:
+  oneOf:
+    - $ref: '#/CanaryStartSkipped'
+    - $ref: '#/CanaryStartGated'
+  discriminator:
+    propertyName: skipped
+  description: |
+    Two-headed start response discriminated on `skipped`:
+    - `skipped: true`: single-target auto-skip ran a plain sync
+    - `skipped: false`: staged rollout persisted and awaiting confirmation
+
+CanaryRolloutListResponse:
+  type: object
+  required:
+    - items
+    - page
+    - pageSize
+    - totalRecords
+    - totalPages
+    - hasNext
+  properties:
+    items:
+      type: array
+      items:
+        $ref: '#/CanaryRolloutSummary'
+    page:
+      type: integer
+      minimum: 1
+    pageSize:
+      type: integer
+      minimum: 1
+    totalRecords:
+      type: integer
+      minimum: 0
+    totalPages:
+      type: integer
+      minimum: 0
+    hasNext:
+      type: boolean
+
+CanarySettings:
+  type: object
+  required:
+    - enabled
+    - defaultMaxBatchSize
+    - autoSelect
+    - defaultCanaryInstanceId
+    - defaultPartialPolicy
+  properties:
+    enabled:
+      type: boolean
+      description: Opt-in. When false the staged flow is hidden and start falls through to a plain sync.
+    defaultMaxBatchSize:
+      type: integer
+      minimum: 1
+    autoSelect:
+      type: boolean
+      description: Allow least-critical auto-pick when no explicit or default canary is set.
+    defaultCanaryInstanceId:
+      oneOf:
+        - type: integer
+        - type: 'null'
+    defaultPartialPolicy:
+      $ref: '#/CanaryPartialPolicy'
+
+CanarySettingsUpdate:
+  type: object
+  properties:
+    enabled:
+      type: boolean
+    defaultMaxBatchSize:
+      type: integer
+      minimum: 1
+    autoSelect:
+      type: boolean
+    defaultCanaryInstanceId:
+      oneOf:
+        - type: integer
+        - type: 'null'
+    defaultPartialPolicy:
+      $ref: '#/CanaryPartialPolicy'
+
+CanaryProceedRequest:
+  type: object
+  required:
+    - stateToken
+  properties:
+    stateToken:
+      type: string
+      description: The state_token the client was shown; value-guards concurrent/double-proceed.
+
+CanaryAbortRequest:
+  type: object
+  required:
+    - stateToken
+  properties:
+    stateToken:
+      type: string
+      description: The state_token the client was shown; value-guards concurrent proceed/abort.

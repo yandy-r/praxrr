@@ -14,6 +14,7 @@ export type JobType =
   | 'logs.cleanup'
   | 'drift.check'
   | 'sync.history.cleanup'
+  | 'sync.canary.rollout'
   | 'config-health.snapshot'
   | 'config-health.cleanup';
 
@@ -69,6 +70,10 @@ export interface DriftCheckJobPayload {
   cursor?: number;
 }
 
+export interface CanaryRolloutJobPayload {
+  rolloutId: number;
+}
+
 export interface JobPayloadByType {
   'arr.sync': ArrSyncJobPayload;
   'arr.sync.qualityProfiles': ArrSyncSectionJobPayload;
@@ -85,6 +90,7 @@ export interface JobPayloadByType {
   'logs.cleanup': ArrSyncCleanupOnlyPayload;
   'drift.check': DriftCheckJobPayload;
   'sync.history.cleanup': ArrSyncCleanupOnlyPayload;
+  'sync.canary.rollout': CanaryRolloutJobPayload;
   'config-health.snapshot': ArrSyncCleanupOnlyPayload;
   'config-health.cleanup': ArrSyncCleanupOnlyPayload;
 }
