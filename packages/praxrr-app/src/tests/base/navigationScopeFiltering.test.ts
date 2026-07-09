@@ -202,6 +202,7 @@ Deno.test('bottom nav ordering is deterministic by priority and sidebar traversa
     '/goals',
     '/sync-history',
     '/canary',
+    '/timeline',
     '/settings',
   ]);
 
@@ -222,6 +223,7 @@ Deno.test('bottom nav ordering is deterministic by priority and sidebar traversa
     '/goals',
     '/sync-history',
     '/canary',
+    '/timeline',
     '/media-management',
     '/delay-profiles',
     '/metadata-profiles',

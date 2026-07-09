@@ -1,0 +1,225 @@
+TimelineSource:
+  type: string
+  description: The event source a timeline event originates from.
+  enum:
+    - sync
+    - canary
+    - snapshot
+    - rollback
+
+TimelineScopeKind:
+  type: string
+  description: Which instance axis an event is scoped to.
+  enum:
+    - arr-instance
+    - pcd-database
+
+TimelineStatus:
+  type: string
+  description: Normalized, cross-source status used for filtering and badge colour.
+  enum:
+    - success
+    - partial
+    - failed
+    - skipped
+    - pending
+    - info
+
+TimelineBadge:
+  type: string
+  description: Badge variant used to colour the event row.
+  enum:
+    - success
+    - warning
+    - danger
+    - neutral
+    - info
+
+TimelineArrType:
+  type: string
+  enum:
+    - radarr
+    - sonarr
+    - lidarr
+
+TimelineScope:
+  type: object
+  description: Where an event happened. `id` is null when the Arr instance was deleted; `label` is retained.
+  required:
+    - kind
+    - id
+    - label
+    - arrType
+  properties:
+    kind:
+      $ref: '#/TimelineScopeKind'
+    id:
+      type: integer
+      nullable: true
+    label:
+      type: string
+      nullable: true
+    arrType:
+      allOf:
+        - $ref: '#/TimelineArrType'
+      nullable: true
+
+TimelineAnnotation:
+  type: object
+  description: A user note attached to a single timeline event.
+  required:
+    - id
+    - source
+    - eventId
+    - body
+    - authorUserId
+    - authorName
+    - createdAt
+    - updatedAt
+  properties:
+    id:
+      type: integer
+    source:
+      $ref: '#/TimelineSource'
+    eventId:
+      type: integer
+    body:
+      type: string
+    authorUserId:
+      type: integer
+      nullable: true
+    authorName:
+      type: string
+      nullable: true
+    createdAt:
+      type: string
+    updatedAt:
+      type: string
+
+TimelineEvent:
+  type: object
+  description: A single normalized timeline event with inline annotations.
+  required:
+    - id
+    - source
+    - sourceId
+    - timestamp
+    - type
+    - status
+    - badge
+    - scope
+    - title
+    - metrics
+    - detailHref
+    - annotations
+  properties:
+    id:
+      type: string
+      description: Stable composite key `${source}:${sourceId}`.
+    source:
+      $ref: '#/TimelineSource'
+    sourceId:
+      type: integer
+    timestamp:
+      type: string
+      format: date-time
+      description: ISO-8601 UTC event time (normalized across source dialects).
+    type:
+      type: string
+      nullable: true
+      description: Source-specific subtype (e.g. the trigger).
+    status:
+      $ref: '#/TimelineStatus'
+    badge:
+      $ref: '#/TimelineBadge'
+    scope:
+      $ref: '#/TimelineScope'
+    title:
+      type: string
+    metrics:
+      type: object
+      description: Small source-specific bag of counts sufficient to render the row.
+      additionalProperties:
+        nullable: true
+        oneOf:
+          - type: string
+          - type: number
+    detailHref:
+      type: string
+      description: Deep-link into the owning feature's existing detail surface.
+    annotations:
+      type: array
+      items:
+        $ref: '#/TimelineAnnotation'
+
+TimelineSourceCounts:
+  type: object
+  description: Per-source event counts over the same filtered/gated set.
+  required:
+    - sync
+    - canary
+    - snapshot
+    - rollback
+  properties:
+    sync:
+      type: integer
+    canary:
+      type: integer
+    snapshot:
+      type: integer
+    rollback:
+      type: integer
+
+TimelineListResponse:
+  type: object
+  required:
+    - items
+    - page
+    - pageSize
+    - totalRecords
+    - totalPages
+    - hasNext
+    - sourceCounts
+  properties:
+    items:
+      type: array
+      items:
+        $ref: '#/TimelineEvent'
+    page:
+      type: integer
+    pageSize:
+      type: integer
+    totalRecords:
+      type: integer
+    totalPages:
+      type: integer
+    hasNext:
+      type: boolean
+    sourceCounts:
+      $ref: '#/TimelineSourceCounts'
+
+CreateAnnotationRequest:
+  type: object
+  required:
+    - source
+    - eventId
+    - body
+  properties:
+    source:
+      $ref: '#/TimelineSource'
+    eventId:
+      type: integer
+    body:
+      type: string
+      minLength: 1
+      maxLength: 4000
+
+UpdateAnnotationRequest:
+  type: object
+  required:
+    - body
+  properties:
+    body:
+      type: string
+      minLength: 1
+      maxLength: 4000

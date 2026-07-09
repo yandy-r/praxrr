@@ -50,6 +50,8 @@ tags:
     description: Staged rollout orchestration — canary sync, verification gate, and batched fan-out
   - name: Config Health
     description: Score configuration quality/health per instance and profile, with suggestions and trends
+  - name: Timeline
+    description: Sync-archaeology timeline — merged read-only feed of syncs, snapshots, rollbacks, and canary rollouts, with annotations
 
 paths:
   /health:
@@ -690,6 +692,14 @@ paths:
     $ref: './paths/config-health.yaml#/trends'
   /config-health/settings:
     $ref: './paths/config-health.yaml#/settings'
+  /timeline:
+    $ref: './paths/timeline.yaml#/list'
+  /timeline/export:
+    $ref: './paths/timeline.yaml#/export'
+  /timeline/annotations:
+    $ref: './paths/timeline.yaml#/annotations'
+  /timeline/annotations/{id}:
+    $ref: './paths/timeline.yaml#/annotation'
 
 components:
   schemas:
@@ -1642,3 +1652,28 @@ components:
       $ref: './schemas/config-health.yaml#/ConfigHealthSettingsResponse'
     ConfigHealthSettingsUpdateRequest:
       $ref: './schemas/config-health.yaml#/ConfigHealthSettingsUpdateRequest'
+    # Timeline
+    TimelineSource:
+      $ref: './schemas/timeline.yaml#/TimelineSource'
+    TimelineScopeKind:
+      $ref: './schemas/timeline.yaml#/TimelineScopeKind'
+    TimelineStatus:
+      $ref: './schemas/timeline.yaml#/TimelineStatus'
+    TimelineBadge:
+      $ref: './schemas/timeline.yaml#/TimelineBadge'
+    TimelineArrType:
+      $ref: './schemas/timeline.yaml#/TimelineArrType'
+    TimelineScope:
+      $ref: './schemas/timeline.yaml#/TimelineScope'
+    TimelineAnnotation:
+      $ref: './schemas/timeline.yaml#/TimelineAnnotation'
+    TimelineEvent:
+      $ref: './schemas/timeline.yaml#/TimelineEvent'
+    TimelineSourceCounts:
+      $ref: './schemas/timeline.yaml#/TimelineSourceCounts'
+    TimelineListResponse:
+      $ref: './schemas/timeline.yaml#/TimelineListResponse'
+    CreateAnnotationRequest:
+      $ref: './schemas/timeline.yaml#/CreateAnnotationRequest'
+    UpdateAnnotationRequest:
+      $ref: './schemas/timeline.yaml#/UpdateAnnotationRequest'
