@@ -11,11 +11,13 @@ SnapshotTrigger:
     - pull
     - sync
     - manual
+    - rollback
   description: |
     What event triggered the snapshot creation.
     - pull: before a PCD repository pull/refresh
     - sync: before an Arr instance sync
     - manual: user-initiated via API
+    - rollback: system pre-rollback auto-capture taken before a restore rewinds the op log
 
 PcdSnapshotDetail:
   type: object
@@ -79,7 +81,10 @@ PcdSnapshotFullDetail:
           description: Number of ops written after this snapshot (count of pcd_ops rows with id greater than opsSequenceMaxId)
         isRestorable:
           type: boolean
-          description: Always false in this release. Restore support is not yet implemented.
+          description: |
+            Whether this snapshot can be safely restored. True only when the snapshot's
+            published-op set reconstructs and its recomputed fingerprint matches the stored
+            cacheStateHash (fail-closed). Legacy snapshots without a fingerprint are false.
 
 PcdSnapshotListResponse:
   type: object
@@ -102,3 +107,157 @@ CreateManualSnapshotRequest:
     description:
       type: string
       description: Optional description for the snapshot
+
+RollbackSection:
+  type: object
+  description: |
+    A group of entity changes for one resolved-config family. Reuses the sync-preview
+    EntityChange/FieldChange shapes. Diff direction is PCD-to-PCD: each FieldChange.current
+    is the CURRENT PCD desired-state and FieldChange.desired is the SNAPSHOT restore-target
+    state (NOT live Arr state).
+  required:
+    - title
+    - entityType
+    - arrType
+    - changes
+  properties:
+    title:
+      type: string
+      description: Human-readable family label (e.g. "Custom Formats", "Naming (radarr)")
+    entityType:
+      type: string
+      description: Namespaced entity type; per-arr families are "${entityType}:${arrType}"
+    arrType:
+      type: string
+      nullable: true
+      enum:
+        - radarr
+        - sonarr
+        - lidarr
+    changes:
+      type: array
+      items:
+        $ref: './sync.yaml#/EntityChange'
+
+RollbackPreview:
+  type: object
+  description: |
+    Mandatory PCD-to-PCD preview of what restoring a snapshot would change in the PCD desired
+    state. Never contacts an Arr instance. When reconstructable is false the snapshot cannot
+    be safely restored and sections is empty.
+  required:
+    - databaseId
+    - snapshotId
+    - reconstructable
+    - reason
+    - currentStateHash
+    - snapshotStateHash
+    - opsWrittenSince
+    - sections
+    - summary
+  properties:
+    databaseId:
+      type: integer
+    snapshotId:
+      type: integer
+    reconstructable:
+      type: boolean
+      description: Whether the snapshot verifies against its fingerprint and can be restored
+    reason:
+      type: string
+      nullable: true
+      description: When not reconstructable, why (legacy/no-fingerprint or diverged history)
+    currentStateHash:
+      type: string
+      nullable: true
+      description: Live published-op fingerprint at preview time; echo as expectedCurrentStateHash on execute
+    snapshotStateHash:
+      type: string
+      nullable: true
+      description: The snapshot's stored restore-target fingerprint
+    opsWrittenSince:
+      type: integer
+    sections:
+      type: array
+      items:
+        $ref: '#/RollbackSection'
+    summary:
+      $ref: '#/RollbackSummary'
+
+RollbackSummary:
+  type: object
+  required:
+    - totalCreates
+    - totalUpdates
+    - totalDeletes
+    - totalUnchanged
+  properties:
+    totalCreates:
+      type: integer
+    totalUpdates:
+      type: integer
+    totalDeletes:
+      type: integer
+    totalUnchanged:
+      type: integer
+
+ExecuteRollbackRequest:
+  type: object
+  description: |
+    Request body to execute a rollback. expectedCurrentStateHash is a from-state value-guard
+    echoed from the preview's currentStateHash; if the live state changed since the preview
+    the request is rejected with 422.
+  required:
+    - expectedCurrentStateHash
+  properties:
+    expectedCurrentStateHash:
+      type: string
+      description: The preview's currentStateHash (may be empty string when no published ops exist)
+
+RollbackResult:
+  type: object
+  required:
+    - rollbackId
+    - snapshotId
+    - databaseId
+    - status
+    - opsUndone
+    - opsReactivated
+    - preRollbackSnapshotId
+    - targetStateHash
+    - postVerified
+    - error
+    - createdAt
+  properties:
+    rollbackId:
+      type: integer
+    snapshotId:
+      type: integer
+    databaseId:
+      type: integer
+    status:
+      type: string
+      enum:
+        - success
+        - failed
+    opsUndone:
+      type: integer
+      description: Ops written after the snapshot that were superseded
+    opsReactivated:
+      type: integer
+      description: Pre-snapshot ops deactivated since that were re-published
+    preRollbackSnapshotId:
+      type: integer
+      nullable: true
+      description: The durable pre-rollback capture that makes this rollback reversible
+    targetStateHash:
+      type: string
+      nullable: true
+    postVerified:
+      type: boolean
+    error:
+      type: string
+      nullable: true
+    createdAt:
+      type: string
+      format: date-time

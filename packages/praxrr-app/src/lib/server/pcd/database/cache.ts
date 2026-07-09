@@ -304,15 +304,22 @@ export class PCDCache {
    * `close()` when done. It must NEVER be registered via `setCache()` — the cache
    * registry is reserved exclusively for instances produced by `build()`.
    */
-  async buildReadOnly(options: { layers: ReadonlySet<'schema' | 'base' | 'tweaks' | 'user'> }): Promise<void> {
+  async buildReadOnly(options: {
+    layers: ReadonlySet<'schema' | 'base' | 'tweaks' | 'user'>;
+    snapshotOpIds?: ReadonlySet<number>;
+  }): Promise<void> {
     // 1-2. Create in-memory database, initialize Kysely, and register SQL helper functions
     //      (identical bootstrap to build() step 1-2).
     this.bootstrap();
 
     // 3. Load all operations, then keep only the requested layers.
     //    loadAllOperations() already returns a fully sorted array, so filtering after
-    //    the fact preserves correct relative ordering within the kept layers.
-    const allOperations = await loadAllOperations(this.pcdPath, this.databaseInstanceId);
+    //    the fact preserves correct relative ordering within the kept layers. When
+    //    snapshotOpIds is provided, the base/user layers replay exactly that reconstructed
+    //    op set for point-in-time snapshot restore (rollback, issue #16).
+    const allOperations = await loadAllOperations(this.pcdPath, this.databaseInstanceId, {
+      snapshotOpIds: options.snapshotOpIds,
+    });
     const operations = allOperations.filter((operation) => options.layers.has(operation.layer));
     validateOperations(operations);
 

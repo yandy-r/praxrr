@@ -6,6 +6,10 @@
 import { db } from '$db/db.ts';
 import { pcdSnapshotQueries } from '$db/queries/pcdSnapshots.ts';
 import { logger } from '$logger/logger.ts';
+import { computeOpsMetadata, computeOpsWrittenSince, computePublishedOpIds, computeStateHash } from './fingerprint.ts';
+import { verifySnapshot } from './reconstruct.ts';
+import { previewRestore } from './rollback/preview.ts';
+import { restore } from './rollback/restore.ts';
 import type {
   CreateAutoSnapshotInput,
   CreateManualSnapshotInput,
@@ -25,135 +29,6 @@ const MAX_AUTO_AGE_DAYS = 30;
 
 /** Deduplication window in seconds */
 const DEDUP_WINDOW_SECONDS = 60;
-
-// ============================================================================
-// HASH UTILITIES
-// ============================================================================
-
-/**
- * Compute SHA-256 hex digest of a string
- */
-async function sha256Hex(data: string): Promise<string> {
-  const encoder = new TextEncoder();
-  const hashBuffer = await crypto.subtle.digest('SHA-256', encoder.encode(data));
-  return Array.from(new Uint8Array(hashBuffer))
-    .map((b) => b.toString(16).padStart(2, '0'))
-    .join('');
-}
-
-// ============================================================================
-// INTERNAL ROW TYPE FOR OPS QUERY
-// ============================================================================
-
-interface PublishedOpRow {
-  id: number;
-  origin: string;
-  sequence: number | null;
-  state: string;
-  source: string;
-  content_hash: string | null;
-  sql: string;
-  metadata: string | null;
-}
-
-// ============================================================================
-// FINGERPRINT COMPUTATION
-// ============================================================================
-
-/**
- * Compute a deterministic state fingerprint from published ops for a database.
- *
- * Algorithm:
- * 1. Query all ops with `state = 'published'` for the database, ordered by id
- * 2. For each row, build a canonical record string including deterministic fields:
- *    database row id, origin, sequence, state, source, and hash
- * 3. When content_hash is absent, compute a fallback hash from sql + metadata
- * 4. Serialize as newline-delimited canonical records
- * 5. SHA-256 the full serialized string
- *
- * Returns null if no published ops exist.
- */
-async function computeStateHash(databaseId: number): Promise<string | null> {
-  const rows = db.query<PublishedOpRow>(
-    `SELECT id, origin, sequence, state, source, content_hash, sql, metadata
-		FROM pcd_ops
-		WHERE database_id = ? AND state = 'published'
-		ORDER BY id`,
-    databaseId
-  );
-
-  if (rows.length === 0) {
-    return null;
-  }
-
-  const recordLines: string[] = [];
-
-  for (const row of rows) {
-    let hash = row.content_hash;
-    if (!hash) {
-      hash = await sha256Hex(`${row.sql}\n${row.metadata ?? ''}`);
-    }
-
-    // Canonical record: deterministic fields separated by pipe
-    const record = [String(row.id), row.origin, String(row.sequence ?? ''), row.state, row.source, hash].join('|');
-
-    recordLines.push(record);
-  }
-
-  const serialized = recordLines.join('\n');
-  return sha256Hex(serialized);
-}
-
-// ============================================================================
-// OPS METADATA COMPUTATION
-// ============================================================================
-
-interface OpsMetadata {
-  opsSequenceMaxId: number;
-  opsCountBase: number;
-  opsCountUser: number;
-}
-
-/**
- * Compute ops metadata for a database snapshot.
- * Returns the maximum pcd_ops row ID across all states and counts of published
- * ops by origin.
- */
-function computeOpsMetadata(databaseId: number): OpsMetadata {
-  const maxIdResult = db.queryFirst<{ max_id: number | null }>(
-    `SELECT MAX(id) as max_id FROM pcd_ops WHERE database_id = ?`,
-    databaseId
-  );
-  const opsSequenceMaxId = maxIdResult?.max_id ?? 0;
-
-  const baseCountResult = db.queryFirst<{ count: number }>(
-    `SELECT COUNT(*) as count FROM pcd_ops
-		WHERE database_id = ? AND state = 'published' AND origin = 'base'`,
-    databaseId
-  );
-  const opsCountBase = baseCountResult?.count ?? 0;
-
-  const userCountResult = db.queryFirst<{ count: number }>(
-    `SELECT COUNT(*) as count FROM pcd_ops
-		WHERE database_id = ? AND state = 'published' AND origin = 'user'`,
-    databaseId
-  );
-  const opsCountUser = userCountResult?.count ?? 0;
-
-  return { opsSequenceMaxId, opsCountBase, opsCountUser };
-}
-
-/**
- * Count all ops written after a snapshot sequence marker.
- */
-function computeOpsWrittenSince(databaseId: number, opsSequenceMaxId: number): number {
-  const countResult = db.queryFirst<{ count: number }>(
-    'SELECT COUNT(*) as count FROM pcd_ops WHERE database_id = ? AND id > ?',
-    databaseId,
-    opsSequenceMaxId
-  );
-  return countResult?.count ?? 0;
-}
 
 // ============================================================================
 // DEDUPLICATION
@@ -269,6 +144,7 @@ async function createAutoSnapshot(input: CreateAutoSnapshotInput): Promise<PcdSn
       opsCountBase,
       opsCountUser,
       cacheStateHash,
+      publishedOpIds: computePublishedOpIds(databaseId),
       targetInstanceIds: targetInstanceIds ?? null,
     });
 
@@ -340,6 +216,7 @@ async function createManualSnapshot(input: CreateManualSnapshotInput): Promise<P
     opsCountBase,
     opsCountUser,
     cacheStateHash,
+    publishedOpIds: computePublishedOpIds(databaseId),
   });
 
   await logger.info('Manual snapshot created', {
@@ -374,19 +251,24 @@ function getDetail(snapshotId: number): PcdSnapshotDetail | undefined {
 
 /**
  * Get a snapshot with computed restore-context fields.
+ *
+ * `isRestorable` reflects a real fail-closed check: the snapshot's published-op set must
+ * reconstruct and its recomputed fingerprint must match the stored `cacheStateHash` (issue
+ * #16). Async because verification hashes op content via crypto.subtle.
  */
-function getFullDetail(snapshotId: number): PcdSnapshotFullDetail | undefined {
+async function getFullDetail(snapshotId: number): Promise<PcdSnapshotFullDetail | undefined> {
   const snapshot = getDetail(snapshotId);
   if (!snapshot) {
     return undefined;
   }
 
   const opsWrittenSince = computeOpsWrittenSince(snapshot.databaseId, snapshot.opsSequenceMaxId);
+  const { reconstructable } = await verifySnapshot(snapshot);
 
   return {
     ...snapshot,
     opsWrittenSince,
-    isRestorable: false,
+    isRestorable: reconstructable,
   };
 }
 
@@ -408,6 +290,8 @@ export const snapshotService = {
   getDetail,
   getFullDetail,
   deleteSnapshot,
+  previewRestore,
+  restore,
 };
 
 export const __testOnly = {

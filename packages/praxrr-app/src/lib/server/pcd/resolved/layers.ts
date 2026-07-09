@@ -22,6 +22,9 @@ const SOURCE = 'ResolvedConfigLayers';
 /** The layer set that constitutes "base" -- everything except user-origin ops. */
 const BASE_ONLY_LAYERS = new Set<'schema' | 'base' | 'tweaks' | 'user'>(['schema', 'base', 'tweaks']);
 
+/** The full resolved layer set -- everything including user-origin ops. */
+const ALL_LAYERS = new Set<'schema' | 'base' | 'tweaks' | 'user'>(['schema', 'base', 'tweaks', 'user']);
+
 /**
  * Thrown when `databaseId` does not resolve to a known database instance. Distinct
  * from `ResolvedConfigValidationError` (readers.ts, reserved for entityType/arrType
@@ -48,6 +51,48 @@ export class ResolvedConfigDatabaseNotFoundError extends Error {
  *   the lifetime of `fn`.
  */
 export async function withBaseOnlyCache<T>(databaseId: number, fn: (cache: PCDCache) => Promise<T>): Promise<T> {
+  return withEphemeralCache(databaseId, { layers: BASE_ONLY_LAYERS, label: 'base-only' }, fn);
+}
+
+/**
+ * Builds a fresh, read-only, point-in-time replay of a PCD as of a snapshot (rollback,
+ * issue #16). Replays the FULL layer set {schema, base, tweaks, user}, but the base/user ops
+ * are exactly `snapshotOpIds` (the reconstructed published-op set for the snapshot) rather
+ * than the current published ops. Same lifecycle guarantees as `withBaseOnlyCache`: never
+ * registered via `setCache`, always closed.
+ */
+export async function withSnapshotCache<T>(
+  databaseId: number,
+  snapshotOpIds: ReadonlySet<number>,
+  fn: (cache: PCDCache) => Promise<T>
+): Promise<T> {
+  return withEphemeralCache(databaseId, { layers: ALL_LAYERS, snapshotOpIds, label: 'snapshot' }, fn);
+}
+
+/**
+ * Builds a fresh, read-only replay of the CURRENT resolved state (all layers, current
+ * published ops). Used as the current side of a rollback preview when no registry cache is
+ * built for the database. Best-effort: unlike the registered `build()` cache it applies no
+ * value guards / auto-drop, so it can differ slightly from the live cache — prefer
+ * `getCache(databaseId)` when it is built.
+ */
+export async function withCurrentCache<T>(databaseId: number, fn: (cache: PCDCache) => Promise<T>): Promise<T> {
+  return withEphemeralCache(databaseId, { layers: ALL_LAYERS, label: 'current' }, fn);
+}
+
+/**
+ * Shared ephemeral-cache lifecycle: build a fresh unregistered read-only cache, run `fn`
+ * against it, and ALWAYS close it (whether `fn` resolves or throws). Never calls `setCache`.
+ */
+async function withEphemeralCache<T>(
+  databaseId: number,
+  options: {
+    layers: ReadonlySet<'schema' | 'base' | 'tweaks' | 'user'>;
+    snapshotOpIds?: ReadonlySet<number>;
+    label: string;
+  },
+  fn: (cache: PCDCache) => Promise<T>
+): Promise<T> {
   const instance = databaseInstancesQueries.getById(databaseId);
   if (!instance) {
     throw new ResolvedConfigDatabaseNotFoundError(databaseId);
@@ -56,11 +101,11 @@ export async function withBaseOnlyCache<T>(databaseId: number, fn: (cache: PCDCa
   const cache = new PCDCache(instance.local_path, databaseId);
   const startTime = performance.now();
   try {
-    await cache.buildReadOnly({ layers: BASE_ONLY_LAYERS });
+    await cache.buildReadOnly({ layers: options.layers, snapshotOpIds: options.snapshotOpIds });
     return await fn(cache);
   } finally {
     cache.close();
-    await logger.debug('withBaseOnlyCache: ephemeral base-only cache closed', {
+    await logger.debug(`withEphemeralCache: ephemeral ${options.label} cache closed`, {
       source: SOURCE,
       meta: { databaseId, timingMs: Math.round(performance.now() - startTime) },
     });

@@ -1,6 +1,6 @@
 <script lang="ts">
   import Tabs from '$ui/navigation/tabs/Tabs.svelte';
-  import { GitBranch, History, GitPullRequestClosed, Wrench, Settings, FileCog } from 'lucide-svelte';
+  import { GitBranch, History, GitPullRequestClosed, Wrench, Settings, FileCog, Camera } from 'lucide-svelte';
   import { page } from '$app/stores';
 
   $: database = $page.data.database;
@@ -31,6 +31,12 @@
           href: `/databases/${database.id}/tweaks`,
           icon: Wrench,
           active: currentPath.includes('/tweaks'),
+        },
+        {
+          label: 'Snapshots',
+          href: `/databases/${database.id}/snapshots`,
+          icon: Camera,
+          active: currentPath.includes('/snapshots'),
         },
         ...(database.has_personal_access_token || database.personal_access_token
           ? [

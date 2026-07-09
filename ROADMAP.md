@@ -34,11 +34,11 @@ The best next order is:
 
 1. Build configuration lifecycle safety (P2). The Resilient Arr API Adapter Layer (#24) shipped in
    [#211](https://github.com/yandy-r/praxrr/pull/211), the Drift Detection Dashboard (#15) shipped in
-   [#212](https://github.com/yandy-r/praxrr/pull/212), and Sync History / Audit Trail (#17) shipped in
-   [#214](https://github.com/yandy-r/praxrr/pull/214); the next lifecycle feature is Rollback /
-   Point-in-Time Restore (#16), which builds on proven snapshots and the audit records that now identify
-   restore points. The Onboarding & Transparency wave is complete (#12, #14, #25, #26, #30, #75), as is
-   P0 documentation.
+   [#212](https://github.com/yandy-r/praxrr/pull/212), Sync History / Audit Trail (#17) shipped in
+   [#214](https://github.com/yandy-r/praxrr/pull/214), and Rollback / Point-in-Time Restore (#16) shipped
+   — completing the Safety Triad (preview + drift + rollback). The next lifecycle feature is Canary Sync /
+   Blast Radius Safety (#19), which builds on the drift, audit, and rollback foundations. The Onboarding &
+   Transparency wave is complete (#12, #14, #25, #26, #30, #75), as is P0 documentation.
 2. Add advanced automation, trust, and integration features (P3).
 3. Handle parser migration and deferred ecosystem expansion only when they become release or
    maintenance blockers.
@@ -137,21 +137,22 @@ Notes:
 
 Goal: make Praxrr trustworthy after setup, especially when managing multiple Arr instances.
 
-| Order | Issue                                                                                | Priority | Decision                                                                                                                                                                                                                                                | Done When                                                                                                                                                              |
-| ----- | ------------------------------------------------------------------------------------ | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| —     | [#24](https://github.com/yandy-r/praxrr/issues/24) Resilient Arr API Adapter Layer   | Medium   | **Shipped in [#211](https://github.com/yandy-r/praxrr/pull/211).** Version differences isolated behind a data-driven resolver with graceful degradation, per-instance detection, and EOL warnings.                                                      | **Done** — `(arr_type, version)` compatibility resolver, support tiers, dormant sync gate, and `/api/v1/compatibility/versions`.                                       |
-| —     | [#15](https://github.com/yandy-r/praxrr/issues/15) Drift Detection Dashboard         | High     | **Shipped in [#212](https://github.com/yandy-r/praxrr/pull/212).** Reuses the sync-preview diff engine; latest-state drift per instance with field detail, chunked non-blocking sweep, and opt-in notifications. Info-only (never auto-corrects).       | **Done** — per-instance drift status (in-sync/drifted/unreachable/unauthorized), field-level detail, configurable interval + on-demand refresh, and `/api/v1/drift/*`. |
-| —     | [#17](https://github.com/yandy-r/praxrr/issues/17) Sync History / Audit Trail        | Medium   | **Shipped in [#214](https://github.com/yandy-r/praxrr/pull/214).** Append-only per-run audit with retention, JSON/CSV export, and a `/sync-history` dashboard; full diffs captured best-effort via the sync-preview engine (no sync-write-path change). | **Done** — every sync run records trigger, target instance, per-section outcomes, before/after diffs, status, and timing; searchable + exportable + retention-pruned.  |
-| 4     | [#16](https://github.com/yandy-r/praxrr/issues/16) Rollback / Point-in-Time Restore  | High     | Build after snapshots are proven and audit records identify restore points.                                                                                                                                                                             | Users can restore a known-good PCD state and understand what will be re-synced.                                                                                        |
-| 5     | [#19](https://github.com/yandy-r/praxrr/issues/19) Canary Sync / Blast Radius Safety | High     | Build after drift, audit, and rollback foundations exist.                                                                                                                                                                                               | Users can sync one canary instance, verify, then roll out safely to more instances.                                                                                    |
-| 6     | [#27](https://github.com/yandy-r/praxrr/issues/27) Sync Archaeology Timeline         | High     | Build as the visual layer on top of #16 and #17, not as the source of truth.                                                                                                                                                                            | Users can inspect a timeline of syncs, snapshots, rollbacks, and config changes.                                                                                       |
+| Order | Issue                                                                                | Priority | Decision                                                                                                                                                                                                                                                                                                                                   | Done When                                                                                                                                                              |
+| ----- | ------------------------------------------------------------------------------------ | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| —     | [#24](https://github.com/yandy-r/praxrr/issues/24) Resilient Arr API Adapter Layer   | Medium   | **Shipped in [#211](https://github.com/yandy-r/praxrr/pull/211).** Version differences isolated behind a data-driven resolver with graceful degradation, per-instance detection, and EOL warnings.                                                                                                                                         | **Done** — `(arr_type, version)` compatibility resolver, support tiers, dormant sync gate, and `/api/v1/compatibility/versions`.                                       |
+| —     | [#15](https://github.com/yandy-r/praxrr/issues/15) Drift Detection Dashboard         | High     | **Shipped in [#212](https://github.com/yandy-r/praxrr/pull/212).** Reuses the sync-preview diff engine; latest-state drift per instance with field detail, chunked non-blocking sweep, and opt-in notifications. Info-only (never auto-corrects).                                                                                          | **Done** — per-instance drift status (in-sync/drifted/unreachable/unauthorized), field-level detail, configurable interval + on-demand refresh, and `/api/v1/drift/*`. |
+| —     | [#17](https://github.com/yandy-r/praxrr/issues/17) Sync History / Audit Trail        | Medium   | **Shipped in [#214](https://github.com/yandy-r/praxrr/pull/214).** Append-only per-run audit with retention, JSON/CSV export, and a `/sync-history` dashboard; full diffs captured best-effort via the sync-preview engine (no sync-write-path change).                                                                                    | **Done** — every sync run records trigger, target instance, per-section outcomes, before/after diffs, status, and timing; searchable + exportable + retention-pruned.  |
+| —     | [#16](https://github.com/yandy-r/praxrr/issues/16) Rollback / Point-in-Time Restore  | High     | **Shipped in [#216](https://github.com/yandy-r/praxrr/pull/216).** Verified op-log rewind to a snapshot's reconstructed published-op set (fingerprint-verified, fail-closed); mandatory PCD-to-PCD preview reusing the sync-preview differ; append-only (boundary marker + `pcd_rollbacks` audit + pre-rollback snapshot). PCD-only scope. | **Done** — restore a known-good PCD state with a preview of exactly what changes; reversible and audited.                                                              |
+| 5     | [#19](https://github.com/yandy-r/praxrr/issues/19) Canary Sync / Blast Radius Safety | High     | Build after drift, audit, and rollback foundations exist.                                                                                                                                                                                                                                                                                  | Users can sync one canary instance, verify, then roll out safely to more instances.                                                                                    |
+| 6     | [#27](https://github.com/yandy-r/praxrr/issues/27) Sync Archaeology Timeline         | High     | Build as the visual layer on top of #16 and #17, not as the source of truth.                                                                                                                                                                                                                                                               | Users can inspect a timeline of syncs, snapshots, rollbacks, and config changes.                                                                                       |
 
 Notes:
 
 - #24 is only labeled medium, but it should be scheduled early if lifecycle features touch Arr API
   behavior.
-- #16 depends on reliable snapshot semantics and clear restore UX. Do not ship restore flows that make
-  it unclear what will happen on the next sync.
+- #16 shipped as PCD-only rollback: it restores desired state and shows a preview of exactly what
+  changes; the next sync stays an explicit, separately preview-gated step (never auto-synced). Selective
+  per-entity rollback and an "Arr changed since snapshot" overlay are documented follow-ups.
 - #27 should be delayed until audit and rollback events exist as structured data.
 
 ## P3 - Advanced Capabilities: Automation, Trust, and Integrations
@@ -265,7 +266,7 @@ P0 Documentation Foundation is complete (#73, #74, #75, #76, #77, #38).
 - [x] #24 - Resilient Arr API Adapter Layer ([#211](https://github.com/yandy-r/praxrr/pull/211))
 - [x] #15 - Drift Detection Dashboard ([#212](https://github.com/yandy-r/praxrr/pull/212))
 - [x] #17 - Sync History / Audit Trail ([#214](https://github.com/yandy-r/praxrr/pull/214))
-- [ ] #16 - Rollback / Point-in-Time Restore
+- [x] #16 - Rollback / Point-in-Time Restore ([#216](https://github.com/yandy-r/praxrr/pull/216))
 - [ ] #19 - Canary Sync / Blast Radius Safety
 - [ ] #27 - Sync Archaeology Timeline
 
@@ -303,10 +304,11 @@ The Onboarding & Transparency wave is complete (#30 shipped in [#209](https://gi
 
 1. P2 Lifecycle Safety opened with #24 Resilient Arr API Adapter Layer (shipped in
    [#211](https://github.com/yandy-r/praxrr/pull/211)), #15 Drift Detection Dashboard (shipped in
-   [#212](https://github.com/yandy-r/praxrr/pull/212)), and #17 Sync History / Audit Trail (shipped in
-   [#214](https://github.com/yandy-r/praxrr/pull/214)); continue with #16 Rollback / Point-in-Time
-   Restore, since the remaining lifecycle features (#16, #19, #27) depend on reliable Arr reads/writes
-   plus the audit records that now identify restore points.
+   [#212](https://github.com/yandy-r/praxrr/pull/212)), #17 Sync History / Audit Trail (shipped in
+   [#214](https://github.com/yandy-r/praxrr/pull/214)), and #16 Rollback / Point-in-Time Restore (shipped
+   in [#216](https://github.com/yandy-r/praxrr/pull/216)) — completing the Safety Triad. Continue with
+   #19 Canary Sync / Blast Radius Safety, since the remaining lifecycle features (#19, #27) build on the
+   drift, audit, and rollback foundations now in place.
 2. Update #6 so the parent research checklist points to this roadmap and no longer implies closed
    Phase 1 items are still active.
 

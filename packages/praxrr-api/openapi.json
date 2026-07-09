@@ -75,6 +75,14 @@
     {
       "name": "Drift Detection",
       "description": "Desired-vs-actual drift status per Arr instance, on-demand refresh, and settings"
+    },
+    {
+      "name": "Sync History",
+      "description": "Append-only audit trail of Arr sync runs — search, detail, export, and retention"
+    },
+    {
+      "name": "Quality Goals",
+      "description": "Intent-to-implementation bridge — translate presets/sliders into custom-format scores"
     }
   ],
   "paths": {
@@ -1729,7 +1737,7 @@
       "get": {
         "operationId": "getPcdSnapshot",
         "summary": "Get PCD snapshot detail",
-        "description": "Returns full snapshot detail including computed fields for restore context\n(opsWrittenSince, isRestorable). Restore support is not yet implemented,\nso `isRestorable` is always false.\n",
+        "description": "Returns full snapshot detail including computed fields for restore context\n(opsWrittenSince, isRestorable). `isRestorable` reflects a real fail-closed check:\nit is true only when the snapshot's published-op manifest reconstructs and its\nrecomputed fingerprint matches the stored cacheStateHash. See the\n`.../rollback/preview` and `.../rollback` endpoints to preview and execute a restore.\n",
         "tags": ["PCD Snapshots"],
         "parameters": [
           {
@@ -1845,6 +1853,176 @@
           },
           "500": {
             "description": "Delete failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PcdErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/pcd/{databaseId}/snapshots/{snapshotId}/rollback/preview": {
+      "get": {
+        "operationId": "previewSnapshotRollback",
+        "summary": "Preview restoring a PCD snapshot",
+        "description": "Read-only, PCD-to-PCD preview of exactly what restoring this snapshot would change in\nthe PCD desired state (issue #16). Does not contact any Arr instance. The returned\ncurrentStateHash is the from-state value-guard required by the execute endpoint.\n",
+        "tags": ["PCD Snapshots"],
+        "parameters": [
+          {
+            "name": "databaseId",
+            "in": "path",
+            "required": true,
+            "description": "PCD database ID",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "snapshotId",
+            "in": "path",
+            "required": true,
+            "description": "PCD snapshot ID",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Rollback preview",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RollbackPreview"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PcdErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Snapshot not found or doesn't belong to database",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PcdErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Failed to generate rollback preview",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PcdErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/pcd/{databaseId}/snapshots/{snapshotId}/rollback": {
+      "post": {
+        "operationId": "executeSnapshotRollback",
+        "summary": "Execute a PCD point-in-time restore",
+        "description": "Restores PCD state to this snapshot by rewinding the append-only op log (issue #16).\nNo op rows are deleted; a durable pre-rollback snapshot is captured first. The body's\nexpectedCurrentStateHash (from the preview) guards against an apply-after-change race —\na mismatch returns 422 and the caller must regenerate the preview.\n",
+        "tags": ["PCD Snapshots"],
+        "parameters": [
+          {
+            "name": "databaseId",
+            "in": "path",
+            "required": true,
+            "description": "PCD database ID",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "snapshotId",
+            "in": "path",
+            "required": true,
+            "description": "PCD snapshot ID",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExecuteRollbackRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Rollback executed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RollbackResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid parameters or missing expectedCurrentStateHash",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PcdErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Snapshot not found or doesn't belong to database",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PcdErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Snapshot cannot be reconstructed/verified (unrestorable)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PcdErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Database state changed since preview; regenerate the preview and retry",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PcdErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Rollback execution failed",
             "content": {
               "application/json": {
                 "schema": {
@@ -3113,6 +3291,384 @@
         }
       }
     },
+    "/sync-history": {
+      "get": {
+        "operationId": "listSyncHistory",
+        "summary": "List / search sync history",
+        "description": "Returns a filtered, paginated list of sync run audit entries (newest first). All\nfilters are optional and combine with AND. This endpoint returns 500 only on an\ninternal error; invalid query params return 400.\n",
+        "tags": ["Sync History"],
+        "parameters": [
+          {
+            "name": "instanceId",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "arrType",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": ["radarr", "sonarr", "lidarr"]
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/SyncOperationStatus"
+            }
+          },
+          {
+            "name": "trigger",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/SyncTrigger"
+            }
+          },
+          {
+            "name": "section",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/SyncPreviewSection"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "description": "ISO-8601 lower bound on startedAt.",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "description": "ISO-8601 upper bound on startedAt.",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "description": "Free-text match on instance name or error.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 250,
+              "default": 100
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Sync history page",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SyncHistoryListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid query parameter",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Failed to list sync history",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sync-history/{id}": {
+      "get": {
+        "operationId": "getSyncHistoryEntry",
+        "summary": "Sync history entry detail",
+        "description": "Returns one sync run audit entry with the full section results and diff.",
+        "tags": ["Sync History"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Sync history detail",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SyncHistoryDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid id",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Entry not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Failed to read sync history entry",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sync-history/export": {
+      "get": {
+        "operationId": "exportSyncHistory",
+        "summary": "Export sync history",
+        "description": "Streams the filtered sync history (same filters as the list endpoint, no pagination)\nas a JSON array or CSV file download.\n",
+        "tags": ["Sync History"],
+        "parameters": [
+          {
+            "name": "format",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": ["json", "csv"],
+              "default": "json"
+            }
+          },
+          {
+            "name": "instanceId",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "arrType",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": ["radarr", "sonarr", "lidarr"]
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/SyncOperationStatus"
+            }
+          },
+          {
+            "name": "trigger",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/SyncTrigger"
+            }
+          },
+          {
+            "name": "section",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/SyncPreviewSection"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Sync history export",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SyncHistoryDetail"
+                  }
+                }
+              },
+              "text/csv": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid query parameter",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Failed to export sync history",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sync-history/settings": {
+      "get": {
+        "operationId": "getSyncHistorySettings",
+        "summary": "Get sync history settings",
+        "tags": ["Sync History"],
+        "responses": {
+          "200": {
+            "description": "Sync history settings",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SyncHistorySettings"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Failed to read sync history settings",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "operationId": "updateSyncHistorySettings",
+        "summary": "Update sync history settings",
+        "description": "Updates retention (days + max entries) and the enable flag, then reschedules or cancels\nthe recurring cleanup job accordingly.\n",
+        "tags": ["Sync History"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SyncHistorySettingsUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated sync history settings",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SyncHistorySettings"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid settings payload",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Failed to update sync history settings",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/setup/state": {
       "get": {
         "operationId": "getSetupState",
@@ -3392,6 +3948,193 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/goals/presets": {
+      "get": {
+        "operationId": "getGoalPresets",
+        "summary": "List Quality Goal presets and slider axes",
+        "description": "Returns the built-in goal presets, the slider-axis metadata, and the engine version. The editor\nrenders sliders and can run the pure engine client-side from this payload with nothing hardcoded.\n",
+        "tags": ["Quality Goals"],
+        "responses": {
+          "200": {
+            "description": "Presets and axes",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GoalPresetsResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/goals/preview": {
+      "post": {
+        "operationId": "previewGoal",
+        "summary": "Preview the config a goal would generate (non-persisting)",
+        "description": "Translates a goal (preset + slider weights) into a concrete scoring plan for one quality\nprofile and returns the plan plus the authoritative sandbox config diff. Mutates nothing —\nscores are compiled only inside an ephemeral sandbox cache; `pcd_ops` is untouched.\n",
+        "tags": ["Quality Goals"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GoalPreviewRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The generated plan and sandbox diff",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GoalPreviewResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Database cache not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/goals/apply": {
+      "post": {
+        "operationId": "applyGoal",
+        "summary": "Apply a goal to a quality profile",
+        "description": "Persists the generated scores + thresholds to the quality profile via the standard PCD user-op\npath (`updateScoring`) and records the goal binding. Applied scores are ordinary user ops,\neditable anywhere manual scores are. Returns 409 when `expectedEngineVersion` does not match the\nserver engine version (optimistic concurrency).\n",
+        "tags": ["Quality Goals"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GoalApplyRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The applied plan and persisted binding",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GoalApplyResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Database cache or profile not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Engine version mismatch",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/goals/binding": {
+      "get": {
+        "operationId": "getGoalBinding",
+        "summary": "Get the goal binding for a quality profile",
+        "description": "Returns the persisted goal binding (preset + weights + engine version + applied time) for a\nprofile, or `null` when the profile is not goal-governed. A stale `engineVersion` drives a\nre-apply prompt in the editor.\n",
+        "tags": ["Quality Goals"],
+        "parameters": [
+          {
+            "name": "databaseId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "profileName",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "arrType",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": ["radarr", "sonarr"]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The binding, or null",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GoalBindingResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid query parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -5742,6 +6485,721 @@
           }
         }
       },
+      "SyncTrigger": {
+        "type": "string",
+        "enum": ["manual", "schedule", "system"],
+        "description": "How a sync run was initiated."
+      },
+      "SyncOperationStatus": {
+        "type": "string",
+        "enum": ["success", "partial", "failed", "skipped"],
+        "description": "Terminal status of an audited sync run."
+      },
+      "SyncSectionResult": {
+        "type": "object",
+        "required": ["section", "status", "itemsSynced", "error"],
+        "properties": {
+          "section": {
+            "$ref": "#/components/schemas/SyncPreviewSection"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["success", "failed", "skipped"]
+          },
+          "itemsSynced": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "error": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "failedProfiles": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "SyncEntityChange": {
+        "type": "object",
+        "required": ["section", "category", "entityType", "name", "action", "remoteId", "fields"],
+        "properties": {
+          "section": {
+            "$ref": "#/components/schemas/SyncPreviewSection"
+          },
+          "category": {
+            "type": "string",
+            "description": "Sibling collection within the section (e.g. customFormats, naming)."
+          },
+          "entityType": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string",
+            "description": "Entity display name (namespace-stripped)."
+          },
+          "action": {
+            "$ref": "#/components/schemas/SyncPreviewAction"
+          },
+          "remoteId": {
+            "type": "integer",
+            "nullable": true
+          },
+          "fields": {
+            "type": "array",
+            "description": "Field-level diff (`current` = live/old, `desired` = PCD/new).",
+            "items": {
+              "$ref": "#/components/schemas/FieldChange"
+            }
+          }
+        }
+      },
+      "SyncHistoryEntry": {
+        "type": "object",
+        "required": [
+          "id",
+          "arrInstanceId",
+          "instanceName",
+          "arrType",
+          "jobId",
+          "trigger",
+          "triggerEvent",
+          "sectionsAttempted",
+          "status",
+          "sectionsRun",
+          "itemsSynced",
+          "failureCount",
+          "entityChangeCount",
+          "error",
+          "startedAt",
+          "finishedAt",
+          "durationMs",
+          "createdAt"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "arrInstanceId": {
+            "oneOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Null when the source instance was deleted after this run."
+          },
+          "instanceName": {
+            "type": "string"
+          },
+          "arrType": {
+            "type": "string",
+            "enum": ["radarr", "sonarr", "lidarr"]
+          },
+          "jobId": {
+            "oneOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "trigger": {
+            "$ref": "#/components/schemas/SyncTrigger"
+          },
+          "triggerEvent": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "sectionsAttempted": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SyncPreviewSection"
+            }
+          },
+          "status": {
+            "$ref": "#/components/schemas/SyncOperationStatus"
+          },
+          "sectionsRun": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "itemsSynced": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "failureCount": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "entityChangeCount": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "error": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "startedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "finishedAt": {
+            "oneOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "durationMs": {
+            "oneOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "createdAt": {
+            "type": "string"
+          }
+        }
+      },
+      "SyncHistoryDetail": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/SyncHistoryEntry"
+          },
+          {
+            "type": "object",
+            "required": ["sectionResults", "changes"],
+            "properties": {
+              "sectionResults": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/SyncSectionResult"
+                }
+              },
+              "changes": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/SyncEntityChange"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "SyncHistoryListResponse": {
+        "type": "object",
+        "required": ["items", "page", "pageSize", "totalRecords", "totalPages", "hasNext"],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SyncHistoryEntry"
+            }
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "totalRecords": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "totalPages": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "hasNext": {
+            "type": "boolean"
+          }
+        }
+      },
+      "SyncHistorySettings": {
+        "type": "object",
+        "required": ["enabled", "retentionDays", "retentionMaxEntries"],
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "retentionDays": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "retentionMaxEntries": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Keep at most this many rows; 0 disables the entry cap (age-only retention)."
+          }
+        }
+      },
+      "SyncHistorySettingsUpdateRequest": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "retentionDays": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "retentionMaxEntries": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      },
+      "GoalCategory": {
+        "type": "string",
+        "description": "Closed set of semantic categories a custom format is classified into.",
+        "enum": [
+          "unwanted",
+          "hdr_dv",
+          "hdr_hdr10plus",
+          "hdr_baseline",
+          "remux",
+          "release_group_tier_1",
+          "release_group_tier_2",
+          "release_group_tier_3",
+          "audio_lossless",
+          "audio_advanced",
+          "audio_baseline",
+          "streaming_service",
+          "movie_version",
+          "repack_proper",
+          "resolution"
+        ]
+      },
+      "GoalCeilingRelation": {
+        "type": "string",
+        "enum": ["above", "match", "below"]
+      },
+      "GoalResolutionCeiling": {
+        "type": "string",
+        "enum": ["720p", "1080p", "2160p"]
+      },
+      "GoalWeights": {
+        "type": "object",
+        "required": ["qualityVsSize", "compatibility", "hdrPreference", "unwantedStrictness", "resolutionCeiling"],
+        "properties": {
+          "qualityVsSize": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100
+          },
+          "compatibility": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100
+          },
+          "hdrPreference": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100
+          },
+          "unwantedStrictness": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100
+          },
+          "resolutionCeiling": {
+            "$ref": "#/components/schemas/GoalResolutionCeiling"
+          }
+        }
+      },
+      "GoalAxisMeta": {
+        "type": "object",
+        "required": ["key", "label", "kind", "description"],
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": ["weight", "strictness", "ceiling"]
+          },
+          "min": {
+            "type": "integer"
+          },
+          "max": {
+            "type": "integer"
+          },
+          "step": {
+            "type": "integer"
+          },
+          "options": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GoalResolutionCeiling"
+            }
+          },
+          "description": {
+            "type": "string"
+          }
+        }
+      },
+      "GoalPreset": {
+        "type": "object",
+        "required": ["id", "label", "description", "weights"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "enum": ["best-quality", "smallest-size", "balanced", "4k-hdr-priority"]
+          },
+          "label": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "weights": {
+            "$ref": "#/components/schemas/GoalWeights"
+          }
+        }
+      },
+      "GoalAxisContribution": {
+        "type": "object",
+        "required": ["axis", "delta"],
+        "properties": {
+          "axis": {
+            "type": "string"
+          },
+          "delta": {
+            "type": "integer"
+          }
+        }
+      },
+      "GoalReason": {
+        "type": "object",
+        "required": ["code", "category", "ruleId", "base", "axisContributions", "ceiling"],
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "category": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/GoalCategory"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "ruleId": {
+            "type": "string"
+          },
+          "base": {
+            "type": "integer"
+          },
+          "axisContributions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GoalAxisContribution"
+            }
+          },
+          "ceiling": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/GoalCeilingRelation"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "GoalCfDecision": {
+        "type": "object",
+        "required": ["customFormatName", "arrType", "category", "score", "reason"],
+        "properties": {
+          "customFormatName": {
+            "type": "string"
+          },
+          "arrType": {
+            "type": "string",
+            "enum": ["radarr", "sonarr"]
+          },
+          "category": {
+            "$ref": "#/components/schemas/GoalCategory"
+          },
+          "score": {
+            "type": "integer"
+          },
+          "reason": {
+            "$ref": "#/components/schemas/GoalReason"
+          }
+        }
+      },
+      "GoalUncategorizedCf": {
+        "type": "object",
+        "required": ["name", "suggestedCategory", "reason"],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "suggestedCategory": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/GoalCategory"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "reason": {
+            "type": "string"
+          }
+        }
+      },
+      "GoalCoverage": {
+        "type": "object",
+        "required": ["total", "scored", "uncategorized"],
+        "properties": {
+          "total": {
+            "type": "integer"
+          },
+          "scored": {
+            "type": "integer"
+          },
+          "uncategorized": {
+            "type": "integer"
+          }
+        }
+      },
+      "GoalThresholds": {
+        "type": "object",
+        "required": ["minimumScore", "upgradeUntilScore", "upgradeScoreIncrement"],
+        "properties": {
+          "minimumScore": {
+            "type": "integer"
+          },
+          "upgradeUntilScore": {
+            "type": "integer"
+          },
+          "upgradeScoreIncrement": {
+            "type": "integer"
+          }
+        }
+      },
+      "GoalPlan": {
+        "type": "object",
+        "description": "Deterministic translation of a goal into concrete scores + thresholds.",
+        "required": ["engineVersion", "arrType", "decisions", "uncategorized", "thresholds", "coverage"],
+        "properties": {
+          "engineVersion": {
+            "type": "string"
+          },
+          "arrType": {
+            "type": "string",
+            "enum": ["radarr", "sonarr"]
+          },
+          "decisions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GoalCfDecision"
+            }
+          },
+          "uncategorized": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GoalUncategorizedCf"
+            }
+          },
+          "thresholds": {
+            "$ref": "#/components/schemas/GoalThresholds"
+          },
+          "coverage": {
+            "$ref": "#/components/schemas/GoalCoverage"
+          }
+        }
+      },
+      "GoalBinding": {
+        "type": "object",
+        "description": "Persisted intent metadata for a goal-governed quality profile.",
+        "required": ["presetId", "weights", "engineVersion", "appliedAt"],
+        "properties": {
+          "presetId": {
+            "type": "string"
+          },
+          "weights": {
+            "$ref": "#/components/schemas/GoalWeights"
+          },
+          "engineVersion": {
+            "type": "string"
+          },
+          "appliedAt": {
+            "type": "string",
+            "description": "ISO-8601 UTC timestamp of the last apply"
+          }
+        }
+      },
+      "GoalPresetsResponse": {
+        "type": "object",
+        "required": ["presets", "axes", "engineVersion"],
+        "properties": {
+          "presets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GoalPreset"
+            }
+          },
+          "axes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GoalAxisMeta"
+            }
+          },
+          "engineVersion": {
+            "type": "string"
+          }
+        }
+      },
+      "GoalPreviewRequest": {
+        "type": "object",
+        "required": ["databaseId", "arrType", "profileName", "preset", "weights"],
+        "properties": {
+          "databaseId": {
+            "type": "integer"
+          },
+          "arrType": {
+            "type": "string",
+            "enum": ["radarr", "sonarr"]
+          },
+          "profileName": {
+            "type": "string",
+            "description": "Raw PCD quality-profile name (pcd:-stripped)"
+          },
+          "preset": {
+            "type": "string"
+          },
+          "weights": {
+            "$ref": "#/components/schemas/GoalWeights"
+          }
+        }
+      },
+      "GoalPreviewResponse": {
+        "type": "object",
+        "description": "Non-persisting preview — the plan plus the authoritative sandbox config diff.",
+        "required": ["plan", "configDiff", "appliedChanges", "skippedChanges"],
+        "properties": {
+          "plan": {
+            "$ref": "#/components/schemas/GoalPlan"
+          },
+          "configDiff": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EntityConfigDiff"
+            }
+          },
+          "appliedChanges": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProposedChange"
+            }
+          },
+          "skippedChanges": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SkippedChange"
+            }
+          }
+        }
+      },
+      "GoalApplyRequest": {
+        "type": "object",
+        "required": ["databaseId", "arrType", "profileName", "preset", "weights", "expectedEngineVersion"],
+        "properties": {
+          "databaseId": {
+            "type": "integer"
+          },
+          "arrType": {
+            "type": "string",
+            "enum": ["radarr", "sonarr"]
+          },
+          "profileName": {
+            "type": "string"
+          },
+          "preset": {
+            "type": "string"
+          },
+          "weights": {
+            "$ref": "#/components/schemas/GoalWeights"
+          },
+          "expectedEngineVersion": {
+            "type": "string",
+            "description": "The engine version the client computed against; a mismatch yields 409."
+          }
+        }
+      },
+      "GoalApplyResponse": {
+        "type": "object",
+        "required": ["plan", "binding"],
+        "properties": {
+          "plan": {
+            "$ref": "#/components/schemas/GoalPlan"
+          },
+          "binding": {
+            "$ref": "#/components/schemas/GoalBinding"
+          }
+        }
+      },
+      "GoalBindingResponse": {
+        "type": "object",
+        "required": ["binding"],
+        "properties": {
+          "binding": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/GoalBinding"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
       "EntityType": {
         "type": "string",
         "description": "Portable PCD entity identifiers used by import/export endpoints.\n\nLidarr media-management entities are first-class portable contract members:\n- `lidarr_naming`\n- `lidarr_media_settings`\n- `lidarr_quality_definitions`\n\nRuntime validation is deterministic and fail-fast for Lidarr payloads:\npayloads are rejected when required fields are missing, when unsupported\nfields are present, or when cross-family fields are mixed into the payload\n(for example Radarr naming fields with `lidarr_naming`).\n\nClients must emit `lidarr_*` entity types for Lidarr entities.\n",
@@ -6301,8 +7759,8 @@
       },
       "SnapshotTrigger": {
         "type": "string",
-        "enum": ["pull", "sync", "manual"],
-        "description": "What event triggered the snapshot creation.\n- pull: before a PCD repository pull/refresh\n- sync: before an Arr instance sync\n- manual: user-initiated via API\n"
+        "enum": ["pull", "sync", "manual", "rollback"],
+        "description": "What event triggered the snapshot creation.\n- pull: before a PCD repository pull/refresh\n- sync: before an Arr instance sync\n- manual: user-initiated via API\n- rollback: system pre-rollback auto-capture taken before a restore rewinds the op log\n"
       },
       "PcdSnapshotDetail": {
         "type": "object",
@@ -6382,7 +7840,7 @@
               },
               "isRestorable": {
                 "type": "boolean",
-                "description": "Always false in this release. Restore support is not yet implemented."
+                "description": "Whether this snapshot can be safely restored. True only when the snapshot's\npublished-op set reconstructs and its recomputed fingerprint matches the stored\ncacheStateHash (fail-closed). Legacy snapshots without a fingerprint are false.\n"
               }
             }
           }
@@ -6411,6 +7869,174 @@
           "description": {
             "type": "string",
             "description": "Optional description for the snapshot"
+          }
+        }
+      },
+      "RollbackSection": {
+        "type": "object",
+        "description": "A group of entity changes for one resolved-config family. Reuses the sync-preview\nEntityChange/FieldChange shapes. Diff direction is PCD-to-PCD: each FieldChange.current\nis the CURRENT PCD desired-state and FieldChange.desired is the SNAPSHOT restore-target\nstate (NOT live Arr state).\n",
+        "required": ["title", "entityType", "arrType", "changes"],
+        "properties": {
+          "title": {
+            "type": "string",
+            "description": "Human-readable family label (e.g. \"Custom Formats\", \"Naming (radarr)\")"
+          },
+          "entityType": {
+            "type": "string",
+            "description": "Namespaced entity type; per-arr families are \"${entityType}:${arrType}\""
+          },
+          "arrType": {
+            "type": "string",
+            "nullable": true,
+            "enum": ["radarr", "sonarr", "lidarr"]
+          },
+          "changes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EntityChange"
+            }
+          }
+        }
+      },
+      "RollbackPreview": {
+        "type": "object",
+        "description": "Mandatory PCD-to-PCD preview of what restoring a snapshot would change in the PCD desired\nstate. Never contacts an Arr instance. When reconstructable is false the snapshot cannot\nbe safely restored and sections is empty.\n",
+        "required": [
+          "databaseId",
+          "snapshotId",
+          "reconstructable",
+          "reason",
+          "currentStateHash",
+          "snapshotStateHash",
+          "opsWrittenSince",
+          "sections",
+          "summary"
+        ],
+        "properties": {
+          "databaseId": {
+            "type": "integer"
+          },
+          "snapshotId": {
+            "type": "integer"
+          },
+          "reconstructable": {
+            "type": "boolean",
+            "description": "Whether the snapshot verifies against its fingerprint and can be restored"
+          },
+          "reason": {
+            "type": "string",
+            "nullable": true,
+            "description": "When not reconstructable, why (legacy/no-fingerprint or diverged history)"
+          },
+          "currentStateHash": {
+            "type": "string",
+            "nullable": true,
+            "description": "Live published-op fingerprint at preview time; echo as expectedCurrentStateHash on execute"
+          },
+          "snapshotStateHash": {
+            "type": "string",
+            "nullable": true,
+            "description": "The snapshot's stored restore-target fingerprint"
+          },
+          "opsWrittenSince": {
+            "type": "integer"
+          },
+          "sections": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RollbackSection"
+            }
+          },
+          "summary": {
+            "$ref": "#/components/schemas/RollbackSummary"
+          }
+        }
+      },
+      "RollbackSummary": {
+        "type": "object",
+        "required": ["totalCreates", "totalUpdates", "totalDeletes", "totalUnchanged"],
+        "properties": {
+          "totalCreates": {
+            "type": "integer"
+          },
+          "totalUpdates": {
+            "type": "integer"
+          },
+          "totalDeletes": {
+            "type": "integer"
+          },
+          "totalUnchanged": {
+            "type": "integer"
+          }
+        }
+      },
+      "ExecuteRollbackRequest": {
+        "type": "object",
+        "description": "Request body to execute a rollback. expectedCurrentStateHash is a from-state value-guard\nechoed from the preview's currentStateHash; if the live state changed since the preview\nthe request is rejected with 422.\n",
+        "required": ["expectedCurrentStateHash"],
+        "properties": {
+          "expectedCurrentStateHash": {
+            "type": "string",
+            "description": "The preview's currentStateHash (may be empty string when no published ops exist)"
+          }
+        }
+      },
+      "RollbackResult": {
+        "type": "object",
+        "required": [
+          "rollbackId",
+          "snapshotId",
+          "databaseId",
+          "status",
+          "opsUndone",
+          "opsReactivated",
+          "preRollbackSnapshotId",
+          "targetStateHash",
+          "postVerified",
+          "error",
+          "createdAt"
+        ],
+        "properties": {
+          "rollbackId": {
+            "type": "integer"
+          },
+          "snapshotId": {
+            "type": "integer"
+          },
+          "databaseId": {
+            "type": "integer"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["success", "failed"]
+          },
+          "opsUndone": {
+            "type": "integer",
+            "description": "Ops written after the snapshot that were superseded"
+          },
+          "opsReactivated": {
+            "type": "integer",
+            "description": "Pre-snapshot ops deactivated since that were re-published"
+          },
+          "preRollbackSnapshotId": {
+            "type": "integer",
+            "nullable": true,
+            "description": "The durable pre-rollback capture that makes this rollback reversible"
+          },
+          "targetStateHash": {
+            "type": "string",
+            "nullable": true
+          },
+          "postVerified": {
+            "type": "boolean"
+          },
+          "error": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
           }
         }
       },

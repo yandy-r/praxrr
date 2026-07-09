@@ -57,7 +57,7 @@ export const GET: RequestHandler = async ({ params }) => {
   }
 
   try {
-    const fullDetail = snapshotService.getFullDetail(snapshotIdResult.value);
+    const fullDetail = await snapshotService.getFullDetail(snapshotIdResult.value);
     if (!fullDetail) {
       return json({ error: 'Snapshot not found' }, { status: 404 });
     }
