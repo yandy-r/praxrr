@@ -3,8 +3,11 @@
   import { RefreshCw } from 'lucide-svelte';
   import Badge from '$ui/badge/Badge.svelte';
   import DriftFieldDiff from '$ui/drift/DriftFieldDiff.svelte';
+  import NarrationBlock from '$ui/narration/NarrationBlock.svelte';
   import { DRIFT_STATUS_LABEL, driftStatusVariant } from '$ui/drift/driftStatus.ts';
   import { alertStore } from '$alerts/store';
+  import { narrateDriftReason, narrateDriftCounts, narrateDriftEntity } from '$shared/narration/index.ts';
+  import type { NarrationLevel } from '$shared/narration/index.ts';
   import type { DriftDetailResponse } from '$sync/drift/responses.ts';
   import type { PageData } from './$types';
 
@@ -23,6 +26,8 @@
   let loadError: string | null = null;
   let refreshing = false;
   let detailRequestId = 0;
+  let verbose = false;
+  $: level = (verbose ? 'verbose' : 'summary') as NarrationLevel;
 
   async function loadDetail() {
     if (data.instanceId === null) return;
@@ -160,9 +165,20 @@
         <span>Missing {detail.counts.missing}</span>
         <span>Unmanaged {detail.counts.unmanaged}</span>
         <span>Checked {formatWhen(detail.checkedAt)}</span>
-        {#if detail.reason}
-          <span>Reason: {detail.reason}</span>
-        {/if}
+      </div>
+
+      <div class="space-y-2 rounded-lg border border-neutral-200 p-3 dark:border-neutral-800">
+        <div class="flex items-start justify-between gap-3">
+          <NarrationBlock line={narrateDriftReason(detail.status, detail.reason, level)} {verbose} />
+          <button
+            type="button"
+            class="text-accent-600 dark:text-accent-500 shrink-0 text-xs font-medium hover:underline"
+            on:click={() => (verbose = !verbose)}
+          >
+            {verbose ? 'Hide details' : 'Show details'}
+          </button>
+        </div>
+        <NarrationBlock line={narrateDriftCounts(detail.counts, detail.status, level)} {verbose} />
       </div>
 
       {#if detail.drift.length === 0 && detail.missing.length === 0 && detail.unmanaged.length === 0}
@@ -180,7 +196,10 @@
           </h2>
           <div class="space-y-3">
             {#each detail.drift as change (`${change.section}:${change.entityType}:${change.name}:${change.remoteId ?? ''}`)}
-              <DriftFieldDiff {change} />
+              <div class="space-y-2">
+                <NarrationBlock line={narrateDriftEntity(change, detail.arrType, level)} {verbose} />
+                <DriftFieldDiff {change} />
+              </div>
             {/each}
           </div>
         </section>
@@ -196,7 +215,10 @@
           </p>
           <div class="space-y-2">
             {#each detail.missing as change (`${change.section}:${change.entityType}:${change.name}:${change.remoteId ?? ''}`)}
-              <DriftFieldDiff {change} />
+              <div class="space-y-2">
+                <NarrationBlock line={narrateDriftEntity(change, detail.arrType, level)} {verbose} />
+                <DriftFieldDiff {change} />
+              </div>
             {/each}
           </div>
         </section>
@@ -209,7 +231,10 @@
           </summary>
           <div class="space-y-2 px-4 pt-1 pb-4 opacity-70">
             {#each detail.unmanaged as change (`${change.section}:${change.entityType}:${change.name}:${change.remoteId ?? ''}`)}
-              <DriftFieldDiff {change} />
+              <div class="space-y-2">
+                <NarrationBlock line={narrateDriftEntity(change, detail.arrType, level)} {verbose} />
+                <DriftFieldDiff {change} />
+              </div>
             {/each}
           </div>
         </details>
