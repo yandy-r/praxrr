@@ -153,7 +153,7 @@ export async function readResource(uri: string, _ctx: McpContext): Promise<Resou
     return toResourceContents(uri, await readEntityNames(match[1], match[2], queryArrType));
   }
 
-  throw new JsonRpcError(ERROR_CODES.INVALID_PARAMS, `Unknown resource URI: ${uri}`);
+  throw new JsonRpcError(ERROR_CODES.RESOURCE_NOT_FOUND, `Unknown resource URI: ${uri}`);
 }
 
 function readArrInstance(idText: string): unknown {
@@ -163,16 +163,18 @@ function readArrInstance(idText: string): unknown {
   }
   const instance = arrInstancesQueries.getById(id);
   if (!instance || !isSyncPreviewArrType(instance.type)) {
-    throw new JsonRpcError(ERROR_CODES.INVALID_PARAMS, `Arr instance ${idText} not found`);
+    throw new JsonRpcError(ERROR_CODES.RESOURCE_NOT_FOUND, `Arr instance ${idText} not found`);
   }
   return toMcpInstance(instance);
 }
 
 async function readEntityNames(dbIdText: string, entityType: string, arrType: string | undefined): Promise<unknown> {
-  const cache = requireCache(dbIdText);
+  // Validate the URI params (invalid → -32602) before the resource lookup (missing → -32002).
   assertKnownEntityType(entityType);
+  const validatedArrType = validateArrType(arrType);
+  const cache = requireCache(dbIdText);
   try {
-    return await listResolvedEntityNames(cache, entityType, validateArrType(arrType));
+    return await listResolvedEntityNames(cache, entityType, validatedArrType);
   } catch (error) {
     throwResolvedError(error);
   }
@@ -184,10 +186,13 @@ async function readEntity(
   arrType: string | undefined,
   nameText: string
 ): Promise<unknown> {
-  const cache = requireCache(dbIdText);
+  // Validate the URI params (invalid → -32602) before the resource lookup (missing → -32002).
   assertKnownEntityType(entityType);
+  const validatedArrType = validateArrType(arrType);
+  const name = decodeResourceSegment(nameText);
+  const cache = requireCache(dbIdText);
   try {
-    return await readResolvedEntity(cache, entityType, validateArrType(arrType), decodeURIComponent(nameText));
+    return await readResolvedEntity(cache, entityType, validatedArrType, name);
   } catch (error) {
     throwResolvedError(error);
   }
@@ -200,9 +205,18 @@ function requireCache(dbIdText: string): PcdCache {
   }
   const lookup = lookupDatabaseCache(id);
   if (!lookup.ok) {
-    throw new JsonRpcError(ERROR_CODES.INVALID_PARAMS, lookup.reason);
+    throw new JsonRpcError(ERROR_CODES.RESOURCE_NOT_FOUND, lookup.reason);
   }
   return lookup.cache;
+}
+
+/** Percent-decode a URI path segment; a malformed encoding is an invalid URI, not an internal error. */
+function decodeResourceSegment(segment: string): string {
+  try {
+    return decodeURIComponent(segment);
+  } catch {
+    throw new JsonRpcError(ERROR_CODES.INVALID_PARAMS, `Invalid resource URI segment: ${segment}`);
+  }
 }
 
 function assertKnownEntityType(entityType: string): asserts entityType is ResolvedEntityType {
@@ -220,8 +234,11 @@ function validateArrType(value: string | undefined): 'radarr' | 'sonarr' | 'lida
 }
 
 function throwResolvedError(error: unknown): never {
-  if (isResolvedConfigValidationError(error) || isResolvedEntityNotFoundError(error)) {
+  if (isResolvedConfigValidationError(error)) {
     throw new JsonRpcError(ERROR_CODES.INVALID_PARAMS, error.message);
+  }
+  if (isResolvedEntityNotFoundError(error)) {
+    throw new JsonRpcError(ERROR_CODES.RESOURCE_NOT_FOUND, error.message);
   }
   throw error;
 }

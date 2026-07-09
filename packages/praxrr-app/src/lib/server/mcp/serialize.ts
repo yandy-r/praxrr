@@ -8,13 +8,21 @@
 import { redactSecrets } from './redact.ts';
 import type { ResourceReadResult, ToolCallResult } from './types.ts';
 
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
 /** Wrap a successful tool payload as a `tools/call` result (redacted text + structured content). */
 export function toToolResult(value: unknown): ToolCallResult {
   const safe = redactSecrets(value);
+  // The MCP spec requires `structuredContent` to be a JSON object. Wrap array/primitive payloads so
+  // a strict client (e.g. the official SDK) can still parse the result; the text block carries the
+  // unwrapped JSON.
+  const structuredContent = isPlainRecord(safe) ? safe : Array.isArray(safe) ? { items: safe } : { value: safe };
   return {
     content: [{ type: 'text', text: JSON.stringify(safe) }],
     isError: false,
-    structuredContent: safe,
+    structuredContent,
   };
 }
 

@@ -9,6 +9,7 @@ import { jobDispatcher } from '$jobs/dispatcher.ts';
 import { arrInstancesQueries } from '$db/queries/arrInstances.ts';
 import { databaseInstancesQueries } from '$db/queries/databaseInstances.ts';
 import { configHealthSettingsQueries } from '$db/queries/configHealthSettings.ts';
+import { redactSecrets } from '$lib/server/mcp/redact.ts';
 import { DELETE, GET, POST } from '../../routes/api/v1/mcp/+server.ts';
 
 type PostEvent = Parameters<typeof POST>[0];
@@ -279,19 +280,42 @@ migratedTest('list_resolved_entities: unknown db → isError; invalid entityType
 // resources/read
 // ============================================================================
 
-migratedTest('resources/read: unknown URI → -32602', async () => {
+migratedTest('resources/read: unknown URI → -32002 (resource not found)', async () => {
   const body = await rpcBody('resources/read', { uri: 'praxrr://nope' });
-  assertEquals(body.error.code, -32602);
+  assertEquals(body.error.code, -32002);
 });
 
-migratedTest('resources/read: arr-agnostic entity template matches (missing db reports its id)', async () => {
+migratedTest('resources/read: arr-agnostic entity template matches (missing db → -32002 with id)', async () => {
   const body = await rpcBody('resources/read', {
     uri: 'praxrr://databases/999999/entities/customFormat/Some%20Name',
   });
-  assertEquals(body.error.code, -32602);
-  // Message references the db id → the 2-segment (arr-agnostic) template matched, rather than
+  assertEquals(body.error.code, -32002);
+  // Message references the db id → the 3-segment (arr-agnostic) template matched, rather than
   // falling through to the unknown-URI branch.
   assert(body.error.message.includes('999999'));
+});
+
+migratedTest('resources/read: per-arr (4-segment) template validates arrType before lookup → -32602', async () => {
+  const body = await rpcBody('resources/read', {
+    uri: 'praxrr://databases/999999/entities/naming/bogus/Some',
+  });
+  assertEquals(body.error.code, -32602);
+  assert(body.error.message.toLowerCase().includes('arrtype'));
+});
+
+migratedTest('resources/read: entity-names template parses ?arrType= query (bogus → -32602)', async () => {
+  const body = await rpcBody('resources/read', {
+    uri: 'praxrr://databases/999999/entities/naming?arrType=bogus',
+  });
+  assertEquals(body.error.code, -32602);
+  assert(body.error.message.toLowerCase().includes('arrtype'));
+});
+
+migratedTest('resources/read: malformed percent-encoding in a name → -32602 (not -32603)', async () => {
+  const body = await rpcBody('resources/read', {
+    uri: 'praxrr://databases/999999/entities/customFormat/bad%ZZname',
+  });
+  assertEquals(body.error.code, -32602);
 });
 
 // ============================================================================
@@ -317,17 +341,34 @@ migratedTest('redaction: resources/read arr-instances has no api_key key', async
   assert(keys.has('api_key_fingerprint'));
 });
 
-migratedTest('redaction: list_databases drops personal_access_token', async () => {
+function seedDatabase(token = 'ghp_rawtoken'): void {
   databaseInstancesQueries.create({
     uuid: crypto.randomUUID(),
     name: 'Test DB',
     repositoryUrl: 'http://127.0.0.1:9/repo.git',
     localPath: `/tmp/praxrr-tests/pcd-${crypto.randomUUID()}`,
-    personalAccessToken: 'ghp_rawtoken',
+    personalAccessToken: token,
     enabled: true,
   });
+}
+
+migratedTest('redaction: list_databases drops the PAT and keeps has_personal_access_token as a boolean', async () => {
+  seedDatabase();
   const body = await rpcBody('tools/call', { name: 'list_databases', arguments: {} });
   const text = body.result.content[0].text as string;
+  assert(!text.includes('ghp_rawtoken'));
+  const parsed = JSON.parse(text) as Array<Record<string, unknown>>;
+  const keys = collectKeys(parsed);
+  assert(!keys.has('personal_access_token'));
+  assert(keys.has('has_personal_access_token'));
+  // The boolean presence flag must survive the scrubber (it shares the `token` suffix).
+  assertEquals(typeof parsed[0].has_personal_access_token, 'boolean');
+});
+
+migratedTest('redaction: resources/read databases drops the PAT, keeps the boolean flag', async () => {
+  seedDatabase();
+  const body = await rpcBody('resources/read', { uri: 'praxrr://databases' });
+  const text = body.result.contents[0].text as string;
   assert(!text.includes('ghp_rawtoken'));
   const keys = collectKeys(JSON.parse(text));
   assert(!keys.has('personal_access_token'));
@@ -411,4 +452,58 @@ migratedTest('Origin guard: cross-origin → 403, same-origin + absent → 200',
   assertEquals(same.status, 200);
   const absent = await callRpc('ping');
   assertEquals(absent.status, 200);
+});
+
+migratedTest('oversized Content-Length header → 413 (fast path, small body)', async () => {
+  const response = await POST(
+    buildEvent(JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'ping' }), {
+      'content-length': String(70 * 1024),
+    })
+  );
+  assertEquals(response.status, 413);
+});
+
+// ============================================================================
+// Result shape + argument validation
+// ============================================================================
+
+migratedTest('tools/call structuredContent is a JSON object even when the payload is an array', async () => {
+  seedInstance('radarr');
+  const body = await rpcBody('tools/call', { name: 'list_instances', arguments: {} });
+  const structured = body.result.structuredContent;
+  assert(structured !== null && typeof structured === 'object' && !Array.isArray(structured));
+  assert(Array.isArray(structured.items));
+});
+
+migratedTest('tools/call rejects unexpected arguments (additionalProperties:false) → -32602', async () => {
+  const body = await rpcBody('tools/call', { name: 'list_instances', arguments: { bogusArg: true } });
+  assertEquals(body.error.code, -32602);
+});
+
+// ============================================================================
+// redactSecrets unit coverage
+// ============================================================================
+
+Deno.test('redactSecrets scrubs string secrets (incl. password_hash) but keeps fingerprints and boolean flags', () => {
+  const scrubbed = redactSecrets({
+    api_key: 'raw-key',
+    api_key_fingerprint: 'fp-123',
+    personal_access_token: 'ghp_x',
+    password_hash: 'hashed',
+    passwordHash: 'hashed2',
+    authorization: 'Bearer x',
+    has_personal_access_token: true,
+    nested: [{ token: 'inner-secret', label: 'keep-me' }],
+    count: 5,
+  });
+  assertEquals(scrubbed.api_key, '[REDACTED]');
+  assertEquals(scrubbed.api_key_fingerprint, 'fp-123');
+  assertEquals(scrubbed.personal_access_token, '[REDACTED]');
+  assertEquals(scrubbed.password_hash, '[REDACTED]');
+  assertEquals(scrubbed.passwordHash, '[REDACTED]');
+  assertEquals(scrubbed.authorization, '[REDACTED]');
+  assertEquals(scrubbed.has_personal_access_token, true);
+  assertEquals(scrubbed.nested[0].token, '[REDACTED]');
+  assertEquals(scrubbed.nested[0].label, 'keep-me');
+  assertEquals(scrubbed.count, 5);
 });

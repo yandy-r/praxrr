@@ -13,6 +13,8 @@ export const ERROR_CODES = {
   METHOD_NOT_FOUND: -32601,
   INVALID_PARAMS: -32602,
   INTERNAL_ERROR: -32603,
+  // MCP-specific: resources/read on a resolvable-but-missing resource.
+  RESOURCE_NOT_FOUND: -32002,
 } as const;
 
 export type ParseResult =
@@ -21,11 +23,6 @@ export type ParseResult =
 
 function isPlainRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
-}
-
-function extractId(value: Record<string, unknown>): JsonRpcId | null {
-  const id = value.id;
-  return typeof id === 'string' || typeof id === 'number' ? id : null;
 }
 
 /**
@@ -47,13 +44,17 @@ export function parseJsonRpc(raw: string): ParseResult {
     return { ok: false, id: null, code: ERROR_CODES.INVALID_REQUEST, message: 'Invalid Request' };
   }
 
-  const id = extractId(parsed);
   if (parsed.jsonrpc !== '2.0' || typeof parsed.method !== 'string') {
-    return { ok: false, id, code: ERROR_CODES.INVALID_REQUEST, message: 'Invalid Request' };
+    return { ok: false, id: null, code: ERROR_CODES.INVALID_REQUEST, message: 'Invalid Request' };
   }
 
-  if (typeof parsed.id === 'string' || typeof parsed.id === 'number') {
-    return { ok: true, message: { jsonrpc: '2.0', id: parsed.id, method: parsed.method, params: parsed.params } };
+  // Presence of the `id` key (not its type) signals a request. MCP forbids a null request id, so an
+  // `id` that is present but not a string/number is an Invalid Request. Absent `id` is a notification.
+  if ('id' in parsed) {
+    if (typeof parsed.id === 'string' || typeof parsed.id === 'number') {
+      return { ok: true, message: { jsonrpc: '2.0', id: parsed.id, method: parsed.method, params: parsed.params } };
+    }
+    return { ok: false, id: null, code: ERROR_CODES.INVALID_REQUEST, message: 'Invalid Request' };
   }
   return { ok: true, message: { jsonrpc: '2.0', method: parsed.method, params: parsed.params } };
 }

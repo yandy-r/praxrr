@@ -37,7 +37,7 @@ import { toToolError, toToolResult } from './serialize.ts';
 import { ERROR_CODES, asRecord } from './jsonrpc.ts';
 import { JsonRpcError, McpDomainError } from './errors.ts';
 import type { McpContext } from './context.ts';
-import type { JsonSchema, Tool, ToolCallResult } from './types.ts';
+import type { JsonSchema, Tool, ToolAnnotations, ToolCallResult } from './types.ts';
 
 // ---------------------------------------------------------------------------
 // Shared enums / guards
@@ -123,7 +123,7 @@ export interface McpTool {
   name: string;
   description: string;
   inputSchema: JsonSchema;
-  annotations: { readOnlyHint: true };
+  annotations: ToolAnnotations;
   handler: (args: Record<string, unknown>, ctx: McpContext) => Promise<unknown>;
 }
 
@@ -398,7 +398,7 @@ export function listTools(): Tool[] {
   }));
 }
 
-export function getTool(name: string): McpTool | undefined {
+function getTool(name: string): McpTool | undefined {
   return TOOLS.find((tool) => tool.name === name);
 }
 
@@ -431,6 +431,7 @@ function validateArgs(schema: JsonSchema, args: unknown): Record<string, unknown
   const record = asRecord(args);
   const properties = isPlainRecord(schema.properties) ? schema.properties : {};
   const required = Array.isArray(schema.required) ? schema.required : [];
+  const allowAdditional = schema.additionalProperties !== false;
 
   for (const key of required) {
     if (record[key] === undefined || record[key] === null) {
@@ -439,9 +440,16 @@ function validateArgs(schema: JsonSchema, args: unknown): Record<string, unknown
   }
 
   for (const [key, value] of Object.entries(record)) {
+    if (!(key in properties)) {
+      if (!allowAdditional) {
+        throw new JsonRpcError(ERROR_CODES.INVALID_PARAMS, `Unexpected argument: ${key}`);
+      }
+      continue;
+    }
     const spec = properties[key];
-    if (!isPlainRecord(spec)) continue;
-    validateValue(key, value, spec);
+    if (isPlainRecord(spec)) {
+      validateValue(key, value, spec);
+    }
   }
 
   return record;
