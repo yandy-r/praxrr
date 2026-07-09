@@ -54,6 +54,8 @@ tags:
     description: Non-blocking security posture "Shield Check" — auth, transport, and credential exposure audit
   - name: Timeline
     description: Sync-archaeology timeline — merged read-only feed of syncs, snapshots, rollbacks, and canary rollouts, with annotations
+  - name: MCP
+    description: Model Context Protocol server — read-only tools, resources, and prompts over Praxrr's configuration and observability surface
 
 paths:
   /health:
@@ -64,6 +66,8 @@ paths:
     $ref: './paths/system.yaml#/parser-health'
   /system/startup-pull/latest:
     $ref: './paths/system.yaml#/startup-pull-latest'
+  /mcp:
+    $ref: './paths/mcp.yaml#/mcp'
   /ui-preferences:
     get:
       operationId: getUiPreference

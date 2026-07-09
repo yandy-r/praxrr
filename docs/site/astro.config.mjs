@@ -70,6 +70,7 @@ export default defineConfig({
             { label: 'Syncing Profiles', link: '/guides/syncing-profiles/' },
             { label: 'Custom Formats', link: '/guides/custom-formats/' },
             { label: 'Quality Profiles', link: '/guides/quality-profiles/' },
+            { label: 'MCP Server', link: '/guides/mcp-server/' },
             { label: 'Upgrading', link: '/guides/upgrading/' },
             { label: 'Troubleshooting', link: '/guides/troubleshooting/' },
           ],
