@@ -23,6 +23,23 @@ Deno.test('sanitizeLogMeta strips sk- tokens and JWT triples by value pattern', 
   assertEquals(sanitized.bearer, '[REDACTED]');
 });
 
+Deno.test('sanitizeLogMeta strips embedded tokens and credential query values', () => {
+  const sk = 'sk-ABCDEFGHIJKLMNOPQRSTUVWX';
+  const apiKey = 'deadbeefdeadbeefdeadbeefdeadbeef';
+  const sanitized = sanitizeLogMeta({
+    label: `Movies ${sk}`,
+    url: `https://arr.example/api?apikey=${apiKey}&mode=preview`,
+    header: `Bearer ${sk}`,
+  });
+  const serialized = JSON.stringify(sanitized);
+
+  assert(!serialized.includes(sk), 'embedded sk token must not survive');
+  assert(!serialized.includes(apiKey), 'credential query value must not survive');
+  assert(serialized.includes('Movies [REDACTED]'));
+  assert(serialized.includes('apikey=[REDACTED]&mode=preview'));
+  assert(serialized.includes('"header":"[REDACTED]"'));
+});
+
 Deno.test('sanitizeLogMeta redacts a non-string value under a sensitive key', () => {
   const sanitized = sanitizeLogMeta({ credential: { user: 'admin', token: 42 } }) as Record<string, unknown>;
   assertEquals(sanitized.credential, '[REDACTED]');

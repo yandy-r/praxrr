@@ -63,6 +63,7 @@ function buildEvent(bodyText: string, headers: Record<string, string> = {}): Pos
 }
 
 // deno-lint-ignore no-explicit-any
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- heterogeneous JSON-RPC test assertions intentionally traverse dynamic response bodies
 type JsonRpcBody = any;
 
 async function callRpc(

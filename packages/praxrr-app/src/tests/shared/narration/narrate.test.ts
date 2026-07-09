@@ -34,7 +34,7 @@ Deno.test('narrateEntityChange: create summarizes to a single decision headline'
     headline: 'Praxrr plans to add Custom Format "HDR".',
     detail: [],
     tone: 'info',
-    templateVersion: '2',
+    templateVersion: '3',
   });
 });
 
@@ -53,7 +53,7 @@ Deno.test('narrateEntityChange: update verbose adds one detail line per field', 
     headline: 'Praxrr plans to update Quality Profile "HD-1080p" (2 fields differ).',
     detail: ['Cutoff quality changed.', 'Name set.'],
     tone: 'info',
-    templateVersion: '2',
+    templateVersion: '3',
   });
 });
 
@@ -136,7 +136,7 @@ Deno.test('narrateSyncPreviewSummary: mixed supplied totals stay planned and ver
   );
   assertEquals(line.detail, ['These are planned changes, not confirmed apply results.']);
   assertEquals(line.tone, 'warning');
-  assertEquals(line.templateVersion, '2');
+  assertEquals(line.templateVersion, '3');
 });
 
 Deno.test('narrateSyncPreviewSummary: zero changes stays neutral without claiming complete coverage', () => {
@@ -217,7 +217,10 @@ Deno.test('narrateSyncSectionOutcome: every section reports preview-generation c
 Deno.test('narrateSyncSectionOutcome: empty section error remains a failure with generic detail', () => {
   const line = narrateSyncSectionOutcome({ section: 'qualityProfiles', skipped: false, error: '' }, 'verbose');
   assertEquals(line.headline, 'Quality Profiles preview generation failed.');
-  assertEquals(line.detail[0], 'No additional error detail was provided.');
+  assertEquals(
+    line.detail[0],
+    'Preview generation reported an error. Review the instance connection and configuration, then regenerate the preview.'
+  );
   assertEquals(line.tone, 'warning');
 });
 
@@ -239,18 +242,30 @@ Deno.test('narrateEntityChanges: delegates planned wording and literal fallback 
   }
 });
 
-Deno.test('narrateSyncPreviewError: arbitrary text is framed without substring classification', () => {
-  const unauthorized = narrateSyncPreviewError('unauthorized at upstream host', 'verbose');
-  const timeout = narrateSyncPreviewError('timeout while reading', 'verbose');
-  const hidden = narrateSyncPreviewError('<script>alert(1)</script>', 'summary');
+Deno.test('sync preview narration never renders secret-shaped upstream error text', () => {
+  const upstreamErrors = [
+    'GET https://admin:password@example.invalid/api?apiKey=url-secret failed',
+    'X-Api-Key: header-secret',
+    'Authorization: Bearer authorization-secret',
+  ] as const;
+  const safeDetail =
+    'Preview generation reported an error. Review the instance connection and configuration, then regenerate the preview.';
 
-  assertEquals(unauthorized.headline, 'A trustworthy preview could not be generated.');
-  assertEquals(timeout.headline, unauthorized.headline);
-  assertEquals(unauthorized.detail, ['Reported detail: unauthorized at upstream host']);
-  assertEquals(timeout.detail, ['Reported detail: timeout while reading']);
-  assertEquals(hidden.detail, []);
-  assertEquals(hidden.headline, unauthorized.headline);
-  assertEquals(narrateSyncPreviewError(null, 'verbose').detail, ['No additional error detail was provided.']);
+  for (const upstreamError of upstreamErrors) {
+    const previewError = narrateSyncPreviewError(upstreamError, 'verbose');
+    const sectionError = narrateSyncSectionOutcome(
+      { section: 'qualityProfiles', skipped: false, error: upstreamError },
+      'verbose'
+    );
+
+    assertEquals(previewError.headline, 'A trustworthy preview could not be generated.');
+    assertEquals(previewError.detail, [safeDetail]);
+    assertEquals(sectionError.detail[0], safeDetail);
+    assert(!JSON.stringify([previewError, sectionError]).includes(upstreamError));
+  }
+
+  assertEquals(narrateSyncPreviewError(null, 'verbose').detail, [safeDetail]);
+  assertEquals(narrateSyncPreviewError('hidden in summary', 'summary').detail, []);
 });
 
 // --- narrateDriftEntity (delegates to the core, reframes by category) --------------------
@@ -269,7 +284,7 @@ Deno.test('narrateDriftEntity: drift (update) reuses core detail, warns, frames 
     headline: 'Quality Profile "HD" has drifted from the resolved config (1 field differs).',
     detail: ['Cutoff quality changed.'],
     tone: 'warning',
-    templateVersion: '2',
+    templateVersion: '3',
   });
 });
 

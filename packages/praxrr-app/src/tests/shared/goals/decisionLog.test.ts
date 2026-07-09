@@ -144,21 +144,22 @@ Deno.test('goal decision metadata caps decisions and every copied free-form iden
 
 Deno.test('goal decision metadata remains safe when nested identifiers resemble secrets', () => {
   const secret = 'sk-ABCDEFGHIJKLMNOPQRSTUVWX';
-  const secretDecision = decision(secret);
+  const secretDecision = decision(`Remux ${secret}`);
   secretDecision.reason.code = secret;
   secretDecision.reason.ruleId = 'deadbeefdeadbeefdeadbeefdeadbeef';
   const sanitized = sanitizeLogMeta(
     buildGoalDecisionLogMetadata({
       databaseId: 42,
-      profileName: secret,
-      presetId: 'best-quality',
+      profileName: `Movies ${secret}`,
+      presetId: `https://arr.example/?apikey=${secret}`,
       plan: plan({ decisions: [secretDecision], uncategorized: [] }),
     })
   ) as GoalDecisionLogMetadata;
 
   assertFalse(JSON.stringify(sanitized).includes(secret));
-  assertEquals(sanitized.profileName, '[REDACTED]');
-  assertEquals(sanitized.decisions[0].customFormatName, '[REDACTED]');
+  assertEquals(sanitized.profileName, 'Movies [REDACTED]');
+  assertEquals(sanitized.presetId, 'https://arr.example/?apikey=[REDACTED]');
+  assertEquals(sanitized.decisions[0].customFormatName, 'Remux [REDACTED]');
   assertEquals(sanitized.decisions[0].reason.code, '[REDACTED]');
   assertEquals(sanitized.decisions[0].reason.ruleId, '[REDACTED]');
 });

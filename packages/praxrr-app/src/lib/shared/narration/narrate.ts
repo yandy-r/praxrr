@@ -160,7 +160,7 @@ export function narrateSyncSectionOutcome(outcome: SyncPreviewSectionOutcome, le
   const detail: string[] = [];
 
   if (level === 'verbose') {
-    if (failed) detail.push(resolvePreviewErrorDetail(outcome.error));
+    if (failed) detail.push(resolvePreviewErrorDetail());
     detail.push('This status describes preview generation only; it does not confirm apply execution.');
   }
 
@@ -183,13 +183,14 @@ export function narrateEntityChanges(
 }
 
 /**
- * Frame an arbitrary preview error without classifying vendor-specific free text. Raw detail is
- * optional and visible only in verbose mode.
+ * Frame an arbitrary preview error without classifying or rendering vendor-specific free text.
+ * The input remains part of the upstream contract, but narration deliberately emits only a closed
+ * safe explanation and recovery action.
  */
-export function narrateSyncPreviewError(error: string | null | undefined, level: NarrationLevel): NarrationLine {
+export function narrateSyncPreviewError(_error: string | null | undefined, level: NarrationLevel): NarrationLine {
   return {
     headline: resolvePreviewErrorHeadline(),
-    detail: level === 'verbose' ? [resolvePreviewErrorDetail(error)] : [],
+    detail: level === 'verbose' ? [resolvePreviewErrorDetail()] : [],
     tone: 'danger',
     templateVersion: NARRATION_TEMPLATE_VERSION,
   };

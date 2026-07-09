@@ -70,16 +70,18 @@ export function resolvePreviewSectionOutcomePhrase(outcome: SyncPreviewSectionOu
   return `${label} was included in preview generation.`;
 }
 
-/** Generic failure headline for free-form preview errors; callers may show raw detail separately. */
+/** Generic failure headline for free-form preview errors. */
 export function resolvePreviewErrorHeadline(): string {
   return 'A trustworthy preview could not be generated.';
 }
 
 /**
- * Frame already-exposed free-form error detail without inferring a cause from vendor-specific text.
+ * Closed user-facing explanation for an upstream preview error. This narration boundary does not
+ * render the free-form error retained by the upstream preview contract; issue #235 still owns that
+ * broader transport and persistence contract.
  */
-export function resolvePreviewErrorDetail(error: string | null | undefined): string {
-  return error && error.trim().length > 0 ? `Reported detail: ${error}` : 'No additional error detail was provided.';
+export function resolvePreviewErrorDetail(): string {
+  return 'Preview generation reported an error. Review the instance connection and configuration, then regenerate the preview.';
 }
 
 /** Verb describing how a single field diverged. */

@@ -108,6 +108,42 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/mcp': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Method not allowed
+     * @description The MCP endpoint offers no server-initiated SSE stream; GET returns 405 (use POST).
+     */
+    get: operations['getMcp'];
+    put?: never;
+    /**
+     * MCP Streamable HTTP endpoint
+     * @description Model Context Protocol (MCP) endpoint over Streamable HTTP, stateless. The request body is a
+     *     single JSON-RPC 2.0 request or notification: a request returns a single JSON-RPC response, a
+     *     notification returns 202 with no body. The tool/resource/prompt surface is discovered at
+     *     runtime via `tools/list`, `resources/list`, and `prompts/list` rather than modeled here.
+     *
+     *     Read-only: exposes Praxrr's configuration and observability surface (instances, drift, config
+     *     health, security posture, PCD databases and resolved entities, sync history) plus a
+     *     write-free `preview_sync`. Authenticate with the `X-Api-Key` header (required under AUTH=on);
+     *     there is no OAuth/Bearer support. Disabled (404) when `MCP_ENABLED` is off.
+     */
+    post: operations['postMcp'];
+    /**
+     * Method not allowed
+     * @description The MCP endpoint is stateless with no session lifecycle; DELETE returns 405 (use POST).
+     */
+    delete: operations['deleteMcp'];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/ui-preferences': {
     parameters: {
       query?: never;
@@ -4571,6 +4607,119 @@ export interface operations {
         content: {
           'application/json': components['schemas']['ErrorResponse'];
         };
+      };
+    };
+  };
+  getMcp: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Method Not Allowed. Use POST. */
+      405: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  postMcp: {
+    parameters: {
+      query?: never;
+      header?: {
+        /** @description Praxrr API key. Required for non-browser clients under AUTH=on. */
+        'X-Api-Key'?: string;
+        /** @description Negotiated MCP protocol version. An unsupported value returns 400. */
+        'MCP-Protocol-Version'?: string;
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': {
+          [key: string]: unknown;
+        };
+      };
+    };
+    responses: {
+      /** @description A single JSON-RPC 2.0 response object. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': {
+            [key: string]: unknown;
+          };
+        };
+      };
+      /** @description A JSON-RPC notification was accepted; no response body. */
+      202: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Unsupported MCP-Protocol-Version header. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Unauthenticated (missing or invalid API key). */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Rejected cross-origin request (DNS-rebinding defense). */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description The MCP endpoint is disabled (MCP_ENABLED is off). */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Request body too large. */
+      413: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  deleteMcp: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Method Not Allowed. Use POST. */
+      405: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
       };
     };
   };

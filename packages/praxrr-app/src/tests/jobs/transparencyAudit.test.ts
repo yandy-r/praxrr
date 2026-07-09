@@ -1,6 +1,6 @@
-import { assertEquals, assertMatch } from '@std/assert';
+import { assertEquals } from '@std/assert';
 import { JOB_TRANSPARENCY_AUDIT, type TransparencyAuditEntry } from '$jobs/transparencyAudit.ts';
-import { JOB_TYPES } from '$jobs/queueTypes.ts';
+import { JOB_TYPES, type JobType } from '$jobs/queueTypes.ts';
 import { jobQueueRegistry } from '$jobs/queueRegistry.ts';
 
 // Import registration side effects only. This does not initialize the dispatcher,
@@ -8,6 +8,19 @@ import { jobQueueRegistry } from '$jobs/queueRegistry.ts';
 import '$jobs/handlers/index.ts';
 
 const sorted = (values: readonly string[]): string[] => [...values].sort();
+
+const DURABLE_EVIDENCE_SAFETY_URL = 'https://github.com/yandy-r/praxrr/issues/237' as const;
+const SYNC_ENTITY_OUTCOMES_URL = 'https://github.com/yandy-r/praxrr/issues/232' as const;
+const TRASHGUIDE_RUN_CORRELATION_URL = 'https://github.com/yandy-r/praxrr/issues/238' as const;
+
+const SPECIALIZED_FOLLOW_UPS = {
+  'arr.sync': [SYNC_ENTITY_OUTCOMES_URL, DURABLE_EVIDENCE_SAFETY_URL],
+  'arr.sync.qualityProfiles': [SYNC_ENTITY_OUTCOMES_URL, DURABLE_EVIDENCE_SAFETY_URL],
+  'arr.sync.delayProfiles': [SYNC_ENTITY_OUTCOMES_URL, DURABLE_EVIDENCE_SAFETY_URL],
+  'arr.sync.mediaManagement': [SYNC_ENTITY_OUTCOMES_URL, DURABLE_EVIDENCE_SAFETY_URL],
+  'arr.sync.metadataProfiles': [SYNC_ENTITY_OUTCOMES_URL, DURABLE_EVIDENCE_SAFETY_URL],
+  'trashguide.sync': [TRASHGUIDE_RUN_CORRELATION_URL, DURABLE_EVIDENCE_SAFETY_URL],
+} as const satisfies Partial<Record<JobType, readonly string[]>>;
 
 Deno.test('queued-workflow transparency audit is exhaustive and matches production registrations', () => {
   const declared = sorted(JOB_TYPES);
@@ -28,18 +41,16 @@ Deno.test('queued-workflow transparency entries carry usable evidence', () => {
   }
 });
 
-Deno.test('follow-up and not-applicable dispositions enforce ownership invariants', () => {
-  const entries: readonly TransparencyAuditEntry[] = Object.values(JOB_TRANSPARENCY_AUDIT);
+Deno.test('queued ownership matches the audit and never misclassifies an unresolved job as pass', () => {
+  for (const jobType of JOB_TYPES) {
+    const entry: TransparencyAuditEntry = JOB_TRANSPARENCY_AUDIT[jobType];
+    const specialized = SPECIALIZED_FOLLOW_UPS[jobType as keyof typeof SPECIALIZED_FOLLOW_UPS];
+    const expected = specialized ?? [DURABLE_EVIDENCE_SAFETY_URL];
 
-  for (const entry of entries) {
-    if (entry.disposition === 'follow-up') {
-      assertMatch(entry.followUpUrl, /^https:\/\/github\.com\/yandy-r\/praxrr\/issues\/\d+$/);
-      assertEquals(entry.rationale.trim().length > 0, true, 'follow-up entries require a rationale');
-    } else if (entry.disposition === 'not-applicable') {
-      assertEquals(entry.rationale.trim().length > 0, true, 'not-applicable entries require a rationale');
-      assertEquals(entry.followUpUrl, null);
-    } else {
-      assertEquals(entry.followUpUrl, null);
-    }
+    assertEquals(entry.disposition, 'follow-up', `${jobType} has unresolved follow-up ownership`);
+    if (entry.disposition !== 'follow-up') continue;
+
+    assertEquals(entry.followUpUrls, expected, `${jobType} follow-up ownership must match the human audit`);
+    assertEquals(entry.rationale.trim().length > 0, true, `${jobType} follow-up requires a rationale`);
   }
 });

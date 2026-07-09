@@ -531,27 +531,29 @@
               type="button"
               class="rounded-md border border-neutral-300 bg-white px-2.5 py-1.5 text-xs font-medium text-neutral-700 hover:bg-neutral-100 dark:border-neutral-600 dark:bg-neutral-900 dark:text-neutral-200 dark:hover:bg-neutral-800"
               aria-expanded={showExplanationDetails}
-              aria-controls="sync-preview-decision-log"
-              on:click={toggleExplanationDetails}
+              aria-controls="sync-preview-explanation-details"
+              onclick={toggleExplanationDetails}
             >
               {showExplanationDetails ? 'Hide explanation details' : 'Show explanation details'}
             </button>
           </div>
 
-          <NarrationBlock line={summaryNarration} verbose={showExplanationDetails} />
+          <div id="sync-preview-explanation-details" class="space-y-3">
+            <NarrationBlock line={summaryNarration} verbose={showExplanationDetails} />
 
-          <div class="flex flex-wrap items-center gap-2 text-xs text-neutral-600 dark:text-neutral-400">
-            <Badge variant={coverage.status === 'partial' ? 'warning' : 'neutral'}>{coverage.label}</Badge>
-            <span>{coverage.detail}</span>
-          </div>
-
-          {#if sectionNarrations.length > 0}
-            <div class="space-y-2 border-t border-neutral-200 pt-3 dark:border-neutral-700">
-              {#each sectionNarrations as line}
-                <NarrationBlock {line} verbose={showExplanationDetails} />
-              {/each}
+            <div class="flex flex-wrap items-center gap-2 text-xs text-neutral-600 dark:text-neutral-400">
+              <Badge variant={coverage.status === 'partial' ? 'warning' : 'neutral'}>{coverage.label}</Badge>
+              <span>{coverage.detail}</span>
             </div>
-          {/if}
+
+            {#if sectionNarrations.length > 0}
+              <div class="space-y-2 border-t border-neutral-200 pt-3 dark:border-neutral-700">
+                {#each sectionNarrations as line}
+                  <NarrationBlock {line} verbose={showExplanationDetails} />
+                {/each}
+              </div>
+            {/if}
+          </div>
         </section>
 
         {#if coverage.status === 'complete' && summary.totalCreates === 0 && summary.totalUpdates === 0 && summary.totalDeletes === 0 && summary.totalUnchanged > 0}
