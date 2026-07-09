@@ -34,12 +34,12 @@ None.
 
 ## Validation Results
 
-| Check | Result |
-| --- | --- |
-| Type check | Pass — server and client, 0 errors and 0 warnings |
-| Lint | Pass — ESLint and locked Prettier on all changed source/config files |
-| Tests | Pass — 1,801 passed across 31 steps; focused suites 8/8 and 13/13 |
-| Build | Pass — production Vite build completed successfully |
+| Check      | Result                                                               |
+| ---------- | -------------------------------------------------------------------- |
+| Type check | Pass — server and client, 0 errors and 0 warnings                    |
+| Lint       | Pass — ESLint and locked Prettier on all changed source/config files |
+| Tests      | Pass — 1,801 passed across 31 steps; focused suites 8/8 and 13/13    |
+| Build      | Pass — production Vite build completed successfully                  |
 
 ## Files Reviewed
 
