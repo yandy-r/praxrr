@@ -18,6 +18,9 @@ node_modules
 *.out
 *.out.exit
 
+# worktrees
+/.claude/worktrees/
+
 # Application
 /config
 .deno-cache/
