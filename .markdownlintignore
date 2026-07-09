@@ -44,3 +44,7 @@ yarn.lock
 pnpm-lock.yaml
 
 # Add your custom patterns below:
+
+# Internal design/planning working notes — not published docs; may contain
+# tab-indented code samples and bare example URLs. Kept out of doc-style linting.
+docs/internal/
