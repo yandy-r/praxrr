@@ -8,7 +8,13 @@
  * source of truth; a drift category only reframes the headline and sets the tone.
  */
 
-import type { EntityChange, SyncPreviewArrType, SyncPreviewSection } from '$sync/preview/types.ts';
+import type {
+  EntityChange,
+  SyncPreviewArrType,
+  SyncPreviewSection,
+  SyncPreviewSectionOutcome,
+  SyncPreviewSummary,
+} from '$sync/preview/types.ts';
 import type { DriftCategory, DriftCounts, DriftEntityChange, DriftReason } from '$sync/drift/types.ts';
 import type { DriftSummaryStatus } from '$sync/drift/responses.ts';
 import { NARRATION_TEMPLATE_VERSION } from './types.ts';
@@ -19,6 +25,11 @@ import {
   resolveFieldCountPhrase,
   resolveFieldLabel,
   resolveFieldVerb,
+  resolveNoPlannedChangesPhrase,
+  resolvePlannedActionCountPhrase,
+  resolvePreviewErrorDetail,
+  resolvePreviewErrorHeadline,
+  resolvePreviewSectionOutcomePhrase,
   resolveReasonExplanation,
 } from './templates.ts';
 
@@ -77,11 +88,11 @@ export function narrateEntityChange(
 
   switch (change.action) {
     case 'create':
-      headline = `Add ${label} "${change.name}".`;
+      headline = `Praxrr plans to add ${label} "${change.name}".`;
       tone = 'info';
       break;
     case 'delete':
-      headline = `Remove ${label} "${change.name}".`;
+      headline = `Praxrr plans to remove ${label} "${change.name}".`;
       tone = 'info';
       break;
     case 'unchanged':
@@ -89,7 +100,7 @@ export function narrateEntityChange(
       tone = 'neutral';
       break;
     case 'update':
-      headline = `Update ${label} "${change.name}" (${resolveFieldCountPhrase(change.fields.length)}).`;
+      headline = `Praxrr plans to update ${label} "${change.name}" (${resolveFieldCountPhrase(change.fields.length)}).`;
       tone = 'info';
       break;
   }
@@ -103,6 +114,85 @@ export function narrateEntityChange(
       : [];
 
   return { headline, detail, tone, templateVersion: NARRATION_TEMPLATE_VERSION };
+}
+
+/**
+ * Narrate the authoritative sync-preview totals without inspecting or re-tallying entity rows.
+ * Every action clause remains planned; verbose mode adds the explicit stage boundary.
+ */
+export function narrateSyncPreviewSummary(summary: SyncPreviewSummary, level: NarrationLevel): NarrationLine {
+  const plannedChangeCount = summary.totalCreates + summary.totalUpdates + summary.totalDeletes;
+  const detail = level === 'verbose' ? ['These are planned changes, not confirmed apply results.'] : [];
+
+  if (plannedChangeCount === 0) {
+    if (level === 'verbose' && summary.totalUnchanged > 0) {
+      detail.unshift(`${resolvePlannedActionCountPhrase('unchanged', summary.totalUnchanged)}.`);
+    }
+    return {
+      headline: resolveNoPlannedChangesPhrase(),
+      detail,
+      tone: 'neutral',
+      templateVersion: NARRATION_TEMPLATE_VERSION,
+    };
+  }
+
+  const clauses = [
+    resolvePlannedActionCountPhrase('create', summary.totalCreates),
+    resolvePlannedActionCountPhrase('update', summary.totalUpdates),
+    resolvePlannedActionCountPhrase('delete', summary.totalDeletes),
+    resolvePlannedActionCountPhrase('unchanged', summary.totalUnchanged),
+  ];
+
+  return {
+    headline: `Planned changes: ${joinClauses(clauses)}.`,
+    detail,
+    tone: summary.totalDeletes > 0 ? 'warning' : 'info',
+    templateVersion: NARRATION_TEMPLATE_VERSION,
+  };
+}
+
+/**
+ * Narrate whether one section was included, skipped, or failed during preview generation. This
+ * deliberately does not describe apply execution or convert a successful preview into an apply result.
+ */
+export function narrateSyncSectionOutcome(outcome: SyncPreviewSectionOutcome, level: NarrationLevel): NarrationLine {
+  const failed = outcome.error !== null;
+  const detail: string[] = [];
+
+  if (level === 'verbose') {
+    if (failed) detail.push(resolvePreviewErrorDetail(outcome.error));
+    detail.push('This status describes preview generation only; it does not confirm apply execution.');
+  }
+
+  return {
+    headline: resolvePreviewSectionOutcomePhrase(outcome),
+    detail,
+    tone: failed ? 'warning' : 'neutral',
+    templateVersion: NARRATION_TEMPLATE_VERSION,
+  };
+}
+
+/** Narrate a list of planned entity changes through the single entity-change core. */
+export function narrateEntityChanges(
+  changes: readonly EntityChange[],
+  arrType: SyncPreviewArrType,
+  section: SyncPreviewSection,
+  level: NarrationLevel
+): readonly NarrationLine[] {
+  return changes.map((change) => narrateEntityChange(change, arrType, section, level));
+}
+
+/**
+ * Frame an arbitrary preview error without classifying vendor-specific free text. Raw detail is
+ * optional and visible only in verbose mode.
+ */
+export function narrateSyncPreviewError(error: string | null | undefined, level: NarrationLevel): NarrationLine {
+  return {
+    headline: resolvePreviewErrorHeadline(),
+    detail: level === 'verbose' ? [resolvePreviewErrorDetail(error)] : [],
+    tone: 'danger',
+    templateVersion: NARRATION_TEMPLATE_VERSION,
+  };
 }
 
 /**

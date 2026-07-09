@@ -21,9 +21,14 @@ import { db } from '$db/db.ts';
 import { runMigrations } from '$db/migrations.ts';
 import { databaseInstancesQueries } from '$db/queries/databaseInstances.ts';
 import { qualityGoalBindingQueries } from '$db/queries/qualityGoalBindings.ts';
+import { buildGoalDecisionLogMetadata } from '$lib/server/goals/decisionLog.ts';
 import type { PCDCache } from '$pcd/index.ts';
 import type { PCDDatabase } from '$shared/pcd/types.ts';
+import type { GoalPlan } from '$shared/goals/index.ts';
 import type { DatabaseInstance } from '$db/queries/databaseInstances.ts';
+import type { QualityGoalBindingRow } from '$db/queries/qualityGoalBindings.ts';
+import type { LogOptions } from '$logger/types.ts';
+import type { GoalApplyDependencies } from '../../routes/api/v1/goals/apply/+server.ts';
 import type { components } from '$api/v1.d.ts';
 
 const { setCache, deleteCache } = await import('$pcd/database/registry.ts');
@@ -67,6 +72,79 @@ const BEST_QUALITY_WEIGHTS = {
   unwantedStrictness: 85,
   resolutionCeiling: '2160p',
 };
+
+const SERVER_GOAL_PLAN: GoalPlan = {
+  engineVersion: '1',
+  arrType: 'radarr',
+  decisions: [
+    {
+      customFormatName: 'Server-derived Remux',
+      arrType: 'radarr',
+      category: 'remux',
+      score: 321,
+      reason: {
+        code: 'category.remux',
+        category: 'remux',
+        ruleId: 'remux',
+        base: 200,
+        axisContributions: [{ axis: 'qualityVsSize', delta: 121 }],
+        ceiling: null,
+      },
+    },
+  ],
+  uncategorized: [],
+  thresholds: {
+    minimumScore: 0,
+    upgradeUntilScore: 321,
+    upgradeScoreIncrement: 1,
+  },
+  coverage: { total: 1, scored: 1, uncategorized: 0 },
+  scoringInput: {
+    minimumScore: 0,
+    upgradeUntilScore: 321,
+    upgradeScoreIncrement: 1,
+    customFormatScores: [
+      {
+        customFormatName: 'Server-derived Remux',
+        arrType: 'radarr',
+        score: 321,
+      },
+    ],
+  },
+};
+
+const SERVER_BINDING: QualityGoalBindingRow = {
+  database_id: DATABASE_ID,
+  profile_name: 'Movies',
+  arr_type: 'radarr',
+  preset_id: 'best-quality',
+  weights_json: JSON.stringify(BEST_QUALITY_WEIGHTS),
+  engine_version: '1',
+  applied_at: '2026-07-09T00:00:00.000Z',
+  created_at: '2026-07-09 00:00:00',
+  updated_at: '2026-07-09 00:00:00',
+};
+
+interface ApplyLogCall {
+  message: string;
+  options?: LogOptions;
+}
+
+function buildApplyDependencies(
+  logs: ApplyLogCall[],
+  overrides: Partial<GoalApplyDependencies> = {}
+): GoalApplyDependencies {
+  return {
+    buildGoalPlan: () => Promise.resolve({ cache: {} as PCDCache, plan: SERVER_GOAL_PLAN }),
+    updateScoring: () => Promise.resolve({ success: true }),
+    upsertBinding: () => SERVER_BINDING,
+    logInfo: (message, options) => {
+      logs.push({ message, options });
+      return Promise.resolve();
+    },
+    ...overrides,
+  };
+}
 
 type Restore = () => void;
 
@@ -158,20 +236,18 @@ async function withGoalsFixture(fn: (databaseId: number, current: CurrentFixture
   }
 }
 
-// deno-lint-ignore no-explicit-any
-function postEvent(payload: unknown): any {
+function postEvent(payload: unknown): Parameters<typeof previewRoute.POST>[0] {
   return {
     request: new Request('http://localhost/api/v1/goals', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(payload),
     }),
-  };
+  } as Parameters<typeof previewRoute.POST>[0];
 }
 
-// deno-lint-ignore no-explicit-any
-function getEvent(query: string): any {
-  return { url: new URL(`http://localhost/api/v1/goals/binding?${query}`) };
+function getEvent(query: string): Parameters<typeof bindingRoute.GET>[0] {
+  return { url: new URL(`http://localhost/api/v1/goals/binding?${query}`) } as Parameters<typeof bindingRoute.GET>[0];
 }
 
 function getErrorStatus(error: unknown): number {
@@ -208,8 +284,7 @@ function migratedTest(name: string, fn: () => Promise<void> | void): void {
 // ============================================================================
 
 Deno.test('goals presets: returns the catalog, axes, and engine version', async () => {
-  // deno-lint-ignore no-explicit-any
-  const response: Response = await presetsRoute.GET({} as any);
+  const response: Response = await presetsRoute.GET({} as Parameters<typeof presetsRoute.GET>[0]);
   assertEquals(response.status, 200);
   const body = (await response.json()) as GoalPresetsResponse;
   assertEquals(body.presets.map((preset) => preset.id).sort(), [
@@ -314,9 +389,66 @@ Deno.test('goals preview: validation and missing-cache errors', async () => {
 // apply validation
 // ============================================================================
 
-Deno.test('goals apply: engine-version mismatch -> 409, missing version -> 400', async () => {
-  const mismatch = await assertRejects(async () =>
-    applyRoute.POST(
+Deno.test('goals apply: logs one server-derived decision event after persistence succeeds', async () => {
+  const logs: ApplyLogCall[] = [];
+  const response = await applyRoute.handleGoalApplyRequest(
+    postEvent({
+      databaseId: DATABASE_ID,
+      arrType: 'radarr',
+      profileName: 'Movies',
+      preset: 'best-quality',
+      weights: BEST_QUALITY_WEIGHTS,
+      expectedEngineVersion: '1',
+      decisions: [{ customFormatName: 'Client-forged decision', score: 999999 }],
+      scoringInput: { customFormatScores: [{ customFormatName: 'Client-forged decision', score: 999999 }] },
+    }).request,
+    buildApplyDependencies(logs)
+  );
+
+  assertEquals(response.status, 200);
+  assertEquals(logs, [
+    {
+      message: 'Quality goal applied',
+      options: {
+        source: 'QualityGoals',
+        meta: buildGoalDecisionLogMetadata({
+          databaseId: DATABASE_ID,
+          profileName: 'Movies',
+          presetId: 'best-quality',
+          plan: SERVER_GOAL_PLAN,
+        }),
+      },
+    },
+  ]);
+
+  const meta = logs[0].options?.meta as Record<string, unknown>;
+  assert(!('scoringInput' in meta));
+  const loggedDecision = (meta.decisions as Array<Record<string, unknown>>)[0];
+  assertEquals(loggedDecision.customFormatName, 'Server-derived Remux');
+  assertEquals(loggedDecision.score, 321);
+});
+
+Deno.test('goals apply: validation and engine-version failures do not log', async () => {
+  const logs: ApplyLogCall[] = [];
+  const dependencies = buildApplyDependencies(logs);
+
+  const invalid = await assertRejects(() =>
+    applyRoute.handleGoalApplyRequest(
+      postEvent({
+        databaseId: 1,
+        arrType: 'lidarr',
+        profileName: 'Movies',
+        preset: 'balanced',
+        weights: BEST_QUALITY_WEIGHTS,
+        expectedEngineVersion: '1',
+      }).request,
+      dependencies
+    )
+  );
+  assertEquals(getErrorStatus(invalid), 400);
+
+  const mismatch = await assertRejects(() =>
+    applyRoute.handleGoalApplyRequest(
       postEvent({
         databaseId: 1,
         arrType: 'radarr',
@@ -324,23 +456,71 @@ Deno.test('goals apply: engine-version mismatch -> 409, missing version -> 400',
         preset: 'balanced',
         weights: BEST_QUALITY_WEIGHTS,
         expectedEngineVersion: '0',
-      })
+      }).request,
+      dependencies
     )
   );
   assertEquals(getErrorStatus(mismatch), 409);
 
-  const missing = await assertRejects(async () =>
-    applyRoute.POST(
+  const missing = await assertRejects(() =>
+    applyRoute.handleGoalApplyRequest(
       postEvent({
         databaseId: 1,
         arrType: 'radarr',
         profileName: 'Movies',
         preset: 'balanced',
         weights: BEST_QUALITY_WEIGHTS,
-      })
+      }).request,
+      dependencies
     )
   );
   assertEquals(getErrorStatus(missing), 400);
+  assertEquals(logs, []);
+});
+
+Deno.test('goals apply: scoring and binding failures do not log', async () => {
+  const requestPayload = {
+    databaseId: DATABASE_ID,
+    arrType: 'radarr',
+    profileName: 'Movies',
+    preset: 'best-quality',
+    weights: BEST_QUALITY_WEIGHTS,
+    expectedEngineVersion: '1',
+  };
+
+  const scoringLogs: ApplyLogCall[] = [];
+  let scoringFailureBindingCalls = 0;
+  const scoringFailure = await assertRejects(() =>
+    applyRoute.handleGoalApplyRequest(
+      postEvent(requestPayload).request,
+      buildApplyDependencies(scoringLogs, {
+        updateScoring: () => Promise.resolve({ success: false, error: 'Scoring write failed' }),
+        upsertBinding: () => {
+          scoringFailureBindingCalls += 1;
+          return SERVER_BINDING;
+        },
+      })
+    )
+  );
+  assertEquals(getErrorStatus(scoringFailure), 500);
+  assertEquals(scoringFailureBindingCalls, 0);
+  assertEquals(scoringLogs, []);
+
+  const bindingLogs: ApplyLogCall[] = [];
+  await assertRejects(
+    () =>
+      applyRoute.handleGoalApplyRequest(
+        postEvent(requestPayload).request,
+        buildApplyDependencies(bindingLogs, {
+          upsertBinding: () => {
+            throw new Error('Binding write failed');
+          },
+        })
+      ),
+    Error,
+    'Binding write failed'
+  );
+  assertEquals(bindingLogs, []);
 });
 
 // ============================================================================

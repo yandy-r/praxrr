@@ -21,6 +21,67 @@ SyncPreviewApplyRequest:
       items:
         $ref: '#/SyncPreviewSection'
 
+SyncPreviewApplyJobStatus:
+  type: string
+  enum:
+    - success
+    - failure
+    - skipped
+    - cancelled
+  description: Terminal status returned by the sync job execution.
+
+SyncPreviewApplyJobResult:
+  type: object
+  required:
+    - status
+    - output
+  properties:
+    status:
+      $ref: '#/SyncPreviewApplyJobStatus'
+    output:
+      type: string
+      description: Aggregate human-readable output from the sync job.
+    error:
+      type: string
+      description: User-facing sync-job failure reason, when one is available.
+
+SyncPreviewApplyResponse:
+  type: object
+  description: |
+    Coarse result of executing the preview's selected sections through the normal
+    sync job path. `results` describes only the aggregate job/run outcome. It does
+    not confirm which individual preview entity changes succeeded.
+  required:
+    - success
+    - results
+    - staleWarning
+  properties:
+    success:
+      type: boolean
+      description: True when the sync job succeeded or reported that no work was needed.
+    results:
+      $ref: '#/SyncPreviewApplyJobResult'
+    staleWarning:
+      oneOf:
+        - type: string
+        - type: 'null'
+      description: Preview-age warning returned when the reviewed snapshot is stale, or null.
+
+SyncPreviewApplyErrorResponse:
+  type: object
+  required:
+    - error
+    - staleWarning
+  properties:
+    error:
+      type: string
+      description: User-facing reason the preview could not be applied.
+    staleWarning:
+      oneOf:
+        - type: string
+        - type: 'null'
+      description: Preview-age warning when relevant to the failure, or null.
+
 SyncPreviewStatus:
   type: string
   enum:

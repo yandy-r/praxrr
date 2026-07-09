@@ -3,14 +3,21 @@
   import { onMount } from 'svelte';
   import { AlertTriangle, CheckCircle2, Loader2 } from 'lucide-svelte';
   import Button from '$ui/button/Button.svelte';
+  import Badge from '$ui/badge/Badge.svelte';
   import Modal from '$ui/modal/Modal.svelte';
   import FormInput from '$ui/form/FormInput.svelte';
+  import NarrationBlock from '$ui/narration/NarrationBlock.svelte';
   import { alertStore } from '$alerts/store.ts';
+  import { narrateSyncPreviewSummary, narrateSyncSectionOutcome } from '$shared/narration/index.ts';
+  import type { NarrationLevel, NarrationLine } from '$shared/narration/index.ts';
   import SyncPreviewEntityDiff from './SyncPreviewEntityDiff.svelte';
   import type { SyncPreviewSection, SyncPreviewSummary, SyncPreviewResult, EntityChange } from '$sync/preview/types.ts';
   import type { SectionType } from '$sync/types.ts';
+  import type { components } from '$api/v1.d.ts';
 
   type SyncPreviewTriggerStatus = 'idle' | 'generating' | 'error' | 'ready';
+  type SyncPreviewApplyResponse = components['schemas']['SyncPreviewApplyResponse'];
+  type SyncPreviewApplyErrorResponse = components['schemas']['SyncPreviewApplyErrorResponse'];
 
   type SyncPreviewRouteState = {
     previewId: string | null;
@@ -38,6 +45,12 @@
     };
   };
 
+  type PreviewCoverage = {
+    status: 'complete' | 'partial' | 'unavailable';
+    label: string;
+    detail: string;
+  };
+
   const PREVIEW_STALE_WARNING_MS = 5 * 60 * 1000;
   const PREVIEW_STALE_BLOCK_MS = 30 * 60 * 1000;
   const EMPTY_PREVIEW_SUMMARY: SyncPreviewSummary = {
@@ -45,6 +58,11 @@
     totalUpdates: 0,
     totalDeletes: 0,
     totalUnchanged: 0,
+  };
+  const UNAVAILABLE_PREVIEW_COVERAGE: PreviewCoverage = {
+    status: 'unavailable',
+    label: 'Coverage unavailable',
+    detail: 'This preview does not contain section coverage records.',
   };
 
   export let previewState: SyncPreviewRouteState;
@@ -68,6 +86,12 @@
   let applying = false;
   let applyError = '';
   let confirmationMatches = false;
+  let showExplanationDetails = false;
+  let narrationLevel: NarrationLevel = 'summary';
+  let summaryNarration: NarrationLine = narrateSyncPreviewSummary(EMPTY_PREVIEW_SUMMARY, 'summary');
+  let sectionNarrations: readonly NarrationLine[] = [];
+  let coverage: PreviewCoverage = UNAVAILABLE_PREVIEW_COVERAGE;
+  let applyResultText = '';
 
   const sectionLabels: Record<SyncPreviewSection, string> = {
     qualityProfiles: 'Quality Profiles',
@@ -242,14 +266,35 @@
     return `${pluralize(values.create, 'create')}, ${pluralize(values.update, 'update')}, ${pluralize(values.delete, 'delete')}, ${pluralize(values.unchanged, 'unchanged')}`;
   }
 
+  function resolveCoverage(snapshot: SyncPreviewResult): PreviewCoverage {
+    const outcomes = snapshot.sectionOutcomes;
+    if (outcomes.length === 0) {
+      return UNAVAILABLE_PREVIEW_COVERAGE;
+    }
+
+    const includedCount = outcomes.filter((outcome) => outcome.error === null && !outcome.skipped).length;
+    const complete = includedCount === outcomes.length && !snapshot.error;
+    return {
+      status: complete ? 'complete' : 'partial',
+      label: complete ? 'Complete coverage' : 'Partial coverage',
+      detail: `${includedCount} of ${outcomes.length} preview sections were included without a recorded skip or failure.`,
+    };
+  }
+
+  function toggleExplanationDetails() {
+    showExplanationDetails = !showExplanationDetails;
+  }
+
   async function loadPreview(previewId: string) {
     activePreviewId = previewId;
     loading = true;
     loadError = '';
+    showExplanationDetails = false;
 
     try {
       const response = await fetch(`/api/v1/sync/preview/${previewId}`);
       const payload = (await response.json().catch(() => null)) as SyncPreviewResult | { error: string } | null;
+      if (activePreviewId !== previewId) return;
       if (!response.ok || !payload || !('id' in payload)) {
         loadError =
           payload && 'error' in payload && typeof payload.error === 'string'
@@ -261,10 +306,13 @@
 
       preview = payload;
     } catch {
+      if (activePreviewId !== previewId) return;
       loadError = 'Failed to fetch preview details.';
       preview = null;
     } finally {
-      loading = false;
+      if (activePreviewId === previewId) {
+        loading = false;
+      }
     }
   }
 
@@ -277,6 +325,7 @@
     showApplyModal = false;
     applying = true;
     applyError = '';
+    applyResultText = '';
 
     try {
       const response = await fetch(`/api/v1/sync/preview/${preview.id}/apply`, {
@@ -285,19 +334,26 @@
         body: JSON.stringify({}),
       });
       const payload = (await response.json().catch(() => null)) as
-        { success: boolean; error?: string; staleWarning?: string } | { error: string; staleWarning?: string };
+        SyncPreviewApplyResponse | SyncPreviewApplyErrorResponse | null;
 
       if (!response.ok || !payload || !('success' in payload) || payload.success === false) {
         const message =
           payload && 'error' in payload && typeof payload.error === 'string'
             ? payload.error
-            : 'Failed to apply preview.';
+            : payload && 'results' in payload && payload.results.error
+              ? payload.results.error
+              : 'Failed to apply preview.';
         throw new Error(message);
       }
 
       if ('staleWarning' in payload && payload.staleWarning) {
         alertStore.add('warning', payload.staleWarning);
       }
+
+      applyResultText =
+        payload.results.status === 'skipped'
+          ? 'The apply job was skipped. No per-entity execution outcomes are available.'
+          : 'The apply job completed successfully. No per-entity execution outcomes are available.';
 
       alertStore.add('success', 'Preview applied');
       await invalidateAll();
@@ -306,6 +362,7 @@
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to apply preview.';
       applyError = message;
+      applyResultText = `The apply request failed: ${message}`;
       alertStore.add('error', message);
     } finally {
       applying = false;
@@ -323,6 +380,14 @@
   }
 
   $: summary = preview?.summary ?? previewState.summary ?? EMPTY_PREVIEW_SUMMARY;
+  $: narrationLevel = showExplanationDetails ? 'verbose' : 'summary';
+  $: summaryNarration = narrateSyncPreviewSummary(summary, narrationLevel);
+  $: coverage = preview ? resolveCoverage(preview) : UNAVAILABLE_PREVIEW_COVERAGE;
+  $: sectionNarrations = preview
+    ? preview.sectionOutcomes
+        .filter((outcome) => showExplanationDetails || outcome.error !== null || outcome.skipped)
+        .map((outcome) => narrateSyncSectionOutcome(outcome, narrationLevel))
+    : [];
   $: stalenessText = staleness ? formatAge(staleness.ageMs) : '';
   $: sectionGroups = (() => {
     if (!preview) return [];
@@ -342,8 +407,10 @@
       void loadPreview(previewState.previewId);
     }
   } else {
+    activePreviewId = null;
     preview = null;
     loadError = previewState.error ?? '';
+    applyResultText = '';
   }
 </script>
 
@@ -443,7 +510,51 @@
           </div>
         {/if}
 
-        {#if summary.totalCreates === 0 && summary.totalUpdates === 0 && summary.totalDeletes === 0 && summary.totalUnchanged > 0}
+        <section
+          id="sync-preview-decision-log"
+          class="space-y-3 rounded-md border border-neutral-200 bg-neutral-50 p-4 dark:border-neutral-700 dark:bg-neutral-800/40"
+          aria-labelledby="sync-preview-planned-changes-heading"
+        >
+          <div class="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h3
+                id="sync-preview-planned-changes-heading"
+                class="font-semibold text-neutral-900 dark:text-neutral-100"
+              >
+                Planned changes
+              </h3>
+              <p class="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
+                Decision log for preview generation. These entries are not confirmed apply outcomes.
+              </p>
+            </div>
+            <button
+              type="button"
+              class="rounded-md border border-neutral-300 bg-white px-2.5 py-1.5 text-xs font-medium text-neutral-700 hover:bg-neutral-100 dark:border-neutral-600 dark:bg-neutral-900 dark:text-neutral-200 dark:hover:bg-neutral-800"
+              aria-expanded={showExplanationDetails}
+              aria-controls="sync-preview-decision-log"
+              on:click={toggleExplanationDetails}
+            >
+              {showExplanationDetails ? 'Hide explanation details' : 'Show explanation details'}
+            </button>
+          </div>
+
+          <NarrationBlock line={summaryNarration} verbose={showExplanationDetails} />
+
+          <div class="flex flex-wrap items-center gap-2 text-xs text-neutral-600 dark:text-neutral-400">
+            <Badge variant={coverage.status === 'partial' ? 'warning' : 'neutral'}>{coverage.label}</Badge>
+            <span>{coverage.detail}</span>
+          </div>
+
+          {#if sectionNarrations.length > 0}
+            <div class="space-y-2 border-t border-neutral-200 pt-3 dark:border-neutral-700">
+              {#each sectionNarrations as line}
+                <NarrationBlock {line} verbose={showExplanationDetails} />
+              {/each}
+            </div>
+          {/if}
+        </section>
+
+        {#if coverage.status === 'complete' && summary.totalCreates === 0 && summary.totalUpdates === 0 && summary.totalDeletes === 0 && summary.totalUnchanged > 0}
           <div
             class="flex items-start gap-2 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700 dark:border-emerald-900/40 dark:bg-emerald-900/20 dark:text-emerald-200"
           >
@@ -457,7 +568,7 @@
             {#if focusSection && focusSection === 'metadataProfiles' && !preview?.sections?.length}
               Configure and save metadata profile settings first, then generate a new preview.
             {:else}
-              The preview snapshot contains no section-level changes.
+              No section-level entity changes are available from the supplied preview data.
             {/if}
           </p>
         {:else}
@@ -477,7 +588,13 @@
 
                 <div class="mt-3 space-y-2">
                   {#each sectionGroup.entities as entity}
-                    <SyncPreviewEntityDiff {entity} defaultExpanded={entity.action !== 'unchanged'} />
+                    <SyncPreviewEntityDiff
+                      {entity}
+                      arrType={preview.arrType}
+                      section={sectionGroup.section}
+                      level={narrationLevel}
+                      defaultExpanded={entity.action !== 'unchanged'}
+                    />
                   {/each}
                 </div>
               </div>
@@ -485,11 +602,20 @@
           </div>
         {/if}
 
+        {#if applyResultText}
+          <div
+            class="rounded-md border px-3 py-2 text-sm {applyError
+              ? 'border-red-200 bg-red-50 text-red-700 dark:border-red-900/40 dark:bg-red-900/20 dark:text-red-300'
+              : 'border-neutral-200 bg-neutral-50 text-neutral-700 dark:border-neutral-700 dark:bg-neutral-800/40 dark:text-neutral-300'}"
+          >
+            <p class="font-medium">Apply result</p>
+            <p class="mt-1">{applyResultText}</p>
+          </div>
+        {/if}
+
         <div class="flex flex-col gap-2 pt-2 sm:flex-row sm:items-center sm:justify-between">
           <div class="text-xs text-neutral-500 dark:text-neutral-400">
-            {applyError
-              ? `Apply error: ${applyError}`
-              : 'Apply will run exactly the selected sync operations from this snapshot.'}
+            Apply reruns the eligible selected sections; planned entries above are not confirmed outcomes.
           </div>
           <div class="flex items-center gap-2">
             <Button
@@ -552,5 +678,3 @@
     {/if}
   </div>
 </Modal>
-
-<div class="sr-only" aria-live="polite">{stalenessText}</div>

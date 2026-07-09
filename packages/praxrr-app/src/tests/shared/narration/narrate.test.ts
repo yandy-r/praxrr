@@ -1,5 +1,5 @@
-import { assert, assertEquals } from '@std/assert';
-import type { EntityChange } from '$sync/preview/types.ts';
+import { assert, assertEquals, assertStringIncludes } from '@std/assert';
+import type { EntityChange, SyncPreviewArrType, SyncPreviewSectionOutcome } from '$sync/preview/types.ts';
 import type { DriftEntityChange, DriftReason } from '$sync/drift/types.ts';
 import type { DriftSummaryStatus } from '$sync/drift/responses.ts';
 import {
@@ -8,6 +8,10 @@ import {
   narrateDriftEntity,
   narrateDriftReason,
   narrateEntityChange,
+  narrateEntityChanges,
+  narrateSyncPreviewError,
+  narrateSyncPreviewSummary,
+  narrateSyncSectionOutcome,
 } from '../../../lib/shared/narration/index.ts';
 import {
   resolveEntityLabel,
@@ -27,10 +31,10 @@ Deno.test('narrateEntityChange: create summarizes to a single decision headline'
     fields: [],
   };
   assertEquals(narrateEntityChange(change, 'radarr', 'qualityProfiles', 'summary'), {
-    headline: 'Add Custom Format "HDR".',
+    headline: 'Praxrr plans to add Custom Format "HDR".',
     detail: [],
     tone: 'info',
-    templateVersion: '1',
+    templateVersion: '2',
   });
 });
 
@@ -46,10 +50,10 @@ Deno.test('narrateEntityChange: update verbose adds one detail line per field', 
     ],
   };
   assertEquals(narrateEntityChange(change, 'radarr', 'qualityProfiles', 'verbose'), {
-    headline: 'Update Quality Profile "HD-1080p" (2 fields differ).',
+    headline: 'Praxrr plans to update Quality Profile "HD-1080p" (2 fields differ).',
     detail: ['Cutoff quality changed.', 'Name set.'],
     tone: 'info',
-    templateVersion: '1',
+    templateVersion: '2',
   });
 });
 
@@ -63,13 +67,13 @@ Deno.test('narrateEntityChange: update summary keeps detail empty', () => {
   };
   const line = narrateEntityChange(change, 'radarr', 'qualityProfiles', 'summary');
   assertEquals(line.detail, []);
-  assertEquals(line.headline, 'Update Quality Profile "HD" (1 field differs).');
+  assertEquals(line.headline, 'Praxrr plans to update Quality Profile "HD" (1 field differs).');
 });
 
 Deno.test('narrateEntityChange: delete does not over-explain (no verbose detail)', () => {
   const change: EntityChange = { entityType: 'customFormat', name: 'Old', action: 'delete', remoteId: 5, fields: [] };
   const line = narrateEntityChange(change, 'radarr', 'qualityProfiles', 'verbose');
-  assertEquals(line.headline, 'Remove Custom Format "Old".');
+  assertEquals(line.headline, 'Praxrr plans to remove Custom Format "Old".');
   assertEquals(line.detail, []);
   assertEquals(line.tone, 'info');
 });
@@ -118,6 +122,137 @@ Deno.test('resolveFieldLabel: cross-Arr safe — mapped label resolves, unmapped
   assertEquals(resolveFieldLabel('sonarr', 'qualityProfile', 'qualityProfiles', 'zzz_unknown'), 'zzz_unknown');
 });
 
+// --- sync-preview narration --------------------------------------------------------------
+
+Deno.test('narrateSyncPreviewSummary: mixed supplied totals stay planned and verbatim', () => {
+  const line = narrateSyncPreviewSummary(
+    { totalCreates: 2, totalUpdates: 1, totalDeletes: 3, totalUnchanged: 4 },
+    'verbose'
+  );
+
+  assertEquals(
+    line.headline,
+    'Planned changes: 2 entities to add, 1 entity to update, 3 entities to remove, and 4 entities already matching.'
+  );
+  assertEquals(line.detail, ['These are planned changes, not confirmed apply results.']);
+  assertEquals(line.tone, 'warning');
+  assertEquals(line.templateVersion, '2');
+});
+
+Deno.test('narrateSyncPreviewSummary: zero changes stays neutral without claiming complete coverage', () => {
+  const summary = narrateSyncPreviewSummary(
+    { totalCreates: 0, totalUpdates: 0, totalDeletes: 0, totalUnchanged: 5 },
+    'verbose'
+  );
+
+  assertEquals(summary.headline, 'No changes are planned from the supplied preview data.');
+  assertEquals(summary.detail, [
+    '5 entities already matching.',
+    'These are planned changes, not confirmed apply results.',
+  ]);
+  assertEquals(summary.tone, 'neutral');
+});
+
+Deno.test('narrateSyncPreviewSummary: visible rows cannot retally contradictory authoritative totals', () => {
+  const visible: EntityChange[] = [
+    {
+      entityType: 'customFormat',
+      name: 'Visible only',
+      action: 'update',
+      remoteId: 1,
+      fields: [{ field: 'score', type: 'changed', current: 1, desired: 2 }],
+    },
+  ];
+  const summary = narrateSyncPreviewSummary(
+    { totalCreates: 7, totalUpdates: 0, totalDeletes: 0, totalUnchanged: 9 },
+    'summary'
+  );
+  const rows = narrateEntityChanges(visible, 'radarr', 'qualityProfiles', 'summary');
+
+  assertStringIncludes(summary.headline, '7 entities to add');
+  assertStringIncludes(summary.headline, '9 entities already matching');
+  assertEquals(rows.length, 1);
+  assertStringIncludes(rows[0].headline, 'plans to update');
+});
+
+Deno.test('narrateSyncSectionOutcome: every section reports preview-generation coverage only', () => {
+  const cases: readonly {
+    outcome: SyncPreviewSectionOutcome;
+    expectedHeadline: string;
+    expectedTone: 'neutral' | 'warning';
+  }[] = [
+    {
+      outcome: { section: 'qualityProfiles', skipped: false, error: null },
+      expectedHeadline: 'Quality Profiles was included in preview generation.',
+      expectedTone: 'neutral',
+    },
+    {
+      outcome: { section: 'delayProfiles', skipped: true, error: null },
+      expectedHeadline: 'Delay Profiles was skipped during preview generation.',
+      expectedTone: 'neutral',
+    },
+    {
+      outcome: { section: 'mediaManagement', skipped: false, error: 'upstream detail' },
+      expectedHeadline: 'Media Management preview generation failed.',
+      expectedTone: 'warning',
+    },
+    {
+      outcome: { section: 'metadataProfiles', skipped: false, error: null },
+      expectedHeadline: 'Metadata Profiles was included in preview generation.',
+      expectedTone: 'neutral',
+    },
+  ];
+
+  for (const testCase of cases) {
+    const summary = narrateSyncSectionOutcome(testCase.outcome, 'summary');
+    const verbose = narrateSyncSectionOutcome(testCase.outcome, 'verbose');
+    assertEquals(summary.headline, testCase.expectedHeadline);
+    assertEquals(summary.detail, []);
+    assertEquals(summary.tone, testCase.expectedTone);
+    assertStringIncludes(verbose.detail.at(-1) ?? '', 'preview generation only');
+    assert(!/appl(?:y|ied)|succeeded/i.test(summary.headline));
+  }
+});
+
+Deno.test('narrateSyncSectionOutcome: empty section error remains a failure with generic detail', () => {
+  const line = narrateSyncSectionOutcome({ section: 'qualityProfiles', skipped: false, error: '' }, 'verbose');
+  assertEquals(line.headline, 'Quality Profiles preview generation failed.');
+  assertEquals(line.detail[0], 'No additional error detail was provided.');
+  assertEquals(line.tone, 'warning');
+});
+
+Deno.test('narrateEntityChanges: delegates planned wording and literal fallback for every Arr type', () => {
+  const change: EntityChange = {
+    entityType: 'unknownEntity',
+    name: '<img src=x onerror=alert(1)>',
+    action: 'create',
+    remoteId: null,
+    fields: [],
+  };
+  const arrTypes: readonly SyncPreviewArrType[] = ['radarr', 'sonarr', 'lidarr'];
+
+  for (const arrType of arrTypes) {
+    const [line] = narrateEntityChanges([change], arrType, 'qualityProfiles', 'summary');
+    assertEquals(line, narrateEntityChange(change, arrType, 'qualityProfiles', 'summary'));
+    assertEquals(line.headline, 'Praxrr plans to add unknownEntity "<img src=x onerror=alert(1)>".');
+    assert(!/created|added|applied|succeeded/i.test(line.headline));
+  }
+});
+
+Deno.test('narrateSyncPreviewError: arbitrary text is framed without substring classification', () => {
+  const unauthorized = narrateSyncPreviewError('unauthorized at upstream host', 'verbose');
+  const timeout = narrateSyncPreviewError('timeout while reading', 'verbose');
+  const hidden = narrateSyncPreviewError('<script>alert(1)</script>', 'summary');
+
+  assertEquals(unauthorized.headline, 'A trustworthy preview could not be generated.');
+  assertEquals(timeout.headline, unauthorized.headline);
+  assertEquals(unauthorized.detail, ['Reported detail: unauthorized at upstream host']);
+  assertEquals(timeout.detail, ['Reported detail: timeout while reading']);
+  assertEquals(hidden.detail, []);
+  assertEquals(hidden.headline, unauthorized.headline);
+  assertEquals(narrateSyncPreviewError(null, 'verbose').detail, ['No additional error detail was provided.']);
+});
+
 // --- narrateDriftEntity (delegates to the core, reframes by category) --------------------
 
 Deno.test('narrateDriftEntity: drift (update) reuses core detail, warns, frames as drifted', () => {
@@ -134,7 +269,7 @@ Deno.test('narrateDriftEntity: drift (update) reuses core detail, warns, frames 
     headline: 'Quality Profile "HD" has drifted from the resolved config (1 field differs).',
     detail: ['Cutoff quality changed.'],
     tone: 'warning',
-    templateVersion: '1',
+    templateVersion: '2',
   });
 });
 
@@ -284,6 +419,9 @@ Deno.test('every NarrationLine stamps the current template version', () => {
   };
   const lines = [
     narrateEntityChange(entity, 'radarr', 'qualityProfiles', 'summary'),
+    narrateSyncPreviewSummary({ totalCreates: 1, totalUpdates: 0, totalDeletes: 0, totalUnchanged: 0 }, 'summary'),
+    narrateSyncSectionOutcome({ section: 'qualityProfiles', skipped: false, error: null }, 'verbose'),
+    narrateSyncPreviewError('opaque detail', 'verbose'),
     narrateDriftEntity(drift, 'radarr', 'verbose'),
     narrateDriftReason('drifted', null, 'summary'),
     narrateDriftCounts({ drifted: 1, missing: 0, unmanaged: 0 }, 'drifted', 'verbose'),

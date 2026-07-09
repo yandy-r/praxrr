@@ -3,17 +3,36 @@ import { updateScoring } from '$pcd/entities/qualityProfiles/scoring/update.ts';
 import { GOALS_ENGINE_VERSION } from '$shared/goals/index.ts';
 import { readJsonObjectBody, parseGoalRequest, buildGoalPlan } from '$lib/server/goals/planRequest.ts';
 import { toWirePlan, toWireBinding } from '$lib/server/goals/responses.ts';
+import { buildGoalDecisionLogMetadata } from '$lib/server/goals/decisionLog.ts';
 import { qualityGoalBindingQueries } from '$db/queries/qualityGoalBindings.ts';
+import { logger } from '$logger/logger.ts';
 import type { components } from '$api/v1.d.ts';
 
 type GoalApplyResponse = components['schemas']['GoalApplyResponse'];
+
+export interface GoalApplyDependencies {
+  readonly buildGoalPlan: typeof buildGoalPlan;
+  readonly updateScoring: typeof updateScoring;
+  readonly upsertBinding: typeof qualityGoalBindingQueries.upsert;
+  readonly logInfo: typeof logger.info;
+}
+
+const DEFAULT_DEPENDENCIES: GoalApplyDependencies = {
+  buildGoalPlan,
+  updateScoring,
+  upsertBinding: (input) => qualityGoalBindingQueries.upsert(input),
+  logInfo: (message, options) => logger.info(message, options),
+};
 
 /**
  * POST /api/v1/goals/apply — persist the generated scores + thresholds to the quality profile via the
  * standard PCD user-op path, then record the goal binding. Returns 409 when the client computed
  * against a different engine version.
  */
-export const POST: RequestHandler = async ({ request }) => {
+export async function handleGoalApplyRequest(
+  request: Request,
+  dependencies: GoalApplyDependencies = DEFAULT_DEPENDENCIES
+): Promise<Response> {
   const body = await readJsonObjectBody(request);
   const goalRequest = parseGoalRequest(body);
 
@@ -27,31 +46,43 @@ export const POST: RequestHandler = async ({ request }) => {
     );
   }
 
-  const { cache, plan } = await buildGoalPlan(goalRequest);
+  const { cache, plan } = await dependencies.buildGoalPlan(goalRequest);
 
-  const result = await updateScoring({
+  const result = await dependencies.updateScoring({
     databaseId: goalRequest.databaseId,
     cache,
     layer: 'user',
     profileName: goalRequest.profileName,
-    input: plan.scoringInput
+    input: plan.scoringInput,
   });
   if (!result.success) {
     throw error(500, result.error ?? 'Failed to apply goal scoring');
   }
 
-  const binding = qualityGoalBindingQueries.upsert({
+  const binding = dependencies.upsertBinding({
     databaseId: goalRequest.databaseId,
     profileName: goalRequest.profileName,
     arrType: goalRequest.arrType,
     presetId: goalRequest.presetId,
     weightsJson: JSON.stringify(goalRequest.weights),
     engineVersion: GOALS_ENGINE_VERSION,
-    appliedAt: new Date().toISOString()
+    appliedAt: new Date().toISOString(),
+  });
+
+  await dependencies.logInfo('Quality goal applied', {
+    source: 'QualityGoals',
+    meta: buildGoalDecisionLogMetadata({
+      databaseId: goalRequest.databaseId,
+      profileName: goalRequest.profileName,
+      presetId: goalRequest.presetId,
+      plan,
+    }),
   });
 
   return json({
     plan: toWirePlan(plan),
-    binding: toWireBinding(binding)
+    binding: toWireBinding(binding),
   } satisfies GoalApplyResponse);
-};
+}
+
+export const POST: RequestHandler = ({ request }) => handleGoalApplyRequest(request);

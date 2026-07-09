@@ -1,22 +1,31 @@
-export type JobType =
-  | 'arr.upgrade'
-  | 'arr.rename'
-  | 'arr.sync'
-  | 'arr.sync.qualityProfiles'
-  | 'arr.sync.delayProfiles'
-  | 'arr.sync.mediaManagement'
-  | 'arr.sync.metadataProfiles'
-  | 'arr.pull.startup'
-  | 'pcd.sync'
-  | 'trashguide.sync'
-  | 'backup.create'
-  | 'backup.cleanup'
-  | 'logs.cleanup'
-  | 'drift.check'
-  | 'sync.history.cleanup'
-  | 'sync.canary.rollout'
-  | 'config-health.snapshot'
-  | 'config-health.cleanup';
+/**
+ * Ordered inventory of every queued workflow Praxrr can dispatch.
+ *
+ * Runtime consumers (including the transparency audit) use this tuple so the
+ * compile-time union and runtime inventory cannot drift apart.
+ */
+export const JOB_TYPES = [
+  'arr.upgrade',
+  'arr.rename',
+  'arr.sync',
+  'arr.sync.qualityProfiles',
+  'arr.sync.delayProfiles',
+  'arr.sync.mediaManagement',
+  'arr.sync.metadataProfiles',
+  'arr.pull.startup',
+  'pcd.sync',
+  'trashguide.sync',
+  'backup.create',
+  'backup.cleanup',
+  'logs.cleanup',
+  'drift.check',
+  'sync.history.cleanup',
+  'sync.canary.rollout',
+  'config-health.snapshot',
+  'config-health.cleanup',
+] as const;
+
+export type JobType = (typeof JOB_TYPES)[number];
 
 export type JobStatus = 'queued' | 'running' | 'success' | 'failed' | 'cancelled';
 
