@@ -127,6 +127,18 @@ export const NAV_REGISTRY: ArrCapabilityAwareNavItem[] = [
     hasChildren: false,
   },
   {
+    id: 'overview.config_health',
+    label: 'Config Health',
+    href: '/config-health',
+    groupId: ensureGroupId('overview'),
+    order: 5,
+    arrScope: scopeAll,
+    mobilePriority: 'medium',
+    iconKey: 'GitCompare',
+    emoji: '🩺',
+    hasChildren: false,
+  },
+  {
     id: 'apps.arrs',
     label: 'Arrs',
     href: '/arr',

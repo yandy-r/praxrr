@@ -1,0 +1,152 @@
+summary:
+  get:
+    operationId: getConfigHealthSummary
+    summary: Fleet config-health summary
+    description: |
+      Live per-instance overall health score and band for every enabled, sync-capable Arr instance,
+      plus aggregate totals and a settings snapshot. Degraded/never-checked states are carried in the
+      200 body (per-instance band), not as an HTTP error.
+    tags:
+      - Config Health
+    responses:
+      '200':
+        description: Fleet health summary
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/config-health.yaml#/ConfigHealthSummaryResponse'
+      '500':
+        description: Internal error
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+
+detail:
+  get:
+    operationId: getConfigHealthDetail
+    summary: Config-health detail for one instance
+    description: |
+      Live overall health plus a per-quality-profile breakdown with per-criterion contributions and
+      non-judgmental suggestions for a single instance.
+    tags:
+      - Config Health
+    parameters:
+      - name: instanceId
+        in: path
+        required: true
+        description: Arr instance id
+        schema:
+          type: integer
+    responses:
+      '200':
+        description: Instance health detail
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/config-health.yaml#/ConfigHealthDetailResponse'
+      '400':
+        description: Invalid instance id
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+      '404':
+        description: Instance not found or not sync-capable
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+
+trends:
+  get:
+    operationId: getConfigHealthTrends
+    summary: Config-health score trend for one instance
+    description: |
+      Time-series of the persisted overall score and band for one instance, oldest → newest, for the
+      trend sparkline. Bounded to the last `days` when provided.
+    tags:
+      - Config Health
+    parameters:
+      - name: instanceId
+        in: path
+        required: true
+        description: Arr instance id
+        schema:
+          type: integer
+      - name: days
+        in: query
+        required: false
+        description: Restrict the series to the last N days.
+        schema:
+          type: integer
+          minimum: 1
+    responses:
+      '200':
+        description: Health trend series
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/config-health.yaml#/ConfigHealthTrendsResponse'
+      '400':
+        description: Invalid instance id or days
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+      '404':
+        description: Instance not found or not sync-capable
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+
+settings:
+  get:
+    operationId: getConfigHealthSettings
+    summary: Read config-health settings
+    description: |
+      The configurable per-criterion enable/weight set, cadence, retention, the engine version, and
+      the static criterion catalog (id/label/description) so the client hardcodes nothing.
+    tags:
+      - Config Health
+    responses:
+      '200':
+        description: Config-health settings
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/config-health.yaml#/ConfigHealthSettingsResponse'
+  put:
+    operationId: updateConfigHealthSettings
+    summary: Update config-health settings
+    description: |
+      Update the criteria enable/weights, cadence, and retention. Reschedules the snapshot + cleanup
+      jobs immediately. Returns 409 when `expectedEngineVersion` does not match the server engine.
+    tags:
+      - Config Health
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../schemas/config-health.yaml#/ConfigHealthSettingsUpdateRequest'
+    responses:
+      '200':
+        description: Updated config-health settings
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/config-health.yaml#/ConfigHealthSettingsResponse'
+      '400':
+        description: Invalid request
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+      '409':
+        description: Engine version mismatch
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'

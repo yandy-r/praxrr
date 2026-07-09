@@ -83,6 +83,10 @@
     {
       "name": "Quality Goals",
       "description": "Intent-to-implementation bridge — translate presets/sliders into custom-format scores"
+    },
+    {
+      "name": "Config Health",
+      "description": "Score configuration quality/health per instance and profile, with suggestions and trends"
     }
   ],
   "paths": {
@@ -4131,6 +4135,216 @@
           },
           "400": {
             "description": "Invalid query parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/config-health/summary": {
+      "get": {
+        "operationId": "getConfigHealthSummary",
+        "summary": "Fleet config-health summary",
+        "description": "Live per-instance overall health score and band for every enabled, sync-capable Arr instance,\nplus aggregate totals and a settings snapshot. Degraded/never-checked states are carried in the\n200 body (per-instance band), not as an HTTP error.\n",
+        "tags": ["Config Health"],
+        "responses": {
+          "200": {
+            "description": "Fleet health summary",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConfigHealthSummaryResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/config-health/{instanceId}": {
+      "get": {
+        "operationId": "getConfigHealthDetail",
+        "summary": "Config-health detail for one instance",
+        "description": "Live overall health plus a per-quality-profile breakdown with per-criterion contributions and\nnon-judgmental suggestions for a single instance.\n",
+        "tags": ["Config Health"],
+        "parameters": [
+          {
+            "name": "instanceId",
+            "in": "path",
+            "required": true,
+            "description": "Arr instance id",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Instance health detail",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConfigHealthDetailResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid instance id",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Instance not found or not sync-capable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/config-health/{instanceId}/trends": {
+      "get": {
+        "operationId": "getConfigHealthTrends",
+        "summary": "Config-health score trend for one instance",
+        "description": "Time-series of the persisted overall score and band for one instance, oldest → newest, for the\ntrend sparkline. Bounded to the last `days` when provided.\n",
+        "tags": ["Config Health"],
+        "parameters": [
+          {
+            "name": "instanceId",
+            "in": "path",
+            "required": true,
+            "description": "Arr instance id",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "days",
+            "in": "query",
+            "required": false,
+            "description": "Restrict the series to the last N days.",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Health trend series",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConfigHealthTrendsResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid instance id or days",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Instance not found or not sync-capable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/config-health/settings": {
+      "get": {
+        "operationId": "getConfigHealthSettings",
+        "summary": "Read config-health settings",
+        "description": "The configurable per-criterion enable/weight set, cadence, retention, the engine version, and\nthe static criterion catalog (id/label/description) so the client hardcodes nothing.\n",
+        "tags": ["Config Health"],
+        "responses": {
+          "200": {
+            "description": "Config-health settings",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConfigHealthSettingsResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "operationId": "updateConfigHealthSettings",
+        "summary": "Update config-health settings",
+        "description": "Update the criteria enable/weights, cadence, and retention. Reschedules the snapshot + cleanup\njobs immediately. Returns 409 when `expectedEngineVersion` does not match the server engine.\n",
+        "tags": ["Config Health"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfigHealthSettingsUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated config-health settings",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConfigHealthSettingsResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Engine version mismatch",
             "content": {
               "application/json": {
                 "schema": {
@@ -8928,6 +9142,403 @@
           "truncated": {
             "type": "boolean",
             "description": "True when the traversal hit its depth or visited cap and stopped early"
+          }
+        }
+      },
+      "ConfigHealthBand": {
+        "type": "string",
+        "description": "Health band derived from the 0–100 rollup. `unknown` means every enabled criterion was skipped.",
+        "enum": ["healthy", "attention", "needs-review", "unknown"]
+      },
+      "ConfigHealthArrType": {
+        "type": "string",
+        "enum": ["radarr", "sonarr", "lidarr"]
+      },
+      "ConfigHealthTone": {
+        "type": "string",
+        "description": "Presentation hint for a suggestion; health tone never exceeds `warning`.",
+        "enum": ["neutral", "info", "warning", "danger"]
+      },
+      "ConfigHealthSuggestion": {
+        "type": "object",
+        "description": "A non-judgmental remediation line rendered through the shared narration surface.",
+        "required": ["headline", "detail", "tone", "templateVersion"],
+        "properties": {
+          "headline": {
+            "type": "string"
+          },
+          "detail": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "tone": {
+            "$ref": "#/components/schemas/ConfigHealthTone"
+          },
+          "templateVersion": {
+            "type": "string"
+          }
+        }
+      },
+      "ConfigHealthCriterion": {
+        "type": "object",
+        "description": "One criterion's contribution to a scored unit.",
+        "required": ["id", "label", "score", "weight", "contribution", "detail", "suggestions"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Criterion id — one of completeness, drift, coherence, compatibility, trash_alignment."
+          },
+          "label": {
+            "type": "string"
+          },
+          "score": {
+            "description": "0–100 sub-score, or null when the criterion could not be evaluated (excluded from the rollup).",
+            "oneOf": [
+              {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 100
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "weight": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "contribution": {
+            "type": "integer"
+          },
+          "detail": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "suggestions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ConfigHealthSuggestion"
+            }
+          }
+        }
+      },
+      "ConfigHealthScoredUnit": {
+        "type": "object",
+        "description": "A scored unit (whole instance or one profile) — the rollup number, its band, and the breakdown.",
+        "required": ["score", "band", "criteria", "suggestions"],
+        "properties": {
+          "score": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100
+          },
+          "band": {
+            "$ref": "#/components/schemas/ConfigHealthBand"
+          },
+          "criteria": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ConfigHealthCriterion"
+            }
+          },
+          "suggestions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ConfigHealthSuggestion"
+            }
+          }
+        }
+      },
+      "ConfigHealthProfileHealth": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/ConfigHealthScoredUnit"
+          },
+          {
+            "type": "object",
+            "required": ["name"],
+            "properties": {
+              "name": {
+                "type": "string"
+              }
+            }
+          }
+        ]
+      },
+      "ConfigHealthInstanceSummary": {
+        "type": "object",
+        "required": ["instanceId", "instanceName", "arrType", "score", "band", "generatedAt"],
+        "properties": {
+          "instanceId": {
+            "type": "integer"
+          },
+          "instanceName": {
+            "type": "string"
+          },
+          "arrType": {
+            "$ref": "#/components/schemas/ConfigHealthArrType"
+          },
+          "score": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100
+          },
+          "band": {
+            "$ref": "#/components/schemas/ConfigHealthBand"
+          },
+          "generatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ConfigHealthTotals": {
+        "type": "object",
+        "required": ["instances", "healthy", "attention", "needsReview", "unknown", "averageScore"],
+        "properties": {
+          "instances": {
+            "type": "integer"
+          },
+          "healthy": {
+            "type": "integer"
+          },
+          "attention": {
+            "type": "integer"
+          },
+          "needsReview": {
+            "type": "integer"
+          },
+          "unknown": {
+            "type": "integer"
+          },
+          "averageScore": {
+            "description": "Mean overall score across scored instances, or null when none could be scored.",
+            "oneOf": [
+              {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 100
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "ConfigHealthSettingsSnapshot": {
+        "type": "object",
+        "required": ["enabled", "intervalMinutes"],
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "intervalMinutes": {
+            "type": "integer",
+            "minimum": 5
+          }
+        }
+      },
+      "ConfigHealthSummaryResponse": {
+        "type": "object",
+        "required": ["engineVersion", "generatedAt", "totals", "settings", "instances"],
+        "properties": {
+          "engineVersion": {
+            "type": "string"
+          },
+          "generatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "totals": {
+            "$ref": "#/components/schemas/ConfigHealthTotals"
+          },
+          "settings": {
+            "$ref": "#/components/schemas/ConfigHealthSettingsSnapshot"
+          },
+          "instances": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ConfigHealthInstanceSummary"
+            }
+          }
+        }
+      },
+      "ConfigHealthDetailResponse": {
+        "type": "object",
+        "required": ["instanceId", "instanceName", "arrType", "engineVersion", "generatedAt", "overall", "profiles"],
+        "properties": {
+          "instanceId": {
+            "type": "integer"
+          },
+          "instanceName": {
+            "type": "string"
+          },
+          "arrType": {
+            "$ref": "#/components/schemas/ConfigHealthArrType"
+          },
+          "engineVersion": {
+            "type": "string"
+          },
+          "generatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "overall": {
+            "$ref": "#/components/schemas/ConfigHealthScoredUnit"
+          },
+          "profiles": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ConfigHealthProfileHealth"
+            }
+          }
+        }
+      },
+      "ConfigHealthTrendPoint": {
+        "type": "object",
+        "required": ["generatedAt", "overallScore", "band"],
+        "properties": {
+          "generatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "overallScore": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100
+          },
+          "band": {
+            "$ref": "#/components/schemas/ConfigHealthBand"
+          }
+        }
+      },
+      "ConfigHealthTrendsResponse": {
+        "type": "object",
+        "required": ["instanceId", "engineVersion", "points"],
+        "properties": {
+          "instanceId": {
+            "type": "integer"
+          },
+          "engineVersion": {
+            "type": "string"
+          },
+          "points": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ConfigHealthTrendPoint"
+            }
+          }
+        }
+      },
+      "ConfigHealthCriterionConfig": {
+        "type": "object",
+        "required": ["id", "enabled", "weight"],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "weight": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      },
+      "ConfigHealthCriterionMeta": {
+        "type": "object",
+        "required": ["id", "label", "description"],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          }
+        }
+      },
+      "ConfigHealthSettingsResponse": {
+        "type": "object",
+        "required": [
+          "engineVersion",
+          "enabled",
+          "intervalMinutes",
+          "retentionDays",
+          "retentionMaxEntries",
+          "criteria",
+          "catalog"
+        ],
+        "properties": {
+          "engineVersion": {
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "intervalMinutes": {
+            "type": "integer",
+            "minimum": 5
+          },
+          "retentionDays": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "retentionMaxEntries": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "criteria": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ConfigHealthCriterionConfig"
+            }
+          },
+          "catalog": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ConfigHealthCriterionMeta"
+            }
+          }
+        }
+      },
+      "ConfigHealthSettingsUpdateRequest": {
+        "type": "object",
+        "description": "Partial settings update. `expectedEngineVersion` guards against a stale client (409 on mismatch).",
+        "required": ["expectedEngineVersion"],
+        "properties": {
+          "expectedEngineVersion": {
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "intervalMinutes": {
+            "type": "integer",
+            "minimum": 5
+          },
+          "retentionDays": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "retentionMaxEntries": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "criteria": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ConfigHealthCriterionConfig"
+            }
           }
         }
       }
