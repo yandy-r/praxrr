@@ -63,7 +63,31 @@ const SEED_SQL = `
 
   INSERT INTO quality_profiles (id, name, minimum_custom_format_score, upgrade_until_score, upgrade_score_increment)
   VALUES (1, 'Movies', 0, 100, 1);
+
+  -- A profile WITH a quality ladder (issue #221). 'Movies' stays ladder-free so its preview test is
+  -- unaffected: with no Bluray-<ceiling> row present, its ladder is always a no-op (ladderInput null).
+  INSERT INTO qualities (name) VALUES ('Bluray-2160p'), ('Bluray-1080p'), ('Bluray-720p'), ('DVD-R');
+  INSERT INTO quality_api_mappings (quality_name, arr_type, api_name) VALUES
+    ('Bluray-2160p', 'radarr', 'Bluray-2160p'),
+    ('Bluray-1080p', 'radarr', 'Bluray-1080p'),
+    ('Bluray-720p', 'radarr', 'Bluray-720p'),
+    ('DVD-R', 'radarr', 'DVD-R');
+  INSERT INTO quality_profiles (id, name, minimum_custom_format_score, upgrade_until_score, upgrade_score_increment)
+  VALUES (2, 'MoviesLadder', 0, 100, 1);
+  INSERT INTO quality_profile_qualities (quality_profile_name, quality_name, quality_group_name, position, enabled, upgrade_until) VALUES
+    ('MoviesLadder', 'Bluray-2160p', NULL, 1, 1, 1),
+    ('MoviesLadder', 'Bluray-1080p', NULL, 2, 1, 0),
+    ('MoviesLadder', 'Bluray-720p', NULL, 3, 0, 0),
+    ('MoviesLadder', 'DVD-R', NULL, 4, 0, 0);
 `;
+
+const CEILING_720_WEIGHTS = {
+  qualityVsSize: 50,
+  compatibility: 55,
+  hdrPreference: 50,
+  unwantedStrictness: 80,
+  resolutionCeiling: '720p',
+};
 
 const BEST_QUALITY_WEIGHTS = {
   qualityVsSize: 100,
@@ -347,6 +371,55 @@ Deno.test('goals preview: returns the plan + config diff without persisting', as
       .select('custom_format_name')
       .execute();
     assertEquals(persisted.length, 0);
+  });
+});
+
+Deno.test('goals preview: surfaces quality-ladder + cutoff changes without persisting (#221)', async () => {
+  await withGoalsFixture(async (databaseId, current) => {
+    const response: Response = await previewRoute.POST(
+      postEvent({
+        databaseId,
+        arrType: 'radarr',
+        profileName: 'MoviesLadder',
+        preset: 'balanced',
+        weights: CEILING_720_WEIGHTS,
+      })
+    );
+    assertEquals(response.status, 200);
+    const body = (await response.json()) as GoalPreviewResponse;
+
+    // The plan's ladder: 720p ceiling enables <=720, disables 1080p/2160p, cutoff -> Bluray-720p.
+    assertEquals(body.plan.qualityLadder.cutoff, 'Bluray-720p');
+    const ladderByName = new Map(body.plan.qualityLadder.items.map((item) => [item.name, item]));
+    assertEquals(ladderByName.get('Bluray-720p')?.enabled, true);
+    assertEquals(ladderByName.get('DVD-R')?.enabled, true);
+    assertEquals(ladderByName.get('Bluray-1080p')?.enabled, false);
+    assertEquals(ladderByName.get('Bluray-2160p')?.enabled, false);
+    // Shared row set: MoviesLadder's enabled qualities are Sonarr-compatible → advisory present.
+    assert(body.plan.qualityLadder.sharedLadderNote !== null);
+
+    // The config diff surfaces the enabled + cutoff (upgradeUntil) FieldChanges for the ladder rows.
+    const ladderDiff = body.configDiff.find((entry) => entry.name === 'MoviesLadder');
+    assert(ladderDiff, 'expected a MoviesLadder config diff');
+    const diffText = JSON.stringify(ladderDiff.changes);
+    assert(diffText.includes('orderedItems'), 'diff references orderedItems');
+    assert(diffText.includes('enabled'), 'diff surfaces enabled changes');
+    assert(diffText.includes('upgradeUntil'), 'diff surfaces cutoff (upgradeUntil) changes');
+    assert(diffText.includes('Bluray-720p'), 'diff references the new cutoff row');
+
+    // Non-persistence: the live cache ladder is untouched (old cutoff still on Bluray-2160p).
+    const persisted = await current.cache.kb
+      .selectFrom('quality_profile_qualities')
+      .select(['quality_name', 'enabled', 'upgrade_until'])
+      .where('quality_profile_name', '=', 'MoviesLadder')
+      .orderBy('position')
+      .execute();
+    assertEquals(persisted, [
+      { quality_name: 'Bluray-2160p', enabled: 1, upgrade_until: 1 },
+      { quality_name: 'Bluray-1080p', enabled: 1, upgrade_until: 0 },
+      { quality_name: 'Bluray-720p', enabled: 0, upgrade_until: 0 },
+      { quality_name: 'DVD-R', enabled: 0, upgrade_until: 0 },
+    ]);
   });
 });
 
