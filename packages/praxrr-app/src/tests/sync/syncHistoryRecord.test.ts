@@ -95,6 +95,8 @@ function makeInput(
     failureCount: 0,
     sectionResults: [{ section: 'qualityProfiles', status: 'success', itemsSynced: 3, error: null }],
     changes: [makeChange('qualityProfiles', 'customFormats', 'HDR10')],
+    entityOutcomes: [],
+    previewId: null,
     error: null,
     startedAt: '2026-07-09T10:00:00.000Z',
     finishedAt: '2026-07-09T10:00:01.000Z',

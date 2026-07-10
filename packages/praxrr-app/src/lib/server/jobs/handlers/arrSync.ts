@@ -1,5 +1,5 @@
 import { jobQueueRegistry } from '../queueRegistry.ts';
-import type { JobHandler, JobRunStatus, JobType } from '../queueTypes.ts';
+import type { JobHandler, JobHandlerResult, JobQueueRecord, JobType } from '../queueTypes.ts';
 import { arrInstancesQueries } from '$db/queries/arrInstances.ts';
 import { arrSyncQueries } from '$db/queries/arrSync.ts';
 import { getArrInstanceClient } from '$arr/arrInstanceClients.ts';
@@ -23,6 +23,17 @@ import type {
   SyncPreviewSection,
   SyncSectionResult,
 } from '$sync/syncHistory/types.ts';
+import type { SyncEntityOutcome } from '$sync/types.ts';
+
+/**
+ * An arr-sync run's result: the job status plus the confirmed per-entity outcomes and the
+ * durable Sync History id that exposes them (issue #232). A function returning this subtype
+ * of {@link JobHandlerResult} stays assignable to {@link JobHandler} (covariant return).
+ */
+export interface SyncJobResult extends JobHandlerResult {
+  outcomes: SyncEntityOutcome[];
+  syncHistoryId: number | null;
+}
 
 // Register sync handlers
 import '$lib/server/sync/qualityProfiles/handler.ts';
@@ -96,17 +107,14 @@ export function setSectionsStatusPending(instanceId: number, sections: readonly 
 export async function executeSyncJob(
   instanceId: number,
   sections: readonly SectionType[],
-  source: 'manual' | 'system' | 'schedule' = 'manual'
-): Promise<{
-  status: JobRunStatus;
-  output?: string;
-  error?: string;
-  rescheduleAt?: string | null;
-}> {
+  source: 'manual' | 'system' | 'schedule' = 'manual',
+  previewId?: string
+): Promise<SyncJobResult> {
   setSectionsStatusPending(instanceId, sections);
 
   const now = new Date().toISOString();
-  const payload = sections.length === 0 ? { instanceId } : { instanceId, sections };
+  const payload =
+    sections.length === 0 ? { instanceId, previewId } : { instanceId, sections, previewId };
 
   return arrSyncHandler({
     id: 0,
@@ -296,28 +304,35 @@ export const __testOnly = {
   collectSnapshotDatabaseIds,
 };
 
-const arrSyncHandler: JobHandler = async (job) => {
+const arrSyncHandler = async (job: JobQueueRecord): Promise<SyncJobResult> => {
   const startedAt = new Date().toISOString();
+  const previewId = typeof job.payload.previewId === 'string' ? job.payload.previewId : null;
   const instanceId = Number(job.payload.instanceId);
   if (!Number.isFinite(instanceId)) {
     // No instance context — nothing attempted, no audit row.
-    return { status: 'failure', error: 'Invalid instance ID' };
+    return { status: 'failure', error: 'Invalid instance ID', outcomes: [], syncHistoryId: null };
   }
 
   const instance = arrInstancesQueries.getById(instanceId);
   if (!instance || !instance.enabled) {
     // Disabled/missing instance — nothing attempted (semantically cancelled), no audit row.
-    return { status: 'cancelled', output: 'Arr instance disabled' };
+    return { status: 'cancelled', output: 'Arr instance disabled', outcomes: [], syncHistoryId: null };
   }
 
   const syncArrType = toSyncArrType(instance.type);
   if (!syncArrType) {
     // arr_type cannot satisfy the sync_history CHECK (radarr/sonarr/lidarr only), so this
     // misconfiguration is not audited beyond the failure return.
-    return { status: 'failure', error: `Unsupported sync instance type: ${instance.type}` };
+    return {
+      status: 'failure',
+      error: `Unsupported sync instance type: ${instance.type}`,
+      outcomes: [],
+      syncHistoryId: null,
+    };
   }
 
-  // Audit-trail recorder (never throws; self-gates on sync_history_settings.enabled).
+  // Audit-trail recorder (never throws; self-gates on sync_history_settings.enabled). Returns the
+  // durable row id so callers can surface it (issue #232), or null when disabled/failed.
   const recordHistory = (
     status: SyncOperationStatus,
     opts: {
@@ -328,10 +343,11 @@ const arrSyncHandler: JobHandler = async (job) => {
       failureCount?: number;
       sectionResults?: SyncSectionResult[];
       changes?: SyncEntityChange[];
+      entityOutcomes?: SyncEntityOutcome[];
     } = {}
-  ): void => {
+  ): number | null => {
     const finishedAt = new Date().toISOString();
-    recordSyncHistory({
+    return recordSyncHistory({
       arrInstanceId: instanceId,
       instanceName: instance.name,
       arrType: syncArrType,
@@ -345,6 +361,8 @@ const arrSyncHandler: JobHandler = async (job) => {
       failureCount: opts.failureCount ?? 0,
       sectionResults: opts.sectionResults ?? [],
       changes: opts.changes ?? [],
+      entityOutcomes: opts.entityOutcomes ?? [],
+      previewId,
       error: opts.error ?? null,
       startedAt,
       finishedAt,
@@ -356,8 +374,8 @@ const arrSyncHandler: JobHandler = async (job) => {
   const sectionsToRun = resolveSections(job.jobType, job.payload);
 
   if (sectionsToRun.length === 0) {
-    recordHistory('skipped', { error: 'No sync sections specified' });
-    return { status: 'skipped', output: 'No sync sections specified' };
+    const syncHistoryId = recordHistory('skipped', { error: 'No sync sections specified' });
+    return { status: 'skipped', output: 'No sync sections specified', outcomes: [], syncHistoryId };
   }
 
   let client: Awaited<ReturnType<typeof getArrInstanceClient>>;
@@ -391,16 +409,20 @@ const arrSyncHandler: JobHandler = async (job) => {
       }
 
       const credentialError = `Arr credentials are not readable. ${getArrClientFailureMessage(message)} The instance has been disabled.`;
-      recordHistory('failed', {
+      const syncHistoryId = recordHistory('failed', {
         error: credentialError,
         sectionsAttempted: sectionsToRun,
         failureCount: sectionsToRun.length,
       });
-      return { status: 'failure', error: credentialError };
+      return { status: 'failure', error: credentialError, outcomes: [], syncHistoryId };
     }
 
-    recordHistory('failed', { error: message, sectionsAttempted: sectionsToRun, failureCount: sectionsToRun.length });
-    return { status: 'failure', error: message };
+    const syncHistoryId = recordHistory('failed', {
+      error: message,
+      sectionsAttempted: sectionsToRun,
+      failureCount: sectionsToRun.length,
+    });
+    return { status: 'failure', error: message, outcomes: [], syncHistoryId };
   }
 
   // Refresh the detected application version on every run, reusing this run's
@@ -423,6 +445,7 @@ const arrSyncHandler: JobHandler = async (job) => {
   // Best-effort + gated on sync_history_settings.enabled; never affects the sync.
   const changes = await capturePreSyncChanges(instance, sectionsToRun);
   const sectionResults: SyncSectionResult[] = [];
+  const allOutcomes: SyncEntityOutcome[] = [];
   let itemsSynced = 0;
 
   const results: string[] = [];
@@ -502,10 +525,21 @@ const arrSyncHandler: JobHandler = async (job) => {
       const syncer = handler.createSyncer(client, instance);
       const result = await syncer.sync();
 
+      allOutcomes.push(...result.outcomes);
       itemsSynced += result.itemsSynced;
       if (result.success) {
         handler.completeSync(instanceId);
-        results.push(`${section}: ${result.itemsSynced} item(s)`);
+        // Surface entity-level failures inside an otherwise-successful section (e.g. a
+        // swallowed-then-surfaced custom format) so the aggregate never hides them. The section
+        // rollup stays `success` (its own writes succeeded); the run status is pulled to `partial`
+        // by the outcome-aware deriveSyncHistoryStatus below, and each failed entity is preserved
+        // in `allOutcomes` (issue #232, Gap 1 — never collapse to success).
+        const failedEntities = result.outcomes.filter((outcome) => outcome.status === 'failed').length;
+        results.push(
+          failedEntities > 0
+            ? `${section}: ${result.itemsSynced} item(s), ${failedEntities} entity failure(s)`
+            : `${section}: ${result.itemsSynced} item(s)`
+        );
         sectionResults.push({
           section,
           status: 'success',
@@ -546,8 +580,9 @@ const arrSyncHandler: JobHandler = async (job) => {
     }
   }
 
-  const historyStatus = deriveSyncHistoryStatus(ranSections, failures, sectionResults);
-  recordHistory(historyStatus, {
+  const historyStatus = deriveSyncHistoryStatus(ranSections, failures, sectionResults, allOutcomes);
+  const hasFailedOutcome = allOutcomes.some((outcome) => outcome.status === 'failed');
+  const syncHistoryId = recordHistory(historyStatus, {
     error: failures > 0 ? results.join(', ') : null,
     sectionsAttempted: sectionsToRun,
     sectionsRun: ranSections,
@@ -555,23 +590,28 @@ const arrSyncHandler: JobHandler = async (job) => {
     failureCount: failures,
     sectionResults,
     changes,
+    entityOutcomes: allOutcomes,
   });
 
   if (job.source === 'schedule' && job.jobType === 'arr.sync') {
     const nextRunAt = arrSyncQueries.getNextScheduledRunAt(instanceId);
     if (nextRunAt) {
       return {
-        status: failures > 0 ? 'failure' : 'success',
+        status: failures > 0 || hasFailedOutcome ? 'failure' : 'success',
         output: results.join(', '),
         rescheduleAt: nextRunAt,
+        outcomes: allOutcomes,
+        syncHistoryId,
       };
     }
   }
 
   return {
-    status: ranSections === 0 ? 'skipped' : failures > 0 ? 'failure' : 'success',
+    status: ranSections === 0 ? 'skipped' : failures > 0 || hasFailedOutcome ? 'failure' : 'success',
     output: results.join(', '),
     rescheduleAt: job.source === 'schedule' ? rescheduleAt : null,
+    outcomes: allOutcomes,
+    syncHistoryId,
   };
 };
 

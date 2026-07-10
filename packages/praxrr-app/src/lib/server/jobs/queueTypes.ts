@@ -39,6 +39,8 @@ export interface ArrSyncJobPayload {
   instanceId: number;
   sections?: ArrSyncSection[];
   section?: ArrSyncSection;
+  /** Correlates the run's confirmed outcomes back to the reviewed sync preview (issue #232). */
+  previewId?: string;
 }
 
 export interface ArrSyncSectionJobPayload {

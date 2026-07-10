@@ -51,6 +51,7 @@ const aliases: Record<string, string> = {
   // Directories
   jobs: 'packages/praxrr-app/src/tests/jobs',
   logger: 'packages/praxrr-app/src/tests/logger',
+  sync: 'packages/praxrr-app/src/tests/sync',
   upgrades: 'packages/praxrr-app/src/tests/upgrades',
 };
 

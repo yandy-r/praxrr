@@ -86,10 +86,14 @@ function createApplyRequest(previewId: string, body: string = '{}'): Request {
   });
 }
 
-function dependenciesReturning(result: SyncJobResult, nowMs: number = Date.now()): SyncPreviewApplyDependencies {
+function dependenciesReturning(
+  result: Partial<SyncJobResult> & Pick<SyncJobResult, 'status'>,
+  nowMs: number = Date.now()
+): SyncPreviewApplyDependencies {
+  const full: SyncJobResult = { outcomes: [], syncHistoryId: null, ...result };
   return {
     getSectionsInProgress: () => [],
-    executeSyncJob: () => Promise.resolve(result),
+    executeSyncJob: () => Promise.resolve(full),
     now: () => nowMs,
   };
 }
@@ -102,6 +106,7 @@ Deno.test('sync preview apply success body matches the generated response contra
         instanceId: number;
         sections: readonly string[];
         source: string | undefined;
+        previewId: string | undefined;
       }
     | undefined;
 
@@ -111,9 +116,25 @@ Deno.test('sync preview apply success body matches the generated response contra
       createApplyRequest(previewId, JSON.stringify({ sections: ['qualityProfiles'] })),
       {
         getSectionsInProgress: () => [],
-        executeSyncJob: (instanceId, sections, source) => {
-          execution = { instanceId, sections, source };
-          return Promise.resolve({ status: 'success', output: 'Synced 2 entities' });
+        executeSyncJob: (instanceId, sections, source, passedPreviewId) => {
+          execution = { instanceId, sections, source, previewId: passedPreviewId };
+          return Promise.resolve({
+            status: 'success',
+            output: 'Synced 2 entities',
+            outcomes: [
+              {
+                section: 'qualityProfiles',
+                arrType: 'radarr',
+                entityType: 'qualityProfile',
+                name: 'HD-1080p',
+                action: 'create',
+                status: 'success',
+                remoteId: '42',
+                reason: null,
+              },
+            ],
+            syncHistoryId: 555,
+          });
         },
         now: Date.now,
       }
@@ -128,11 +149,26 @@ Deno.test('sync preview apply success body matches the generated response contra
         output: 'Synced 2 entities',
       },
       staleWarning: null,
+      outcomes: [
+        {
+          section: 'qualityProfiles',
+          arrType: 'radarr',
+          entityType: 'qualityProfile',
+          name: 'HD-1080p',
+          action: 'create',
+          status: 'success',
+          remoteId: '42',
+          reason: null,
+        },
+      ],
+      syncHistoryId: 555,
     });
+    // Hole 1: the reviewed preview id is threaded into the run for plan↔run correlation.
     assertEquals(execution, {
       instanceId: INSTANCE_ID,
       sections: ['qualityProfiles'],
       source: 'manual',
+      previewId,
     });
   } finally {
     previewStore.delete(previewId);
@@ -159,6 +195,8 @@ Deno.test('sync preview apply skipped body matches the generated success contrac
         output: 'No changes required',
       },
       staleWarning: null,
+      outcomes: [],
+      syncHistoryId: null,
     });
   } finally {
     previewStore.delete(previewId);
@@ -173,7 +211,24 @@ Deno.test('sync preview apply failed body matches the generated coarse result co
     const response = await _handleSyncPreviewApplyRequest(
       previewId,
       createApplyRequest(previewId, JSON.stringify({ sections: ['qualityProfiles'] })),
-      dependenciesReturning({ status: 'failure', error: 'Arr rejected the update' })
+      // Gap 5: a partial/failed run still carries confirmed outcomes + the durable history id.
+      dependenciesReturning({
+        status: 'failure',
+        error: 'Arr rejected the update',
+        outcomes: [
+          {
+            section: 'qualityProfiles',
+            arrType: 'radarr',
+            entityType: 'customFormat',
+            name: 'HDR10',
+            action: 'create',
+            status: 'failed',
+            remoteId: null,
+            reason: 'The Arr instance rejected the request (HTTP 400).',
+          },
+        ],
+        syncHistoryId: 909,
+      })
     );
 
     assertEquals(response.status, 500);
@@ -186,7 +241,23 @@ Deno.test('sync preview apply failed body matches the generated coarse result co
         error: 'Arr rejected the update',
       },
       staleWarning: null,
+      outcomes: [
+        {
+          section: 'qualityProfiles',
+          arrType: 'radarr',
+          entityType: 'customFormat',
+          name: 'HDR10',
+          action: 'create',
+          status: 'failed',
+          remoteId: null,
+          reason: 'The Arr instance rejected the request (HTTP 400).',
+        },
+      ],
+      syncHistoryId: 909,
     });
+    // The failed outcome and its durable id must survive the failure response — never dropped.
+    assertEquals(payload.outcomes.length, 1);
+    assertEquals(payload.syncHistoryId, 909);
   } finally {
     previewStore.delete(previewId);
   }
@@ -224,7 +295,7 @@ Deno.test('sync preview apply stale-blocked body matches the generated error con
       getSectionsInProgress: () => [],
       executeSyncJob: () => {
         executionCount++;
-        return Promise.resolve({ status: 'success' });
+        return Promise.resolve({ status: 'success', outcomes: [], syncHistoryId: null });
       },
       now: () => createdAtMs + 31 * 60 * 1000,
     });

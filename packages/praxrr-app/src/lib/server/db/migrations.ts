@@ -81,6 +81,7 @@ import { migration as migration20260716CreateTimelineAnnotations } from './migra
 import { migration as migration20260717CreateWebauthnTables } from './migrations/20260717_create_webauthn_tables.ts';
 import { migration as migration20260718WidenQualityGoalBindingsArrType } from './migrations/20260718_widen_quality_goal_bindings_arr_type.ts';
 import { migration as migration20260719CreateConfigHealthNotificationState } from './migrations/20260719_create_config_health_notification_state.ts';
+import { migration as migration20260720AddSyncHistoryEntityOutcomes } from './migrations/20260720_add_sync_history_entity_outcomes.ts';
 
 export interface Migration {
   version: number;
@@ -396,6 +397,7 @@ export function loadMigrations(): Migration[] {
     migration20260717CreateWebauthnTables,
     migration20260718WidenQualityGoalBindingsArrType,
     migration20260719CreateConfigHealthNotificationState,
+    migration20260720AddSyncHistoryEntityOutcomes,
   ];
 
   // Sort by version number

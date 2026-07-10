@@ -12,16 +12,35 @@
 import type { BaseArrClient } from '$arr/base.ts';
 import { logger } from '$logger/logger.ts';
 import type { SyncArrType } from '../mappings.ts';
+import type { SyncEntityOutcome } from '../types.ts';
+import { sanitizeArrWriteError } from '../sanitizeArrWriteError.ts';
 import { type ArrCustomFormat, transformCustomFormatWithDiagnostics, type PcdCustomFormat } from './transformer.ts';
+
+/** A Lidarr custom format dropped before write because no conditions are supported (issue #232). */
+const LIDARR_NO_SUPPORTED_CONDITIONS_REASON = 'No custom format conditions are supported on Lidarr.';
 
 interface PreparedCustomFormat {
   readonly pcdName: string;
   readonly arrFormat: ArrCustomFormat;
 }
 
+/** A CF intentionally not written (e.g. Lidarr with no supported conditions), surfaced so
+ * `syncCustomFormats` can emit exactly one `skipped` outcome for it (issue #232, D5). */
+interface DroppedCustomFormat {
+  readonly pcdName: string;
+  readonly reason: string;
+}
+
 interface PreparedCustomFormatResult {
   readonly preparedFormats: readonly PreparedCustomFormat[];
   readonly pcdFormatIdMap: Map<string, number>;
+  readonly droppedFormats: readonly DroppedCustomFormat[];
+}
+
+/** Confirmed custom-format sync outcomes plus the resolved PCD-name → arr-id map. */
+export interface SyncCustomFormatsResult {
+  readonly pcdFormatIdMap: Map<string, number>;
+  readonly outcomes: SyncEntityOutcome[];
 }
 
 interface CompileCustomFormatsOptions {
@@ -41,6 +60,7 @@ async function buildCustomFormatPayloads(
 
   const preparedFormats: PreparedCustomFormat[] = [];
   const pcdFormatIdMap = new Map<string, number>();
+  const droppedFormats: DroppedCustomFormat[] = [];
   let syntheticId = -1;
 
   for (const [pcdName, pcdFormat] of pcdFormats) {
@@ -71,6 +91,7 @@ async function buildCustomFormatPayloads(
           conditionCount: pcdFormat.conditions.length,
         },
       });
+      droppedFormats.push({ pcdName, reason: LIDARR_NO_SUPPORTED_CONDITIONS_REASON });
       continue;
     }
 
@@ -90,7 +111,7 @@ async function buildCustomFormatPayloads(
     });
   }
 
-  return { preparedFormats, pcdFormatIdMap };
+  return { preparedFormats, pcdFormatIdMap, droppedFormats };
 }
 
 /**
@@ -112,8 +133,11 @@ export async function previewCustomFormats(
  * Sync custom formats for a single database to an arr instance.
  *
  * @param suffix - Zero-width namespace suffix for this database
- * @returns Map of PCD format name (unsuffixed) → arr format ID.
- *          The caller uses this to resolve CF scores in quality profiles.
+ * @returns The PCD-name → arr-id map (used to resolve CF scores in quality
+ *          profiles) plus one confirmed {@link SyncEntityOutcome} per attempted
+ *          CF: `success` on a resolved create/update, `failed` on a thrown write
+ *          (previously swallowed), and `skipped` for a Lidarr CF dropped because
+ *          no conditions are supported.
  */
 export async function syncCustomFormats(
   client: BaseArrClient,
@@ -121,14 +145,30 @@ export async function syncCustomFormats(
   instanceType: SyncArrType,
   pcdFormats: Map<string, PcdCustomFormat>,
   suffix: string
-): Promise<Map<string, number>> {
-  const { preparedFormats, pcdFormatIdMap } = await buildCustomFormatPayloads(
+): Promise<SyncCustomFormatsResult> {
+  const { preparedFormats, pcdFormatIdMap, droppedFormats } = await buildCustomFormatPayloads(
     client,
     instanceId,
     instanceType,
     pcdFormats,
     suffix
   );
+
+  const outcomes: SyncEntityOutcome[] = [];
+
+  // CFs dropped before any write (Lidarr, no supported conditions) → one skipped outcome each.
+  for (const { pcdName, reason } of droppedFormats) {
+    outcomes.push({
+      section: 'qualityProfiles',
+      arrType: instanceType,
+      entityType: 'customFormat',
+      name: pcdName,
+      action: 'create',
+      status: 'skipped',
+      remoteId: null,
+      reason,
+    });
+  }
 
   for (const { pcdName, arrFormat } of preparedFormats) {
     await logger.debug(`Compiled custom format "${pcdName}" (suffixed)`, {
@@ -140,10 +180,13 @@ export async function syncCustomFormats(
       },
     });
 
+    const isUpdate = arrFormat.id !== undefined;
     try {
+      let remoteId: number;
       if (arrFormat.id !== undefined) {
         // Update existing
         await client.updateCustomFormat(arrFormat.id, arrFormat);
+        remoteId = arrFormat.id;
         pcdFormatIdMap.set(pcdName, arrFormat.id);
         await logger.debug(`Updated custom format "${pcdName}"`, {
           source: 'Sync:CustomFormats',
@@ -152,14 +195,25 @@ export async function syncCustomFormats(
       } else {
         // Create new
         const response = await client.createCustomFormat(arrFormat);
+        remoteId = response.id!;
         pcdFormatIdMap.set(pcdName, response.id!);
         await logger.debug(`Created custom format "${pcdName}"`, {
           source: 'Sync:CustomFormats',
           meta: { instanceId, formatId: response.id, pcdName, suffixedName: arrFormat.name },
         });
       }
+      outcomes.push({
+        section: 'qualityProfiles',
+        arrType: instanceType,
+        entityType: 'customFormat',
+        name: pcdName,
+        action: isUpdate ? 'update' : 'create',
+        status: 'success',
+        remoteId: String(remoteId),
+        reason: null,
+      });
     } catch (error) {
-      const errorDetails = extractErrorDetails(error);
+      const { reason, protectedDetails } = sanitizeArrWriteError(error);
       await logger.error(`Failed to sync custom format "${pcdName}"`, {
         source: 'Sync:CustomFormats',
         meta: {
@@ -167,32 +221,21 @@ export async function syncCustomFormats(
           pcdName,
           suffixedName: arrFormat.name,
           request: arrFormat,
-          ...errorDetails,
+          ...protectedDetails,
         },
+      });
+      outcomes.push({
+        section: 'qualityProfiles',
+        arrType: instanceType,
+        entityType: 'customFormat',
+        name: pcdName,
+        action: isUpdate ? 'update' : 'create',
+        status: 'failed',
+        remoteId: isUpdate ? String(arrFormat.id) : null,
+        reason,
       });
     }
   }
 
-  return pcdFormatIdMap;
-}
-
-/**
- * Extract error details from HTTP errors for logging
- */
-function extractErrorDetails(error: unknown): Record<string, unknown> {
-  const details: Record<string, unknown> = {
-    error: error instanceof Error ? error.message : 'Unknown error',
-  };
-
-  if (error && typeof error === 'object') {
-    const err = error as Record<string, unknown>;
-    if ('status' in err) details.status = err.status;
-    if ('statusText' in err) details.statusText = err.statusText;
-    if ('response' in err) details.response = err.response;
-    if ('body' in err) details.responseBody = err.body;
-    if ('data' in err) details.responseData = err.data;
-    if (err.cause) details.cause = err.cause;
-  }
-
-  return details;
+  return { pcdFormatIdMap, outcomes };
 }

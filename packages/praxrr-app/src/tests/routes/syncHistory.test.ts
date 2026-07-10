@@ -110,6 +110,8 @@ function seedRow(overrides: Partial<SyncHistoryInput> = {}): number {
       { section: 'qualityProfiles', status: 'success', itemsSynced: 3, error: null },
     ],
     changes: overrides.changes ?? [entityChange()],
+    entityOutcomes: overrides.entityOutcomes ?? [],
+    previewId: overrides.previewId ?? null,
     error: overrides.error ?? null,
     startedAt: overrides.startedAt ?? new Date().toISOString(),
     finishedAt: overrides.finishedAt ?? new Date().toISOString(),

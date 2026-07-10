@@ -857,6 +857,14 @@ components:
       $ref: './schemas/sync.yaml#/FieldChange'
     EntityChange:
       $ref: './schemas/sync.yaml#/EntityChange'
+    SyncEntityOutcomeAction:
+      $ref: './schemas/sync.yaml#/SyncEntityOutcomeAction'
+    SyncEntityOutcomeStatus:
+      $ref: './schemas/sync.yaml#/SyncEntityOutcomeStatus'
+    SyncOutcomeEntityType:
+      $ref: './schemas/sync.yaml#/SyncOutcomeEntityType'
+    SyncEntityOutcome:
+      $ref: './schemas/sync.yaml#/SyncEntityOutcome'
     QualityProfilesPreview:
       $ref: './schemas/sync.yaml#/QualityProfilesPreview'
     DelayProfilesPreview:
