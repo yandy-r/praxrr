@@ -7,9 +7,12 @@
  */
 
 import { computeShieldReport, type SessionRequestContext, type ShieldReport } from '$shared/security/index.ts';
-import { buildPostureInputs } from './gather.ts';
+import { buildPostureInputs, type SecurityPostureDependencies } from './gather.ts';
 
 /** Materialize the current deployment's facts and score them into a live {@link ShieldReport}. */
-export function computeShield(event?: SessionRequestContext): ShieldReport {
-  return computeShieldReport(buildPostureInputs(event));
+export async function computeShield(
+  event?: SessionRequestContext,
+  dependencies: Partial<SecurityPostureDependencies> = {}
+): Promise<ShieldReport> {
+  return computeShieldReport(await buildPostureInputs(event, dependencies));
 }

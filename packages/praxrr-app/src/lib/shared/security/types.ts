@@ -19,7 +19,7 @@ import type { NarrationLine } from '$shared/narration/index.ts';
  * per-check score formula, OR the unscored advisory/assurance report surface changes, so a client
  * can tell a report was produced by a different engine generation. Declared here ONCE.
  */
-export const SECURITY_POSTURE_ENGINE_VERSION = '3';
+export const SECURITY_POSTURE_ENGINE_VERSION = '4';
 
 /**
  * Closed, versioned set of shield checks. Adding/removing/renaming a member is a breaking change —
@@ -57,7 +57,40 @@ export type ShieldArrType = 'radarr' | 'sonarr' | 'lidarr';
 export type CheckStatus = 'pass' | 'advisory' | 'attention' | 'action' | 'assured' | 'na';
 
 /** How a single Arr connection's transport is classified from its URL host (no probing). */
-export type TransportTier = 'encrypted' | 'loopback' | 'docker-alias' | 'private' | 'unknown' | 'public';
+export type TransportTier = 'encrypted' | 'loopback' | 'docker-alias' | 'private' | 'unknown' | 'public' | 'mixed';
+
+/** Closed address classes emitted by the pure IP classifier; unfamiliar/special space is never public by default. */
+export type IpAddressClass = 'loopback' | 'private' | 'link-local' | 'public' | 'special';
+
+/** Result of bounded DNS evidence gathering for one stored Arr hostname. */
+export type DnsOutcome = 'not-applicable' | 'resolved' | 'partial' | 'timeout' | 'failed' | 'empty' | 'budget-exceeded';
+
+/** Provenance of one DNS observation. `cache` preserves the original observation time. */
+export type DnsEvidenceSource = 'none' | 'fresh' | 'cache';
+
+/** Bounded aggregate address-class counts for one DNS record family; raw addresses never cross this contract. */
+export interface DnsAddressClassCounts {
+  readonly loopback: number;
+  readonly private: number;
+  readonly linkLocal: number;
+  readonly public: number;
+  readonly special: number;
+}
+
+/** Closed, redacted DNS transport evidence materialized by the server for deterministic shared grading. */
+export interface DnsTransportEvidence {
+  readonly outcome: DnsOutcome;
+  readonly source: DnsEvidenceSource;
+  readonly ipv4: DnsAddressClassCounts;
+  readonly ipv6: DnsAddressClassCounts;
+  readonly retainedCount: number;
+  /** Original observation time; a cache hit must not refresh it. */
+  readonly observedAt: string | null;
+  readonly incomplete: boolean;
+  readonly truncated: boolean;
+  /** True only when successful observations cross the public/non-public class boundary. */
+  readonly addressClassesChanged: boolean;
+}
 
 /**
  * A concrete, machine-renderable remediation target attached to a recommendation. Every warning/danger
@@ -118,6 +151,8 @@ export interface TransportRow {
   readonly tier: TransportTier;
   readonly score: SubScore;
   readonly status: CheckStatus;
+  /** Closed DNS evidence for this row; non-candidates carry the inert not-applicable value. */
+  readonly dns: DnsTransportEvidence;
   readonly fix: ShieldFix;
 }
 
@@ -152,6 +187,8 @@ export interface InstanceFact {
   readonly name: string;
   readonly arrType: ShieldArrType;
   readonly url: string;
+  /** Optional materialized resolver evidence. The pure engine never performs DNS I/O. */
+  readonly dns?: DnsTransportEvidence;
 }
 
 /** Credential key-ring facts used to detect instances still encrypted under a retired key. */

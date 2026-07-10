@@ -16,6 +16,8 @@ import { clamp0100 } from './policy.ts';
 import type {
   CheckResult,
   CheckStatus,
+  DnsAddressClassCounts,
+  DnsTransportEvidence,
   InstanceFact,
   PostureInputs,
   SecurityCheck,
@@ -45,6 +47,27 @@ const PRIVATE_HTTP_SCORE = 65;
 const PUBLIC_HTTP_SCORE = 30;
 const ROTATION_PER_STALE_PENALTY = 20;
 const REPO_ISSUES_URL = 'https://github.com/yandy-r/praxrr/issues';
+
+const ZERO_DNS_COUNTS: DnsAddressClassCounts = Object.freeze({
+  loopback: 0,
+  private: 0,
+  linkLocal: 0,
+  public: 0,
+  special: 0,
+});
+
+/** Inert evidence carried by rows whose URL classification deliberately performs no DNS work. */
+const NOT_APPLICABLE_DNS: DnsTransportEvidence = Object.freeze({
+  outcome: 'not-applicable',
+  source: 'none',
+  ipv4: ZERO_DNS_COUNTS,
+  ipv6: ZERO_DNS_COUNTS,
+  retainedCount: 0,
+  observedAt: null,
+  incomplete: false,
+  truncated: false,
+  addressClassesChanged: false,
+});
 
 // --- helpers ----------------------------------------------------------------------------------
 
@@ -154,41 +177,148 @@ interface TransportGrade {
   readonly tier: TransportTier;
   readonly score: SubScore;
   readonly status: CheckStatus;
+  readonly dns: DnsTransportEvidence;
 }
 
-function gradeUrl(rawUrl: string): TransportGrade {
+function totalDnsClass(evidence: DnsTransportEvidence, key: keyof DnsAddressClassCounts): number {
+  return evidence.ipv4[key] + evidence.ipv6[key];
+}
+
+/**
+ * Grade an unknown multi-label HTTP hostname from already-materialized DNS facts. Public evidence is
+ * monotonic: it remains actionable even when another family failed or the retained set truncated.
+ */
+function gradeDnsEvidence(host: string, evidence: DnsTransportEvidence): TransportGrade {
+  const publicCount = totalDnsClass(evidence, 'public');
+  const localCount =
+    totalDnsClass(evidence, 'loopback') + totalDnsClass(evidence, 'private') + totalDnsClass(evidence, 'linkLocal');
+  const specialCount = totalDnsClass(evidence, 'special');
+  const complete = evidence.outcome === 'resolved' && !evidence.incomplete && !evidence.truncated;
+
+  if (evidence.addressClassesChanged) {
+    return {
+      scheme: 'http',
+      host,
+      tier: 'mixed',
+      score: PUBLIC_HTTP_SCORE,
+      status: 'action',
+      dns: evidence,
+    };
+  }
+
+  if (publicCount > 0) {
+    const mixed = localCount > 0 || specialCount > 0 || !complete;
+    return {
+      scheme: 'http',
+      host,
+      tier: mixed ? 'mixed' : 'public',
+      score: PUBLIC_HTTP_SCORE,
+      status: 'action',
+      dns: evidence,
+    };
+  }
+
+  if (complete && localCount > 0 && specialCount === 0) {
+    return {
+      scheme: 'http',
+      host,
+      tier: 'private',
+      score: PRIVATE_HTTP_SCORE,
+      status: 'attention',
+      dns: evidence,
+    };
+  }
+
+  return {
+    scheme: 'http',
+    host,
+    tier: 'unknown',
+    score: PRIVATE_HTTP_SCORE,
+    status: 'attention',
+    dns: evidence,
+  };
+}
+
+function gradeUrl(rawUrl: string, dns: DnsTransportEvidence | undefined): TransportGrade {
   let url: URL;
   try {
     url = new URL(rawUrl);
   } catch {
     const scheme = rawUrl.trim().toLowerCase().startsWith('https') ? 'https' : 'http';
-    return { scheme, host: '(unparseable URL)', tier: 'unknown', score: null, status: 'na' };
+    return {
+      scheme,
+      host: '(unparseable URL)',
+      tier: 'unknown',
+      score: null,
+      status: 'na',
+      dns: NOT_APPLICABLE_DNS,
+    };
   }
 
   const host = url.hostname;
   if (url.protocol === 'https:') {
-    return { scheme: 'https', host, tier: 'encrypted', score: 100, status: 'pass' };
+    return {
+      scheme: 'https',
+      host,
+      tier: 'encrypted',
+      score: 100,
+      status: 'pass',
+      dns: NOT_APPLICABLE_DNS,
+    };
   }
 
   switch (classifyHost(host)) {
     case 'loopback':
-      return { scheme: 'http', host, tier: 'loopback', score: 100, status: 'pass' };
+      return {
+        scheme: 'http',
+        host,
+        tier: 'loopback',
+        score: 100,
+        status: 'pass',
+        dns: NOT_APPLICABLE_DNS,
+      };
     case 'docker-alias':
-      return { scheme: 'http', host, tier: 'docker-alias', score: 100, status: 'pass' };
+      return {
+        scheme: 'http',
+        host,
+        tier: 'docker-alias',
+        score: 100,
+        status: 'pass',
+        dns: NOT_APPLICABLE_DNS,
+      };
     case 'private':
-      return { scheme: 'http', host, tier: 'private', score: PRIVATE_HTTP_SCORE, status: 'attention' };
+      return {
+        scheme: 'http',
+        host,
+        tier: 'private',
+        score: PRIVATE_HTTP_SCORE,
+        status: 'attention',
+        dns: NOT_APPLICABLE_DNS,
+      };
     case 'unknown':
-      return { scheme: 'http', host, tier: 'unknown', score: PRIVATE_HTTP_SCORE, status: 'attention' };
+      return gradeDnsEvidence(host, dns ?? NOT_APPLICABLE_DNS);
     case 'public':
-      return { scheme: 'http', host, tier: 'public', score: PUBLIC_HTTP_SCORE, status: 'action' };
+      return {
+        scheme: 'http',
+        host,
+        tier: 'public',
+        score: PUBLIC_HTTP_SCORE,
+        status: 'action',
+        dns: NOT_APPLICABLE_DNS,
+      };
   }
 }
 
 function transportRowFor(instance: InstanceFact): TransportRow {
-  const grade = gradeUrl(instance.url);
+  const grade = gradeUrl(instance.url, instance.dns);
   const fix: ShieldFix =
     grade.score !== null && grade.score < 100
-      ? { kind: 'instance-link', instanceId: instance.id, href: `/arr/${instance.id}`, label: 'Edit connection' }
+      ? {
+          kind: 'instance-link',
+          instanceId: instance.id,
+          href: `/arr/${instance.id}`,
+          label: 'Edit connection',
+        }
       : { kind: 'none' };
   return {
     instanceId: instance.id,
@@ -199,6 +329,7 @@ function transportRowFor(instance: InstanceFact): TransportRow {
     tier: grade.tier,
     score: grade.score,
     status: grade.status,
+    dns: grade.dns,
     fix,
   };
 }
@@ -348,6 +479,59 @@ const controlPlaneAuth: SecurityCheck = {
 const ID_TRANSPORT: SecurityCheckId = 'arr_transport';
 const LABEL_TRANSPORT = 'Arr connection transport';
 
+function dnsRecommendationDetail(row: TransportRow): readonly string[] {
+  const observedByDns = row.dns.outcome !== 'not-applicable';
+  if (!observedByDns) {
+    return [
+      `Praxrr talks to ${row.instanceName} at http://${row.host}; its API key crosses the network in cleartext on every request${
+        row.tier === 'public' ? ' over what looks like a public address' : ''
+      }.`,
+      'Point Praxrr at an https URL, or front the instance with TLS.',
+    ];
+  }
+
+  if (row.dns.addressClassesChanged) {
+    return [
+      `Address scope changed in DNS evidence observed from Praxrr's resolver for ${row.instanceName}.`,
+      'DNS alone does not prove WAN reachability or identify the cause of the change.',
+      'Review its A and AAAA records, and point Praxrr at an https URL or front the instance with TLS.',
+    ];
+  }
+
+  if (row.tier === 'mixed') {
+    return [
+      `Mixed address scopes were observed from Praxrr's resolver for ${row.instanceName}; at least one public address was present.`,
+      'DNS alone does not prove WAN reachability, and the available evidence may be incomplete.',
+      'Review its A and AAAA records, and point Praxrr at an https URL or front the instance with TLS.',
+    ];
+  }
+
+  if (row.tier === 'public') {
+    return [
+      `A public address was observed from Praxrr's resolver for ${row.instanceName}.`,
+      'DNS alone does not prove WAN reachability.',
+      'Point Praxrr at an https URL, or front the instance with TLS.',
+    ];
+  }
+
+  if (row.tier === 'private') {
+    return [
+      `Only loopback, private, or link-local addresses were observed from Praxrr's resolver for ${row.instanceName}.`,
+      'DNS is mutable, and the API key still crosses this connection in plaintext.',
+      'Point Praxrr at an https URL, or front the instance with TLS.',
+    ];
+  }
+
+  const unavailable = ['timeout', 'failed', 'empty', 'budget-exceeded'].includes(row.dns.outcome);
+  return [
+    unavailable
+      ? `DNS evidence was unavailable from Praxrr's resolver for ${row.instanceName}; this does not mean the Arr service is down.`
+      : `DNS evidence observed from Praxrr's resolver for ${row.instanceName} was incomplete or not safely classifiable.`,
+    'No local-only conclusion can be made from this evidence.',
+    'Point Praxrr at an https URL or front the instance with TLS, and review its A and AAAA records.',
+  ];
+}
+
 const arrTransport: SecurityCheck = {
   id: ID_TRANSPORT,
   label: LABEL_TRANSPORT,
@@ -386,12 +570,12 @@ const arrTransport: SecurityCheck = {
 
     const score = clamp0100(mean(scored));
     const plaintext = rows.filter((r) => r.score !== null && r.score < 100);
-    const publicRows = rows.filter((r) => r.tier === 'public');
+    const actionableRows = rows.filter((r) => r.tier === 'public' || r.tier === 'mixed');
 
     let status: CheckStatus = 'pass';
     let critical = false;
     let cap: ShieldBand | null = null;
-    if (publicRows.length > 0) {
+    if (actionableRows.length > 0) {
       status = 'action';
       critical = true;
       cap = 'guarded';
@@ -403,11 +587,8 @@ const arrTransport: SecurityCheck = {
     const recommendations = plaintext.map((row) =>
       rec(
         `${row.instanceName} is reached over plaintext http`,
-        [
-          `Praxrr talks to ${row.instanceName} at http://${row.host}; its API key crosses the network in cleartext on every request${row.tier === 'public' ? ' over what looks like a public address' : ''}.`,
-          'Point Praxrr at an https URL, or front the instance with TLS.',
-        ],
-        row.tier === 'public' ? 'danger' : 'warning',
+        dnsRecommendationDetail(row),
+        row.tier === 'public' || row.tier === 'mixed' ? 'danger' : 'warning',
         row.fix
       )
     );

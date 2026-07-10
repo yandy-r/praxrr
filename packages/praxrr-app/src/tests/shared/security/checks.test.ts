@@ -8,12 +8,15 @@ import { assert, assertEquals } from '@std/assert';
 import {
   ALL_CHECKS,
   buildTransportRows,
-  classifyHost,
   type CheckResult,
+  classifyHost,
+  type DnsAddressClassCounts,
+  type DnsTransportEvidence,
   type InstanceFact,
   type PostureInputs,
   type SecurityCheckId,
 } from '$shared/security/index.ts';
+import { tierVariant, TRANSPORT_TIER_LABEL } from '$ui/security/shieldStatus.ts';
 
 function makeInputs(overrides: Partial<PostureInputs> = {}): PostureInputs {
   return {
@@ -43,8 +46,42 @@ function runCheck(id: SecurityCheckId, inputs: PostureInputs): CheckResult {
   return check.score(inputs);
 }
 
-function instance(id: number, url: string): InstanceFact {
-  return { id, name: `arr-${id}`, arrType: 'radarr', url };
+const ZERO_COUNTS: DnsAddressClassCounts = {
+  loopback: 0,
+  private: 0,
+  linkLocal: 0,
+  public: 0,
+  special: 0,
+};
+
+function dnsEvidence(
+  overrides: Partial<Omit<DnsTransportEvidence, 'ipv4' | 'ipv6'>> = {},
+  ipv4: Partial<DnsAddressClassCounts> = {},
+  ipv6: Partial<DnsAddressClassCounts> = {}
+): DnsTransportEvidence {
+  return {
+    outcome: 'resolved',
+    source: 'fresh',
+    ipv4: { ...ZERO_COUNTS, ...ipv4 },
+    ipv6: { ...ZERO_COUNTS, ...ipv6 },
+    retainedCount:
+      Object.values(ipv4).reduce((sum, count) => sum + (count ?? 0), 0) +
+      Object.values(ipv6).reduce((sum, count) => sum + (count ?? 0), 0),
+    observedAt: '2026-07-10T00:00:00.000Z',
+    incomplete: false,
+    truncated: false,
+    addressClassesChanged: false,
+    ...overrides,
+  };
+}
+
+function instance(id: number, url: string, dns?: DnsTransportEvidence): InstanceFact {
+  const base = { id, name: `arr-${id}`, arrType: 'radarr' as const, url };
+  return dns === undefined ? base : { ...base, dns };
+}
+
+function transportRow(url: string, dns?: DnsTransportEvidence) {
+  return buildTransportRows([instance(1, url, dns)])[0];
 }
 
 // --- classifyHost -----------------------------------------------------------------------------
@@ -103,8 +140,120 @@ Deno.test('buildTransportRows: grades scheme + host into a tier/score/status', (
   assertEquals(by.get(8)?.status, 'action');
   assertEquals(by.get(9)?.score, null);
   assertEquals(by.get(9)?.status, 'na');
+  for (const row of rows) {
+    assertEquals(row.dns.outcome, 'not-applicable');
+    assertEquals(row.dns.source, 'none');
+    assertEquals(row.dns.retainedCount, 0);
+  }
   // A row never carries anything but a host (never an API key or a full URL with credentials).
   for (const row of rows) assert(!row.host.includes('@'));
+});
+
+Deno.test('buildTransportRows: complete IPv4 and IPv6 local DNS evidence stays conservative at 65', () => {
+  const cases: readonly [string, DnsTransportEvidence][] = [
+    ['IPv4 loopback', dnsEvidence({}, { loopback: 1 })],
+    ['IPv4 private', dnsEvidence({}, { private: 2 })],
+    ['IPv4 link-local', dnsEvidence({}, { linkLocal: 1 })],
+    ['IPv6 loopback', dnsEvidence({}, {}, { loopback: 1 })],
+    ['IPv6 private', dnsEvidence({}, {}, { private: 2 })],
+    ['IPv6 link-local', dnsEvidence({}, {}, { linkLocal: 1 })],
+    ['local classes across families', dnsEvidence({}, { private: 1 }, { loopback: 1, linkLocal: 1 })],
+  ];
+
+  for (const [label, dns] of cases) {
+    const row = transportRow('http://arr.internal.example:7878', dns);
+    assertEquals(row.tier, 'private', label);
+    assertEquals(row.score, 65, label);
+    assertEquals(row.status, 'attention', label);
+    assertEquals(row.dns, dns, label);
+  }
+});
+
+Deno.test('buildTransportRows: complete public-only DNS is a public action for either family', () => {
+  for (const dns of [dnsEvidence({}, { public: 1 }), dnsEvidence({}, {}, { public: 2 })]) {
+    const row = transportRow('http://arr.example.com:7878', dns);
+    assertEquals(row.tier, 'public');
+    assertEquals(row.score, 30);
+    assertEquals(row.status, 'action');
+  }
+});
+
+Deno.test('buildTransportRows: mixed, changed, and incomplete public evidence is always actionable', () => {
+  const cases: readonly [string, DnsTransportEvidence][] = [
+    ['public plus private', dnsEvidence({}, { public: 1, private: 1 })],
+    ['public plus special', dnsEvidence({}, { public: 1 }, { special: 1 })],
+    ['public with failed family', dnsEvidence({ outcome: 'partial', incomplete: true }, { public: 1 })],
+    ['public with truncation', dnsEvidence({ truncated: true, incomplete: true }, {}, { public: 1 })],
+    ['local-to-public or public-to-local change', dnsEvidence({ addressClassesChanged: true }, { private: 1 })],
+  ];
+
+  for (const [label, dns] of cases) {
+    const row = transportRow('http://arr.example.com:7878', dns);
+    assertEquals(row.tier, 'mixed', label);
+    assertEquals(row.score, 30, label);
+    assertEquals(row.status, 'action', label);
+  }
+});
+
+Deno.test('buildTransportRows: uncertain evidence without public remains unknown at 65', () => {
+  const cases: readonly [string, DnsTransportEvidence][] = [
+    ['partial local', dnsEvidence({ outcome: 'partial', incomplete: true }, { private: 1 })],
+    ['truncated local', dnsEvidence({ incomplete: true, truncated: true }, {}, { linkLocal: 1 })],
+    ['special-only', dnsEvidence({}, { special: 1 })],
+    ['timeout', dnsEvidence({ outcome: 'timeout', incomplete: true }, {})],
+    ['failed', dnsEvidence({ outcome: 'failed', incomplete: true }, {})],
+    ['empty', dnsEvidence({ outcome: 'empty', incomplete: true }, {})],
+    [
+      'report budget',
+      dnsEvidence(
+        {
+          outcome: 'budget-exceeded',
+          incomplete: true,
+          observedAt: null,
+        },
+        {}
+      ),
+    ],
+  ];
+
+  for (const [label, dns] of cases) {
+    const row = transportRow('http://arr.example.com:7878', dns);
+    assertEquals(row.tier, 'unknown', label);
+    assertEquals(row.score, 65, label);
+    assertEquals(row.status, 'attention', label);
+  }
+});
+
+Deno.test('buildTransportRows: URL-first established cases ignore attached DNS evidence', () => {
+  const publicDns = dnsEvidence({}, { public: 1 });
+  const localDns = dnsEvidence({}, { private: 1 });
+  const cases = [
+    [transportRow('https://arr.example.com', publicDns), 'encrypted', 100],
+    [transportRow('http://127.0.0.1:7878', publicDns), 'loopback', 100],
+    [transportRow('http://radarr:7878', publicDns), 'docker-alias', 100],
+    [transportRow('http://arr.internal:7878', publicDns), 'private', 65],
+    [transportRow('http://8.8.8.8:7878', localDns), 'public', 30],
+  ] as const;
+
+  for (const [row, tier, score] of cases) {
+    assertEquals(row.tier, tier);
+    assertEquals(row.score, score);
+    assertEquals(row.dns.outcome, 'not-applicable');
+    assertEquals(row.dns.source, 'none');
+  }
+});
+
+Deno.test('shieldStatus: every transport tier has a non-colour label and mixed is dangerous', () => {
+  assertEquals(TRANSPORT_TIER_LABEL, {
+    encrypted: 'TLS',
+    loopback: 'Loopback',
+    'docker-alias': 'Container',
+    private: 'Private LAN',
+    unknown: 'Unclassified',
+    public: 'Public',
+    mixed: 'Mixed address scopes',
+  });
+  assertEquals(tierVariant('mixed'), 'danger');
 });
 
 // --- control_plane_auth -----------------------------------------------------------------------
@@ -168,6 +317,78 @@ Deno.test('arr_transport: mean of scored rows; public http is a capping action; 
   assert(withPublic.critical);
   assertEquals(withPublic.bandCapWhenAction, 'guarded');
   assertEquals(withPublic.recommendations.length, 1);
+});
+
+Deno.test('arr_transport: DNS public, mixed, and changed evidence caps guarded with honest wording', () => {
+  const cases: readonly [string, DnsTransportEvidence, string][] = [
+    ['public', dnsEvidence({}, { public: 1 }), 'A public address was observed'],
+    ['mixed', dnsEvidence({}, { public: 1, private: 1 }), 'Mixed address scopes were observed'],
+    [
+      'changed',
+      dnsEvidence({ addressClassesChanged: true }, {}, { private: 1 }),
+      'Address scope changed in DNS evidence',
+    ],
+  ];
+
+  for (const [label, dns, expectedCopy] of cases) {
+    const check = runCheck(
+      'arr_transport',
+      makeInputs({
+        instances: [instance(1, 'http://arr.example.com:7878', dns)],
+      })
+    );
+    assertEquals(check.score, 30, label);
+    assertEquals(check.status, 'action', label);
+    assertEquals(check.critical, true, label);
+    assertEquals(check.bandCapWhenAction, 'guarded', label);
+    const copy = check.recommendations.flatMap((recommendation) => recommendation.line.detail).join(' ');
+    assert(copy.includes(expectedCopy), `${label}: expected ${expectedCopy}`);
+    assert(copy.includes("observed from Praxrr's resolver"), `${label}: resolver vantage must be explicit`);
+    assert(copy.includes('DNS alone does not prove WAN reachability'), `${label}: reachability qualifier required`);
+    for (const forbidden of ['publicly reachable', 'attack detected', 'DNS rebinding']) {
+      assert(!copy.includes(forbidden), `${label}: forbidden overclaim ${forbidden}`);
+    }
+  }
+});
+
+Deno.test('arr_transport: local and unavailable DNS stay attention without a band cap', () => {
+  const local = runCheck(
+    'arr_transport',
+    makeInputs({
+      instances: [instance(1, 'http://arr.example.com', dnsEvidence({}, {}, { private: 1 }))],
+    })
+  );
+  assertEquals(local.score, 65);
+  assertEquals(local.status, 'attention');
+  assertEquals(local.critical, false);
+  assertEquals(local.bandCapWhenAction, null);
+  const localCopy = local.recommendations[0]?.line.detail.join(' ') ?? '';
+  assert(localCopy.includes("observed from Praxrr's resolver"));
+  assert(localCopy.includes('DNS is mutable'));
+
+  const failed = runCheck(
+    'arr_transport',
+    makeInputs({
+      instances: [
+        instance(
+          2,
+          'http://arr.example.com',
+          dnsEvidence({
+            outcome: 'failed',
+            incomplete: true,
+            observedAt: null,
+          })
+        ),
+      ],
+    })
+  );
+  assertEquals(failed.score, 65);
+  assertEquals(failed.status, 'attention');
+  assertEquals(failed.critical, false);
+  assertEquals(failed.bandCapWhenAction, null);
+  const failedCopy = failed.recommendations[0]?.line.detail.join(' ') ?? '';
+  assert(failedCopy.includes('DNS evidence was unavailable'));
+  assert(failedCopy.includes('does not mean the Arr service is down'));
 });
 
 // --- app_key_at_rest --------------------------------------------------------------------------

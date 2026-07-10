@@ -70,7 +70,7 @@ const STATIC_RESOURCES: readonly StaticResource[] = [
     uri: 'praxrr://security-posture',
     name: 'Security posture',
     description: 'The security shield report for this deployment.',
-    read: () => Promise.resolve(toSecuritySummary(computeShield())),
+    read: async () => toSecuritySummary(await computeShield()),
   },
   {
     uri: 'praxrr://databases',

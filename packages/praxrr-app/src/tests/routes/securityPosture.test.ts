@@ -6,6 +6,8 @@ import { config } from '$config';
 import { db } from '$db/db.ts';
 import { runMigrations } from '$db/migrations.ts';
 import { CHECK_IDS, SECURITY_POSTURE_ENGINE_VERSION } from '$shared/security/index.ts';
+import { createDnsTransportResolver, overrideDnsTransportResolverForTest } from '$lib/server/security/dnsTransport.ts';
+import type { DnsRecordType, DnsTransportResolver, ResolveDns } from '$lib/server/security/dnsTransport.ts';
 import type { SecurityPostureSummaryResponse } from '$lib/server/security/responses.ts';
 import { GET as GET_SUMMARY } from '../../routes/api/v1/security-posture/summary/+server.ts';
 
@@ -60,12 +62,38 @@ function insertInstance(name: string, type: string, url: string): void {
   );
 }
 
+// prettier-ignore
 async function getSummary(
   override: SummaryEventOverride = {}
-): Promise<{ status: number; body: SecurityPostureSummaryResponse }> {
+): Promise<{ status: number; cacheControl: string | null; serialized: string; body: SecurityPostureSummaryResponse }> {
   const response = await GET_SUMMARY(summaryEvent(override));
-  return { status: response.status, body: (await response.json()) as SecurityPostureSummaryResponse };
+	const serialized = await response.text();
+	return {
+		status: response.status,
+		cacheControl: response.headers.get('cache-control'),
+		serialized,
+		body: JSON.parse(serialized) as SecurityPostureSummaryResponse,
+	};
 }
+
+// prettier-ignore
+async function withDnsResolver<T>(resolver: DnsTransportResolver, fn: () => Promise<T>): Promise<T> {
+	const restore = overrideDnsTransportResolverForTest(resolver);
+	try {
+		return await fn();
+	} finally {
+		restore();
+	}
+}
+
+// prettier-ignore
+function rowByHost(body: SecurityPostureSummaryResponse, host: string) {
+	const row = body.transport.find((candidate) => candidate.host === host);
+	assert(row, `expected transport row for ${host}`);
+	return row;
+}
+
+const ZERO_DNS_COUNTS = { loopback: 0, private: 0, linkLocal: 0, public: 0, special: 0 };
 
 migratedTest('GET /security-posture/summary returns a well-formed report with zero instances', async () => {
   const { status, body } = await getSummary();
@@ -127,6 +155,196 @@ migratedTest('GET /security-posture/summary grades transport from url, never ext
   assertEquals(row.tier, 'encrypted');
 });
 
+// prettier-ignore
+migratedTest('GET /security-posture/summary emits bounded redacted DNS evidence without state leaks', async () => {
+	let now = 1_000;
+	const calls: { hostname: string; recordType: DnsRecordType }[] = [];
+	const resolveDns: ResolveDns = (hostname, recordType) => {
+		calls.push({ hostname, recordType });
+		if (hostname === 'failed.example.com') {
+			return Promise.reject(new Error('TOP_SECRET_RESOLVER_ERROR'));
+		}
+		if (hostname === 'partial.example.com' && recordType === 'AAAA') {
+			return Promise.reject(new Error('TOP_SECRET_PARTIAL_ERROR'));
+		}
+		if (recordType === 'AAAA') {
+			return Promise.resolve(hostname === 'mixed.example.com' ? ['fd00::1'] : []);
+		}
+		const answers: Readonly<Record<string, readonly string[]>> = {
+			'public.example.com': ['8.8.8.8'],
+			'mixed.example.com': ['10.0.0.1', '8.8.4.4'],
+			'partial.example.com': ['1.1.1.1'],
+			'cache.example.com': ['192.168.1.5'],
+			'change.example.com': now < 61_000 ? ['10.1.2.3'] : ['9.9.9.9'],
+		};
+		return Promise.resolve(answers[hostname] ?? []);
+	};
+	const resolver = createDnsTransportResolver({
+		resolveDns,
+		now: () => now,
+		setTimer: (callback, delayMs) => setTimeout(callback, Math.min(delayMs, 10_000))
+	});
+
+	await withDnsResolver(resolver, async () => {
+		insertInstance(
+			'Public',
+			'radarr',
+			'http://user:password@public.example.com:7878/secret/path?api_key=raw-secret'
+		);
+		insertInstance('Mixed', 'sonarr', 'http://mixed.example.com:8989');
+		insertInstance('Partial', 'lidarr', 'http://partial.example.com:8686');
+		insertInstance('Cache', 'radarr', 'http://cache.example.com:7878');
+		insertInstance('Change', 'sonarr', 'http://change.example.com:8989');
+		insertInstance('Failure', 'lidarr', 'http://failed.example.com:8686');
+		db.execute(
+			`UPDATE arr_instances SET external_url = ? WHERE name = 'Public'`,
+			'http://external-only.example.com:7878/external/path?api_key=external-secret'
+		);
+
+		const first = await getSummary();
+		assertEquals(first.status, 200);
+		assertEquals(first.cacheControl, 'no-store');
+		assertEquals(first.body.engineVersion, '4');
+
+		const publicRow = rowByHost(first.body, 'public.example.com');
+		assertEquals(publicRow.arrType, 'radarr');
+		assertEquals(publicRow.tier, 'public');
+		assertEquals(publicRow.score, 30);
+		assertEquals(publicRow.status, 'action');
+		assertEquals(publicRow.dns, {
+			outcome: 'resolved',
+			source: 'fresh',
+			ipv4: { ...ZERO_DNS_COUNTS, public: 1 },
+			ipv6: ZERO_DNS_COUNTS,
+			retainedCount: 1,
+			observedAt: '1970-01-01T00:00:01.000Z',
+			incomplete: false,
+			truncated: false,
+			addressClassesChanged: false,
+		});
+
+		const mixedRow = rowByHost(first.body, 'mixed.example.com');
+		assertEquals(mixedRow.arrType, 'sonarr');
+		assertEquals(mixedRow.tier, 'mixed');
+		assertEquals(mixedRow.score, 30);
+		assertEquals(mixedRow.dns, {
+			outcome: 'resolved',
+			source: 'fresh',
+			ipv4: { ...ZERO_DNS_COUNTS, private: 1, public: 1 },
+			ipv6: { ...ZERO_DNS_COUNTS, private: 1 },
+			retainedCount: 3,
+			observedAt: '1970-01-01T00:00:01.000Z',
+			incomplete: false,
+			truncated: false,
+			addressClassesChanged: false,
+		});
+
+		const partialRow = rowByHost(first.body, 'partial.example.com');
+		assertEquals(partialRow.arrType, 'lidarr');
+		assertEquals(partialRow.tier, 'mixed');
+		assertEquals(partialRow.score, 30);
+		assertEquals(partialRow.dns, {
+			outcome: 'partial',
+			source: 'fresh',
+			ipv4: { ...ZERO_DNS_COUNTS, public: 1 },
+			ipv6: ZERO_DNS_COUNTS,
+			retainedCount: 1,
+			observedAt: '1970-01-01T00:00:01.000Z',
+			incomplete: true,
+			truncated: false,
+			addressClassesChanged: false
+		});
+
+		const failedRow = rowByHost(first.body, 'failed.example.com');
+		assertEquals(failedRow.tier, 'unknown');
+		assertEquals(failedRow.score, 65);
+		assertEquals(failedRow.status, 'attention');
+		assertEquals(failedRow.dns, {
+			outcome: 'failed',
+			source: 'fresh',
+			ipv4: ZERO_DNS_COUNTS,
+			ipv6: ZERO_DNS_COUNTS,
+			retainedCount: 0,
+			observedAt: '1970-01-01T00:00:01.000Z',
+			incomplete: true,
+			truncated: false,
+			addressClassesChanged: false
+		});
+
+		const second = await getSummary();
+		assertEquals(second.status, 200);
+		assertEquals(second.cacheControl, 'no-store');
+		const cachedRow = rowByHost(second.body, 'cache.example.com');
+		assertEquals(cachedRow.dns, {
+			outcome: 'resolved',
+			source: 'cache',
+			ipv4: { ...ZERO_DNS_COUNTS, private: 1 },
+			ipv6: ZERO_DNS_COUNTS,
+			retainedCount: 1,
+			observedAt: '1970-01-01T00:00:01.000Z',
+			incomplete: false,
+			truncated: false,
+			addressClassesChanged: false
+		});
+
+		const beforeChange = rowByHost(second.body, 'change.example.com');
+		assertEquals(beforeChange.tier, 'private');
+		assertEquals(beforeChange.dns.source, 'cache');
+		assertEquals(beforeChange.dns.addressClassesChanged, false);
+
+		now = 61_001;
+		const third = await getSummary();
+		assertEquals(third.status, 200);
+		assertEquals(third.cacheControl, 'no-store');
+		const changedRow = rowByHost(third.body, 'change.example.com');
+		assertEquals(changedRow.tier, 'mixed');
+		assertEquals(changedRow.score, 30);
+		assertEquals(changedRow.status, 'action');
+		assertEquals(changedRow.dns, {
+			outcome: 'resolved',
+			source: 'fresh',
+			ipv4: { ...ZERO_DNS_COUNTS, public: 1 },
+			ipv6: ZERO_DNS_COUNTS,
+			retainedCount: 1,
+			observedAt: '1970-01-01T00:01:01.001Z',
+			incomplete: false,
+			truncated: false,
+			addressClassesChanged: true
+		});
+
+		for (const serialized of [first.serialized, second.serialized, third.serialized]) {
+			for (const forbidden of [
+				'8.8.8.8',
+				'10.0.0.1',
+				'fd00::1',
+				'1.1.1.1',
+				'TOP_SECRET_RESOLVER_ERROR',
+				'TOP_SECRET_PARTIAL_ERROR',
+				'user:password@',
+				'/secret/path',
+				'external-only.example.com',
+				'/external/path',
+				'raw-secret',
+				'external-secret',
+				'api_key',
+			]) {
+				assert(!serialized.includes(forbidden), `response leaked ${forbidden}`);
+			}
+		}
+
+		const transportCopy = JSON.stringify(
+			third.body.checks.find((check) => check.id === 'arr_transport')
+		).toLowerCase();
+		for (const overclaim of ['publicly reachable', 'attack detected', 'dns rebinding detected', 'exposed']) {
+			assert(!transportCopy.includes(overclaim), `transport copy overclaimed ${overclaim}`);
+		}
+	});
+
+	assert(calls.length > 0, 'the injected resolver must serve every DNS observation');
+	assert(calls.every((call) => call.recordType === 'A' || call.recordType === 'AAAA'));
+	assert(calls.every((call) => call.hostname !== 'external-only.example.com'));
+});
+
 migratedTest('GET /security-posture/summary never returns a secret value', async () => {
   insertInstance('Radarr', 'radarr', 'http://radarr:7878');
   const { body } = await getSummary();
@@ -143,8 +361,8 @@ migratedTest(
   async () => {
     const { status, body } = await getSummary();
     assertEquals(status, 200);
-    // Report-surface engine version: '2' (session posture #227) → '3' (proxy_trust check #228).
-    assertEquals(body.engineVersion, '3');
+    // Report surface: '3' proxy trust (#228) → '4' DNS transport evidence (#229).
+    assertEquals(body.engineVersion, '4');
 
     // A no-context ({}) event cannot observe transport, so it is reported unknown and never assumed safe.
     const transportAdvisory = body.advisories.find((a) => a.id === 'session_cookie_transport');

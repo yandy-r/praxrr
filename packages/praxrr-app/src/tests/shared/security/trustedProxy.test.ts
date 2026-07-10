@@ -27,6 +27,24 @@ Deno.test('parseTrustedProxy: a bare IPv6 literal becomes a /128 range', () => {
   assertEquals(cfg.ranges[0].prefix, 128);
 });
 
+Deno.test('parseTrustedProxy: extracted parser preserves IPv4 and IPv6 literal normalization', () => {
+  const cfg = parseTrustedProxy('192.0.2.10 [2001:db8::10] 2001:0DB8:0:0:0:0:0:11');
+  assertEquals(cfg.invalidEntries, []);
+  assertEquals(
+    cfg.ranges.map((range) => [range.family, range.prefix]),
+    [
+      [4, 32],
+      [6, 128],
+      [6, 128],
+    ]
+  );
+  assert(isTrustedProxyPeer('192.0.2.10', cfg));
+  assert(isTrustedProxyPeer('2001:db8::10', cfg));
+  assert(isTrustedProxyPeer('[2001:db8::11]', cfg));
+  assert(!isTrustedProxyPeer('192.0.2.11', cfg));
+  assert(!isTrustedProxyPeer('2001:db8::12', cfg));
+});
+
 Deno.test('parseTrustedProxy: IPv4 + IPv6 CIDR parse at prefix boundaries /0 /32 /128', () => {
   const cfg = parseTrustedProxy('10.0.0.0/8, 0.0.0.0/0, 192.168.1.1/32, 2001:db8::/32, ::/0');
   assertEquals(cfg.invalidEntries, []);
@@ -60,6 +78,65 @@ Deno.test(
   }
 );
 
+Deno.test('parseTrustedProxy: private keyword preserves exact IPv4 and IPv6 boundaries', () => {
+  const cfg = parseTrustedProxy('PrIvAtE');
+  const cases: readonly [string, boolean][] = [
+    ['9.255.255.255', false],
+    ['10.0.0.0', true],
+    ['10.255.255.255', true],
+    ['11.0.0.0', false],
+    ['172.15.255.255', false],
+    ['172.16.0.0', true],
+    ['172.31.255.255', true],
+    ['172.32.0.0', false],
+    ['192.167.255.255', false],
+    ['192.168.0.0', true],
+    ['192.168.255.255', true],
+    ['192.169.0.0', false],
+    ['169.253.255.255', false],
+    ['169.254.0.0', true],
+    ['169.254.255.255', true],
+    ['169.255.0.0', false],
+    ['fbff:ffff:ffff:ffff:ffff:ffff:ffff:ffff', false],
+    ['fc00::', true],
+    ['fdff:ffff:ffff:ffff:ffff:ffff:ffff:ffff', true],
+    ['fe00::', false],
+  ];
+  for (const [peer, trusted] of cases) {
+    assertEquals(isTrustedProxyPeer(peer, cfg), trusted, `private keyword parity at ${peer}`);
+  }
+});
+
+Deno.test('parseTrustedProxy: private keyword preserves the full fe80::/10 link-local boundary', () => {
+  const cfg = parseTrustedProxy('private');
+  const cases: readonly [string, boolean][] = [
+    ['fe7f:ffff:ffff:ffff:ffff:ffff:ffff:ffff', false],
+    ['fe80::', true],
+    ['fea0::1', true],
+    ['febf:ffff:ffff:ffff:ffff:ffff:ffff:ffff', true],
+    ['fec0::', false],
+  ];
+  for (const [peer, trusted] of cases) {
+    assertEquals(isTrustedProxyPeer(peer, cfg), trusted, `fe80::/10 parity at ${peer}`);
+  }
+});
+
+Deno.test('parseTrustedProxy: loopback keyword remains limited to IPv4 /8 and IPv6 ::1', () => {
+  const cfg = parseTrustedProxy('LoOpBaCk');
+  const cases: readonly [string, boolean][] = [
+    ['126.255.255.255', false],
+    ['127.0.0.0', true],
+    ['127.255.255.255', true],
+    ['128.0.0.0', false],
+    ['::', false],
+    ['::1', true],
+    ['::2', false],
+  ];
+  for (const [peer, trusted] of cases) {
+    assertEquals(isTrustedProxyPeer(peer, cfg), trusted, `loopback keyword parity at ${peer}`);
+  }
+});
+
 // --- wildcard + overly broad ------------------------------------------------------------------
 
 Deno.test('parseTrustedProxy: * and all set wildcard + overlyBroad and trust every peer', () => {
@@ -70,6 +147,7 @@ Deno.test('parseTrustedProxy: * and all set wildcard + overlyBroad and trust eve
     assertEquals(cfg.overlyBroad, true);
     assert(isTrustedProxyPeer('8.8.8.8', cfg));
     assert(isTrustedProxyPeer('2001:db8::1', cfg));
+    assert(isTrustedProxyPeer('not-an-ip', cfg));
   }
 });
 
@@ -81,17 +159,22 @@ Deno.test('parseTrustedProxy: 0.0.0.0/0 and ::/0 and a <= /7 supernet are overly
   // Legit operator supernets are spared.
   assertEquals(parseTrustedProxy('10.0.0.0/8').overlyBroad, false);
   assertEquals(parseTrustedProxy('172.16.0.0/12').overlyBroad, false);
+  // The extraction keeps the same inclusive threshold for both address families.
+  assertEquals(parseTrustedProxy('2000::/7').overlyBroad, true);
+  assertEquals(parseTrustedProxy('2000::/8').overlyBroad, false);
 });
 
 // --- malformed tokens: fail-closed, non-throwing ----------------------------------------------
 
 Deno.test('parseTrustedProxy: malformed tokens are dropped into invalidEntries, never into ranges (no throw)', () => {
-  const cfg = parseTrustedProxy('10.0.0.0/8, 999.0.0.0/8, 10.0.0.0/33, fe80::1%eth0, garbage, 2001:db8::/129');
+  const cfg = parseTrustedProxy(
+    '10.0.0.0/8, 999.0.0.0/8, 10.0.0.0/33, fe80::1%eth0, garbage, 2001:db8::/129, 1.2.3.4/24/1, 2001:::1'
+  );
   assertEquals(cfg.ranges.length, 1); // only 10.0.0.0/8 survives
   assertEquals(cfg.ranges[0].family, 4);
   assertEquals(
     new Set(cfg.invalidEntries),
-    new Set(['999.0.0.0/8', '10.0.0.0/33', 'fe80::1%eth0', 'garbage', '2001:db8::/129'])
+    new Set(['999.0.0.0/8', '10.0.0.0/33', 'fe80::1%eth0', 'garbage', '2001:db8::/129', '1.2.3.4/24/1', '2001:::1'])
   );
 });
 
@@ -146,6 +229,16 @@ Deno.test('isTrustedProxyPeer: an IPv4-mapped IPv6 peer matches a v4 range', () 
   const cfg = parseTrustedProxy('10.0.0.0/8');
   assert(isTrustedProxyPeer('::ffff:10.0.0.5', cfg));
   assert(isTrustedProxyPeer('[::ffff:10.0.0.5]', cfg));
+});
+
+Deno.test('isTrustedProxyPeer: mapped IPv6 keeps dotted and pure-hex proxy matching semantics distinct', () => {
+  const v4 = parseTrustedProxy('127.0.0.0/8');
+  assert(isTrustedProxyPeer('::ffff:127.0.0.1', v4));
+  assert(!isTrustedProxyPeer('::ffff:7f00:1', v4));
+
+  const mappedV6 = parseTrustedProxy('::ffff:0:0/96');
+  assert(isTrustedProxyPeer('::ffff:7f00:1', mappedV6));
+  assert(!isTrustedProxyPeer('::ffff:127.0.0.1', mappedV6));
 });
 
 Deno.test('parseTrustedProxy: a non-mapped embedded-IPv4 IPv6 tail folds correctly (NAT64-style)', () => {

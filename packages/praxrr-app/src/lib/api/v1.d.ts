@@ -4319,7 +4319,7 @@ export interface components {
      * @description How an Arr connection's target host is classified from Praxrr's own knowledge (no probing).
      * @enum {string}
      */
-    SecurityTransportTier: 'encrypted' | 'loopback' | 'docker-alias' | 'private' | 'unknown' | 'public';
+    SecurityTransportTier: 'encrypted' | 'loopback' | 'docker-alias' | 'private' | 'unknown' | 'public' | 'mixed';
     /** @description A concrete remediation target. `kind` discriminates which optional fields are present. */
     SecurityFix: {
       /** @enum {string} */
@@ -4367,6 +4367,7 @@ export interface components {
       tier: components['schemas']['SecurityTransportTier'];
       score: number | null;
       status: components['schemas']['SecurityCheckStatus'];
+      dns: components['schemas']['SecurityDnsTransportEvidence'];
       fix: components['schemas']['SecurityFix'];
     };
     /** @description An always-on protection surfaced as a verified affirmation (contributes zero to the score). */
@@ -4796,6 +4797,37 @@ export interface components {
      *     The shape matches `PortableQualityDefinitions`.
      */
     PortableLidarrQualityDefinitions: components['schemas']['PortableQualityDefinitions'];
+    /**
+     * @description Closed result of bounded DNS evidence gathering for one stored Arr hostname.
+     * @enum {string}
+     */
+    SecurityDnsOutcome: 'not-applicable' | 'resolved' | 'partial' | 'timeout' | 'failed' | 'empty' | 'budget-exceeded';
+    /**
+     * @description Provenance of a DNS observation; cache hits retain the original observation time.
+     * @enum {string}
+     */
+    SecurityDnsEvidenceSource: 'none' | 'fresh' | 'cache';
+    /** @description Bounded address-class counts for one DNS record family; raw addresses are never exposed. */
+    SecurityDnsAddressClassCounts: {
+      loopback: number;
+      private: number;
+      linkLocal: number;
+      public: number;
+      special: number;
+    };
+    /** @description Safe aggregate DNS evidence; excludes addresses, resolver details, CNAMEs, and error text. */
+    SecurityDnsTransportEvidence: {
+      outcome: components['schemas']['SecurityDnsOutcome'];
+      source: components['schemas']['SecurityDnsEvidenceSource'];
+      ipv4: components['schemas']['SecurityDnsAddressClassCounts'];
+      ipv6: components['schemas']['SecurityDnsAddressClassCounts'];
+      retainedCount: number;
+      /** @description Original observation time, or null when no DNS observation exists. */
+      observedAt: string | null;
+      incomplete: boolean;
+      truncated: boolean;
+      addressClassesChanged: boolean;
+    };
   };
   responses: never;
   parameters: never;

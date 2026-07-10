@@ -12,6 +12,13 @@ import { configHealthSettingsQueries } from '$db/queries/configHealthSettings.ts
 import { redactSecrets } from '$lib/server/mcp/redact.ts';
 import { toMcpDatabase, toMcpInstance } from '$lib/server/mcp/mappers.ts';
 import { toToolResult } from '$lib/server/mcp/serialize.ts';
+import {
+  createDnsTransportResolver,
+  overrideDnsTransportResolverForTest,
+  type DnsRecordType,
+  type DnsTransportResolver,
+} from '$lib/server/security/dnsTransport.ts';
+import type { SecurityPostureSummaryResponse, WireDnsTransportEvidence } from '$lib/server/security/responses.ts';
 import type { ArrInstance } from '$db/queries/arrInstances.ts';
 import type { DatabaseInstance } from '$db/queries/databaseInstances.ts';
 import { DELETE, GET, POST } from '../../routes/api/v1/mcp/+server.ts';
@@ -92,6 +99,22 @@ function seedInstance(type: 'radarr' | 'sonarr' | 'lidarr', apiKey = 'super-secr
     apiKeyFingerprint: 'fp-abc123',
     enabled: true,
   });
+}
+
+function seedDnsInstance(url: string, apiKey: string): number {
+  return arrInstancesQueries.create({
+    name: `dns-radarr ${crypto.randomUUID()}`,
+    type: 'radarr',
+    url,
+    apiKey,
+    apiKeyFingerprint: 'dns-fingerprint',
+    enabled: true,
+  });
+}
+
+function dnsAggregate(evidence: WireDnsTransportEvidence): Omit<WireDnsTransportEvidence, 'source'> {
+  const { source: _source, ...aggregate } = evidence;
+  return aggregate;
 }
 
 function collectKeys(value: unknown, keys = new Set<string>()): Set<string> {
@@ -263,14 +286,103 @@ migratedTest('tools/call unexpected handler throw → -32603 with generic messag
   }
 });
 
-migratedTest('get_security_posture and get_config_health fleet return valid summaries', async () => {
-  const shield = await rpcBody('tools/call', { name: 'get_security_posture', arguments: {} });
-  assertEquals(shield.result.isError, false);
-  assert(typeof JSON.parse(shield.result.content[0].text).score === 'number');
-
+migratedTest('get_config_health fleet returns a valid summary', async () => {
   const health = await rpcBody('tools/call', { name: 'get_config_health', arguments: {} });
   assertEquals(health.result.isError, false);
   assertExists(JSON.parse(health.result.content[0].text).totals);
+});
+
+migratedTest('security posture tool and resource share singleton DNS aggregates without leaking inputs', async () => {
+  const configuredUrl = 'http://mcp-dns.example.test:7878/api?access=full-url-secret';
+  const apiKey = 'mcp-success-api-key-secret';
+  const rawIpv4 = ['8.8.8.8', '10.20.30.40'] as const;
+  const rawIpv6 = ['2606:4700:4700::1111', 'fd00::1234'] as const;
+  const lookups: DnsRecordType[] = [];
+  seedDnsInstance(configuredUrl, apiKey);
+
+  const resolver = createDnsTransportResolver({
+    resolveDns: (_hostname, recordType) => {
+      lookups.push(recordType);
+      return Promise.resolve(recordType === 'A' ? rawIpv4 : rawIpv6);
+    },
+  });
+  const restore = overrideDnsTransportResolverForTest(resolver);
+  try {
+    const toolBody = await rpcBody('tools/call', { name: 'get_security_posture', arguments: {} });
+    const resourceBody = await rpcBody('resources/read', { uri: 'praxrr://security-posture' });
+    assertEquals(toolBody.result.isError, false);
+
+    const tool = JSON.parse(toolBody.result.content[0].text) as SecurityPostureSummaryResponse;
+    const resource = JSON.parse(resourceBody.result.contents[0].text) as SecurityPostureSummaryResponse;
+    const toolDns = tool.transport[0].dns;
+    const resourceDns = resource.transport[0].dns;
+
+    assertEquals(toolDns, {
+      outcome: 'resolved',
+      source: 'fresh',
+      ipv4: { loopback: 0, private: 1, linkLocal: 0, public: 1, special: 0 },
+      ipv6: { loopback: 0, private: 1, linkLocal: 0, public: 1, special: 0 },
+      retainedCount: 4,
+      observedAt: toolDns.observedAt,
+      incomplete: false,
+      truncated: false,
+      addressClassesChanged: false,
+    });
+    assertEquals(resourceDns.source, 'cache');
+    assertEquals(dnsAggregate(resourceDns), dnsAggregate(toolDns));
+    assertEquals(lookups, ['A', 'AAAA']);
+
+    const serialized = JSON.stringify({ toolBody, resourceBody });
+    for (const rawAddress of [...rawIpv4, ...rawIpv6]) assert(!serialized.includes(rawAddress));
+    assert(!serialized.includes(configuredUrl));
+    assert(!serialized.includes('full-url-secret'));
+    assert(!serialized.includes(apiKey));
+  } finally {
+    restore();
+  }
+});
+
+migratedTest('security posture tool and resource degrade DNS failures identically without leaking errors', async () => {
+  const configuredUrl = 'http://mcp-failure.example.test:7878/private/path?secret=url-secret';
+  const apiKey = 'mcp-failure-api-key-secret';
+  const resolverError = 'resolver exploded for 198.51.100.77 with internal details';
+  seedDnsInstance(configuredUrl, apiKey);
+
+  const resolver: DnsTransportResolver = {
+    observe: () => Promise.reject(new Error(resolverError)),
+    reset: () => undefined,
+  };
+  const restore = overrideDnsTransportResolverForTest(resolver);
+  try {
+    const toolBody = await rpcBody('tools/call', { name: 'get_security_posture', arguments: {} });
+    const resourceBody = await rpcBody('resources/read', { uri: 'praxrr://security-posture' });
+    assertEquals(toolBody.result.isError, false);
+
+    const tool = JSON.parse(toolBody.result.content[0].text) as SecurityPostureSummaryResponse;
+    const resource = JSON.parse(resourceBody.result.contents[0].text) as SecurityPostureSummaryResponse;
+    const expectedFailure: WireDnsTransportEvidence = {
+      outcome: 'failed',
+      source: 'none',
+      ipv4: { loopback: 0, private: 0, linkLocal: 0, public: 0, special: 0 },
+      ipv6: { loopback: 0, private: 0, linkLocal: 0, public: 0, special: 0 },
+      retainedCount: 0,
+      observedAt: null,
+      incomplete: true,
+      truncated: false,
+      addressClassesChanged: false,
+    };
+    assertEquals(tool.transport[0].dns, expectedFailure);
+    assertEquals(resource.transport[0].dns, expectedFailure);
+
+    const serialized = JSON.stringify({ toolBody, resourceBody });
+    assert(!serialized.includes(resolverError));
+    assert(!serialized.includes('198.51.100.77'));
+    assert(!serialized.includes(configuredUrl));
+    assert(!serialized.includes('url-secret'));
+    assert(!serialized.includes(apiKey));
+  } finally {
+    restore();
+  }
 });
 
 migratedTest('search_sync_history: empty history + pageSize clamp to 100', async () => {

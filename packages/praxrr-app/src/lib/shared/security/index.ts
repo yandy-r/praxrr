@@ -7,6 +7,7 @@
 export * from './types.ts';
 export { CHECK_CATALOG } from './catalog.ts';
 export { ALL_CHECKS, classifyHost, buildTransportRows } from './checks.ts';
+export { classifyIpAddress, containsParsedIp, parseCidrToken, parseIpLiteral, type ParsedIp } from './ip.ts';
 export { shieldBandFor, capBand, clamp0100, rollUp, HARDENED_THRESHOLD, GUARDED_THRESHOLD } from './policy.ts';
 export { computeShieldReport } from './engine.ts';
 export {

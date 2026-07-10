@@ -10,13 +10,19 @@
     SHIELD_BAND_LABEL,
     SHIELD_BAND_TEXT_CLASS,
     CHECK_STATUS_LABEL,
+    DNS_OUTCOME_LABEL,
+    DNS_SOURCE_LABEL,
     TRANSPORT_TIER_LABEL,
     bandVariant,
+    dnsOutcomeVariant,
     statusVariant,
     tierVariant,
   } from '$ui/security/shieldStatus.ts';
   import { CHECK_CATALOG } from '$shared/security/index.ts';
+  import type { components } from '$api/v1.d.ts';
   import type { SecurityPostureSummaryResponse } from '$lib/server/security/responses.ts';
+
+  type DnsAddressClassCounts = components['schemas']['SecurityDnsAddressClassCounts'];
 
   type ErrorResponse = { error: string };
 
@@ -29,6 +35,16 @@
 
   function formatScore(score: number | null): string {
     return score === null ? '—' : String(score);
+  }
+
+  function formatDnsCounts(counts: DnsAddressClassCounts): string {
+    const parts: string[] = [];
+    if (counts.loopback > 0) parts.push(`${counts.loopback} loopback`);
+    if (counts.private > 0) parts.push(`${counts.private} private`);
+    if (counts.linkLocal > 0) parts.push(`${counts.linkLocal} link-local`);
+    if (counts.public > 0) parts.push(`${counts.public} public`);
+    if (counts.special > 0) parts.push(`${counts.special} special`);
+    return parts.length > 0 ? parts.join(', ') : 'none';
   }
 
   let summary: SecurityPostureSummaryResponse | null = null;
@@ -64,6 +80,15 @@
   // The log-redaction check is surfaced in the assurances strip / failure banner, not as a card.
   $: checkCards = summary?.checks.filter((check) => check.id !== 'log_redaction') ?? [];
   $: redactionFailed = summary?.assurances.some((a) => a.id === 'log_redaction' && !a.verified) ?? false;
+  $: liveStatus = loading
+    ? summary
+      ? 'Refreshing DNS evidence… Previous results remain visible.'
+      : 'Checking security posture and bounded DNS evidence…'
+    : loadError
+      ? 'Security posture refresh failed.'
+      : summary
+        ? `Security posture updated at ${formatWhen(summary.generatedAt)}.`
+        : '';
 
   onMount(() => {
     void loadSummary();
@@ -91,12 +116,18 @@
       type="button"
       class="flex items-center gap-2 rounded-lg border border-neutral-300 px-3 py-1.5 text-sm font-medium text-neutral-700 transition-colors hover:bg-neutral-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-neutral-700 dark:text-neutral-200 dark:hover:bg-neutral-800"
       disabled={loading}
-      on:click={loadSummary}
+      aria-busy={loading}
+      aria-label={loading ? 'Refreshing security posture' : 'Refresh security posture'}
+      onclick={loadSummary}
     >
-      <RefreshCw size={14} class={loading ? 'animate-spin' : ''} />
-      Refresh
+      <RefreshCw size={14} class={loading ? 'animate-spin' : ''} aria-hidden="true" />
+      {loading ? 'Refreshing…' : 'Refresh'}
     </button>
   </div>
+
+  <p class="text-xs text-neutral-500 dark:text-neutral-400" aria-live="polite" aria-atomic="true">
+    {liveStatus}
+  </p>
 
   {#if loadError}
     <div
@@ -106,7 +137,7 @@
       <button
         type="button"
         class="rounded-lg border border-red-400 px-3 py-1 text-xs font-medium text-red-900 hover:bg-red-100 dark:border-red-700 dark:text-red-200 dark:hover:bg-red-900/40"
-        on:click={loadSummary}
+        onclick={loadSummary}
       >
         Retry
       </button>
@@ -205,7 +236,7 @@
         <button
           type="button"
           class="text-accent-600 dark:text-accent-500 text-xs font-medium hover:underline"
-          on:click={() => (verbose = !verbose)}
+          onclick={() => (verbose = !verbose)}
         >
           {verbose ? 'Hide details' : 'Show details'}
         </button>
@@ -238,24 +269,30 @@
             {/if}
 
             {#if check.id === 'arr_transport' && summary.transport.length > 0}
-              <div class="mt-3 overflow-x-auto">
+              <p class="mt-3 text-xs text-neutral-600 dark:text-neutral-400">
+                DNS evidence is observed from Praxrr's resolver. It is not a connection test and does not prove WAN
+                reachability.
+              </p>
+              <div class="mt-3 max-w-full overflow-x-auto [contain:paint]">
                 <table class="w-full text-left text-xs">
+                  <caption class="sr-only">Arr connection transport and DNS evidence</caption>
                   <thead class="text-neutral-500 dark:text-neutral-400">
                     <tr>
-                      <th class="py-1 pr-3 font-medium">Instance</th>
-                      <th class="py-1 pr-3 font-medium">Scheme</th>
-                      <th class="py-1 pr-3 font-medium">Host</th>
-                      <th class="py-1 pr-3 font-medium">Exposure</th>
-                      <th class="py-1 font-medium"></th>
+                      <th scope="col" class="py-1 pr-3 font-medium">Instance</th>
+                      <th scope="col" class="py-1 pr-3 font-medium">Scheme</th>
+                      <th scope="col" class="py-1 pr-3 font-medium">Host</th>
+                      <th scope="col" class="py-1 pr-3 font-medium">Target evidence</th>
+                      <th scope="col" class="py-1 pr-3 font-medium">DNS evidence</th>
+                      <th scope="col" class="py-1 font-medium"><span class="sr-only">Action</span></th>
                     </tr>
                   </thead>
                   <tbody>
                     {#each summary.transport as row (row.instanceId)}
                       <tr class="border-t border-neutral-100 dark:border-neutral-800">
-                        <td class="py-1.5 pr-3">
+                        <th scope="row" class="py-1.5 pr-3 text-left font-normal">
                           <span class="font-medium text-neutral-800 dark:text-neutral-200">{row.instanceName}</span>
                           <Badge variant={row.arrType}>{row.arrType}</Badge>
-                        </td>
+                        </th>
                         <td class="py-1.5 pr-3">
                           <Badge variant={row.scheme === 'https' ? 'success' : 'danger'}>{row.scheme}</Badge>
                         </td>
@@ -263,6 +300,41 @@
                         <td class="py-1.5 pr-3"
                           ><Badge variant={tierVariant(row.tier)}>{TRANSPORT_TIER_LABEL[row.tier]}</Badge></td
                         >
+                        <td class="min-w-72 py-2 pr-3 align-top">
+                          <div class="flex flex-wrap items-center gap-1.5">
+                            <Badge variant={dnsOutcomeVariant(row.dns.outcome)}
+                              >{DNS_OUTCOME_LABEL[row.dns.outcome]}</Badge
+                            >
+                            {#if row.dns.incomplete}
+                              <Badge variant="warning">Incomplete</Badge>
+                            {/if}
+                            {#if row.dns.truncated}
+                              <Badge variant="warning">Result limit reached</Badge>
+                            {/if}
+                            {#if row.dns.addressClassesChanged}
+                              <Badge variant="danger">Address scope changed</Badge>
+                            {/if}
+                          </div>
+                          <p class="mt-1 text-neutral-600 dark:text-neutral-400">
+                            {DNS_SOURCE_LABEL[row.dns.source]}
+                            {#if row.dns.observedAt}
+                              · observed {formatWhen(row.dns.observedAt)}
+                            {/if}
+                          </p>
+                          {#if row.dns.outcome !== 'not-applicable'}
+                            <dl class="mt-1 grid grid-cols-[auto_1fr] gap-x-2 text-neutral-600 dark:text-neutral-400">
+                              <dt class="font-medium">A</dt>
+                              <dd>{formatDnsCounts(row.dns.ipv4)}</dd>
+                              <dt class="font-medium">AAAA</dt>
+                              <dd>{formatDnsCounts(row.dns.ipv6)}</dd>
+                              <dt class="font-medium">Retained</dt>
+                              <dd>{row.dns.retainedCount}</dd>
+                            </dl>
+                            <p class="mt-1 text-neutral-500 dark:text-neutral-400">
+                              Observed from Praxrr; DNS alone does not prove WAN reachability.
+                            </p>
+                          {/if}
+                        </td>
                         <td class="py-1.5"><ShieldFixControl fix={row.fix} /></td>
                       </tr>
                     {/each}
