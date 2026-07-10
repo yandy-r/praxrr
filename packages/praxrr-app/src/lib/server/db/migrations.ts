@@ -82,6 +82,7 @@ import { migration as migration20260717CreateWebauthnTables } from './migrations
 import { migration as migration20260718WidenQualityGoalBindingsArrType } from './migrations/20260718_widen_quality_goal_bindings_arr_type.ts';
 import { migration as migration20260719CreateConfigHealthNotificationState } from './migrations/20260719_create_config_health_notification_state.ts';
 import { migration as migration20260720AddSyncHistoryEntityOutcomes } from './migrations/20260720_add_sync_history_entity_outcomes.ts';
+import { migration as migration20260721CreateQualityGoalApplyJournal } from './migrations/20260721_create_quality_goal_apply_journal.ts';
 
 export interface Migration {
   version: number;
@@ -398,6 +399,7 @@ export function loadMigrations(): Migration[] {
     migration20260718WidenQualityGoalBindingsArrType,
     migration20260719CreateConfigHealthNotificationState,
     migration20260720AddSyncHistoryEntityOutcomes,
+    migration20260721CreateQualityGoalApplyJournal,
   ];
 
   // Sort by version number

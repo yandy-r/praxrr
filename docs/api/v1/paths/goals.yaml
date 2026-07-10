@@ -100,7 +100,123 @@ apply:
             schema:
               $ref: '../schemas/arr.yaml#/ErrorResponse'
       '409':
-        description: Engine version mismatch
+        description: >-
+          Engine version mismatch (ErrorResponse) or a value-guard concurrency conflict — nothing
+          persisted (GoalApplyFailure with the reported outcome + reconcile action).
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - $ref: '../schemas/arr.yaml#/ErrorResponse'
+                - $ref: '../schemas/goals.yaml#/GoalApplyFailure'
+      '500':
+        description: >-
+          Scoring or binding write failed. Returns the reported outcome (whether scoring changed) and a
+          safe reconcile recovery action — never a silent partial write (issue #236).
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/goals.yaml#/GoalApplyFailure'
+
+reconcile:
+  post:
+    operationId: reconcileGoal
+    summary: Recover a partial or pending Quality Goals apply
+    description: |
+      Re-drives the recorded goal intent (preset + weights) for a profile against live state to heal a
+      partial write — scoring persisted but the binding missing, or a crash-interrupted apply. Recompiles
+      the cache from committed `pcd_ops`, then persists only the residual diff and confirms the binding.
+      Deterministic and idempotent: a second call is a no-op (`reconciled=false`, `alreadyApplied=true`).
+    tags:
+      - Quality Goals
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../schemas/goals.yaml#/GoalReconcileRequest'
+    responses:
+      '200':
+        description: The reconciled plan, confirmed binding, and outcome
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/goals.yaml#/GoalReconcileResponse'
+      '400':
+        description: Invalid request
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+      '404':
+        description: Nothing to reconcile for this profile
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+      '409':
+        description: >-
+          Engine version drift (ErrorResponse) or a value-guard concurrency conflict during re-drive
+          (GoalApplyFailure).
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - $ref: '../schemas/arr.yaml#/ErrorResponse'
+                - $ref: '../schemas/goals.yaml#/GoalApplyFailure'
+      '500':
+        description: Re-drive scoring or binding write failed
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/goals.yaml#/GoalApplyFailure'
+
+applyStatus:
+  get:
+    operationId: getGoalApplyStatus
+    summary: Get the latest apply outcome for a quality profile
+    description: |
+      Returns the most recent apply-journal outcome for a profile target, or `null` if none has been
+      attempted. Out-of-band recovery surface that reports a failed or pending apply even when it never
+      wrote a binding (which the binding endpoint cannot surface) — issue #236.
+    tags:
+      - Quality Goals
+    parameters:
+      - name: databaseId
+        in: query
+        required: true
+        schema:
+          type: integer
+      - name: profileName
+        in: query
+        required: true
+        schema:
+          type: string
+      - name: arrType
+        in: query
+        required: true
+        schema:
+          type: string
+          enum:
+            - radarr
+            - sonarr
+            - lidarr
+    responses:
+      '200':
+        description: The latest apply status, or null
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - applyStatus
+              properties:
+                applyStatus:
+                  oneOf:
+                    - $ref: '../schemas/goals.yaml#/GoalApplyStatus'
+                    - type: 'null'
+      '400':
+        description: Invalid query parameters
         content:
           application/json:
             schema:

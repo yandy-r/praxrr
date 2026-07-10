@@ -4226,11 +4226,175 @@
             }
           },
           "409": {
-            "description": "Engine version mismatch",
+            "description": "Engine version mismatch (ErrorResponse) or a value-guard concurrency conflict — nothing persisted (GoalApplyFailure with the reported outcome + reconcile action).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/ErrorResponse"
+                    },
+                    {
+                      "$ref": "#/components/schemas/GoalApplyFailure"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Scoring or binding write failed. Returns the reported outcome (whether scoring changed) and a safe reconcile recovery action — never a silent partial write (issue #236).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GoalApplyFailure"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/goals/apply/status": {
+      "get": {
+        "operationId": "getGoalApplyStatus",
+        "summary": "Get the latest apply outcome for a quality profile",
+        "description": "Returns the most recent apply-journal outcome for a profile target, or `null` if none has been\nattempted. Out-of-band recovery surface that reports a failed or pending apply even when it never\nwrote a binding (which the binding endpoint cannot surface) — issue #236.\n",
+        "tags": ["Quality Goals"],
+        "parameters": [
+          {
+            "name": "databaseId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "profileName",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "arrType",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": ["radarr", "sonarr", "lidarr"]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The latest apply status, or null",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["applyStatus"],
+                  "properties": {
+                    "applyStatus": {
+                      "oneOf": [
+                        {
+                          "$ref": "#/components/schemas/GoalApplyStatus"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid query parameters",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/goals/reconcile": {
+      "post": {
+        "operationId": "reconcileGoal",
+        "summary": "Recover a partial or pending Quality Goals apply",
+        "description": "Re-drives the recorded goal intent (preset + weights) for a profile against live state to heal a\npartial write — scoring persisted but the binding missing, or a crash-interrupted apply. Recompiles\nthe cache from committed `pcd_ops`, then persists only the residual diff and confirms the binding.\nDeterministic and idempotent: a second call is a no-op (`reconciled=false`, `alreadyApplied=true`).\n",
+        "tags": ["Quality Goals"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GoalReconcileRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The reconciled plan, confirmed binding, and outcome",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GoalReconcileResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Nothing to reconcile for this profile",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Engine version drift (ErrorResponse) or a value-guard concurrency conflict during re-drive (GoalApplyFailure).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/ErrorResponse"
+                    },
+                    {
+                      "$ref": "#/components/schemas/GoalApplyFailure"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Re-drive scoring or binding write failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GoalApplyFailure"
                 }
               }
             }
@@ -9977,7 +10141,7 @@
       },
       "GoalApplyResponse": {
         "type": "object",
-        "required": ["plan", "binding", "configDiff"],
+        "required": ["plan", "binding", "configDiff", "applyId", "applyStatus"],
         "properties": {
           "plan": {
             "$ref": "#/components/schemas/GoalPlan"
@@ -9991,6 +10155,13 @@
             "items": {
               "$ref": "#/components/schemas/EntityConfigDiff"
             }
+          },
+          "applyId": {
+            "type": "integer",
+            "description": "The apply-journal row id for this apply (issue #236)."
+          },
+          "applyStatus": {
+            "$ref": "#/components/schemas/GoalApplyStatus"
           }
         }
       },
@@ -10007,8 +10178,158 @@
                 "type": "null"
               }
             ]
+          },
+          "applyStatus": {
+            "description": "The latest apply-journal outcome for this profile target, or null if none has been attempted. Surfaces a failed/pending apply — including a failure that never wrote a binding (issue #236).",
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/GoalApplyStatus"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         }
+      },
+      "GoalRecoveryAction": {
+        "type": "object",
+        "description": "The safe operator recovery action for a failed or pending Quality Goals apply (issue #236).",
+        "required": ["action"],
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": ["none", "reconcile"]
+          },
+          "endpoint": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "GoalApplyStatus": {
+        "type": "object",
+        "description": "Durable outcome of a Quality Goals apply/reconcile attempt (issue #236). Reports whether scoring changed, the binding's terminal state, and the safe recovery action, so a partial write is never unreported.",
+        "required": ["applyId", "status", "scoringChanged", "bindingStatus", "recovery", "startedAt"],
+        "properties": {
+          "applyId": {
+            "type": "integer"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["pending", "succeeded", "failed"]
+          },
+          "scoringChanged": {
+            "type": "boolean",
+            "description": "Whether the scoring ops reached (or may have reached) their intended terminal state."
+          },
+          "bindingStatus": {
+            "type": "string",
+            "enum": ["written", "pending", "failed"]
+          },
+          "failureStage": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "failureReason": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "intentFingerprint": {
+            "type": "string"
+          },
+          "startedAt": {
+            "type": "string"
+          },
+          "settledAt": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "recovery": {
+            "$ref": "#/components/schemas/GoalRecoveryAction"
+          }
+        }
+      },
+      "GoalApplyFailure": {
+        "type": "object",
+        "description": "Structured failure body for a Quality Goals apply/reconcile (issue #236). `message` mirrors ErrorResponse's human text (the UI failure reader falls back to `error`), and `applyStatus` carries the reported outcome + recovery action.",
+        "required": ["message", "applyStatus"],
+        "properties": {
+          "message": {
+            "type": "string"
+          },
+          "applyStatus": {
+            "$ref": "#/components/schemas/GoalApplyStatus"
+          }
+        }
+      },
+      "GoalReconcileRequest": {
+        "type": "object",
+        "description": "Recover a partial or pending Quality Goals apply by re-driving the recorded intent (#236).",
+        "required": ["databaseId", "arrType", "profileName", "expectedEngineVersion"],
+        "properties": {
+          "databaseId": {
+            "type": "integer"
+          },
+          "arrType": {
+            "type": "string",
+            "enum": ["radarr", "sonarr", "lidarr"]
+          },
+          "profileName": {
+            "type": "string"
+          },
+          "expectedEngineVersion": {
+            "type": "string"
+          }
+        }
+      },
+      "GoalReconcileResponse": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/GoalApplyResponse"
+          },
+          {
+            "type": "object",
+            "required": ["reconciled", "alreadyApplied", "applyStatus"],
+            "properties": {
+              "reconciled": {
+                "type": "boolean",
+                "description": "Whether ops were persisted this call (false when live already matched the intent)."
+              },
+              "alreadyApplied": {
+                "type": "boolean",
+                "description": "Whether the live state already equalled the recorded intent (a no-op reconcile)."
+              },
+              "applyStatus": {
+                "$ref": "#/components/schemas/GoalApplyStatus"
+              }
+            }
+          }
+        ]
       },
       "EntityType": {
         "type": "string",

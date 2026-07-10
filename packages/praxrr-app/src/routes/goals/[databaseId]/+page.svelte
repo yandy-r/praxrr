@@ -15,6 +15,7 @@
   type GoalWeights = components['schemas']['GoalWeights'];
   type GoalPreviewResponse = components['schemas']['GoalPreviewResponse'];
   type GoalBinding = components['schemas']['GoalBinding'];
+  type GoalApplyStatus = components['schemas']['GoalApplyStatus'];
   type ArrType = 'radarr' | 'sonarr' | 'lidarr';
 
   export let data: PageData;
@@ -40,7 +41,11 @@
   let previewError: string | null = null;
   let loadingPreview = false;
   let binding: GoalBinding | null = null;
+  // Latest apply-journal outcome for the target — surfaces a failed/pending apply (even one that never
+  // wrote a binding) and drives the recovery affordance (#236).
+  let applyStatus: GoalApplyStatus | null = null;
   let applying = false;
+  let reconciling = false;
   let ready = false;
   let previewTimer: ReturnType<typeof setTimeout> | undefined;
   // Sequence guards: only the latest in-flight request may write shared state (out-of-order responses).
@@ -51,6 +56,8 @@
   $: databaseId = data.currentDatabase.id;
   $: changeCount = preview?.configDiff[0]?.changes.length ?? 0;
   $: bindingStale = binding !== null && binding.engineVersion !== engineVersion;
+  // A failed/pending apply needs recovery — offer the deterministic reconcile action (#236).
+  $: needsRecovery = applyStatus !== null && applyStatus.status !== 'succeeded';
   // Only profiles the selected Arr app can apply to (no sibling fallback) are offered as targets (#222).
   $: compatibleProfiles = data.qualityProfiles.filter((profile) => profile.compatibleArrTypes.includes(arrType));
 
@@ -108,6 +115,7 @@
     const requestId = ++bindingRequestId;
     if (!profileName) {
       binding = null;
+      applyStatus = null;
       return;
     }
     const params = new URLSearchParams({ databaseId: String(databaseId), profileName, arrType });
@@ -115,11 +123,15 @@
     if (requestId !== bindingRequestId) return;
     if (!response.ok) {
       binding = null;
+      applyStatus = null;
       return;
     }
     const body = (await response.json()) as components['schemas']['GoalBindingResponse'];
     if (requestId !== bindingRequestId) return;
     binding = body.binding;
+    // The binding response carries the latest apply outcome even when `binding` is null, so a failed
+    // first apply with no binding row still surfaces its recovery badge (#236).
+    applyStatus = body.applyStatus ?? null;
     // Restore the governed profile's goal so the sliders/preset reflect what's applied. Skip when the
     // binding was produced by a different engine version (weights may not map cleanly — prompt re-apply).
     if (binding && binding.engineVersion === engineVersion) {
@@ -164,6 +176,9 @@
 
   async function applyGoal(): Promise<void> {
     if (!profileName || applying) return;
+    // Snapshot the target so a slow response can't paint a stale badge onto a switched profile/Arr.
+    const target = profileName;
+    const targetArr = arrType;
     applying = true;
     try {
       const response = await fetch('/api/v1/goals/apply', {
@@ -179,7 +194,14 @@
         }),
       });
       if (!response.ok) {
-        const body = (await response.json().catch(() => null)) as { message?: string; error?: string } | null;
+        const body = (await response.json().catch(() => null)) as {
+          message?: string;
+          error?: string;
+          applyStatus?: GoalApplyStatus;
+        } | null;
+        // Surface the reported outcome (scoring changed?) + reconcile affordance for the partial write,
+        // but only if the user hasn't switched target mid-flight.
+        if (body?.applyStatus && profileName === target && arrType === targetArr) applyStatus = body.applyStatus;
         alertStore.add('error', body?.message ?? body?.error ?? `Apply failed (HTTP ${response.status})`);
         return;
       }
@@ -191,6 +213,38 @@
       alertStore.add('error', err instanceof Error ? err.message : 'Apply failed');
     } finally {
       applying = false;
+    }
+  }
+
+  /** Recover a failed or pending apply by re-driving the recorded intent idempotently (#236). */
+  async function reconcile(): Promise<void> {
+    if (!profileName || reconciling) return;
+    const target = profileName;
+    const targetArr = arrType;
+    reconciling = true;
+    try {
+      const response = await fetch('/api/v1/goals/reconcile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ databaseId, arrType, profileName, expectedEngineVersion: engineVersion }),
+      });
+      if (!response.ok) {
+        const body = (await response.json().catch(() => null)) as {
+          message?: string;
+          error?: string;
+          applyStatus?: GoalApplyStatus;
+        } | null;
+        if (body?.applyStatus && profileName === target && arrType === targetArr) applyStatus = body.applyStatus;
+        alertStore.add('error', body?.message ?? body?.error ?? `Reconcile failed (HTTP ${response.status})`);
+        return;
+      }
+      alertStore.add('success', `Recovered the goal apply for ${profileName}.`);
+      await loadBinding();
+      await runPreview();
+    } catch (err) {
+      alertStore.add('error', err instanceof Error ? err.message : 'Reconcile failed');
+    } finally {
+      reconciling = false;
     }
   }
 
@@ -295,6 +349,24 @@
             Currently governed by <span class="font-medium">{presetLabel(binding.presetId)}</span>
             {#if bindingStale}<span class="text-amber-600 dark:text-amber-400"> · engine updated, re-apply</span>{/if}
           </p>
+        {/if}
+        {#if needsRecovery && applyStatus}
+          <div class="flex w-full items-center gap-2 text-xs">
+            <span
+              class="rounded-full bg-amber-100 px-2 py-0.5 font-medium text-amber-800 dark:bg-amber-900/40 dark:text-amber-300"
+            >
+              {applyStatus.status === 'pending' ? 'Apply pending' : 'Apply failed'}{#if applyStatus.scoringChanged}
+                · scores changed{/if}
+            </span>
+            <button
+              type="button"
+              class="rounded-lg border border-amber-400 px-2 py-0.5 font-medium text-amber-700 transition-colors hover:bg-amber-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-amber-600 dark:text-amber-300 dark:hover:bg-amber-900/30"
+              disabled={reconciling}
+              on:click={reconcile}
+            >
+              {reconciling ? 'Reconciling…' : 'Reconcile'}
+            </button>
+          </div>
         {/if}
       </div>
     </Card>

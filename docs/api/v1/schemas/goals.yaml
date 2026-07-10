@@ -443,6 +443,8 @@ GoalApplyResponse:
     - plan
     - binding
     - configDiff
+    - applyId
+    - applyStatus
   properties:
     plan:
       $ref: '#/GoalPlan'
@@ -455,6 +457,11 @@ GoalApplyResponse:
         it matches the preview diff for the same request (issue #221).
       items:
         $ref: '../schemas/impact-simulator.yaml#/EntityConfigDiff'
+    applyId:
+      type: integer
+      description: 'The apply-journal row id for this apply (issue #236).'
+    applyStatus:
+      $ref: '#/GoalApplyStatus'
 
 GoalBindingResponse:
   type: object
@@ -465,3 +472,131 @@ GoalBindingResponse:
       oneOf:
         - $ref: '#/GoalBinding'
         - type: 'null'
+    applyStatus:
+      description: >-
+        The latest apply-journal outcome for this profile target, or null if none has been attempted.
+        Surfaces a failed/pending apply — including a failure that never wrote a binding (issue #236).
+      oneOf:
+        - $ref: '#/GoalApplyStatus'
+        - type: 'null'
+
+GoalRecoveryAction:
+  type: object
+  description: 'The safe operator recovery action for a failed or pending Quality Goals apply (issue #236).'
+  required:
+    - action
+  properties:
+    action:
+      type: string
+      enum:
+        - none
+        - reconcile
+    endpoint:
+      oneOf:
+        - type: string
+        - type: 'null'
+
+GoalApplyStatus:
+  type: object
+  description: >-
+    Durable outcome of a Quality Goals apply/reconcile attempt (issue #236). Reports whether scoring
+    changed, the binding's terminal state, and the safe recovery action, so a partial write is never
+    unreported.
+  required:
+    - applyId
+    - status
+    - scoringChanged
+    - bindingStatus
+    - recovery
+    - startedAt
+  properties:
+    applyId:
+      type: integer
+    status:
+      type: string
+      enum:
+        - pending
+        - succeeded
+        - failed
+    scoringChanged:
+      type: boolean
+      description: Whether the scoring ops reached (or may have reached) their intended terminal state.
+    bindingStatus:
+      type: string
+      enum:
+        - written
+        - pending
+        - failed
+    failureStage:
+      oneOf:
+        - type: string
+        - type: 'null'
+    failureReason:
+      oneOf:
+        - type: string
+        - type: 'null'
+    intentFingerprint:
+      type: string
+    startedAt:
+      type: string
+    settledAt:
+      oneOf:
+        - type: string
+        - type: 'null'
+    recovery:
+      $ref: '#/GoalRecoveryAction'
+
+GoalApplyFailure:
+  type: object
+  description: >-
+    Structured failure body for a Quality Goals apply/reconcile (issue #236). `message` mirrors
+    ErrorResponse's human text (the UI failure reader falls back to `error`), and `applyStatus` carries
+    the reported outcome + recovery action.
+  required:
+    - message
+    - applyStatus
+  properties:
+    message:
+      type: string
+    applyStatus:
+      $ref: '#/GoalApplyStatus'
+
+GoalReconcileRequest:
+  type: object
+  description: 'Recover a partial or pending Quality Goals apply by re-driving the recorded intent (#236).'
+  required:
+    - databaseId
+    - arrType
+    - profileName
+    - expectedEngineVersion
+  properties:
+    databaseId:
+      type: integer
+    arrType:
+      type: string
+      enum:
+        - radarr
+        - sonarr
+        - lidarr
+    profileName:
+      type: string
+    expectedEngineVersion:
+      type: string
+
+GoalReconcileResponse:
+  allOf:
+    - $ref: '#/GoalApplyResponse'
+    - type: object
+      required:
+        - reconciled
+        - alreadyApplied
+        - applyStatus
+      properties:
+        reconciled:
+          type: boolean
+          description: Whether ops were persisted this call (false when live already matched the intent).
+        alreadyApplied:
+          type: boolean
+          description: Whether the live state already equalled the recorded intent (a no-op reconcile).
+        applyStatus:
+          $ref: '#/GoalApplyStatus'

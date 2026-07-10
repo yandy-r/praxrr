@@ -29,6 +29,9 @@ import type { DatabaseInstance } from '$db/queries/databaseInstances.ts';
 import type { QualityGoalBindingRow } from '$db/queries/qualityGoalBindings.ts';
 import type { LogOptions } from '$logger/types.ts';
 import type { GoalApplyDependencies } from '../../routes/api/v1/goals/apply/+server.ts';
+import type { GoalReconcileDependencies } from '$lib/server/goals/reconcileGoalApply.ts';
+import type { QualityGoalApplyJournalRow } from '$db/queries/qualityGoalApplyJournal.ts';
+import { qualityGoalApplyJournalQueries } from '$db/queries/qualityGoalApplyJournal.ts';
 import type { components } from '$api/v1.d.ts';
 
 const { setCache, deleteCache } = await import('$pcd/database/registry.ts');
@@ -36,6 +39,8 @@ const { PCDCache: PCDCacheClass } = await import('$pcd/index.ts');
 const presetsRoute = await import('../../routes/api/v1/goals/presets/+server.ts');
 const previewRoute = await import('../../routes/api/v1/goals/preview/+server.ts');
 const applyRoute = await import('../../routes/api/v1/goals/apply/+server.ts');
+const reconcileRoute = await import('../../routes/api/v1/goals/reconcile/+server.ts');
+const applyStatusRoute = await import('../../routes/api/v1/goals/apply/status/+server.ts');
 const bindingRoute = await import('../../routes/api/v1/goals/binding/+server.ts');
 
 type GoalPresetsResponse = components['schemas']['GoalPresetsResponse'];
@@ -180,9 +185,13 @@ function buildApplyDependencies(
 ): GoalApplyDependencies {
   return {
     buildGoalPlan: () => Promise.resolve({ cache: {} as PCDCache, plan: SERVER_GOAL_PLAN }),
-    persistGoalApply: () => Promise.resolve({ success: true }),
+    persistGoalApply: () => Promise.resolve({ success: true, filepath: 'pcd_ops:1' }),
     computeGoalConfigDiff: () => Promise.resolve({ configDiff: [], appliedChanges: [], skippedChanges: [] }),
+    computeIntentFingerprint: () => Promise.resolve('fixed-fingerprint'),
     upsertBinding: () => SERVER_BINDING,
+    insertPendingJournal: () => 1,
+    markJournalSucceeded: () => {},
+    markJournalFailed: () => {},
     logInfo: (message, options) => {
       logs.push({ message, options });
       return Promise.resolve();
@@ -293,6 +302,58 @@ function postEvent(payload: unknown): Parameters<typeof previewRoute.POST>[0] {
 
 function getEvent(query: string): Parameters<typeof bindingRoute.GET>[0] {
   return { url: new URL(`http://localhost/api/v1/goals/binding?${query}`) } as Parameters<typeof bindingRoute.GET>[0];
+}
+
+function getStatusEvent(query: string): Parameters<typeof applyStatusRoute.GET>[0] {
+  return {
+    url: new URL(`http://localhost/api/v1/goals/apply/status?${query}`),
+  } as Parameters<typeof applyStatusRoute.GET>[0];
+}
+
+const RECONCILE_JOURNAL_ROW: QualityGoalApplyJournalRow = {
+  id: 7,
+  database_id: DATABASE_ID,
+  profile_name: 'Movies',
+  arr_type: 'radarr',
+  preset_id: 'best-quality',
+  weights_json: JSON.stringify(BEST_QUALITY_WEIGHTS),
+  engine_version: '2',
+  intent_fingerprint: 'fp',
+  status: 'failed',
+  scoring_persisted: 1,
+  binding_persisted: 0,
+  origin: 'apply',
+  failure_stage: 'binding',
+  failure_reason: 'Binding write failed',
+  started_at: '2026-07-09T00:00:00.000Z',
+  settled_at: '2026-07-09T00:00:00.000Z',
+  created_at: '2026-07-09 00:00:00',
+  updated_at: '2026-07-09 00:00:00',
+};
+
+function buildReconcileDependencies(
+  logs: ApplyLogCall[],
+  overrides: Partial<GoalReconcileDependencies> = {}
+): GoalReconcileDependencies {
+  return {
+    getInstance: () => buildInstance(),
+    recompileCache: () => Promise.resolve(),
+    getLatestJournal: () => RECONCILE_JOURNAL_ROW,
+    getBinding: () => undefined,
+    buildGoalPlan: () => Promise.resolve({ cache: {} as PCDCache, plan: SERVER_GOAL_PLAN }),
+    computeGoalConfigDiff: () => Promise.resolve({ configDiff: [], appliedChanges: [], skippedChanges: [] }),
+    computeIntentFingerprint: () => Promise.resolve('fixed-fingerprint'),
+    persistGoalApply: () => Promise.resolve({ success: true, filepath: 'pcd_ops:9' }),
+    upsertBinding: () => SERVER_BINDING,
+    insertPendingJournal: () => 2,
+    markJournalSucceeded: () => {},
+    markJournalFailed: () => {},
+    logInfo: (message, options) => {
+      logs.push({ message, options });
+      return Promise.resolve();
+    },
+    ...overrides,
+  };
 }
 
 function getErrorStatus(error: unknown): number {
@@ -594,6 +655,12 @@ Deno.test('goals apply: logs one server-derived decision event after persistence
   );
 
   assertEquals(response.status, 200);
+  const applyBody = (await response.json()) as components['schemas']['GoalApplyResponse'];
+  assertEquals(applyBody.applyId, 1);
+  assertEquals(applyBody.applyStatus?.status, 'succeeded');
+  assertEquals(applyBody.applyStatus?.bindingStatus, 'written');
+  assertEquals(applyBody.applyStatus?.scoringChanged, true);
+  assertEquals(applyBody.applyStatus?.recovery.action, 'none');
   assertEquals(logs, [
     {
       message: 'Quality goal applied',
@@ -697,7 +764,7 @@ Deno.test('goals apply: validation and engine-version failures do not log', asyn
   assertEquals(logs, []);
 });
 
-Deno.test('goals apply: scoring and binding failures do not log', async () => {
+Deno.test('goals apply: scoring and binding failures return a structured failure and do not log (#236)', async () => {
   const requestPayload = {
     databaseId: DATABASE_ID,
     arrType: 'radarr',
@@ -706,63 +773,92 @@ Deno.test('goals apply: scoring and binding failures do not log', async () => {
     weights: BEST_QUALITY_WEIGHTS,
     expectedEngineVersion: '2',
   };
+  type GoalApplyFailure = components['schemas']['GoalApplyFailure'];
 
+  // Scoring failure (pre-persist reject): nothing persisted, binding never attempted, no decision log.
   const scoringLogs: ApplyLogCall[] = [];
   let scoringFailureBindingCalls = 0;
-  const scoringFailure = await assertRejects(() =>
-    applyRoute._handleGoalApplyRequest(
-      postEvent(requestPayload).request,
-      buildApplyDependencies(scoringLogs, {
-        persistGoalApply: () => Promise.resolve({ success: false, error: 'Scoring write failed' }),
-        upsertBinding: () => {
-          scoringFailureBindingCalls += 1;
-          return SERVER_BINDING;
-        },
-      })
-    )
+  const scoringFailed: Array<Parameters<GoalApplyDependencies['markJournalFailed']>[1]> = [];
+  const scoringResponse = await applyRoute._handleGoalApplyRequest(
+    postEvent(requestPayload).request,
+    buildApplyDependencies(scoringLogs, {
+      persistGoalApply: () => Promise.resolve({ success: false, error: 'Scoring write failed' }),
+      markJournalFailed: (_id, input) => {
+        scoringFailed.push(input);
+      },
+      upsertBinding: () => {
+        scoringFailureBindingCalls += 1;
+        return SERVER_BINDING;
+      },
+    })
   );
-  assertEquals(getErrorStatus(scoringFailure), 500);
+  assertEquals(scoringResponse.status, 500);
+  const scoringBody = (await scoringResponse.json()) as GoalApplyFailure;
+  assertEquals(scoringBody.message, 'Scoring write failed');
+  assertEquals(scoringBody.applyStatus.failureStage, 'scoring');
+  assertEquals(scoringBody.applyStatus.scoringChanged, false);
+  assertEquals(scoringBody.applyStatus.recovery.endpoint, '/api/v1/goals/reconcile');
+  assertEquals(
+    scoringFailed.map((call) => call.failureStage),
+    ['scoring']
+  );
   assertEquals(scoringFailureBindingCalls, 0);
   assertEquals(scoringLogs, []);
 
+  // Binding failure AFTER scoring persisted (the #236 gap): scoring IS reported changed, stage=binding.
   const bindingLogs: ApplyLogCall[] = [];
-  await assertRejects(
-    () =>
-      applyRoute._handleGoalApplyRequest(
-        postEvent(requestPayload).request,
-        buildApplyDependencies(bindingLogs, {
-          upsertBinding: () => {
-            throw new Error('Binding write failed');
-          },
-        })
-      ),
-    Error,
-    'Binding write failed'
+  const bindingFailed: Array<Parameters<GoalApplyDependencies['markJournalFailed']>[1]> = [];
+  const bindingResponse = await applyRoute._handleGoalApplyRequest(
+    postEvent(requestPayload).request,
+    buildApplyDependencies(bindingLogs, {
+      markJournalFailed: (_id, input) => {
+        bindingFailed.push(input);
+      },
+      upsertBinding: () => {
+        throw new Error('Binding write failed');
+      },
+    })
   );
+  assertEquals(bindingResponse.status, 500);
+  const bindingBody = (await bindingResponse.json()) as GoalApplyFailure;
+  assertEquals(bindingBody.message, 'Binding write failed');
+  assertEquals(bindingBody.applyStatus.failureStage, 'binding');
+  assertEquals(bindingBody.applyStatus.scoringChanged, true);
+  assertEquals(bindingBody.applyStatus.bindingStatus, 'failed');
+  assertEquals(bindingBody.applyStatus.recovery.action, 'reconcile');
+  assertEquals(
+    bindingFailed.map((call) => call.failureStage),
+    ['binding']
+  );
+  assertEquals(bindingFailed[0].scoringPersisted, 1);
   assertEquals(bindingLogs, []);
 });
 
 Deno.test('goals apply: a value-guard gate rejection maps to 409 (not 500) and does not log (#221)', async () => {
   const logs: ApplyLogCall[] = [];
-  const conflict = await assertRejects(() =>
-    applyRoute._handleGoalApplyRequest(
-      postEvent({
-        databaseId: DATABASE_ID,
-        arrType: 'radarr',
-        profileName: 'Movies',
-        preset: 'best-quality',
-        weights: BEST_QUALITY_WEIGHTS,
-        expectedEngineVersion: '2',
-      }).request,
-      buildApplyDependencies(logs, {
-        // The writer emits "Value-guard gate rejected operation N …" on a guard conflict; the route
-        // classifies that as a 409 concurrency conflict via /value-guard gate/i.
-        persistGoalApply: () =>
-          Promise.resolve({ success: false, error: 'Value-guard gate rejected operation 2 (quality_profile "Movies"): conflict' }),
-      })
-    )
+  const conflictResponse = await applyRoute._handleGoalApplyRequest(
+    postEvent({
+      databaseId: DATABASE_ID,
+      arrType: 'radarr',
+      profileName: 'Movies',
+      preset: 'best-quality',
+      weights: BEST_QUALITY_WEIGHTS,
+      expectedEngineVersion: '2',
+    }).request,
+    buildApplyDependencies(logs, {
+      // The writer emits "Value-guard gate rejected operation N …" on a guard conflict; the route
+      // classifies that as a 409 concurrency conflict via /value-guard gate/i and returns a structured body.
+      persistGoalApply: () =>
+        Promise.resolve({
+          success: false,
+          error: 'Value-guard gate rejected operation 2 (quality_profile "Movies"): conflict',
+        }),
+    })
   );
-  assertEquals(getErrorStatus(conflict), 409);
+  assertEquals(conflictResponse.status, 409);
+  const conflictBody = (await conflictResponse.json()) as components['schemas']['GoalApplyFailure'];
+  assertEquals(conflictBody.applyStatus.scoringChanged, false);
+  assertEquals(conflictBody.applyStatus.failureStage, 'scoring');
   assertEquals(logs, []);
 });
 
@@ -800,6 +896,38 @@ migratedTest('goals binding: null when unbound, then reflects an upserted bindin
   const body = (await bound.json()) as GoalBindingResponse;
   assertEquals(body.binding?.presetId, 'best-quality');
   assertEquals(body.binding?.weights.resolutionCeiling, '2160p');
+  // No apply-journal row yet → the binding response reports no outcome (#236).
+  assertEquals(body.applyStatus ?? null, null);
+
+  // A prior failed apply (scoring persisted, binding stage failed) surfaces on the binding response so
+  // the goals editor can render its recovery banner even alongside a live binding (#236).
+  const journalId = qualityGoalApplyJournalQueries.insertPending({
+    databaseId,
+    profileName: 'Movies',
+    arrType: 'radarr',
+    presetId: 'best-quality',
+    weightsJson: JSON.stringify(BEST_QUALITY_WEIGHTS),
+    engineVersion: '2',
+    intentFingerprint: 'fp',
+    origin: 'apply',
+    startedAt: '2026-07-09T00:00:00.000Z',
+  });
+  qualityGoalApplyJournalQueries.markFailed(journalId, {
+    failureStage: 'binding',
+    failureReason: 'Binding write failed',
+    scoringPersisted: 1,
+    bindingPersisted: 0,
+  });
+  const withStatus: Response = await bindingRoute.GET(
+    getEvent(`databaseId=${databaseId}&profileName=Movies&arrType=radarr`)
+  );
+  const statusBody = (await withStatus.json()) as GoalBindingResponse;
+  assertEquals(statusBody.binding?.presetId, 'best-quality');
+  assertEquals(statusBody.applyStatus?.status, 'failed');
+  assertEquals(statusBody.applyStatus?.failureStage, 'binding');
+  assertEquals(statusBody.applyStatus?.bindingStatus, 'failed');
+  assertEquals(statusBody.applyStatus?.scoringChanged, true);
+  assertEquals(statusBody.applyStatus?.recovery.action, 'reconcile');
 
   const badArr = await assertRejects(async () =>
     bindingRoute.GET(getEvent(`databaseId=${databaseId}&profileName=Movies&arrType=plex`))
@@ -855,4 +983,124 @@ Deno.test('goals binding: empty or missing databaseId query param -> 400 (not a 
   assertEquals(getErrorStatus(empty), 400);
   const missing = await assertRejects(async () => bindingRoute.GET(getEvent('profileName=Movies&arrType=radarr')));
   assertEquals(getErrorStatus(missing), 400);
+});
+
+// ============================================================================
+// reconcile (unit — stubbed deps)
+// ============================================================================
+
+Deno.test('goals reconcile: re-drives the recorded intent and logs once when residual ops persist (#236)', async () => {
+  const logs: ApplyLogCall[] = [];
+  const response = await reconcileRoute._handleGoalReconcileRequest(
+    postEvent({ databaseId: DATABASE_ID, arrType: 'radarr', profileName: 'Movies', expectedEngineVersion: '2' }).request,
+    buildReconcileDependencies(logs)
+  );
+  assertEquals(response.status, 200);
+  const body = (await response.json()) as components['schemas']['GoalReconcileResponse'];
+  assertEquals(body.reconciled, true);
+  assertEquals(body.alreadyApplied, false);
+  assertEquals(body.applyStatus.status, 'succeeded');
+  assertEquals(body.applyStatus.scoringChanged, true);
+  assertEquals(logs.length, 1);
+});
+
+Deno.test('goals reconcile: a no-op (live already matches intent) does not log and reports alreadyApplied (#236)', async () => {
+  const logs: ApplyLogCall[] = [];
+  const response = await reconcileRoute._handleGoalReconcileRequest(
+    postEvent({ databaseId: DATABASE_ID, arrType: 'radarr', profileName: 'Movies', expectedEngineVersion: '2' }).request,
+    // No residual ops (live already matches) → persistGoalApply returns success with no filepath.
+    buildReconcileDependencies(logs, { persistGoalApply: () => Promise.resolve({ success: true }) })
+  );
+  assertEquals(response.status, 200);
+  const body = (await response.json()) as components['schemas']['GoalReconcileResponse'];
+  assertEquals(body.reconciled, false);
+  assertEquals(body.alreadyApplied, true);
+  assertEquals(body.applyStatus.scoringChanged, false);
+  assertEquals(logs, []);
+});
+
+Deno.test('goals reconcile: 404 when nothing has ever been applied to the profile (#236)', async () => {
+  const logs: ApplyLogCall[] = [];
+  const rejected = await assertRejects(() =>
+    reconcileRoute._handleGoalReconcileRequest(
+      postEvent({ databaseId: DATABASE_ID, arrType: 'radarr', profileName: 'Movies', expectedEngineVersion: '2' })
+        .request,
+      buildReconcileDependencies(logs, { getLatestJournal: () => undefined, getBinding: () => undefined })
+    )
+  );
+  assertEquals(getErrorStatus(rejected), 404);
+  assertEquals(logs, []);
+});
+
+Deno.test('goals reconcile: an engine-version mismatch is a 409 before any write (#236)', async () => {
+  const logs: ApplyLogCall[] = [];
+  let persistCalls = 0;
+  const rejected = await assertRejects(() =>
+    reconcileRoute._handleGoalReconcileRequest(
+      postEvent({ databaseId: DATABASE_ID, arrType: 'radarr', profileName: 'Movies', expectedEngineVersion: '0' })
+        .request,
+      buildReconcileDependencies(logs, {
+        persistGoalApply: () => {
+          persistCalls += 1;
+          return Promise.resolve({ success: true });
+        },
+      })
+    )
+  );
+  assertEquals(getErrorStatus(rejected), 409);
+  assertEquals(persistCalls, 0);
+});
+
+// ============================================================================
+// apply status (real migrated app DB)
+// ============================================================================
+
+migratedTest('goals apply status: null when no attempt, then reflects the latest journal row (#236)', async () => {
+  const databaseId = databaseInstancesQueries.create({
+    uuid: crypto.randomUUID(),
+    name: 'Apply Status DB',
+    repositoryUrl: 'https://example.invalid/repo.git',
+    localPath: '/tmp/apply-status-db-does-not-exist',
+  });
+
+  const empty: Response = await applyStatusRoute.GET(
+    getStatusEvent(`databaseId=${databaseId}&profileName=Movies&arrType=radarr`)
+  );
+  assertEquals(empty.status, 200);
+  assertEquals(((await empty.json()) as { applyStatus: unknown }).applyStatus, null);
+
+  // A failed binding stage: scoring persisted, binding absent — the #236 headline partial write.
+  const id = qualityGoalApplyJournalQueries.insertPending({
+    databaseId,
+    profileName: 'Movies',
+    arrType: 'radarr',
+    presetId: 'best-quality',
+    weightsJson: JSON.stringify(BEST_QUALITY_WEIGHTS),
+    engineVersion: '2',
+    intentFingerprint: 'fp',
+    origin: 'apply',
+    startedAt: '2026-07-09T00:00:00.000Z',
+  });
+  qualityGoalApplyJournalQueries.markFailed(id, {
+    failureStage: 'binding',
+    failureReason: 'Binding write failed',
+    scoringPersisted: 1,
+    bindingPersisted: 0,
+  });
+
+  const failed: Response = await applyStatusRoute.GET(
+    getStatusEvent(`databaseId=${databaseId}&profileName=Movies&arrType=radarr`)
+  );
+  const status = ((await failed.json()) as { applyStatus: components['schemas']['GoalApplyStatus'] }).applyStatus;
+  assertEquals(status.status, 'failed');
+  assertEquals(status.failureStage, 'binding');
+  assertEquals(status.scoringChanged, true);
+  assertEquals(status.bindingStatus, 'failed');
+  assertEquals(status.recovery.action, 'reconcile');
+  assertEquals(status.recovery.endpoint, '/api/v1/goals/reconcile');
+
+  const bad = await assertRejects(async () =>
+    applyStatusRoute.GET(getStatusEvent('databaseId=&profileName=Movies&arrType=radarr'))
+  );
+  assertEquals(getErrorStatus(bad), 400);
 });
