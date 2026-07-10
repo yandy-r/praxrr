@@ -52,3 +52,19 @@
 
 All actionable findings from the PR #247 review were resolved. The branch is ready for a clean
 re-review and CI validation.
+
+## Re-review Cycle
+
+The integrated re-review found seven additional bounded-resource and contract/documentation issues.
+All seven were fixed:
+
+- Disconnected chart runs now share one multi-subpath SVG path per visual series.
+- Distinct criterion chart discovery stops at the display cap plus one and renders at most 12 charts.
+- Raw evidence-byte budgets are checked in SQL before JSON text reaches JavaScript.
+- Retained profile discovery has a 10,000-snapshot sentinel before JSON expansion.
+- Empty persisted profile names are rejected without trimming valid exact names.
+- JSON and export OpenAPI 422 responses document every evidence-budget rejection.
+- The merged roadmap consistently records #223–#225 shipped and #226/#247 pending merge.
+
+Post-fix validation increased the focused suite to 197 passing tests and the focused browser suite
+remains 11 passing tests. The final re-review decision is `APPROVE`.
