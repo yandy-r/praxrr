@@ -43,6 +43,7 @@ export const CRITERION_CATALOG: readonly CriterionMeta[] = [
   {
     id: 'trash_alignment',
     label: 'TRaSH Alignment',
-    description: 'Overlap with a TRaSH-recommended custom-format set. Optional and disabled by default.'
+    description:
+      'Instance-level overlap between the custom formats you opted into from a linked TRaSH source and those actually assigned across your quality profiles. Optional and disabled by default.'
   }
 ] as const;

@@ -18,8 +18,11 @@ import type { NarrationLine } from '$shared/narration/index.ts';
  * Stamped onto every {@link HealthReport} and persisted snapshot. Bump whenever the criteria set,
  * the band thresholds, the per-criterion score formulas, or the rollup math change, so a client can
  * detect that a stored snapshot was produced by a different engine generation. Declared here ONCE.
+ *
+ * Bumped `1 -> 2` for issue #225: the `trash_alignment` per-criterion formula changed from a
+ * constant `null` stub to a real, evidence-based scorer.
  */
-export const CONFIG_HEALTH_ENGINE_VERSION = '1';
+export const CONFIG_HEALTH_ENGINE_VERSION = '2';
 
 /** Arr apps the engine scores. Matches `SyncPreviewArrType`; the gatherer narrows the loose column. */
 export type HealthArrType = 'radarr' | 'sonarr' | 'lidarr';
@@ -136,6 +139,15 @@ export interface HealthInputs {
   readonly versionSupported: boolean | null;
   readonly drift: DriftFacts;
   readonly profiles: readonly ProfileFacts[];
+  /**
+   * Instance-level TRaSH reference set for `trash_alignment`: DISTINCT, original-case names of the
+   * instance's OWN opted-in TRaSH `customFormats` selections (local app-DB read, arr-matched, NO
+   * remote fetch). Instance-level like {@link drift}, NOT on {@link ProfileFacts}. `null` when
+   * unmeasurable — arr not TRaSH-supported (lidarr), no opted-in selections, or a read error. The
+   * `trash_alignment` criterion treats both `null` AND `[]` as unmeasurable (skip) so its
+   * `100 * aligned / |R|` is divide-by-zero-safe regardless of which constructor built these inputs.
+   */
+  readonly trashRecommendedCfNames: readonly string[] | null;
   /** Per-criterion enable/weight config from settings (drives which criteria the engine runs). */
   readonly criteria: readonly CriterionConfig[];
   /** ISO-8601 UTC timestamp passed IN — the engine never calls `Date.now()`/`new Date()`. */

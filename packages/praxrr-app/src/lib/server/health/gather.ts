@@ -16,11 +16,13 @@ import type { ArrInstance } from '$db/queries/arrInstances.ts';
 import { arrSyncQueries } from '$db/queries/arrSync.ts';
 import { driftStatusQueries } from '$db/queries/driftStatus.ts';
 import { configHealthSettingsQueries } from '$db/queries/configHealthSettings.ts';
+import { trashGuideSyncQueries } from '$db/queries/trashGuideSync.ts';
 import { getCache, type PCDCache } from '$pcd/index.ts';
 import { computeCompatibleProfileNames } from '$pcd/entities/qualityProfiles/compatibility.ts';
 import { scoring, QualityProfileScoringNotFoundError } from '$pcd/entities/qualityProfiles/scoring/read.ts';
 import { qualities } from '$pcd/entities/qualityProfiles/qualities/read.ts';
 import { resolveArrCompatibility } from '$shared/arr/compatibility.ts';
+import { isTrashGuideSupportedArrType } from '$shared/trashguide/types.ts';
 import { isSyncPreviewArrType } from '$sync/preview/types.ts';
 import type {
   DriftFacts,
@@ -63,6 +65,41 @@ function gatherVersionSupported(arrType: HealthArrType, detectedVersion: string 
   const tier = resolveArrCompatibility(arrType, detectedVersion).tier;
   if (tier === 'unknown') return null;
   return tier !== 'unsupported';
+}
+
+/**
+ * Instance-level TRaSH reference set for the `trash_alignment` criterion (issue #225): DISTINCT
+ * (case-insensitive), original-case names of the instance's opted-in `customFormats` selections.
+ * Local app-DB read only — `getSelectionsByInstance` is a synchronous SQLite query arr-matched via
+ * `ai.type = s.arr_type`, so no source with a foreign arr_type can leak in (no remote fetch, no
+ * sibling fallback). NEVER throws — like the rest of the gatherer, a read failure degrades to `null`.
+ *
+ * Returns `null` (=> the criterion skips) for: non-TRaSH arr types (lidarr — the gate here plus the
+ * structural fact that no lidarr TRaSH source exists), no opted-in `customFormats` selections, or a
+ * read error.
+ *
+ * NOTE: R is "ever opted in". `getSelectionsByInstance` does NOT filter on source `enabled`, so a
+ * selection from a later-disabled source still counts. Intentional for this opt-in info criterion.
+ */
+export function gatherTrashRecommendedCfNames(instanceId: number, arrType: HealthArrType): readonly string[] | null {
+  if (!isTrashGuideSupportedArrType(arrType)) return null;
+  try {
+    const selections = trashGuideSyncQueries.getSelectionsByInstance(instanceId);
+    const distinct = new Map<string, string>(); // lower-cased key -> original case (first seen)
+    for (const selection of selections) {
+      if (selection.sectionType !== 'customFormats') continue;
+      const key = selection.itemName.toLowerCase();
+      if (!distinct.has(key)) distinct.set(key, selection.itemName);
+    }
+    return distinct.size > 0 ? [...distinct.values()] : null;
+  } catch (error) {
+    // Sync degradation path (the DB read is synchronous): fire-and-forget the warning.
+    void logger.warn('Config health: TRaSH selection read failed; skipping trash_alignment', {
+      source: SOURCE,
+      meta: { instanceId, error: error instanceof Error ? error.message : String(error) },
+    });
+    return null;
+  }
 }
 
 /** A profile we could not read (unbuilt cache / missing row): scored as `unknown`, never crashes. */
@@ -187,6 +224,7 @@ export async function buildHealthInputs(instance: ArrInstance): Promise<HealthIn
 
   const drift = gatherDrift(instance.id);
   const versionSupported = gatherVersionSupported(arrType, instance.detected_version ?? null);
+  const trashRecommendedCfNames = gatherTrashRecommendedCfNames(instance.id, arrType);
   const criteria = configHealthSettingsQueries.get().criteria;
 
   let profiles: ProfileFacts[] = [];
@@ -208,6 +246,7 @@ export async function buildHealthInputs(instance: ArrInstance): Promise<HealthIn
     versionSupported,
     drift,
     profiles,
+    trashRecommendedCfNames,
     criteria,
     nowIso,
   };
