@@ -1,19 +1,31 @@
-import { assert, assertEquals, assertExists } from '@std/assert';
+import { assert, assertEquals, assertExists, assertRejects, assertThrows } from '@std/assert';
 import { config } from '$config';
 import { db } from '$db/db.ts';
 import { runMigrations } from '$db/migrations.ts';
-import { arrInstancesQueries, type ArrInstance } from '$db/queries/arrInstances.ts';
+import { type ArrInstance, arrInstancesQueries } from '$db/queries/arrInstances.ts';
 import { canaryRolloutQueries } from '$db/queries/canaryRollouts.ts';
 import { canarySettingsQueries } from '$db/queries/canarySettings.ts';
 import {
-  syncHistoryQueries,
   type Pagination,
   type SyncHistoryFilters,
   type SyncHistorySummary,
+  syncHistoryQueries,
 } from '$db/queries/syncHistory.ts';
-import { startRollout } from '$sync/canary/coordinator.ts';
-import type { CanaryOutcomeStatus, CanaryStartResult } from '$sync/canary/types.ts';
+import { HttpError } from '$http/types.ts';
+import { jobDispatcher } from '$jobs/dispatcher.ts';
+import { logger } from '$logger/logger.ts';
+import { abortRollout, buildRemainingPreviewEvidence, proceedRollout, startRollout } from '$sync/canary/coordinator.ts';
+import { CanaryPreviewUnavailableError, CanaryStaleTokenError, CanaryStateError } from '$sync/canary/errors.ts';
+import type {
+  CanaryOutcomeStatus,
+  CanaryRemainingPreviewEvidence,
+  CanaryStartResult,
+  CanaryTarget,
+} from '$sync/canary/types.ts';
+import { buildPreviewFailure } from '$sync/preview/failureReason.ts';
+import type { GeneratePreviewResult } from '$sync/preview/orchestrator.ts';
 import type { SyncHistoryInput } from '$sync/syncHistory/types.ts';
+import type { SectionType } from '$sync/types.ts';
 
 // Side-effect import registers the arr.sync section handlers that executeSyncJob
 // (invoked inline by the coordinator's canary run) resolves through.
@@ -44,6 +56,7 @@ function migratedTest(name: string, fn: () => Promise<void> | void): void {
         await runMigrations();
         await fn();
       } finally {
+        jobDispatcher.stop();
         db.close();
         config.setBasePath(originalBasePath);
         await Deno.remove(tempBasePath, { recursive: true }).catch(() => {});
@@ -193,7 +206,109 @@ function expectGate(result: CanaryStartResult): Extract<CanaryStartResult, { ski
  * resolves from the getEnabled cohort, so it is unaffected by the getById probe.
  */
 function pinDefaultCanary(instanceId: number): void {
-  canarySettingsQueries.update({ defaultCanaryInstanceId: instanceId, autoSelect: true });
+  canarySettingsQueries.update({
+    defaultCanaryInstanceId: instanceId,
+    autoSelect: true,
+  });
+}
+
+function targetFor(instanceId: number): CanaryTarget {
+  const instance = arrInstancesQueries.getById(instanceId);
+  assertExists(instance);
+  return { instanceId, instanceName: instance.name };
+}
+
+function zeroChangePreview(
+  target: CanaryTarget,
+  arrType: 'radarr' | 'sonarr' | 'lidarr' = 'radarr',
+  sectionFailure = false,
+  sections: SectionType[] = ['qualityProfiles']
+): GeneratePreviewResult {
+  const failure = sectionFailure ? buildPreviewFailure('unauthorized', arrType) : null;
+  return {
+    instanceId: target.instanceId,
+    instanceName: target.instanceName,
+    arrType,
+    status: 'ready',
+    createdAtMs: 1_783_510_400_000,
+    sections,
+    sectionOutcomes: sections.map((section) => ({ section, failure, skipped: false })),
+    qualityProfiles:
+      failure || !sections.includes('qualityProfiles')
+        ? null
+        : { section: 'qualityProfiles', customFormats: [], qualityProfiles: [] },
+    delayProfiles: null,
+    mediaManagement:
+      failure || !sections.includes('mediaManagement')
+        ? null
+        : { section: 'mediaManagement', naming: null, qualityDefinitions: [], mediaSettings: null },
+    metadataProfiles: null,
+    summary: {
+      totalCreates: 0,
+      totalUpdates: 0,
+      totalDeletes: 0,
+      totalUnchanged: 0,
+    },
+  };
+}
+
+function availableEvidence(target: CanaryTarget): CanaryRemainingPreviewEvidence {
+  return {
+    version: 1,
+    availability: 'available',
+    generatedAt: '2026-07-09T10:01:00.000Z',
+    previews: [zeroChangePreview(target)],
+  };
+}
+
+function unavailableEvidence(target: CanaryTarget): CanaryRemainingPreviewEvidence {
+  return {
+    version: 1,
+    availability: 'unavailable',
+    generatedAt: '2026-07-09T10:01:00.000Z',
+    failure: buildPreviewFailure('unreachable', 'radarr'),
+    partialPreviews: [zeroChangePreview(target)],
+  };
+}
+
+function insertGate(evidence: CanaryRemainingPreviewEvidence): {
+  id: number;
+  token: string;
+} {
+  const target = evidence.availability === 'available' ? evidence.previews[0] : evidence.partialPreviews[0];
+  const id = canaryRolloutQueries.insert({
+    arrType: 'radarr',
+    canaryInstanceId: null,
+    canaryInstanceName: 'Canary',
+    sections: ['qualityProfiles'],
+    maxBatchSize: 1,
+    partialPolicy: 'gate',
+    remainingTargets: [{ instanceId: target.instanceId, instanceName: target.instanceName }],
+    trigger: 'manual',
+    startedAt: '2026-07-09T10:00:00.000Z',
+    stateToken: 'initial',
+  });
+  const token = `gate-${id}`;
+  assert(
+    canaryRolloutQueries.recordCanaryOutcome(id, {
+      status: 'awaiting_confirmation',
+      canaryStatus: 'success',
+      canaryOutput: 'ok',
+      canaryError: null,
+      canarySyncHistoryId: null,
+      remainingPreview: evidence,
+      nextToken: token,
+      finishedAt: null,
+    })
+  );
+  return { id, token };
+}
+
+function queuedCanaryJobs(): number {
+  return (
+    db.queryFirst<{ total: number }>("SELECT COUNT(*) AS total FROM job_queue WHERE job_type = 'sync.canary.rollout'")
+      ?.total ?? 0
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -245,8 +360,8 @@ migratedTest('gate matrix: a failed canary aborts and never dispatches the remai
     assertEquals(result.rollout.status, 'aborted');
     assertEquals(result.rollout.canaryStatus, 'failed');
     assertEquals(result.rollout.canarySyncHistoryId, histId);
-    // Fail-closed: no preview, and the remaining instance is never synced/previewed.
-    assertEquals(result.remainingPreview, []);
+    // Fail-closed: no remaining target is synced/previewed.
+    assertEquals(result.rollout.remainingPreview.availability, 'unavailable');
     assertEquals(calls.get(canaryId), 1, 'only the canary sync ran');
     assertEquals(calls.get(remainingId), undefined, 'remaining instance must not be dispatched on abort');
 
@@ -279,10 +394,9 @@ migratedTest(
       assertEquals(result.rollout.status, 'awaiting_confirmation');
       assertEquals(result.rollout.canaryStatus, 'success');
       assertEquals(result.rollout.canarySyncHistoryId, histId);
-      // The preview-build path is taken (distinct from abort's hard-coded []): the remaining
-      // instance is read for previewing. Content is [] only because the offline Arr client
-      // cannot generate a live diff in a unit test — asserting the array shape is enough here.
-      assert(Array.isArray(result.remainingPreview));
+      // The preview-build path is taken. The offline probe makes generation unavailable,
+      // which is now explicit rather than an ambiguous empty array.
+      assertEquals(result.rollout.remainingPreview.availability, 'unavailable');
       assert((calls.get(remainingId) ?? 0) >= 1, 'buildRemainingPreview must reach the remaining instance');
     } finally {
       undo(restores);
@@ -326,7 +440,7 @@ migratedTest('gate matrix: a partial canary under the abort policy aborts fail-c
 
     assertEquals(result.rollout.status, 'aborted');
     assertEquals(result.rollout.canaryStatus, 'partial');
-    assertEquals(result.remainingPreview, []);
+    assertEquals(result.rollout.remainingPreview.availability, 'unavailable');
     assertEquals(calls.get(remainingId), undefined, 'remaining instance is not previewed on abort');
   } finally {
     undo(restores);
@@ -347,7 +461,7 @@ migratedTest('gate matrix: a skipped canary aborts fail-closed', async () => {
 
     assertEquals(result.rollout.status, 'aborted');
     assertEquals(result.rollout.canaryStatus, 'skipped');
-    assertEquals(result.remainingPreview, []);
+    assertEquals(result.rollout.remainingPreview.availability, 'unavailable');
   } finally {
     undo(restores);
   }
@@ -392,7 +506,11 @@ migratedTest('classification rejects a foreign-instance row (asserts row.arrInst
   // A newest row that belongs to a DIFFERENT instance but reports success — the classifier
   // must not trust it. Falls through to the JobRunStatus mapping instead.
   const search = stubClassificationSearch(restores, [
-    makeSummary({ id: 999, arrInstanceId: canaryId + 5000, status: 'success' }),
+    makeSummary({
+      id: 999,
+      arrInstanceId: canaryId + 5000,
+      status: 'success',
+    }),
   ]);
 
   try {
@@ -409,11 +527,11 @@ migratedTest('classification rejects a foreign-instance row (asserts row.arrInst
 });
 
 // ---------------------------------------------------------------------------
-// Preview resilience: a remaining instance disabled mid-gate degrades to []
+// Preview resilience: target drift becomes explicit unavailable evidence
 // ---------------------------------------------------------------------------
 
 migratedTest(
-  'a remaining instance disabled between selection and preview degrades to [] without throwing',
+  'a remaining instance disabled between selection and preview becomes unavailable without throwing',
   async () => {
     const restores: Restore[] = [];
     const canaryId = seedInstance('radarr');
@@ -422,8 +540,10 @@ migratedTest(
 
     // Capture the real enabled rows before patching so the stateful getEnabled can replay them.
     const enabledRows = arrInstancesQueries.getEnabled();
-    const canaryRow = enabledRows.find((row) => row.id === canaryId)!;
-    const remainingRow = enabledRows.find((row) => row.id === remainingId)!;
+    const canaryRow = enabledRows.find((row) => row.id === canaryId);
+    const remainingRow = enabledRows.find((row) => row.id === remainingId);
+    assertExists(canaryRow);
+    assertExists(remainingRow);
 
     const histId = seedHistoryRow(canaryId, 'success');
     const calls = installGetByIdProbe(restores);
@@ -442,11 +562,11 @@ migratedTest(
     });
 
     try {
-      // Must not 500: the rollout still halts at the gate with an empty preview.
+      // Must not 500: the rollout still halts at the gate with unavailable evidence.
       const result = expectGate(await startRollout({ arrType: 'radarr' }));
 
       assertEquals(result.rollout.status, 'awaiting_confirmation');
-      assertEquals(result.remainingPreview, []);
+      assertEquals(result.rollout.remainingPreview.availability, 'unavailable');
       // The re-filter dropped the disabled remaining BEFORE any preview generation, so its
       // getById is never reached during the preview build.
       assertEquals(calls.get(remainingId), undefined, 'disabled remaining must be filtered before previewing');
@@ -456,3 +576,172 @@ migratedTest(
     }
   }
 );
+
+// ---------------------------------------------------------------------------
+// Remaining-preview evidence and promotion authorization
+// ---------------------------------------------------------------------------
+
+migratedTest('evidence builder distinguishes complete zero-change from partial section failure', async () => {
+  const remainingId = seedInstance('radarr');
+  const target = targetFor(remainingId);
+
+  const available = await buildRemainingPreviewEvidence('radarr', [target], ['qualityProfiles'], (requests) => {
+    assertEquals(
+      requests.map((request) => request.instanceId),
+      [remainingId]
+    );
+    return Promise.resolve([zeroChangePreview(target)]);
+  });
+  assertEquals(available.availability, 'available');
+  if (available.availability === 'available') {
+    assertEquals(available.previews[0].summary.totalCreates, 0);
+  }
+
+  const partial = await buildRemainingPreviewEvidence('radarr', [target], ['qualityProfiles'], () =>
+    Promise.resolve([zeroChangePreview(target, 'radarr', true)])
+  );
+  assertEquals(partial.availability, 'unavailable');
+  if (partial.availability === 'unavailable') {
+    assertEquals(partial.failure.code, 'sectionErrors');
+    assertEquals(partial.partialPreviews.length, 1);
+  }
+});
+
+migratedTest('evidence builder binds explicit section order but preserves configured-section variance', async () => {
+  const targets = [targetFor(seedInstance('radarr')), targetFor(seedInstance('radarr'))];
+
+  const mismatched = await buildRemainingPreviewEvidence(
+    'radarr',
+    [targets[0]],
+    ['qualityProfiles', 'mediaManagement'],
+    () => Promise.resolve([zeroChangePreview(targets[0], 'radarr', false, ['mediaManagement', 'qualityProfiles'])])
+  );
+  assertEquals(mismatched.availability, 'unavailable');
+
+  const configured = await buildRemainingPreviewEvidence('radarr', targets, null, () =>
+    Promise.resolve([
+      zeroChangePreview(targets[0], 'radarr', false, ['qualityProfiles']),
+      zeroChangePreview(targets[1], 'radarr', false, ['mediaManagement']),
+    ])
+  );
+  assertEquals(configured.availability, 'available');
+
+  const emptyMeansConfigured = await buildRemainingPreviewEvidence('radarr', [targets[0]], [], () =>
+    Promise.resolve([zeroChangePreview(targets[0])])
+  );
+  assertEquals(emptyMeansConfigured.availability, 'available');
+});
+
+migratedTest('evidence builder classifies unreachable/unauthorized safely and sanitizes logger metadata', async () => {
+  const remainingId = seedInstance('radarr');
+  const target = targetFor(remainingId);
+  const secretKey = '0123456789abcdef0123456789abcdef';
+  const secretUrl = `http://arr.invalid/api?apikey=${secretKey}`;
+  const captured: Array<{ message: string; options: unknown }> = [];
+  const originalError = logger.error;
+  logger.error = (message, options) => {
+    captured.push({ message, options });
+    return Promise.resolve();
+  };
+
+  try {
+    for (const [status, code] of [
+      [0, 'unreachable'],
+      [401, 'unauthorized'],
+    ] as const) {
+      const evidence = await buildRemainingPreviewEvidence('radarr', [target], null, () =>
+        Promise.reject(new HttpError(`${secretUrl} Authorization: Bearer ${secretKey}`, status, { secretKey }))
+      );
+      assertEquals(evidence.availability, 'unavailable');
+      if (evidence.availability === 'unavailable') assertEquals(evidence.failure.code, code);
+    }
+
+    const logged = JSON.stringify(captured);
+    assertEquals(
+      captured.every((entry) => entry.message === 'Canary remaining-target preview generation failed'),
+      true
+    );
+    assert(!logged.includes(secretKey));
+    assert(!logged.includes(secretUrl));
+    assert(!logged.includes(`Bearer ${secretKey}`));
+  } finally {
+    logger.error = originalError;
+  }
+});
+
+migratedTest('evidence builder rejects missing and cross-Arr targets without invoking generation', async () => {
+  const sonarrId = seedInstance('sonarr');
+  const target = targetFor(sonarrId);
+  let generated = false;
+  const evidence = await buildRemainingPreviewEvidence('radarr', [target], null, () => {
+    generated = true;
+    return Promise.resolve([]);
+  });
+  assertEquals(evidence.availability, 'unavailable');
+  assertEquals(generated, false);
+});
+
+migratedTest('proceed requires available exact evidence; unavailable/null/corrupt evidence enqueue nothing', () => {
+  const target = { instanceId: 901, instanceName: 'Remaining' };
+
+  const unavailable = insertGate(unavailableEvidence(target));
+  assertThrows(() => proceedRollout(unavailable.id, unavailable.token), CanaryPreviewUnavailableError);
+
+  const legacy = insertGate(availableEvidence(target));
+  db.execute('UPDATE canary_rollouts SET remaining_preview_evidence = NULL WHERE id = ?', legacy.id);
+  assertThrows(() => proceedRollout(legacy.id, legacy.token), CanaryPreviewUnavailableError);
+
+  const corrupt = insertGate(availableEvidence(target));
+  db.execute("UPDATE canary_rollouts SET remaining_preview_evidence = '{bad' WHERE id = ?", corrupt.id);
+  assertThrows(() => proceedRollout(corrupt.id, corrupt.token), CanaryPreviewUnavailableError);
+
+  const missingRequestedSection = insertGate(availableEvidence(target));
+  db.execute(
+    'UPDATE canary_rollouts SET sections = ? WHERE id = ?',
+    JSON.stringify(['qualityProfiles', 'mediaManagement']),
+    missingRequestedSection.id
+  );
+  assertThrows(
+    () => proceedRollout(missingRequestedSection.id, missingRequestedSection.token),
+    CanaryPreviewUnavailableError
+  );
+  assertEquals(queuedCanaryJobs(), 0);
+});
+
+migratedTest('zero-change evidence promotes with token guard while unavailable evidence remains abortable', () => {
+  const target = { instanceId: 902, instanceName: 'Remaining' };
+  const stale = insertGate(availableEvidence(target));
+  assertThrows(() => proceedRollout(stale.id, 'stale-token'), CanaryStaleTokenError);
+  assertEquals(queuedCanaryJobs(), 0);
+
+  const promoted = proceedRollout(stale.id, stale.token);
+  assertEquals(promoted.status, 'rolling_out');
+  assertEquals(queuedCanaryJobs(), 1);
+
+  const abortable = insertGate(unavailableEvidence(target));
+  const aborted = abortRollout(abortable.id, abortable.token);
+  assertEquals(aborted.status, 'aborted');
+  assertEquals(aborted.remainingPreview.availability, 'unavailable');
+  assertEquals(queuedCanaryJobs(), 1, 'abort must not enqueue another rollout');
+});
+
+migratedTest('startRollout fails fast when the atomic canary outcome guard is lost', async () => {
+  const restores: Restore[] = [];
+  const canaryId = seedInstance('radarr');
+  seedInstance('radarr');
+  pinDefaultCanary(canaryId);
+  const histId = seedHistoryRow(canaryId, 'success');
+  installGetByIdProbe(restores);
+  stubClassificationSearch(restores, [makeSummary({ id: histId, arrInstanceId: canaryId, status: 'success' })]);
+  const originalRecord = canaryRolloutQueries.recordCanaryOutcome;
+  canaryRolloutQueries.recordCanaryOutcome = () => false;
+  restores.push(() => {
+    canaryRolloutQueries.recordCanaryOutcome = originalRecord;
+  });
+
+  try {
+    await assertRejects(() => startRollout({ arrType: 'radarr' }), CanaryStateError);
+  } finally {
+    undo(restores);
+  }
+});

@@ -4590,7 +4590,7 @@
       "post": {
         "operationId": "startCanaryRollout",
         "summary": "Start a canary rollout",
-        "description": "Runs the canary sync inline, persists the rollout, and returns the canary result plus a\nlive preview of the remaining same-`arr_type` instances. When only one eligible target\nexists the staged flow is auto-skipped and a plain sync result is returned instead. The\nresponse is discriminated on `skipped`.\n",
+        "description": "Runs the canary sync inline and persists the rollout with durable, explicit remaining-target\npreview evidence. The staged response contains the evidence in its rollout as either complete\n`available` previews or `unavailable` with a safe reason and recovery action; array length is\nnever used to infer availability. When only one eligible target exists the staged flow is\nauto-skipped and a plain sync result is returned instead. The response is discriminated on\n`skipped`.\n",
         "tags": ["Canary"],
         "requestBody": {
           "required": false,
@@ -4719,7 +4719,7 @@
       "get": {
         "operationId": "getCanaryRollout",
         "summary": "Canary rollout detail",
-        "description": "Returns one rollout with its full state: canary diagnostics, remaining targets, per-instance\nrollout results, and the current `stateToken` used to guard proceed/abort.\n",
+        "description": "Returns one rollout with its full state: canary diagnostics, remaining targets, per-instance\nrollout results, durable remaining-preview evidence, and the current `stateToken` used to\nguard proceed/abort. Legacy, corrupt, partial, or target-mismatched evidence is returned as\nsafely unavailable rather than as an empty successful preview.\n",
         "tags": ["Canary"],
         "parameters": [
           {
@@ -4779,7 +4779,7 @@
       "post": {
         "operationId": "proceedCanaryRollout",
         "summary": "Proceed past the verification gate",
-        "description": "Confirms an `awaiting_confirmation` rollout, transitions it to `rolling_out`, and enqueues the\nresumable batched rollout job. Value-guarded on `stateToken`; returns the updated rollout.\n",
+        "description": "Confirms an `awaiting_confirmation` rollout only when its persisted remaining-preview evidence\nis available and exactly covers its same-Arr remaining targets, then transitions it to\n`rolling_out` and enqueues the resumable batched rollout job. Value-guarded on `stateToken`;\nreturns the updated rollout. Unavailable or invalid evidence fails closed and enqueues no job.\n",
         "tags": ["Canary"],
         "parameters": [
           {
@@ -4833,7 +4833,7 @@
             }
           },
           "409": {
-            "description": "Rollout is not awaiting confirmation",
+            "description": "Rollout is not awaiting confirmation, or remaining-preview evidence is unavailable or invalid",
             "content": {
               "application/json": {
                 "schema": {
@@ -4869,7 +4869,7 @@
       "post": {
         "operationId": "abortCanaryRollout",
         "summary": "Abort the rollout at the verification gate",
-        "description": "Aborts an `awaiting_confirmation` rollout; remaining instances are never dispatched.\nValue-guarded on `stateToken`; returns the updated rollout.\n",
+        "description": "Aborts an `awaiting_confirmation` rollout; remaining instances are never dispatched.\nAbort remains available when remaining-preview evidence is unavailable. Value-guarded on\n`stateToken`; returns the updated rollout. Aborting does not roll back changes already applied\nto the canary instance.\n",
         "tags": ["Canary"],
         "parameters": [
           {
@@ -9641,6 +9641,177 @@
           }
         }
       },
+      "CanaryGeneratePreviewResult": {
+        "type": "object",
+        "description": "Read-only per-instance preview payload produced by the Canary coordinator. This matches the\nruntime `GeneratePreviewResult` contract; it is not a stored Sync Preview and therefore has no\npreview id, expiry timestamp, or top-level failure field.\n",
+        "required": [
+          "instanceId",
+          "instanceName",
+          "arrType",
+          "status",
+          "createdAtMs",
+          "sections",
+          "sectionOutcomes",
+          "qualityProfiles",
+          "delayProfiles",
+          "mediaManagement",
+          "metadataProfiles",
+          "summary"
+        ],
+        "properties": {
+          "instanceId": {
+            "type": "integer",
+            "description": "Exact remaining-target Arr instance ID."
+          },
+          "instanceName": {
+            "type": "string",
+            "description": "Arr instance name at preview-generation time."
+          },
+          "arrType": {
+            "$ref": "#/components/schemas/CanaryArrType"
+          },
+          "status": {
+            "$ref": "#/components/schemas/SyncPreviewStatus"
+          },
+          "createdAtMs": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0,
+            "description": "Preview generation time as Unix epoch milliseconds."
+          },
+          "sections": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SyncPreviewSection"
+            }
+          },
+          "sectionOutcomes": {
+            "type": "array",
+            "description": "Per-section evidence; any failure makes aggregate Canary evidence unavailable.",
+            "items": {
+              "$ref": "#/components/schemas/SyncPreviewSectionOutcome"
+            }
+          },
+          "qualityProfiles": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/QualityProfilesPreview"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "delayProfiles": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/DelayProfilesPreview"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "mediaManagement": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/MediaManagementPreview"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "metadataProfiles": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/MetadataProfilesPreview"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "summary": {
+            "$ref": "#/components/schemas/SyncPreviewSummary"
+          }
+        }
+      },
+      "CanaryRemainingPreviewAvailable": {
+        "type": "object",
+        "required": ["version", "availability", "generatedAt", "previews"],
+        "properties": {
+          "version": {
+            "type": "integer",
+            "const": 1,
+            "description": "Persisted Canary remaining-preview evidence schema version."
+          },
+          "availability": {
+            "type": "string",
+            "const": "available"
+          },
+          "generatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Time the complete exact-target evidence snapshot was generated."
+          },
+          "previews": {
+            "type": "array",
+            "description": "Complete previews for the persisted remaining target set. An empty mutation summary is a\nvalid no-changes result and is distinct from unavailable evidence.\n",
+            "items": {
+              "$ref": "#/components/schemas/CanaryGeneratePreviewResult"
+            }
+          }
+        }
+      },
+      "CanaryRemainingPreviewUnavailable": {
+        "type": "object",
+        "required": ["version", "availability", "generatedAt", "failure", "partialPreviews"],
+        "properties": {
+          "version": {
+            "type": "integer",
+            "const": 1,
+            "description": "Persisted Canary remaining-preview evidence schema version."
+          },
+          "availability": {
+            "type": "string",
+            "const": "unavailable"
+          },
+          "generatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Time this unavailable evidence result was recorded."
+          },
+          "failure": {
+            "$ref": "#/components/schemas/SyncPreviewFailureReason"
+          },
+          "partialPreviews": {
+            "type": "array",
+            "description": "Successfully generated diagnostic pieces, if any. Partial previews never authorize\npromotion and do not represent complete target coverage.\n",
+            "items": {
+              "$ref": "#/components/schemas/CanaryGeneratePreviewResult"
+            }
+          }
+        }
+      },
+      "CanaryRemainingPreviewEvidence": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/CanaryRemainingPreviewAvailable"
+          },
+          {
+            "$ref": "#/components/schemas/CanaryRemainingPreviewUnavailable"
+          }
+        ],
+        "discriminator": {
+          "propertyName": "availability",
+          "mapping": {
+            "available": "#/components/schemas/CanaryRemainingPreviewAvailable",
+            "unavailable": "#/components/schemas/CanaryRemainingPreviewUnavailable"
+          }
+        },
+        "description": "Durable, versioned evidence for the exact persisted remaining-target cohort. Availability is\nexplicit and must never be inferred from preview-array length. Null, legacy, corrupt, partial,\ncross-Arr, or target-mismatched stored data is exposed as unavailable and cannot authorize\nProceed.\n"
+      },
       "CanaryRolloutDetail": {
         "type": "object",
         "required": [
@@ -9657,6 +9828,7 @@
           "canaryOutput",
           "canaryError",
           "remainingTargets",
+          "remainingPreview",
           "batchCursor",
           "rolloutResults",
           "trigger",
@@ -9758,6 +9930,9 @@
             "items": {
               "$ref": "#/components/schemas/CanaryTarget"
             }
+          },
+          "remainingPreview": {
+            "$ref": "#/components/schemas/CanaryRemainingPreviewEvidence"
           },
           "batchCursor": {
             "type": "integer",
@@ -9911,7 +10086,7 @@
       },
       "CanaryStartGated": {
         "type": "object",
-        "required": ["skipped", "rollout", "remainingPreview"],
+        "required": ["skipped", "rollout"],
         "properties": {
           "skipped": {
             "type": "boolean",
@@ -9919,16 +10094,9 @@
           },
           "rollout": {
             "$ref": "#/components/schemas/CanaryRolloutDetail"
-          },
-          "remainingPreview": {
-            "type": "array",
-            "description": "Live per-instance preview of remaining targets shown at the gate.",
-            "items": {
-              "$ref": "#/components/schemas/SyncPreviewResult"
-            }
           }
         },
-        "description": "Returned when the canary passed and the rollout is awaiting confirmation."
+        "description": "Returned when the canary passed and the rollout is awaiting confirmation. The rollout carries\nthe persisted remaining-preview evidence used by detail reads and promotion authorization.\n"
       },
       "CanaryStartResult": {
         "oneOf": [
@@ -9939,10 +10107,7 @@
             "$ref": "#/components/schemas/CanaryStartGated"
           }
         ],
-        "discriminator": {
-          "propertyName": "skipped"
-        },
-        "description": "Two-headed start response discriminated on `skipped`:\n- `skipped: true`: single-target auto-skip ran a plain sync\n- `skipped: false`: staged rollout persisted and awaiting confirmation\n"
+        "description": "Two-headed start response distinguished by the boolean `skipped` constant:\n- `skipped: true`: single-target auto-skip ran a plain sync\n- `skipped: false`: staged rollout persisted and awaiting confirmation\n"
       },
       "CanaryRolloutListResponse": {
         "type": "object",

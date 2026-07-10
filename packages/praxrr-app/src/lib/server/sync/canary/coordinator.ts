@@ -14,24 +14,34 @@
  * value-guarded so a stale caller cannot double-proceed.
  */
 
-import { executeSyncJob } from '$jobs/handlers/arrSync.ts';
 import { FAILURE_COPY } from '$jobs/evidence.ts';
-import { generateInstancePreviews } from '$sync/processor.ts';
-import { enqueueJob } from '$jobs/queueService.ts';
 import { arrInstancesQueries } from '$db/queries/arrInstances.ts';
 import { canaryRolloutQueries } from '$db/queries/canaryRollouts.ts';
 import { canarySettingsQueries } from '$db/queries/canarySettings.ts';
 import { syncHistoryQueries } from '$db/queries/syncHistory.ts';
-import type { GeneratePreviewResult } from '$sync/preview/orchestrator.ts';
+import { executeSyncJob } from '$jobs/handlers/arrSync.ts';
+import { enqueueJob } from '$jobs/queueService.ts';
 import type { JobRunStatus } from '$jobs/queueTypes.ts';
+import { logger } from '$logger/logger.ts';
+import { sanitizeLogMeta } from '$logger/sanitizer.ts';
+import { buildPreviewFailure, classifyPreviewFailure } from '$sync/preview/failureReason.ts';
+import type { GeneratePreviewResult } from '$sync/preview/orchestrator.ts';
+import { generateInstancePreviews } from '$sync/processor.ts';
 import type { SectionType } from '$sync/types.ts';
+import {
+  CanaryNotFoundError,
+  CanaryPreviewUnavailableError,
+  CanaryStaleTokenError,
+  CanaryStateError,
+  CanaryUnresolvedError,
+} from './errors.ts';
+import { notifyCanaryFailed } from './notify.ts';
 import { isCanaryResolutionError, resolveCanary, resolveSyncArrType } from './selection.ts';
 import { newStateToken } from './token.ts';
-import { notifyCanaryFailed } from './notify.ts';
-import { CanaryNotFoundError, CanaryStaleTokenError, CanaryStateError, CanaryUnresolvedError } from './errors.ts';
 import type {
   CanaryArrType,
   CanaryOutcomeStatus,
+  CanaryRemainingPreviewEvidence,
   CanaryRolloutDetail,
   CanaryRolloutStatus,
   CanaryStartInput,
@@ -83,7 +93,10 @@ function classifyCanaryOutcome(canaryId: number, from: string, result: SyncRunRe
   if (row && row.arrInstanceId === canaryId) {
     return { canaryStatus: row.status, canarySyncHistoryId: row.id };
   }
-  return { canaryStatus: mapJobRunStatus(result.status), canarySyncHistoryId: null };
+  return {
+    canaryStatus: mapJobRunStatus(result.status),
+    canarySyncHistoryId: null,
+  };
 }
 
 /** Decide the post-canary status: fail-closed on failed/skipped/partial+abort, else gate. */
@@ -110,35 +123,111 @@ function abortReason(result: SyncRunResult, canaryStatus: CanaryOutcomeStatus): 
     : 'Canary sync did not pass; rollout aborted.';
 }
 
+function hasExactSections(preview: GeneratePreviewResult, sections: readonly SectionType[] | null): boolean {
+  return (
+    sections === null ||
+    sections.length === 0 ||
+    (preview.sections.length === sections.length &&
+      preview.sections.every((section, index) => section === sections[index]))
+  );
+}
+
 /**
- * Build the live preview of the remaining instances for the gate. Re-filters
- * `getEnabled()` to the rollout `arr_type` immediately before previewing so an instance
- * disabled/deleted between selection and preview is dropped, and wraps the read-only
- * preview in `try/catch` degrading to `[]` — a stranded remaining target never 500s the
- * gate (the rollout stays in `awaiting_confirmation`).
+ * Build durable evidence for the exact persisted remaining cohort. Any missing,
+ * disabled, renamed, wrong-Arr, duplicate, extra, or section-failed preview makes the
+ * aggregate unavailable; targets are never silently dropped or substituted.
  */
-async function buildRemainingPreview(
+export async function buildRemainingPreviewEvidence(
   arrType: CanaryArrType,
   remaining: readonly CanaryTarget[],
-  sections: SectionType[] | null
-): Promise<GeneratePreviewResult[]> {
-  const stillEnabled = new Set(
-    arrInstancesQueries
-      .getEnabled()
-      .filter((instance) => resolveSyncArrType(instance.type) === arrType)
-      .map((instance) => instance.id)
-  );
-  const targets = remaining.filter((target) => stillEnabled.has(target.instanceId));
-  if (targets.length === 0) {
-    return [];
+  sections: SectionType[] | null,
+  generatePreviews: typeof generateInstancePreviews = generateInstancePreviews
+): Promise<CanaryRemainingPreviewEvidence> {
+  const generatedAt = new Date().toISOString();
+  const enabledById = new Map(arrInstancesQueries.getEnabled().map((instance) => [instance.id, instance]));
+  const targetIds = new Set<number>();
+  for (const target of remaining) {
+    const instance = enabledById.get(target.instanceId);
+    if (
+      targetIds.has(target.instanceId) ||
+      !instance ||
+      instance.name !== target.instanceName ||
+      resolveSyncArrType(instance.type) !== arrType
+    ) {
+      return {
+        version: 1,
+        availability: 'unavailable',
+        generatedAt,
+        failure: buildPreviewFailure('internalError', arrType),
+        partialPreviews: [],
+      };
+    }
+    targetIds.add(target.instanceId);
   }
 
   try {
-    return await generateInstancePreviews(
-      targets.map((target) => ({ instanceId: target.instanceId, sections: sections ?? undefined }))
+    const previews = await generatePreviews(
+      remaining.map((target) => ({
+        instanceId: target.instanceId,
+        sections: sections ?? undefined,
+      }))
     );
-  } catch {
-    return [];
+    const previewIds = new Set<number>();
+    const exact =
+      previews.length === remaining.length &&
+      previews.every((preview) => {
+        const target = remaining.find((candidate) => candidate.instanceId === preview.instanceId);
+        if (
+          !target ||
+          previewIds.has(preview.instanceId) ||
+          preview.instanceName !== target.instanceName ||
+          preview.arrType !== arrType ||
+          !hasExactSections(preview, sections)
+        ) {
+          return false;
+        }
+        previewIds.add(preview.instanceId);
+        return true;
+      });
+    if (!exact) {
+      return {
+        version: 1,
+        availability: 'unavailable',
+        generatedAt,
+        failure: buildPreviewFailure('internalError', arrType),
+        partialPreviews: [],
+      };
+    }
+
+    if (previews.some((preview) => preview.sectionOutcomes.some((outcome) => outcome.failure !== null))) {
+      return {
+        version: 1,
+        availability: 'unavailable',
+        generatedAt,
+        failure: buildPreviewFailure('sectionErrors', arrType),
+        partialPreviews: previews,
+      };
+    }
+
+    return { version: 1, availability: 'available', generatedAt, previews };
+  } catch (error) {
+    const failure = classifyPreviewFailure(error, arrType);
+    await logger.error('Canary remaining-target preview generation failed', {
+      source: 'CanaryCoordinator',
+      meta: sanitizeLogMeta({
+        arrType,
+        targetIds: remaining.map((target) => target.instanceId),
+        failureCode: failure.code,
+        error: error instanceof Error ? error.message : String(error),
+      }),
+    });
+    return {
+      version: 1,
+      availability: 'unavailable',
+      generatedAt,
+      failure,
+      partialPreviews: [],
+    };
   }
 }
 
@@ -195,8 +284,9 @@ export async function startRollout(input: CanaryStartInput): Promise<CanaryStart
 
   const status = decideGateStatus(canaryStatus, partialPolicy);
   const isAbort = status === 'aborted';
+  const remainingPreview = isAbort ? null : await buildRemainingPreviewEvidence(arrType, remaining, sections);
 
-  canaryRolloutQueries.recordCanaryOutcome(rolloutId, {
+  const recorded = canaryRolloutQueries.recordCanaryOutcome(rolloutId, {
     status,
     canaryStatus,
     canaryOutput: result.output ?? null,
@@ -206,20 +296,47 @@ export async function startRollout(input: CanaryStartInput): Promise<CanaryStart
         ? FAILURE_COPY[result.failureCode].message
         : null,
     canarySyncHistoryId,
+    remainingPreview,
     nextToken: newStateToken(),
     finishedAt: isAbort ? new Date().toISOString() : null,
   });
+  if (!recorded) {
+    throw new CanaryStateError(`Canary rollout ${rolloutId} changed before its outcome could be recorded`);
+  }
 
   const rollout = requireDetail(rolloutId);
 
   if (isAbort) {
     // Fail-closed: remaining instances are never dispatched. Notify best-effort.
     notifyCanaryFailed(rollout);
-    return { skipped: false, rollout, remainingPreview: [] };
+    return { skipped: false, rollout };
   }
 
-  const remainingPreview = await buildRemainingPreview(arrType, rollout.remainingTargets, rollout.sections);
-  return { skipped: false, rollout, remainingPreview };
+  return { skipped: false, rollout };
+}
+
+function hasExactAvailableEvidence(rollout: CanaryRolloutDetail): boolean {
+  if (rollout.remainingPreview.availability !== 'available') return false;
+  const targetById = new Map(rollout.remainingTargets.map((target) => [target.instanceId, target]));
+  const ids = new Set<number>();
+  return (
+    rollout.remainingPreview.previews.length === rollout.remainingTargets.length &&
+    rollout.remainingPreview.previews.every((preview) => {
+      const target = targetById.get(preview.instanceId);
+      if (
+        !target ||
+        ids.has(preview.instanceId) ||
+        preview.instanceName !== target.instanceName ||
+        preview.arrType !== rollout.arrType ||
+        !hasExactSections(preview, rollout.sections) ||
+        preview.sectionOutcomes.some((outcome) => outcome.failure !== null)
+      ) {
+        return false;
+      }
+      ids.add(preview.instanceId);
+      return true;
+    })
+  );
 }
 
 /**
@@ -234,6 +351,13 @@ export function proceedRollout(id: number, expectedToken: string): CanaryRollout
   }
   if (rollout.status !== 'awaiting_confirmation') {
     throw new CanaryStateError(`Canary rollout ${id} is ${rollout.status}, not awaiting confirmation`);
+  }
+  if (!hasExactAvailableEvidence(rollout)) {
+    const failure =
+      rollout.remainingPreview.availability === 'unavailable'
+        ? rollout.remainingPreview.failure
+        : buildPreviewFailure('internalError', rollout.arrType);
+    throw new CanaryPreviewUnavailableError(failure);
   }
 
   const advanced = canaryRolloutQueries.markRollingOut(id, expectedToken, newStateToken());

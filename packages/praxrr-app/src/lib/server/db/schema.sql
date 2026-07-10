@@ -1007,3 +1007,56 @@ CREATE TABLE drift_instance_status (
     created_at         DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at         DATETIME DEFAULT CURRENT_TIMESTAMP
 );
+
+-- ==============================================================================
+-- TABLE: canary_rollouts
+-- Purpose: Persist exact-Arr canary rollout state, gate evidence, and batched results
+-- Migration: 20260715_create_canary_tables.ts, 20260723_add_canary_preview_evidence.ts
+-- ==============================================================================
+
+CREATE TABLE canary_rollouts (
+    id                         INTEGER PRIMARY KEY AUTOINCREMENT,
+    arr_type                   TEXT NOT NULL CHECK (arr_type IN ('radarr', 'sonarr', 'lidarr')),
+    status                     TEXT NOT NULL CHECK (status IN ('canary_running', 'awaiting_confirmation', 'rolling_out', 'completed', 'aborted', 'failed')),
+    canary_instance_id         INTEGER REFERENCES arr_instances(id) ON DELETE SET NULL,
+    canary_instance_name       TEXT NOT NULL,
+    canary_status              TEXT CHECK (canary_status IN ('success', 'partial', 'failed', 'skipped') OR canary_status IS NULL),
+    canary_sync_history_id     INTEGER REFERENCES sync_history(id) ON DELETE SET NULL,
+    sections                   TEXT,
+    max_batch_size             INTEGER NOT NULL DEFAULT 1 CHECK (max_batch_size >= 1),
+    partial_policy             TEXT NOT NULL DEFAULT 'gate' CHECK (partial_policy IN ('gate', 'abort')),
+    canary_output              TEXT,
+    canary_error               TEXT,
+    remaining_targets          TEXT NOT NULL DEFAULT '[]',
+    batch_cursor               INTEGER NOT NULL DEFAULT 0,
+    rollout_results            TEXT NOT NULL DEFAULT '[]',
+    trigger                    TEXT NOT NULL DEFAULT 'manual' CHECK (trigger IN ('manual', 'system', 'schedule')),
+    started_at                 TEXT NOT NULL,
+    finished_at                TEXT,
+    state_token                TEXT NOT NULL,
+    created_at                 TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at                 TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    remaining_preview_evidence TEXT
+);
+
+CREATE INDEX idx_canary_rollouts_status
+    ON canary_rollouts(status);
+CREATE INDEX idx_canary_rollouts_arr_type_started
+    ON canary_rollouts(arr_type, started_at DESC);
+
+-- ==============================================================================
+-- TABLE: canary_settings
+-- Purpose: Singleton defaults and enablement for staged Canary rollouts
+-- Migration: 20260715_create_canary_tables.ts
+-- ==============================================================================
+
+CREATE TABLE canary_settings (
+    id                         INTEGER PRIMARY KEY CHECK (id = 1),
+    enabled                    INTEGER NOT NULL DEFAULT 0 CHECK (enabled IN (0, 1)),
+    default_max_batch_size     INTEGER NOT NULL DEFAULT 1 CHECK (default_max_batch_size >= 1),
+    auto_select                INTEGER NOT NULL DEFAULT 1 CHECK (auto_select IN (0, 1)),
+    default_canary_instance_id INTEGER REFERENCES arr_instances(id) ON DELETE SET NULL,
+    default_partial_policy     TEXT NOT NULL DEFAULT 'gate' CHECK (default_partial_policy IN ('gate', 'abort')),
+    created_at                 TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at                 TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);

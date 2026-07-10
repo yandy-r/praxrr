@@ -1,8 +1,9 @@
 import { assert, assertEquals, assertExists } from '@std/assert';
 import { config } from '$config';
 import { db } from '$db/db.ts';
-import { runMigrations } from '$db/migrations.ts';
-import { migration } from '$db/migrations/20260715_create_canary_tables.ts';
+import { migration as createCanaryTablesMigration } from '$db/migrations/20260715_create_canary_tables.ts';
+import { migration as addCanaryPreviewEvidenceMigration } from '$db/migrations/20260723_add_canary_preview_evidence.ts';
+import { loadMigrations, runMigrations } from '$db/migrations.ts';
 
 /**
  * Point the db singleton at a scratch SQLite file under a fresh temp base path,
@@ -50,9 +51,11 @@ function indexNames(): Set<string> {
 // ---------------------------------------------------------------------------
 
 migratedTest('up registers every canary_rollouts column via PRAGMA table_info', () => {
-  const columns = db.query<{ name: string; notnull: number; dflt_value: string | null }>(
-    'PRAGMA table_info(canary_rollouts)'
-  );
+  const columns = db.query<{
+    name: string;
+    notnull: number;
+    dflt_value: string | null;
+  }>('PRAGMA table_info(canary_rollouts)');
   const byName = new Map(columns.map((c) => [c.name, c]));
 
   const expected = [
@@ -75,6 +78,7 @@ migratedTest('up registers every canary_rollouts column via PRAGMA table_info', 
     'started_at',
     'finished_at',
     'state_token',
+    'remaining_preview_evidence',
     'created_at',
     'updated_at',
   ];
@@ -94,6 +98,8 @@ migratedTest('up registers every canary_rollouts column via PRAGMA table_info', 
   assertEquals(byName.get('canary_status')?.notnull, 0);
   assertEquals(byName.get('canary_sync_history_id')?.notnull, 0);
   assertEquals(byName.get('finished_at')?.notnull, 0);
+  assertEquals(byName.get('remaining_preview_evidence')?.notnull, 0);
+  assertEquals(byName.get('remaining_preview_evidence')?.dflt_value, null);
   // Defaults for the resumable rollout state.
   assertEquals(byName.get('max_batch_size')?.dflt_value, '1');
   assertEquals(byName.get('partial_policy')?.dflt_value, "'gate'");
@@ -104,9 +110,11 @@ migratedTest('up registers every canary_rollouts column via PRAGMA table_info', 
 });
 
 migratedTest('up registers every canary_settings column via PRAGMA table_info', () => {
-  const columns = db.query<{ name: string; notnull: number; dflt_value: string | null }>(
-    'PRAGMA table_info(canary_settings)'
-  );
+  const columns = db.query<{
+    name: string;
+    notnull: number;
+    dflt_value: string | null;
+  }>('PRAGMA table_info(canary_settings)');
   const byName = new Map(columns.map((c) => [c.name, c]));
 
   const expected = [
@@ -189,13 +197,77 @@ migratedTest('up seeds exactly one canary_settings row (id=1) with fail-closed d
   assertEquals(row.default_partial_policy, 'gate');
 });
 
+migratedTest('migration 20260723 is registered immediately after 20260722', () => {
+  const migrations = loadMigrations();
+  const previousIndex = migrations.findIndex((candidate) => candidate.version === 20260722);
+  const evidenceIndex = migrations.findIndex((candidate) => candidate.version === 20260723);
+
+  assert(previousIndex >= 0, 'migration 20260722 should be registered');
+  assertEquals(evidenceIndex, previousIndex + 1);
+  assertEquals(migrations[evidenceIndex].name, 'Add canary preview evidence');
+});
+
+migratedTest('migration 20260723 down/up preserves legacy rows with null evidence', () => {
+  const down = addCanaryPreviewEvidenceMigration.down;
+  assertExists(down);
+  db.exec(down);
+
+  let columns = db.query<{ name: string }>('PRAGMA table_info(canary_rollouts)');
+  assert(
+    !columns.some((column) => column.name === 'remaining_preview_evidence'),
+    'down should remove remaining_preview_evidence'
+  );
+
+  db.execute(
+    `INSERT INTO canary_rollouts (
+			arr_type, status, canary_instance_name, started_at, state_token
+		) VALUES (?, ?, ?, ?, ?)`,
+    'radarr',
+    'canary_running',
+    'Legacy Radarr',
+    '2026-07-10T00:00:00.000Z',
+    'legacy-token'
+  );
+
+  db.exec(addCanaryPreviewEvidenceMigration.up);
+  columns = db.query<{ name: string }>('PRAGMA table_info(canary_rollouts)');
+  assert(
+    columns.some((column) => column.name === 'remaining_preview_evidence'),
+    'up should restore remaining_preview_evidence'
+  );
+
+  const legacy = db.queryFirst<{ remaining_preview_evidence: string | null }>(
+    'SELECT remaining_preview_evidence FROM canary_rollouts WHERE state_token = ?',
+    'legacy-token'
+  );
+  assertExists(legacy);
+  assertEquals(legacy.remaining_preview_evidence, null);
+
+  db.execute(
+    `INSERT INTO canary_rollouts (
+			arr_type, status, canary_instance_name, started_at, state_token
+		) VALUES (?, ?, ?, ?, ?)`,
+    'sonarr',
+    'canary_running',
+    'New Sonarr',
+    '2026-07-10T00:01:00.000Z',
+    'new-token'
+  );
+  const current = db.queryFirst<{
+    remaining_preview_evidence: string | null;
+  }>('SELECT remaining_preview_evidence FROM canary_rollouts WHERE state_token = ?', 'new-token');
+  assertExists(current);
+  assertEquals(current.remaining_preview_evidence, null);
+});
+
 // ---------------------------------------------------------------------------
 // down: reverse-drops indexes then tables (and up remains re-runnable)
 // ---------------------------------------------------------------------------
 
 migratedTest('down reverse-drops both tables and their indexes', () => {
-  assertExists(migration.down);
-  db.exec(migration.down!);
+  const down = createCanaryTablesMigration.down;
+  assertExists(down);
+  db.exec(down);
 
   const tables = tableNames();
   assert(!tables.has('canary_rollouts'), 'canary_rollouts should be dropped');
@@ -206,7 +278,7 @@ migratedTest('down reverse-drops both tables and their indexes', () => {
   assert(!indexes.has('idx_canary_rollouts_arr_type_started'), 'arr_type/started index should be dropped');
 
   // up is re-runnable: re-applying it restores tables, indexes, and the seeded singleton.
-  db.exec(migration.up);
+  db.exec(createCanaryTablesMigration.up);
   const restored = tableNames();
   assert(restored.has('canary_rollouts'));
   assert(restored.has('canary_settings'));

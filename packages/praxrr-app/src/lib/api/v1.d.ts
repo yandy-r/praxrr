@@ -1387,10 +1387,12 @@ export interface paths {
     put?: never;
     /**
      * Start a canary rollout
-     * @description Runs the canary sync inline, persists the rollout, and returns the canary result plus a
-     *     live preview of the remaining same-`arr_type` instances. When only one eligible target
-     *     exists the staged flow is auto-skipped and a plain sync result is returned instead. The
-     *     response is discriminated on `skipped`.
+     * @description Runs the canary sync inline and persists the rollout with durable, explicit remaining-target
+     *     preview evidence. The staged response contains the evidence in its rollout as either complete
+     *     `available` previews or `unavailable` with a safe reason and recovery action; array length is
+     *     never used to infer availability. When only one eligible target exists the staged flow is
+     *     auto-skipped and a plain sync result is returned instead. The response is discriminated on
+     *     `skipped`.
      */
     post: operations['startCanaryRollout'];
     delete?: never;
@@ -1409,7 +1411,9 @@ export interface paths {
     /**
      * Canary rollout detail
      * @description Returns one rollout with its full state: canary diagnostics, remaining targets, per-instance
-     *     rollout results, and the current `stateToken` used to guard proceed/abort.
+     *     rollout results, durable remaining-preview evidence, and the current `stateToken` used to
+     *     guard proceed/abort. Legacy, corrupt, partial, or target-mismatched evidence is returned as
+     *     safely unavailable rather than as an empty successful preview.
      */
     get: operations['getCanaryRollout'];
     put?: never;
@@ -1431,8 +1435,10 @@ export interface paths {
     put?: never;
     /**
      * Proceed past the verification gate
-     * @description Confirms an `awaiting_confirmation` rollout, transitions it to `rolling_out`, and enqueues the
-     *     resumable batched rollout job. Value-guarded on `stateToken`; returns the updated rollout.
+     * @description Confirms an `awaiting_confirmation` rollout only when its persisted remaining-preview evidence
+     *     is available and exactly covers its same-Arr remaining targets, then transitions it to
+     *     `rolling_out` and enqueues the resumable batched rollout job. Value-guarded on `stateToken`;
+     *     returns the updated rollout. Unavailable or invalid evidence fails closed and enqueues no job.
      */
     post: operations['proceedCanaryRollout'];
     delete?: never;
@@ -1453,7 +1459,9 @@ export interface paths {
     /**
      * Abort the rollout at the verification gate
      * @description Aborts an `awaiting_confirmation` rollout; remaining instances are never dispatched.
-     *     Value-guarded on `stateToken`; returns the updated rollout.
+     *     Abort remains available when remaining-preview evidence is unavailable. Value-guarded on
+     *     `stateToken`; returns the updated rollout. Aborting does not roll back changes already applied
+     *     to the canary instance.
      */
     post: operations['abortCanaryRollout'];
     delete?: never;
@@ -2971,6 +2979,86 @@ export interface components {
       maxBatchSize?: number;
       partialPolicy?: components['schemas']['CanaryPartialPolicy'];
     };
+    /**
+     * @description Read-only per-instance preview payload produced by the Canary coordinator. This matches the
+     *     runtime `GeneratePreviewResult` contract; it is not a stored Sync Preview and therefore has no
+     *     preview id, expiry timestamp, or top-level failure field.
+     */
+    CanaryGeneratePreviewResult: {
+      /** @description Exact remaining-target Arr instance ID. */
+      instanceId: number;
+      /** @description Arr instance name at preview-generation time. */
+      instanceName: string;
+      arrType: components['schemas']['CanaryArrType'];
+      status: components['schemas']['SyncPreviewStatus'];
+      /**
+       * Format: int64
+       * @description Preview generation time as Unix epoch milliseconds.
+       */
+      createdAtMs: number;
+      sections: components['schemas']['SyncPreviewSection'][];
+      /** @description Per-section evidence; any failure makes aggregate Canary evidence unavailable. */
+      sectionOutcomes: components['schemas']['SyncPreviewSectionOutcome'][];
+      qualityProfiles: components['schemas']['QualityProfilesPreview'] | null;
+      delayProfiles: components['schemas']['DelayProfilesPreview'] | null;
+      mediaManagement: components['schemas']['MediaManagementPreview'] | null;
+      metadataProfiles: components['schemas']['MetadataProfilesPreview'] | null;
+      summary: components['schemas']['SyncPreviewSummary'];
+    };
+    CanaryRemainingPreviewAvailable: {
+      /**
+       * @description Persisted Canary remaining-preview evidence schema version.
+       * @constant
+       */
+      version: 1;
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      availability: 'available';
+      /**
+       * Format: date-time
+       * @description Time the complete exact-target evidence snapshot was generated.
+       */
+      generatedAt: string;
+      /**
+       * @description Complete previews for the persisted remaining target set. An empty mutation summary is a
+       *     valid no-changes result and is distinct from unavailable evidence.
+       */
+      previews: components['schemas']['CanaryGeneratePreviewResult'][];
+    };
+    CanaryRemainingPreviewUnavailable: {
+      /**
+       * @description Persisted Canary remaining-preview evidence schema version.
+       * @constant
+       */
+      version: 1;
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      availability: 'unavailable';
+      /**
+       * Format: date-time
+       * @description Time this unavailable evidence result was recorded.
+       */
+      generatedAt: string;
+      failure: components['schemas']['SyncPreviewFailureReason'];
+      /**
+       * @description Successfully generated diagnostic pieces, if any. Partial previews never authorize
+       *     promotion and do not represent complete target coverage.
+       */
+      partialPreviews: components['schemas']['CanaryGeneratePreviewResult'][];
+    };
+    /**
+     * @description Durable, versioned evidence for the exact persisted remaining-target cohort. Availability is
+     *     explicit and must never be inferred from preview-array length. Null, legacy, corrupt, partial,
+     *     cross-Arr, or target-mismatched stored data is exposed as unavailable and cannot authorize
+     *     Proceed.
+     */
+    CanaryRemainingPreviewEvidence:
+      | components['schemas']['CanaryRemainingPreviewAvailable']
+      | components['schemas']['CanaryRemainingPreviewUnavailable'];
     CanaryRolloutDetail: {
       id: number;
       arrType: components['schemas']['CanaryArrType'];
@@ -2989,6 +3077,7 @@ export interface components {
       canaryOutput: string | null;
       canaryError: string | null;
       remainingTargets: components['schemas']['CanaryTarget'][];
+      remainingPreview: components['schemas']['CanaryRemainingPreviewEvidence'];
       /** @description Index into remainingTargets the rollout job has reached (resumable). */
       batchCursor: number;
       rolloutResults: components['schemas']['CanaryInstanceResult'][];
@@ -3023,26 +3112,21 @@ export interface components {
     };
     /** @description Returned when a single eligible same-arr_type target auto-skips the staged flow. */
     CanaryStartSkipped: {
-      /**
-       * @description discriminator enum property added by openapi-typescript
-       * @enum {string}
-       */
-      skipped: 'CanaryStartSkipped';
+      /** @constant */
+      skipped: true;
       result: components['schemas']['CanarySyncRunResult'];
     };
-    /** @description Returned when the canary passed and the rollout is awaiting confirmation. */
+    /**
+     * @description Returned when the canary passed and the rollout is awaiting confirmation. The rollout carries
+     *     the persisted remaining-preview evidence used by detail reads and promotion authorization.
+     */
     CanaryStartGated: {
-      /**
-       * @description discriminator enum property added by openapi-typescript
-       * @enum {string}
-       */
-      skipped: 'CanaryStartGated';
+      /** @constant */
+      skipped: false;
       rollout: components['schemas']['CanaryRolloutDetail'];
-      /** @description Live per-instance preview of remaining targets shown at the gate. */
-      remainingPreview: components['schemas']['SyncPreviewResult'][];
     };
     /**
-     * @description Two-headed start response discriminated on `skipped`:
+     * @description Two-headed start response distinguished by the boolean `skipped` constant:
      *     - `skipped: true`: single-target auto-skip ran a plain sync
      *     - `skipped: false`: staged rollout persisted and awaiting confirmation
      */
@@ -8785,7 +8869,7 @@ export interface operations {
           'application/json': components['schemas']['ErrorResponse'];
         };
       };
-      /** @description Rollout is not awaiting confirmation */
+      /** @description Rollout is not awaiting confirmation, or remaining-preview evidence is unavailable or invalid */
       409: {
         headers: {
           [name: string]: unknown;
