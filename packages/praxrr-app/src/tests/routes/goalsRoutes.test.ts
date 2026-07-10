@@ -168,7 +168,8 @@ function buildApplyDependencies(
 ): GoalApplyDependencies {
   return {
     buildGoalPlan: () => Promise.resolve({ cache: {} as PCDCache, plan: SERVER_GOAL_PLAN }),
-    updateScoring: () => Promise.resolve({ success: true }),
+    persistGoalApply: () => Promise.resolve({ success: true }),
+    computeGoalConfigDiff: () => Promise.resolve({ configDiff: [], appliedChanges: [], skippedChanges: [] }),
     upsertBinding: () => SERVER_BINDING,
     logInfo: (message, options) => {
       logs.push({ message, options });
@@ -575,7 +576,7 @@ Deno.test('goals apply: scoring and binding failures do not log', async () => {
     applyRoute.handleGoalApplyRequest(
       postEvent(requestPayload).request,
       buildApplyDependencies(scoringLogs, {
-        updateScoring: () => Promise.resolve({ success: false, error: 'Scoring write failed' }),
+        persistGoalApply: () => Promise.resolve({ success: false, error: 'Scoring write failed' }),
         upsertBinding: () => {
           scoringFailureBindingCalls += 1;
           return SERVER_BINDING;
