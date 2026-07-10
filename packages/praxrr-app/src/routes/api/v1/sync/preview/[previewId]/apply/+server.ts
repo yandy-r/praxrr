@@ -1,6 +1,7 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from '@sveltejs/kit';
 import type { components } from '$api/v1.d.ts';
+import { logger } from '$logger/logger.ts';
 import { getSectionsInProgress, executeSyncJob } from '$lib/server/jobs/handlers/arrSync.ts';
 import type { SectionType } from '$lib/server/sync/types.ts';
 import { PREVIEW_REQUEST_BODY_LIMIT_BYTES } from '$lib/server/sync/preview/limits.ts';
@@ -11,8 +12,8 @@ import {
   PREVIEW_STATUS_APPLYING,
   PREVIEW_STATUS_FAILED,
   evaluatePreviewStaleness,
-  PREVIEW_STALE_BLOCK_MS,
 } from '$lib/server/sync/preview/store.ts';
+import { buildPreviewFailure, classifyPreviewFailure } from '$lib/server/sync/preview/failureReason.ts';
 import type { SyncPreviewResult } from '$lib/server/sync/preview/types.ts';
 
 type ErrorResponse = components['schemas']['ErrorResponse'];
@@ -76,12 +77,12 @@ function getBodyByteLength(rawBody: string): number {
 function resolveEligibleSections(snapshot: SyncPreviewResult): SectionType[] {
   if (snapshot.sectionOutcomes.length === 0) {
     // Backward-compat fallback for snapshots created before section outcomes were persisted.
-    return snapshot.error ? [] : [...snapshot.sections];
+    return snapshot.failure ? [] : [...snapshot.sections];
   }
 
   const successful = new Set<SectionType>();
   for (const outcome of snapshot.sectionOutcomes) {
-    if (outcome.error === null && outcome.skipped === false) {
+    if (outcome.failure === null && outcome.skipped === false) {
       successful.add(outcome.section);
     }
   }
@@ -116,7 +117,10 @@ export async function _handleSyncPreviewApplyRequest(
     return json({ error: `Invalid preview state: ${snapshot.status}` } satisfies ErrorResponse, { status: 409 });
   }
 
-  if (snapshot.error) {
+  // Any generation failure (hard fail, or the top-level `sectionErrors` aggregate set on a partial
+  // `ready` preview) blocks apply — mirrors the prior top-level error gate. Per-section eligibility
+  // is enforced separately below via resolveEligibleSections.
+  if (snapshot.failure) {
     return json(
       { error: 'Preview had section-generation errors. Regenerate preview before applying.' } satisfies ErrorResponse,
       { status: 409 }
@@ -187,10 +191,9 @@ export async function _handleSyncPreviewApplyRequest(
   previewStore.cleanup(nowMs);
   const staleness = evaluatePreviewStaleness(snapshot, nowMs);
   if (staleness.shouldBlock) {
-    const staleMinutes = Math.round(PREVIEW_STALE_BLOCK_MS / 60000);
     return json(
       {
-        error: `Preview is older than ${staleMinutes} minutes. Regenerate before applying.`,
+        failure: buildPreviewFailure('stale', snapshot.arrType),
         staleWarning: staleWarningMessage(staleness.ageMs),
       } satisfies SyncPreviewApplyErrorResponse,
       { status: 422 }
@@ -236,9 +239,23 @@ export async function _handleSyncPreviewApplyRequest(
       } satisfies SyncPreviewApplyResponse);
     }
 
+    // The aggregate job error string is opaque and may carry raw Arr/exception text, so it is
+    // never reclassified by substring nor transported. Surface a typed `executionFailed` reason;
+    // the granular, already-sanitized per-entity `outcomes[].reason` (#232) carry the detail.
+    const failure = buildPreviewFailure('executionFailed', snapshot.arrType);
     previewStore.updateResult(previewId, {
       status: PREVIEW_STATUS_FAILED,
-      error: result.error || `Sync job failed with status ${result.status}`,
+      failure,
+    });
+    await logger.error('Sync preview apply run reported failure', {
+      source: 'SyncPreviewApply',
+      meta: {
+        previewId,
+        instanceId: snapshot.instanceId,
+        status: result.status,
+        failureCode: failure.code,
+        error: result.error ?? null,
+      },
     });
     // Surface confirmed outcomes on the failure branch too — partial/failed/skipped outcomes must
     // never be dropped just because the run's terminal status is failure (issue #232, Gap 5).
@@ -248,7 +265,7 @@ export async function _handleSyncPreviewApplyRequest(
         results: {
           status: result.status,
           output,
-          error: result.error,
+          failure,
         },
         staleWarning: staleness.shouldWarn ? staleWarningMessage(staleness.ageMs) : null,
         outcomes: result.outcomes,
@@ -257,14 +274,26 @@ export async function _handleSyncPreviewApplyRequest(
       { status: 500 }
     );
   } catch (error) {
+    // Classify by error TYPE only; the raw message stays out of the response and the stored
+    // snapshot, and is recorded solely on the sanitized logger boundary below.
+    const failure = classifyPreviewFailure(error, snapshot.arrType);
     previewStore.updateResult(previewId, {
       status: PREVIEW_STATUS_FAILED,
-      error: error instanceof Error ? error.message : 'Unknown error while applying preview',
+      failure,
+    });
+    await logger.error('Sync preview apply raised an unexpected error', {
+      source: 'SyncPreviewApply',
+      meta: {
+        previewId,
+        instanceId: snapshot.instanceId,
+        failureCode: failure.code,
+        error: error instanceof Error ? error.message : String(error),
+      },
     });
 
     return json(
       {
-        error: error instanceof Error ? error.message : 'Unknown error while applying preview',
+        failure,
         staleWarning: staleness.shouldWarn ? staleWarningMessage(staleness.ageMs) : null,
       } satisfies SyncPreviewApplyErrorResponse,
       { status: 500 }

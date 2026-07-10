@@ -62,7 +62,6 @@ function buildPreviewResult(overrides: Partial<GeneratePreviewResult>): Generate
     mediaManagement: null,
     metadataProfiles: null,
     summary: { totalCreates: 0, totalUpdates: 0, totalDeletes: 0, totalUnchanged: 0 },
-    errors: [],
     ...overrides,
   };
 }
@@ -129,7 +128,7 @@ Deno.test('computeLiveDiff locates a collection entity via namespace-aware match
     Promise.resolve(
       buildPreviewResult({
         sections: ['qualityProfiles'],
-        sectionOutcomes: [{ section: 'qualityProfiles', error: null, skipped: false }],
+        sectionOutcomes: [{ section: 'qualityProfiles', failure: null, skipped: false }],
         qualityProfiles: { section: 'qualityProfiles', qualityProfiles: [change], customFormats: [] },
       })
     );
@@ -152,7 +151,7 @@ Deno.test('computeLiveDiff locates a singleton entity via direct field access', 
     Promise.resolve(
       buildPreviewResult({
         sections: ['delayProfiles'],
-        sectionOutcomes: [{ section: 'delayProfiles', error: null, skipped: false }],
+        sectionOutcomes: [{ section: 'delayProfiles', failure: null, skipped: false }],
         delayProfiles: { section: 'delayProfiles', profile: change },
       })
     );
@@ -180,7 +179,7 @@ Deno.test(
       Promise.resolve(
         buildPreviewResult({
           sections: ['delayProfiles'],
-          sectionOutcomes: [{ section: 'delayProfiles', error: null, skipped: false }],
+          sectionOutcomes: [{ section: 'delayProfiles', failure: null, skipped: false }],
           delayProfiles: { section: 'delayProfiles', profile: change },
         })
       );
@@ -203,7 +202,7 @@ Deno.test('computeLiveDiff locates a namespace-suffixed singleton profile name',
     Promise.resolve(
       buildPreviewResult({
         sections: ['delayProfiles'],
-        sectionOutcomes: [{ section: 'delayProfiles', error: null, skipped: false }],
+        sectionOutcomes: [{ section: 'delayProfiles', failure: null, skipped: false }],
         delayProfiles: { section: 'delayProfiles', profile: change },
       })
     );
@@ -224,7 +223,7 @@ Deno.test('computeLiveDiff returns not_found when the entity is absent from the 
     Promise.resolve(
       buildPreviewResult({
         sections: ['qualityProfiles'],
-        sectionOutcomes: [{ section: 'qualityProfiles', error: null, skipped: false }],
+        sectionOutcomes: [{ section: 'qualityProfiles', failure: null, skipped: false }],
         qualityProfiles: { section: 'qualityProfiles', qualityProfiles: [], customFormats: [] },
       })
     );
@@ -250,7 +249,7 @@ Deno.test(
       Promise.resolve(
         buildPreviewResult({
           sections: ['qualityProfiles'],
-          sectionOutcomes: [{ section: 'qualityProfiles', error: null, skipped: true }],
+          sectionOutcomes: [{ section: 'qualityProfiles', failure: null, skipped: true }],
         })
       );
 
@@ -276,11 +275,16 @@ Deno.test('computeLiveDiff maps a section outcome error to a sanitized reason', 
           sectionOutcomes: [
             {
               section: 'qualityProfiles',
-              error: 'Section qualityProfiles failed: HTTP 401 Unauthorized',
+              // A 401 is classified upstream as the typed `unauthorized` code; liveDiff maps the
+              // code straight to its closed reason (no substring parsing).
+              failure: {
+                code: 'unauthorized',
+                message: 'The Radarr instance rejected the API key.',
+                recoveryAction: 'Update the API key for this instance in its settings, then regenerate the preview.',
+              },
               skipped: false,
             },
           ],
-          errors: ['Section qualityProfiles failed: HTTP 401 Unauthorized'],
         })
       );
 

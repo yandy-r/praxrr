@@ -233,8 +233,8 @@ export function aggregateDrift(
   const availableOutcomes = preview.sectionOutcomes.filter((outcome) =>
     availableSections.has(outcome.section as SyncPreviewSection)
   );
-  const succeeded = availableOutcomes.filter((outcome) => outcome.error === null && !outcome.skipped);
-  const errored = availableOutcomes.filter((outcome) => outcome.error !== null);
+  const succeeded = availableOutcomes.filter((outcome) => outcome.failure === null && !outcome.skipped);
+  const errored = availableOutcomes.filter((outcome) => outcome.failure !== null);
 
   return {
     changes,

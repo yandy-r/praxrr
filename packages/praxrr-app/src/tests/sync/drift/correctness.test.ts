@@ -32,7 +32,7 @@ const QP_SECTIONS = new Set<SyncPreviewSection>(['qualityProfiles']);
 /** A `qualityProfiles` section outcome that RAN and succeeded (so `comparedAny` is true). */
 const QP_OK_OUTCOME: SyncPreviewSectionOutcome = {
   section: 'qualityProfiles',
-  error: null,
+  failure: null,
   skipped: false,
 };
 
@@ -73,7 +73,6 @@ function makePreview(qualityProfiles: QualityProfilesPreview | null): GeneratePr
     mediaManagement: null,
     metadataProfiles: null,
     summary: { totalCreates: 0, totalUpdates: 0, totalDeletes: 0, totalUnchanged: 0 },
-    errors: [],
   };
 }
 

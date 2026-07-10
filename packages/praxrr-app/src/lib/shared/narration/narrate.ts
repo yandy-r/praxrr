@@ -156,7 +156,7 @@ export function narrateSyncPreviewSummary(summary: SyncPreviewSummary, level: Na
  * deliberately does not describe apply execution or convert a successful preview into an apply result.
  */
 export function narrateSyncSectionOutcome(outcome: SyncPreviewSectionOutcome, level: NarrationLevel): NarrationLine {
-  const failed = outcome.error !== null;
+  const failed = outcome.failure !== null;
   const detail: string[] = [];
 
   if (level === 'verbose') {

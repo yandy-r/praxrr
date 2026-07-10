@@ -23,7 +23,7 @@ import { findNamespaceMatch } from '$sync/namespace.ts';
 import { isSyncSectionSupported, type SyncArrType } from '$sync/mappings.ts';
 import { generatePreview } from '$sync/preview/orchestrator.ts';
 import type { GeneratePreviewResult } from '$sync/preview/orchestrator.ts';
-import type { EntityChange, SyncPreviewSectionResult } from '$sync/preview/types.ts';
+import type { EntityChange, SyncPreviewFailureCode, SyncPreviewSectionResult } from '$sync/preview/types.ts';
 import type { SectionType } from '$sync/types.ts';
 import type { ResolvedEntityType } from './types.ts';
 
@@ -138,8 +138,29 @@ function mapErrorToLiveDiffReason(error: unknown): LiveDiffReason {
 }
 
 /** Same mapping, applied to a section-outcome error string (already extracted from an Error). */
-function reasonForFailedSection(errorMessage: string): LiveDiffReason {
-  return mapErrorToLiveDiffReason(new Error(errorMessage));
+/**
+ * Map a preview section's typed failure code to a closed LiveDiffReason. Direct code mapping
+ * (no substring parsing) now that section outcomes carry a typed, redacted failure.
+ */
+function reasonForFailedSection(code: SyncPreviewFailureCode): LiveDiffReason {
+  switch (code) {
+    case 'unreachable':
+      return 'unreachable';
+    case 'timeout':
+      return 'timeout';
+    case 'unauthorized':
+      return 'unauthorized';
+    case 'notFound':
+      return 'not_found';
+    case 'rejected':
+    case 'serverError':
+      return 'invalid_response';
+    case 'sectionErrors':
+    case 'executionFailed':
+    case 'stale':
+    case 'internalError':
+      return 'error';
+  }
 }
 
 // ============================================================================
@@ -276,17 +297,17 @@ export async function computeLiveDiff(input: ComputeLiveDiffInput): Promise<Live
   const sectionResult = getSectionResult(preview, section);
 
   if (!sectionResult) {
-    if (outcome?.error) {
+    if (outcome?.failure) {
       await logger.error('Live diff section failed', {
         source: SOURCE,
         meta: {
           instanceId: instance.id,
           instanceName: instance.name,
           section,
-          error: outcome.error,
+          failureCode: outcome.failure.code,
         },
       });
-      return { found: false, reason: reasonForFailedSection(outcome.error) };
+      return { found: false, reason: reasonForFailedSection(outcome.failure.code) };
     }
 
     // `skipped === true` (no `error`, no `result`) means the section has no sync

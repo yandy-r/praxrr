@@ -17,6 +17,7 @@
     status: SyncPreviewTriggerStatus;
     summary: SyncPreviewSummary | null;
     error: string | null;
+    recoveryAction: string | null;
   };
 
   const EMPTY_PREVIEW_SUMMARY: SyncPreviewSummary = {
@@ -31,6 +32,7 @@
     status: 'idle',
     summary: null,
     error: null,
+    recoveryAction: null,
   };
   let finishing = false;
 
@@ -43,7 +45,7 @@
   });
 
   async function generatePreview() {
-    previewState = { previewId: null, status: 'generating', summary: null, error: null };
+    previewState = { previewId: null, status: 'generating', summary: null, error: null, recoveryAction: null };
 
     try {
       const response = await fetch('/api/v1/sync/preview', {
@@ -54,17 +56,25 @@
 
       if (response.status === 429) {
         const message = 'Preview busy, retry shortly.';
-        previewState = { previewId: null, status: 'error', summary: null, error: message };
+        previewState = { previewId: null, status: 'error', summary: null, error: message, recoveryAction: null };
         alertStore.add('warning', message);
         return;
       }
 
       const payload = (await response.json().catch(() => null)) as
-        { id: string; summary?: SyncPreviewSummary } | { error: string } | null;
+        { id: string; summary?: SyncPreviewSummary; failure?: { message?: string } | null } | { error: string } | null;
 
       if (!response.ok || !payload || !('id' in payload)) {
-        const message = payload && 'error' in payload && payload.error ? payload.error : 'Failed to generate preview.';
-        previewState = { previewId: null, status: 'error', summary: null, error: message };
+        // A hard generation failure returns the failed snapshot with a typed, safe `failure`;
+        // 4xx validation errors keep the authored-safe `error` string. Never raw text.
+        const record = (payload ?? {}) as { error?: unknown; failure?: { message?: unknown } | null };
+        const message =
+          record.failure && typeof record.failure.message === 'string'
+            ? record.failure.message
+            : typeof record.error === 'string'
+              ? record.error
+              : 'Failed to generate preview.';
+        previewState = { previewId: null, status: 'error', summary: null, error: message, recoveryAction: null };
         alertStore.add('error', message);
         return;
       }
@@ -74,10 +84,11 @@
         status: 'ready',
         summary: payload.summary ?? EMPTY_PREVIEW_SUMMARY,
         error: null,
+        recoveryAction: null,
       };
     } catch {
       const message = 'Failed to generate preview.';
-      previewState = { previewId: null, status: 'error', summary: null, error: message };
+      previewState = { previewId: null, status: 'error', summary: null, error: message, recoveryAction: null };
       alertStore.add('error', message);
     }
   }

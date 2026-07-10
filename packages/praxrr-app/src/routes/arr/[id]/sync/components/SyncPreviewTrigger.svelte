@@ -23,7 +23,14 @@
 
   function toErrorMessage(payload: SyncPreviewCreateResponse | null): string {
     if (payload && typeof payload === 'object' && !Array.isArray(payload)) {
-      const candidate = (payload as Record<string, unknown>).error;
+      const record = payload as Record<string, unknown>;
+      // A hard generation failure returns the failed snapshot carrying a typed, safe `failure`.
+      const failure = record.failure;
+      if (failure && typeof failure === 'object' && typeof (failure as Record<string, unknown>).message === 'string') {
+        return (failure as { message: string }).message;
+      }
+      // 4xx validation errors keep the authored-safe `error` string envelope.
+      const candidate = record.error;
       if (typeof candidate === 'string') {
         return candidate;
       }

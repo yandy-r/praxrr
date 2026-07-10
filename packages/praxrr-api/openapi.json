@@ -1360,11 +1360,11 @@
             }
           },
           "500": {
-            "description": "Failed to generate preview",
+            "description": "Preview generation failed. The failed preview snapshot is returned with\n`status: failed` and a typed, safe `failure` reason — no raw exception text.\n",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
+                  "$ref": "#/components/schemas/SyncPreviewResult"
                 }
               }
             }
@@ -7677,6 +7677,40 @@
           }
         }
       },
+      "SyncPreviewFailureCode": {
+        "type": "string",
+        "enum": [
+          "unreachable",
+          "timeout",
+          "unauthorized",
+          "notFound",
+          "rejected",
+          "serverError",
+          "sectionErrors",
+          "executionFailed",
+          "stale",
+          "internalError"
+        ],
+        "description": "Closed vocabulary of Sync Preview generate/apply failure reasons. Each value is\nassigned by matching a thrown error's TYPE/status (never by parsing message text),\nso no raw exception or secret-shaped string is ever transported:\n- `unreachable`: the Arr instance could not be reached (network/DNS/connection).\n- `timeout`: the Arr instance did not respond in time.\n- `unauthorized`: the Arr instance rejected the API key (HTTP 401/403).\n- `notFound`: a required Arr resource was not found (HTTP 404).\n- `rejected`: the Arr instance rejected the request (other HTTP 4xx).\n- `serverError`: the Arr instance returned a server error (HTTP 5xx).\n- `sectionErrors`: one or more sections failed to generate (top-level aggregate).\n- `executionFailed`: the apply sync run did not complete successfully.\n- `stale`: the preview is too old to apply safely.\n- `internalError`: an unexpected error occurred (catch-all for untyped failures).\n"
+      },
+      "SyncPreviewFailureReason": {
+        "type": "object",
+        "required": ["code", "message", "recoveryAction"],
+        "description": "Typed, closed, safe failure evidence for Sync Preview generate/apply. Replaces the\nformer free-form `error` strings. `message` and `recoveryAction` are pre-authored safe\ncopy drawn from a closed vocabulary — they NEVER contain raw exception text, Arr\nresponse bodies, credentials, hostnames, or stack traces. Full diagnostics live only in\nthe sanitized server logs.\n",
+        "properties": {
+          "code": {
+            "$ref": "#/components/schemas/SyncPreviewFailureCode"
+          },
+          "message": {
+            "type": "string",
+            "description": "Safe, user-facing summary of the failure. Never raw exception or secret text."
+          },
+          "recoveryAction": {
+            "type": "string",
+            "description": "Actionable next step the operator can take to recover."
+          }
+        }
+      },
       "SyncPreviewApplyJobStatus": {
         "type": "string",
         "enum": ["success", "failure", "skipped", "cancelled"],
@@ -7693,9 +7727,16 @@
             "type": "string",
             "description": "Aggregate human-readable output from the sync job."
           },
-          "error": {
-            "type": "string",
-            "description": "User-facing sync-job failure reason, when one is available."
+          "failure": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/SyncPreviewFailureReason"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Typed, safe failure reason when the sync run did not succeed; omitted or null\notherwise. Replaces the former free-form `error` string — the raw job error is\nnever transported and remains only in sanitized logs and per-entity outcomes.\n"
           }
         }
       },
@@ -7744,11 +7785,10 @@
       },
       "SyncPreviewApplyErrorResponse": {
         "type": "object",
-        "required": ["error", "staleWarning"],
+        "required": ["failure", "staleWarning"],
         "properties": {
-          "error": {
-            "type": "string",
-            "description": "User-facing reason the preview could not be applied."
+          "failure": {
+            "$ref": "#/components/schemas/SyncPreviewFailureReason"
           },
           "staleWarning": {
             "oneOf": [
@@ -8083,7 +8123,7 @@
       },
       "SyncPreviewSectionOutcome": {
         "type": "object",
-        "required": ["section", "skipped", "error"],
+        "required": ["section", "skipped", "failure"],
         "properties": {
           "section": {
             "$ref": "#/components/schemas/SyncPreviewSection"
@@ -8092,16 +8132,16 @@
             "type": "boolean",
             "description": "True when the section had no config to preview and was skipped."
           },
-          "error": {
+          "failure": {
             "oneOf": [
               {
-                "type": "string"
+                "$ref": "#/components/schemas/SyncPreviewFailureReason"
               },
               {
-                "type": null
+                "type": "null"
               }
             ],
-            "description": "Section-level preview generation error, when present."
+            "description": "Typed, safe section-level preview generation failure, or null when the section\nsucceeded or was skipped. Replaces the former free-form `error` string.\n"
           }
         }
       },
@@ -8115,6 +8155,7 @@
           "createdAt",
           "expiresAt",
           "status",
+          "failure",
           "sections",
           "sectionOutcomes",
           "qualityProfiles",
@@ -8154,9 +8195,16 @@
           "status": {
             "$ref": "#/components/schemas/SyncPreviewStatus"
           },
-          "error": {
-            "type": "string",
-            "description": "Optional error message from generation or apply"
+          "failure": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/SyncPreviewFailureReason"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Typed, safe top-level failure reason, set when whole-preview generation or apply\nfailed; null on success and on partial generation (per-section failures live in\n`sectionOutcomes[].failure`). Replaces the former free-form `error` string.\n"
           },
           "sections": {
             "type": "array",
