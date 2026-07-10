@@ -118,10 +118,16 @@ recompute:
 trends:
   get:
     operationId: getConfigHealthTrends
-    summary: Config-health score trend for one instance
+    summary: Read config-health history for one instance
     description: |
-      Time-series of the persisted overall score and band for one instance, oldest → newest, for the
-      trend sparkline. Bounded to the last `days` when provided.
+      Returns one canonical, bounded historical result from persisted config-health snapshots for an
+      active sync-capable instance. Overall scope includes persisted criterion observations; exact
+      profile scope includes only the profile score and band recorded in each snapshot.
+
+      Filters are inclusive. `days` is mutually exclusive with `from` and `to`, and is normalized to
+      absolute UTC bounds in the response. Points are ordered by `generatedAt ASC, snapshotId ASC`.
+      Unknown, absent, or unrecorded evidence is represented by explicit states and nullable values,
+      never recomputed or silently truncated. A valid selection with no points returns 200.
     tags:
       - Config Health
     parameters:
@@ -134,25 +140,182 @@ trends:
       - name: days
         in: query
         required: false
-        description: Restrict the series to the last N days.
+        description: Relative UTC window in days. Cannot be combined with `from` or `to`.
         schema:
           type: integer
           minimum: 1
+          maximum: 3650
+      - name: from
+        in: query
+        required: false
+        description: Inclusive date-only or ISO-8601 date-time lower bound.
+        schema:
+          oneOf:
+            - type: string
+              format: date
+            - type: string
+              format: date-time
+      - name: to
+        in: query
+        required: false
+        description: Inclusive date-only or ISO-8601 date-time upper bound.
+        schema:
+          oneOf:
+            - type: string
+              format: date
+            - type: string
+              format: date-time
+      - name: profile
+        in: query
+        required: false
+        description: Exact non-empty persisted profile name. Matching does not trim or case-fold.
+        schema:
+          type: string
+          minLength: 1
     responses:
       '200':
-        description: Health trend series
+        description: Canonical health history, including an empty `points` array when nothing matches
         content:
           application/json:
             schema:
               $ref: '../schemas/config-health.yaml#/ConfigHealthTrendsResponse'
       '400':
-        description: Invalid instance id or days
+        description: Invalid instance id, filter, filter combination, or range
         content:
           application/json:
             schema:
               $ref: '../schemas/arr.yaml#/ErrorResponse'
       '404':
         description: Instance not found or not sync-capable
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+      '422':
+        description: Exact selection exceeds the 10,000-point limit; no partial result is returned
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+      '500':
+        description: Failed to read config-health history
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+
+trendsExport:
+  get:
+    operationId: exportConfigHealthTrends
+    summary: Export config-health history for one instance
+    description: |
+      Downloads the same canonical filtered result and point order as the trend endpoint. JSON uses
+      the complete response envelope. CSV uses one row per canonical point and a fixed criteria JSON
+      cell. A valid empty selection returns 200 with an empty JSON `points` array or a header-only CSV.
+
+      The exact 10,000-point limit applies atomically to both formats; oversized selections are never
+      silently truncated.
+    tags:
+      - Config Health
+    parameters:
+      - name: instanceId
+        in: path
+        required: true
+        description: Arr instance id
+        schema:
+          type: integer
+      - name: format
+        in: query
+        required: false
+        description: Attachment representation. Defaults to the canonical JSON envelope.
+        schema:
+          type: string
+          enum:
+            - json
+            - csv
+          default: json
+      - name: days
+        in: query
+        required: false
+        description: Relative UTC window in days. Cannot be combined with `from` or `to`.
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 3650
+      - name: from
+        in: query
+        required: false
+        description: Inclusive date-only or ISO-8601 date-time lower bound.
+        schema:
+          oneOf:
+            - type: string
+              format: date
+            - type: string
+              format: date-time
+      - name: to
+        in: query
+        required: false
+        description: Inclusive date-only or ISO-8601 date-time upper bound.
+        schema:
+          oneOf:
+            - type: string
+              format: date
+            - type: string
+              format: date-time
+      - name: profile
+        in: query
+        required: false
+        description: Exact non-empty persisted profile name. Matching does not trim or case-fold.
+        schema:
+          type: string
+          minLength: 1
+    responses:
+      '200':
+        description: JSON or CSV attachment, including successful empty selections
+        headers:
+          Content-Disposition:
+            description: Fixed ASCII attachment filename derived from the numeric instance id and server time
+            schema:
+              type: string
+          Cache-Control:
+            description: Prevents storage of operational history downloads
+            schema:
+              type: string
+              enum:
+                - no-store
+          X-Content-Type-Options:
+            description: Prevents content-type sniffing
+            schema:
+              type: string
+              enum:
+                - nosniff
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/config-health.yaml#/ConfigHealthTrendsResponse'
+          text/csv:
+            schema:
+              type: string
+      '400':
+        description: Invalid instance id, filter, filter combination, range, or format
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+      '404':
+        description: Instance not found or not sync-capable
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+      '422':
+        description: Exact selection exceeds the 10,000-point limit; no partial attachment is returned
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+      '500':
+        description: Failed to export config-health history
         content:
           application/json:
             schema:

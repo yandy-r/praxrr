@@ -7,10 +7,18 @@
  */
 
 import type { NarrationLine, NarrationTone } from '$shared/narration/index.ts';
-import type { CriterionConfig, CriterionMeta, CriterionResult, HealthArrType, HealthBand, HealthReport, ScoredUnit } from '$shared/health/index.ts';
+import type {
+  CriterionConfig,
+  CriterionMeta,
+  CriterionResult,
+  HealthArrType,
+  HealthBand,
+  HealthReport,
+  ScoredUnit,
+} from '$shared/health/index.ts';
 import { CONFIG_HEALTH_ENGINE_VERSION, CRITERION_CATALOG } from '$shared/health/index.ts';
 import type { ConfigHealthSettings } from '$db/queries/configHealthSettings.ts';
-import type { ConfigHealthSnapshotDetail } from '$db/queries/configHealthSnapshots.ts';
+import type { ConfigHealthTrendResult } from './trends.ts';
 
 // --- wire shapes (mutable; mirror the OpenAPI schemas) ----------------------------------------
 
@@ -83,15 +91,66 @@ export interface ConfigHealthDetailResponse {
   profiles: WireProfileHealth[];
 }
 
+export interface ConfigHealthTrendInstance {
+  id: number;
+  name: string;
+  arrType: HealthArrType;
+}
+
+export interface ConfigHealthTrendFilter {
+  from: string | null;
+  to: string;
+  profile: string | null;
+}
+
+export interface ConfigHealthTrendRetention {
+  days: number;
+  maxEntries: number;
+  ageCutoffAt: string;
+  oldestAvailableAt: string | null;
+  newestAvailableAt: string | null;
+}
+
+export interface ConfigHealthTrendCounts {
+  points: number;
+  measured: number;
+  unknown: number;
+  missing: number;
+}
+
+export interface ConfigHealthTrendEngineBoundary {
+  engineVersion: string;
+  startsAt: string;
+  pointIndex: number;
+}
+
+export interface ConfigHealthTrendCriterion {
+  id: string;
+  label: string;
+  state: 'measured' | 'not-evaluated' | 'not-recorded';
+  score: number | null;
+  weight: number | null;
+  contribution: number | null;
+}
+
 export interface ConfigHealthTrendPoint {
+  snapshotId: number;
   generatedAt: string;
-  overallScore: number;
-  band: HealthBand;
+  engineVersion: string;
+  state: 'measured' | 'unknown' | 'profile-missing' | 'not-recorded';
+  score: number | null;
+  band: HealthBand | null;
+  criteria: ConfigHealthTrendCriterion[];
 }
 
 export interface ConfigHealthTrendsResponse {
-  instanceId: number;
-  engineVersion: string;
+  instance: ConfigHealthTrendInstance;
+  currentEngineVersion: string;
+  normalizedFilter: ConfigHealthTrendFilter;
+  retention: ConfigHealthTrendRetention;
+  availableProfiles: string[];
+  counts: ConfigHealthTrendCounts;
+  engineBoundaries: ConfigHealthTrendEngineBoundary[];
   points: ConfigHealthTrendPoint[];
 }
 
@@ -119,7 +178,7 @@ function toWireCriterion(criterion: CriterionResult): WireCriterion {
     weight: criterion.weight,
     contribution: criterion.contribution,
     detail: [...criterion.detail],
-    suggestions: criterion.suggestions.map(toWireSuggestion)
+    suggestions: criterion.suggestions.map(toWireSuggestion),
   };
 }
 
@@ -128,7 +187,7 @@ function toWireUnit(unit: ScoredUnit): WireScoredUnit {
     score: unit.score,
     band: unit.band,
     criteria: unit.criteria.map(toWireCriterion),
-    suggestions: unit.suggestions.map(toWireSuggestion)
+    suggestions: unit.suggestions.map(toWireSuggestion),
   };
 }
 
@@ -141,23 +200,28 @@ export function toDetailResponse(report: HealthReport): ConfigHealthDetailRespon
     engineVersion: report.engineVersion,
     generatedAt: report.generatedAt,
     overall: toWireUnit(report.overall),
-    profiles: report.profiles.map((profile) => ({ name: profile.name, ...toWireUnit(profile) }))
+    profiles: report.profiles.map((profile) => ({ name: profile.name, ...toWireUnit(profile) })),
   };
 }
 
 /** A fleet of reports + settings → the summary response (light per-instance rows + totals). */
-export function toSummaryResponse(reports: readonly HealthReport[], settings: ConfigHealthSettings, generatedAt: string): ConfigHealthSummaryResponse {
+export function toSummaryResponse(
+  reports: readonly HealthReport[],
+  settings: ConfigHealthSettings,
+  generatedAt: string
+): ConfigHealthSummaryResponse {
   const instances: ConfigHealthInstanceSummary[] = reports.map((report) => ({
     instanceId: report.instanceId,
     instanceName: report.instanceName,
     arrType: report.arrType,
     score: report.overall.score,
     band: report.overall.band,
-    generatedAt: report.generatedAt
+    generatedAt: report.generatedAt,
   }));
 
   const scored = instances.filter((instance) => instance.band !== 'unknown');
-  const averageScore = scored.length > 0 ? Math.round(scored.reduce((sum, instance) => sum + instance.score, 0) / scored.length) : null;
+  const averageScore =
+    scored.length > 0 ? Math.round(scored.reduce((sum, instance) => sum + instance.score, 0) / scored.length) : null;
 
   const totals: ConfigHealthTotals = {
     instances: instances.length,
@@ -165,7 +229,7 @@ export function toSummaryResponse(reports: readonly HealthReport[], settings: Co
     attention: instances.filter((i) => i.band === 'attention').length,
     needsReview: instances.filter((i) => i.band === 'needs-review').length,
     unknown: instances.filter((i) => i.band === 'unknown').length,
-    averageScore
+    averageScore,
   };
 
   return {
@@ -173,16 +237,24 @@ export function toSummaryResponse(reports: readonly HealthReport[], settings: Co
     generatedAt,
     totals,
     settings: { enabled: settings.enabled === 1, intervalMinutes: settings.interval_minutes },
-    instances
+    instances,
   };
 }
 
-/** Snapshot rows → the trend-series response for the sparkline. */
-export function toTrendsResponse(instanceId: number, snapshots: readonly ConfigHealthSnapshotDetail[]): ConfigHealthTrendsResponse {
+/** Canonical historical result → a plain mutable OpenAPI-aligned response. */
+export function toTrendsResponse(result: ConfigHealthTrendResult): ConfigHealthTrendsResponse {
   return {
-    instanceId,
-    engineVersion: CONFIG_HEALTH_ENGINE_VERSION,
-    points: snapshots.map((snapshot) => ({ generatedAt: snapshot.generatedAt, overallScore: snapshot.overallScore, band: snapshot.band }))
+    instance: { ...result.instance },
+    currentEngineVersion: result.currentEngineVersion,
+    normalizedFilter: { ...result.normalizedFilter },
+    retention: { ...result.retention },
+    availableProfiles: [...result.availableProfiles],
+    counts: { ...result.counts },
+    engineBoundaries: result.engineBoundaries.map((boundary) => ({ ...boundary })),
+    points: result.points.map((point) => ({
+      ...point,
+      criteria: point.criteria.map((criterion) => ({ ...criterion })),
+    })),
   };
 }
 
@@ -195,6 +267,6 @@ export function toSettingsResponse(settings: ConfigHealthSettings): ConfigHealth
     retentionDays: settings.retention_days,
     retentionMaxEntries: settings.retention_max_entries,
     criteria: settings.criteria.map((criterion) => ({ ...criterion })),
-    catalog: CRITERION_CATALOG.map((meta) => ({ ...meta }))
+    catalog: CRITERION_CATALOG.map((meta) => ({ ...meta })),
   };
 }

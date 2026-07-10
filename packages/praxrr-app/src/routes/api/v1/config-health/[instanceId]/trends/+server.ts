@@ -1,58 +1,38 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from '@sveltejs/kit';
-import { arrInstancesQueries } from '$db/queries/arrInstances.ts';
-import { isSyncPreviewArrType } from '$sync/preview/types.ts';
-import { configHealthSnapshotsQueries } from '$db/queries/configHealthSnapshots.ts';
+import type { components } from '$api/v1.d.ts';
+import { ConfigHealthTrendQueryError, parseConfigHealthTrendFilters } from '$lib/server/health/trendFilters.ts';
+import { ConfigHealthTrendServiceError, readConfigHealthTrend } from '$lib/server/health/trends.ts';
 import { toTrendsResponse } from '$lib/server/health/responses.ts';
 import { logger } from '$logger/logger.ts';
-import type { components } from '$api/v1.d.ts';
 
-type ErrorResponse = { error: string };
+type ErrorResponse = components['schemas']['ErrorResponse'];
 type TrendsResponse = components['schemas']['ConfigHealthTrendsResponse'];
 
 function parseInstanceId(raw: string | undefined): number | null {
   const value = Number(raw);
-  if (!Number.isInteger(value) || value <= 0) {
-    return null;
-  }
-  return value;
+  return Number.isSafeInteger(value) && value > 0 ? value : null;
 }
 
-/**
- * GET /api/v1/config-health/{instanceId}/trends?days=N
- *
- * Persisted overall-score/band time series for one instance (oldest → newest) for the sparkline,
- * optionally bounded to the last N days.
- */
+/** GET one canonical, bounded Config Health historical selection. */
 export const GET: RequestHandler = async ({ params, url }) => {
   const instanceId = parseInstanceId(params.instanceId);
   if (instanceId === null) {
     return json({ error: 'Invalid instance id' } satisfies ErrorResponse, { status: 400 });
   }
 
-  let days: number | undefined;
-  const rawDays = url.searchParams.get('days');
-  if (rawDays !== null) {
-    const parsed = Number(rawDays);
-    if (!Number.isInteger(parsed) || parsed <= 0) {
-      return json({ error: 'Invalid days parameter' } satisfies ErrorResponse, { status: 400 });
-    }
-    days = parsed;
-  }
-
-  const instance = arrInstancesQueries.getById(instanceId);
-  // 404 covers both "unknown" and "not sync-capable" (per the OpenAPI contract).
-  if (!instance || !isSyncPreviewArrType(instance.type)) {
-    return json({ error: 'Instance not found or not sync-capable' } satisfies ErrorResponse, { status: 404 });
-  }
-
   try {
-    const snapshots = configHealthSnapshotsQueries.getTrend(instanceId, days);
-    return json(toTrendsResponse(instanceId, snapshots) satisfies TrendsResponse);
+    const filters = parseConfigHealthTrendFilters(url);
+    const result = readConfigHealthTrend(instanceId, filters);
+    return json(toTrendsResponse(result) satisfies TrendsResponse);
   } catch (error) {
+    if (error instanceof ConfigHealthTrendQueryError || error instanceof ConfigHealthTrendServiceError) {
+      return json({ error: error.message } satisfies ErrorResponse, { status: error.status });
+    }
+
     await logger.error('Failed to read config health trends', {
       source: 'ConfigHealthTrendsRoute',
-      meta: { instanceId, error: error instanceof Error ? error.message : String(error) },
+      meta: { instanceId, errorType: error instanceof Error ? error.name : 'UnknownError' },
     });
     return json({ error: 'Failed to read config health trends' } satisfies ErrorResponse, { status: 500 });
   }

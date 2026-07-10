@@ -42,6 +42,19 @@ export interface ConfigHealthSnapshotDetail {
   createdAt: string;
 }
 
+/** Snapshot detail used by historical analysis, including whether stored arrays were valid JSON. */
+export interface ConfigHealthTrendSnapshotDetail extends ConfigHealthSnapshotDetail {
+  criteriaScoresValid: boolean;
+  profileScoresValid: boolean;
+}
+
+/** Inclusive canonical UTC bounds and the exact maximum rows the caller wants fetched. */
+export interface ConfigHealthTrendSearchOptions {
+  from?: string;
+  to?: string;
+  limit: number;
+}
+
 interface ConfigHealthDegradationSnapshotRow {
   id: number;
   arr_instance_id: number | null;
@@ -68,11 +81,15 @@ export interface ConfigHealthDegradationSnapshotDetail {
 }
 
 function parseJsonArray<T>(raw: string): T[] {
+  return parseJsonArrayEvidence<T>(raw).values;
+}
+
+function parseJsonArrayEvidence<T>(raw: string): { values: T[]; valid: boolean } {
   try {
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? (parsed as T[]) : [];
+    return Array.isArray(parsed) ? { values: parsed as T[], valid: true } : { values: [], valid: false };
   } catch {
-    return [];
+    return { values: [], valid: false };
   }
 }
 
@@ -87,6 +104,27 @@ function rowToDetail(row: ConfigHealthSnapshotRow): ConfigHealthSnapshotDetail {
     band: row.band as HealthBand,
     criteriaScores: parseJsonArray<CriterionResult>(row.criteria_scores),
     profileScores: parseJsonArray<SnapshotProfileScore>(row.profile_scores),
+    generatedAt: row.generated_at,
+    createdAt: row.created_at,
+  };
+}
+
+function rowToTrendDetail(row: ConfigHealthSnapshotRow): ConfigHealthTrendSnapshotDetail {
+  const criteriaScores = parseJsonArrayEvidence<CriterionResult>(row.criteria_scores);
+  const profileScores = parseJsonArrayEvidence<SnapshotProfileScore>(row.profile_scores);
+
+  return {
+    id: row.id,
+    arrInstanceId: row.arr_instance_id,
+    instanceName: row.instance_name,
+    arrType: row.arr_type as HealthArrType,
+    engineVersion: row.engine_version,
+    overallScore: row.overall_score,
+    band: row.band as HealthBand,
+    criteriaScores: criteriaScores.values,
+    profileScores: profileScores.values,
+    criteriaScoresValid: criteriaScores.valid,
+    profileScoresValid: profileScores.valid,
     generatedAt: row.generated_at,
     createdAt: row.created_at,
   };
@@ -183,6 +221,64 @@ export const configHealthSnapshotsQueries = {
       instanceId
     );
     return rows.map(rowToDetail);
+  },
+
+  /**
+   * Evidence-aware trend rows for one instance in canonical chronological order.
+   *
+   * Bounds are inclusive canonical ISO timestamps supplied by the shared filter parser. The SQL
+   * variants are fixed and parameterized so optional bounds never require interpolating values or
+   * wrapping the indexed `generated_at` column in a conversion function.
+   */
+  searchTrend(instanceId: number, options: ConfigHealthTrendSearchOptions): ConfigHealthTrendSnapshotDetail[] {
+    if (!Number.isSafeInteger(options.limit) || options.limit <= 0) {
+      throw new RangeError('Config Health trend limit must be a positive safe integer');
+    }
+
+    let rows: ConfigHealthSnapshotRow[];
+    if (options.from !== undefined && options.to !== undefined) {
+      rows = db.query<ConfigHealthSnapshotRow>(
+        `SELECT * FROM config_health_snapshots
+			 WHERE arr_instance_id = ? AND generated_at >= ? AND generated_at <= ?
+			 ORDER BY generated_at ASC, id ASC
+			 LIMIT ?`,
+        instanceId,
+        options.from,
+        options.to,
+        options.limit
+      );
+    } else if (options.from !== undefined) {
+      rows = db.query<ConfigHealthSnapshotRow>(
+        `SELECT * FROM config_health_snapshots
+			 WHERE arr_instance_id = ? AND generated_at >= ?
+			 ORDER BY generated_at ASC, id ASC
+			 LIMIT ?`,
+        instanceId,
+        options.from,
+        options.limit
+      );
+    } else if (options.to !== undefined) {
+      rows = db.query<ConfigHealthSnapshotRow>(
+        `SELECT * FROM config_health_snapshots
+			 WHERE arr_instance_id = ? AND generated_at <= ?
+			 ORDER BY generated_at ASC, id ASC
+			 LIMIT ?`,
+        instanceId,
+        options.to,
+        options.limit
+      );
+    } else {
+      rows = db.query<ConfigHealthSnapshotRow>(
+        `SELECT * FROM config_health_snapshots
+			 WHERE arr_instance_id = ?
+			 ORDER BY generated_at ASC, id ASC
+			 LIMIT ?`,
+        instanceId,
+        options.limit
+      );
+    }
+
+    return rows.map(rowToTrendDetail);
   },
 
   /** Delete snapshots older than `days`. Returns rows deleted. */

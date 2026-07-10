@@ -1212,6 +1212,8 @@ export interface paths {
      * List Quality Goal presets and slider axes
      * @description Returns the built-in goal presets, the slider-axis metadata, and the engine version. The editor
      *     renders sliders and can run the pure engine client-side from this payload with nothing hardcoded.
+     *     `arrType=lidarr` scopes the response to the audio presets and hides the video-only
+     *     `hdrPreference`/`resolutionCeiling` axes; omitting it (or radarr/sonarr) returns the video presets.
      */
     get: operations['getGoalPresets'];
     put?: never;
@@ -1476,11 +1478,42 @@ export interface paths {
       cookie?: never;
     };
     /**
-     * Config-health score trend for one instance
-     * @description Time-series of the persisted overall score and band for one instance, oldest → newest, for the
-     *     trend sparkline. Bounded to the last `days` when provided.
+     * Read config-health history for one instance
+     * @description Returns one canonical, bounded historical result from persisted config-health snapshots for an
+     *     active sync-capable instance. Overall scope includes persisted criterion observations; exact
+     *     profile scope includes only the profile score and band recorded in each snapshot.
+     *
+     *     Filters are inclusive. `days` is mutually exclusive with `from` and `to`, and is normalized to
+     *     absolute UTC bounds in the response. Points are ordered by `generatedAt ASC, snapshotId ASC`.
+     *     Unknown, absent, or unrecorded evidence is represented by explicit states and nullable values,
+     *     never recomputed or silently truncated. A valid selection with no points returns 200.
      */
     get: operations['getConfigHealthTrends'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/config-health/{instanceId}/trends/export': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Export config-health history for one instance
+     * @description Downloads the same canonical filtered result and point order as the trend endpoint. JSON uses
+     *     the complete response envelope. CSV uses one row per canonical point and a fixed criteria JSON
+     *     cell. A valid empty selection returns 200 with an empty JSON `points` array or a header-only CSV.
+     *
+     *     The exact 10,000-point limit applies atomically to both formats; oversized selections are never
+     *     silently truncated.
+     */
+    get: operations['exportConfigHealthTrends'];
     put?: never;
     post?: never;
     delete?: never;
@@ -2857,7 +2890,6 @@ export interface components {
       upgradeUntilScore: number;
       upgradeScoreIncrement: number;
     };
-    /** @description Deterministic translation of a goal into concrete scores + thresholds. */
     /** @description One row of the ceiling-derived quality ladder (issue #221). */
     GoalQualityLadderItem: {
       name: string;
@@ -4028,15 +4060,97 @@ export interface components {
       overall: components['schemas']['ConfigHealthScoredUnit'];
       profiles: components['schemas']['ConfigHealthProfileHealth'][];
     };
+    /**
+     * @description Availability of the point's selected scope. `unknown` is persisted scoring without a measured
+     *     score, `profile-missing` preserves a snapshot where the exact profile was absent, and
+     *     `not-recorded` preserves snapshot identity when stored evidence is unusable.
+     * @enum {string}
+     */
+    ConfigHealthTrendPointState: 'measured' | 'unknown' | 'profile-missing' | 'not-recorded';
+    /**
+     * @description Availability of one persisted overall criterion observation.
+     * @enum {string}
+     */
+    ConfigHealthTrendCriterionState: 'measured' | 'not-evaluated' | 'not-recorded';
+    ConfigHealthTrendInstance: {
+      id: number;
+      name: string;
+      arrType: components['schemas']['ConfigHealthArrType'];
+    };
+    /**
+     * @description Applied absolute filter echoed for representation parity. `from=null` means unbounded history;
+     *     `to` is captured once per request so a later export cannot acquire newer points. Profile matching
+     *     preserves the exact persisted name.
+     */
+    ConfigHealthTrendFilter: {
+      from: string | null;
+      /** Format: date-time */
+      to: string;
+      profile: string | null;
+    };
+    /**
+     * @description Current global retention policy and observed availability for this instance. These values do not
+     *     identify why any older point is absent or prove which retention rule removed it.
+     */
+    ConfigHealthTrendRetention: {
+      days: number;
+      maxEntries: number;
+      /** Format: date-time */
+      ageCutoffAt: string;
+      oldestAvailableAt: string | null;
+      newestAvailableAt: string | null;
+    };
+    ConfigHealthTrendCounts: {
+      points: number;
+      measured: number;
+      unknown: number;
+      /** @description Points whose selected evidence is profile-missing or not-recorded. */
+      missing: number;
+    };
+    /** @description Start of one contiguous persisted engine-version run in canonical point order. */
+    ConfigHealthTrendEngineBoundary: {
+      engineVersion: string;
+      /** Format: date-time */
+      startsAt: string;
+      pointIndex: number;
+    };
+    /**
+     * @description One persisted overall criterion observation. Profile-scoped points do not expose criteria.
+     *     Nullable numeric fields remain distinct from measured zero.
+     */
+    ConfigHealthTrendCriterion: {
+      id: string;
+      label: string;
+      state: components['schemas']['ConfigHealthTrendCriterionState'];
+      score: number | null;
+      weight: number | null;
+      contribution: number | null;
+    };
+    /** @description One persisted snapshot observation in `generatedAt ASC, snapshotId ASC` order. */
     ConfigHealthTrendPoint: {
+      snapshotId: number;
       /** Format: date-time */
       generatedAt: string;
-      overallScore: number;
-      band: components['schemas']['ConfigHealthBand'];
-    };
-    ConfigHealthTrendsResponse: {
-      instanceId: number;
       engineVersion: string;
+      state: components['schemas']['ConfigHealthTrendPointState'];
+      score: number | null;
+      band: components['schemas']['ConfigHealthBand'] | null;
+      /** @description Persisted overall criterion observations; empty for exact-profile scope. */
+      criteria: components['schemas']['ConfigHealthTrendCriterion'][];
+    };
+    /**
+     * @description Canonical bounded historical result shared by chart/table JSON and JSON/CSV export selection.
+     *     Empty selections are successful and contain `points: []` with the same metadata shape.
+     */
+    ConfigHealthTrendsResponse: {
+      instance: components['schemas']['ConfigHealthTrendInstance'];
+      currentEngineVersion: string;
+      normalizedFilter: components['schemas']['ConfigHealthTrendFilter'];
+      retention: components['schemas']['ConfigHealthTrendRetention'];
+      /** @description Exact historical profile names in deterministic order. */
+      availableProfiles: string[];
+      counts: components['schemas']['ConfigHealthTrendCounts'];
+      engineBoundaries: components['schemas']['ConfigHealthTrendEngineBoundary'][];
       points: components['schemas']['ConfigHealthTrendPoint'][];
     };
     ConfigHealthCriterionConfig: {
@@ -8214,8 +8328,14 @@ export interface operations {
   getConfigHealthTrends: {
     parameters: {
       query?: {
-        /** @description Restrict the series to the last N days. */
+        /** @description Relative UTC window in days. Cannot be combined with `from` or `to`. */
         days?: number;
+        /** @description Inclusive date-only or ISO-8601 date-time lower bound. */
+        from?: string;
+        /** @description Inclusive date-only or ISO-8601 date-time upper bound. */
+        to?: string;
+        /** @description Exact non-empty persisted profile name. Matching does not trim or case-fold. */
+        profile?: string;
       };
       header?: never;
       path: {
@@ -8226,7 +8346,7 @@ export interface operations {
     };
     requestBody?: never;
     responses: {
-      /** @description Health trend series */
+      /** @description Canonical health history, including an empty `points` array when nothing matches */
       200: {
         headers: {
           [name: string]: unknown;
@@ -8235,7 +8355,7 @@ export interface operations {
           'application/json': components['schemas']['ConfigHealthTrendsResponse'];
         };
       };
-      /** @description Invalid instance id or days */
+      /** @description Invalid instance id, filter, filter combination, or range */
       400: {
         headers: {
           [name: string]: unknown;
@@ -8246,6 +8366,101 @@ export interface operations {
       };
       /** @description Instance not found or not sync-capable */
       404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Exact selection exceeds the 10,000-point limit; no partial result is returned */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Failed to read config-health history */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+    };
+  };
+  exportConfigHealthTrends: {
+    parameters: {
+      query?: {
+        /** @description Attachment representation. Defaults to the canonical JSON envelope. */
+        format?: 'json' | 'csv';
+        /** @description Relative UTC window in days. Cannot be combined with `from` or `to`. */
+        days?: number;
+        /** @description Inclusive date-only or ISO-8601 date-time lower bound. */
+        from?: string;
+        /** @description Inclusive date-only or ISO-8601 date-time upper bound. */
+        to?: string;
+        /** @description Exact non-empty persisted profile name. Matching does not trim or case-fold. */
+        profile?: string;
+      };
+      header?: never;
+      path: {
+        /** @description Arr instance id */
+        instanceId: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description JSON or CSV attachment, including successful empty selections */
+      200: {
+        headers: {
+          /** @description Fixed ASCII attachment filename derived from the numeric instance id and server time */
+          'Content-Disposition'?: string;
+          /** @description Prevents storage of operational history downloads */
+          'Cache-Control'?: 'no-store';
+          /** @description Prevents content-type sniffing */
+          'X-Content-Type-Options'?: 'nosniff';
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ConfigHealthTrendsResponse'];
+          'text/csv': string;
+        };
+      };
+      /** @description Invalid instance id, filter, filter combination, range, or format */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Instance not found or not sync-capable */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Exact selection exceeds the 10,000-point limit; no partial attachment is returned */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Failed to export config-health history */
+      500: {
         headers: {
           [name: string]: unknown;
         };
