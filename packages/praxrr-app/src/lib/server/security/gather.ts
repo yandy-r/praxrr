@@ -20,7 +20,13 @@ import { authSettingsQueries } from '$db/queries/authSettings.ts';
 import { getActiveArrCredentialKeyVersion, getAllArrCredentialKeyVersions } from '$utils/encryption/keys.ts';
 import { isSyncPreviewArrType } from '$sync/preview/types.ts';
 import { resolveCookieSecure, resolveSessionTransport } from './sessionTransport.ts';
-import type { InstanceFact, PostureInputs, RotationFacts, ShieldArrType } from '$shared/security/index.ts';
+import type {
+  InstanceFact,
+  PostureInputs,
+  RotationFacts,
+  SessionRequestContext,
+  ShieldArrType
+} from '$shared/security/index.ts';
 
 const SOURCE = 'SecurityPostureGather';
 const STRONG_APP_KEY_MIN_LENGTH = 32;
@@ -105,7 +111,7 @@ function verifyLogRedaction(): boolean {
 }
 
 /** Build the fully-materialized {@link PostureInputs} for the current deployment. Never throws. */
-export function buildPostureInputs(event?: { request?: Request; url?: URL }): PostureInputs {
+export function buildPostureInputs(event?: SessionRequestContext): PostureInputs {
   const oidc = gatherOidcState();
   const appKey = gatherAppKeyState();
   const instances = gatherInstances();

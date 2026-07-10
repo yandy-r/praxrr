@@ -31,6 +31,24 @@ Deno.test('observeSessionTransport: http url with forwarded https is proxy-termi
   assertEquals(observeSessionTransport(info(null, 'https')), 'proxy-terminated');
 });
 
+Deno.test('observeSessionTransport: forwarded proto is matched case-insensitively (proxy may send HTTPS)', () => {
+  // A proxy emitting an uppercase/mixed-case X-Forwarded-Proto must still be graded proxy-terminated,
+  // not mis-graded insecure (which would withhold the Secure cookie on an HTTPS-fronted deployment).
+  assertEquals(observeSessionTransport(info('http:', 'HTTPS')), 'proxy-terminated');
+  assertEquals(observeSessionTransport(info('http:', 'Https')), 'proxy-terminated');
+  assertEquals(observeSessionTransport(info('HTTPS:', null)), 'direct-secure');
+});
+
+Deno.test('resolveSessionTransport: an uppercase X-Forwarded-Proto header is proxy-terminated', () => {
+  assertEquals(
+    resolveSessionTransport({
+      url: new URL('http://praxrr.test/'),
+      request: new Request('http://praxrr.test/', { headers: { 'x-forwarded-proto': 'HTTPS' } }),
+    }),
+    'proxy-terminated'
+  );
+});
+
 Deno.test('observeSessionTransport: http url without forwarded https is insecure', () => {
   assertEquals(observeSessionTransport(info('http:', null)), 'insecure');
   assertEquals(observeSessionTransport(info('http:', 'http')), 'insecure');

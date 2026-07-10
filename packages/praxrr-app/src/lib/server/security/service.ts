@@ -6,10 +6,10 @@
  * store for this feature; posture is computed on demand).
  */
 
-import { computeShieldReport, type ShieldReport } from '$shared/security/index.ts';
+import { computeShieldReport, type SessionRequestContext, type ShieldReport } from '$shared/security/index.ts';
 import { buildPostureInputs } from './gather.ts';
 
 /** Materialize the current deployment's facts and score them into a live {@link ShieldReport}. */
-export function computeShield(event?: { request?: Request; url?: URL }): ShieldReport {
+export function computeShield(event?: SessionRequestContext): ShieldReport {
   return computeShieldReport(buildPostureInputs(event));
 }

@@ -175,6 +175,13 @@ export interface SessionPosture {
   readonly cookieSecureMode: CookieSecureMode;
 }
 
+/**
+ * Minimal request slice the session-transport observers read. A full SvelteKit `RequestEvent`
+ * satisfies it structurally; a bare `{}` (the MCP/no-request path) yields `unknown` transport.
+ * Declared once so the gatherer, service, cookie helper, and transport module share one shape.
+ */
+export type SessionRequestContext = { request?: Request; url?: URL };
+
 /** Fully-materialized engine input. Nothing is read lazily — the engine performs no I/O. */
 export interface PostureInputs {
   readonly authMode: 'on' | 'local' | 'off' | 'oidc';

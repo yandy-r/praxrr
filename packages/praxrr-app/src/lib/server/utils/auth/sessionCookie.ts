@@ -1,4 +1,5 @@
 import { config } from '$config';
+import type { SessionRequestContext } from '$shared/security/types.ts';
 import {
   resolveCookieSecure,
   resolveSessionTransport
@@ -8,7 +9,7 @@ export const SESSION_COOKIE_HTTPONLY = true;
 export const SESSION_COOKIE_SAMESITE = 'lax' as const;
 
 /** { request, url }-shaped context — accepts a RequestEvent or a minimal slice. */
-export type CookieRequestContext = { request?: Request; url?: URL };
+export type CookieRequestContext = SessionRequestContext;
 
 /**
  * Single source of truth for session-cookie hardening. Resolves `Secure` from the configured
