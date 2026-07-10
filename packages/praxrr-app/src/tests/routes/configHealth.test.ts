@@ -6,7 +6,10 @@ import { config } from '$config';
 import { db } from '$db/db.ts';
 import { runMigrations } from '$db/migrations.ts';
 import { arrInstancesQueries } from '$db/queries/arrInstances.ts';
-import { configHealthSnapshotsQueries } from '$db/queries/configHealthSnapshots.ts';
+import {
+  CONFIG_HEALTH_TREND_EVIDENCE_BUDGET,
+  configHealthSnapshotsQueries,
+} from '$db/queries/configHealthSnapshots.ts';
 import { jobDispatcher } from '$jobs/dispatcher.ts';
 import { CONFIG_HEALTH_ENGINE_VERSION } from '$shared/health/index.ts';
 import { isPublicPath } from '$auth/middleware.ts';
@@ -26,6 +29,7 @@ import { POST as POST_RECOMPUTE } from '../../routes/api/v1/config-health/[insta
 import { GET as GET_TRENDS } from '../../routes/api/v1/config-health/[instanceId]/trends/+server.ts';
 import { GET as GET_TRENDS_EXPORT } from '../../routes/api/v1/config-health/[instanceId]/trends/export/+server.ts';
 import { GET as GET_SETTINGS, PUT as PUT_SETTINGS } from '../../routes/api/v1/config-health/settings/+server.ts';
+import { load as LOAD_DETAIL_PAGE } from '../../routes/config-health/[instanceId]/+page.server.ts';
 
 type SummaryGetEvent = Parameters<typeof GET_SUMMARY>[0];
 type DetailGetEvent = Parameters<typeof GET_DETAIL>[0];
@@ -34,8 +38,10 @@ type TrendsEvent = Parameters<typeof GET_TRENDS>[0];
 type TrendsExportEvent = Parameters<typeof GET_TRENDS_EXPORT>[0];
 type SettingsGetEvent = Parameters<typeof GET_SETTINGS>[0];
 type SettingsPutEvent = Parameters<typeof PUT_SETTINGS>[0];
+type DetailPageLoadEvent = Parameters<typeof LOAD_DETAIL_PAGE>[0];
 
 type ErrorResponse = { error: string };
+type DetailPageData = { instanceId: number | null; error?: string };
 
 /**
  * Mirrors syncHistory.test.ts: point the db singleton at a scratch SQLite file under a fresh temp
@@ -98,6 +104,10 @@ function trendsExportEvent(instanceId: string, query = ''): TrendsExportEvent {
     params: { instanceId },
     url: new URL(`http://localhost/api/v1/config-health/${instanceId}/trends/export${query ? `?${query}` : ''}`),
   } as unknown as TrendsExportEvent;
+}
+
+function detailPageEvent(instanceId: string): DetailPageLoadEvent {
+  return { params: { instanceId } } as unknown as DetailPageLoadEvent;
 }
 
 /** Seed an arr instance so the recompute route can pass the existence / sync-capable / enabled gates. */
@@ -243,6 +253,29 @@ migratedTest('GET /config-health/{instanceId}: non-numeric id returns 400', asyn
 migratedTest('GET /config-health/{instanceId}: zero id returns 400', async () => {
   const response = await GET_DETAIL(detailEvent('0'));
   assertEquals(response.status, 400);
+});
+
+migratedTest('Config Health path boundaries reject non-canonical positive safe integer ids', async () => {
+  for (const invalidId of ['1e2', ' 1', '1.5', String(Number.MAX_SAFE_INTEGER + 1), '0', '-1']) {
+    for (const response of [
+      await GET_DETAIL(detailEvent(invalidId)),
+      await POST_RECOMPUTE(recomputeEvent(invalidId)),
+      await GET_TRENDS(trendsEvent(invalidId)),
+      await GET_TRENDS_EXPORT(trendsExportEvent(invalidId)),
+    ]) {
+      assertEquals(response.status, 400, `expected ${invalidId} to return 400`);
+    }
+
+    const page = (await LOAD_DETAIL_PAGE(detailPageEvent(invalidId))) as DetailPageData;
+    assertEquals(page.instanceId, null);
+    assertEquals(page.error, 'Invalid instance ID');
+  }
+});
+
+migratedTest('Config Health page accepts a valid positive safe integer id', async () => {
+  const page = (await LOAD_DETAIL_PAGE(detailPageEvent('42'))) as DetailPageData;
+  assertEquals(page.instanceId, 42);
+  assertEquals(page.error, undefined);
 });
 
 migratedTest('GET /config-health/{instanceId}: unknown numeric id returns 404', async () => {
@@ -643,6 +676,54 @@ migratedTest('GET trends isolates Radarr, Sonarr, and Lidarr by the explicit pat
   assertEquals((await GET_TRENDS(trendsEvent('999999'))).status, 404);
 });
 
+migratedTest('GET trends and export reject disabled Radarr, Sonarr, and Lidarr instances', async () => {
+  for (const arrType of ['radarr', 'sonarr', 'lidarr'] as const) {
+    const instanceId = seedInstance(arrType, false);
+    assertEquals((await GET_TRENDS(trendsEvent(String(instanceId)))).status, 404);
+    assertEquals((await GET_TRENDS_EXPORT(trendsExportEvent(String(instanceId)))).status, 404);
+  }
+});
+
+migratedTest('GET trends fails closed after an instance Arr type changes', async () => {
+  const instanceId = seedInstance('radarr');
+  const instance = arrInstancesQueries.getById(instanceId)!;
+  seedTrendSnapshot({
+    instanceId,
+    instanceName: instance.name,
+    arrType: 'radarr',
+    generatedAt: '2026-07-01T00:00:00.000Z',
+  });
+  db.execute("UPDATE arr_instances SET type = 'sonarr' WHERE id = ?", instanceId);
+
+  assertEquals((await GET_TRENDS(trendsEvent(String(instanceId)))).status, 404);
+  assertEquals((await GET_TRENDS_EXPORT(trendsExportEvent(String(instanceId)))).status, 404);
+});
+
+migratedTest('GET trends keeps retained profile options stable outside the selected range', async () => {
+  const instanceId = seedInstance('lidarr');
+  const instance = arrInstancesQueries.getById(instanceId)!;
+  seedTrendSnapshot({
+    instanceId,
+    instanceName: instance.name,
+    arrType: 'lidarr',
+    profileScores: [{ name: 'Historical Profile', score: 70, band: 'attention' }],
+    generatedAt: '2026-05-01T00:00:00.000Z',
+  });
+  seedTrendSnapshot({
+    instanceId,
+    instanceName: instance.name,
+    arrType: 'lidarr',
+    profileScores: [{ name: 'Current Profile', score: 90, band: 'healthy' }],
+    generatedAt: '2026-07-01T00:00:00.000Z',
+  });
+
+  const response = await GET_TRENDS(trendsEvent(String(instanceId), 'from=2026-07-01&to=2026-07-02'));
+  assertEquals(response.status, 200);
+  const body = (await response.json()) as ConfigHealthTrendsResponse;
+  assertEquals(body.points.length, 1);
+  assertEquals(body.availableProfiles, ['Current Profile', 'Historical Profile']);
+});
+
 migratedTest('GET trends and export return successful empty JSON and header-only CSV responses', async () => {
   const instanceId = seedInstance('sonarr');
   const trends = await GET_TRENDS(trendsEvent(String(instanceId), 'from=2026-07-01&to=2026-07-02'));
@@ -691,6 +772,35 @@ migratedTest('GET trends and export reject a 10,001-point exact selection atomic
     assertEquals(response.status, 422);
     const body = (await response.json()) as ErrorResponse;
     assert(body.error.toLowerCase().includes('narrow'));
+  }
+});
+
+migratedTest('GET trends and export reject oversized stored evidence atomically with 422', async () => {
+  const instanceId = seedInstance('radarr');
+  const instance = arrInstancesQueries.getById(instanceId)!;
+  const oversizedId = seedTrendSnapshot({
+    instanceId,
+    instanceName: instance.name,
+    arrType: 'radarr',
+    generatedAt: '2026-07-01T00:00:00.000Z',
+  });
+  const oversizedCriteria = JSON.stringify(['x'.repeat(CONFIG_HEALTH_TREND_EVIDENCE_BUDGET.maxBytesPerRow)]);
+  db.execute(
+    'UPDATE config_health_snapshots SET criteria_scores = ?, profile_scores = ? WHERE id = ?',
+    oversizedCriteria,
+    '[]',
+    oversizedId
+  );
+
+  for (const response of [
+    await GET_TRENDS(trendsEvent(String(instanceId))),
+    await GET_TRENDS_EXPORT(trendsExportEvent(String(instanceId), 'format=json')),
+    await GET_TRENDS_EXPORT(trendsExportEvent(String(instanceId), 'format=csv')),
+  ]) {
+    assertEquals(response.status, 422);
+    assertEquals(await response.json(), {
+      error: 'Stored Config Health trend evidence exceeds the safe request budget',
+    });
   }
 });
 

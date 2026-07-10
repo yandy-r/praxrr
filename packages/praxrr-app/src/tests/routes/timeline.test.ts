@@ -22,6 +22,8 @@ type NotePostEvent = Parameters<typeof POST_NOTE>[0];
 type NotePatchEvent = Parameters<typeof PATCH_NOTE>[0];
 type NoteDeleteEvent = Parameters<typeof DELETE_NOTE>[0];
 
+const FORMULA_PREFIXES = ['=', '+', '-', '@', '\t', '\r', '\n', '＝', '＋', '－', '＠'] as const;
+
 function migratedTest(name: string, fn: () => Promise<void> | void): void {
   Deno.test({
     name,
@@ -316,15 +318,20 @@ migratedTest('GET /timeline/export?format=csv: CSV attachment, RFC-4180 escaped'
   assert(text.includes('"Weird, ""name"""') || text.includes('Weird, ""name""'));
 });
 
-migratedTest('GET /timeline/export?format=csv: neutralizes spreadsheet formula injection', async () => {
+migratedTest('GET /timeline/export?format=csv: neutralizes every spreadsheet formula prefix', async () => {
   const inst = seedInstance();
-  // instance_name -> scopeLabel cell; a leading '=' would be evaluated as a formula by Excel/Sheets.
-  seedSync(inst, '2026-07-09T09:00:00.000Z', '=HYPERLINK("http://evil","x")');
+  const payloads = FORMULA_PREFIXES.map((prefix) => `${prefix}formula, "quoted"\r\nnext`);
+  for (const [index, payload] of payloads.entries()) {
+    seedSync(inst, `2026-07-09T09:${String(index).padStart(2, '0')}:00.000Z`, payload);
+  }
+
   const res = await GET_EXPORT(exportEvent('format=csv'));
-  const text = await res.text();
-  // apostrophe-guarded (CWE-1236) and no unguarded field beginning with '='
-  assert(text.includes("'=HYPERLINK"), 'formula cell must be apostrophe-guarded');
-  assert(!text.includes(',=HYPERLINK'), 'no CSV field may start with a bare =');
+  const csv = await res.text();
+
+  for (const payload of payloads) {
+    const expectedCell = `"'${payload.replaceAll('"', '""')}"`;
+    assert(csv.includes(expectedCell), `formula-prefixed scope label must be guarded: ${JSON.stringify(payload)}`);
+  }
 });
 
 migratedTest('POST /timeline/annotations: 401 unauthenticated, 201 with author, bypass -> null author', async () => {

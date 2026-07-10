@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { onDestroy, onMount } from 'svelte';
+  import { afterNavigate } from '$app/navigation';
+  import { onDestroy } from 'svelte';
   import { RefreshCw } from 'lucide-svelte';
   import type { components } from '$api/v1.d.ts';
   import { alertStore } from '$alerts/store';
@@ -54,13 +55,13 @@
     return `/api/v1/config-health/${instanceId}/trends${query ? `?${query}` : ''}`;
   }
 
-  function exportUrl(result: ConfigHealthTrendsResponse, format: 'json' | 'csv'): string {
-    if (data.instanceId === null) return '#';
+  function exportUrl(result: ConfigHealthTrendsResponse, format: 'json' | 'csv'): string | null {
+    if (data.instanceId === null || result.instance.id !== data.instanceId) return null;
     const params = new URLSearchParams({ format });
     if (result.normalizedFilter.from !== null) params.set('from', result.normalizedFilter.from);
     params.set('to', result.normalizedFilter.to);
     if (result.normalizedFilter.profile !== null) params.set('profile', result.normalizedFilter.profile);
-    return `/api/v1/config-health/${data.instanceId}/trends/export?${params.toString()}`;
+    return `/api/v1/config-health/${result.instance.id}/trends/export?${params.toString()}`;
   }
 
   let detail: ConfigHealthDetailResponse | null = null;
@@ -68,6 +69,7 @@
   let recomputing = false;
   let detailError: string | null = null;
   let detailRequestId = 0;
+  let detailAbortController: AbortController | null = null;
   let verbose = false;
 
   let trendResult: ConfigHealthTrendsResponse | null = null;
@@ -78,6 +80,7 @@
   let trendAbortController: AbortController | null = null;
   let appliedTrendFilter: TrendFilterSelection = DEFAULT_TREND_FILTER;
   let failedTrendFilter: TrendFilterSelection | null = null;
+  let activeInstanceId: number | null | undefined;
 
   async function loadTrends(filter: TrendFilterSelection): Promise<void> {
     if (data.instanceId === null) return;
@@ -126,11 +129,14 @@
     if (data.instanceId === null) return;
     const instanceId = data.instanceId;
     const requestId = ++detailRequestId;
+    detailAbortController?.abort();
+    const controller = new AbortController();
+    detailAbortController = controller;
     detailLoading = true;
     detailError = null;
 
     try {
-      const response = await fetch(`/api/v1/config-health/${instanceId}`);
+      const response = await fetch(`/api/v1/config-health/${instanceId}`, { signal: controller.signal });
       if (requestId !== detailRequestId) return;
 
       if (!response.ok) {
@@ -144,10 +150,13 @@
       if (requestId !== detailRequestId) return;
       detail = nextDetail;
     } catch (err) {
-      if (requestId !== detailRequestId) return;
+      if (controller.signal.aborted || requestId !== detailRequestId) return;
       detailError = err instanceof Error ? err.message : 'Failed to load config health';
     } finally {
-      if (requestId === detailRequestId) detailLoading = false;
+      if (requestId === detailRequestId) {
+        detailLoading = false;
+        if (detailAbortController === controller) detailAbortController = null;
+      }
     }
   }
 
@@ -167,6 +176,7 @@
 
     try {
       const response = await fetch(`/api/v1/config-health/${instanceId}/recompute`, { method: 'POST' });
+      if (requestId !== detailRequestId) return;
 
       if (response.status === 429) {
         alertStore.add('warning', 'Too many recompute requests for this instance — try again shortly.');
@@ -189,14 +199,15 @@
       void loadTrends(appliedTrendFilter);
       alertStore.add('success', `Health recomputed and saved — status: ${HEALTH_BAND_LABEL[nextDetail.overall.band]}.`);
     } catch (err) {
+      if (requestId !== detailRequestId) return;
       alertStore.add('error', err instanceof Error ? err.message : 'Failed to recompute config health');
     } finally {
-      recomputing = false;
+      if (requestId === detailRequestId) recomputing = false;
     }
   }
 
-  function applyTrendFilters(event: CustomEvent<TrendFilterSelection>): void {
-    void loadTrends(event.detail);
+  function applyTrendFilters(filter: TrendFilterSelection): void {
+    void loadTrends(filter);
   }
 
   function retryTrends(): void {
@@ -260,15 +271,42 @@
   $: jsonExportHref = trendResult ? exportUrl(trendResult, 'json') : null;
   $: csvExportHref = trendResult ? exportUrl(trendResult, 'csv') : null;
 
-  onMount(() => {
+  function invalidateInstanceRequests(): void {
+    detailRequestId += 1;
+    detailAbortController?.abort();
+    detailAbortController = null;
+    trendRequestId += 1;
+    trendAbortController?.abort();
+    trendAbortController = null;
+  }
+
+  function loadInstance(instanceId: number | null): void {
+    invalidateInstanceRequests();
+    detail = null;
+    detailLoading = false;
+    recomputing = false;
+    detailError = null;
+    verbose = false;
+    trendResult = null;
+    trendLoading = false;
+    trendError = null;
+    trendStatus = 'Trend history has not loaded yet.';
+    appliedTrendFilter = { ...DEFAULT_TREND_FILTER };
+    failedTrendFilter = null;
+
+    if (instanceId === null) return;
     void loadDetail();
-    void loadTrends(DEFAULT_TREND_FILTER);
+    void loadTrends(appliedTrendFilter);
+  }
+
+  afterNavigate(() => {
+    if (data.instanceId === activeInstanceId) return;
+    activeInstanceId = data.instanceId;
+    loadInstance(data.instanceId);
   });
 
   onDestroy(() => {
-    detailRequestId += 1;
-    trendRequestId += 1;
-    trendAbortController?.abort();
+    invalidateInstanceRequests();
   });
 </script>
 
@@ -441,7 +479,7 @@
         instanceId={data.instanceId}
         availableProfiles={trendResult?.availableProfiles ?? []}
         appliedFilter={appliedTrendFilter}
-        on:apply={applyTrendFilters}
+        onapply={applyTrendFilters}
       />
 
       <p class="text-sm text-neutral-600 dark:text-neutral-300" role="status" aria-live="polite">

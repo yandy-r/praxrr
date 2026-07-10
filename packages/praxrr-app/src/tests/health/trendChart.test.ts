@@ -1,9 +1,13 @@
 import { assert, assertEquals } from '@std/assert';
 import {
   buildAdaptiveTimeTicks,
+  buildTrendChartEngineRules,
   buildTrendChartGeometry,
+  MAX_VISIBLE_CHART_INDICATORS,
+  sampleTrendChartIndicators,
   scaleScore,
   scaleTime,
+  type TrendChartBand,
   type TrendChartPoint,
   type TrendChartPointState,
 } from '../../routes/config-health/[instanceId]/components/trendChart.ts';
@@ -16,13 +20,15 @@ function point(
   hours: number,
   score: number | null,
   state: TrendChartPointState = 'measured',
-  engineVersion = '1'
+  engineVersion = '1',
+  band: TrendChartBand | null = null
 ): TrendChartPoint {
   return {
     generatedAt: new Date(START + hours * HOUR).toISOString(),
     engineVersion,
     state,
     score,
+    band,
   };
 }
 
@@ -43,7 +49,9 @@ Deno.test('trend chart returns no axes or measured geometry for an empty selecti
 Deno.test('trend chart centres a singleton as one marker and never invents a line', () => {
   const geometry = buildTrendChartGeometry([point(0, 0)], PLOT);
 
-  assertEquals(geometry.markers, [{ sourceIndex: 0, timestamp: START, engineVersion: '1', score: 0, x: 50, y: 100 }]);
+  assertEquals(geometry.markers, [
+    { sourceIndex: 0, timestamp: START, engineVersion: '1', score: 0, band: null, x: 50, y: 100 },
+  ]);
   assertEquals(geometry.segments, []);
   assertEquals(geometry.timeTicks, [{ timestamp: START, x: 50 }]);
 });
@@ -139,6 +147,21 @@ Deno.test('engine version transitions are hard segment boundaries', () => {
   );
 });
 
+Deno.test('persisted bands survive cross-engine score matches without current-policy recomputation', () => {
+  const geometry = buildTrendChartGeometry(
+    [point(0, 90, 'measured', 'legacy', 'attention'), point(1, 90, 'measured', 'current', 'healthy')],
+    PLOT
+  );
+
+  assertEquals(
+    geometry.markers.map(({ engineVersion, score, band }) => ({ engineVersion, score, band })),
+    [
+      { engineVersion: 'legacy', score: 90, band: 'attention' },
+      { engineVersion: 'current', score: 90, band: 'healthy' },
+    ]
+  );
+});
+
 Deno.test('contiguous measured runs create separate line segments around explicit gaps', () => {
   const geometry = buildTrendChartGeometry(
     [
@@ -195,4 +218,27 @@ Deno.test('geometry is deterministic and does not mutate its source points', () 
 
   assertEquals(buildTrendChartGeometry(points, PLOT), buildTrendChartGeometry(points, PLOT));
   assertEquals(points, before);
+});
+
+Deno.test('maximum-size sparse histories bound gap and engine SVG indicators', () => {
+  const maximumPoints = 10_000;
+  const points = Array.from({ length: maximumPoints }, (_, index) => point(index, null, 'unknown', String(index)));
+  const geometry = buildTrendChartGeometry(points, PLOT);
+  const boundaries = points.map((trendPoint, pointIndex) => ({
+    engineVersion: trendPoint.engineVersion,
+    startsAt: trendPoint.generatedAt,
+    pointIndex,
+  }));
+  const rules = buildTrendChartEngineRules(geometry, boundaries);
+  const visibleGaps = sampleTrendChartIndicators(geometry.gaps.filter((gap) => gap.x !== null));
+  const visibleRules = sampleTrendChartIndicators(rules);
+
+  assertEquals(geometry.gaps.length, maximumPoints);
+  assertEquals(rules.length, maximumPoints - 1);
+  assertEquals(visibleGaps.length, MAX_VISIBLE_CHART_INDICATORS);
+  assertEquals(visibleRules.length, MAX_VISIBLE_CHART_INDICATORS);
+  assertEquals(visibleGaps[0], geometry.gaps[0]);
+  assertEquals(visibleGaps.at(-1), geometry.gaps.at(-1));
+  assertEquals(visibleRules[0], rules[0]);
+  assertEquals(visibleRules.at(-1), rules.at(-1));
 });

@@ -5,16 +5,12 @@ import { ConfigHealthTrendQueryError, parseConfigHealthTrendFilters } from '$lib
 import { ConfigHealthTrendServiceError, readConfigHealthTrend } from '$lib/server/health/trends.ts';
 import { toConfigHealthTrendCsv } from '$lib/server/health/trendCsv.ts';
 import { toTrendsResponse } from '$lib/server/health/responses.ts';
+import { parseConfigHealthInstanceId } from '$lib/server/health/pathParams.ts';
 import { logger } from '$logger/logger.ts';
 
 type ErrorResponse = components['schemas']['ErrorResponse'];
 type TrendsResponse = components['schemas']['ConfigHealthTrendsResponse'];
 type ExportFormat = 'json' | 'csv';
-
-function parseInstanceId(raw: string | undefined): number | null {
-  const value = Number(raw);
-  return Number.isSafeInteger(value) && value > 0 ? value : null;
-}
 
 function attachmentHeaders(instanceId: number, format: ExportFormat): Record<string, string> {
   const timestamp = Date.now();
@@ -27,7 +23,7 @@ function attachmentHeaders(instanceId: number, format: ExportFormat): Record<str
 
 /** GET the same canonical selection as a lossless JSON or fixed-row CSV attachment. */
 export const GET: RequestHandler = async ({ params, url }) => {
-  const instanceId = parseInstanceId(params.instanceId);
+  const instanceId = parseConfigHealthInstanceId(params.instanceId);
   if (instanceId === null) {
     return json({ error: 'Invalid instance id' } satisfies ErrorResponse, { status: 400 });
   }

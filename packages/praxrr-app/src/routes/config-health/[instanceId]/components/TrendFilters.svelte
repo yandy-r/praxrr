@@ -18,7 +18,6 @@
 
 <script lang="ts">
   import { goto } from '$app/navigation';
-  import { createEventDispatcher } from 'svelte';
 
   const DEFAULT_APPLIED_FILTER: TrendFilterSelection = {
     range: '30',
@@ -33,8 +32,7 @@
   export let availableProfiles: readonly string[] = [];
   export let appliedFilter: TrendFilterSelection = DEFAULT_APPLIED_FILTER;
   export let disabled = false;
-
-  const dispatch = createEventDispatcher<{ apply: TrendFilterSelection }>();
+  export let onapply: (selection: TrendFilterSelection) => void;
 
   let syncedAppliedFilter = appliedFilter;
   let draftRange: TrendRange = appliedFilter.range;
@@ -80,7 +78,7 @@
   function applyDraft(): void {
     validationError = validateCustomRange();
     if (validationError) return;
-    dispatch('apply', selectionFromDraft());
+    onapply(selectionFromDraft());
   }
 
   function submitForm(event: SubmitEvent): void {

@@ -7,6 +7,7 @@ import type {
 } from '$lib/server/health/trends.ts';
 
 const HEADER = 'snapshotId,generatedAt,engineVersion,scopeKind,profileName,state,score,band,criteria';
+const FORMULA_PREFIXES = ['=', '+', '-', '@', '\t', '\r', '\n', '＝', '＋', '－', '＠'] as const;
 
 function result(points: readonly ConfigHealthTrendPoint[], profile: string | null = null): ConfigHealthTrendResult {
   return {
@@ -139,13 +140,20 @@ Deno.test('trend CSV keeps nested criterion JSON compact and exactly round-tripp
 });
 
 Deno.test('trend CSV formula-neutralizes every dangerous exact-profile prefix before quoting', () => {
-  for (const prefix of ['=', '+', '-', '@', '\t', '\r']) {
+  for (const prefix of FORMULA_PREFIXES) {
     const profile = `${prefix}profile, "quoted"\r\nnext`;
     const row = parseCsv(toConfigHealthTrendCsv(result([point(1)], profile)))[1];
 
     assertEquals(row[3], 'profile');
     assertEquals(row[4], `'${profile}`);
   }
+});
+
+Deno.test('trend CSV preserves non-leading formula characters and ordinary Unicode exactly', () => {
+  const profile = 'profile = + - @ ＝ ＋ － ＠ 日本語';
+  const row = parseCsv(toConfigHealthTrendCsv(result([point(1)], profile)))[1];
+
+  assertEquals(row[4], profile);
 });
 
 Deno.test('trend CSV preserves canonical point identity, count and order without sorting or dropping rows', () => {

@@ -1,10 +1,14 @@
 export type TrendChartPointState = 'measured' | 'unknown' | 'profile-missing' | 'not-evaluated' | 'not-recorded';
 
+export type TrendChartBand = 'healthy' | 'attention' | 'needs-review' | 'unknown';
+
 export interface TrendChartPoint {
   generatedAt: string;
   engineVersion: string;
   state: TrendChartPointState;
   score: number | null;
+  /** The band persisted with this observation. Never recompute it from current policy. */
+  band?: TrendChartBand | null;
 }
 
 export interface TrendChartPadding {
@@ -29,6 +33,7 @@ export interface TrendChartMarker {
   timestamp: number;
   engineVersion: string;
   score: number;
+  band: TrendChartBand | null;
   x: number;
   y: number;
 }
@@ -71,12 +76,67 @@ export interface TrendChartGeometry {
   scoreTicks: readonly TrendChartScoreTick[];
 }
 
+export interface TrendChartEngineBoundary {
+  engineVersion: string;
+  startsAt: string;
+  pointIndex: number;
+}
+
+export interface TrendChartEngineRule {
+  engineVersion: string;
+  pointIndex: number;
+  x: number;
+}
+
 const DEFAULT_WIDTH = 640;
 const DEFAULT_HEIGHT = 240;
 const DEFAULT_PADDING: TrendChartPadding = { top: 16, right: 16, bottom: 28, left: 40 };
 const DEFAULT_MINIMUM_TICK_SPACING = 88;
 const DEFAULT_MAXIMUM_TICKS = 8;
 const SCORE_TICKS = [0, 25, 50, 75, 100] as const;
+
+export const MAX_VISIBLE_CHART_INDICATORS = 80;
+
+/**
+ * Deterministically bound repeated SVG indicators while retaining both ends of the history.
+ * Exact unsampled facts remain available to the point inspector and history table.
+ */
+export function sampleTrendChartIndicators<T>(
+  items: readonly T[],
+  maximum = MAX_VISIBLE_CHART_INDICATORS
+): readonly T[] {
+  const cap = Math.max(1, Math.floor(finitePositive(maximum, MAX_VISIBLE_CHART_INDICATORS)));
+  if (items.length <= cap) return items;
+  if (cap === 1) return [items[0]];
+
+  const lastIndex = items.length - 1;
+  return Array.from({ length: cap }, (_, index) => items[Math.round((index * lastIndex) / (cap - 1))]);
+}
+
+/** Convert exact engine transition facts into SVG rules for one plot. */
+export function buildTrendChartEngineRules(
+  geometry: TrendChartGeometry,
+  boundaries: readonly TrendChartEngineBoundary[]
+): TrendChartEngineRule[] {
+  if (geometry.domain === null) return [];
+  const domain = geometry.domain;
+  const range: TimeDomain = [geometry.padding.left, geometry.width - geometry.padding.right];
+
+  return boundaries.flatMap((boundary) => {
+    if (boundary.pointIndex <= 0) return [];
+    const x = scaleTime(Date.parse(boundary.startsAt), domain, range);
+    return x === null ? [] : [{ engineVersion: boundary.engineVersion, pointIndex: boundary.pointIndex, x }];
+  });
+}
+
+/** Locate the rendered x-coordinate for a measured point or explicit gap. */
+export function trendChartPointX(geometry: TrendChartGeometry, sourceIndex: number): number | null {
+  return (
+    geometry.markers.find((marker) => marker.sourceIndex === sourceIndex)?.x ??
+    geometry.gaps.find((gap) => gap.sourceIndex === sourceIndex)?.x ??
+    null
+  );
+}
 
 function finiteNonNegative(value: number | undefined, fallback: number): number {
   return value !== undefined && Number.isFinite(value) && value >= 0 ? value : fallback;
@@ -261,6 +321,7 @@ export function buildTrendChartGeometry(
       timestamp,
       engineVersion: point.engineVersion,
       score,
+      band: point.band ?? null,
       x,
       y,
     };

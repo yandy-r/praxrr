@@ -1,5 +1,6 @@
 import type { ServerLoad } from '@sveltejs/kit';
 import { arrInstancesQueries } from '$db/queries/arrInstances.ts';
+import { parseConfigHealthInstanceId } from '$lib/server/health/pathParams.ts';
 import { isSyncPreviewArrType, type SyncPreviewArrType } from '$sync/preview/types.ts';
 
 interface ConfigHealthInstanceOption {
@@ -28,10 +29,10 @@ export const load: ServerLoad = ({ params }) => {
       type: instance.type as SyncPreviewArrType,
     }));
 
-  // Strict digits-only: reject leading-numeric junk like "1e5"/"1abc"/" 1" outright.
-  if (!raw || !/^\d+$/.test(raw)) {
+  const instanceId = parseConfigHealthInstanceId(raw);
+  if (instanceId === null) {
     return { instanceId: null, error: 'Invalid instance ID', instances };
   }
 
-  return { instanceId: Number.parseInt(raw, 10), error: undefined, instances };
+  return { instanceId, error: undefined, instances };
 };

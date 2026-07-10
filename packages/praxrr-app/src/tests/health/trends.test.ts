@@ -1,6 +1,10 @@
 import { assertEquals, assertNotStrictEquals, assertThrows } from '@std/assert';
 import type { CriterionResult } from '$shared/health/index.ts';
-import type { ConfigHealthTrendSnapshotDetail } from '$db/queries/configHealthSnapshots.ts';
+import {
+  CONFIG_HEALTH_TREND_EVIDENCE_BUDGET,
+  ConfigHealthTrendEvidenceLimitError,
+  type ConfigHealthTrendSnapshotDetail,
+} from '$db/queries/configHealthSnapshots.ts';
 import type { ConfigHealthTrendFilters } from '$lib/server/health/trendFilters.ts';
 import {
   buildConfigHealthTrendResult,
@@ -38,7 +42,6 @@ function snapshot(
   return {
     id,
     arrInstanceId: 12,
-    instanceName: 'Living Room Sonarr',
     arrType: 'sonarr',
     engineVersion: '1',
     overallScore: 80,
@@ -47,8 +50,9 @@ function snapshot(
     profileScores: [{ name: 'WEB-1080p', score: 82, band: 'attention' }],
     criteriaScoresValid: true,
     profileScoresValid: true,
+    criteriaScoresBytes: 2,
+    profileScoresBytes: 2,
     generatedAt: `2026-06-${String(id).padStart(2, '0')}T00:00:00.000Z`,
-    createdAt: `2026-06-${String(id).padStart(2, '0')}T00:00:00.000Z`,
     ...overrides,
   };
 }
@@ -70,9 +74,12 @@ function dependencies(
   overrides: Partial<ConfigHealthTrendServiceDependencies> = {}
 ): ConfigHealthTrendServiceDependencies {
   return {
-    getInstance: (id) => ({ id, name: `${type} instance`, type }),
+    getInstance: (id) => ({ id, name: `${type} instance`, type, enabled: 1 }),
     getSettings: () => ({ retention_days: 90, retention_max_entries: 5000 }),
     searchTrend: () => snapshots,
+    listProfileNames: () =>
+      [...new Set(snapshots.flatMap((snapshot) => snapshot.profileScores.map((profile) => profile.name)))].sort(),
+    hasArrTypeMismatch: (_instanceId, arrType) => snapshots.some((snapshot) => snapshot.arrType !== arrType),
     now: () => Date.parse(NOW),
     currentEngineVersion: '9',
     ...overrides,
@@ -184,6 +191,47 @@ Deno.test('trend projector distinguishes a valid empty overall breakdown from ma
   assertEquals(result.points[1].state, 'not-recorded');
 });
 
+Deno.test('trend projector accepts only OpenAPI integer and range compliant numeric evidence', () => {
+  const validBoundaries = build([
+    snapshot(1, {
+      overallScore: 100,
+      criteriaScores: [criterion({ score: 0, weight: 0, contribution: -1 })],
+    }),
+  ]);
+  assertEquals(validBoundaries.points[0].state, 'measured');
+  assertEquals(validBoundaries.points[0].criteria[0], {
+    id: 'completeness',
+    label: 'Completeness',
+    state: 'measured',
+    score: 0,
+    weight: 0,
+    contribution: -1,
+  });
+
+  for (const overallScore of [-1, 100.1, 101]) {
+    assertEquals(build([snapshot(2, { overallScore })]).points[0].state, 'not-recorded');
+  }
+
+  for (const malformed of [
+    criterion({ score: -1 }),
+    criterion({ score: 10.5 }),
+    criterion({ score: 101 }),
+    criterion({ weight: -1 }),
+    criterion({ weight: 1.5 }),
+    criterion({ contribution: 1.5 }),
+  ]) {
+    assertEquals(build([snapshot(3, { criteriaScores: [malformed] })]).points[0].criteria[0].state, 'not-recorded');
+  }
+
+  for (const score of [-1, 50.5, 101]) {
+    const result = build([snapshot(4, { profileScores: [{ name: 'WEB-1080p', score, band: 'attention' }] })], {
+      ...FILTERS,
+      profile: 'WEB-1080p',
+    });
+    assertEquals(result.points[0].state, 'not-recorded');
+  }
+});
+
 Deno.test('trend projector matches profile names exactly and retains absence and malformed timestamps', () => {
   const exactName = '  WEB / Anime?!  ';
   const result = build(
@@ -233,7 +281,15 @@ Deno.test('trend projector returns an explicit empty success envelope', () => {
 
 Deno.test('trend service validates Radarr, Sonarr and Lidarr explicitly and uses the canonical bounded query', () => {
   for (const arrType of ['radarr', 'sonarr', 'lidarr']) {
-    const calls: Array<{ instanceId: number; options: { from?: string; to?: string; limit: number } }> = [];
+    const calls: Array<{
+      instanceId: number;
+      options: {
+        from?: string;
+        to?: string;
+        limit: number;
+        evidenceBudget?: typeof CONFIG_HEALTH_TREND_EVIDENCE_BUDGET;
+      };
+    }> = [];
     const rows = [snapshot(1, { arrType: arrType as 'radarr' | 'sonarr' | 'lidarr' })];
     const result = readConfigHealthTrend(
       42,
@@ -254,6 +310,7 @@ Deno.test('trend service validates Radarr, Sonarr and Lidarr explicitly and uses
           from: FILTERS.from,
           to: FILTERS.to,
           limit: MAX_CONFIG_HEALTH_TREND_POINTS + 1,
+          evidenceBudget: CONFIG_HEALTH_TREND_EVIDENCE_BUDGET,
         },
       },
     ]);
@@ -286,6 +343,110 @@ Deno.test('trend service fails closed for missing and unsupported Arr types befo
     ConfigHealthTrendServiceError
   );
   assertEquals(missing.status, 404);
+});
+
+Deno.test('trend service fails closed for disabled instances and persisted Arr type mismatches', () => {
+  for (const arrType of ['radarr', 'sonarr', 'lidarr'] as const) {
+    let queried = false;
+    const disabled = assertThrows(
+      () =>
+        readConfigHealthTrend(
+          1,
+          FILTERS,
+          dependencies(arrType, [], {
+            getInstance: (id) => ({ id, name: `${arrType} instance`, type: arrType, enabled: 0 }),
+            searchTrend: () => {
+              queried = true;
+              return [];
+            },
+          })
+        ),
+      ConfigHealthTrendServiceError
+    );
+    assertEquals(disabled.status, 404);
+    assertEquals(queried, false);
+  }
+
+  let queried = false;
+  const mismatch = assertThrows(
+    () =>
+      readConfigHealthTrend(
+        12,
+        FILTERS,
+        dependencies('sonarr', [snapshot(1, { arrType: 'radarr' })], {
+          searchTrend: () => {
+            queried = true;
+            return [];
+          },
+        })
+      ),
+    ConfigHealthTrendServiceError
+  );
+  assertEquals(mismatch.status, 404);
+  assertEquals(queried, false);
+});
+
+Deno.test('trend service loads stable profile options independently from the point time range', () => {
+  const selected = [snapshot(2, { profileScores: [{ name: 'Current', score: 80, band: 'attention' }] })];
+  const calls: Array<{
+    instanceId: number;
+    limit: number;
+    evidenceBudget: typeof CONFIG_HEALTH_TREND_EVIDENCE_BUDGET | undefined;
+  }> = [];
+  const result = readConfigHealthTrend(
+    12,
+    FILTERS,
+    dependencies('sonarr', selected, {
+      hasArrTypeMismatch: () => false,
+      listProfileNames: (instanceId, _arrType, options) => {
+        calls.push({ instanceId, limit: options.limit, evidenceBudget: options.evidenceBudget });
+        return ['Current', 'Historical'];
+      },
+    })
+  );
+
+  assertEquals(
+    result.points.map((point) => point.snapshotId),
+    [2]
+  );
+  assertEquals(result.availableProfiles, ['Current', 'Historical']);
+  assertEquals(calls, [
+    {
+      instanceId: 12,
+      limit: MAX_CONFIG_HEALTH_TREND_POINTS,
+      evidenceBudget: CONFIG_HEALTH_TREND_EVIDENCE_BUDGET,
+    },
+  ]);
+});
+
+Deno.test('trend service maps storage evidence budget failures to atomic 422 errors', () => {
+  let settingsRead = false;
+  let profilesRead = false;
+  const error = assertThrows(
+    () =>
+      readConfigHealthTrend(
+        12,
+        FILTERS,
+        dependencies('sonarr', [], {
+          searchTrend: () => {
+            throw new ConfigHealthTrendEvidenceLimitError();
+          },
+          getSettings: () => {
+            settingsRead = true;
+            return { retention_days: 90, retention_max_entries: 5000 };
+          },
+          listProfileNames: () => {
+            profilesRead = true;
+            return [];
+          },
+        })
+      ),
+    ConfigHealthTrendServiceError
+  );
+
+  assertEquals(error.status, 422);
+  assertEquals(settingsRead, false);
+  assertEquals(profilesRead, false);
 });
 
 Deno.test('trend service rejects 10,001 matches atomically with 422', () => {

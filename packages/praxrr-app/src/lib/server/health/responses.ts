@@ -2,10 +2,10 @@
  * Config Health wire mappers (issue #22).
  *
  * Translate internal engine/query types (which use `readonly` arrays) into plain, mutable wire
- * objects that `satisfies components['schemas'][...]` at the route boundary. These interfaces are
- * the source of truth the OpenAPI `config-health.yaml` schemas mirror — keep them in lockstep.
+ * objects aligned with the generated OpenAPI schemas used at the route boundary.
  */
 
+import type { components } from '$api/v1.d.ts';
 import type { NarrationLine, NarrationTone } from '$shared/narration/index.ts';
 import type {
   CriterionConfig,
@@ -91,68 +91,14 @@ export interface ConfigHealthDetailResponse {
   profiles: WireProfileHealth[];
 }
 
-export interface ConfigHealthTrendInstance {
-  id: number;
-  name: string;
-  arrType: HealthArrType;
-}
-
-export interface ConfigHealthTrendFilter {
-  from: string | null;
-  to: string;
-  profile: string | null;
-}
-
-export interface ConfigHealthTrendRetention {
-  days: number;
-  maxEntries: number;
-  ageCutoffAt: string;
-  oldestAvailableAt: string | null;
-  newestAvailableAt: string | null;
-}
-
-export interface ConfigHealthTrendCounts {
-  points: number;
-  measured: number;
-  unknown: number;
-  missing: number;
-}
-
-export interface ConfigHealthTrendEngineBoundary {
-  engineVersion: string;
-  startsAt: string;
-  pointIndex: number;
-}
-
-export interface ConfigHealthTrendCriterion {
-  id: string;
-  label: string;
-  state: 'measured' | 'not-evaluated' | 'not-recorded';
-  score: number | null;
-  weight: number | null;
-  contribution: number | null;
-}
-
-export interface ConfigHealthTrendPoint {
-  snapshotId: number;
-  generatedAt: string;
-  engineVersion: string;
-  state: 'measured' | 'unknown' | 'profile-missing' | 'not-recorded';
-  score: number | null;
-  band: HealthBand | null;
-  criteria: ConfigHealthTrendCriterion[];
-}
-
-export interface ConfigHealthTrendsResponse {
-  instance: ConfigHealthTrendInstance;
-  currentEngineVersion: string;
-  normalizedFilter: ConfigHealthTrendFilter;
-  retention: ConfigHealthTrendRetention;
-  availableProfiles: string[];
-  counts: ConfigHealthTrendCounts;
-  engineBoundaries: ConfigHealthTrendEngineBoundary[];
-  points: ConfigHealthTrendPoint[];
-}
+export type ConfigHealthTrendsResponse = components['schemas']['ConfigHealthTrendsResponse'];
+export type ConfigHealthTrendInstance = ConfigHealthTrendsResponse['instance'];
+export type ConfigHealthTrendFilter = ConfigHealthTrendsResponse['normalizedFilter'];
+export type ConfigHealthTrendRetention = ConfigHealthTrendsResponse['retention'];
+export type ConfigHealthTrendCounts = ConfigHealthTrendsResponse['counts'];
+export type ConfigHealthTrendEngineBoundary = ConfigHealthTrendsResponse['engineBoundaries'][number];
+export type ConfigHealthTrendPoint = ConfigHealthTrendsResponse['points'][number];
+export type ConfigHealthTrendCriterion = ConfigHealthTrendPoint['criteria'][number];
 
 export interface ConfigHealthSettingsResponse {
   engineVersion: string;
@@ -255,7 +201,7 @@ export function toTrendsResponse(result: ConfigHealthTrendResult): ConfigHealthT
       ...point,
       criteria: point.criteria.map((criterion) => ({ ...criterion })),
     })),
-  };
+  } satisfies ConfigHealthTrendsResponse;
 }
 
 /** Settings row → the settings response (adds the engine version + static criterion catalog). */

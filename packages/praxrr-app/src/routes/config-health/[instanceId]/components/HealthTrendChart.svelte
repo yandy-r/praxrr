@@ -1,14 +1,15 @@
 <script lang="ts">
   import type { components } from '$lib/api/v1.d.ts';
-  import Card from '$ui/card/Card.svelte';
   import { HEALTH_BAND_LABEL } from '$lib/client/ui/health/healthStatus.ts';
   import { ATTENTION_THRESHOLD, HEALTHY_THRESHOLD } from '$shared/health/index.ts';
+  import Card from '$ui/card/Card.svelte';
+  import TrendPlot from './TrendPlot.svelte';
   import {
+    buildTrendChartEngineRules,
     buildTrendChartGeometry,
-    scaleTime,
+    trendChartPointX,
     type TrendChartGapReason,
     type TrendChartGeometry,
-    type TrendChartMarker,
     type TrendChartPoint,
   } from './trendChart.ts';
 
@@ -27,20 +28,12 @@
     contribution: TrendChartGeometry;
   }
 
-  interface EngineRule {
-    engineVersion: string;
-    pointIndex: number;
-    x: number;
-  }
-
   export let result: TrendResponse;
 
   const WIDTH = 720;
   const HEIGHT = 260;
   const SMALL_HEIGHT = 220;
   const PADDING = { top: 18, right: 18, bottom: 42, left: 52 } as const;
-  const MAX_VISIBLE_MARKERS = 80;
-
   let selectedIndex = 0;
 
   function collectCriteria(points: readonly TrendPoint[]): CriterionDefinition[] {
@@ -80,20 +73,10 @@
     definitions: readonly CriterionDefinition[]
   ): CriterionChart[] {
     return definitions.map((definition) => {
-      const scorePoints = points.map((point) =>
-        criterionPoint(
-          point,
-          point.criteria.find((criterion) => criterion.id === definition.id),
-          'score'
-        )
-      );
-      const contributionPoints = points.map((point) =>
-        criterionPoint(
-          point,
-          point.criteria.find((criterion) => criterion.id === definition.id),
-          'contribution'
-        )
-      );
+      const criterionFor = (point: TrendPoint): TrendCriterion | undefined =>
+        point.criteria.find((criterion) => criterion.id === definition.id);
+      const scorePoints = points.map((point) => criterionPoint(point, criterionFor(point), 'score'));
+      const contributionPoints = points.map((point) => criterionPoint(point, criterionFor(point), 'contribution'));
       const options = { width: WIDTH, height: SMALL_HEIGHT, padding: PADDING } as const;
 
       return {
@@ -104,50 +87,10 @@
     });
   }
 
-  function engineRules(geometry: TrendChartGeometry): EngineRule[] {
-    if (geometry.domain === null) return [];
-    const range = [geometry.padding.left, geometry.width - geometry.padding.right] as const;
-
-    return result.engineBoundaries.flatMap((boundary) => {
-      if (boundary.pointIndex <= 0) return [];
-      const timestamp = Date.parse(boundary.startsAt);
-      const x = scaleTime(timestamp, geometry.domain!, range);
-      return x === null ? [] : [{ engineVersion: boundary.engineVersion, pointIndex: boundary.pointIndex, x }];
-    });
-  }
-
-  function visibleMarkers(markers: readonly TrendChartMarker[]): readonly TrendChartMarker[] {
-    if (markers.length <= MAX_VISIBLE_MARKERS) return markers;
-    const step = Math.ceil(markers.length / MAX_VISIBLE_MARKERS);
-    return markers.filter((_, index) => index === 0 || index === markers.length - 1 || index % step === 0);
-  }
-
-  function pointX(geometry: TrendChartGeometry, sourceIndex: number): number | null {
-    return (
-      geometry.markers.find((marker) => marker.sourceIndex === sourceIndex)?.x ??
-      geometry.gaps.find((gap) => gap.sourceIndex === sourceIndex)?.x ??
-      null
-    );
-  }
-
   function formatTimestamp(value: string): string {
     const timestamp = Date.parse(value);
     if (!Number.isFinite(timestamp)) return 'Invalid recorded time';
     return new Date(timestamp).toISOString().replace('T', ' ').replace('.000Z', ' UTC').replace('Z', ' UTC');
-  }
-
-  function formatTick(timestamp: number, domain: readonly [number, number] | null): string {
-    const date = new Date(timestamp);
-    if (domain !== null && domain[1] - domain[0] <= 2 * 24 * 60 * 60 * 1000) {
-      return date.toISOString().slice(11, 16);
-    }
-    return date.toISOString().slice(0, 10);
-  }
-
-  function tickAnchor(index: number, count: number): 'start' | 'middle' | 'end' {
-    if (index === 0) return 'start';
-    if (index === count - 1) return 'end';
-    return 'middle';
   }
 
   function pointStateLabel(point: TrendPoint): string {
@@ -239,8 +182,13 @@
   $: criteria = collectCriteria(result.points);
   $: criterionCharts = result.normalizedFilter.profile === null ? buildCriterionCharts(result.points, criteria) : [];
   $: selectedPoint = result.points[selectedIndex] ?? null;
-  $: selectedOverallX = pointX(overallGeometry, selectedIndex);
-  $: overallEngineRules = engineRules(overallGeometry);
+  $: selectedOverallX = trendChartPointX(overallGeometry, selectedIndex);
+  $: overallEngineRules = buildTrendChartEngineRules(overallGeometry, result.engineBoundaries);
+  $: currentPolicyReference = {
+    healthyThreshold: HEALTHY_THRESHOLD,
+    attentionThreshold: ATTENTION_THRESHOLD,
+    engineVersion: result.currentEngineVersion,
+  } as const;
 </script>
 
 <section class="space-y-4" aria-labelledby="health-trend-heading">
@@ -260,7 +208,7 @@
   {:else}
     <div class="space-y-4">
       <div
-        class="focus-visible:ring-accent-500 cursor-ew-resize rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 dark:border-neutral-700 dark:bg-neutral-800/50 dark:text-neutral-200 dark:focus-visible:ring-offset-neutral-900"
+        class="focus-visible:ring-accent-500 cursor-ew-resize rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-700 focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none dark:border-neutral-700 dark:bg-neutral-800/50 dark:text-neutral-200 dark:focus-visible:ring-offset-neutral-900"
         role="slider"
         tabindex="0"
         aria-label="Trend point"
@@ -279,14 +227,16 @@
       <Card padding="sm">
         <figure aria-labelledby="overall-chart-title" aria-describedby="overall-chart-description">
           <figcaption class="mb-3 flex flex-wrap items-start justify-between gap-3 px-1">
-            <div>
+            <div class="max-w-2xl">
               <h3 id="overall-chart-title" class="text-sm font-semibold text-neutral-900 dark:text-neutral-100">
                 {result.normalizedFilter.profile === null
                   ? 'Overall score and band'
                   : `${result.normalizedFilter.profile} score and band`}
               </h3>
               <p id="overall-chart-description" class="text-xs text-neutral-500 dark:text-neutral-400">
-                Persisted scores on a fixed 0–100 scale. Lines stop at evidence gaps and engine changes.
+                Scores and marker colors are persisted historical evidence. Background bands and labelled thresholds are
+                a current-policy reference for engine v{result.currentEngineVersion} only, so an older engine's stored band
+                may differ at the same score. Lines stop at evidence gaps and engine changes.
               </p>
             </div>
             <div
@@ -294,7 +244,7 @@
               aria-label="Chart legend"
             >
               <span class="inline-flex items-center gap-1.5"
-                ><span class="border-accent-600 h-2.5 w-2.5 rounded-full border-2"></span>Measured</span
+                ><span class="h-2.5 w-2.5 rounded-full bg-emerald-500"></span>Persisted band</span
               >
               <span class="inline-flex items-center gap-1.5"
                 ><span class="font-mono font-bold">×</span>Evidence gap</span
@@ -305,205 +255,15 @@
             </div>
           </figcaption>
 
-          <div class="overflow-x-auto pb-1" aria-label="Scrollable overall score chart">
-            <svg
-              class="h-auto min-w-[40rem] text-neutral-700 dark:text-neutral-200"
-              viewBox={`0 0 ${overallGeometry.width} ${overallGeometry.height}`}
-              role="img"
-              aria-labelledby="overall-svg-title overall-svg-description"
-            >
-              <title id="overall-svg-title">Persisted config health score trend</title>
-              <desc id="overall-svg-description"
-                >Actual-time score history from zero to one hundred, with labelled band thresholds, evidence gaps, and
-                engine boundaries. Exact values are in the point inspector and trend table.</desc
-              >
-
-              <rect
-                x={overallGeometry.padding.left}
-                y={overallGeometry.padding.top}
-                width={overallGeometry.width - overallGeometry.padding.left - overallGeometry.padding.right}
-                height={(overallGeometry.height - overallGeometry.padding.bottom - overallGeometry.padding.top) * 0.15}
-                class="fill-emerald-50 dark:fill-emerald-950/20"
-              />
-              <rect
-                x={overallGeometry.padding.left}
-                y={overallGeometry.padding.top +
-                  (overallGeometry.height - overallGeometry.padding.bottom - overallGeometry.padding.top) * 0.15}
-                width={overallGeometry.width - overallGeometry.padding.left - overallGeometry.padding.right}
-                height={(overallGeometry.height - overallGeometry.padding.bottom - overallGeometry.padding.top) * 0.25}
-                class="fill-amber-50 dark:fill-amber-950/20"
-              />
-              <rect
-                x={overallGeometry.padding.left}
-                y={overallGeometry.padding.top +
-                  (overallGeometry.height - overallGeometry.padding.bottom - overallGeometry.padding.top) * 0.4}
-                width={overallGeometry.width - overallGeometry.padding.left - overallGeometry.padding.right}
-                height={(overallGeometry.height - overallGeometry.padding.bottom - overallGeometry.padding.top) * 0.6}
-                class="fill-red-50 dark:fill-red-950/20"
-              />
-
-              {#each overallGeometry.scoreTicks as tick (tick.score)}
-                <line
-                  x1={overallGeometry.padding.left}
-                  x2={overallGeometry.width - overallGeometry.padding.right}
-                  y1={tick.y}
-                  y2={tick.y}
-                  class="stroke-neutral-300 dark:stroke-neutral-700"
-                  stroke-width="1"
-                  vector-effect="non-scaling-stroke"
-                />
-                <text
-                  x={overallGeometry.padding.left - 8}
-                  y={tick.y + 4}
-                  text-anchor="end"
-                  class="fill-current text-[11px]">{tick.score}</text
-                >
-              {/each}
-
-              <line
-                x1={overallGeometry.padding.left}
-                x2={overallGeometry.width - overallGeometry.padding.right}
-                y1={overallGeometry.padding.top +
-                  (overallGeometry.height - overallGeometry.padding.bottom - overallGeometry.padding.top) *
-                    (1 - HEALTHY_THRESHOLD / 100)}
-                y2={overallGeometry.padding.top +
-                  (overallGeometry.height - overallGeometry.padding.bottom - overallGeometry.padding.top) *
-                    (1 - HEALTHY_THRESHOLD / 100)}
-                class="stroke-emerald-700 dark:stroke-emerald-400"
-                stroke-width="1.5"
-                stroke-dasharray="2 3"
-                vector-effect="non-scaling-stroke"
-              />
-              <text
-                x={overallGeometry.width - overallGeometry.padding.right - 4}
-                y={overallGeometry.padding.top +
-                  (overallGeometry.height - overallGeometry.padding.bottom - overallGeometry.padding.top) *
-                    (1 - HEALTHY_THRESHOLD / 100) -
-                  4}
-                text-anchor="end"
-                class="fill-emerald-800 text-[10px] font-medium dark:fill-emerald-300"
-                >Healthy {HEALTHY_THRESHOLD}+</text
-              >
-              <line
-                x1={overallGeometry.padding.left}
-                x2={overallGeometry.width - overallGeometry.padding.right}
-                y1={overallGeometry.padding.top +
-                  (overallGeometry.height - overallGeometry.padding.bottom - overallGeometry.padding.top) *
-                    (1 - ATTENTION_THRESHOLD / 100)}
-                y2={overallGeometry.padding.top +
-                  (overallGeometry.height - overallGeometry.padding.bottom - overallGeometry.padding.top) *
-                    (1 - ATTENTION_THRESHOLD / 100)}
-                class="stroke-amber-700 dark:stroke-amber-400"
-                stroke-width="1.5"
-                stroke-dasharray="5 3"
-                vector-effect="non-scaling-stroke"
-              />
-              <text
-                x={overallGeometry.width - overallGeometry.padding.right - 4}
-                y={overallGeometry.padding.top +
-                  (overallGeometry.height - overallGeometry.padding.bottom - overallGeometry.padding.top) *
-                    (1 - ATTENTION_THRESHOLD / 100) -
-                  4}
-                text-anchor="end"
-                class="fill-amber-800 text-[10px] font-medium dark:fill-amber-300"
-                >Attention {ATTENTION_THRESHOLD}+</text
-              >
-
-              {#each overallEngineRules as boundary (`${boundary.pointIndex}-${boundary.engineVersion}`)}
-                <line
-                  x1={boundary.x}
-                  x2={boundary.x}
-                  y1={overallGeometry.padding.top}
-                  y2={overallGeometry.height - overallGeometry.padding.bottom}
-                  class="stroke-neutral-600 dark:stroke-neutral-300"
-                  stroke-width="1.5"
-                  stroke-dasharray="6 4"
-                  vector-effect="non-scaling-stroke"
-                />
-                <text
-                  x={boundary.x + 4}
-                  y={overallGeometry.padding.top + 11}
-                  class="fill-current text-[10px] font-semibold">v{boundary.engineVersion}</text
-                >
-              {/each}
-
-              {#each overallGeometry.segments as segment, index (`${segment.engineVersion}-${index}`)}
-                <path
-                  d={segment.path}
-                  fill="none"
-                  class="stroke-accent-600 dark:stroke-accent-400"
-                  stroke-width="2.5"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  vector-effect="non-scaling-stroke"
-                />
-              {/each}
-
-              {#each visibleMarkers(overallGeometry.markers) as marker (marker.sourceIndex)}
-                <circle
-                  cx={marker.x}
-                  cy={marker.y}
-                  r="3.5"
-                  class="stroke-accent-700 dark:stroke-accent-300 fill-white dark:fill-neutral-900"
-                  stroke-width="2"
-                  vector-effect="non-scaling-stroke"
-                />
-              {/each}
-
-              {#each overallGeometry.gaps as gap (gap.sourceIndex)}
-                {#if gap.x !== null}
-                  <g
-                    class="stroke-neutral-700 dark:stroke-neutral-200"
-                    stroke-width="2"
-                    vector-effect="non-scaling-stroke"
-                  >
-                    <line
-                      x1={gap.x - 4}
-                      x2={gap.x + 4}
-                      y1={overallGeometry.height - overallGeometry.padding.bottom + 5}
-                      y2={overallGeometry.height - overallGeometry.padding.bottom + 13}
-                    />
-                    <line
-                      x1={gap.x + 4}
-                      x2={gap.x - 4}
-                      y1={overallGeometry.height - overallGeometry.padding.bottom + 5}
-                      y2={overallGeometry.height - overallGeometry.padding.bottom + 13}
-                    />
-                  </g>
-                {/if}
-              {/each}
-
-              {#if selectedOverallX !== null}
-                <line
-                  x1={selectedOverallX}
-                  x2={selectedOverallX}
-                  y1={overallGeometry.padding.top}
-                  y2={overallGeometry.height - overallGeometry.padding.bottom}
-                  class="stroke-violet-700 dark:stroke-violet-300"
-                  stroke-width="2"
-                  vector-effect="non-scaling-stroke"
-                />
-              {/if}
-
-              {#each overallGeometry.timeTicks as tick, index (tick.timestamp)}
-                <line
-                  x1={tick.x}
-                  x2={tick.x}
-                  y1={overallGeometry.height - overallGeometry.padding.bottom}
-                  y2={overallGeometry.height - overallGeometry.padding.bottom + 5}
-                  class="stroke-current"
-                  stroke-width="1"
-                  vector-effect="non-scaling-stroke"
-                />
-                <text
-                  x={tick.x}
-                  y={overallGeometry.height - 10}
-                  text-anchor={tickAnchor(index, overallGeometry.timeTicks.length)}
-                  class="fill-current text-[11px]">{formatTick(tick.timestamp, overallGeometry.domain)}</text
-                >
-              {/each}
-            </svg>
-          </div>
+          <TrendPlot
+            geometry={overallGeometry}
+            engineRules={overallEngineRules}
+            selectedX={selectedOverallX}
+            regionLabel="Scrollable overall score chart. Use arrow keys to scroll horizontally on narrow screens."
+            imageLabel="Persisted config health score history. Marker fill is the persisted band; background thresholds are current-policy reference only."
+            showPersistedBands={true}
+            {currentPolicyReference}
+          />
         </figure>
 
         <div class="mt-3 border-t border-neutral-200 pt-3 dark:border-neutral-700/60">
@@ -547,7 +307,14 @@
                   ? ` · Score ${selectedPoint.score}`
                   : ''}
               </p>
-              {#if selectedPoint.state !== 'measured'}
+              {#if selectedPoint.state === 'measured'}
+                <p class="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
+                  {selectedPoint.band === null
+                    ? 'No band was persisted for this point.'
+                    : `${HEALTH_BAND_LABEL[selectedPoint.band]} is the band persisted by engine v${selectedPoint.engineVersion}.`}
+                  Current threshold shading for engine v{result.currentEngineVersion} is reference only.
+                </p>
+              {:else}
                 <p class="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
                   This state is an explicit gap, not a zero score.
                 </p>
@@ -612,148 +379,15 @@
                     </span>
                   </figcaption>
 
-                  <div class="overflow-x-auto" aria-label={`Scrollable ${chart.definition.label} chart`}>
-                    <svg
-                      class="h-auto min-w-[32rem] text-neutral-700 dark:text-neutral-200"
-                      viewBox={`0 0 ${chart.score.width} ${chart.score.height}`}
-                      role="img"
-                      aria-label={`${chart.definition.label} actual-time history on a zero to one hundred scale`}
-                    >
-                      {#each chart.score.scoreTicks as tick (tick.score)}
-                        <line
-                          x1={chart.score.padding.left}
-                          x2={chart.score.width - chart.score.padding.right}
-                          y1={tick.y}
-                          y2={tick.y}
-                          class="stroke-neutral-300 dark:stroke-neutral-700"
-                          stroke-width="1"
-                          vector-effect="non-scaling-stroke"
-                        />
-                        <text
-                          x={chart.score.padding.left - 8}
-                          y={tick.y + 4}
-                          text-anchor="end"
-                          class="fill-current text-[11px]">{tick.score}</text
-                        >
-                      {/each}
-
-                      {#each engineRules(chart.score) as boundary (`${boundary.pointIndex}-${boundary.engineVersion}`)}
-                        <line
-                          x1={boundary.x}
-                          x2={boundary.x}
-                          y1={chart.score.padding.top}
-                          y2={chart.score.height - chart.score.padding.bottom}
-                          class="stroke-neutral-600 dark:stroke-neutral-300"
-                          stroke-width="1.5"
-                          stroke-dasharray="6 4"
-                          vector-effect="non-scaling-stroke"
-                        />
-                        <text
-                          x={boundary.x + 4}
-                          y={chart.score.padding.top + 11}
-                          class="fill-current text-[10px] font-semibold">v{boundary.engineVersion}</text
-                        >
-                      {/each}
-
-                      {#each chart.score.segments as segment, index (`score-${segment.engineVersion}-${index}`)}
-                        <path
-                          d={segment.path}
-                          fill="none"
-                          class="stroke-accent-600 dark:stroke-accent-400"
-                          stroke-width="2"
-                          stroke-linejoin="round"
-                          vector-effect="non-scaling-stroke"
-                        />
-                      {/each}
-                      {#each chart.contribution.segments as segment, index (`contribution-${segment.engineVersion}-${index}`)}
-                        <path
-                          d={segment.path}
-                          fill="none"
-                          class="stroke-violet-700 dark:stroke-violet-300"
-                          stroke-width="2"
-                          stroke-dasharray="5 3"
-                          stroke-linejoin="round"
-                          vector-effect="non-scaling-stroke"
-                        />
-                      {/each}
-
-                      {#each visibleMarkers(chart.score.markers) as marker (marker.sourceIndex)}
-                        <circle
-                          cx={marker.x}
-                          cy={marker.y}
-                          r="3"
-                          class="stroke-accent-700 dark:stroke-accent-300 fill-white dark:fill-neutral-900"
-                          stroke-width="2"
-                          vector-effect="non-scaling-stroke"
-                        />
-                      {/each}
-                      {#each visibleMarkers(chart.contribution.markers) as marker (marker.sourceIndex)}
-                        <rect
-                          x={marker.x - 3}
-                          y={marker.y - 3}
-                          width="6"
-                          height="6"
-                          transform={`rotate(45 ${marker.x} ${marker.y})`}
-                          class="fill-white stroke-violet-700 dark:fill-neutral-900 dark:stroke-violet-300"
-                          stroke-width="1.5"
-                          vector-effect="non-scaling-stroke"
-                        />
-                      {/each}
-
-                      {#each chart.score.gaps as gap (gap.sourceIndex)}
-                        {#if gap.x !== null}
-                          <g
-                            class="stroke-neutral-700 dark:stroke-neutral-200"
-                            stroke-width="2"
-                            vector-effect="non-scaling-stroke"
-                          >
-                            <line
-                              x1={gap.x - 3}
-                              x2={gap.x + 3}
-                              y1={chart.score.height - chart.score.padding.bottom + 5}
-                              y2={chart.score.height - chart.score.padding.bottom + 11}
-                            />
-                            <line
-                              x1={gap.x + 3}
-                              x2={gap.x - 3}
-                              y1={chart.score.height - chart.score.padding.bottom + 5}
-                              y2={chart.score.height - chart.score.padding.bottom + 11}
-                            />
-                          </g>
-                        {/if}
-                      {/each}
-
-                      {#if pointX(chart.score, selectedIndex) !== null}
-                        <line
-                          x1={pointX(chart.score, selectedIndex) ?? 0}
-                          x2={pointX(chart.score, selectedIndex) ?? 0}
-                          y1={chart.score.padding.top}
-                          y2={chart.score.height - chart.score.padding.bottom}
-                          class="stroke-violet-700 dark:stroke-violet-300"
-                          stroke-width="2"
-                          vector-effect="non-scaling-stroke"
-                        />
-                      {/if}
-
-                      {#each chart.score.timeTicks as tick, index (tick.timestamp)}
-                        <line
-                          x1={tick.x}
-                          x2={tick.x}
-                          y1={chart.score.height - chart.score.padding.bottom}
-                          y2={chart.score.height - chart.score.padding.bottom + 5}
-                          class="stroke-current"
-                          stroke-width="1"
-                          vector-effect="non-scaling-stroke"
-                        />
-                        <text
-                          x={tick.x}
-                          y={chart.score.height - 10}
-                          text-anchor={tickAnchor(index, chart.score.timeTicks.length)}
-                          class="fill-current text-[11px]">{formatTick(tick.timestamp, chart.score.domain)}</text
-                        >
-                      {/each}
-                    </svg>
-                  </div>
+                  <TrendPlot
+                    geometry={chart.score}
+                    secondaryGeometry={chart.contribution}
+                    engineRules={buildTrendChartEngineRules(chart.score, result.engineBoundaries)}
+                    selectedX={trendChartPointX(chart.score, selectedIndex)}
+                    regionLabel={`Scrollable ${chart.definition.label} chart. Use arrow keys to scroll horizontally on narrow screens.`}
+                    imageLabel={`${chart.definition.label} actual-time history on a zero to one hundred scale`}
+                    compact={true}
+                  />
 
                   {#if chart.score.gaps.length > 0}
                     <p class="px-1 pt-1 text-[11px] text-neutral-500 dark:text-neutral-400">

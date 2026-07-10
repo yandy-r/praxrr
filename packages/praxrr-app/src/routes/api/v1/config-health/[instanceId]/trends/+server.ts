@@ -4,19 +4,15 @@ import type { components } from '$api/v1.d.ts';
 import { ConfigHealthTrendQueryError, parseConfigHealthTrendFilters } from '$lib/server/health/trendFilters.ts';
 import { ConfigHealthTrendServiceError, readConfigHealthTrend } from '$lib/server/health/trends.ts';
 import { toTrendsResponse } from '$lib/server/health/responses.ts';
+import { parseConfigHealthInstanceId } from '$lib/server/health/pathParams.ts';
 import { logger } from '$logger/logger.ts';
 
 type ErrorResponse = components['schemas']['ErrorResponse'];
 type TrendsResponse = components['schemas']['ConfigHealthTrendsResponse'];
 
-function parseInstanceId(raw: string | undefined): number | null {
-  const value = Number(raw);
-  return Number.isSafeInteger(value) && value > 0 ? value : null;
-}
-
 /** GET one canonical, bounded Config Health historical selection. */
 export const GET: RequestHandler = async ({ params, url }) => {
-  const instanceId = parseInstanceId(params.instanceId);
+  const instanceId = parseConfigHealthInstanceId(params.instanceId);
   if (instanceId === null) {
     return json({ error: 'Invalid instance id' } satisfies ErrorResponse, { status: 400 });
   }

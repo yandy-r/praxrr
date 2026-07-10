@@ -9,7 +9,11 @@
 import { arrInstancesQueries } from '$db/queries/arrInstances.ts';
 import { configHealthSettingsQueries, type ConfigHealthSettings } from '$db/queries/configHealthSettings.ts';
 import {
+  CONFIG_HEALTH_TREND_EVIDENCE_BUDGET,
+  ConfigHealthTrendEvidenceLimitError,
   configHealthSnapshotsQueries,
+  type ConfigHealthTrendProfileNameOptions,
+  type ConfigHealthTrendSearchOptions,
   type ConfigHealthTrendSnapshotDetail,
 } from '$db/queries/configHealthSnapshots.ts';
 import {
@@ -92,12 +96,18 @@ export interface ConfigHealthTrendResult {
 }
 
 type TrendSettings = Pick<ConfigHealthSettings, 'retention_days' | 'retention_max_entries'>;
-type TrendInstanceRecord = { readonly id: number; readonly name: string; readonly type: string };
+type TrendInstanceRecord = {
+  readonly id: number;
+  readonly name: string;
+  readonly type: string;
+  readonly enabled: number;
+};
 
 export interface BuildConfigHealthTrendResultInput {
   readonly instance: ConfigHealthTrendInstance;
   readonly filters: ConfigHealthTrendFilters;
   readonly snapshots: readonly ConfigHealthTrendSnapshotDetail[];
+  readonly availableProfiles?: readonly string[];
   readonly settings: TrendSettings;
   readonly currentEngineVersion: string;
   readonly nowIso: string;
@@ -108,8 +118,14 @@ export interface ConfigHealthTrendServiceDependencies {
   readonly getSettings: () => TrendSettings;
   readonly searchTrend: (
     instanceId: number,
-    options: { from?: string; to?: string; limit: number }
+    options: ConfigHealthTrendSearchOptions
   ) => ConfigHealthTrendSnapshotDetail[];
+  readonly listProfileNames: (
+    instanceId: number,
+    arrType: HealthArrType,
+    options: ConfigHealthTrendProfileNameOptions
+  ) => string[];
+  readonly hasArrTypeMismatch: (instanceId: number, arrType: HealthArrType) => boolean;
   readonly now: () => Date | number;
   readonly currentEngineVersion: string;
 }
@@ -129,6 +145,10 @@ const DEFAULT_DEPENDENCIES: ConfigHealthTrendServiceDependencies = {
   getInstance: (instanceId) => arrInstancesQueries.getById(instanceId),
   getSettings: () => configHealthSettingsQueries.get(),
   searchTrend: (instanceId, options) => configHealthSnapshotsQueries.searchTrend(instanceId, options),
+  listProfileNames: (instanceId, arrType, options) =>
+    configHealthSnapshotsQueries.listTrendProfileNames(instanceId, arrType, options),
+  hasArrTypeMismatch: (instanceId, arrType) =>
+    configHealthSnapshotsQueries.hasTrendArrTypeMismatch(instanceId, arrType),
   now: Date.now,
   currentEngineVersion: CONFIG_HEALTH_ENGINE_VERSION,
 };
@@ -137,8 +157,12 @@ function isHealthBand(value: unknown): value is HealthBand {
   return value === 'healthy' || value === 'attention' || value === 'needs-review' || value === 'unknown';
 }
 
-function isFiniteNumber(value: unknown): value is number {
-  return typeof value === 'number' && Number.isFinite(value);
+function isIntegerInRange(value: unknown, minimum: number, maximum = Number.POSITIVE_INFINITY): value is number {
+  return Number.isSafeInteger(value) && (value as number) >= minimum && (value as number) <= maximum;
+}
+
+function isPortableScore(value: unknown): value is number {
+  return isIntegerInRange(value, 0, 100);
 }
 
 function isIdentifiableCriterion(value: unknown): value is CriterionResult {
@@ -155,16 +179,16 @@ function hasUsableProfiles(snapshot: ConfigHealthTrendSnapshotDetail): boolean {
   return (
     snapshot.profileScoresValid &&
     snapshot.profileScores.every(
-      (profile) => typeof profile?.name === 'string' && isFiniteNumber(profile.score) && isHealthBand(profile.band)
+      (profile) => typeof profile?.name === 'string' && isPortableScore(profile.score) && isHealthBand(profile.band)
     )
   );
 }
 
 function projectCriterion(criterion: CriterionResult): ConfigHealthTrendCriterion {
   if (
-    (criterion.score !== null && !isFiniteNumber(criterion.score)) ||
-    !isFiniteNumber(criterion.weight) ||
-    !isFiniteNumber(criterion.contribution)
+    (criterion.score !== null && !isPortableScore(criterion.score)) ||
+    !isIntegerInRange(criterion.weight, 0) ||
+    !Number.isSafeInteger(criterion.contribution)
   ) {
     return {
       id: criterion.id,
@@ -237,7 +261,7 @@ function projectPoint(snapshot: ConfigHealthTrendSnapshotDetail, profile: string
     return scoredPoint(snapshot, storedProfile.score, storedProfile.band, []);
   }
 
-  if (!hasUsableCriteria(snapshot) || !isHealthBand(snapshot.band) || !isFiniteNumber(snapshot.overallScore)) {
+  if (!hasUsableCriteria(snapshot) || !isHealthBand(snapshot.band) || !isPortableScore(snapshot.overallScore)) {
     return unavailablePoint(snapshot, 'not-recorded');
   }
 
@@ -250,7 +274,7 @@ function profileOptions(snapshots: readonly ConfigHealthTrendSnapshotDetail[]): 
     if (!hasUsableProfiles(snapshot)) continue;
     for (const profile of snapshot.profileScores) names.add(profile.name);
   }
-  return [...names].sort();
+  return [...names].sort().slice(0, MAX_CONFIG_HEALTH_TREND_POINTS);
 }
 
 function engineBoundaries(points: readonly ConfigHealthTrendPoint[]): ConfigHealthTrendEngineBoundary[] {
@@ -300,7 +324,9 @@ export function buildConfigHealthTrendResult(input: BuildConfigHealthTrendResult
       oldestAvailableAt,
       newestAvailableAt,
     },
-    availableProfiles: profileOptions(input.snapshots),
+    availableProfiles: [...(input.availableProfiles ?? profileOptions(input.snapshots))]
+      .sort()
+      .slice(0, MAX_CONFIG_HEALTH_TREND_POINTS),
     counts: { points: points.length, measured, unknown, missing },
     engineBoundaries: engineBoundaries(points),
     points,
@@ -314,24 +340,55 @@ export function readConfigHealthTrend(
   dependencies: ConfigHealthTrendServiceDependencies = DEFAULT_DEPENDENCIES
 ): ConfigHealthTrendResult {
   const instance = dependencies.getInstance(instanceId);
-  if (!instance || !isSyncPreviewArrType(instance.type)) {
+  if (!instance || !isSyncPreviewArrType(instance.type) || !instance.enabled) {
+    throw new ConfigHealthTrendServiceError('Instance not found or not sync-capable', 404);
+  }
+  if (dependencies.hasArrTypeMismatch(instanceId, instance.type)) {
     throw new ConfigHealthTrendServiceError('Instance not found or not sync-capable', 404);
   }
 
-  const snapshots = dependencies.searchTrend(instanceId, {
-    from: filters.from,
-    to: filters.to,
-    limit: TREND_QUERY_LIMIT,
-  });
+  let snapshots: ConfigHealthTrendSnapshotDetail[];
+  try {
+    snapshots = dependencies.searchTrend(instanceId, {
+      from: filters.from,
+      to: filters.to,
+      limit: TREND_QUERY_LIMIT,
+      evidenceBudget: CONFIG_HEALTH_TREND_EVIDENCE_BUDGET,
+    });
+  } catch (error) {
+    if (error instanceof ConfigHealthTrendEvidenceLimitError) {
+      throw new ConfigHealthTrendServiceError(error.message, 422);
+    }
+    throw error;
+  }
   if (snapshots.length > MAX_CONFIG_HEALTH_TREND_POINTS) {
     throw new ConfigHealthTrendServiceError('Too many Config Health trend points; narrow the requested range', 422);
   }
+  if (snapshots.some((snapshot) => snapshot.arrType !== instance.type)) {
+    throw new ConfigHealthTrendServiceError('Instance not found or not sync-capable', 404);
+  }
 
   const settings = dependencies.getSettings();
+  let availableProfiles: string[];
+  try {
+    availableProfiles = dependencies.listProfileNames(instanceId, instance.type, {
+      limit: MAX_CONFIG_HEALTH_TREND_POINTS,
+      evidenceBudget: CONFIG_HEALTH_TREND_EVIDENCE_BUDGET,
+    });
+  } catch (error) {
+    if (error instanceof ConfigHealthTrendEvidenceLimitError) {
+      throw new ConfigHealthTrendServiceError(error.message, 422);
+    }
+    throw error;
+  }
+  if (dependencies.hasArrTypeMismatch(instanceId, instance.type)) {
+    throw new ConfigHealthTrendServiceError('Instance not found or not sync-capable', 404);
+  }
   return buildConfigHealthTrendResult({
     instance: { id: instance.id, name: instance.name, arrType: instance.type },
     filters,
     snapshots,
+    availableProfiles,
     settings,
     currentEngineVersion: dependencies.currentEngineVersion,
     nowIso: captureIso(dependencies.now()),

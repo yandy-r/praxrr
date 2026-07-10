@@ -3,7 +3,12 @@ import { config } from '$config';
 import { db } from '$db/db.ts';
 import { runMigrations } from '$db/migrations.ts';
 import { arrInstancesQueries } from '$db/queries/arrInstances.ts';
-import { configHealthSnapshotsQueries } from '$db/queries/configHealthSnapshots.ts';
+import {
+  CONFIG_HEALTH_TREND_EVIDENCE_BUDGET,
+  ConfigHealthTrendEvidenceLimitError,
+  configHealthSnapshotsQueries,
+  type ConfigHealthTrendEvidenceBudget,
+} from '$db/queries/configHealthSnapshots.ts';
 import {
   CONFIG_HEALTH_ENGINE_VERSION,
   type CriterionResult,
@@ -356,6 +361,35 @@ migratedTest('searchTrend returns the caller-requested cap sentinel row', () => 
   );
 });
 
+migratedTest('trend profile names form a deterministic bounded retained union and detect Arr type changes', () => {
+  const instanceId = seedInstance('radarr');
+  const ids = ['z profile', 'A profile', 'middle profile'].map((name, index) => {
+    const id = configHealthSnapshotsQueries.insert(
+      makeReport(instanceId, 'radarr', `2026-07-0${index + 1}T00:00:00.000Z`, 70 + index, 'attention')
+    );
+    db.execute(
+      'UPDATE config_health_snapshots SET profile_scores = ? WHERE id = ?',
+      JSON.stringify([{ name, score: 80, band: 'attention' }]),
+      id
+    );
+    return id;
+  });
+
+  assertEquals(configHealthSnapshotsQueries.hasTrendArrTypeMismatch(instanceId, 'radarr'), false);
+  assertEquals(configHealthSnapshotsQueries.listTrendProfileNames(instanceId, 'radarr', { limit: 2 }), [
+    'A profile',
+    'middle profile',
+  ]);
+  assertThrows(
+    () => configHealthSnapshotsQueries.listTrendProfileNames(instanceId, 'radarr', { limit: 0 }),
+    RangeError,
+    'positive safe integer'
+  );
+
+  db.execute("UPDATE config_health_snapshots SET arr_type = 'sonarr' WHERE id = ?", ids[0]);
+  assertEquals(configHealthSnapshotsQueries.hasTrendArrTypeMismatch(instanceId, 'radarr'), true);
+});
+
 migratedTest('searchTrend distinguishes valid empty arrays from malformed or non-array evidence', () => {
   const radarr = seedInstance('radarr');
   const emptyId = configHealthSnapshotsQueries.insert(
@@ -392,6 +426,57 @@ migratedTest('searchTrend distinguishes valid empty arrays from malformed or non
     assertEquals(row.criteriaScoresValid, false);
     assertEquals(row.profileScoresValid, false);
   }
+});
+
+migratedTest('searchTrend reports UTF-8 evidence bytes and rejects row, aggregate, and nested overages', () => {
+  const radarr = seedInstance('radarr');
+  const firstId = configHealthSnapshotsQueries.insert(
+    makeReport(radarr, 'radarr', '2026-07-01T00:00:00.000Z', 80, 'attention')
+  );
+  const secondId = configHealthSnapshotsQueries.insert(
+    makeReport(radarr, 'radarr', '2026-07-02T00:00:00.000Z', 70, 'attention')
+  );
+  const criteriaJson = JSON.stringify([{ label: 'Santé' }]);
+  const profileJson = JSON.stringify([{ name: 'Vidéo', score: 80, band: 'attention' }]);
+  for (const id of [firstId, secondId]) {
+    db.execute(
+      'UPDATE config_health_snapshots SET criteria_scores = ?, profile_scores = ? WHERE id = ?',
+      criteriaJson,
+      profileJson,
+      id
+    );
+  }
+
+  const rows = configHealthSnapshotsQueries.searchTrend(radarr, { limit: 10 });
+  assertEquals(rows[0].criteriaScoresBytes, new TextEncoder().encode(criteriaJson).byteLength);
+  assertEquals(rows[0].profileScoresBytes, new TextEncoder().encode(profileJson).byteLength);
+  assertEquals('instanceName' in rows[0], false);
+  assertEquals('createdAt' in rows[0], false);
+
+  const rowBytes = rows[0].criteriaScoresBytes + rows[0].profileScoresBytes;
+  const budget = (overrides: Partial<ConfigHealthTrendEvidenceBudget>): ConfigHealthTrendEvidenceBudget => ({
+    ...CONFIG_HEALTH_TREND_EVIDENCE_BUDGET,
+    ...overrides,
+  });
+  for (const evidenceBudget of [
+    budget({ maxBytesPerRow: rowBytes - 1 }),
+    budget({ maxTotalBytes: rowBytes * 2 - 1 }),
+  ]) {
+    assertThrows(
+      () => configHealthSnapshotsQueries.searchTrend(radarr, { limit: 10, evidenceBudget }),
+      ConfigHealthTrendEvidenceLimitError
+    );
+  }
+
+  db.execute('UPDATE config_health_snapshots SET criteria_scores = ? WHERE id = ?', JSON.stringify([{}, {}]), firstId);
+  assertThrows(
+    () =>
+      configHealthSnapshotsQueries.searchTrend(radarr, {
+        limit: 10,
+        evidenceBudget: budget({ maxCriteriaPerRow: 1 }),
+      }),
+    ConfigHealthTrendEvidenceLimitError
+  );
 });
 
 migratedTest('searchTrend bounded predicates use the instance timestamp index lexically', () => {

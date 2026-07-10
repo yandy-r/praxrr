@@ -1,53 +1,22 @@
 import { expect, type Page, type Route, test } from '@playwright/test';
+import type { components } from '$api/v1.d.ts';
 
 const E2E_USERNAME = process.env.E2E_USERNAME;
 const E2E_PASSWORD = process.env.E2E_PASSWORD;
 const INSTANCE_ID = 424_242;
+const SECOND_INSTANCE_ID = 424_243;
 const CAPTURED_TO = '2026-07-10T12:00:00.000Z';
+const SECOND_CAPTURED_TO = '2026-07-10T13:00:00.000Z';
 const CAPTURED_ALL_TO = '2026-07-10T12:34:56.789Z';
+const MAX_SIZE_POINT_COUNT = 10_000;
 const HOSTILE_INSTANCE = `Living Room <svg data-e2e-injected="instance"></svg> ${'very-long-instance-name-'.repeat(5)}`;
 const HOSTILE_PROFILE = `Profile <img data-e2e-injected="profile" onerror="window.__e2eInjected=true"> & ${'exact-name-'.repeat(8)}`;
 const HOSTILE_CRITERION = `Configuration parity <script>window.__e2eInjected=true</script> ${'long-label-'.repeat(7)}`;
+const SECOND_INSTANCE_NAME = 'Kitchen Sonarr';
 
-type PointState = 'measured' | 'unknown' | 'profile-missing' | 'not-recorded';
-type CriterionState = 'measured' | 'not-evaluated' | 'not-recorded';
-type HealthBand = 'healthy' | 'attention' | 'needs-review' | 'unknown';
-
-interface Criterion {
-  id: string;
-  label: string;
-  state: CriterionState;
-  score: number | null;
-  weight: number | null;
-  contribution: number | null;
-}
-
-interface TrendPoint {
-  snapshotId: number;
-  generatedAt: string;
-  engineVersion: string;
-  state: PointState;
-  score: number | null;
-  band: HealthBand | null;
-  criteria: Criterion[];
-}
-
-interface TrendResult {
-  instance: { id: number; name: string; arrType: 'sonarr' };
-  currentEngineVersion: string;
-  normalizedFilter: { from: string | null; to: string; profile: string | null };
-  retention: {
-    days: number;
-    maxEntries: number;
-    ageCutoffAt: string;
-    oldestAvailableAt: string | null;
-    newestAvailableAt: string | null;
-  };
-  availableProfiles: string[];
-  counts: { points: number; measured: number; unknown: number; missing: number };
-  engineBoundaries: Array<{ engineVersion: string; startsAt: string; pointIndex: number }>;
-  points: TrendPoint[];
-}
+type DetailResponse = components['schemas']['ConfigHealthDetailResponse'];
+type TrendResult = components['schemas']['ConfigHealthTrendsResponse'];
+type TrendPoint = TrendResult['points'][number];
 
 type TrendHandler = (route: Route, url: URL) => Promise<void>;
 
@@ -82,9 +51,9 @@ const DETAIL_RESPONSE = {
       suggestions: [],
     },
   ],
-};
+} satisfies DetailResponse;
 
-const COMPREHENSIVE_POINTS: TrendPoint[] = [
+const COMPREHENSIVE_POINTS = [
   {
     snapshotId: 501,
     generatedAt: '2026-06-11T00:00:00.000Z',
@@ -181,7 +150,7 @@ const COMPREHENSIVE_POINTS: TrendPoint[] = [
     band: null,
     criteria: [],
   },
-];
+] satisfies TrendPoint[];
 
 function resultFor(
   points: TrendPoint[],
@@ -218,6 +187,33 @@ function resultFor(
 }
 
 const COMPREHENSIVE_RESULT = resultFor(COMPREHENSIVE_POINTS);
+const MAX_SIZE_POINTS = Array.from({ length: MAX_SIZE_POINT_COUNT }, (_, index) => ({
+  snapshotId: 700_000 + index,
+  generatedAt: new Date(Date.UTC(2026, 0, 1) + index * 60_000).toISOString(),
+  engineVersion: '2',
+  state: 'measured',
+  score: index % 101,
+  band: 'healthy',
+  criteria: [
+    {
+      id: 'bounded-rendering',
+      label: `Bounded rendering criterion ${index + 1}`,
+      state: 'measured',
+      score: index % 101,
+      weight: 100,
+      contribution: index % 101,
+    },
+  ],
+})) satisfies TrendPoint[];
+const MAX_SIZE_BASE_RESULT = resultFor(MAX_SIZE_POINTS);
+const MAX_SIZE_RESULT = {
+  ...MAX_SIZE_BASE_RESULT,
+  retention: { ...MAX_SIZE_BASE_RESULT.retention, maxEntries: MAX_SIZE_POINT_COUNT },
+} satisfies TrendResult;
+const SECOND_RESULT = {
+  ...resultFor([COMPREHENSIVE_POINTS[0]], { from: '2026-07-01T13:00:00.000Z', to: SECOND_CAPTURED_TO }),
+  instance: { id: SECOND_INSTANCE_ID, name: SECOND_INSTANCE_NAME, arrType: 'sonarr' },
+} satisfies TrendResult;
 const SINGLETON_RESULT = resultFor([COMPREHENSIVE_POINTS[0]]);
 const FILTERED_EMPTY_RESULT = resultFor([], { from: '2026-06-10T12:00:00.000Z' });
 const NEVER_COLLECTED_RESULT = resultFor([], { from: null, to: CAPTURED_ALL_TO });
@@ -253,6 +249,13 @@ const PROFILE_RESULT = resultFor(
   ],
   { profile: HOSTILE_PROFILE }
 );
+
+const SECOND_DETAIL_RESPONSE = {
+  ...DETAIL_RESPONSE,
+  instanceId: SECOND_INSTANCE_ID,
+  instanceName: SECOND_INSTANCE_NAME,
+  generatedAt: SECOND_CAPTURED_TO,
+} satisfies DetailResponse;
 
 async function fulfillJson(route: Route, body: unknown, status = 200): Promise<void> {
   await route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) });
@@ -337,7 +340,7 @@ test.describe('Config Health trends and export', () => {
     await expect(page.getByText('Unknown — score not measured')).toBeVisible();
     await expect(page.getByText('Evidence not recorded').last()).toBeVisible();
 
-    const overallChart = page.getByRole('img', { name: 'Persisted config health score trend' });
+    const overallChart = page.getByRole('img', { name: /^Persisted config health score history/ });
     await expect(overallChart).toBeVisible();
     const markerX = await overallChart
       .locator('circle')
@@ -376,6 +379,54 @@ test.describe('Config Health trends and export', () => {
     await expect(pointSelector).toHaveAttribute('aria-valuenow', '2');
     await expect(page.getByText('Snapshot 502', { exact: false })).toBeVisible();
     await expect(pointSelector).toBeFocused();
+  });
+
+  test('max-size history mounts a bounded table page and preserves chronological access to all 10,000 points', async ({
+    page,
+  }) => {
+    await installConfigHealthMocks(page, async (route) => {
+      await fulfillJson(route, MAX_SIZE_RESULT);
+    });
+
+    await openConfigHealth(page);
+
+    const table = page.getByRole('region', { name: /Config Health history table/ });
+    const rows = table.locator('tbody tr');
+    await expect(rows).toHaveCount(50);
+    await expect(table.locator('tbody li')).toHaveCount(50);
+    await expect(page.getByRole('status').filter({ hasText: 'of 10,000' })).toContainText(
+      'Showing chronological snapshots 1–50 of 10,000. Page 1 of 200.'
+    );
+    await expect(table).toContainText('#700000');
+    await expect(table).not.toContainText('#700050');
+
+    const nextPage = page.getByRole('button', { name: 'Next evidence page' });
+    const nextPageBox = await nextPage.boundingBox();
+    expect(nextPageBox).not.toBeNull();
+    expect(nextPageBox!.height).toBeGreaterThanOrEqual(44);
+    await nextPage.focus();
+    await nextPage.press('Enter');
+
+    await expect(rows).toHaveCount(50);
+    await expect(table.locator('tbody li')).toHaveCount(50);
+    await expect(page.getByRole('status').filter({ hasText: 'of 10,000' })).toContainText(
+      'Showing chronological snapshots 51–100 of 10,000. Page 2 of 200.'
+    );
+    await expect(table).toContainText('#700050');
+    await expect(table).not.toContainText('#700000');
+
+    await page.getByLabel('Historical evidence page').selectOption('200');
+    await expect(rows).toHaveCount(50);
+    await expect(table).toContainText('#709999');
+    await expect(page.getByRole('status').filter({ hasText: 'of 10,000' })).toContainText(
+      'Showing chronological snapshots 9,951–10,000 of 10,000. Page 200 of 200.'
+    );
+
+    for (const name of ['Export JSON', 'Export CSV']) {
+      const href = await page.getByRole('link', { name }).getAttribute('href');
+      expect(href).not.toBeNull();
+      expect(exportParams(href!).has('page')).toBe(false);
+    }
   });
 
   test('superseded applies cannot overwrite the latest result and a failed apply retries its exact filter', async ({
@@ -431,6 +482,109 @@ test.describe('Config Health trends and export', () => {
     await expect(page.getByText('Temporary trend failure')).toHaveCount(0);
   });
 
+  test('instance navigation clears stale state and cannot pair old results with the new export path', async ({
+    page,
+  }) => {
+    let firstDetailCalls = 0;
+    let firstNinetyDayCalls = 0;
+    let secondDetailCalls = 0;
+    let secondTrendCalls = 0;
+    let releaseOldDetail: () => void = () => undefined;
+    let releaseOldTrend: () => void = () => undefined;
+    let releaseSecond: () => void = () => undefined;
+    const oldDetailGate = new Promise<void>((resolve) => {
+      releaseOldDetail = resolve;
+    });
+    const oldTrendGate = new Promise<void>((resolve) => {
+      releaseOldTrend = resolve;
+    });
+    const secondGate = new Promise<void>((resolve) => {
+      releaseSecond = resolve;
+    });
+
+    await installConfigHealthMocks(page, async (route, url) => {
+      if (url.searchParams.get('days') === '90') {
+        firstNinetyDayCalls += 1;
+        await oldTrendGate;
+        await fulfillJson(route, resultFor(COMPREHENSIVE_POINTS, { to: '2026-07-10T14:00:00.000Z' })).catch(
+          () => undefined
+        );
+        return;
+      }
+      await fulfillJson(route, COMPREHENSIVE_RESULT);
+    });
+    await page.unroute(`**/api/v1/config-health/${INSTANCE_ID}`);
+    await page.route(`**/api/v1/config-health/${INSTANCE_ID}`, async (route) => {
+      firstDetailCalls += 1;
+      if (firstDetailCalls > 1) {
+        await oldDetailGate;
+        await fulfillJson(route, DETAIL_RESPONSE).catch(() => undefined);
+        return;
+      }
+      await fulfillJson(route, DETAIL_RESPONSE);
+    });
+    await page.route(`**/api/v1/config-health/${SECOND_INSTANCE_ID}/trends*`, async (route) => {
+      const url = new URL(route.request().url());
+      if (!url.pathname.endsWith('/trends')) {
+        await route.abort();
+        return;
+      }
+      secondTrendCalls += 1;
+      await secondGate;
+      await fulfillJson(route, SECOND_RESULT);
+    });
+    await page.route(`**/api/v1/config-health/${SECOND_INSTANCE_ID}`, async (route) => {
+      secondDetailCalls += 1;
+      await secondGate;
+      await fulfillJson(route, SECOND_DETAIL_RESPONSE);
+    });
+
+    await openConfigHealth(page);
+    await selectRange(page, '90');
+    await expect.poll(() => firstNinetyDayCalls).toBe(1);
+    await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+    await expect.poll(() => firstDetailCalls).toBe(2);
+
+    await page.getByLabel('Instance').evaluate((select, targetId) => {
+      const option = document.createElement('option');
+      option.value = String(targetId);
+      option.textContent = 'Second test instance';
+      select.append(option);
+      select.value = String(targetId);
+      select.dispatchEvent(new Event('change', { bubbles: true }));
+    }, SECOND_INSTANCE_ID);
+
+    await expect(page).toHaveURL(`/config-health/${SECOND_INSTANCE_ID}`);
+    await expect.poll(() => secondDetailCalls).toBe(1);
+    await expect.poll(() => secondTrendCalls).toBe(1);
+    await expect(page.getByText(HOSTILE_INSTANCE, { exact: true })).toHaveCount(0);
+    await expect(page.getByRole('heading', { name: 'Applied historical evidence' })).toHaveCount(0);
+    await expect(page.getByRole('link', { name: 'Export JSON' })).toHaveCount(0);
+    await expect(page.getByRole('link', { name: 'Export CSV' })).toHaveCount(0);
+    await expect(page.getByLabel('Time range')).toHaveValue('30');
+    await expect(page.getByLabel('Profile scope')).toHaveValue('');
+
+    releaseSecond();
+    await expect(page.getByText(SECOND_INSTANCE_NAME, { exact: true })).toBeVisible();
+    await expect(page.getByText('Last 30 days', { exact: false }).first()).toBeVisible();
+    const secondJsonHref = await page.getByRole('link', { name: 'Export JSON' }).getAttribute('href');
+    expect(secondJsonHref).not.toBeNull();
+    expect(new URL(secondJsonHref!, 'http://localhost').pathname).toBe(
+      `/api/v1/config-health/${SECOND_INSTANCE_ID}/trends/export`
+    );
+    expect(exportParams(secondJsonHref!).get('to')).toBe(SECOND_CAPTURED_TO);
+
+    releaseOldDetail();
+    releaseOldTrend();
+    await expect(page.getByText(SECOND_INSTANCE_NAME, { exact: true })).toBeVisible();
+    await expect(page.getByText(HOSTILE_INSTANCE, { exact: true })).toHaveCount(0);
+    await expect(page.getByText('Last 30 days', { exact: false }).first()).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Export JSON' })).toHaveAttribute(
+      'href',
+      new RegExp(`/api/v1/config-health/${SECOND_INSTANCE_ID}/trends/export`)
+    );
+  });
+
   test('filtered-empty can widen to never-collected All history and exports use the captured absolute upper bound', async ({
     page,
   }) => {
@@ -469,7 +623,7 @@ test.describe('Config Health trends and export', () => {
     await expect(
       page.getByText('One persisted point is available; it does not establish a direction of change.')
     ).toBeVisible();
-    const overallChart = page.getByRole('img', { name: 'Persisted config health score trend' });
+    const overallChart = page.getByRole('img', { name: /^Persisted config health score history/ });
     await expect(overallChart.locator('circle')).toHaveCount(1);
     await expect(overallChart.locator('path')).toHaveCount(0);
     await expect(page.getByText(HOSTILE_INSTANCE, { exact: true })).toBeVisible();
