@@ -1444,6 +1444,30 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/config-health/{instanceId}/recompute': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Recompute config-health for one instance on demand
+     * @description Recomputes and persists current config health for a single instance on the request thread (not
+     *     the scheduled sweep), then returns the fresh detail. Reuses the same scoring + snapshot service
+     *     as the scheduled computation, so the response schema and engine version match exactly.
+     *     Rate-limited and in-flight-bounded per instance. Scoring performs no live Arr I/O, so a
+     *     degraded/unreachable instance still returns 200 with an `unknown` band.
+     */
+    post: operations['recomputeConfigHealth'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/config-health/{instanceId}/trends': {
     parameters: {
       query?: never;
@@ -8085,6 +8109,74 @@ export interface operations {
       };
       /** @description Instance not found or not sync-capable */
       404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+    };
+  };
+  recomputeConfigHealth: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        /** @description Arr instance id */
+        instanceId: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Recomputed instance health detail */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ConfigHealthDetailResponse'];
+        };
+      };
+      /** @description Invalid instance id or the instance is disabled */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Instance not found or not sync-capable */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description A config-health recompute for this instance is already in progress */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description On-demand config-health recompute is rate-limited for this instance */
+      429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Failed to recompute config health */
+      500: {
         headers: {
           [name: string]: unknown;
         };

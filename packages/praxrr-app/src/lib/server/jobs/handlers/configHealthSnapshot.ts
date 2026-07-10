@@ -2,8 +2,7 @@ import { jobQueueRegistry } from '../queueRegistry.ts';
 import type { JobHandler } from '../queueTypes.ts';
 import { arrInstancesQueries } from '$db/queries/arrInstances.ts';
 import { configHealthSettingsQueries } from '$db/queries/configHealthSettings.ts';
-import { configHealthSnapshotsQueries } from '$db/queries/configHealthSnapshots.ts';
-import { scoreInstance } from '$lib/server/health/service.ts';
+import { recomputeAndPersistInstance } from '$lib/server/health/recompute.ts';
 import { isSyncPreviewArrType } from '$sync/preview/types.ts';
 import { processBatches } from '$sync/processor.ts';
 import { calculateNextRunFromMinutes } from '../scheduleUtils.ts';
@@ -22,21 +21,6 @@ const SWEEP_CHUNK_SIZE = 5;
 const CONCURRENCY = 3;
 const BACKOFF_BASE_MS = 5 * 60 * 1000; // 5 minutes
 const BACKOFF_CAP_MS = 6 * 60 * 60 * 1000; // 6 hours
-
-/** Score + persist one instance. Never throws — a Promise.all batch must not abort on one failure. */
-async function snapshotInstance(instanceId: number): Promise<void> {
-  try {
-    const report = await scoreInstance(instanceId);
-    if (report) {
-      configHealthSnapshotsQueries.insert(report);
-    }
-  } catch (error) {
-    await logger.error('Config health snapshot failed for instance', {
-      source: 'ConfigHealthSnapshotJob',
-      meta: { instanceId, error: error instanceof Error ? error.message : String(error) },
-    });
-  }
-}
 
 const configHealthSnapshotHandler: JobHandler = async (job) => {
   const settings = configHealthSettingsQueries.get();
@@ -67,7 +51,12 @@ const configHealthSnapshotHandler: JobHandler = async (job) => {
     }
 
     const chunk = eligible.filter((instance) => instance.id > cursor).slice(0, SWEEP_CHUNK_SIZE);
-    await processBatches(chunk, (instance) => snapshotInstance(instance.id), CONCURRENCY);
+    // Both the sweep and the on-demand recompute route funnel through the one score+persist path so
+    // they can never diverge. `recomputeAndPersistInstance` never throws (safe under the Promise.all
+    // batch) and self-logs insert failures. An `in_flight` outcome (a concurrent manual recompute for
+    // the same instance) is intentionally ignored: that manual call already persisted the instance's
+    // trend point, so the sweep skipping it leaves no gap.
+    await processBatches(chunk, (instance) => recomputeAndPersistInstance(instance), CONCURRENCY);
 
     const lastProcessedId = chunk.length > 0 ? chunk[chunk.length - 1].id : cursor;
     const moreRemain = eligible.some((instance) => instance.id > lastProcessedId);

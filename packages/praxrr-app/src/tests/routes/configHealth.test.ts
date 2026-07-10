@@ -5,18 +5,26 @@ import { assert, assertEquals } from '@std/assert';
 import { config } from '$config';
 import { db } from '$db/db.ts';
 import { runMigrations } from '$db/migrations.ts';
+import { arrInstancesQueries } from '$db/queries/arrInstances.ts';
 import { jobDispatcher } from '$jobs/dispatcher.ts';
 import { CONFIG_HEALTH_ENGINE_VERSION } from '$shared/health/index.ts';
+import {
+  CONFIG_HEALTH_RECOMPUTE_RATE_LIMIT_MAX_REQUESTS,
+  registerConfigHealthRecomputeAttempt,
+  resetConfigHealthRecomputeRateLimitForTests,
+} from '$lib/server/health/recomputeLimits.ts';
 import type {
   ConfigHealthSettingsResponse,
   ConfigHealthSummaryResponse,
 } from '$lib/server/health/responses.ts';
 import { GET as GET_SUMMARY } from '../../routes/api/v1/config-health/summary/+server.ts';
 import { GET as GET_DETAIL } from '../../routes/api/v1/config-health/[instanceId]/+server.ts';
+import { POST as POST_RECOMPUTE } from '../../routes/api/v1/config-health/[instanceId]/recompute/+server.ts';
 import { GET as GET_SETTINGS, PUT as PUT_SETTINGS } from '../../routes/api/v1/config-health/settings/+server.ts';
 
 type SummaryGetEvent = Parameters<typeof GET_SUMMARY>[0];
 type DetailGetEvent = Parameters<typeof GET_DETAIL>[0];
+type RecomputeEvent = Parameters<typeof POST_RECOMPUTE>[0];
 type SettingsGetEvent = Parameters<typeof GET_SETTINGS>[0];
 type SettingsPutEvent = Parameters<typeof PUT_SETTINGS>[0];
 
@@ -44,8 +52,12 @@ function migratedTest(name: string, fn: () => Promise<void> | void): void {
       try {
         await db.initialize();
         await runMigrations();
+        // The recompute limiter is a module-global keyed by instance id; reset it so an exhausted
+        // window from one test cannot leak into another that reuses a low instance id.
+        resetConfigHealthRecomputeRateLimitForTests();
         await fn();
       } finally {
+        resetConfigHealthRecomputeRateLimitForTests();
         jobDispatcher.stop();
         db.close();
         config.setBasePath(originalBasePath);
@@ -61,6 +73,21 @@ function summaryEvent(): SummaryGetEvent {
 
 function detailEvent(instanceId: string): DetailGetEvent {
   return { params: { instanceId } } as unknown as DetailGetEvent;
+}
+
+function recomputeEvent(instanceId: string): RecomputeEvent {
+  return { params: { instanceId } } as unknown as RecomputeEvent;
+}
+
+/** Seed an arr instance so the recompute route can pass the existence / sync-capable / enabled gates. */
+function seedInstance(type: string, enabled = true): number {
+  return arrInstancesQueries.create({
+    name: `${type}-${crypto.randomUUID()}`,
+    type,
+    url: 'http://127.0.0.1:9',
+    apiKey: 'test-api-key',
+    enabled,
+  });
 }
 
 function settingsGetEvent(): SettingsGetEvent {
@@ -115,6 +142,48 @@ migratedTest('GET /config-health/{instanceId}: unknown numeric id returns 404', 
   assertEquals(response.status, 404);
   const body = (await response.json()) as ErrorResponse;
   assert(typeof body.error === 'string' && body.error.length > 0);
+});
+
+// ============================================================================
+// RECOMPUTE -- POST /config-health/{instanceId}/recompute
+// ============================================================================
+
+migratedTest('POST /config-health/{instanceId}/recompute: non-numeric id returns 400', async () => {
+  const response = await POST_RECOMPUTE(recomputeEvent('abc'));
+  assertEquals(response.status, 400);
+  const body = (await response.json()) as ErrorResponse;
+  assert(typeof body.error === 'string' && body.error.length > 0);
+});
+
+migratedTest('POST /config-health/{instanceId}/recompute: unknown numeric id returns 404', async () => {
+  const response = await POST_RECOMPUTE(recomputeEvent('999999'));
+  assertEquals(response.status, 404);
+});
+
+migratedTest('POST /config-health/{instanceId}/recompute: not sync-capable instance returns 404', async () => {
+  const id = seedInstance('prowlarr');
+  const response = await POST_RECOMPUTE(recomputeEvent(String(id)));
+  assertEquals(response.status, 404);
+});
+
+migratedTest('POST /config-health/{instanceId}/recompute: disabled instance returns 400', async () => {
+  const id = seedInstance('radarr', false);
+  const response = await POST_RECOMPUTE(recomputeEvent(String(id)));
+  assertEquals(response.status, 400);
+  const body = (await response.json()) as ErrorResponse;
+  assert(body.error.toLowerCase().includes('disabled'));
+});
+
+migratedTest('POST /config-health/{instanceId}/recompute: rate-limited request returns 429 with Retry-After', async () => {
+  const id = seedInstance('radarr');
+  // Exhaust the per-instance window directly so the route rejects at the limiter, before any scoring.
+  const now = Date.now();
+  for (let i = 0; i < CONFIG_HEALTH_RECOMPUTE_RATE_LIMIT_MAX_REQUESTS; i++) {
+    registerConfigHealthRecomputeAttempt(id, now);
+  }
+  const response = await POST_RECOMPUTE(recomputeEvent(String(id)));
+  assertEquals(response.status, 429);
+  assertEquals(response.headers.get('Retry-After'), '60');
 });
 
 // ============================================================================
