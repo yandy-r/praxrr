@@ -1344,6 +1344,34 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/trash-guide/sources/{id}/sync': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Resolve current + latest terminal run for a TRaSH source
+     * @description Returns the source's current queue slot and latest terminal run evidence, used to poll a
+     *     queued/running sync to its exact terminal run. Read-only and safe for a since-deleted source:
+     *     identity falls back to the durable snapshot, so it does not 404 on that case.
+     */
+    get: operations['getTrashGuideSyncStatus'];
+    put?: never;
+    /**
+     * Enqueue a manual TRaSH source sync
+     * @description Enqueues a manual sync for the TRaSH source and returns the per-run correlation token plus a
+     *     source-labeled status view, so the initiating surface can link to exactly one current-or-terminal
+     *     run. An already-running source dedupes onto the in-flight run (409) instead of acking a new one.
+     */
+    post: operations['syncTrashGuideSource'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/canary/rollouts': {
     parameters: {
       query?: never;
@@ -3268,6 +3296,91 @@ export interface components {
       /** @description Whether the live state already equalled the recorded intent (a no-op reconcile). */
       alreadyApplied: boolean;
       applyStatus: components['schemas']['GoalApplyStatus'];
+    };
+    /**
+     * @description Closed, safe vocabulary of TRaSH sync failure reasons. Assigned by outcome/error type only — never by message parsing — so no raw diagnostic can leak.
+     * @enum {string}
+     */
+    TrashGuideSyncFailureCode:
+      'source_missing' | 'source_disabled' | 'network' | 'parser_failed' | 'sync_failed' | 'internal';
+    /** @description Typed, closed, SAFE failure evidence. message/recoveryAction are pre-authored copy that never embeds raw exception text, git/parser diagnostics, credentials, or hostnames. */
+    TrashGuideSyncFailureReason: {
+      code: components['schemas']['TrashGuideSyncFailureCode'];
+      message: string;
+      recoveryAction: string;
+    };
+    /** @description Fetched/applied counts for a TRaSH sync run. */
+    TrashGuideSyncCounts: {
+      commitsBehind: number;
+      parsedFiles: number;
+      failedFiles: number;
+      activeOperations: number;
+      removedEntities: number;
+      renamedEntities: number;
+    };
+    /** @description Versioned, structured terminal evidence for one TRaSH sync run, serialized into job_run_history.output. Survives a source hard-delete via its embedded identity snapshot. */
+    TrashGuideSyncRunEvidence: {
+      /** @enum {integer} */
+      schemaVersion: 1;
+      runToken: string | null;
+      source: {
+        id: number;
+        name: string | null;
+        arrType: ('radarr' | 'sonarr') | null;
+      };
+      /** @enum {string} */
+      trigger: 'manual' | 'scheduled';
+      requestedAt: string | null;
+      /** @enum {string} */
+      status: 'success' | 'failure' | 'skipped' | 'cancelled';
+      counts: components['schemas']['TrashGuideSyncCounts'] | null;
+      failure: components['schemas']['TrashGuideSyncFailureReason'] | null;
+      retry: {
+        rescheduleAt: string | null;
+        retryable: boolean;
+      };
+    };
+    /** @description Single wire view of a source's current queue slot + latest terminal run, reused by the POST response and the GET status resolver. */
+    TrashGuideSyncStatusView: {
+      sourceId: number;
+      sourceName: string | null;
+      arrType: ('radarr' | 'sonarr') | null;
+      queueId: number | null;
+      current: {
+        status: string;
+        runAt: string;
+        startedAt: string | null;
+        attempts: number;
+        runToken: string | null;
+      } | null;
+      latestRun: {
+        id: number;
+        /** @enum {string} */
+        status: 'success' | 'failure' | 'skipped' | 'cancelled';
+        startedAt: string;
+        finishedAt: string;
+        durationMs: number;
+        evidence: components['schemas']['TrashGuideSyncRunEvidence'] | null;
+      } | null;
+    };
+    /** @description Manual-sync enqueue acknowledgement, linking to exactly one current-or-terminal run. */
+    TrashGuideSyncQueuedResponse: {
+      /** @enum {boolean} */
+      success: true;
+      /** @enum {boolean} */
+      queued: true;
+      runToken: string;
+      statusUrl: string;
+      view: components['schemas']['TrashGuideSyncStatusView'];
+    };
+    /** @description Already-running dedupe response — links to the existing in-flight run rather than acking a new one. */
+    TrashGuideSyncDedupeResponse: {
+      error: string;
+      /** @enum {boolean} */
+      deduped: true;
+      runToken: string;
+      statusUrl: string;
+      view: components['schemas']['TrashGuideSyncStatusView'];
     };
     /** @enum {string} */
     TrashGuideEntityType: 'custom_format' | 'custom_format_group' | 'quality_profile' | 'quality_size' | 'naming';
@@ -8371,6 +8484,106 @@ export interface operations {
       };
       /** @description Invalid query parameters */
       400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+    };
+  };
+  getTrashGuideSyncStatus: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        /** @description TRaSH source ID */
+        id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Current + latest terminal run view */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['TrashGuideSyncStatusView'];
+        };
+      };
+      /** @description Invalid source ID */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Failed to resolve sync status */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+    };
+  };
+  syncTrashGuideSource: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        /** @description TRaSH source ID */
+        id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Sync queued (or coalesced onto a pending run) */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['TrashGuideSyncQueuedResponse'];
+        };
+      };
+      /** @description Invalid source ID */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description TRaSH source not found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description A sync is already running for this source — links to the existing run */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['TrashGuideSyncDedupeResponse'];
+        };
+      };
+      /** @description Failed to enqueue the sync */
+      500: {
         headers: {
           [name: string]: unknown;
         };

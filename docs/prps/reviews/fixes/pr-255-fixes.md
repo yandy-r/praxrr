@@ -85,7 +85,7 @@ Final source status: **17 Fixed, 0 Open, 0 Failed**.
 | Check                   | Result                                                                                          |
 | ----------------------- | ----------------------------------------------------------------------------------------------- |
 | Type check              | Pass — `deno task check`; Svelte 0 errors, 0 warnings                                           |
-| Tests                   | Pass — `deno task test`; 2,261 passed, 0 failed                                                 |
+| Tests                   | Pass — `deno task test`; 2,287 passed, 0 failed                                                 |
 | Build                   | Pass — `deno task build`                                                                        |
 | API generation          | Pass — generation + bundle + Prettier is deterministic across two runs                          |
 | API contract            | Pass — 3 bundled/runtime contract tests                                                         |
