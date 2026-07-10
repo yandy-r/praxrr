@@ -83,7 +83,7 @@ and available.
 ## Integration Points
 
 Persistence requires a new migration, expected as
-`packages/praxrr-app/src/lib/server/db/migrations/20260722_add_canary_preview_evidence.ts`,
+`packages/praxrr-app/src/lib/server/db/migrations/20260723_add_canary_preview_evidence.ts`,
 registration in `packages/praxrr-app/src/lib/server/db/migrations.ts`, and
 parity in `packages/praxrr-app/src/lib/server/db/schema.sql`. The new nullable
 `remaining_preview_evidence TEXT` keeps legacy rows readable; strict decoding

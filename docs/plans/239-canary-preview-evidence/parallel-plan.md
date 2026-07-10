@@ -98,7 +98,7 @@ unchanged; do not add a failure taxonomy or dependency.
 
 Files to Create
 
-- `packages/praxrr-app/src/lib/server/db/migrations/20260722_add_canary_preview_evidence.ts`
+- `packages/praxrr-app/src/lib/server/db/migrations/20260723_add_canary_preview_evidence.ts`
 
 Files to Modify
 

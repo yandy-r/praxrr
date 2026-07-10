@@ -1,5 +1,6 @@
 import { db } from '../db.ts';
 import type { ArrType } from '$shared/pcd/types.ts';
+import type { SectionType } from '$lib/server/sync/types.ts';
 
 // Types
 export type SyncTrigger = 'manual' | 'on_pull' | 'on_change' | 'schedule';
@@ -66,6 +67,263 @@ export interface SyncConfigStatus {
   cron: string | null;
   nextRunAt: string | null;
   syncStatus: string;
+}
+
+/**
+ * Opaque, process-local ownership receipt for an all-selected reviewed sync claim.
+ *
+ * Callers may inspect the exact claimed scope, but only the object returned by
+ * `claimReviewedSyncSections` can release or finalize the claim. A structurally identical object is
+ * not an ownership credential.
+ */
+export interface ReviewedSyncClaim {
+  readonly instanceId: number;
+  readonly sections: readonly SectionType[];
+}
+
+type SyncStatus = 'idle' | 'pending' | 'in_progress' | 'failed';
+
+interface ReviewedSyncClaimRecord {
+  readonly claim: ReviewedSyncClaim;
+  readonly instanceId: number;
+  readonly sections: readonly SectionType[];
+  readonly previousStatuses: ReadonlyMap<SectionType, SyncStatus>;
+  readonly previousShouldSync: ReadonlyMap<SectionType, number>;
+}
+
+interface ReviewedSyncSectionConfig {
+  readonly table: string;
+  readonly instanceScopeSql: string;
+}
+
+const REVIEWED_SYNC_SECTION_ORDER: readonly SectionType[] = [
+  'qualityProfiles',
+  'delayProfiles',
+  'mediaManagement',
+  'metadataProfiles',
+];
+
+const REVIEWED_SYNC_SECTION_CONFIG: Record<SectionType, ReviewedSyncSectionConfig> = {
+  qualityProfiles: {
+    table: 'arr_sync_quality_profiles_config',
+    instanceScopeSql: 'instance_id = ?',
+  },
+  delayProfiles: {
+    table: 'arr_sync_delay_profiles_config',
+    instanceScopeSql: 'instance_id = ?',
+  },
+  mediaManagement: {
+    table: 'arr_sync_media_management',
+    instanceScopeSql: 'instance_id = ?',
+  },
+  metadataProfiles: {
+    table: 'arr_sync_metadata_profiles_config',
+    instanceScopeSql: "instance_id = ? AND instance_id IN (SELECT id FROM arr_instances WHERE type = 'lidarr')",
+  },
+};
+
+const reviewedSyncClaimRecords = new WeakMap<ReviewedSyncClaim, ReviewedSyncClaimRecord>();
+const reviewedSyncClaimRows = new Map<string, ReviewedSyncClaimRecord>();
+
+class ReviewedSyncClaimConflict extends Error {}
+
+function reviewedSyncRowKey(instanceId: number, section: SectionType): string {
+  return `${instanceId}:${section}`;
+}
+
+function normalizeReviewedSyncSections(sections: readonly SectionType[]): readonly SectionType[] {
+  const requested = new Set(sections);
+  const normalized = REVIEWED_SYNC_SECTION_ORDER.filter((section) => requested.has(section));
+
+  if (normalized.length !== requested.size) {
+    throw new Error('Reviewed sync claim contains an unknown section');
+  }
+
+  if (normalized.length === 0) {
+    throw new Error('Reviewed sync claim requires at least one section');
+  }
+
+  return Object.freeze(normalized);
+}
+
+function isSyncStatus(value: string): value is SyncStatus {
+  return value === 'idle' || value === 'pending' || value === 'in_progress' || value === 'failed';
+}
+
+function runReviewedSyncSavepoint<T>(operation: () => T): T {
+  db.exec('SAVEPOINT reviewed_sync_claim');
+  try {
+    const result = operation();
+    db.exec('RELEASE SAVEPOINT reviewed_sync_claim');
+    return result;
+  } catch (error) {
+    db.exec('ROLLBACK TO SAVEPOINT reviewed_sync_claim');
+    db.exec('RELEASE SAVEPOINT reviewed_sync_claim');
+    throw error;
+  }
+}
+
+function getReviewedSyncClaimRecord(claim: ReviewedSyncClaim): ReviewedSyncClaimRecord | null {
+  const record = reviewedSyncClaimRecords.get(claim);
+  if (!record) {
+    return null;
+  }
+
+  const ownsEveryRow = record.sections.every(
+    (section) => reviewedSyncClaimRows.get(reviewedSyncRowKey(record.instanceId, section)) === record
+  );
+  return ownsEveryRow ? record : null;
+}
+
+function isReviewedSyncRowOwned(instanceId: number, section: SectionType): boolean {
+  return reviewedSyncClaimRows.has(reviewedSyncRowKey(instanceId, section));
+}
+
+function forgetReviewedSyncClaim(record: ReviewedSyncClaimRecord): void {
+  reviewedSyncClaimRecords.delete(record.claim);
+  for (const section of record.sections) {
+    const key = reviewedSyncRowKey(record.instanceId, section);
+    if (reviewedSyncClaimRows.get(key) === record) {
+      reviewedSyncClaimRows.delete(key);
+    }
+  }
+}
+
+function claimReviewedSyncSections(
+  instanceId: number,
+  requestedSections: readonly SectionType[]
+): ReviewedSyncClaim | null {
+  if (!Number.isInteger(instanceId) || instanceId <= 0) {
+    throw new Error('Reviewed sync claim requires a positive instance ID');
+  }
+
+  const sections = normalizeReviewedSyncSections(requestedSections);
+  const previousStatuses = new Map<SectionType, SyncStatus>();
+  const previousShouldSync = new Map<SectionType, number>();
+
+  try {
+    runReviewedSyncSavepoint(() => {
+      for (const section of sections) {
+        const sectionConfig = REVIEWED_SYNC_SECTION_CONFIG[section];
+        const row = db.queryFirst<{ sync_status: string; should_sync: number }>(
+          `SELECT sync_status, should_sync FROM ${sectionConfig.table} WHERE ${sectionConfig.instanceScopeSql}`,
+          instanceId
+        );
+
+        if (!row || !isSyncStatus(row.sync_status) || row.sync_status === 'in_progress') {
+          throw new ReviewedSyncClaimConflict();
+        }
+
+        const previousStatus = row.sync_status;
+        const updated = db.execute(
+          `UPDATE ${sectionConfig.table}
+SET sync_status = 'in_progress', should_sync = 0
+WHERE ${sectionConfig.instanceScopeSql} AND sync_status = ? AND should_sync = ?`,
+          instanceId,
+          previousStatus,
+          row.should_sync
+        );
+        if (updated !== 1) {
+          throw new ReviewedSyncClaimConflict();
+        }
+
+        previousStatuses.set(section, previousStatus);
+        previousShouldSync.set(section, row.should_sync);
+      }
+    });
+  } catch (error) {
+    if (error instanceof ReviewedSyncClaimConflict) {
+      return null;
+    }
+    throw error;
+  }
+
+  const claim = Object.freeze({ instanceId, sections });
+  const record: ReviewedSyncClaimRecord = {
+    claim,
+    instanceId,
+    sections,
+    previousStatuses,
+    previousShouldSync,
+  };
+  reviewedSyncClaimRecords.set(claim, record);
+  for (const section of sections) {
+    reviewedSyncClaimRows.set(reviewedSyncRowKey(instanceId, section), record);
+  }
+  return claim;
+}
+
+type ReviewedSyncFinalizeMode = 'release' | 'complete' | 'fail';
+
+function finalizeReviewedSyncSections(
+  claim: ReviewedSyncClaim,
+  mode: ReviewedSyncFinalizeMode,
+  errorMessage?: string
+): boolean {
+  const record = getReviewedSyncClaimRecord(claim);
+  if (!record) {
+    return false;
+  }
+
+  try {
+    runReviewedSyncSavepoint(() => {
+      const completedAt = new Date().toISOString();
+      for (const section of record.sections) {
+        const sectionConfig = REVIEWED_SYNC_SECTION_CONFIG[section];
+        const previousStatus = record.previousStatuses.get(section);
+        const previousShouldSync = record.previousShouldSync.get(section);
+        if (!previousStatus || previousShouldSync === undefined) {
+          throw new ReviewedSyncClaimConflict();
+        }
+
+        let updated: number;
+        if (mode === 'release') {
+          updated = db.execute(
+            `UPDATE ${sectionConfig.table}
+SET sync_status = CASE WHEN should_sync = 1 THEN 'pending' ELSE ? END,
+    should_sync = CASE WHEN should_sync = 1 THEN 1 ELSE ? END
+WHERE ${sectionConfig.instanceScopeSql} AND sync_status = 'in_progress'`,
+            previousStatus,
+            previousShouldSync,
+            record.instanceId
+          );
+        } else if (mode === 'complete') {
+          updated = db.execute(
+            `UPDATE ${sectionConfig.table}
+SET sync_status = CASE WHEN should_sync = 1 THEN 'pending' ELSE 'idle' END,
+    should_sync = CASE WHEN should_sync = 1 THEN 1 ELSE 0 END,
+    last_error = NULL,
+    last_synced_at = ?
+WHERE ${sectionConfig.instanceScopeSql} AND sync_status = 'in_progress'`,
+            completedAt,
+            record.instanceId
+          );
+        } else {
+          updated = db.execute(
+            `UPDATE ${sectionConfig.table}
+SET sync_status = CASE WHEN should_sync = 1 THEN 'pending' ELSE 'failed' END,
+    should_sync = CASE WHEN should_sync = 1 THEN 1 ELSE 0 END,
+    last_error = ?
+WHERE ${sectionConfig.instanceScopeSql} AND sync_status = 'in_progress'`,
+            errorMessage ?? 'Reviewed sync failed',
+            record.instanceId
+          );
+        }
+
+        if (updated !== 1) {
+          throw new ReviewedSyncClaimConflict();
+        }
+      }
+    });
+  } catch (error) {
+    if (error instanceof ReviewedSyncClaimConflict) {
+      return false;
+    }
+    throw error;
+  }
+
+  forgetReviewedSyncClaim(record);
+  return true;
 }
 
 // Row types
@@ -809,20 +1067,30 @@ export const arrSyncQueries = {
     const placeholders = triggers.map(() => '?').join(', ');
 
     db.execute(
-      `UPDATE arr_sync_quality_profiles_config SET should_sync = 1, sync_status = 'pending' WHERE trigger IN (${placeholders})`,
+      `UPDATE arr_sync_quality_profiles_config
+			 SET should_sync = 1,
+			     sync_status = CASE WHEN sync_status = 'in_progress' THEN 'in_progress' ELSE 'pending' END
+			 WHERE trigger IN (${placeholders})`,
       ...triggers
     );
     db.execute(
-      `UPDATE arr_sync_delay_profiles_config SET should_sync = 1, sync_status = 'pending' WHERE trigger IN (${placeholders})`,
+      `UPDATE arr_sync_delay_profiles_config
+			 SET should_sync = 1,
+			     sync_status = CASE WHEN sync_status = 'in_progress' THEN 'in_progress' ELSE 'pending' END
+			 WHERE trigger IN (${placeholders})`,
       ...triggers
     );
     db.execute(
-      `UPDATE arr_sync_media_management SET should_sync = 1, sync_status = 'pending' WHERE trigger IN (${placeholders})`,
+      `UPDATE arr_sync_media_management
+			 SET should_sync = 1,
+			     sync_status = CASE WHEN sync_status = 'in_progress' THEN 'in_progress' ELSE 'pending' END
+			 WHERE trigger IN (${placeholders})`,
       ...triggers
     );
     db.execute(
       `UPDATE arr_sync_metadata_profiles_config
-			 SET should_sync = 1, sync_status = 'pending'
+			 SET should_sync = 1,
+			     sync_status = CASE WHEN sync_status = 'in_progress' THEN 'in_progress' ELSE 'pending' END
 			 WHERE trigger IN (${placeholders})
 			 AND instance_id IN (SELECT id FROM arr_instances WHERE type = 'lidarr')`,
       ...triggers
@@ -994,9 +1262,35 @@ export const arrSyncQueries = {
   },
 
   /**
+   * Atomically claim every selected section for reviewed execution.
+   *
+   * Unlike ordinary claims this transitions directly from the row's current non-active state. If
+   * any selected row is absent or already active, all earlier transitions are rolled back. The
+   * returned object is an identity-checked ownership receipt required by every reviewed terminal
+   * operation.
+   */
+  claimReviewedSyncSections,
+
+  /** Restore only the rows owned by this reviewed request to their pre-claim state. */
+  releaseReviewedSyncSections(claim: ReviewedSyncClaim): boolean {
+    return finalizeReviewedSyncSections(claim, 'release');
+  },
+
+  /** Complete only the rows owned by this reviewed request. */
+  completeReviewedSyncSections(claim: ReviewedSyncClaim): boolean {
+    return finalizeReviewedSyncSections(claim, 'complete');
+  },
+
+  /** Fail only the rows owned by this reviewed request. */
+  failReviewedSyncSections(claim: ReviewedSyncClaim, error: string): boolean {
+    return finalizeReviewedSyncSections(claim, 'fail', error);
+  },
+
+  /**
    * Mark sync as completed successfully
    */
   completeQualityProfilesSync(instanceId: number): void {
+    if (isReviewedSyncRowOwned(instanceId, 'qualityProfiles')) return;
     db.execute(
       "UPDATE arr_sync_quality_profiles_config SET sync_status = 'idle', should_sync = 0, last_error = NULL, last_synced_at = ? WHERE instance_id = ?",
       new Date().toISOString(),
@@ -1005,6 +1299,7 @@ export const arrSyncQueries = {
   },
 
   completeDelayProfilesSync(instanceId: number): void {
+    if (isReviewedSyncRowOwned(instanceId, 'delayProfiles')) return;
     db.execute(
       "UPDATE arr_sync_delay_profiles_config SET sync_status = 'idle', should_sync = 0, last_error = NULL, last_synced_at = ? WHERE instance_id = ?",
       new Date().toISOString(),
@@ -1013,6 +1308,7 @@ export const arrSyncQueries = {
   },
 
   completeMediaManagementSync(instanceId: number): void {
+    if (isReviewedSyncRowOwned(instanceId, 'mediaManagement')) return;
     db.execute(
       "UPDATE arr_sync_media_management SET sync_status = 'idle', should_sync = 0, last_error = NULL, last_synced_at = ? WHERE instance_id = ?",
       new Date().toISOString(),
@@ -1021,6 +1317,7 @@ export const arrSyncQueries = {
   },
 
   completeMetadataProfilesSync(instanceId: number): void {
+    if (isReviewedSyncRowOwned(instanceId, 'metadataProfiles')) return;
     db.execute(
       `UPDATE arr_sync_metadata_profiles_config
 			 SET sync_status = 'idle', should_sync = 0, last_error = NULL, last_synced_at = ?
@@ -1035,6 +1332,7 @@ export const arrSyncQueries = {
    * Mark sync as failed
    */
   failQualityProfilesSync(instanceId: number, error: string): void {
+    if (isReviewedSyncRowOwned(instanceId, 'qualityProfiles')) return;
     db.execute(
       "UPDATE arr_sync_quality_profiles_config SET sync_status = 'failed', should_sync = 0, last_error = ? WHERE instance_id = ?",
       error,
@@ -1043,6 +1341,7 @@ export const arrSyncQueries = {
   },
 
   failDelayProfilesSync(instanceId: number, error: string): void {
+    if (isReviewedSyncRowOwned(instanceId, 'delayProfiles')) return;
     db.execute(
       "UPDATE arr_sync_delay_profiles_config SET sync_status = 'failed', should_sync = 0, last_error = ? WHERE instance_id = ?",
       error,
@@ -1051,6 +1350,7 @@ export const arrSyncQueries = {
   },
 
   failMediaManagementSync(instanceId: number, error: string): void {
+    if (isReviewedSyncRowOwned(instanceId, 'mediaManagement')) return;
     db.execute(
       "UPDATE arr_sync_media_management SET sync_status = 'failed', should_sync = 0, last_error = ? WHERE instance_id = ?",
       error,
@@ -1059,6 +1359,7 @@ export const arrSyncQueries = {
   },
 
   failMetadataProfilesSync(instanceId: number, error: string): void {
+    if (isReviewedSyncRowOwned(instanceId, 'metadataProfiles')) return;
     db.execute(
       `UPDATE arr_sync_metadata_profiles_config
 			 SET sync_status = 'failed', should_sync = 0, last_error = ?
@@ -1074,21 +1375,30 @@ export const arrSyncQueries = {
    */
   setQualityProfilesStatusPending(instanceId: number): void {
     db.execute(
-      "UPDATE arr_sync_quality_profiles_config SET sync_status = 'pending', should_sync = 1 WHERE instance_id = ?",
+      `UPDATE arr_sync_quality_profiles_config
+			 SET sync_status = CASE WHEN sync_status = 'in_progress' THEN 'in_progress' ELSE 'pending' END,
+			     should_sync = 1
+			 WHERE instance_id = ?`,
       instanceId
     );
   },
 
   setDelayProfilesStatusPending(instanceId: number): void {
     db.execute(
-      "UPDATE arr_sync_delay_profiles_config SET sync_status = 'pending', should_sync = 1 WHERE instance_id = ?",
+      `UPDATE arr_sync_delay_profiles_config
+			 SET sync_status = CASE WHEN sync_status = 'in_progress' THEN 'in_progress' ELSE 'pending' END,
+			     should_sync = 1
+			 WHERE instance_id = ?`,
       instanceId
     );
   },
 
   setMediaManagementStatusPending(instanceId: number): void {
     db.execute(
-      "UPDATE arr_sync_media_management SET sync_status = 'pending', should_sync = 1 WHERE instance_id = ?",
+      `UPDATE arr_sync_media_management
+			 SET sync_status = CASE WHEN sync_status = 'in_progress' THEN 'in_progress' ELSE 'pending' END,
+			     should_sync = 1
+			 WHERE instance_id = ?`,
       instanceId
     );
   },
@@ -1096,7 +1406,8 @@ export const arrSyncQueries = {
   setMetadataProfilesStatusPending(instanceId: number): void {
     db.execute(
       `UPDATE arr_sync_metadata_profiles_config
-			 SET sync_status = 'pending', should_sync = 1
+			 SET sync_status = CASE WHEN sync_status = 'in_progress' THEN 'in_progress' ELSE 'pending' END,
+			     should_sync = 1
 			 WHERE instance_id = ?
 			 AND instance_id IN (SELECT id FROM arr_instances WHERE type = 'lidarr')`,
       instanceId
@@ -1140,6 +1451,7 @@ export const arrSyncQueries = {
    * Reset any in_progress syncs back to pending (for startup recovery)
    */
   recoverInterruptedSyncs(): number {
+    reviewedSyncClaimRows.clear();
     let count = 0;
     count += db.execute(
       "UPDATE arr_sync_quality_profiles_config SET sync_status = 'pending' WHERE sync_status = 'in_progress'"

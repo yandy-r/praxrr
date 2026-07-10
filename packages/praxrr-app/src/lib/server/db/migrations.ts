@@ -83,7 +83,8 @@ import { migration as migration20260718WidenQualityGoalBindingsArrType } from '.
 import { migration as migration20260719CreateConfigHealthNotificationState } from './migrations/20260719_create_config_health_notification_state.ts';
 import { migration as migration20260720AddSyncHistoryEntityOutcomes } from './migrations/20260720_add_sync_history_entity_outcomes.ts';
 import { migration as migration20260721CreateQualityGoalApplyJournal } from './migrations/20260721_create_quality_goal_apply_journal.ts';
-import { migration as migration20260722AddCanaryPreviewEvidence } from './migrations/20260722_add_canary_preview_evidence.ts';
+import { migration as migration20260722AddJobRunHistoryEvidence } from './migrations/20260722_add_job_run_history_evidence.ts';
+import { migration as migration20260723AddCanaryPreviewEvidence } from './migrations/20260723_add_canary_preview_evidence.ts';
 
 export interface Migration {
   version: number;
@@ -401,7 +402,8 @@ export function loadMigrations(): Migration[] {
     migration20260719CreateConfigHealthNotificationState,
     migration20260720AddSyncHistoryEntityOutcomes,
     migration20260721CreateQualityGoalApplyJournal,
-    migration20260722AddCanaryPreviewEvidence,
+    migration20260722AddJobRunHistoryEvidence,
+    migration20260723AddCanaryPreviewEvidence,
   ];
 
   // Sort by version number

@@ -71,7 +71,7 @@ Re-review of head `bd23999f` confirms both findings are fixed with no new findin
 - `packages/praxrr-api/types.ts` (Modified)
 - `packages/praxrr-app/src/lib/api/v1.d.ts` (Modified)
 - `packages/praxrr-app/src/lib/server/db/migrations.ts` (Modified)
-- `packages/praxrr-app/src/lib/server/db/migrations/20260722_add_canary_preview_evidence.ts` (Added)
+- `packages/praxrr-app/src/lib/server/db/migrations/20260723_add_canary_preview_evidence.ts` (Added)
 - `packages/praxrr-app/src/lib/server/db/queries/canaryRollouts.ts` (Modified)
 - `packages/praxrr-app/src/lib/server/db/schema.sql` (Modified)
 - `packages/praxrr-app/src/lib/server/sync/canary/coordinator.ts` (Modified)

@@ -425,7 +425,10 @@ export interface paths {
      *
      *     This endpoint performs no writes. It only reads from PCD and Arr GET
      *     endpoints to compare desired versus current state, then stores a preview
-     *     snapshot for later retrieval or application.
+     *     snapshot for later retrieval or application. Optional transient
+     *     `sectionConfigs` are treated as bound reviewed execution state: their
+     *     normalized effective values are retained privately with the expiring
+     *     preview and reused during reviewed apply.
      *
      *     If no `sections` are provided, all configured sections for the instance are
      *     included.
@@ -484,9 +487,15 @@ export interface paths {
      * @description Applies the selected sections from a previously generated preview to the
      *     target Arr instance.
      *
-     *     Preview generation itself is read-only. Apply runs the normal sync job path
-     *     afresh for the selected sections using the current saved sync configuration;
-     *     it does not replay stored per-entity mutations from the preview snapshot.
+     *     Preview generation itself is read-only. Apply atomically claims the preview
+     *     and selected section rows, then revalidates the exact reviewed instance, Arr
+     *     family, section subset, effective configuration, desired PCD evidence, live
+     *     Arr evidence, and material plan. Every selected section must match before
+     *     any Arr write, confirmed outcome, or Sync History row is created.
+     *
+     *     A matching review executes through the existing section writers with the
+     *     bound effective configuration. Private fingerprints, retained configuration,
+     *     and raw comparison evidence are never returned by this endpoint.
      *
      *     The response reports only the aggregate job/run result. Preview entity changes
      *     remain planned evidence and are not per-entity confirmation of what succeeded.
@@ -1329,6 +1338,34 @@ export interface paths {
     get: operations['getGoalBinding'];
     put?: never;
     post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/trash-guide/sources/{id}/sync': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Resolve current + latest terminal run for a TRaSH source
+     * @description Returns the source's current queue slot and latest terminal run evidence, used to poll a
+     *     queued/running sync to its exact terminal run. Read-only and safe for a since-deleted source:
+     *     identity falls back to the durable snapshot, so it does not 404 on that case.
+     */
+    get: operations['getTrashGuideSyncStatus'];
+    put?: never;
+    /**
+     * Enqueue a manual TRaSH source sync
+     * @description Enqueues a manual sync for the TRaSH source and returns the per-run correlation token plus a
+     *     source-labeled status view, so the initiating surface can link to exactly one current-or-terminal
+     *     run. An already-running source dedupes onto the in-flight run (409) instead of acking a new one.
+     */
+    post: operations['syncTrashGuideSource'];
     delete?: never;
     options?: never;
     head?: never;
@@ -2348,10 +2385,112 @@ export interface components {
       instanceId: number;
       /** @description Optional section filters for preview generation */
       sections?: components['schemas']['SyncPreviewSection'][];
+      sectionConfigs?: components['schemas']['SyncPreviewSectionConfigs'];
+    };
+    /**
+     * @description Optional transient configuration overrides used to materialize the selected
+     *     preview sections. These values are bound as reviewed execution state: apply
+     *     revalidates and executes with the same effective configuration instead of
+     *     silently falling back to newly saved configuration. The server retains the
+     *     normalized values only in the private, expiring preview envelope; they are
+     *     never included in preview or apply responses.
+     */
+    SyncPreviewSectionConfigs: {
+      /** @description Effective quality-profile section configuration to review and bind. */
+      qualityProfiles?: unknown;
+      delayProfiles?: components['schemas']['SyncPreviewNamedProfileSectionConfig'];
+      mediaManagement?: components['schemas']['SyncPreviewMediaManagementSectionConfig'];
+      metadataProfiles?: components['schemas']['SyncPreviewNamedProfileSectionConfig'];
     };
     SyncPreviewApplyRequest: {
       /** @description Optional section filters for preview application */
       sections?: components['schemas']['SyncPreviewSection'][];
+    };
+    /**
+     * @description Terminal status returned by the sync job execution.
+     * @enum {string}
+     */
+    SyncPreviewApplyJobStatus: 'success' | 'failure' | 'skipped' | 'cancelled';
+    SyncPreviewApplyJobResult: {
+      status: components['schemas']['SyncPreviewApplyJobStatus'];
+      /** @description Aggregate human-readable output from the sync job. */
+      output: string;
+      /**
+       * @description Typed, safe failure reason when the sync run did not succeed; omitted or null
+       *     otherwise. Replaces the former free-form `error` string — the raw job error is
+       *     never transported and remains only in sanitized logs and per-entity outcomes.
+       */
+      failure?: components['schemas']['SyncPreviewFailureReason'] | null;
+    };
+    /**
+     * @description Result of executing the preview's selected sections through the normal sync job
+     *     path. `results` describes the aggregate job/run outcome; `outcomes` carries the
+     *     confirmed, per-entity terminal results captured from the ACTUAL Arr writes
+     *     (issue #232) — these, not the planned preview changes, are execution proof.
+     */
+    SyncPreviewApplyResponse: {
+      /** @description True when the sync job succeeded or reported that no work was needed. */
+      success: boolean;
+      results: components['schemas']['SyncPreviewApplyJobResult'];
+      /** @description Preview-age warning returned when the reviewed snapshot is stale, or null. */
+      staleWarning: string | null;
+      /**
+       * @description Confirmed per-entity outcomes captured from the actual Arr writes. Present on
+       *     both success and partial/failure responses so failed and skipped outcomes are
+       *     never dropped.
+       */
+      outcomes: components['schemas']['SyncEntityOutcome'][];
+      /** @description Durable Sync History id exposing these outcomes, or null when recording is disabled. */
+      syncHistoryId: number | null;
+    };
+    /**
+     * @description Closed reason for rejecting reviewed execution before any write:
+     *     - `pcd_drift`: desired PCD, source, mapping, or reviewed configuration changed
+     *     - `arr_drift`: material live Arr state changed
+     *     - `pcd_and_arr_drift`: both PCD-side and live Arr evidence changed
+     *     - `scope_drift`: the instance, Arr family, capability, or reviewed scope changed
+     *     - `unverifiable_review`: authoritative evidence could not be read or compared safely
+     * @enum {string}
+     */
+    SyncPreviewApplyInvalidationCode:
+      'pcd_drift' | 'arr_drift' | 'pcd_and_arr_drift' | 'scope_drift' | 'unverifiable_review';
+    /**
+     * @description Public evidence class that changed; private fingerprints and raw evidence are never returned.
+     * @enum {string}
+     */
+    SyncPreviewChangedEvidence: 'pcd' | 'arr';
+    /**
+     * @description Safe pre-write rejection when the selected reviewed plan is no longer
+     *     verifiable. No Arr write was attempted, so this response never contains
+     *     confirmed outcomes, Sync History identifiers, private fingerprints,
+     *     retained configuration, or raw PCD/Arr evidence.
+     */
+    SyncPreviewApplyInvalidatedResponse: {
+      /**
+       * @description Sanitized recovery text stating that nothing was applied and directing
+       *     the operator to generate and review a new preview.
+       */
+      error: string;
+      code: components['schemas']['SyncPreviewApplyInvalidationCode'];
+      /**
+       * @description Bounded changed source classes. Empty for scope or unverifiable failures
+       *     when PCD-side or Arr-side drift cannot be attributed safely.
+       */
+      changedEvidence: components['schemas']['SyncPreviewChangedEvidence'][];
+      /** @description Exact selected sections whose reviewed execution was invalidated. */
+      changedSections: components['schemas']['SyncPreviewSection'][];
+      /**
+       * @description Always true because an invalidated review cannot be retried.
+       * @constant
+       */
+      regenerateRequired: true;
+      /** @description Preview-age warning when relevant to the rejection, or null. */
+      staleWarning: string | null;
+    };
+    SyncPreviewApplyErrorResponse: {
+      failure: components['schemas']['SyncPreviewFailureReason'];
+      /** @description Preview-age warning when relevant to the failure, or null. */
+      staleWarning: string | null;
     };
     /**
      * @description Preview lifecycle state:
@@ -3241,6 +3380,91 @@ export interface components {
       /** @description Whether the live state already equalled the recorded intent (a no-op reconcile). */
       alreadyApplied: boolean;
       applyStatus: components['schemas']['GoalApplyStatus'];
+    };
+    /**
+     * @description Closed, safe vocabulary of TRaSH sync failure reasons. Assigned by outcome/error type only — never by message parsing — so no raw diagnostic can leak.
+     * @enum {string}
+     */
+    TrashGuideSyncFailureCode:
+      'source_missing' | 'source_disabled' | 'network' | 'parser_failed' | 'sync_failed' | 'internal';
+    /** @description Typed, closed, SAFE failure evidence. message/recoveryAction are pre-authored copy that never embeds raw exception text, git/parser diagnostics, credentials, or hostnames. */
+    TrashGuideSyncFailureReason: {
+      code: components['schemas']['TrashGuideSyncFailureCode'];
+      message: string;
+      recoveryAction: string;
+    };
+    /** @description Fetched/applied counts for a TRaSH sync run. */
+    TrashGuideSyncCounts: {
+      commitsBehind: number;
+      parsedFiles: number;
+      failedFiles: number;
+      activeOperations: number;
+      removedEntities: number;
+      renamedEntities: number;
+    };
+    /** @description Versioned, structured terminal evidence for one TRaSH sync run, serialized into job_run_history.output. Survives a source hard-delete via its embedded identity snapshot. */
+    TrashGuideSyncRunEvidence: {
+      /** @enum {integer} */
+      schemaVersion: 1;
+      runToken: string | null;
+      source: {
+        id: number;
+        name: string | null;
+        arrType: ('radarr' | 'sonarr') | null;
+      };
+      /** @enum {string} */
+      trigger: 'manual' | 'scheduled';
+      requestedAt: string | null;
+      /** @enum {string} */
+      status: 'success' | 'failure' | 'skipped' | 'cancelled';
+      counts: components['schemas']['TrashGuideSyncCounts'] | null;
+      failure: components['schemas']['TrashGuideSyncFailureReason'] | null;
+      retry: {
+        rescheduleAt: string | null;
+        retryable: boolean;
+      };
+    };
+    /** @description Single wire view of a source's current queue slot + latest terminal run, reused by the POST response and the GET status resolver. */
+    TrashGuideSyncStatusView: {
+      sourceId: number;
+      sourceName: string | null;
+      arrType: ('radarr' | 'sonarr') | null;
+      queueId: number | null;
+      current: {
+        status: string;
+        runAt: string;
+        startedAt: string | null;
+        attempts: number;
+        runToken: string | null;
+      } | null;
+      latestRun: {
+        id: number;
+        /** @enum {string} */
+        status: 'success' | 'failure' | 'skipped' | 'cancelled';
+        startedAt: string;
+        finishedAt: string;
+        durationMs: number;
+        evidence: components['schemas']['TrashGuideSyncRunEvidence'] | null;
+      } | null;
+    };
+    /** @description Manual-sync enqueue acknowledgement, linking to exactly one current-or-terminal run. */
+    TrashGuideSyncQueuedResponse: {
+      /** @enum {boolean} */
+      success: true;
+      /** @enum {boolean} */
+      queued: true;
+      runToken: string;
+      statusUrl: string;
+      view: components['schemas']['TrashGuideSyncStatusView'];
+    };
+    /** @description Already-running dedupe response — links to the existing in-flight run rather than acking a new one. */
+    TrashGuideSyncDedupeResponse: {
+      error: string;
+      /** @enum {boolean} */
+      deduped: true;
+      runToken: string;
+      statusUrl: string;
+      view: components['schemas']['TrashGuideSyncStatusView'];
     };
     /** @enum {string} */
     TrashGuideEntityType: 'custom_format' | 'custom_format_group' | 'quality_profile' | 'quality_size' | 'naming';
@@ -4846,47 +5070,71 @@ export interface components {
       reason: string;
     };
     /**
-     * @description Terminal status returned by the sync job execution.
-     * @enum {string}
+     * @description Complete transient delay/metadata profile selection. Both fields must be
+     *     null to select no profile, or both must contain a valid selection.
      */
-    SyncPreviewApplyJobStatus: 'success' | 'failure' | 'skipped' | 'cancelled';
-    SyncPreviewApplyJobResult: {
-      status: components['schemas']['SyncPreviewApplyJobStatus'];
-      /** @description Aggregate human-readable output from the sync job. */
-      output: string;
-      /**
-       * @description Typed, safe failure reason when the sync run did not succeed; omitted or null
-       *     otherwise. Replaces the former free-form `error` string — the raw job error is
-       *     never transported and remains only in sanitized logs and per-entity outcomes.
-       */
-      failure?: components['schemas']['SyncPreviewFailureReason'] | null;
-    };
+    SyncPreviewNamedProfileSectionConfig: {
+      databaseId: number | null;
+      profileName: string | null;
+    } & (
+      | {
+          databaseId?: number;
+          profileName?: string;
+        }
+      | {
+          /** @enum {unknown|null} */
+          databaseId?: null;
+          /** @enum {unknown|null} */
+          profileName?: null;
+        }
+    );
     /**
-     * @description Result of executing the preview's selected sections through the normal sync job
-     *     path. `results` describes the aggregate job/run outcome; `outcomes` carries the
-     *     confirmed, per-entity terminal results captured from the ACTUAL Arr writes
-     *     (issue #232) — these, not the planned preview changes, are execution proof.
+     * @description Complete transient media-management selection. Each database/name pair
+     *     must either be null/null or contain a positive database ID and non-empty name.
      */
-    SyncPreviewApplyResponse: {
-      /** @description True when the sync job succeeded or reported that no work was needed. */
-      success: boolean;
-      results: components['schemas']['SyncPreviewApplyJobResult'];
-      /** @description Preview-age warning returned when the reviewed snapshot is stale, or null. */
-      staleWarning: string | null;
-      /**
-       * @description Confirmed per-entity outcomes captured from the actual Arr writes. Present on
-       *     both success and partial/failure responses so failed and skipped outcomes are
-       *     never dropped.
-       */
-      outcomes: components['schemas']['SyncEntityOutcome'][];
-      /** @description Durable Sync History id exposing these outcomes, or null when recording is disabled. */
-      syncHistoryId: number | null;
-    };
-    SyncPreviewApplyErrorResponse: {
-      failure: components['schemas']['SyncPreviewFailureReason'];
-      /** @description Preview-age warning when relevant to the failure, or null. */
-      staleWarning: string | null;
-    };
+    SyncPreviewMediaManagementSectionConfig: {
+      namingDatabaseId: number | null;
+      namingConfigName: string | null;
+      qualityDefinitionsDatabaseId: number | null;
+      qualityDefinitionsConfigName: string | null;
+      mediaSettingsDatabaseId: number | null;
+      mediaSettingsConfigName: string | null;
+    } & ((
+      | {
+          namingDatabaseId?: number;
+          namingConfigName?: string;
+        }
+      | {
+          /** @enum {unknown|null} */
+          namingDatabaseId?: null;
+          /** @enum {unknown|null} */
+          namingConfigName?: null;
+        }
+    ) &
+      (
+        | {
+            qualityDefinitionsDatabaseId?: number;
+            qualityDefinitionsConfigName?: string;
+          }
+        | {
+            /** @enum {unknown|null} */
+            qualityDefinitionsDatabaseId?: null;
+            /** @enum {unknown|null} */
+            qualityDefinitionsConfigName?: null;
+          }
+      ) &
+      (
+        | {
+            mediaSettingsDatabaseId?: number;
+            mediaSettingsConfigName?: string;
+          }
+        | {
+            /** @enum {unknown|null} */
+            mediaSettingsDatabaseId?: null;
+            /** @enum {unknown|null} */
+            mediaSettingsConfigName?: null;
+          }
+      ));
     /**
      * @description Optional metadata for hybrid JSON/YAML migration envelopes.
      *     Existing payloads are backward-compatible when omitted.
@@ -6191,7 +6439,7 @@ export interface operations {
           'application/json': components['schemas']['ErrorResponse'];
         };
       };
-      /** @description Preview not found or expired */
+      /** @description Preview is missing, evicted, or no longer retained */
       404: {
         headers: {
           [name: string]: unknown;
@@ -6200,7 +6448,7 @@ export interface operations {
           'application/json': components['schemas']['ErrorResponse'];
         };
       };
-      /** @description Preview is not in a ready state, contains failed sections, or instance is syncing */
+      /** @description Preview lifecycle conflict or a selected section has an active claim */
       409: {
         headers: {
           [name: string]: unknown;
@@ -6209,16 +6457,24 @@ export interface operations {
           'application/json': components['schemas']['ErrorResponse'];
         };
       };
-      /** @description Preview is stale beyond apply threshold */
+      /** @description Preview age policy blocked apply or reviewed evidence was invalidated before writes */
       422: {
         headers: {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['SyncPreviewApplyErrorResponse'];
+          'application/json':
+            | components['schemas']['SyncPreviewApplyInvalidatedResponse']
+            | components['schemas']['SyncPreviewApplyErrorResponse'];
         };
       };
-      /** @description Sync job reported failure or preview apply raised an unexpected error */
+      /**
+       * @description The reviewed evidence matched but the write-time sync job failed, or an
+       *     unexpected internal failure occurred. A matched write-time failure uses
+       *     `SyncPreviewApplyResponse` and preserves confirmed outcomes and Sync
+       *     History correlation when present. An unexpected failure uses the typed,
+       *     sanitized `SyncPreviewApplyErrorResponse`.
+       */
       500: {
         headers: {
           [name: string]: unknown;
@@ -8312,6 +8568,106 @@ export interface operations {
       };
       /** @description Invalid query parameters */
       400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+    };
+  };
+  getTrashGuideSyncStatus: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        /** @description TRaSH source ID */
+        id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Current + latest terminal run view */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['TrashGuideSyncStatusView'];
+        };
+      };
+      /** @description Invalid source ID */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Failed to resolve sync status */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+    };
+  };
+  syncTrashGuideSource: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        /** @description TRaSH source ID */
+        id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Sync queued (or coalesced onto a pending run) */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['TrashGuideSyncQueuedResponse'];
+        };
+      };
+      /** @description Invalid source ID */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description TRaSH source not found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description A sync is already running for this source — links to the existing run */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['TrashGuideSyncDedupeResponse'];
+        };
+      };
+      /** @description Failed to enqueue the sync */
+      500: {
         headers: {
           [name: string]: unknown;
         };

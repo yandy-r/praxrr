@@ -50,7 +50,7 @@ remaining targets. Never use the canary’s recorded changes as proof that
 remaining instances were successfully previewed.
 
 Persist `remaining_preview_evidence TEXT NULL` through a new dated migration,
-expected `20260722_add_canary_preview_evidence.ts`. Null supports
+expected `20260723_add_canary_preview_evidence.ts`. Null supports
 legacy/in-progress rows but is never promotable. Persist evidence in the same
 guarded `canary_running` outcome transition that sets `awaiting_confirmation`;
 avoid a crash window with gate status but no evidence.
@@ -65,7 +65,7 @@ avoid a crash window with gate status but no evidence.
 | `packages/praxrr-app/src/lib/server/sync/canary/selection.ts`                              | Preserve existing initial same-Arr cohort resolution; no policy change                              |
 | `packages/praxrr-app/src/lib/server/sync/preview/orchestrator.ts`                          | Existing `GeneratePreviewResult` and per-section failure source; normally unchanged                 |
 | `packages/praxrr-app/src/lib/server/sync/preview/failureReason.ts`                         | Reuse `classifyPreviewFailure()` and `buildPreviewFailure('sectionErrors')`; do not duplicate copy  |
-| `packages/praxrr-app/src/lib/server/db/migrations/20260722_add_canary_preview_evidence.ts` | Add nullable JSON-text column                                                                       |
+| `packages/praxrr-app/src/lib/server/db/migrations/20260723_add_canary_preview_evidence.ts` | Add nullable JSON-text column                                                                       |
 | `packages/praxrr-app/src/lib/server/db/migrations.ts`                                      | Register migration after 20260721                                                                   |
 | `packages/praxrr-app/src/lib/server/db/schema.sql`                                         | Keep reference application schema in parity                                                         |
 | `packages/praxrr-app/src/lib/server/db/queries/canaryRollouts.ts`                          | Strict decode, row/detail projection, atomic evidence/outcome persistence, authorizing validation   |

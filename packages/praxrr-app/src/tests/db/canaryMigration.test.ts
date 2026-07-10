@@ -2,7 +2,7 @@ import { assert, assertEquals, assertExists } from '@std/assert';
 import { config } from '$config';
 import { db } from '$db/db.ts';
 import { migration as createCanaryTablesMigration } from '$db/migrations/20260715_create_canary_tables.ts';
-import { migration as addCanaryPreviewEvidenceMigration } from '$db/migrations/20260722_add_canary_preview_evidence.ts';
+import { migration as addCanaryPreviewEvidenceMigration } from '$db/migrations/20260723_add_canary_preview_evidence.ts';
 import { loadMigrations, runMigrations } from '$db/migrations.ts';
 
 /**
@@ -197,17 +197,17 @@ migratedTest('up seeds exactly one canary_settings row (id=1) with fail-closed d
   assertEquals(row.default_partial_policy, 'gate');
 });
 
-migratedTest('migration 20260722 is registered immediately after 20260721', () => {
+migratedTest('migration 20260723 is registered immediately after 20260722', () => {
   const migrations = loadMigrations();
-  const previousIndex = migrations.findIndex((candidate) => candidate.version === 20260721);
-  const evidenceIndex = migrations.findIndex((candidate) => candidate.version === 20260722);
+  const previousIndex = migrations.findIndex((candidate) => candidate.version === 20260722);
+  const evidenceIndex = migrations.findIndex((candidate) => candidate.version === 20260723);
 
-  assert(previousIndex >= 0, 'migration 20260721 should be registered');
+  assert(previousIndex >= 0, 'migration 20260722 should be registered');
   assertEquals(evidenceIndex, previousIndex + 1);
   assertEquals(migrations[evidenceIndex].name, 'Add canary preview evidence');
 });
 
-migratedTest('migration 20260722 down/up preserves legacy rows with null evidence', () => {
+migratedTest('migration 20260723 down/up preserves legacy rows with null evidence', () => {
   const down = addCanaryPreviewEvidenceMigration.down;
   assertExists(down);
   db.exec(down);

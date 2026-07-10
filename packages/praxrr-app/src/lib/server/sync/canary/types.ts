@@ -5,7 +5,7 @@
  * per-instance sync primitive `executeSyncJob` behind a verification gate.
  */
 
-import type { JobRunStatus } from '$jobs/queueTypes.ts';
+import type { JobHandlerResult, JobRunStatus } from '$jobs/queueTypes.ts';
 import type { GeneratePreviewResult } from '$sync/preview/orchestrator.ts';
 import type { SyncPreviewArrType, SyncPreviewFailureReason } from '$sync/preview/types.ts';
 import type { SectionType } from '$sync/types.ts';
@@ -49,13 +49,12 @@ export interface CanaryInstanceResult {
   error?: string;
 }
 
-/** Verbatim `executeSyncJob` return shape (arrSync.ts:96). */
-export interface SyncRunResult {
-  status: JobRunStatus;
-  output?: string;
-  error?: string;
-  rescheduleAt?: string | null;
-}
+/**
+ * `executeSyncJob`'s return contract. Aliased to the canonical {@link JobHandlerResult}
+ * discriminated union so it can never drift from the primitive: a failure carries a typed
+ * `failureCode` (no free-form `error`), matching the safe-evidence model (issue #237).
+ */
+export type SyncRunResult = JobHandlerResult;
 
 /**
  * Durable, planned evidence for every remaining target at the verification gate.

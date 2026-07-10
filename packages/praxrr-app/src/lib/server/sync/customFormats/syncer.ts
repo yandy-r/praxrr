@@ -43,6 +43,92 @@ export interface SyncCustomFormatsResult {
   readonly outcomes: SyncEntityOutcome[];
 }
 
+export interface CustomFormatPayloadWrite {
+  readonly pcdName: string;
+  readonly payload: ArrCustomFormat;
+}
+
+export interface CustomFormatPayloadWriteResult {
+  readonly remoteId: number | null;
+  readonly outcome: SyncEntityOutcome;
+}
+
+function requireCreatedId(value: unknown, entity: string): number {
+  if (typeof value !== 'number' || !Number.isInteger(value) || value <= 0) {
+    throw new Error(`Arr did not return an id for ${entity}`);
+  }
+  return value;
+}
+
+/** Write one already-materialized custom-format payload without re-reading Arr or PCD state. */
+export async function writeCustomFormatPayload(
+  client: BaseArrClient,
+  instanceId: number,
+  instanceType: SyncArrType,
+  prepared: CustomFormatPayloadWrite
+): Promise<CustomFormatPayloadWriteResult> {
+  const payload = structuredClone(prepared.payload);
+  const isUpdate = payload.id !== undefined;
+
+  try {
+    let remoteId: number;
+    if (payload.id !== undefined) {
+      remoteId = payload.id;
+      await client.updateCustomFormat(remoteId, payload);
+      await logger.debug(`Updated custom format "${prepared.pcdName}"`, {
+        source: 'Sync:CustomFormats',
+        meta: { instanceId, formatId: remoteId, pcdName: prepared.pcdName, suffixedName: payload.name },
+      });
+    } else {
+      const response = await client.createCustomFormat(payload);
+      remoteId = requireCreatedId(response.id, `custom format "${prepared.pcdName}"`);
+      await logger.debug(`Created custom format "${prepared.pcdName}"`, {
+        source: 'Sync:CustomFormats',
+        meta: { instanceId, formatId: remoteId, pcdName: prepared.pcdName, suffixedName: payload.name },
+      });
+    }
+
+    return {
+      remoteId,
+      outcome: {
+        section: 'qualityProfiles',
+        arrType: instanceType,
+        entityType: 'customFormat',
+        name: prepared.pcdName,
+        action: isUpdate ? 'update' : 'create',
+        status: 'success',
+        remoteId: String(remoteId),
+        reason: null,
+      },
+    };
+  } catch (error) {
+    const { reason, protectedDetails } = sanitizeArrWriteError(error);
+    await logger.error(`Failed to sync custom format "${prepared.pcdName}"`, {
+      source: 'Sync:CustomFormats',
+      meta: {
+        instanceId,
+        pcdName: prepared.pcdName,
+        suffixedName: payload.name,
+        request: payload,
+        ...protectedDetails,
+      },
+    });
+    return {
+      remoteId: null,
+      outcome: {
+        section: 'qualityProfiles',
+        arrType: instanceType,
+        entityType: 'customFormat',
+        name: prepared.pcdName,
+        action: isUpdate ? 'update' : 'create',
+        status: 'failed',
+        remoteId: isUpdate ? String(payload.id) : null,
+        reason,
+      },
+    };
+  }
+}
+
 interface CompileCustomFormatsOptions {
   readonly includeSyntheticIds?: boolean;
 }
@@ -180,60 +266,13 @@ export async function syncCustomFormats(
       },
     });
 
-    const isUpdate = arrFormat.id !== undefined;
-    try {
-      let remoteId: number;
-      if (arrFormat.id !== undefined) {
-        // Update existing
-        await client.updateCustomFormat(arrFormat.id, arrFormat);
-        remoteId = arrFormat.id;
-        pcdFormatIdMap.set(pcdName, arrFormat.id);
-        await logger.debug(`Updated custom format "${pcdName}"`, {
-          source: 'Sync:CustomFormats',
-          meta: { instanceId, formatId: arrFormat.id, pcdName, suffixedName: arrFormat.name },
-        });
-      } else {
-        // Create new
-        const response = await client.createCustomFormat(arrFormat);
-        remoteId = response.id!;
-        pcdFormatIdMap.set(pcdName, response.id!);
-        await logger.debug(`Created custom format "${pcdName}"`, {
-          source: 'Sync:CustomFormats',
-          meta: { instanceId, formatId: response.id, pcdName, suffixedName: arrFormat.name },
-        });
-      }
-      outcomes.push({
-        section: 'qualityProfiles',
-        arrType: instanceType,
-        entityType: 'customFormat',
-        name: pcdName,
-        action: isUpdate ? 'update' : 'create',
-        status: 'success',
-        remoteId: String(remoteId),
-        reason: null,
-      });
-    } catch (error) {
-      const { reason, protectedDetails } = sanitizeArrWriteError(error);
-      await logger.error(`Failed to sync custom format "${pcdName}"`, {
-        source: 'Sync:CustomFormats',
-        meta: {
-          instanceId,
-          pcdName,
-          suffixedName: arrFormat.name,
-          request: arrFormat,
-          ...protectedDetails,
-        },
-      });
-      outcomes.push({
-        section: 'qualityProfiles',
-        arrType: instanceType,
-        entityType: 'customFormat',
-        name: pcdName,
-        action: isUpdate ? 'update' : 'create',
-        status: 'failed',
-        remoteId: isUpdate ? String(arrFormat.id) : null,
-        reason,
-      });
+    const write = await writeCustomFormatPayload(client, instanceId, instanceType, {
+      pcdName,
+      payload: arrFormat,
+    });
+    outcomes.push(write.outcome);
+    if (write.remoteId !== null) {
+      pcdFormatIdMap.set(pcdName, write.remoteId);
     }
   }
 

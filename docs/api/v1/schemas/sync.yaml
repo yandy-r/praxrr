@@ -11,6 +11,157 @@ SyncPreviewCreateRequest:
       description: Optional section filters for preview generation
       items:
         $ref: '#/SyncPreviewSection'
+    sectionConfigs:
+      $ref: '#/SyncPreviewSectionConfigs'
+
+SyncPreviewSectionConfigs:
+  type: object
+  additionalProperties: false
+  maxProperties: 4
+  description: |
+    Optional transient configuration overrides used to materialize the selected
+    preview sections. These values are bound as reviewed execution state: apply
+    revalidates and executes with the same effective configuration instead of
+    silently falling back to newly saved configuration. The server retains the
+    normalized values only in the private, expiring preview envelope; they are
+    never included in preview or apply responses.
+  properties:
+    qualityProfiles:
+      description: Effective quality-profile section configuration to review and bind.
+    delayProfiles:
+      $ref: '#/SyncPreviewNamedProfileSectionConfig'
+    mediaManagement:
+      $ref: '#/SyncPreviewMediaManagementSectionConfig'
+    metadataProfiles:
+      $ref: '#/SyncPreviewNamedProfileSectionConfig'
+
+SyncPreviewNamedProfileSectionConfig:
+  type: object
+  additionalProperties: false
+  required:
+    - databaseId
+    - profileName
+  description: |
+    Complete transient delay/metadata profile selection. Both fields must be
+    null to select no profile, or both must contain a valid selection.
+  properties:
+    databaseId:
+      type: integer
+      minimum: 1
+      nullable: true
+    profileName:
+      type: string
+      minLength: 1
+      pattern: '.*\S.*'
+      nullable: true
+  allOf:
+    - anyOf:
+        - properties:
+            databaseId:
+              type: integer
+              minimum: 1
+            profileName:
+              type: string
+              minLength: 1
+              pattern: '.*\S.*'
+        - properties:
+            databaseId:
+              nullable: true
+              enum: [null]
+            profileName:
+              nullable: true
+              enum: [null]
+
+SyncPreviewMediaManagementSectionConfig:
+  type: object
+  additionalProperties: false
+  required:
+    - namingDatabaseId
+    - namingConfigName
+    - qualityDefinitionsDatabaseId
+    - qualityDefinitionsConfigName
+    - mediaSettingsDatabaseId
+    - mediaSettingsConfigName
+  description: |
+    Complete transient media-management selection. Each database/name pair
+    must either be null/null or contain a positive database ID and non-empty name.
+  properties:
+    namingDatabaseId:
+      type: integer
+      minimum: 1
+      nullable: true
+    namingConfigName:
+      type: string
+      minLength: 1
+      pattern: '.*\S.*'
+      nullable: true
+    qualityDefinitionsDatabaseId:
+      type: integer
+      minimum: 1
+      nullable: true
+    qualityDefinitionsConfigName:
+      type: string
+      minLength: 1
+      pattern: '.*\S.*'
+      nullable: true
+    mediaSettingsDatabaseId:
+      type: integer
+      minimum: 1
+      nullable: true
+    mediaSettingsConfigName:
+      type: string
+      minLength: 1
+      pattern: '.*\S.*'
+      nullable: true
+  allOf:
+    - anyOf:
+        - properties:
+            namingDatabaseId:
+              type: integer
+              minimum: 1
+            namingConfigName:
+              type: string
+              minLength: 1
+              pattern: '.*\S.*'
+        - properties:
+            namingDatabaseId:
+              nullable: true
+              enum: [null]
+            namingConfigName:
+              nullable: true
+              enum: [null]
+    - anyOf:
+        - properties:
+            qualityDefinitionsDatabaseId:
+              type: integer
+              minimum: 1
+            qualityDefinitionsConfigName:
+              type: string
+              minLength: 1
+              pattern: '.*\S.*'
+        - properties:
+            qualityDefinitionsDatabaseId:
+              nullable: true
+              enum: [null]
+            qualityDefinitionsConfigName:
+              nullable: true
+              enum: [null]
+    - anyOf:
+        - properties:
+            mediaSettingsDatabaseId:
+              type: integer
+              minimum: 1
+            mediaSettingsConfigName:
+              type: string
+              minLength: 1
+              pattern: '.*\S.*'
+        - properties:
+            mediaSettingsDatabaseId:
+              nullable: true
+              enum: [null]
+            mediaSettingsConfigName:
+              nullable: true
+              enum: [null]
 
 SyncPreviewApplyRequest:
   type: object
@@ -138,8 +289,83 @@ SyncPreviewApplyResponse:
         - type: 'null'
       description: Durable Sync History id exposing these outcomes, or null when recording is disabled.
 
+SyncPreviewApplyInvalidationCode:
+  type: string
+  enum:
+    - pcd_drift
+    - arr_drift
+    - pcd_and_arr_drift
+    - scope_drift
+    - unverifiable_review
+  description: |
+    Closed reason for rejecting reviewed execution before any write:
+    - `pcd_drift`: desired PCD, source, mapping, or reviewed configuration changed
+    - `arr_drift`: material live Arr state changed
+    - `pcd_and_arr_drift`: both PCD-side and live Arr evidence changed
+    - `scope_drift`: the instance, Arr family, capability, or reviewed scope changed
+    - `unverifiable_review`: authoritative evidence could not be read or compared safely
+
+SyncPreviewChangedEvidence:
+  type: string
+  enum:
+    - pcd
+    - arr
+  description: Public evidence class that changed; private fingerprints and raw evidence are never returned.
+
+SyncPreviewApplyInvalidatedResponse:
+  type: object
+  additionalProperties: false
+  description: |
+    Safe pre-write rejection when the selected reviewed plan is no longer
+    verifiable. No Arr write was attempted, so this response never contains
+    confirmed outcomes, Sync History identifiers, private fingerprints,
+    retained configuration, or raw PCD/Arr evidence.
+  required:
+    - error
+    - code
+    - changedEvidence
+    - changedSections
+    - regenerateRequired
+    - staleWarning
+  properties:
+    error:
+      type: string
+      description: |
+        Sanitized recovery text stating that nothing was applied and directing
+        the operator to generate and review a new preview.
+    code:
+      $ref: '#/SyncPreviewApplyInvalidationCode'
+    changedEvidence:
+      type: array
+      minItems: 0
+      maxItems: 2
+      uniqueItems: true
+      description: |
+        Bounded changed source classes. Empty for scope or unverifiable failures
+        when PCD-side or Arr-side drift cannot be attributed safely.
+      items:
+        $ref: '#/SyncPreviewChangedEvidence'
+    changedSections:
+      type: array
+      minItems: 1
+      maxItems: 4
+      uniqueItems: true
+      description: Exact selected sections whose reviewed execution was invalidated.
+      items:
+        $ref: '#/SyncPreviewSection'
+    regenerateRequired:
+      type: boolean
+      const: true
+      description: Always true because an invalidated review cannot be retried.
+    staleWarning:
+      oneOf:
+        - type: string
+        - type: 'null'
+      description: Preview-age warning when relevant to the rejection, or null.
+
 SyncPreviewApplyErrorResponse:
   type: object
+  additionalProperties: false
   required:
     - failure
     - staleWarning

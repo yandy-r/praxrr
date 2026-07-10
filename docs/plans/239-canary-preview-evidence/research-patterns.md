@@ -111,7 +111,7 @@ In `packages/praxrr-app/src/tests/db/canaryMigration.test.ts`, tests initialize
 a unique temp base, run the full migration chain, inspect `PRAGMA table_info`,
 verify defaults/constraints, and exercise `down`. Extend it for the nullable
 `remaining_preview_evidence` column. Add the dated migration
-`20260722_add_canary_preview_evidence.ts`, statically import it and append it
+`20260723_add_canary_preview_evidence.ts`, statically import it and append it
 after 20260721 in `packages/praxrr-app/src/lib/server/db/migrations.ts`; the
 established additive-column shape is shown by
 `migrations/20260720_add_sync_history_entity_outcomes.ts`. Update the reference

@@ -1011,7 +1011,7 @@ CREATE TABLE drift_instance_status (
 -- ==============================================================================
 -- TABLE: canary_rollouts
 -- Purpose: Persist exact-Arr canary rollout state, gate evidence, and batched results
--- Migration: 20260715_create_canary_tables.ts, 20260722_add_canary_preview_evidence.ts
+-- Migration: 20260715_create_canary_tables.ts, 20260723_add_canary_preview_evidence.ts
 -- ==============================================================================
 
 CREATE TABLE canary_rollouts (

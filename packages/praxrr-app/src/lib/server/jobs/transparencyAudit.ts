@@ -46,21 +46,35 @@ export interface TransparencyFollowUpEntry extends TransparencyAuditEvidence {
  */
 export type TransparencyAuditEntry = TransparencyPassEntry | TransparencyNotApplicableEntry | TransparencyFollowUpEntry;
 
-const DURABLE_EVIDENCE_SAFETY_URL = 'https://github.com/yandy-r/praxrr/issues/237' as const;
 const SYNC_ENTITY_OUTCOMES_URL = 'https://github.com/yandy-r/praxrr/issues/232' as const;
 const TRASHGUIDE_RUN_CORRELATION_URL = 'https://github.com/yandy-r/praxrr/issues/238' as const;
 
+/**
+ * The durable safe-evidence gap (issue #237) is resolved: every queued job now produces a typed,
+ * bounded {@link SafeJobEvidence} record at the dispatcher boundary, so entries that once owned
+ * only that follow-up are now `pass`.
+ */
+const DURABLE_EVIDENCE_PASS_RATIONALE =
+  'Durable safe evidence is enforced at the dispatcher boundary via the typed job-evidence contract (issue #237): every run produces a bounded, secret-safe evidence record.';
+
+function queuedPass(evidence: TransparencyAuditEvidence): TransparencyPassEntry {
+  return {
+    ...evidence,
+    disposition: 'pass',
+    rationale: DURABLE_EVIDENCE_PASS_RATIONALE,
+    followUpUrls: null,
+  };
+}
+
 function queuedFollowUp(
   evidence: TransparencyAuditEvidence,
-  specializedFollowUps: readonly TransparencyFollowUpUrl[] = []
+  specializedFollowUps: TransparencyFollowUpUrls
 ): TransparencyFollowUpEntry {
-  const followUpUrls: TransparencyFollowUpUrls = [...specializedFollowUps, DURABLE_EVIDENCE_SAFETY_URL];
-
   return {
     ...evidence,
     disposition: 'follow-up',
-    rationale: 'The human audit assigns each unresolved gap to the linked engineering issue.',
-    followUpUrls,
+    rationale: 'The human audit assigns each remaining gap to the linked engineering issue.',
+    followUpUrls: specializedFollowUps,
   };
 }
 
@@ -97,14 +111,14 @@ function syncEntry(section: string): TransparencyFollowUpEntry {
  * registrations.
  */
 export const JOB_TRANSPARENCY_AUDIT = {
-  'arr.upgrade': queuedFollowUp({
+  'arr.upgrade': queuedPass({
     inputs: ['The payload identifies the Arr instance; job source and upgrade settings expose schedule and filters.'],
     decisions: ['The handler records disabled, unsupported, cooldown, no-candidate, and selected-candidate branches.'],
     outputs: ['Upgrade run history and job history expose result counts, timing, output, and next run.'],
     failureReasons: ['Missing instance, processor failure, and unsupported Arr reasons are retained explicitly.'],
     userSurface: '/arr/{instanceId}/upgrades and /settings/jobs',
   }),
-  'arr.rename': queuedFollowUp({
+  'arr.rename': queuedPass({
     inputs: ['The payload identifies the Arr instance; rename settings expose schedule, dry-run, and rename scope.'],
     decisions: ['The handler records disabled, unsupported, dry-run, and eligible-item decisions.'],
     outputs: ['Rename run history and job history expose counts, sample results, timing, output, and next run.'],
@@ -118,14 +132,14 @@ export const JOB_TRANSPARENCY_AUDIT = {
   'arr.sync.delayProfiles': syncEntry('Delay Profiles'),
   'arr.sync.mediaManagement': syncEntry('Media Management'),
   'arr.sync.metadataProfiles': syncEntry('Metadata Profiles'),
-  'arr.pull.startup': queuedFollowUp({
+  'arr.pull.startup': queuedPass({
     inputs: ['The system job records startup trigger time and evaluates every enabled Arr instance.'],
     decisions: ['Per-instance results distinguish imported, default-skipped, unmatched, conflicted, and failed items.'],
     outputs: ['Startup-pull run results retain per-instance and aggregate counters plus terminal status and timing.'],
     failureReasons: ['Disabled startup pull and per-instance failures are preserved as skipped/failure evidence.'],
     userSurface: '/settings/jobs and startup-pull run history',
   }),
-  'pcd.sync': queuedFollowUp({
+  'pcd.sync': queuedPass({
     inputs: ['The payload identifies the database; database settings expose enabled state and sync interval.'],
     decisions: ['The handler records disabled, auto-sync-disabled, not-due, no-change, and update branches.'],
     outputs: ['Job history exposes pull/update result, output, timing, and rescheduled run time.'],
@@ -146,28 +160,28 @@ export const JOB_TRANSPARENCY_AUDIT = {
     },
     [TRASHGUIDE_RUN_CORRELATION_URL]
   ),
-  'backup.create': queuedFollowUp({
+  'backup.create': queuedPass({
     inputs: ['Backup settings and job source expose whether creation is scheduled, manual, or system-triggered.'],
     decisions: ['The handler records the backups-disabled branch before attempting creation.'],
     outputs: ['Job history exposes terminal status, backup output, timing, and next scheduled run.'],
     failureReasons: ['Disabled backup, service failure, and unexpected error paths return explicit reasons.'],
     userSurface: '/settings/backups and /settings/jobs',
   }),
-  'backup.cleanup': queuedFollowUp({
+  'backup.cleanup': queuedPass({
     inputs: ['Backup retention settings and job source expose cleanup policy and trigger.'],
     decisions: ['The handler records disabled, no-files, retained, deleted, and delete-failure decisions.'],
     outputs: ['Job history exposes removed counts, retained counts, status, output, timing, and next run.'],
     failureReasons: ['Invalid backup directory and per-file or handler failures retain explicit reasons.'],
     userSurface: '/settings/backups and /settings/jobs',
   }),
-  'logs.cleanup': queuedFollowUp({
+  'logs.cleanup': queuedPass({
     inputs: ['Logging retention settings and job source expose cleanup policy and trigger.'],
     decisions: ['The handler records file-logging-disabled, no-files, retained, and deleted branches.'],
     outputs: ['Job history exposes removed counts, terminal status, output, timing, and next run.'],
     failureReasons: ['Retention and filesystem failures return explicit failure reasons.'],
     userSurface: '/settings/logs and /settings/jobs',
   }),
-  'drift.check': queuedFollowUp({
+  'drift.check': queuedPass({
     inputs: ['Drift settings expose enabled state and interval; continuation payload records sweep cursor and start.'],
     decisions: [
       'The handler records disabled, chunk continuation, per-instance classification, and retry/backoff decisions.',
@@ -176,14 +190,14 @@ export const JOB_TRANSPARENCY_AUDIT = {
     failureReasons: ['Closed drift reason codes and handler errors preserve user-facing recovery evidence.'],
     userSurface: '/drift and /settings/jobs',
   }),
-  'sync.history.cleanup': queuedFollowUp({
+  'sync.history.cleanup': queuedPass({
     inputs: ['Sync History retention settings and job source expose age/count policy and trigger.'],
     decisions: ['The handler records history-disabled, no-rows, retained, and pruned branches.'],
     outputs: ['Job history exposes pruned counts, terminal status, output, timing, and next run.'],
     failureReasons: ['Cleanup query and handler failures return explicit reasons.'],
     userSurface: '/sync-history and /settings/jobs',
   }),
-  'sync.canary.rollout': queuedFollowUp({
+  'sync.canary.rollout': queuedPass({
     inputs: [
       'The payload identifies a persisted rollout whose target type, canary, and remaining instances are inspectable.',
     ],
@@ -198,7 +212,7 @@ export const JOB_TRANSPARENCY_AUDIT = {
     ],
     userSurface: '/canary/{rolloutId} and /settings/jobs',
   }),
-  'config-health.snapshot': queuedFollowUp({
+  'config-health.snapshot': queuedPass({
     inputs: ['Config Health settings expose enabled state and interval; continuation payload records sweep progress.'],
     decisions: ['The handler records disabled, empty, chunk continuation, scoring, and retry/backoff branches.'],
     outputs: [
@@ -207,7 +221,7 @@ export const JOB_TRANSPARENCY_AUDIT = {
     failureReasons: ['Per-instance scoring and handler failures retain criterion or sanitized handler reasons.'],
     userSurface: '/config-health and /settings/jobs',
   }),
-  'config-health.cleanup': queuedFollowUp({
+  'config-health.cleanup': queuedPass({
     inputs: ['Config Health retention settings and job source expose age/count policy and trigger.'],
     decisions: ['The handler records scoring-disabled, no-snapshots, retained, and pruned branches.'],
     outputs: ['Job history exposes pruned counts, terminal status, output, timing, and next run.'],

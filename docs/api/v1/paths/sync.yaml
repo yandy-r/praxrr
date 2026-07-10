@@ -7,7 +7,10 @@ preview:
 
       This endpoint performs no writes. It only reads from PCD and Arr GET
       endpoints to compare desired versus current state, then stores a preview
-      snapshot for later retrieval or application.
+      snapshot for later retrieval or application. Optional transient
+      `sectionConfigs` are treated as bound reviewed execution state: their
+      normalized effective values are retained privately with the expiring
+      preview and reused during reviewed apply.
 
       If no `sections` are provided, all configured sections for the instance are
       included.
@@ -140,9 +143,15 @@ previewApply:
       Applies the selected sections from a previously generated preview to the
       target Arr instance.
 
-      Preview generation itself is read-only. Apply runs the normal sync job path
-      afresh for the selected sections using the current saved sync configuration;
-      it does not replay stored per-entity mutations from the preview snapshot.
+      Preview generation itself is read-only. Apply atomically claims the preview
+      and selected section rows, then revalidates the exact reviewed instance, Arr
+      family, section subset, effective configuration, desired PCD evidence, live
+      Arr evidence, and material plan. Every selected section must match before
+      any Arr write, confirmed outcome, or Sync History row is created.
+
+      A matching review executes through the existing section writers with the
+      bound effective configuration. Private fingerprints, retained configuration,
+      and raw comparison evidence are never returned by this endpoint.
 
       The response reports only the aggregate job/run result. Preview entity changes
       remain planned evidence and are not per-entity confirmation of what succeeded.
@@ -179,25 +188,32 @@ previewApply:
             schema:
               $ref: '../schemas/arr.yaml#/ErrorResponse'
       '404':
-        description: Preview not found or expired
+        description: Preview is missing, evicted, or no longer retained
         content:
           application/json:
             schema:
               $ref: '../schemas/arr.yaml#/ErrorResponse'
       '409':
-        description: Preview is not in a ready state, contains failed sections, or instance is syncing
+        description: Preview lifecycle conflict or a selected section has an active claim
         content:
           application/json:
             schema:
               $ref: '../schemas/arr.yaml#/ErrorResponse'
       '422':
-        description: Preview is stale beyond apply threshold
+        description: Preview age policy blocked apply or reviewed evidence was invalidated before writes
         content:
           application/json:
             schema:
-              $ref: '../schemas/sync.yaml#/SyncPreviewApplyErrorResponse'
+              oneOf:
+                - $ref: '../schemas/sync.yaml#/SyncPreviewApplyInvalidatedResponse'
+                - $ref: '../schemas/sync.yaml#/SyncPreviewApplyErrorResponse'
       '500':
-        description: Sync job reported failure or preview apply raised an unexpected error
+        description: |
+          The reviewed evidence matched but the write-time sync job failed, or an
+          unexpected internal failure occurred. A matched write-time failure uses
+          `SyncPreviewApplyResponse` and preserves confirmed outcomes and Sync
+          History correlation when present. An unexpected failure uses the typed,
+          sanitized `SyncPreviewApplyErrorResponse`.
         content:
           application/json:
             schema:

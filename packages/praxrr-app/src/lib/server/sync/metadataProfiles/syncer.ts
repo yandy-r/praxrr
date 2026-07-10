@@ -16,8 +16,8 @@ import type {
   MetadataProfileReleaseStatusToggle,
 } from '$pcd/entities/metadataProfiles/read.ts';
 import type {
-  LidarrMetadataProfileCreatePayload,
   LidarrMetadataProfile,
+  LidarrMetadataProfileCreatePayload,
   LidarrMetadataProfileSchema,
   LidarrProfilePrimaryAlbumTypeItem,
   LidarrProfileReleaseStatusItem,
@@ -28,51 +28,33 @@ import { getNamespaceSuffix } from '../namespace.ts';
 import { logger } from '$logger/logger.ts';
 import { HttpError } from '$http/types.ts';
 import { diffSingletonEntity, METADATA_PROFILE_ARRAY_KEY_STRATEGIES } from '../preview/sectionDiffs.ts';
-import type { MetadataProfilesPreview, SyncPreviewSectionResult } from '../preview/types.ts';
+import { parseNamedProfilePreviewConfig } from '../preview/sectionConfigs.ts';
+import { SyncPreviewSectionSkipped } from '../preview/sectionSkip.ts';
+import type {
+  MetadataProfilesPreview,
+  SyncPreviewPreparedExecutionContext,
+  SyncPreviewSectionResult,
+} from '../preview/types.ts';
 
-interface MetadataProfilesPreviewConfig {
-  databaseId: number | null;
-  profileName: string | null;
-}
-
-function parseMetadataProfilesPreviewConfig(rawConfig: unknown): MetadataProfilesPreviewConfig | null {
-  if (!rawConfig || typeof rawConfig !== 'object' || Array.isArray(rawConfig)) {
-    return null;
-  }
-
-  const value = rawConfig as Record<string, unknown>;
-  if (!('databaseId' in value) || !('profileName' in value)) {
-    return null;
-  }
-
-  const rawDatabaseId = value.databaseId;
-  const rawProfileName = value.profileName;
-  const databaseId = rawDatabaseId === null || rawDatabaseId === undefined ? null : parsePositiveInt(rawDatabaseId);
-  const profileName = typeof rawProfileName === 'string' && rawProfileName.length > 0 ? rawProfileName : null;
-
-  if (databaseId === null && profileName === null) {
-    return {
-      databaseId: null,
-      profileName: null,
-    };
-  }
-
-  if (databaseId === null || profileName === null) {
-    return null;
-  }
-
-  return {
-    databaseId,
-    profileName,
+interface MetadataProfilePreparedExecutionContext extends SyncPreviewPreparedExecutionContext {
+  readonly section: 'metadataProfiles';
+  readonly config: {
+    readonly databaseId: number;
+    readonly profileName: string;
   };
-}
-
-function parsePositiveInt(rawValue: unknown): number | null {
-  if (typeof rawValue !== 'number' || !Number.isInteger(rawValue) || rawValue <= 0) {
-    return null;
-  }
-
-  return rawValue;
+  readonly desired: LidarrMetadataProfileCreatePayload;
+  readonly materialPlan: {
+    readonly arrType: 'lidarr';
+    readonly sourceProfileName: string;
+    readonly targetProfileName: string;
+    readonly namespaceIndex: number;
+    readonly schemaAvailable: boolean;
+    readonly action: 'create' | 'update';
+    readonly targetRemoteId: number | null;
+  };
+  readonly currentGuards: {
+    readonly targetProfile: LidarrMetadataProfile | null;
+  };
 }
 
 const METADATA_PROFILE_SCHEMA_FALLBACK: Omit<LidarrMetadataProfileSchema, 'id' | 'name'> = {
@@ -321,18 +303,25 @@ export class MetadataProfileSyncer extends BaseSyncer {
   override async generatePreview(): Promise<Readonly<SyncPreviewSectionResult>> {
     const lidarrClient = this.getLidarrClient();
     const syncConfig = this.getMetadataProfilesSyncConfig();
+    this.recordPreviewEvidence('metadataProfiles', 'arr', 'materialCapabilities', {
+      arrType: 'lidarr',
+      metadataProfilesSupported: true,
+      schemaEndpoint: 'metadataprofile/schema',
+    });
+    this.recordPreviewEvidence('metadataProfiles', 'pcd', 'selectedConfig', {
+      databaseId: syncConfig.databaseId,
+      profileName: syncConfig.profileName,
+    });
 
     if (!syncConfig.databaseId || !syncConfig.profileName) {
       await logger.debug('No metadata profile configured for preview', {
         source: 'Preview:MetadataProfile',
         meta: { instanceId: this.instanceId },
       });
-      const result: MetadataProfilesPreview = {
-        section: 'metadataProfiles',
-        profile: null,
-      };
-
-      return result;
+      throw new SyncPreviewSectionSkipped(
+        'metadataProfiles',
+        'Metadata profile preview has no selected profile to compare'
+      );
     }
 
     const profile = await getMetadataProfileFromCache(syncConfig.databaseId, syncConfig.profileName);
@@ -343,6 +332,17 @@ export class MetadataProfileSyncer extends BaseSyncer {
     const namespaceIndex = arrNamespaceQueries.getOrCreate(this.instanceId, syncConfig.databaseId);
     const namespaceSuffix = getNamespaceSuffix(namespaceIndex);
     const suffixedProfileName = `${profile.name}${namespaceSuffix}`;
+    this.recordPreviewEvidence('metadataProfiles', 'pcd', 'selectedProfileSource', {
+      databaseId: syncConfig.databaseId,
+      table: 'lidarr_metadata_profiles',
+      profile,
+    });
+    this.recordPreviewEvidence('metadataProfiles', 'pcd', 'namespace', {
+      instanceId: this.instanceId,
+      databaseId: syncConfig.databaseId,
+      index: namespaceIndex,
+      suffix: namespaceSuffix,
+    });
 
     let metadataSchema: LidarrMetadataProfileSchema | null = null;
     try {
@@ -366,6 +366,10 @@ export class MetadataProfileSyncer extends BaseSyncer {
     }
 
     const normalizedSchema = normalizeSchema(metadataSchema);
+    this.recordPreviewEvidence('metadataProfiles', 'arr', 'metadataSchema', {
+      available: metadataSchema !== null,
+      value: metadataSchema,
+    });
 
     const normalizedPayload = buildPayload(
       {
@@ -377,6 +381,32 @@ export class MetadataProfileSyncer extends BaseSyncer {
 
     const remoteProfiles = await lidarrClient.getMetadataProfiles();
     const existingProfile = findMatchingRemoteProfile(suffixedProfileName, remoteProfiles);
+    this.recordPreviewEvidence('metadataProfiles', 'arr', 'liveTargetProfile', existingProfile ?? null);
+    this.recordPreviewEvidence('metadataProfiles', 'arr', 'targetIdentity', {
+      name: suffixedProfileName,
+      remoteId: existingProfile?.id ?? null,
+      action: existingProfile ? 'update' : 'create',
+    });
+    this.preparePreviewExecution({
+      section: 'metadataProfiles',
+      config: {
+        databaseId: syncConfig.databaseId,
+        profileName: syncConfig.profileName,
+      },
+      desired: normalizedPayload,
+      materialPlan: {
+        arrType: 'lidarr',
+        sourceProfileName: profile.name,
+        targetProfileName: suffixedProfileName,
+        namespaceIndex,
+        schemaAvailable: metadataSchema !== null,
+        action: existingProfile ? 'update' : 'create',
+        targetRemoteId: existingProfile?.id ?? null,
+      },
+      currentGuards: {
+        targetProfile: existingProfile ?? null,
+      },
+    } satisfies MetadataProfilePreparedExecutionContext);
 
     const profileChange = diffSingletonEntity({
       entityType: 'metadataProfile',
@@ -408,8 +438,18 @@ export class MetadataProfileSyncer extends BaseSyncer {
   }
 
   override async sync(): Promise<SyncResult> {
+    try {
+      return await this.syncOnce();
+    } finally {
+      this.clearPreparedExecutionContext();
+      this.clearPreviewConfig();
+    }
+  }
+
+  private async syncOnce(): Promise<SyncResult> {
     const lidarrClient = this.getLidarrClient();
-    const syncConfig = arrSyncQueries.getMetadataProfilesSync(this.instanceId);
+    const prepared = this.getPreparedMetadataProfileExecution();
+    const syncConfig = prepared?.config ?? this.getMetadataProfilesSyncConfig();
 
     if (!syncConfig.databaseId || !syncConfig.profileName) {
       await logger.debug('No metadata profile configured for sync', {
@@ -438,6 +478,16 @@ export class MetadataProfileSyncer extends BaseSyncer {
       reason,
     });
 
+    if (prepared) {
+      return await this.writeMetadataProfile(
+        lidarrClient,
+        prepared.materialPlan.sourceProfileName,
+        structuredClone(prepared.desired),
+        prepared.currentGuards.targetProfile,
+        outcome
+      );
+    }
+
     const profile = await getMetadataProfileFromCache(syncConfig.databaseId, profileName);
     if (!profile) {
       await logger.warn(`Metadata profile "${profileName}" not found in database ${syncConfig.databaseId}`, {
@@ -453,7 +503,9 @@ export class MetadataProfileSyncer extends BaseSyncer {
       return {
         success: true,
         itemsSynced: 0,
-        outcomes: [outcome('skipped', 'create', null, `Metadata profile "${profileName}" not found in its source database.`)],
+        outcomes: [
+          outcome('skipped', 'create', null, `Metadata profile "${profileName}" not found in its source database.`),
+        ],
       };
     }
 
@@ -489,42 +541,15 @@ export class MetadataProfileSyncer extends BaseSyncer {
       normalizedSchema
     );
 
-    let writeOutcome: SyncEntityOutcome;
-    try {
-      const remoteProfiles = await lidarrClient.getMetadataProfiles();
-      const existingProfile = findMatchingRemoteProfile(suffixedProfileName, remoteProfiles);
-
-      if (existingProfile) {
-        await lidarrClient.updateMetadataProfile(existingProfile.id, { ...normalizedPayload, id: existingProfile.id });
-
-        await logger.info(`Updated metadata profile "${profile.name}" on "${this.instanceName}"`, {
-          source: 'Sync:MetadataProfile',
-          meta: {
-            instanceId: this.instanceId,
-            remoteId: existingProfile.id,
-          },
-        });
-        writeOutcome = outcome('success', 'update', String(existingProfile.id), null);
-      } else {
-        const created = await lidarrClient.createMetadataProfile(normalizedPayload);
-
-        await logger.info(`Created metadata profile "${profile.name}" on "${this.instanceName}"`, {
-          source: 'Sync:MetadataProfile',
-          meta: { instanceId: this.instanceId, remoteName: suffixedProfileName, remoteId: created.id },
-        });
-        writeOutcome = outcome('success', 'create', created.id != null ? String(created.id) : null, null);
-      }
-    } catch (error) {
-      const { message: errorMsg, response } = readErrorDetails(error);
-      const { reason } = sanitizeArrWriteError(error);
-      await logger.error(`Failed to sync metadata profile "${profile.name}"`, {
-        source: 'Sync:MetadataProfile',
-        meta: { instanceId: this.instanceId, error: errorMsg, response },
-      });
-      return { success: false, itemsSynced: 0, error: errorMsg, outcomes: [outcome('failed', 'update', null, reason)] };
-    }
-
-    return { success: true, itemsSynced: 1, outcomes: [writeOutcome] };
+    const remoteProfiles = await lidarrClient.getMetadataProfiles();
+    const existingProfile = findMatchingRemoteProfile(suffixedProfileName, remoteProfiles);
+    return await this.writeMetadataProfile(
+      lidarrClient,
+      profile.name,
+      normalizedPayload,
+      existingProfile ?? null,
+      outcome
+    );
   }
 
   // Base class abstract methods - implemented but not used since we override sync()
@@ -532,13 +557,108 @@ export class MetadataProfileSyncer extends BaseSyncer {
     return [];
   }
 
-  private getMetadataProfilesSyncConfig(): { databaseId: number | null; profileName: string | null } {
-    const previewConfig = parseMetadataProfilesPreviewConfig(this.getPreviewConfig());
-    if (previewConfig) {
+  private getMetadataProfilesSyncConfig(): {
+    databaseId: number | null;
+    profileName: string | null;
+  } {
+    if (this.hasPreviewConfig()) {
+      const previewConfig = parseNamedProfilePreviewConfig(this.getPreviewConfig());
+      if (!previewConfig) {
+        throw new Error('Invalid reviewed metadata profile configuration');
+      }
       return previewConfig;
     }
 
     return arrSyncQueries.getMetadataProfilesSync(this.instanceId);
+  }
+
+  private getPreparedMetadataProfileExecution(): Readonly<MetadataProfilePreparedExecutionContext> | null {
+    const context = this.getPreparedExecutionContext<MetadataProfilePreparedExecutionContext>();
+    if (!context) {
+      return null;
+    }
+
+    const target = context.currentGuards.targetProfile;
+    const validTarget =
+      context.materialPlan.action === 'create'
+        ? target === null && context.materialPlan.targetRemoteId === null
+        : target !== null &&
+          target.id === context.materialPlan.targetRemoteId &&
+          target.name === context.materialPlan.targetProfileName;
+    if (
+      context.section !== 'metadataProfiles' ||
+      context.materialPlan.arrType !== 'lidarr' ||
+      context.config.databaseId <= 0 ||
+      context.config.profileName.length === 0 ||
+      context.materialPlan.sourceProfileName !== context.config.profileName ||
+      context.materialPlan.namespaceIndex <= 0 ||
+      typeof context.materialPlan.schemaAvailable !== 'boolean' ||
+      context.desired.name !== context.materialPlan.targetProfileName ||
+      !validTarget
+    ) {
+      throw new TypeError('Invalid reviewed metadata profile execution context');
+    }
+
+    return context;
+  }
+
+  private async writeMetadataProfile(
+    lidarrClient: LidarrClient,
+    sourceProfileName: string,
+    desired: LidarrMetadataProfileCreatePayload,
+    target: LidarrMetadataProfile | null,
+    outcome: (
+      status: SyncEntityOutcome['status'],
+      action: SyncEntityOutcome['action'],
+      remoteId: string | null,
+      reason: string | null
+    ) => SyncEntityOutcome
+  ): Promise<SyncResult> {
+    let writeOutcome: SyncEntityOutcome;
+    try {
+      if (target) {
+        await lidarrClient.updateMetadataProfile(target.id, {
+          ...desired,
+          id: target.id,
+        });
+
+        await logger.info(`Updated metadata profile "${sourceProfileName}" on "${this.instanceName}"`, {
+          source: 'Sync:MetadataProfile',
+          meta: {
+            instanceId: this.instanceId,
+            remoteId: target.id,
+          },
+        });
+        writeOutcome = outcome('success', 'update', String(target.id), null);
+      } else {
+        const created = await lidarrClient.createMetadataProfile(desired);
+
+        await logger.info(`Created metadata profile "${sourceProfileName}" on "${this.instanceName}"`, {
+          source: 'Sync:MetadataProfile',
+          meta: {
+            instanceId: this.instanceId,
+            remoteName: desired.name,
+            remoteId: created.id,
+          },
+        });
+        writeOutcome = outcome('success', 'create', created.id != null ? String(created.id) : null, null);
+      }
+    } catch (error) {
+      const { message: errorMsg, response } = readErrorDetails(error);
+      const { reason } = sanitizeArrWriteError(error);
+      await logger.error(`Failed to sync metadata profile "${sourceProfileName}"`, {
+        source: 'Sync:MetadataProfile',
+        meta: { instanceId: this.instanceId, error: errorMsg, response },
+      });
+      return {
+        success: false,
+        itemsSynced: 0,
+        error: errorMsg,
+        outcomes: [outcome('failed', target ? 'update' : 'create', target ? String(target.id) : null, reason)],
+      };
+    }
+
+    return { success: true, itemsSynced: 1, outcomes: [writeOutcome] };
   }
 
   protected transformToArr(_pcdData: unknown[]): unknown[] {

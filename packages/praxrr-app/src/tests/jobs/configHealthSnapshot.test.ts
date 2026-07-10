@@ -165,8 +165,8 @@ migratedTest('config-health.snapshot returns skipped and reschedules when schedu
   const result = await handler(createSnapshotJob({ source: 'schedule' }));
 
   assertEquals(result.status, 'skipped');
-  assertExists(result.output);
-  assertStringIncludes(result.output, 'No sync-capable instances');
+  assertExists(result.decision);
+  assertStringIncludes(result.decision, 'No sync-capable instances');
   assertExists(result.rescheduleAt, 'a scheduled sweep must reschedule even with nothing to snapshot');
 
   // A scheduled empty sweep is recorded as a completed run.
@@ -195,8 +195,8 @@ migratedTest('config-health.snapshot returns cancelled when scoring is disabled'
 
   const result = await handler(createSnapshotJob({ source: 'schedule' }));
   assertEquals(result.status, 'cancelled');
-  assertExists(result.output);
-  assertStringIncludes(result.output, 'disabled');
+  assertExists(result.decision);
+  assertStringIncludes(result.decision, 'disabled');
 });
 
 // ============================================================================

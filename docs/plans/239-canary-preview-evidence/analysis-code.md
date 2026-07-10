@@ -123,7 +123,7 @@ state/token (`coordinator.ts:252-266`). Add a named
 ## Integration Points
 
 - **Database:** create
-  `packages/praxrr-app/src/lib/server/db/migrations/20260722_add_canary_preview_evidence.ts`
+  `packages/praxrr-app/src/lib/server/db/migrations/20260723_add_canary_preview_evidence.ts`
   with `ALTER TABLE canary_rollouts ADD COLUMN remaining_preview_evidence TEXT`.
   Register its static import and list entry after 20260721 in
   `packages/praxrr-app/src/lib/server/db/migrations.ts` (current tail: lines

@@ -49,7 +49,7 @@ state, not from a client assertion or ephemeral POST response.
 
 ## Data Models
 
-Add migration `20260722_add_canary_preview_evidence.ts`, register it after
+Add migration `20260723_add_canary_preview_evidence.ts`, register it after
 migration 20260721, and add a nullable `remaining_preview_evidence TEXT` column
 to `canary_rollouts`. Null is required for legacy rows and for the interval
 while a newly created row is still `canary_running`; null must never authorize
@@ -139,7 +139,7 @@ evidence for the UI to explain why Proceed is disabled.
   and extend row/detail/start contracts.
 - `packages/praxrr-app/src/lib/server/sync/preview/failureReason.ts`: reuse
   `classifyPreviewFailure`; do not create message-based classification.
-- `packages/praxrr-app/src/lib/server/db/migrations/20260722_add_canary_preview_evidence.ts`
+- `packages/praxrr-app/src/lib/server/db/migrations/20260723_add_canary_preview_evidence.ts`
   and `db/migrations.ts`: add/register the column.
 - `packages/praxrr-app/src/lib/server/db/queries/canaryRollouts.ts`: serialize,
   parse, validate, project, persist, and guard evidence.

@@ -154,7 +154,7 @@ POST /proceed
 | ---------------------------- | ------ | ------------- | ----------------------------------------------------------------------------------------------- |
 | `remaining_preview_evidence` | `TEXT` | nullable JSON | Versioned available/unavailable snapshot; null for legacy/in-progress rows and never promotable |
 
-Migration `20260722_add_canary_preview_evidence.ts` adds the column and is
+Migration `20260723_add_canary_preview_evidence.ts` adds the column and is
 registered after `20260721`. The reference `schema.sql` is updated for parity.
 Existing rows remain null; historical lifecycle facts are not rewritten.
 
@@ -246,7 +246,7 @@ codes remain unchanged.
 
 #### Files to Create
 
-- `packages/praxrr-app/src/lib/server/db/migrations/20260722_add_canary_preview_evidence.ts`:
+- `packages/praxrr-app/src/lib/server/db/migrations/20260723_add_canary_preview_evidence.ts`:
   nullable evidence column.
 
 #### Files to Modify
@@ -258,7 +258,7 @@ codes remain unchanged.
 - `packages/praxrr-app/src/lib/server/db/queries/canaryRollouts.ts`: strict JSON
   round-trip and atomic outcome/evidence write.
 - `packages/praxrr-app/src/lib/server/db/migrations.ts`: register
-  migration 20260722.
+  migration 20260723.
 - `packages/praxrr-app/src/lib/server/db/schema.sql`: reference schema parity.
 - `packages/praxrr-app/src/routes/api/v1/canary/rollouts/+server.ts`: updated
   gated response documentation/contract.

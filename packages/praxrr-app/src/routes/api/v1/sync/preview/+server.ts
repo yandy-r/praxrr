@@ -1,11 +1,19 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from '@sveltejs/kit';
 import { arrInstancesQueries } from '$db/queries/arrInstances.ts';
+import { getArrInstanceReviewClient, type ArrInstanceReviewClient } from '$arr/arrInstanceClients.ts';
 import { logger } from '$logger/logger.ts';
 import { previewStore } from '$sync/preview/store.ts';
-import { PREVIEW_STATUS_FAILED, PREVIEW_STATUS_GENERATING, PREVIEW_STATUS_READY } from '$sync/preview/store.ts';
-import { generatePreview } from '$sync/preview/orchestrator.ts';
+import { PREVIEW_STATUS_FAILED, PREVIEW_STATUS_GENERATING } from '$sync/preview/store.ts';
+import {
+  generatePreview,
+  type GeneratePreviewInput,
+  type GeneratePreviewReviewOptions,
+  type GeneratePreviewWithReviewContextResult,
+} from '$sync/preview/orchestrator.ts';
 import { buildPreviewFailure, classifyPreviewFailure } from '$sync/preview/failureReason.ts';
+import { buildSyncPreviewReviewBinding, syncPreviewReviewTarget } from '$sync/preview/reviewBinding.ts';
+import { parseMediaManagementPreviewConfig, parseNamedProfilePreviewConfig } from '$sync/preview/sectionConfigs.ts';
 import { SYNC_SECTION_ORDER } from '$sync/mappings.ts';
 import {
   PREVIEW_CREATE_RATE_LIMIT_MAX_REQUESTS,
@@ -47,14 +55,19 @@ type CreatePreviewResult = {
  * reassign `arrInstancesQueries.getById` keep working.
  */
 export interface SyncPreviewCreateDependencies {
-  readonly generatePreview: typeof generatePreview;
+  readonly generatePreview: (
+    input: GeneratePreviewInput,
+    options: GeneratePreviewReviewOptions
+  ) => Promise<GeneratePreviewWithReviewContextResult>;
   readonly getInstanceById: typeof arrInstancesQueries.getById;
+  readonly getReviewClient: typeof getArrInstanceReviewClient;
   readonly now: () => number;
 }
 
 const DEFAULT_CREATE_DEPENDENCIES: SyncPreviewCreateDependencies = {
   generatePreview,
   getInstanceById: (id: number) => arrInstancesQueries.getById(id),
+  getReviewClient: getArrInstanceReviewClient,
   now: Date.now,
 };
 
@@ -110,7 +123,18 @@ function parseSectionConfigs(rawSectionConfigs: unknown): Partial<Record<Section
       throw new Error(`Invalid section config key: ${rawSection}`);
     }
 
-    parsed[rawSection as SectionType] = rawConfig;
+    const section = rawSection as SectionType;
+    if (section === 'delayProfiles' || section === 'metadataProfiles') {
+      const config = parseNamedProfilePreviewConfig(rawConfig);
+      if (!config) throw new Error(`Invalid ${section} section config`);
+      parsed[section] = config;
+    } else if (section === 'mediaManagement') {
+      const config = parseMediaManagementPreviewConfig(rawConfig);
+      if (!config) throw new Error('Invalid mediaManagement section config');
+      parsed[section] = config;
+    } else {
+      parsed[section] = rawConfig;
+    }
   }
 
   return parsed;
@@ -298,13 +322,18 @@ export async function _handleSyncPreviewCreateRequest(
 
   const requestedSections = requestPayload.sections?.length ? requestPayload.sections : undefined;
 
+  let reviewClient: ArrInstanceReviewClient | null = null;
   try {
-    const generated = await dependencies.generatePreview({
-      instance,
-      sections: requestedSections,
-      sectionConfigs: requestPayload.sectionConfigs,
-      nowMs,
-    });
+    reviewClient = await dependencies.getReviewClient(instance.type, instance);
+    const { preview: generated, reviewContext } = await dependencies.generatePreview(
+      {
+        instance,
+        sections: requestedSections,
+        sectionConfigs: requestPayload.sectionConfigs,
+        nowMs,
+      },
+      { captureReviewContext: true, client: reviewClient.client }
+    );
 
     // Preserve successful-section evidence: a partial generation stays `ready` (successful
     // sections keep their diffs) but carries a typed top-level `sectionErrors` reason so apply
@@ -312,8 +341,12 @@ export async function _handleSyncPreviewCreateRequest(
     const hasFailedSection = generated.sectionOutcomes.some((outcome) => outcome.failure !== null);
     const topLevelFailure = hasFailedSection ? buildPreviewFailure('sectionErrors', requestPayload.arrType) : null;
 
-    storedPreview = previewStore.updateResult(storedPreview.id, {
-      status: PREVIEW_STATUS_READY,
+    const eligibleSections = generated.sections.filter((section) =>
+      generated.sectionOutcomes.some(
+        (outcome) => outcome.section === section && outcome.failure === null && !outcome.skipped
+      )
+    );
+    const generationPatch = {
       sections: generated.sections,
       sectionOutcomes: generated.sectionOutcomes,
       qualityProfiles: generated.qualityProfiles,
@@ -323,7 +356,33 @@ export async function _handleSyncPreviewCreateRequest(
       summary: generated.summary,
       failure: topLevelFailure,
       instanceName: generated.instanceName,
-    })!;
+    };
+
+    if (eligibleSections.length === 0 && hasFailedSection) {
+      storedPreview = previewStore.updateResult(storedPreview.id, {
+        ...generationPatch,
+        status: PREVIEW_STATUS_FAILED,
+      })!;
+      if (!storedPreview) {
+        return json({ error: 'Failed to persist preview result' } satisfies ErrorResponse, { status: 500 });
+      }
+      return json(storedPreview, { status: 500 });
+    }
+
+    if (eligibleSections.length === 0) {
+      storedPreview = previewStore.completeNonApplicableGeneration(storedPreview.id, generationPatch)!;
+    } else {
+      const binding = await buildSyncPreviewReviewBinding({
+        instanceId: generated.instanceId,
+        arrType: generated.arrType,
+        target: syncPreviewReviewTarget(instance, reviewClient.credentialIdentity),
+        sections: eligibleSections,
+        sectionConfigs: reviewContext.sectionConfigs,
+        evidence: reviewContext.evidence,
+      });
+
+      storedPreview = previewStore.completeGeneration(storedPreview.id, generationPatch, binding)!;
+    }
 
     if (!storedPreview) {
       return json({ error: 'Failed to persist preview result' } satisfies ErrorResponse, { status: 500 });
@@ -353,6 +412,8 @@ export async function _handleSyncPreviewCreateRequest(
 
     // Return the failed snapshot (status 'failed' + typed, safe failure) — never raw text.
     return json(failedPreview ?? { ...storedPreview, status: PREVIEW_STATUS_FAILED, failure }, { status: 500 });
+  } finally {
+    reviewClient?.client.close();
   }
 }
 

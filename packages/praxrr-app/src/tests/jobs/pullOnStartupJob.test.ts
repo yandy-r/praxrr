@@ -1,4 +1,4 @@
-import { assertEquals, assertExists, assertStringIncludes } from '@std/assert';
+import { assert, assertEquals, assertExists, assertStringIncludes } from '@std/assert';
 import { jobQueueRegistry } from '$jobs/queueRegistry.ts';
 import type { JobQueueRecord } from '$jobs/queueTypes.ts';
 import { config } from '$config';
@@ -129,7 +129,7 @@ Deno.test({
     try {
       const result = await handler(createStartupJobRecord());
       assertEquals(result.status, 'skipped');
-      assertStringIncludes(result.output!, 'Startup pull disabled');
+      assertStringIncludes(result.decision!, 'Startup pull disabled');
     } finally {
       restoreAll(restores);
     }
@@ -152,13 +152,11 @@ Deno.test({
 
     try {
       const result = await handler(createStartupJobRecord());
-      // No instances -> orchestrator returns skipped run -> handler maps to skipped
+      // No instances -> orchestrator returns skipped run -> handler maps to skipped. The durable
+      // output is a bounded safe count summary (issue #237), not a raw JSON blob.
       assertEquals(result.status, 'skipped');
       assertExists(result.output);
-
-      const parsed = JSON.parse(result.output!);
-      assertEquals(parsed.status, 'skipped');
-      assertEquals(parsed.instances.length, 0);
+      assertStringIncludes(result.output!, 'across 0 instance(s)');
     } finally {
       restoreAll(restores);
     }
@@ -182,10 +180,7 @@ Deno.test({
       const result = await handler(createStartupJobRecord());
       assertEquals(result.status, 'skipped');
       assertExists(result.output);
-
-      const parsed = JSON.parse(result.output!);
-      assertEquals(parsed.status, 'skipped');
-      assertEquals(parsed.instances.length, 0);
+      assertStringIncludes(result.output!, 'across 0 instance(s)');
     } finally {
       restoreAll(restores);
     }
@@ -222,22 +217,15 @@ Deno.test({
 
     try {
       const result = await handler(createStartupJobRecord());
-      // Both instances fail, so orchestrator returns 'failed' run -> handler maps to 'failure'
+      // Both instances fail, so orchestrator returns 'failed' run -> handler maps to 'failure' with a
+      // typed code; the aggregate counters ride in the safe summary (per-instance detail is persisted
+      // to startup_pull_runs and logged, not embedded raw in the durable output).
       assertEquals(result.status, 'failure');
+      assert(result.status === 'failure');
+      assertEquals(result.failureCode, 'upstream');
       assertExists(result.output);
-
-      const parsed = JSON.parse(result.output!);
-      assertEquals(parsed.status, 'failure');
-      assertEquals(parsed.instances.length, 2);
-
-      // Each instance should have failed independently (per-instance isolation)
-      for (const instanceResult of parsed.instances) {
-        assertEquals(instanceResult.status, 'failure');
-        assertEquals(instanceResult.failed, 1);
-      }
-
-      // Aggregate counters should reflect both failures
-      assertEquals(parsed.failed, 2);
+      assertStringIncludes(result.output!, 'failed 2');
+      assertStringIncludes(result.output!, 'across 2 instance(s)');
     } finally {
       restoreAll(restores);
     }
@@ -245,7 +233,7 @@ Deno.test({
 });
 
 Deno.test({
-  name: 'arr.pull.startup handler returns structured output with instance-level counters',
+  name: 'arr.pull.startup handler returns a bounded safe count summary with aggregate counters',
   sanitizeResources: false,
   fn: async () => {
     const handler = getStartupHandler();
@@ -273,30 +261,15 @@ Deno.test({
       const result = await handler(createStartupJobRecord());
       assertExists(result.output);
 
-      const parsed = JSON.parse(result.output!);
-      assertExists(parsed.runId);
-      assertExists(parsed.startedAt);
-      assertExists(parsed.finishedAt);
-      assertExists(parsed.instances);
-
-      // Verify counter fields exist at run level
-      assertEquals(typeof parsed.imported, 'number');
-      assertEquals(typeof parsed.skippedDefault, 'number');
-      assertEquals(typeof parsed.skippedNoMatch, 'number');
-      assertEquals(typeof parsed.conflicted, 'number');
-      assertEquals(typeof parsed.failed, 'number');
-
-      // Verify each instance has counter fields
-      for (const instanceResult of parsed.instances) {
-        assertEquals(typeof instanceResult.instanceId, 'number');
-        assertEquals(typeof instanceResult.instanceName, 'string');
-        assertEquals(typeof instanceResult.status, 'string');
-        assertEquals(typeof instanceResult.imported, 'number');
-        assertEquals(typeof instanceResult.skippedDefault, 'number');
-        assertEquals(typeof instanceResult.skippedNoMatch, 'number');
-        assertEquals(typeof instanceResult.conflicted, 'number');
-        assertEquals(typeof instanceResult.failed, 'number');
-      }
+      // The durable output is a bounded, human-readable safe summary carrying the aggregate
+      // counters — never a raw JSON blob of per-instance rows (issue #237). Full per-instance
+      // detail is persisted to startup_pull_runs and logged instead.
+      assertStringIncludes(result.output!, 'Imported');
+      assertStringIncludes(result.output!, 'conflicted');
+      assertStringIncludes(result.output!, 'failed');
+      assertStringIncludes(result.output!, 'across 1 instance(s)');
+      // No raw JSON structure leaks into the durable evidence.
+      assert(!result.output!.trimStart().startsWith('{'), 'output must not be a raw JSON blob');
     } finally {
       restoreAll(restores);
     }

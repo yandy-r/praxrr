@@ -61,7 +61,7 @@ The exact existing tables are created by
   auto-selection, default canary, and partial policy.
 
 The feature spec proposes
-`packages/praxrr-app/src/lib/server/db/migrations/20260722_add_canary_preview_evidence.ts`,
+`packages/praxrr-app/src/lib/server/db/migrations/20260723_add_canary_preview_evidence.ts`,
 adding `remaining_preview_evidence TEXT NULL` to `canary_rollouts`. Register it
 after migration 20260721 in both the imports and `loadMigrations()` array in
 `packages/praxrr-app/src/lib/server/db/migrations.ts`. Existing rows

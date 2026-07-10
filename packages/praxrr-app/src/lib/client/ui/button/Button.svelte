@@ -93,6 +93,7 @@
       title={!tooltip && title ? title : undefined}
       aria-label={ariaLabel || tooltip || undefined}
       class={classes}
+      {...$$restProps}
       on:click
     >
       {#if icon && iconPosition === 'left'}
@@ -113,6 +114,7 @@
       title={!tooltip && title ? title : undefined}
       aria-label={ariaLabel || tooltip || undefined}
       class={classes}
+      {...$$restProps}
       on:click
     >
       {#if icon && iconPosition === 'left'}

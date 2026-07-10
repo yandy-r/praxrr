@@ -34,7 +34,7 @@ each phase boundary, reconcile types/tests, and then dispatch the next batch.
 
 3. **T3 Evidence migration — Parallel-safe after T1**
    - Files:
-     `packages/praxrr-app/src/lib/server/db/migrations/20260722_add_canary_preview_evidence.ts`,
+     `packages/praxrr-app/src/lib/server/db/migrations/20260723_add_canary_preview_evidence.ts`,
      `packages/praxrr-app/src/lib/server/db/migrations.ts`,
      `packages/praxrr-app/src/tests/db/canaryMigration.test.ts`.
    - Add nullable `remaining_preview_evidence TEXT`, register it after 20260721,

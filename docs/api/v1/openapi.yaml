@@ -686,6 +686,8 @@ paths:
     $ref: './paths/goals.yaml#/reconcile'
   /goals/binding:
     $ref: './paths/goals.yaml#/binding'
+  /trash-guide/sources/{id}/sync:
+    $ref: './paths/trash-guide.yaml#/sync'
   /canary/rollouts:
     $ref: './paths/canary.yaml#/rollouts'
   /canary/rollouts/{id}:
@@ -845,8 +847,24 @@ components:
     # Sync - Preview
     SyncPreviewCreateRequest:
       $ref: './schemas/sync.yaml#/SyncPreviewCreateRequest'
+    SyncPreviewSectionConfigs:
+      $ref: './schemas/sync.yaml#/SyncPreviewSectionConfigs'
     SyncPreviewApplyRequest:
       $ref: './schemas/sync.yaml#/SyncPreviewApplyRequest'
+    SyncPreviewApplyJobStatus:
+      $ref: './schemas/sync.yaml#/SyncPreviewApplyJobStatus'
+    SyncPreviewApplyJobResult:
+      $ref: './schemas/sync.yaml#/SyncPreviewApplyJobResult'
+    SyncPreviewApplyResponse:
+      $ref: './schemas/sync.yaml#/SyncPreviewApplyResponse'
+    SyncPreviewApplyInvalidationCode:
+      $ref: './schemas/sync.yaml#/SyncPreviewApplyInvalidationCode'
+    SyncPreviewChangedEvidence:
+      $ref: './schemas/sync.yaml#/SyncPreviewChangedEvidence'
+    SyncPreviewApplyInvalidatedResponse:
+      $ref: './schemas/sync.yaml#/SyncPreviewApplyInvalidatedResponse'
+    SyncPreviewApplyErrorResponse:
+      $ref: './schemas/sync.yaml#/SyncPreviewApplyErrorResponse'
     SyncPreviewStatus:
       $ref: './schemas/sync.yaml#/SyncPreviewStatus'
     SyncPreviewSection:
@@ -1030,6 +1048,20 @@ components:
       $ref: './schemas/goals.yaml#/GoalReconcileRequest'
     GoalReconcileResponse:
       $ref: './schemas/goals.yaml#/GoalReconcileResponse'
+    TrashGuideSyncFailureCode:
+      $ref: './schemas/trash-guide.yaml#/TrashGuideSyncFailureCode'
+    TrashGuideSyncFailureReason:
+      $ref: './schemas/trash-guide.yaml#/TrashGuideSyncFailureReason'
+    TrashGuideSyncCounts:
+      $ref: './schemas/trash-guide.yaml#/TrashGuideSyncCounts'
+    TrashGuideSyncRunEvidence:
+      $ref: './schemas/trash-guide.yaml#/TrashGuideSyncRunEvidence'
+    TrashGuideSyncStatusView:
+      $ref: './schemas/trash-guide.yaml#/TrashGuideSyncStatusView'
+    TrashGuideSyncQueuedResponse:
+      $ref: './schemas/trash-guide.yaml#/TrashGuideSyncQueuedResponse'
+    TrashGuideSyncDedupeResponse:
+      $ref: './schemas/trash-guide.yaml#/TrashGuideSyncDedupeResponse'
     TrashGuideEntityType:
       type: string
       enum:
