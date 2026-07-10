@@ -134,6 +134,141 @@ CanaryStartRequest:
     partialPolicy:
       $ref: '#/CanaryPartialPolicy'
 
+CanaryGeneratePreviewResult:
+  type: object
+  description: |
+    Read-only per-instance preview payload produced by the Canary coordinator. This matches the
+    runtime `GeneratePreviewResult` contract; it is not a stored Sync Preview and therefore has no
+    preview id, expiry timestamp, or top-level failure field.
+  required:
+    - instanceId
+    - instanceName
+    - arrType
+    - status
+    - createdAtMs
+    - sections
+    - sectionOutcomes
+    - qualityProfiles
+    - delayProfiles
+    - mediaManagement
+    - metadataProfiles
+    - summary
+  properties:
+    instanceId:
+      type: integer
+      description: Exact remaining-target Arr instance ID.
+    instanceName:
+      type: string
+      description: Arr instance name at preview-generation time.
+    arrType:
+      $ref: '#/CanaryArrType'
+    status:
+      $ref: '../schemas/sync.yaml#/SyncPreviewStatus'
+    createdAtMs:
+      type: integer
+      format: int64
+      minimum: 0
+      description: Preview generation time as Unix epoch milliseconds.
+    sections:
+      type: array
+      items:
+        $ref: '../schemas/sync.yaml#/SyncPreviewSection'
+    sectionOutcomes:
+      type: array
+      description: Per-section evidence; any failure makes aggregate Canary evidence unavailable.
+      items:
+        $ref: '../schemas/sync.yaml#/SyncPreviewSectionOutcome'
+    qualityProfiles:
+      oneOf:
+        - $ref: '../schemas/sync.yaml#/QualityProfilesPreview'
+        - type: 'null'
+    delayProfiles:
+      oneOf:
+        - $ref: '../schemas/sync.yaml#/DelayProfilesPreview'
+        - type: 'null'
+    mediaManagement:
+      oneOf:
+        - $ref: '../schemas/sync.yaml#/MediaManagementPreview'
+        - type: 'null'
+    metadataProfiles:
+      oneOf:
+        - $ref: '../schemas/sync.yaml#/MetadataProfilesPreview'
+        - type: 'null'
+    summary:
+      $ref: '../schemas/sync.yaml#/SyncPreviewSummary'
+
+CanaryRemainingPreviewAvailable:
+  type: object
+  required:
+    - version
+    - availability
+    - generatedAt
+    - previews
+  properties:
+    version:
+      type: integer
+      const: 1
+      description: Persisted Canary remaining-preview evidence schema version.
+    availability:
+      type: string
+      const: available
+    generatedAt:
+      type: string
+      format: date-time
+      description: Time the complete exact-target evidence snapshot was generated.
+    previews:
+      type: array
+      description: |
+        Complete previews for the persisted remaining target set. An empty mutation summary is a
+        valid no-changes result and is distinct from unavailable evidence.
+      items:
+        $ref: '#/CanaryGeneratePreviewResult'
+
+CanaryRemainingPreviewUnavailable:
+  type: object
+  required:
+    - version
+    - availability
+    - generatedAt
+    - failure
+    - partialPreviews
+  properties:
+    version:
+      type: integer
+      const: 1
+      description: Persisted Canary remaining-preview evidence schema version.
+    availability:
+      type: string
+      const: unavailable
+    generatedAt:
+      type: string
+      format: date-time
+      description: Time this unavailable evidence result was recorded.
+    failure:
+      $ref: '../schemas/sync.yaml#/SyncPreviewFailureReason'
+    partialPreviews:
+      type: array
+      description: |
+        Successfully generated diagnostic pieces, if any. Partial previews never authorize
+        promotion and do not represent complete target coverage.
+      items:
+        $ref: '#/CanaryGeneratePreviewResult'
+
+CanaryRemainingPreviewEvidence:
+  oneOf:
+    - $ref: '#/CanaryRemainingPreviewAvailable'
+    - $ref: '#/CanaryRemainingPreviewUnavailable'
+  discriminator:
+    propertyName: availability
+    mapping:
+      available: '#/CanaryRemainingPreviewAvailable'
+      unavailable: '#/CanaryRemainingPreviewUnavailable'
+  description: |
+    Durable, versioned evidence for the exact persisted remaining-target cohort. Availability is
+    explicit and must never be inferred from preview-array length. Null, legacy, corrupt, partial,
+    cross-Arr, or target-mismatched stored data is exposed as unavailable and cannot authorize
+    Proceed.
+
 CanaryRolloutDetail:
   type: object
   required:
@@ -150,6 +285,7 @@ CanaryRolloutDetail:
     - canaryOutput
     - canaryError
     - remainingTargets
+    - remainingPreview
     - batchCursor
     - rolloutResults
     - trigger
@@ -206,6 +342,8 @@ CanaryRolloutDetail:
       type: array
       items:
         $ref: '#/CanaryTarget'
+    remainingPreview:
+      $ref: '#/CanaryRemainingPreviewEvidence'
     batchCursor:
       type: integer
       minimum: 0
@@ -313,28 +451,22 @@ CanaryStartGated:
   required:
     - skipped
     - rollout
-    - remainingPreview
   properties:
     skipped:
       type: boolean
       const: false
     rollout:
       $ref: '#/CanaryRolloutDetail'
-    remainingPreview:
-      type: array
-      description: Live per-instance preview of remaining targets shown at the gate.
-      items:
-        $ref: '../schemas/sync.yaml#/SyncPreviewResult'
-  description: Returned when the canary passed and the rollout is awaiting confirmation.
+  description: |
+    Returned when the canary passed and the rollout is awaiting confirmation. The rollout carries
+    the persisted remaining-preview evidence used by detail reads and promotion authorization.
 
 CanaryStartResult:
   oneOf:
     - $ref: '#/CanaryStartSkipped'
     - $ref: '#/CanaryStartGated'
-  discriminator:
-    propertyName: skipped
   description: |
-    Two-headed start response discriminated on `skipped`:
+    Two-headed start response distinguished by the boolean `skipped` constant:
     - `skipped: true`: single-target auto-skip ran a plain sync
     - `skipped: false`: staged rollout persisted and awaiting confirmation
 

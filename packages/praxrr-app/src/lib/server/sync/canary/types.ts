@@ -5,10 +5,10 @@
  * per-instance sync primitive `executeSyncJob` behind a verification gate.
  */
 
-import type { SyncPreviewArrType } from '$sync/preview/types.ts';
-import type { GeneratePreviewResult } from '$sync/preview/orchestrator.ts';
-import type { SectionType } from '$sync/types.ts';
 import type { JobRunStatus } from '$jobs/queueTypes.ts';
+import type { GeneratePreviewResult } from '$sync/preview/orchestrator.ts';
+import type { SyncPreviewArrType, SyncPreviewFailureReason } from '$sync/preview/types.ts';
+import type { SectionType } from '$sync/types.ts';
 
 // =============================================================================
 // STATUS UNIONS
@@ -19,12 +19,7 @@ export type CanaryArrType = SyncPreviewArrType; // 'radarr' | 'sonarr' | 'lidarr
 
 /** Lifecycle status of a `canary_rollouts` row. */
 export type CanaryRolloutStatus =
-  | 'canary_running'
-  | 'awaiting_confirmation'
-  | 'rolling_out'
-  | 'completed'
-  | 'aborted'
-  | 'failed';
+  'canary_running' | 'awaiting_confirmation' | 'rolling_out' | 'completed' | 'aborted' | 'failed';
 
 /** Classified outcome of the canary sync itself. */
 export type CanaryOutcomeStatus = 'success' | 'partial' | 'failed' | 'skipped';
@@ -62,6 +57,26 @@ export interface SyncRunResult {
   rescheduleAt?: string | null;
 }
 
+/**
+ * Durable, planned evidence for every remaining target at the verification gate.
+ * `available` proves a complete exact-target preview; `unavailable` retains only
+ * safe typed failure evidence and any successful diagnostic partial previews.
+ */
+export type CanaryRemainingPreviewEvidence =
+  | {
+      version: 1;
+      availability: 'available';
+      generatedAt: string;
+      previews: GeneratePreviewResult[];
+    }
+  | {
+      version: 1;
+      availability: 'unavailable';
+      generatedAt: string;
+      failure: SyncPreviewFailureReason;
+      partialPreviews: GeneratePreviewResult[];
+    };
+
 // =============================================================================
 // ROW SHAPES (byte-aligned to the migration columns)
 // =============================================================================
@@ -81,6 +96,7 @@ export interface CanaryRolloutRow {
   canary_output: string | null;
   canary_error: string | null;
   remaining_targets: string;
+  remaining_preview_evidence: string | null;
   batch_cursor: number;
   rollout_results: string;
   trigger: string;
@@ -144,6 +160,7 @@ export interface CanaryRolloutDetail {
   canaryOutput: string | null;
   canaryError: string | null;
   remainingTargets: CanaryTarget[];
+  remainingPreview: CanaryRemainingPreviewEvidence;
   batchCursor: number;
   rolloutResults: CanaryInstanceResult[];
   trigger: CanaryTrigger;
@@ -197,9 +214,8 @@ export interface CanaryResolution {
 
 /**
  * Result of `startRollout`. Discriminated on `skipped`: single-eligible-target
- * auto-skips to a normal sync; otherwise the rollout halts at the gate with the
- * live preview of the remaining instances.
+ * auto-skips to a normal sync; otherwise the rollout carries the persisted
+ * remaining-target evidence used by the verification gate.
  */
 export type CanaryStartResult =
-  | { skipped: true; result: SyncRunResult }
-  | { skipped: false; rollout: CanaryRolloutDetail; remainingPreview: GeneratePreviewResult[] };
+  { skipped: true; result: SyncRunResult } | { skipped: false; rollout: CanaryRolloutDetail };

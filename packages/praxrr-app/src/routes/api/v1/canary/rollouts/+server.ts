@@ -1,13 +1,13 @@
-import { json } from '@sveltejs/kit';
 import type { RequestHandler } from '@sveltejs/kit';
+import { json } from '@sveltejs/kit';
 import { db } from '$db/db.ts';
 import { canaryRolloutQueries } from '$db/queries/canaryRollouts.ts';
+import { logger } from '$logger/logger.ts';
 import { startRollout } from '$sync/canary/coordinator.ts';
 import { isCanaryNotFoundError, isCanaryUnresolvedError } from '$sync/canary/errors.ts';
+import type { CanaryArrType, CanaryPartialPolicy, CanaryRolloutSummary, CanaryStartInput } from '$sync/canary/types.ts';
 import { isSyncPreviewArrType } from '$sync/preview/types.ts';
 import type { SectionType } from '$sync/types.ts';
-import type { CanaryArrType, CanaryPartialPolicy, CanaryRolloutSummary, CanaryStartInput } from '$sync/canary/types.ts';
-import { logger } from '$logger/logger.ts';
 
 type ErrorResponse = { error: string };
 
@@ -39,7 +39,9 @@ interface CanaryRolloutListResponse {
  */
 function parseArrType(value: unknown): { value: CanaryArrType } | { error: string } {
   if (typeof value !== 'string' || !isSyncPreviewArrType(value)) {
-    return { error: 'Missing or invalid arrType (expected radarr, sonarr, or lidarr)' };
+    return {
+      error: 'Missing or invalid arrType (expected radarr, sonarr, or lidarr)',
+    };
   }
   return { value };
 }
@@ -158,32 +160,41 @@ function parsePositiveInt(raw: string | null, fallback: number, name: string, ma
  *
  * Start a canary rollout (issue #19). Runs the canary sync inline, persists the rollout, and
  * returns the `CanaryStartResult` union: `{ skipped: true, result }` when a single eligible
- * target auto-skips to a plain sync, otherwise `{ skipped: false, rollout, remainingPreview }`
- * halted at the verification gate. A rollout is scoped to exactly one `arr_type`.
+ * target auto-skips to a plain sync, otherwise `{ skipped: false, rollout }` halted at the
+ * verification gate. The rollout carries the durable remaining-preview evidence used by both
+ * detail reads and promotion. A rollout is scoped to exactly one `arr_type`.
  */
 export const POST: RequestHandler = async ({ request }) => {
   // Reject oversized bodies via Content-Length before buffering; the post-read check below
   // still guards the case where the header is absent or understates the actual size.
   const declaredLength = Number(request.headers.get('content-length') ?? '0');
   if (Number.isFinite(declaredLength) && declaredLength > MAX_BODY_BYTES) {
-    return json({ error: 'Request body too large' } satisfies ErrorResponse, { status: 400 });
+    return json({ error: 'Request body too large' } satisfies ErrorResponse, {
+      status: 400,
+    });
   }
 
   const rawBody = await request.text();
   if (new TextEncoder().encode(rawBody).length > MAX_BODY_BYTES) {
-    return json({ error: 'Request body too large' } satisfies ErrorResponse, { status: 400 });
+    return json({ error: 'Request body too large' } satisfies ErrorResponse, {
+      status: 400,
+    });
   }
 
   let body: unknown;
   try {
     body = rawBody.length > 0 ? JSON.parse(rawBody) : {};
   } catch {
-    return json({ error: 'Invalid JSON body' } satisfies ErrorResponse, { status: 400 });
+    return json({ error: 'Invalid JSON body' } satisfies ErrorResponse, {
+      status: 400,
+    });
   }
 
   const parsed = parseStartBody(body);
   if ('error' in parsed) {
-    return json({ error: parsed.error } satisfies ErrorResponse, { status: 400 });
+    return json({ error: parsed.error } satisfies ErrorResponse, {
+      status: 400,
+    });
   }
 
   try {
@@ -191,10 +202,14 @@ export const POST: RequestHandler = async ({ request }) => {
     return json(result);
   } catch (error) {
     if (isCanaryUnresolvedError(error)) {
-      return json({ error: error.message } satisfies ErrorResponse, { status: 422 });
+      return json({ error: error.message } satisfies ErrorResponse, {
+        status: 422,
+      });
     }
     if (isCanaryNotFoundError(error)) {
-      return json({ error: error.message } satisfies ErrorResponse, { status: 404 });
+      return json({ error: error.message } satisfies ErrorResponse, {
+        status: 404,
+      });
     }
 
     await logger.error('Failed to start canary rollout', {
@@ -218,9 +233,14 @@ export const GET: RequestHandler = async ({ url }) => {
     page = parsePositiveInt(url.searchParams.get('page'), DEFAULT_PAGE, 'page');
     pageSize = parsePositiveInt(url.searchParams.get('pageSize'), DEFAULT_PAGE_SIZE, 'pageSize', MAX_PAGE_SIZE);
   } catch (err) {
-    return json({ error: err instanceof Error ? err.message : 'Invalid query parameters' } satisfies ErrorResponse, {
-      status: 400,
-    });
+    return json(
+      {
+        error: err instanceof Error ? err.message : 'Invalid query parameters',
+      } satisfies ErrorResponse,
+      {
+        status: 400,
+      }
+    );
   }
 
   try {

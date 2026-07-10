@@ -3,10 +3,12 @@ rollouts:
     operationId: startCanaryRollout
     summary: Start a canary rollout
     description: |
-      Runs the canary sync inline, persists the rollout, and returns the canary result plus a
-      live preview of the remaining same-`arr_type` instances. When only one eligible target
-      exists the staged flow is auto-skipped and a plain sync result is returned instead. The
-      response is discriminated on `skipped`.
+      Runs the canary sync inline and persists the rollout with durable, explicit remaining-target
+      preview evidence. The staged response contains the evidence in its rollout as either complete
+      `available` previews or `unavailable` with a safe reason and recovery action; array length is
+      never used to infer availability. When only one eligible target exists the staged flow is
+      auto-skipped and a plain sync result is returned instead. The response is discriminated on
+      `skipped`.
     tags:
       - Canary
     requestBody:
@@ -92,7 +94,9 @@ rolloutById:
     summary: Canary rollout detail
     description: |
       Returns one rollout with its full state: canary diagnostics, remaining targets, per-instance
-      rollout results, and the current `stateToken` used to guard proceed/abort.
+      rollout results, durable remaining-preview evidence, and the current `stateToken` used to
+      guard proceed/abort. Legacy, corrupt, partial, or target-mismatched evidence is returned as
+      safely unavailable rather than as an empty successful preview.
     tags:
       - Canary
     parameters:
@@ -132,8 +136,10 @@ rolloutProceed:
     operationId: proceedCanaryRollout
     summary: Proceed past the verification gate
     description: |
-      Confirms an `awaiting_confirmation` rollout, transitions it to `rolling_out`, and enqueues the
-      resumable batched rollout job. Value-guarded on `stateToken`; returns the updated rollout.
+      Confirms an `awaiting_confirmation` rollout only when its persisted remaining-preview evidence
+      is available and exactly covers its same-Arr remaining targets, then transitions it to
+      `rolling_out` and enqueues the resumable batched rollout job. Value-guarded on `stateToken`;
+      returns the updated rollout. Unavailable or invalid evidence fails closed and enqueues no job.
     tags:
       - Canary
     parameters:
@@ -168,7 +174,7 @@ rolloutProceed:
             schema:
               $ref: '../schemas/arr.yaml#/ErrorResponse'
       '409':
-        description: Rollout is not awaiting confirmation
+        description: Rollout is not awaiting confirmation, or remaining-preview evidence is unavailable or invalid
         content:
           application/json:
             schema:
@@ -192,7 +198,9 @@ rolloutAbort:
     summary: Abort the rollout at the verification gate
     description: |
       Aborts an `awaiting_confirmation` rollout; remaining instances are never dispatched.
-      Value-guarded on `stateToken`; returns the updated rollout.
+      Abort remains available when remaining-preview evidence is unavailable. Value-guarded on
+      `stateToken`; returns the updated rollout. Aborting does not roll back changes already applied
+      to the canary instance.
     tags:
       - Canary
     parameters:

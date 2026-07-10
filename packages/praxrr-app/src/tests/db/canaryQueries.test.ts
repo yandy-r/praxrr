@@ -5,7 +5,14 @@ import { runMigrations } from '$db/migrations.ts';
 import { arrInstancesQueries } from '$db/queries/arrInstances.ts';
 import { canaryRolloutQueries, type InsertCanaryRolloutInput } from '$db/queries/canaryRollouts.ts';
 import { canarySettingsQueries } from '$db/queries/canarySettings.ts';
-import type { CanaryInstanceResult, CanaryTarget } from '$sync/canary/types.ts';
+import type {
+  CanaryInstanceResult,
+  CanaryRemainingPreviewEvidence,
+  CanaryRolloutDetail,
+  CanaryTarget,
+} from '$sync/canary/types.ts';
+import { buildPreviewFailure } from '$sync/preview/failureReason.ts';
+import type { GeneratePreviewResult } from '$sync/preview/orchestrator.ts';
 
 /**
  * Point the db singleton at a scratch SQLite file under a fresh temp base path,
@@ -65,14 +72,81 @@ function insertRollout(overrides: Partial<InsertCanaryRolloutInput> = {}): numbe
   });
 }
 
+function zeroChangePreview(
+  target: CanaryTarget,
+  options: {
+    arrType?: 'radarr' | 'sonarr' | 'lidarr';
+    sectionFailure?: boolean;
+  } = {}
+): GeneratePreviewResult {
+  const arrType = options.arrType ?? 'radarr';
+  const failure = options.sectionFailure ? buildPreviewFailure('unauthorized', arrType) : null;
+  return {
+    instanceId: target.instanceId,
+    instanceName: target.instanceName,
+    arrType,
+    status: 'ready',
+    createdAtMs: 1_783_510_400_000,
+    sections: ['qualityProfiles'],
+    sectionOutcomes: [{ section: 'qualityProfiles', failure, skipped: false }],
+    qualityProfiles: failure ? null : { section: 'qualityProfiles', customFormats: [], qualityProfiles: [] },
+    delayProfiles: null,
+    mediaManagement: null,
+    metadataProfiles: null,
+    summary: {
+      totalCreates: 0,
+      totalUpdates: 0,
+      totalDeletes: 0,
+      totalUnchanged: 0,
+    },
+  };
+}
+
+function availableEvidence(
+  targets: CanaryTarget[] = [{ instanceId: 11, instanceName: 'Radarr B' }]
+): CanaryRemainingPreviewEvidence {
+  return {
+    version: 1,
+    availability: 'available',
+    generatedAt: '2026-07-08T10:01:00.000Z',
+    previews: targets.map((target) => zeroChangePreview(target)),
+  };
+}
+
+function unavailableEvidence(
+  code: 'unreachable' | 'unauthorized' = 'unreachable',
+  partialPreviews: GeneratePreviewResult[] = []
+): CanaryRemainingPreviewEvidence {
+  return {
+    version: 1,
+    availability: 'unavailable',
+    generatedAt: '2026-07-08T10:01:00.000Z',
+    failure: buildPreviewFailure(code, 'radarr'),
+    partialPreviews,
+  };
+}
+
+function assertUnavailable(detail: CanaryRolloutDetail | undefined, code = 'internalError'): void {
+  assertExists(detail);
+  assertEquals(detail.remainingPreview.availability, 'unavailable');
+  if (detail.remainingPreview.availability === 'unavailable') {
+    assertEquals(detail.remainingPreview.failure.code, code);
+  }
+}
+
 /** Drive a rollout into `awaiting_confirmation`, re-issuing `state_token` to `gateToken`. */
-function moveToGate(id: number, gateToken: string): void {
+function moveToGate(
+  id: number,
+  gateToken: string,
+  remainingPreview: CanaryRemainingPreviewEvidence = availableEvidence()
+): void {
   const advanced = canaryRolloutQueries.recordCanaryOutcome(id, {
     status: 'awaiting_confirmation',
     canaryStatus: 'success',
     canaryOutput: 'canary ok',
     canaryError: null,
     canarySyncHistoryId: null,
+    remainingPreview,
     nextToken: gateToken,
     finishedAt: null,
   });
@@ -115,6 +189,7 @@ migratedTest('insert then getById round-trips every field incl. decoded JSON blo
   assertEquals(detail.canaryError, null);
   // The JSON blobs decode back to the exact structures we wrote.
   assertEquals(detail.remainingTargets, targets);
+  assertUnavailable(detail);
   assertEquals(detail.batchCursor, 0);
   assertEquals(detail.rolloutResults, []);
   assertEquals(detail.trigger, 'manual');
@@ -130,6 +205,151 @@ migratedTest('insert stores sections as NULL when provided as null', () => {
 
 migratedTest('getById returns undefined for an unknown id', () => {
   assert(canaryRolloutQueries.getById(999_999) === undefined);
+});
+
+migratedTest('recordCanaryOutcome atomically round-trips available zero-change evidence', () => {
+  const target = { instanceId: 11, instanceName: 'Radarr B' };
+  const evidence = availableEvidence([target]);
+  const id = insertRollout({ remainingTargets: [target] });
+
+  assert(
+    canaryRolloutQueries.recordCanaryOutcome(id, {
+      status: 'awaiting_confirmation',
+      canaryStatus: 'success',
+      canaryOutput: 'ok',
+      canaryError: null,
+      canarySyncHistoryId: null,
+      remainingPreview: evidence,
+      nextToken: 'tok-gate',
+      finishedAt: null,
+    })
+  );
+
+  const detail = canaryRolloutQueries.getById(id);
+  assertExists(detail);
+  assertEquals(detail.remainingPreview, evidence);
+  assertEquals(detail.remainingPreview.availability, 'available');
+  if (detail.remainingPreview.availability === 'available') {
+    assertEquals(detail.remainingPreview.previews[0].summary.totalCreates, 0);
+  }
+});
+
+migratedTest('unavailable evidence round-trips partial previews with canonical safe failure copy', () => {
+  const target = { instanceId: 11, instanceName: 'Radarr B' };
+  // Simulate unsafe caller-supplied copy; the query boundary must canonicalize before storage.
+  const evidence = {
+    ...unavailableEvidence('unauthorized', [zeroChangePreview(target)]),
+    failure: {
+      code: 'unauthorized',
+      message: 'secret api key should not persist',
+      recoveryAction: 'raw response should not persist',
+    },
+  } as CanaryRemainingPreviewEvidence;
+  const id = insertRollout({ remainingTargets: [target] });
+  moveToGate(id, 'tok-gate', evidence);
+
+  const detail = canaryRolloutQueries.getById(id);
+  assertUnavailable(detail, 'unauthorized');
+  assertEquals(
+    detail?.remainingPreview.availability === 'unavailable' ? detail.remainingPreview.partialPreviews.length : -1,
+    1
+  );
+  const stored = db.queryFirst<{ evidence: string }>(
+    'SELECT remaining_preview_evidence AS evidence FROM canary_rollouts WHERE id = ?',
+    id
+  );
+  assertExists(stored);
+  assert(!stored.evidence.includes('secret api key'));
+  assert(!stored.evidence.includes('raw response'));
+  assert(stored.evidence.includes('Update the API key'));
+});
+
+migratedTest('available evidence with a failed section decodes as unavailable sectionErrors', () => {
+  const target = { instanceId: 11, instanceName: 'Radarr B' };
+  const evidence: CanaryRemainingPreviewEvidence = {
+    version: 1,
+    availability: 'available',
+    generatedAt: '2026-07-08T10:01:00.000Z',
+    previews: [zeroChangePreview(target, { sectionFailure: true })],
+  };
+  const id = insertRollout({ remainingTargets: [target] });
+  moveToGate(id, 'tok-gate', evidence);
+
+  const detail = canaryRolloutQueries.getById(id);
+  assertUnavailable(detail, 'sectionErrors');
+  assertEquals(
+    detail?.remainingPreview.availability === 'unavailable' ? detail.remainingPreview.partialPreviews.length : -1,
+    1
+  );
+});
+
+migratedTest('legacy, malformed, unsupported, invalid-failure, and target-mismatched evidence fail closed', () => {
+  const cases: Array<{ raw: string | null; label: string }> = [
+    { raw: null, label: 'legacy null' },
+    { raw: '{bad json', label: 'malformed JSON' },
+    {
+      raw: JSON.stringify({
+        version: 2,
+        availability: 'available',
+        generatedAt: '2026-07-08T10:01:00.000Z',
+        previews: [],
+      }),
+      label: 'unsupported version',
+    },
+    {
+      raw: JSON.stringify({
+        version: 1,
+        availability: 'unavailable',
+        generatedAt: '2026-07-08T10:01:00.000Z',
+        failure: {
+          code: 'not-a-code',
+          message: 'unsafe',
+          recoveryAction: 'unsafe',
+        },
+        partialPreviews: [],
+      }),
+      label: 'invalid failure',
+    },
+    {
+      raw: JSON.stringify({
+        version: 1,
+        availability: 'available',
+        generatedAt: '2026-07-08T10:01:00.000Z',
+        previews: [zeroChangePreview({ instanceId: 99, instanceName: 'Not selected' })],
+      }),
+      label: 'target mismatch',
+    },
+  ];
+
+  for (const testCase of cases) {
+    const id = insertRollout({ stateToken: `tok-${testCase.label}` });
+    db.execute('UPDATE canary_rollouts SET remaining_preview_evidence = ? WHERE id = ?', testCase.raw, id);
+    assertUnavailable(canaryRolloutQueries.getById(id));
+  }
+});
+
+migratedTest('malformed and duplicate remaining target data cannot authorize stored evidence', () => {
+  const evidence = JSON.stringify(availableEvidence());
+  for (const rawTargets of [
+    '{bad json',
+    JSON.stringify([
+      { instanceId: 11, instanceName: 'A' },
+      { instanceId: 11, instanceName: 'B' },
+    ]),
+    JSON.stringify([{ instanceId: 0, instanceName: '' }]),
+  ]) {
+    const id = insertRollout();
+    db.execute(
+      'UPDATE canary_rollouts SET remaining_targets = ?, remaining_preview_evidence = ? WHERE id = ?',
+      rawTargets,
+      evidence,
+      id
+    );
+    const detail = canaryRolloutQueries.getById(id);
+    assertUnavailable(detail);
+    assertEquals(detail?.remainingTargets, []);
+    assertEquals(canaryRolloutQueries.listRecent(1, 0)[0].remainingCount, 0);
+  }
 });
 
 // ---------------------------------------------------------------------------
@@ -196,6 +416,7 @@ migratedTest('recordCanaryOutcome is guarded to canary_running and re-issues the
     canaryOutput: '2 item(s)',
     canaryError: null,
     canarySyncHistoryId: null,
+    remainingPreview: availableEvidence(),
     nextToken: 'tok-gate',
     finishedAt: null,
   });
@@ -206,6 +427,7 @@ migratedTest('recordCanaryOutcome is guarded to canary_running and re-issues the
   assertEquals(after.status, 'awaiting_confirmation');
   assertEquals(after.canaryStatus, 'partial');
   assertEquals(after.canaryOutput, '2 item(s)');
+  assertEquals(after.remainingPreview.availability, 'available');
   // The pre-canary token can no longer authorize a proceed.
   assertEquals(after.stateToken, 'tok-gate');
 
@@ -216,6 +438,7 @@ migratedTest('recordCanaryOutcome is guarded to canary_running and re-issues the
     canaryOutput: null,
     canaryError: 'late',
     canarySyncHistoryId: null,
+    remainingPreview: unavailableEvidence(),
     nextToken: 'tok-late',
     finishedAt: '2026-07-08T11:00:00.000Z',
   });
@@ -332,6 +555,8 @@ migratedTest('update round-trips every field (INTEGER flags <-> booleans) and pe
   assertEquals(partial.defaultPartialPolicy, 'abort');
 
   // Clearing the default canary instance is an explicit null (not "leave alone").
-  const cleared = canarySettingsQueries.update({ defaultCanaryInstanceId: null });
+  const cleared = canarySettingsQueries.update({
+    defaultCanaryInstanceId: null,
+  });
   assertEquals(cleared.defaultCanaryInstanceId, null);
 });

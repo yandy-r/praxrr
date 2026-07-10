@@ -948,6 +948,14 @@ components:
       $ref: './schemas/canary.yaml#/CanarySyncRunResult'
     CanaryStartRequest:
       $ref: './schemas/canary.yaml#/CanaryStartRequest'
+    CanaryGeneratePreviewResult:
+      $ref: './schemas/canary.yaml#/CanaryGeneratePreviewResult'
+    CanaryRemainingPreviewAvailable:
+      $ref: './schemas/canary.yaml#/CanaryRemainingPreviewAvailable'
+    CanaryRemainingPreviewUnavailable:
+      $ref: './schemas/canary.yaml#/CanaryRemainingPreviewUnavailable'
+    CanaryRemainingPreviewEvidence:
+      $ref: './schemas/canary.yaml#/CanaryRemainingPreviewEvidence'
     CanaryRolloutDetail:
       $ref: './schemas/canary.yaml#/CanaryRolloutDetail'
     CanaryRolloutSummary:

@@ -8,13 +8,21 @@ import { runMigrations } from '$db/migrations.ts';
 import { arrInstancesQueries } from '$db/queries/arrInstances.ts';
 import { canaryRolloutQueries } from '$db/queries/canaryRollouts.ts';
 import { canarySettingsQueries } from '$db/queries/canarySettings.ts';
-import { newStateToken } from '$sync/canary/token.ts';
-import type { CanaryArrType, CanaryRolloutDetail, CanarySettings, CanaryStartResult } from '$sync/canary/types.ts';
 import { jobDispatcher } from '$jobs/dispatcher.ts';
+import { newStateToken } from '$sync/canary/token.ts';
+import type {
+  CanaryArrType,
+  CanaryRemainingPreviewEvidence,
+  CanaryRolloutDetail,
+  CanarySettings,
+  CanaryStartResult,
+  CanaryTarget,
+} from '$sync/canary/types.ts';
+import { buildPreviewFailure } from '$sync/preview/failureReason.ts';
 import { GET as GET_LIST, POST as POST_START } from '../../routes/api/v1/canary/rollouts/+server.ts';
 import { GET as GET_DETAIL } from '../../routes/api/v1/canary/rollouts/[id]/+server.ts';
-import { POST as POST_PROCEED } from '../../routes/api/v1/canary/rollouts/[id]/proceed/+server.ts';
 import { POST as POST_ABORT } from '../../routes/api/v1/canary/rollouts/[id]/abort/+server.ts';
+import { POST as POST_PROCEED } from '../../routes/api/v1/canary/rollouts/[id]/proceed/+server.ts';
 import { GET as GET_SETTINGS, PATCH as PATCH_SETTINGS } from '../../routes/api/v1/canary/settings/+server.ts';
 
 type StartPostEvent = Parameters<typeof POST_START>[0];
@@ -88,15 +96,64 @@ function createInstance(type: CanaryArrType): number {
   });
 }
 
+function availableZeroChangeEvidence(arrType: CanaryArrType, target: CanaryTarget): CanaryRemainingPreviewEvidence {
+  return {
+    version: 1,
+    availability: 'available',
+    generatedAt: '2026-07-10T00:00:00.000Z',
+    previews: [
+      {
+        instanceId: target.instanceId,
+        instanceName: target.instanceName,
+        arrType,
+        status: 'ready',
+        createdAtMs: Date.parse('2026-07-10T00:00:00.000Z'),
+        sections: [],
+        sectionOutcomes: [],
+        qualityProfiles: null,
+        delayProfiles: null,
+        mediaManagement: null,
+        metadataProfiles: null,
+        summary: {
+          totalCreates: 0,
+          totalUpdates: 0,
+          totalDeletes: 0,
+          totalUnchanged: 0,
+        },
+      },
+    ],
+  };
+}
+
+function unavailableEvidence(arrType: CanaryArrType): CanaryRemainingPreviewEvidence {
+  return {
+    version: 1,
+    availability: 'unavailable',
+    generatedAt: '2026-07-10T00:00:00.000Z',
+    failure: buildPreviewFailure('unauthorized', arrType),
+    partialPreviews: [],
+  };
+}
+
 /**
  * Seed a rollout parked at the verification gate (`awaiting_confirmation`) holding
  * `token` as its live `state_token`. Two enabled instances of one `arr_type` model
  * the canary + a single remaining target. Returns the rollout id.
  */
-function seedAwaitingRollout(token: string): number {
+function seedAwaitingRollout(
+  token: string,
+  buildEvidence: (
+    arrType: CanaryArrType,
+    target: CanaryTarget
+  ) => CanaryRemainingPreviewEvidence = availableZeroChangeEvidence
+): number {
   const arrType: CanaryArrType = 'radarr';
   const canaryId = createInstance(arrType);
   const remainingId = createInstance(arrType);
+  const remainingTarget = {
+    instanceId: remainingId,
+    instanceName: 'remaining',
+  };
 
   const id = canaryRolloutQueries.insert({
     arrType,
@@ -105,7 +162,7 @@ function seedAwaitingRollout(token: string): number {
     sections: null,
     maxBatchSize: 1,
     partialPolicy: 'gate',
-    remainingTargets: [{ instanceId: remainingId, instanceName: 'remaining' }],
+    remainingTargets: [remainingTarget],
     trigger: 'manual',
     startedAt: new Date().toISOString(),
     stateToken: newStateToken(),
@@ -117,6 +174,7 @@ function seedAwaitingRollout(token: string): number {
     canaryOutput: 'ok',
     canaryError: null,
     canarySyncHistoryId: null,
+    remainingPreview: buildEvidence(arrType, remainingTarget),
     nextToken: token,
     finishedAt: null,
   });
@@ -215,9 +273,9 @@ migratedTest('POST /canary/rollouts: multiple targets halt at the gate (skipped:
   // Two enabled radarr instances => a non-empty remaining cohort => the coordinator persists
   // a rollout and returns the gate arm ({ rollout, remainingPreview }). A Sonarr instance is
   // present to prove the cohort stays scoped to the requested arr_type (no sibling pull-in).
-  createInstance('radarr');
-  createInstance('radarr');
-  createInstance('sonarr');
+  const canaryId = createInstance('radarr');
+  const remainingId = createInstance('radarr');
+  const siblingId = createInstance('sonarr');
 
   const response = await POST_START(startEvent({ arrType: 'radarr' }));
   assertEquals(response.status, 200);
@@ -227,12 +285,22 @@ migratedTest('POST /canary/rollouts: multiple targets halt at the gate (skipped:
   assertEquals(body.rollout.arrType, 'radarr');
   assert(body.rollout.id > 0);
   assertEquals(typeof body.rollout.status, 'string');
-  assert(Array.isArray(body.remainingPreview));
+  assertEquals(typeof body.rollout.remainingPreview.availability, 'string');
+  assertEquals(body.rollout.canaryInstanceId, canaryId);
+  assertEquals(
+    body.rollout.remainingTargets.map((target) => target.instanceId),
+    [remainingId]
+  );
+  assert(!body.rollout.remainingTargets.some((target) => target.instanceId === siblingId));
 
   // The persisted rollout is scoped to radarr only.
   const detail = canaryRolloutQueries.getById(body.rollout.id);
   assertExists(detail);
   assertEquals(detail.arrType, 'radarr');
+  assertEquals(
+    detail.remainingTargets.map((target) => target.instanceId),
+    [remainingId]
+  );
 });
 
 migratedTest('POST /canary/rollouts: invalid arrType returns 400 with { error }', async () => {
@@ -303,6 +371,13 @@ migratedTest('GET /canary/rollouts/{id}: 200 returns detail including the live s
   assertEquals(body.status, 'awaiting_confirmation');
   assertEquals(body.stateToken, token);
   assertEquals(body.remainingTargets.length, 1);
+  assertEquals(body.remainingPreview.availability, 'available');
+  if (body.remainingPreview.availability === 'available') {
+    assertEquals(
+      body.remainingPreview.previews.map((preview) => preview.instanceId),
+      [body.remainingTargets[0].instanceId]
+    );
+  }
 });
 
 migratedTest('GET /canary/rollouts/{id}: unknown id returns 404 with { error }', async () => {
@@ -323,7 +398,7 @@ migratedTest('GET /canary/rollouts/{id}: non-numeric id returns 400 with { error
 // PROCEED ENDPOINT -- POST /canary/rollouts/{id}/proceed
 // ============================================================================
 
-migratedTest('POST /canary/rollouts/{id}/proceed: correct token enqueues the rollout job', async () => {
+migratedTest('POST /canary/rollouts/{id}/proceed: zero-change evidence enqueues the rollout job', async () => {
   // proceedRollout enqueues the resumable rollout job and pokes the dispatcher; stub the
   // wake so the runAt=now timer never fires an actual run under test.
   const originalNotify = jobDispatcher.notifyJobEnqueued;
@@ -339,6 +414,7 @@ migratedTest('POST /canary/rollouts/{id}/proceed: correct token enqueues the rol
     const body = (await response.json()) as CanaryRolloutDetail;
     assertEquals(body.id, id);
     assertEquals(body.status, 'rolling_out');
+    assertEquals(body.remainingPreview.availability, 'available');
 
     // A single rollout job was enqueued for exactly this rollout id.
     const enqueued =
@@ -348,6 +424,67 @@ migratedTest('POST /canary/rollouts/{id}/proceed: correct token enqueues the rol
   } finally {
     jobDispatcher.notifyJobEnqueued = originalNotify;
   }
+});
+
+migratedTest(
+  'POST /canary/rollouts/{id}/proceed: unavailable evidence returns safe 409 and enqueues nothing',
+  async () => {
+    const token = newStateToken();
+    const id = seedAwaitingRollout(token, (arrType) => unavailableEvidence(arrType));
+
+    const response = await POST_PROCEED(proceedEvent(String(id), { stateToken: token }));
+    assertEquals(response.status, 409);
+    const body = (await response.json()) as ErrorResponse;
+    assertEquals(body.error, buildPreviewFailure('unauthorized', 'radarr').message);
+
+    const enqueued =
+      db.queryFirst<{ total: number }>("SELECT COUNT(*) AS total FROM job_queue WHERE job_type = 'sync.canary.rollout'")
+        ?.total ?? 0;
+    assertEquals(enqueued, 0);
+    assertEquals(canaryRolloutQueries.getById(id)?.status, 'awaiting_confirmation');
+  }
+);
+
+migratedTest('POST /canary/rollouts/{id}/proceed: canonical response does not leak stored secrets', async () => {
+  const token = newStateToken();
+  const id = seedAwaitingRollout(token);
+  const secret = 'https://arr.example/api?apikey=0123456789abcdef0123456789abcdef';
+  const rawEvidence = {
+    version: 1,
+    availability: 'unavailable',
+    generatedAt: '2026-07-10T00:00:00.000Z',
+    failure: {
+      code: 'unauthorized',
+      message: `Rejected ${secret}`,
+      recoveryAction: `Retry with Bearer raw-secret-token at ${secret}`,
+    },
+    partialPreviews: [],
+  };
+  db.execute('UPDATE canary_rollouts SET remaining_preview_evidence = ? WHERE id = ?', JSON.stringify(rawEvidence), id);
+
+  const detailResponse = await GET_DETAIL(detailEvent(String(id)));
+  assertEquals(detailResponse.status, 200);
+  const detail = (await detailResponse.json()) as CanaryRolloutDetail;
+  assertEquals(detail.remainingPreview.availability, 'unavailable');
+  if (detail.remainingPreview.availability === 'unavailable') {
+    assertEquals(detail.remainingPreview.failure, buildPreviewFailure('unauthorized', 'radarr'));
+  }
+  const serializedDetail = JSON.stringify(detail);
+  assert(!serializedDetail.includes('apikey='));
+  assert(!serializedDetail.includes('raw-secret-token'));
+
+  const response = await POST_PROCEED(proceedEvent(String(id), { stateToken: token }));
+  assertEquals(response.status, 409);
+  const body = (await response.json()) as ErrorResponse;
+  const serialized = JSON.stringify(body);
+  assertEquals(body.error, buildPreviewFailure('unauthorized', 'radarr').message);
+  assert(!serialized.includes('apikey='));
+  assert(!serialized.includes('raw-secret-token'));
+
+  const enqueued =
+    db.queryFirst<{ total: number }>("SELECT COUNT(*) AS total FROM job_queue WHERE job_type = 'sync.canary.rollout'")
+      ?.total ?? 0;
+  assertEquals(enqueued, 0);
 });
 
 migratedTest('POST /canary/rollouts/{id}/proceed: wrong-state rollout returns 409', async () => {
@@ -389,7 +526,9 @@ migratedTest('POST /canary/rollouts/{id}/proceed: missing stateToken returns 400
 
 migratedTest('POST /canary/rollouts/{id}/abort: correct token aborts the gate', async () => {
   const token = newStateToken();
-  const id = seedAwaitingRollout(token);
+  const id = seedAwaitingRollout(token, (arrType) => unavailableEvidence(arrType));
+  const before = canaryRolloutQueries.getById(id);
+  assertExists(before);
 
   const response = await POST_ABORT(abortEvent(String(id), { stateToken: token }));
   assertEquals(response.status, 200);
@@ -398,6 +537,9 @@ migratedTest('POST /canary/rollouts/{id}/abort: correct token aborts the gate', 
   assertEquals(body.id, id);
   assertEquals(body.status, 'aborted');
   assertExists(body.finishedAt);
+  assertEquals(body.remainingPreview, before.remainingPreview);
+  assertEquals(body.canaryStatus, 'success');
+  assertEquals(body.canaryOutput, 'ok');
 });
 
 migratedTest('POST /canary/rollouts/{id}/abort: stale token returns 422', async () => {
@@ -436,7 +578,12 @@ migratedTest('GET /canary/settings: 200 returns the seeded singleton shape', asy
 migratedTest('PATCH /canary/settings: valid body updates and returns the fresh settings', async () => {
   const response = await PATCH_SETTINGS(
     settingsPatchEvent(
-      JSON.stringify({ enabled: true, autoSelect: false, defaultMaxBatchSize: 3, defaultPartialPolicy: 'abort' })
+      JSON.stringify({
+        enabled: true,
+        autoSelect: false,
+        defaultMaxBatchSize: 3,
+        defaultPartialPolicy: 'abort',
+      })
     )
   );
   assertEquals(response.status, 200);
