@@ -1,0 +1,189 @@
+/**
+ * Field-lineage engine (issue #231).
+ *
+ * `resolveEntityLineage` runs an on-demand, side-effect-free, all-layers replay with per-op
+ * write capture (`withInstrumentedCache`), serializes the entity, projects each serializer leaf
+ * onto its backing `(table, rowKey, column)` cell, and classifies it via `explainFieldLineage`.
+ *
+ * Value-guard divergence (AC4): `buildReadOnly` applies no value guards, so a `skipped`/`error`
+ * op the live build never applied would still write here. The engine consults each op's terminal
+ * `pcd_op_history` status and EXCLUDES `skipped`/`error`/`dropped`/`superseded` writers,
+ * re-resolving each cell to the prior surviving writer (or the schema default). `conflicted`/
+ * `conflicted_pending` writers, and any op whose SQL could not be fully parsed, yield `ambiguous`.
+ * An entity with a pending value-guard conflict forces every field ambiguous (Business Rule 6).
+ */
+
+import type { PCDCache } from '../../database/cache.ts';
+import type { ArrAppType } from '$shared/arr/capabilities.ts';
+import type { ResolvedEntityType } from '../types.ts';
+import type { PcdOpHistoryStatus } from '$db/queries/pcdOpHistory.ts';
+import {
+  explainFieldLineage,
+  foldPendingConflict,
+  type EffectiveCell,
+  type FieldLineage,
+  type LineageEntityStatus,
+} from '$shared/pcd/fieldLineage.ts';
+import { pcdOpHistoryQueries } from '$db/queries/pcdOpHistory.ts';
+import { databaseInstancesQueries } from '$db/queries/databaseInstances.ts';
+import { withInstrumentedCache } from '../layers.ts';
+import { readEntityOrNull, computeHasPendingConflict } from '../layerDiff.ts';
+import { collectEntityLeaves, type LeafRef } from './projection.ts';
+import { type CellLineage, type LineageIndex } from './lineageIndex.ts';
+import { buildRowKey, KEY_DELIMITER, LINEAGE_TABLE_KEYS } from './tableKeys.ts';
+import { lookupSchemaDefault, parseSchemaDefaults, type SchemaDefaultMap } from './schemaDefaults.ts';
+
+export interface ResolveEntityLineageInput {
+  readonly databaseId: number;
+  readonly entityType: ResolvedEntityType;
+  readonly arrType: ArrAppType | undefined;
+  readonly name: string;
+}
+
+export interface EntityLineageResult {
+  readonly lineage: FieldLineage[];
+  readonly lineageStatus: LineageEntityStatus;
+}
+
+/** Op-history statuses whose writers the live build never applied -> excluded from lineage. */
+const EXCLUDED_STATUSES = new Set<PcdOpHistoryStatus>(['skipped', 'error', 'dropped', 'superseded']);
+/** Op-history statuses that make a surviving writer ambiguous rather than a confident source. */
+const AMBIGUOUS_STATUSES = new Set<PcdOpHistoryStatus>(['conflicted', 'conflicted_pending']);
+
+type OpStatusMap = Map<number, PcdOpHistoryStatus>;
+
+/**
+ * Fold a cell's writer stack (replay order) against op statuses into the surviving establishing
+ * writer, or null when every writer was excluded (or the cell was never written).
+ */
+function foldWriterStack(stack: readonly CellLineage[] | undefined, opStatus: OpStatusMap): EffectiveCell | null {
+  if (!stack) return null;
+  for (let i = stack.length - 1; i >= 0; i--) {
+    const cell = stack[i];
+    const status = cell.opId === null ? 'applied' : (opStatus.get(cell.opId) ?? 'applied');
+    if (EXCLUDED_STATUSES.has(status as PcdOpHistoryStatus)) continue;
+    const ambiguous = cell.parseStatus === 'ambiguous' || AMBIGUOUS_STATUSES.has(status as PcdOpHistoryStatus);
+    return { sourceLayer: cell.sourceLayer, opId: cell.opId, opRef: cell.opRef, ambiguous };
+  }
+  return null;
+}
+
+/** Read the raw backing row (all columns) once per `(table, rowKey)`, memoized in `rowCache`. */
+function readRawRow(
+  cache: PCDCache,
+  table: string,
+  rowValues: Record<string, unknown>,
+  rowCache: Map<string, Record<string, unknown> | null>
+): Record<string, unknown> | null {
+  const keyColumns = LINEAGE_TABLE_KEYS[table];
+  if (!keyColumns) return null;
+  const rowKey = buildRowKey(table, rowValues);
+  const cacheKey = `${table}${KEY_DELIMITER}${rowKey}`;
+  const cached = rowCache.get(cacheKey);
+  if (cached !== undefined) return cached;
+
+  const conds: string[] = [];
+  const params: (string | number | null)[] = [];
+  for (const col of keyColumns) {
+    const value = rowValues[col];
+    if (value === null || value === undefined) {
+      conds.push(`"${col}" IS NULL`);
+    } else {
+      conds.push(`"${col}" = ?`);
+      params.push(value as string | number);
+    }
+  }
+  let row: Record<string, unknown> | null = null;
+  try {
+    row =
+      cache.queryOne<Record<string, unknown>>(`SELECT * FROM "${table}" WHERE ${conds.join(' AND ')}`, ...params) ??
+      null;
+  } catch {
+    row = null;
+  }
+  rowCache.set(cacheKey, row);
+  return row;
+}
+
+/** Whether the raw value equals the parsed default literal (undefined when not comparable). */
+function computeValueMatchesDefault(rawValue: unknown, defaultLiteral: string | null): boolean | undefined {
+  if (defaultLiteral === null) return undefined;
+  if (rawValue === null || rawValue === undefined) return false;
+  return String(rawValue) === defaultLiteral;
+}
+
+function classifyLeaf(
+  leaf: LeafRef,
+  index: LineageIndex,
+  schemaDefaults: SchemaDefaultMap,
+  opStatus: OpStatusMap,
+  cache: PCDCache,
+  rowCache: Map<string, Record<string, unknown> | null>
+): FieldLineage {
+  if (leaf.column === null) {
+    return {
+      fieldPath: leaf.fieldPath,
+      status: 'unavailable',
+      sourceLayer: null,
+      sourceKind: 'unavailable',
+      opId: null,
+      opRef: null,
+      explicit: false,
+    };
+  }
+
+  const rowKey = buildRowKey(leaf.table, leaf.rowValues);
+  const effectiveCell =
+    rowKey === null ? null : foldWriterStack(index.getStack(leaf.table, rowKey, leaf.column), opStatus);
+
+  const schemaEntry = lookupSchemaDefault(schemaDefaults, leaf.table, leaf.column);
+  const rawRow = readRawRow(cache, leaf.table, leaf.rowValues, rowCache);
+  const rawValue = rawRow ? rawRow[leaf.column] : undefined;
+  const valueMatchesDefault = computeValueMatchesDefault(rawValue, schemaEntry?.defaultLiteral ?? null);
+
+  return explainFieldLineage({
+    fieldPath: leaf.fieldPath,
+    effectiveCell,
+    schemaDefault: schemaEntry ? { hasDefault: schemaEntry.hasDefault, schemaFile: schemaEntry.schemaFile } : undefined,
+    valueMatchesDefault,
+  });
+}
+
+function loadOpStatusMap(databaseId: number): OpStatusMap {
+  const map: OpStatusMap = new Map();
+  const rows = pcdOpHistoryQueries.listLatestByDatabaseWithOps(databaseId);
+  for (const row of rows) {
+    map.set(row.history.op_id, row.history.status);
+  }
+  return map;
+}
+
+/**
+ * Resolve exact per-field lineage for one entity in the fully-resolved layer. Returns an empty,
+ * `unavailable` result when the entity is absent from resolved config; validation errors (bad
+ * arrType / unmapped entity) propagate to the caller.
+ */
+export async function resolveEntityLineage(input: ResolveEntityLineageInput): Promise<EntityLineageResult> {
+  const { databaseId, entityType, arrType, name } = input;
+  const instance = databaseInstancesQueries.getById(databaseId);
+  if (!instance) {
+    return { lineage: [], lineageStatus: 'unavailable' };
+  }
+
+  const schemaDefaults = await parseSchemaDefaults(instance.local_path);
+  const opStatus = loadOpStatusMap(databaseId);
+
+  return withInstrumentedCache(databaseId, async (cache, index) => {
+    const payload = await readEntityOrNull(cache, entityType, arrType, name);
+    if (payload === null) {
+      return { lineage: [], lineageStatus: 'unavailable' };
+    }
+
+    const leaves = collectEntityLeaves(entityType, arrType, payload);
+    const rowCache = new Map<string, Record<string, unknown> | null>();
+    const fields = leaves.map((leaf) => classifyLeaf(leaf, index, schemaDefaults, opStatus, cache, rowCache));
+
+    const hasPendingConflict = computeHasPendingConflict(databaseId, entityType, arrType, name);
+    return foldPendingConflict(fields, hasPendingConflict);
+  });
+}

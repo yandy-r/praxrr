@@ -12,6 +12,84 @@ ResolvedLayer:
     - `resolved`: the fully replayed state (schema -> base -> tweaks -> user),
       matching what sync applies to Arr instances
 
+FieldLineage:
+  type: object
+  description: |
+    Exact provenance for one resolved nested field. `status` is the gate:
+    `resolved` rows name a source; `ambiguous`/`unavailable` rows make no source
+    claim. `schema-default` means no op explicitly wrote the column and its value
+    equals the parsed schema DEFAULT; it is never inferred from the mere absence
+    of a user override.
+  required:
+    - fieldPath
+    - status
+    - sourceKind
+    - explicit
+  properties:
+    fieldPath:
+      type: string
+      description: |
+        Nested field path, byte-identical to the diff convention used by
+        `overrides` (e.g. `conditions["HDR"].negate`,
+        `orderedItems["WEB"].members[0].name`).
+    status:
+      type: string
+      enum:
+        - resolved
+        - ambiguous
+        - unavailable
+      description: |
+        `resolved`: a source is named. `ambiguous`: evidence conflicts, is
+        pending, or the op SQL was unparseable. `unavailable`: no establishing
+        op and no default backs this path.
+    sourceLayer:
+      type: string
+      nullable: true
+      enum:
+        - schema
+        - base
+        - tweaks
+        - user
+      description: The establishing layer; null unless `status` is `resolved`.
+    sourceKind:
+      type: string
+      enum:
+        - schema-default
+        - base-op
+        - tweaks-op
+        - user-op
+        - ambiguous
+        - unavailable
+      description: Source classification, aligned with `sourceLayer` for resolved rows.
+    opId:
+      type: integer
+      nullable: true
+      description: |
+        Establishing `pcd_ops` id for base/user (DB) ops; null for file layers
+        (schema/tweaks) and schema-default.
+    opRef:
+      type: object
+      nullable: true
+      required:
+        - filename
+        - order
+      properties:
+        filename:
+          type: string
+        order:
+          type: integer
+      description: |
+        File-layer op identity (schema/tweaks), which has no `pcd_ops` row; null
+        for DB ops.
+    explicit:
+      type: boolean
+      description: True when an op explicitly named this column (distinct from an implicit default).
+    valueEqualsDefault:
+      type: boolean
+      description: |
+        Display-only signal indicating the resolved value equals the schema
+        default. Never used to classify provenance. Absent when not comparable.
+
 ResolvedEntityState:
   type: object
   required:
@@ -93,6 +171,25 @@ ResolvedEntityState:
         True when a pending value-guard conflict targets this entity (see
         `pcd_op_history`). The resolved value must not be treated as
         unambiguous while this is true.
+    lineage:
+      type: array
+      nullable: true
+      items:
+        $ref: '#/FieldLineage'
+      description: |
+        Exact per-field lineage. Present only when `includeLineage=true` and
+        `layer=resolved`; null/absent otherwise.
+    lineageStatus:
+      type: string
+      nullable: true
+      enum:
+        - available
+        - ambiguous
+        - unavailable
+      description: |
+        Entity-level lineage rollup. `ambiguous` when a pending value-guard
+        conflict withholds all field claims; `unavailable` when the entity is
+        absent. Present only alongside `lineage`.
 
 ResolvedEntityListResponse:
   type: object

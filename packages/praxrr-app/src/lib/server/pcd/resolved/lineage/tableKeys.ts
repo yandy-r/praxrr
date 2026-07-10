@@ -1,0 +1,96 @@
+/**
+ * Business-key map for lineage row identity.
+ *
+ * The capture observer (from a live after-row) and the projector (from a synthesized row of
+ * key columns) both build the SAME `RowKey` string via `buildRowKey`, so a cell written during
+ * replay is looked up by the exact same key at projection time. Keys are the stable natural
+ * keys of each lineage-relevant table, using the verified schema column names.
+ */
+
+export type RowKey = string;
+
+/**
+ * Separator for joining multi-column business keys and the table/rowKey/column parts of a
+ * CellKey. Uses NUL because entity names, tags, and condition/quality names routinely contain
+ * spaces — a space separator would let distinct key tuples (e.g. `['A B','Foo']` vs `['A','B
+ * Foo']`) concatenate to the same string and cross-attribute lineage. NUL cannot appear in
+ * these SQLite text values, so joins are collision-free.
+ */
+export const KEY_DELIMITER = '\u0000';
+
+/** Each lineage-relevant table -> its stable business-key columns (in fixed order). */
+export const LINEAGE_TABLE_KEYS: Readonly<Record<string, readonly string[]>> = {
+  // Custom formats
+  custom_formats: ['name'],
+  custom_format_conditions: ['custom_format_name', 'name'],
+  custom_format_tags: ['custom_format_name', 'tag_name'],
+  custom_format_tests: ['custom_format_name', 'title', 'type'],
+  condition_patterns: ['custom_format_name', 'condition_name'],
+  condition_languages: ['custom_format_name', 'condition_name'],
+  condition_indexer_flags: ['custom_format_name', 'condition_name'],
+  condition_sources: ['custom_format_name', 'condition_name'],
+  condition_resolutions: ['custom_format_name', 'condition_name'],
+  condition_quality_modifiers: ['custom_format_name', 'condition_name'],
+  condition_sizes: ['custom_format_name', 'condition_name'],
+  condition_release_types: ['custom_format_name', 'condition_name'],
+  condition_years: ['custom_format_name', 'condition_name'],
+
+  // Quality profiles
+  quality_profiles: ['name'],
+  quality_profile_tags: ['quality_profile_name', 'tag_name'],
+  quality_profile_languages: ['quality_profile_name', 'language_name'],
+  quality_profile_custom_formats: ['quality_profile_name', 'custom_format_name', 'arr_type'],
+  quality_profile_qualities: ['quality_profile_name', 'quality_name', 'quality_group_name'],
+  quality_groups: ['quality_profile_name', 'name'],
+  quality_group_members: ['quality_profile_name', 'quality_group_name', 'quality_name'],
+
+  // Regular expressions
+  regular_expressions: ['name'],
+  regular_expression_tags: ['regular_expression_name', 'tag_name'],
+
+  // Delay profiles
+  delay_profiles: ['name'],
+
+  // Naming
+  radarr_naming: ['name'],
+  sonarr_naming: ['name'],
+  lidarr_naming: ['name'],
+
+  // Media settings
+  radarr_media_settings: ['name'],
+  sonarr_media_settings: ['name'],
+  lidarr_media_settings: ['name'],
+
+  // Quality definitions
+  radarr_quality_definitions: ['name', 'quality_name'],
+  sonarr_quality_definitions: ['name', 'quality_name'],
+  lidarr_quality_definitions: ['name', 'quality_name'],
+
+  // Lidarr metadata profiles
+  lidarr_metadata_profiles: ['name'],
+  lidarr_metadata_profile_primary_types: ['metadata_profile_name', 'type_id'],
+  lidarr_metadata_profile_secondary_types: ['metadata_profile_name', 'type_id'],
+  lidarr_metadata_profile_release_statuses: ['metadata_profile_name', 'status_id'],
+} as const;
+
+/** Normalize a key-column value to a stable string (null/undefined -> empty). */
+function keyPart(value: unknown): string {
+  if (value === null || value === undefined) return '';
+  return String(value);
+}
+
+/**
+ * Build the `RowKey` for a table row from its business-key columns. Returns null when the
+ * table is not lineage-relevant (the observer then skips it — schema-only / seed tables like
+ * `languages`, `qualities`, `tags` back no Portable field).
+ */
+export function buildRowKey(table: string, row: Record<string, unknown>): RowKey | null {
+  const keyColumns = LINEAGE_TABLE_KEYS[table];
+  if (!keyColumns) return null;
+  return keyColumns.map((col) => keyPart(row[col])).join(KEY_DELIMITER);
+}
+
+/** True when the table participates in lineage capture/projection. */
+export function isLineageTable(table: string): boolean {
+  return table in LINEAGE_TABLE_KEYS;
+}

@@ -133,6 +133,8 @@ export {
   resolveLayerState,
 } from './resolved/layerDiff.ts';
 export type { PendingConflictLookup } from './resolved/layerDiff.ts';
+export { resolveEntityLineage } from './resolved/lineage/engine.ts';
+export type { EntityLineageResult, ResolveEntityLineageInput } from './resolved/lineage/engine.ts';
 export { compareAcrossInstances } from './resolved/compare.ts';
 export type {
   CompareAcrossInstancesInput,

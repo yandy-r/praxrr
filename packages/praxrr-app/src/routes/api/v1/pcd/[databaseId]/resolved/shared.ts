@@ -27,6 +27,7 @@ import {
 } from '$pcd/index.ts';
 import type { ResolvedEntityPayload, ResolvedEntityType } from '$pcd/index.ts';
 import type { FieldChange } from '$sync/preview/types.ts';
+import type { FieldLineage } from '$shared/pcd/fieldLineage.ts';
 import { logger } from '$logger/logger.ts';
 
 type ResolvedEntityState = components['schemas']['ResolvedEntityState'];
@@ -72,6 +73,16 @@ export function toWirePayload(payload: ResolvedEntityPayload): ResolvedEntitySta
  */
 export function toWireOverrides(overrides: readonly FieldChange[]): ResolvedEntityState['overrides'] {
   return overrides as unknown as ResolvedEntityState['overrides'];
+}
+
+/**
+ * Same wire-boundary narrowing for exact field lineage. The internal `FieldLineage`
+ * (`$shared/pcd/fieldLineage.ts`) and the generated OpenAPI `FieldLineage` are identical
+ * once serialized to JSON; this single-purpose cast keeps the rest of `ResolvedEntityState`
+ * `satisfies`-checked.
+ */
+export function toWireLineage(lineage: readonly FieldLineage[]): ResolvedEntityState['lineage'] {
+  return lineage as unknown as ResolvedEntityState['lineage'];
 }
 
 // ============================================================================
