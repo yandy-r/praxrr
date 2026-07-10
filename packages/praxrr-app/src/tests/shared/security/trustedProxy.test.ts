@@ -148,6 +148,30 @@ Deno.test('isTrustedProxyPeer: an IPv4-mapped IPv6 peer matches a v4 range', () 
   assert(isTrustedProxyPeer('[::ffff:10.0.0.5]', cfg));
 });
 
+Deno.test('parseTrustedProxy: a non-mapped embedded-IPv4 IPv6 tail folds correctly (NAT64-style)', () => {
+  // The dotted-quad tail (not the ::ffff: mapped form) stays IPv6 and folds into two hextets.
+  const cfg = parseTrustedProxy('64:ff9b::1.2.3.4');
+  assertEquals(cfg.invalidEntries, []);
+  assertEquals(cfg.ranges.length, 1);
+  assertEquals(cfg.ranges[0].family, 6);
+  assertEquals(cfg.ranges[0].prefix, 128);
+  // 1.2.3.4 -> 0102:0304, so the canonical form is 64:ff9b::102:304.
+  assert(isTrustedProxyPeer('64:ff9b::102:304', cfg));
+  assert(!isTrustedProxyPeer('64:ff9b::102:305', cfg));
+
+  // Six leading hextets + a dotted-quad tail = 8 groups total (fully-specified, no `::`).
+  const full = parseTrustedProxy('1:2:3:4:5:6:7.8.9.10');
+  assertEquals(full.invalidEntries, []);
+  assertEquals(full.ranges.length, 1);
+  assert(isTrustedProxyPeer('1:2:3:4:5:6:708:90a', full));
+});
+
+Deno.test('parseTrustedProxy: a malformed embedded-IPv4 tail is rejected, not silently folded', () => {
+  const cfg = parseTrustedProxy('64:ff9b::1.2.3.256, 64:ff9b::1.2.3');
+  assertEquals(cfg.ranges.length, 0);
+  assertEquals(new Set(cfg.invalidEntries), new Set(['64:ff9b::1.2.3.256', '64:ff9b::1.2.3']));
+});
+
 Deno.test('isTrustedProxyPeer: an unparseable peer is not trusted (fail closed)', () => {
   const cfg = parseTrustedProxy('10.0.0.0/8, ::1');
   assert(!isTrustedProxyPeer('not-an-ip', cfg));

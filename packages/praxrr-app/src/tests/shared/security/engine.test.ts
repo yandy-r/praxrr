@@ -291,6 +291,13 @@ Deno.test(
     // below 60 on its own, so the cap is belt-and-suspenders here rather than the decisive factor.
     assertEquals(report.band, 'exposed');
     assert(report.topActions.some((a) => a.checkId === 'proxy_trust' && a.fix.kind === 'env-var'));
+    // Pin the contributions-sum-EXACTLY invariant for the ONE state where proxy_trust is scored
+    // (score 0 / weight 25) — the earlier invariant test only covers TRUSTED_PROXY-unset cases.
+    assertEquals(
+      report.checks.reduce((total, c) => total + c.contribution, 0),
+      report.score,
+      'contributions must sum to score even when proxy_trust carries weight'
+    );
   }
 );
 

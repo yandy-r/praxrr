@@ -136,7 +136,14 @@ function rightmostForwarded(headerValue: string): string | null {
  * not the leftmost client-supplied value. Fail-closed: an unresolvable peer returns the non-local
  * `'unknown'` sentinel.
  *
- * NOTE: this relies on `event.getClientAddress()` returning the real socket peer. `sveltekit-adapter-deno`
+ * OPERATOR CONTRACT: a trusted proxy MUST overwrite or strip every client-supplied forwarded header
+ * Praxrr reads (all of {@link IP_HEADERS}), not merely set one of them. `x-forwarded-for` is consulted
+ * FIRST, and Praxrr cannot tell a proxy-set value from a client-forged one that the proxy passed through
+ * untouched. nginx `$proxy_add_x_forwarded_for` (append) is safe because it appends the real client, so
+ * the rightmost hop wins; a proxy that sets only `X-Real-IP` while forwarding the client's raw
+ * `X-Forwarded-For` reopens the AUTH=local bypass (the forged XFF is returned before X-Real-IP is read).
+ *
+ * NOTE: this also relies on `event.getClientAddress()` returning the real socket peer. `sveltekit-adapter-deno`
  * does so today; enabling any adapter XFF/address override — or fronting Praxrr with a PROXY-protocol
  * terminator that rewrites the peer — would silently defeat `TRUSTED_PROXY`.
  */

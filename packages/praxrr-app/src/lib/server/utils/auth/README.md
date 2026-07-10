@@ -108,6 +108,18 @@ The "local IP" decision uses `getClientIp()` (`network.ts`). Forwarded headers
 - **Unresolvable peer:** returns the non-local sentinel `'unknown'` (fail-closed;
   it does not grant the local bypass).
 
+**Operator contract:** a trusted proxy must overwrite or strip _every_
+client-supplied forwarded header (`X-Forwarded-For`, `X-Real-IP`, and the other
+`IP_HEADERS`). `X-Forwarded-For` is consulted first, and Praxrr cannot tell a
+proxy-set value from a forged one passed through untouched — a proxy that sets
+only `X-Real-IP` while forwarding a client's raw `X-Forwarded-For` reopens the
+bypass. Use nginx `$proxy_add_x_forwarded_for` (which appends the real client).
+
+Under `AUTH=local` behind a private-subnet proxy, leaving `TRUSTED_PROXY` unset
+does **not** force authentication: the proxy's own socket IP is itself local, so
+every proxied request bypasses. Set `TRUSTED_PROXY` so the real forwarded client
+is graded instead.
+
 Because the gate keys on the socket peer, it depends on
 `event.getClientAddress()` returning the real peer. `sveltekit-adapter-deno` does
 so today; enabling an adapter XFF/address override would defeat it.

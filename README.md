@@ -70,8 +70,10 @@ API access via `X-Api-Key` header or `?apikey=` query param. See
 > [!IMPORTANT] Reverse proxies and `AUTH=local`: forwarded headers (`X-Forwarded-For`, `X-Real-IP`,
 > …) are trusted **only** from peers listed in `TRUSTED_PROXY` (unset by default). A direct deployment
 > needs no change. If a reverse proxy fronts Praxrr under `AUTH=local`, set `TRUSTED_PROXY` to the
-> proxy's address/CIDR so real client IPs are honored — otherwise every request is graded by the
-> proxy's own IP and must authenticate. This closes a spoofed-`X-Forwarded-For` bypass; see the
+> proxy's address/CIDR so the real forwarded client is graded — otherwise Praxrr grades the proxy's own
+> IP, which (on a private/LAN subnet) is itself "local", so **every** proxied request skips
+> authentication. The proxy must also overwrite/strip client forwarded headers. This closes a
+> spoofed-`X-Forwarded-For` bypass; see the
 > [Trusted proxy guide](docs/site/src/content/docs/guides/configuration.md).
 
 <!-- markdownlint-disable-next-line MD028 -->

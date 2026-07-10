@@ -164,6 +164,26 @@ cases, set `TRUSTED_PROXY` to the proxy's address as Praxrr sees it (its
 container IP / CIDR on the shared docker network, or `loopback` if the proxy
 runs on the same host).
 
+The trusted proxy **must overwrite or strip** the client-supplied forwarded
+headers (all of `X-Forwarded-For`, `X-Real-IP`, `X-Client-IP`,
+`CF-Connecting-IP`, `Fastly-Client-IP`, `True-Client-IP`, `X-Cluster-Client-IP`).
+Praxrr consults `X-Forwarded-For` first and cannot distinguish a proxy-set value
+from a forged one the proxy forwarded untouched. `$proxy_add_x_forwarded_for`
+appends the real client, so the value is safe; a config that sets only
+`X-Real-IP` while passing the client's raw `X-Forwarded-For` through would let a
+forged `X-Forwarded-For` win.
+
+### `AUTH=local` behind a proxy
+
+Under `AUTH=local`, do **not** leave `TRUSTED_PROXY` unset behind a reverse
+proxy. Praxrr would grade every request by the direct peer — the proxy's own IP
+— and because a reverse proxy usually sits on a private/LAN subnet, that IP is
+itself "local", so **every** proxied request (including remote clients) skips
+authentication. Setting `TRUSTED_PROXY` to the proxy makes Praxrr grade the real
+forwarded client: remote clients authenticate, LAN clients keep the intended
+local bypass. The Security Posture surfaces the unset case as the
+`proxy_trust_missing` advisory.
+
 ## CSRF note
 
 During active development, SvelteKit CSRF trusted origins may include a wildcard

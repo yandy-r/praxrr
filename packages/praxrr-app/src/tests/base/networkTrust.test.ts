@@ -89,3 +89,15 @@ Deno.test('getClientIp: an x-real-ip from a trusted peer is honored (replace-sem
   const ip = getClientIp(eventWith('203.0.113.9', { 'x-real-ip': '198.51.100.4' }), cfg);
   assertEquals(ip, '198.51.100.4');
 });
+
+Deno.test('getClientIp: x-forwarded-for is consumed BEFORE x-real-ip — the trusted proxy must sanitize XFF', () => {
+  // Documents the operator contract (see getClientIp doc comment): if a trusted proxy sets only
+  // X-Real-IP but forwards the client's raw X-Forwarded-For untouched, the forged XFF wins because it is
+  // checked first. A proxy that appends via $proxy_add_x_forwarded_for avoids this. Pins CURRENT behavior.
+  const cfg = parseTrustedProxy('203.0.113.9/32');
+  const ip = getClientIp(
+    eventWith('203.0.113.9', { 'x-forwarded-for': '127.0.0.1', 'x-real-ip': '198.51.100.4' }),
+    cfg
+  );
+  assertEquals(ip, '127.0.0.1'); // XFF is authoritative; the proxy is responsible for overwriting it
+});
