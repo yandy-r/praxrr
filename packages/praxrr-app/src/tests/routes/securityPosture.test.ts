@@ -74,11 +74,16 @@ migratedTest('GET /security-posture/summary returns a well-formed report with ze
   assert(body.score >= 0 && body.score <= 100);
   assert(['hardened', 'guarded', 'exposed', 'unknown'].includes(body.band));
 
-  // All five checks are present, in the canonical order.
+  // All six checks are present, in the canonical order (proxy_trust joined in issue #228).
   assertEquals(
     body.checks.map((c) => c.id),
     [...CHECK_IDS]
   );
+  // proxy_trust rides the wire contract; with TRUSTED_PROXY unset it is inert (null), so it must not
+  // shift the score — this pins the OpenAPI enum + wire lockstep and the numeric-invariance guarantee.
+  const proxyTrust = body.checks.find((c) => c.id === 'proxy_trust');
+  assert(proxyTrust, 'proxy_trust must be present in the wire report');
+  assertEquals(proxyTrust?.score, null);
   // Contributions sum EXACTLY to the score (the invariant survives the wire mapping).
   assertEquals(
     body.checks.reduce((total, c) => total + c.contribution, 0),
@@ -138,8 +143,8 @@ migratedTest(
   async () => {
     const { status, body } = await getSummary();
     assertEquals(status, 200);
-    // The session posture surface bumped the report-surface engine version to '2'.
-    assertEquals(body.engineVersion, '2');
+    // Report-surface engine version: '2' (session posture #227) → '3' (proxy_trust check #228).
+    assertEquals(body.engineVersion, '3');
 
     // A no-context ({}) event cannot observe transport, so it is reported unknown and never assumed safe.
     const transportAdvisory = body.advisories.find((a) => a.id === 'session_cookie_transport');

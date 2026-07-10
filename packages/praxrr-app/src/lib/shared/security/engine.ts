@@ -9,7 +9,7 @@
  */
 
 import { TONE_SEVERITY } from '$shared/narration/index.ts';
-import { ALL_CHECKS, buildTransportRows } from './checks.ts';
+import { ALL_CHECKS, buildTransportRows, isLoopbackBindHost } from './checks.ts';
 import { capBand, rollUp, shieldBandFor } from './policy.ts';
 import {
   SECURITY_POSTURE_ENGINE_VERSION,
@@ -61,6 +61,22 @@ function buildAssurances(inputs: PostureInputs): Assurance[] {
       note: 'For a request served over direct HTTPS, the session cookie is marked Secure.',
     });
   }
+
+  // Row 2 (active & valid): an explicit, non-broad, fully-valid TRUSTED_PROXY allowlist is a good state.
+  if (
+    inputs.trustedProxyConfigured &&
+    inputs.trustedProxyValidRangeCount > 0 &&
+    !inputs.trustedProxyOverlyBroad &&
+    inputs.trustedProxyInvalidEntries.length === 0
+  ) {
+    assurances.push({
+      id: 'proxy_trust',
+      label: 'Trusted proxy allowlist',
+      verified: true,
+      note: 'TRUSTED_PROXY names an explicit proxy allowlist; forwarded client IPs are trusted only from those peers, and a spoofed X-Forwarded-For from any other peer is ignored.',
+    });
+  }
+
   return assurances;
 }
 
@@ -151,11 +167,78 @@ function sessionCookieTransportAdvisory(session: SessionPosture): Advisory | nul
   }
 }
 
+/**
+ * Rows 3/4/5 of the proxy-trust states table, resolved in precedence order. Rows 1 (scored) and 2
+ * (assurance) are handled elsewhere, so this returns `null` for them and for the inert row 6. At most
+ * one advisory ever fires per report. Each carries a concrete fix (AC#4) without a false failing grade —
+ * Praxrr cannot observe whether a proxy is in front of it, so the unset default must not be scored down.
+ */
+function buildProxyTrustAdvisory(inputs: PostureInputs): Advisory | null {
+  const configured = inputs.trustedProxyConfigured;
+  const spoofableContext = inputs.authMode === 'local' && !isLoopbackBindHost(inputs.bindHost);
+  const overlyBroad = inputs.trustedProxyOverlyBroad;
+  const invalid = inputs.trustedProxyInvalidEntries;
+
+  // Row 1 (scored) and row 2 (assurance) are not advisories.
+  if (configured && overlyBroad && spoofableContext) return null;
+  if (configured && inputs.trustedProxyValidRangeCount > 0 && !overlyBroad && invalid.length === 0) return null;
+
+  // Row 3 — overly-broad, but not a live bypass in this mode.
+  if (configured && overlyBroad && !spoofableContext) {
+    return {
+      id: 'proxy_trust_overly_broad',
+      label: 'TRUSTED_PROXY trusts every peer',
+      detail: [
+        'TRUSTED_PROXY trusts every peer (a wildcard, /0, or a supernet ≤ /7); forwarded IPs used for logging and rate-limiting are spoofable.',
+        "This is not an auth bypass in the current mode — narrow it to the proxy's exact address. This is informational, not scored.",
+      ],
+      fix: { kind: 'env-var', name: 'TRUSTED_PROXY', label: "Narrow TRUSTED_PROXY to the proxy's address" },
+    };
+  }
+
+  // Row 4 — some tokens were dropped as invalid.
+  if (configured && invalid.length > 0) {
+    return {
+      id: 'proxy_trust_invalid',
+      label: 'TRUSTED_PROXY has ignored tokens',
+      detail: [
+        `${invalid.length} TRUSTED_PROXY token(s) were ignored: ${invalid.join(', ')}.`,
+        'The peers they named are NOT trusted, so a legitimately-proxied AUTH=local deployment will stop bypassing auth for real local users until the value is fixed.',
+      ],
+      fix: { kind: 'env-var', name: 'TRUSTED_PROXY', label: 'Fix the ignored TRUSTED_PROXY token(s)' },
+    };
+  }
+
+  // Row 5 — missing under a spoofable context (Praxrr cannot tell proxy-fronted from direct/LAN apart).
+  if (!configured && spoofableContext) {
+    return {
+      id: 'proxy_trust_missing',
+      label: 'TRUSTED_PROXY is not set',
+      detail: [
+        'If a reverse proxy fronts Praxrr under AUTH=local, set TRUSTED_PROXY to its address so real client IPs are honored.',
+        'If this is a direct / LAN deployment, no action is needed here. To remove the local-address bypass entirely, set AUTH=on or bind to loopback (HOST=127.0.0.1).',
+        'This is informational, not scored — Praxrr cannot observe whether a proxy is in front of it.',
+      ],
+      fix: {
+        kind: 'env-var',
+        name: 'TRUSTED_PROXY',
+        docHref: 'https://github.com/yandy-r/praxrr',
+        label: 'Set TRUSTED_PROXY to your reverse proxy address',
+      },
+    };
+  }
+
+  // Row 6 — inert.
+  return null;
+}
+
 /** Real posture notes whose exploitability Praxrr cannot observe, so they inform without a score. */
 function buildAdvisories(inputs: PostureInputs): Advisory[] {
   const advisories: Advisory[] = [];
   const transportAdvisory = sessionCookieTransportAdvisory(inputs.session);
   if (transportAdvisory) advisories.push(transportAdvisory);
+  const proxyTrustAdvisory = buildProxyTrustAdvisory(inputs);
+  if (proxyTrustAdvisory) advisories.push(proxyTrustAdvisory);
   return advisories;
 }
 

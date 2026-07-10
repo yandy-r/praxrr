@@ -28,6 +28,10 @@ function makeInputs(overrides: Partial<PostureInputs> = {}): PostureInputs {
     rotation: { activeVersion: '1', configuredVersions: ['1'], instanceKeyVersions: [] },
     redactionVerified: true,
     session: { transport: 'unknown', cookieSecure: false, cookieSecureMode: 'auto' },
+    trustedProxyConfigured: false,
+    trustedProxyValidRangeCount: 0,
+    trustedProxyInvalidEntries: [],
+    trustedProxyOverlyBroad: false,
     nowIso: '2026-07-09T00:00:00.000Z',
     ...overrides,
   };
@@ -266,4 +270,78 @@ Deno.test('log_redaction: null+assured when verified; a critical weighted failur
   assert(broken.critical);
   assertEquals(broken.bandCapWhenAction, 'exposed');
   assertEquals(broken.weight, 25);
+});
+
+// --- proxy_trust (issue #228) -----------------------------------------------------------------
+
+Deno.test('proxy_trust: unset is inert (null/na, weight 0) regardless of mode', () => {
+  for (const authMode of ['on', 'local', 'off', 'oidc'] as const) {
+    const check = runCheck('proxy_trust', makeInputs({ authMode }));
+    assertEquals(check.score, null, `unset should be null under AUTH=${authMode}`);
+    assertEquals(check.status, 'na');
+    assertEquals(check.weight, 0);
+    assertEquals(check.critical, false);
+  }
+});
+
+Deno.test('proxy_trust: overly-broad under AUTH=local + non-loopback is the one scored/weighted/critical state', () => {
+  const check = runCheck(
+    'proxy_trust',
+    makeInputs({ authMode: 'local', bindHost: '0.0.0.0', trustedProxyConfigured: true, trustedProxyOverlyBroad: true })
+  );
+  assertEquals(check.score, 0);
+  assertEquals(check.status, 'action');
+  assertEquals(check.weight, 25);
+  assert(check.critical);
+  assertEquals(check.bandCapWhenAction, 'exposed');
+  assertEquals(check.recommendations[0]?.fix.kind, 'env-var');
+});
+
+Deno.test(
+  'proxy_trust: overly-broad is NOT scored when the context is not spoofable (AUTH=on, or loopback bind)',
+  () => {
+    const onMode = runCheck(
+      'proxy_trust',
+      makeInputs({ authMode: 'on', trustedProxyConfigured: true, trustedProxyOverlyBroad: true })
+    );
+    assertEquals(onMode.score, null);
+    assertEquals(onMode.status, 'na');
+
+    const loopbackBind = runCheck(
+      'proxy_trust',
+      makeInputs({
+        authMode: 'local',
+        bindHost: '127.0.0.1',
+        trustedProxyConfigured: true,
+        trustedProxyOverlyBroad: true,
+      })
+    );
+    assertEquals(loopbackBind.score, null);
+  }
+);
+
+Deno.test('proxy_trust: active, valid, non-broad, no-invalid config is assured (null, weight 0)', () => {
+  const check = runCheck(
+    'proxy_trust',
+    makeInputs({
+      authMode: 'local',
+      trustedProxyConfigured: true,
+      trustedProxyValidRangeCount: 2,
+      trustedProxyOverlyBroad: false,
+      trustedProxyInvalidEntries: [],
+    })
+  );
+  assertEquals(check.score, null);
+  assertEquals(check.status, 'assured');
+  assertEquals(check.weight, 0);
+});
+
+Deno.test('proxy_trust: a config with invalid tokens is inert at the check level (surfaced as an advisory)', () => {
+  const check = runCheck(
+    'proxy_trust',
+    makeInputs({ authMode: 'on', trustedProxyConfigured: true, trustedProxyInvalidEntries: ['junk'] })
+  );
+  assertEquals(check.score, null);
+  assertEquals(check.status, 'na');
+  assertEquals(check.critical, false);
 });

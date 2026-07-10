@@ -120,6 +120,35 @@ to the mounted directory.
 - **Parser:** When enabled, set `PARSER_HOST` to the parser service name
   (`parser` in production, `parser-dev` in dev compose) and `PARSER_PORT=5000`.
 
+### Behind a reverse proxy
+
+When a reverse proxy fronts Praxrr, set `TRUSTED_PROXY` to the proxy's address
+as Praxrr sees it so the real forwarded client IP is honored (and spoofed ones
+from other peers are ignored). On a shared compose network that is the proxy
+container's subnet; use `loopback` if the proxy runs on the same host.
+
+```yaml
+services:
+  praxrr:
+    image: ghcr.io/yandy-r/praxrr:latest
+    environment:
+      - AUTH=local
+      - TRUSTED_PROXY=172.18.0.0/16 # the compose network the proxy sits on
+```
+
+Under `AUTH=local`, do **not** leave `TRUSTED_PROXY` unset behind a proxy.
+With it unset, Praxrr grades every request by the direct peer — the proxy
+container's own IP. Because compose proxies sit on a private subnet
+(`10.x`, `172.16-31.x`, `192.168.x`), that IP is itself "local", so **every**
+proxied request (including remote clients) is treated as local and skips
+authentication. Setting `TRUSTED_PROXY` to the proxy makes Praxrr grade the real
+forwarded client instead: remote clients then authenticate while LAN clients
+keep the intended `AUTH=local` bypass. The proxy must also overwrite/strip
+client-supplied forwarded headers (e.g. nginx `$proxy_add_x_forwarded_for`).
+Praxrr's Security Posture flags the unset case as the `proxy_trust_missing`
+advisory. See the [Trusted proxy](/guides/configuration/#trusted-proxy) guide for
+the full grammar and failure behavior.
+
 ## Parser opt-in
 
 Custom format testing and quality profile simulation require the optional

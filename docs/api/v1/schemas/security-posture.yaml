@@ -15,6 +15,7 @@ SecurityCheckId:
     - app_key_at_rest
     - credential_rotation
     - log_redaction
+    - proxy_trust
 
 SecurityArrType:
   type: string

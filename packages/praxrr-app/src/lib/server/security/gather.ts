@@ -25,7 +25,7 @@ import type {
   PostureInputs,
   RotationFacts,
   SessionRequestContext,
-  ShieldArrType
+  ShieldArrType,
 } from '$shared/security/index.ts';
 
 const SOURCE = 'SecurityPostureGather';
@@ -119,6 +119,8 @@ export function buildPostureInputs(event?: SessionRequestContext): PostureInputs
   const transport = resolveSessionTransport(event);
   const cookieSecureMode = config.cookieSecureMode;
   const cookieSecure = resolveCookieSecure(cookieSecureMode, transport);
+  // Already parsed once at Config construction (fail-closed, non-throwing); never re-parsed here.
+  const trustedProxy = config.trustedProxy;
 
   return {
     authMode: config.authMode,
@@ -132,6 +134,10 @@ export function buildPostureInputs(event?: SessionRequestContext): PostureInputs
     rotation: gatherRotation(instances),
     redactionVerified: verifyLogRedaction(),
     session: { transport, cookieSecure, cookieSecureMode },
+    trustedProxyConfigured: trustedProxy.mode !== 'unset',
+    trustedProxyValidRangeCount: trustedProxy.ranges.length,
+    trustedProxyInvalidEntries: trustedProxy.invalidEntries,
+    trustedProxyOverlyBroad: trustedProxy.overlyBroad,
     nowIso: new Date().toISOString(),
   };
 }
