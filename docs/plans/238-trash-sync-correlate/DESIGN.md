@@ -127,8 +127,8 @@ so no separate `outcome` enum is needed. Per-branch mapping (all handler termina
 
 - `TrashGuideSyncStatusView`:
   `{ sourceId, sourceName:string|null, arrType, queueId:number|null,
-   current:{ status, runAt, startedAt, attempts, runToken:string|null }|null,
-   latestRun:{ id,status,startedAt,finishedAt,durationMs, evidence:Evidence|null }|null }`
+ current:{ status, runAt, startedAt, attempts, runToken:string|null }|null,
+ latestRun:{ id,status,startedAt,finishedAt,durationMs, evidence:Evidence|null }|null }`
   Built by one `getTrashGuideSyncStatus(sourceId)`, reused by the POST response and the GET resolver.
 - `EnqueueManualTrashGuideSyncResult`:
   `{ status:'queued', runToken, view }` | `{ status:'already_running', runToken, view }`.
