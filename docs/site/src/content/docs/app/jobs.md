@@ -1,6 +1,6 @@
 ---
 title: Job System
-description: Background job queue persistence, dispatcher claim loop, handler registration, scheduling dedupe, and per-handler rescheduleAt retry behavior.
+description: Background job queue persistence, dispatcher claim loop, handler registration, Config Health jobs, scheduling dedupe, and per-handler rescheduleAt behavior.
 ---
 
 Praxrr runs background work through a SQLite-backed **job queue** and a timer-driven
@@ -41,6 +41,25 @@ Defined in `queueTypes.ts`:
 | `trashguide.sync`                  | `{ sourceId, trigger }`                       |
 | `backup.create` / `backup.cleanup` | `{}`                                          |
 | `logs.cleanup`                     | `{}`                                          |
+| `config-health.snapshot`           | `{}`                                          |
+| `config-health.cleanup`            | `{}`                                          |
+
+## Config Health Jobs
+
+`config-health.snapshot` runs a chunked, instance-ordered sweep of enabled sync-capable Arr
+instances. It scores each instance and appends the report to `config_health_snapshots`. Scheduled
+sweeps persist their cursor between chunks and schedule the next interval after the terminal chunk;
+a manual run does not make itself recurring.
+
+Snapshot insertion is the primary-operation boundary. Only after the insert succeeds does the
+handler read the adjacent persisted predecessor and evaluate a possible `health.degraded` event.
+Assessment, state claim or re-arm, rendering, notification manager, provider, history, and secondary
+logging failures are contained by that post-insert boundary. They do not undo the snapshot, fail
+sibling instances, change sweep progress, or activate the snapshot handler's failure backoff.
+
+`config-health.cleanup` prunes snapshots by retention age and then caps the rows that remain. The
+scheduled job recurs daily; a manual run performs one cleanup only. Both Config Health jobs cancel
+when Config Health scoring is disabled.
 
 ## Dispatcher
 
@@ -97,6 +116,8 @@ persistence mechanics.
 - `packages/praxrr-app/src/lib/server/jobs/schedule.ts`
 - `packages/praxrr-app/src/lib/server/jobs/queueTypes.ts`
 - `packages/praxrr-app/src/lib/server/jobs/handlers/`
+- `packages/praxrr-app/src/lib/server/jobs/handlers/configHealthSnapshot.ts`
+- `packages/praxrr-app/src/lib/server/jobs/handlers/configHealthCleanup.ts`
 
 ## Related
 

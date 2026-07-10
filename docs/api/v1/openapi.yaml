@@ -974,6 +974,10 @@ components:
       $ref: './schemas/goals.yaml#/GoalCoverage'
     GoalThresholds:
       $ref: './schemas/goals.yaml#/GoalThresholds'
+    GoalQualityLadderItem:
+      $ref: './schemas/goals.yaml#/GoalQualityLadderItem'
+    GoalQualityLadder:
+      $ref: './schemas/goals.yaml#/GoalQualityLadder'
     GoalPlan:
       $ref: './schemas/goals.yaml#/GoalPlan'
     GoalBinding:

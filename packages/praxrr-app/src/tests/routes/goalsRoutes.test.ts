@@ -63,7 +63,43 @@ const SEED_SQL = `
 
   INSERT INTO quality_profiles (id, name, minimum_custom_format_score, upgrade_until_score, upgrade_score_increment)
   VALUES (1, 'Movies', 0, 100, 1);
+
+  -- A profile WITH a quality ladder (issue #221). 'Movies' stays ladder-free so its preview test is
+  -- unaffected: with no Bluray-<ceiling> row present, its ladder is always a no-op (ladderInput null).
+  INSERT INTO qualities (name) VALUES ('Bluray-2160p'), ('Bluray-1080p'), ('Bluray-720p'), ('DVD-R');
+  INSERT INTO quality_api_mappings (quality_name, arr_type, api_name) VALUES
+    ('Bluray-2160p', 'radarr', 'Bluray-2160p'),
+    ('Bluray-1080p', 'radarr', 'Bluray-1080p'),
+    ('Bluray-720p', 'radarr', 'Bluray-720p'),
+    ('DVD-R', 'radarr', 'DVD-R');
+  INSERT INTO quality_profiles (id, name, minimum_custom_format_score, upgrade_until_score, upgrade_score_increment)
+  VALUES (2, 'MoviesLadder', 0, 100, 1);
+  INSERT INTO quality_profile_qualities (quality_profile_name, quality_name, quality_group_name, position, enabled, upgrade_until) VALUES
+    ('MoviesLadder', 'Bluray-2160p', NULL, 1, 1, 1),
+    ('MoviesLadder', 'Bluray-1080p', NULL, 2, 1, 0),
+    ('MoviesLadder', 'Bluray-720p', NULL, 3, 0, 0),
+    ('MoviesLadder', 'DVD-R', NULL, 4, 0, 0);
+
+  -- A profile whose quality group straddles the 1080p ceiling (mapped members at 1080p AND 2160p) —
+  -- a genuinely ambiguous mapping that must fail fast (422) before any write (#221 AC4).
+  INSERT INTO quality_profiles (id, name, minimum_custom_format_score, upgrade_until_score, upgrade_score_increment)
+  VALUES (3, 'StraddleLadder', 0, 100, 1);
+  INSERT INTO quality_groups (quality_profile_name, name) VALUES ('StraddleLadder', 'Mixed');
+  INSERT INTO quality_group_members (quality_profile_name, quality_group_name, quality_name) VALUES
+    ('StraddleLadder', 'Mixed', 'Bluray-1080p'),
+    ('StraddleLadder', 'Mixed', 'Bluray-2160p');
+  INSERT INTO quality_profile_qualities (quality_profile_name, quality_name, quality_group_name, position, enabled, upgrade_until) VALUES
+    ('StraddleLadder', NULL, 'Mixed', 1, 1, 0),
+    ('StraddleLadder', 'Bluray-720p', NULL, 2, 0, 0);
 `;
+
+const CEILING_720_WEIGHTS = {
+  qualityVsSize: 50,
+  compatibility: 55,
+  hdrPreference: 50,
+  unwantedStrictness: 80,
+  resolutionCeiling: '720p',
+};
 
 const BEST_QUALITY_WEIGHTS = {
   qualityVsSize: 100,
@@ -74,7 +110,7 @@ const BEST_QUALITY_WEIGHTS = {
 };
 
 const SERVER_GOAL_PLAN: GoalPlan = {
-  engineVersion: '1',
+  engineVersion: '2',
   arrType: 'radarr',
   decisions: [
     {
@@ -111,6 +147,14 @@ const SERVER_GOAL_PLAN: GoalPlan = {
       },
     ],
   },
+  ladderInput: null,
+  qualityLadder: {
+    ceiling: '2160p',
+    cutoff: null,
+    items: [],
+    reshapesSiblingArrs: false,
+    sharedLadderNote: null,
+  },
 };
 
 const SERVER_BINDING: QualityGoalBindingRow = {
@@ -119,7 +163,7 @@ const SERVER_BINDING: QualityGoalBindingRow = {
   arr_type: 'radarr',
   preset_id: 'best-quality',
   weights_json: JSON.stringify(BEST_QUALITY_WEIGHTS),
-  engine_version: '1',
+  engine_version: '2',
   applied_at: '2026-07-09T00:00:00.000Z',
   created_at: '2026-07-09 00:00:00',
   updated_at: '2026-07-09 00:00:00',
@@ -136,7 +180,8 @@ function buildApplyDependencies(
 ): GoalApplyDependencies {
   return {
     buildGoalPlan: () => Promise.resolve({ cache: {} as PCDCache, plan: SERVER_GOAL_PLAN }),
-    updateScoring: () => Promise.resolve({ success: true }),
+    persistGoalApply: () => Promise.resolve({ success: true }),
+    computeGoalConfigDiff: () => Promise.resolve({ configDiff: [], appliedChanges: [], skippedChanges: [] }),
     upsertBinding: () => SERVER_BINDING,
     logInfo: (message, options) => {
       logs.push({ message, options });
@@ -295,7 +340,7 @@ Deno.test('goals presets: returns the catalog, axes, and engine version', async 
   ]);
   assertEquals(body.axes.length, 5);
   assert(body.axes.some((axis) => axis.key === 'resolutionCeiling' && axis.kind === 'ceiling'));
-  assertEquals(body.engineVersion, '1');
+  assertEquals(body.engineVersion, '2');
 });
 
 Deno.test('goals presets: arrType=lidarr returns the audio presets and hides video-only axes (#222)', async () => {
@@ -311,7 +356,7 @@ Deno.test('goals presets: arrType=lidarr returns the audio presets and hides vid
   // hdrPreference + resolutionCeiling are inert for audio and are not offered as sliders.
   assertEquals(body.axes.length, 3);
   assert(!body.axes.some((axis) => axis.key === 'hdrPreference' || axis.key === 'resolutionCeiling'));
-  assertEquals(body.engineVersion, '1');
+  assertEquals(body.engineVersion, '2');
 });
 
 // ============================================================================
@@ -358,6 +403,55 @@ Deno.test('goals preview: returns the plan + config diff without persisting', as
   });
 });
 
+Deno.test('goals preview: surfaces quality-ladder + cutoff changes without persisting (#221)', async () => {
+  await withGoalsFixture(async (databaseId, current) => {
+    const response: Response = await previewRoute.POST(
+      postEvent({
+        databaseId,
+        arrType: 'radarr',
+        profileName: 'MoviesLadder',
+        preset: 'balanced',
+        weights: CEILING_720_WEIGHTS,
+      })
+    );
+    assertEquals(response.status, 200);
+    const body = (await response.json()) as GoalPreviewResponse;
+
+    // The plan's ladder: 720p ceiling enables <=720, disables 1080p/2160p, cutoff -> Bluray-720p.
+    assertEquals(body.plan.qualityLadder.cutoff, 'Bluray-720p');
+    const ladderByName = new Map(body.plan.qualityLadder.items.map((item) => [item.name, item]));
+    assertEquals(ladderByName.get('Bluray-720p')?.enabled, true);
+    assertEquals(ladderByName.get('DVD-R')?.enabled, true);
+    assertEquals(ladderByName.get('Bluray-1080p')?.enabled, false);
+    assertEquals(ladderByName.get('Bluray-2160p')?.enabled, false);
+    // Shared row set: MoviesLadder's enabled qualities are Sonarr-compatible → advisory present.
+    assert(body.plan.qualityLadder.sharedLadderNote !== null);
+
+    // The config diff surfaces the enabled + cutoff (upgradeUntil) FieldChanges for the ladder rows.
+    const ladderDiff = body.configDiff.find((entry) => entry.name === 'MoviesLadder');
+    assert(ladderDiff, 'expected a MoviesLadder config diff');
+    const diffText = JSON.stringify(ladderDiff.changes);
+    assert(diffText.includes('orderedItems'), 'diff references orderedItems');
+    assert(diffText.includes('enabled'), 'diff surfaces enabled changes');
+    assert(diffText.includes('upgradeUntil'), 'diff surfaces cutoff (upgradeUntil) changes');
+    assert(diffText.includes('Bluray-720p'), 'diff references the new cutoff row');
+
+    // Non-persistence: the live cache ladder is untouched (old cutoff still on Bluray-2160p).
+    const persisted = await current.cache.kb
+      .selectFrom('quality_profile_qualities')
+      .select(['quality_name', 'enabled', 'upgrade_until'])
+      .where('quality_profile_name', '=', 'MoviesLadder')
+      .orderBy('position')
+      .execute();
+    assertEquals(persisted, [
+      { quality_name: 'Bluray-2160p', enabled: 1, upgrade_until: 1 },
+      { quality_name: 'Bluray-1080p', enabled: 1, upgrade_until: 0 },
+      { quality_name: 'Bluray-720p', enabled: 0, upgrade_until: 0 },
+      { quality_name: 'DVD-R', enabled: 0, upgrade_until: 0 },
+    ]);
+  });
+});
+
 Deno.test(
   'goals preview: lidarr scores audio, excludes video-only with the distinct reason, and does not persist (#222)',
   async () => {
@@ -399,6 +493,42 @@ Deno.test(
     });
   }
 );
+
+Deno.test('goals preview: a straddling quality group fails fast with 422 before any write (#221 AC4)', async () => {
+  await withGoalsFixture(async (databaseId, current) => {
+    const rejected = await assertRejects(async () =>
+      previewRoute.POST(
+        postEvent({
+          databaseId,
+          arrType: 'radarr',
+          profileName: 'StraddleLadder',
+          preset: 'balanced',
+          weights: {
+            qualityVsSize: 50,
+            compatibility: 55,
+            hdrPreference: 50,
+            unwantedStrictness: 80,
+            resolutionCeiling: '1080p',
+          },
+        })
+      )
+    );
+    // buildGoalPlan (shared by preview AND apply) translates the GoalLadderMappingError to 422, not 500.
+    assertEquals(getErrorStatus(rejected), 422);
+
+    // The live cache ladder is untouched (fail-fast is before any write).
+    const persisted = await current.cache.kb
+      .selectFrom('quality_profile_qualities')
+      .select(['quality_group_name', 'quality_name', 'enabled'])
+      .where('quality_profile_name', '=', 'StraddleLadder')
+      .orderBy('position')
+      .execute();
+    assertEquals(persisted, [
+      { quality_group_name: 'Mixed', quality_name: null, enabled: 1 },
+      { quality_group_name: null, quality_name: 'Bluray-720p', enabled: 0 },
+    ]);
+  });
+});
 
 Deno.test('goals preview: validation and missing-cache errors', async () => {
   await assertRejects(async () =>
@@ -456,7 +586,7 @@ Deno.test('goals apply: logs one server-derived decision event after persistence
       profileName: 'Movies',
       preset: 'best-quality',
       weights: BEST_QUALITY_WEIGHTS,
-      expectedEngineVersion: '1',
+      expectedEngineVersion: '2',
       decisions: [{ customFormatName: 'Client-forged decision', score: 999999 }],
       scoringInput: { customFormatScores: [{ customFormatName: 'Client-forged decision', score: 999999 }] },
     }).request,
@@ -489,7 +619,7 @@ Deno.test('goals apply: logs one server-derived decision event after persistence
 Deno.test('goals apply: accepts arrType lidarr and upserts the binding with it (#222)', async () => {
   const logs: ApplyLogCall[] = [];
   let capturedArrType: string | undefined;
-  const response = await applyRoute.handleGoalApplyRequest(
+  const response = await applyRoute._handleGoalApplyRequest(
     postEvent({
       databaseId: DATABASE_ID,
       arrType: 'lidarr',
@@ -502,7 +632,7 @@ Deno.test('goals apply: accepts arrType lidarr and upserts the binding with it (
         unwantedStrictness: 85,
         resolutionCeiling: '1080p',
       },
-      expectedEngineVersion: '1',
+      expectedEngineVersion: '2',
     }).request,
     buildApplyDependencies(logs, {
       upsertBinding: (input) => {
@@ -529,7 +659,7 @@ Deno.test('goals apply: validation and engine-version failures do not log', asyn
         profileName: 'Movies',
         preset: 'balanced',
         weights: BEST_QUALITY_WEIGHTS,
-        expectedEngineVersion: '1',
+        expectedEngineVersion: '2',
       }).request,
       dependencies
     )
@@ -574,7 +704,7 @@ Deno.test('goals apply: scoring and binding failures do not log', async () => {
     profileName: 'Movies',
     preset: 'best-quality',
     weights: BEST_QUALITY_WEIGHTS,
-    expectedEngineVersion: '1',
+    expectedEngineVersion: '2',
   };
 
   const scoringLogs: ApplyLogCall[] = [];
@@ -583,7 +713,7 @@ Deno.test('goals apply: scoring and binding failures do not log', async () => {
     applyRoute._handleGoalApplyRequest(
       postEvent(requestPayload).request,
       buildApplyDependencies(scoringLogs, {
-        updateScoring: () => Promise.resolve({ success: false, error: 'Scoring write failed' }),
+        persistGoalApply: () => Promise.resolve({ success: false, error: 'Scoring write failed' }),
         upsertBinding: () => {
           scoringFailureBindingCalls += 1;
           return SERVER_BINDING;
@@ -612,6 +742,30 @@ Deno.test('goals apply: scoring and binding failures do not log', async () => {
   assertEquals(bindingLogs, []);
 });
 
+Deno.test('goals apply: a value-guard gate rejection maps to 409 (not 500) and does not log (#221)', async () => {
+  const logs: ApplyLogCall[] = [];
+  const conflict = await assertRejects(() =>
+    applyRoute._handleGoalApplyRequest(
+      postEvent({
+        databaseId: DATABASE_ID,
+        arrType: 'radarr',
+        profileName: 'Movies',
+        preset: 'best-quality',
+        weights: BEST_QUALITY_WEIGHTS,
+        expectedEngineVersion: '2',
+      }).request,
+      buildApplyDependencies(logs, {
+        // The writer emits "Value-guard gate rejected operation N …" on a guard conflict; the route
+        // classifies that as a 409 concurrency conflict via /value-guard gate/i.
+        persistGoalApply: () =>
+          Promise.resolve({ success: false, error: 'Value-guard gate rejected operation 2 (quality_profile "Movies"): conflict' }),
+      })
+    )
+  );
+  assertEquals(getErrorStatus(conflict), 409);
+  assertEquals(logs, []);
+});
+
 // ============================================================================
 // binding (real migrated app DB)
 // ============================================================================
@@ -636,7 +790,7 @@ migratedTest('goals binding: null when unbound, then reflects an upserted bindin
     arrType: 'radarr',
     presetId: 'best-quality',
     weightsJson: JSON.stringify(BEST_QUALITY_WEIGHTS),
-    engineVersion: '1',
+    engineVersion: '2',
     appliedAt: '2026-07-09T00:00:00.000Z',
   });
 
@@ -676,7 +830,7 @@ migratedTest(
         unwantedStrictness: 85,
         resolutionCeiling: '1080p',
       }),
-      engineVersion: '1',
+      engineVersion: '2',
       appliedAt: '2026-07-10T00:00:00.000Z',
     });
 
