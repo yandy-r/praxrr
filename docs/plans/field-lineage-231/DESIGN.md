@@ -26,7 +26,7 @@ that happens to equal a default with an implicit default. The current
 entity-level surface (`explainResolvedProvenance`) deliberately collapses
 `schema+base+tweaks` into `base-side` and refuses default/exact-op attribution;
 
-# 231 asks for the granular, honest version.
+# 231 asks for the granular, honest version
 
 ### 1.2 Goals
 
