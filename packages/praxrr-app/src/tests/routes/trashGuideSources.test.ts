@@ -697,6 +697,7 @@ Deno.test({
       durationMs: 8000,
       error: null,
       output: JSON.stringify(evidence),
+      evidence: null,
       createdAt: '2026-02-27T08:00:09.000Z',
     };
 
