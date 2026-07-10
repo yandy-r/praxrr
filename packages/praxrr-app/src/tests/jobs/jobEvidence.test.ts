@@ -85,6 +85,18 @@ Deno.test('evidence descriptors are exhaustive over JobType and match production
   }
 });
 
+Deno.test('buildSafeJobEvidence tolerates an unknown/legacy jobType without throwing', () => {
+  // The dispatcher's handler-not-found branch runs for a jobType with no registered handler —
+  // exactly when JOB_EVIDENCE_DESCRIPTORS has no descriptor. Evidence capture must degrade the
+  // target to null, never crash on an undefined descriptor.
+  const orphan = { ...GLOBAL_JOB, jobType: 'foo.legacy.removed' as JobType };
+  const evidence = buildSafeJobEvidence(orphan, { status: 'failure', failureCode: 'handlerNotFound' });
+  assertEquals(evidence.target, null);
+  assertEquals(evidence.failure?.code, 'handlerNotFound');
+  assertEquals(evidence.failure?.message, FAILURE_COPY.handlerNotFound.message);
+  assertEquals(evidence.schemaVersion, JOB_EVIDENCE_SCHEMA_VERSION);
+});
+
 Deno.test('FAILURE_COPY provides safe non-empty copy for every failure code', () => {
   for (const code of ALL_CODES) {
     const copy = FAILURE_COPY[code];

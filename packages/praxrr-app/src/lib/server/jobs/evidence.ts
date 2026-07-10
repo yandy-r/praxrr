@@ -152,9 +152,14 @@ export const JOB_EVIDENCE_DESCRIPTORS: JobEvidenceDescriptors = {
 };
 
 function resolveTargetForJob(job: JobQueueRecord): string | null {
+  // job.jobType is unvalidated runtime data (job_queue.job_type is a bare TEXT column), so a
+  // legacy/orphan type has no descriptor. This is exactly the handler-not-found case — degrade the
+  // target to null instead of dereferencing an undefined descriptor and crashing evidence capture.
+  const descriptor = JOB_EVIDENCE_DESCRIPTORS[job.jobType];
+  if (!descriptor) return null;
   // Dispatch is runtime-dynamic (payload is the widened union), so the per-key resolver is
   // called through a widened signature. Type safety lives at the descriptor DEFINITION above.
-  const resolve = JOB_EVIDENCE_DESCRIPTORS[job.jobType].resolveTarget as (payload: AnyJobPayload) => string | null;
+  const resolve = descriptor.resolveTarget as (payload: AnyJobPayload) => string | null;
   try {
     return resolve(job.payload);
   } catch {

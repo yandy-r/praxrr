@@ -15,6 +15,7 @@
  */
 
 import { executeSyncJob } from '$jobs/handlers/arrSync.ts';
+import { FAILURE_COPY } from '$jobs/evidence.ts';
 import { generateInstancePreviews } from '$sync/processor.ts';
 import { enqueueJob } from '$jobs/queueService.ts';
 import { arrInstancesQueries } from '$db/queries/arrInstances.ts';
@@ -96,10 +97,13 @@ function decideGateStatus(canaryStatus: CanaryOutcomeStatus, partialPolicy: 'gat
   return 'awaiting_confirmation';
 }
 
-/** Diagnostics string persisted as `canary_error` when a canary aborts without a raw error. */
+/**
+ * Diagnostics string persisted as `canary_error` when a canary aborts. The primitive now returns a
+ * typed `failureCode` (issue #237), so surface the pre-authored safe copy for it — never raw text.
+ */
 function abortReason(result: SyncRunResult, canaryStatus: CanaryOutcomeStatus): string {
-  if (result.error) {
-    return result.error;
+  if (result.status === 'failure') {
+    return FAILURE_COPY[result.failureCode].message;
   }
   return canaryStatus === 'skipped'
     ? 'Canary sync was skipped (all sections gated or unsupported); rollout aborted for review.'
@@ -196,7 +200,11 @@ export async function startRollout(input: CanaryStartInput): Promise<CanaryStart
     status,
     canaryStatus,
     canaryOutput: result.output ?? null,
-    canaryError: isAbort ? abortReason(result, canaryStatus) : (result.error ?? null),
+    canaryError: isAbort
+      ? abortReason(result, canaryStatus)
+      : result.status === 'failure'
+        ? FAILURE_COPY[result.failureCode].message
+        : null,
     canarySyncHistoryId,
     nextToken: newStateToken(),
     finishedAt: isAbort ? new Date().toISOString() : null,
