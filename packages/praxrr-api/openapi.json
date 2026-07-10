@@ -10141,7 +10141,7 @@
       },
       "GoalApplyResponse": {
         "type": "object",
-        "required": ["plan", "binding", "configDiff"],
+        "required": ["plan", "binding", "configDiff", "applyId", "applyStatus"],
         "properties": {
           "plan": {
             "$ref": "#/components/schemas/GoalPlan"
@@ -10199,7 +10199,7 @@
         "properties": {
           "action": {
             "type": "string",
-            "enum": ["none", "reconcile", "reapply"]
+            "enum": ["none", "reconcile"]
           },
           "endpoint": {
             "oneOf": [

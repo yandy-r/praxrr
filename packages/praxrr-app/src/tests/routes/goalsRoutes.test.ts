@@ -896,6 +896,38 @@ migratedTest('goals binding: null when unbound, then reflects an upserted bindin
   const body = (await bound.json()) as GoalBindingResponse;
   assertEquals(body.binding?.presetId, 'best-quality');
   assertEquals(body.binding?.weights.resolutionCeiling, '2160p');
+  // No apply-journal row yet → the binding response reports no outcome (#236).
+  assertEquals(body.applyStatus ?? null, null);
+
+  // A prior failed apply (scoring persisted, binding stage failed) surfaces on the binding response so
+  // the goals editor can render its recovery banner even alongside a live binding (#236).
+  const journalId = qualityGoalApplyJournalQueries.insertPending({
+    databaseId,
+    profileName: 'Movies',
+    arrType: 'radarr',
+    presetId: 'best-quality',
+    weightsJson: JSON.stringify(BEST_QUALITY_WEIGHTS),
+    engineVersion: '2',
+    intentFingerprint: 'fp',
+    origin: 'apply',
+    startedAt: '2026-07-09T00:00:00.000Z',
+  });
+  qualityGoalApplyJournalQueries.markFailed(journalId, {
+    failureStage: 'binding',
+    failureReason: 'Binding write failed',
+    scoringPersisted: 1,
+    bindingPersisted: 0,
+  });
+  const withStatus: Response = await bindingRoute.GET(
+    getEvent(`databaseId=${databaseId}&profileName=Movies&arrType=radarr`)
+  );
+  const statusBody = (await withStatus.json()) as GoalBindingResponse;
+  assertEquals(statusBody.binding?.presetId, 'best-quality');
+  assertEquals(statusBody.applyStatus?.status, 'failed');
+  assertEquals(statusBody.applyStatus?.failureStage, 'binding');
+  assertEquals(statusBody.applyStatus?.bindingStatus, 'failed');
+  assertEquals(statusBody.applyStatus?.scoringChanged, true);
+  assertEquals(statusBody.applyStatus?.recovery.action, 'reconcile');
 
   const badArr = await assertRejects(async () =>
     bindingRoute.GET(getEvent(`databaseId=${databaseId}&profileName=Movies&arrType=plex`))

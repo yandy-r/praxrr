@@ -176,6 +176,9 @@
 
   async function applyGoal(): Promise<void> {
     if (!profileName || applying) return;
+    // Snapshot the target so a slow response can't paint a stale badge onto a switched profile/Arr.
+    const target = profileName;
+    const targetArr = arrType;
     applying = true;
     try {
       const response = await fetch('/api/v1/goals/apply', {
@@ -196,8 +199,9 @@
           error?: string;
           applyStatus?: GoalApplyStatus;
         } | null;
-        // Surface the reported outcome (scoring changed?) + reconcile affordance for the partial write.
-        if (body?.applyStatus) applyStatus = body.applyStatus;
+        // Surface the reported outcome (scoring changed?) + reconcile affordance for the partial write,
+        // but only if the user hasn't switched target mid-flight.
+        if (body?.applyStatus && profileName === target && arrType === targetArr) applyStatus = body.applyStatus;
         alertStore.add('error', body?.message ?? body?.error ?? `Apply failed (HTTP ${response.status})`);
         return;
       }
@@ -215,6 +219,8 @@
   /** Recover a failed or pending apply by re-driving the recorded intent idempotently (#236). */
   async function reconcile(): Promise<void> {
     if (!profileName || reconciling) return;
+    const target = profileName;
+    const targetArr = arrType;
     reconciling = true;
     try {
       const response = await fetch('/api/v1/goals/reconcile', {
@@ -228,7 +234,7 @@
           error?: string;
           applyStatus?: GoalApplyStatus;
         } | null;
-        if (body?.applyStatus) applyStatus = body.applyStatus;
+        if (body?.applyStatus && profileName === target && arrType === targetArr) applyStatus = body.applyStatus;
         alertStore.add('error', body?.message ?? body?.error ?? `Reconcile failed (HTTP ${response.status})`);
         return;
       }

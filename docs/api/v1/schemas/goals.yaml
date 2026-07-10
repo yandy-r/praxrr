@@ -443,6 +443,8 @@ GoalApplyResponse:
     - plan
     - binding
     - configDiff
+    - applyId
+    - applyStatus
   properties:
     plan:
       $ref: '#/GoalPlan'
@@ -489,7 +491,6 @@ GoalRecoveryAction:
       enum:
         - none
         - reconcile
-        - reapply
     endpoint:
       oneOf:
         - type: string

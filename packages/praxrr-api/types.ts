@@ -1269,6 +1269,51 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/goals/apply/status': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get the latest apply outcome for a quality profile
+     * @description Returns the most recent apply-journal outcome for a profile target, or `null` if none has been
+     *     attempted. Out-of-band recovery surface that reports a failed or pending apply even when it never
+     *     wrote a binding (which the binding endpoint cannot surface) — issue #236.
+     */
+    get: operations['getGoalApplyStatus'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/goals/reconcile': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Recover a partial or pending Quality Goals apply
+     * @description Re-drives the recorded goal intent (preset + weights) for a profile against live state to heal a
+     *     partial write — scoring persisted but the binding missing, or a crash-interrupted apply. Recompiles
+     *     the cache from committed `pcd_ops`, then persists only the residual diff and confirms the binding.
+     *     Deterministic and idempotent: a second call is a no-op (`reconciled=false`, `alreadyApplied=true`).
+     */
+    post: operations['reconcileGoal'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/goals/binding': {
     parameters: {
       query?: never;
@@ -2682,7 +2727,7 @@ export interface components {
       itemsSynced: number;
       failureCount: number;
       entityChangeCount: number;
-      /** @description Number of confirmed per-entity outcomes captured from the actual Arr writes (issue #232). */
+      /** @description Number of confirmed per-entity outcomes captured from the actual Arr writes (issue */
       entityOutcomeCount: number;
       /** @description The reviewed sync preview this run applied, when known (plan↔run correlation). */
       previewId: string | null;
@@ -2696,7 +2741,7 @@ export interface components {
     SyncHistoryDetail: components['schemas']['SyncHistoryEntry'] & {
       sectionResults: components['schemas']['SyncSectionResult'][];
       changes: components['schemas']['SyncEntityChange'][];
-      /** @description Confirmed per-entity outcomes captured from the actual Arr writes (issue #232). */
+      /** @description Confirmed per-entity outcomes captured from the actual Arr writes (issue */
       entityOutcomes: components['schemas']['SyncEntityOutcome'][];
     };
     SyncHistoryListResponse: {
@@ -3066,8 +3111,8 @@ export interface components {
       /** @description Authoritative sandbox config diff of the persisted ladder + scoring, captured before persist so it matches the preview diff for the same request (issue #221). */
       configDiff: components['schemas']['EntityConfigDiff'][];
       /** @description The apply-journal row id for this apply (issue #236). */
-      applyId?: number;
-      applyStatus?: components['schemas']['GoalApplyStatus'];
+      applyId: number;
+      applyStatus: components['schemas']['GoalApplyStatus'];
     };
     GoalBindingResponse: {
       binding: components['schemas']['GoalBinding'] | null;
@@ -3077,7 +3122,7 @@ export interface components {
     /** @description The safe operator recovery action for a failed or pending Quality Goals apply (issue #236). */
     GoalRecoveryAction: {
       /** @enum {string} */
-      action: 'none' | 'reconcile' | 'reapply';
+      action: 'none' | 'reconcile';
       endpoint?: string | null;
     };
     /** @description Durable outcome of a Quality Goals apply/reconcile attempt (issue #236). Reports whether scoring changed, the binding's terminal state, and the safe recovery action, so a partial write is never unreported. */
@@ -5939,13 +5984,16 @@ export interface operations {
           'application/json': components['schemas']['ErrorResponse'];
         };
       };
-      /** @description Failed to generate preview */
+      /**
+       * @description Preview generation failed. The failed preview snapshot is returned with
+       *     `status: failed` and a typed, safe `failure` reason — no raw exception text.
+       */
       500: {
         headers: {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['ErrorResponse'];
+          'application/json': components['schemas']['SyncPreviewResult'];
         };
       };
     };
@@ -8046,13 +8094,117 @@ export interface operations {
           'application/json': components['schemas']['ErrorResponse'];
         };
       };
-      /** @description Engine version mismatch */
+      /** @description Engine version mismatch (ErrorResponse) or a value-guard concurrency conflict — nothing persisted (GoalApplyFailure with the reported outcome + reconcile action). */
       409: {
         headers: {
           [name: string]: unknown;
         };
         content: {
+          'application/json': components['schemas']['ErrorResponse'] | components['schemas']['GoalApplyFailure'];
+        };
+      };
+      /** @description Scoring or binding write failed. Returns the reported outcome (whether scoring changed) and a safe reconcile recovery action — never a silent partial write (issue #236). */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['GoalApplyFailure'];
+        };
+      };
+    };
+  };
+  getGoalApplyStatus: {
+    parameters: {
+      query: {
+        databaseId: number;
+        profileName: string;
+        arrType: 'radarr' | 'sonarr' | 'lidarr';
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description The latest apply status, or null */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': {
+            applyStatus: components['schemas']['GoalApplyStatus'] | null;
+          };
+        };
+      };
+      /** @description Invalid query parameters */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
           'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+    };
+  };
+  reconcileGoal: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['GoalReconcileRequest'];
+      };
+    };
+    responses: {
+      /** @description The reconciled plan, confirmed binding, and outcome */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['GoalReconcileResponse'];
+        };
+      };
+      /** @description Invalid request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Nothing to reconcile for this profile */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Engine version drift (ErrorResponse) or a value-guard concurrency conflict during re-drive (GoalApplyFailure). */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'] | components['schemas']['GoalApplyFailure'];
+        };
+      };
+      /** @description Re-drive scoring or binding write failed */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['GoalApplyFailure'];
         };
       };
     };
