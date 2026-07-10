@@ -1,4 +1,6 @@
 // @ts-check
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import starlight from '@astrojs/starlight';
 import svelte from '@astrojs/svelte';
 import tailwindcss from '@tailwindcss/vite';
@@ -6,8 +8,21 @@ import mermaid from 'astro-mermaid';
 import { defineConfig } from 'astro/config';
 import starlightOpenAPI, { openAPISidebarGroups } from 'starlight-openapi';
 
+// Resolve the documentation version being built from DOCS_VERSION (set per build by
+// scripts/build-versions.mjs). See src/content/docs/app/docs-versioning.md.
+const versions = JSON.parse(readFileSync(fileURLToPath(new URL('./versions.json', import.meta.url)), 'utf8'));
+const activeVersion =
+  versions.find((v) => v.id === process.env.DOCS_VERSION) ?? versions.find((v) => v.default);
+if (!activeVersion) {
+  throw new Error(`Unknown DOCS_VERSION "${process.env.DOCS_VERSION}" and no default in versions.json`);
+}
+// Astro's `base` expects no trailing slash ('/' or '/next'); versions.json stores '/next/'.
+const astroBase = activeVersion.base === '/' ? '/' : activeVersion.base.replace(/\/+$/, '');
+
 export default defineConfig({
   site: 'https://docs.praxrr.dev',
+  base: astroBase,
+  outDir: `./dist/.versions/${activeVersion.id}`,
   integrations: [
     mermaid(),
     svelte(),
@@ -15,8 +30,17 @@ export default defineConfig({
       title: 'Praxrr',
       description: 'Documentation for the Praxrr app, PCD schema, and curated configuration database.',
       customCss: ['./src/styles/global.css'],
+      // In-development versions render the same content as the stable root, so keep them
+      // out of search indexes to avoid duplicate-content competition with the canonical docs.
+      head: activeVersion.development
+        ? [{ tag: 'meta', attrs: { name: 'robots', content: 'noindex' } }]
+        : [],
+      components: {
+        Sidebar: './src/components/VersionedSidebar.astro',
+        Banner: './src/components/VersionBanner.astro',
+      },
       editLink: {
-        baseUrl: 'https://github.com/yandy-r/praxrr/edit/main/docs/site/',
+        baseUrl: `https://github.com/yandy-r/praxrr/edit/${activeVersion.ref}/docs/site/`,
       },
       social: [
         {
@@ -86,6 +110,7 @@ export default defineConfig({
             { label: 'Sync Pipeline', link: '/app/sync-pipeline/' },
             { label: 'Notifications', link: '/app/notifications/' },
             { label: 'Testing', link: '/app/testing/' },
+            { label: 'Docs Versioning', link: '/app/docs-versioning/' },
             {
               label: 'Component Library',
               collapsed: true,

@@ -18,6 +18,17 @@
 - Use `deno task dev`, `deno task lint`, `deno task check`, and `deno task test` during feature
   development before release tagging.
 
+## Documentation Site
+
+The Starlight docs site lives in `docs/site/`. `npm run build` there is **versioned**: it runs
+`scripts/build-versions.mjs`, which performs one isolated `astro build` per entry in
+`docs/site/versions.json` (each with its own base, Pagefind index, and OpenAPI reference) and
+assembles them into a single `docs/site/dist/` (the default version at the root, others under
+`/<id>/`). `npm run dev` serves only the default version. To publish a new docs version, edit
+`versions.json` and rebuild — the full process is documented on the published
+[Docs Versioning](https://docs.praxrr.dev/app/docs-versioning/) page
+(`docs/site/src/content/docs/app/docs-versioning.md`).
+
 ## Branching Strategy
 
 Praxrr uses **GitHub Flow** with **Release Channels**.

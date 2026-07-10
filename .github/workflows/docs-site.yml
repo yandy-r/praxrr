@@ -88,6 +88,18 @@ jobs:
           PRAXRR_DB_DOCS_SOURCE: ../../.external/praxrr-db
         run: npm run build
 
+      - name: Verify version selector rendered
+        working-directory: docs/site
+        run: |
+          set -euo pipefail
+          # Structure, per-version HTML counts, symmetry, and per-version Pagefind indexes
+          # are enforced by scripts/build-versions.mjs's guard during `npm run build` (the
+          # single source of truth). This step adds the only check the build guard does not
+          # perform: that each version renders the selector with its own option selected
+          # (acceptance criterion #7).
+          grep -q '<option value="/" selected' dist/getting-started/index.html
+          grep -q '<option value="/next/" selected' dist/next/getting-started/index.html
+
       - name: Upload static site artifact
         uses: actions/upload-artifact@v4
         with:

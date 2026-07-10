@@ -1,0 +1,10 @@
+---
+// Starlight `Sidebar` override: renders the version selector above the stock sidebar.
+// The stock Sidebar reads its nav data from Astro.locals.starlightRoute, so no prop or
+// slot forwarding is required.
+import Default from '@astrojs/starlight/components/Sidebar.astro';
+import VersionSelect from './VersionSelect.astro';
+---
+
+<VersionSelect />
+<Default />
