@@ -12,7 +12,8 @@
   import type { NarrationLevel, NarrationLine } from '$shared/narration/index.ts';
   import SyncPreviewEntityDiff from './SyncPreviewEntityDiff.svelte';
   import type { SyncPreviewSection, SyncPreviewSummary, SyncPreviewResult, EntityChange } from '$sync/preview/types.ts';
-  import type { SectionType } from '$sync/types.ts';
+  import type { SectionType, SyncEntityOutcome } from '$sync/types.ts';
+  import SyncOutcomeList from '$ui/sync-history/SyncOutcomeList.svelte';
   import type { components } from '$api/v1.d.ts';
 
   type SyncPreviewTriggerStatus = 'idle' | 'generating' | 'error' | 'ready';
@@ -92,6 +93,8 @@
   let sectionNarrations: readonly NarrationLine[] = [];
   let coverage: PreviewCoverage = UNAVAILABLE_PREVIEW_COVERAGE;
   let applyResultText = '';
+  let applyOutcomes: SyncEntityOutcome[] = [];
+  let applySyncHistoryId: number | null = null;
 
   const sectionLabels: Record<SyncPreviewSection, string> = {
     qualityProfiles: 'Quality Profiles',
@@ -326,6 +329,8 @@
     applying = true;
     applyError = '';
     applyResultText = '';
+    applyOutcomes = [];
+    applySyncHistoryId = null;
 
     try {
       const response = await fetch(`/api/v1/sync/preview/${preview.id}/apply`, {
@@ -335,6 +340,12 @@
       });
       const payload = (await response.json().catch(() => null)) as
         SyncPreviewApplyResponse | SyncPreviewApplyErrorResponse | null;
+
+      // Capture confirmed outcomes even on a partial/failed apply — they must never be dropped.
+      if (payload && 'outcomes' in payload) {
+        applyOutcomes = payload.outcomes;
+        applySyncHistoryId = payload.syncHistoryId;
+      }
 
       if (!response.ok || !payload || !('success' in payload) || payload.success === false) {
         const message =
@@ -352,8 +363,8 @@
 
       applyResultText =
         payload.results.status === 'skipped'
-          ? 'The apply job was skipped. No per-entity execution outcomes are available.'
-          : 'The apply job completed successfully. No per-entity execution outcomes are available.';
+          ? 'The apply job was skipped.'
+          : `The apply job completed. ${applyOutcomes.length} confirmed entity outcome(s) recorded.`;
 
       alertStore.add('success', 'Preview applied');
       await invalidateAll();
@@ -411,6 +422,8 @@
     preview = null;
     loadError = previewState.error ?? '';
     applyResultText = '';
+    applyOutcomes = [];
+    applySyncHistoryId = null;
   }
 </script>
 
@@ -612,6 +625,28 @@
           >
             <p class="font-medium">Apply result</p>
             <p class="mt-1">{applyResultText}</p>
+          </div>
+        {/if}
+
+        {#if applyOutcomes.length > 0}
+          <div class="space-y-2 rounded-md border border-neutral-200 px-3 py-3 dark:border-neutral-700">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <p class="text-sm font-medium text-neutral-900 dark:text-neutral-100">
+                Confirmed apply outcomes <span class="text-neutral-500 dark:text-neutral-400">({applyOutcomes.length})</span>
+              </p>
+              {#if applySyncHistoryId !== null}
+                <a
+                  href={`/sync-history/${applySyncHistoryId}`}
+                  class="text-accent-600 dark:text-accent-500 text-xs font-medium hover:underline"
+                >
+                  View in sync history →
+                </a>
+              {/if}
+            </div>
+            <p class="text-xs text-neutral-500 dark:text-neutral-400">
+              What the Arr instance actually did — separate from the planned changes above.
+            </p>
+            <SyncOutcomeList outcomes={applyOutcomes} />
           </div>
         {/if}
 

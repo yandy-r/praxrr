@@ -234,7 +234,7 @@ async function processInstanceSections(
         source: 'SyncProcessor',
         meta: { instanceId: instance.id, section: sectionType, error: errorMsg },
       });
-      instanceResult[sectionType] = { success: false, itemsSynced: 0, error: errorMsg };
+      instanceResult[sectionType] = { success: false, itemsSynced: 0, error: errorMsg, outcomes: [] };
     }
   }
 

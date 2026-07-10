@@ -13,8 +13,10 @@
  */
 
 import type { EntityChange, FieldChange, SyncPreviewArrType, SyncPreviewSection } from '$sync/preview/types.ts';
+import type { SyncEntityOutcome } from '$sync/types.ts';
 
 export type { EntityChange, FieldChange, SyncPreviewArrType, SyncPreviewSection };
+export type { SyncEntityOutcome };
 
 /** How the sync run was initiated. Maps from the job's `source`. */
 export type SyncTrigger = 'manual' | 'schedule' | 'system';
@@ -63,6 +65,10 @@ export interface SyncHistoryInput {
   failureCount: number;
   sectionResults: SyncSectionResult[];
   changes: SyncEntityChange[];
+  /** Confirmed per-entity outcomes captured from the actual Arr writes (issue #232). */
+  entityOutcomes: SyncEntityOutcome[];
+  /** The reviewed sync preview this run applied, when known (plan↔run correlation). */
+  previewId: string | null;
   error: string | null;
   startedAt: string;
   finishedAt: string | null;

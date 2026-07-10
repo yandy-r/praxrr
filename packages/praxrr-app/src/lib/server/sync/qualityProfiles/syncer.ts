@@ -16,6 +16,8 @@
  */
 
 import { BaseSyncer, type SyncResult } from '../base.ts';
+import type { SyncEntityOutcome } from '../types.ts';
+import { sanitizeArrWriteError } from '../sanitizeArrWriteError.ts';
 import { arrSyncQueries, type ProfileSelection } from '$db/queries/arrSync.ts';
 import { arrNamespaceQueries } from '$db/queries/arrNamespaces.ts';
 import { trashGuideSyncQueries, type TrashGuideSyncQualityProfileSourceHydration } from '$db/queries/trashGuideSync.ts';
@@ -244,14 +246,17 @@ export class QualityProfileSyncer extends BaseSyncer {
    * Override sync to handle the complex quality profile sync flow
    */
   override async sync(): Promise<SyncResult> {
+    // Confirmed per-entity outcomes (issue #232). Declared outside the try so a mid-sync throw
+    // still returns whatever was captured before the failure (partials are never dropped).
+    const outcomes: SyncEntityOutcome[] = [];
     try {
       await logger.info(`Starting quality profile sync for "${this.instanceName}"`, {
         source: 'Sync:QualityProfiles',
         meta: { instanceId: this.instanceId, instanceType: this.instanceType },
       });
 
-      // 1. Fetch profiles and CFs grouped by database
-      const batches = await this.fetchSyncBatches();
+      // 1. Fetch profiles and CFs grouped by database (dropped selections → skipped outcomes)
+      const batches = await this.fetchSyncBatches(outcomes);
 
       const totalProfiles = batches.reduce((sum, b) => sum + b.profiles.length, 0);
       if (totalProfiles === 0) {
@@ -259,18 +264,20 @@ export class QualityProfileSyncer extends BaseSyncer {
           source: 'Sync:QualityProfiles',
           meta: { instanceId: this.instanceId },
         });
-        return { success: true, itemsSynced: 0 };
+        return { success: true, itemsSynced: 0, outcomes };
       }
 
       // 2. Sync custom formats per-database (each with its namespace suffix)
       for (const batch of batches) {
-        batch.pcdFormatIdMap = await syncCustomFormats(
+        const cfResult = await syncCustomFormats(
           this.client,
           this.instanceId,
           this.instanceType,
           batch.customFormats,
           batch.suffix
         );
+        batch.pcdFormatIdMap = cfResult.pcdFormatIdMap;
+        outcomes.push(...cfResult.outcomes);
       }
 
       // 3. Refresh full CF list from arr (all databases' suffixed CFs)
@@ -294,7 +301,8 @@ export class QualityProfileSyncer extends BaseSyncer {
           allFormatIdMap,
           qualityMappings,
           existingMap,
-          failedProfiles
+          failedProfiles,
+          outcomes
         );
         allSyncedProfiles.push(...synced);
       }
@@ -305,6 +313,7 @@ export class QualityProfileSyncer extends BaseSyncer {
           itemsSynced: allSyncedProfiles.length,
           failedProfiles: [...failedProfiles],
           error: `Failed to sync ${failedProfiles.size} quality profile(s)`,
+          outcomes,
         };
       }
 
@@ -321,7 +330,7 @@ export class QualityProfileSyncer extends BaseSyncer {
         },
       });
 
-      return { success: true, itemsSynced: allSyncedProfiles.length };
+      return { success: true, itemsSynced: allSyncedProfiles.length, outcomes };
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'Unknown error';
 
@@ -330,7 +339,7 @@ export class QualityProfileSyncer extends BaseSyncer {
         meta: { instanceId: this.instanceId, error: errorMsg },
       });
 
-      return { success: false, itemsSynced: 0, error: errorMsg };
+      return { success: false, itemsSynced: 0, error: errorMsg, outcomes };
     }
   }
 
@@ -454,7 +463,7 @@ export class QualityProfileSyncer extends BaseSyncer {
   /**
    * Fetch profiles and CFs grouped by database, each with a namespace suffix.
    */
-  private async fetchSyncBatches(): Promise<DatabaseSyncBatch[]> {
+  private async fetchSyncBatches(skippedOutcomes?: SyncEntityOutcome[]): Promise<DatabaseSyncBatch[]> {
     const syncConfig = this.getQualityProfilesSyncConfig();
     const batches: DatabaseSyncBatch[] = [];
     const byDatabase = new Map<number, typeof syncConfig.selections>();
@@ -464,6 +473,25 @@ export class QualityProfileSyncer extends BaseSyncer {
       existing.push(selection);
       byDatabase.set(selection.databaseId, existing);
     }
+
+    // Emit one skipped outcome per selected profile that never reaches a write (issue #232, D5).
+    const recordSkips = (selections: readonly ProfileSelection[], reason: string): void => {
+      if (!skippedOutcomes) {
+        return;
+      }
+      for (const selection of selections) {
+        skippedOutcomes.push({
+          section: 'qualityProfiles',
+          arrType: this.instanceType,
+          entityType: 'qualityProfile',
+          name: selection.profileName,
+          action: 'create',
+          status: 'skipped',
+          remoteId: null,
+          reason,
+        });
+      }
+    };
 
     for (const [databaseId, selections] of byDatabase) {
       // Skip stale references to deleted databases
@@ -477,6 +505,7 @@ export class QualityProfileSyncer extends BaseSyncer {
             profileCount: selections.length,
           },
         });
+        recordSkips(selections, `Source database ${databaseId} no longer exists.`);
         continue;
       }
 
@@ -513,6 +542,7 @@ export class QualityProfileSyncer extends BaseSyncer {
             databaseName: dbInstance?.name ?? null,
           },
         });
+        recordSkips(selections, `PCD cache not available for database ${databaseId}.`);
         continue;
       }
 
@@ -527,6 +557,7 @@ export class QualityProfileSyncer extends BaseSyncer {
             source: 'Sync:QualityProfiles',
             meta: { instanceId: this.instanceId, profileName: selection.profileName },
           });
+          recordSkips([selection], `Quality profile "${selection.profileName}" not found in its source database.`);
           continue;
         }
 
@@ -564,7 +595,8 @@ export class QualityProfileSyncer extends BaseSyncer {
     }
 
     const trashBatches = await this.fetchTrashSyncBatches(
-      trashGuideSyncQueries.getQualityProfileSourceHydrationByInstance(this.instanceId)
+      trashGuideSyncQueries.getQualityProfileSourceHydrationByInstance(this.instanceId),
+      skippedOutcomes
     );
     batches.push(...trashBatches);
 
@@ -572,10 +604,32 @@ export class QualityProfileSyncer extends BaseSyncer {
   }
 
   private async fetchTrashSyncBatches(
-    sourceHydrations: TrashGuideSyncQualityProfileSourceHydration[]
+    sourceHydrations: TrashGuideSyncQualityProfileSourceHydration[],
+    skippedOutcomes?: SyncEntityOutcome[]
   ): Promise<DatabaseSyncBatch[]> {
     const batches: DatabaseSyncBatch[] = [];
     let trashNamespaceIndex = 0;
+
+    // Emit one skipped outcome per user-selected TRaSH profile that never reaches a write
+    // (issue #232, D5) — mirrors the PCD path's recordSkips so a selected profile is never
+    // silently absent from the confirmed outcomes.
+    const recordTrashSkips = (names: readonly string[], reason: string): void => {
+      if (!skippedOutcomes) {
+        return;
+      }
+      for (const profileName of names) {
+        skippedOutcomes.push({
+          section: 'qualityProfiles',
+          arrType: this.instanceType,
+          entityType: 'qualityProfile',
+          name: profileName,
+          action: 'create',
+          status: 'skipped',
+          remoteId: null,
+          reason,
+        });
+      }
+    };
 
     for (const sourceHydration of sourceHydrations) {
       if (sourceHydration.selectedQualityProfiles.length === 0) {
@@ -584,11 +638,16 @@ export class QualityProfileSyncer extends BaseSyncer {
 
       const source = trashGuideSourcesQueries.getById(sourceHydration.sourceId);
       if (!source || source.arr_type !== this.instanceType) {
+        recordTrashSkips(
+          sourceHydration.selectedQualityProfiles,
+          `TRaSH source ${sourceHydration.sourceId} is unavailable or does not match this arr type.`
+        );
         continue;
       }
 
       const cachedRows = trashGuideEntityCacheQueries.getBySource(source.id);
       if (cachedRows.length === 0) {
+        recordTrashSkips(sourceHydration.selectedQualityProfiles, `TRaSH source "${source.name}" has no cached data.`);
         continue;
       }
 
@@ -682,6 +741,10 @@ export class QualityProfileSyncer extends BaseSyncer {
             error: error instanceof Error ? error.message : String(error),
           },
         });
+        recordTrashSkips(
+          sourceHydration.selectedQualityProfiles,
+          `TRaSH source "${source.name}" could not be processed.`
+        );
         continue;
       }
 
@@ -704,6 +767,7 @@ export class QualityProfileSyncer extends BaseSyncer {
       for (const profileName of sourceHydration.selectedQualityProfiles) {
         const portable = portableProfilesByName.get(profileName);
         if (!portable) {
+          recordTrashSkips([profileName], `TRaSH quality profile "${profileName}" was not found in its source.`);
           continue;
         }
 
@@ -845,7 +909,8 @@ export class QualityProfileSyncer extends BaseSyncer {
     allFormatIdMap: Map<string, number>,
     qualityMappings: Map<string, string>,
     existingMap: Map<string, number>,
-    failedProfiles: Set<string>
+    failedProfiles: Set<string>,
+    outcomes: SyncEntityOutcome[]
   ): Promise<SyncedProfileSummary[]> {
     const syncedProfiles: SyncedProfileSummary[] = [];
 
@@ -868,12 +933,14 @@ export class QualityProfileSyncer extends BaseSyncer {
         },
       });
 
+      const isUpdate = existingMap.has(suffixedName);
       try {
-        const isUpdate = existingMap.has(suffixedName);
+        let remoteId: number;
         if (isUpdate) {
           // Update existing
           const existingId = existingMap.get(suffixedName)!;
           arrProfile.id = existingId;
+          remoteId = existingId;
           await this.client.updateQualityProfile(existingId, arrProfile);
           await logger.debug(`Updated quality profile "${pcdProfile.name}"`, {
             source: 'Sync:QualityProfiles',
@@ -882,6 +949,7 @@ export class QualityProfileSyncer extends BaseSyncer {
         } else {
           // Create new
           const response = await this.client.createQualityProfile(arrProfile);
+          remoteId = response.id;
           existingMap.set(suffixedName, response.id);
           await logger.debug(`Created quality profile "${pcdProfile.name}"`, {
             source: 'Sync:QualityProfiles',
@@ -902,8 +970,19 @@ export class QualityProfileSyncer extends BaseSyncer {
           minFormatScore: arrProfile.minFormatScore,
           formats: scoredFormats,
         });
+
+        outcomes.push({
+          section: 'qualityProfiles',
+          arrType: this.instanceType,
+          entityType: 'qualityProfile',
+          name: pcdProfile.name,
+          action: isUpdate ? 'update' : 'create',
+          status: 'success',
+          remoteId: String(remoteId),
+          reason: null,
+        });
       } catch (error) {
-        const errorDetails = this.extractErrorDetails(error);
+        const { reason, protectedDetails } = sanitizeArrWriteError(error);
         await logger.error(`Failed to sync quality profile "${pcdProfile.name}"`, {
           source: 'Sync:QualityProfiles',
           meta: {
@@ -911,10 +990,20 @@ export class QualityProfileSyncer extends BaseSyncer {
             pcdName: pcdProfile.name,
             suffixedName,
             request: arrProfile,
-            ...errorDetails,
+            ...protectedDetails,
           },
         });
         failedProfiles.add(pcdProfile.name);
+        outcomes.push({
+          section: 'qualityProfiles',
+          arrType: this.instanceType,
+          entityType: 'qualityProfile',
+          name: pcdProfile.name,
+          action: isUpdate ? 'update' : 'create',
+          status: 'failed',
+          remoteId: isUpdate ? String(existingMap.get(suffixedName)!) : null,
+          reason,
+        });
       }
     }
 
@@ -955,33 +1044,6 @@ export class QualityProfileSyncer extends BaseSyncer {
       allFormatIdMap,
       suffix
     );
-  }
-
-  /**
-   * Extract error details from HTTP errors for logging
-   * Attempts to get response body, status, etc.
-   */
-  private extractErrorDetails(error: unknown): Record<string, unknown> {
-    const details: Record<string, unknown> = {
-      error: error instanceof Error ? error.message : 'Unknown error',
-    };
-
-    // Check if it's an HTTP error with response details
-    if (error && typeof error === 'object') {
-      const err = error as Record<string, unknown>;
-
-      // Common HTTP client error properties
-      if ('status' in err) details.status = err.status;
-      if ('statusText' in err) details.statusText = err.statusText;
-      if ('response' in err) details.response = err.response;
-      if ('body' in err) details.responseBody = err.body;
-      if ('data' in err) details.responseData = err.data;
-
-      // If error has a cause, include it
-      if (err.cause) details.cause = err.cause;
-    }
-
-    return details;
   }
 
   // Base class abstract methods - implemented but not used since we override sync()

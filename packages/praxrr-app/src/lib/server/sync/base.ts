@@ -64,7 +64,7 @@ export abstract class BaseSyncer {
           source: 'Syncer',
           meta: { instanceId: this.instanceId },
         });
-        return { success: true, itemsSynced: 0 };
+        return { success: true, itemsSynced: 0, outcomes: [] };
       }
 
       // Transform to arr format
@@ -78,7 +78,7 @@ export abstract class BaseSyncer {
         meta: { instanceId: this.instanceId, itemsSynced: arrData.length },
       });
 
-      return { success: true, itemsSynced: arrData.length };
+      return { success: true, itemsSynced: arrData.length, outcomes: [] };
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'Unknown error';
 
@@ -87,7 +87,7 @@ export abstract class BaseSyncer {
         meta: { instanceId: this.instanceId, error: errorMsg },
       });
 
-      return { success: false, itemsSynced: 0, error: errorMsg };
+      return { success: false, itemsSynced: 0, error: errorMsg, outcomes: [] };
     }
   }
 

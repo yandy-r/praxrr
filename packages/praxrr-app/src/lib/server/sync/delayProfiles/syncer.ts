@@ -7,6 +7,8 @@
  */
 
 import { BaseSyncer, type SyncResult } from '../base.ts';
+import type { SyncEntityOutcome } from '../types.ts';
+import { sanitizeArrWriteError } from '../sanitizeArrWriteError.ts';
 import { arrSyncQueries } from '$db/queries/arrSync.ts';
 import { getCache } from '$pcd/index.ts';
 import { getByName as getDelayProfileByName } from '$pcd/entities/delayProfiles/index.ts';
@@ -252,31 +254,65 @@ export class DelayProfileSyncer extends BaseSyncer {
    */
   override async sync(): Promise<SyncResult> {
     const syncConfig = arrSyncQueries.getDelayProfilesSync(this.instanceId);
+    const arrType = this.getSyncArrType();
 
     if (!syncConfig.databaseId || !syncConfig.profileName) {
       await logger.debug('No delay profile configured for sync', {
         source: 'Sync:DelayProfile',
         meta: { instanceId: this.instanceId },
       });
-      return { success: true, itemsSynced: 0 };
+      return { success: true, itemsSynced: 0, outcomes: [] };
     }
+
+    if (!arrType) {
+      // Unsupported instance type for delay profiles — no entity was attempted.
+      return {
+        success: false,
+        itemsSynced: 0,
+        error: 'Delay profiles are not supported for this arr instance type',
+        outcomes: [],
+      };
+    }
+
+    const profileName = syncConfig.profileName;
+    const outcome = (status: SyncEntityOutcome['status'], remoteId: string | null, reason: string | null): SyncEntityOutcome => ({
+      section: 'delayProfiles',
+      arrType,
+      entityType: 'delayProfile',
+      name: profileName,
+      action: 'update',
+      status,
+      remoteId,
+      reason,
+    });
 
     const cache = getCache(syncConfig.databaseId);
     if (!cache) {
+      // Source data unavailable (no Arr write attempted) → skipped, not a write failure. Matches
+      // the qualityProfiles cache-not-found classification so the same condition never yields a
+      // different run status across sections (issue #232 review).
       await logger.warn(`PCD cache not found for database ${syncConfig.databaseId}`, {
         source: 'Sync:DelayProfile',
         meta: { instanceId: this.instanceId },
       });
-      return { success: false, itemsSynced: 0, error: 'PCD cache not found' };
+      return {
+        success: true,
+        itemsSynced: 0,
+        outcomes: [outcome('skipped', null, `PCD cache not available for database ${syncConfig.databaseId}.`)],
+      };
     }
 
-    const profile = await getDelayProfileByName(cache, syncConfig.profileName);
+    const profile = await getDelayProfileByName(cache, profileName);
     if (!profile) {
-      await logger.warn(`Profile "${syncConfig.profileName}" not found`, {
+      await logger.warn(`Profile "${profileName}" not found`, {
         source: 'Sync:DelayProfile',
-        meta: { instanceId: this.instanceId, profileName: syncConfig.profileName },
+        meta: { instanceId: this.instanceId, profileName },
       });
-      return { success: false, itemsSynced: 0, error: 'Profile not found in PCD' };
+      return {
+        success: true,
+        itemsSynced: 0,
+        outcomes: [outcome('skipped', null, `Delay profile "${profileName}" not found in its source database.`)],
+      };
     }
 
     const targetProfile = await this.resolveTargetDelayProfile();
@@ -299,14 +335,28 @@ export class DelayProfileSyncer extends BaseSyncer {
         }
       : transformed;
 
-    await this.client.updateDelayProfile(profileId, payload);
+    try {
+      await this.client.updateDelayProfile(profileId, payload);
+    } catch (error) {
+      const { reason, protectedDetails } = sanitizeArrWriteError(error);
+      await logger.error(`Failed to sync delay profile "${profile.name}" to "${this.instanceName}"`, {
+        source: 'Sync:DelayProfile',
+        meta: { instanceId: this.instanceId, targetProfileId: profileId, ...protectedDetails },
+      });
+      return {
+        success: false,
+        itemsSynced: 0,
+        error: reason,
+        outcomes: [outcome('failed', String(profileId), reason)],
+      };
+    }
 
     await logger.info(`Synced delay profile "${profile.name}" to "${this.instanceName}"`, {
       source: 'Sync:DelayProfile',
       meta: { instanceId: this.instanceId, remoteId: profileId },
     });
 
-    return { success: true, itemsSynced: 1 };
+    return { success: true, itemsSynced: 1, outcomes: [outcome('success', String(profileId), null)] };
   }
 
   /**

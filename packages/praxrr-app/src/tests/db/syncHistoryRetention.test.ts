@@ -62,6 +62,8 @@ function makeInput(instanceId: number, arrType: SyncPreviewArrType, startedAt: s
     failureCount: 0,
     sectionResults: [],
     changes: [],
+    entityOutcomes: [],
+    previewId: null,
     error: null,
     startedAt,
     finishedAt: startedAt,

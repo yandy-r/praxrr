@@ -208,9 +208,9 @@ function drive(outcomes: Map<number, SyncOutcome>): { restore: Restore } {
     ({
       sync: async () => {
         if (outcomes.get(instance.id) === 'failure') {
-          return { success: false, itemsSynced: 0, error: `sync failed for ${instance.id}` };
+          return { success: false, itemsSynced: 0, error: `sync failed for ${instance.id}`, outcomes: [] };
         }
-        return { success: true, itemsSynced: 1 };
+        return { success: true, itemsSynced: 1, outcomes: [] };
       },
       generatePreview: async () => ({ section: 'qualityProfiles', profile: null }),
       setPreviewConfig: () => undefined,

@@ -2363,6 +2363,51 @@ export interface components {
       /** @description Field-level diff; empty for unchanged/create where no deltas are tracked */
       fields: components['schemas']['FieldChange'][];
     };
+    /**
+     * @description The write attempted for an entity (intent). `delete` is reserved; no syncer emits it yet.
+     * @enum {string}
+     */
+    SyncEntityOutcomeAction: 'create' | 'update' | 'delete';
+    /**
+     * @description Terminal status of a per-entity Arr write, sourced ONLY from the write result:
+     *     `success` (resolved), `failed` (threw), `skipped` (intentionally not written).
+     * @enum {string}
+     */
+    SyncEntityOutcomeStatus: 'success' | 'skipped' | 'failed';
+    /**
+     * @description The kind of entity a confirmed outcome describes.
+     * @enum {string}
+     */
+    SyncOutcomeEntityType:
+      | 'customFormat'
+      | 'qualityProfile'
+      | 'delayProfile'
+      | 'metadataProfile'
+      | 'naming'
+      | 'mediaSettings'
+      | 'qualityDefinitions';
+    /**
+     * @description A confirmed, per-entity terminal outcome captured from an actual Arr write
+     *     (issue #232). Exactly one is produced per attempted entity. Unlike the preview
+     *     EntityChange (planned intent), `status` proves what the Arr instance actually did.
+     */
+    SyncEntityOutcome: {
+      section: components['schemas']['SyncPreviewSection'];
+      /**
+       * @description Arr type of the target instance — set explicitly by the syncer, never inferred.
+       * @enum {string}
+       */
+      arrType: 'radarr' | 'sonarr' | 'lidarr';
+      entityType: components['schemas']['SyncOutcomeEntityType'];
+      /** @description Stable identity — the unsuffixed PCD name (or subsection label for singletons). */
+      name: string;
+      action: components['schemas']['SyncEntityOutcomeAction'];
+      status: components['schemas']['SyncEntityOutcomeStatus'];
+      /** @description Remote entity id when known; null for bulk writes. */
+      remoteId: string | null;
+      /** @description Sanitized, user-facing reason; non-null for skipped/failed, null for success. */
+      reason: string | null;
+    };
     QualityProfilesPreview: {
       /** @enum {string} */
       section: 'qualityProfiles';
@@ -2586,6 +2631,10 @@ export interface components {
       itemsSynced: number;
       failureCount: number;
       entityChangeCount: number;
+      /** @description Number of confirmed per-entity outcomes captured from the actual Arr writes (issue #232). */
+      entityOutcomeCount: number;
+      /** @description The reviewed sync preview this run applied, when known (plan↔run correlation). */
+      previewId: string | null;
       error: string | null;
       /** Format: date-time */
       startedAt: string;
@@ -2596,6 +2645,8 @@ export interface components {
     SyncHistoryDetail: components['schemas']['SyncHistoryEntry'] & {
       sectionResults: components['schemas']['SyncSectionResult'][];
       changes: components['schemas']['SyncEntityChange'][];
+      /** @description Confirmed per-entity outcomes captured from the actual Arr writes (issue #232). */
+      entityOutcomes: components['schemas']['SyncEntityOutcome'][];
     };
     SyncHistoryListResponse: {
       items: components['schemas']['SyncHistoryEntry'][];
@@ -4582,9 +4633,10 @@ export interface components {
       error?: string;
     };
     /**
-     * @description Coarse result of executing the preview's selected sections through the normal
-     *     sync job path. `results` describes only the aggregate job/run outcome. It does
-     *     not confirm which individual preview entity changes succeeded.
+     * @description Result of executing the preview's selected sections through the normal sync job
+     *     path. `results` describes the aggregate job/run outcome; `outcomes` carries the
+     *     confirmed, per-entity terminal results captured from the ACTUAL Arr writes
+     *     (issue #232) — these, not the planned preview changes, are execution proof.
      */
     SyncPreviewApplyResponse: {
       /** @description True when the sync job succeeded or reported that no work was needed. */
@@ -4592,6 +4644,14 @@ export interface components {
       results: components['schemas']['SyncPreviewApplyJobResult'];
       /** @description Preview-age warning returned when the reviewed snapshot is stale, or null. */
       staleWarning: string | null;
+      /**
+       * @description Confirmed per-entity outcomes captured from the actual Arr writes. Present on
+       *     both success and partial/failure responses so failed and skipped outcomes are
+       *     never dropped.
+       */
+      outcomes: components['schemas']['SyncEntityOutcome'][];
+      /** @description Durable Sync History id exposing these outcomes, or null when recording is disabled. */
+      syncHistoryId: number | null;
     };
     SyncPreviewApplyErrorResponse: {
       /** @description User-facing reason the preview could not be applied. */
