@@ -9233,7 +9233,15 @@
       "GoalPlan": {
         "type": "object",
         "description": "Deterministic translation of a goal into concrete scores + thresholds.",
-        "required": ["engineVersion", "arrType", "decisions", "uncategorized", "thresholds", "coverage"],
+        "required": [
+          "engineVersion",
+          "arrType",
+          "decisions",
+          "uncategorized",
+          "thresholds",
+          "coverage",
+          "qualityLadder"
+        ],
         "properties": {
           "engineVersion": {
             "type": "string"
@@ -9259,6 +9267,86 @@
           },
           "coverage": {
             "$ref": "#/components/schemas/GoalCoverage"
+          },
+          "qualityLadder": {
+            "$ref": "#/components/schemas/GoalQualityLadder"
+          }
+        }
+      },
+      "GoalQualityLadderItem": {
+        "type": "object",
+        "description": "One row of the ceiling-derived quality ladder (issue",
+        "required": ["name", "type", "enabled", "upgradeUntil", "position", "resolution", "mapped"],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "enum": ["quality", "group"]
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "upgradeUntil": {
+            "type": "boolean"
+          },
+          "position": {
+            "type": "integer"
+          },
+          "resolution": {
+            "oneOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "mapped": {
+            "type": "boolean",
+            "description": "False when the row is not present/derivable for the target arr (left unchanged)."
+          }
+        }
+      },
+      "GoalQualityLadder": {
+        "type": "object",
+        "description": "Ceiling-derived quality-ladder configuration (issue #221), always shown before persistence. A per-arr ceiling reshapes the shared quality_profile_qualities row set for every Arr that syncs the profile; sharedLadderNote surfaces that when the profile is sibling-compatible.",
+        "required": ["ceiling", "cutoff", "items", "reshapesSiblingArrs", "sharedLadderNote"],
+        "properties": {
+          "ceiling": {
+            "$ref": "#/components/schemas/GoalResolutionCeiling"
+          },
+          "cutoff": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "PCD quality name carrying the cutoff; null when no ladder change is derivable."
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GoalQualityLadderItem"
+            }
+          },
+          "reshapesSiblingArrs": {
+            "type": "boolean"
+          },
+          "sharedLadderNote": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         }
       },
@@ -9389,6 +9477,13 @@
           },
           "binding": {
             "$ref": "#/components/schemas/GoalBinding"
+          },
+          "configDiff": {
+            "type": "array",
+            "description": "Authoritative sandbox config diff of the persisted ladder + scoring, captured before persist so it matches the preview diff for the same request (issue #221).",
+            "items": {
+              "$ref": "#/components/schemas/EntityConfigDiff"
+            }
           }
         }
       },
