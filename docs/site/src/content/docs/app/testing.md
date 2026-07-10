@@ -26,9 +26,11 @@ Derived from `scripts/test.ts`:
 | --------------- | -------------------------------------------------------------------------- |
 | `backup`        | `packages/praxrr-app/src/tests/jobs/createBackup.test.ts`                  |
 | `cleanup`       | `packages/praxrr-app/src/tests/logger/cleanupLogs.test.ts`                 |
+| `config-health` | Config Health policy, persistence, routes, snapshot, and cleanup tests     |
 | `env-instances` | `packages/praxrr-app/src/tests/base/envInstances.test.ts`                  |
 | `filters`       | `packages/praxrr-app/src/tests/upgrades/filters.test.ts`                   |
 | `normalize`     | `packages/praxrr-app/src/tests/upgrades/normalize.test.ts`                 |
+| `notifications` | Notification routing plus Config Health degradation and snapshot tests     |
 | `phase3`        | score simulator phase 3 helper + URL state tests                           |
 | `selectors`     | `packages/praxrr-app/src/tests/upgrades/selectors.test.ts`                 |
 | `url-state`     | `packages/praxrr-app/src/tests/routes/scoreSimulatorUrlState.test.ts`      |
@@ -38,6 +40,18 @@ Derived from `scripts/test.ts`:
 | `upgrades`      | `packages/praxrr-app/src/tests/upgrades/` (directory)                      |
 
 Pass a file or directory path directly when no alias exists.
+
+Run the focused Config Health and notification contracts with:
+
+```bash
+deno task test config-health
+deno task test notifications
+```
+
+The `config-health` alias includes the degradation policy, notification-state and snapshot query
+tests, route tests, and snapshot/cleanup handlers. The `notifications` alias covers event catalog and
+subscription routing together with degradation policy and snapshot integration. These suites use
+test doubles and do not send external webhooks.
 
 ## Test Layout
 
