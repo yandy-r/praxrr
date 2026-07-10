@@ -595,7 +595,8 @@ export class QualityProfileSyncer extends BaseSyncer {
     }
 
     const trashBatches = await this.fetchTrashSyncBatches(
-      trashGuideSyncQueries.getQualityProfileSourceHydrationByInstance(this.instanceId)
+      trashGuideSyncQueries.getQualityProfileSourceHydrationByInstance(this.instanceId),
+      skippedOutcomes
     );
     batches.push(...trashBatches);
 
@@ -603,10 +604,32 @@ export class QualityProfileSyncer extends BaseSyncer {
   }
 
   private async fetchTrashSyncBatches(
-    sourceHydrations: TrashGuideSyncQualityProfileSourceHydration[]
+    sourceHydrations: TrashGuideSyncQualityProfileSourceHydration[],
+    skippedOutcomes?: SyncEntityOutcome[]
   ): Promise<DatabaseSyncBatch[]> {
     const batches: DatabaseSyncBatch[] = [];
     let trashNamespaceIndex = 0;
+
+    // Emit one skipped outcome per user-selected TRaSH profile that never reaches a write
+    // (issue #232, D5) — mirrors the PCD path's recordSkips so a selected profile is never
+    // silently absent from the confirmed outcomes.
+    const recordTrashSkips = (names: readonly string[], reason: string): void => {
+      if (!skippedOutcomes) {
+        return;
+      }
+      for (const profileName of names) {
+        skippedOutcomes.push({
+          section: 'qualityProfiles',
+          arrType: this.instanceType,
+          entityType: 'qualityProfile',
+          name: profileName,
+          action: 'create',
+          status: 'skipped',
+          remoteId: null,
+          reason,
+        });
+      }
+    };
 
     for (const sourceHydration of sourceHydrations) {
       if (sourceHydration.selectedQualityProfiles.length === 0) {
@@ -615,11 +638,16 @@ export class QualityProfileSyncer extends BaseSyncer {
 
       const source = trashGuideSourcesQueries.getById(sourceHydration.sourceId);
       if (!source || source.arr_type !== this.instanceType) {
+        recordTrashSkips(
+          sourceHydration.selectedQualityProfiles,
+          `TRaSH source ${sourceHydration.sourceId} is unavailable or does not match this arr type.`
+        );
         continue;
       }
 
       const cachedRows = trashGuideEntityCacheQueries.getBySource(source.id);
       if (cachedRows.length === 0) {
+        recordTrashSkips(sourceHydration.selectedQualityProfiles, `TRaSH source "${source.name}" has no cached data.`);
         continue;
       }
 
@@ -713,6 +741,10 @@ export class QualityProfileSyncer extends BaseSyncer {
             error: error instanceof Error ? error.message : String(error),
           },
         });
+        recordTrashSkips(
+          sourceHydration.selectedQualityProfiles,
+          `TRaSH source "${source.name}" could not be processed.`
+        );
         continue;
       }
 
@@ -735,6 +767,7 @@ export class QualityProfileSyncer extends BaseSyncer {
       for (const profileName of sourceHydration.selectedQualityProfiles) {
         const portable = portableProfilesByName.get(profileName);
         if (!portable) {
+          recordTrashSkips([profileName], `TRaSH quality profile "${profileName}" was not found in its source.`);
           continue;
         }
 

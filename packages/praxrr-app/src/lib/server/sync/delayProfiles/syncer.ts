@@ -288,15 +288,17 @@ export class DelayProfileSyncer extends BaseSyncer {
 
     const cache = getCache(syncConfig.databaseId);
     if (!cache) {
+      // Source data unavailable (no Arr write attempted) → skipped, not a write failure. Matches
+      // the qualityProfiles cache-not-found classification so the same condition never yields a
+      // different run status across sections (issue #232 review).
       await logger.warn(`PCD cache not found for database ${syncConfig.databaseId}`, {
         source: 'Sync:DelayProfile',
         meta: { instanceId: this.instanceId },
       });
       return {
-        success: false,
+        success: true,
         itemsSynced: 0,
-        error: 'PCD cache not found',
-        outcomes: [outcome('failed', null, `PCD cache not available for database ${syncConfig.databaseId}.`)],
+        outcomes: [outcome('skipped', null, `PCD cache not available for database ${syncConfig.databaseId}.`)],
       };
     }
 
@@ -307,9 +309,8 @@ export class DelayProfileSyncer extends BaseSyncer {
         meta: { instanceId: this.instanceId, profileName },
       });
       return {
-        success: false,
+        success: true,
         itemsSynced: 0,
-        error: 'Profile not found in PCD',
         outcomes: [outcome('skipped', null, `Delay profile "${profileName}" not found in its source database.`)],
       };
     }

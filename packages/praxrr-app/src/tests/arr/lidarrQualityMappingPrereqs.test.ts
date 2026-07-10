@@ -547,6 +547,16 @@ INSERT INTO sonarr_quality_definitions (name, quality_name, min_size, max_size, 
       assertEquals(mappedResult.itemsSynced, 1);
       assertEquals(client.updatedPayloads.length, 1);
 
+      // Issue #232: the qualityDefinitions bulk write yields exactly one confirmed subsection
+      // outcome sourced from the real write — success, lidarr-scoped, no per-quality remote id.
+      const qdOutcome = mappedResult.outcomes.find((outcome) => outcome.entityType === 'qualityDefinitions');
+      assertExists(qdOutcome);
+      assertEquals(qdOutcome.status, 'success');
+      assertEquals(qdOutcome.section, 'mediaManagement');
+      assertEquals(qdOutcome.arrType, 'lidarr');
+      assertEquals(qdOutcome.action, 'update');
+      assertEquals(qdOutcome.remoteId, null);
+
       const updatedFlac = client.updatedPayloads[0].find((definition) => definition.quality.name === 'FLAC');
       assertExists(updatedFlac);
       assertEquals(updatedFlac.minSize, 64);
@@ -583,6 +593,13 @@ INSERT INTO sonarr_quality_definitions (name, quality_name, min_size, max_size, 
       assertEquals(noMappingResult.success, true);
       assertEquals(noMappingResult.itemsSynced, 0);
       assertEquals(noMappingClient.updatedPayloads.length, 0);
+
+      // Issue #232: a qualityDefinitions config with no entries is a skip (not a failure and not a
+      // silent drop) — one confirmed subsection outcome with status 'skipped'.
+      const qdSkip = noMappingResult.outcomes.find((outcome) => outcome.entityType === 'qualityDefinitions');
+      assertExists(qdSkip);
+      assertEquals(qdSkip.status, 'skipped');
+      assert((qdSkip.reason ?? '').length > 0);
 
       const noEntriesDebug = debugLogs.find(
         (entry) => entry.message === 'Quality definitions config "Lidarr-No-Mappings" has no entries'

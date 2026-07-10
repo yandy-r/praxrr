@@ -922,7 +922,8 @@ export class MediaManagementSyncer extends BaseSyncer {
         source: 'Sync:MediaSettings',
         meta: { instanceId: this.instanceId },
       });
-      return subFail(`PCD cache not available for database ${databaseId}.`);
+      // Source data unavailable (no Arr write attempted) → skipped, consistent across sections.
+      return subSkip(`PCD cache not available for database ${databaseId}.`);
     }
 
     const mediaSettingsSource = this.resolveMediaSettingsSource();
@@ -1046,7 +1047,8 @@ export class MediaManagementSyncer extends BaseSyncer {
         source: 'Sync:Naming',
         meta: { instanceId: this.instanceId },
       });
-      return subFail(`PCD cache not available for database ${databaseId}.`);
+      // Source data unavailable (no Arr write attempted) → skipped, consistent across sections.
+      return subSkip(`PCD cache not available for database ${databaseId}.`);
     }
 
     if (this.instanceType === 'radarr') {
@@ -1247,7 +1249,8 @@ export class MediaManagementSyncer extends BaseSyncer {
         source: 'Sync:QualityDefinitions',
         meta: { instanceId: this.instanceId },
       });
-      return subFail(`PCD cache not available for database ${databaseId}.`);
+      // Source data unavailable (no Arr write attempted) → skipped, consistent across sections.
+      return subSkip(`PCD cache not available for database ${databaseId}.`);
     }
 
     const qualityDefinitionsSource = this.resolveQualityDefinitionsSource();

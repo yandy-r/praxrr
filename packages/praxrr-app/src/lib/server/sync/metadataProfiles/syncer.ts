@@ -448,10 +448,11 @@ export class MetadataProfileSyncer extends BaseSyncer {
           profileName,
         },
       });
+      // Source data unavailable (no Arr write attempted) → skipped, not a failure — consistent
+      // with the other syncers' source-not-found handling (issue #232 review).
       return {
-        success: false,
+        success: true,
         itemsSynced: 0,
-        error: 'Profile not found in PCD cache',
         outcomes: [outcome('skipped', 'create', null, `Metadata profile "${profileName}" not found in its source database.`)],
       };
     }

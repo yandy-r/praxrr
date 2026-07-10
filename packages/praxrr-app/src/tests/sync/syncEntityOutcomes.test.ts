@@ -8,6 +8,8 @@ import { HttpError } from '$http/types.ts';
 import { sanitizeArrWriteError } from '$sync/sanitizeArrWriteError.ts';
 import { deriveSyncHistoryStatus } from '$sync/syncHistory/record.ts';
 import { QualityProfileSyncer } from '$sync/qualityProfiles/syncer.ts';
+import { syncCustomFormats } from '$sync/customFormats/syncer.ts';
+import type { PcdCustomFormat } from '$sync/customFormats/transformer.ts';
 import type { PcdQualityProfile } from '$sync/qualityProfiles/transformer.ts';
 import type { SyncEntityOutcome } from '$sync/types.ts';
 import type { SyncHistoryInput, SyncPreviewArrType, SyncSectionResult } from '$sync/syncHistory/types.ts';
@@ -162,6 +164,77 @@ Deno.test('quality profile sync emits one terminal outcome per profile sourced f
   // Back-compat aggregate still reflects the failure.
   assertEquals(result.success, false);
   assertEquals(result.failedProfiles, ['second']);
+});
+
+// =============================================================================
+// Custom formats — the previously-swallowed failure is now a surfaced outcome, and
+// a Lidarr no-supported-conditions format is a skip (not silently dropped)
+// =============================================================================
+
+function pcdFormat(name: string, conditions: PcdCustomFormat['conditions'] = []): PcdCustomFormat {
+  return { id: 1, name, includeInRename: false, conditions };
+}
+
+Deno.test('syncCustomFormats surfaces a failed outcome for a thrown write with a sanitized reason', async () => {
+  const client = {
+    getCustomFormats: () => Promise.resolve([]),
+    updateCustomFormat: () => Promise.resolve({}),
+    createCustomFormat: (fmt: { name: string }) => {
+      if (fmt.name.includes('cf-fail')) {
+        throw new HttpError('SECRET arr body: apiKey leaked', 400);
+      }
+      return Promise.resolve({ id: 7 });
+    }
+  };
+
+  const pcdFormats = new Map<string, PcdCustomFormat>([
+    ['cf-ok', pcdFormat('cf-ok')],
+    ['cf-fail', pcdFormat('cf-fail')]
+  ]);
+
+  const { outcomes, pcdFormatIdMap } = await syncCustomFormats(client as never, 10, 'radarr', pcdFormats, '-x');
+
+  assertEquals(outcomes.length, 2);
+  const ok = outcomes.find((o) => o.name === 'cf-ok');
+  const failed = outcomes.find((o) => o.name === 'cf-fail');
+  assertExists(ok);
+  assertExists(failed);
+  assertEquals(ok.status, 'success');
+  assertEquals(ok.entityType, 'customFormat');
+  assertEquals(ok.remoteId, '7');
+  assertEquals(failed.status, 'failed');
+  // The previously-swallowed error is now surfaced, with a sanitized (non-leaking) reason.
+  assertEquals(failed.reason, 'The Arr instance rejected the request (HTTP 400).');
+  assert(!(failed.reason ?? '').includes('SECRET'), 'sanitized reason must not leak the raw Arr body');
+  // The successful format's id still resolves for quality-profile scoring.
+  assertEquals(pcdFormatIdMap.get('cf-ok'), 7);
+});
+
+Deno.test('syncCustomFormats emits a skipped outcome for a Lidarr format with no supported conditions', async () => {
+  const client = {
+    getCustomFormats: () => Promise.resolve([]),
+    updateCustomFormat: () => Promise.resolve({}),
+    createCustomFormat: () => Promise.resolve({ id: 1 })
+  };
+
+  // A `source` condition is not in LIDARR_SUPPORTED_CONDITION_TYPES, so it is dropped; with the
+  // only condition dropped, the format has no supported conditions and is skipped (not written).
+  const pcdFormats = new Map<string, PcdCustomFormat>([
+    [
+      'lidarr-cf',
+      pcdFormat('lidarr-cf', [
+        { name: 'src', type: 'source', arrType: 'all', negate: false, required: false, sources: ['bluray'] }
+      ])
+    ]
+  ]);
+
+  const { outcomes } = await syncCustomFormats(client as never, 11, 'lidarr', pcdFormats, '-x');
+
+  assertEquals(outcomes.length, 1);
+  assertEquals(outcomes[0].status, 'skipped');
+  assertEquals(outcomes[0].name, 'lidarr-cf');
+  assertEquals(outcomes[0].arrType, 'lidarr');
+  assert((outcomes[0].reason ?? '').length > 0, 'a skipped outcome must carry a reason');
 });
 
 // =============================================================================
