@@ -15,11 +15,11 @@
 import type { NarrationLine } from '$shared/narration/index.ts';
 
 /**
- * Stamped onto every {@link ShieldReport}. Bump whenever the check set, the band thresholds, or any
- * per-check score formula changes so a client can tell a report was produced by a different engine
- * generation. Declared here ONCE.
+ * Stamped onto every {@link ShieldReport}. Bump whenever the check set, the band thresholds, the
+ * per-check score formula, OR the unscored advisory/assurance report surface changes, so a client
+ * can tell a report was produced by a different engine generation. Declared here ONCE.
  */
-export const SECURITY_POSTURE_ENGINE_VERSION = '1';
+export const SECURITY_POSTURE_ENGINE_VERSION = '2';
 
 /**
  * Closed, versioned set of shield checks. Adding/removing/renaming a member is a breaking change —
@@ -160,6 +160,28 @@ export interface RotationFacts {
   readonly instanceKeyVersions: readonly { readonly instanceId: number; readonly keyVersion: string | null }[];
 }
 
+/** How the request that triggered this report reached Praxrr (never probed; observed only). */
+export type SessionTransport = 'direct-secure' | 'proxy-terminated' | 'insecure' | 'unknown';
+
+/** PRAXRR_COOKIE_SECURE intent: mark the session cookie Secure automatically / always / never. */
+export type CookieSecureMode = 'auto' | 'on' | 'off';
+
+/** Request-derived session posture. Unscored — drives advisories/assurances only. */
+export interface SessionPosture {
+  readonly transport: SessionTransport;
+  /** Whether THIS request's session cookie would carry Secure (resolved from mode + transport). */
+  readonly cookieSecure: boolean;
+  /** Configured intent, so an advisory can name the concrete env-var change. */
+  readonly cookieSecureMode: CookieSecureMode;
+}
+
+/**
+ * Minimal request slice the session-transport observers read. A full SvelteKit `RequestEvent`
+ * satisfies it structurally; a bare `{}` (the MCP/no-request path) yields `unknown` transport.
+ * Declared once so the gatherer, service, cookie helper, and transport module share one shape.
+ */
+export type SessionRequestContext = { request?: Request; url?: URL };
+
 /** Fully-materialized engine input. Nothing is read lazily — the engine performs no I/O. */
 export interface PostureInputs {
   readonly authMode: 'on' | 'local' | 'off' | 'oidc';
@@ -176,8 +198,8 @@ export interface PostureInputs {
   readonly rotation: RotationFacts;
   /** Runtime self-verify: `sanitizeLogMeta` stripped a planted secret at gather time. */
   readonly redactionVerified: boolean;
-  /** The session cookie's `Secure` flag (const `false` today → drives the transport advisory). */
-  readonly sessionCookieSecure: boolean;
+  /** Request-derived session posture (unscored; drives the session advisory/assurance surface). */
+  readonly session: SessionPosture;
   /** ISO-8601 UTC timestamp passed IN — the engine never calls `Date.now()`/`new Date()`. */
   readonly nowIso: string;
 }

@@ -1,5 +1,6 @@
 import type { RequestEvent } from '@sveltejs/kit';
 import { config } from '$config';
+import { firstForwardedValue } from '$http/forwardedHeader.ts';
 
 /**
  * Resolved Relying Party parameters for a WebAuthn ceremony.
@@ -77,13 +78,6 @@ export function deriveWebAuthnRp(info: WebAuthnRpRequestInfo, overrides: WebAuth
   }
 
   return { rpID, rpName: overrides.rpName, allowedOrigins };
-}
-
-/** First comma-separated token of a possibly-chained forwarded header. */
-function firstForwardedValue(headerValue: string | null): string | null {
-  if (!headerValue) return null;
-  const first = headerValue.split(',')[0]?.trim();
-  return first || null;
 }
 
 /**

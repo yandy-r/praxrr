@@ -13,6 +13,7 @@ import { sessionsQueries } from '$db/queries/sessions.ts';
 import { authSettingsQueries } from '$db/queries/authSettings.ts';
 import { parseUserAgent } from '$auth/userAgent.ts';
 import { getClientIp } from '$auth/network.ts';
+import { sessionCookieOptions } from '$auth/sessionCookie.ts';
 import { logger } from '$logger/logger.ts';
 
 type ErrorResponse = { error: string };
@@ -126,13 +127,7 @@ export const POST: RequestHandler = async (event) => {
     deviceType: parsed.deviceType,
   });
   const expires = new Date(Date.now() + durationHours * 60 * 60 * 1000);
-  event.cookies.set('session', sessionId, {
-    path: '/',
-    httpOnly: true,
-    sameSite: 'lax',
-    secure: false,
-    expires,
-  });
+  event.cookies.set('session', sessionId, sessionCookieOptions(event, expires));
 
   await logger.info(`Passkey login successful for '${userRow.username}'`, {
     source: 'Auth:WebAuthn',

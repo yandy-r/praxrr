@@ -17,13 +17,15 @@ import {
   type Assurance,
   type CheckResult,
   type PostureInputs,
+  type SessionPosture,
+  type ShieldFix,
   type ShieldReport,
   type TopAction,
 } from './types.ts';
 
 /** Always-on protections surfaced as verified affirmations; they contribute zero to the score. */
 function buildAssurances(inputs: PostureInputs): Assurance[] {
-  return [
+  const assurances: Assurance[] = [
     {
       id: 'log_redaction',
       label: 'Log redaction',
@@ -38,23 +40,122 @@ function buildAssurances(inputs: PostureInputs): Assurance[] {
       verified: true,
       note: 'Arr API keys are stored AES-256-GCM encrypted, not in plaintext (issue #9).',
     },
+    {
+      id: 'session_secret',
+      label: 'Session secret',
+      verified: true,
+      note: 'Session identifiers are opaque, server-side, randomly generated tokens; the cookie carries no signing secret, so there is no session secret to be missing, weak, or leaked.',
+    },
+    {
+      id: 'session_cookie_protections',
+      label: 'Session cookie protections',
+      verified: true,
+      note: 'The session cookie is HttpOnly (mitigates XSS token theft) and SameSite=Lax (mitigates cross-site request forgery).',
+    },
   ];
+  if (inputs.session.transport === 'direct-secure' && inputs.session.cookieSecure) {
+    assurances.push({
+      id: 'session_cookie_secure',
+      label: 'Session cookie Secure',
+      verified: true,
+      note: 'For a request served over direct HTTPS, the session cookie is marked Secure.',
+    });
+  }
+  return assurances;
+}
+
+/** Session-cookie env-var remediation, always naming the concrete PRAXRR_COOKIE_SECURE change to make. */
+function cookieSecureEnvFix(label: string): ShieldFix {
+  return { kind: 'env-var', name: 'PRAXRR_COOKIE_SECURE', label };
+}
+
+/**
+ * At most one `session_cookie_transport` advisory, keyed on the request-derived {@link SessionPosture}.
+ * Fixed-literal copy per (transport × cookieSecure); every emitted advisory carries a non-`none` fix.
+ * `direct-secure` + Secure emits no advisory — that state is affirmed by the `session_cookie_secure`
+ * assurance instead. No host, header value, or secret substring ever appears in the copy.
+ */
+function sessionCookieTransportAdvisory(session: SessionPosture): Advisory | null {
+  const id = 'session_cookie_transport';
+  const label = 'Session cookie transport posture';
+  switch (session.transport) {
+    case 'direct-secure':
+      if (session.cookieSecure) return null;
+      return {
+        id,
+        label,
+        detail: [
+          'PRAXRR_COOKIE_SECURE=off disables Secure even though this request arrived over direct HTTPS; the session cookie is sent without Secure.',
+        ],
+        fix: cookieSecureEnvFix('Set PRAXRR_COOKIE_SECURE=auto to mark the session cookie Secure over HTTPS'),
+      };
+    case 'proxy-terminated':
+      if (session.cookieSecure) {
+        return {
+          id,
+          label,
+          detail: [
+            'For a request arriving via a proxy reporting X-Forwarded-Proto: https, the session cookie is sent Secure. Praxrr cannot verify the proxy terminates TLS externally (see #228), so this is reported as trusted-termination, not confirmed-secure.',
+          ],
+          fix: cookieSecureEnvFix('Set PRAXRR_COOKIE_SECURE=on to pin Secure if this proxy is trusted'),
+        };
+      }
+      return {
+        id,
+        label,
+        detail: ['PRAXRR_COOKIE_SECURE=off while a proxy reports HTTPS; the session cookie is sent without Secure.'],
+        fix: cookieSecureEnvFix('Set PRAXRR_COOKIE_SECURE=auto or on'),
+      };
+    case 'insecure':
+      if (session.cookieSecure) {
+        return {
+          id,
+          label,
+          detail: [
+            'PRAXRR_COOKIE_SECURE=on but this request arrived over plaintext HTTP — browsers drop the Secure cookie, so login fails here. Set PRAXRR_COOKIE_SECURE=auto, or serve Praxrr behind HTTPS.',
+          ],
+          fix: cookieSecureEnvFix('Set PRAXRR_COOKIE_SECURE=auto'),
+        };
+      }
+      return {
+        id,
+        label,
+        detail: [
+          'For a request arriving over plaintext HTTP, the session cookie is not marked Secure and crosses this observed ingress hop unprotected. Praxrr grades only this ingress hop; it cannot observe any upstream edge.',
+        ],
+        fix: {
+          kind: 'docs',
+          href: 'https://github.com/yandy-r/praxrr',
+          label: 'Serve Praxrr behind HTTPS (PRAXRR_COOKIE_SECURE=auto then marks it Secure automatically)',
+        },
+      };
+    case 'unknown':
+      if (session.cookieSecure) {
+        return {
+          id,
+          label,
+          detail: [
+            'PRAXRR_COOKIE_SECURE=on; transport is not observable in this context. If any request path is plaintext HTTP, the Secure cookie is dropped there and login fails.',
+          ],
+          fix: cookieSecureEnvFix('Set PRAXRR_COOKIE_SECURE=auto'),
+        };
+      }
+      return {
+        id,
+        label,
+        detail: [
+          'Request transport could not be observed in this context (e.g. the MCP resource/tool path, which carries no HTTP request). The session cookie is treated as not Secure and never assumed safe. If Praxrr is served over HTTPS, set PRAXRR_COOKIE_SECURE=on.',
+        ],
+        fix: cookieSecureEnvFix('Set PRAXRR_COOKIE_SECURE=on if Praxrr is served over HTTPS'),
+      };
+  }
 }
 
 /** Real posture notes whose exploitability Praxrr cannot observe, so they inform without a score. */
 function buildAdvisories(inputs: PostureInputs): Advisory[] {
   const advisories: Advisory[] = [];
-  if (!inputs.sessionCookieSecure) {
-    advisories.push({
-      id: 'session_cookie_secure',
-      label: 'Session cookie is not marked Secure',
-      detail: [
-        'Praxrr sets its session cookie without the Secure flag, so if Praxrr is ever reached over plain http the session cookie can be captured on the wire.',
-        'Serve Praxrr behind an HTTPS reverse proxy. This is informational, not scored — Praxrr cannot observe the scheme it is actually served over.',
-      ],
-      fix: { kind: 'docs', href: 'https://github.com/yandy-r/praxrr', label: 'Serve Praxrr behind HTTPS' },
-    });
-  }
+  const transportAdvisory = sessionCookieTransportAdvisory(inputs.session);
+  if (transportAdvisory) advisories.push(transportAdvisory);
   return advisories;
 }
 
