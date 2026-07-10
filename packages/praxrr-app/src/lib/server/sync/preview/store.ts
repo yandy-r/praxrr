@@ -5,7 +5,16 @@
  * and are cleaned up when expired.
  */
 
-import type { SyncPreviewResult, SyncPreviewStatus } from './types.ts';
+import { canonicalizeReviewValue, SYNC_PREVIEW_REVIEW_BINDING_VERSION } from './reviewBinding.ts';
+import type {
+  SyncPreviewArrType,
+  SyncPreviewFailureReason,
+  SyncPreviewResult,
+  SyncPreviewReviewBinding,
+  SyncPreviewSection,
+  SyncPreviewSectionEvidenceHash,
+  SyncPreviewStatus,
+} from './types.ts';
 
 export const DEFAULT_PREVIEW_TTL_MS = 10 * 60 * 1000;
 export const PREVIEW_STALE_WARNING_MS = 5 * 60 * 1000;
@@ -78,10 +87,63 @@ export type SyncPreviewCreateInput = Omit<SyncPreviewResult, 'createdAt' | 'expi
 
 export type SyncPreviewUpdatePatch = Omit<Partial<SyncPreviewResult>, 'createdAt' | 'expiresAt'>;
 
+export type SyncPreviewGenerationPatch = Omit<SyncPreviewUpdatePatch, 'status'>;
+
+declare const APPLY_CLAIM_RECEIPT_BRAND: unique symbol;
+
+/**
+ * Runtime-opaque proof that a caller owns the current apply claim.
+ *
+ * Receipts intentionally expose no preview id or ownership token. Only the store instance that
+ * issued a receipt can resolve it.
+ */
+export type SyncPreviewApplyClaimReceipt = Readonly<{
+  readonly [APPLY_CLAIM_RECEIPT_BRAND]: true;
+}>;
+
+export type SyncPreviewApplyClaimFailure =
+  | { readonly ok: false; readonly reason: 'not_found' }
+  | { readonly ok: false; readonly reason: 'expired' }
+  | {
+      readonly ok: false;
+      readonly reason: 'invalid_state';
+      readonly status: SyncPreviewStatus;
+    }
+  | { readonly ok: false; readonly reason: 'unverifiable_review' }
+  | { readonly ok: false; readonly reason: 'scope_drift' };
+
+export interface SyncPreviewApplyClaimSuccess {
+  readonly ok: true;
+  readonly snapshot: SyncPreviewResult;
+  readonly binding: SyncPreviewReviewBinding;
+  readonly sections: readonly SyncPreviewSection[];
+  readonly receipt: SyncPreviewApplyClaimReceipt;
+}
+
+export type SyncPreviewApplyClaimResult = SyncPreviewApplyClaimFailure | SyncPreviewApplyClaimSuccess;
+
+export interface SyncPreviewApplyCompletion {
+  readonly status: typeof PREVIEW_STATUS_APPLIED | typeof PREVIEW_STATUS_FAILED;
+  readonly failure?: SyncPreviewFailureReason | null;
+}
+
 export interface SyncPreviewStoreApi {
   create(input: SyncPreviewCreateInput, nowMs?: number): SyncPreviewResult;
   get(id: string, nowMs?: number): SyncPreviewResult | null;
   updateResult(id: string, patch: SyncPreviewUpdatePatch, nowMs?: number): SyncPreviewResult | null;
+  completeGeneration(
+    id: string,
+    patch: SyncPreviewGenerationPatch,
+    binding: SyncPreviewReviewBinding,
+    nowMs?: number
+  ): SyncPreviewResult | null;
+  claimReadyForApply(id: string, sections: readonly SyncPreviewSection[], nowMs?: number): SyncPreviewApplyClaimResult;
+  releaseApplyClaim(receipt: SyncPreviewApplyClaimReceipt, nowMs?: number): SyncPreviewResult | null;
+  completeApplyClaim(
+    receipt: SyncPreviewApplyClaimReceipt,
+    completion: SyncPreviewApplyCompletion,
+    nowMs?: number
+  ): SyncPreviewResult | null;
   /**
    * Returns null when the preview is missing or expired.
    */
@@ -95,15 +157,203 @@ interface StoredPreview {
   snapshot: SyncPreviewResult;
   createdAtMs: number;
   expiresAtMs: number;
+  binding: SyncPreviewReviewBinding | null;
+  applyOwnerToken: string | null;
+}
+
+interface ApplyClaimOwnership {
+  readonly previewId: string;
+  readonly ownerToken: string;
 }
 
 export interface SyncPreviewStoreOptions {
   ttlMs?: number;
 }
 
+const REVIEW_SECTIONS: readonly SyncPreviewSection[] = [
+  'qualityProfiles',
+  'delayProfiles',
+  'mediaManagement',
+  'metadataProfiles',
+];
+const REVIEW_ARR_TYPES: readonly SyncPreviewArrType[] = ['radarr', 'sonarr', 'lidarr'];
+const SHA256_HEX_PATTERN = /^[0-9a-f]{64}$/;
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  if (value === null || typeof value !== 'object') {
+    return false;
+  }
+  const prototype = Object.getPrototypeOf(value);
+  return prototype === Object.prototype || prototype === null;
+}
+
+function isReviewSection(value: unknown): value is SyncPreviewSection {
+  return typeof value === 'string' && REVIEW_SECTIONS.includes(value as SyncPreviewSection);
+}
+
+function isReviewArrType(value: unknown): value is SyncPreviewArrType {
+  return typeof value === 'string' && REVIEW_ARR_TYPES.includes(value as SyncPreviewArrType);
+}
+
+function supportsSection(arrType: SyncPreviewArrType, section: SyncPreviewSection): boolean {
+  return section !== 'metadataProfiles' || arrType === 'lidarr';
+}
+
+function deepFreeze<T>(value: T): T {
+  if (value !== null && typeof value === 'object' && !Object.isFrozen(value)) {
+    for (const child of Object.values(value)) {
+      deepFreeze(child);
+    }
+    Object.freeze(value);
+  }
+  return value;
+}
+
+function cloneCanonicalObject(value: unknown): Readonly<Record<string, unknown>> | null {
+  try {
+    const canonical = canonicalizeReviewValue(value);
+    const cloned = JSON.parse(canonical) as unknown;
+    return isPlainObject(cloned) ? deepFreeze(cloned) : null;
+  } catch {
+    return null;
+  }
+}
+
+function cloneEvidenceHash(value: unknown, section: SyncPreviewSection): SyncPreviewSectionEvidenceHash | null {
+  if (!isPlainObject(value) || value.section !== section) {
+    return null;
+  }
+  if (
+    typeof value.pcdHash !== 'string' ||
+    !SHA256_HEX_PATTERN.test(value.pcdHash) ||
+    typeof value.arrHash !== 'string' ||
+    !SHA256_HEX_PATTERN.test(value.arrHash) ||
+    typeof value.planHash !== 'string' ||
+    !SHA256_HEX_PATTERN.test(value.planHash)
+  ) {
+    return null;
+  }
+  return Object.freeze({
+    section,
+    pcdHash: value.pcdHash,
+    arrHash: value.arrHash,
+    planHash: value.planHash,
+  });
+}
+
+function eligibleSections(snapshot: SyncPreviewResult): readonly SyncPreviewSection[] {
+  return snapshot.sectionOutcomes
+    .filter((outcome) => outcome.failure === null && !outcome.skipped)
+    .map((outcome) => outcome.section);
+}
+
+function cloneAndValidateBinding(value: unknown, snapshot: SyncPreviewResult): SyncPreviewReviewBinding | null {
+  if (!isPlainObject(value) || value.version !== SYNC_PREVIEW_REVIEW_BINDING_VERSION) {
+    return null;
+  }
+  if (
+    !Number.isSafeInteger(value.instanceId) ||
+    Number(value.instanceId) <= 0 ||
+    !isReviewArrType(value.arrType) ||
+    value.instanceId !== snapshot.instanceId ||
+    value.arrType !== snapshot.arrType ||
+    !Array.isArray(value.sections) ||
+    !isPlainObject(value.sectionConfigs) ||
+    !isPlainObject(value.evidence)
+  ) {
+    return null;
+  }
+
+  const sections = value.sections as unknown[];
+  const successfulSections = eligibleSections(snapshot);
+  if (
+    sections.length === 0 ||
+    sections.length !== successfulSections.length ||
+    sections.some(
+      (section, index) =>
+        !isReviewSection(section) ||
+        !supportsSection(value.arrType as SyncPreviewArrType, section) ||
+        section !== successfulSections[index] ||
+        sections.indexOf(section) !== index
+    )
+  ) {
+    return null;
+  }
+
+  const sectionSet = new Set(sections as SyncPreviewSection[]);
+  const configKeys = Object.keys(value.sectionConfigs);
+  if (configKeys.some((key) => !isReviewSection(key) || !sectionSet.has(key))) {
+    return null;
+  }
+  const sectionConfigs = cloneCanonicalObject(value.sectionConfigs);
+  if (!sectionConfigs) {
+    return null;
+  }
+
+  const evidenceKeys = Object.keys(value.evidence);
+  if (
+    evidenceKeys.length !== sections.length ||
+    evidenceKeys.some((key) => !sectionSet.has(key as SyncPreviewSection))
+  ) {
+    return null;
+  }
+  const evidence: Partial<Record<SyncPreviewSection, SyncPreviewSectionEvidenceHash>> = {};
+  for (const section of sections as SyncPreviewSection[]) {
+    const cloned = cloneEvidenceHash(value.evidence[section], section);
+    if (!cloned) {
+      return null;
+    }
+    evidence[section] = cloned;
+  }
+
+  return Object.freeze({
+    version: SYNC_PREVIEW_REVIEW_BINDING_VERSION,
+    instanceId: snapshot.instanceId,
+    arrType: snapshot.arrType,
+    sections: Object.freeze([...(sections as SyncPreviewSection[])]),
+    sectionConfigs: sectionConfigs as Readonly<Partial<Record<SyncPreviewSection, unknown>>>,
+    evidence: Object.freeze(evidence),
+  });
+}
+
+function isBindingValidForSnapshot(binding: SyncPreviewReviewBinding, snapshot: SyncPreviewResult): boolean {
+  return cloneAndValidateBinding(binding, snapshot) !== null;
+}
+
+function isExactReviewedSubset(
+  selectedSections: readonly SyncPreviewSection[],
+  binding: SyncPreviewReviewBinding,
+  snapshot: SyncPreviewResult
+): boolean {
+  if (
+    !Array.isArray(selectedSections) ||
+    selectedSections.length === 0 ||
+    selectedSections.length > binding.sections.length
+  ) {
+    return false;
+  }
+
+  const eligible = new Set(eligibleSections(snapshot));
+  const seen = new Set<SyncPreviewSection>();
+  for (const section of selectedSections) {
+    if (
+      !isReviewSection(section) ||
+      seen.has(section) ||
+      !eligible.has(section) ||
+      !binding.sections.includes(section) ||
+      !binding.evidence[section]
+    ) {
+      return false;
+    }
+    seen.add(section);
+  }
+  return true;
+}
+
 export class SyncPreviewStore {
   private readonly ttlMs: number;
   private readonly previews = new Map<string, StoredPreview>();
+  private readonly applyClaimReceipts = new WeakMap<object, ApplyClaimOwnership>();
 
   constructor(options: SyncPreviewStoreOptions = {}) {
     this.ttlMs = options.ttlMs ?? DEFAULT_PREVIEW_TTL_MS;
@@ -124,6 +374,10 @@ export class SyncPreviewStore {
   private sanitizePatch(entry: StoredPreview, patch: SyncPreviewUpdatePatch, nowMs: number): SyncPreviewResult {
     const currentStatus = this.getCurrentStatus(entry, nowMs);
     const nextStatus = patch.status ?? currentStatus;
+
+    if (patch.status === PREVIEW_STATUS_APPLYING || currentStatus === PREVIEW_STATUS_APPLYING) {
+      throw new Error('Applying preview state requires an apply claim receipt');
+    }
 
     if (patch.status && !SyncPreviewStore.canTransition(currentStatus, patch.status)) {
       throw new Error(`Invalid preview status transition ${currentStatus} -> ${patch.status}`);
@@ -154,6 +408,8 @@ export class SyncPreviewStore {
       snapshot: preview,
       createdAtMs: nowMs,
       expiresAtMs: nowMs + this.ttlMs,
+      binding: null,
+      applyOwnerToken: null,
     });
 
     return preview;
@@ -181,6 +437,8 @@ export class SyncPreviewStore {
       snapshot,
       createdAtMs: entry.createdAtMs,
       expiresAtMs: entry.expiresAtMs,
+      binding: entry.binding,
+      applyOwnerToken: entry.applyOwnerToken,
     };
 
     this.previews.set(id, updated);
@@ -200,6 +458,160 @@ export class SyncPreviewStore {
    */
   transition(id: string, status: SyncPreviewStatus, nowMs: number = Date.now()): SyncPreviewResult | null {
     return this.updateResult(id, { status }, nowMs);
+  }
+
+  /**
+   * Atomically install the completed public result and its private immutable review binding.
+   * Any validation failure leaves the original generating entry untouched.
+   */
+  completeGeneration(
+    id: string,
+    patch: SyncPreviewGenerationPatch,
+    binding: SyncPreviewReviewBinding,
+    nowMs: number = Date.now()
+  ): SyncPreviewResult | null {
+    const entry = this.previews.get(id);
+    if (!entry) {
+      this.cleanup(nowMs);
+      return null;
+    }
+    if (SyncPreviewStore.isExpired(entry.expiresAtMs, nowMs)) {
+      this.previews.delete(id);
+      return null;
+    }
+    if (entry.snapshot.status !== PREVIEW_STATUS_GENERATING) {
+      throw new Error(`Invalid preview status transition ${entry.snapshot.status} -> ${PREVIEW_STATUS_READY}`);
+    }
+
+    const snapshot = this.sanitizePatch(
+      entry,
+      {
+        ...patch,
+        status: PREVIEW_STATUS_READY,
+      },
+      nowMs
+    );
+    const immutableBinding = cloneAndValidateBinding(binding, snapshot);
+    if (!immutableBinding) {
+      throw new TypeError('Invalid sync preview review binding');
+    }
+
+    this.previews.set(id, {
+      snapshot,
+      createdAtMs: entry.createdAtMs,
+      expiresAtMs: entry.expiresAtMs,
+      binding: immutableBinding,
+      applyOwnerToken: null,
+    });
+    return snapshot;
+  }
+
+  /**
+   * Atomically validate the private binding and claim an exact reviewed subset for apply.
+   */
+  claimReadyForApply(
+    id: string,
+    sections: readonly SyncPreviewSection[],
+    nowMs: number = Date.now()
+  ): SyncPreviewApplyClaimResult {
+    const entry = this.previews.get(id);
+    if (!entry) {
+      return { ok: false, reason: 'not_found' };
+    }
+    if (SyncPreviewStore.isExpired(entry.expiresAtMs, nowMs)) {
+      this.previews.delete(id);
+      return { ok: false, reason: 'expired' };
+    }
+    if (entry.snapshot.status !== PREVIEW_STATUS_READY) {
+      return {
+        ok: false,
+        reason: 'invalid_state',
+        status: entry.snapshot.status,
+      };
+    }
+    if (!entry.binding || !isBindingValidForSnapshot(entry.binding, entry.snapshot)) {
+      return { ok: false, reason: 'unverifiable_review' };
+    }
+    if (!isExactReviewedSubset(sections, entry.binding, entry.snapshot)) {
+      return { ok: false, reason: 'scope_drift' };
+    }
+
+    const ownerToken = crypto.randomUUID();
+    const snapshot: SyncPreviewResult = {
+      ...entry.snapshot,
+      status: PREVIEW_STATUS_APPLYING,
+    };
+    const receipt = Object.freeze({}) as SyncPreviewApplyClaimReceipt;
+    const selectedSections = Object.freeze([...sections]);
+
+    this.previews.set(id, {
+      ...entry,
+      snapshot,
+      applyOwnerToken: ownerToken,
+    });
+    this.applyClaimReceipts.set(receipt, { previewId: id, ownerToken });
+
+    return {
+      ok: true,
+      snapshot,
+      binding: entry.binding,
+      sections: selectedSections,
+      receipt,
+    };
+  }
+
+  /** Release a pre-write claim conflict back to ready, only for the current owner. */
+  releaseApplyClaim(receipt: SyncPreviewApplyClaimReceipt, nowMs: number = Date.now()): SyncPreviewResult | null {
+    return this.finishOwnedApplyClaim(receipt, PREVIEW_STATUS_READY, undefined, nowMs);
+  }
+
+  /** Complete or terminally invalidate an apply claim, only for the current owner. */
+  completeApplyClaim(
+    receipt: SyncPreviewApplyClaimReceipt,
+    completion: SyncPreviewApplyCompletion,
+    nowMs: number = Date.now()
+  ): SyncPreviewResult | null {
+    return this.finishOwnedApplyClaim(receipt, completion.status, completion.failure, nowMs);
+  }
+
+  private finishOwnedApplyClaim(
+    receipt: SyncPreviewApplyClaimReceipt,
+    status: typeof PREVIEW_STATUS_READY | typeof PREVIEW_STATUS_APPLIED | typeof PREVIEW_STATUS_FAILED,
+    failure: SyncPreviewFailureReason | null | undefined,
+    nowMs: number
+  ): SyncPreviewResult | null {
+    const ownership = this.applyClaimReceipts.get(receipt);
+    if (!ownership) {
+      return null;
+    }
+
+    const entry = this.previews.get(ownership.previewId);
+    if (!entry) {
+      this.applyClaimReceipts.delete(receipt);
+      return null;
+    }
+    if (SyncPreviewStore.isExpired(entry.expiresAtMs, nowMs)) {
+      this.previews.delete(ownership.previewId);
+      this.applyClaimReceipts.delete(receipt);
+      return null;
+    }
+    if (entry.snapshot.status !== PREVIEW_STATUS_APPLYING || entry.applyOwnerToken !== ownership.ownerToken) {
+      this.applyClaimReceipts.delete(receipt);
+      return null;
+    }
+
+    const snapshot: SyncPreviewResult = {
+      ...entry.snapshot,
+      status,
+      ...(failure === undefined ? {} : { failure }),
+    };
+    this.previews.set(ownership.previewId, {
+      ...entry,
+      snapshot,
+      applyOwnerToken: null,
+    });
+    this.applyClaimReceipts.delete(receipt);
+    return snapshot;
   }
 
   /**
@@ -228,6 +640,8 @@ export class SyncPreviewStore {
         snapshot,
         createdAtMs: entry.createdAtMs,
         expiresAtMs: entry.expiresAtMs,
+        binding: entry.binding,
+        applyOwnerToken: entry.applyOwnerToken,
       });
 
       return snapshot;

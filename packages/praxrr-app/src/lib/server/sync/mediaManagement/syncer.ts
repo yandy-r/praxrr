@@ -67,7 +67,7 @@ import type {
 } from '$arr/types.ts';
 import { logger } from '$logger/logger.ts';
 import { diffSingletonEntity } from '../preview/sectionDiffs.ts';
-import type { EntityChange, MediaManagementPreview } from '../preview/types.ts';
+import type { EntityChange, MediaManagementPreview, SyncPreviewPreparedExecutionContext } from '../preview/types.ts';
 import {
   getUnsupportedMediaManagementSubsectionReason,
   getUnsupportedSyncSectionReason,
@@ -119,6 +119,102 @@ interface MediaManagementSyncConfig {
   qualityDefinitionsConfigName: string | null;
   mediaSettingsDatabaseId: number | null;
   mediaSettingsConfigName: string | null;
+}
+
+type MediaManagementSourceKind = 'pcd' | 'trash';
+
+interface PreparedMediaManagementWrite {
+  readonly name: string;
+  readonly sourceKind: MediaManagementSourceKind;
+  readonly payload: Record<string, unknown>;
+  readonly remoteId: string | null;
+}
+
+interface PreparedQualityDefinitionsWrite {
+  readonly name: string;
+  readonly sourceKind: MediaManagementSourceKind;
+  readonly payload: readonly ArrQualityDefinition[];
+  readonly matchedRemoteIds: readonly number[];
+}
+
+interface MediaManagementPreparedExecutionContext extends SyncPreviewPreparedExecutionContext {
+  readonly section: 'mediaManagement';
+  readonly config: MediaManagementSyncConfig;
+  readonly desired: {
+    readonly mediaSettings: PreparedMediaManagementWrite | null;
+    readonly naming: PreparedMediaManagementWrite | null;
+    readonly qualityDefinitions: PreparedQualityDefinitionsWrite | null;
+  };
+  readonly materialPlan: {
+    readonly arrType: SyncArrType;
+    readonly subsectionOrder: readonly ['mediaSettings', 'naming', 'qualityDefinitions'];
+    readonly selections: Readonly<Record<'mediaSettings' | 'naming' | 'qualityDefinitions', unknown>>;
+    readonly capabilities: Readonly<Record<'mediaSettings' | 'naming' | 'qualityDefinitions', unknown>>;
+  };
+  readonly currentGuards: {
+    readonly mediaSettings: Record<string, unknown> | null;
+    readonly naming: Record<string, unknown> | null;
+    readonly qualityDefinitions: readonly ArrQualityDefinition[];
+  };
+}
+
+interface MediaManagementReviewAccumulator {
+  pcd: {
+    selection: MediaManagementSyncConfig;
+    mediaSettingsSource: unknown;
+    namingSource: unknown;
+    qualityDefinitionsSource: unknown;
+    qualityApiMappings: readonly (readonly [string, string])[];
+  };
+  arr: {
+    target: { arrType: SyncArrType };
+    mediaSettingsCurrent: Record<string, unknown> | null;
+    namingCurrent: Record<string, unknown> | null;
+    qualityDefinitionsCurrent: readonly ArrQualityDefinition[];
+  };
+  desired: {
+    mediaSettings: PreparedMediaManagementWrite | null;
+    naming: PreparedMediaManagementWrite | null;
+    qualityDefinitions: PreparedQualityDefinitionsWrite | null;
+  };
+  selections: Record<'mediaSettings' | 'naming' | 'qualityDefinitions', unknown>;
+  capabilities: Record<'mediaSettings' | 'naming' | 'qualityDefinitions', unknown>;
+}
+
+function createReviewAccumulator(
+  syncConfig: MediaManagementSyncConfig,
+  arrType: SyncArrType
+): MediaManagementReviewAccumulator {
+  return {
+    pcd: {
+      selection: structuredClone(syncConfig),
+      mediaSettingsSource: null,
+      namingSource: null,
+      qualityDefinitionsSource: null,
+      qualityApiMappings: [],
+    },
+    arr: {
+      target: { arrType },
+      mediaSettingsCurrent: null,
+      namingCurrent: null,
+      qualityDefinitionsCurrent: [],
+    },
+    desired: {
+      mediaSettings: null,
+      naming: null,
+      qualityDefinitions: null,
+    },
+    selections: {
+      mediaSettings: null,
+      naming: null,
+      qualityDefinitions: null,
+    },
+    capabilities: {
+      mediaSettings: null,
+      naming: null,
+      qualityDefinitions: null,
+    },
+  };
 }
 
 function parsePositiveInt(rawValue: unknown): number | null {
@@ -202,7 +298,8 @@ export class MediaManagementSyncer extends BaseSyncer {
   private async generateMediaSettingsPreview(
     databaseId: number | null,
     configName: string | null,
-    instanceType: SyncArrType
+    instanceType: SyncArrType,
+    review: MediaManagementReviewAccumulator
   ): Promise<EntityChange | null> {
     this.assertMediaManagementSubsectionSupported('mediaSettings', instanceType);
 
@@ -250,6 +347,20 @@ export class MediaManagementSyncer extends BaseSyncer {
       return null;
     }
 
+    review.pcd.mediaSettingsSource = {
+      sourceKind: 'pcd',
+      databaseId,
+      entityType: mediaSettingsSource.entityType,
+      configName,
+      row: mediaSettings,
+    };
+    review.selections.mediaSettings = {
+      sourceKind: 'pcd',
+      databaseId,
+      entityType: mediaSettingsSource.entityType,
+      configName,
+    };
+
     const existingConfig = (await this.client.getMediaManagementConfig()) as ArrMediaManagementConfig;
     const managedUpdates = {
       downloadPropersAndRepacks: this.mapPropersRepacks(mediaSettings.propers_repacks),
@@ -260,9 +371,19 @@ export class MediaManagementSyncer extends BaseSyncer {
       ...existingConfig,
       ...managedUpdates,
     };
+    let appliedFields = Object.keys(managedUpdates).sort();
+    let missingFields: string[] = [];
     if (this.instanceType === 'lidarr') {
       const applied = this.applyConfigUpdates(existingConfig, managedUpdates);
       updatedConfig = applied.updatedConfig;
+      appliedFields = applied.appliedFields;
+      missingFields = applied.missingFields;
+      review.arr.mediaSettingsCurrent = existingConfig as Record<string, unknown>;
+      review.capabilities.mediaSettings = {
+        observedFields: Object.keys(existingConfig).sort(),
+        appliedFields,
+        missingFields,
+      };
       if (applied.appliedFields.length === 0) {
         await logger.warn('No supported Lidarr media settings fields available to preview', {
           source: 'Preview:MediaSettings',
@@ -291,6 +412,19 @@ export class MediaManagementSyncer extends BaseSyncer {
       }
     }
 
+    review.arr.mediaSettingsCurrent = existingConfig as Record<string, unknown>;
+    review.capabilities.mediaSettings ??= {
+      observedFields: Object.keys(existingConfig).sort(),
+      appliedFields,
+      missingFields,
+    };
+    review.desired.mediaSettings = {
+      name: configName,
+      sourceKind: 'pcd',
+      payload: updatedConfig as Record<string, unknown>,
+      remoteId: readConfigId(existingConfig),
+    };
+
     return diffSingletonEntity({
       entityType: 'mediaSettings',
       name: configName,
@@ -303,7 +437,8 @@ export class MediaManagementSyncer extends BaseSyncer {
   private async generateNamingPreview(
     databaseId: number | null,
     configName: string | null,
-    instanceType: SyncArrType
+    instanceType: SyncArrType,
+    review: MediaManagementReviewAccumulator
   ): Promise<EntityChange | null> {
     this.assertMediaManagementSubsectionSupported('naming', instanceType);
 
@@ -346,6 +481,20 @@ export class MediaManagementSyncer extends BaseSyncer {
       return null;
     }
 
+    review.pcd.namingSource = {
+      sourceKind: 'pcd',
+      databaseId,
+      entityType: namingSource.entityType,
+      configName,
+      row: namingConfig,
+    };
+    review.selections.naming = {
+      sourceKind: 'pcd',
+      databaseId,
+      entityType: namingSource.entityType,
+      configName,
+    };
+
     const existingConfig = (await this.client.getNamingConfig()) as ArrNamingConfig;
     const previewConfig = namingSource.toDesiredPayload(namingConfig);
     const currentConfig = existingConfig as Record<string, unknown>;
@@ -353,12 +502,23 @@ export class MediaManagementSyncer extends BaseSyncer {
       ...currentConfig,
       ...previewConfig,
     };
+    let appliedFields = Object.keys(previewConfig).sort();
+    let missingFields: string[] = [];
 
     if (this.instanceType === 'lidarr') {
       const applied = this.applyConfigUpdates(currentConfig, previewConfig);
       finalConfig = {
         ...currentConfig,
         ...applied.updatedConfig,
+      };
+      appliedFields = applied.appliedFields;
+      missingFields = applied.missingFields;
+      review.arr.namingCurrent = currentConfig;
+      review.capabilities.naming = {
+        observedFields: Object.keys(currentConfig).sort(),
+        appliedFields,
+        missingFields,
+        unsupportedSourceFields: [...LIDARR_UNSUPPORTED_NAMING_SOURCE_FIELDS],
       };
 
       if (applied.missingFields.length > 0) {
@@ -399,6 +559,20 @@ export class MediaManagementSyncer extends BaseSyncer {
       });
     }
 
+    review.arr.namingCurrent = currentConfig;
+    review.capabilities.naming ??= {
+      observedFields: Object.keys(currentConfig).sort(),
+      appliedFields,
+      missingFields,
+      unsupportedSourceFields: this.instanceType === 'lidarr' ? [...LIDARR_UNSUPPORTED_NAMING_SOURCE_FIELDS] : [],
+    };
+    review.desired.naming = {
+      name: configName,
+      sourceKind: 'pcd',
+      payload: finalConfig,
+      remoteId: readConfigId(existingConfig),
+    };
+
     return diffSingletonEntity({
       entityType: 'naming',
       name: configName,
@@ -411,7 +585,8 @@ export class MediaManagementSyncer extends BaseSyncer {
   private async generateQualityDefinitionsPreview(
     databaseId: number | null,
     configName: string | null,
-    instanceType: SyncArrType
+    instanceType: SyncArrType,
+    review: MediaManagementReviewAccumulator
   ): Promise<readonly EntityChange[]> {
     this.assertMediaManagementSubsectionSupported('qualityDefinitions', instanceType);
 
@@ -457,6 +632,20 @@ export class MediaManagementSyncer extends BaseSyncer {
       return [];
     }
 
+    review.pcd.qualityDefinitionsSource = {
+      sourceKind: 'pcd',
+      databaseId,
+      entityType: qualityDefinitionsSource.entityType,
+      configName,
+      config: qualityDefsConfig,
+    };
+    review.selections.qualityDefinitions = {
+      sourceKind: 'pcd',
+      databaseId,
+      entityType: qualityDefinitionsSource.entityType,
+      configName,
+    };
+
     if (qualityDefsConfig.entries.length === 0) {
       await logger.debug(`Quality definitions config "${configName}" has no entries`, {
         source: 'Preview:QualityDefinitions',
@@ -466,6 +655,7 @@ export class MediaManagementSyncer extends BaseSyncer {
     }
 
     const apiMappings = await this.getQualityApiMappings(cache);
+    review.pcd.qualityApiMappings = [...apiMappings.entries()].sort(([left], [right]) => left.localeCompare(right));
     if (instanceType === 'lidarr' && apiMappings.size === 0) {
       await logger.warn('Skipping Lidarr quality definitions preview due missing mappings', {
         source: 'Preview:QualityDefinitions',
@@ -480,16 +670,21 @@ export class MediaManagementSyncer extends BaseSyncer {
     }
 
     const arrDefinitions = await this.client.getQualityDefinitions();
+    const desiredDefinitions = structuredClone(arrDefinitions);
     const arrDefMap = new Map<string, ArrQualityDefinition>();
-    for (const def of arrDefinitions) {
+    const desiredDefMap = new Map<string, ArrQualityDefinition>();
+    for (let index = 0; index < arrDefinitions.length; index += 1) {
+      const def = arrDefinitions[index];
       if (typeof def.quality?.name === 'string') {
         arrDefMap.set(def.quality.name.toLowerCase(), def);
+        desiredDefMap.set(def.quality.name.toLowerCase(), desiredDefinitions[index]);
       }
     }
 
     const changes: EntityChange[] = [];
     const missingMappingEntries: string[] = [];
     const missingDefinitionEntries: string[] = [];
+    const matchedRemoteIds: number[] = [];
 
     for (const entry of qualityDefsConfig.entries) {
       const apiName = apiMappings.get(entry.quality_name.toLowerCase());
@@ -509,12 +704,22 @@ export class MediaManagementSyncer extends BaseSyncer {
         continue;
       }
 
+      const desiredDefinitionTarget = desiredDefMap.get(apiName.toLowerCase());
+      if (!desiredDefinitionTarget) {
+        missingDefinitionEntries.push(entry.quality_name);
+        continue;
+      }
+
       const desiredDefinition = {
         ...arrDefinition,
         minSize: entry.min_size,
         maxSize: entry.max_size === 0 ? null : entry.max_size,
         preferredSize: entry.preferred_size === 0 ? null : entry.preferred_size,
       };
+      desiredDefinitionTarget.minSize = desiredDefinition.minSize;
+      desiredDefinitionTarget.maxSize = desiredDefinition.maxSize;
+      desiredDefinitionTarget.preferredSize = desiredDefinition.preferredSize;
+      matchedRemoteIds.push(arrDefinition.id);
 
       const change = diffSingletonEntity({
         entityType: 'qualityDefinition',
@@ -537,6 +742,25 @@ export class MediaManagementSyncer extends BaseSyncer {
       if (change.action !== 'unchanged') {
         changes.push(change);
       }
+    }
+
+    review.arr.qualityDefinitionsCurrent = arrDefinitions;
+    review.capabilities.qualityDefinitions = {
+      definitions: arrDefinitions.map((definition) => ({
+        id: definition.id,
+        name: definition.quality?.name ?? null,
+      })),
+      matchedRemoteIds,
+      missingMappings: [...missingMappingEntries].sort(),
+      missingArrDefinitions: [...missingDefinitionEntries].sort(),
+    };
+    if (matchedRemoteIds.length > 0) {
+      review.desired.qualityDefinitions = {
+        name: configName,
+        sourceKind: 'pcd',
+        payload: desiredDefinitions,
+        matchedRemoteIds,
+      };
     }
 
     if (instanceType === 'lidarr' && (missingMappingEntries.length > 0 || missingDefinitionEntries.length > 0)) {
@@ -564,6 +788,213 @@ export class MediaManagementSyncer extends BaseSyncer {
           subsection: 'qualityDefinitions',
         },
       });
+    }
+
+    return changes;
+  }
+
+  private async generateTrashNamingPreview(
+    selection: { sourceId: number; itemName: string } | null,
+    instanceType: SyncArrType,
+    review: MediaManagementReviewAccumulator
+  ): Promise<EntityChange | null> {
+    if (!selection) return null;
+
+    const source = trashGuideSourcesQueries.getById(selection.sourceId);
+    const cached = trashGuideEntityCacheQueries
+      .getBySourceAndType(selection.sourceId, 'naming')
+      .find((entity) => entity.name === selection.itemName);
+    if (!source || !cached || source.arr_type !== instanceType) {
+      review.pcd.namingSource = { sourceKind: 'trash', selection, source: source ?? null, cached: cached ?? null };
+      review.selections.naming = { sourceKind: 'trash', ...selection };
+      review.capabilities.naming = {
+        supported: false,
+        sourceArrType: source?.arr_type ?? null,
+        targetArrType: instanceType,
+      };
+      return null;
+    }
+
+    const entity = JSON.parse(cached.jsonData) as TrashGuideNamingEntity;
+    const transformed = toPortableNaming(entity, source.arr_type);
+    const expectedEntityType = `${instanceType}_naming`;
+    if (transformed.portableEntityType !== expectedEntityType) {
+      throw new Error('TRaSH naming source does not match the explicit target arr type.');
+    }
+
+    const current = (await this.client.getNamingConfig()) as Record<string, unknown>;
+    let updates: Record<string, unknown>;
+    if (transformed.portableEntityType === 'radarr_naming') {
+      const portable = transformed.data;
+      updates = {
+        renameMovies: portable.rename,
+        replaceIllegalCharacters: portable.replaceIllegalCharacters,
+        colonReplacementFormat: portable.colonReplacementFormat,
+        standardMovieFormat: portable.movieFormat,
+        movieFolderFormat: portable.movieFolderFormat,
+      };
+    } else {
+      const portable = transformed.data;
+      updates = {
+        renameEpisodes: portable.rename,
+        replaceIllegalCharacters: portable.replaceIllegalCharacters,
+        colonReplacementFormat: colonReplacementToDb(portable.colonReplacementFormat),
+        customColonReplacementFormat: portable.customColonReplacementFormat,
+        multiEpisodeStyle: multiEpisodeStyleToDb(portable.multiEpisodeStyle),
+        standardEpisodeFormat: portable.standardEpisodeFormat,
+        dailyEpisodeFormat: portable.dailyEpisodeFormat,
+        animeEpisodeFormat: portable.animeEpisodeFormat,
+        seriesFolderFormat: portable.seriesFolderFormat,
+        seasonFolderFormat: portable.seasonFolderFormat,
+      };
+    }
+    const desired = { ...current, ...updates };
+
+    review.pcd.namingSource = {
+      sourceKind: 'trash',
+      selection,
+      source,
+      cacheIdentity: {
+        id: cached.id,
+        trashId: cached.trashId,
+        contentHash: cached.contentHash,
+        filePath: cached.filePath,
+      },
+      entity,
+      transformed,
+    };
+    review.selections.naming = { sourceKind: 'trash', ...selection, arrType: source.arr_type };
+    review.arr.namingCurrent = current;
+    review.capabilities.naming = {
+      supported: true,
+      observedFields: Object.keys(current).sort(),
+      appliedFields: Object.keys(updates).sort(),
+    };
+    review.desired.naming = {
+      name: selection.itemName,
+      sourceKind: 'trash',
+      payload: desired,
+      remoteId: readConfigId(current),
+    };
+
+    return diffSingletonEntity({
+      entityType: 'naming',
+      name: selection.itemName,
+      desiredEntity: desired,
+      currentEntity: current,
+      currentRemoteId: (config) => (config as { id?: number | null }).id ?? null,
+    });
+  }
+
+  private async generateTrashQualityDefinitionsPreview(
+    selection: { sourceId: number; itemName: string } | null,
+    instanceType: SyncArrType,
+    review: MediaManagementReviewAccumulator
+  ): Promise<readonly EntityChange[]> {
+    if (!selection) return [];
+
+    const source = trashGuideSourcesQueries.getById(selection.sourceId);
+    const cached = trashGuideEntityCacheQueries
+      .getBySourceAndType(selection.sourceId, 'quality_size')
+      .find((entity) => entity.name === selection.itemName);
+    if (!source || !cached || source.arr_type !== instanceType) {
+      review.pcd.qualityDefinitionsSource = {
+        sourceKind: 'trash',
+        selection,
+        source: source ?? null,
+        cached: cached ?? null,
+      };
+      review.selections.qualityDefinitions = { sourceKind: 'trash', ...selection };
+      review.capabilities.qualityDefinitions = {
+        supported: false,
+        sourceArrType: source?.arr_type ?? null,
+        targetArrType: instanceType,
+      };
+      return [];
+    }
+
+    const entity = JSON.parse(cached.jsonData) as TrashGuideQualitySizeEntity;
+    const transformed = toPortableQualityDefinitions(entity, source.arr_type);
+    const current = await this.client.getQualityDefinitions();
+    const desired = structuredClone(current);
+    const desiredByName = new Map(
+      desired.flatMap((definition) =>
+        typeof definition.quality?.name === 'string'
+          ? [[definition.quality.name.toLowerCase(), definition] as const]
+          : []
+      )
+    );
+    const currentByName = new Map(
+      current.flatMap((definition) =>
+        typeof definition.quality?.name === 'string'
+          ? [[definition.quality.name.toLowerCase(), definition] as const]
+          : []
+      )
+    );
+    const changes: EntityChange[] = [];
+    const matchedRemoteIds: number[] = [];
+    const missingDefinitions: string[] = [];
+
+    for (const entry of transformed.data.entries) {
+      const desiredDefinition = desiredByName.get(entry.quality_name.toLowerCase());
+      const currentDefinition = currentByName.get(entry.quality_name.toLowerCase());
+      if (!desiredDefinition || !currentDefinition) {
+        missingDefinitions.push(entry.quality_name);
+        continue;
+      }
+      desiredDefinition.minSize = entry.min_size;
+      desiredDefinition.maxSize = entry.max_size === 0 ? null : entry.max_size;
+      desiredDefinition.preferredSize = entry.preferred_size === 0 ? null : entry.preferred_size;
+      matchedRemoteIds.push(desiredDefinition.id);
+
+      const change = diffSingletonEntity({
+        entityType: 'qualityDefinition',
+        name: entry.quality_name,
+        desiredEntity: desiredDefinition as ArrQualityDefinition & Record<string, unknown>,
+        currentEntity: currentDefinition as ArrQualityDefinition & Record<string, unknown>,
+        currentComparable: (definition) => ({
+          minSize: definition.minSize,
+          maxSize: definition.maxSize,
+          preferredSize: definition.preferredSize,
+        }),
+        desiredComparable: (definition) => ({
+          minSize: definition.minSize,
+          maxSize: definition.maxSize,
+          preferredSize: definition.preferredSize,
+        }),
+        currentRemoteId: (definition) => (definition as ArrQualityDefinition).id,
+      });
+      if (change.action !== 'unchanged') changes.push(change);
+    }
+
+    review.pcd.qualityDefinitionsSource = {
+      sourceKind: 'trash',
+      selection,
+      source,
+      cacheIdentity: {
+        id: cached.id,
+        trashId: cached.trashId,
+        contentHash: cached.contentHash,
+        filePath: cached.filePath,
+      },
+      entity,
+      transformed,
+    };
+    review.selections.qualityDefinitions = { sourceKind: 'trash', ...selection, arrType: source.arr_type };
+    review.arr.qualityDefinitionsCurrent = current;
+    review.capabilities.qualityDefinitions = {
+      supported: true,
+      definitions: current.map((definition) => ({ id: definition.id, name: definition.quality?.name ?? null })),
+      matchedRemoteIds,
+      missingDefinitions,
+    };
+    if (matchedRemoteIds.length > 0) {
+      review.desired.qualityDefinitions = {
+        name: selection.itemName,
+        sourceKind: 'trash',
+        payload: desired,
+        matchedRemoteIds,
+      };
     }
 
     return changes;
@@ -709,22 +1140,74 @@ export class MediaManagementSyncer extends BaseSyncer {
       }
 
       const syncConfig = this.getMediaManagementSyncConfig();
+      const review = createReviewAccumulator(syncConfig, instanceType);
 
       const mediaSettings = await this.generateMediaSettingsPreview(
         syncConfig.mediaSettingsDatabaseId,
         syncConfig.mediaSettingsConfigName,
-        instanceType
+        instanceType,
+        review
       );
-      const naming = await this.generateNamingPreview(
-        syncConfig.namingDatabaseId,
-        syncConfig.namingConfigName,
-        instanceType
+      const naming =
+        syncConfig.namingDatabaseId && syncConfig.namingConfigName
+          ? await this.generateNamingPreview(
+              syncConfig.namingDatabaseId,
+              syncConfig.namingConfigName,
+              instanceType,
+              review
+            )
+          : await this.generateTrashNamingPreview(this.getTrashNamingSelection(), instanceType, review);
+      const qualityDefinitions =
+        syncConfig.qualityDefinitionsDatabaseId && syncConfig.qualityDefinitionsConfigName
+          ? await this.generateQualityDefinitionsPreview(
+              syncConfig.qualityDefinitionsDatabaseId,
+              syncConfig.qualityDefinitionsConfigName,
+              instanceType,
+              review
+            )
+          : await this.generateTrashQualityDefinitionsPreview(
+              this.getTrashQualityDefinitionsSelection(),
+              instanceType,
+              review
+            );
+
+      this.recordPreviewEvidence('mediaManagement', 'pcd', 'selection', review.pcd.selection);
+      this.recordPreviewEvidence('mediaManagement', 'pcd', 'mediaSettingsSource', review.pcd.mediaSettingsSource);
+      this.recordPreviewEvidence('mediaManagement', 'pcd', 'namingSource', review.pcd.namingSource);
+      this.recordPreviewEvidence(
+        'mediaManagement',
+        'pcd',
+        'qualityDefinitionsSource',
+        review.pcd.qualityDefinitionsSource
       );
-      const qualityDefinitions = await this.generateQualityDefinitionsPreview(
-        syncConfig.qualityDefinitionsDatabaseId,
-        syncConfig.qualityDefinitionsConfigName,
-        instanceType
+      this.recordPreviewEvidence('mediaManagement', 'pcd', 'qualityApiMappings', review.pcd.qualityApiMappings);
+      this.recordPreviewEvidence('mediaManagement', 'pcd', 'transformedDesiredValues', review.desired);
+      this.recordPreviewEvidence('mediaManagement', 'arr', 'target', review.arr.target);
+      this.recordPreviewEvidence('mediaManagement', 'arr', 'mediaSettingsCurrent', review.arr.mediaSettingsCurrent);
+      this.recordPreviewEvidence('mediaManagement', 'arr', 'namingCurrent', review.arr.namingCurrent);
+      this.recordPreviewEvidence(
+        'mediaManagement',
+        'arr',
+        'qualityDefinitionsCurrent',
+        review.arr.qualityDefinitionsCurrent
       );
+      this.recordPreviewEvidence('mediaManagement', 'arr', 'capabilities', review.capabilities);
+      this.preparePreviewExecution({
+        section: 'mediaManagement',
+        config: syncConfig,
+        desired: review.desired,
+        materialPlan: {
+          arrType: instanceType,
+          subsectionOrder: ['mediaSettings', 'naming', 'qualityDefinitions'],
+          selections: review.selections,
+          capabilities: review.capabilities,
+        },
+        currentGuards: {
+          mediaSettings: review.arr.mediaSettingsCurrent,
+          naming: review.arr.namingCurrent,
+          qualityDefinitions: review.arr.qualityDefinitionsCurrent,
+        },
+      } satisfies MediaManagementPreparedExecutionContext);
 
       await logger.info(`Generated media management preview for "${this.instanceName}"`, {
         source: 'Preview:MediaManagement',
@@ -759,7 +1242,8 @@ export class MediaManagementSyncer extends BaseSyncer {
    * Override sync to handle multiple config types
    */
   override async sync(): Promise<SyncResult> {
-    const syncConfig = arrSyncQueries.getMediaManagementSync(this.instanceId);
+    const prepared = this.getPreparedExecutionContext<MediaManagementPreparedExecutionContext>();
+    const syncConfig = prepared?.config ?? this.getMediaManagementSyncConfig();
     const arrType = this.getSyncArrType();
     let totalSynced = 0;
     const errors: string[] = [];
@@ -822,6 +1306,42 @@ export class MediaManagementSyncer extends BaseSyncer {
         });
       }
     };
+
+    if (prepared) {
+      if (!arrType || prepared.materialPlan.arrType !== arrType) {
+        return {
+          success: false,
+          itemsSynced: 0,
+          error: 'Prepared media-management context does not match the target arr type.',
+          outcomes: [],
+        };
+      }
+
+      const desired = prepared.desired;
+      if (desired.mediaSettings) {
+        await runSubsection('mediaSettings', desired.mediaSettings.name, () =>
+          this.syncPreparedSingleton('mediaSettings', desired.mediaSettings!, prepared.currentGuards.mediaSettings)
+        );
+      }
+      if (desired.naming) {
+        await runSubsection('naming', desired.naming.name, () =>
+          this.syncPreparedSingleton('naming', desired.naming!, prepared.currentGuards.naming)
+        );
+      }
+      if (desired.qualityDefinitions) {
+        await runSubsection('qualityDefinitions', desired.qualityDefinitions.name, () =>
+          this.syncPreparedQualityDefinitions(desired.qualityDefinitions!, prepared.currentGuards.qualityDefinitions)
+        );
+      }
+
+      const success = errors.length === 0;
+      return {
+        success,
+        itemsSynced: totalSynced,
+        error: errors.length > 0 ? errors.join('; ') : undefined,
+        outcomes,
+      };
+    }
 
     let trashNamingSelection: { sourceId: number; itemName: string } | null = null;
     let trashQualityDefinitionsSelection: { sourceId: number; itemName: string } | null = null;
@@ -890,8 +1410,10 @@ export class MediaManagementSyncer extends BaseSyncer {
       const configName = syncConfig.qualityDefinitionsConfigName;
       await runSubsection('qualityDefinitions', configName, () => this.syncQualityDefinitions(databaseId, configName));
     } else {
-      await runSubsection('qualityDefinitions', trashQualityDefinitionsSelection?.itemName ?? 'qualityDefinitions', () =>
-        this.syncTrashQualityDefinitions(trashQualityDefinitionsSelection)
+      await runSubsection(
+        'qualityDefinitions',
+        trashQualityDefinitionsSelection?.itemName ?? 'qualityDefinitions',
+        () => this.syncTrashQualityDefinitions(trashQualityDefinitionsSelection)
       );
     }
 
@@ -909,6 +1431,40 @@ export class MediaManagementSyncer extends BaseSyncer {
     });
 
     return result;
+  }
+
+  private async syncPreparedSingleton(
+    subsection: 'mediaSettings' | 'naming',
+    prepared: Readonly<PreparedMediaManagementWrite>,
+    currentGuard: Readonly<Record<string, unknown>> | null
+  ): Promise<MediaSubsectionResult> {
+    const guardRemoteId = readConfigId(currentGuard);
+    const payloadRemoteId = readConfigId(prepared.payload);
+    if (guardRemoteId !== prepared.remoteId || payloadRemoteId !== prepared.remoteId) {
+      return subFail('Prepared media-management identity guard is inconsistent.');
+    }
+
+    const payload = structuredClone(prepared.payload);
+    if (subsection === 'mediaSettings') {
+      await this.client.updateMediaManagementConfig(payload as unknown as ArrMediaManagementConfig);
+    } else {
+      await this.client.updateNamingConfig(payload as unknown as ArrNamingConfig);
+    }
+    return subOk(prepared.remoteId);
+  }
+
+  private async syncPreparedQualityDefinitions(
+    prepared: Readonly<PreparedQualityDefinitionsWrite>,
+    currentGuards: readonly ArrQualityDefinition[]
+  ): Promise<MediaSubsectionResult> {
+    const guardIds = currentGuards.map((definition) => definition.id);
+    const payloadIds = prepared.payload.map((definition) => definition.id);
+    if (JSON.stringify(guardIds) !== JSON.stringify(payloadIds)) {
+      return subFail('Prepared quality-definition identity guards are inconsistent.');
+    }
+
+    await this.client.updateQualityDefinitions([...structuredClone(prepared.payload)]);
+    return subOk(null);
   }
 
   // =========================================================================
@@ -1537,6 +2093,9 @@ export class MediaManagementSyncer extends BaseSyncer {
       });
       return subFail(`TRaSH source ${selection.sourceId} is no longer available.`);
     }
+    if (source.arr_type !== this.instanceType) {
+      return subSkip('TRaSH naming source does not match this explicit arr target.');
+    }
 
     const cachedEntities = trashGuideEntityCacheQueries.getBySourceAndType(selection.sourceId, 'naming');
     const cached = cachedEntities.find((e) => e.name === selection.itemName);
@@ -1618,6 +2177,9 @@ export class MediaManagementSyncer extends BaseSyncer {
         meta: { instanceId: this.instanceId, sourceId: selection.sourceId },
       });
       return subFail(`TRaSH source ${selection.sourceId} is no longer available.`);
+    }
+    if (source.arr_type !== this.instanceType) {
+      return subSkip('TRaSH quality-definition source does not match this explicit arr target.');
     }
 
     const cachedEntities = trashGuideEntityCacheQueries.getBySourceAndType(selection.sourceId, 'quality_size');

@@ -13,6 +13,13 @@ export type SyncPreviewFieldChangeType = 'added' | 'changed' | 'removed';
 
 export type SyncPreviewSection = 'qualityProfiles' | 'delayProfiles' | 'mediaManagement' | 'metadataProfiles';
 
+/** Private evidence classes captured while materializing a reviewed preview. */
+export type SyncPreviewEvidenceClass = 'pcd' | 'arr';
+
+/** Closed reasons why a reviewed binding cannot authorize execution. */
+export type SyncPreviewReviewInvalidationReason =
+  'pcd_drift' | 'arr_drift' | 'pcd_and_arr_drift' | 'scope_drift' | 'unverifiable_review';
+
 /**
  * Closed vocabulary of Sync Preview generate/apply failure reasons.
  *
@@ -119,6 +126,92 @@ export interface SyncPreviewSectionOutcome {
   readonly failure: SyncPreviewFailureReason | null;
   readonly skipped: boolean;
 }
+
+/**
+ * Exact values prepared by a section while producing a reviewed preview.
+ *
+ * `desired` is the validated Arr payload (or bounded group of payloads), `materialPlan`
+ * contains any execution ordering/identity decisions that are not represented by the public
+ * diff, and `currentGuards` contains the relevant current-value identities used to narrow the
+ * validation-to-write race. Values are private, process-local, and must be structured-cloneable.
+ */
+export interface SyncPreviewPreparedExecutionContext {
+  readonly section: SyncPreviewSection;
+  readonly config: unknown;
+  readonly desired: unknown;
+  readonly materialPlan: unknown;
+  readonly currentGuards: unknown;
+}
+
+/**
+ * Optional private sink attached only while materializing a reviewed preview.
+ *
+ * Concrete syncers record bounded evidence beside their authoritative reads. Keys are
+ * section-owned stable labels (for example `selectedProfile` or `remoteProfiles`), not
+ * user-facing text. Duplicate keys fail closed in the orchestrator's recorder.
+ */
+export interface SyncPreviewEvidenceRecorder {
+  record(section: SyncPreviewSection, source: SyncPreviewEvidenceClass, key: string, value: unknown): void;
+  prepare(context: SyncPreviewPreparedExecutionContext): void;
+}
+
+/** Raw private evidence for one successfully materialized section. */
+export interface SyncPreviewSectionMaterializedEvidence {
+  readonly section: SyncPreviewSection;
+  readonly pcd: unknown;
+  readonly arr: unknown;
+  readonly plan: unknown;
+}
+
+/**
+ * Private companion to a generated public preview.
+ *
+ * This type must never be placed on {@link SyncPreviewResult} or returned by a GET/API route.
+ * It exists for preview creation and apply-time revalidation only.
+ */
+export interface SyncPreviewReviewMaterialization {
+  readonly sectionConfigs: Readonly<Partial<Record<SyncPreviewSection, unknown>>>;
+  readonly evidence: readonly SyncPreviewSectionMaterializedEvidence[];
+  readonly preparedExecutionContexts: Readonly<
+    Partial<Record<SyncPreviewSection, SyncPreviewPreparedExecutionContext>>
+  >;
+}
+
+/**
+ * Private, per-section digests. Raw PCD, Arr, and material-plan evidence must never be
+ * retained on this type or added to the public {@link SyncPreviewResult}.
+ */
+export interface SyncPreviewSectionEvidenceHash {
+  readonly section: SyncPreviewSection;
+  readonly pcdHash: string;
+  readonly arrHash: string;
+  readonly planHash: string;
+}
+
+/**
+ * Process-local authorization evidence for a reviewed preview.
+ *
+ * This is deliberately not part of any public API result. The preview store owns it beside
+ * (rather than inside) the public snapshot, so GET serialization cannot expose private hashes
+ * or effective execution configuration accidentally.
+ */
+export interface SyncPreviewReviewBinding {
+  readonly version: 1;
+  readonly instanceId: number;
+  readonly arrType: SyncPreviewArrType;
+  readonly sections: readonly SyncPreviewSection[];
+  readonly sectionConfigs: Readonly<Partial<Record<SyncPreviewSection, unknown>>>;
+  readonly evidence: Readonly<Partial<Record<SyncPreviewSection, SyncPreviewSectionEvidenceHash>>>;
+}
+
+export type ReviewedEvidenceComparison =
+  | { readonly kind: 'match' }
+  | {
+      readonly kind: 'invalidated';
+      readonly reason: SyncPreviewReviewInvalidationReason;
+      readonly changedEvidence: readonly SyncPreviewEvidenceClass[];
+      readonly changedSections: readonly SyncPreviewSection[];
+    };
 
 export interface SyncPreviewResult {
   readonly id: string;

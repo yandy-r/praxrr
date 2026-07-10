@@ -46,8 +46,42 @@ current Arr API state:
 Preview runs per section (quality profiles, delay profiles, etc.). Quality
 profile preview includes custom formats referenced by selected profiles.
 
-Preview does not modify Arr. Use it as a dry-run gate before **Sync now** or
-before enabling aggressive triggers.
+Preview does not modify Arr. Use it as a dry-run gate before **Apply Preview**,
+**Sync now**, or enabling aggressive triggers.
+
+### Apply the reviewed preview
+
+**Apply Preview** authorizes only what you reviewed: the displayed instance and Arr
+family, the eligible sections you selected, their effective configuration, and the
+underlying desired PCD and live Arr evidence. Praxrr keeps the corresponding review
+binding privately in memory for the preview's limited lifetime; it is not durable across
+a restart.
+
+Before anything is written, Praxrr:
+
+1. Claims the preview and all selected sections so another sync cannot take over that
+   reviewed work.
+2. Reloads the exact instance and dispatches explicitly as Radarr, Sonarr, or Lidarr.
+3. Rebuilds the PCD/config evidence, live Arr evidence, and material plan separately for
+   every selected section.
+4. Confirms every selected section still matches the review before allowing the first
+   write.
+
+If any selected evidence changed or cannot be verified, the entire apply stops with
+zero writes. The alert names the affected evidence class and sections, says that nothing
+was applied, and keeps the old diff visible as read-only evidence. Choose **Generate a
+new preview**, review the replacement diff, and apply that new preview instead. An
+invalidated preview cannot be retried.
+
+The entries in a preview are planned changes. After a matched apply begins, confirmed
+outcomes show what Arr actually accepted, skipped, or failed and may link to Sync
+History. Planned changes and confirmed outcomes are deliberately displayed separately;
+a plan is never treated as proof that a remote write happened.
+
+Praxrr validates all selected sections before its first write, but the supported Arr
+APIs do not provide one shared transaction or conditional-write mechanism. A separate
+external Arr editor can still race between Praxrr's final read and write. If you expect
+concurrent edits, coordinate them and generate a fresh preview immediately before Apply.
 
 ## Run a sync
 
@@ -93,9 +127,10 @@ entity editing and sync.
 
 If sync fails because remote Arr state diverged:
 
-1. Check preview errors for the failing section.
+1. Check the reviewed-preview alert or preview errors for the affected evidence and
+   section.
 2. Compare PCD **Changes** with Arr UI state.
-3. Adjust user ops or Arr selections, then preview again.
+3. Adjust user ops or Arr selections, then generate and review a new preview.
 
 Avoid blind force-syncing over manual Arr edits you intend to keep.
 

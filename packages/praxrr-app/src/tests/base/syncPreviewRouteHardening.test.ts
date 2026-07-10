@@ -13,9 +13,11 @@ import type { components } from '$api/v1.d.ts';
 import { arrInstancesQueries, type ArrInstance } from '../../lib/server/db/queries/arrInstances.ts';
 import {
   previewStore,
+  PREVIEW_STATUS_GENERATING,
   PREVIEW_STATUS_READY,
   type SyncPreviewCreateInput,
 } from '../../lib/server/sync/preview/store.ts';
+import { buildSyncPreviewReviewBinding } from '../../lib/server/sync/preview/reviewBinding.ts';
 import {
   PREVIEW_CREATE_RATE_LIMIT_MAX_REQUESTS,
   PREVIEW_MAX_SNAPSHOTS,
@@ -110,7 +112,8 @@ function createDependencies(
 type ErrorResponse = components['schemas']['ErrorResponse'];
 type SyncPreviewApplyResponse = components['schemas']['SyncPreviewApplyResponse'];
 type SyncPreviewApplyErrorResponse = components['schemas']['SyncPreviewApplyErrorResponse'];
-type SyncJobResult = Awaited<ReturnType<SyncPreviewApplyDependencies['executeSyncJob']>>;
+type ReviewedSyncJobResult = Awaited<ReturnType<SyncPreviewApplyDependencies['executeReviewedSyncJob']>>;
+type SyncJobResult = Extract<ReviewedSyncJobResult, { kind: 'executed' }>['result'];
 
 function createArrInstanceFixture(): ArrInstance {
   return {
@@ -171,6 +174,27 @@ function createApplyRequest(previewId: string, body: string = '{}'): Request {
   });
 }
 
+async function createReviewedSnapshot(id: string, createdAtMs: number = Date.now()): Promise<void> {
+  const input = createSnapshotInput(id);
+  previewStore.create({ ...input, status: PREVIEW_STATUS_GENERATING }, createdAtMs);
+  const binding = await buildSyncPreviewReviewBinding({
+    instanceId: input.instanceId,
+    arrType: input.arrType,
+    sections: ['qualityProfiles'],
+    sectionConfigs: { qualityProfiles: { selections: ['Reviewed HD'] } },
+    evidence: [
+      {
+        section: 'qualityProfiles',
+        pcd: { desired: 'reviewed' },
+        arr: { current: 'reviewed' },
+        plan: { action: 'update' },
+      },
+    ],
+  });
+  const { status: _status, ...patch } = input;
+  previewStore.completeGeneration(id, patch, binding, createdAtMs);
+}
+
 function dependenciesReturning(
   result: Partial<SyncJobResult> & Pick<SyncJobResult, 'status'>,
   nowMs: number = Date.now()
@@ -178,20 +202,22 @@ function dependenciesReturning(
   const full: SyncJobResult = { outcomes: [], syncHistoryId: null, ...result };
   return {
     getSectionsInProgress: () => [],
-    executeSyncJob: () => Promise.resolve(full),
+    executeReviewedSyncJob: () => Promise.resolve({ kind: 'executed', result: full }),
     now: () => nowMs,
   };
 }
 
 Deno.test('sync preview apply success body matches the generated response contract', async () => {
   const previewId = `preview-apply-success-${crypto.randomUUID()}`;
-  previewStore.create(createSnapshotInput(previewId), Date.now());
+  await createReviewedSnapshot(previewId);
   let execution:
     | {
         instanceId: number;
         sections: readonly string[];
         source: string | undefined;
         previewId: string | undefined;
+        arrType: string;
+        sectionConfigs: unknown;
       }
     | undefined;
 
@@ -201,24 +227,34 @@ Deno.test('sync preview apply success body matches the generated response contra
       createApplyRequest(previewId, JSON.stringify({ sections: ['qualityProfiles'] })),
       {
         getSectionsInProgress: () => [],
-        executeSyncJob: (instanceId, sections, source, passedPreviewId) => {
-          execution = { instanceId, sections, source, previewId: passedPreviewId };
+        executeReviewedSyncJob: (input) => {
+          execution = {
+            instanceId: input.binding.instanceId,
+            sections: input.sections,
+            source: input.source,
+            previewId: input.previewId,
+            arrType: input.binding.arrType,
+            sectionConfigs: input.binding.sectionConfigs,
+          };
           return Promise.resolve({
-            status: 'success',
-            output: 'Synced 2 entities',
-            outcomes: [
-              {
-                section: 'qualityProfiles',
-                arrType: 'radarr',
-                entityType: 'qualityProfile',
-                name: 'HD-1080p',
-                action: 'create',
-                status: 'success',
-                remoteId: '42',
-                reason: null,
-              },
-            ],
-            syncHistoryId: 555,
+            kind: 'executed',
+            result: {
+              status: 'success',
+              output: 'Synced 2 entities',
+              outcomes: [
+                {
+                  section: 'qualityProfiles',
+                  arrType: 'radarr',
+                  entityType: 'qualityProfile',
+                  name: 'HD-1080p',
+                  action: 'create',
+                  status: 'success',
+                  remoteId: '42',
+                  reason: null,
+                },
+              ],
+              syncHistoryId: 555,
+            },
           });
         },
         now: Date.now,
@@ -254,7 +290,89 @@ Deno.test('sync preview apply success body matches the generated response contra
       sections: ['qualityProfiles'],
       source: 'manual',
       previewId,
+      arrType: 'radarr',
+      sectionConfigs: { qualityProfiles: { selections: ['Reviewed HD'] } },
     });
+  } finally {
+    previewStore.delete(previewId);
+  }
+});
+
+Deno.test('sync preview apply maps every reviewed invalidation and terminally fails the receipt', async () => {
+  const cases = [
+    { reason: 'pcd_drift', evidence: ['pcd'] },
+    { reason: 'arr_drift', evidence: ['arr'] },
+    { reason: 'pcd_and_arr_drift', evidence: ['pcd', 'arr'] },
+    { reason: 'scope_drift', evidence: [] },
+    { reason: 'unverifiable_review', evidence: [] },
+  ] as const;
+
+  for (const testCase of cases) {
+    const previewId = `preview-apply-${testCase.reason}-${crypto.randomUUID()}`;
+    await createReviewedSnapshot(previewId);
+    try {
+      const response = await _handleSyncPreviewApplyRequest(
+        previewId,
+        createApplyRequest(previewId, JSON.stringify({ sections: ['qualityProfiles'] })),
+        {
+          getSectionsInProgress: () => [],
+          executeReviewedSyncJob: () =>
+            Promise.resolve({
+              kind: 'invalidated',
+              reason: testCase.reason,
+              changedEvidence: testCase.evidence,
+              changedSections: ['qualityProfiles'],
+              outcomes: [],
+              syncHistoryId: null,
+            }),
+          now: Date.now,
+        }
+      );
+
+      assertEquals(response.status, 422);
+      const payload = (await response.json()) as components['schemas']['SyncPreviewApplyInvalidatedResponse'];
+      assertEquals(payload.code, testCase.reason);
+      assertEquals(payload.changedEvidence, [...testCase.evidence]);
+      assertEquals(payload.changedSections, ['qualityProfiles']);
+      assertEquals(payload.regenerateRequired, true);
+      assertMatch(payload.error, /Nothing was applied.*Generate and review a new preview/i);
+      assertEquals(previewStore.get(previewId)?.status, 'failed');
+      assertEquals('binding' in payload, false);
+      assertEquals('sectionConfigs' in payload, false);
+    } finally {
+      previewStore.delete(previewId);
+    }
+  }
+});
+
+Deno.test('sync preview apply releases a reviewed DB claim conflict back to ready', async () => {
+  const previewId = `preview-apply-claim-conflict-${crypto.randomUUID()}`;
+  await createReviewedSnapshot(previewId);
+  try {
+    const response = await _handleSyncPreviewApplyRequest(previewId, createApplyRequest(previewId), {
+      getSectionsInProgress: () => [],
+      executeReviewedSyncJob: () => Promise.resolve({ kind: 'claim_conflict', outcomes: [], syncHistoryId: null }),
+      now: Date.now,
+    });
+    assertEquals(response.status, 409);
+    assertEquals(previewStore.get(previewId)?.status, 'ready');
+  } finally {
+    previewStore.delete(previewId);
+  }
+});
+
+Deno.test('sync preview apply sanitizes unexpected execution failures and does not strand applying', async () => {
+  const previewId = `preview-apply-unexpected-${crypto.randomUUID()}`;
+  await createReviewedSnapshot(previewId);
+  try {
+    const response = await _handleSyncPreviewApplyRequest(previewId, createApplyRequest(previewId), {
+      getSectionsInProgress: () => [],
+      executeReviewedSyncJob: () => Promise.reject(new Error('secret upstream response body')),
+      now: Date.now,
+    });
+    assertEquals(response.status, 500);
+    assertTypedFailure((await response.json()).failure, 'unexpected apply failure');
+    assertEquals(previewStore.get(previewId)?.status, 'failed');
   } finally {
     previewStore.delete(previewId);
   }
@@ -262,7 +380,7 @@ Deno.test('sync preview apply success body matches the generated response contra
 
 Deno.test('sync preview apply skipped body matches the generated success contract', async () => {
   const previewId = `preview-apply-skipped-${crypto.randomUUID()}`;
-  previewStore.create(createSnapshotInput(previewId), Date.now());
+  await createReviewedSnapshot(previewId);
 
   try {
     const response = await _handleSyncPreviewApplyRequest(
@@ -290,7 +408,7 @@ Deno.test('sync preview apply skipped body matches the generated success contrac
 
 Deno.test('sync preview apply failed body matches the generated coarse result contract', async () => {
   const previewId = `preview-apply-job-failed-${crypto.randomUUID()}`;
-  previewStore.create(createSnapshotInput(previewId), Date.now());
+  await createReviewedSnapshot(previewId);
 
   try {
     const response = await _handleSyncPreviewApplyRequest(
@@ -358,7 +476,7 @@ Deno.test('sync preview apply failed body matches the generated coarse result co
 Deno.test('sync preview apply includes the stale warning in the generated response shape', async () => {
   const previewId = `preview-apply-stale-warning-${crypto.randomUUID()}`;
   const createdAtMs = Date.now();
-  previewStore.create(createSnapshotInput(previewId), createdAtMs);
+  await createReviewedSnapshot(previewId, createdAtMs);
 
   try {
     const response = await _handleSyncPreviewApplyRequest(
@@ -385,9 +503,12 @@ Deno.test('sync preview apply stale-blocked body matches the generated error con
   try {
     const response = await _handleSyncPreviewApplyRequest(previewId, createApplyRequest(previewId), {
       getSectionsInProgress: () => [],
-      executeSyncJob: () => {
+      executeReviewedSyncJob: () => {
         executionCount++;
-        return Promise.resolve({ status: 'success', outcomes: [], syncHistoryId: null });
+        return Promise.resolve({
+          kind: 'executed',
+          result: { status: 'success', outcomes: [], syncHistoryId: null },
+        });
       },
       now: () => createdAtMs + 31 * 60 * 1000,
     });
@@ -692,7 +813,23 @@ Deno.test('sync preview create preserves successful-section evidence on partial 
     metadataProfiles: null,
     summary: { totalCreates: 1, totalUpdates: 0, totalDeletes: 0, totalUnchanged: 0 },
   };
-  const deps = createDependencies(() => Promise.resolve(partial));
+  const deps = createDependencies(() =>
+    Promise.resolve({
+      preview: partial,
+      reviewContext: {
+        sectionConfigs: {},
+        evidence: [
+          {
+            section: 'qualityProfiles',
+            pcd: { desired: 'reviewed' },
+            arr: { current: 'reviewed' },
+            plan: { action: 'create' },
+          },
+        ],
+        preparedExecutionContexts: {},
+      },
+    })
+  );
 
   const response = await _handleSyncPreviewCreateRequest(createPreviewCreateRequest(), deps);
 
@@ -719,7 +856,7 @@ Deno.test('sync preview create preserves successful-section evidence on partial 
 
 Deno.test('sync preview apply redacts a secret-shaped job-failure error', async () => {
   const previewId = `preview-apply-redact-secret-job-${crypto.randomUUID()}`;
-  previewStore.create(createSnapshotInput(previewId), Date.now());
+  await createReviewedSnapshot(previewId);
 
   try {
     const response = await _handleSyncPreviewApplyRequest(
@@ -740,7 +877,7 @@ Deno.test('sync preview apply redacts a secret-shaped job-failure error', async 
 
 Deno.test('sync preview apply redacts an arbitrary free-form job-failure error', async () => {
   const previewId = `preview-apply-redact-freeform-job-${crypto.randomUUID()}`;
-  previewStore.create(createSnapshotInput(previewId), Date.now());
+  await createReviewedSnapshot(previewId);
 
   try {
     const response = await _handleSyncPreviewApplyRequest(
@@ -761,7 +898,7 @@ Deno.test('sync preview apply redacts an arbitrary free-form job-failure error',
 
 Deno.test('sync preview apply redacts a secret-shaped thrown exception', async () => {
   const previewId = `preview-apply-redact-secret-throw-${crypto.randomUUID()}`;
-  previewStore.create(createSnapshotInput(previewId), Date.now());
+  await createReviewedSnapshot(previewId);
 
   try {
     const response = await _handleSyncPreviewApplyRequest(
@@ -769,7 +906,7 @@ Deno.test('sync preview apply redacts a secret-shaped thrown exception', async (
       createApplyRequest(previewId, JSON.stringify({ sections: ['qualityProfiles'] })),
       {
         getSectionsInProgress: () => [],
-        executeSyncJob: () => Promise.reject(new Error(SECRET_MIX)),
+        executeReviewedSyncJob: () => Promise.reject(new Error(SECRET_MIX)),
         now: Date.now,
       }
     );
@@ -786,7 +923,7 @@ Deno.test('sync preview apply redacts a secret-shaped thrown exception', async (
 
 Deno.test('sync preview apply redacts an arbitrary free-form thrown exception', async () => {
   const previewId = `preview-apply-redact-freeform-throw-${crypto.randomUUID()}`;
-  previewStore.create(createSnapshotInput(previewId), Date.now());
+  await createReviewedSnapshot(previewId);
 
   try {
     const response = await _handleSyncPreviewApplyRequest(
@@ -794,7 +931,7 @@ Deno.test('sync preview apply redacts an arbitrary free-form thrown exception', 
       createApplyRequest(previewId, JSON.stringify({ sections: ['qualityProfiles'] })),
       {
         getSectionsInProgress: () => [],
-        executeSyncJob: () => Promise.reject(new Error(FREE_FORM)),
+        executeReviewedSyncJob: () => Promise.reject(new Error(FREE_FORM)),
         now: Date.now,
       }
     );

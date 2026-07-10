@@ -22,7 +22,7 @@ import type { ArrInstance } from '$db/queries/arrInstances.ts';
 import { findNamespaceMatch } from '$sync/namespace.ts';
 import { isSyncSectionSupported, type SyncArrType } from '$sync/mappings.ts';
 import { generatePreview } from '$sync/preview/orchestrator.ts';
-import type { GeneratePreviewResult } from '$sync/preview/orchestrator.ts';
+import type { GeneratePreviewInput, GeneratePreviewResult } from '$sync/preview/orchestrator.ts';
 import type { EntityChange, SyncPreviewFailureCode, SyncPreviewSectionResult } from '$sync/preview/types.ts';
 import type { SectionType } from '$sync/types.ts';
 import type { ResolvedEntityType } from './types.ts';
@@ -65,7 +65,7 @@ export type LiveDiffResult =
  * `deps.generatePreview`.
  */
 export interface LiveDiffDeps {
-  readonly generatePreview: typeof generatePreview;
+  readonly generatePreview: (input: GeneratePreviewInput) => Promise<GeneratePreviewResult>;
 }
 
 const defaultDeps: LiveDiffDeps = { generatePreview };
@@ -137,7 +137,6 @@ function mapErrorToLiveDiffReason(error: unknown): LiveDiffReason {
   return 'unreachable';
 }
 
-/** Same mapping, applied to a section-outcome error string (already extracted from an Error). */
 /**
  * Map a preview section's typed failure code to a closed LiveDiffReason. Direct code mapping
  * (no substring parsing) now that section outcomes carry a typed, redacted failure.
@@ -310,7 +309,7 @@ export async function computeLiveDiff(input: ComputeLiveDiffInput): Promise<Live
       return { found: false, reason: reasonForFailedSection(outcome.failure.code) };
     }
 
-    // `skipped === true` (no `error`, no `result`) means the section has no sync
+    // `skipped === true` (no `failure`, no `result`) means the section has no sync
     // configuration on this instance at all -- not a fetch/parse failure. Reporting
     // this as a generic 'error' is misleading (routes turn 'error' into a 500); it is
     // a normal, expected outcome for an instance that has never configured this section.

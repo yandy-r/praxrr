@@ -3,9 +3,15 @@ import type { RequestHandler } from '@sveltejs/kit';
 import { arrInstancesQueries } from '$db/queries/arrInstances.ts';
 import { logger } from '$logger/logger.ts';
 import { previewStore } from '$sync/preview/store.ts';
-import { PREVIEW_STATUS_FAILED, PREVIEW_STATUS_GENERATING, PREVIEW_STATUS_READY } from '$sync/preview/store.ts';
-import { generatePreview } from '$sync/preview/orchestrator.ts';
+import { PREVIEW_STATUS_FAILED, PREVIEW_STATUS_GENERATING } from '$sync/preview/store.ts';
+import {
+  generatePreview,
+  type GeneratePreviewInput,
+  type GeneratePreviewReviewOptions,
+  type GeneratePreviewWithReviewContextResult,
+} from '$sync/preview/orchestrator.ts';
 import { buildPreviewFailure, classifyPreviewFailure } from '$sync/preview/failureReason.ts';
+import { buildSyncPreviewReviewBinding } from '$sync/preview/reviewBinding.ts';
 import { SYNC_SECTION_ORDER } from '$sync/mappings.ts';
 import {
   PREVIEW_CREATE_RATE_LIMIT_MAX_REQUESTS,
@@ -47,7 +53,10 @@ type CreatePreviewResult = {
  * reassign `arrInstancesQueries.getById` keep working.
  */
 export interface SyncPreviewCreateDependencies {
-  readonly generatePreview: typeof generatePreview;
+  readonly generatePreview: (
+    input: GeneratePreviewInput,
+    options: GeneratePreviewReviewOptions
+  ) => Promise<GeneratePreviewWithReviewContextResult>;
   readonly getInstanceById: typeof arrInstancesQueries.getById;
   readonly now: () => number;
 }
@@ -299,12 +308,15 @@ export async function _handleSyncPreviewCreateRequest(
   const requestedSections = requestPayload.sections?.length ? requestPayload.sections : undefined;
 
   try {
-    const generated = await dependencies.generatePreview({
-      instance,
-      sections: requestedSections,
-      sectionConfigs: requestPayload.sectionConfigs,
-      nowMs,
-    });
+    const { preview: generated, reviewContext } = await dependencies.generatePreview(
+      {
+        instance,
+        sections: requestedSections,
+        sectionConfigs: requestPayload.sectionConfigs,
+        nowMs,
+      },
+      { captureReviewContext: true }
+    );
 
     // Preserve successful-section evidence: a partial generation stays `ready` (successful
     // sections keep their diffs) but carries a typed top-level `sectionErrors` reason so apply
@@ -312,18 +324,34 @@ export async function _handleSyncPreviewCreateRequest(
     const hasFailedSection = generated.sectionOutcomes.some((outcome) => outcome.failure !== null);
     const topLevelFailure = hasFailedSection ? buildPreviewFailure('sectionErrors', requestPayload.arrType) : null;
 
-    storedPreview = previewStore.updateResult(storedPreview.id, {
-      status: PREVIEW_STATUS_READY,
-      sections: generated.sections,
-      sectionOutcomes: generated.sectionOutcomes,
-      qualityProfiles: generated.qualityProfiles,
-      delayProfiles: generated.delayProfiles,
-      mediaManagement: generated.mediaManagement,
-      metadataProfiles: generated.metadataProfiles,
-      summary: generated.summary,
-      failure: topLevelFailure,
-      instanceName: generated.instanceName,
-    })!;
+    const eligibleSections = generated.sections.filter((section) =>
+      generated.sectionOutcomes.some(
+        (outcome) => outcome.section === section && outcome.failure === null && !outcome.skipped
+      )
+    );
+    const binding = await buildSyncPreviewReviewBinding({
+      instanceId: generated.instanceId,
+      arrType: generated.arrType,
+      sections: eligibleSections,
+      sectionConfigs: reviewContext.sectionConfigs,
+      evidence: reviewContext.evidence,
+    });
+
+    storedPreview = previewStore.completeGeneration(
+      storedPreview.id,
+      {
+        sections: generated.sections,
+        sectionOutcomes: generated.sectionOutcomes,
+        qualityProfiles: generated.qualityProfiles,
+        delayProfiles: generated.delayProfiles,
+        mediaManagement: generated.mediaManagement,
+        metadataProfiles: generated.metadataProfiles,
+        summary: generated.summary,
+        failure: topLevelFailure,
+        instanceName: generated.instanceName,
+      },
+      binding
+    )!;
 
     if (!storedPreview) {
       return json({ error: 'Failed to persist preview result' } satisfies ErrorResponse, { status: 500 });

@@ -426,7 +426,10 @@ export interface paths {
      *
      *     This endpoint performs no writes. It only reads from PCD and Arr GET
      *     endpoints to compare desired versus current state, then stores a preview
-     *     snapshot for later retrieval or application.
+     *     snapshot for later retrieval or application. Optional transient
+     *     `sectionConfigs` are treated as bound reviewed execution state: their
+     *     normalized effective values are retained privately with the expiring
+     *     preview and reused during reviewed apply.
      *
      *     If no `sections` are provided, all configured sections for the instance are
      *     included.
@@ -485,9 +488,15 @@ export interface paths {
      * @description Applies the selected sections from a previously generated preview to the
      *     target Arr instance.
      *
-     *     Preview generation itself is read-only. Apply runs the normal sync job path
-     *     afresh for the selected sections using the current saved sync configuration;
-     *     it does not replay stored per-entity mutations from the preview snapshot.
+     *     Preview generation itself is read-only. Apply atomically claims the preview
+     *     and selected section rows, then revalidates the exact reviewed instance, Arr
+     *     family, section subset, effective configuration, desired PCD evidence, live
+     *     Arr evidence, and material plan. Every selected section must match before
+     *     any Arr write, confirmed outcome, or Sync History row is created.
+     *
+     *     A matching review executes through the existing section writers with the
+     *     bound effective configuration. Private fingerprints, retained configuration,
+     *     and raw comparison evidence are never returned by this endpoint.
      *
      *     The response reports only the aggregate job/run result. Preview entity changes
      *     remain planned evidence and are not per-entity confirmation of what succeeded.
@@ -2343,10 +2352,115 @@ export interface components {
       instanceId: number;
       /** @description Optional section filters for preview generation */
       sections?: components['schemas']['SyncPreviewSection'][];
+      sectionConfigs?: components['schemas']['SyncPreviewSectionConfigs'];
+    };
+    /**
+     * @description Optional transient configuration overrides used to materialize the selected
+     *     preview sections. These values are bound as reviewed execution state: apply
+     *     revalidates and executes with the same effective configuration instead of
+     *     silently falling back to newly saved configuration. The server retains the
+     *     normalized values only in the private, expiring preview envelope; they are
+     *     never included in preview or apply responses.
+     */
+    SyncPreviewSectionConfigs: {
+      /** @description Effective quality-profile section configuration to review and bind. */
+      qualityProfiles?: unknown;
+      /** @description Effective delay-profile section configuration to review and bind. */
+      delayProfiles?: unknown;
+      /** @description Effective media-management section configuration to review and bind. */
+      mediaManagement?: unknown;
+      /** @description Effective metadata-profile section configuration to review and bind. */
+      metadataProfiles?: unknown;
     };
     SyncPreviewApplyRequest: {
       /** @description Optional section filters for preview application */
       sections?: components['schemas']['SyncPreviewSection'][];
+    };
+    /**
+     * @description Terminal status returned by the sync job execution.
+     * @enum {string}
+     */
+    SyncPreviewApplyJobStatus: 'success' | 'failure' | 'skipped' | 'cancelled';
+    SyncPreviewApplyJobResult: {
+      status: components['schemas']['SyncPreviewApplyJobStatus'];
+      /** @description Aggregate human-readable output from the sync job. */
+      output: string;
+      /**
+       * @description Typed, safe failure reason when the sync run did not succeed; omitted or null
+       *     otherwise. Replaces the former free-form `error` string — the raw job error is
+       *     never transported and remains only in sanitized logs and per-entity outcomes.
+       */
+      failure?: components['schemas']['SyncPreviewFailureReason'] | null;
+    };
+    /**
+     * @description Result of executing the preview's selected sections through the normal sync job
+     *     path. `results` describes the aggregate job/run outcome; `outcomes` carries the
+     *     confirmed, per-entity terminal results captured from the ACTUAL Arr writes
+     *     (issue #232) — these, not the planned preview changes, are execution proof.
+     */
+    SyncPreviewApplyResponse: {
+      /** @description True when the sync job succeeded or reported that no work was needed. */
+      success: boolean;
+      results: components['schemas']['SyncPreviewApplyJobResult'];
+      /** @description Preview-age warning returned when the reviewed snapshot is stale, or null. */
+      staleWarning: string | null;
+      /**
+       * @description Confirmed per-entity outcomes captured from the actual Arr writes. Present on
+       *     both success and partial/failure responses so failed and skipped outcomes are
+       *     never dropped.
+       */
+      outcomes: components['schemas']['SyncEntityOutcome'][];
+      /** @description Durable Sync History id exposing these outcomes, or null when recording is disabled. */
+      syncHistoryId: number | null;
+    };
+    /**
+     * @description Closed reason for rejecting reviewed execution before any write:
+     *     - `pcd_drift`: desired PCD, source, mapping, or reviewed configuration changed
+     *     - `arr_drift`: material live Arr state changed
+     *     - `pcd_and_arr_drift`: both PCD-side and live Arr evidence changed
+     *     - `scope_drift`: the instance, Arr family, capability, or reviewed scope changed
+     *     - `unverifiable_review`: authoritative evidence could not be read or compared safely
+     * @enum {string}
+     */
+    SyncPreviewApplyInvalidationCode:
+      'pcd_drift' | 'arr_drift' | 'pcd_and_arr_drift' | 'scope_drift' | 'unverifiable_review';
+    /**
+     * @description Public evidence class that changed; private fingerprints and raw evidence are never returned.
+     * @enum {string}
+     */
+    SyncPreviewChangedEvidence: 'pcd' | 'arr';
+    /**
+     * @description Safe pre-write rejection when the selected reviewed plan is no longer
+     *     verifiable. No Arr write was attempted, so this response never contains
+     *     confirmed outcomes, Sync History identifiers, private fingerprints,
+     *     retained configuration, or raw PCD/Arr evidence.
+     */
+    SyncPreviewApplyInvalidatedResponse: {
+      /**
+       * @description Sanitized recovery text stating that nothing was applied and directing
+       *     the operator to generate and review a new preview.
+       */
+      error: string;
+      code: components['schemas']['SyncPreviewApplyInvalidationCode'];
+      /**
+       * @description Bounded changed source classes. Empty for scope or unverifiable failures
+       *     when PCD-side or Arr-side drift cannot be attributed safely.
+       */
+      changedEvidence: components['schemas']['SyncPreviewChangedEvidence'][];
+      /** @description Exact selected sections whose reviewed execution was invalidated. */
+      changedSections: components['schemas']['SyncPreviewSection'][];
+      /**
+       * @description Always true because an invalidated review cannot be retried.
+       * @constant
+       */
+      regenerateRequired: true;
+      /** @description Preview-age warning when relevant to the rejection, or null. */
+      staleWarning: string | null;
+    };
+    SyncPreviewApplyErrorResponse: {
+      failure: components['schemas']['SyncPreviewFailureReason'];
+      /** @description Preview-age warning when relevant to the failure, or null. */
+      staleWarning: string | null;
     };
     /**
      * @description Preview lifecycle state:
@@ -4765,48 +4879,6 @@ export interface components {
       reason: string;
     };
     /**
-     * @description Terminal status returned by the sync job execution.
-     * @enum {string}
-     */
-    SyncPreviewApplyJobStatus: 'success' | 'failure' | 'skipped' | 'cancelled';
-    SyncPreviewApplyJobResult: {
-      status: components['schemas']['SyncPreviewApplyJobStatus'];
-      /** @description Aggregate human-readable output from the sync job. */
-      output: string;
-      /**
-       * @description Typed, safe failure reason when the sync run did not succeed; omitted or null
-       *     otherwise. Replaces the former free-form `error` string — the raw job error is
-       *     never transported and remains only in sanitized logs and per-entity outcomes.
-       */
-      failure?: components['schemas']['SyncPreviewFailureReason'] | null;
-    };
-    /**
-     * @description Result of executing the preview's selected sections through the normal sync job
-     *     path. `results` describes the aggregate job/run outcome; `outcomes` carries the
-     *     confirmed, per-entity terminal results captured from the ACTUAL Arr writes
-     *     (issue #232) — these, not the planned preview changes, are execution proof.
-     */
-    SyncPreviewApplyResponse: {
-      /** @description True when the sync job succeeded or reported that no work was needed. */
-      success: boolean;
-      results: components['schemas']['SyncPreviewApplyJobResult'];
-      /** @description Preview-age warning returned when the reviewed snapshot is stale, or null. */
-      staleWarning: string | null;
-      /**
-       * @description Confirmed per-entity outcomes captured from the actual Arr writes. Present on
-       *     both success and partial/failure responses so failed and skipped outcomes are
-       *     never dropped.
-       */
-      outcomes: components['schemas']['SyncEntityOutcome'][];
-      /** @description Durable Sync History id exposing these outcomes, or null when recording is disabled. */
-      syncHistoryId: number | null;
-    };
-    SyncPreviewApplyErrorResponse: {
-      failure: components['schemas']['SyncPreviewFailureReason'];
-      /** @description Preview-age warning when relevant to the failure, or null. */
-      staleWarning: string | null;
-    };
-    /**
      * @description Optional metadata for hybrid JSON/YAML migration envelopes.
      *     Existing payloads are backward-compatible when omitted.
      */
@@ -6112,7 +6184,7 @@ export interface operations {
           'application/json': components['schemas']['ErrorResponse'];
         };
       };
-      /** @description Preview not found or expired */
+      /** @description Preview is missing, evicted, or no longer retained */
       404: {
         headers: {
           [name: string]: unknown;
@@ -6121,7 +6193,7 @@ export interface operations {
           'application/json': components['schemas']['ErrorResponse'];
         };
       };
-      /** @description Preview is not in a ready state, contains failed sections, or instance is syncing */
+      /** @description Preview lifecycle conflict or a selected section has an active claim */
       409: {
         headers: {
           [name: string]: unknown;
@@ -6130,23 +6202,31 @@ export interface operations {
           'application/json': components['schemas']['ErrorResponse'];
         };
       };
-      /** @description Preview is stale beyond apply threshold */
+      /** @description Preview age policy blocked apply or reviewed evidence was invalidated before writes */
       422: {
         headers: {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['SyncPreviewApplyErrorResponse'];
+          'application/json':
+            | components['schemas']['SyncPreviewApplyInvalidatedResponse']
+            | components['schemas']['SyncPreviewApplyErrorResponse'];
         };
       };
-      /** @description Sync job reported failure or preview apply raised an unexpected error */
+      /**
+       * @description The reviewed evidence matched but the write-time sync job failed, or an
+       *     unexpected internal failure occurred. A matched write-time failure uses
+       *     `SyncPreviewApplyResponse` and preserves confirmed outcomes and Sync
+       *     History correlation when present. An unexpected failure uses only the
+       *     sanitized generic error response.
+       */
       500: {
         headers: {
           [name: string]: unknown;
         };
         content: {
           'application/json':
-            components['schemas']['SyncPreviewApplyResponse'] | components['schemas']['SyncPreviewApplyErrorResponse'];
+            components['schemas']['SyncPreviewApplyResponse'] | components['schemas']['ErrorResponse'];
         };
       };
     };

@@ -845,8 +845,24 @@ components:
     # Sync - Preview
     SyncPreviewCreateRequest:
       $ref: './schemas/sync.yaml#/SyncPreviewCreateRequest'
+    SyncPreviewSectionConfigs:
+      $ref: './schemas/sync.yaml#/SyncPreviewSectionConfigs'
     SyncPreviewApplyRequest:
       $ref: './schemas/sync.yaml#/SyncPreviewApplyRequest'
+    SyncPreviewApplyJobStatus:
+      $ref: './schemas/sync.yaml#/SyncPreviewApplyJobStatus'
+    SyncPreviewApplyJobResult:
+      $ref: './schemas/sync.yaml#/SyncPreviewApplyJobResult'
+    SyncPreviewApplyResponse:
+      $ref: './schemas/sync.yaml#/SyncPreviewApplyResponse'
+    SyncPreviewApplyInvalidationCode:
+      $ref: './schemas/sync.yaml#/SyncPreviewApplyInvalidationCode'
+    SyncPreviewChangedEvidence:
+      $ref: './schemas/sync.yaml#/SyncPreviewChangedEvidence'
+    SyncPreviewApplyInvalidatedResponse:
+      $ref: './schemas/sync.yaml#/SyncPreviewApplyInvalidatedResponse'
+    SyncPreviewApplyErrorResponse:
+      $ref: './schemas/sync.yaml#/SyncPreviewApplyErrorResponse'
     SyncPreviewStatus:
       $ref: './schemas/sync.yaml#/SyncPreviewStatus'
     SyncPreviewSection:

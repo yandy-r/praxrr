@@ -1,3 +1,23 @@
+<script context="module" lang="ts">
+  const MAX_REMEMBERED_PREVIEW_REQUESTS = 20;
+  const previewRequestBodies = new Map<string, string>();
+
+  export function rememberSyncPreviewRequest(previewId: string, requestBody: string): void {
+    previewRequestBodies.delete(previewId);
+    previewRequestBodies.set(previewId, requestBody);
+
+    while (previewRequestBodies.size > MAX_REMEMBERED_PREVIEW_REQUESTS) {
+      const oldestPreviewId = previewRequestBodies.keys().next().value;
+      if (typeof oldestPreviewId !== 'string') break;
+      previewRequestBodies.delete(oldestPreviewId);
+    }
+  }
+
+  export function getRememberedSyncPreviewRequest(previewId: string): string | null {
+    return previewRequestBodies.get(previewId) ?? null;
+  }
+</script>
+
 <script lang="ts">
   import { page } from '$app/stores';
   import { Eye, Loader2 } from 'lucide-svelte';
@@ -128,6 +148,8 @@
         : 'No preview loaded.';
 
   async function handleCreatePreview() {
+    if (generating) return;
+
     if (!instanceId) {
       localError = 'Unable to generate preview: missing instance id.';
       return;
@@ -138,14 +160,16 @@
     hasPreview = false;
 
     try {
+      const sectionConfigs = buildSectionConfigs();
+      const requestBody = JSON.stringify({
+        instanceId,
+        ...(sections.length > 0 ? { sections } : {}),
+        ...(sectionConfigs ? { sectionConfigs } : {}),
+      });
       const response = await fetch('/api/v1/sync/preview', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          instanceId,
-          ...(sections.length > 0 ? { sections } : {}),
-          ...(buildSectionConfigs() ? { sectionConfigs: buildSectionConfigs() } : {}),
-        }),
+        body: requestBody,
       });
 
       const payload = (await response.json().catch(() => null)) as SyncPreviewCreateResponse | null;
@@ -159,6 +183,7 @@
       const nextSummary = parseSummary(payload.summary);
       currentSummary = nextSummary ?? EMPTY_PREVIEW_SUMMARY;
       hasPreview = true;
+      rememberSyncPreviewRequest(payload.id, requestBody);
       dispatch('previewGenerated', { id: payload.id, summary: nextSummary ?? undefined });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to generate preview.';

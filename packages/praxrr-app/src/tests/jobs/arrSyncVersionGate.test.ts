@@ -3,13 +3,16 @@ import { config } from '$config';
 import { db } from '$db/db.ts';
 import { runMigrations } from '$db/migrations.ts';
 import { arrInstancesQueries, type ArrInstance } from '$db/queries/arrInstances.ts';
-import { arrSyncQueries } from '$db/queries/arrSync.ts';
+import { arrSyncQueries, type ReviewedSyncClaim } from '$db/queries/arrSync.ts';
+import { executeReviewedSyncJob, type ReviewedSyncExecutionDependencies } from '$jobs/handlers/arrSync.ts';
 import { jobQueueRegistry } from '$jobs/queueRegistry.ts';
 import type { JobQueueRecord, JobSource } from '$jobs/queueTypes.ts';
 import { getSection } from '$lib/server/sync/registry.ts';
 import { resolveSyncSectionAvailability } from '$lib/server/sync/mappings.ts';
+import { buildSyncPreviewReviewBinding } from '$lib/server/sync/preview/reviewBinding.ts';
 import type { BaseSyncer, SectionType } from '$lib/server/sync/types.ts';
 import { BaseArrClient } from '$arr/base.ts';
+import { resolveArrCompatibility } from '$shared/arr/compatibility.ts';
 
 // Registers arrSyncHandler ('arr.sync') plus every section handler.
 import '$jobs/handlers/arrSync.ts';
@@ -272,4 +275,164 @@ Deno.test('resolveSyncSectionAvailability: gates sections across versions x tier
   const radarrMetadata = resolveSyncSectionAvailability('radarr', 'metadataProfiles', '5.14.0.9383');
   assertEquals(radarrMetadata.status, 'unavailable');
   assertEquals(radarrMetadata.reason, 'base_unsupported');
+});
+
+function reviewedRadarrTarget(overrides: Partial<ArrInstance> = {}): ArrInstance {
+  return {
+    id: 234,
+    name: 'Reviewed Radarr',
+    type: 'radarr',
+    url: 'http://127.0.0.1:7878',
+    external_url: null,
+    api_key_fingerprint: null,
+    api_key: 'reviewed-key',
+    tags: null,
+    enabled: 1,
+    source: 'ui',
+    detected_version: '5.14.0.9383',
+    detected_at: '2026-07-10T11:00:00.000Z',
+    created_at: '2026-07-10T10:00:00.000Z',
+    updated_at: '2026-07-10T10:00:00.000Z',
+    ...overrides,
+  };
+}
+
+async function reviewedQualityProfileBinding() {
+  return await buildSyncPreviewReviewBinding({
+    instanceId: 234,
+    arrType: 'radarr',
+    sections: ['qualityProfiles'],
+    sectionConfigs: { qualityProfiles: { selections: ['Reviewed HD'] } },
+    evidence: [
+      {
+        section: 'qualityProfiles',
+        pcd: { desired: 'Reviewed HD' },
+        arr: { remoteId: 7 },
+        plan: { action: 'update' },
+      },
+    ],
+  });
+}
+
+Deno.test('reviewed executor rejects target Arr-family drift before claims or mutation', async () => {
+  const binding = await reviewedQualityProfileBinding();
+  const calls = { claims: 0, clients: 0, materializations: 0, histories: 0 };
+  const dependencies = {
+    getInstance: () => reviewedRadarrTarget({ type: 'sonarr' }),
+    getClient: () => {
+      calls.clients += 1;
+      return Promise.reject(new Error('scope drift must not create a client'));
+    },
+    claimSections: () => {
+      calls.claims += 1;
+      return null;
+    },
+    materializeReview: () => {
+      calls.materializations += 1;
+      return Promise.reject(new Error('scope drift must not materialize reviewed evidence'));
+    },
+    recordHistory: () => {
+      calls.histories += 1;
+      return 1;
+    },
+  } satisfies Partial<ReviewedSyncExecutionDependencies>;
+
+  const result = await executeReviewedSyncJob({
+    binding,
+    sections: ['qualityProfiles'],
+    previewId: 'preview-target-drift',
+    expiresAt: '2026-07-10T12:01:00.000Z',
+    dependencies,
+  });
+
+  assertEquals(result, {
+    kind: 'invalidated',
+    reason: 'scope_drift',
+    changedEvidence: [],
+    changedSections: ['qualityProfiles'],
+    outcomes: [],
+    syncHistoryId: null,
+  });
+  assertEquals(calls, { claims: 0, clients: 0, materializations: 0, histories: 0 });
+});
+
+Deno.test('reviewed executor rejects version capability drift before materialization or mutation', async () => {
+  const binding = await reviewedQualityProfileBinding();
+  const target = reviewedRadarrTarget();
+  const claim = Object.freeze({
+    instanceId: target.id,
+    sections: Object.freeze(['qualityProfiles'] as const),
+  }) as ReviewedSyncClaim;
+  const calls = {
+    claims: 0,
+    closes: 0,
+    failedClaims: 0,
+    materializations: 0,
+    snapshots: 0,
+    captures: 0,
+    handlers: 0,
+    histories: 0,
+  };
+  const client = { close: () => (calls.closes += 1) } as unknown as BaseArrClient;
+  const dependencies = {
+    now: () => Date.parse('2026-07-10T12:00:00.000Z'),
+    getInstance: () => target,
+    getClient: () => Promise.resolve(client),
+    detectVersion: () => Promise.resolve(resolveArrCompatibility('radarr', '3.2.2.0')),
+    claimSections: () => {
+      calls.claims += 1;
+      return claim;
+    },
+    failSections: () => {
+      calls.failedClaims += 1;
+      return true;
+    },
+    materializeReview: () => {
+      calls.materializations += 1;
+      return Promise.reject(new Error('capability drift must not materialize reviewed evidence'));
+    },
+    createSnapshot: () => {
+      calls.snapshots += 1;
+      return Promise.resolve(null);
+    },
+    captureChanges: () => {
+      calls.captures += 1;
+      return Promise.resolve([]);
+    },
+    getSectionHandler: () => {
+      calls.handlers += 1;
+      throw new Error('capability drift must not reach a writer');
+    },
+    recordHistory: () => {
+      calls.histories += 1;
+      return 1;
+    },
+  } satisfies Partial<ReviewedSyncExecutionDependencies>;
+
+  const result = await executeReviewedSyncJob({
+    binding,
+    sections: ['qualityProfiles'],
+    previewId: 'preview-version-drift',
+    expiresAt: '2026-07-10T12:01:00.000Z',
+    dependencies,
+  });
+
+  assertEquals(result, {
+    kind: 'invalidated',
+    reason: 'scope_drift',
+    changedEvidence: [],
+    changedSections: ['qualityProfiles'],
+    outcomes: [],
+    syncHistoryId: null,
+  });
+  assertEquals(calls, {
+    claims: 1,
+    closes: 1,
+    failedClaims: 1,
+    materializations: 0,
+    snapshots: 0,
+    captures: 0,
+    handlers: 0,
+    histories: 0,
+  });
 });
