@@ -326,17 +326,82 @@ const compatibility: Criterion = {
   },
 };
 
-// --- trash_alignment (Phase-1 stub) -----------------------------------------------------------
+// --- trash_alignment --------------------------------------------------------------------------
+
+/** Cap the number of named missing custom formats surfaced in a single suggestion. */
+const TRASH_MISSING_SAMPLE = 5;
 
 /**
- * Registered so the criteria set is complete and stable, but disabled by default and always
- * returns `null` (excluded from the rollup) until a curated TRaSH recommended set feeds it.
+ * `trash_alignment` (issue #225): the versioned, per-Arr TRaSH-alignment evidence policy. Evidence-rule
+ * changes are versioned by {@link CONFIG_HEALTH_ENGINE_VERSION} (bumped `1 -> 2` for this criterion),
+ * which is stamped onto every report/snapshot so a client can detect a different engine generation.
+ *
+ * Evidence model — INSTANCE scope only, mirroring {@link drift}:
+ *  - Reference set R = the instance's OWN opted-in TRaSH `customFormats` selections
+ *    (`inputs.trashRecommendedCfNames` — local app-DB read, arr-matched, NO remote fetch, distinct).
+ *  - assignedUnion = custom formats with a non-null arr-effective score across the instance's READABLE
+ *    synced profiles.
+ *  - alignment = |R ∩ assignedUnion| / |R|, matched case-insensitively.
+ *
+ * `assignedUnion` reuses the SAME `p.cfScores` arr-effective-or-`'all'` fold that completeness and
+ * coherence already consume. This is an INTENTIONAL parity reuse — NOT the `'all'` fold that
+ * {@link ProfileFacts.compatible} forbids; compatibility deliberately uses a different (enabled-quality
+ * mapping) signal for a different reason (a hard capability gate, not effective CF assignment).
+ *
+ * null-skip (unmeasurable => null, NEVER 0): profile scope; `R === null` (lidarr, no opted-in CF
+ * selections, or a DB read error); `R.length === 0` (defense-in-depth divide-by-zero guard); and NO
+ * READABLE profile — every profile degraded by an unbuilt cache or a failed scoring read carries
+ * `thresholds === null`, so a transient read failure SKIPS rather than fabricating a judgmental 0. A
+ * non-null, NON-EMPTY R with nothing assigned across READABLE profiles is a REAL, honest 0 — the user
+ * explicitly opted into TRaSH custom formats and assigned none (measurable and actionable, not a
+ * verdict on non-TRaSH use).
  */
 const trashAlignment: Criterion = {
   id: 'trash_alignment',
   label: 'TRaSH Alignment',
-  score(_inputs, _scope, config) {
-    return result('trash_alignment', 'TRaSH Alignment', null, config, [], []);
+  score(inputs, scope, config) {
+    const r = inputs.trashRecommendedCfNames;
+    // Instance-only, and skip when the reference set is unmeasurable. `r.length === 0` is treated as
+    // null so the division below can never be 100 * aligned / 0 = NaN even if a constructor set `[]`.
+    if (scope.kind === 'profile' || r === null || r.length === 0) {
+      return result('trash_alignment', 'TRaSH Alignment', null, config, [], []);
+    }
+
+    // Skip when the ASSIGNMENT surface is unmeasurable: a degraded/unbuilt-cache profile carries
+    // `thresholds === null` (its scoring row could not be read), so scoring an empty union would
+    // fabricate a judgmental 0. Mirror the completeness/coherence/compatibility null-skip.
+    const readable = inputs.profiles.filter((p) => p.thresholds !== null);
+    if (readable.length === 0) {
+      return result('trash_alignment', 'TRaSH Alignment', null, config, [], []);
+    }
+
+    const assignedUnion = new Set<string>();
+    for (const p of readable) {
+      for (const cf of p.cfScores) {
+        if (cf.score !== null) assignedUnion.add(cf.name.toLowerCase());
+      }
+    }
+
+    const missingNames = r.filter((name) => !assignedUnion.has(name.toLowerCase()));
+    const aligned = r.length - missingNames.length; // r is distinct (deduped in the gatherer)
+    const score = clamp0100((100 * aligned) / r.length);
+
+    const detail = [`${aligned} of ${r.length} opted-in TRaSH custom formats are assigned across your profiles`];
+    const suggestions: NarrationLine[] = [];
+    if (missingNames.length > 0) {
+      suggestions.push(
+        line(
+          // The `TRaSH alignment:` prefix keeps this headline unique (engine dedupes by exact headline).
+          `TRaSH alignment: ${missingNames.length} opted-in TRaSH custom format(s) are not assigned in any profile`,
+          [
+            ...missingNames.slice(0, TRASH_MISSING_SAMPLE),
+            'Assign these custom formats in a quality profile to align with your linked TRaSH guide.',
+          ],
+          'info' // an optional criterion informs, never shames
+        )
+      );
+    }
+    return result('trash_alignment', 'TRaSH Alignment', score, config, detail, suggestions);
   },
 };
 

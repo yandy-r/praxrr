@@ -54,6 +54,7 @@ function makeInputs(overrides: Partial<HealthInputs> = {}): HealthInputs {
     versionSupported: true,
     drift: inSyncDrift,
     profiles: [makeProfile()],
+    trashRecommendedCfNames: null,
     criteria: DEFAULT_CRITERIA.map((c) => ({ ...c })),
     nowIso: '2026-07-14T02:00:00Z',
     ...overrides,
@@ -175,6 +176,30 @@ Deno.test('computeHealthReport: disabled criteria never appear in the breakdown'
   // trash_alignment ships disabled by default.
   assert(!report.overall.criteria.some((c) => c.id === 'trash_alignment'));
   assert(report.overall.criteria.some((c) => c.id === 'completeness'));
+});
+
+Deno.test('computeHealthReport: enabling trash_alignment preserves exact contribution arithmetic', () => {
+  // Enable a real, scored trash_alignment alongside the other criteria and prove the rollup still
+  // sums EXACTLY to the total at every scope (acceptance criterion: enabling it preserves arithmetic).
+  const report = computeHealthReport(
+    makeInputs({
+      trashRecommendedCfNames: ['CF-A', 'CF-B', 'CF-C'],
+      profiles: [
+        makeProfile({ name: 'Alpha', cfScores: [{ name: 'CF-A', score: 100 }] }),
+        makeProfile({ name: 'Beta', cfScores: [{ name: 'CF-B', score: 50 }] }),
+      ],
+      criteria: DEFAULT_CRITERIA.map((c) => (c.id === 'trash_alignment' ? { ...c, enabled: true, weight: 20 } : { ...c })),
+    })
+  );
+  const overallTrash = report.overall.criteria.find((c) => c.id === 'trash_alignment');
+  assert(overallTrash && overallTrash.score !== null, 'trash_alignment scored at instance scope');
+  assertContributionsSumToScore(report.overall);
+  for (const profile of report.profiles) {
+    // Instance-level signal: null (skipped) at every profile scope, never double-counted.
+    const profileTrash = profile.criteria.find((c) => c.id === 'trash_alignment');
+    assertEquals(profileTrash?.score ?? null, null, 'trash_alignment must be null at profile scope');
+    assertContributionsSumToScore(profile);
+  }
 });
 
 Deno.test('computeHealthReport: drift is instance-scope only (null at profile scope)', () => {
