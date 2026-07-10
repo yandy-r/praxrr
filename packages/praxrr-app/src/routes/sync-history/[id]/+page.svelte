@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import Badge from '$ui/badge/Badge.svelte';
   import SyncHistoryDiff from '$ui/sync-history/SyncHistoryDiff.svelte';
+  import SyncOutcomeList from '$ui/sync-history/SyncOutcomeList.svelte';
   import { SYNC_HISTORY_STATUS_LABEL, syncHistoryStatusVariant } from '$ui/sync-history/syncHistoryStatus.ts';
   import type { SyncHistoryDetail } from '$db/queries/syncHistory.ts';
   import type { PageData } from './$types';
@@ -165,6 +166,18 @@
         <dt class="text-xs tracking-wide text-neutral-500 uppercase dark:text-neutral-400">Changes</dt>
         <dd class="text-neutral-900 dark:text-neutral-100">{detail.entityChangeCount}</dd>
       </div>
+      <div>
+        <dt class="text-xs tracking-wide text-neutral-500 uppercase dark:text-neutral-400">Confirmed outcomes</dt>
+        <dd class="text-neutral-900 dark:text-neutral-100">{detail.entityOutcomeCount}</dd>
+      </div>
+      {#if detail.previewId}
+        <div>
+          <dt class="text-xs tracking-wide text-neutral-500 uppercase dark:text-neutral-400">Preview</dt>
+          <dd class="truncate font-mono text-xs text-neutral-900 dark:text-neutral-100" title={detail.previewId}>
+            {detail.previewId}
+          </dd>
+        </div>
+      {/if}
     </dl>
 
     {#if detail.error}
@@ -206,8 +219,29 @@
     </section>
 
     <section class="space-y-3">
+      <div class="space-y-1">
+        <h2 class="text-sm font-semibold text-neutral-900 dark:text-neutral-100">
+          Confirmed outcomes <span class="text-neutral-500 dark:text-neutral-400">({detail.entityOutcomes.length})</span>
+        </h2>
+        <p class="text-xs text-neutral-500 dark:text-neutral-400">
+          Per-entity results captured from the actual Arr writes — distinct from the planned changes below.
+        </p>
+      </div>
+      {#if detail.entityOutcomes.length === 0}
+        <div
+          class="rounded-lg border border-dashed border-neutral-300 p-4 text-sm text-neutral-500 dark:border-neutral-700 dark:text-neutral-400"
+        >
+          No confirmed per-entity outcomes were recorded for this run. Runs predating this feature, or runs where every
+          section was skipped, have none.
+        </div>
+      {:else}
+        <SyncOutcomeList outcomes={detail.entityOutcomes} />
+      {/if}
+    </section>
+
+    <section class="space-y-3">
       <h2 class="text-sm font-semibold text-neutral-900 dark:text-neutral-100">
-        Entity changes <span class="text-neutral-500 dark:text-neutral-400">({detail.changes.length})</span>
+        Planned changes <span class="text-neutral-500 dark:text-neutral-400">({detail.changes.length})</span>
       </h2>
       {#if detail.changes.length === 0}
         <div

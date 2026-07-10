@@ -91,6 +91,8 @@ SyncHistoryEntry:
     - itemsSynced
     - failureCount
     - entityChangeCount
+    - entityOutcomeCount
+    - previewId
     - error
     - startedAt
     - finishedAt
@@ -140,6 +142,15 @@ SyncHistoryEntry:
     entityChangeCount:
       type: integer
       minimum: 0
+    entityOutcomeCount:
+      type: integer
+      minimum: 0
+      description: Number of confirmed per-entity outcomes captured from the actual Arr writes (issue #232).
+    previewId:
+      oneOf:
+        - type: string
+        - type: 'null'
+      description: The reviewed sync preview this run applied, when known (plan↔run correlation).
     error:
       oneOf:
         - type: string
@@ -166,6 +177,7 @@ SyncHistoryDetail:
       required:
         - sectionResults
         - changes
+        - entityOutcomes
       properties:
         sectionResults:
           type: array
@@ -175,6 +187,11 @@ SyncHistoryDetail:
           type: array
           items:
             $ref: '#/SyncEntityChange'
+        entityOutcomes:
+          type: array
+          description: Confirmed per-entity outcomes captured from the actual Arr writes (issue #232).
+          items:
+            $ref: '../schemas/sync.yaml#/SyncEntityOutcome'
 
 SyncHistoryListResponse:
   type: object

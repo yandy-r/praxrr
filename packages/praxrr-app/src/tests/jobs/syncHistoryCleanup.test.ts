@@ -102,6 +102,8 @@ function insertRow(arrInstanceId: number, arrType: SyncPreviewArrType, startedAt
     failureCount: 0,
     sectionResults: [],
     changes: [],
+    entityOutcomes: [],
+    previewId: null,
     error: null,
     startedAt,
     finishedAt: startedAt,

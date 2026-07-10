@@ -23,6 +23,7 @@ import type { ArrInstance } from '$db/queries/arrInstances.ts';
 import type { SectionType } from '$sync/types.ts';
 import type { GeneratePreviewResult } from '$sync/preview/orchestrator.ts';
 import type { EntityChange } from '$sync/preview/types.ts';
+import type { SyncEntityOutcome } from '$sync/types.ts';
 import type { SyncEntityChange, SyncHistoryInput, SyncOperationStatus, SyncSectionResult } from './types.ts';
 
 const SOURCE = 'SyncHistoryRecord';
@@ -34,23 +35,31 @@ const MAX_EMBED_CHANGE_LINES = 10;
  * successful no-op section reports 0 items and a failing section can report >0. So a
  * mixed run (some sections succeed, some fail) is correctly `partial`, and a run
  * where every ran section failed is `failed`.
+ *
+ * Also outcome-aware (issue #232): a per-entity `failed` outcome (e.g. a single
+ * custom format that failed inside an otherwise-successful quality-profiles section)
+ * pulls the run to at least `partial` so a confirmed failure can never collapse to
+ * `success`.
  */
 export function deriveSyncHistoryStatus(
   ranSections: number,
   failures: number,
-  sectionResults: readonly SyncSectionResult[]
+  sectionResults: readonly SyncSectionResult[],
+  entityOutcomes: readonly SyncEntityOutcome[] = []
 ): SyncOperationStatus {
   if (ranSections === 0) {
     return 'skipped';
   }
   const successCount = sectionResults.filter((section) => section.status === 'success').length;
-  if (failures > 0 && successCount === 0) {
+  const hasFailedOutcome = entityOutcomes.some((outcome) => outcome.status === 'failed');
+  if (failures === 0 && !hasFailedOutcome) {
+    return 'success';
+  }
+  // At least one failure signal exists: `failed` only when nothing succeeded.
+  if (successCount === 0 && failures > 0) {
     return 'failed';
   }
-  if (failures > 0) {
-    return 'partial';
-  }
-  return 'success';
+  return 'partial';
 }
 
 /** Whether recording (and pre-sync preview capture) is enabled. */
@@ -175,15 +184,18 @@ function fireNotification(id: number, input: SyncHistoryInput): void {
 
 /**
  * Append one audit row and fire the failed/partial notification. Never throws;
- * gated on `sync_history_settings.enabled`.
+ * gated on `sync_history_settings.enabled`. Returns the durable row id (used to
+ * correlate confirmed outcomes back to the run, issue #232), or `null` when
+ * recording is disabled or the insert failed.
  */
-export function recordSyncHistory(input: SyncHistoryInput): void {
+export function recordSyncHistory(input: SyncHistoryInput): number | null {
   try {
     if (!isSyncHistoryEnabled()) {
-      return;
+      return null;
     }
     const id = syncHistoryQueries.insert(input);
     fireNotification(id, input);
+    return id;
   } catch (error) {
     // A silently-dropped audit record is bad, but breaking the sync is worse.
     void logger.error('Failed to record sync history', {
@@ -194,5 +206,6 @@ export function recordSyncHistory(input: SyncHistoryInput): void {
         error: error instanceof Error ? error.message : String(error),
       },
     });
+    return null;
   }
 }

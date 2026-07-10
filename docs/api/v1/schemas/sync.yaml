@@ -48,13 +48,16 @@ SyncPreviewApplyJobResult:
 SyncPreviewApplyResponse:
   type: object
   description: |
-    Coarse result of executing the preview's selected sections through the normal
-    sync job path. `results` describes only the aggregate job/run outcome. It does
-    not confirm which individual preview entity changes succeeded.
+    Result of executing the preview's selected sections through the normal sync job
+    path. `results` describes the aggregate job/run outcome; `outcomes` carries the
+    confirmed, per-entity terminal results captured from the ACTUAL Arr writes
+    (issue #232) — these, not the planned preview changes, are execution proof.
   required:
     - success
     - results
     - staleWarning
+    - outcomes
+    - syncHistoryId
   properties:
     success:
       type: boolean
@@ -66,6 +69,19 @@ SyncPreviewApplyResponse:
         - type: string
         - type: 'null'
       description: Preview-age warning returned when the reviewed snapshot is stale, or null.
+    outcomes:
+      type: array
+      description: |
+        Confirmed per-entity outcomes captured from the actual Arr writes. Present on
+        both success and partial/failure responses so failed and skipped outcomes are
+        never dropped.
+      items:
+        $ref: '#/SyncEntityOutcome'
+    syncHistoryId:
+      oneOf:
+        - type: integer
+        - type: 'null'
+      description: Durable Sync History id exposing these outcomes, or null when recording is disabled.
 
 SyncPreviewApplyErrorResponse:
   type: object
@@ -186,6 +202,81 @@ EntityChange:
       description: Field-level diff; empty for unchanged/create where no deltas are tracked
       items:
         $ref: '#/FieldChange'
+
+SyncEntityOutcomeAction:
+  type: string
+  enum:
+    - create
+    - update
+    - delete
+  description: The write attempted for an entity (intent). `delete` is reserved; no syncer emits it yet.
+
+SyncEntityOutcomeStatus:
+  type: string
+  enum:
+    - success
+    - skipped
+    - failed
+  description: |
+    Terminal status of a per-entity Arr write, sourced ONLY from the write result:
+    `success` (resolved), `failed` (threw), `skipped` (intentionally not written).
+
+SyncOutcomeEntityType:
+  type: string
+  enum:
+    - customFormat
+    - qualityProfile
+    - delayProfile
+    - metadataProfile
+    - naming
+    - mediaSettings
+    - qualityDefinitions
+  description: The kind of entity a confirmed outcome describes.
+
+SyncEntityOutcome:
+  type: object
+  description: |
+    A confirmed, per-entity terminal outcome captured from an actual Arr write
+    (issue #232). Exactly one is produced per attempted entity. Unlike the preview
+    EntityChange (planned intent), `status` proves what the Arr instance actually did.
+  required:
+    - section
+    - arrType
+    - entityType
+    - name
+    - action
+    - status
+    - remoteId
+    - reason
+  properties:
+    section:
+      $ref: '#/SyncPreviewSection'
+    arrType:
+      type: string
+      enum:
+        - radarr
+        - sonarr
+        - lidarr
+      description: Arr type of the target instance — set explicitly by the syncer, never inferred.
+    entityType:
+      $ref: '#/SyncOutcomeEntityType'
+    name:
+      type: string
+      description: Stable identity — the unsuffixed PCD name (or subsection label for singletons).
+    action:
+      $ref: '#/SyncEntityOutcomeAction'
+    status:
+      $ref: '#/SyncEntityOutcomeStatus'
+    remoteId:
+      oneOf:
+        - type: string
+        - type: 'null'
+      description: Remote entity id when known; null for bulk writes.
+    reason:
+      oneOf:
+        - type: string
+        - type: 'null'
+      description: Sanitized, user-facing reason; non-null for skipped/failed, null for success.
 
 QualityProfilesPreview:
   type: object

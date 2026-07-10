@@ -15,6 +15,8 @@
  */
 
 import { BaseSyncer, type SyncResult } from '../base.ts';
+import type { SyncEntityOutcome, SyncOutcomeEntityType } from '../types.ts';
+import { sanitizeArrWriteError } from '../sanitizeArrWriteError.ts';
 import { arrSyncQueries } from '$db/queries/arrSync.ts';
 import { trashGuideSyncQueries } from '$db/queries/trashGuideSync.ts';
 import { trashGuideEntityCacheQueries } from '$db/queries/trashGuideEntityCache.ts';
@@ -80,6 +82,35 @@ const LIDARR_NAMING_SOURCE_FIELD_REASON =
   'Some stored Lidarr naming fields do not map to current Lidarr API payload fields and are skipped';
 const LIDARR_QUALITY_SKIP_REASON =
   'Lidarr quality definition sync applies only to entries with Lidarr mappings and matching Lidarr definitions';
+
+/**
+ * Terminal result of a single media-management subsection write (issue #232). Replaces the
+ * old bare `boolean` return, which conflated real errors, absent config, and unsupported-field
+ * skips. `noop` = the subsection was never configured (no entity attempted → no outcome). The
+ * other three each become exactly one {@link SyncEntityOutcome}.
+ */
+type MediaSubStatus = 'success' | 'skipped' | 'failed' | 'noop';
+interface MediaSubsectionResult {
+  status: MediaSubStatus;
+  reason?: string;
+  remoteId?: string | null;
+}
+
+const subOk = (remoteId: string | null = null): MediaSubsectionResult => ({ status: 'success', remoteId });
+const subSkip = (reason: string): MediaSubsectionResult => ({ status: 'skipped', reason });
+const subFail = (reason: string): MediaSubsectionResult => ({ status: 'failed', reason });
+const subNoop = (): MediaSubsectionResult => ({ status: 'noop' });
+
+/** Read a singleton config's remote id defensively (media-management/naming configs are singletons). */
+function readConfigId(config: unknown): string | null {
+  if (config && typeof config === 'object' && 'id' in config) {
+    const id = (config as { id?: unknown }).id;
+    if (typeof id === 'number') {
+      return String(id);
+    }
+  }
+  return null;
+}
 
 interface MediaManagementSyncConfig {
   namingDatabaseId: number | null;
@@ -729,8 +760,69 @@ export class MediaManagementSyncer extends BaseSyncer {
    */
   override async sync(): Promise<SyncResult> {
     const syncConfig = arrSyncQueries.getMediaManagementSync(this.instanceId);
+    const arrType = this.getSyncArrType();
     let totalSynced = 0;
     const errors: string[] = [];
+    const outcomes: SyncEntityOutcome[] = [];
+
+    /**
+     * Run one subsection write and fold its terminal result into totals + a single
+     * confirmed outcome. `noop` emits nothing (nothing was attempted); a thrown Arr
+     * write is caught here and classified via {@link sanitizeArrWriteError}.
+     */
+    const runSubsection = async (
+      entityType: SyncOutcomeEntityType,
+      name: string,
+      run: () => Promise<MediaSubsectionResult>
+    ): Promise<void> => {
+      let res: MediaSubsectionResult;
+      try {
+        res = await run();
+      } catch (error) {
+        const { reason, protectedDetails } = sanitizeArrWriteError(error);
+        errors.push(`${entityType}: ${reason}`);
+        await logger.error(`Failed to sync ${entityType}`, {
+          source: 'Sync:MediaManagement',
+          meta: { instanceId: this.instanceId, ...protectedDetails },
+        });
+        if (arrType) {
+          outcomes.push({
+            section: 'mediaManagement',
+            arrType,
+            entityType,
+            name,
+            action: 'update',
+            status: 'failed',
+            remoteId: null,
+            reason,
+          });
+        }
+        return;
+      }
+
+      if (res.status === 'noop') {
+        return;
+      }
+      if (res.status === 'success') {
+        totalSynced++;
+      }
+      if (res.status === 'failed' && res.reason) {
+        errors.push(`${entityType}: ${res.reason}`);
+      }
+      if (arrType) {
+        outcomes.push({
+          section: 'mediaManagement',
+          arrType,
+          entityType,
+          name,
+          action: 'update',
+          status: res.status,
+          remoteId: res.remoteId ?? null,
+          reason: res.status === 'success' ? null : (res.reason ?? null),
+        });
+      }
+    };
+
     let trashNamingSelection: { sourceId: number; itemName: string } | null = null;
     let trashQualityDefinitionsSelection: { sourceId: number; itemName: string } | null = null;
     let hasTrashNaming = false;
@@ -776,77 +868,31 @@ export class MediaManagementSyncer extends BaseSyncer {
 
     // Sync media settings if configured (both database and config name required)
     if (syncConfig.mediaSettingsDatabaseId && syncConfig.mediaSettingsConfigName) {
-      try {
-        const synced = await this.syncMediaSettings(
-          syncConfig.mediaSettingsDatabaseId,
-          syncConfig.mediaSettingsConfigName
-        );
-        if (synced) totalSynced++;
-      } catch (error) {
-        const msg = error instanceof Error ? error.message : 'Unknown error';
-        errors.push(`Media settings: ${msg}`);
-        await logger.error(`Failed to sync media settings`, {
-          source: 'Sync:MediaManagement',
-          meta: { instanceId: this.instanceId, error: msg },
-        });
-      }
+      const databaseId = syncConfig.mediaSettingsDatabaseId;
+      const configName = syncConfig.mediaSettingsConfigName;
+      await runSubsection('mediaSettings', configName, () => this.syncMediaSettings(databaseId, configName));
     }
 
     // Sync naming: PCD first, TRaSH fallback
     if (syncConfig.namingDatabaseId && syncConfig.namingConfigName) {
-      try {
-        const synced = await this.syncNaming(syncConfig.namingDatabaseId, syncConfig.namingConfigName);
-        if (synced) totalSynced++;
-      } catch (error) {
-        const msg = error instanceof Error ? error.message : 'Unknown error';
-        errors.push(`Naming: ${msg}`);
-        await logger.error(`Failed to sync naming`, {
-          source: 'Sync:MediaManagement',
-          meta: { instanceId: this.instanceId, error: msg },
-        });
-      }
+      const databaseId = syncConfig.namingDatabaseId;
+      const configName = syncConfig.namingConfigName;
+      await runSubsection('naming', configName, () => this.syncNaming(databaseId, configName));
     } else {
-      try {
-        const synced = await this.syncTrashNaming(trashNamingSelection);
-        if (synced) totalSynced++;
-      } catch (error) {
-        const msg = error instanceof Error ? error.message : 'Unknown error';
-        errors.push(`Naming (TRaSH): ${msg}`);
-        await logger.error(`Failed to sync TRaSH naming`, {
-          source: 'Sync:MediaManagement',
-          meta: { instanceId: this.instanceId, error: msg },
-        });
-      }
+      await runSubsection('naming', trashNamingSelection?.itemName ?? 'naming', () =>
+        this.syncTrashNaming(trashNamingSelection)
+      );
     }
 
     // Sync quality definitions: PCD first, TRaSH fallback
     if (syncConfig.qualityDefinitionsDatabaseId && syncConfig.qualityDefinitionsConfigName) {
-      try {
-        const synced = await this.syncQualityDefinitions(
-          syncConfig.qualityDefinitionsDatabaseId,
-          syncConfig.qualityDefinitionsConfigName
-        );
-        if (synced) totalSynced++;
-      } catch (error) {
-        const msg = error instanceof Error ? error.message : 'Unknown error';
-        errors.push(`Quality definitions: ${msg}`);
-        await logger.error(`Failed to sync quality definitions`, {
-          source: 'Sync:MediaManagement',
-          meta: { instanceId: this.instanceId, error: msg },
-        });
-      }
+      const databaseId = syncConfig.qualityDefinitionsDatabaseId;
+      const configName = syncConfig.qualityDefinitionsConfigName;
+      await runSubsection('qualityDefinitions', configName, () => this.syncQualityDefinitions(databaseId, configName));
     } else {
-      try {
-        const synced = await this.syncTrashQualityDefinitions(trashQualityDefinitionsSelection);
-        if (synced) totalSynced++;
-      } catch (error) {
-        const msg = error instanceof Error ? error.message : 'Unknown error';
-        errors.push(`Quality definitions (TRaSH): ${msg}`);
-        await logger.error(`Failed to sync TRaSH quality definitions`, {
-          source: 'Sync:MediaManagement',
-          meta: { instanceId: this.instanceId, error: msg },
-        });
-      }
+      await runSubsection('qualityDefinitions', trashQualityDefinitionsSelection?.itemName ?? 'qualityDefinitions', () =>
+        this.syncTrashQualityDefinitions(trashQualityDefinitionsSelection)
+      );
     }
 
     const success = errors.length === 0;
@@ -854,6 +900,7 @@ export class MediaManagementSyncer extends BaseSyncer {
       success,
       itemsSynced: totalSynced,
       error: errors.length > 0 ? errors.join('; ') : undefined,
+      outcomes,
     };
 
     await logger.info(`Completed media management sync for "${this.instanceName}"`, {
@@ -868,14 +915,14 @@ export class MediaManagementSyncer extends BaseSyncer {
   // Media Settings
   // =========================================================================
 
-  private async syncMediaSettings(databaseId: number, configName: string): Promise<boolean> {
+  private async syncMediaSettings(databaseId: number, configName: string): Promise<MediaSubsectionResult> {
     const cache = getCache(databaseId);
     if (!cache) {
       await logger.warn(`PCD cache not found for database ${databaseId}`, {
         source: 'Sync:MediaSettings',
         meta: { instanceId: this.instanceId },
       });
-      return false;
+      return subFail(`PCD cache not available for database ${databaseId}.`);
     }
 
     const mediaSettingsSource = this.resolveMediaSettingsSource();
@@ -884,7 +931,7 @@ export class MediaManagementSyncer extends BaseSyncer {
         source: 'Sync:MediaSettings',
         meta: { instanceId: this.instanceId },
       });
-      return false;
+      return subFail('Media settings are not supported for this arr instance type.');
     }
 
     const mediaSettingsEntity = mediaSettingsSource.entityType;
@@ -902,7 +949,7 @@ export class MediaManagementSyncer extends BaseSyncer {
           entityType: mediaSettingsEntity,
         },
       });
-      return false;
+      return subSkip(`Media settings config "${configName}" not found in its source database.`);
     }
 
     // GET existing config
@@ -944,7 +991,7 @@ export class MediaManagementSyncer extends BaseSyncer {
             reason: LIDARR_UNSUPPORTED_FIELD_REASON,
           },
         });
-        return false;
+        return subSkip(LIDARR_UNSUPPORTED_FIELD_REASON);
       }
 
       const unchangedFields = this.getUnmanagedConfigFields(existingConfig, [
@@ -976,7 +1023,7 @@ export class MediaManagementSyncer extends BaseSyncer {
     });
 
     await this.client.updateMediaManagementConfig(updatedConfig);
-    return true;
+    return subOk(readConfigId(existingConfig));
   }
 
   private mapPropersRepacks(pcdValue: string): ArrPropersAndRepacks {
@@ -992,14 +1039,14 @@ export class MediaManagementSyncer extends BaseSyncer {
   // Naming
   // =========================================================================
 
-  private async syncNaming(databaseId: number, configName: string): Promise<boolean> {
+  private async syncNaming(databaseId: number, configName: string): Promise<MediaSubsectionResult> {
     const cache = getCache(databaseId);
     if (!cache) {
       await logger.warn(`PCD cache not found for database ${databaseId}`, {
         source: 'Sync:Naming',
         meta: { instanceId: this.instanceId },
       });
-      return false;
+      return subFail(`PCD cache not available for database ${databaseId}.`);
     }
 
     if (this.instanceType === 'radarr') {
@@ -1014,17 +1061,17 @@ export class MediaManagementSyncer extends BaseSyncer {
       source: 'Sync:Naming',
       meta: { instanceId: this.instanceId },
     });
-    return false;
+    return subFail('Naming is not supported for this arr instance type.');
   }
 
-  private async syncRadarrNaming(cache: PCDCache, configName: string): Promise<boolean> {
+  private async syncRadarrNaming(cache: PCDCache, configName: string): Promise<MediaSubsectionResult> {
     const naming = await getRadarrNaming(cache, configName);
     if (!naming) {
       await logger.debug(`Radarr naming config "${configName}" not found in PCD`, {
         source: 'Sync:Naming',
         meta: { instanceId: this.instanceId, configName },
       });
-      return false;
+      return subSkip(`Radarr naming config "${configName}" not found in its source database.`);
     }
 
     // GET existing config
@@ -1051,10 +1098,10 @@ export class MediaManagementSyncer extends BaseSyncer {
     });
 
     await this.client.updateNamingConfig(updatedConfig);
-    return true;
+    return subOk(readConfigId(existingConfig));
   }
 
-  private async syncLidarrNaming(cache: PCDCache, configName: string): Promise<boolean> {
+  private async syncLidarrNaming(cache: PCDCache, configName: string): Promise<MediaSubsectionResult> {
     const naming = await getLidarrNaming(cache, configName);
     if (!naming) {
       await logger.debug(`Lidarr naming config "${configName}" not found in lidarr_naming`, {
@@ -1065,7 +1112,7 @@ export class MediaManagementSyncer extends BaseSyncer {
           entityType: 'lidarr_naming',
         },
       });
-      return false;
+      return subSkip(`Lidarr naming config "${configName}" not found in its source database.`);
     }
 
     const existingConfig = await this.client.getNamingConfig();
@@ -1110,7 +1157,7 @@ export class MediaManagementSyncer extends BaseSyncer {
           reason: LIDARR_UNSUPPORTED_FIELD_REASON,
         },
       });
-      return false;
+      return subSkip(LIDARR_UNSUPPORTED_FIELD_REASON);
     }
 
     const unchangedFields = this.getUnmanagedConfigFields(existingConfig, [
@@ -1143,17 +1190,17 @@ export class MediaManagementSyncer extends BaseSyncer {
     });
 
     await this.client.updateNamingConfig(updatedConfig);
-    return true;
+    return subOk(readConfigId(existingConfig));
   }
 
-  private async syncSonarrNaming(cache: PCDCache, configName: string): Promise<boolean> {
+  private async syncSonarrNaming(cache: PCDCache, configName: string): Promise<MediaSubsectionResult> {
     const naming = await getSonarrNaming(cache, configName);
     if (!naming) {
       await logger.debug(`Sonarr naming config "${configName}" not found in PCD`, {
         source: 'Sync:Naming',
         meta: { instanceId: this.instanceId, configName },
       });
-      return false;
+      return subSkip(`Sonarr naming config "${configName}" not found in its source database.`);
     }
 
     // GET existing config
@@ -1186,21 +1233,21 @@ export class MediaManagementSyncer extends BaseSyncer {
     });
 
     await this.client.updateNamingConfig(updatedConfig);
-    return true;
+    return subOk(readConfigId(existingConfig));
   }
 
   // =========================================================================
   // Quality Definitions
   // =========================================================================
 
-  private async syncQualityDefinitions(databaseId: number, configName: string): Promise<boolean> {
+  private async syncQualityDefinitions(databaseId: number, configName: string): Promise<MediaSubsectionResult> {
     const cache = getCache(databaseId);
     if (!cache) {
       await logger.warn(`PCD cache not found for database ${databaseId}`, {
         source: 'Sync:QualityDefinitions',
         meta: { instanceId: this.instanceId },
       });
-      return false;
+      return subFail(`PCD cache not available for database ${databaseId}.`);
     }
 
     const qualityDefinitionsSource = this.resolveQualityDefinitionsSource();
@@ -1209,7 +1256,7 @@ export class MediaManagementSyncer extends BaseSyncer {
         source: 'Sync:QualityDefinitions',
         meta: { instanceId: this.instanceId },
       });
-      return false;
+      return subFail('Quality definitions are not supported for this arr instance type.');
     }
 
     const qualityDefinitionsEntity = qualityDefinitionsSource.entityType;
@@ -1225,7 +1272,7 @@ export class MediaManagementSyncer extends BaseSyncer {
           entityType: qualityDefinitionsEntity,
         },
       });
-      return false;
+      return subSkip(`Quality definitions config "${configName}" not found in its source database.`);
     }
 
     if (qualityDefsConfig.entries.length === 0) {
@@ -1233,7 +1280,7 @@ export class MediaManagementSyncer extends BaseSyncer {
         source: 'Sync:QualityDefinitions',
         meta: { instanceId: this.instanceId, configName },
       });
-      return false;
+      return subSkip(`Quality definitions config "${configName}" has no entries.`);
     }
 
     // Get quality API mappings from PCD (maps quality_name -> api_name)
@@ -1247,7 +1294,7 @@ export class MediaManagementSyncer extends BaseSyncer {
           reason: LIDARR_QUALITY_SKIP_REASON,
         },
       });
-      return false;
+      return subSkip(LIDARR_QUALITY_SKIP_REASON);
     }
 
     // GET existing quality definitions from ARR
@@ -1333,7 +1380,7 @@ export class MediaManagementSyncer extends BaseSyncer {
           missingArrDefinitions: missingDefinitionEntries,
         },
       });
-      return false;
+      return subSkip('No quality definitions matched between the source config and this instance.');
     }
 
     await logger.debug(`Updating ${updatedCount} quality definitions`, {
@@ -1347,9 +1394,9 @@ export class MediaManagementSyncer extends BaseSyncer {
       },
     });
 
-    // PUT the full array back
+    // PUT the full array back (bulk write → one subsection outcome, no per-quality remote id)
     await this.client.updateQualityDefinitions(arrDefinitions);
-    return true;
+    return subOk(null);
   }
 
   private getQualityApiMappings(cache: PCDCache): Promise<Map<string, string>> {
@@ -1474,8 +1521,10 @@ export class MediaManagementSyncer extends BaseSyncer {
     return { sourceId: qdSel.sourceId, itemName: qdSel.itemName };
   }
 
-  private async syncTrashNaming(selection: { sourceId: number; itemName: string } | null): Promise<boolean> {
-    if (!selection) return false;
+  private async syncTrashNaming(
+    selection: { sourceId: number; itemName: string } | null
+  ): Promise<MediaSubsectionResult> {
+    if (!selection) return subNoop();
 
     const source = trashGuideSourcesQueries.getById(selection.sourceId);
     if (!source) {
@@ -1483,7 +1532,7 @@ export class MediaManagementSyncer extends BaseSyncer {
         source: 'Sync:Naming',
         meta: { instanceId: this.instanceId, sourceId: selection.sourceId },
       });
-      return false;
+      return subFail(`TRaSH source ${selection.sourceId} is no longer available.`);
     }
 
     const cachedEntities = trashGuideEntityCacheQueries.getBySourceAndType(selection.sourceId, 'naming');
@@ -1493,7 +1542,7 @@ export class MediaManagementSyncer extends BaseSyncer {
         source: 'Sync:Naming',
         meta: { instanceId: this.instanceId, sourceId: selection.sourceId, itemName: selection.itemName },
       });
-      return false;
+      return subFail(`TRaSH naming entity "${selection.itemName}" is not in the local cache.`);
     }
 
     const entity = JSON.parse(cached.jsonData) as TrashGuideNamingEntity;
@@ -1518,7 +1567,7 @@ export class MediaManagementSyncer extends BaseSyncer {
       });
 
       await this.client.updateNamingConfig(updatedConfig);
-      return true;
+      return subOk(readConfigId(existingConfig));
     }
 
     if (result.portableEntityType === 'sonarr_naming') {
@@ -1544,10 +1593,10 @@ export class MediaManagementSyncer extends BaseSyncer {
       });
 
       await this.client.updateNamingConfig(updatedConfig);
-      return true;
+      return subOk(readConfigId(existingConfig));
     }
 
-    return false;
+    return subSkip('TRaSH naming is not supported for this arr instance type.');
   }
 
   // =========================================================================
@@ -1556,8 +1605,8 @@ export class MediaManagementSyncer extends BaseSyncer {
 
   private async syncTrashQualityDefinitions(
     selection: { sourceId: number; itemName: string } | null
-  ): Promise<boolean> {
-    if (!selection) return false;
+  ): Promise<MediaSubsectionResult> {
+    if (!selection) return subNoop();
 
     const source = trashGuideSourcesQueries.getById(selection.sourceId);
     if (!source) {
@@ -1565,7 +1614,7 @@ export class MediaManagementSyncer extends BaseSyncer {
         source: 'Sync:QualityDefinitions',
         meta: { instanceId: this.instanceId, sourceId: selection.sourceId },
       });
-      return false;
+      return subFail(`TRaSH source ${selection.sourceId} is no longer available.`);
     }
 
     const cachedEntities = trashGuideEntityCacheQueries.getBySourceAndType(selection.sourceId, 'quality_size');
@@ -1575,7 +1624,7 @@ export class MediaManagementSyncer extends BaseSyncer {
         source: 'Sync:QualityDefinitions',
         meta: { instanceId: this.instanceId, sourceId: selection.sourceId, itemName: selection.itemName },
       });
-      return false;
+      return subFail(`TRaSH quality definition "${selection.itemName}" is not in the local cache.`);
     }
 
     const entity = JSON.parse(cached.jsonData) as TrashGuideQualitySizeEntity;
@@ -1587,7 +1636,7 @@ export class MediaManagementSyncer extends BaseSyncer {
         source: 'Sync:QualityDefinitions',
         meta: { instanceId: this.instanceId, entityName: entity.name },
       });
-      return false;
+      return subSkip(`TRaSH quality definition "${entity.name}" has no entries.`);
     }
 
     // GET existing quality definitions from Arr
@@ -1622,7 +1671,7 @@ export class MediaManagementSyncer extends BaseSyncer {
         source: 'Sync:QualityDefinitions',
         meta: { instanceId: this.instanceId, entityName: entity.name },
       });
-      return false;
+      return subSkip('No TRaSH quality definitions matched the definitions on this instance.');
     }
 
     await logger.debug(`Updating ${updatedCount} quality definitions from TRaSH`, {
@@ -1631,7 +1680,7 @@ export class MediaManagementSyncer extends BaseSyncer {
     });
 
     await this.client.updateQualityDefinitions(arrDefinitions);
-    return true;
+    return subOk(null);
   }
 
   // =========================================================================

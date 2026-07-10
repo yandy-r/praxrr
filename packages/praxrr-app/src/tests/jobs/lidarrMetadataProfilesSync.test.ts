@@ -373,7 +373,7 @@ Deno.test({
 
       try {
         metadataProfilesHandler.createSyncer = () => ({
-          sync: async () => ({ success: true, itemsSynced: 7 }),
+          sync: async () => ({ success: true, itemsSynced: 7, outcomes: [] }),
           generatePreview: async () => ({ section: 'metadataProfiles', profile: null }),
           setPreviewConfig: () => undefined,
           clearPreviewConfig: () => undefined,
@@ -391,6 +391,7 @@ Deno.test({
             success: false,
             itemsSynced: 0,
             error: 'Metadata profile sync failed for reporting test',
+            outcomes: [],
           }),
           generatePreview: async () => ({ section: 'metadataProfiles', profile: null }),
           setPreviewConfig: () => undefined,

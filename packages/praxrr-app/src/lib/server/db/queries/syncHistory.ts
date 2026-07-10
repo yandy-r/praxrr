@@ -1,6 +1,7 @@
 import { db } from '../db.ts';
 import type {
   SyncEntityChange,
+  SyncEntityOutcome,
   SyncHistoryInput,
   SyncOperationStatus,
   SyncPreviewArrType,
@@ -27,8 +28,11 @@ export interface SyncHistoryRow {
   items_synced: number;
   failure_count: number;
   entity_change_count: number;
+  entity_outcome_count: number;
   section_results: string;
   changes: string;
+  entity_outcomes: string;
+  preview_id: string | null;
   error: string | null;
   started_at: string;
   finished_at: string | null;
@@ -54,6 +58,8 @@ export interface SyncHistorySummary {
   itemsSynced: number;
   failureCount: number;
   entityChangeCount: number;
+  entityOutcomeCount: number;
+  previewId: string | null;
   error: string | null;
   startedAt: string;
   finishedAt: string | null;
@@ -62,11 +68,13 @@ export interface SyncHistorySummary {
 }
 
 /**
- * Full detail — summary plus the decoded `section_results` and `changes` blobs.
+ * Full detail — summary plus the decoded `section_results`, `changes`, and
+ * `entity_outcomes` blobs.
  */
 export interface SyncHistoryDetail extends SyncHistorySummary {
   sectionResults: SyncSectionResult[];
   changes: SyncEntityChange[];
+  entityOutcomes: SyncEntityOutcome[];
 }
 
 /**
@@ -91,7 +99,7 @@ export interface Pagination {
 
 const SUMMARY_COLUMNS = `id, arr_instance_id, instance_name, arr_type, job_id, trigger, trigger_event,
 	sections_attempted, status, sections_run, items_synced, failure_count, entity_change_count,
-	error, started_at, finished_at, duration_ms, created_at`;
+	entity_outcome_count, preview_id, error, started_at, finished_at, duration_ms, created_at`;
 
 function parseJsonArray<T>(raw: string): T[] {
   try {
@@ -117,6 +125,8 @@ function rowToSummary(row: SyncHistoryRow): SyncHistorySummary {
     itemsSynced: row.items_synced,
     failureCount: row.failure_count,
     entityChangeCount: row.entity_change_count,
+    entityOutcomeCount: row.entity_outcome_count,
+    previewId: row.preview_id,
     error: row.error,
     startedAt: row.started_at,
     finishedAt: row.finished_at,
@@ -130,6 +140,7 @@ function rowToDetail(row: SyncHistoryRow): SyncHistoryDetail {
     ...rowToSummary(row),
     sectionResults: parseJsonArray<SyncSectionResult>(row.section_results),
     changes: parseJsonArray<SyncEntityChange>(row.changes),
+    entityOutcomes: parseJsonArray<SyncEntityOutcome>(row.entity_outcomes),
   };
 }
 
@@ -199,9 +210,9 @@ export const syncHistoryQueries = {
       `INSERT INTO sync_history (
 				arr_instance_id, instance_name, arr_type, job_id, trigger, trigger_event,
 				sections_attempted, status, sections_run, items_synced, failure_count,
-				entity_change_count, section_results, changes, error,
-				started_at, finished_at, duration_ms
-			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+				entity_change_count, entity_outcome_count, section_results, changes, entity_outcomes,
+				preview_id, error, started_at, finished_at, duration_ms
+			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       input.arrInstanceId,
       input.instanceName,
       input.arrType,
@@ -214,8 +225,11 @@ export const syncHistoryQueries = {
       input.itemsSynced,
       input.failureCount,
       input.changes.length,
+      input.entityOutcomes.length,
       JSON.stringify(input.sectionResults),
       JSON.stringify(input.changes),
+      JSON.stringify(input.entityOutcomes),
+      input.previewId,
       input.error,
       input.startedAt,
       input.finishedAt,

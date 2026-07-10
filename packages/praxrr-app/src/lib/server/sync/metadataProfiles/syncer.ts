@@ -5,6 +5,8 @@
  */
 
 import { BaseSyncer, type SyncResult } from '../base.ts';
+import type { SyncEntityOutcome } from '../types.ts';
+import { sanitizeArrWriteError } from '../sanitizeArrWriteError.ts';
 import { arrSyncQueries } from '$db/queries/arrSync.ts';
 import { arrNamespaceQueries } from '$db/queries/arrNamespaces.ts';
 import { getCache } from '$pcd/index.ts';
@@ -414,20 +416,44 @@ export class MetadataProfileSyncer extends BaseSyncer {
         source: 'Sync:MetadataProfile',
         meta: { instanceId: this.instanceId },
       });
-      return { success: true, itemsSynced: 0 };
+      return { success: true, itemsSynced: 0, outcomes: [] };
     }
 
-    const profile = await getMetadataProfileFromCache(syncConfig.databaseId, syncConfig.profileName);
+    const profileName = syncConfig.profileName;
+    // Metadata profiles are Lidarr-only (getLidarrClient() throws above for other arr types),
+    // so the outcome arrType is explicitly 'lidarr' — never inferred from a sibling.
+    const outcome = (
+      status: SyncEntityOutcome['status'],
+      action: SyncEntityOutcome['action'],
+      remoteId: string | null,
+      reason: string | null
+    ): SyncEntityOutcome => ({
+      section: 'metadataProfiles',
+      arrType: 'lidarr',
+      entityType: 'metadataProfile',
+      name: profileName,
+      action,
+      status,
+      remoteId,
+      reason,
+    });
+
+    const profile = await getMetadataProfileFromCache(syncConfig.databaseId, profileName);
     if (!profile) {
-      await logger.warn(`Metadata profile "${syncConfig.profileName}" not found in database ${syncConfig.databaseId}`, {
+      await logger.warn(`Metadata profile "${profileName}" not found in database ${syncConfig.databaseId}`, {
         source: 'Sync:MetadataProfile',
         meta: {
           instanceId: this.instanceId,
           databaseId: syncConfig.databaseId,
-          profileName: syncConfig.profileName,
+          profileName,
         },
       });
-      return { success: false, itemsSynced: 0, error: 'Profile not found in PCD cache' };
+      return {
+        success: false,
+        itemsSynced: 0,
+        error: 'Profile not found in PCD cache',
+        outcomes: [outcome('skipped', 'create', null, `Metadata profile "${profileName}" not found in its source database.`)],
+      };
     }
 
     const namespaceIndex = arrNamespaceQueries.getOrCreate(this.instanceId, syncConfig.databaseId);
@@ -462,6 +488,7 @@ export class MetadataProfileSyncer extends BaseSyncer {
       normalizedSchema
     );
 
+    let writeOutcome: SyncEntityOutcome;
     try {
       const remoteProfiles = await lidarrClient.getMetadataProfiles();
       const existingProfile = findMatchingRemoteProfile(suffixedProfileName, remoteProfiles);
@@ -476,24 +503,27 @@ export class MetadataProfileSyncer extends BaseSyncer {
             remoteId: existingProfile.id,
           },
         });
+        writeOutcome = outcome('success', 'update', String(existingProfile.id), null);
       } else {
-        await lidarrClient.createMetadataProfile(normalizedPayload);
+        const created = await lidarrClient.createMetadataProfile(normalizedPayload);
 
         await logger.info(`Created metadata profile "${profile.name}" on "${this.instanceName}"`, {
           source: 'Sync:MetadataProfile',
-          meta: { instanceId: this.instanceId, remoteName: suffixedProfileName },
+          meta: { instanceId: this.instanceId, remoteName: suffixedProfileName, remoteId: created.id },
         });
+        writeOutcome = outcome('success', 'create', created.id != null ? String(created.id) : null, null);
       }
     } catch (error) {
       const { message: errorMsg, response } = readErrorDetails(error);
+      const { reason } = sanitizeArrWriteError(error);
       await logger.error(`Failed to sync metadata profile "${profile.name}"`, {
         source: 'Sync:MetadataProfile',
         meta: { instanceId: this.instanceId, error: errorMsg, response },
       });
-      return { success: false, itemsSynced: 0, error: errorMsg };
+      return { success: false, itemsSynced: 0, error: errorMsg, outcomes: [outcome('failed', 'update', null, reason)] };
     }
 
-    return { success: true, itemsSynced: 1 };
+    return { success: true, itemsSynced: 1, outcomes: [writeOutcome] };
   }
 
   // Base class abstract methods - implemented but not used since we override sync()

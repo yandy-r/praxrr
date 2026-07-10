@@ -162,7 +162,7 @@ function driveHandlerHarness(version: string): {
     ({
       sync: async () => {
         observed.syncCalled = true;
-        return { success: true, itemsSynced: 3 };
+        return { success: true, itemsSynced: 3, outcomes: [] };
       },
       generatePreview: async () => ({ section: 'qualityProfiles', profile: null }),
       setPreviewConfig: () => undefined,

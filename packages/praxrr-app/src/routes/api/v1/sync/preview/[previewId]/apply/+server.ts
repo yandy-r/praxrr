@@ -217,7 +217,8 @@ export async function _handleSyncPreviewApplyRequest(
   }
 
   try {
-    const result = await dependencies.executeSyncJob(snapshot.instanceId, sectionsToApply, 'manual');
+    // Pass the reviewed preview id so the run correlates back to it in Sync History (issue #232).
+    const result = await dependencies.executeSyncJob(snapshot.instanceId, sectionsToApply, 'manual', snapshot.id);
     const output = result.output ?? '';
     const success = result.status === 'success' || result.status === 'skipped';
 
@@ -230,6 +231,8 @@ export async function _handleSyncPreviewApplyRequest(
           output,
         },
         staleWarning: staleness.shouldWarn ? staleWarningMessage(staleness.ageMs) : null,
+        outcomes: result.outcomes,
+        syncHistoryId: result.syncHistoryId,
       } satisfies SyncPreviewApplyResponse);
     }
 
@@ -237,6 +240,8 @@ export async function _handleSyncPreviewApplyRequest(
       status: PREVIEW_STATUS_FAILED,
       error: result.error || `Sync job failed with status ${result.status}`,
     });
+    // Surface confirmed outcomes on the failure branch too — partial/failed/skipped outcomes must
+    // never be dropped just because the run's terminal status is failure (issue #232, Gap 5).
     return json(
       {
         success: false,
@@ -246,6 +251,8 @@ export async function _handleSyncPreviewApplyRequest(
           error: result.error,
         },
         staleWarning: staleness.shouldWarn ? staleWarningMessage(staleness.ageMs) : null,
+        outcomes: result.outcomes,
+        syncHistoryId: result.syncHistoryId,
       } satisfies SyncPreviewApplyResponse,
       { status: 500 }
     );
