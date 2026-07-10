@@ -435,13 +435,11 @@ Files to Modify
 
 Ensure `deno task test config-health` executes every new `tests/health` suite without broadening
 unrelated aliases. Update all Config Health/#226 roadmap references consistently: #244 is now merged,
-
-# 226 is implemented by this completion change pending merge, and #224/#225 remain separate open/in-
-
-flight follow-ups according to live state. Describe the actual filter, evidence, accessible chart/table,
-and exact export outcome without claiming profile criterion history, multi-instance comparison, causal
-prune provenance, or a merged #226 PR before merge. The orchestrator will add the created PR number in
-a follow-up roadmap commit once GitHub assigns it.
+issue #226 is implemented by this completion change pending merge, and #224/#225 remain separate
+open/in-flight follow-ups according to live state. Describe the actual filter, evidence, accessible
+chart/table, and exact export outcome without claiming profile criterion history, multi-instance
+comparison, causal prune provenance, or a merged #226 PR before merge. The orchestrator will add the
+created PR number in a follow-up roadmap commit once GitHub assigns it.
 
 ## Advice
 
