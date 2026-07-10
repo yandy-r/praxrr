@@ -157,6 +157,17 @@ named:
             - radarr
             - sonarr
             - lidarr
+      - name: includeLineage
+        in: query
+        required: false
+        description: |
+          When `true` and `layer=resolved`, attaches exact per-field lineage
+          (`lineage` + `lineageStatus`) identifying the source layer and
+          establishing op for each resolved value. Ignored for
+          `layer=base`/`layer=user`. Defaults to `false`.
+        schema:
+          type: boolean
+          default: false
     responses:
       '200':
         description: Resolved entity state

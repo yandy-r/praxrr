@@ -1614,6 +1614,8 @@ components:
     # Resolved Config
     ResolvedLayer:
       $ref: './schemas/resolved-config.yaml#/ResolvedLayer'
+    FieldLineage:
+      $ref: './schemas/resolved-config.yaml#/FieldLineage'
     ResolvedEntityState:
       $ref: './schemas/resolved-config.yaml#/ResolvedEntityState'
     ResolvedEntityListResponse:

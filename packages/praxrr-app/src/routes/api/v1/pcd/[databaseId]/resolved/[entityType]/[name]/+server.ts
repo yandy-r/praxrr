@@ -1,13 +1,14 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from '@sveltejs/kit';
 import type { components } from '$api/v1.d.ts';
-import { pcdManager, resolveLayerState } from '$pcd/index.ts';
+import { pcdManager, resolveEntityLineage, resolveLayerState } from '$pcd/index.ts';
 import { isArrAppType } from '$shared/arr/capabilities.ts';
 import type { ArrAppType } from '$shared/pcd/types.ts';
 import {
   isKnownResolvedEntityType,
   mapResolvedErrorToResponse,
   sanitizeBigInts,
+  toWireLineage,
   toWireOverrides,
   toWirePayload,
 } from '../../shared.ts';
@@ -77,6 +78,9 @@ export const GET: RequestHandler = async ({ locals, params, url }) => {
     arrType = arrTypeParam;
   }
 
+  // Opt-in exact field lineage; honored only for layer=resolved (mirrors compare's includeLive idiom).
+  const includeLineage = url.searchParams.get('includeLineage') === 'true';
+
   try {
     // resolveLayerState composes the readers dispatch table (`layer=resolved`), the
     // ephemeral base-only cache (`layer=base`), and the base-vs-resolved field diff
@@ -106,6 +110,13 @@ export const GET: RequestHandler = async ({ locals, params, url }) => {
         entity: state.entity !== null ? toWirePayload(state.entity) : null,
         hasPendingConflict: state.hasPendingConflict,
       } satisfies ResolvedEntityState;
+
+      // Exact per-field lineage is opt-in and only meaningful for the fully-resolved layer.
+      if (includeLineage && state.layer === 'resolved') {
+        const result = await resolveEntityLineage({ databaseId, entityType, arrType, name });
+        response.lineage = toWireLineage(result.lineage);
+        response.lineageStatus = result.lineageStatus;
+      }
     }
 
     return json(sanitizeBigInts(response));
