@@ -10,6 +10,9 @@ import {
   SECURITY_POSTURE_ENGINE_VERSION,
   computeShieldReport,
   type CookieSecureMode,
+  type DnsAddressClassCounts,
+  type DnsTransportEvidence,
+  type InstanceFact,
   type PostureInputs,
   type SessionPosture,
   type SessionTransport,
@@ -64,11 +67,45 @@ const ALL_SESSIONS: readonly SessionPosture[] = [
   sessionPosture('unknown', 'on'),
 ];
 
+const ZERO_DNS_COUNTS: DnsAddressClassCounts = {
+  loopback: 0,
+  private: 0,
+  linkLocal: 0,
+  public: 0,
+  special: 0,
+};
+
+function dnsEvidence(
+  overrides: Partial<Omit<DnsTransportEvidence, 'ipv4' | 'ipv6'>> = {},
+  ipv4: Partial<DnsAddressClassCounts> = {},
+  ipv6: Partial<DnsAddressClassCounts> = {}
+): DnsTransportEvidence {
+  return {
+    outcome: 'resolved',
+    source: 'fresh',
+    ipv4: { ...ZERO_DNS_COUNTS, ...ipv4 },
+    ipv6: { ...ZERO_DNS_COUNTS, ...ipv6 },
+    retainedCount:
+      Object.values(ipv4).reduce((sum, count) => sum + (count ?? 0), 0) +
+      Object.values(ipv6).reduce((sum, count) => sum + (count ?? 0), 0),
+    observedAt: '2026-07-10T00:00:00.000Z',
+    incomplete: false,
+    truncated: false,
+    addressClassesChanged: false,
+    ...overrides,
+  };
+}
+
+function instance(id: number, url: string, dns?: DnsTransportEvidence): InstanceFact {
+  const base = { id, name: `arr-${id}`, arrType: 'radarr' as const, url };
+  return dns === undefined ? base : { ...base, dns };
+}
+
 Deno.test('computeShieldReport: stamps the engine version and generatedAt from nowIso', () => {
   const report = computeShieldReport(makeInputs());
-  assertEquals(SECURITY_POSTURE_ENGINE_VERSION, '3'); // '2' session posture (#227) → '3' proxy_trust check (#228)
+  assertEquals(SECURITY_POSTURE_ENGINE_VERSION, '4'); // '3' proxy trust (#228) → '4' DNS transport evidence (#229)
   assertEquals(report.engineVersion, SECURITY_POSTURE_ENGINE_VERSION);
-  assertEquals(report.engineVersion, '3');
+  assertEquals(report.engineVersion, '4');
   assertEquals(report.generatedAt, '2026-07-09T02:00:00.000Z');
 });
 
@@ -80,6 +117,176 @@ Deno.test('computeShieldReport: instance order does not change the score (order-
   const a = makeInputs();
   const b = makeInputs({ instances: [...a.instances].reverse() });
   assertEquals(computeShieldReport(a).score, computeShieldReport(b).score);
+});
+
+Deno.test('computeShieldReport: DNS evidence produces the exact conservative row and check matrix', () => {
+  const cases: readonly {
+    label: string;
+    dns: DnsTransportEvidence;
+    tier: 'private' | 'public' | 'mixed' | 'unknown';
+    score: 65 | 30;
+    status: 'attention' | 'action';
+    critical: boolean;
+  }[] = [
+    {
+      label: 'IPv4 private-only',
+      dns: dnsEvidence({}, { private: 1 }),
+      tier: 'private',
+      score: 65,
+      status: 'attention',
+      critical: false,
+    },
+    {
+      label: 'IPv6 local-only',
+      dns: dnsEvidence({}, {}, { loopback: 1, linkLocal: 1 }),
+      tier: 'private',
+      score: 65,
+      status: 'attention',
+      critical: false,
+    },
+    {
+      label: 'public-only',
+      dns: dnsEvidence({}, {}, { public: 1 }),
+      tier: 'public',
+      score: 30,
+      status: 'action',
+      critical: true,
+    },
+    {
+      label: 'mixed local/public',
+      dns: dnsEvidence({}, { private: 1, public: 1 }),
+      tier: 'mixed',
+      score: 30,
+      status: 'action',
+      critical: true,
+    },
+    {
+      label: 'public/non-public class change',
+      dns: dnsEvidence({ addressClassesChanged: true }, { private: 1 }),
+      tier: 'mixed',
+      score: 30,
+      status: 'action',
+      critical: true,
+    },
+    {
+      label: 'partial public',
+      dns: dnsEvidence({ outcome: 'partial', incomplete: true }, { public: 1 }),
+      tier: 'mixed',
+      score: 30,
+      status: 'action',
+      critical: true,
+    },
+    {
+      label: 'special-only',
+      dns: dnsEvidence({}, { special: 1 }),
+      tier: 'unknown',
+      score: 65,
+      status: 'attention',
+      critical: false,
+    },
+  ];
+
+  for (const testCase of cases) {
+    const report = computeShieldReport(
+      makeInputs({ instances: [instance(1, 'http://arr.example.com:7878', testCase.dns)] })
+    );
+    const row = report.transport[0];
+    const check = report.checks.find((candidate) => candidate.id === 'arr_transport');
+    assertEquals(row.tier, testCase.tier, `${testCase.label} row tier`);
+    assertEquals(row.score, testCase.score, `${testCase.label} row score`);
+    assertEquals(row.status, testCase.status, `${testCase.label} row status`);
+    assertEquals(row.dns, testCase.dns, `${testCase.label} evidence`);
+    assertEquals(check?.score, testCase.score, `${testCase.label} check score`);
+    assertEquals(check?.status, testCase.status, `${testCase.label} check status`);
+    assertEquals(check?.critical, testCase.critical, `${testCase.label} critical`);
+    assertEquals(check?.bandCapWhenAction, testCase.critical ? 'guarded' : null, `${testCase.label} cap`);
+  }
+});
+
+Deno.test('computeShieldReport: DNS contributions, recoverable points, and order remain exact', () => {
+  const local = computeShieldReport(
+    makeInputs({
+      appApiKeyPresent: false,
+      instances: [instance(1, 'http://local.example.com', dnsEvidence({}, { private: 1 }))],
+    })
+  );
+  const localCheck = local.checks.find((check) => check.id === 'arr_transport');
+  assertEquals(local.score, 85);
+  assertEquals(local.band, 'hardened');
+  assertEquals(localCheck?.recoverablePoints, 15);
+  assertEquals(
+    local.checks.reduce((sum, check) => sum + check.contribution, 0),
+    local.score
+  );
+
+  const publicDns = dnsEvidence({}, { public: 1 });
+  const privateDns = dnsEvidence({}, {}, { private: 1 });
+  const instances = [
+    instance(1, 'http://public.example.com', publicDns),
+    instance(2, 'http://private.example.com', privateDns),
+    instance(3, 'https://secure.example.com'),
+  ];
+  const forward = computeShieldReport(makeInputs({ instances }));
+  const reverse = computeShieldReport(makeInputs({ instances: [...instances].reverse() }));
+  assertEquals(forward.score, reverse.score);
+  assertEquals(
+    forward.checks.map((check) => [check.id, check.score, check.contribution, check.recoverablePoints]),
+    reverse.checks.map((check) => [check.id, check.score, check.contribution, check.recoverablePoints])
+  );
+  for (const report of [forward, reverse]) {
+    assertEquals(
+      report.checks.reduce((sum, check) => sum + check.contribution, 0),
+      report.score
+    );
+  }
+});
+
+Deno.test('computeShieldReport: DNS public and mixed evidence cap a would-be hardened report at guarded', () => {
+  for (const dns of [dnsEvidence({}, { public: 1 }), dnsEvidence({}, { private: 1, public: 1 })]) {
+    const instances = [instance(1, 'https://secure'), instance(2, 'http://arr.example.com', dns)];
+    const report = computeShieldReport(makeInputs({ appApiKeyPresent: false, instances }));
+    assertEquals(report.score, 85);
+    assertEquals(report.band, 'guarded');
+    assertEquals(report.bandCappedBy?.checkId, 'arr_transport');
+  }
+});
+
+Deno.test('computeShieldReport: established trusted URL cases ignore attached DNS and remain 100', () => {
+  const hostileDns = dnsEvidence({ addressClassesChanged: true }, { public: 1, private: 1 });
+  const instances = [
+    instance(1, 'https://secure.example.com', hostileDns),
+    instance(2, 'http://127.0.0.1:7878', hostileDns),
+    instance(3, 'http://radarr:7878', hostileDns),
+  ];
+  const report = computeShieldReport(makeInputs({ instances }));
+  const transport = report.checks.find((check) => check.id === 'arr_transport');
+  assertEquals(transport?.score, 100);
+  assertEquals(transport?.status, 'pass');
+  for (const row of report.transport) {
+    assertEquals(row.score, 100);
+    assertEquals(row.dns.outcome, 'not-applicable');
+    assertEquals(row.dns.source, 'none');
+  }
+});
+
+Deno.test('computeShieldReport: every DNS action remains actionable and resolver evidence stays redacted', () => {
+  for (const dns of [
+    dnsEvidence({}, { public: 1 }),
+    dnsEvidence({}, { public: 1, private: 1 }),
+    dnsEvidence({ addressClassesChanged: true }, {}, { private: 1 }),
+  ]) {
+    const report = computeShieldReport(makeInputs({ instances: [instance(1, 'http://arr.example.com', dns)] }));
+    const check = report.checks.find((candidate) => candidate.id === 'arr_transport');
+    assert(check);
+    assertEquals(check.status, 'action');
+    assert(check.recommendations.length > 0);
+    for (const recommendation of check.recommendations) {
+      assert(recommendation.fix.kind !== 'none');
+    }
+    const serialized = JSON.stringify(report);
+    assert(!serialized.includes('8.8.8.8'));
+    assert(!serialized.includes('resolver error'));
+  }
 });
 
 Deno.test('computeShieldReport: per-check contributions sum EXACTLY to the score', () => {
@@ -346,10 +553,10 @@ Deno.test(
   }
 );
 
-Deno.test('computeShieldReport: engineVersion is the pinned report-surface version 3 for every transport', () => {
-  assertEquals(SECURITY_POSTURE_ENGINE_VERSION, '3');
+Deno.test('computeShieldReport: engineVersion is the pinned report-surface version 4 for every transport', () => {
+  assertEquals(SECURITY_POSTURE_ENGINE_VERSION, '4');
   for (const session of ALL_SESSIONS) {
-    assertEquals(computeShieldReport(makeInputs({ session })).engineVersion, '3');
+    assertEquals(computeShieldReport(makeInputs({ session })).engineVersion, '4');
   }
 });
 

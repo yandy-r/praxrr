@@ -179,7 +179,7 @@ export const TOOLS: readonly McpTool[] = [
     description: 'The security shield report for this deployment (score, per-check breakdown, top actions).',
     inputSchema: { type: 'object', properties: {}, additionalProperties: false },
     annotations: { readOnlyHint: true },
-    handler: () => Promise.resolve(toSecuritySummary(computeShield())),
+    handler: async () => toSecuritySummary(await computeShield()),
   },
   {
     name: 'get_drift_status',

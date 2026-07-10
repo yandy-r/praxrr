@@ -14,6 +14,10 @@ import type {
   Assurance,
   CheckResult,
   CheckStatus,
+  DnsAddressClassCounts,
+  DnsEvidenceSource,
+  DnsOutcome,
+  DnsTransportEvidence,
   SecurityCheckId,
   ShieldArrType,
   ShieldBand,
@@ -55,6 +59,26 @@ export interface WireCheck {
   recommendations: WireRecommendation[];
 }
 
+export interface WireDnsAddressClassCounts {
+  loopback: number;
+  private: number;
+  linkLocal: number;
+  public: number;
+  special: number;
+}
+
+export interface WireDnsTransportEvidence {
+  outcome: DnsOutcome;
+  source: DnsEvidenceSource;
+  ipv4: WireDnsAddressClassCounts;
+  ipv6: WireDnsAddressClassCounts;
+  retainedCount: number;
+  observedAt: string | null;
+  incomplete: boolean;
+  truncated: boolean;
+  addressClassesChanged: boolean;
+}
+
 export interface WireTransportRow {
   instanceId: number;
   instanceName: string;
@@ -64,6 +88,7 @@ export interface WireTransportRow {
   tier: TransportTier;
   score: number | null;
   status: CheckStatus;
+  dns: WireDnsTransportEvidence;
   fix: WireFix;
 }
 
@@ -146,6 +171,30 @@ function toWireCheck(check: CheckResult): WireCheck {
   };
 }
 
+function toWireDnsAddressClassCounts(counts: DnsAddressClassCounts): WireDnsAddressClassCounts {
+  return {
+    loopback: counts.loopback,
+    private: counts.private,
+    linkLocal: counts.linkLocal,
+    public: counts.public,
+    special: counts.special,
+  };
+}
+
+function toWireDnsTransportEvidence(evidence: DnsTransportEvidence): WireDnsTransportEvidence {
+  return {
+    outcome: evidence.outcome,
+    source: evidence.source,
+    ipv4: toWireDnsAddressClassCounts(evidence.ipv4),
+    ipv6: toWireDnsAddressClassCounts(evidence.ipv6),
+    retainedCount: evidence.retainedCount,
+    observedAt: evidence.observedAt,
+    incomplete: evidence.incomplete,
+    truncated: evidence.truncated,
+    addressClassesChanged: evidence.addressClassesChanged,
+  };
+}
+
 function toWireTransportRow(row: TransportRow): WireTransportRow {
   return {
     instanceId: row.instanceId,
@@ -156,6 +205,7 @@ function toWireTransportRow(row: TransportRow): WireTransportRow {
     tier: row.tier,
     score: row.score,
     status: row.status,
+    dns: toWireDnsTransportEvidence(row.dns),
     fix: toWireFix(row.fix),
   };
 }

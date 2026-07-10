@@ -12365,7 +12365,106 @@
       "SecurityTransportTier": {
         "type": "string",
         "description": "How an Arr connection's target host is classified from Praxrr's own knowledge (no probing).",
-        "enum": ["encrypted", "loopback", "docker-alias", "private", "unknown", "public"]
+        "enum": ["encrypted", "loopback", "docker-alias", "private", "unknown", "public", "mixed"]
+      },
+      "SecurityDnsOutcome": {
+        "type": "string",
+        "description": "Closed result of bounded DNS evidence gathering for one stored Arr hostname.",
+        "enum": ["not-applicable", "resolved", "partial", "timeout", "failed", "empty", "budget-exceeded"]
+      },
+      "SecurityDnsEvidenceSource": {
+        "type": "string",
+        "description": "Provenance of a DNS observation; cache hits retain the original observation time.",
+        "enum": ["none", "fresh", "cache"]
+      },
+      "SecurityDnsAddressClassCounts": {
+        "type": "object",
+        "additionalProperties": false,
+        "description": "Bounded address-class counts for one DNS record family; raw addresses are never exposed.",
+        "required": ["loopback", "private", "linkLocal", "public", "special"],
+        "properties": {
+          "loopback": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 16
+          },
+          "private": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 16
+          },
+          "linkLocal": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 16
+          },
+          "public": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 16
+          },
+          "special": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 16
+          }
+        }
+      },
+      "SecurityDnsTransportEvidence": {
+        "type": "object",
+        "additionalProperties": false,
+        "description": "Safe aggregate DNS evidence; excludes addresses, resolver details, CNAMEs, and error text.",
+        "required": [
+          "outcome",
+          "source",
+          "ipv4",
+          "ipv6",
+          "retainedCount",
+          "observedAt",
+          "incomplete",
+          "truncated",
+          "addressClassesChanged"
+        ],
+        "properties": {
+          "outcome": {
+            "$ref": "#/components/schemas/SecurityDnsOutcome"
+          },
+          "source": {
+            "$ref": "#/components/schemas/SecurityDnsEvidenceSource"
+          },
+          "ipv4": {
+            "$ref": "#/components/schemas/SecurityDnsAddressClassCounts"
+          },
+          "ipv6": {
+            "$ref": "#/components/schemas/SecurityDnsAddressClassCounts"
+          },
+          "retainedCount": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 16
+          },
+          "observedAt": {
+            "description": "Original observation time, or null when no DNS observation exists.",
+            "oneOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "incomplete": {
+            "type": "boolean"
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "addressClassesChanged": {
+            "type": "boolean"
+          }
+        }
       },
       "SecurityFix": {
         "type": "object",
@@ -12491,7 +12590,18 @@
       "SecurityTransportRow": {
         "type": "object",
         "description": "One enabled Arr connection's transport posture (host only — never the API key).",
-        "required": ["instanceId", "instanceName", "arrType", "scheme", "host", "tier", "score", "status", "fix"],
+        "required": [
+          "instanceId",
+          "instanceName",
+          "arrType",
+          "scheme",
+          "host",
+          "tier",
+          "score",
+          "status",
+          "dns",
+          "fix"
+        ],
         "properties": {
           "instanceId": {
             "type": "integer"
@@ -12526,6 +12636,9 @@
           },
           "status": {
             "$ref": "#/components/schemas/SecurityCheckStatus"
+          },
+          "dns": {
+            "$ref": "#/components/schemas/SecurityDnsTransportEvidence"
           },
           "fix": {
             "$ref": "#/components/schemas/SecurityFix"

@@ -4,8 +4,8 @@
  * The ONLY config/DB-touching code on the read path. It materializes every fact the pure engine
  * needs — the auth mode + bind, per-instance connection URLs, the app-key-at-rest posture, and the
  * credential key-ring rotation state — into a {@link PostureInputs}, plus a runtime self-verify of the
- * log-redaction sanitizer. Zero network I/O; it audits only state Praxrr already knows and NEVER
- * reads out a secret value (only presence, length, and host strings).
+ * log-redaction sanitizer and bounded DNS evidence for eligible stored Arr URLs. It NEVER reads out
+ * a secret value (only presence, length, and host strings).
  *
  * Degrade-never-throw: any reader failure (uninitialized DB, missing key ring) narrows the affected
  * fact to its inert/`null` state so one bad read can never 500 the summary route.
@@ -20,16 +20,48 @@ import { authSettingsQueries } from '$db/queries/authSettings.ts';
 import { getActiveArrCredentialKeyVersion, getAllArrCredentialKeyVersions } from '$utils/encryption/keys.ts';
 import { isSyncPreviewArrType } from '$sync/preview/types.ts';
 import { resolveCookieSecure, resolveSessionTransport } from './sessionTransport.ts';
-import type {
-  InstanceFact,
-  PostureInputs,
-  RotationFacts,
-  SessionRequestContext,
-  ShieldArrType,
+import { getDnsTransportResolver, type DnsTransportResolver } from './dnsTransport.ts';
+import {
+  classifyHost,
+  type DnsOutcome,
+  type DnsTransportEvidence,
+  type InstanceFact,
+  type PostureInputs,
+  type RotationFacts,
+  type SessionRequestContext,
+  type ShieldArrType,
 } from '$shared/security/index.ts';
 
 const SOURCE = 'SecurityPostureGather';
 const STRONG_APP_KEY_MIN_LENGTH = 32;
+const DNS_REPORT_DEADLINE_MS = 2_000;
+const MAX_DNS_CANDIDATES = 32;
+
+export interface SecurityPostureDependencies {
+  readonly resolver: DnsTransportResolver;
+  readonly now: () => number;
+}
+
+function resolveDependencies(dependencies: Partial<SecurityPostureDependencies>): SecurityPostureDependencies {
+  return {
+    resolver: dependencies.resolver ?? getDnsTransportResolver(),
+    now: dependencies.now ?? Date.now,
+  };
+}
+
+function closedDnsEvidence(outcome: DnsOutcome): DnsTransportEvidence {
+  return {
+    outcome,
+    source: 'none',
+    ipv4: { loopback: 0, private: 0, linkLocal: 0, public: 0, special: 0 },
+    ipv6: { loopback: 0, private: 0, linkLocal: 0, public: 0, special: 0 },
+    retainedCount: 0,
+    observedAt: null,
+    incomplete: true,
+    truncated: false,
+    addressClassesChanged: false,
+  };
+}
 
 /** OIDC is only as strong as its configuration; distinguish fully-, partially-, and un-configured. */
 function gatherOidcState(): { configured: boolean; partiallyConfigured: boolean } {
@@ -72,6 +104,53 @@ function gatherInstances(): InstanceFact[] {
   }
 }
 
+/** Return the normalized DNS key only for stored URLs eligible for report-only resolution. */
+function dnsCandidateHostname(rawUrl: string): string | null {
+  try {
+    const url = new URL(rawUrl);
+    if (url.protocol !== 'http:') return null;
+    const lower = url.hostname.toLowerCase();
+    const hostname = lower.endsWith('.') ? lower.slice(0, -1) : lower;
+    if (!hostname.includes('.') || classifyHost(hostname) !== 'unknown') return null;
+    return hostname;
+  } catch {
+    return null;
+  }
+}
+
+/** Resolve each unique eligible hostname once, then project closed evidence to every matching row. */
+async function gatherDnsEvidence(
+  instances: readonly InstanceFact[],
+  dependencies: SecurityPostureDependencies,
+  deadlineAt: number
+): Promise<InstanceFact[]> {
+  const hostnames = instances.map((instance) => dnsCandidateHostname(instance.url));
+  const uniqueHostnames = [...new Set(hostnames.filter((hostname): hostname is string => hostname !== null))];
+  const selected = uniqueHostnames.slice(0, MAX_DNS_CANDIDATES);
+  const evidenceByHostname = new Map<string, DnsTransportEvidence>();
+
+  for (const hostname of uniqueHostnames.slice(MAX_DNS_CANDIDATES)) {
+    evidenceByHostname.set(hostname, closedDnsEvidence('budget-exceeded'));
+  }
+
+  async function observe(hostname: string): Promise<readonly [string, DnsTransportEvidence]> {
+    try {
+      return [hostname, await dependencies.resolver.observe(hostname, { deadlineAt })];
+    } catch {
+      return [hostname, closedDnsEvidence('failed')];
+    }
+  }
+
+  const observations = await Promise.all(selected.map(observe));
+  for (const [hostname, evidence] of observations) evidenceByHostname.set(hostname, evidence);
+
+  return instances.map((instance, index) => {
+    const hostname = hostnames[index];
+    if (hostname === null) return instance;
+    return { ...instance, dns: evidenceByHostname.get(hostname) ?? closedDnsEvidence('failed') };
+  });
+}
+
 /** Key-ring + per-instance key-version facts. A missing key ring degrades to "no rotation in play". */
 function gatherRotation(instances: readonly InstanceFact[]): RotationFacts {
   try {
@@ -111,10 +190,15 @@ function verifyLogRedaction(): boolean {
 }
 
 /** Build the fully-materialized {@link PostureInputs} for the current deployment. Never throws. */
-export function buildPostureInputs(event?: SessionRequestContext): PostureInputs {
+export async function buildPostureInputs(
+  event?: SessionRequestContext,
+  dependencyOverrides: Partial<SecurityPostureDependencies> = {}
+): Promise<PostureInputs> {
+  const dependencies = resolveDependencies(dependencyOverrides);
+  const startedAt = dependencies.now();
   const oidc = gatherOidcState();
   const appKey = gatherAppKeyState();
-  const instances = gatherInstances();
+  const instances = await gatherDnsEvidence(gatherInstances(), dependencies, startedAt + DNS_REPORT_DEADLINE_MS);
 
   const transport = resolveSessionTransport(event);
   const cookieSecureMode = config.cookieSecureMode;
@@ -138,6 +222,6 @@ export function buildPostureInputs(event?: SessionRequestContext): PostureInputs
     trustedProxyValidRangeCount: trustedProxy.ranges.length,
     trustedProxyInvalidEntries: trustedProxy.invalidEntries,
     trustedProxyOverlyBroad: trustedProxy.overlyBroad,
-    nowIso: new Date().toISOString(),
+    nowIso: new Date(dependencies.now()).toISOString(),
   };
 }

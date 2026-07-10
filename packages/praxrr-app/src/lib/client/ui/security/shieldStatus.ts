@@ -1,4 +1,11 @@
-import type { CheckStatus, ShieldBand, TransportTier } from '$shared/security/index.ts';
+import type { components } from '$api/v1.d.ts';
+
+type SecuritySchemas = components['schemas'];
+type CheckStatus = SecuritySchemas['SecurityCheckStatus'];
+type DnsEvidenceSource = SecuritySchemas['SecurityDnsEvidenceSource'];
+type DnsOutcome = SecuritySchemas['SecurityDnsOutcome'];
+type ShieldBand = SecuritySchemas['SecurityShieldBand'];
+type TransportTier = SecuritySchemas['SecurityTransportTier'];
 
 /**
  * Shared presentation mapping for the security-posture surface — the single source of truth for band,
@@ -68,6 +75,23 @@ export const TRANSPORT_TIER_LABEL: Record<TransportTier, string> = {
   private: 'Private LAN',
   unknown: 'Unclassified',
   public: 'Public',
+  mixed: 'Mixed address scopes',
+};
+
+export const DNS_OUTCOME_LABEL: Record<DnsOutcome, string> = {
+  'not-applicable': 'DNS not needed',
+  resolved: 'DNS resolved',
+  partial: 'Partial DNS evidence',
+  timeout: 'DNS timed out',
+  failed: 'DNS unavailable',
+  empty: 'No A/AAAA answers',
+  'budget-exceeded': 'DNS lookup deferred',
+};
+
+export const DNS_SOURCE_LABEL: Record<DnsEvidenceSource, string> = {
+  none: 'No DNS observation',
+  fresh: 'Fresh observation',
+  cache: 'Cached observation',
 };
 
 export function tierVariant(tier: TransportTier): ShieldBadgeVariant {
@@ -80,6 +104,22 @@ export function tierVariant(tier: TransportTier): ShieldBadgeVariant {
     case 'unknown':
       return 'warning';
     case 'public':
+    case 'mixed':
       return 'danger';
+  }
+}
+
+export function dnsOutcomeVariant(outcome: DnsOutcome): ShieldBadgeVariant {
+  switch (outcome) {
+    case 'resolved':
+      return 'info';
+    case 'partial':
+    case 'timeout':
+    case 'failed':
+    case 'empty':
+    case 'budget-exceeded':
+      return 'warning';
+    case 'not-applicable':
+      return 'neutral';
   }
 }
