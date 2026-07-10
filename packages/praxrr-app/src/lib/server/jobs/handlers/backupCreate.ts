@@ -9,7 +9,7 @@ import { logger } from '$logger/logger.ts';
 const backupCreateHandler: JobHandler = async (job) => {
   const settings = backupSettingsQueries.get();
   if (!settings || settings.enabled !== 1) {
-    return { status: 'cancelled', output: 'Backups disabled' };
+    return { status: 'cancelled', decision: 'Backups disabled' };
   }
 
   const sourceDir = config.paths.data;
@@ -18,7 +18,11 @@ const backupCreateHandler: JobHandler = async (job) => {
   try {
     const result = await createBackup(sourceDir, backupsDir);
     if (!result.success) {
-      return { status: 'failure', error: result.error ?? 'Backup failed' };
+      await logger.error('Backup creation failed', {
+        source: 'BackupCreateJob',
+        meta: { jobId: job.id, error: result.error ?? 'Backup failed' },
+      });
+      return { status: 'failure', failureCode: 'filesystem' };
     }
 
     const sizeInMB = ((result.sizeBytes ?? 0) / (1024 * 1024)).toFixed(2);
@@ -34,7 +38,7 @@ const backupCreateHandler: JobHandler = async (job) => {
       source: 'BackupCreateJob',
       meta: { jobId: job.id, error },
     });
-    return { status: 'failure', error: error instanceof Error ? error.message : String(error) };
+    return { status: 'failure', failureCode: 'filesystem' };
   }
 };
 

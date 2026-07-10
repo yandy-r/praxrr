@@ -243,6 +243,7 @@ Deno.test('getTrashGuideSyncStatus parses structured run evidence and resolves l
         durationMs: 1000,
         error: null,
         output: JSON.stringify(evidence),
+        evidence: null,
         createdAt: runAt,
       },
     ]) as typeof jobRunHistoryQueries.getByQueueId,

@@ -177,6 +177,7 @@ function createRunHistoryRecord(
     durationMs: 2000,
     error: evidence.failure?.message ?? null,
     output: JSON.stringify(evidence),
+    evidence: null,
     createdAt: '2026-07-10T00:00:03.000Z',
     ...overrides,
   };

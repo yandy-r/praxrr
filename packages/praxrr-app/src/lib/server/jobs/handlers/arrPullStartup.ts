@@ -3,11 +3,12 @@ import { logger } from '$logger/logger.ts';
 import { startupPullQueries } from '$db/queries/startupPull.ts';
 import { jobQueueRegistry } from '../queueRegistry.ts';
 import type { JobHandler } from '../queueTypes.ts';
+import { classifyJobFailure } from '../evidence.ts';
 import { runStartupPull, toArrPullStartupRunResult, toJobRunStatus } from '$lib/server/pull/startup/index.ts';
 
 const arrPullStartupHandler: JobHandler = async (_job) => {
   if (!config.pullOnStart) {
-    return { status: 'skipped', output: 'Startup pull disabled via PULL_ON_START' };
+    return { status: 'skipped', decision: 'Startup pull disabled via PULL_ON_START' };
   }
 
   try {
@@ -58,8 +59,13 @@ const arrPullStartupHandler: JobHandler = async (_job) => {
       });
     }
 
+    // Structured per-instance detail is persisted to startup_pull_runs and logged below;
+    // the durable job evidence carries only a bounded, safe count summary (no raw JSON blob).
     const runResult = toArrPullStartupRunResult(summary);
     const jobStatus = toJobRunStatus(summary.status);
+    const outputSummary =
+      `Imported ${summary.imported}, skipped ${summary.skippedDefault + summary.skippedNoMatch}, ` +
+      `conflicted ${summary.conflicted}, failed ${summary.failed} across ${summary.instances.length} instance(s)`;
 
     await logger.info('Startup pull job completed', {
       source: 'ArrPullStartupJob',
@@ -70,24 +76,26 @@ const arrPullStartupHandler: JobHandler = async (_job) => {
         imported: summary.imported,
         failed: summary.failed,
         instanceCount: summary.instances.length,
+        runResult,
       },
     });
 
-    return {
-      status: jobStatus,
-      output: JSON.stringify(runResult),
-    };
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    await logger.error('Startup pull job failed unexpectedly', {
-      source: 'ArrPullStartupJob',
-      meta: { error: message, stack: error instanceof Error ? error.stack : undefined },
-    });
+    if (jobStatus === 'failure') {
+      // Instances failed to pull (the run completed without throwing); persist a typed code.
+      return { status: 'failure', failureCode: 'upstream', output: outputSummary };
+    }
 
     return {
-      status: 'failure',
-      error: message,
+      status: jobStatus,
+      output: outputSummary,
     };
+  } catch (error) {
+    await logger.error('Startup pull job failed unexpectedly', {
+      source: 'ArrPullStartupJob',
+      meta: { error, stack: error instanceof Error ? error.stack : undefined },
+    });
+
+    return { status: 'failure', failureCode: classifyJobFailure(error) };
   }
 };
 

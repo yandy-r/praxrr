@@ -155,7 +155,7 @@ Deno.test('trashGuideSync handler maps sync() throw into scheduled transient ret
     assertEquals(result.status, 'failure');
     assertEquals(evidence.status, 'failure');
     assert(evidence.failure?.code === 'network' || evidence.failure?.code === 'sync_failed');
-    assertEquals(result.error, buildTrashGuideSyncFailure(evidence.failure!.code).message);
+    assertEquals(evidence.failure?.message, buildTrashGuideSyncFailure(evidence.failure!.code).message);
     assertEquals(evidence.runToken, 'tok-1');
     assertEquals(typeof result.rescheduleAt, 'string');
     assert(warnCalls.length >= 1);
@@ -366,10 +366,10 @@ Deno.test('trashGuideSync handler never leaks secrets from an unexpected crash',
 
     assertEquals(result.status, 'failure');
     assertEquals(evidence.failure?.code, 'internal');
-    assertEquals(result.error, buildTrashGuideSyncFailure('internal').message);
+    assertEquals(evidence.failure?.message, buildTrashGuideSyncFailure('internal').message);
 
     const output = result.output ?? '';
-    const error = result.error ?? '';
+    const error = evidence.failure?.message ?? '';
     assert(!output.includes('ghp_secretTOKEN123'));
     assert(!output.includes('user:pass'));
     assert(!error.includes('ghp_secretTOKEN123'));

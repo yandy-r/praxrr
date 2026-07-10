@@ -1,5 +1,6 @@
 import { db } from '../db.ts';
 import type { JobRunHistoryRecord, JobRunStatus, JobType } from '$jobs/queueTypes.ts';
+import { parseSafeJobEvidence, type SafeJobEvidence } from '$shared/jobs/evidence.ts';
 
 interface JobRunHistoryRow {
   id: number;
@@ -11,6 +12,7 @@ interface JobRunHistoryRow {
   duration_ms: number;
   error: string | null;
   output: string | null;
+  evidence: string | null;
   created_at: string;
 }
 
@@ -25,11 +27,18 @@ function rowToRecord(row: JobRunHistoryRow): JobRunHistoryRecord {
     durationMs: row.duration_ms,
     error: row.error,
     output: row.output,
+    // Tolerant parse: legacy/malformed/wrong-version blobs degrade to null, never throw.
+    evidence: parseSafeJobEvidence(row.evidence),
     createdAt: row.created_at,
   };
 }
 
 export const jobRunHistoryQueries = {
+  /**
+   * Persist one job run. `evidence` is the structured safe durable record (issue #237); the
+   * `error`/`output` columns are written as safe back-compat summaries derived from it, so
+   * existing consumers (last-run error, per-queue latest run) keep working.
+   */
   create(
     queueId: number | null,
     jobType: JobType,
@@ -37,21 +46,24 @@ export const jobRunHistoryQueries = {
     startedAt: string,
     finishedAt: string,
     durationMs: number,
-    error?: string,
-    output?: string
+    evidence: SafeJobEvidence
   ): number {
+    const errorSummary = evidence.failure?.message ?? null;
+    const outputSummary = evidence.output ?? evidence.decision ?? null;
+
     db.execute(
       `INSERT INTO job_run_history
-			 (queue_id, job_type, status, started_at, finished_at, duration_ms, error, output)
-			 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+			 (queue_id, job_type, status, started_at, finished_at, duration_ms, error, output, evidence)
+			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       queueId,
       jobType,
       status,
       startedAt,
       finishedAt,
       durationMs,
-      error ?? null,
-      output ?? null
+      errorSummary,
+      outputSummary,
+      JSON.stringify(evidence)
     );
 
     const result = db.queryFirst<{ id: number }>('SELECT last_insert_rowid() as id');

@@ -1,6 +1,7 @@
 import { jobQueueRegistry } from '../queueRegistry.ts';
 import type { JobHandler } from '../queueTypes.ts';
 import { executeSyncJob } from './arrSync.ts';
+import { classifyJobFailure, FAILURE_COPY } from '../evidence.ts';
 import { arrInstancesQueries } from '$db/queries/arrInstances.ts';
 import { canaryRolloutQueries } from '$db/queries/canaryRollouts.ts';
 import { processBatches } from '$sync/processor.ts';
@@ -52,14 +53,20 @@ async function syncRemainingInstance(
       instanceName: target.instanceName,
       status: result.status,
       output: result.output,
-      error: result.error,
+      // Safe by construction: the per-instance error is the pre-authored copy for the typed
+      // failure code, never raw sync/exception text.
+      error: result.status === 'failure' ? FAILURE_COPY[result.failureCode].message : undefined,
     };
   } catch (error) {
+    await logger.error('Canary rollout instance sync threw', {
+      source: 'CanaryRolloutJob',
+      meta: { instanceId: target.instanceId, error },
+    });
     return {
       instanceId: target.instanceId,
       instanceName: target.instanceName,
       status: 'failure',
-      error: error instanceof Error ? error.message : String(error),
+      error: FAILURE_COPY[classifyJobFailure(error)].message,
     };
   }
 }
@@ -68,10 +75,10 @@ const canaryRolloutHandler: JobHandler = async (job) => {
   const rolloutId = Number(job.payload.rolloutId);
   const rollout = canaryRolloutQueries.getById(rolloutId);
   if (!rollout) {
-    return { status: 'cancelled', output: `Canary rollout ${rolloutId} not found` };
+    return { status: 'cancelled', decision: `Canary rollout ${rolloutId} not found` };
   }
   if (rollout.status !== 'rolling_out') {
-    return { status: 'cancelled', output: `Canary rollout ${rolloutId} is ${rollout.status}, not rolling out` };
+    return { status: 'cancelled', decision: `Canary rollout ${rolloutId} is ${rollout.status}, not rolling out` };
   }
 
   const sections: readonly SectionType[] = rollout.sections ?? [];
@@ -117,7 +124,11 @@ const canaryRolloutHandler: JobHandler = async (job) => {
   });
 
   return rolloutFailed
-    ? { status: 'failure', error: `Canary rollout failed: ${remainingTargets.length} remaining instance(s), one or more failed` }
+    ? {
+        status: 'failure',
+        failureCode: 'upstream',
+        output: `${remainingTargets.length} remaining instance(s); one or more failed`,
+      }
     : { status: 'success', output: `Canary rollout completed: ${accumulatedResults.length} instance(s) synced` };
 };
 

@@ -464,7 +464,7 @@ Deno.test('trashGuideSync handler coerces numeric-string sourceId through parseP
     assertExists(evidence.failure);
     assertEquals(evidence.failure.code, 'source_missing');
     assertEquals(evidence.counts, null);
-    assertEquals(result.error, buildTrashGuideSyncFailure('source_missing').message);
+    assertEquals(evidence.failure?.message, buildTrashGuideSyncFailure('source_missing').message);
     // AC5: a since-deleted source stays identifiable from the durable payload snapshot.
     assertEquals(evidence.runToken, 'tok-55');
     assertEquals(evidence.source.name, 'deleted-source-55');
@@ -628,7 +628,7 @@ Deno.test('trashGuideSync handler rejects payload missing sourceId', async () =>
     assertExists(evidence.failure);
     assertEquals(evidence.failure.code, 'internal');
     assertEquals(evidence.counts, null);
-    assertEquals(result.error, buildTrashGuideSyncFailure('internal').message);
+    assertEquals(evidence.failure?.message, buildTrashGuideSyncFailure('internal').message);
     assertEquals(getByIdCalls, 0);
   } finally {
     for (const restore of restores.reverse()) {
@@ -662,7 +662,7 @@ Deno.test('trashGuideSync handler rejects payload with non-numeric sourceId', as
     assertEquals(evidence.status, 'failure');
     assertExists(evidence.failure);
     assertEquals(evidence.failure.code, 'internal');
-    assertEquals(result.error, buildTrashGuideSyncFailure('internal').message);
+    assertEquals(evidence.failure?.message, buildTrashGuideSyncFailure('internal').message);
     assertEquals(getByIdCalls, 0);
   } finally {
     for (const restore of restores.reverse()) {
@@ -696,7 +696,7 @@ Deno.test('trashGuideSync handler rejects payload with invalid trigger literal',
     assertEquals(evidence.status, 'failure');
     assertExists(evidence.failure);
     assertEquals(evidence.failure.code, 'internal');
-    assertEquals(result.error, buildTrashGuideSyncFailure('internal').message);
+    assertEquals(evidence.failure?.message, buildTrashGuideSyncFailure('internal').message);
     assertEquals(getByIdCalls, 0);
   } finally {
     for (const restore of restores.reverse()) {
@@ -733,7 +733,7 @@ Deno.test('trashGuideSync handler rejects payload with non-string requestedAt', 
     assertEquals(evidence.status, 'failure');
     assertExists(evidence.failure);
     assertEquals(evidence.failure.code, 'internal');
-    assertEquals(result.error, buildTrashGuideSyncFailure('internal').message);
+    assertEquals(evidence.failure?.message, buildTrashGuideSyncFailure('internal').message);
     assertEquals(getByIdCalls, 0);
   } finally {
     for (const restore of restores.reverse()) {
@@ -818,9 +818,9 @@ Deno.test('trashGuideSync handler schedules a retry for transient git/network fa
       assertEquals(result.status, 'failure', `status for "${message}"`);
       assertEquals(evidence.failure?.code, 'network', `failure code for "${message}"`);
       // Typed safe copy is transported; the raw git/network message is never leaked into evidence or error.
-      assertEquals(result.error, networkFailure.message, `safe error copy for "${message}"`);
+      assertEquals(evidence.failure?.message, networkFailure.message, `safe error copy for "${message}"`);
       assertFalse(result.output?.includes(message) ?? false, `output leak for "${message}"`);
-      assertFalse(result.error?.includes(message) ?? false, `error leak for "${message}"`);
+      assertFalse(evidence.failure?.message?.includes(message) ?? false, `error leak for "${message}"`);
       assertEquals(typeof result.rescheduleAt, 'string', `rescheduleAt type for "${message}"`);
       assertEquals(warnCalls, 1, `warn count for "${message}"`);
       assertEquals(errorCalls, 1, `error count for "${message}"`);
@@ -871,9 +871,9 @@ Deno.test('trashGuideSync handler does not retry non-transient failures', async 
     const evidence = parseEvidence(result.output);
     assertEquals(result.status, 'failure');
     assertEquals(evidence.failure?.code, 'sync_failed');
-    assertEquals(result.error, buildTrashGuideSyncFailure('sync_failed').message);
+    assertEquals(evidence.failure?.message, buildTrashGuideSyncFailure('sync_failed').message);
     assertFalse(result.output?.includes(message) ?? false);
-    assertFalse(result.error?.includes(message) ?? false);
+    assertFalse(evidence.failure?.message?.includes(message) ?? false);
     assertEquals(counters.warnCalls(), 0);
     assertEquals(typeof result.rescheduleAt, 'string');
     const deltaMinutes = (Date.parse(result.rescheduleAt as string) - before) / 60_000;
@@ -923,9 +923,9 @@ Deno.test('trashGuideSync handler does not retry transient failures on manual tr
     const evidence = parseEvidence(result.output);
     assertEquals(result.status, 'failure');
     assertEquals(evidence.failure?.code, 'network');
-    assertEquals(result.error, buildTrashGuideSyncFailure('network').message);
+    assertEquals(evidence.failure?.message, buildTrashGuideSyncFailure('network').message);
     assertFalse(result.output?.includes(message) ?? false);
-    assertFalse(result.error?.includes(message) ?? false);
+    assertFalse(evidence.failure?.message?.includes(message) ?? false);
     assertEquals(counters.warnCalls(), 0);
     assertEquals(result.rescheduleAt, null);
   } finally {
@@ -1081,7 +1081,7 @@ Deno.test('trashGuideSync handler treats sync parseStatus failed as a terminal f
     const evidence = parseEvidence(result.output);
     assertEquals(result.status, 'failure');
     assertEquals(evidence.failure?.code, 'parser_failed');
-    assertEquals(result.error, buildTrashGuideSyncFailure('parser_failed').message);
+    assertEquals(evidence.failure?.message, buildTrashGuideSyncFailure('parser_failed').message);
     // parser_failed carries the counts observed during the failed parse.
     assertExists(evidence.counts);
     assertEquals(evidence.counts.commitsBehind, 1);
@@ -1147,9 +1147,9 @@ Deno.test('trashGuideSync handler treats sync success:false schema errors as ter
     assertEquals(result.status, 'failure');
     // success:false short-circuits before parseStatus, classifying the raw message (non-transient here).
     assertEquals(evidence.failure?.code, 'sync_failed');
-    assertEquals(result.error, buildTrashGuideSyncFailure('sync_failed').message);
+    assertEquals(evidence.failure?.message, buildTrashGuideSyncFailure('sync_failed').message);
     assertFalse(result.output?.includes(message) ?? false);
-    assertFalse(result.error?.includes(message) ?? false);
+    assertFalse(evidence.failure?.message?.includes(message) ?? false);
     assertEquals(counters.warnCalls(), 0);
     assertEquals(counters.errorCalls(), 1);
     assertEquals(typeof result.rescheduleAt, 'string');
@@ -1185,7 +1185,7 @@ Deno.test('trashGuideSync handler cancels a disabled source before checking upda
     assertExists(evidence.failure);
     assertEquals(evidence.failure.code, 'source_disabled');
     assertEquals(evidence.counts, null);
-    assertEquals(result.error, buildTrashGuideSyncFailure('source_disabled').message);
+    assertEquals(evidence.failure?.message, buildTrashGuideSyncFailure('source_disabled').message);
     assertEquals(check.calls(), 0);
   } finally {
     for (const restore of restores.reverse()) {
@@ -1217,7 +1217,7 @@ Deno.test('trashGuideSync handler cancels a scheduled job when the schedule is d
     // A disabled schedule is benign, not an operator-facing failure.
     assertEquals(evidence.failure, null);
     assertEquals(evidence.counts, null);
-    assertEquals(result.error, undefined);
+    assertEquals(evidence.failure?.message, undefined);
     assertEquals(check.calls(), 0);
   } finally {
     for (const restore of restores.reverse()) {

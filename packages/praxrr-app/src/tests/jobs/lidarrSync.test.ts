@@ -348,7 +348,7 @@ Deno.test({
     try {
       const result = await handler(createSyncJob(201, 'manual'));
       assertEquals(result.status, 'cancelled');
-      assertEquals(result.output, 'Arr instance disabled');
+      assertEquals(result.decision, 'Arr instance disabled');
     } finally {
       arrInstancesQueries.getById = originalGetById;
     }

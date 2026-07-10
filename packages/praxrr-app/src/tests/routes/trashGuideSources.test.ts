@@ -582,6 +582,7 @@ Deno.test({
       durationMs: 5000,
       error: 'network timeout',
       output: null,
+      evidence: null,
       createdAt: '2026-02-25T04:05:05.000Z',
     };
 
@@ -696,6 +697,7 @@ Deno.test({
       durationMs: 8000,
       error: null,
       output: JSON.stringify(evidence),
+      evidence: null,
       createdAt: '2026-02-27T08:00:09.000Z',
     };
 
