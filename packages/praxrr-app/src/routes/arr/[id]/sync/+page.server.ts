@@ -62,6 +62,7 @@ type SyncPreviewRouteState = {
   status: SyncPreviewTriggerStatus;
   summary: SyncPreviewSummary | null;
   error: string | null;
+  recoveryAction: string | null;
 };
 
 function buildTrashGuideAvailableSelections(sourceId: number, selectedQualityProfiles: string[]): string[] {
@@ -91,6 +92,7 @@ function getSyncPreviewRouteState(instanceId: number, previewId: string | null):
       status: 'idle',
       summary: null,
       error: null,
+      recoveryAction: null,
     };
   }
 
@@ -101,6 +103,7 @@ function getSyncPreviewRouteState(instanceId: number, previewId: string | null):
       status: 'error',
       summary: null,
       error: 'Preview not found or not associated with this instance',
+      recoveryAction: null,
     };
   }
 
@@ -124,7 +127,8 @@ function getSyncPreviewRouteState(instanceId: number, previewId: string | null):
     previewId: snapshot.id,
     status: mapStatus,
     summary: snapshot.summary ?? EMPTY_PREVIEW_SUMMARY,
-    error: snapshot.error ?? null,
+    error: snapshot.failure?.message ?? null,
+    recoveryAction: snapshot.failure?.recoveryAction ?? null,
   };
 }
 

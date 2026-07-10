@@ -21,6 +21,56 @@ SyncPreviewApplyRequest:
       items:
         $ref: '#/SyncPreviewSection'
 
+SyncPreviewFailureCode:
+  type: string
+  enum:
+    - unreachable
+    - timeout
+    - unauthorized
+    - notFound
+    - rejected
+    - serverError
+    - sectionErrors
+    - executionFailed
+    - stale
+    - internalError
+  description: |
+    Closed vocabulary of Sync Preview generate/apply failure reasons. Each value is
+    assigned by matching a thrown error's TYPE/status (never by parsing message text),
+    so no raw exception or secret-shaped string is ever transported:
+    - `unreachable`: the Arr instance could not be reached (network/DNS/connection).
+    - `timeout`: the Arr instance did not respond in time.
+    - `unauthorized`: the Arr instance rejected the API key (HTTP 401/403).
+    - `notFound`: a required Arr resource was not found (HTTP 404).
+    - `rejected`: the Arr instance rejected the request (other HTTP 4xx).
+    - `serverError`: the Arr instance returned a server error (HTTP 5xx).
+    - `sectionErrors`: one or more sections failed to generate (top-level aggregate).
+    - `executionFailed`: the apply sync run did not complete successfully.
+    - `stale`: the preview is too old to apply safely.
+    - `internalError`: an unexpected error occurred (catch-all for untyped failures).
+
+SyncPreviewFailureReason:
+  type: object
+  required:
+    - code
+    - message
+    - recoveryAction
+  description: |
+    Typed, closed, safe failure evidence for Sync Preview generate/apply. Replaces the
+    former free-form `error` strings. `message` and `recoveryAction` are pre-authored safe
+    copy drawn from a closed vocabulary — they NEVER contain raw exception text, Arr
+    response bodies, credentials, hostnames, or stack traces. Full diagnostics live only in
+    the sanitized server logs.
+  properties:
+    code:
+      $ref: '#/SyncPreviewFailureCode'
+    message:
+      type: string
+      description: Safe, user-facing summary of the failure. Never raw exception or secret text.
+    recoveryAction:
+      type: string
+      description: Actionable next step the operator can take to recover.
+
 SyncPreviewApplyJobStatus:
   type: string
   enum:
@@ -41,9 +91,14 @@ SyncPreviewApplyJobResult:
     output:
       type: string
       description: Aggregate human-readable output from the sync job.
-    error:
-      type: string
-      description: User-facing sync-job failure reason, when one is available.
+    failure:
+      oneOf:
+        - $ref: '#/SyncPreviewFailureReason'
+        - type: 'null'
+      description: |
+        Typed, safe failure reason when the sync run did not succeed; omitted or null
+        otherwise. Replaces the former free-form `error` string — the raw job error is
+        never transported and remains only in sanitized logs and per-entity outcomes.
 
 SyncPreviewApplyResponse:
   type: object
@@ -86,12 +141,11 @@ SyncPreviewApplyResponse:
 SyncPreviewApplyErrorResponse:
   type: object
   required:
-    - error
+    - failure
     - staleWarning
   properties:
-    error:
-      type: string
-      description: User-facing reason the preview could not be applied.
+    failure:
+      $ref: '#/SyncPreviewFailureReason'
     staleWarning:
       oneOf:
         - type: string
@@ -390,18 +444,20 @@ SyncPreviewSectionOutcome:
   required:
     - section
     - skipped
-    - error
+    - failure
   properties:
     section:
       $ref: '#/SyncPreviewSection'
     skipped:
       type: boolean
       description: True when the section had no config to preview and was skipped.
-    error:
+    failure:
       oneOf:
-        - type: string
-        - type: null
-      description: Section-level preview generation error, when present.
+        - $ref: '#/SyncPreviewFailureReason'
+        - type: 'null'
+      description: |
+        Typed, safe section-level preview generation failure, or null when the section
+        succeeded or was skipped. Replaces the former free-form `error` string.
 
 SyncPreviewResult:
   type: object
@@ -413,6 +469,7 @@ SyncPreviewResult:
     - createdAt
     - expiresAt
     - status
+    - failure
     - sections
     - sectionOutcomes
     - qualityProfiles
@@ -447,9 +504,14 @@ SyncPreviewResult:
       description: ISO 8601 timestamp when preview becomes expired
     status:
       $ref: '#/SyncPreviewStatus'
-    error:
-      type: string
-      description: Optional error message from generation or apply
+    failure:
+      oneOf:
+        - $ref: '#/SyncPreviewFailureReason'
+        - type: 'null'
+      description: |
+        Typed, safe top-level failure reason, set when whole-preview generation or apply
+        failed; null on success and on partial generation (per-section failures live in
+        `sectionOutcomes[].failure`). Replaces the former free-form `error` string.
     sections:
       type: array
       items:

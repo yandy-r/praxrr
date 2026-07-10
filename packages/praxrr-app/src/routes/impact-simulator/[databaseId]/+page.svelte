@@ -1,3 +1,5 @@
+<svelte:options runes={false} />
+
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
   import { get } from 'svelte/store';
@@ -27,6 +29,7 @@
 
   const SIMULATION_REQUEST_TIMEOUT_MS = 15000;
   const MAX_PROFILES = 10;
+  const DATABASE_STORAGE_KEY = 'impactSimulatorDatabase';
 
   let releaseRawText = '';
   let arrType: ImpactArrType = 'radarr';
@@ -52,6 +55,8 @@
 
   onMount(() => {
     if (!browser) return;
+
+    localStorage.setItem(DATABASE_STORAGE_KEY, String(data.currentDatabase.id));
 
     const urlState = parseUrlState($page.url.searchParams);
 

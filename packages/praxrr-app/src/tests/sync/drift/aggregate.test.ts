@@ -40,7 +40,14 @@ function entity(action: SyncPreviewAction, overrides: Partial<EntityChange> = {}
 }
 
 function outcome(section: SyncPreviewSection, error: string | null = null, skipped = false): SyncPreviewSectionOutcome {
-  return { section, error, skipped };
+  return {
+    section,
+    failure:
+      error === null
+        ? null
+        : { code: 'internalError', message: error, recoveryAction: 'Regenerate the preview and try again.' },
+    skipped,
+  };
 }
 
 function makePreview(overrides: Partial<GeneratePreviewResult> = {}): GeneratePreviewResult {
@@ -57,7 +64,6 @@ function makePreview(overrides: Partial<GeneratePreviewResult> = {}): GeneratePr
     mediaManagement: null,
     metadataProfiles: null,
     summary: { totalCreates: 0, totalUpdates: 0, totalDeletes: 0, totalUnchanged: 0 },
-    errors: [],
     ...overrides,
   };
 }

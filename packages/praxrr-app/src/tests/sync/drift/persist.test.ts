@@ -109,13 +109,12 @@ function previewWith(instance: ArrInstance, qualityProfiles: EntityChange[]): Ge
     status: 'ready',
     createdAtMs: 0,
     sections: ['qualityProfiles'],
-    sectionOutcomes: [{ section: 'qualityProfiles', error: null, skipped: false }],
+    sectionOutcomes: [{ section: 'qualityProfiles', failure: null, skipped: false }],
     qualityProfiles: { section: 'qualityProfiles', customFormats: [], qualityProfiles },
     delayProfiles: null,
     mediaManagement: null,
     metadataProfiles: null,
     summary: { totalCreates: 0, totalUpdates: 0, totalDeletes: 0, totalUnchanged: 0 },
-    errors: [],
   };
 }
 
@@ -134,8 +133,16 @@ function partialFailurePreview(instance: ArrInstance): GeneratePreviewResult {
     createdAtMs: 0,
     sections: ['qualityProfiles', 'delayProfiles'],
     sectionOutcomes: [
-      { section: 'qualityProfiles', error: null, skipped: false },
-      { section: 'delayProfiles', error: 'delay profile fetch failed', skipped: false },
+      { section: 'qualityProfiles', failure: null, skipped: false },
+      {
+        section: 'delayProfiles',
+        failure: {
+          code: 'internalError',
+          message: 'delay profile fetch failed',
+          recoveryAction: 'Regenerate the preview and try again.',
+        },
+        skipped: false,
+      },
     ],
     // qualityProfiles compared clean (present, no changes); delayProfiles errored (null payload).
     qualityProfiles: { section: 'qualityProfiles', customFormats: [], qualityProfiles: [] },
@@ -143,7 +150,6 @@ function partialFailurePreview(instance: ArrInstance): GeneratePreviewResult {
     mediaManagement: null,
     metadataProfiles: null,
     summary: { totalCreates: 0, totalUpdates: 0, totalDeletes: 0, totalUnchanged: 0 },
-    errors: [],
   };
 }
 

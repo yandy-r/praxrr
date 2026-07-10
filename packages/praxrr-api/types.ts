@@ -2319,12 +2319,56 @@ export interface components {
      * @enum {string}
      */
     SyncPreviewSection: 'qualityProfiles' | 'delayProfiles' | 'mediaManagement' | 'metadataProfiles';
+    /**
+     * @description Closed vocabulary of Sync Preview generate/apply failure reasons. Each value is
+     *     assigned by matching a thrown error's TYPE/status (never by parsing message text),
+     *     so no raw exception or secret-shaped string is ever transported:
+     *     - `unreachable`: the Arr instance could not be reached (network/DNS/connection).
+     *     - `timeout`: the Arr instance did not respond in time.
+     *     - `unauthorized`: the Arr instance rejected the API key (HTTP 401/403).
+     *     - `notFound`: a required Arr resource was not found (HTTP 404).
+     *     - `rejected`: the Arr instance rejected the request (other HTTP 4xx).
+     *     - `serverError`: the Arr instance returned a server error (HTTP 5xx).
+     *     - `sectionErrors`: one or more sections failed to generate (top-level aggregate).
+     *     - `executionFailed`: the apply sync run did not complete successfully.
+     *     - `stale`: the preview is too old to apply safely.
+     *     - `internalError`: an unexpected error occurred (catch-all for untyped failures).
+     * @enum {string}
+     */
+    SyncPreviewFailureCode:
+      | 'unreachable'
+      | 'timeout'
+      | 'unauthorized'
+      | 'notFound'
+      | 'rejected'
+      | 'serverError'
+      | 'sectionErrors'
+      | 'executionFailed'
+      | 'stale'
+      | 'internalError';
+    /**
+     * @description Typed, closed, safe failure evidence for Sync Preview generate/apply. Replaces the
+     *     former free-form `error` strings. `message` and `recoveryAction` are pre-authored safe
+     *     copy drawn from a closed vocabulary — they NEVER contain raw exception text, Arr
+     *     response bodies, credentials, hostnames, or stack traces. Full diagnostics live only in
+     *     the sanitized server logs.
+     */
+    SyncPreviewFailureReason: {
+      code: components['schemas']['SyncPreviewFailureCode'];
+      /** @description Safe, user-facing summary of the failure. Never raw exception or secret text. */
+      message: string;
+      /** @description Actionable next step the operator can take to recover. */
+      recoveryAction: string;
+    };
     SyncPreviewSectionOutcome: {
       section: components['schemas']['SyncPreviewSection'];
       /** @description True when the section had no config to preview and was skipped. */
       skipped: boolean;
-      /** @description Section-level preview generation error, when present. */
-      error: string | Record<string, never>;
+      /**
+       * @description Typed, safe section-level preview generation failure, or null when the section
+       *     succeeded or was skipped. Replaces the former free-form `error` string.
+       */
+      failure: components['schemas']['SyncPreviewFailureReason'] | null;
     };
     /** @enum {string} */
     SyncPreviewAction: 'create' | 'update' | 'delete' | 'unchanged';
@@ -2474,8 +2518,12 @@ export interface components {
        */
       expiresAt: string;
       status: components['schemas']['SyncPreviewStatus'];
-      /** @description Optional error message from generation or apply */
-      error?: string;
+      /**
+       * @description Typed, safe top-level failure reason, set when whole-preview generation or apply
+       *     failed; null on success and on partial generation (per-section failures live in
+       *     `sectionOutcomes[].failure`). Replaces the former free-form `error` string.
+       */
+      failure: components['schemas']['SyncPreviewFailureReason'] | null;
       /** @description Sections included in preview */
       sections: components['schemas']['SyncPreviewSection'][];
       /** @description Per-section preview generation status used to enforce safe apply behavior. */
@@ -4680,8 +4728,12 @@ export interface components {
       status: components['schemas']['SyncPreviewApplyJobStatus'];
       /** @description Aggregate human-readable output from the sync job. */
       output: string;
-      /** @description User-facing sync-job failure reason, when one is available. */
-      error?: string;
+      /**
+       * @description Typed, safe failure reason when the sync run did not succeed; omitted or null
+       *     otherwise. Replaces the former free-form `error` string — the raw job error is
+       *     never transported and remains only in sanitized logs and per-entity outcomes.
+       */
+      failure?: components['schemas']['SyncPreviewFailureReason'] | null;
     };
     /**
      * @description Result of executing the preview's selected sections through the normal sync job
@@ -4705,8 +4757,7 @@ export interface components {
       syncHistoryId: number | null;
     };
     SyncPreviewApplyErrorResponse: {
-      /** @description User-facing reason the preview could not be applied. */
-      error: string;
+      failure: components['schemas']['SyncPreviewFailureReason'];
       /** @description Preview-age warning when relevant to the failure, or null. */
       staleWarning: string | null;
     };

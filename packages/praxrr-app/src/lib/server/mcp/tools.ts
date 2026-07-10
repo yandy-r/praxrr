@@ -24,6 +24,7 @@ import { buildDriftSummary } from '$sync/drift/summary.ts';
 import { toInstanceSummary } from '$sync/drift/responses.ts';
 import { buildSyncHistoryListResponse } from '$sync/syncHistory/responses.ts';
 import { generatePreview } from '$sync/preview/orchestrator.ts';
+import { classifyPreviewFailure } from '$sync/preview/failureReason.ts';
 import { isSyncPreviewArrType } from '$sync/preview/types.ts';
 import {
   isResolvedConfigValidationError,
@@ -356,13 +357,16 @@ export const TOOLS: readonly McpTool[] = [
       try {
         result = await generatePreview({ instance, sections, sectionConfigs } as Parameters<typeof generatePreview>[0]);
       } catch (error) {
-        throw new McpDomainError(error instanceof Error ? error.message : String(error));
+        // Classify by error TYPE; surface only the typed, safe message — never raw exception text.
+        throw new McpDomainError(classifyPreviewFailure(error, instance.type).message);
       }
-      // Partial success (some sections produced a diff) is returned whole with per-section errors
-      // surfaced. A total failure (e.g. the Arr is unreachable) becomes an isError result.
-      const hadSuccess = result.sectionOutcomes.some((outcome) => outcome.error === null && !outcome.skipped);
-      if (result.errors.length > 0 && !hadSuccess) {
-        throw new McpDomainError(result.error ?? `Sync preview failed: ${result.errors.join('; ')}`);
+      // Partial success (some sections produced a diff) is returned whole with per-section, typed
+      // failure reasons surfaced. A total failure (e.g. the Arr is unreachable) becomes an isError
+      // result carrying only the typed, safe failure message.
+      const hadSuccess = result.sectionOutcomes.some((outcome) => outcome.failure === null && !outcome.skipped);
+      const failedOutcome = result.sectionOutcomes.find((outcome) => outcome.failure !== null);
+      if (failedOutcome?.failure && !hadSuccess) {
+        throw new McpDomainError(failedOutcome.failure.message);
       }
       return result;
     },

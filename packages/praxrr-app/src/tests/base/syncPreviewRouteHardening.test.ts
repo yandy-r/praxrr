@@ -1,5 +1,9 @@
-import { assertEquals, assertMatch } from '@std/assert';
-import { POST as createPreviewPost } from '../../routes/api/v1/sync/preview/+server.ts';
+import { assert, assertEquals, assertMatch } from '@std/assert';
+import {
+  POST as createPreviewPost,
+  _handleSyncPreviewCreateRequest,
+  type SyncPreviewCreateDependencies,
+} from '../../routes/api/v1/sync/preview/+server.ts';
 import {
   _handleSyncPreviewApplyRequest,
   POST as applyPreviewPost,
@@ -19,9 +23,89 @@ import {
   registerPreviewCreateAttempt,
   resetPreviewCreateRateLimitForTests,
 } from '../../lib/server/sync/preview/limits.ts';
+import type { GeneratePreviewResult } from '../../lib/server/sync/preview/orchestrator.ts';
+import { classifyPreviewFailure } from '../../lib/server/sync/preview/failureReason.ts';
+import type { SyncPreviewFailureReason, SyncPreviewResult } from '../../lib/server/sync/preview/types.ts';
+import { HttpError } from '../../lib/server/utils/http/types.ts';
 
 const INSTANCE_ID = 7001;
 const now = '2026-02-21T00:00:00.000Z';
+
+// A typed, safe section failure used to seed snapshots. Redaction is proven separately; here it
+// just stands in for "this section failed to generate" without any raw text.
+const SAMPLE_FAILURE: SyncPreviewFailureReason = {
+  code: 'internalError',
+  message: 'An unexpected error occurred while processing the preview.',
+  recoveryAction: 'Try again; if the problem persists, check the server logs for details.',
+};
+
+// Secret-shaped and arbitrary free-form strings that must NEVER reach a response body or the store.
+const SECRET_API_KEY = 'sk-live-DEADBEEFCAFEBABE0123456789';
+const SECRET_HEX = 'deadbeefcafebabedeadbeefcafebabe';
+const SECRET_MIX = `GET http://radarr.local/api/v3/qualityprofile?apikey=${SECRET_API_KEY} failed (X-Api-Key: ${SECRET_HEX}) password=hunter2`;
+const FREE_FORM =
+  'internal stacktrace at orchestrator.ts:255 host 10.1.2.3 /home/yandy/.env DATABASE_URL=postgres://u:p@h';
+const FORBIDDEN_SUBSTRINGS: readonly string[] = [
+  SECRET_API_KEY,
+  SECRET_HEX,
+  'hunter2',
+  FREE_FORM,
+  '10.1.2.3',
+  'DATABASE_URL',
+  '/home/yandy/.env',
+];
+
+/** Assert that no forbidden (secret-shaped or free-form) substring appears anywhere in `value`. */
+function assertNoLeak(value: unknown, label: string): void {
+  const serialized = JSON.stringify(value) ?? '';
+  for (const secret of FORBIDDEN_SUBSTRINGS) {
+    assert(!serialized.includes(secret), `${label} leaked forbidden substring: ${secret}`);
+  }
+}
+
+/** Assert a value is a well-formed, closed SyncPreviewFailureReason (typed code + safe strings). */
+const CLOSED_FAILURE_CODES: ReadonlySet<string> = new Set([
+  'unreachable',
+  'timeout',
+  'unauthorized',
+  'notFound',
+  'rejected',
+  'serverError',
+  'sectionErrors',
+  'executionFailed',
+  'stale',
+  'internalError',
+]);
+
+function assertTypedFailure(failure: unknown, label: string): SyncPreviewFailureReason {
+  assert(failure !== null && typeof failure === 'object', `${label}: failure must be an object`);
+  const reason = failure as Record<string, unknown>;
+  assert(typeof reason.code === 'string' && CLOSED_FAILURE_CODES.has(reason.code), `${label}: code must be closed`);
+  assert(typeof reason.message === 'string' && reason.message.length > 0, `${label}: message must be a safe string`);
+  assert(
+    typeof reason.recoveryAction === 'string' && reason.recoveryAction.length > 0,
+    `${label}: recoveryAction must be a safe string`
+  );
+  return reason as unknown as SyncPreviewFailureReason;
+}
+
+function createPreviewCreateRequest(instanceId: number = INSTANCE_ID): Request {
+  return new Request('http://localhost/api/v1/sync/preview', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ instanceId }),
+  });
+}
+
+function createDependencies(
+  generatePreview: SyncPreviewCreateDependencies['generatePreview']
+): SyncPreviewCreateDependencies {
+  return {
+    generatePreview,
+    getInstanceById: () => createArrInstanceFixture(),
+    now: () => Date.now(),
+  };
+}
 
 type ErrorResponse = components['schemas']['ErrorResponse'];
 type SyncPreviewApplyResponse = components['schemas']['SyncPreviewApplyResponse'];
@@ -52,16 +136,17 @@ function createSnapshotInput(id: string): SyncPreviewCreateInput {
     instanceName: 'Preview Test Instance',
     arrType: 'radarr',
     status: PREVIEW_STATUS_READY,
+    failure: null,
     sections: ['qualityProfiles', 'delayProfiles'],
     sectionOutcomes: [
       {
         section: 'qualityProfiles',
-        error: null,
+        failure: null,
         skipped: false,
       },
       {
         section: 'delayProfiles',
-        error: 'upstream failed',
+        failure: SAMPLE_FAILURE,
         skipped: false,
       },
     ],
@@ -238,7 +323,12 @@ Deno.test('sync preview apply failed body matches the generated coarse result co
       results: {
         status: 'failure',
         output: '',
-        error: 'Arr rejected the update',
+        // The raw job error ('Arr rejected the update') is redacted to a typed, safe reason.
+        failure: {
+          code: 'executionFailed',
+          message: 'The sync run did not complete successfully.',
+          recoveryAction: 'Review the per-entity outcomes, resolve the reported issues, then apply again.',
+        },
       },
       staleWarning: null,
       outcomes: [
@@ -255,6 +345,8 @@ Deno.test('sync preview apply failed body matches the generated coarse result co
       ],
       syncHistoryId: 909,
     });
+    // The raw aggregate job error must never reach the response body.
+    assert(!JSON.stringify(payload).includes('Arr rejected the update'));
     // The failed outcome and its durable id must survive the failure response — never dropped.
     assertEquals(payload.outcomes.length, 1);
     assertEquals(payload.syncHistoryId, 909);
@@ -303,7 +395,11 @@ Deno.test('sync preview apply stale-blocked body matches the generated error con
     assertEquals(response.status, 422);
     const payload = (await response.json()) as SyncPreviewApplyErrorResponse;
     assertEquals(payload, {
-      error: 'Preview is older than 30 minutes. Regenerate before applying.',
+      failure: {
+        code: 'stale',
+        message: 'This preview is too old to apply safely.',
+        recoveryAction: 'Regenerate the preview, then apply again.',
+      },
       staleWarning: 'Preview is 31 minute(s) old.',
     });
     assertEquals(executionCount, 0);
@@ -317,7 +413,7 @@ Deno.test('sync preview apply blocks when preview had section-generation errors'
   previewStore.create(
     {
       ...createSnapshotInput(previewId),
-      error: 'Preview generation completed with 1 section error(s)',
+      failure: SAMPLE_FAILURE,
     },
     Date.now()
   );
@@ -372,12 +468,12 @@ Deno.test('sync preview apply blocks when no sections were successfully previewe
       sectionOutcomes: [
         {
           section: 'qualityProfiles',
-          error: 'failed',
+          failure: SAMPLE_FAILURE,
           skipped: false,
         },
         {
           section: 'delayProfiles',
-          error: null,
+          failure: null,
           skipped: true,
         },
       ],
@@ -528,4 +624,217 @@ Deno.test('sync preview create enforces preview-store capacity limits', async ()
     resetPreviewCreateRateLimitForTests();
     arrInstancesQueries.getById = originalGetById;
   }
+});
+
+// --- Issue #235: failure-evidence redaction ------------------------------------------------
+
+Deno.test('sync preview create redacts a secret-shaped total generation failure', async () => {
+  resetPreviewCreateRateLimitForTests();
+  const deps = createDependencies(() => Promise.reject(new Error(SECRET_MIX)));
+
+  const response = await _handleSyncPreviewCreateRequest(createPreviewCreateRequest(), deps);
+
+  assertEquals(response.status, 500);
+  const payload = (await response.json()) as SyncPreviewResult;
+  try {
+    assertEquals(payload.status, 'failed');
+    assertTypedFailure(payload.failure, 'create total-failure body');
+    assertNoLeak(payload, 'create total-failure body');
+    // The stored snapshot served by GET must also be redacted.
+    const stored = previewStore.get(payload.id);
+    assert(stored !== null, 'failed snapshot should be stored');
+    assertTypedFailure(stored!.failure, 'create total-failure stored');
+    assertNoLeak(stored, 'create total-failure stored');
+  } finally {
+    previewStore.delete(payload.id);
+    resetPreviewCreateRateLimitForTests();
+  }
+});
+
+Deno.test('sync preview create redacts an arbitrary free-form total generation failure', async () => {
+  resetPreviewCreateRateLimitForTests();
+  const deps = createDependencies(() => Promise.reject(new Error(FREE_FORM)));
+
+  const response = await _handleSyncPreviewCreateRequest(createPreviewCreateRequest(), deps);
+
+  assertEquals(response.status, 500);
+  const payload = (await response.json()) as SyncPreviewResult;
+  try {
+    assertTypedFailure(payload.failure, 'create free-form body');
+    assertNoLeak(payload, 'create free-form body');
+    assertNoLeak(previewStore.get(payload.id), 'create free-form stored');
+  } finally {
+    previewStore.delete(payload.id);
+    resetPreviewCreateRateLimitForTests();
+  }
+});
+
+Deno.test('sync preview create preserves successful-section evidence on partial generation', async () => {
+  resetPreviewCreateRateLimitForTests();
+  const partial: GeneratePreviewResult = {
+    instanceId: INSTANCE_ID,
+    instanceName: 'Preview Test Instance',
+    arrType: 'radarr',
+    status: 'ready',
+    createdAtMs: Date.now(),
+    sections: ['qualityProfiles', 'delayProfiles'],
+    sectionOutcomes: [
+      { section: 'qualityProfiles', failure: null, skipped: false },
+      { section: 'delayProfiles', failure: SAMPLE_FAILURE, skipped: false },
+    ],
+    qualityProfiles: {
+      section: 'qualityProfiles',
+      customFormats: [{ entityType: 'customFormat', name: 'HDR10', action: 'create', remoteId: null, fields: [] }],
+      qualityProfiles: [],
+    },
+    delayProfiles: null,
+    mediaManagement: null,
+    metadataProfiles: null,
+    summary: { totalCreates: 1, totalUpdates: 0, totalDeletes: 0, totalUnchanged: 0 },
+  };
+  const deps = createDependencies(() => Promise.resolve(partial));
+
+  const response = await _handleSyncPreviewCreateRequest(createPreviewCreateRequest(), deps);
+
+  assertEquals(response.status, 200);
+  const payload = (await response.json()) as SyncPreviewResult;
+  try {
+    // Successful-section evidence survives a partial generation...
+    assertEquals(payload.status, 'ready');
+    assert(payload.qualityProfiles !== null, 'successful section evidence must be preserved');
+    assertEquals(payload.qualityProfiles!.customFormats.length, 1);
+    assertEquals(payload.summary.totalCreates, 1);
+    // ...alongside a typed top-level aggregate and a typed per-section failure (never raw text).
+    const topLevel = assertTypedFailure(payload.failure, 'partial top-level');
+    assertEquals(topLevel.code, 'sectionErrors');
+    const failedSection = payload.sectionOutcomes.find((outcome) => outcome.section === 'delayProfiles');
+    assertTypedFailure(failedSection?.failure, 'partial section');
+    assertNoLeak(payload, 'partial body');
+    assertNoLeak(previewStore.get(payload.id), 'partial stored');
+  } finally {
+    previewStore.delete(payload.id);
+    resetPreviewCreateRateLimitForTests();
+  }
+});
+
+Deno.test('sync preview apply redacts a secret-shaped job-failure error', async () => {
+  const previewId = `preview-apply-redact-secret-job-${crypto.randomUUID()}`;
+  previewStore.create(createSnapshotInput(previewId), Date.now());
+
+  try {
+    const response = await _handleSyncPreviewApplyRequest(
+      previewId,
+      createApplyRequest(previewId, JSON.stringify({ sections: ['qualityProfiles'] })),
+      dependenciesReturning({ status: 'failure', error: SECRET_MIX, syncHistoryId: 42 })
+    );
+
+    assertEquals(response.status, 500);
+    const payload = (await response.json()) as SyncPreviewApplyResponse;
+    assertEquals(assertTypedFailure(payload.results.failure, 'apply job-failure results').code, 'executionFailed');
+    assertNoLeak(payload, 'apply job-failure body');
+    assertNoLeak(previewStore.get(previewId), 'apply job-failure stored');
+  } finally {
+    previewStore.delete(previewId);
+  }
+});
+
+Deno.test('sync preview apply redacts an arbitrary free-form job-failure error', async () => {
+  const previewId = `preview-apply-redact-freeform-job-${crypto.randomUUID()}`;
+  previewStore.create(createSnapshotInput(previewId), Date.now());
+
+  try {
+    const response = await _handleSyncPreviewApplyRequest(
+      previewId,
+      createApplyRequest(previewId, JSON.stringify({ sections: ['qualityProfiles'] })),
+      dependenciesReturning({ status: 'failure', error: FREE_FORM, syncHistoryId: null })
+    );
+
+    assertEquals(response.status, 500);
+    const payload = (await response.json()) as SyncPreviewApplyResponse;
+    assertTypedFailure(payload.results.failure, 'apply free-form job results');
+    assertNoLeak(payload, 'apply free-form job body');
+    assertNoLeak(previewStore.get(previewId), 'apply free-form job stored');
+  } finally {
+    previewStore.delete(previewId);
+  }
+});
+
+Deno.test('sync preview apply redacts a secret-shaped thrown exception', async () => {
+  const previewId = `preview-apply-redact-secret-throw-${crypto.randomUUID()}`;
+  previewStore.create(createSnapshotInput(previewId), Date.now());
+
+  try {
+    const response = await _handleSyncPreviewApplyRequest(
+      previewId,
+      createApplyRequest(previewId, JSON.stringify({ sections: ['qualityProfiles'] })),
+      {
+        getSectionsInProgress: () => [],
+        executeSyncJob: () => Promise.reject(new Error(SECRET_MIX)),
+        now: Date.now,
+      }
+    );
+
+    assertEquals(response.status, 500);
+    const payload = (await response.json()) as SyncPreviewApplyErrorResponse;
+    assertTypedFailure(payload.failure, 'apply thrown-secret body');
+    assertNoLeak(payload, 'apply thrown-secret body');
+    assertNoLeak(previewStore.get(previewId), 'apply thrown-secret stored');
+  } finally {
+    previewStore.delete(previewId);
+  }
+});
+
+Deno.test('sync preview apply redacts an arbitrary free-form thrown exception', async () => {
+  const previewId = `preview-apply-redact-freeform-throw-${crypto.randomUUID()}`;
+  previewStore.create(createSnapshotInput(previewId), Date.now());
+
+  try {
+    const response = await _handleSyncPreviewApplyRequest(
+      previewId,
+      createApplyRequest(previewId, JSON.stringify({ sections: ['qualityProfiles'] })),
+      {
+        getSectionsInProgress: () => [],
+        executeSyncJob: () => Promise.reject(new Error(FREE_FORM)),
+        now: Date.now,
+      }
+    );
+
+    assertEquals(response.status, 500);
+    const payload = (await response.json()) as SyncPreviewApplyErrorResponse;
+    assertTypedFailure(payload.failure, 'apply thrown-freeform body');
+    assertNoLeak(payload, 'apply thrown-freeform body');
+    assertNoLeak(previewStore.get(previewId), 'apply thrown-freeform stored');
+  } finally {
+    previewStore.delete(previewId);
+  }
+});
+
+Deno.test('classifyPreviewFailure maps error TYPE/status to closed codes without leaking raw text', () => {
+  const cases: readonly { error: unknown; expected: string }[] = [
+    { error: new HttpError(SECRET_MIX, 0), expected: 'unreachable' },
+    { error: new HttpError(SECRET_MIX, 408), expected: 'timeout' },
+    { error: new HttpError(SECRET_MIX, 401), expected: 'unauthorized' },
+    { error: new HttpError(SECRET_MIX, 403), expected: 'unauthorized' },
+    { error: new HttpError(SECRET_MIX, 404), expected: 'notFound' },
+    { error: new HttpError(SECRET_MIX, 422), expected: 'rejected' },
+    { error: new HttpError(SECRET_MIX, 503), expected: 'serverError' },
+    // A non-error HTTP status (< 400) falls through to the catch-all rather than misclassifying.
+    { error: new HttpError(SECRET_MIX, 302), expected: 'internalError' },
+    { error: new Error(FREE_FORM), expected: 'internalError' },
+  ];
+
+  for (const { error, expected } of cases) {
+    const reason = classifyPreviewFailure(error, 'radarr');
+    assertEquals(reason.code, expected);
+    assertTypedFailure(reason, `classify ${expected}`);
+    assertNoLeak(reason, `classify ${expected}`);
+  }
+
+  // AbortError / TimeoutError are classified by error.name, not message substring.
+  const abort = new Error('aborted');
+  abort.name = 'AbortError';
+  assertEquals(classifyPreviewFailure(abort, 'sonarr').code, 'timeout');
+  const timeoutNamed = new Error('slow');
+  timeoutNamed.name = 'TimeoutError';
+  assertEquals(classifyPreviewFailure(timeoutNamed, 'sonarr').code, 'timeout');
 });
