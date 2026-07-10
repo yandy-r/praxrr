@@ -1,4 +1,4 @@
-import { assertEquals } from '@std/assert';
+import { assert, assertEquals } from '@std/assert';
 import { jobQueueRegistry } from '../../lib/server/jobs/queueRegistry.ts';
 import { trashGuideSourcesQueries } from '../../lib/server/db/queries/trashGuideSources.ts';
 import { logger } from '../../lib/server/utils/logger/logger.ts';
@@ -99,7 +99,9 @@ Deno.test('trashGuideSync handler maps sync() throw into failure retry flow', as
   try {
     const result = await handler(job);
     assertEquals(result.status, 'failure');
-    assertEquals(result.error, 'git network failure while pulling');
+    assert(result.status === 'failure');
+    assertEquals(result.failureCode, 'gitNetwork');
+    assert(!JSON.stringify(result).includes('git network failure while pulling'));
     assertEquals(typeof result.rescheduleAt, 'string');
     assertEquals(errors.length, 1);
   } finally {

@@ -8,28 +8,29 @@ import { logger } from '$logger/logger.ts';
 const dbSyncHandler: JobHandler = async (job) => {
   const databaseId = Number(job.payload.databaseId);
   if (!Number.isFinite(databaseId)) {
-    return { status: 'failure', error: 'Invalid database ID' };
+    return { status: 'failure', failureCode: 'invalidPayload' };
   }
 
   const isManualTrigger = job.source === 'manual';
 
   const instance = databaseInstancesQueries.getById(databaseId);
   if (!instance || instance.enabled === 0) {
-    return { status: 'cancelled', output: 'Database sync disabled' };
+    return { status: 'cancelled', decision: 'Database sync disabled' };
   }
 
   if (!isManualTrigger && instance.sync_strategy <= 0) {
-    return { status: 'cancelled', output: 'Auto-sync disabled' };
+    return { status: 'cancelled', decision: 'Auto-sync disabled' };
   }
 
   if (isManualTrigger) {
     try {
       const syncResult = await pcdManager.sync(databaseId);
       if (!syncResult.success) {
-        return {
-          status: 'failure',
-          error: syncResult.error ?? 'Sync failed',
-        };
+        await logger.error('Manual database sync job failed', {
+          source: 'DbSyncJob',
+          meta: { jobId: job.id, databaseId, databaseName: instance.name, error: syncResult.error ?? 'Sync failed' },
+        });
+        return { status: 'failure', failureCode: 'gitNetwork' };
       }
 
       return {
@@ -41,10 +42,7 @@ const dbSyncHandler: JobHandler = async (job) => {
         source: 'DbSyncJob',
         meta: { jobId: job.id, databaseId, databaseName: instance.name, error },
       });
-      return {
-        status: 'failure',
-        error: error instanceof Error ? error.message : String(error),
-      };
+      return { status: 'failure', failureCode: 'gitNetwork' };
     }
   }
 
@@ -56,7 +54,7 @@ const dbSyncHandler: JobHandler = async (job) => {
     if (Date.now() < dueAt) {
       return {
         status: 'skipped',
-        output: 'Database sync not due',
+        decision: 'Database sync not due',
         rescheduleAt: scheduledFromLastRun,
       };
     }
@@ -74,7 +72,7 @@ const dbSyncHandler: JobHandler = async (job) => {
       databaseInstancesQueries.updateSyncedAt(databaseId);
       return {
         status: 'skipped',
-        output: 'No updates available',
+        decision: 'No updates available',
         rescheduleAt,
       };
     }
@@ -82,11 +80,11 @@ const dbSyncHandler: JobHandler = async (job) => {
     if (instance.auto_pull === 1) {
       const syncResult = await pcdManager.sync(databaseId);
       if (!syncResult.success) {
-        return {
-          status: 'failure',
-          error: syncResult.error ?? 'Sync failed',
-          rescheduleAt,
-        };
+        await logger.error('Database sync job failed', {
+          source: 'DbSyncJob',
+          meta: { jobId: job.id, databaseId, databaseName: instance.name, error: syncResult.error ?? 'Sync failed' },
+        });
+        return { status: 'failure', failureCode: 'gitNetwork', rescheduleAt };
       }
 
       return {
@@ -108,11 +106,7 @@ const dbSyncHandler: JobHandler = async (job) => {
       source: 'DbSyncJob',
       meta: { jobId: job.id, databaseId, databaseName: instance.name, error },
     });
-    return {
-      status: 'failure',
-      error: error instanceof Error ? error.message : String(error),
-      rescheduleAt,
-    };
+    return { status: 'failure', failureCode: 'gitNetwork', rescheduleAt };
   }
 };
 

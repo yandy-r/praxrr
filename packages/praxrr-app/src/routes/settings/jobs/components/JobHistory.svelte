@@ -1,10 +1,11 @@
 <script lang="ts">
   import type { Column } from '$lib/client/ui/table/types';
-  import Table from '$lib/client/ui/table/Table.svelte';
+  import ExpandableTable from '$lib/client/ui/table/ExpandableTable.svelte';
   import Badge from '$lib/client/ui/badge/Badge.svelte';
   import Toggle from '$lib/client/ui/toggle/Toggle.svelte';
-  import { CheckCircle, XCircle, Clock, MinusCircle } from 'lucide-svelte';
+  import { CheckCircle, XCircle, Clock, MinusCircle, AlertTriangle } from 'lucide-svelte';
   import { parseUTC } from '$shared/utils/dates';
+  import type { SafeJobEvidence } from '$shared/jobs/evidence';
 
   type JobRun = {
     id: number;
@@ -16,12 +17,16 @@
     durationMs: number;
     error: string | null;
     output: string | null;
+    // Structured safe evidence (issue #237); null for legacy rows written before the contract.
+    evidence: SafeJobEvidence | null;
   };
 
   export let jobRuns: JobRun[];
 
   // Filter state - hide skipped by default
   let showSkipped = false;
+
+  let expandedIds: Set<number> = new Set();
 
   // Filtered runs based on toggle
   $: filteredRuns = showSkipped ? jobRuns : jobRuns.filter((run) => run.status !== 'skipped');
@@ -34,7 +39,7 @@
     { key: 'status', header: 'Status', sortable: true, width: 'w-28' },
     { key: 'startedAt', header: 'Started', sortable: true },
     { key: 'durationMs', header: 'Duration', sortable: true, width: 'w-28' },
-    { key: 'output', header: 'Output' },
+    { key: 'summary', header: 'Summary' },
   ];
 
   // Format duration in ms to human readable
@@ -71,6 +76,15 @@
     if (minutes > 0) return `${minutes}m ago`;
     return `${seconds}s ago`;
   }
+
+  // Collapsed-row one-line preview. For evidence rows this is the validated failure message
+  // or output/decision; for legacy rows it's the raw free-form text (clearly muted).
+  function previewText(run: JobRun): string {
+    if (run.evidence) {
+      return run.evidence.failure?.message ?? run.evidence.output ?? run.evidence.decision ?? '-';
+    }
+    return run.error ?? run.output ?? '-';
+  }
 </script>
 
 <div class="space-y-4">
@@ -90,7 +104,17 @@
     {/if}
   </div>
 
-  <Table {columns} data={filteredRuns} emptyMessage="No job runs yet" compact responsive>
+  <ExpandableTable
+    {columns}
+    data={filteredRuns}
+    getRowId={(run) => run.id}
+    bind:expandedRows={expandedIds}
+    chevronPosition="right"
+    flushExpanded={true}
+    emptyMessage="No job runs yet"
+    compact
+    responsive
+  >
     <svelte:fragment slot="cell" let:row let:column>
       {#if column.key === 'jobName'}
         <span class="text-xs font-medium">{row.displayName ?? formatJobName(row.jobName)}</span>
@@ -108,15 +132,86 @@
         <Badge variant="neutral" mono>{getRelativeTime(row.startedAt)}</Badge>
       {:else if column.key === 'durationMs'}
         <Badge variant="neutral" mono>{formatDuration(row.durationMs)}</Badge>
-      {:else if column.key === 'output'}
-        {#if row.error}
-          <span class="line-clamp-1 font-mono text-xs text-red-600 dark:text-red-400">{row.error}</span>
-        {:else if row.output}
-          <span class="line-clamp-1 font-mono text-xs text-neutral-600 dark:text-neutral-400">{row.output}</span>
-        {:else}
-          <span class="text-neutral-400 dark:text-neutral-600">-</span>
-        {/if}
+      {:else if column.key === 'summary'}
+        <span
+          class="line-clamp-1 font-mono text-xs {row.status === 'failure'
+            ? 'text-red-600 dark:text-red-400'
+            : 'text-neutral-600 dark:text-neutral-400'}"
+        >
+          {previewText(row)}
+        </span>
       {/if}
     </svelte:fragment>
-  </Table>
+
+    <svelte:fragment slot="expanded" let:row>
+      <div class="space-y-3 p-6">
+        {#if row.evidence}
+          {#if row.evidence.target}
+            <div class="flex">
+              <span class="w-24 shrink-0 text-sm font-medium text-neutral-500 dark:text-neutral-400">Target</span>
+              <span class="text-sm break-words text-neutral-900 dark:text-neutral-100">{row.evidence.target}</span>
+            </div>
+          {/if}
+
+          {#if row.evidence.decision}
+            <div class="flex">
+              <span class="w-24 shrink-0 text-sm font-medium text-neutral-500 dark:text-neutral-400">Decision</span>
+              <span class="text-sm break-words text-neutral-900 dark:text-neutral-100">{row.evidence.decision}</span>
+            </div>
+          {/if}
+
+          {#if row.evidence.output}
+            <div class="flex">
+              <span class="w-24 shrink-0 text-sm font-medium text-neutral-500 dark:text-neutral-400">Output</span>
+              <span class="font-mono text-xs break-all whitespace-pre-wrap text-neutral-700 dark:text-neutral-300">
+                {row.evidence.output}
+              </span>
+            </div>
+          {/if}
+
+          {#if row.evidence.failure}
+            <div class="flex">
+              <span class="w-24 shrink-0 text-sm font-medium text-red-600 dark:text-red-400">Failure</span>
+              <span class="text-sm break-words text-neutral-900 dark:text-neutral-100">
+                {row.evidence.failure.message}
+                <span class="ml-1 font-mono text-xs text-neutral-500 dark:text-neutral-400"
+                  >({row.evidence.failure.code})</span
+                >
+              </span>
+            </div>
+          {/if}
+
+          {#if row.evidence.recovery}
+            <div class="flex">
+              <span class="w-24 shrink-0 text-sm font-medium text-neutral-500 dark:text-neutral-400">Recovery</span>
+              <span class="text-sm break-words text-neutral-700 dark:text-neutral-300">{row.evidence.recovery}</span>
+            </div>
+          {/if}
+
+          {#if !row.evidence.target && !row.evidence.decision && !row.evidence.output && !row.evidence.failure}
+            <span class="text-sm text-neutral-500 dark:text-neutral-400">No additional evidence for this run.</span>
+          {/if}
+        {:else}
+          <div
+            class="flex items-center gap-2 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+          >
+            <AlertTriangle size={14} />
+            <span>Legacy run — structured evidence was not captured for this run.</span>
+          </div>
+
+          {#if row.error || row.output}
+            <div>
+              <div class="mb-1 text-xs font-medium text-neutral-500 dark:text-neutral-400">
+                Unvalidated legacy output
+              </div>
+              <pre
+                class="font-mono text-xs break-all whitespace-pre-wrap {row.error
+                  ? 'text-red-600 dark:text-red-400'
+                  : 'text-neutral-700 dark:text-neutral-300'}">{row.error ?? row.output}</pre>
+            </div>
+          {/if}
+        {/if}
+      </div>
+    </svelte:fragment>
+  </ExpandableTable>
 </div>

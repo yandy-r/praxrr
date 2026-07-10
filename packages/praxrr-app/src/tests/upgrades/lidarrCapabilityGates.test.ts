@@ -1,4 +1,4 @@
-import { assertEquals, assertExists } from '@std/assert';
+import { assert, assertEquals, assertExists } from '@std/assert';
 import type { ArrInstance } from '$db/queries/arrInstances.ts';
 import { arrInstancesQueries } from '$db/queries/arrInstances.ts';
 import type { RenameSettings } from '$db/queries/arrRenameSettings.ts';
@@ -217,24 +217,24 @@ Deno.test(
       // then instance lookup, then capability gate
       const lidarrRenameResult = await renameHandler(createJob('arr.rename', 201, 'manual'));
       assertEquals(lidarrRenameResult.status, 'skipped');
-      assertEquals(lidarrRenameResult.output, 'Rename is not supported for Lidarr instances');
+      assertEquals(lidarrRenameResult.decision, 'Rename is not supported for Lidarr instances');
 
       // Lidarr upgrade: handler checks config.enabled first (true for 201),
       // then instance lookup, then capability gate
       const lidarrUpgradeResult = await upgradeHandler(createJob('arr.upgrade', 201, 'manual'));
       assertEquals(lidarrUpgradeResult.status, 'skipped');
-      assertEquals(lidarrUpgradeResult.output, 'Upgrades are not supported for Lidarr instances');
+      assertEquals(lidarrUpgradeResult.decision, 'Upgrades are not supported for Lidarr instances');
 
       // Radarr/Sonarr regression: config is disabled for these instances,
       // so they return 'cancelled' before reaching the capability gate
       for (const supportedId of [202, 203]) {
         const supportedRenameResult = await renameHandler(createJob('arr.rename', supportedId, 'manual'));
         assertEquals(supportedRenameResult.status, 'cancelled');
-        assertEquals(supportedRenameResult.output, 'Rename config disabled');
+        assertEquals(supportedRenameResult.decision, 'Rename config disabled');
 
         const supportedUpgradeResult = await upgradeHandler(createJob('arr.upgrade', supportedId, 'schedule'));
         assertEquals(supportedUpgradeResult.status, 'cancelled');
-        assertEquals(supportedUpgradeResult.output, 'Upgrade config disabled');
+        assertEquals(supportedUpgradeResult.decision, 'Upgrade config disabled');
       }
     } finally {
       arrInstancesQueries.getById = originalGetById;
@@ -257,7 +257,8 @@ Deno.test('rename handler: missing instance returns failure', async () => {
   try {
     const result = await renameHandler(createJob('arr.rename', 999, 'manual'));
     assertEquals(result.status, 'failure');
-    assertEquals(result.error, 'Arr instance not found');
+    assert(result.status === 'failure');
+    assertEquals(result.failureCode, 'targetNotFound');
   } finally {
     arrRenameSettingsQueries.getByInstanceId = originalGetRenameSettings;
     arrInstancesQueries.getById = originalGetById;
@@ -277,7 +278,8 @@ Deno.test('upgrade handler: missing instance returns failure', async () => {
   try {
     const result = await upgradeHandler(createJob('arr.upgrade', 999, 'manual'));
     assertEquals(result.status, 'failure');
-    assertEquals(result.error, 'Arr instance not found');
+    assert(result.status === 'failure');
+    assertEquals(result.failureCode, 'targetNotFound');
   } finally {
     upgradeConfigsQueries.getByArrInstanceId = originalGetUpgradeConfig;
     arrInstancesQueries.getById = originalGetById;

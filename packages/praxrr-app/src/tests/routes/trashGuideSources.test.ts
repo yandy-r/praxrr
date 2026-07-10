@@ -551,6 +551,7 @@ Deno.test({
       durationMs: 5000,
       error: 'network timeout',
       output: null,
+      evidence: null,
       createdAt: '2026-02-25T04:05:05.000Z',
     };
 

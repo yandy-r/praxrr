@@ -8,7 +8,7 @@ import { calculateNextRunFromSchedule } from '../scheduleUtils.ts';
 const backupCleanupHandler: JobHandler = async (job) => {
   const settings = backupSettingsQueries.get();
   if (!settings || settings.enabled !== 1) {
-    return { status: 'cancelled', output: 'Backups disabled' };
+    return { status: 'cancelled', decision: 'Backups disabled' };
   }
 
   const retentionDays = settings.retention_days;
@@ -47,23 +47,25 @@ const backupCleanupHandler: JobHandler = async (job) => {
       source: 'BackupCleanupJob',
       meta: { jobId: job.id, error },
     });
-    return {
-      status: 'failure',
-      error: `Failed to read backups directory: ${error instanceof Error ? error.message : String(error)}`,
-    };
+    return { status: 'failure', failureCode: 'filesystem' };
   }
 
   const message = `Cleanup completed: deleted ${deletedCount} backup(s), ${errorCount} error(s)`;
   const nextRun = calculateNextRunFromSchedule('daily');
 
   if (errorCount > 0 && deletedCount === 0) {
-    return { status: 'failure', error: message, rescheduleAt: job.source === 'schedule' ? nextRun : undefined };
+    return {
+      status: 'failure',
+      failureCode: 'filesystem',
+      output: message,
+      rescheduleAt: job.source === 'schedule' ? nextRun : undefined,
+    };
   }
 
   if (deletedCount === 0) {
     return {
       status: 'skipped',
-      output: 'No old backups to clean up',
+      decision: 'No old backups to clean up',
       rescheduleAt: job.source === 'schedule' ? nextRun : undefined,
     };
   }

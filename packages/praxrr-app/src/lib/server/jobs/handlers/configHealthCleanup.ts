@@ -14,7 +14,7 @@ import { logger } from '$logger/logger.ts';
 const configHealthCleanupHandler: JobHandler = async (job) => {
   const settings = configHealthSettingsQueries.get();
   if (settings.enabled !== 1) {
-    return { status: 'cancelled', output: 'Config health scoring disabled' };
+    return { status: 'cancelled', decision: 'Config health scoring disabled' };
   }
 
   const nextRun = calculateNextRunFromSchedule('daily');
@@ -27,16 +27,16 @@ const configHealthCleanupHandler: JobHandler = async (job) => {
     const output = `Pruned ${byAge} (age) + ${byCount} (cap) config health snapshot(s)`;
 
     if (total === 0) {
-      return { status: 'skipped', output: 'No config health snapshots to prune', rescheduleAt };
+      return { status: 'skipped', decision: 'No config health snapshots to prune', rescheduleAt };
     }
 
     return { status: 'success', output, rescheduleAt };
   } catch (error) {
     await logger.error('Config health cleanup failed', {
       source: 'ConfigHealthCleanupJob',
-      meta: { jobId: job.id, error: error instanceof Error ? error.message : String(error) },
+      meta: { jobId: job.id, error },
     });
-    return { status: 'failure', error: error instanceof Error ? error.message : String(error), rescheduleAt };
+    return { status: 'failure', failureCode: 'database', rescheduleAt };
   }
 };
 

@@ -4,6 +4,7 @@ import { trashGuideManager, type TrashGuideSyncResult } from '$trashguide/index.
 import { calculateNextRunFromMinutes } from '../scheduleUtils.ts';
 import { jobQueueRegistry } from '../queueRegistry.ts';
 import type { JobHandler, JobHandlerResult, TrashGuideSyncJobPayload } from '../queueTypes.ts';
+import type { JobFailureCode } from '$shared/jobs/evidence.ts';
 
 const MAX_TRANSIENT_RETRY_ATTEMPTS = 3;
 
@@ -95,11 +96,14 @@ async function buildFailureResult(
   jobId: number,
   sourceId: number,
   message: string,
+  failureCode: JobFailureCode,
   attempts: number,
   trigger: TrashGuideSyncJobPayload['trigger'],
   enabled: boolean,
   scheduleMinutes: number
 ): Promise<JobHandlerResult> {
+  // `message` is used ONLY for transient-retry routing and sanitized logging — it is never
+  // persisted into the durable evidence, which carries the typed `failureCode` instead.
   const scheduledRescheduleAt = getScheduledRescheduleAt(trigger, enabled, scheduleMinutes);
 
   if (
@@ -120,39 +124,31 @@ async function buildFailureResult(
       },
     });
 
-    return {
-      status: 'failure',
-      error: message,
-      rescheduleAt: retryAt,
-    };
+    return { status: 'failure', failureCode, rescheduleAt: retryAt };
   }
 
-  return {
-    status: 'failure',
-    error: message,
-    rescheduleAt: scheduledRescheduleAt,
-  };
+  return { status: 'failure', failureCode, rescheduleAt: scheduledRescheduleAt };
 }
 
 const trashGuideSyncHandler: JobHandler = async (job) => {
   const payload = parsePayload(job.payload, job.source);
   if (!payload) {
-    return { status: 'failure', error: 'Invalid TRaSH sync payload' };
+    return { status: 'failure', failureCode: 'invalidPayload' };
   }
 
   const source = trashGuideSourcesQueries.getById(payload.sourceId);
   if (!source) {
-    return { status: 'cancelled', output: 'TRaSH source not found' };
+    return { status: 'cancelled', decision: 'TRaSH source not found' };
   }
 
   if (!source.enabled) {
-    return { status: 'cancelled', output: 'TRaSH source disabled' };
+    return { status: 'cancelled', decision: 'TRaSH source disabled' };
   }
 
   const scheduleEnabled = hasValidSchedule(source.enabled, source.sync_strategy);
   if (payload.trigger === 'scheduled') {
     if (!scheduleEnabled) {
-      return { status: 'cancelled', output: 'TRaSH source schedule is disabled' };
+      return { status: 'cancelled', decision: 'TRaSH source schedule is disabled' };
     }
 
     if (source.last_synced_at) {
@@ -160,7 +156,7 @@ const trashGuideSyncHandler: JobHandler = async (job) => {
       if (Date.now() < new Date(dueAt).getTime()) {
         return {
           status: 'skipped',
-          output: 'TRaSH sync not due',
+          decision: 'TRaSH sync not due',
           rescheduleAt: dueAt,
         };
       }
@@ -182,6 +178,7 @@ const trashGuideSyncHandler: JobHandler = async (job) => {
       job.id,
       payload.sourceId,
       message,
+      'gitNetwork',
       job.attempts,
       payload.trigger,
       source.enabled,
@@ -193,7 +190,7 @@ const trashGuideSyncHandler: JobHandler = async (job) => {
     trashGuideSourcesQueries.updateSyncMetadata(payload.sourceId, { lastSyncedAt: new Date().toISOString() });
     return {
       status: 'skipped',
-      output: 'No TRaSH guide updates available',
+      decision: 'No TRaSH guide updates available',
       rescheduleAt: scheduledRescheduleAt,
     };
   }
@@ -220,6 +217,7 @@ const trashGuideSyncHandler: JobHandler = async (job) => {
       job.id,
       payload.sourceId,
       message,
+      'gitNetwork',
       job.attempts,
       payload.trigger,
       source.enabled,
@@ -237,6 +235,7 @@ const trashGuideSyncHandler: JobHandler = async (job) => {
       job.id,
       payload.sourceId,
       message,
+      'gitNetwork',
       job.attempts,
       payload.trigger,
       source.enabled,
@@ -247,7 +246,7 @@ const trashGuideSyncHandler: JobHandler = async (job) => {
   if (syncResult.parseStatus === 'failed') {
     return {
       status: 'failure',
-      error: 'TRaSH parser/schema validation failed',
+      failureCode: 'validation',
       rescheduleAt: scheduledRescheduleAt,
     };
   }

@@ -9,7 +9,7 @@ import { logger } from '$logger/logger.ts';
 const logsCleanupHandler: JobHandler = async (job) => {
   const settings = logSettingsQueries.get();
   if (!settings || settings.file_logging !== 1) {
-    return { status: 'cancelled', output: 'File logging disabled' };
+    return { status: 'cancelled', decision: 'File logging disabled' };
   }
 
   const retentionDays = settings.retention_days;
@@ -21,13 +21,18 @@ const logsCleanupHandler: JobHandler = async (job) => {
     const nextRun = calculateNextRunFromSchedule('daily');
 
     if (result.errorCount > 0 && result.deletedCount === 0) {
-      return { status: 'failure', error: message, rescheduleAt: job.source === 'schedule' ? nextRun : undefined };
+      return {
+        status: 'failure',
+        failureCode: 'filesystem',
+        output: message,
+        rescheduleAt: job.source === 'schedule' ? nextRun : undefined,
+      };
     }
 
     if (result.deletedCount === 0) {
       return {
         status: 'skipped',
-        output: 'No old log files to clean up',
+        decision: 'No old log files to clean up',
         rescheduleAt: job.source === 'schedule' ? nextRun : undefined,
       };
     }
@@ -42,7 +47,7 @@ const logsCleanupHandler: JobHandler = async (job) => {
       source: 'LogsCleanupJob',
       meta: { jobId: job.id, error },
     });
-    return { status: 'failure', error: error instanceof Error ? error.message : String(error) };
+    return { status: 'failure', failureCode: 'filesystem' };
   }
 };
 

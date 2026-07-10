@@ -7,7 +7,12 @@ import { configHealthSnapshotsQueries } from '$db/queries/configHealthSnapshots.
 import { configHealthSettingsQueries } from '$db/queries/configHealthSettings.ts';
 import { jobQueueRegistry } from '$jobs/queueRegistry.ts';
 import type { JobHandler, JobQueueRecord } from '$jobs/queueTypes.ts';
-import { CONFIG_HEALTH_ENGINE_VERSION, type HealthArrType, type HealthBand, type HealthReport } from '$shared/health/index.ts';
+import {
+  CONFIG_HEALTH_ENGINE_VERSION,
+  type HealthArrType,
+  type HealthBand,
+  type HealthReport,
+} from '$shared/health/index.ts';
 
 // Side-effect import registers the 'config-health.cleanup' handler.
 import '$jobs/handlers/configHealthCleanup.ts';
@@ -120,7 +125,7 @@ migratedTest('config-health.cleanup returns cancelled when scoring is disabled',
 
   const result = await handler(createCleanupJob());
   assertEquals(result.status, 'cancelled');
-  assertStringIncludes(result.output!, 'disabled');
+  assertStringIncludes(result.decision!, 'disabled');
   // The aged snapshot survives — disabled short-circuits before pruning.
   assertEquals(configHealthSnapshotsQueries.getTrend(radarr).length, 1);
 });
@@ -171,7 +176,7 @@ migratedTest('config-health.cleanup returns skipped when there is nothing to pru
   const result = await handler(createCleanupJob({ source: 'schedule' }));
 
   assertEquals(result.status, 'skipped');
-  assertStringIncludes(result.output!, 'No config health snapshots to prune');
+  assertStringIncludes(result.decision!, 'No config health snapshots to prune');
   assertExists(result.rescheduleAt, 'a scheduled skip must still reschedule');
   assertEquals(configHealthSnapshotsQueries.getTrend(radarr).length, 1);
 });

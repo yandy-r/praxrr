@@ -26,7 +26,7 @@ const BACKOFF_CAP_MS = 6 * 60 * 60 * 1000; // 6 hours
 const driftCheckHandler: JobHandler = async (job) => {
   const settings = driftSettingsQueries.get();
   if (settings.enabled !== 1) {
-    return { status: 'cancelled', output: 'Drift detection disabled' };
+    return { status: 'cancelled', decision: 'Drift detection disabled' };
   }
 
   const isScheduled = job.source === 'schedule';
@@ -76,12 +76,12 @@ const driftCheckHandler: JobHandler = async (job) => {
 
     await logger.error('Drift sweep handler failed', {
       source: 'DriftCheckJob',
-      meta: { jobId: job.id, error: error instanceof Error ? error.message : String(error) },
+      meta: { jobId: job.id, error },
     });
 
     return {
       status: 'failure',
-      error: error instanceof Error ? error.message : String(error),
+      failureCode: 'database',
       rescheduleAt: isScheduled ? backoffUntil : undefined,
     };
   }

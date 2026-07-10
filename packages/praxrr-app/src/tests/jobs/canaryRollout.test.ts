@@ -1,4 +1,4 @@
-import { assertEquals, assertExists } from '@std/assert';
+import { assert, assertEquals, assertExists } from '@std/assert';
 import { config } from '$config';
 import { db } from '$db/db.ts';
 import { runMigrations } from '$db/migrations.ts';
@@ -281,12 +281,15 @@ migratedTest('a target that throws inside executeSyncJob is recorded as failure;
     assertEquals(byId.get(a)?.status, 'success');
     assertEquals(byId.get(c)?.status, 'success');
 
-    // The throw is caught at the EXACT instance id and surfaced as a failure result.
+    // The throw is caught at the EXACT instance id and surfaced as a failure result. Per issue
+    // #237 the per-instance error is the pre-authored safe copy for the typed code, never the raw
+    // thrown message, so no exception text leaks into the durable rollout results.
     const failed = byId.get(b);
     assertExists(failed);
     assertEquals(failed.instanceId, b);
     assertEquals(failed.status, 'failure');
-    assertEquals(failed.error, `sync config exploded for ${b}`);
+    assertEquals(failed.error, 'The job failed with an unexpected error.');
+    assert(!(failed.error ?? '').includes('exploded'), 'raw thrown message must not leak');
 
     // Not every remaining instance synced -> the rollout finishes failed.
     assertEquals(canaryRolloutQueries.getById(id)?.status, 'failed');

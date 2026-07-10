@@ -1,4 +1,4 @@
-import { assertAlmostEquals, assertEquals, assertExists, assertStringIncludes } from '@std/assert';
+import { assert, assertAlmostEquals, assertEquals, assertExists, assertStringIncludes } from '@std/assert';
 import { type CreateJobQueueInput, jobQueueQueries } from '$db/queries/jobQueue.ts';
 import { type TrashGuideSource, trashGuideSourcesQueries } from '$db/queries/trashGuideSources.ts';
 import { jobDispatcher } from '$jobs/dispatcher.ts';
@@ -355,7 +355,7 @@ Deno.test('trashGuideSync handler coerces numeric-string sourceId through parseP
 
     assertEquals(requestedId, 55);
     assertEquals(result.status, 'cancelled');
-    assertEquals(result.output, 'TRaSH source not found');
+    assertEquals(result.decision, 'TRaSH source not found');
   } finally {
     for (const restore of restores.reverse()) {
       restore();
@@ -385,7 +385,7 @@ Deno.test('trashGuideSync handler resolves undefined trigger to scheduled for sc
     const result = await handler(createHandlerJob({ payload: { sourceId: 60 }, source: 'schedule' }));
 
     assertEquals(result.status, 'skipped');
-    assertEquals(result.output, 'TRaSH sync not due');
+    assertEquals(result.decision, 'TRaSH sync not due');
     assertEquals(check.calls(), 0);
   } finally {
     for (const restore of restores.reverse()) {
@@ -497,7 +497,8 @@ Deno.test('trashGuideSync handler rejects payload missing sourceId', async () =>
     const result = await handler(createHandlerJob({ payload: {}, source: 'manual' }));
 
     assertEquals(result.status, 'failure');
-    assertEquals(result.error, 'Invalid TRaSH sync payload');
+    assert(result.status === 'failure');
+    assertEquals(result.failureCode, 'invalidPayload');
     assertEquals(getByIdCalls, 0);
   } finally {
     for (const restore of restores.reverse()) {
@@ -527,7 +528,8 @@ Deno.test('trashGuideSync handler rejects payload with non-numeric sourceId', as
     );
 
     assertEquals(result.status, 'failure');
-    assertEquals(result.error, 'Invalid TRaSH sync payload');
+    assert(result.status === 'failure');
+    assertEquals(result.failureCode, 'invalidPayload');
     assertEquals(getByIdCalls, 0);
   } finally {
     for (const restore of restores.reverse()) {
@@ -555,7 +557,8 @@ Deno.test('trashGuideSync handler rejects payload with invalid trigger literal',
     const result = await handler(createHandlerJob({ payload: { sourceId: 5, trigger: 'auto' }, source: 'manual' }));
 
     assertEquals(result.status, 'failure');
-    assertEquals(result.error, 'Invalid TRaSH sync payload');
+    assert(result.status === 'failure');
+    assertEquals(result.failureCode, 'invalidPayload');
     assertEquals(getByIdCalls, 0);
   } finally {
     for (const restore of restores.reverse()) {
@@ -585,7 +588,8 @@ Deno.test('trashGuideSync handler rejects payload with non-string requestedAt', 
     );
 
     assertEquals(result.status, 'failure');
-    assertEquals(result.error, 'Invalid TRaSH sync payload');
+    assert(result.status === 'failure');
+    assertEquals(result.failureCode, 'invalidPayload');
     assertEquals(getByIdCalls, 0);
   } finally {
     for (const restore of restores.reverse()) {
@@ -661,7 +665,9 @@ Deno.test('trashGuideSync handler schedules a retry for transient git/network fa
       );
 
       assertEquals(result.status, 'failure', `status for "${message}"`);
-      assertEquals(result.error, message, `error passthrough for "${message}"`);
+      assert(result.status === 'failure');
+      assertEquals(result.failureCode, 'gitNetwork', `failure code for "${message}"`);
+      assert(!JSON.stringify(result).includes(message), `no message leak for "${message}"`);
       assertEquals(typeof result.rescheduleAt, 'string', `rescheduleAt type for "${message}"`);
       assertEquals(warnCalls, 1, `warn count for "${message}"`);
       assertEquals(errorCalls, 1, `error count for "${message}"`);
@@ -706,7 +712,9 @@ Deno.test('trashGuideSync handler does not retry non-transient failures', async 
     );
 
     assertEquals(result.status, 'failure');
-    assertEquals(result.error, message);
+    assert(result.status === 'failure');
+    assertEquals(result.failureCode, 'gitNetwork');
+    assert(!JSON.stringify(result).includes(message));
     assertEquals(counters.warnCalls(), 0);
     assertEquals(typeof result.rescheduleAt, 'string');
     const deltaMinutes = (Date.parse(result.rescheduleAt as string) - before) / 60_000;
@@ -749,7 +757,9 @@ Deno.test('trashGuideSync handler does not retry transient failures on manual tr
     );
 
     assertEquals(result.status, 'failure');
-    assertEquals(result.error, 'git network failure');
+    assert(result.status === 'failure');
+    assertEquals(result.failureCode, 'gitNetwork');
+    assert(!JSON.stringify(result).includes('git network failure'));
     assertEquals(counters.warnCalls(), 0);
     assertEquals(result.rescheduleAt, null);
   } finally {
@@ -887,7 +897,8 @@ Deno.test('trashGuideSync handler treats sync parseStatus failed as a terminal f
     );
 
     assertEquals(result.status, 'failure');
-    assertEquals(result.error, 'TRaSH parser/schema validation failed');
+    assert(result.status === 'failure');
+    assertEquals(result.failureCode, 'validation');
     assertEquals(counters.warnCalls(), 0);
     assertEquals(typeof result.rescheduleAt, 'string');
     const deltaMinutes = (Date.parse(result.rescheduleAt as string) - before) / 60_000;
@@ -942,7 +953,9 @@ Deno.test('trashGuideSync handler treats sync success:false schema errors as ter
     );
 
     assertEquals(result.status, 'failure');
-    assertEquals(result.error, message);
+    assert(result.status === 'failure');
+    assertEquals(result.failureCode, 'gitNetwork');
+    assert(!JSON.stringify(result).includes(message));
     assertEquals(counters.warnCalls(), 0);
     assertEquals(counters.errorCalls(), 1);
     assertEquals(typeof result.rescheduleAt, 'string');
@@ -971,7 +984,7 @@ Deno.test('trashGuideSync handler cancels a disabled source before checking upda
     const result = await handler(createHandlerJob({ payload: { sourceId: 87, trigger: 'manual' }, source: 'manual' }));
 
     assertEquals(result.status, 'cancelled');
-    assertEquals(result.output, 'TRaSH source disabled');
+    assertEquals(result.decision, 'TRaSH source disabled');
     assertEquals(check.calls(), 0);
   } finally {
     for (const restore of restores.reverse()) {
@@ -998,7 +1011,7 @@ Deno.test('trashGuideSync handler cancels a scheduled job when the schedule is d
     );
 
     assertEquals(result.status, 'cancelled');
-    assertEquals(result.output, 'TRaSH source schedule is disabled');
+    assertEquals(result.decision, 'TRaSH source schedule is disabled');
     assertEquals(check.calls(), 0);
   } finally {
     for (const restore of restores.reverse()) {
@@ -1031,7 +1044,7 @@ Deno.test('trashGuideSync handler skips and reschedules a scheduled job that is 
     );
 
     assertEquals(result.status, 'skipped');
-    assertEquals(result.output, 'TRaSH sync not due');
+    assertEquals(result.decision, 'TRaSH sync not due');
     assertEquals(result.rescheduleAt, calculateNextRunFromMinutes(lastSyncedAt, 60));
     assertEquals(check.calls(), 0);
   } finally {
@@ -1075,7 +1088,7 @@ Deno.test('trashGuideSync handler proceeds past the not-due guard when overdue',
 
     assertEquals(checkCalls, 1);
     assertEquals(result.status, 'skipped');
-    assertEquals(result.output, 'No TRaSH guide updates available');
+    assertEquals(result.decision, 'No TRaSH guide updates available');
     assertEquals(meta.calls(), 1);
   } finally {
     for (const restore of restores.reverse()) {
@@ -1289,7 +1302,7 @@ Deno.test('trashGuideSync handler skips before the auto_pull gate when there are
     );
 
     assertEquals(result.status, 'skipped');
-    assertEquals(result.output, 'No TRaSH guide updates available');
+    assertEquals(result.decision, 'No TRaSH guide updates available');
     assertEquals(syncCalls, 0);
     assertEquals(meta.calls(), 1);
     assertEquals(typeof meta.lastInput()?.lastSyncedAt, 'string');

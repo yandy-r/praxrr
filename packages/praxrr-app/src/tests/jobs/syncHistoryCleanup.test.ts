@@ -139,7 +139,7 @@ migratedTest('sync.history.cleanup returns cancelled when history recording is d
   const result = await handler(createCleanupJob());
 
   assertEquals(result.status, 'cancelled');
-  assertStringIncludes(result.output!, 'disabled');
+  assertStringIncludes(result.decision!, 'disabled');
   // Disabled short-circuits before any pruning — every row survives, per Arr type.
   assertEquals(syncHistoryQueries.count({ arrType: 'radarr' }), 1);
   assertEquals(syncHistoryQueries.count({ arrType: 'sonarr' }), 1);
@@ -206,7 +206,7 @@ migratedTest('sync.history.cleanup returns skipped when there is nothing to prun
   const result = await handler(createCleanupJob({ source: 'schedule' }));
 
   assertEquals(result.status, 'skipped');
-  assertStringIncludes(result.output!, 'No sync history rows to prune');
+  assertStringIncludes(result.decision!, 'No sync history rows to prune');
   // Skipped still reschedules on a scheduled run so retention keeps recurring.
   assertExists(result.rescheduleAt, 'a scheduled skip must still reschedule');
 
