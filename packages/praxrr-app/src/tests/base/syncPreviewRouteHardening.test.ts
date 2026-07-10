@@ -818,6 +818,8 @@ Deno.test('classifyPreviewFailure maps error TYPE/status to closed codes without
     { error: new HttpError(SECRET_MIX, 404), expected: 'notFound' },
     { error: new HttpError(SECRET_MIX, 422), expected: 'rejected' },
     { error: new HttpError(SECRET_MIX, 503), expected: 'serverError' },
+    // A non-error HTTP status (< 400) falls through to the catch-all rather than misclassifying.
+    { error: new HttpError(SECRET_MIX, 302), expected: 'internalError' },
     { error: new Error(FREE_FORM), expected: 'internalError' },
   ];
 
@@ -832,4 +834,7 @@ Deno.test('classifyPreviewFailure maps error TYPE/status to closed codes without
   const abort = new Error('aborted');
   abort.name = 'AbortError';
   assertEquals(classifyPreviewFailure(abort, 'sonarr').code, 'timeout');
+  const timeoutNamed = new Error('slow');
+  timeoutNamed.name = 'TimeoutError';
+  assertEquals(classifyPreviewFailure(timeoutNamed, 'sonarr').code, 'timeout');
 });
