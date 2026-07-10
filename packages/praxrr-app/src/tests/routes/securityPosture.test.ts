@@ -43,8 +43,11 @@ function migratedTest(name: string, fn: () => Promise<void> | void): void {
   });
 }
 
-function summaryEvent(): SummaryGetEvent {
-  return {} as unknown as SummaryGetEvent;
+/** Minimal slice the summary handler actually reads (`event.url` / `event.request`); `{}` => unknown transport. */
+type SummaryEventOverride = { url?: URL; request?: Request };
+
+function summaryEvent(override: SummaryEventOverride = {}): SummaryGetEvent {
+  return override as unknown as SummaryGetEvent;
 }
 
 function insertInstance(name: string, type: string, url: string): void {
@@ -57,8 +60,10 @@ function insertInstance(name: string, type: string, url: string): void {
   );
 }
 
-async function getSummary(): Promise<{ status: number; body: SecurityPostureSummaryResponse }> {
-  const response = await GET_SUMMARY(summaryEvent());
+async function getSummary(
+  override: SummaryEventOverride = {}
+): Promise<{ status: number; body: SecurityPostureSummaryResponse }> {
+  const response = await GET_SUMMARY(summaryEvent(override));
   return { status: response.status, body: (await response.json()) as SecurityPostureSummaryResponse };
 }
 
@@ -132,3 +137,38 @@ migratedTest('GET /security-posture/summary never returns a secret value', async
   // The redaction self-verify must not have leaked its own planted sentinel into the payload.
   assert(!serialized.includes('deadbeefdeadbeefdeadbeefdeadbeef'));
 });
+
+migratedTest(
+  'GET /security-posture/summary reports unknown session transport and the secretless session assurance',
+  async () => {
+    const { status, body } = await getSummary();
+    assertEquals(status, 200);
+    // Report-surface engine version: '2' (session posture #227) → '3' (proxy_trust check #228).
+    assertEquals(body.engineVersion, '3');
+
+    // A no-context ({}) event cannot observe transport, so it is reported unknown and never assumed safe.
+    const transportAdvisory = body.advisories.find((a) => a.id === 'session_cookie_transport');
+    assert(transportAdvisory, 'session_cookie_transport advisory present for an unobservable transport');
+    assert(
+      transportAdvisory.detail.join(' ').includes('could not be observed'),
+      'the advisory reports the transport as unknown'
+    );
+
+    // The secretless session model is affirmed; the direct-HTTPS Secure assurance is withheld (transport unknown).
+    assert(body.assurances.some((a) => a.id === 'session_secret' && a.verified));
+    assert(!body.assurances.some((a) => a.id === 'session_cookie_secure'));
+  }
+);
+
+migratedTest(
+  'GET /security-posture/summary affirms Secure over a direct-HTTPS request and drops the transport advisory',
+  async () => {
+    const httpsUrl = 'https://praxrr.example/api/v1/security-posture/summary';
+    const { status, body } = await getSummary({ url: new URL(httpsUrl), request: new Request(httpsUrl) });
+    assertEquals(status, 200);
+
+    // direct-secure transport (url.protocol === 'https:') + default auto => no advisory, verified Secure assurance.
+    assert(!body.advisories.some((a) => a.id === 'session_cookie_transport'));
+    assert(body.assurances.some((a) => a.id === 'session_cookie_secure' && a.verified));
+  }
+);

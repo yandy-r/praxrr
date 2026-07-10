@@ -27,7 +27,7 @@ function makeInputs(overrides: Partial<PostureInputs> = {}): PostureInputs {
     instances: [],
     rotation: { activeVersion: '1', configuredVersions: ['1'], instanceKeyVersions: [] },
     redactionVerified: true,
-    sessionCookieSecure: false,
+    session: { transport: 'unknown', cookieSecure: false, cookieSecureMode: 'auto' },
     trustedProxyConfigured: false,
     trustedProxyValidRangeCount: 0,
     trustedProxyInvalidEntries: [],
