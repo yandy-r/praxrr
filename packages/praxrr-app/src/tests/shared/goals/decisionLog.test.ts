@@ -38,7 +38,7 @@ function plan(overrides: Partial<GoalPlan> = {}): GoalPlan {
   ];
 
   return {
-    engineVersion: '1',
+    engineVersion: '2',
     arrType: 'radarr',
     decisions,
     uncategorized,
@@ -62,6 +62,14 @@ function plan(overrides: Partial<GoalPlan> = {}): GoalPlan {
         score,
       })),
     },
+    ladderInput: null,
+    qualityLadder: {
+      ceiling: '1080p',
+      cutoff: null,
+      items: [],
+      reshapesSiblingArrs: false,
+      sharedLadderNote: null,
+    },
     ...overrides,
   };
 }
@@ -84,7 +92,7 @@ Deno.test('goal decision metadata preserves canonical scores, reasons, ceiling, 
     profileName: 'Movies',
     arrType: 'radarr',
     presetId: 'best-quality',
-    engineVersion: '1',
+    engineVersion: '2',
     coverage: { total: 2, scored: 1, uncategorized: 1 },
     thresholds: {
       minimumScore: -15,

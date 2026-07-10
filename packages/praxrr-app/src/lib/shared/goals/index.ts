@@ -21,3 +21,5 @@ export {
   ceilingLevel
 } from './policy.ts';
 export { computeGoalPlan, diffGoalPlans } from './engine.ts';
+export { buildCeilingLadder, JUNK_QUALITIES, GoalLadderMappingError } from './ladder.ts';
+export type { GoalQualityFact, GoalQualityLadder, GoalQualityLadderItem } from './ladder.ts';

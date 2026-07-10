@@ -74,7 +74,7 @@ const BEST_QUALITY_WEIGHTS = {
 };
 
 const SERVER_GOAL_PLAN: GoalPlan = {
-  engineVersion: '1',
+  engineVersion: '2',
   arrType: 'radarr',
   decisions: [
     {
@@ -111,6 +111,14 @@ const SERVER_GOAL_PLAN: GoalPlan = {
       },
     ],
   },
+  ladderInput: null,
+  qualityLadder: {
+    ceiling: '2160p',
+    cutoff: null,
+    items: [],
+    reshapesSiblingArrs: false,
+    sharedLadderNote: null,
+  },
 };
 
 const SERVER_BINDING: QualityGoalBindingRow = {
@@ -119,7 +127,7 @@ const SERVER_BINDING: QualityGoalBindingRow = {
   arr_type: 'radarr',
   preset_id: 'best-quality',
   weights_json: JSON.stringify(BEST_QUALITY_WEIGHTS),
-  engine_version: '1',
+  engine_version: '2',
   applied_at: '2026-07-09T00:00:00.000Z',
   created_at: '2026-07-09 00:00:00',
   updated_at: '2026-07-09 00:00:00',
@@ -295,7 +303,7 @@ Deno.test('goals presets: returns the catalog, axes, and engine version', async 
   ]);
   assertEquals(body.axes.length, 5);
   assert(body.axes.some((axis) => axis.key === 'resolutionCeiling' && axis.kind === 'ceiling'));
-  assertEquals(body.engineVersion, '1');
+  assertEquals(body.engineVersion, '2');
 });
 
 // ============================================================================
@@ -398,7 +406,7 @@ Deno.test('goals apply: logs one server-derived decision event after persistence
       profileName: 'Movies',
       preset: 'best-quality',
       weights: BEST_QUALITY_WEIGHTS,
-      expectedEngineVersion: '1',
+      expectedEngineVersion: '2',
       decisions: [{ customFormatName: 'Client-forged decision', score: 999999 }],
       scoringInput: { customFormatScores: [{ customFormatName: 'Client-forged decision', score: 999999 }] },
     }).request,
@@ -440,7 +448,7 @@ Deno.test('goals apply: validation and engine-version failures do not log', asyn
         profileName: 'Movies',
         preset: 'balanced',
         weights: BEST_QUALITY_WEIGHTS,
-        expectedEngineVersion: '1',
+        expectedEngineVersion: '2',
       }).request,
       dependencies
     )
@@ -485,7 +493,7 @@ Deno.test('goals apply: scoring and binding failures do not log', async () => {
     profileName: 'Movies',
     preset: 'best-quality',
     weights: BEST_QUALITY_WEIGHTS,
-    expectedEngineVersion: '1',
+    expectedEngineVersion: '2',
   };
 
   const scoringLogs: ApplyLogCall[] = [];
@@ -547,7 +555,7 @@ migratedTest('goals binding: null when unbound, then reflects an upserted bindin
     arrType: 'radarr',
     presetId: 'best-quality',
     weightsJson: JSON.stringify(BEST_QUALITY_WEIGHTS),
-    engineVersion: '1',
+    engineVersion: '2',
     appliedAt: '2026-07-09T00:00:00.000Z',
   });
 

@@ -22,6 +22,7 @@ import type {
 import { GOALS_ENGINE_VERSION } from './types.ts';
 import { classifyCustomFormat, detectResolutionLevel } from './classifier.ts';
 import { CEILING_ABOVE_PENALTY, UNWANTED_SCORE, ceilingGate, computeThresholds, scoreCategory } from './policy.ts';
+import { buildCeilingLadder } from './ladder.ts';
 
 function byName(a: { customFormatName: string }, b: { customFormatName: string }): number {
   return a.customFormatName < b.customFormatName ? -1 : a.customFormatName > b.customFormatName ? 1 : 0;
@@ -86,6 +87,16 @@ export function computeGoalPlan(input: ComputeGoalPlanInput): GoalPlan {
 
   const thresholds = computeThresholds(input.weights, input.presetBaseUpgrade);
 
+  // Ceiling → quality-ladder gating (issue #221). Additive and independent of the CF-score path
+  // above: a partial/empty ladder yields `ladderInput: null` and never blocks scoring. Only a
+  // genuinely ambiguous (straddling) group throws, exactly as `buildScoringOps` throws on bad input.
+  const { ladderInput, ladder } = buildCeilingLadder(
+    input.weights.resolutionCeiling,
+    input.currentLadder ?? [],
+    input.qualityFacts ?? [],
+    input.compatibleWithSiblingArr ?? false
+  );
+
   const scoringInput: UpdateScoringInput = {
     minimumScore: thresholds.minimumScore,
     upgradeUntilScore: thresholds.upgradeUntilScore,
@@ -109,7 +120,9 @@ export function computeGoalPlan(input: ComputeGoalPlanInput): GoalPlan {
       scored: decisions.length,
       uncategorized: uncategorized.length
     },
-    scoringInput
+    scoringInput,
+    ladderInput,
+    qualityLadder: ladder
   };
 }
 
