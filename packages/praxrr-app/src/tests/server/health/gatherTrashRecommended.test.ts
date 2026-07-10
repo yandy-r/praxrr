@@ -28,8 +28,16 @@ const sel = (itemName: string, sectionType: TrashGuideSyncSelection['sectionType
   itemName,
 });
 
-Deno.test('gatherTrashRecommendedCfNames: lidarr short-circuits to null (never queries)', () => {
-  assertEquals(gatherTrashRecommendedCfNames(1, 'lidarr'), null);
+Deno.test('gatherTrashRecommendedCfNames: lidarr short-circuits to null BEFORE querying (pins the arr gate)', () => {
+  const restores: Restore[] = [];
+  // Selections ARE available; lidarr must still gate out before the query runs. If the
+  // isTrashGuideSupportedArrType gate were removed, the stub would leak ['CF-A'] and this fails.
+  patchSelections([sel('CF-A', 'customFormats')], restores);
+  try {
+    assertEquals(gatherTrashRecommendedCfNames(1, 'lidarr'), null);
+  } finally {
+    restores.forEach((r) => r());
+  }
 });
 
 Deno.test('gatherTrashRecommendedCfNames: filters to the customFormats section only', () => {

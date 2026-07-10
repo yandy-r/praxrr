@@ -256,7 +256,39 @@ Deno.test('trash_alignment: a recommended CF assigned with score===null is repor
   assertEquals(r.score, 50);
   assert(r.suggestions[0].headline.startsWith('TRaSH alignment:'));
   assert(r.suggestions[0].detail.includes('CF-B'));
+  assert(
+    r.suggestions[0].detail.includes('Assign these custom formats in a quality profile to align with your linked TRaSH guide.')
+  );
   assertEquals(r.suggestions[0].tone, 'info');
+});
+
+Deno.test('trash_alignment: all-degraded profiles (unreadable) are unmeasurable => null, not a false 0', () => {
+  // Unbuilt cache / failed scoring read: degradedProfile carries thresholds=null + empty cfScores.
+  // R stays populated (independent app-DB read), but the assignment surface is unreadable => skip.
+  const inputs = makeInputs({
+    trashRecommendedCfNames: ['CF-A', 'CF-B'],
+    profiles: [makeProfile({ thresholds: null, cfScores: [] })],
+  });
+  assertEquals(score('trash_alignment', inputs, INSTANCE_SCOPE).score, null);
+});
+
+Deno.test('trash_alignment: no profiles (gather failure) is unmeasurable => null', () => {
+  const inputs = makeInputs({ trashRecommendedCfNames: ['CF-A'], profiles: [] });
+  assertEquals(score('trash_alignment', inputs, INSTANCE_SCOPE).score, null);
+});
+
+Deno.test('trash_alignment: missing-CF suggestion caps the named sample at 5 and appends the corrective action', () => {
+  const names = ['CF-1', 'CF-2', 'CF-3', 'CF-4', 'CF-5', 'CF-6', 'CF-7'];
+  const inputs = makeInputs({
+    trashRecommendedCfNames: names,
+    // Readable profile (thresholds set) that assigns none of the recommended CFs.
+    profiles: [makeProfile({ cfScores: [] })],
+  });
+  const r = score('trash_alignment', inputs, INSTANCE_SCOPE);
+  assertEquals(r.score, 0);
+  assert(r.suggestions[0].headline.includes('7 opted-in'));
+  // 5 named CFs (capped) + 1 corrective-action line.
+  assertEquals(r.suggestions[0].detail.length, 6);
 });
 
 Deno.test('trash_alignment: fully aligned emits no suggestion (quiet path)', () => {
