@@ -1,0 +1,21 @@
+---
+// Starlight `Banner` override: shows a site-wide notice on every page of a version marked
+// `development` in versions.json, while preserving any per-page frontmatter banner via the
+// stock Banner component. The active version is resolved at build time from DOCS_VERSION.
+import Default from '@astrojs/starlight/components/Banner.astro';
+import versions from '../../versions.json';
+
+const current =
+  versions.find((v) => v.id === process.env.DOCS_VERSION) ?? versions.find((v) => v.default);
+const showDevBanner = Boolean(current && current.development);
+---
+
+{
+	showDevBanner && (
+		<div class="sl-banner">
+			You are viewing the in-development <strong>Next</strong> docs. For the current release, see{' '}
+			<a href="/">v2.0</a>.
+		</div>
+	)
+}
+<Default />

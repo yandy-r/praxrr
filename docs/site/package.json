@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "npm run sync:external-docs && astro dev --root .",
-    "build": "npm run sync:external-docs && astro build --root .",
+    "build": "npm run sync:external-docs && node scripts/build-versions.mjs",
     "preview": "astro preview --root .",
     "sync:external-docs": "node scripts/import-external-docs.mjs"
   },

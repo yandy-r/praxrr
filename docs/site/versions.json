@@ -1,0 +1,4 @@
+[
+  { "id": "2.0", "label": "v2.0 (Latest)", "base": "/", "ref": "main", "default": true },
+  { "id": "next", "label": "Next (dev)", "base": "/next/", "ref": "main", "development": true }
+]
