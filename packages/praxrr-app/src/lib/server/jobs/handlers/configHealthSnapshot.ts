@@ -54,8 +54,10 @@ const configHealthSnapshotHandler: JobHandler = async (job) => {
     // Both the sweep and the on-demand recompute route funnel through the one score+persist path so
     // they can never diverge. `recomputeAndPersistInstance` never throws (safe under the Promise.all
     // batch) and self-logs insert failures. An `in_flight` outcome (a concurrent manual recompute for
-    // the same instance) is intentionally ignored: that manual call already persisted the instance's
-    // trend point, so the sweep skipping it leaves no gap.
+    // the same instance) is intentionally ignored: the concurrent manual call is persisting that
+    // instance's trend point, so the sweep need not. If that manual insert happens to fail, the
+    // instance is simply re-scored on the next sweep — the same self-healing the sweep already relies
+    // on for its own transient insert failures.
     await processBatches(chunk, (instance) => recomputeAndPersistInstance(instance), CONCURRENCY);
 
     const lastProcessedId = chunk.length > 0 ? chunk[chunk.length - 1].id : cursor;

@@ -119,8 +119,11 @@
   async function recompute() {
     if (data.instanceId === null || recomputing) return;
     const instanceId = data.instanceId;
-    // Supersede any in-flight GET so a slow Refresh can't clobber the POST result assigned below.
+    // Supersede any in-flight GET so a slow Refresh can't clobber the POST result assigned below. That
+    // superseded loadAll early-returns without clearing its `loading` flag (its requestId no longer
+    // matches), so clear it here — otherwise the Refresh button stays disabled and spinning forever.
     const requestId = ++detailRequestId;
+    loading = false;
     recomputing = true;
 
     try {

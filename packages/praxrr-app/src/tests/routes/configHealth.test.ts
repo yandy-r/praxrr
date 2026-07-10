@@ -6,6 +6,7 @@ import { config } from '$config';
 import { db } from '$db/db.ts';
 import { runMigrations } from '$db/migrations.ts';
 import { arrInstancesQueries } from '$db/queries/arrInstances.ts';
+import { configHealthSnapshotsQueries } from '$db/queries/configHealthSnapshots.ts';
 import { jobDispatcher } from '$jobs/dispatcher.ts';
 import { CONFIG_HEALTH_ENGINE_VERSION } from '$shared/health/index.ts';
 import {
@@ -147,6 +148,20 @@ migratedTest('GET /config-health/{instanceId}: unknown numeric id returns 404', 
 // ============================================================================
 // RECOMPUTE -- POST /config-health/{instanceId}/recompute
 // ============================================================================
+
+migratedTest('POST /config-health/{instanceId}/recompute: enabled sync-capable instance recomputes, persists, and returns 200 with the engine version', async () => {
+  const id = seedInstance('radarr');
+  const response = await POST_RECOMPUTE(recomputeEvent(String(id)));
+  assertEquals(response.status, 200);
+
+  // Same schema + engine version as the scheduled computation (AC), via the shared toDetailResponse.
+  const body = (await response.json()) as { engineVersion: string; instanceId: number };
+  assertEquals(body.engineVersion, CONFIG_HEALTH_ENGINE_VERSION);
+  assertEquals(body.instanceId, id);
+
+  // AC: exactly one trend snapshot was persisted through the route.
+  assertEquals(configHealthSnapshotsQueries.getTrend(id).length, 1);
+});
 
 migratedTest('POST /config-health/{instanceId}/recompute: non-numeric id returns 400', async () => {
   const response = await POST_RECOMPUTE(recomputeEvent('abc'));
