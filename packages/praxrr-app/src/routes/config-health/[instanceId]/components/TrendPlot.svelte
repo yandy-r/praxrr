@@ -1,6 +1,7 @@
 <script lang="ts">
   import { HEALTH_BAND_LABEL } from '$lib/client/ui/health/healthStatus.ts';
   import {
+    combineTrendChartSegmentPaths,
     MAX_VISIBLE_CHART_INDICATORS,
     sampleTrendChartIndicators,
     type TrendChartEngineRule,
@@ -63,6 +64,8 @@
 
   $: visibleMarkers = sampleTrendChartIndicators(geometry.markers);
   $: visibleSecondaryMarkers = sampleTrendChartIndicators(secondaryGeometry?.markers ?? []);
+  $: primaryPath = combineTrendChartSegmentPaths(geometry.segments);
+  $: secondaryPath = combineTrendChartSegmentPaths(secondaryGeometry?.segments ?? []);
   $: drawableGaps = geometry.gaps.filter((gap) => gap.x !== null);
   $: visibleGaps = sampleTrendChartIndicators(drawableGaps);
   $: visibleEngineRules = sampleTrendChartIndicators(engineRules);
@@ -180,9 +183,9 @@
       >
     {/each}
 
-    {#each geometry.segments as segment, index (`primary-${segment.engineVersion}-${index}`)}
+    {#if primaryPath !== null}
       <path
-        d={segment.path}
+        d={primaryPath}
         fill="none"
         class="stroke-accent-600 dark:stroke-accent-400"
         stroke-width={compact ? 2 : 2.5}
@@ -190,19 +193,17 @@
         stroke-linejoin="round"
         vector-effect="non-scaling-stroke"
       />
-    {/each}
-    {#if secondaryGeometry !== null}
-      {#each secondaryGeometry.segments as segment, index (`secondary-${segment.engineVersion}-${index}`)}
-        <path
-          d={segment.path}
-          fill="none"
-          class="stroke-violet-700 dark:stroke-violet-300"
-          stroke-width="2"
-          stroke-dasharray="5 3"
-          stroke-linejoin="round"
-          vector-effect="non-scaling-stroke"
-        />
-      {/each}
+    {/if}
+    {#if secondaryPath !== null}
+      <path
+        d={secondaryPath}
+        fill="none"
+        class="stroke-violet-700 dark:stroke-violet-300"
+        stroke-width="2"
+        stroke-dasharray="5 3"
+        stroke-linejoin="round"
+        vector-effect="non-scaling-stroke"
+      />
     {/if}
 
     {#each visibleMarkers as marker (marker.sourceIndex)}

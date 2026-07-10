@@ -7,7 +7,9 @@
   import {
     buildTrendChartEngineRules,
     buildTrendChartGeometry,
+    collectBoundedTrendChartCriteria,
     trendChartPointX,
+    type TrendChartCriterionDefinition,
     type TrendChartGapReason,
     type TrendChartGeometry,
     type TrendChartPoint,
@@ -17,13 +19,8 @@
   type TrendPoint = components['schemas']['ConfigHealthTrendPoint'];
   type TrendCriterion = components['schemas']['ConfigHealthTrendCriterion'];
 
-  interface CriterionDefinition {
-    id: string;
-    label: string;
-  }
-
   interface CriterionChart {
-    definition: CriterionDefinition;
+    definition: TrendChartCriterionDefinition;
     score: TrendChartGeometry;
     contribution: TrendChartGeometry;
   }
@@ -35,16 +32,6 @@
   const SMALL_HEIGHT = 220;
   const PADDING = { top: 18, right: 18, bottom: 42, left: 52 } as const;
   let selectedIndex = 0;
-
-  function collectCriteria(points: readonly TrendPoint[]): CriterionDefinition[] {
-    const criteria = new Map<string, CriterionDefinition>();
-    for (const point of points) {
-      for (const criterion of point.criteria) {
-        if (!criteria.has(criterion.id)) criteria.set(criterion.id, { id: criterion.id, label: criterion.label });
-      }
-    }
-    return [...criteria.values()];
-  }
 
   function criterionPoint(
     point: TrendPoint,
@@ -70,7 +57,7 @@
 
   function buildCriterionCharts(
     points: readonly TrendPoint[],
-    definitions: readonly CriterionDefinition[]
+    definitions: readonly TrendChartCriterionDefinition[]
   ): CriterionChart[] {
     return definitions.map((definition) => {
       const criterionFor = (point: TrendPoint): TrendCriterion | undefined =>
@@ -179,8 +166,9 @@
   $: if (result.points.length === 0) selectedIndex = 0;
   $: if (selectedIndex >= result.points.length && result.points.length > 0) selectedIndex = result.points.length - 1;
   $: overallGeometry = buildTrendChartGeometry(result.points, { width: WIDTH, height: HEIGHT, padding: PADDING });
-  $: criteria = collectCriteria(result.points);
-  $: criterionCharts = result.normalizedFilter.profile === null ? buildCriterionCharts(result.points, criteria) : [];
+  $: criterionSelection = collectBoundedTrendChartCriteria(result.points);
+  $: criterionCharts =
+    result.normalizedFilter.profile === null ? buildCriterionCharts(result.points, criterionSelection.definitions) : [];
   $: selectedPoint = result.points[selectedIndex] ?? null;
   $: selectedOverallX = trendChartPointX(overallGeometry, selectedIndex);
   $: overallEngineRules = buildTrendChartEngineRules(overallGeometry, result.engineBoundaries);
@@ -360,6 +348,18 @@
               scale.
             </p>
           </div>
+
+          {#if criterionSelection.hasOmitted}
+            <p
+              class="rounded-lg border border-neutral-200 bg-neutral-50 p-3 text-xs text-neutral-600 dark:border-neutral-700 dark:bg-neutral-900/60 dark:text-neutral-300"
+              role="status"
+              aria-live="polite"
+            >
+              Showing the first {criterionCharts.length} distinct criterion charts in canonical evidence order. Additional
+              distinct criteria are omitted from charts for performance. Exact evidence remains available in the history table
+              and exports.
+            </p>
+          {/if}
 
           <div class="grid gap-4 lg:grid-cols-2">
             {#each criterionCharts as chart (chart.definition.id)}

@@ -29,8 +29,9 @@ authenticated, same-origin SvelteKit API and use the existing SQLite application
   - `GET /api/v1/config-health/{instanceId}/trends/export`: JSON or CSV attachment produced from the
     same canonical result.
 - **Limits**: At most 10,000 matching snapshot points; query 10,001 and fail with `422` rather than
-  silently truncating. This exceeds the default fleet-wide retention cap of 5,000 while bounding
-  configured extremes.
+  silently truncating. Selected rows and retained-profile discovery also fail atomically with `422`
+  above 256 KiB per row, 16 MiB aggregate JSON, 64 criteria per row, or 1,000 profiles per row. These
+  bounds exceed normal evidence while constraining configured, corrupt, or hostile extremes.
 - **Pricing/rate limits**: None external. Exact point bounds and request cancellation provide the
   initial resource controls.
 
@@ -103,8 +104,8 @@ authenticated, same-origin SvelteKit API and use the existing SQLite application
     Say older data may have been pruned; do not claim which policy removed a point.
 11. **One canonical result**: Trend JSON and both attachments call the same filter parser, query, and
     projector. CSV serialization may flatten values but cannot select or reorder points.
-12. **Exact overflow**: A result over 10,000 points fails atomically with `422`; no response or export
-    silently omits data.
+12. **Exact overflow**: A result over 10,000 points or above the stored-evidence byte/nested-item
+    budgets fails atomically with `422`; no response or export silently omits data.
 13. **Safe downloads**: JSON is lossless. CSV uses fixed columns, CRLF, RFC 4180 escaping, formula
     neutralization, blank nullable cells, and an explicit point state.
 14. **Empty success**: A valid empty selection returns `200`; JSON includes metadata and `points: []`,
@@ -125,6 +126,7 @@ authenticated, same-origin SvelteKit API and use the existing SQLite application
 | Engine changes                        | Boundary label and hard segment break         | Per-point version retained                               |
 | Malformed stored JSON                 | Safe point identity plus `not-recorded`       | Log bounded metadata only                                |
 | Range exceeds cap                     | `422` with narrow-range guidance              | No partial artifact                                      |
+| Stored evidence exceeds safe budget   | `422` with evidence-budget guidance           | No partial result or attachment                          |
 | Concurrent new snapshot               | Export uses absolute applied bounds           | `throughSnapshotId` deferred unless tests prove required |
 | Instance removed/unsupported          | Existing indistinguishable `404`              | No sibling-app fallback                                  |
 
@@ -308,12 +310,12 @@ the existing strict date helper, rejects `from > to`, and returns normalized abs
 
 **Errors**:
 
-| Status | Condition                                             |
-| ------ | ----------------------------------------------------- |
-| `400`  | Invalid id, range, days combination, or empty profile |
-| `404`  | Instance absent or not sync-capable                   |
-| `422`  | More than 10,000 exact matching points                |
-| `500`  | Sanitized internal read failure                       |
+| Status | Condition                                                                        |
+| ------ | -------------------------------------------------------------------------------- |
+| `400`  | Invalid id, range, days combination, or empty profile                            |
+| `404`  | Instance absent or not sync-capable                                              |
+| `422`  | More than 10,000 points or stored evidence exceeds safe byte/nested-item budgets |
+| `500`  | Sanitized internal read failure                                                  |
 
 #### `GET /api/v1/config-health/{instanceId}/trends/export`
 
@@ -456,16 +458,16 @@ ROADMAP/graph closeout.
 
 ### Technology Decisions
 
-| Decision         | Recommendation                        | Rationale                                                       |
-| ---------------- | ------------------------------------- | --------------------------------------------------------------- |
-| Storage          | Existing snapshots only               | Required source of truth; no migration needed                   |
-| Profile criteria | Do not persist/reconstruct in #226    | Old history cannot prove them                                   |
-| CSV shape        | One point row with criteria JSON cell | Strongest point-count/order parity and smallest stable contract |
-| Result cap       | 10,000 + explicit 422                 | Exact and bounded; no silent loss                               |
-| Time ranges      | 7/30/90/all plus custom inclusive UTC | Useful inspection/export coverage                               |
-| Chart            | Route-local native SVG                | No dependency; full gap/a11y control                            |
-| Engine changes   | Hard segment boundary                 | Policies are not assumed comparable                             |
-| Retention        | Current policy + earliest available   | Evidence cannot identify prune cause                            |
+| Decision         | Recommendation                                  | Rationale                                                       |
+| ---------------- | ----------------------------------------------- | --------------------------------------------------------------- |
+| Storage          | Existing snapshots only                         | Required source of truth; no migration needed                   |
+| Profile criteria | Do not persist/reconstruct in #226              | Old history cannot prove them                                   |
+| CSV shape        | One point row with criteria JSON cell           | Strongest point-count/order parity and smallest stable contract |
+| Result bounds    | 10,000 points + evidence budgets + explicit 422 | Exact and bounded; no silent loss                               |
+| Time ranges      | 7/30/90/all plus custom inclusive UTC           | Useful inspection/export coverage                               |
+| Chart            | Route-local native SVG                          | No dependency; full gap/a11y control                            |
+| Engine changes   | Hard segment boundary                           | Policies are not assumed comparable                             |
+| Retention        | Current policy + earliest available             | Evidence cannot identify prune cause                            |
 
 ### Quick Wins
 
@@ -487,15 +489,15 @@ ROADMAP/graph closeout.
 
 ### Technical Risks
 
-| Risk                     | Likelihood | Impact | Mitigation                                             |
-| ------------------------ | ---------- | ------ | ------------------------------------------------------ |
-| UI/export drift          | Medium     | High   | One parser/service/result plus parity tests            |
-| False zero/interpolation | Medium     | High   | Nullable tagged states and segment tests               |
-| Cross-engine comparison  | Medium     | High   | Per-point version and hard boundary                    |
-| Unbounded history        | Medium     | High   | Indexed cap+1 query, 422, request cancellation         |
-| Malformed legacy JSON    | Low        | High   | Explicit `not-recorded`, safe identity, bounded logs   |
-| Mobile/chart overlap     | Medium     | Medium | Stacked controls, adaptive ticks, table, viewport E2E  |
-| Contract drift           | Medium     | High   | OpenAPI first, generated artifacts, `satisfies` checks |
+| Risk                     | Likelihood | Impact | Mitigation                                               |
+| ------------------------ | ---------- | ------ | -------------------------------------------------------- |
+| UI/export drift          | Medium     | High   | One parser/service/result plus parity tests              |
+| False zero/interpolation | Medium     | High   | Nullable tagged states and segment tests                 |
+| Cross-engine comparison  | Medium     | High   | Per-point version and hard boundary                      |
+| Unbounded history        | Medium     | High   | Indexed cap+1 query, evidence budgets, 422, cancellation |
+| Malformed legacy JSON    | Low        | High   | Explicit `not-recorded`, safe identity, bounded logs     |
+| Mobile/chart overlap     | Medium     | Medium | Stacked controls, adaptive ticks, table, viewport E2E    |
+| Contract drift           | Medium     | High   | OpenAPI first, generated artifacts, `satisfies` checks   |
 
 ### Integration Challenges
 
@@ -519,7 +521,7 @@ ROADMAP/graph closeout.
 
 | Finding                    | Risk                                | Mitigation                                     | Alternatives                                |
 | -------------------------- | ----------------------------------- | ---------------------------------------------- | ------------------------------------------- |
-| Oversized exact result     | CPU/memory/bandwidth exhaustion     | 10,000 cap+1 and 422                           | Streaming/pagination later                  |
+| Oversized exact result     | CPU/memory/bandwidth exhaustion     | 10,000 cap+1, byte/nested budgets, and 422     | Streaming/pagination later                  |
 | Formula CSV cells          | Spreadsheet execution/exfiltration  | Formula neutralization then RFC escaping       | JSON for lossless automation                |
 | Cached/unsafe downloads    | Operational metadata leakage        | no-store, nosniff, fixed ASCII filename        | Private caching only if later required      |
 | Unsafe SVG labels          | Stored XSS                          | Escaped Svelte text only; numeric internal ids | Sanitizer only if HTML is later unavoidable |
@@ -578,9 +580,10 @@ All implementation-blocking decisions are resolved for planning:
 2. **CSV shape**
    - Decision: One canonical point per row with an exact criteria JSON cell.
    - Rationale: Strongest filter/count/order parity and smallest stable serializer.
-3. **Result bound**
-   - Decision: 10,000 points, queried as cap+1, overflow `422`.
-   - Rationale: Bounded exactness without silently truncating configured extreme retention.
+3. **Result and evidence bounds**
+   - Decision: 10,000 points queried as cap+1, plus per-row, aggregate-byte, criteria, and profile
+     budgets; any overflow returns `422`.
+   - Rationale: Bounded exactness without silently truncating configured, corrupt, or hostile evidence.
 4. **Sampling gaps**
    - Decision: Plot actual elapsed time and break only at explicit unknown/absence/malformed/version
      states; do not invent a cadence-based cause in #226.

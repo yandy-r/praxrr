@@ -88,6 +88,20 @@ export interface TrendChartEngineRule {
   x: number;
 }
 
+export interface TrendChartCriterionDefinition {
+  id: string;
+  label: string;
+}
+
+export interface TrendChartCriterionSource {
+  criteria: readonly TrendChartCriterionDefinition[];
+}
+
+export interface BoundedTrendChartCriteria {
+  definitions: readonly TrendChartCriterionDefinition[];
+  hasOmitted: boolean;
+}
+
 const DEFAULT_WIDTH = 640;
 const DEFAULT_HEIGHT = 240;
 const DEFAULT_PADDING: TrendChartPadding = { top: 16, right: 16, bottom: 28, left: 40 };
@@ -96,6 +110,31 @@ const DEFAULT_MAXIMUM_TICKS = 8;
 const SCORE_TICKS = [0, 25, 50, 75, 100] as const;
 
 export const MAX_VISIBLE_CHART_INDICATORS = 80;
+export const MAX_VISIBLE_CRITERION_CHARTS = 12;
+
+/**
+ * Collect criterion identities in canonical first-observation order while bounding expensive chart
+ * materialization. The semantic table and exports continue to receive every exact criterion value.
+ */
+export function collectBoundedTrendChartCriteria(
+  points: readonly TrendChartCriterionSource[],
+  maximum = MAX_VISIBLE_CRITERION_CHARTS
+): BoundedTrendChartCriteria {
+  const cap = Math.max(1, Math.floor(finitePositive(maximum, MAX_VISIBLE_CRITERION_CHARTS)));
+  const distinct = new Map<string, TrendChartCriterionDefinition>();
+
+  for (const point of points) {
+    for (const criterion of point.criteria) {
+      if (distinct.has(criterion.id)) continue;
+      if (distinct.size === cap) {
+        return { definitions: [...distinct.values()], hasOmitted: true };
+      }
+      distinct.set(criterion.id, { id: criterion.id, label: criterion.label });
+    }
+  }
+
+  return { definitions: [...distinct.values()], hasOmitted: false };
+}
 
 /**
  * Deterministically bound repeated SVG indicators while retaining both ends of the history.
@@ -111,6 +150,12 @@ export function sampleTrendChartIndicators<T>(
 
   const lastIndex = items.length - 1;
   return Array.from({ length: cap }, (_, index) => items[Math.round((index * lastIndex) / (cap - 1))]);
+}
+
+/** Combine disconnected runs into one SVG path without joining gaps or engine boundaries. */
+export function combineTrendChartSegmentPaths(segments: readonly TrendChartSegment[]): string | null {
+  if (segments.length === 0) return null;
+  return segments.map((segment) => segment.path).join(' ');
 }
 
 /** Convert exact engine transition facts into SVG rules for one plot. */

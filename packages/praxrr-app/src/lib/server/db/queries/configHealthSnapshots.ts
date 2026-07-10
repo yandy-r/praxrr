@@ -93,7 +93,14 @@ export interface ConfigHealthTrendSearchOptions {
 /** Exact maximum distinct historical profile names the caller wants returned. */
 export interface ConfigHealthTrendProfileNameOptions {
   limit: number;
+  snapshotLimit: number;
   evidenceBudget?: ConfigHealthTrendEvidenceBudget;
+}
+
+interface ConfigHealthTrendEvidenceSummaryRow {
+  row_count: number;
+  max_row_bytes: number;
+  total_bytes: number;
 }
 
 interface ConfigHealthTrendSnapshotRow {
@@ -215,6 +222,53 @@ function assertRowsWithinEvidenceBudget(
   }
 }
 
+/**
+ * Check byte ceilings using scalar lengths before the raw JSON columns are selected into JavaScript.
+ * The predicate fragments are fixed here; only bound values are passed as SQL parameters.
+ */
+function assertTrendSelectionWithinEvidenceBudget(
+  instanceId: number,
+  options: ConfigHealthTrendSearchOptions,
+  budget: ConfigHealthTrendEvidenceBudget
+): void {
+  const predicates = ['arr_instance_id = ?'];
+  const parameters: Array<string | number> = [instanceId];
+  if (options.from !== undefined) {
+    predicates.push('generated_at >= ?');
+    parameters.push(options.from);
+  }
+  if (options.to !== undefined) {
+    predicates.push('generated_at <= ?');
+    parameters.push(options.to);
+  }
+
+  const summary = db.queryFirst<ConfigHealthTrendEvidenceSummaryRow>(
+    `SELECT COUNT(*) AS row_count,
+			        COALESCE(MAX(row_bytes), 0) AS max_row_bytes,
+			        COALESCE(SUM(row_bytes), 0) AS total_bytes
+			 FROM (
+			   SELECT length(CAST(criteria_scores AS BLOB)) +
+			          length(CAST(profile_scores AS BLOB)) AS row_bytes
+			   FROM config_health_snapshots
+			   WHERE ${predicates.join(' AND ')}
+			   ORDER BY generated_at ASC, id ASC
+			   LIMIT ?
+			 )`,
+    ...parameters,
+    options.limit
+  );
+  if (
+    !summary ||
+    !Number.isSafeInteger(summary.row_count) ||
+    !Number.isSafeInteger(summary.max_row_bytes) ||
+    !Number.isSafeInteger(summary.total_bytes) ||
+    summary.max_row_bytes > budget.maxBytesPerRow ||
+    summary.total_bytes > budget.maxTotalBytes
+  ) {
+    throw new ConfigHealthTrendEvidenceLimitError();
+  }
+}
+
 function rowToDegradationDetail(row: ConfigHealthDegradationSnapshotRow): ConfigHealthDegradationSnapshotDetail {
   return {
     id: row.id,
@@ -321,6 +375,7 @@ export const configHealthSnapshotsQueries = {
     }
     const evidenceBudget = options.evidenceBudget ?? CONFIG_HEALTH_TREND_EVIDENCE_BUDGET;
     validateEvidenceBudget(evidenceBudget);
+    assertTrendSelectionWithinEvidenceBudget(instanceId, options, evidenceBudget);
 
     let rows: ConfigHealthTrendSnapshotRow[];
     if (options.from !== undefined && options.to !== undefined) {
@@ -410,6 +465,13 @@ export const configHealthSnapshotsQueries = {
     if (!Number.isSafeInteger(options.limit) || options.limit <= 0) {
       throw new RangeError('Config Health trend profile name limit must be a positive safe integer');
     }
+    if (
+      !Number.isSafeInteger(options.snapshotLimit) ||
+      options.snapshotLimit <= 0 ||
+      options.snapshotLimit >= Number.MAX_SAFE_INTEGER
+    ) {
+      throw new RangeError('Config Health trend profile snapshot limit must be a positive safe integer');
+    }
     const evidenceBudget = options.evidenceBudget ?? CONFIG_HEALTH_TREND_EVIDENCE_BUDGET;
     validateEvidenceBudget(evidenceBudget);
     const rows = db.query<{ name: string | null; over_budget: number }>(
@@ -417,11 +479,14 @@ export const configHealthSnapshotsQueries = {
 			   SELECT profile_scores,
 			          length(CAST(profile_scores AS BLOB)) AS evidence_bytes
 				   FROM config_health_snapshots
-				   WHERE arr_instance_id = ?
-				     AND arr_type = ?
-				 ), budget AS MATERIALIZED (
-				   SELECT CASE
-				     WHEN COALESCE(SUM(evidence_bytes), 0) > ? THEN 0
+					   WHERE arr_instance_id = ?
+					     AND arr_type = ?
+					   ORDER BY generated_at ASC, id ASC
+					   LIMIT ?
+					 ), budget AS MATERIALIZED (
+					   SELECT CASE
+					     WHEN COUNT(*) > ? THEN 0
+					     WHEN COALESCE(SUM(evidence_bytes), 0) > ? THEN 0
 				     WHEN COALESCE(MAX(evidence_bytes), 0) > ? THEN 0
 				     WHEN COALESCE(MAX(CASE
 				       WHEN evidence_bytes <= ?
@@ -443,9 +508,10 @@ export const configHealthSnapshotsQueries = {
 				       SELECT 1
 				       FROM json_each(profile_scores) AS candidate
 				       WHERE candidate.type <> 'object'
-				          OR CASE WHEN candidate.type = 'object' THEN NOT (
-				               json_type(candidate.value, '$.name') = 'text'
-				               AND json_type(candidate.value, '$.score') IN ('integer', 'real')
+					          OR CASE WHEN candidate.type = 'object' THEN NOT (
+					               json_type(candidate.value, '$.name') = 'text'
+					               AND json_extract(candidate.value, '$.name') <> ''
+					               AND json_type(candidate.value, '$.score') IN ('integer', 'real')
 				               AND json_extract(candidate.value, '$.score') BETWEEN 0 AND 100
 				               AND json_extract(candidate.value, '$.score') = CAST(json_extract(candidate.value, '$.score') AS INTEGER)
 				               AND json_extract(candidate.value, '$.band') IN ('healthy', 'attention', 'needs-review', 'unknown')
@@ -467,6 +533,8 @@ export const configHealthSnapshotsQueries = {
 				 ORDER BY over_budget DESC, name COLLATE BINARY ASC`,
       instanceId,
       arrType,
+      options.snapshotLimit + 1,
+      options.snapshotLimit,
       evidenceBudget.maxTotalBytes,
       evidenceBudget.maxBytesPerRow,
       evidenceBudget.maxBytesPerRow,

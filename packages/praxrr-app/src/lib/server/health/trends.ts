@@ -179,7 +179,11 @@ function hasUsableProfiles(snapshot: ConfigHealthTrendSnapshotDetail): boolean {
   return (
     snapshot.profileScoresValid &&
     snapshot.profileScores.every(
-      (profile) => typeof profile?.name === 'string' && isPortableScore(profile.score) && isHealthBand(profile.band)
+      (profile) =>
+        typeof profile?.name === 'string' &&
+        profile.name.length > 0 &&
+        isPortableScore(profile.score) &&
+        isHealthBand(profile.band)
     )
   );
 }
@@ -373,6 +377,7 @@ export function readConfigHealthTrend(
   try {
     availableProfiles = dependencies.listProfileNames(instanceId, instance.type, {
       limit: MAX_CONFIG_HEALTH_TREND_POINTS,
+      snapshotLimit: MAX_CONFIG_HEALTH_TREND_POINTS,
       evidenceBudget: CONFIG_HEALTH_TREND_EVIDENCE_BUDGET,
     });
   } catch (error) {

@@ -267,6 +267,23 @@ Deno.test('trend projector matches profile names exactly and retains absence and
   assertEquals(result.counts, { points: 4, measured: 1, unknown: 1, missing: 2 });
 });
 
+Deno.test('trend projector rejects empty profile names without trimming exact whitespace names', () => {
+  const exactWhitespaceName = '  ';
+  const result = build(
+    [
+      snapshot(1, { profileScores: [{ name: '', score: 80, band: 'attention' }] }),
+      snapshot(2, { profileScores: [{ name: exactWhitespaceName, score: 80, band: 'attention' }] }),
+    ],
+    { ...FILTERS, profile: exactWhitespaceName }
+  );
+
+  assertEquals(
+    result.points.map((point) => point.state),
+    ['not-recorded', 'measured']
+  );
+  assertEquals(result.availableProfiles, [exactWhitespaceName]);
+});
+
 Deno.test('trend projector returns an explicit empty success envelope', () => {
   const result = build([], { from: undefined, to: NOW, profile: undefined });
 
@@ -391,6 +408,7 @@ Deno.test('trend service loads stable profile options independently from the poi
   const calls: Array<{
     instanceId: number;
     limit: number;
+    snapshotLimit: number;
     evidenceBudget: typeof CONFIG_HEALTH_TREND_EVIDENCE_BUDGET | undefined;
   }> = [];
   const result = readConfigHealthTrend(
@@ -399,7 +417,12 @@ Deno.test('trend service loads stable profile options independently from the poi
     dependencies('sonarr', selected, {
       hasArrTypeMismatch: () => false,
       listProfileNames: (instanceId, _arrType, options) => {
-        calls.push({ instanceId, limit: options.limit, evidenceBudget: options.evidenceBudget });
+        calls.push({
+          instanceId,
+          limit: options.limit,
+          snapshotLimit: options.snapshotLimit,
+          evidenceBudget: options.evidenceBudget,
+        });
         return ['Current', 'Historical'];
       },
     })
@@ -414,6 +437,7 @@ Deno.test('trend service loads stable profile options independently from the poi
     {
       instanceId: 12,
       limit: MAX_CONFIG_HEALTH_TREND_POINTS,
+      snapshotLimit: MAX_CONFIG_HEALTH_TREND_POINTS,
       evidenceBudget: CONFIG_HEALTH_TREND_EVIDENCE_BUDGET,
     },
   ]);

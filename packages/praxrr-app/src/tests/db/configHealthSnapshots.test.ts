@@ -376,14 +376,52 @@ migratedTest('trend profile names form a deterministic bounded retained union an
   });
 
   assertEquals(configHealthSnapshotsQueries.hasTrendArrTypeMismatch(instanceId, 'radarr'), false);
-  assertEquals(configHealthSnapshotsQueries.listTrendProfileNames(instanceId, 'radarr', { limit: 2 }), [
-    'A profile',
-    'middle profile',
-  ]);
+  assertEquals(
+    configHealthSnapshotsQueries.listTrendProfileNames(instanceId, 'radarr', { limit: 2, snapshotLimit: 10 }),
+    ['A profile', 'middle profile']
+  );
   assertThrows(
-    () => configHealthSnapshotsQueries.listTrendProfileNames(instanceId, 'radarr', { limit: 0 }),
+    () =>
+      configHealthSnapshotsQueries.listTrendProfileNames(instanceId, 'radarr', {
+        limit: 0,
+        snapshotLimit: 10,
+      }),
     RangeError,
     'positive safe integer'
+  );
+  assertThrows(
+    () =>
+      configHealthSnapshotsQueries.listTrendProfileNames(instanceId, 'radarr', {
+        limit: 10,
+        snapshotLimit: 2,
+      }),
+    ConfigHealthTrendEvidenceLimitError,
+    'safe request budget'
+  );
+
+  const emptyNameId = configHealthSnapshotsQueries.insert(
+    makeReport(instanceId, 'radarr', '2026-07-04T00:00:00.000Z', 80, 'attention')
+  );
+  const whitespaceNameId = configHealthSnapshotsQueries.insert(
+    makeReport(instanceId, 'radarr', '2026-07-05T00:00:00.000Z', 80, 'attention')
+  );
+  db.execute(
+    'UPDATE config_health_snapshots SET profile_scores = ? WHERE id = ?',
+    JSON.stringify([{ name: '', score: 80, band: 'attention' }]),
+    emptyNameId
+  );
+  db.execute(
+    'UPDATE config_health_snapshots SET profile_scores = ? WHERE id = ?',
+    JSON.stringify([{ name: '  ', score: 80, band: 'attention' }]),
+    whitespaceNameId
+  );
+  assertEquals(
+    configHealthSnapshotsQueries.listTrendProfileNames(instanceId, 'radarr', {
+      limit: 10,
+      snapshotLimit: 10,
+    }),
+    ['  ', 'A profile', 'middle profile', 'z profile'],
+    'empty names are rejected while exact whitespace-only names are preserved'
   );
 
   db.execute("UPDATE config_health_snapshots SET arr_type = 'sonarr' WHERE id = ?", ids[0]);
@@ -476,6 +514,26 @@ migratedTest('searchTrend reports UTF-8 evidence bytes and rejects row, aggregat
         evidenceBudget: budget({ maxCriteriaPerRow: 1 }),
       }),
     ConfigHealthTrendEvidenceLimitError
+  );
+});
+
+migratedTest('searchTrend rejects adversarial raw evidence through the byte preflight', () => {
+  const radarr = seedInstance('radarr');
+  const snapshotId = configHealthSnapshotsQueries.insert(
+    makeReport(radarr, 'radarr', '2026-07-01T00:00:00.000Z', 80, 'attention')
+  );
+  const hostileEvidence = `["${'x'.repeat(CONFIG_HEALTH_TREND_EVIDENCE_BUDGET.maxBytesPerRow)}"]`;
+  db.execute(
+    'UPDATE config_health_snapshots SET criteria_scores = ?, profile_scores = ? WHERE id = ?',
+    hostileEvidence,
+    hostileEvidence,
+    snapshotId
+  );
+
+  assertThrows(
+    () => configHealthSnapshotsQueries.searchTrend(radarr, { limit: 10 }),
+    ConfigHealthTrendEvidenceLimitError,
+    'safe request budget'
   );
 });
 

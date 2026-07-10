@@ -1510,8 +1510,8 @@ export interface paths {
      *     the complete response envelope. CSV uses one row per canonical point and a fixed criteria JSON
      *     cell. A valid empty selection returns 200 with an empty JSON `points` array or a header-only CSV.
      *
-     *     The exact 10,000-point limit applies atomically to both formats; oversized selections are never
-     *     silently truncated.
+     *     The exact 10,000-point limit and stored-evidence budgets apply atomically to both formats;
+     *     oversized selections are never silently truncated.
      */
     get: operations['exportConfigHealthTrends'];
     put?: never;
@@ -8378,7 +8378,10 @@ export interface operations {
           'application/json': components['schemas']['ErrorResponse'];
         };
       };
-      /** @description Exact selection exceeds the 10,000-point limit; no partial result is returned */
+      /**
+       * @description Exact selection exceeds the 10,000-point limit, or selected/retained-profile evidence
+       *     exceeds the safe per-row, aggregate-byte, or nested-item budget. No partial result is returned.
+       */
       422: {
         headers: {
           [name: string]: unknown;
@@ -8455,7 +8458,10 @@ export interface operations {
           'application/json': components['schemas']['ErrorResponse'];
         };
       };
-      /** @description Exact selection exceeds the 10,000-point limit; no partial attachment is returned */
+      /**
+       * @description Exact selection exceeds the 10,000-point limit, or selected/retained-profile evidence
+       *     exceeds the safe per-row, aggregate-byte, or nested-item budget. No partial attachment is returned.
+       */
       422: {
         headers: {
           [name: string]: unknown;

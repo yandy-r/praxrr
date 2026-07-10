@@ -1,8 +1,11 @@
 import { assert, assertEquals } from '@std/assert';
 import {
   buildAdaptiveTimeTicks,
+  collectBoundedTrendChartCriteria,
+  combineTrendChartSegmentPaths,
   buildTrendChartEngineRules,
   buildTrendChartGeometry,
+  MAX_VISIBLE_CRITERION_CHARTS,
   MAX_VISIBLE_CHART_INDICATORS,
   sampleTrendChartIndicators,
   scaleScore,
@@ -241,4 +244,59 @@ Deno.test('maximum-size sparse histories bound gap and engine SVG indicators', (
   assertEquals(visibleGaps.at(-1), geometry.gaps.at(-1));
   assertEquals(visibleRules[0], rules[0]);
   assertEquals(visibleRules.at(-1), rules.at(-1));
+});
+
+Deno.test('maximum-size alternating gaps collapse disconnected segments into one SVG path', () => {
+  const maximumPoints = 10_000;
+  const points = Array.from({ length: maximumPoints }, (_, index) =>
+    index % 3 === 2 ? point(index, null, 'unknown') : point(index, index % 101)
+  );
+  const geometry = buildTrendChartGeometry(points, PLOT);
+  const combinedPath = combineTrendChartSegmentPaths(geometry.segments);
+  const renderedPaths = combinedPath === null ? [] : [combinedPath];
+
+  assertEquals(geometry.segments.length, 3_333);
+  assertEquals(renderedPaths.length, 1);
+  assertEquals(combinedPath?.match(/\bM\b/g)?.length, geometry.segments.length);
+});
+
+Deno.test('adversarial distinct criteria produce a deterministic bounded chart selection', () => {
+  const criteriaPerPoint = 64;
+  let trailingPointsRead = false;
+  const points = [
+    {
+      criteria: Array.from({ length: criteriaPerPoint }, (_, criterionIndex) => ({
+        id: `criterion-0-${criterionIndex}`,
+        label: `Criterion 0-${criterionIndex}`,
+      })),
+    },
+    ...Array.from({ length: 199 }, (_, pointIndex) => ({
+      get criteria() {
+        trailingPointsRead = true;
+        return [
+          {
+            id: `criterion-${pointIndex + 1}-0`,
+            label: `Criterion ${pointIndex + 1}-0`,
+          },
+        ];
+      },
+    })),
+  ];
+
+  const selection = collectBoundedTrendChartCriteria(points);
+
+  assertEquals(selection.definitions.length, MAX_VISIBLE_CRITERION_CHARTS);
+  assertEquals(
+    selection.definitions.map((criterion) => criterion.id),
+    Array.from({ length: MAX_VISIBLE_CRITERION_CHARTS }, (_, index) => `criterion-0-${index}`)
+  );
+  assertEquals(selection.hasOmitted, true);
+  assertEquals(trailingPointsRead, false);
+  assertEquals(collectBoundedTrendChartCriteria(points), selection);
+  assertEquals(trailingPointsRead, false);
+  assertEquals(
+    collectBoundedTrendChartCriteria([{ criteria: points[0].criteria.slice(0, MAX_VISIBLE_CRITERION_CHARTS) }])
+      .hasOmitted,
+    false
+  );
 });
