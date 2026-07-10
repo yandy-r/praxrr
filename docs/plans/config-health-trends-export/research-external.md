@@ -506,18 +506,18 @@ At minimum, tests should cover:
 
 ## Primary Documentation URLs
 
-- OpenAPI 3.1.0: https://spec.openapis.org/oas/v3.1.0.html
-- RFC 8259 (JSON): https://www.rfc-editor.org/rfc/rfc8259.html
-- RFC 4180 (CSV): https://www.rfc-editor.org/rfc/rfc4180.html
-- RFC 6266 (Content-Disposition): https://www.rfc-editor.org/rfc/rfc6266.html
-- OWASP CSV Injection: https://owasp.org/www-community/attacks/CSV_Injection
-- W3C WAI Complex Images: https://www.w3.org/WAI/tutorials/images/complex/
-- WCAG 2.2: https://www.w3.org/TR/WCAG22/
-- MDN SVG in HTML: https://developer.mozilla.org/en-US/docs/Web/SVG/Guides/SVG_in_HTML
-- MDN anchor download behavior: https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/a#download
-- MDN object URLs: https://developer.mozilla.org/en-US/docs/Web/API/URL/createObjectURL_static
-- D3 line generator and `defined`: https://d3js.org/d3-shape/line
-- LayerChart LineChart: https://www.layerchart.com/docs/components/LineChart
-- Chart.js line chart: https://www.chartjs.org/docs/latest/charts/line.html
-- Chart.js accessibility: https://www.chartjs.org/docs/latest/general/accessibility.html
-- uPlot docs: https://github.com/leeoniya/uPlot/blob/master/docs/README.md
+- OpenAPI 3.1.0: <https://spec.openapis.org/oas/v3.1.0.html>
+- RFC 8259 (JSON): <https://www.rfc-editor.org/rfc/rfc8259.html>
+- RFC 4180 (CSV): <https://www.rfc-editor.org/rfc/rfc4180.html>
+- RFC 6266 (Content-Disposition): <https://www.rfc-editor.org/rfc/rfc6266.html>
+- OWASP CSV Injection: <https://owasp.org/www-community/attacks/CSV_Injection>
+- W3C WAI Complex Images: <https://www.w3.org/WAI/tutorials/images/complex/>
+- WCAG 2.2: <https://www.w3.org/TR/WCAG22/>
+- MDN SVG in HTML: <https://developer.mozilla.org/en-US/docs/Web/SVG/Guides/SVG_in_HTML>
+- MDN anchor download behavior: <https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/a#download>
+- MDN object URLs: <https://developer.mozilla.org/en-US/docs/Web/API/URL/createObjectURL_static>
+- D3 line generator and `defined`: <https://d3js.org/d3-shape/line>
+- LayerChart LineChart: <https://www.layerchart.com/docs/components/LineChart>
+- Chart.js line chart: <https://www.chartjs.org/docs/latest/charts/line.html>
+- Chart.js accessibility: <https://www.chartjs.org/docs/latest/general/accessibility.html>
+- uPlot docs: <https://github.com/leeoniya/uPlot/blob/master/docs/README.md>
