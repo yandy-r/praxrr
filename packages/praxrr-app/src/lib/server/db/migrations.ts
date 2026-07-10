@@ -1,5 +1,5 @@
-import { db } from './db.ts';
 import { logger } from '$logger/logger.ts';
+import { db } from './db.ts';
 
 // Static imports for all migrations
 import { migration as migration001 } from './migrations/001_create_arr_instances.ts';
@@ -80,6 +80,7 @@ import { migration as migration20260715CreateCanaryTables } from './migrations/2
 import { migration as migration20260716CreateTimelineAnnotations } from './migrations/20260716_create_timeline_annotations.ts';
 import { migration as migration20260717CreateWebauthnTables } from './migrations/20260717_create_webauthn_tables.ts';
 import { migration as migration20260718WidenQualityGoalBindingsArrType } from './migrations/20260718_widen_quality_goal_bindings_arr_type.ts';
+import { migration as migration20260719CreateConfigHealthNotificationState } from './migrations/20260719_create_config_health_notification_state.ts';
 
 export interface Migration {
   version: number;
@@ -176,14 +177,15 @@ class MigrationRunner {
    * Rollback a single migration
    */
   private async rollbackMigration(migration: Migration): Promise<void> {
-    if (!migration.down) {
+    const down = migration.down;
+    if (!down) {
       throw new Error(`Migration ${migration.version} does not support rollback`);
     }
 
     try {
       await db.transaction(async () => {
         // Execute the rollback
-        db.exec(migration.down!);
+        db.exec(down);
 
         // Remove the migration record
         db.execute(`DELETE FROM ${this.migrationsTable} WHERE version = ?`, migration.version);
@@ -268,7 +270,11 @@ class MigrationRunner {
   /**
    * Get list of applied migrations
    */
-  getAppliedMigrations(): Array<{ version: number; name: string; applied_at: string }> {
+  getAppliedMigrations(): Array<{
+    version: number;
+    name: string;
+    applied_at: string;
+  }> {
     return db.query(`SELECT version, name, applied_at FROM ${this.migrationsTable} ORDER BY version`);
   }
 
@@ -389,6 +395,7 @@ export function loadMigrations(): Migration[] {
     migration20260716CreateTimelineAnnotations,
     migration20260717CreateWebauthnTables,
     migration20260718WidenQualityGoalBindingsArrType,
+    migration20260719CreateConfigHealthNotificationState,
   ];
 
   // Sort by version number
