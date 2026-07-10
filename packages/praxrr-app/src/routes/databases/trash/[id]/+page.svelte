@@ -52,14 +52,15 @@
       const res = await fetch(`/api/v1/trash-guide/sources/${source.id}/sync`, { method: 'POST' });
       const data = await res.json().catch(() => ({}));
       if (res.ok) {
-        runToken = data.runToken ?? null;
+        // `|| null` so an uncorrelatable legacy run (empty token) is treated as null, not a sentinel ''.
+        runToken = data.runToken || null;
         statusUrl = data.statusUrl ?? `/api/v1/trash-guide/sources/${source.id}/sync`;
         runView = data.view ?? null;
         alertStore.add('success', 'Sync job queued');
         void pollStatus();
       } else if (res.status === 409) {
         // Dedupe: link to the already-running run rather than acking a new one.
-        runToken = data.runToken ?? null;
+        runToken = data.runToken || null;
         statusUrl = data.statusUrl ?? `/api/v1/trash-guide/sources/${source.id}/sync`;
         runView = data.view ?? null;
         alertStore.add('warning', 'Sync is already running — following the current run');
@@ -80,14 +81,22 @@
     try {
       // Poll until the run this request initiated reaches its terminal evidence (matched by runToken),
       // or the queue slot is no longer active. No timestamp matching — correlation is the runToken.
+      let settled = false;
       for (let i = 0; i < 150; i++) {
         const res = await fetch(statusUrl);
         if (!res.ok) break;
         runView = (await res.json()) as StatusView;
         const done = runView.latestRun?.evidence?.runToken === runToken;
         const active = !!runView.current && ACTIVE_STATUSES.has(runView.current.status);
-        if (done || !active) break;
+        if (done || !active) {
+          settled = true;
+          break;
+        }
         await new Promise((resolve) => setTimeout(resolve, 2000));
+      }
+      // Long run exceeded the poll window while still active — tell the operator rather than freeze silently.
+      if (!settled && runView?.current && ACTIVE_STATUSES.has(runView.current.status)) {
+        alertStore.add('info', 'Sync is still running — reload the page to see the final result.');
       }
     } catch {
       // Transient poll error — leave the last known view in place.
@@ -150,7 +159,7 @@
       month: 'short',
       day: 'numeric',
       hour: 'numeric',
-      minute: '2-digit'
+      minute: '2-digit',
     });
   }
 </script>
@@ -189,10 +198,7 @@
         <div class="flex flex-wrap items-center justify-between gap-3">
           <div class="flex items-center gap-2">
             <span class="text-sm font-semibold text-neutral-900 dark:text-neutral-50">Sync Run</span>
-            <Badge
-              variant={runStatusVariant(terminalEvidence?.status ?? runView.current?.status)}
-              size="sm"
-            >
+            <Badge variant={runStatusVariant(terminalEvidence?.status ?? runView.current?.status)} size="sm">
               {runStatusLabel()}
             </Badge>
             <span class="text-xs text-neutral-500 dark:text-neutral-400">{runView.sourceName ?? source.name}</span>

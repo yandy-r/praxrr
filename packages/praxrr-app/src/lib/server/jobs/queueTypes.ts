@@ -67,8 +67,11 @@ export interface TrashGuideSyncJobPayload {
   requestedAt?: string;
   /**
    * Correlation token minted at enqueue and preserved across dedupe-coalesced triggers (issue #238).
-   * Exists during queued/running (in the queue payload) before any run-history row is created, so the
-   * initiating surface can link to exactly one run by id rather than by timestamp matching.
+   * Exists during queued/running (in the queue payload) before any run-history row is created, so a
+   * manual initiating surface can link to its run by id rather than by timestamp matching. It
+   * correlates the initiating request(s) to their run; because a scheduled auto-reschedule reuses the
+   * same slot payload, consecutive scheduled runs of one source may carry the same token — the durable
+   * per-run identity therefore remains `job_run_history.id`, which the token narrows to but never replaces.
    */
   runToken?: string;
   /** Durable source-identity snapshot so a since-deleted/disabled source stays identifiable (#238). */
@@ -78,12 +81,7 @@ export interface TrashGuideSyncJobPayload {
 
 /** Closed, safe vocabulary of manual/scheduled TRaSH sync failure reasons (issue #238). */
 export type TrashGuideSyncFailureCode =
-  | 'source_missing'
-  | 'source_disabled'
-  | 'network'
-  | 'parser_failed'
-  | 'sync_failed'
-  | 'internal';
+  'source_missing' | 'source_disabled' | 'network' | 'parser_failed' | 'sync_failed' | 'internal';
 
 /**
  * Typed, closed, SAFE failure evidence for a TRaSH sync run.

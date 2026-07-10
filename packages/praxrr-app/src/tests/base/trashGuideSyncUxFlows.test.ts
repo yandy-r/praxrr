@@ -687,3 +687,15 @@ Deno.test('the arr sync TRaSH sources surface links each source to its run-detai
   assertStringIncludes(trashGuideSourcesComponent, '/databases/trash/${source.sourceId}');
   assertStringIncludes(trashGuideSourcesComponent, 'View sync run');
 });
+
+Deno.test('the arr sync surface unwraps the form-action envelope before reading the source label (#238)', async () => {
+  const component = await readFixture('../../routes/arr/[id]/sync/components/TrashGuideSources.svelte');
+
+  // The source-labeled toast reads action data, which SvelteKit wraps in an ActionResult envelope;
+  // it must deserialize and branch on result.type before reading `.data.view`, or the label silently
+  // collapses to the generic fallback. These guards catch a regression back to raw `response.json().view`.
+  assertStringIncludes(component, "import { deserialize } from '$app/forms'");
+  assertStringIncludes(component, 'deserialize(await response.text())');
+  assertStringIncludes(component, "result.type === 'success'");
+  assertStringIncludes(component, 'TRaSH sync queued for');
+});

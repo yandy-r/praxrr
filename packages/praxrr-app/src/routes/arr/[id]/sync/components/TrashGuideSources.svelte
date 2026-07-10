@@ -1,5 +1,7 @@
 <script lang="ts">
   import { invalidateAll } from '$app/navigation';
+  import { deserialize } from '$app/forms';
+  import type { ActionResult } from '@sveltejs/kit';
   import { AlertTriangle, FilterX, Loader2, RefreshCw, Save, Search } from 'lucide-svelte';
   import { alertStore } from '$alerts/store.ts';
   import Badge from '$ui/badge/Badge.svelte';
@@ -385,24 +387,22 @@
         body: formData,
       });
 
-      if (!response.ok) {
-        const message = await extractFormError(response, 'TRaSH sync failed');
-        alertStore.add('error', message);
-        return;
+      // Form-action responses are wrapped in an ActionResult envelope; deserialize before reading data.
+      const result = deserialize(await response.text()) as ActionResult;
+      if (result.type === 'success') {
+        const view = (result.data as { view?: { sourceName?: string | null } } | undefined)?.view;
+        const label = view?.sourceName ?? null;
+        alertStore.add(
+          'success',
+          label ? `TRaSH sync queued for "${label}" — open the source to follow the run` : 'TRaSH source sync queued'
+        );
+        await invalidateAll().catch(() => undefined);
+      } else if (result.type === 'failure') {
+        const error = (result.data as { error?: string } | undefined)?.error;
+        alertStore.add('error', error ?? 'TRaSH sync failed');
+      } else {
+        alertStore.add('error', 'TRaSH sync failed');
       }
-
-      const payload = (await response.json()) as {
-        message?: string;
-        view?: { sourceName?: string | null };
-      };
-      const label = payload.view?.sourceName ?? null;
-      alertStore.add(
-        'success',
-        label
-          ? `TRaSH sync queued for "${label}" — open the source to follow the run`
-          : (payload.message ?? 'TRaSH source sync queued')
-      );
-      await invalidateAll().catch(() => undefined);
     } catch {
       alertStore.add('error', 'TRaSH sync failed');
     } finally {
