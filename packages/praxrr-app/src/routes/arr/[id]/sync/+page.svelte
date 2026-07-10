@@ -31,6 +31,7 @@
     status: 'idle' | 'generating' | 'error' | 'ready';
     summary: SyncPreviewSummary | null;
     error: string | null;
+    recoveryAction: string | null;
   };
 
   const EMPTY_PREVIEW_SUMMARY: SyncPreviewSummary = {
@@ -49,6 +50,7 @@
     status: data.syncPreview.status,
     summary: data.syncPreview.summary ?? EMPTY_PREVIEW_SUMMARY,
     error: data.syncPreview.error,
+    recoveryAction: data.syncPreview.recoveryAction,
   };
   let activePreviewSection: SyncPreviewSection | null = null;
   let isPreviewSectionActioning = false;
@@ -243,6 +245,7 @@
       status: 'ready',
       summary: parsePreviewSummary(event.detail.summary),
       error: null,
+      recoveryAction: null,
     };
     activePreviewSection = section;
     showPreviewModal = true;

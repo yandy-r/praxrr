@@ -51,11 +51,13 @@ preview:
             schema:
               $ref: '../schemas/arr.yaml#/ErrorResponse'
       '500':
-        description: Failed to generate preview
+        description: |
+          Preview generation failed. The failed preview snapshot is returned with
+          `status: failed` and a typed, safe `failure` reason — no raw exception text.
         content:
           application/json:
             schema:
-              $ref: '../schemas/arr.yaml#/ErrorResponse'
+              $ref: '../schemas/sync.yaml#/SyncPreviewResult'
 
 previewById:
   get:

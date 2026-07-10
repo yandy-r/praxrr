@@ -61,7 +61,7 @@ export function resolveNoPlannedChangesPhrase(): string {
 export function resolvePreviewSectionOutcomePhrase(outcome: SyncPreviewSectionOutcome): string {
   const label = resolveSyncSectionLabel(outcome.section);
 
-  if (outcome.error !== null) {
+  if (outcome.failure !== null) {
     return `${label} preview generation failed.`;
   }
   if (outcome.skipped) {

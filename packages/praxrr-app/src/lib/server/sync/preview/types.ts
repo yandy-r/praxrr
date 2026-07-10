@@ -14,6 +14,39 @@ export type SyncPreviewFieldChangeType = 'added' | 'changed' | 'removed';
 export type SyncPreviewSection = 'qualityProfiles' | 'delayProfiles' | 'mediaManagement' | 'metadataProfiles';
 
 /**
+ * Closed vocabulary of Sync Preview generate/apply failure reasons.
+ *
+ * Every value is assigned by matching a thrown error's TYPE/status (never by parsing
+ * message text), so no raw exception or secret-shaped string is ever transported to the
+ * API response, the stored snapshot, or the UI. Full diagnostics stay only in the
+ * sanitized logger. Kept in lockstep with `SyncPreviewFailureCode` in
+ * `docs/api/v1/schemas/sync.yaml`.
+ */
+export type SyncPreviewFailureCode =
+  | 'unreachable'
+  | 'timeout'
+  | 'unauthorized'
+  | 'notFound'
+  | 'rejected'
+  | 'serverError'
+  | 'sectionErrors'
+  | 'executionFailed'
+  | 'stale'
+  | 'internalError';
+
+/**
+ * Typed, closed, safe failure evidence for Sync Preview generate/apply.
+ *
+ * `message` and `recoveryAction` are pre-authored safe copy — they never contain raw
+ * exception text, Arr response bodies, credentials, hostnames, or stack traces.
+ */
+export interface SyncPreviewFailureReason {
+  readonly code: SyncPreviewFailureCode;
+  readonly message: string;
+  readonly recoveryAction: string;
+}
+
+/**
  * Arr type values supported by sync preview operations.
  *
  * This intentionally excludes placeholder/unsupported values from ArrType.
@@ -83,7 +116,7 @@ export interface SyncPreviewSummary {
 
 export interface SyncPreviewSectionOutcome {
   readonly section: SyncPreviewSection;
-  readonly error: string | null;
+  readonly failure: SyncPreviewFailureReason | null;
   readonly skipped: boolean;
 }
 
@@ -95,7 +128,7 @@ export interface SyncPreviewResult {
   readonly createdAt: string;
   readonly expiresAt: string;
   readonly status: SyncPreviewStatus;
-  readonly error?: string;
+  readonly failure: SyncPreviewFailureReason | null;
   readonly sections: readonly SyncPreviewSection[];
   readonly sectionOutcomes: readonly SyncPreviewSectionOutcome[];
   readonly qualityProfiles: QualityProfilesPreview | null;

@@ -10,6 +10,7 @@ import { SYNC_SECTION_ORDER, type SyncArrType } from '../mappings.ts';
 import type { ArrInstance } from '$db/queries/arrInstances.ts';
 import { getSection } from '../registry.ts';
 import { PREVIEW_STATUS_READY } from './store.ts';
+import { classifyPreviewFailure } from './failureReason.ts';
 import type { BaseSyncer, SectionType } from '../types.ts';
 import type {
   SyncPreviewSectionResult,
@@ -57,8 +58,6 @@ export interface GeneratePreviewResult {
   mediaManagement: MediaManagementPreview | null;
   metadataProfiles: MetadataProfilesPreview | null;
   summary: SyncPreviewSummary;
-  errors: ReadonlyArray<string>;
-  error?: string;
 }
 
 function toSyncArrType(value: string): SyncArrType | null {
@@ -165,7 +164,7 @@ function buildSectionPayloads(sectionOutcomes: readonly SectionOutcome[]): {
   const summary = buildEmptySummary();
 
   for (const outcome of sectionOutcomes) {
-    if (!outcome.result || outcome.error || outcome.skipped) {
+    if (!outcome.result || outcome.failure || outcome.skipped) {
       continue;
     }
 
@@ -211,7 +210,6 @@ export async function generatePreview(input: GeneratePreviewInput): Promise<Gene
   }
 
   const sectionOutcomes: SectionOutcome[] = [];
-  const errors: string[] = [];
 
   const client = await getArrInstanceClient(
     arrType,
@@ -233,7 +231,7 @@ export async function generatePreview(input: GeneratePreviewInput): Promise<Gene
         sectionOutcomes.push({
           section,
           result: null,
-          error: null,
+          failure: null,
           skipped: true,
         });
         continue;
@@ -249,16 +247,17 @@ export async function generatePreview(input: GeneratePreviewInput): Promise<Gene
         sectionOutcomes.push({
           section,
           result,
-          error: null,
+          failure: null,
           skipped: false,
         });
       } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-        errors.push(`Section ${section} failed: ${errorMessage}`);
+        // Classify by error TYPE only; the raw message stays out of the outcome and is
+        // recorded solely on the sanitized logger boundary below.
+        const failure = classifyPreviewFailure(error, arrType);
         sectionOutcomes.push({
           section,
           result: null,
-          error: errorMessage,
+          failure,
           skipped: false,
         });
         await logger.error(`Preview section ${section} failed for ${input.instance.name}`, {
@@ -268,7 +267,8 @@ export async function generatePreview(input: GeneratePreviewInput): Promise<Gene
             instanceName,
             instanceType,
             section,
-            error: errorMessage,
+            failureCode: failure.code,
+            error: error instanceof Error ? error.message : String(error),
           },
         });
       } finally {
@@ -282,8 +282,6 @@ export async function generatePreview(input: GeneratePreviewInput): Promise<Gene
   }
 
   const payloads = buildSectionPayloads(sectionOutcomes);
-  const statusError =
-    errors.length > 0 ? `Preview generation completed with ${errors.length} section error(s)` : undefined;
 
   return {
     instanceId,
@@ -292,9 +290,9 @@ export async function generatePreview(input: GeneratePreviewInput): Promise<Gene
     status: PREVIEW_STATUS_READY,
     createdAtMs: nowMs,
     sections: sectionsToRun,
-    sectionOutcomes: sectionOutcomes.map(({ section, error, skipped }) => ({
+    sectionOutcomes: sectionOutcomes.map(({ section, failure, skipped }) => ({
       section,
-      error,
+      failure,
       skipped,
     })),
     qualityProfiles: payloads.qualityProfiles,
@@ -302,7 +300,5 @@ export async function generatePreview(input: GeneratePreviewInput): Promise<Gene
     mediaManagement: payloads.mediaManagement,
     metadataProfiles: payloads.metadataProfiles,
     summary: payloads.summary,
-    errors,
-    error: statusError,
   };
 }

@@ -847,6 +847,10 @@ components:
       $ref: './schemas/sync.yaml#/SyncPreviewStatus'
     SyncPreviewSection:
       $ref: './schemas/sync.yaml#/SyncPreviewSection'
+    SyncPreviewFailureCode:
+      $ref: './schemas/sync.yaml#/SyncPreviewFailureCode'
+    SyncPreviewFailureReason:
+      $ref: './schemas/sync.yaml#/SyncPreviewFailureReason'
     SyncPreviewSectionOutcome:
       $ref: './schemas/sync.yaml#/SyncPreviewSectionOutcome'
     SyncPreviewAction:

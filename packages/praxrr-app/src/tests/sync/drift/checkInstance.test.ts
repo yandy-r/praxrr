@@ -50,13 +50,12 @@ function makePreview(over: Partial<GeneratePreviewResult> = {}): GeneratePreview
     status: 'ready',
     createdAtMs: FIXED_MS,
     sections: ['qualityProfiles'],
-    sectionOutcomes: [{ section: 'qualityProfiles', error: null, skipped: false }],
+    sectionOutcomes: [{ section: 'qualityProfiles', failure: null, skipped: false }],
     qualityProfiles: { section: 'qualityProfiles', customFormats: [], qualityProfiles: [] },
     delayProfiles: null,
     mediaManagement: null,
     metadataProfiles: null,
     summary: { totalCreates: 0, totalUpdates: 0, totalDeletes: 0, totalUnchanged: 0 },
-    errors: [],
     ...over,
   };
 }
@@ -306,7 +305,17 @@ Deno.test('throwing generatePreview → error / error (version carried, never re
 Deno.test('all available sections errored → error / invalid_response', async () => {
   const preview = makePreview({
     qualityProfiles: null,
-    sectionOutcomes: [{ section: 'qualityProfiles', error: 'HTTP 500', skipped: false }],
+    sectionOutcomes: [
+      {
+        section: 'qualityProfiles',
+        failure: {
+          code: 'internalError',
+          message: 'HTTP 500',
+          recoveryAction: 'Regenerate the preview and try again.',
+        },
+        skipped: false,
+      },
+    ],
   });
   const result = await checkInstanceDrift(
     makeInstance(),
@@ -321,7 +330,7 @@ Deno.test('all available sections errored → error / invalid_response', async (
 Deno.test('all available sections skipped (none errored, none compared) → in-sync / not_configured', async () => {
   const preview = makePreview({
     qualityProfiles: null,
-    sectionOutcomes: [{ section: 'qualityProfiles', error: null, skipped: true }],
+    sectionOutcomes: [{ section: 'qualityProfiles', failure: null, skipped: true }],
   });
   const result = await checkInstanceDrift(
     makeInstance(),
@@ -343,8 +352,16 @@ Deno.test(
     const preview = makePreview({
       sections: ['qualityProfiles', 'delayProfiles'],
       sectionOutcomes: [
-        { section: 'qualityProfiles', error: null, skipped: false }, // compared clean
-        { section: 'delayProfiles', error: 'HTTP 500', skipped: false }, // errored
+        { section: 'qualityProfiles', failure: null, skipped: false }, // compared clean
+        {
+          section: 'delayProfiles',
+          failure: {
+            code: 'internalError',
+            message: 'HTTP 500',
+            recoveryAction: 'Regenerate the preview and try again.',
+          },
+          skipped: false,
+        }, // errored
       ],
       // Clean, compared-but-no-changes section.
       qualityProfiles: {
@@ -382,8 +399,8 @@ Deno.test('DC-7: degraded section is still compared (forwarded to preview + aggr
   const preview = makePreview({
     sections: ['qualityProfiles', 'delayProfiles'],
     sectionOutcomes: [
-      { section: 'qualityProfiles', error: null, skipped: false },
-      { section: 'delayProfiles', error: null, skipped: false },
+      { section: 'qualityProfiles', failure: null, skipped: false },
+      { section: 'delayProfiles', failure: null, skipped: false },
     ],
     delayProfiles: {
       section: 'delayProfiles',

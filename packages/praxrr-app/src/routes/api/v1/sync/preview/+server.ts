@@ -5,6 +5,7 @@ import { logger } from '$logger/logger.ts';
 import { previewStore } from '$sync/preview/store.ts';
 import { PREVIEW_STATUS_FAILED, PREVIEW_STATUS_GENERATING, PREVIEW_STATUS_READY } from '$sync/preview/store.ts';
 import { generatePreview } from '$sync/preview/orchestrator.ts';
+import { buildPreviewFailure, classifyPreviewFailure } from '$sync/preview/failureReason.ts';
 import { SYNC_SECTION_ORDER } from '$sync/mappings.ts';
 import {
   PREVIEW_CREATE_RATE_LIMIT_MAX_REQUESTS,
@@ -37,6 +38,24 @@ type CreatePreviewResult = {
   arrType: SyncPreviewArrType;
   sections: SectionType[] | undefined;
   sectionConfigs?: Partial<Record<SectionType, unknown>>;
+};
+
+/**
+ * Injectable dependencies for the create handler. Mirrors the apply route's DI pattern so
+ * tests can force secret-shaped / free-form generation failures without monkeypatching an
+ * immutable ESM binding. Defaults call through dynamically so the existing tests that
+ * reassign `arrInstancesQueries.getById` keep working.
+ */
+export interface SyncPreviewCreateDependencies {
+  readonly generatePreview: typeof generatePreview;
+  readonly getInstanceById: typeof arrInstancesQueries.getById;
+  readonly now: () => number;
+}
+
+const DEFAULT_CREATE_DEPENDENCIES: SyncPreviewCreateDependencies = {
+  generatePreview,
+  getInstanceById: (id: number) => arrInstancesQueries.getById(id),
+  now: Date.now,
 };
 
 function parseSectionOrderValue(rawSections: unknown): SectionType[] | undefined {
@@ -135,6 +154,7 @@ function createInitialPreview(request: CreatePreviewResult): SyncPreviewResult {
     createdAt: new Date().toISOString(),
     expiresAt: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
     status: PREVIEW_STATUS_GENERATING,
+    failure: null,
     sections: request.sections ?? [],
     sectionOutcomes: [],
     qualityProfiles: null,
@@ -205,7 +225,10 @@ async function parseRequestBody(
  * - sections: optional ordered list of sync sections to preview
  * - sectionConfigs: optional config overrides per section
  */
-export const POST: RequestHandler = async ({ request }) => {
+export async function _handleSyncPreviewCreateRequest(
+  request: Request,
+  dependencies: SyncPreviewCreateDependencies = DEFAULT_CREATE_DEPENDENCIES
+): Promise<Response> {
   const requestBody = await parseRequestBody(request);
   if (!requestBody.ok) {
     return requestBody.response;
@@ -219,7 +242,7 @@ export const POST: RequestHandler = async ({ request }) => {
     return json({ error: message } satisfies ErrorResponse, { status: 400 });
   }
 
-  const instance = arrInstancesQueries.getById(requestPayload.instanceId);
+  const instance = dependencies.getInstanceById(requestPayload.instanceId);
   if (!instance) {
     return json({ error: 'Instance not found' } satisfies ErrorResponse, { status: 404 });
   }
@@ -232,7 +255,7 @@ export const POST: RequestHandler = async ({ request }) => {
     return json({ error: 'Instance is disabled' } satisfies ErrorResponse, { status: 400 });
   }
 
-  const nowMs = Date.now();
+  const nowMs = dependencies.now();
   previewStore.cleanup(nowMs);
   if (previewStore.getSize() >= PREVIEW_MAX_SNAPSHOTS) {
     return json(
@@ -276,16 +299,18 @@ export const POST: RequestHandler = async ({ request }) => {
   const requestedSections = requestPayload.sections?.length ? requestPayload.sections : undefined;
 
   try {
-    const generated = await generatePreview({
+    const generated = await dependencies.generatePreview({
       instance,
       sections: requestedSections,
       sectionConfigs: requestPayload.sectionConfigs,
       nowMs,
     });
 
-    const errors = generated.errors ?? [];
-    const statusError =
-      errors.length > 0 ? `Preview generation completed with ${errors.length} section error(s)` : undefined;
+    // Preserve successful-section evidence: a partial generation stays `ready` (successful
+    // sections keep their diffs) but carries a typed top-level `sectionErrors` reason so apply
+    // requires a clean regenerate — mirroring the prior top-level error-count gate, without raw text.
+    const hasFailedSection = generated.sectionOutcomes.some((outcome) => outcome.failure !== null);
+    const topLevelFailure = hasFailedSection ? buildPreviewFailure('sectionErrors', requestPayload.arrType) : null;
 
     storedPreview = previewStore.updateResult(storedPreview.id, {
       status: PREVIEW_STATUS_READY,
@@ -296,7 +321,7 @@ export const POST: RequestHandler = async ({ request }) => {
       mediaManagement: generated.mediaManagement,
       metadataProfiles: generated.metadataProfiles,
       summary: generated.summary,
-      error: statusError,
+      failure: topLevelFailure,
       instanceName: generated.instanceName,
     })!;
 
@@ -306,11 +331,13 @@ export const POST: RequestHandler = async ({ request }) => {
 
     return json(storedPreview);
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : 'Failed to generate preview';
+    // Classify by error TYPE only; the raw message never reaches the response or the
+    // stored snapshot — it is recorded solely on the sanitized logger boundary below.
+    const failure = classifyPreviewFailure(error, requestPayload.arrType);
 
-    previewStore.updateResult(storedPreview.id, {
+    const failedPreview = previewStore.updateResult(storedPreview.id, {
       status: PREVIEW_STATUS_FAILED,
-      error: errorMessage,
+      failure,
     });
 
     await logger.error('Failed to generate sync preview', {
@@ -319,10 +346,14 @@ export const POST: RequestHandler = async ({ request }) => {
         previewId: storedPreview.id,
         instanceId: requestPayload.instanceId,
         instanceName: requestPayload.instanceName,
-        error: errorMessage,
+        failureCode: failure.code,
+        error: error instanceof Error ? error.message : String(error),
       },
     });
 
-    return json({ error: errorMessage } satisfies ErrorResponse, { status: 500 });
+    // Return the failed snapshot (status 'failed' + typed, safe failure) — never raw text.
+    return json(failedPreview ?? { ...storedPreview, status: PREVIEW_STATUS_FAILED, failure }, { status: 500 });
   }
-};
+}
+
+export const POST: RequestHandler = ({ request }) => _handleSyncPreviewCreateRequest(request);

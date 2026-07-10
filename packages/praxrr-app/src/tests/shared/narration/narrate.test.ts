@@ -1,5 +1,17 @@
 import { assert, assertEquals, assertStringIncludes } from '@std/assert';
-import type { EntityChange, SyncPreviewArrType, SyncPreviewSectionOutcome } from '$sync/preview/types.ts';
+import type {
+  EntityChange,
+  SyncPreviewArrType,
+  SyncPreviewFailureReason,
+  SyncPreviewSectionOutcome,
+} from '$sync/preview/types.ts';
+
+// A typed, safe section failure — narration renders its own closed copy, not this object's fields.
+const SAMPLE_SECTION_FAILURE: SyncPreviewFailureReason = {
+  code: 'internalError',
+  message: 'An unexpected error occurred while processing the preview.',
+  recoveryAction: 'Try again; if the problem persists, check the server logs for details.',
+};
 import type { DriftEntityChange, DriftReason } from '$sync/drift/types.ts';
 import type { DriftSummaryStatus } from '$sync/drift/responses.ts';
 import {
@@ -182,22 +194,22 @@ Deno.test('narrateSyncSectionOutcome: every section reports preview-generation c
     expectedTone: 'neutral' | 'warning';
   }[] = [
     {
-      outcome: { section: 'qualityProfiles', skipped: false, error: null },
+      outcome: { section: 'qualityProfiles', skipped: false, failure: null },
       expectedHeadline: 'Quality Profiles was included in preview generation.',
       expectedTone: 'neutral',
     },
     {
-      outcome: { section: 'delayProfiles', skipped: true, error: null },
+      outcome: { section: 'delayProfiles', skipped: true, failure: null },
       expectedHeadline: 'Delay Profiles was skipped during preview generation.',
       expectedTone: 'neutral',
     },
     {
-      outcome: { section: 'mediaManagement', skipped: false, error: 'upstream detail' },
+      outcome: { section: 'mediaManagement', skipped: false, failure: SAMPLE_SECTION_FAILURE },
       expectedHeadline: 'Media Management preview generation failed.',
       expectedTone: 'warning',
     },
     {
-      outcome: { section: 'metadataProfiles', skipped: false, error: null },
+      outcome: { section: 'metadataProfiles', skipped: false, failure: null },
       expectedHeadline: 'Metadata Profiles was included in preview generation.',
       expectedTone: 'neutral',
     },
@@ -214,8 +226,11 @@ Deno.test('narrateSyncSectionOutcome: every section reports preview-generation c
   }
 });
 
-Deno.test('narrateSyncSectionOutcome: empty section error remains a failure with generic detail', () => {
-  const line = narrateSyncSectionOutcome({ section: 'qualityProfiles', skipped: false, error: '' }, 'verbose');
+Deno.test('narrateSyncSectionOutcome: a typed section failure renders the generic safe detail', () => {
+  const line = narrateSyncSectionOutcome(
+    { section: 'qualityProfiles', skipped: false, failure: SAMPLE_SECTION_FAILURE },
+    'verbose'
+  );
   assertEquals(line.headline, 'Quality Profiles preview generation failed.');
   assertEquals(
     line.detail[0],
@@ -252,9 +267,12 @@ Deno.test('sync preview narration never renders secret-shaped upstream error tex
     'Preview generation reported an error. Review the instance connection and configuration, then regenerate the preview.';
 
   for (const upstreamError of upstreamErrors) {
+    // The free-form-string helper deliberately ignores its input and emits only closed copy.
     const previewError = narrateSyncPreviewError(upstreamError, 'verbose');
+    // Section outcomes can no longer carry raw text — `failure` is a typed, closed reason — so
+    // narration renders the generic safe detail regardless of what upstream failed.
     const sectionError = narrateSyncSectionOutcome(
-      { section: 'qualityProfiles', skipped: false, error: upstreamError },
+      { section: 'qualityProfiles', skipped: false, failure: SAMPLE_SECTION_FAILURE },
       'verbose'
     );
 
@@ -435,7 +453,7 @@ Deno.test('every NarrationLine stamps the current template version', () => {
   const lines = [
     narrateEntityChange(entity, 'radarr', 'qualityProfiles', 'summary'),
     narrateSyncPreviewSummary({ totalCreates: 1, totalUpdates: 0, totalDeletes: 0, totalUnchanged: 0 }, 'summary'),
-    narrateSyncSectionOutcome({ section: 'qualityProfiles', skipped: false, error: null }, 'verbose'),
+    narrateSyncSectionOutcome({ section: 'qualityProfiles', skipped: false, failure: null }, 'verbose'),
     narrateSyncPreviewError('opaque detail', 'verbose'),
     narrateDriftEntity(drift, 'radarr', 'verbose'),
     narrateDriftReason('drifted', null, 'summary'),

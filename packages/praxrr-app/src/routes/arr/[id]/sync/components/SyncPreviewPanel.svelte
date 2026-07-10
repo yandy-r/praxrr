@@ -25,6 +25,7 @@
     status: SyncPreviewTriggerStatus;
     summary: SyncPreviewSummary | null;
     error: string | null;
+    recoveryAction: string | null;
   };
 
   type StalenessState = {
@@ -93,6 +94,7 @@
   let sectionNarrations: readonly NarrationLine[] = [];
   let coverage: PreviewCoverage = UNAVAILABLE_PREVIEW_COVERAGE;
   let applyResultText = '';
+  let applyRecoveryAction = '';
   let applyOutcomes: SyncEntityOutcome[] = [];
   let applySyncHistoryId: number | null = null;
 
@@ -275,8 +277,8 @@
       return UNAVAILABLE_PREVIEW_COVERAGE;
     }
 
-    const includedCount = outcomes.filter((outcome) => outcome.error === null && !outcome.skipped).length;
-    const complete = includedCount === outcomes.length && !snapshot.error;
+    const includedCount = outcomes.filter((outcome) => outcome.failure === null && !outcome.skipped).length;
+    const complete = includedCount === outcomes.length && !snapshot.failure;
     return {
       status: complete ? 'complete' : 'partial',
       label: complete ? 'Complete coverage' : 'Partial coverage',
@@ -329,6 +331,7 @@
     applying = true;
     applyError = '';
     applyResultText = '';
+    applyRecoveryAction = '';
     applyOutcomes = [];
     applySyncHistoryId = null;
 
@@ -348,13 +351,15 @@
       }
 
       if (!response.ok || !payload || !('success' in payload) || payload.success === false) {
-        const message =
-          payload && 'error' in payload && typeof payload.error === 'string'
-            ? payload.error
-            : payload && 'results' in payload && payload.results.error
-              ? payload.results.error
-              : 'Failed to apply preview.';
-        throw new Error(message);
+        // Both apply failure shapes now carry a typed, safe `failure` reason — never raw text.
+        const reason =
+          payload && 'failure' in payload && payload.failure
+            ? payload.failure
+            : payload && 'results' in payload && payload.results.failure
+              ? payload.results.failure
+              : null;
+        applyRecoveryAction = reason?.recoveryAction ?? '';
+        throw new Error(reason?.message ?? 'Failed to apply preview.');
       }
 
       if ('staleWarning' in payload && payload.staleWarning) {
@@ -396,7 +401,7 @@
   $: coverage = preview ? resolveCoverage(preview) : UNAVAILABLE_PREVIEW_COVERAGE;
   $: sectionNarrations = preview
     ? preview.sectionOutcomes
-        .filter((outcome) => showExplanationDetails || outcome.error !== null || outcome.skipped)
+        .filter((outcome) => showExplanationDetails || outcome.failure !== null || outcome.skipped)
         .map((outcome) => narrateSyncSectionOutcome(outcome, narrationLevel))
     : [];
   $: stalenessText = staleness ? formatAge(staleness.ageMs) : '';
@@ -449,7 +454,10 @@
       <div
         class="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-900/20 dark:text-red-300"
       >
-        {previewState.error || 'Unable to load preview state'}
+        <p>{previewState.error || 'Unable to load preview state'}</p>
+        {#if previewState.recoveryAction}
+          <p class="mt-1 text-red-600 dark:text-red-400">{previewState.recoveryAction}</p>
+        {/if}
       </div>
     {:else if previewState.status === 'generating' || loading}
       <div class="flex items-center gap-2 text-sm text-neutral-700 dark:text-neutral-300">
@@ -625,6 +633,9 @@
           >
             <p class="font-medium">Apply result</p>
             <p class="mt-1">{applyResultText}</p>
+            {#if applyError && applyRecoveryAction}
+              <p class="mt-1">{applyRecoveryAction}</p>
+            {/if}
           </div>
         {/if}
 
@@ -632,7 +643,9 @@
           <div class="space-y-2 rounded-md border border-neutral-200 px-3 py-3 dark:border-neutral-700">
             <div class="flex flex-wrap items-center justify-between gap-2">
               <p class="text-sm font-medium text-neutral-900 dark:text-neutral-100">
-                Confirmed apply outcomes <span class="text-neutral-500 dark:text-neutral-400">({applyOutcomes.length})</span>
+                Confirmed apply outcomes <span class="text-neutral-500 dark:text-neutral-400"
+                  >({applyOutcomes.length})</span
+                >
               </p>
               {#if applySyncHistoryId !== null}
                 <a
