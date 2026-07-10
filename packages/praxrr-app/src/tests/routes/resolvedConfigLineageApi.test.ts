@@ -26,7 +26,12 @@ const SCHEMA_FILES = ['0.schema.sql', '1.languages.sql', '2.qualities.sql'] as c
 
 type Restore = () => void;
 
-function patchTarget<T extends object, K extends keyof T>(target: T, key: K, replacement: T[K], restores: Restore[]): void {
+function patchTarget<T extends object, K extends keyof T>(
+  target: T,
+  key: K,
+  replacement: T[K],
+  restores: Restore[]
+): void {
   const original = target[key];
   target[key] = replacement;
   restores.push(() => {
@@ -53,7 +58,7 @@ function makeOp(id: number, sql: string, origin: PcdOpOrigin = 'base'): PcdOp {
     pushed_at: null,
     pushed_commit: null,
     created_at: '2026-01-01 00:00:00',
-    updated_at: '2026-01-01 00:00:00'
+    updated_at: '2026-01-01 00:00:00',
   };
 }
 
@@ -67,11 +72,11 @@ function buildEvent(query: string): NamedGetEvent {
         username: 'user-1',
         password_hash: 'hash',
         created_at: '2026-01-01T00:00:00.000Z',
-        updated_at: '2026-01-01T00:00:00.000Z'
+        updated_at: '2026-01-01T00:00:00.000Z',
       },
       session: null,
-      authBypass: false
-    }
+      authBypass: false,
+    },
   };
   return event as NamedGetEvent;
 }
@@ -79,7 +84,7 @@ function buildEvent(query: string): NamedGetEvent {
 async function withFixture(fn: () => Promise<void>): Promise<void> {
   const restores: Restore[] = [];
   for (const level of ['debug', 'info', 'warn', 'error', 'errorWithTrace'] as const) {
-    patchTarget(logger, level, (async () => undefined) as typeof logger[typeof level], restores);
+    patchTarget(logger, level, (async () => undefined) as (typeof logger)[typeof level], restores);
   }
   clearSchemaDefaultsCache();
 
@@ -96,7 +101,9 @@ async function withFixture(fn: () => Promise<void>): Promise<void> {
     pcdOpsQueries,
     'listByDatabaseAndOrigin',
     ((_id: number, origin: PcdOpOrigin, options?: ListPcdOpsOptions): PcdOp[] =>
-      origin === 'base' && (options?.states ?? []).includes('published') ? baseOps : []) as typeof pcdOpsQueries.listByDatabaseAndOrigin,
+      origin === 'base' && (options?.states ?? []).includes('published')
+        ? baseOps
+        : []) as typeof pcdOpsQueries.listByDatabaseAndOrigin,
     restores
   );
   patchTarget(
@@ -104,12 +111,24 @@ async function withFixture(fn: () => Promise<void>): Promise<void> {
     'getById',
     ((id: number) =>
       id === DATABASE_ID
-        ? ({ id, local_path: pcdPath, enabled: 1, conflict_strategy: 'override' } as unknown as ReturnType<typeof databaseInstancesQueries.getById>)
+        ? ({ id, local_path: pcdPath, enabled: 1, conflict_strategy: 'override' } as unknown as ReturnType<
+            typeof databaseInstancesQueries.getById
+          >)
         : undefined) as typeof databaseInstancesQueries.getById,
     restores
   );
-  patchTarget(pcdOpHistoryQueries, 'listLatestByDatabaseWithOps', (() => []) as typeof pcdOpHistoryQueries.listLatestByDatabaseWithOps, restores);
-  patchTarget(pcdOpHistoryQueries, 'listLatestConflictsByDatabase', (() => []) as typeof pcdOpHistoryQueries.listLatestConflictsByDatabase, restores);
+  patchTarget(
+    pcdOpHistoryQueries,
+    'listLatestByDatabaseWithOps',
+    (() => []) as typeof pcdOpHistoryQueries.listLatestByDatabaseWithOps,
+    restores
+  );
+  patchTarget(
+    pcdOpHistoryQueries,
+    'listLatestConflictsByDatabase',
+    (() => []) as typeof pcdOpHistoryQueries.listLatestConflictsByDatabase,
+    restores
+  );
 
   // Register a real resolved cache (all layers) so `resolveLayerState(layer=resolved)` reads it.
   const cache = new PCDCache(pcdPath, DATABASE_ID);

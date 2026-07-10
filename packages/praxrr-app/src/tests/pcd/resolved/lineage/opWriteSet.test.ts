@@ -9,7 +9,12 @@ Deno.test('opWriteSet: INSERT with explicit column list', () => {
   const r = analyzeOpWriteSets("INSERT INTO custom_formats (name, include_in_rename) VALUES ('CF', 0)");
   assertEquals(r.parseStatus, 'parsed');
   assertEquals(r.writeSets.length, 1);
-  assertEquals(r.writeSets[0], { table: 'custom_formats', columns: ['name', 'include_in_rename'], kind: 'insert', whereExpr: null });
+  assertEquals(r.writeSets[0], {
+    table: 'custom_formats',
+    columns: ['name', 'include_in_rename'],
+    kind: 'insert',
+    whereExpr: null,
+  });
 });
 
 Deno.test('opWriteSet: INSERT without a column list is ambiguous (cannot attribute columns)', () => {
@@ -27,7 +32,9 @@ Deno.test('opWriteSet: multi-row VALUES shares one column list', () => {
 });
 
 Deno.test('opWriteSet: Kysely-shaped quoted-identifier UPDATE captures SET columns + WHERE', () => {
-  const r = analyzeOpWriteSets('update "delay_profiles" set "usenet_delay" = 30, "torrent_delay" = 10 where "name" = \'DP\'');
+  const r = analyzeOpWriteSets(
+    'update "delay_profiles" set "usenet_delay" = 30, "torrent_delay" = 10 where "name" = \'DP\''
+  );
   assertEquals(r.parseStatus, 'parsed');
   assertEquals(r.writeSets[0].table, 'delay_profiles');
   assertEquals(r.writeSets[0].columns, ['usenet_delay', 'torrent_delay']);
@@ -62,7 +69,7 @@ Deno.test('opWriteSet: multi-statement DELETE then INSERT are analyzed independe
 });
 
 Deno.test('opWriteSet: depth-0 WHERE extraction handles parenthesized and compound predicates', () => {
-  const r = analyzeOpWriteSets("DELETE FROM t WHERE (a = 1 AND b = 2) OR c = 3");
+  const r = analyzeOpWriteSets('DELETE FROM t WHERE (a = 1 AND b = 2) OR c = 3');
   assertEquals(r.writeSets[0].kind, 'delete');
   assertEquals(r.writeSets[0].whereExpr, '(a = 1 AND b = 2) OR c = 3');
 });

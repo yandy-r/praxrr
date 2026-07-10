@@ -71,7 +71,7 @@ export function createLineageIndex(): LineageIndex {
       if (!cols) return;
       for (const column of cols) stacks.delete(cellKey(table, rowKey, column));
       rowColumns.delete(tag);
-    }
+    },
   };
 }
 
@@ -102,7 +102,7 @@ function opIdentity(op: Operation, parseStatus: 'parsed' | 'ambiguous'): OpIdent
     sourceLayer: op.layer as LineageSourceLayer,
     opId,
     opRef: opId === null ? { filename: op.filename, order: op.order } : null,
-    parseStatus
+    parseStatus,
   };
 }
 
@@ -133,8 +133,7 @@ function rowKeyForRowid(db: Database, table: string, rowid: number): RowKey | nu
   if (!keyColumns) return null;
   const cols = keyColumns.map((c) => `"${c}"`).join(', ');
   const row = db.prepare(`SELECT ${cols} FROM "${table}" WHERE rowid = ?`).get(rowid) as
-    | Record<string, unknown>
-    | undefined;
+    Record<string, unknown> | undefined;
   if (!row) return null;
   return buildRowKey(table, row);
 }
@@ -195,7 +194,7 @@ export function createLineageObserver(index: LineageIndex): {
                   sourceLayer: id.sourceLayer,
                   opId: id.opId,
                   opRef: id.opRef,
-                  parseStatus: id.parseStatus
+                  parseStatus: id.parseStatus,
                 });
               }
             }
@@ -208,7 +207,7 @@ export function createLineageObserver(index: LineageIndex): {
                 sourceLayer: id.sourceLayer,
                 opId: id.opId,
                 opRef: id.opRef,
-                parseStatus: id.parseStatus
+                parseStatus: id.parseStatus,
               });
             }
           }
@@ -219,6 +218,6 @@ export function createLineageObserver(index: LineageIndex): {
         pending = [];
         identity = null;
       }
-    }
+    },
   };
 }

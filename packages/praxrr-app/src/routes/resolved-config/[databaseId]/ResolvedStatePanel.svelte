@@ -4,13 +4,14 @@
   import type { components } from '$api/v1.d.ts';
   import JsonView from '$ui/meta/JsonView.svelte';
   import Badge from '$ui/badge/Badge.svelte';
-  import { FIELD_META, formatFieldValue } from '$ui/resolved/fieldChangeDisplay.ts';
+  import { FIELD_META, formatFieldValue, formatLineage } from '$ui/resolved/fieldChangeDisplay.ts';
   import { explainResolvedProvenance, type ResolvedProvenanceKind } from '$shared/pcd/resolvedProvenance.ts';
 
   type ResolvedEntityType = components['schemas']['ResolvedEntityState']['entityType'];
   type ArrAppType = components['schemas']['ResolvedInstanceState']['arrType'];
   type ResolvedEntityState = components['schemas']['ResolvedEntityState'];
   type FieldChange = components['schemas']['FieldChange'];
+  type FieldLineage = components['schemas']['FieldLineage'];
   type ErrorResponse = components['schemas']['ErrorResponse'];
   type Layer = 'resolved' | 'base' | 'user';
 
@@ -69,6 +70,8 @@
     try {
       const query = new URLSearchParams({ layer: activeLayer });
       if (arrType) query.set('arrType', arrType);
+      // Exact per-field lineage is only meaningful for the fully-resolved layer.
+      if (activeLayer === 'resolved') query.set('includeLineage', 'true');
       const response = await fetch(
         `/api/v1/pcd/${databaseId}/resolved/${entityType}/${encodeURIComponent(entityName)}?${query.toString()}`
       );
@@ -103,6 +106,11 @@
 
   $: fields = state?.entity ? Object.entries(state.entity) : [];
   $: overrides = (state?.overrides ?? []) as FieldChange[];
+  // Per-field lineage lookup keyed by the diff field path (top-level scalar keys match directly;
+  // nested paths are surfaced via the raw JSON region).
+  $: lineageByField = new Map<string, FieldLineage>(
+    (state?.lineage ?? []).map((entry) => [entry.fieldPath, entry] as [string, FieldLineage])
+  );
   $: provenance = state
     ? explainResolvedProvenance({
         // Entity names are selected from the resolved-layer list, so a loaded base response has
@@ -198,6 +206,9 @@
       >
         <Badge variant={provenanceVariant(provenance.kind)}>{provenance.label}</Badge>
         <span>{provenance.detail}</span>
+        {#if activeLayer === 'resolved' && state.lineageStatus === 'ambiguous'}
+          <Badge variant="warning">Lineage ambiguous</Badge>
+        {/if}
       </div>
     {/if}
 
@@ -267,10 +278,14 @@
             <tr class="text-left text-xs font-medium tracking-wide text-neutral-500 uppercase dark:text-neutral-400">
               <th class="px-4 py-2">Field</th>
               <th class="px-4 py-2">Value</th>
+              {#if activeLayer === 'resolved'}
+                <th class="px-4 py-2">Source</th>
+              {/if}
             </tr>
           </thead>
           <tbody>
             {#each fields as [key, value] (key)}
+              {@const lineage = lineageByField.get(key)}
               <tr class="border-t border-neutral-200 dark:border-neutral-800">
                 <td class="px-4 py-2 font-mono text-xs text-neutral-500 dark:text-neutral-400">{key}</td>
                 <td class="px-4 py-2 text-neutral-900 dark:text-neutral-100">
@@ -280,6 +295,23 @@
                     {formatValue(value)}
                   {/if}
                 </td>
+                {#if activeLayer === 'resolved'}
+                  <td class="px-4 py-2 align-top whitespace-nowrap">
+                    {#if lineage}
+                      {@const meta = formatLineage(lineage)}
+                      <span class="inline-flex items-center gap-1.5" title={meta.detail}>
+                        <Badge variant={meta.variant}>{meta.label}</Badge>
+                        {#if lineage.status === 'resolved' && lineage.sourceKind !== 'schema-default'}
+                          <span class="text-xs text-neutral-400 dark:text-neutral-500">
+                            {meta.explicit ? 'explicit' : 'default'}
+                          </span>
+                        {/if}
+                      </span>
+                    {:else}
+                      <span class="text-xs text-neutral-400 dark:text-neutral-500">—</span>
+                    {/if}
+                  </td>
+                {/if}
               </tr>
             {/each}
           </tbody>

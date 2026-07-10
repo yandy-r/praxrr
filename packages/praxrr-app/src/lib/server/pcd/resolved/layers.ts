@@ -107,7 +107,7 @@ export async function withInstrumentedCache<T>(
     cache.close();
     await logger.debug('withInstrumentedCache: ephemeral instrumented cache closed', {
       source: SOURCE,
-      meta: { databaseId, timingMs: Math.round(performance.now() - startTime) }
+      meta: { databaseId, timingMs: Math.round(performance.now() - startTime) },
     });
   }
 }

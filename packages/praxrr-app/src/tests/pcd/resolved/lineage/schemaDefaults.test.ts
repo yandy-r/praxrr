@@ -3,7 +3,11 @@
 // IN-lists on the next physical line, NOT NULL detection, and no-default columns.
 
 import { assertEquals } from '@std/assert';
-import { parseSchemaDefaults, clearSchemaDefaultsCache, lookupSchemaDefault } from '$pcd/resolved/lineage/schemaDefaults.ts';
+import {
+  parseSchemaDefaults,
+  clearSchemaDefaultsCache,
+  lookupSchemaDefault,
+} from '$pcd/resolved/lineage/schemaDefaults.ts';
 
 const DDL = `
 CREATE TABLE custom_formats (

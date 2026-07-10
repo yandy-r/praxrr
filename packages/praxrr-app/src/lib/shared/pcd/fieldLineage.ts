@@ -121,7 +121,7 @@ function ambiguousLineage(fieldPath: string, explicit: boolean, valueEqualsDefau
     opId: null,
     opRef: null,
     explicit,
-    ...(valueEqualsDefault === undefined ? {} : { valueEqualsDefault })
+    ...(valueEqualsDefault === undefined ? {} : { valueEqualsDefault }),
   };
 }
 
@@ -133,7 +133,7 @@ function unavailableLineage(fieldPath: string): FieldLineage {
     sourceKind: 'unavailable',
     opId: null,
     opRef: null,
-    explicit: false
+    explicit: false,
   };
 }
 
@@ -165,7 +165,7 @@ export function explainFieldLineage(input: ExplainFieldLineageInput): FieldLinea
       opId: effectiveCell.opId,
       opRef: effectiveCell.opRef,
       explicit: true,
-      ...(valueMatchesDefault === undefined ? {} : { valueEqualsDefault: valueMatchesDefault })
+      ...(valueMatchesDefault === undefined ? {} : { valueEqualsDefault: valueMatchesDefault }),
     };
   }
 
@@ -179,7 +179,7 @@ export function explainFieldLineage(input: ExplainFieldLineageInput): FieldLinea
         opId: null,
         opRef: { filename: schemaDefault.schemaFile, order: 0 },
         explicit: false,
-        valueEqualsDefault: true
+        valueEqualsDefault: true,
       };
     }
     // Never explicitly written, yet value differs from the parsed default -> an unmodeled
@@ -204,7 +204,7 @@ export function foldPendingConflict(
   if (hasPendingConflict) {
     return {
       lineage: fields.map((field) => ambiguousLineage(field.fieldPath, field.explicit, field.valueEqualsDefault)),
-      lineageStatus: 'ambiguous'
+      lineageStatus: 'ambiguous',
     };
   }
 

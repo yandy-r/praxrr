@@ -20,7 +20,12 @@ const SCHEMA_FILES = ['0.schema.sql', '1.languages.sql', '2.qualities.sql'] as c
 
 type Restore = () => void;
 
-function patchTarget<T extends object, K extends keyof T>(target: T, key: K, replacement: T[K], restores: Restore[]): void {
+function patchTarget<T extends object, K extends keyof T>(
+  target: T,
+  key: K,
+  replacement: T[K],
+  restores: Restore[]
+): void {
   const original = target[key];
   target[key] = replacement;
   restores.push(() => {
@@ -30,7 +35,7 @@ function patchTarget<T extends object, K extends keyof T>(target: T, key: K, rep
 
 function silenceLogger(restores: Restore[]): void {
   for (const level of ['debug', 'info', 'warn', 'error', 'errorWithTrace'] as const) {
-    patchTarget(logger, level, (async () => undefined) as typeof logger[typeof level], restores);
+    patchTarget(logger, level, (async () => undefined) as (typeof logger)[typeof level], restores);
   }
 }
 
@@ -52,7 +57,7 @@ function makeOp(overrides: Partial<PcdOp> & Pick<PcdOp, 'id' | 'sql'>): PcdOp {
     pushed_commit: null,
     created_at: '2026-01-01 00:00:00',
     updated_at: '2026-01-01 00:00:00',
-    ...overrides
+    ...overrides,
   };
 }
 
@@ -74,7 +79,11 @@ interface FixtureConfig {
 }
 
 interface Fixture {
-  run: (entityType: Parameters<typeof resolveEntityLineage>[0]['entityType'], name: string, arrType?: 'radarr' | 'sonarr' | 'lidarr') => ReturnType<typeof resolveEntityLineage>;
+  run: (
+    entityType: Parameters<typeof resolveEntityLineage>[0]['entityType'],
+    name: string,
+    arrType?: 'radarr' | 'sonarr' | 'lidarr'
+  ) => ReturnType<typeof resolveEntityLineage>;
   cleanup: () => Promise<void>;
 }
 
@@ -92,7 +101,9 @@ async function setUp(config: FixtureConfig): Promise<Fixture> {
     'getById',
     ((id: number) =>
       id === DATABASE_ID
-        ? ({ id, local_path: pcdPath, enabled: 1, conflict_strategy: 'override' } as unknown as ReturnType<typeof databaseInstancesQueries.getById>)
+        ? ({ id, local_path: pcdPath, enabled: 1, conflict_strategy: 'override' } as unknown as ReturnType<
+            typeof databaseInstancesQueries.getById
+          >)
         : undefined) as typeof databaseInstancesQueries.getById,
     restores
   );
@@ -121,9 +132,9 @@ async function setUp(config: FixtureConfig): Promise<Fixture> {
       conflict_reason: null,
       error: null,
       details: null,
-      applied_at: '2026-01-01 00:00:00'
+      applied_at: '2026-01-01 00:00:00',
     },
-    op: makeOp({ id: opId, sql: '' })
+    op: makeOp({ id: opId, sql: '' }),
   }));
   patchTarget(
     pcdOpHistoryQueries,
@@ -143,9 +154,9 @@ async function setUp(config: FixtureConfig): Promise<Fixture> {
       conflict_reason: 'guard_mismatch',
       error: null,
       details: null,
-      applied_at: '2026-01-01 00:00:00'
+      applied_at: '2026-01-01 00:00:00',
     },
-    op: makeOp({ id: 1000 + i, sql: '', origin: 'user', metadata: JSON.stringify({ entity, name }) })
+    op: makeOp({ id: 1000 + i, sql: '', origin: 'user', metadata: JSON.stringify({ entity, name }) }),
   }));
   patchTarget(
     pcdOpHistoryQueries,
@@ -159,7 +170,7 @@ async function setUp(config: FixtureConfig): Promise<Fixture> {
     cleanup: async () => {
       await Deno.remove(pcdPath, { recursive: true });
       for (const restore of restores.reverse()) restore();
-    }
+    },
   };
 }
 
@@ -173,60 +184,70 @@ function byPath(lineage: FieldLineage[], path: string): FieldLineage {
 // AC1 + AC2 + AC3 + AC7 — custom format scalar lineage across four sources
 // ============================================================================
 
-Deno.test('lineage: explicit base-op value equal to default is distinct from implicit schema-default (AC3/AC7)', async () => {
-  const fixture = await setUp({
-    baseOps: [
-      // Explicitly names include_in_rename = 0 (== schema DEFAULT 0).
-      makeOp({ id: 1, sql: "INSERT INTO custom_formats (name, include_in_rename) VALUES ('Explicit CF', 0)" }),
-      // Omits include_in_rename -> value 0 comes from the schema DEFAULT.
-      makeOp({ id: 2, sql: "INSERT INTO custom_formats (name) VALUES ('Implicit CF')" })
-    ]
-  });
-  try {
-    const explicit = await fixture.run('customFormat', 'Explicit CF');
-    const explicitField = byPath(explicit.lineage, 'includeInRename');
-    assertEquals(explicitField.sourceKind, 'base-op', 'explicit write -> base-op');
-    assertEquals(explicitField.explicit, true);
-    assertEquals(explicitField.valueEqualsDefault, true, 'value equals default but was explicitly written');
-    assertEquals(byPath(explicit.lineage, 'name').sourceKind, 'base-op');
-    assertEquals(byPath(explicit.lineage, 'name').sourceLayer, 'base');
+Deno.test(
+  'lineage: explicit base-op value equal to default is distinct from implicit schema-default (AC3/AC7)',
+  async () => {
+    const fixture = await setUp({
+      baseOps: [
+        // Explicitly names include_in_rename = 0 (== schema DEFAULT 0).
+        makeOp({ id: 1, sql: "INSERT INTO custom_formats (name, include_in_rename) VALUES ('Explicit CF', 0)" }),
+        // Omits include_in_rename -> value 0 comes from the schema DEFAULT.
+        makeOp({ id: 2, sql: "INSERT INTO custom_formats (name) VALUES ('Implicit CF')" }),
+      ],
+    });
+    try {
+      const explicit = await fixture.run('customFormat', 'Explicit CF');
+      const explicitField = byPath(explicit.lineage, 'includeInRename');
+      assertEquals(explicitField.sourceKind, 'base-op', 'explicit write -> base-op');
+      assertEquals(explicitField.explicit, true);
+      assertEquals(explicitField.valueEqualsDefault, true, 'value equals default but was explicitly written');
+      assertEquals(byPath(explicit.lineage, 'name').sourceKind, 'base-op');
+      assertEquals(byPath(explicit.lineage, 'name').sourceLayer, 'base');
 
-    const implicit = await fixture.run('customFormat', 'Implicit CF');
-    const implicitField = byPath(implicit.lineage, 'includeInRename');
-    assertEquals(implicitField.sourceKind, 'schema-default', 'omitted column -> schema-default');
-    assertEquals(implicitField.explicit, false);
-    assertEquals(implicitField.opId, null);
-    assertEquals(implicitField.opRef?.filename, '0.schema.sql');
-    // Same resolved value (0), opposite lineage.
-    assertEquals(implicitField.valueEqualsDefault, true);
-  } finally {
-    await fixture.cleanup();
-  }
-});
-
-Deno.test('lineage: adding/removing an unrelated user override never changes other fields (AC7 structural)', async () => {
-  const base = [
-    makeOp({ id: 1, sql: "INSERT INTO custom_formats (name, include_in_rename) VALUES ('Explicit CF', 0)" }),
-    makeOp({ id: 2, sql: "INSERT INTO custom_formats (name) VALUES ('Implicit CF')" })
-  ];
-  const withoutUser = await setUp({ baseOps: base });
-  const withUser = await setUp({
-    baseOps: base,
-    // An UNRELATED user op touching a different entity.
-    userOps: [makeOp({ id: 9, origin: 'user', sql: "INSERT INTO custom_formats (name) VALUES ('Unrelated')" })]
-  });
-  try {
-    for (const fixture of [withoutUser, withUser]) {
-      const explicit = byPath((await fixture.run('customFormat', 'Explicit CF')).lineage, 'includeInRename');
-      assertEquals(explicit.sourceKind, 'base-op', 'base-op field unchanged by presence of unrelated user op');
-      const implicit = byPath((await fixture.run('customFormat', 'Implicit CF')).lineage, 'includeInRename');
-      assertEquals(implicit.sourceKind, 'schema-default', 'never promoted to a source by absence-of-user-override reasoning');
+      const implicit = await fixture.run('customFormat', 'Implicit CF');
+      const implicitField = byPath(implicit.lineage, 'includeInRename');
+      assertEquals(implicitField.sourceKind, 'schema-default', 'omitted column -> schema-default');
+      assertEquals(implicitField.explicit, false);
+      assertEquals(implicitField.opId, null);
+      assertEquals(implicitField.opRef?.filename, '0.schema.sql');
+      // Same resolved value (0), opposite lineage.
+      assertEquals(implicitField.valueEqualsDefault, true);
+    } finally {
+      await fixture.cleanup();
     }
-  } finally {
-    await withoutUser.cleanup();
-    await withUser.cleanup();
   }
-});
+);
+
+Deno.test(
+  'lineage: adding/removing an unrelated user override never changes other fields (AC7 structural)',
+  async () => {
+    const base = [
+      makeOp({ id: 1, sql: "INSERT INTO custom_formats (name, include_in_rename) VALUES ('Explicit CF', 0)" }),
+      makeOp({ id: 2, sql: "INSERT INTO custom_formats (name) VALUES ('Implicit CF')" }),
+    ];
+    const withoutUser = await setUp({ baseOps: base });
+    const withUser = await setUp({
+      baseOps: base,
+      // An UNRELATED user op touching a different entity.
+      userOps: [makeOp({ id: 9, origin: 'user', sql: "INSERT INTO custom_formats (name) VALUES ('Unrelated')" })],
+    });
+    try {
+      for (const fixture of [withoutUser, withUser]) {
+        const explicit = byPath((await fixture.run('customFormat', 'Explicit CF')).lineage, 'includeInRename');
+        assertEquals(explicit.sourceKind, 'base-op', 'base-op field unchanged by presence of unrelated user op');
+        const implicit = byPath((await fixture.run('customFormat', 'Implicit CF')).lineage, 'includeInRename');
+        assertEquals(
+          implicit.sourceKind,
+          'schema-default',
+          'never promoted to a source by absence-of-user-override reasoning'
+        );
+      }
+    } finally {
+      await withoutUser.cleanup();
+      await withUser.cleanup();
+    }
+  }
+);
 
 // ============================================================================
 // AC2 — four distinct sources (schema-default, base-op, tweaks-op, user-op)
@@ -237,7 +258,13 @@ Deno.test('lineage: distinguishes schema-default / base-op / tweaks-op / user-op
     baseOps: [makeOp({ id: 1, sql: "INSERT INTO custom_formats (name, description) VALUES ('CF', 'base desc')" })],
     tweaks: "UPDATE custom_formats SET include_in_rename = 1 WHERE name = 'CF';",
     // Kysely-shaped quoted-identifier UPDATE exercises the analyzer's quoted-ident path.
-    userOps: [makeOp({ id: 10, origin: 'user', sql: 'update "custom_formats" set "description" = \'user desc\' where "name" = \'CF\'' })]
+    userOps: [
+      makeOp({
+        id: 10,
+        origin: 'user',
+        sql: 'update "custom_formats" set "description" = \'user desc\' where "name" = \'CF\'',
+      }),
+    ],
   });
   try {
     const { lineage } = await fixture.run('customFormat', 'CF');
@@ -259,9 +286,15 @@ Deno.test('lineage: distinguishes schema-default / base-op / tweaks-op / user-op
 Deno.test('lineage: a skipped establishing op is excluded and re-resolves to the prior writer (AC4)', async () => {
   const fixture = await setUp({
     baseOps: [makeOp({ id: 1, sql: "INSERT INTO custom_formats (name, description) VALUES ('CF', 'base desc')" })],
-    userOps: [makeOp({ id: 10, origin: 'user', sql: 'update "custom_formats" set "description" = \'user desc\' where "name" = \'CF\'' })],
+    userOps: [
+      makeOp({
+        id: 10,
+        origin: 'user',
+        sql: 'update "custom_formats" set "description" = \'user desc\' where "name" = \'CF\'',
+      }),
+    ],
     // The live value-guard build skipped the user op; buildReadOnly replays it, but lineage must exclude it.
-    history: [{ opId: 10, status: 'skipped' }]
+    history: [{ opId: 10, status: 'skipped' }],
   });
   try {
     const desc = byPath((await fixture.run('customFormat', 'CF')).lineage, 'description');
@@ -275,8 +308,14 @@ Deno.test('lineage: a skipped establishing op is excluded and re-resolves to the
 Deno.test('lineage: a conflicted establishing op yields ambiguous, not a confident source (AC4)', async () => {
   const fixture = await setUp({
     baseOps: [makeOp({ id: 1, sql: "INSERT INTO custom_formats (name, description) VALUES ('CF', 'base desc')" })],
-    userOps: [makeOp({ id: 10, origin: 'user', sql: 'update "custom_formats" set "description" = \'user desc\' where "name" = \'CF\'' })],
-    history: [{ opId: 10, status: 'conflicted' }]
+    userOps: [
+      makeOp({
+        id: 10,
+        origin: 'user',
+        sql: 'update "custom_formats" set "description" = \'user desc\' where "name" = \'CF\'',
+      }),
+    ],
+    history: [{ opId: 10, status: 'conflicted' }],
   });
   try {
     const desc = byPath((await fixture.run('customFormat', 'CF')).lineage, 'description');
@@ -290,7 +329,7 @@ Deno.test('lineage: a conflicted establishing op yields ambiguous, not a confide
 Deno.test('lineage: a pending value-guard conflict forces every field ambiguous (AC4 / Business Rule 6)', async () => {
   const fixture = await setUp({
     baseOps: [makeOp({ id: 1, sql: "INSERT INTO custom_formats (name, include_in_rename) VALUES ('CF', 0)" })],
-    conflicts: [{ entity: 'custom_format', name: 'CF' }]
+    conflicts: [{ entity: 'custom_format', name: 'CF' }],
   });
   try {
     const { lineage, lineageStatus } = await fixture.run('customFormat', 'CF');
@@ -313,13 +352,13 @@ Deno.test('lineage: nested custom-format condition fields are attributed (AC1 ne
       makeOp({ id: 1, sql: "INSERT INTO custom_formats (name) VALUES ('CF')" }),
       makeOp({
         id: 2,
-        sql: "INSERT INTO custom_format_conditions (custom_format_name, name, type, negate) VALUES ('CF', 'Is Bluray', 'source', 1)"
+        sql: "INSERT INTO custom_format_conditions (custom_format_name, name, type, negate) VALUES ('CF', 'Is Bluray', 'source', 1)",
       }),
       makeOp({
         id: 3,
-        sql: "INSERT INTO condition_sources (custom_format_name, condition_name, source) VALUES ('CF', 'Is Bluray', 'bluray')"
-      })
-    ]
+        sql: "INSERT INTO condition_sources (custom_format_name, condition_name, source) VALUES ('CF', 'Is Bluray', 'bluray')",
+      }),
+    ],
   });
   try {
     const { lineage } = await fixture.run('customFormat', 'CF');
@@ -331,16 +370,29 @@ Deno.test('lineage: nested custom-format condition fields are attributed (AC1 ne
   }
 });
 
-Deno.test('lineage: a user-created entity attributes all fields to user-op or schema-default (AC6 user-created)', async () => {
-  const fixture = await setUp({
-    userOps: [makeOp({ id: 5, origin: 'user', sql: "INSERT INTO custom_formats (name, description) VALUES ('User CF', 'mine')" })]
-  });
-  try {
-    const { lineage } = await fixture.run('customFormat', 'User CF');
-    assertEquals(byPath(lineage, 'name').sourceKind, 'user-op');
-    assertEquals(byPath(lineage, 'description').sourceKind, 'user-op');
-    assertEquals(byPath(lineage, 'includeInRename').sourceKind, 'schema-default', 'unset column is schema-default even on a user-created entity');
-  } finally {
-    await fixture.cleanup();
+Deno.test(
+  'lineage: a user-created entity attributes all fields to user-op or schema-default (AC6 user-created)',
+  async () => {
+    const fixture = await setUp({
+      userOps: [
+        makeOp({
+          id: 5,
+          origin: 'user',
+          sql: "INSERT INTO custom_formats (name, description) VALUES ('User CF', 'mine')",
+        }),
+      ],
+    });
+    try {
+      const { lineage } = await fixture.run('customFormat', 'User CF');
+      assertEquals(byPath(lineage, 'name').sourceKind, 'user-op');
+      assertEquals(byPath(lineage, 'description').sourceKind, 'user-op');
+      assertEquals(
+        byPath(lineage, 'includeInRename').sourceKind,
+        'schema-default',
+        'unset column is schema-default even on a user-created entity'
+      );
+    } finally {
+      await fixture.cleanup();
+    }
   }
-});
+);

@@ -22,7 +22,7 @@ import type {
   PortableQualityProfile,
   PortableRadarrNaming,
   PortableRegularExpression,
-  PortableSonarrNaming
+  PortableSonarrNaming,
 } from '$shared/pcd/portable.ts';
 import type { ArrAppType } from '$shared/arr/capabilities.ts';
 import type { ResolvedEntityPayload, ResolvedEntityType } from '../types.ts';
@@ -93,7 +93,12 @@ function collectRegularExpression(c: LeafCollector, p: PortableRegularExpression
   c.scalar('description', t, rv, 'description');
   c.scalar('regex101Id', t, rv, 'regex101_id');
   p.tags.forEach((tag, i) => {
-    c.scalar(indexPath('tags', i), 'regular_expression_tags', { regular_expression_name: p.name, tag_name: tag }, 'tag_name');
+    c.scalar(
+      indexPath('tags', i),
+      'regular_expression_tags',
+      { regular_expression_name: p.name, tag_name: tag },
+      'tag_name'
+    );
   });
 }
 
@@ -154,7 +159,14 @@ function collectConditionTypeData(
   }
   scalarArray(c, cond.sources, dot(base, 'sources'), 'condition_sources', condRow, 'source');
   scalarArray(c, cond.resolutions, dot(base, 'resolutions'), 'condition_resolutions', condRow, 'resolution');
-  scalarArray(c, cond.qualityModifiers, dot(base, 'qualityModifiers'), 'condition_quality_modifiers', condRow, 'quality_modifier');
+  scalarArray(
+    c,
+    cond.qualityModifiers,
+    dot(base, 'qualityModifiers'),
+    'condition_quality_modifiers',
+    condRow,
+    'quality_modifier'
+  );
   scalarArray(c, cond.releaseTypes, dot(base, 'releaseTypes'), 'condition_release_types', condRow, 'release_type');
   scalarArray(c, cond.indexerFlags, dot(base, 'indexerFlags'), 'condition_indexer_flags', condRow, 'flag');
   if (cond.size) {
@@ -191,7 +203,12 @@ function collectQualityProfile(c: LeafCollector, p: PortableQualityProfile): voi
     c.scalar(indexPath('tags', i), 'quality_profile_tags', { quality_profile_name: p.name, tag_name: tag }, 'tag_name');
   });
   if (p.language !== null) {
-    c.scalar('language', 'quality_profile_languages', { quality_profile_name: p.name, language_name: p.language }, 'language_name');
+    c.scalar(
+      'language',
+      'quality_profile_languages',
+      { quality_profile_name: p.name, language_name: p.language },
+      'language_name'
+    );
   }
 
   for (const item of p.orderedItems) {
@@ -200,7 +217,7 @@ function collectQualityProfile(c: LeafCollector, p: PortableQualityProfile): voi
     const qpqRow = {
       quality_profile_name: p.name,
       quality_name: isGroup ? null : item.name,
-      quality_group_name: isGroup ? item.name : null
+      quality_group_name: isGroup ? item.name : null,
     };
     // `type` and `name` are computed from which column is populated; anchor lineage to the
     // discriminator/value column of the quality_profile_qualities row.
@@ -228,7 +245,7 @@ function collectQualityProfile(c: LeafCollector, p: PortableQualityProfile): voi
     const scoreRow = {
       quality_profile_name: p.name,
       custom_format_name: score.customFormatName,
-      arr_type: score.arrType
+      arr_type: score.arrType,
     };
     c.scalar(dot(base, 'customFormatName'), 'quality_profile_custom_formats', scoreRow, 'custom_format_name');
     c.scalar(dot(base, 'arrType'), 'quality_profile_custom_formats', scoreRow, 'arr_type');
@@ -302,8 +319,22 @@ function collectLidarrMetadataProfile(c: LeafCollector, p: PortableLidarrMetadat
   c.scalar('name', t, rv, 'name');
   c.scalar('description', t, rv, 'description');
   collectMetadataTypes(c, p.name, p.primaryTypes, 'primaryTypes', 'lidarr_metadata_profile_primary_types', 'type_id');
-  collectMetadataTypes(c, p.name, p.secondaryTypes, 'secondaryTypes', 'lidarr_metadata_profile_secondary_types', 'type_id');
-  collectMetadataTypes(c, p.name, p.releaseStatuses, 'releaseStatuses', 'lidarr_metadata_profile_release_statuses', 'status_id');
+  collectMetadataTypes(
+    c,
+    p.name,
+    p.secondaryTypes,
+    'secondaryTypes',
+    'lidarr_metadata_profile_secondary_types',
+    'type_id'
+  );
+  collectMetadataTypes(
+    c,
+    p.name,
+    p.releaseStatuses,
+    'releaseStatuses',
+    'lidarr_metadata_profile_release_statuses',
+    'status_id'
+  );
 }
 
 function collectMetadataTypes(
