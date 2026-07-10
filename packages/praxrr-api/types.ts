@@ -3017,9 +3017,56 @@ export interface components {
       binding: components['schemas']['GoalBinding'];
       /** @description Authoritative sandbox config diff of the persisted ladder + scoring, captured before persist so it matches the preview diff for the same request (issue #221). */
       configDiff: components['schemas']['EntityConfigDiff'][];
+      /** @description The apply-journal row id for this apply (issue #236). */
+      applyId?: number;
+      applyStatus?: components['schemas']['GoalApplyStatus'];
     };
     GoalBindingResponse: {
       binding: components['schemas']['GoalBinding'] | null;
+      /** @description The latest apply-journal outcome for this profile target, or null if none has been attempted. Surfaces a failed/pending apply — including a failure that never wrote a binding (issue #236). */
+      applyStatus?: components['schemas']['GoalApplyStatus'] | null;
+    };
+    /** @description The safe operator recovery action for a failed or pending Quality Goals apply (issue #236). */
+    GoalRecoveryAction: {
+      /** @enum {string} */
+      action: 'none' | 'reconcile' | 'reapply';
+      endpoint?: string | null;
+    };
+    /** @description Durable outcome of a Quality Goals apply/reconcile attempt (issue #236). Reports whether scoring changed, the binding's terminal state, and the safe recovery action, so a partial write is never unreported. */
+    GoalApplyStatus: {
+      applyId: number;
+      /** @enum {string} */
+      status: 'pending' | 'succeeded' | 'failed';
+      /** @description Whether the scoring ops reached (or may have reached) their intended terminal state. */
+      scoringChanged: boolean;
+      /** @enum {string} */
+      bindingStatus: 'written' | 'pending' | 'failed';
+      failureStage?: string | null;
+      failureReason?: string | null;
+      intentFingerprint?: string;
+      startedAt: string;
+      settledAt?: string | null;
+      recovery: components['schemas']['GoalRecoveryAction'];
+    };
+    /** @description Structured failure body for a Quality Goals apply/reconcile (issue #236). `message` mirrors ErrorResponse's human text (the UI failure reader falls back to `error`), and `applyStatus` carries the reported outcome + recovery action. */
+    GoalApplyFailure: {
+      message: string;
+      applyStatus: components['schemas']['GoalApplyStatus'];
+    };
+    /** @description Recover a partial or pending Quality Goals apply by re-driving the recorded intent (#236). */
+    GoalReconcileRequest: {
+      databaseId: number;
+      /** @enum {string} */
+      arrType: 'radarr' | 'sonarr' | 'lidarr';
+      profileName: string;
+      expectedEngineVersion: string;
+    };
+    GoalReconcileResponse: components['schemas']['GoalApplyResponse'] & {
+      /** @description Whether ops were persisted this call (false when live already matched the intent). */
+      reconciled: boolean;
+      /** @description Whether the live state already equalled the recorded intent (a no-op reconcile). */
+      alreadyApplied: boolean;
+      applyStatus: components['schemas']['GoalApplyStatus'];
     };
     /** @enum {string} */
     TrashGuideEntityType: 'custom_format' | 'custom_format_group' | 'quality_profile' | 'quality_size' | 'naming';
@@ -3711,6 +3758,58 @@ export interface components {
      * @enum {string}
      */
     ResolvedLayer: 'base' | 'user' | 'resolved';
+    /**
+     * @description Exact provenance for one resolved nested field. `status` is the gate:
+     *     `resolved` rows name a source; `ambiguous`/`unavailable` rows make no source
+     *     claim. `schema-default` means no op explicitly wrote the column and its value
+     *     equals the parsed schema DEFAULT; it is never inferred from the mere absence
+     *     of a user override.
+     */
+    FieldLineage: {
+      /**
+       * @description Nested field path, byte-identical to the diff convention used by
+       *     `overrides` (e.g. `conditions["HDR"].negate`,
+       *     `orderedItems["WEB"].members[0].name`).
+       */
+      fieldPath: string;
+      /**
+       * @description `resolved`: a source is named. `ambiguous`: evidence conflicts, is
+       *     pending, or the op SQL was unparseable. `unavailable`: no establishing
+       *     op and no default backs this path.
+       * @enum {string}
+       */
+      status: 'resolved' | 'ambiguous' | 'unavailable';
+      /**
+       * @description The establishing layer; null unless `status` is `resolved`.
+       * @enum {string|null}
+       */
+      sourceLayer?: 'schema' | 'base' | 'tweaks' | 'user' | null;
+      /**
+       * @description Source classification, aligned with `sourceLayer` for resolved rows.
+       * @enum {string}
+       */
+      sourceKind: 'schema-default' | 'base-op' | 'tweaks-op' | 'user-op' | 'ambiguous' | 'unavailable';
+      /**
+       * @description Establishing `pcd_ops` id for base/user (DB) ops; null for file layers
+       *     (schema/tweaks) and schema-default.
+       */
+      opId?: number | null;
+      /**
+       * @description File-layer op identity (schema/tweaks), which has no `pcd_ops` row; null
+       *     for DB ops.
+       */
+      opRef?: {
+        filename: string;
+        order: number;
+      } | null;
+      /** @description True when an op explicitly named this column (distinct from an implicit default). */
+      explicit: boolean;
+      /**
+       * @description Display-only signal indicating the resolved value equals the schema
+       *     default. Never used to classify provenance. Absent when not comparable.
+       */
+      valueEqualsDefault?: boolean;
+    };
     ResolvedEntityState: {
       /** @description PCD database ID */
       databaseId: number;
@@ -3779,6 +3878,18 @@ export interface components {
        *     unambiguous while this is true.
        */
       hasPendingConflict: boolean;
+      /**
+       * @description Exact per-field lineage. Present only when `includeLineage=true` and
+       *     `layer=resolved`; null/absent otherwise.
+       */
+      lineage?: components['schemas']['FieldLineage'][] | null;
+      /**
+       * @description Entity-level lineage rollup. `ambiguous` when a pending value-guard
+       *     conflict withholds all field claims; `unavailable` when the entity is
+       *     absent. Present only alongside `lineage`.
+       * @enum {string|null}
+       */
+      lineageStatus?: 'available' | 'ambiguous' | 'unavailable' | null;
     };
     ResolvedEntityListResponse: {
       /** @description PCD database ID */
@@ -6739,6 +6850,13 @@ export interface operations {
          *     types and for lidarrMetadataProfile.
          */
         arrType?: 'radarr' | 'sonarr' | 'lidarr';
+        /**
+         * @description When `true` and `layer=resolved`, attaches exact per-field lineage
+         *     (`lineage` + `lineageStatus`) identifying the source layer and
+         *     establishing op for each resolved value. Ignored for
+         *     `layer=base`/`layer=user`. Defaults to `false`.
+         */
+        includeLineage?: boolean;
       };
       header?: never;
       path: {

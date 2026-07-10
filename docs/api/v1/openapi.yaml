@@ -680,6 +680,10 @@ paths:
     $ref: './paths/goals.yaml#/preview'
   /goals/apply:
     $ref: './paths/goals.yaml#/apply'
+  /goals/apply/status:
+    $ref: './paths/goals.yaml#/applyStatus'
+  /goals/reconcile:
+    $ref: './paths/goals.yaml#/reconcile'
   /goals/binding:
     $ref: './paths/goals.yaml#/binding'
   /canary/rollouts:
@@ -1004,6 +1008,16 @@ components:
       $ref: './schemas/goals.yaml#/GoalApplyResponse'
     GoalBindingResponse:
       $ref: './schemas/goals.yaml#/GoalBindingResponse'
+    GoalRecoveryAction:
+      $ref: './schemas/goals.yaml#/GoalRecoveryAction'
+    GoalApplyStatus:
+      $ref: './schemas/goals.yaml#/GoalApplyStatus'
+    GoalApplyFailure:
+      $ref: './schemas/goals.yaml#/GoalApplyFailure'
+    GoalReconcileRequest:
+      $ref: './schemas/goals.yaml#/GoalReconcileRequest'
+    GoalReconcileResponse:
+      $ref: './schemas/goals.yaml#/GoalReconcileResponse'
     TrashGuideEntityType:
       type: string
       enum:
