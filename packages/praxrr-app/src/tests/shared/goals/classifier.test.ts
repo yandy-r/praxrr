@@ -89,6 +89,48 @@ Deno.test('classifier: lidarr drops video-only categories to uncategorized', () 
   assertEquals(classifyCustomFormat(cf('TrueHD', ['Audio']), 'lidarr').category, 'audio_lossless');
 });
 
+Deno.test('classifier: lidarr audio codecs classify to audio tiers (grounded in the real Lidarr CFs, #222)', () => {
+  // The 3 real Lidarr CFs (packages/praxrr-db/entities/custom-formats/lidarr-{flac,aac,opus}).
+  const flac = classifyCustomFormat(cf('Lidarr - FLAC (Praxrr)', ['Audio']), 'lidarr');
+  assertEquals(flac.category, 'audio_lossless');
+  assertEquals(flac.ruleId, 'rule.audio.lidarr.lossless');
+  assertEquals(classifyCustomFormat(cf('Lidarr - AAC (Praxrr)', ['Audio']), 'lidarr').category, 'audio_advanced');
+  assertEquals(classifyCustomFormat(cf('Lidarr - Opus (Praxrr)', ['Audio']), 'lidarr').category, 'audio_advanced');
+  // An audio-tagged CF matching no audio token still lands in the gate-only baseline tier.
+  assertEquals(classifyCustomFormat(cf('WMA', ['Audio']), 'lidarr').category, 'audio_baseline');
+});
+
+Deno.test('classifier: lidarr excludes video-only categories with the distinct excluded ruleId (AC4)', () => {
+  const excluded = [
+    cf('Dolby Vision', ['Colour Grade', 'HDR']), // hdr
+    cf('2160p Remux', ['Source']), // remux
+    cf('1080p Bluray', ['Source']), // resolution
+    cf('IMAX', ['Edition']), // movie_version (newly excluded)
+    cf('AMZN', ['Streaming Service', 'WEB-DL']), // streaming_service (newly excluded)
+    cf('Remux Tier 1', ['Release Group Tier', 'Remux']), // release_group_tier (newly excluded)
+  ];
+  for (const facts of excluded) {
+    const result = classifyCustomFormat(facts, 'lidarr');
+    assertEquals(result.category, null, `"${facts.name}" should be excluded for lidarr`);
+    assertEquals(result.ruleId, 'rule.excluded.video-only', `"${facts.name}" should carry the excluded ruleId`);
+  }
+});
+
+Deno.test('classifier: arrScope keeps radarr/sonarr classification unchanged (AC5)', () => {
+  for (const arr of ['radarr', 'sonarr'] as const) {
+    // CFs excluded for lidarr still classify to their video categories for radarr/sonarr.
+    assertEquals(classifyCustomFormat(cf('Dolby Vision', ['Colour Grade', 'HDR']), arr).category, 'hdr_dv');
+    assertEquals(classifyCustomFormat(cf('IMAX', ['Edition']), arr).category, 'movie_version');
+    assertEquals(classifyCustomFormat(cf('AMZN', ['Streaming Service', 'WEB-DL']), arr).category, 'streaming_service');
+    assertEquals(
+      classifyCustomFormat(cf('Remux Tier 1', ['Release Group Tier', 'Remux']), arr).category,
+      'release_group_tier_1'
+    );
+    // The lidarr-only audio rules never fire for radarr/sonarr — a FLAC-named CF matches the SHARED rule.
+    assertEquals(classifyCustomFormat(cf('Lidarr - FLAC (Praxrr)', ['Audio']), arr).ruleId, 'rule.audio.lossless');
+  }
+});
+
 Deno.test('classifier: real descriptions do NOT leak into classification (name/tags only)', () => {
   // Real default-DB descriptions mention OTHER formats via negations/comparisons — substring-matching
   // them would invert intent. Each entry uses a REAL praxrr-db CF's name + tags + description.

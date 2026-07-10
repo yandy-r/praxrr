@@ -16,13 +16,23 @@
 
 import type { CfFacts, GoalArrType, GoalCategory } from './types.ts';
 
-/** Categories dropped to uncategorized for audio-only Arr apps (lidarr). Forward seam. */
+/**
+ * Categories dropped to uncategorized for audio-only Arr apps (lidarr, #222). Every member is a
+ * video-domain concept with no proven audio parity: HDR tiers, remux, resolution, editions
+ * (`movie_version`), and — pending proven music vocabulary — streaming services and release-group
+ * tiers (whose tier group lists are video-derived).
+ */
 const LIDARR_EXCLUDED_CATEGORIES: ReadonlySet<GoalCategory> = new Set([
   'hdr_dv',
   'hdr_hdr10plus',
   'hdr_baseline',
   'remux',
   'resolution',
+  'movie_version',
+  'streaming_service',
+  'release_group_tier_1',
+  'release_group_tier_2',
+  'release_group_tier_3',
 ]);
 
 interface ClassifierRule {
@@ -35,6 +45,8 @@ interface ClassifierRule {
   matchName: string[];
   /** When set, the rule only fires if this lowercased tag is present (AND gate). */
   gateTag?: string;
+  /** When set, the rule only fires for this `arrType` (keeps radarr/sonarr rule evaluation identical). */
+  arrScope?: GoalArrType;
   /** Special resolver for release-group tiers. */
   dynamic?: 'release_group_tier';
 }
@@ -71,6 +83,25 @@ export const CATEGORY_RULES: readonly ClassifierRule[] = [
     matchName: ['tier'],
   },
   { ruleId: 'rule.remux', category: 'remux', matchTags: [], matchName: ['remux'] },
+  // Lidarr-only audio matchers (#222), grounded in QUALITIES.lidarr + the real Lidarr CFs (FLAC/AAC/
+  // Opus). They run before the shared audio rules so Lidarr classification uses audio-domain tokens;
+  // `arrScope: 'lidarr'` keeps radarr/sonarr rule evaluation byte-identical.
+  {
+    ruleId: 'rule.audio.lidarr.lossless',
+    category: 'audio_lossless',
+    arrScope: 'lidarr',
+    gateTag: 'audio',
+    matchTags: [],
+    matchName: ['flac', 'alac', 'wav', 'ape', 'wavpack'],
+  },
+  {
+    ruleId: 'rule.audio.lidarr.advanced',
+    category: 'audio_advanced',
+    arrScope: 'lidarr',
+    gateTag: 'audio',
+    matchTags: [],
+    matchName: ['aac', 'opus', 'ogg', 'vorbis', 'mp3-320', 'mp3 320', 'vbr v0'],
+  },
   {
     ruleId: 'rule.audio.lossless',
     category: 'audio_lossless',
@@ -103,6 +134,13 @@ export const CATEGORY_RULES: readonly ClassifierRule[] = [
 ] as const;
 
 export const FALLBACK_RULE_ID = 'rule.fallback.no-match';
+
+/**
+ * Distinguishes a CF dropped by the Lidarr video-only exclusion filter (#222) from one that simply
+ * matched no rule. The engine maps this ruleId to the user-facing `excluded.video-only-on-lidarr`
+ * reason so the UI can explain the skip instead of showing it as a coverage gap.
+ */
+export const EXCLUDED_RULE_ID = 'rule.excluded.video-only';
 
 /** Resolution ordinal: 0 = SD/DVD, 1 = 720p, 2 = 1080p, 3 = 2160p/4K/UHD. `undefined` if none. */
 export type ResolutionLevel = 0 | 1 | 2 | 3;
@@ -151,7 +189,7 @@ export function detectResolutionLevel(facts: CfFacts): ResolutionLevel | undefin
  * Classify one custom format. Pure and deterministic: first matching rule wins. For `arrType`
  * 'lidarr', video-only categories are dropped to uncategorized (forward seam).
  */
-export function classifyCustomFormat(facts: CfFacts, arrType: GoalArrType | 'lidarr'): CfClassification {
+export function classifyCustomFormat(facts: CfFacts, arrType: GoalArrType): CfClassification {
   const tags = new Set(facts.tags.map(lower));
   // Match name tokens against the NAME only — descriptions routinely mention OTHER formats via
   // negations/comparisons (e.g. "...that are NOT remuxes", "...without Dolby Vision"), so substring
@@ -159,10 +197,13 @@ export function classifyCustomFormat(facts: CfFacts, arrType: GoalArrType | 'lid
   const haystack = lower(facts.name);
 
   for (const rule of CATEGORY_RULES) {
+    // arrScope-gated rules (e.g. the Lidarr audio matchers) only fire for their arrType, so the
+    // radarr/sonarr rule set is untouched.
+    if (rule.arrScope && rule.arrScope !== arrType) continue;
     if (!ruleMatches(rule, tags, haystack)) continue;
     const category = rule.dynamic === 'release_group_tier' ? resolveReleaseGroupTier(lower(facts.name)) : rule.category;
     if (category && arrType === 'lidarr' && LIDARR_EXCLUDED_CATEGORIES.has(category)) {
-      return { category: null, ruleId: FALLBACK_RULE_ID };
+      return { category: null, ruleId: EXCLUDED_RULE_ID };
     }
     return { category, ruleId: rule.ruleId };
   }

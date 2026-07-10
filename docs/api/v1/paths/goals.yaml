@@ -5,8 +5,20 @@ presets:
     description: |
       Returns the built-in goal presets, the slider-axis metadata, and the engine version. The editor
       renders sliders and can run the pure engine client-side from this payload with nothing hardcoded.
+      `arrType=lidarr` scopes the response to the audio presets and hides the video-only
+      `hdrPreference`/`resolutionCeiling` axes; omitting it (or radarr/sonarr) returns the video presets.
     tags:
       - Quality Goals
+    parameters:
+      - name: arrType
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+            - radarr
+            - sonarr
+            - lidarr
     responses:
       '200':
         description: Presets and axes
@@ -123,6 +135,7 @@ binding:
           enum:
             - radarr
             - sonarr
+            - lidarr
     responses:
       '200':
         description: The binding, or null

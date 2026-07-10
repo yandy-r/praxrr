@@ -19,7 +19,7 @@ export interface QualityGoalBindingRow {
 export interface UpsertQualityGoalBindingInput {
   databaseId: number;
   profileName: string;
-  arrType: 'radarr' | 'sonarr';
+  arrType: 'radarr' | 'sonarr' | 'lidarr';
   presetId: string;
   weightsJson: string;
   engineVersion: string;
@@ -78,5 +78,5 @@ export const qualityGoalBindingQueries = {
         arrType
       ) > 0
     );
-  }
+  },
 };
