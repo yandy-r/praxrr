@@ -1,5 +1,6 @@
 import { arrInstancesQueries } from '$db/queries/arrInstances.ts';
 import { databaseInstancesQueries } from '$db/queries/databaseInstances.ts';
+import { trashGuideSourcesQueries } from '$db/queries/trashGuideSources.ts';
 import type { JobType } from './queueTypes.ts';
 
 export type JobNameLookups = {
@@ -45,6 +46,8 @@ export function formatJobTypeLabel(jobType: JobType): string {
       return 'Config Health Snapshot';
     case 'config-health.cleanup':
       return 'Config Health Cleanup';
+    case 'trashguide.sync':
+      return 'TRaSH Sync';
     default:
       return rawJobType
         .replace(/\./g, ' ')
@@ -113,6 +116,19 @@ export function buildJobDisplayName(
         `${databaseId}`;
       return `${base} - ${name}`;
     }
+  }
+
+  if (jobType === 'trashguide.sync') {
+    const sourceId = readId(payload.sourceId);
+    if (sourceId === null) {
+      return base;
+    }
+
+    // Resolve identity live first, then fall back to the durable payload snapshot (#238) so a
+    // since-deleted source still shows a name rather than a bare id.
+    const snapshotName = typeof payload.sourceName === 'string' && payload.sourceName !== '' ? payload.sourceName : null;
+    const name = trashGuideSourcesQueries.getById(sourceId)?.name ?? snapshotName ?? `#${sourceId}`;
+    return `${base} - ${name}`;
   }
 
   const isArrSync = jobType === 'arr.sync' || jobType.startsWith('arr.sync.');

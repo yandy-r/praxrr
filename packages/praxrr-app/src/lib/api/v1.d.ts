@@ -3159,6 +3159,89 @@ export interface components {
       applyStatus: components['schemas']['GoalApplyStatus'];
     };
     /** @enum {string} */
+    TrashGuideSyncFailureCode:
+      | 'source_missing'
+      | 'source_disabled'
+      | 'network'
+      | 'parser_failed'
+      | 'sync_failed'
+      | 'internal';
+    TrashGuideSyncFailureReason: {
+      code: components['schemas']['TrashGuideSyncFailureCode'];
+      message: string;
+      recoveryAction: string;
+    };
+    TrashGuideSyncCounts: {
+      commitsBehind: number;
+      parsedFiles: number;
+      failedFiles: number;
+      activeOperations: number;
+      removedEntities: number;
+      renamedEntities: number;
+    };
+    TrashGuideSyncRunEvidence: {
+      /** @enum {number} */
+      schemaVersion: 1;
+      runToken: string | null;
+      source: {
+        id: number;
+        name: string | null;
+        /** @enum {string|null} */
+        arrType: 'radarr' | 'sonarr' | null;
+      };
+      /** @enum {string} */
+      trigger: 'manual' | 'scheduled';
+      requestedAt: string | null;
+      /** @enum {string} */
+      status: 'success' | 'failure' | 'skipped' | 'cancelled';
+      counts: components['schemas']['TrashGuideSyncCounts'] | null;
+      failure: components['schemas']['TrashGuideSyncFailureReason'] | null;
+      retry: {
+        rescheduleAt: string | null;
+        retryable: boolean;
+      };
+    };
+    TrashGuideSyncStatusView: {
+      sourceId: number;
+      sourceName: string | null;
+      /** @enum {string|null} */
+      arrType: 'radarr' | 'sonarr' | null;
+      queueId: number | null;
+      current: {
+        status: string;
+        runAt: string;
+        startedAt: string | null;
+        attempts: number;
+        runToken: string | null;
+      } | null;
+      latestRun: {
+        id: number;
+        /** @enum {string} */
+        status: 'success' | 'failure' | 'skipped' | 'cancelled';
+        startedAt: string;
+        finishedAt: string;
+        durationMs: number;
+        evidence: components['schemas']['TrashGuideSyncRunEvidence'] | null;
+      } | null;
+    };
+    TrashGuideSyncQueuedResponse: {
+      /** @enum {boolean} */
+      success: true;
+      /** @enum {boolean} */
+      queued: true;
+      runToken: string;
+      statusUrl: string;
+      view: components['schemas']['TrashGuideSyncStatusView'];
+    };
+    TrashGuideSyncDedupeResponse: {
+      error: string;
+      /** @enum {boolean} */
+      deduped: true;
+      runToken: string;
+      statusUrl: string;
+      view: components['schemas']['TrashGuideSyncStatusView'];
+    };
+    /** @enum {string} */
     TrashGuideEntityType: 'custom_format' | 'custom_format_group' | 'quality_profile' | 'quality_size' | 'naming';
     TrashGuideEntityDetailResponse: {
       source: {

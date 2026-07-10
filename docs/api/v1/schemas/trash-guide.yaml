@@ -1,0 +1,266 @@
+# TRaSH Guide manual-sync correlation schemas (issue #238).
+# Kept in lockstep with the server types in
+# packages/praxrr-app/src/lib/server/jobs/queueTypes.ts and the safe copy in
+# packages/praxrr-app/src/lib/server/jobs/trashguide/syncFailure.ts.
+
+TrashGuideSyncFailureCode:
+  type: string
+  description: 'Closed, safe vocabulary of TRaSH sync failure reasons. Assigned by outcome/error type only — never by message parsing — so no raw diagnostic can leak.'
+  enum:
+    - source_missing
+    - source_disabled
+    - network
+    - parser_failed
+    - sync_failed
+    - internal
+
+TrashGuideSyncFailureReason:
+  type: object
+  description: 'Typed, closed, SAFE failure evidence. message/recoveryAction are pre-authored copy that never embeds raw exception text, git/parser diagnostics, credentials, or hostnames.'
+  required:
+    - code
+    - message
+    - recoveryAction
+  properties:
+    code:
+      $ref: '#/TrashGuideSyncFailureCode'
+    message:
+      type: string
+    recoveryAction:
+      type: string
+
+TrashGuideSyncCounts:
+  type: object
+  description: 'Fetched/applied counts for a TRaSH sync run.'
+  required:
+    - commitsBehind
+    - parsedFiles
+    - failedFiles
+    - activeOperations
+    - removedEntities
+    - renamedEntities
+  properties:
+    commitsBehind:
+      type: integer
+    parsedFiles:
+      type: integer
+    failedFiles:
+      type: integer
+    activeOperations:
+      type: integer
+    removedEntities:
+      type: integer
+    renamedEntities:
+      type: integer
+
+TrashGuideSyncRunEvidence:
+  type: object
+  description: 'Versioned, structured terminal evidence for one TRaSH sync run, serialized into job_run_history.output. Survives a source hard-delete via its embedded identity snapshot.'
+  required:
+    - schemaVersion
+    - runToken
+    - source
+    - trigger
+    - requestedAt
+    - status
+    - counts
+    - failure
+    - retry
+  properties:
+    schemaVersion:
+      type: integer
+      enum:
+        - 1
+    runToken:
+      oneOf:
+        - type: string
+        - type: 'null'
+    source:
+      type: object
+      required:
+        - id
+        - name
+        - arrType
+      properties:
+        id:
+          type: integer
+        name:
+          oneOf:
+            - type: string
+            - type: 'null'
+        arrType:
+          oneOf:
+            - type: string
+              enum:
+                - radarr
+                - sonarr
+            - type: 'null'
+    trigger:
+      type: string
+      enum:
+        - manual
+        - scheduled
+    requestedAt:
+      oneOf:
+        - type: string
+        - type: 'null'
+    status:
+      type: string
+      enum:
+        - success
+        - failure
+        - skipped
+        - cancelled
+    counts:
+      oneOf:
+        - $ref: '#/TrashGuideSyncCounts'
+        - type: 'null'
+    failure:
+      oneOf:
+        - $ref: '#/TrashGuideSyncFailureReason'
+        - type: 'null'
+    retry:
+      type: object
+      required:
+        - rescheduleAt
+        - retryable
+      properties:
+        rescheduleAt:
+          oneOf:
+            - type: string
+            - type: 'null'
+        retryable:
+          type: boolean
+
+TrashGuideSyncStatusView:
+  type: object
+  description: "Single wire view of a source's current queue slot + latest terminal run, reused by the POST response and the GET status resolver."
+  required:
+    - sourceId
+    - sourceName
+    - arrType
+    - queueId
+    - current
+    - latestRun
+  properties:
+    sourceId:
+      type: integer
+    sourceName:
+      oneOf:
+        - type: string
+        - type: 'null'
+    arrType:
+      oneOf:
+        - type: string
+          enum:
+            - radarr
+            - sonarr
+        - type: 'null'
+    queueId:
+      oneOf:
+        - type: integer
+        - type: 'null'
+    current:
+      oneOf:
+        - type: object
+          required:
+            - status
+            - runAt
+            - startedAt
+            - attempts
+            - runToken
+          properties:
+            status:
+              type: string
+            runAt:
+              type: string
+            startedAt:
+              oneOf:
+                - type: string
+                - type: 'null'
+            attempts:
+              type: integer
+            runToken:
+              oneOf:
+                - type: string
+                - type: 'null'
+        - type: 'null'
+    latestRun:
+      oneOf:
+        - type: object
+          required:
+            - id
+            - status
+            - startedAt
+            - finishedAt
+            - durationMs
+            - evidence
+          properties:
+            id:
+              type: integer
+            status:
+              type: string
+              enum:
+                - success
+                - failure
+                - skipped
+                - cancelled
+            startedAt:
+              type: string
+            finishedAt:
+              type: string
+            durationMs:
+              type: integer
+            evidence:
+              oneOf:
+                - $ref: '#/TrashGuideSyncRunEvidence'
+                - type: 'null'
+        - type: 'null'
+
+TrashGuideSyncQueuedResponse:
+  type: object
+  description: 'Manual-sync enqueue acknowledgement, linking to exactly one current-or-terminal run.'
+  required:
+    - success
+    - queued
+    - runToken
+    - statusUrl
+    - view
+  properties:
+    success:
+      type: boolean
+      enum:
+        - true
+    queued:
+      type: boolean
+      enum:
+        - true
+    runToken:
+      type: string
+    statusUrl:
+      type: string
+    view:
+      $ref: '#/TrashGuideSyncStatusView'
+
+TrashGuideSyncDedupeResponse:
+  type: object
+  description: 'Already-running dedupe response — links to the existing in-flight run rather than acking a new one.'
+  required:
+    - error
+    - deduped
+    - runToken
+    - statusUrl
+    - view
+  properties:
+    error:
+      type: string
+    deduped:
+      type: boolean
+      enum:
+        - true
+    runToken:
+      type: string
+    statusUrl:
+      type: string
+    view:
+      $ref: '#/TrashGuideSyncStatusView'

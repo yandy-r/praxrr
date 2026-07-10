@@ -63,6 +63,20 @@ export function parseTrashGuideSourceArrType(value: string): TrashGuideSourceArr
   throw new Error(`Invalid TRaSH source arr type: ${value}`);
 }
 
+/**
+ * Coerce an unknown value to a supported TRaSH Arr type without throwing.
+ *
+ * Used where a durable snapshot may carry a missing/legacy arr type (for example an in-flight
+ * job payload created before source-identity snapshotting). Returns `null` for anything that is
+ * not exactly `radarr`/`sonarr` — never a guessed sibling — so cross-Arr semantics stay explicit.
+ *
+ * @param value - Raw arr type value from an untyped snapshot.
+ * @returns The supported Arr type, or `null` when it cannot be resolved.
+ */
+export function coerceTrashGuideSourceArrType(value: unknown): TrashGuideSupportedArrType | null {
+  return typeof value === 'string' && isTrashGuideSupportedArrType(value) ? value : null;
+}
+
 export const TRASHGUIDE_SYNC_TRIGGERS = ['none', 'manual', 'on_pull', 'on_change', 'schedule'] as const;
 export type TrashGuideSyncTrigger = (typeof TRASHGUIDE_SYNC_TRIGGERS)[number];
 
