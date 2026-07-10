@@ -21,14 +21,14 @@ The durable availability contract, exact-target checks, safe failure mapping, UI
 ### HIGH
 
 - **[F001]** `packages/praxrr-app/src/lib/server/db/queries/canaryRollouts.ts:383` — Available evidence is validated against target identity and its own internally consistent section payloads, but never against the rollout's persisted explicit `sections`. Corrupt evidence can omit a requested section while remaining internally valid, so `proceedRollout` can authorize a rollout whose durable plan does not cover the requested scope.
-  - **Status**: Open
+  - **Status**: Fixed
   - **Category**: Correctness
   - **Suggested fix**: Include persisted `sections` in the evidence context, strictly decode it, and require every available preview to match the explicit requested section sequence before returning `available`; also reject mismatched generated previews in the coordinator and add query/coordinator promotion tests. Preserve per-instance configured-section variance when the persisted value is null.
 
 ### MEDIUM
 
 - **[F002]** `packages/praxrr-app/src/routes/canary/[id]/+page.svelte:469` — The changed native Proceed and Abort controls still use legacy `on:click` directives despite the project rule requiring Svelte 5 `onclick` handlers.
-  - **Status**: Open
+  - **Status**: Fixed
   - **Category**: Pattern Compliance
   - **Suggested fix**: Convert the two native button handlers to `onclick` and extend the focused UI source-contract test so the gate controls cannot regress to legacy event directives.
 
@@ -36,12 +36,12 @@ The durable availability contract, exact-target checks, safe failure mapping, UI
 
 ## Validation Results
 
-| Check | Result |
-| --- | --- |
-| Type check | Pass — `deno task check` (0 errors, 0 warnings) |
-| Lint | Pass for changed files; project-wide `tsc` substep reproduces unchanged `settings/about/+page.server.ts:56` baseline failure on clean main |
-| Tests | Pass — 2,208 passed, 0 failed; focused Canary suites 65 passed |
-| Build | Pass — `deno task build` |
+| Check      | Result                                                                                                                                     |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| Type check | Pass — `deno task check` (0 errors, 0 warnings)                                                                                            |
+| Lint       | Pass for changed files; project-wide `tsc` substep reproduces unchanged `settings/about/+page.server.ts:56` baseline failure on clean main |
+| Tests      | Pass — 2,208 passed, 0 failed; focused Canary suites 65 passed                                                                             |
+| Build      | Pass — `deno task build`                                                                                                                   |
 
 ## Files Reviewed
 

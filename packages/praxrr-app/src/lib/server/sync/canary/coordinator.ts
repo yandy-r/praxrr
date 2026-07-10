@@ -24,6 +24,7 @@ import type { JobRunStatus } from '$jobs/queueTypes.ts';
 import { logger } from '$logger/logger.ts';
 import { sanitizeLogMeta } from '$logger/sanitizer.ts';
 import { buildPreviewFailure, classifyPreviewFailure } from '$sync/preview/failureReason.ts';
+import type { GeneratePreviewResult } from '$sync/preview/orchestrator.ts';
 import { generateInstancePreviews } from '$sync/processor.ts';
 import type { SectionType } from '$sync/types.ts';
 import {
@@ -118,6 +119,15 @@ function abortReason(result: SyncRunResult, canaryStatus: CanaryOutcomeStatus): 
     : 'Canary sync did not pass; rollout aborted.';
 }
 
+function hasExactSections(preview: GeneratePreviewResult, sections: readonly SectionType[] | null): boolean {
+  return (
+    sections === null ||
+    sections.length === 0 ||
+    (preview.sections.length === sections.length &&
+      preview.sections.every((section, index) => section === sections[index]))
+  );
+}
+
 /**
  * Build durable evidence for the exact persisted remaining cohort. Any missing,
  * disabled, renamed, wrong-Arr, duplicate, extra, or section-failed preview makes the
@@ -167,7 +177,8 @@ export async function buildRemainingPreviewEvidence(
           !target ||
           previewIds.has(preview.instanceId) ||
           preview.instanceName !== target.instanceName ||
-          preview.arrType !== arrType
+          preview.arrType !== arrType ||
+          !hasExactSections(preview, sections)
         ) {
           return false;
         }
@@ -309,6 +320,7 @@ function hasExactAvailableEvidence(rollout: CanaryRolloutDetail): boolean {
         ids.has(preview.instanceId) ||
         preview.instanceName !== target.instanceName ||
         preview.arrType !== rollout.arrType ||
+        !hasExactSections(preview, rollout.sections) ||
         preview.sectionOutcomes.some((outcome) => outcome.failure !== null)
       ) {
         return false;

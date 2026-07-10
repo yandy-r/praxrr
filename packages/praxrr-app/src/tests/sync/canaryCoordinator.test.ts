@@ -25,6 +25,7 @@ import type {
 import { buildPreviewFailure } from '$sync/preview/failureReason.ts';
 import type { GeneratePreviewResult } from '$sync/preview/orchestrator.ts';
 import type { SyncHistoryInput } from '$sync/syncHistory/types.ts';
+import type { SectionType } from '$sync/types.ts';
 
 // Side-effect import registers the arr.sync section handlers that executeSyncJob
 // (invoked inline by the coordinator's canary run) resolves through.
@@ -220,7 +221,8 @@ function targetFor(instanceId: number): CanaryTarget {
 function zeroChangePreview(
   target: CanaryTarget,
   arrType: 'radarr' | 'sonarr' | 'lidarr' = 'radarr',
-  sectionFailure = false
+  sectionFailure = false,
+  sections: SectionType[] = ['qualityProfiles']
 ): GeneratePreviewResult {
   const failure = sectionFailure ? buildPreviewFailure('unauthorized', arrType) : null;
   return {
@@ -229,11 +231,17 @@ function zeroChangePreview(
     arrType,
     status: 'ready',
     createdAtMs: 1_783_510_400_000,
-    sections: ['qualityProfiles'],
-    sectionOutcomes: [{ section: 'qualityProfiles', failure, skipped: false }],
-    qualityProfiles: failure ? null : { section: 'qualityProfiles', customFormats: [], qualityProfiles: [] },
+    sections,
+    sectionOutcomes: sections.map((section) => ({ section, failure, skipped: false })),
+    qualityProfiles:
+      failure || !sections.includes('qualityProfiles')
+        ? null
+        : { section: 'qualityProfiles', customFormats: [], qualityProfiles: [] },
     delayProfiles: null,
-    mediaManagement: null,
+    mediaManagement:
+      failure || !sections.includes('mediaManagement')
+        ? null
+        : { section: 'mediaManagement', naming: null, qualityDefinitions: [], mediaSettings: null },
     metadataProfiles: null,
     summary: {
       totalCreates: 0,
@@ -599,6 +607,31 @@ migratedTest('evidence builder distinguishes complete zero-change from partial s
   }
 });
 
+migratedTest('evidence builder binds explicit section order but preserves configured-section variance', async () => {
+  const targets = [targetFor(seedInstance('radarr')), targetFor(seedInstance('radarr'))];
+
+  const mismatched = await buildRemainingPreviewEvidence(
+    'radarr',
+    [targets[0]],
+    ['qualityProfiles', 'mediaManagement'],
+    () => Promise.resolve([zeroChangePreview(targets[0], 'radarr', false, ['mediaManagement', 'qualityProfiles'])])
+  );
+  assertEquals(mismatched.availability, 'unavailable');
+
+  const configured = await buildRemainingPreviewEvidence('radarr', targets, null, () =>
+    Promise.resolve([
+      zeroChangePreview(targets[0], 'radarr', false, ['qualityProfiles']),
+      zeroChangePreview(targets[1], 'radarr', false, ['mediaManagement']),
+    ])
+  );
+  assertEquals(configured.availability, 'available');
+
+  const emptyMeansConfigured = await buildRemainingPreviewEvidence('radarr', [targets[0]], [], () =>
+    Promise.resolve([zeroChangePreview(targets[0])])
+  );
+  assertEquals(emptyMeansConfigured.availability, 'available');
+});
+
 migratedTest('evidence builder classifies unreachable/unauthorized safely and sanitizes logger metadata', async () => {
   const remainingId = seedInstance('radarr');
   const target = targetFor(remainingId);
@@ -661,6 +694,17 @@ migratedTest('proceed requires available exact evidence; unavailable/null/corrup
   const corrupt = insertGate(availableEvidence(target));
   db.execute("UPDATE canary_rollouts SET remaining_preview_evidence = '{bad' WHERE id = ?", corrupt.id);
   assertThrows(() => proceedRollout(corrupt.id, corrupt.token), CanaryPreviewUnavailableError);
+
+  const missingRequestedSection = insertGate(availableEvidence(target));
+  db.execute(
+    'UPDATE canary_rollouts SET sections = ? WHERE id = ?',
+    JSON.stringify(['qualityProfiles', 'mediaManagement']),
+    missingRequestedSection.id
+  );
+  assertThrows(
+    () => proceedRollout(missingRequestedSection.id, missingRequestedSection.token),
+    CanaryPreviewUnavailableError
+  );
   assertEquals(queuedCanaryJobs(), 0);
 });
 

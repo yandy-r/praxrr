@@ -13,6 +13,7 @@ import type {
 } from '$sync/canary/types.ts';
 import { buildPreviewFailure } from '$sync/preview/failureReason.ts';
 import type { GeneratePreviewResult } from '$sync/preview/orchestrator.ts';
+import type { SectionType } from '$sync/types.ts';
 
 /**
  * Point the db singleton at a scratch SQLite file under a fresh temp base path,
@@ -77,21 +78,29 @@ function zeroChangePreview(
   options: {
     arrType?: 'radarr' | 'sonarr' | 'lidarr';
     sectionFailure?: boolean;
+    sections?: SectionType[];
   } = {}
 ): GeneratePreviewResult {
   const arrType = options.arrType ?? 'radarr';
   const failure = options.sectionFailure ? buildPreviewFailure('unauthorized', arrType) : null;
+  const sections = options.sections ?? ['qualityProfiles', 'mediaManagement'];
   return {
     instanceId: target.instanceId,
     instanceName: target.instanceName,
     arrType,
     status: 'ready',
     createdAtMs: 1_783_510_400_000,
-    sections: ['qualityProfiles'],
-    sectionOutcomes: [{ section: 'qualityProfiles', failure, skipped: false }],
-    qualityProfiles: failure ? null : { section: 'qualityProfiles', customFormats: [], qualityProfiles: [] },
+    sections,
+    sectionOutcomes: sections.map((section) => ({ section, failure, skipped: false })),
+    qualityProfiles:
+      failure || !sections.includes('qualityProfiles')
+        ? null
+        : { section: 'qualityProfiles', customFormats: [], qualityProfiles: [] },
     delayProfiles: null,
-    mediaManagement: null,
+    mediaManagement:
+      failure || !sections.includes('mediaManagement')
+        ? null
+        : { section: 'mediaManagement', naming: null, qualityDefinitions: [], mediaSettings: null },
     metadataProfiles: null,
     summary: {
       totalCreates: 0,
@@ -232,6 +241,79 @@ migratedTest('recordCanaryOutcome atomically round-trips available zero-change e
   if (detail.remainingPreview.availability === 'available') {
     assertEquals(detail.remainingPreview.previews[0].summary.totalCreates, 0);
   }
+});
+
+migratedTest('available evidence must match the persisted explicit section sequence', () => {
+  const target = { instanceId: 11, instanceName: 'Radarr B' };
+  const id = insertRollout({ remainingTargets: [target] });
+  const omittedSection: CanaryRemainingPreviewEvidence = {
+    version: 1,
+    availability: 'available',
+    generatedAt: '2026-07-08T10:01:00.000Z',
+    previews: [zeroChangePreview(target, { sections: ['qualityProfiles'] })],
+  };
+
+  moveToGate(id, 'tok-gate', omittedSection);
+
+  assertUnavailable(canaryRolloutQueries.getById(id));
+  const stored = db.queryFirst<{ evidence: string }>(
+    'SELECT remaining_preview_evidence AS evidence FROM canary_rollouts WHERE id = ?',
+    id
+  );
+  assertExists(stored);
+  assertEquals(JSON.parse(stored.evidence).availability, 'unavailable');
+});
+
+migratedTest('null persisted sections preserve per-instance configured-section variance', () => {
+  const targets = [
+    { instanceId: 11, instanceName: 'Radarr B' },
+    { instanceId: 12, instanceName: 'Radarr C' },
+  ];
+  const evidence: CanaryRemainingPreviewEvidence = {
+    version: 1,
+    availability: 'available',
+    generatedAt: '2026-07-08T10:01:00.000Z',
+    previews: [
+      zeroChangePreview(targets[0], { sections: ['qualityProfiles'] }),
+      zeroChangePreview(targets[1], { sections: ['mediaManagement'] }),
+    ],
+  };
+  const id = insertRollout({ sections: null, remainingTargets: targets });
+
+  moveToGate(id, 'tok-gate', evidence);
+
+  const detail = canaryRolloutQueries.getById(id);
+  assertExists(detail);
+  assertEquals(detail.remainingPreview, evidence);
+});
+
+migratedTest('empty persisted sections preserve configured-section preview semantics', () => {
+  const target = { instanceId: 11, instanceName: 'Radarr B' };
+  const evidence: CanaryRemainingPreviewEvidence = {
+    version: 1,
+    availability: 'available',
+    generatedAt: '2026-07-08T10:01:00.000Z',
+    previews: [zeroChangePreview(target, { sections: ['qualityProfiles'] })],
+  };
+  const id = insertRollout({ sections: [], remainingTargets: [target] });
+
+  moveToGate(id, 'tok-gate', evidence);
+
+  const detail = canaryRolloutQueries.getById(id);
+  assertExists(detail);
+  assertEquals(detail.sections, []);
+  assertEquals(detail.remainingPreview, evidence);
+});
+
+migratedTest('malformed persisted sections fail closed for otherwise available evidence', () => {
+  const id = insertRollout();
+  moveToGate(id, 'tok-gate');
+
+  db.execute("UPDATE canary_rollouts SET sections = '{bad' WHERE id = ?", id);
+
+  const detail = canaryRolloutQueries.getById(id);
+  assertUnavailable(detail);
+  assertEquals(detail?.sections, null);
 });
 
 migratedTest('unavailable evidence round-trips partial previews with canonical safe failure copy', () => {

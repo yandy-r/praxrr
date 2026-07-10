@@ -56,10 +56,14 @@ Deno.test('canary verification gate disables Proceed accessibly while unavailabl
 
   assertStringIncludes(proceedButton, 'disabled={submitting || !previewAvailable}');
   assertStringIncludes(proceedButton, "aria-describedby={!previewAvailable ? 'proceed-disabled-reason' : undefined}");
+  assertStringIncludes(proceedButton, 'onclick={() => (proceedOpen = true)}');
+  assert(!proceedButton.includes('on:click'), 'Proceed must use the Svelte 5 onclick handler');
   assertStringIncludes(page, 'id="proceed-disabled-reason"');
   assertStringIncludes(prose, 'Proceed is disabled until a complete remaining-target preview is available.');
 
   assertStringIncludes(abortButton, 'disabled={submitting}');
+  assertStringIncludes(abortButton, 'onclick={() => (abortOpen = true)}');
+  assert(!abortButton.includes('on:click'), 'Abort must use the Svelte 5 onclick handler');
   assert(!abortButton.includes('!previewAvailable'), 'Abort must not depend on preview availability');
   assertMatch(abortButton, /Aborting…[\s\S]*Abort rollout/);
 

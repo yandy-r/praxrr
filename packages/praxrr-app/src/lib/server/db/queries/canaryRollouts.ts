@@ -105,6 +105,11 @@ interface DecodedTargets {
   valid: boolean;
 }
 
+interface DecodedSections {
+  sections: SectionType[] | null;
+  valid: boolean;
+}
+
 interface PreviewDecodeResult {
   previews: GeneratePreviewResult[];
   hasSectionFailures: boolean;
@@ -113,6 +118,7 @@ interface PreviewDecodeResult {
 interface EvidenceContextRow {
   arr_type: string;
   remaining_targets: string;
+  sections: string | null;
   started_at: string;
 }
 
@@ -178,6 +184,28 @@ function decodeRemainingTargets(raw: string, arrType: string): DecodedTargets {
     return { targets, valid: true };
   } catch {
     return { targets: [], valid: false };
+  }
+}
+
+/** Strictly decode the optional explicit section sequence that evidence must cover. */
+function decodeSections(raw: string | null): DecodedSections {
+  if (raw === null) return { sections: null, valid: true };
+
+  try {
+    const value: unknown = JSON.parse(raw);
+    if (!Array.isArray(value)) return { sections: null, valid: false };
+    const sections: SectionType[] = [];
+    const seen = new Set<SectionType>();
+    for (const section of value) {
+      if (!isSectionType(section) || seen.has(section)) {
+        return { sections: null, valid: false };
+      }
+      seen.add(section);
+      sections.push(section);
+    }
+    return { sections, valid: true };
+  } catch {
+    return { sections: null, valid: false };
   }
 }
 
@@ -399,6 +427,21 @@ function hasExactTargets(previews: readonly GeneratePreviewResult[], targets: re
   );
 }
 
+function hasExactSections(
+  previews: readonly GeneratePreviewResult[],
+  requestedSections: readonly SectionType[] | null
+): boolean {
+  return (
+    requestedSections === null ||
+    requestedSections.length === 0 ||
+    previews.every(
+      (preview) =>
+        preview.sections.length === requestedSections.length &&
+        preview.sections.every((section, index) => section === requestedSections[index])
+    )
+  );
+}
+
 function unavailableEvidence(
   arrType: CanaryArrType,
   generatedAt: string,
@@ -418,9 +461,10 @@ function decodeRemainingPreview(
   raw: string | null,
   arrTypeValue: string,
   targets: DecodedTargets,
+  requestedSections: DecodedSections,
   fallbackGeneratedAt: string
 ): CanaryRemainingPreviewEvidence {
-  if (!isSyncPreviewArrType(arrTypeValue) || !targets.valid || raw === null) {
+  if (!isSyncPreviewArrType(arrTypeValue) || !targets.valid || !requestedSections.valid || raw === null) {
     return unavailableEvidence(isSyncPreviewArrType(arrTypeValue) ? arrTypeValue : 'radarr', fallbackGeneratedAt);
   }
   const arrType = arrTypeValue;
@@ -433,7 +477,11 @@ function decodeRemainingPreview(
 
     if (value.availability === 'available') {
       const decoded = decodePreviews(value.previews, arrType, targets.targets);
-      if (!decoded || !hasExactTargets(decoded.previews, targets.targets)) {
+      if (
+        !decoded ||
+        !hasExactTargets(decoded.previews, targets.targets) ||
+        !hasExactSections(decoded.previews, requestedSections.sections)
+      ) {
         return unavailableEvidence(arrType, value.generatedAt);
       }
       if (decoded.hasSectionFailures) {
@@ -498,6 +546,7 @@ function rowToSummary(row: CanaryRolloutRow): CanaryRolloutSummary {
 /** Full detail — decoded blobs and the current `state_token`. */
 function rowToDetail(row: CanaryRolloutRow): CanaryRolloutDetail {
   const remainingTargets = decodeRemainingTargets(row.remaining_targets, row.arr_type);
+  const sections = decodeSections(row.sections);
   return {
     id: row.id,
     arrType: row.arr_type as CanaryArrType,
@@ -506,7 +555,7 @@ function rowToDetail(row: CanaryRolloutRow): CanaryRolloutDetail {
     canaryInstanceName: row.canary_instance_name,
     canaryStatus: (row.canary_status as CanaryOutcomeStatus | null) ?? null,
     canarySyncHistoryId: row.canary_sync_history_id,
-    sections: row.sections ? parseJsonArray<SectionType>(row.sections) : null,
+    sections: sections.sections,
     maxBatchSize: row.max_batch_size,
     partialPolicy: row.partial_policy as CanaryPartialPolicy,
     canaryOutput: row.canary_output,
@@ -516,6 +565,7 @@ function rowToDetail(row: CanaryRolloutRow): CanaryRolloutDetail {
       row.remaining_preview_evidence,
       row.arr_type,
       remainingTargets,
+      sections,
       row.started_at
     ),
     batchCursor: row.batch_cursor,
@@ -576,15 +626,17 @@ export const canaryRolloutQueries = {
    */
   recordCanaryOutcome(id: number, input: RecordCanaryOutcomeInput): boolean {
     const context = db.queryFirst<EvidenceContextRow>(
-      'SELECT arr_type, remaining_targets, started_at FROM canary_rollouts WHERE id = ?',
+      'SELECT arr_type, remaining_targets, sections, started_at FROM canary_rollouts WHERE id = ?',
       id
     );
     if (!context) return false;
     const targets = decodeRemainingTargets(context.remaining_targets, context.arr_type);
+    const sections = decodeSections(context.sections);
     const remainingPreview = decodeRemainingPreview(
       input.remainingPreview === null ? null : JSON.stringify(input.remainingPreview),
       context.arr_type,
       targets,
+      sections,
       context.started_at
     );
     return (
