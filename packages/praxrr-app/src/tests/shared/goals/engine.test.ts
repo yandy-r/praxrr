@@ -163,6 +163,24 @@ Deno.test('engine: lidarr audio golden score map (pins LIDARR_AUDIO_POLICY)', ()
   assertEquals(plan.thresholds, { minimumScore: 0, upgradeUntilScore: 1500, upgradeScoreIncrement: 1 });
 });
 
+Deno.test(
+  'engine: lidarr resolution ceiling is inert — a resolution token in an audio CF name never demotes it (#222)',
+  () => {
+    const plan = computeGoalPlan({
+      arrType: 'lidarr',
+      weights: LIDARR_WEIGHTS,
+      presetBaseUpgrade: 500,
+      customFormats: [cf('FLAC (UHD Pure Audio)', ['Audio'])],
+    });
+    const decision = plan.decisions.find((d) => d.customFormatName === 'FLAC (UHD Pure Audio)')!;
+    // 'uhd' maps to resolution level 3 for video, but the ceiling gate is inert for lidarr: the
+    // audio-lossless score stands and the ceiling relation is null (design §3f/§7).
+    assertEquals(decision.category, 'audio_lossless');
+    assertEquals(decision.score, 950);
+    assertEquals(decision.reason.ceiling, null);
+  }
+);
+
 Deno.test('engine: lidarr excludes video-only CFs with the distinct reason (AC4)', () => {
   const plan = lidarrPlan();
   assertEquals(plan.coverage, { total: 5, scored: 3, uncategorized: 2 });
@@ -175,6 +193,46 @@ Deno.test('engine: scoreCategory fails fast for a lidarr category with no audio-
   // silently borrow the video magnitude.
   assertThrows(() => scoreCategory('hdr_baseline', LIDARR_WEIGHTS, 'lidarr'));
   assertEquals(scoreCategory('hdr_baseline', LIDARR_WEIGHTS, 'radarr').base, 300);
+});
+
+Deno.test('engine: lidarr audio_baseline + repack_proper policy rows are pinned (AC1)', () => {
+  const plan = computeGoalPlan({
+    arrType: 'lidarr',
+    weights: LIDARR_WEIGHTS,
+    presetBaseUpgrade: 500,
+    customFormats: [cf('WMA', ['Audio']), cf('Audio Repack', ['Repack'])],
+  });
+  // audio_baseline: base 100 + quality round(-50*1) + compat round(150*-1) = 100 - 50 - 150 = -100
+  assertEquals(scoreOf(plan, 'WMA'), -100);
+  // repack_proper: base 50, all axis sensitivities 0 -> no contributions
+  assertEquals(scoreOf(plan, 'Audio Repack'), 50);
+});
+
+Deno.test('engine: audio presets carry the expected weight vectors + baseUpgrade (AC1)', () => {
+  assertEquals(resolvePreset('audio-lossless-priority')!.weights, {
+    qualityVsSize: 100,
+    compatibility: 20,
+    hdrPreference: 50,
+    unwantedStrictness: 85,
+    resolutionCeiling: '1080p',
+  });
+  assertEquals(resolvePreset('audio-lossless-priority')!.baseUpgrade, 800);
+  assertEquals(resolvePreset('audio-balanced')!.weights, {
+    qualityVsSize: 50,
+    compatibility: 55,
+    hdrPreference: 50,
+    unwantedStrictness: 80,
+    resolutionCeiling: '1080p',
+  });
+  assertEquals(resolvePreset('audio-balanced')!.baseUpgrade, 500);
+  assertEquals(resolvePreset('audio-space-saver')!.weights, {
+    qualityVsSize: 0,
+    compatibility: 80,
+    hdrPreference: 50,
+    unwantedStrictness: 85,
+    resolutionCeiling: '1080p',
+  });
+  assertEquals(resolvePreset('audio-space-saver')!.baseUpgrade, 200);
 });
 
 Deno.test('engine: radarr and sonarr produce identical scores (video policy is arr-agnostic, AC5)', () => {

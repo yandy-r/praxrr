@@ -91,7 +91,10 @@ export function computeGoalPlan(input: ComputeGoalPlanInput): GoalPlan {
       uncategorized.push({ name: facts.name, suggestedCategory: null, reason });
       continue;
     }
-    decisions.push(decide(input, facts.name, category, ruleId, detectResolutionLevel(facts)));
+    // Resolution ceiling is a video concept; keep it fully inert for Lidarr (§3f/§7) so an audio CF
+    // whose name/tags coincidentally contain a resolution token is never demoted or ceiling-stamped.
+    const level = input.arrType === 'lidarr' ? undefined : detectResolutionLevel(facts);
+    decisions.push(decide(input, facts.name, category, ruleId, level));
   }
 
   decisions.sort(byName);

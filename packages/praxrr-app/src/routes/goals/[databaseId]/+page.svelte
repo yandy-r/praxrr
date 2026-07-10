@@ -46,6 +46,7 @@
   // Sequence guards: only the latest in-flight request may write shared state (out-of-order responses).
   let previewRequestId = 0;
   let bindingRequestId = 0;
+  let presetsRequestId = 0;
 
   $: databaseId = data.currentDatabase.id;
   $: changeCount = preview?.configDiff[0]?.changes.length ?? 0;
@@ -86,9 +87,13 @@
   }
 
   async function loadPresets(): Promise<void> {
+    // Sequence guard: rapid Arr switching can race preset fetches — only the latest may write the catalog.
+    const requestId = ++presetsRequestId;
     const response = await fetch(`/api/v1/goals/presets?arrType=${arrType}`);
+    if (requestId !== presetsRequestId) return;
     if (!response.ok) return;
     const body = (await response.json()) as components['schemas']['GoalPresetsResponse'];
+    if (requestId !== presetsRequestId) return;
     presets = body.presets;
     axes = body.axes;
     engineVersion = body.engineVersion;

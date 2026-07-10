@@ -7510,7 +7510,9 @@ export interface operations {
   };
   getGoalPresets: {
     parameters: {
-      query?: never;
+      query?: {
+        arrType?: 'radarr' | 'sonarr' | 'lidarr';
+      };
       header?: never;
       path?: never;
       cookie?: never;
@@ -7626,7 +7628,7 @@ export interface operations {
       query: {
         databaseId: number;
         profileName: string;
-        arrType: 'radarr' | 'sonarr';
+        arrType: 'radarr' | 'sonarr' | 'lidarr';
       };
       header?: never;
       path?: never;
