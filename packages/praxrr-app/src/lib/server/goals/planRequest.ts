@@ -7,9 +7,12 @@
 
 import { error } from '@sveltejs/kit';
 import { pcdManager, type PCDCache } from '$pcd/index.ts';
-import { computeGoalPlan, resolvePreset, GOAL_RESOLUTION_CEILINGS } from '$shared/goals/index.ts';
+import { computeGoalPlan, resolvePreset, GOAL_RESOLUTION_CEILINGS, GoalLadderMappingError } from '$shared/goals/index.ts';
 import type { GoalArrType, GoalPlan, GoalResolutionCeiling, GoalWeights } from '$shared/goals/index.ts';
+import { qualities } from '$pcd/entities/qualityProfiles/qualities/index.ts';
 import { materializeCfFacts } from './materializeCfFacts.ts';
+import { materializeQualityFacts } from './materializeQualityFacts.ts';
+import { isProfileCompatibleWithSiblingArr } from './siblingCompat.ts';
 
 function isGoalArrType(value: unknown): value is GoalArrType {
   return value === 'radarr' || value === 'sonarr';
@@ -105,12 +108,31 @@ export async function buildGoalPlan(request: GoalRequest): Promise<{ cache: PCDC
 
   const preset = resolvePreset(request.presetId)!;
   const customFormats = await materializeCfFacts(cache);
-  const plan = computeGoalPlan({
-    arrType: request.arrType,
-    weights: request.weights,
-    presetBaseUpgrade: preset.baseUpgrade,
-    customFormats,
-  });
+
+  // Materialize the ladder inputs. `materializeQualityFacts` fails fast (422) on a genuinely
+  // ambiguous mapping — before any write — so preview and apply reject identically (AC4).
+  const currentLadder = (await qualities(cache, request.databaseId, request.profileName)).orderedItems;
+  const qualityFacts = await materializeQualityFacts(cache, request.arrType);
+  const compatibleWithSiblingArr = await isProfileCompatibleWithSiblingArr(cache, request);
+
+  let plan: GoalPlan;
+  try {
+    plan = computeGoalPlan({
+      arrType: request.arrType,
+      weights: request.weights,
+      presetBaseUpgrade: preset.baseUpgrade,
+      customFormats,
+      qualityFacts,
+      currentLadder,
+      compatibleWithSiblingArr,
+    });
+  } catch (err) {
+    // A straddling group is the only ambiguity the pure engine can surface → 422 (no write yet).
+    if (err instanceof GoalLadderMappingError) {
+      throw error(422, err.message);
+    }
+    throw err;
+  }
 
   return { cache, plan };
 }
